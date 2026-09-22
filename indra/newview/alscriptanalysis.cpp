@@ -228,7 +228,6 @@ void ALScriptAnalysis::ask(Request request, callback_t callback)
             {
                 case Kind::Check:
                     result.problems = mWorker->lsl.check(request.text, request.mono);
-                    result.parsed   = mWorker->lsl.parsed();
                     result.outline  = mWorker->lsl.outline(request.text);
                     if (request.semantics)
                     {
@@ -250,6 +249,8 @@ void ALScriptAnalysis::ask(Request request, callback_t callback)
                     result.references = mWorker->lsl.references(request.text, request.line, request.column);
                     break;
             }
+            result.parsed     = mWorker->lsl.parsed();
+            result.understood = mWorker->lsl.understood();
         }
         // The words in the viewer's language, on the main thread, where
         // the strings are.

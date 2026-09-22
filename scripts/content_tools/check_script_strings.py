@@ -298,11 +298,19 @@ def main():
             fail("%s: %s\n    code:  %r\n    xml:   %r" % (rel, key, english, strings[key]))
 
     print("the map's keys against strings.xml")
-    for key, text in [(k, t) for _, k, t in lsl_rows] + [(k, t) for _, k, t in lint_rows + shape_rows] + err_rows:
+    for key, text in [(k, t) for _, k, t in lint_rows + shape_rows] + err_rows:
         if key not in strings:
             fail("%s has no string in strings.xml" % key)
         elif strings[key] != text:
             fail("%s\n    map:   %r\n    xml:   %r" % (key, text, strings[key]))
+    # LSL's rows are Tailslide's words, which the map must match to take
+    # a message apart; the skin says them in plainer English of its own,
+    # with any of the words the map took out and none it did not.
+    for _, key, text in lsl_rows:
+        if key not in strings:
+            fail("%s has no string in strings.xml" % key)
+        elif not set(re.findall(r"\[[1-9]\]", strings[key])) <= set(re.findall(r"\[[1-9]\]", text)):
+            fail("%s says words the map does not take\n    map:   %r\n    xml:   %r" % (key, text, strings[key]))
 
     print("strings.xml against the code")
     map_keys = {k for _, k, _ in lsl_rows} | {k for _, k, _ in lint_rows + shape_rows} | {k for k, _ in err_rows}

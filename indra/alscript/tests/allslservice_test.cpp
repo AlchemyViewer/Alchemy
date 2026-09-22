@@ -430,4 +430,117 @@ namespace tut
         ensure("n: before the 2:" + listed, has(7, 29, "n:"));
         ensure("nothing when not asked", service.inlayHints(script, false).empty());
     }
+
+    template<> template<>
+    void allslservice_object::test<13>()
+    {
+        set_test_name("a script mid-edit is answered about the rest of it: the scope, the call being typed, what every name is");
+        ensure("builtins loaded: " + error, loaded);
+        const std::string head =
+            "integer count = 0;\n"
+            "float half(integer n) { return n / 2.0; }\n"
+            "default\n"
+            "{\n"
+            "    touch_start(integer total)\n"
+            "    {\n"
+            "        string before = \"a\";\n";
+        const std::string tail = "\n    }\n}\n";
+        auto names = [&](const std::string& script, S32 line, S32 column) {
+            std::string out;
+            for (const ALScriptCompletion& c : service.symbols(script, line, column))
+            {
+                out += " " + c.text;
+            }
+            return out + " ";
+        };
+
+        // A call not yet closed, the caret after an argument half typed.
+        std::string script = head + "        llSay(0, be" + tail;
+        ALScriptSignature sig = service.signature(script, 7, 19);
+        ensure("the call is found", sig.found && sig.label.find("llSay(") != std::string::npos);
+        ensure_equals("at its second parameter", sig.active, 1);
+        ensure("the text does not parse", !service.parsed());
+        ensure("but was understood", service.understood());
+        const std::string in_scope = names(script, 7, 17);
+        ensure("the local before, in scope:" + in_scope, in_scope.find(" before ") != std::string::npos);
+        ensure("the parameter:" + in_scope, in_scope.find(" total ") != std::string::npos);
+        ensure("the global:" + in_scope, in_scope.find(" count ") != std::string::npos);
+
+        // The bracket just typed, and a comma just typed.
+        sig = service.signature(head + "        llSay(" + tail, 7, 14);
+        ensure("just opened", sig.found);
+        ensure_equals("at the first parameter", sig.active, 0);
+        sig = service.signature(head + "        llSay(0," + tail, 7, 16);
+        ensure("after the comma", sig.found);
+        ensure_equals("at the second parameter", sig.active, 1);
+        sig = service.signature(head + "        llSay(0, \"hel" + tail, 7, 20);
+        ensure("inside a string not yet closed", sig.found && sig.active == 1);
+        sig = service.signature(head + "        half(" + tail, 7, 13);
+        ensure("the script's own function", sig.found && sig.label == "float half(integer n)");
+
+        // A name alone, and a statement without its semicolon.
+        ensure("a word alone", names(head + "        bef" + tail, 7, 8).find(" before ") != std::string::npos);
+        ensure("no semicolon", names(head + "        llSay(0, before)" + tail, 7, 17).find(" before ") != std::string::npos);
+
+        // What the check's other questions answer of a text that does not
+        // parse: the rest of it, rather than nothing.
+        script = head + "        llSay(0, be" + tail;
+        ensure("the outline", service.outline(script).size() == 4);
+        const std::vector<ALScriptSemanticToken> tokens = service.semanticTokens(script);
+        bool before_named = false;
+        for (const ALScriptSemanticToken& token : tokens)
+        {
+            before_named = before_named || (token.span.line == 6 && token.kind == ALScriptSymbolKind::Variable);
+        }
+        ensure("the names before the break", before_named);
+        ensure("the hints", !service.inlayHints(head + "        llSay(0, \"x\");\n        llOwnerSay(" + tail, true).empty());
+
+        // A function being declared at the top, before the states.
+        script = "integer count = 0;\nfoo(\ndefault\n{\n    state_entry()\n    {\n        llSay(0, (string)count);\n    }\n}\n";
+        const ALScriptHover hover = service.hover(script, 6, 26);
+        ensure("a name below a broken declaration", hover.found && hover.label == "integer count");
+        ensure("its references", service.references(script, 6, 26).references.size() == 2);
+
+        // A block left open at the end.
+        script = head + "        llSay(0, before);\n";
+        ensure("closed at the end", names(script, 7, 17).find(" before ") != std::string::npos);
+
+        // Nothing to mend from.
+        ensure("nonsense is not understood", service.outline("}}} ((( ;;; \"").empty() && !service.understood());
+    }
+
+    template<> template<>
+    void allslservice_object::test<14>()
+    {
+        set_test_name("a syntax error says what is missing where it is missing, or what was unexpected, keyed");
+        ensure("builtins loaded: " + error, loaded);
+        const std::string head = "default\n{\n    state_entry()\n    {\n";
+        auto first_error = [&](const std::string& script) {
+            for (const ALScriptProblem& problem : service.check(script))
+            {
+                if (problem.severity == ALScriptProblem::Severity::Error)
+                {
+                    return problem;
+                }
+            }
+            return ALScriptProblem();
+        };
+        // A call not closed, the block closed on the next line.
+        ALScriptProblem p = first_error(head + "        llSay(0, \"hi\"\n    }\n}\n");
+        ensure_equals("missing the bracket: " + p.message, p.message, std::string("Missing ')'."));
+        ensure("keyed", p.key == "LSLSyntaxMissing" && p.args.size() == 1 && p.args[0] == "')'");
+        ensure("on the string's closing quote, not the next line's brace", p.line == 4 && p.column == 20 && p.endColumn == 21);
+        // A statement not ended.
+        p = first_error(head + "        llSay(0, \"hi\")\n        llOwnerSay(\"x\");\n    }\n}\n");
+        ensure_equals("missing the semicolon: " + p.message, p.message, std::string("Missing ';'."));
+        ensure("after the call", p.line == 4 && p.column == 21);
+        p = first_error(head + "        integer x = 5 // five\n    }\n}\n");
+        ensure_equals("past a comment: " + p.message, p.message, std::string("Missing ';'."));
+        ensure("on the number", p.line == 4 && p.column == 20);
+        // Something that is no statement's next word.
+        p = first_error("integer x = 1;\nfoo(\ndefault\n{\n    state_entry() { }\n}\n");
+        ensure("unexpected, by what it is: " + p.message, p.key == "LSLSyntaxUnexpected" || p.key == "LSLSyntaxUnexpectedWanted");
+        ensure("said as written: " + p.message, p.message.find("'default'") != std::string::npos);
+        ensure("no bison left in it: " + p.message, p.message.find("syntax error") == std::string::npos && p.message.find("STATE_DEFAULT") == std::string::npos);
+    }
 }

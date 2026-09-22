@@ -440,6 +440,401 @@ namespace
         }
         return true;
     }
+
+    // --- a text mended to parse ---------------------------------------------------
+
+    // Which bytes of a text are code, a string's -- its quotes too -- or
+    // a comment's, and what the end of it is inside.
+    enum : U8
+    {
+        COMMENT_BYTE = 0,
+        CODE_BYTE    = 1,
+        STRING_BYTE  = 2
+    };
+    struct Lexed
+    {
+        std::vector<U8> code;
+        bool            inString  = false;
+        bool            inComment = false;
+    };
+
+    Lexed lex(std::string_view text)
+    {
+        Lexed out;
+        out.code.assign(text.size(), 0);
+        enum class In { Code, String, LineComment, BlockComment } in = In::Code;
+        for (size_t i = 0; i < text.size(); ++i)
+        {
+            const char c    = text[i];
+            const char next = i + 1 < text.size() ? text[i + 1] : '\0';
+            switch (in)
+            {
+                case In::Code:
+                    if (c == '"')
+                    {
+                        in          = In::String;
+                        out.code[i] = STRING_BYTE;
+                    }
+                    else if (c == '/' && next == '/')
+                    {
+                        in = In::LineComment;
+                        ++i;
+                    }
+                    else if (c == '/' && next == '*')
+                    {
+                        in = In::BlockComment;
+                        ++i;
+                    }
+                    else
+                    {
+                        out.code[i] = CODE_BYTE;
+                    }
+                    break;
+                case In::String:
+                    out.code[i] = STRING_BYTE;
+                    if (c == '\\')
+                    {
+                        if (i + 1 < text.size())
+                        {
+                            out.code[++i] = STRING_BYTE;
+                        }
+                    }
+                    else if (c == '"')
+                    {
+                        in = In::Code;
+                    }
+                    break;
+                case In::LineComment:
+                    if (c == '\n')
+                    {
+                        in          = In::Code;
+                        out.code[i] = CODE_BYTE;
+                    }
+                    break;
+                case In::BlockComment:
+                    if (c == '*' && next == '/')
+                    {
+                        in = In::Code;
+                        ++i;
+                    }
+                    break;
+            }
+        }
+        out.inString  = in == In::String;
+        out.inComment = in == In::BlockComment;
+        return out;
+    }
+
+    // A zero-based line and byte column as an offset, clamped to the line.
+    size_t offsetOf(std::string_view text, S32 line, S32 column)
+    {
+        size_t at = 0;
+        for (S32 l = 0; l < line; ++l)
+        {
+            const size_t end = text.find('\n', at);
+            if (end == std::string_view::npos)
+            {
+                return text.size();
+            }
+            at = end + 1;
+        }
+        const size_t end = std::min(text.find('\n', at), text.size());
+        return std::min(at + static_cast<size_t>(std::max(0, column)), end);
+    }
+
+    void placeOf(std::string_view text, size_t offset, S32& line, S32& column)
+    {
+        line                = 0;
+        size_t line_start   = 0;
+        for (size_t i = 0; i < offset && i < text.size(); ++i)
+        {
+            if (text[i] == '\n')
+            {
+                ++line;
+                line_start = i + 1;
+            }
+        }
+        column = static_cast<S32>(offset - line_start);
+    }
+
+    // Where the parser first stopped, as an offset, or npos where it did not.
+    size_t stoppedAt(Tailslide::ScopedScriptParser& parser, std::string_view text)
+    {
+        size_t first = std::string_view::npos;
+        for (Tailslide::LogMessage* message : parser.logger.getMessages())
+        {
+            if (message->getError() == Tailslide::E_SYNTAX_ERROR)
+            {
+                const auto* where = message->getLoc();
+                first             = std::min(first, offsetOf(text, zeroBased(where->first_line), zeroBased(where->first_column)));
+            }
+        }
+        return first;
+    }
+
+    bool identifierByte(char c)
+    {
+        return isalnum(static_cast<unsigned char>(c)) || c == '_';
+    }
+
+    // The statement the caret is in, closed where the caret is: a string
+    // it is inside ended, an operand put after an operator or a comma
+    // left hanging, the brackets it opened closed, and the statement
+    // ended -- or its block opened, where the rest of the line opened
+    // one. The rest of the caret's line goes; everything before the caret
+    // and every later line stays where it was.
+    std::string closedAt(std::string_view text, size_t caret)
+    {
+        const std::string_view prefix = text.substr(0, caret);
+        const Lexed            lexed  = lex(prefix);
+        std::string            tail;
+        if (lexed.inComment)
+        {
+            tail += "*/";
+        }
+        std::vector<char> open;
+        char              last = '\0';
+        for (size_t i = 0; i < prefix.size(); ++i)
+        {
+            if (lexed.code[i] != CODE_BYTE)
+            {
+                continue;
+            }
+            const char c = prefix[i];
+            if (c == '(' || c == '[' || c == '{')
+            {
+                open.push_back(c);
+            }
+            else if ((c == ')' || c == ']' || c == '}') && !open.empty())
+            {
+                open.pop_back();
+            }
+            if (!isspace(static_cast<unsigned char>(c)))
+            {
+                last = c;
+            }
+        }
+        if (lexed.inString)
+        {
+            tail += '"';
+            last = '"';
+        }
+        else if (last == '.')
+        {
+            tail += "x";
+        }
+        else if (last != '\0' && strchr(",+-*/%=<>&|^!~", last))
+        {
+            tail += "0";
+        }
+        bool statement = last != '\0' && last != ';' && last != '{' && last != '}';
+        for (auto it = open.rbegin(); it != open.rend() && *it != '{'; ++it)
+        {
+            tail += *it == '(' ? ')' : ']';
+            statement = true;
+        }
+        const size_t     line_end = std::min(text.find('\n', caret), text.size());
+        const std::string_view rest = text.substr(caret, line_end - caret);
+        const Lexed      rest_lexed = lex(rest);
+        S32              braces     = 0;
+        for (size_t i = 0; i < rest.size(); ++i)
+        {
+            if (rest_lexed.code[i] == CODE_BYTE)
+            {
+                braces += rest[i] == '{' ? 1 : rest[i] == '}' ? -1 : 0;
+            }
+        }
+        if (braces > 0)
+        {
+            tail += " " + std::string(static_cast<size_t>(braces), '{');
+        }
+        else
+        {
+            if (statement)
+            {
+                tail += ";";
+            }
+            tail += std::string(static_cast<size_t>(-braces), '}');
+        }
+        return std::string(prefix) + tail + std::string(text.substr(line_end));
+    }
+
+    // One step nearer parsing, where the parser stopped at `at`: the
+    // statement it stopped in blanked back to where it began, the token
+    // it stopped on where there was nothing before it to blank, or the
+    // blocks left open at the end closed. Blanking keeps every line and
+    // column where it was. False where nothing more can be done.
+    bool mendAt(std::string& text, size_t at)
+    {
+        const Lexed lexed = lex(text);
+        size_t      rest  = at;
+        while (rest < text.size() && isspace(static_cast<unsigned char>(text[rest])))
+        {
+            ++rest;
+        }
+        if (rest >= text.size())
+        {
+            // At the end: the blocks still open closed after it.
+            S32 depth = 0;
+            for (size_t i = 0; i < text.size(); ++i)
+            {
+                if (lexed.code[i] == CODE_BYTE)
+                {
+                    depth += text[i] == '{' ? 1 : text[i] == '}' ? -1 : 0;
+                }
+            }
+            if (depth > 0)
+            {
+                text += "\n" + std::string(static_cast<size_t>(depth), '}');
+                return true;
+            }
+        }
+        size_t start = std::min(at, text.size());
+        while (start > 0 && !(lexed.code[start - 1] == CODE_BYTE && (text[start - 1] == ';' || text[start - 1] == '{' || text[start - 1] == '}')))
+        {
+            --start;
+        }
+        bool blanked = false;
+        for (size_t i = start; i < at && i < text.size(); ++i)
+        {
+            if (!isspace(static_cast<unsigned char>(text[i])))
+            {
+                text[i] = ' ';
+                blanked = true;
+            }
+        }
+        if (blanked || rest >= text.size())
+        {
+            return blanked;
+        }
+        // Nothing before it: the token itself.
+        size_t end = rest + 1;
+        if (identifierByte(text[rest]))
+        {
+            while (end < text.size() && identifierByte(text[end]))
+            {
+                ++end;
+            }
+        }
+        for (size_t i = rest; i < end; ++i)
+        {
+            text[i] = ' ';
+        }
+        return true;
+    }
+
+    // --- what the parser says, said plainly ------------------------------------------
+
+    // A token as the parser names it, as a scripter would: a character
+    // or a word as it is written, a kind of token by what it is.
+    std::string tokenWords(std::string_view name)
+    {
+        if (name.size() >= 3 && name.front() == '\'' && name.back() == '\'')
+        {
+            return std::string(name);
+        }
+        static const std::pair<const char*, const char*> NAMES[] = {
+            { "\"end of file\"", "the end of the script" }, { "IDENTIFIER", "a name" }, { "EVENT", "an event's name" },
+            { "INTEGER_CONSTANT", "a number" }, { "FP_CONSTANT", "a number" }, { "STRING_CONSTANT", "a string" },
+            { "STATE_DEFAULT", "'default'" }, { "STATE", "'state'" }, { "JUMP", "'jump'" }, { "RETURN", "'return'" },
+            { "IF", "'if'" }, { "ELSE", "'else'" }, { "FOR", "'for'" }, { "DO", "'do'" }, { "WHILE", "'while'" },
+            { "PRINT", "'print'" }, { "INTEGER", "'integer'" }, { "FLOAT_TYPE", "'float'" }, { "STRING", "'string'" },
+            { "LLKEY", "'key'" }, { "VECTOR", "'vector'" }, { "QUATERNION", "'rotation'" }, { "LIST", "'list'" },
+            { "INC_OP", "'++'" }, { "DEC_OP", "'--'" }, { "ADD_ASSIGN", "'+='" }, { "SUB_ASSIGN", "'-='" },
+            { "MUL_ASSIGN", "'*='" }, { "DIV_ASSIGN", "'/='" }, { "MOD_ASSIGN", "'%='" }, { "EQ", "'=='" },
+            { "NEQ", "'!='" }, { "GEQ", "'>='" }, { "LEQ", "'<='" }, { "BOOLEAN_AND", "'&&'" }, { "BOOLEAN_OR", "'||'" },
+            { "SHIFT_LEFT", "'<<'" }, { "SHIFT_RIGHT", "'>>'" }, { "PERIOD", "'.'" },
+        };
+        for (const auto& [token, words] : NAMES)
+        {
+            if (name == token)
+            {
+                return words;
+            }
+        }
+        return std::string(name);
+    }
+
+    // Bison's "syntax error, unexpected X, expecting Y or Z" said as a
+    // scripter would: a single bracket or semicolon it wanted is missing,
+    // and is marked on the last thing before the place it stopped --
+    // where it is missing, rather than on the next line's brace -- and
+    // anything else is unexpected, with what was wanted where it says.
+    // Keyed, as the map's messages are, for the studio to translate.
+    void plainSyntaxError(std::string_view source, ALScriptProblem& problem)
+    {
+        const std::string& said = problem.message;
+        const std::string  UNEXPECTED("syntax error, unexpected ");
+        if (said.compare(0, UNEXPECTED.size(), UNEXPECTED) != 0)
+        {
+            return;
+        }
+        std::string              found = said.substr(UNEXPECTED.size());
+        std::vector<std::string> wanted;
+        const size_t             expecting = found.find(", expecting ");
+        if (expecting != std::string::npos)
+        {
+            std::string rest = found.substr(expecting + 12);
+            found.resize(expecting);
+            for (size_t at = 0; at != std::string::npos;)
+            {
+                const size_t next = rest.find(" or ", at);
+                wanted.push_back(tokenWords(rest.substr(at, next == std::string::npos ? std::string::npos : next - at)));
+                at = next == std::string::npos ? next : next + 4;
+            }
+        }
+        // The last character before where the parser stopped, past blanks
+        // and comments, and whether nothing but blanks is before the stop
+        // on its line.
+        const Lexed  lexed   = lex(source);
+        const size_t stopped = std::min(offsetOf(source, problem.line, problem.column), source.size());
+        size_t       before  = stopped;
+        while (before > 0 && (lexed.code[before - 1] == COMMENT_BYTE || isspace(static_cast<unsigned char>(source[before - 1]))))
+        {
+            --before;
+        }
+        const size_t line_start = source.rfind('\n', stopped == 0 ? 0 : stopped - 1);
+        const size_t from       = line_start == std::string_view::npos || stopped == 0 ? 0 : line_start + 1;
+        const bool   first      = source.substr(from, stopped - from).find_first_not_of(" \t") == std::string_view::npos;
+        // A value ends there: a name, a number, a closing bracket, a string.
+        const char   last        = before > 0 ? source[before - 1] : '\0';
+        const bool   value_ended = before > 0 && (identifierByte(last) || last == ')' || last == ']' || lexed.code[before - 1] == STRING_BYTE);
+        static const char* const CLOSERS[] = { "';'", "')'", "']'", "'}'", "','", "'('" };
+        std::string              missing;
+        if (wanted.size() == 1 && std::find(std::begin(CLOSERS), std::end(CLOSERS), wanted.front()) != std::end(CLOSERS))
+        {
+            missing = wanted.front();
+        }
+        else if (first && value_ended && (wanted.empty() || std::find(wanted.begin(), wanted.end(), "';'") != wanted.end()))
+        {
+            // The parser met the next line's first word with the statement
+            // before it still open and more than one way to go on, so it
+            // named none: the semicolon it most likely wanted.
+            missing = "';'";
+        }
+        if (!missing.empty())
+        {
+            problem.key     = "LSLSyntaxMissing";
+            problem.args    = { missing };
+            problem.message = ALScriptProblem::fill("Missing [1].", problem.args);
+            if (before > 0)
+            {
+                placeOf(source, before - 1, problem.line, problem.column);
+                problem.endLine   = problem.line;
+                problem.endColumn = problem.column + 1;
+            }
+            return;
+        }
+        std::string list;
+        for (size_t i = 0; i < wanted.size(); ++i)
+        {
+            list += (i == 0 ? "" : i + 1 == wanted.size() ? " or " : ", ") + wanted[i];
+        }
+        problem.key     = wanted.empty() ? "LSLSyntaxUnexpected" : "LSLSyntaxUnexpectedWanted";
+        problem.args    = { tokenWords(found), list };
+        problem.message = ALScriptProblem::fill(wanted.empty() ? "Unexpected [1]." : "Unexpected [1]; expected [2].", problem.args);
+        problem.args.resize(wanted.empty() ? 1 : 2);
+    }
 }
 
 struct ALLSLService::Impl
@@ -484,6 +879,68 @@ struct ALLSLService::Impl
         text.clear();
         script = nullptr;
         parsed = false;
+        mendedParser.reset();
+        mendedFor.clear();
+        mended = nullptr;
+    }
+
+    // A script being typed seldom parses -- a call not yet closed, a
+    // statement not yet ended -- and Tailslide answers nothing of a text
+    // that does not: no scope, no call, no names. So the questions are
+    // asked of a copy mended to parse: the statement at the caret, where
+    // there is one, closed where the caret is; then each statement the
+    // parser stops in blanked, and the blocks left open at the end
+    // closed. Every position before the caret, and every line after its
+    // own, is where it was, so the answers need no translating back.
+    std::unique_ptr<Tailslide::ScopedScriptParser> mendedParser;
+    std::string                                    mendedFor;
+    S32                                            mendedLine   = -1;
+    S32                                            mendedColumn = -1;
+    Tailslide::LSLScript*                          mended       = nullptr;
+    // Whether the last question had a tree to be answered from.
+    bool                                           understood   = false;
+
+    // The tree to answer from: the text's own where it parses, else the
+    // mended copy's, closed at the position given where one is; null
+    // where no mending made it parse.
+    Tailslide::LSLScript* understand(std::string_view source, S32 line = -1, S32 column = -1)
+    {
+        if (Tailslide::LSLScript* own = resolve(source))
+        {
+            understood = true;
+            return own;
+        }
+        if (mendedParser && mendedFor == source && mendedLine == line && mendedColumn == column)
+        {
+            understood = mended != nullptr;
+            return mended;
+        }
+        mendedFor.assign(source);
+        mendedLine   = line;
+        mendedColumn = column;
+        mended       = nullptr;
+        std::string copy = line >= 0 ? closedAt(source, offsetOf(source, line, column)) : std::string(source);
+        // Each try blanks a statement or closes the end; a handful mends
+        // what one pause in typing leaves, and a text broken in more
+        // places than that is left as it is.
+        for (int attempt = 0; attempt < 8; ++attempt)
+        {
+            mendedParser = std::make_unique<Tailslide::ScopedScriptParser>(nullptr);
+            mended       = mendedParser->parseLSLBytes(copy.data(), static_cast<int>(copy.size()));
+            if (mended)
+            {
+                mended->collectSymbols();
+                mended->determineTypes();
+                break;
+            }
+            const size_t at = stoppedAt(*mendedParser, copy);
+            if (at == std::string_view::npos || !mendAt(copy, at))
+            {
+                break;
+            }
+        }
+        understood = mended != nullptr;
+        return mended;
     }
 };
 
@@ -517,6 +974,11 @@ bool ALLSLService::loadBuiltins(const std::string& path, std::string& error)
 bool ALLSLService::parsed() const
 {
     return mImpl->parsed;
+}
+
+bool ALLSLService::understood() const
+{
+    return mImpl->understood;
 }
 
 bool ALLSLService::hasBuiltins() const
@@ -591,7 +1053,11 @@ ALScriptProblems ALLSLService::check(std::string_view source, bool mono)
         // Taken apart by its code, where the message is one the map
         // knows, so that the studio may say it in another language.
         ALMessageMap::Match known;
-        if (ALMessageMap::lsl(static_cast<int>(code), problem.message, known))
+        if (code == Tailslide::E_SYNTAX_ERROR)
+        {
+            plainSyntaxError(source, problem);
+        }
+        else if (ALMessageMap::lsl(static_cast<int>(code), problem.message, known))
         {
             problem.key  = std::move(known.key);
             problem.args = std::move(known.args);
@@ -606,7 +1072,7 @@ ALScriptProblems ALLSLService::check(std::string_view source, bool mono)
 std::vector<ALScriptCompletion> ALLSLService::symbols(std::string_view source, S32 line, S32 column)
 {
     AL_SCRIPT_ENGINE_HELD;
-    Tailslide::LSLScript* script = mImpl->resolve(source);
+    Tailslide::LSLScript* script = mImpl->understand(source, line, column);
     std::vector<ALScriptCompletion> out;
     if (!script)
     {
@@ -651,7 +1117,7 @@ std::vector<ALScriptCompletion> ALLSLService::symbols(std::string_view source, S
 ALScriptHover ALLSLService::hover(std::string_view source, S32 line, S32 column)
 {
     AL_SCRIPT_ENGINE_HELD;
-    Tailslide::LSLScript* script = mImpl->resolve(source);
+    Tailslide::LSLScript* script = mImpl->understand(source);
     ALScriptHover                 answer;
     if (!script)
     {
@@ -689,7 +1155,7 @@ ALScriptHover ALLSLService::hover(std::string_view source, S32 line, S32 column)
 ALScriptSignature ALLSLService::signature(std::string_view source, S32 line, S32 column)
 {
     AL_SCRIPT_ENGINE_HELD;
-    Tailslide::LSLScript* script = mImpl->resolve(source);
+    Tailslide::LSLScript* script = mImpl->understand(source, line, column);
     ALScriptSignature             answer;
     if (!script)
     {
@@ -744,7 +1210,7 @@ ALScriptSignature ALLSLService::signature(std::string_view source, S32 line, S32
 ALScriptReferences ALLSLService::references(std::string_view source, S32 line, S32 column)
 {
     AL_SCRIPT_ENGINE_HELD;
-    Tailslide::LSLScript* script = mImpl->resolve(source);
+    Tailslide::LSLScript* script = mImpl->understand(source);
     ALScriptReferences            answer;
     if (!script)
     {
@@ -780,7 +1246,7 @@ ALScriptReferences ALLSLService::references(std::string_view source, S32 line, S
 std::vector<ALScriptOutlineEntry> ALLSLService::outline(std::string_view source)
 {
     AL_SCRIPT_ENGINE_HELD;
-    Tailslide::LSLScript* script = mImpl->resolve(source);
+    Tailslide::LSLScript* script = mImpl->understand(source);
     std::vector<ALScriptOutlineEntry> out;
     if (!script)
     {
@@ -845,7 +1311,7 @@ std::vector<ALScriptOutlineEntry> ALLSLService::outline(std::string_view source)
 std::vector<ALScriptSemanticToken> ALLSLService::semanticTokens(std::string_view source)
 {
     AL_SCRIPT_ENGINE_HELD;
-    Tailslide::LSLScript* script = mImpl->resolve(source);
+    Tailslide::LSLScript* script = mImpl->understand(source);
     if (!script)
     {
         return {};
@@ -868,7 +1334,7 @@ std::vector<ALScriptInlayHint> ALLSLService::inlayHints(std::string_view source,
     {
         return {};
     }
-    Tailslide::LSLScript* script = mImpl->resolve(source);
+    Tailslide::LSLScript* script = mImpl->understand(source);
     if (!script)
     {
         return {};

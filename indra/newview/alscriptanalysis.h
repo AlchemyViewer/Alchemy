@@ -121,10 +121,13 @@ public:
         ALScriptReferences                references;
         // Why the analyzer ran without its definitions, or nothing.
         std::string                     definitionsError;
-        // Whether the text parsed at all: a check of a script mid-edit
-        // answers nothing about anything, and what the editor shows
-        // should be what it last knew rather than nothing.
-        bool                            parsed = true;
+        // Whether the text parsed at all, and whether there was a tree to
+        // answer from even so: an LSL script mid-edit is answered from a
+        // copy mended to parse, and one past mending answers nothing, where
+        // what the editor shows should be what it last knew rather than
+        // nothing.
+        bool                            parsed     = true;
+        bool                            understood = true;
     };
     typedef std::function<void(const Result&)> callback_t;
 

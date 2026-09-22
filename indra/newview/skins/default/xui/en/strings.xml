@@ -529,58 +529,61 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	     shape. Keep the [1], [2]... marks; a mark may stand twice. The
 	     English here is the engines' own, held to almessagemap.cpp and
 	     to the engines by scripts/content_tools/check_script_strings.py. -->
-	<string name="LSLDuplicateDeclaration">Duplicate declaration of `[1]'; previously declared at ([2], [3]).</string>
+	<string name="LSLDuplicateDeclaration">'[1]' is already declared, on line [2].</string>
 	<string name="LSLInvalidOperator">Invalid operator: [1] [2] [3].</string>
-	<string name="LSLWrongType">Attempting to use `[1]' as a [2], but it is a [3].</string>
-	<string name="LSLUndeclared">`[1]' is undeclared.</string>
-	<string name="LSLUndeclaredWithSuggestion">`[1]' is undeclared; did you mean [2]?</string>
-	<string name="LSLInvalidMember">Invalid member: `[1].[2]'.</string>
-	<string name="LSLMemberNotVariable">Trying to access `[1].[2]', but `[1]' is a [3]</string>
-	<string name="LSLMemberWrongType">Attempting to access `[1].[2]', but `[1]' is not a vector or rotation.</string>
-	<string name="LSLArgumentWrongType">Passing [1] as argument [2] of `[3]' which is declared as `[4] [5]'.</string>
-	<string name="LSLTooManyArguments">Too many arguments to function `[1]'.</string>
-	<string name="LSLTooFewArguments">Too few arguments to function `[1]'.</string>
-	<string name="LSLChangeStateInFunction">Functions cannot change state.</string>
-	<string name="LSLWrongTypeInAssignment">`[1] [2]' assigned a [3] value.</string>
-	<string name="LSLWrongTypeInMemberAssignment">[1] member assigned [2] value (must be float or integer).</string>
-	<string name="LSLReturnValueInEventHandler">Event handlers cannot return a value.</string>
+	<string name="LSLWrongType">'[1]' is a [3], and cannot be used as a [2].</string>
+	<string name="LSLUndeclared">'[1]' is not declared.</string>
+	<string name="LSLUndeclaredWithSuggestion">'[1]' is not declared; did you mean '[2]'?</string>
+	<string name="LSLInvalidMember">'[2]' is not a member of '[1]'.</string>
+	<string name="LSLMemberNotVariable">'[1].[2]' cannot be read: '[1]' is a [3].</string>
+	<string name="LSLMemberWrongType">'[1].[2]' cannot be read: '[1]' is not a vector or a rotation.</string>
+	<string name="LSLArgumentWrongType">Argument [2] of '[3]' is a [1], but the parameter is '[4] [5]'.</string>
+	<string name="LSLTooManyArguments">Too many arguments to '[1]'.</string>
+	<string name="LSLTooFewArguments">Too few arguments to '[1]'.</string>
+	<string name="LSLChangeStateInFunction">A function cannot change state.</string>
+	<string name="LSLWrongTypeInAssignment">'[1] [2]' cannot be given a [3] value.</string>
+	<string name="LSLWrongTypeInMemberAssignment">A [1] member cannot be given a [2] value; it takes a float or an integer.</string>
+	<string name="LSLReturnValueInEventHandler">An event handler cannot return a value.</string>
 	<string name="LSLBadReturnType">Returning a [1] value from a [2] function.</string>
-	<string name="LSLNotAllPathsReturn">Not all code paths return a value.</string>
-	<string name="LSLGlobalInitializerNotConstant">Global initializer must be constant.</string>
-	<string name="LSLNoEventHandlers">State must have at least one event handler.</string>
-	<string name="LSLParserStackDepth">Parser stack depth exceeded; SL will throw a syntax error here.</string>
-	<string name="LSLBuiltinLvalue">`[1]' is a constant and cannot be used as an lvalue.</string>
-	<string name="LSLShadowConstant">`[1]' is a constant and cannot be used in a variable declaration.</string>
-	<string name="LSLArgumentWrongTypeEvent">Declaring `[1]' as parameter [2] of `[3]' which should be `[4] [5]'.</string>
-	<string name="LSLTooManyArgumentsEvent">Too many parameters for event `[1]'.</string>
-	<string name="LSLTooFewArgumentsEvent">Too few parameters for event `[1]'.</string>
-	<string name="LSLInvalidEvent">`[1]' is not a valid event name.</string>
-	<string name="LSLEventAsIdentifier">`[1]' is an event name, and cannot be used as an identifier.</string>
-	<string name="LSLDeclarationInvalidHere">`[1]' may not be declared here, create a new scope with { }.</string>
-	<string name="LSLMultipleEventHandlers">Multiple handlers for event `[1]'</string>
-	<string name="LSLListInList">Lists may not contain other lists</string>
-	<string name="LSLIllegalCast">May not cast [1] to [2]</string>
-	<string name="LSLNullInList">Lists may not contain nulls</string>
-	<string name="LSLStackHeapCollision">Stack-heap collision</string>
-	<string name="LSLVoidInCondition">Void expression used as condition</string>
-	<string name="LSLShadowDeclaration">Declaration of `[1]' in this scope shadows previous declaration at ([2], [3])</string>
-	<string name="LSLAssignmentInComparison">Suggest parentheses around assignment used as truth value.</string>
-	<string name="LSLChangeToCurrentState">Changing state to current state acts the same as return, use return instead.</string>
-	<string name="LSLChangeStateHackCorrupt">Changing state in a list or string function will corrupt the stack</string>
-	<string name="LSLChangeStateHack">Using an if statement to change state in a function is a hack and may have unintended side-effects.</string>
-	<string name="LSLEmptyIf">Empty if statement.</string>
-	<string name="LSLDeclaredButNotUsed">[1] `[2]' declared but never used.</string>
-	<string name="LSLUnusedEventParameter">Unused event parameter `[1]'.</string>
-	<string name="LSLListCompare">Using == on lists only compares lengths.</string>
-	<string name="LSLConditionAlwaysTrue">Condition is always true.</string>
-	<string name="LSLConditionAlwaysFalse">Condition is always false.</string>
-	<string name="LSLEmptyLoop">Empty loop body.</string>
-	<string name="LSLIntFloatMulAssign">`i_val *= f_val' can have unpredictable runtime behavior, prefer `i_val = (integer)(i_val * f_val)'</string>
-	<string name="LSLJumpToWrongLabel">`jump [1];' may jump to the wrong label due to label name clashes within function</string>
-	<string name="LSLDuplicateLabelName">label `@[1]' is declared multiple times in the same function, which may cause undesired behavior</string>
-	<string name="LSLEqAsStatement">== comparison used as a statement</string>
-	<string name="LSLDeprecated">`[1]' is deprecated.</string>
-	<string name="LSLDeprecatedWithReplacement">`[1]' is deprecated, use [2] instead.</string>
+	<string name="LSLNotAllPathsReturn">Not every way through the function returns a value.</string>
+	<string name="LSLGlobalInitializerNotConstant">A global's first value must be a constant.</string>
+	<string name="LSLNoEventHandlers">A state must handle at least one event.</string>
+	<string name="LSLParserStackDepth">Nested too deeply: Second Life's compiler will give a syntax error here.</string>
+	<string name="LSLBuiltinLvalue">'[1]' is a constant and cannot be assigned to.</string>
+	<string name="LSLShadowConstant">'[1]' is a constant and cannot be declared as a variable.</string>
+	<string name="LSLArgumentWrongTypeEvent">Parameter [2] of '[3]' is declared as '[1]'; it should be '[4] [5]'.</string>
+	<string name="LSLTooManyArgumentsEvent">Too many parameters for the event '[1]'.</string>
+	<string name="LSLTooFewArgumentsEvent">Too few parameters for the event '[1]'.</string>
+	<string name="LSLInvalidEvent">'[1]' is not an event.</string>
+	<string name="LSLEventAsIdentifier">'[1]' is an event's name, and cannot be used as a name here.</string>
+	<string name="LSLDeclarationInvalidHere">'[1]' cannot be declared here; put it in a block of its own, between { and }.</string>
+	<string name="LSLMultipleEventHandlers">The event '[1]' is handled more than once in this state.</string>
+	<string name="LSLListInList">A list cannot hold another list.</string>
+	<string name="LSLIllegalCast">A [1] cannot be cast to a [2].</string>
+	<string name="LSLNullInList">A list cannot hold something with no value, such as a call that returns nothing.</string>
+	<string name="LSLStackHeapCollision">Stack-heap collision: this needs more memory than a script has.</string>
+	<string name="LSLVoidInCondition">A call that returns nothing cannot be a condition.</string>
+	<string name="LSLShadowDeclaration">'[1]' hides the '[1]' declared on line [2].</string>
+	<string name="LSLAssignmentInComparison">An assignment used as a condition: put it in parentheses if that is meant, or compare with ==.</string>
+	<string name="LSLChangeToCurrentState">Changing to the state the script is already in does what return does; use return instead.</string>
+	<string name="LSLChangeStateHackCorrupt">Changing state in a function that returns a list or a string corrupts the stack.</string>
+	<string name="LSLChangeStateHack">Changing state from a function inside an if statement is a hack, and may have unintended side effects.</string>
+	<string name="LSLEmptyIf">The if statement is empty.</string>
+	<string name="LSLDeclaredButNotUsed">[1] '[2]' is declared but never used.</string>
+	<string name="LSLUnusedEventParameter">The event's parameter '[1]' is never used.</string>
+	<string name="LSLListCompare">== on two lists compares only their lengths.</string>
+	<string name="LSLConditionAlwaysTrue">The condition is always true.</string>
+	<string name="LSLConditionAlwaysFalse">The condition is always false.</string>
+	<string name="LSLEmptyLoop">The loop's body is empty.</string>
+	<string name="LSLIntFloatMulAssign">'integer *= float' can behave unpredictably as it runs; prefer 'i = (integer)(i * f)'.</string>
+	<string name="LSLJumpToWrongLabel">'jump [1];' may go to the wrong label: another label in this function has the same name.</string>
+	<string name="LSLDuplicateLabelName">The label '@[1]' is declared more than once in this function, which may cause undesired behavior.</string>
+	<string name="LSLEqAsStatement">An == comparison used as a statement: its answer is thrown away.</string>
+	<string name="LSLDeprecated">'[1]' is deprecated.</string>
+	<string name="LSLDeprecatedWithReplacement">'[1]' is deprecated; use '[2]' instead.</string>
+	<string name="LSLSyntaxMissing">Missing [1].</string>
+	<string name="LSLSyntaxUnexpected">Unexpected [1].</string>
+	<string name="LSLSyntaxUnexpectedWanted">Unexpected [1]; expected [2].</string>
 	<string name="LuauLintUnknownGlobalAssign">Unknown global '[1]'; consider assigning to it first</string>
 	<string name="LuauLintDeprecatedGlobal">Global '[1]' is deprecated, use '[2]' instead</string>
 	<string name="LuauLintDeprecatedGlobalPlain">Global '[1]' is deprecated</string>

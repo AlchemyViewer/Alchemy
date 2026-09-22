@@ -115,6 +115,7 @@
     <floater.string name="InspectDeclaredTip">Go to the declaration</floater.string>
     <floater.string name="InspectProblem">Problem: [MESSAGE]</floater.string>
     <floater.string name="NothingKnown">Nothing is known about [NAME] here.</floater.string>
+    <floater.string name="NothingKnownBroken">Nothing can be found out about [NAME] until the syntax errors in Problems are fixed.</floater.string>
     <floater.string name="NoDefinition">[NAME] is not defined in this script.</floater.string>
     <floater.string name="ReferencesFoundA">1 place where [NAME] stands.</floater.string>
     <floater.string name="ReferencesFoundB">[COUNT] places where [NAME] stands.</floater.string>

@@ -3550,10 +3550,13 @@ void ALFloaterScriptStudio::analysed(const ALScriptAnalysis::Result& result)
     doc.analysis         = result.problems;
     doc.analysisVersion  = result.version;
     doc.definitionsError = result.definitionsError;
-    // A script mid-edit does not parse, and what it declares is then
-    // not nothing but what it last was: the outline and the breadcrumb
-    // keep what they knew until it parses again.
-    if (result.parsed || !result.outline.empty())
+    // A script mid-edit is answered from a copy mended to parse; one past
+    // mending answers nothing, and what it declares, what its names are
+    // and what goes beside them are then not nothing but what they last
+    // were: the outline, the breadcrumb, the colours and the hints keep
+    // what they knew -- slid along by the edits since -- until it is
+    // understood again.
+    if (result.understood)
     {
         doc.outline = result.outline;
     }
@@ -3703,7 +3706,10 @@ void ALFloaterScriptStudio::analysed(const ALScriptAnalysis::Result& result)
         }
         semantics.push_back(std::move(one));
     }
-    doc.editor->setSemanticTokens(std::move(semantics));
+    if (result.understood)
+    {
+        doc.editor->setSemanticTokens(std::move(semantics));
+    }
     std::vector<ALCodeEditor::InlayHint> hints;
     hints.reserve(result.hints.size());
     for (const ALScriptInlayHint& hint : result.hints)
@@ -3724,7 +3730,10 @@ void ALFloaterScriptStudio::analysed(const ALScriptAnalysis::Result& result)
         one.before = hint.kind == ALScriptInlayHint::Kind::Parameter;
         hints.push_back(std::move(one));
     }
-    doc.editor->setInlayHints(std::move(hints));
+    if (result.understood)
+    {
+        doc.editor->setInlayHints(std::move(hints));
+    }
     if (mapped)
     {
         // Back to the source: a problem in an include keeps its file, and
@@ -3874,7 +3883,10 @@ void ALFloaterScriptStudio::refreshProblems(Doc& doc)
         const std::string origin = problem.source == ALScriptProblem::Source::Parser  ? getString("OriginParser")
                                    : problem.source == ALScriptProblem::Source::Types ? getString("OriginTypes")
                                                                                       : getString("OriginLint");
-        const std::string message = problem.code.empty() ? problem.message : problem.message + " [" + problem.code + "]";
+        // A Luau lint's name says what to look up or turn off; an LSL
+        // error's number says nothing to whoever reads it.
+        const bool        named   = !problem.code.empty() && problem.code.find_first_not_of("0123456789") != std::string::npos;
+        const std::string message = named ? problem.message + " [" + problem.code + "]" : problem.message;
         add(problem.line, problem.column, true, problem.endLine, problem.endColumn, markOf(level), level, origin, message, problem.file);
     }
     for (const Doc::RuntimeProblem& problem : doc.runtime)
@@ -4074,7 +4086,9 @@ void ALFloaterScriptStudio::symbolAnswered(Doc& doc, const ALScriptAnalysis::Res
     args["[NAME]"] = refs.found ? refs.name : doc.editor->document().text(doc.editor->identifierAt(doc.symbolAt));
     if (!refs.found)
     {
-        setStatus(getString("NothingKnown", args));
+        // Nothing known because nothing could be read, which the syntax
+        // errors in the problems explain, or nothing known of this name.
+        setStatus(getString(result.understood ? "NothingKnown" : "NothingKnownBroken", args), !result.understood);
         return;
     }
     // Back to the source: the declaration and each place in this script

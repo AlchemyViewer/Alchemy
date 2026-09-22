@@ -70,6 +70,12 @@ public:
     // caller "nothing here" from "the script is broken": a query
     // answers nothing either way.
     bool parsed() const;
+    // Whether the last question had a tree to be answered from: the
+    // text's own, or, where it does not parse, a copy mended to -- the
+    // statement at the position closed, each the parser stops in blanked
+    // -- with every place kept where it was. A script mid-edit is
+    // answered about the rest of it rather than not at all.
+    bool understood() const;
 
     // The script's own symbols in scope at a position: its globals,
     // functions, states, and the parameters and locals of what encloses
