@@ -52,8 +52,10 @@ public:
     // step before rather than adding one, through `join(last, step)`,
     // which folds what the new step covers that the old did not. The next
     // label given names the step, either way.
+    // True where the oldest step was forgotten to make room: whoever
+    // counts steps from the bottom -- a saved mark -- counts one fewer.
     template <typename Join>
-    void note(Step step, std::string_view key, F64 now, F64 window, Join&& join)
+    bool note(Step step, std::string_view key, F64 now, F64 window, Join&& join)
     {
         const bool same_run = !key.empty() && key == mLastKey && now - mLastTime < window && !mUndo.empty();
         if (same_run)
@@ -71,7 +73,9 @@ public:
         if (mUndo.size() > mDepth)
         {
             mUndo.erase(mUndo.begin());
+            return true;
         }
+        return false;
     }
 
     // What the last change was called, said once: the first label after a

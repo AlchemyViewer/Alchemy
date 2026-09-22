@@ -468,9 +468,10 @@ void ALTextLayout::layoutLine(S32 index, Line& out)
         piece = at + 1;
     }
     out.width = x * inv_x;
-    if (mContentWidth >= 0.f && x > mContentWidth)
+    // The widest line, kept up in the UI's pixels as the width is.
+    if (mContentWidth >= 0.f && out.width > mContentWidth)
     {
-        mContentWidth = x;
+        mContentWidth = out.width;
     }
 
     // Rows. One, unless the line is wider than the wrap and has somewhere
@@ -547,6 +548,9 @@ void ALTextLayout::layoutLine(S32 index, Line& out)
     utf8str_line_break_opportunities(text, mBreaks);
     const F32 wrap       = static_cast<F32>(mWrapWidth);
     size_t    row_begin  = 0;
+    // The break opportunities are in order and the rows go forward, so
+    // the ones a row has passed are not looked at again.
+    size_t    break_from = 0;
     while (row_begin < glyph_count)
     {
         // The first glyph whose right edge is past the wrap, the row's
@@ -576,17 +580,18 @@ void ALTextLayout::layoutLine(S32 index, Line& out)
         const S32 first_cluster = out.glyphs[row_begin].cluster;
         const S32 over_cluster  = out.glyphs[over].cluster;
         S32       break_at      = -1;
-        for (size_t opportunity : mBreaks)
+        while (break_from < mBreaks.size() && static_cast<S32>(mBreaks[break_from]) <= first_cluster)
         {
-            const S32 at = static_cast<S32>(opportunity);
-            if (at > first_cluster && at <= over_cluster)
-            {
-                break_at = at;
-            }
-            else if (at > over_cluster)
+            ++break_from;
+        }
+        for (size_t b = break_from; b < mBreaks.size(); ++b)
+        {
+            const S32 at = static_cast<S32>(mBreaks[b]);
+            if (at > over_cluster)
             {
                 break;
             }
+            break_at = at;
         }
         size_t break_glyph;
         if (break_at >= 0)

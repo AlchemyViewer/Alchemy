@@ -182,4 +182,41 @@ namespace tut
         undo.record(ALTextDocument::Edit(), ALTextPos(), ALTextPos(), now);
         ensure("an empty edit is not a step", !undo.canUndo());
     }
+
+    template<> template<>
+    void altextundo_object::test<8>()
+    {
+        set_test_name("the saved mark goes down with the oldest step forgotten, and away once the saved text is out of reach");
+        // Five steps, saved, then more than the stack keeps: the steps
+        // that led to the saved text are gone, so stepping back can never
+        // reach it, and the journal must not say it has.
+        ALTextPos at = ALTextPos(0, 0);
+        for (S32 i = 0; i < 5; ++i)
+        {
+            at = type(at, "a", 2.0);
+        }
+        undo.markSaved();
+        ensure("saved", undo.isPristine());
+        for (S32 i = 0; i < 100; ++i)
+        {
+            at = type(at, "b", 2.0);
+        }
+        ensure("changed since", !undo.isPristine());
+        for (S32 i = 0; i < 95; ++i)
+        {
+            undo.undo();
+        }
+        ensure("five steps in force again, but not the saved five", !undo.isPristine());
+        // Saved again with a full stack: another step drops one, and the
+        // mark with it keeps counting from the bottom.
+        for (S32 i = 0; i < 95; ++i)
+        {
+            undo.redo();
+        }
+        undo.markSaved();
+        at = type(at, "c", 2.0);
+        ensure("changed", !undo.isPristine());
+        undo.undo();
+        ensure("back to the saved text, the mark having moved down", undo.isPristine());
+    }
 }

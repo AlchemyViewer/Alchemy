@@ -121,8 +121,14 @@ void ALTextUndo::record(const ALTextDocument::Edit& edit, const ALTextPos& befor
         }
     }
     // A group is one step however long it stays open; a run is one step
-    // while its changes come within the window.
-    mSteps.note(std::move(step), key, now, mGroupDepth > 0 ? 1e9 : mWindow, join);
+    // while its changes come within the window. The oldest step forgotten
+    // past the depth takes the saved mark down with it -- or away, where
+    // the saved text was what that step led from, since no stepping
+    // back reaches it any more.
+    if (mSteps.note(std::move(step), key, now, mGroupDepth > 0 ? 1e9 : mWindow, join) && mSavedInForce != NOWHERE)
+    {
+        mSavedInForce = mSavedInForce == 0 ? NOWHERE : mSavedInForce - 1;
+    }
 }
 
 void ALTextUndo::beginGroup()
