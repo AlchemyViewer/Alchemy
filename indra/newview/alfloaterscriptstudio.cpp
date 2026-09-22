@@ -101,6 +101,10 @@ namespace
 {
     // How long after the last keystroke the analyzers are asked.
     const F64 ANALYSIS_DELAY = 0.35;
+    // What makes an include's functions and globals a script to the
+    // parser: a state after them. Put after the text, so that every place
+    // in it is where it was; what is said of it is dropped.
+    const char FRAGMENT_STATE[] = "\ndefault{state_entry(){}}\n";
     // How often the explorer looks at what is selected in world.
     const F64 EXPLORER_POLL = 1.0;
     // How many places a find across scripts lists; the rest are counted
@@ -967,13 +971,8 @@ void ALFloaterScriptStudio::openScript(const ALScriptRef& ref, const std::string
         fillTabs();
         refreshToolbar();
         scheduleAnalysis(*raw);
-        // A run-time error was about the text as it was.
-        if (!raw->runtime.empty())
-        {
-            raw->runtime.clear();
-            refreshProblems(*raw);
-        }
     });
+    doc->placedEdits = doc->editor->document().onChanged([this, raw](const ALTextDocument::Edit& edit) { slideProblems(*raw, edit); });
 
     mDocs.push_back(std::move(doc));
     reindexDocs();
@@ -2570,6 +2569,10 @@ void ALFloaterScriptStudio::askAnalyzer(Doc& doc, ALScriptAnalysis::Kind kind, c
             request.column = loc.column;
         }
     }
+    if (lslFragment(doc))
+    {
+        request.text += FRAGMENT_STATE;
+    }
     const LLHandle<LLFloater> handle = getHandle();
     ALScriptAnalysis::instance().ask(std::move(request), [handle](const ALScriptAnalysis::Result& result) {
         if (ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get()))
@@ -3509,7 +3512,31 @@ void ALFloaterScriptStudio::compiled(const ALScriptWorkspace::CompileResult& res
         }
         return;
     }
-    doc.problems = result.diagnostics;
+    doc.problems.clear();
+    for (const ALScriptWorkspace::Diagnostic& said : result.diagnostics)
+    {
+        Doc::Compiled one;
+        one.line      = said.line;
+        one.column    = said.column;
+        one.hasColumn = said.hasColumn;
+        one.level     = said.level;
+        one.message   = said.message;
+        if (doc.uploaded.valid && !doc.uploaded.disabled)
+        {
+            // The compiler read the expanded text.
+            const ALSourceMap::Loc loc = doc.uploaded.map.toSource(said.line, said.column);
+            if (loc.found())
+            {
+                one.line   = loc.line;
+                one.column = loc.column;
+                if (loc.file > 0)
+                {
+                    one.file = doc.uploaded.map.files()[loc.file].path;
+                }
+            }
+        }
+        doc.problems.push_back(std::move(one));
+    }
     if (result.success)
     {
         // A new script runs from here; what the old one said is past.
@@ -3560,12 +3587,43 @@ void ALFloaterScriptStudio::compiled(const ALScriptWorkspace::CompileResult& res
 
 // --- the analyzers -------------------------------------------------------------
 
+bool ALFloaterScriptStudio::lslFragment(const Doc& doc) const
+{
+    if (doc.file.empty() || doc.language.lua || doc.notecard)
+    {
+        return false;
+    }
+    // A default state, by the grammar's tokens: `default` then `{`, past
+    // blanks and comments, the brace on the same line or a later one.
+    ALCodeEditor&   editor  = *doc.editor;
+    bool            waiting = false;
+    const S32       lines   = editor.document().lineCount();
+    for (S32 line = 0; line < lines; ++line)
+    {
+        const std::string& text = editor.document().line(line);
+        for (const ALSyntaxToken& token : editor.highlighter().tokens(line))
+        {
+            const std::string_view word = std::string_view(text).substr(token.begin, token.end - token.begin);
+            if (token.kind == ALSyntaxKind::Comment || token.kind == ALSyntaxKind::DocComment || word.find_first_not_of(" \t") == std::string_view::npos)
+            {
+                continue;
+            }
+            if (waiting && word.front() == '{')
+            {
+                return false;
+            }
+            waiting = token.kind == ALSyntaxKind::Control && word == "default";
+        }
+    }
+    return true;
+}
+
 void ALFloaterScriptStudio::scheduleAnalysis(Doc& doc, bool now)
 {
-    // An LSL file on disk is a fragment -- functions and globals for an
-    // include -- which is no script to the parser; a Lua one is a module,
-    // which is.
-    if (!doc.loaded || doc.notecard || (!doc.file.empty() && !doc.language.lua))
+    // A file on disk is checked as what it is: a Lua module, or an LSL
+    // script, or an LSL include, which is checked with a state put after
+    // it (lslFragment).
+    if (!doc.loaded || doc.notecard)
     {
         return;
     }
@@ -3589,6 +3647,17 @@ void ALFloaterScriptStudio::requestAnalysis(Doc& doc)
 {
     doc.requestedVersion = doc.editor->document().version();
     askAnalyzer(doc, ALScriptAnalysis::Kind::Check, ALTextPos());
+}
+
+namespace
+{
+    // A warning that something declared is never used: LSL's, by its
+    // number, and Luau's lints, by their names.
+    bool unusedWarning(const ALScriptProblem& problem)
+    {
+        return problem.severity == ALScriptProblem::Severity::Warning &&
+               (problem.code == "20009" || problem.code == "LocalUnused" || problem.code == "FunctionUnused" || problem.code == "ImportUnused");
+    }
 }
 
 void ALFloaterScriptStudio::analysed(const ALScriptAnalysis::Result& result)
@@ -3616,6 +3685,24 @@ void ALFloaterScriptStudio::analysed(const ALScriptAnalysis::Result& result)
     if (result.understood)
     {
         doc.outline = result.outline;
+    }
+    // An include checked with a state after it: what is said of the
+    // state, and that what it declares goes unused, is not the include's.
+    const bool fragment = lslFragment(doc);
+    if (fragment)
+    {
+        const bool mapped_now = preprocessed(doc) && doc.expanded.valid && doc.expanded.version == result.version;
+        const S32  own_lines  = mapped_now ? static_cast<S32>(std::count(doc.expanded.text.begin(), doc.expanded.text.end(), '\n')) + 1
+                                           : doc.editor->document().lineCount();
+        doc.analysis.erase(std::remove_if(doc.analysis.begin(), doc.analysis.end(),
+                                          [own_lines](const ALScriptProblem& problem) { return problem.line >= own_lines || unusedWarning(problem); }),
+                           doc.analysis.end());
+        if (result.understood)
+        {
+            doc.outline.erase(std::remove_if(doc.outline.begin(), doc.outline.end(),
+                                             [own_lines](const ALScriptOutlineEntry& entry) { return entry.nameSpan.line >= own_lines; }),
+                              doc.outline.end());
+        }
     }
     if (!doc.language.lua)
     {
@@ -3794,8 +3881,21 @@ void ALFloaterScriptStudio::analysed(const ALScriptAnalysis::Result& result)
     if (mapped)
     {
         // Back to the source: a problem in an include keeps its file, and
-        // what an include declares is the include's to outline.
+        // what an include declares is the include's to outline. What an
+        // include declares and this script does not use is no problem of
+        // this script's: a library is meant to hold more than any one
+        // script calls, and every script including it would be told so.
         const ALSourceMap& map = doc.expanded.map;
+        doc.analysis.erase(std::remove_if(doc.analysis.begin(), doc.analysis.end(),
+                                          [&map](const ALScriptProblem& problem) {
+                                              if (!unusedWarning(problem))
+                                              {
+                                                  return false;
+                                              }
+                                              const ALSourceMap::Loc loc = map.toSource(problem.line, problem.column);
+                                              return loc.found() && loc.file > 0;
+                                          }),
+                           doc.analysis.end());
         for (ALScriptProblem& problem : doc.analysis)
         {
             ALScriptSpan span;
@@ -3834,6 +3934,40 @@ void ALFloaterScriptStudio::analysed(const ALScriptAnalysis::Result& result)
         doc.saveAfterCheck = false;
         save(doc);
     }
+}
+
+void ALFloaterScriptStudio::slideProblems(Doc& doc, const ALTextDocument::Edit& edit)
+{
+    if (doc.problems.empty() && doc.runtime.empty())
+    {
+        return;
+    }
+    const ALTextRange range = edit.range.normalised();
+    const S32         first = range.begin.line;
+    const S32         last  = range.end.line;
+    const S32         delta = static_cast<S32>(std::count(edit.inserted.begin(), edit.inserted.end(), '\n')) - (last - first);
+    auto              slide = [&](auto& list) {
+        list.erase(std::remove_if(list.begin(), list.end(),
+                                  [&](auto& problem) {
+                                      if (!problem.file.empty() || problem.line < first)
+                                      {
+                                          return false;
+                                      }
+                                      if (problem.line <= last)
+                                      {
+                                          return true;
+                                      }
+                                      problem.line += delta;
+                                      return false;
+                                  }),
+                   list.end());
+    };
+    // The editor slides its own marks and squiggles as the edit lands,
+    // and drops those on the lines it touched; the list is made again
+    // from these at the check the edit has scheduled, when what the
+    // analyzer said is about the same text.
+    slide(doc.problems);
+    slide(doc.runtime);
 }
 
 void ALFloaterScriptStudio::refreshProblems(Doc& doc)
@@ -3887,27 +4021,28 @@ void ALFloaterScriptStudio::refreshProblems(Doc& doc)
         decorations.push_back(std::move(decoration));
     };
 
-    for (const ALScriptWorkspace::Diagnostic& problem : doc.problems)
-    {
-        S32         line   = problem.line;
-        S32         column = problem.column;
-        std::string file;
-        if (doc.uploaded.valid && !doc.uploaded.disabled)
+    // The analyzer's word on a line as it is now over the compiler's on
+    // the text last saved: a syntax error both found is said once.
+    const bool analysis_current = doc.analysisVersion == doc.editor->document().version();
+    auto       analysed_error_on = [&](S32 line) {
+        for (const ALScriptProblem& problem : doc.analysis)
         {
-            // The compiler read the expanded text.
-            const ALSourceMap::Loc loc = doc.uploaded.map.toSource(line, column);
-            if (loc.found())
+            if (problem.severity == ALScriptProblem::Severity::Error && problem.file.empty() && problem.line == line)
             {
-                line   = loc.line;
-                column = loc.column;
-                if (loc.file > 0)
-                {
-                    file = doc.uploaded.map.files()[loc.file].path;
-                }
+                return true;
             }
         }
+        return false;
+    };
+    for (const Doc::Compiled& problem : doc.problems)
+    {
         const Doc::Level level = levelOf(problem.level);
-        add(line, column, problem.hasColumn, line, column, markOf(level), level, getString("OriginCompiler"), problem.message, file);
+        if (analysis_current && level == Doc::Level::Error && problem.file.empty() && analysed_error_on(problem.line))
+        {
+            continue;
+        }
+        add(problem.line, problem.column, problem.hasColumn, problem.line, problem.column, markOf(level), level, getString("OriginCompiler"), problem.message,
+            problem.file);
     }
     // The preprocessor's own word on the text as it stands, and the
     // optimizer's notes from the last run ahead of a save.
@@ -3950,7 +4085,8 @@ void ALFloaterScriptStudio::refreshProblems(Doc& doc)
     {
         const S32 line   = llmax(0, problem.line);
         const S32 column = llmax(0, problem.column);
-        add(line, column, problem.column >= 0, line, column, ALCodeEditor::Mark::Runtime, Doc::Level::Error, getString("OriginRuntime"), problem.message);
+        add(line, column, problem.column >= 0, line, column, ALCodeEditor::Mark::Runtime, Doc::Level::Error, getString("OriginRuntime"), problem.message,
+            problem.file);
     }
     if (!doc.definitionsError.empty())
     {
@@ -3993,6 +4129,17 @@ ALFindings<ALFloaterScriptStudio::Doc::Shown, ALFloaterScriptStudio::ProblemTrai
 
 void ALFloaterScriptStudio::fillProblems(const Doc* doc)
 {
+    // The row chosen and how far the list was scrolled are kept through a
+    // refill of the same script's: a check comes at every pause in
+    // typing, and whoever is working down the list keeps their place.
+    LLSD      chosen;
+    const S32 scrolled = mProblems->getScrollPos();
+    if (LLScrollListItem* item = mProblems->getFirstSelected())
+    {
+        chosen = item->getValue();
+    }
+    const bool same = doc && doc->id == mProblemsShownFor;
+    mProblemsShownFor = doc ? doc->id : std::string();
     mProblems->deleteAllItems();
     if (!doc)
     {
@@ -4011,6 +4158,7 @@ void ALFloaterScriptStudio::fillProblems(const Doc* doc)
         value["fileName"]  = problem->fileName;
         value["level"]     = levelName(problem->level);
         value["origin"]    = problem->origin;
+        value["message"]   = problem->message;
         // Every column carries the whole of it: a diagnostic longer than
         // the column is cut at the column's edge, and the squiggle that
         // would otherwise have to be hovered instead is in a file this
@@ -4041,6 +4189,37 @@ void ALFloaterScriptStudio::fillProblems(const Doc* doc)
         }
         mProblems->addElement(row);
     }
+    if (same)
+    {
+        // The same problem, found by what it says and where it is from;
+        // nearest the line it was on, since an edit above moves it.
+        S32 best = -1;
+        S32 best_distance = S32_MAX;
+        if (chosen.isMap())
+        {
+            const std::vector<LLScrollListItem*> rows = mProblems->getAllData();
+            for (size_t i = 0; i < rows.size(); ++i)
+            {
+                const LLSD& value = rows[i]->getValue();
+                if (value["message"].asString() != chosen["message"].asString() || value["origin"].asString() != chosen["origin"].asString() ||
+                    value["file"].asString() != chosen["file"].asString())
+                {
+                    continue;
+                }
+                const S32 distance = std::abs(value["line"].asInteger() - chosen["line"].asInteger());
+                if (distance < best_distance)
+                {
+                    best          = static_cast<S32>(i);
+                    best_distance = distance;
+                }
+            }
+        }
+        if (best >= 0)
+        {
+            mProblems->selectNthItem(best);
+        }
+        mProblems->setScrollPos(scrolled);
+    }
     const S32 held = mProblemStore.countIn(doc->id);
     if (held == 0)
     {
@@ -4053,6 +4232,67 @@ void ALFloaterScriptStudio::fillProblems(const Doc* doc)
         args["[SHOWN]"] = "0";
         args["[TOTAL]"] = std::to_string(held);
         mProblems->setCommentText(getString("ProblemsShown", args));
+    }
+}
+
+void ALFloaterScriptStudio::goToProblem(Doc& doc, S32 direction)
+{
+    // The script's own problems, each place once and in order; not the
+    // note about the definitions, which is about no place.
+    const std::string      definitions = getString("OriginDefinitions");
+    std::vector<ALTextPos> places;
+    for (const Doc::Shown& row : doc.shown)
+    {
+        if (row.file.empty() && row.origin != definitions)
+        {
+            places.push_back(doc.editor->document().clamp(ALTextPos(row.line, row.hasColumn ? row.column : 0)));
+        }
+    }
+    std::sort(places.begin(), places.end());
+    places.erase(std::unique(places.begin(), places.end()), places.end());
+    if (places.empty())
+    {
+        LLStringUtil::format_map_t args;
+        args["[NAME]"] = doc.name;
+        setStatus(getString("NoProblemsHere", args));
+        return;
+    }
+    // From the caret, round past the end to the other.
+    const ALTextRange selection = doc.editor->selection().normalised();
+    ALTextPos         to        = direction > 0 ? places.front() : places.back();
+    if (direction > 0)
+    {
+        const auto next = std::upper_bound(places.begin(), places.end(), selection.begin);
+        if (next != places.end())
+        {
+            to = *next;
+        }
+    }
+    else
+    {
+        const auto next = std::lower_bound(places.begin(), places.end(), selection.begin);
+        if (next != places.begin())
+        {
+            to = *(next - 1);
+        }
+    }
+    doc.editor->goTo(ALTextRange(to, to));
+    doc.editor->setFocus(true);
+    // What is wrong there, in the card the mouse would bring up.
+    std::vector<ALCodeEditor::CardProblem> problems;
+    ALTextRange                            about;
+    for (const ALCodeEditor::Decoration& decoration : doc.editor->decorations())
+    {
+        const ALTextRange range = decoration.range.normalised();
+        if (!decoration.message.empty() && range.begin <= to && (to < range.end || range.begin == to))
+        {
+            problems.push_back({ decoration.message, decoration.color });
+            about = about.empty() ? range : ALTextRange(std::min(about.begin, range.begin), std::max(about.end, range.end));
+        }
+    }
+    if (!problems.empty())
+    {
+        doc.editor->showCard(about, std::string(), problems);
     }
 }
 
@@ -6639,11 +6879,27 @@ void ALFloaterScriptStudio::runtimeEvent(const ALScriptWorkspace::RuntimeEvent& 
         const size_t index = indexOf(ALScriptRef(event.prim, event.item));
         if (index != NONE)
         {
+            Doc&                doc = *mDocs[index];
             Doc::RuntimeProblem problem;
             problem.line    = event.line;
             problem.column  = event.column;
             problem.message = event.error.empty() ? oneLine(event.message) : event.error;
-            mDocs[index]->runtime.push_back(std::move(problem));
+            if (problem.line >= 0 && doc.uploaded.valid && !doc.uploaded.disabled)
+            {
+                // What runs is the expanded text: its line is the
+                // source's, or an include's.
+                const ALSourceMap::Loc loc = doc.uploaded.map.toSource(problem.line, llmax(0, problem.column));
+                if (loc.found())
+                {
+                    problem.line   = loc.line;
+                    problem.column = problem.column >= 0 ? loc.column : -1;
+                    if (loc.file > 0)
+                    {
+                        problem.file = doc.uploaded.map.files()[loc.file].path;
+                    }
+                }
+            }
+            doc.runtime.push_back(std::move(problem));
             refreshProblems(*mDocs[index]);
         }
     }
@@ -7950,6 +8206,10 @@ void ALFloaterScriptStudio::onMenuAction(const LLSD& param)
     {
         doc->editor->perform(ALEditorCommand::SignatureHelp);
     }
+    else if (doc && (action == "next_problem" || action == "previous_problem"))
+    {
+        goToProblem(*doc, action == "next_problem" ? 1 : -1);
+    }
     else if (doc && action == "fold")
     {
         doc->editor->perform(ALEditorCommand::Fold);
@@ -8264,6 +8524,10 @@ bool ALFloaterScriptStudio::onMenuEnable(const LLSD& param)
     if (action == "load_file" || action == "toggle_comment" || action == "complete" || action == "signature_help")
     {
         return doc && doc->modifiable;
+    }
+    if (action == "next_problem" || action == "previous_problem")
+    {
+        return doc && doc->loaded && !doc->shown.empty();
     }
     if (action == "reference" || action == "wiki")
     {

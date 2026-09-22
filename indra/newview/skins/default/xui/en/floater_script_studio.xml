@@ -115,6 +115,7 @@
     <floater.string name="InspectDeclaredTip">Go to the declaration</floater.string>
     <floater.string name="InspectProblem">Problem: [MESSAGE]</floater.string>
     <floater.string name="NothingKnown">Nothing is known about [NAME] here.</floater.string>
+    <floater.string name="NoProblemsHere">There are no problems in [NAME].</floater.string>
     <floater.string name="NothingKnownBroken">Nothing can be found out about [NAME] until the syntax errors in Problems are fixed.</floater.string>
     <floater.string name="NoDefinition">[NAME] is not defined in this script.</floater.string>
     <floater.string name="ReferencesFoundA">1 place where [NAME] stands.</floater.string>
@@ -431,6 +432,15 @@
             <menu_item_call label="Find References" layout="topleft" name="find_references" shortcut="shift|F12">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="find_references" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="find_references" />
+            </menu_item_call>
+            <menu_item_separator layout="topleft" />
+            <menu_item_call label="Next Problem" layout="topleft" name="next_problem" shortcut="F8">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="next_problem" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="next_problem" />
+            </menu_item_call>
+            <menu_item_call label="Previous Problem" layout="topleft" name="previous_problem" shortcut="shift|F8">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="previous_problem" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="previous_problem" />
             </menu_item_call>
             <menu_item_separator layout="topleft" />
             <menu_item_call label="Next Tab" layout="topleft" name="next_tab" shortcut="control|PGDN">

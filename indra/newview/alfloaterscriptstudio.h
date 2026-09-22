@@ -247,17 +247,34 @@ private:
         // Whether the script's `.luaurc` was asked for once, so that a
         // script with none is not asked for it at every check.
         bool                                       configAsked = false;
-        // What the compiler said of the last save.
-        std::vector<ALScriptWorkspace::Diagnostic> problems;
-        // What the script said as it ran, since it was last saved or
-        // edited: a run-time error's place, or -1 for none, and its words.
+        // What the compiler said of the last save, in the source's places
+        // -- back through the preprocessor's map, where it ran -- or an
+        // include's, by its path.
+        struct Compiled
+        {
+            S32         line      = 0;
+            S32         column    = 0;
+            bool        hasColumn = false;
+            std::string file;
+            std::string level;
+            std::string message;
+        };
+        std::vector<Compiled>                      problems;
+        // What the script said as it ran, since it was last saved: a
+        // run-time error's place, or -1 for none, the include it is in,
+        // and its words.
         struct RuntimeProblem
         {
             S32         line   = -1;
             S32         column = -1;
+            std::string file;
             std::string message;
         };
         std::vector<RuntimeProblem>                runtime;
+        // Both were said of the text as it was: each moves with the edits
+        // since, and goes when one touches its line, the text there being
+        // no longer what was compiled or run.
+        boost::signals2::scoped_connection         placedEdits;
         // Text brought from another window, put in place of the server's
         // once that has loaded.
         std::optional<std::string>                 carriedText;
@@ -390,6 +407,11 @@ private:
     // What the pane's rows say a level is, and what the compiler's own
     // word for one means.
     static const char*  levelName(Doc::Level level);
+    // The compiler's and the run's problems moved along with an edit.
+    void                slideProblems(Doc& doc, const ALTextDocument::Edit& edit);
+    // The caret to the next problem of the script after it, or the one
+    // before, round past the ends, with what it says in a card.
+    void                goToProblem(Doc& doc, S32 direction);
     // The keymap's keys beside the menu's editor commands that have none.
     void                showEditorKeys();
     static Doc::Level   levelOf(const std::string& said);
@@ -576,6 +598,10 @@ private:
     // sent from draw, answered whenever the worker gets to it, and kept
     // only if the text has not moved on.
     void scheduleAnalysis(Doc& doc, bool now = false);
+    // An LSL file on disk with no default state: an include's functions
+    // and globals, which the parser takes for no script at all until a
+    // state is put after them, and whose declarations are for others.
+    bool lslFragment(const Doc& doc) const;
     void pumpAnalysis();
     void requestAnalysis(Doc& doc);
     void analysed(const ALScriptAnalysis::Result& result);
@@ -906,6 +932,9 @@ private:
     LLScrollListCtrl*                  mReferences    = nullptr;
     LLScrollListCtrl*                  mOutline       = nullptr;
     ALTextView*                        mSymbol        = nullptr;
+    // Whose problems the list holds, so that a refill of the same
+    // script's keeps the row chosen and the scroll.
+    std::string                        mProblemsShownFor;
     ALOutputView*                      mOutput        = nullptr;
     LLComboBox*                        mOutputFilter  = nullptr;
     ALScopeBar*                        mSearchBar     = nullptr;
