@@ -878,7 +878,15 @@ namespace tut
         };
         keys("q:");
         ensure("the history was offered", !offered.empty() && std::find(offered.begin(), offered.end(), "set number") != offered.end());
-        ensure("the pick is on the line, to edit", vim->mode() == ALVimKeymap::Mode::Command && vim->typingLine(line, caret) && line == ":" + offered.front());
+        ensure("the pick was run, as vim's window runs a row", vim->mode() == ALVimKeymap::Mode::Normal);
+        // Shift-Left and Shift-Right go a WORD at a time on the line.
+        keys(":one two three");
+        vim->handleKey(e, KEY_LEFT, MASK_SHIFT);
+        ensure("a word back", vim->typingLine(line, caret) && caret == 9);
+        vim->handleKey(e, KEY_LEFT, MASK_SHIFT);
+        ensure("another", vim->typingLine(line, caret) && caret == 5);
+        vim->handleKey(e, KEY_RIGHT, MASK_SHIFT);
+        ensure("and on to the next word's start", vim->typingLine(line, caret) && caret == 9);
         keys("<Esc>");
     }
 }

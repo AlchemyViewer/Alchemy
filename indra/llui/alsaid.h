@@ -27,6 +27,7 @@
 #include "llstl.h"
 #include "llstring.h"
 #include "lltrans.h"
+#include "llui.h"
 
 #include <boost/unordered/unordered_flat_map.hpp>
 
@@ -71,5 +72,20 @@ inline std::string alSaid(const char* key, const std::string& english, const LLS
     {
         LLStringUtil::format(out, args);
     }
+    return out;
+}
+
+// A counted thing, in the form its count takes in the viewer's language:
+// the key with LLTrans's form suffix -- A for one, B for many in English,
+// and a C where a language counts a third way -- with [COUNT] filled in,
+// and any more from the map; the English for one and for many where the
+// skin has no such form.
+inline std::string alSaidCount(const char* key, S32 count, const std::string& english_one, const std::string& english_many,
+                               LLStringUtil::format_map_t args = LLStringUtil::format_map_t())
+{
+    const std::string formed = std::string(key) + LLTrans::countForm(LLUI::getLanguage(), count);
+    args["[COUNT]"]          = std::to_string(count);
+    std::string out          = alSaidTemplate(formed, count == 1 ? english_one : english_many);
+    LLStringUtil::format(out, args);
     return out;
 }

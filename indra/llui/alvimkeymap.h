@@ -91,9 +91,10 @@ public:
     // What was typed after : or / so far.
     const std::string& commandLine() const { return mLine; }
     bool               typingLine(std::string& line, S32& caret) const override;
-    // A line put up to be edited and entered, as the history window
-    // hands one back: the : or / line opened with the text on it.
-    void               takeLine(ALTextView& view, llwchar kind, const std::string& text);
+    // A line put up on the : or / line, as the history window hands one
+    // back: to be edited and entered, or run as it is, as vim's window
+    // runs the row Enter is pressed on.
+    void               takeLine(ALTextView& view, llwchar kind, const std::string& text, bool run = false);
     // What the mode last said: a pattern not found, lines yanked, a
     // command unknown; cleared by the next key.
     std::string message() const override { return mMessage; }

@@ -348,22 +348,20 @@ std::string ALVimKeymap::said(const char* key, const std::string& english, const
     return args.empty() ? alSaid(key, english) : alSaid(key, english, args);
 }
 
+// Two counted nouns in one saying: the lines in their own form, then
+// the substitutions or the matches in theirs with the lines' words put in.
 // static
 std::string ALVimKeymap::substitutionsSaid(S32 count, S32 lines)
 {
-    const LLStringUtil::format_map_t args{ { "[COUNT]", std::to_string(count) }, { "[LINES]", std::to_string(lines) } };
-    return lines == 1 ? said("VimSubstitutionsOneLine", "[COUNT] substitutions on 1 line", args) : said("VimSubstitutions", "[COUNT] substitutions on [LINES] lines", args);
+    const std::string on = alSaidCount("VimOnLines", lines, "on 1 line", "on [COUNT] lines");
+    return alSaidCount("VimSubstitutions", count, "1 substitution [ON_LINES]", "[COUNT] substitutions [ON_LINES]", { { "[ON_LINES]", on } });
 }
 
 // static
 std::string ALVimKeymap::matchesSaid(S32 count, S32 lines)
 {
-    const LLStringUtil::format_map_t args{ { "[COUNT]", std::to_string(count) }, { "[LINES]", std::to_string(lines) } };
-    if (count == 1)
-    {
-        return said("VimOneMatch", "1 match on 1 line", args);
-    }
-    return lines == 1 ? said("VimMatchesOneLine", "[COUNT] matches on 1 line", args) : said("VimMatches", "[COUNT] matches on [LINES] lines", args);
+    const std::string on = alSaidCount("VimOnLines", lines, "on 1 line", "on [COUNT] lines");
+    return alSaidCount("VimMatches", count, "1 match [ON_LINES]", "[COUNT] matches [ON_LINES]", { { "[ON_LINES]", on } });
 }
 
 bool ALVimKeymap::inserting() const
@@ -835,7 +833,7 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
                         // The host's window of them; what is picked comes
                         // back onto the line.
                         const llwchar kind = ch;
-                        mHooks.historyWindow(view, kind, history, [this, &view, kind](const std::string& line) { takeLine(view, kind, line); });
+                        mHooks.historyWindow(view, kind, history, [this, &view, kind](const std::string& line) { takeLine(view, kind, line, true); });
                         return true;
                     }
                     mMode     = ch == ':' ? Mode::Command : Mode::Search;
@@ -2478,7 +2476,7 @@ void ALVimKeymap::applyOperator(ALTextView& view, llwchar op, const Span& span_i
             {
                 if (pieces.size() == 1 && last > first)
                 {
-                    say(said("VimLinesYanked", "[COUNT] lines yanked", { { "[COUNT]", std::to_string(last - first + 1) } }));
+                    say(alSaidCount("VimLinesYanked", last - first + 1, "1 line yanked", "[COUNT] lines yanked"));
                 }
                 moveTo(view, ALTextPos(first, view.caret().line == first ? view.caret().column : firstNonBlankColumn(d, first)));
             }
@@ -2538,7 +2536,7 @@ void ALVimKeymap::applyOperator(ALTextView& view, llwchar op, const Span& span_i
                     view.setCaret(ALTextPos(line, firstNonBlankColumn(d, line)));
                     if (last > first)
                     {
-                        say(said("VimFewerLines", "[COUNT] fewer lines", { { "[COUNT]", std::to_string(last - first + 1) } }));
+                        say(alSaidCount("VimFewerLines", last - first + 1, "1 fewer line", "[COUNT] fewer lines"));
                     }
                 }
             }
@@ -2629,8 +2627,8 @@ void ALVimKeymap::applyOperator(ALTextView& view, llwchar op, const Span& span_i
             moveTo(view, ALTextPos(first, firstNonBlankColumn(d, first)));
             if (last > first)
             {
-                say(said(op == '>' ? "VimLinesShiftedRight" : "VimLinesShiftedLeft", op == '>' ? "[COUNT] lines >ed 1 time" : "[COUNT] lines <ed 1 time",
-                         { { "[COUNT]", std::to_string(last - first + 1) } }));
+                say(alSaidCount(op == '>' ? "VimLinesShiftedRight" : "VimLinesShiftedLeft", last - first + 1, op == '>' ? "1 line >ed 1 time" : "1 line <ed 1 time",
+                                op == '>' ? "[COUNT] lines >ed 1 time" : "[COUNT] lines <ed 1 time"));
             }
             return;
         }
@@ -3138,6 +3136,14 @@ bool ALVimKeymap::commandLine(ALTextView& view, const Input& input)
         {
             switch (input.key)
             {
+                case KEY_LEFT:
+                case KEY_RIGHT:
+                {
+                    // A WORD, as with shift.
+                    Input as_shift = input;
+                    as_shift.mask  = MASK_SHIFT;
+                    return commandLine(view, as_shift);
+                }
                 case 'B': mLineCursor = 0; return true;
                 case 'E': mLineCursor = mLine.size(); return true;
                 case 'U':
@@ -3186,8 +3192,31 @@ bool ALVimKeymap::commandLine(ALTextView& view, const Input& input)
                 mMode       = Mode::Normal;
                 moveTo(view, view.caret());
                 return true;
-            case KEY_LEFT: mLineCursor = back(mLineCursor); return true;
-            case KEY_RIGHT: mLineCursor = forward(mLineCursor); return true;
+            case KEY_LEFT:
+            case KEY_RIGHT:
+            {
+                // A character, or with shift a WORD -- what stands between
+                // blanks -- as vim's <S-Left> and <S-Right> have it.
+                const bool left = input.key == KEY_LEFT;
+                if (!(input.mask & MASK_SHIFT))
+                {
+                    mLineCursor = left ? back(mLineCursor) : forward(mLineCursor);
+                    return true;
+                }
+                size_t at = mLineCursor;
+                if (left)
+                {
+                    while (at > 0 && mLine[at - 1] == ' ') { --at; }
+                    while (at > 0 && mLine[at - 1] != ' ') { --at; }
+                }
+                else
+                {
+                    while (at < mLine.size() && mLine[at] != ' ') { ++at; }
+                    while (at < mLine.size() && mLine[at] == ' ') { ++at; }
+                }
+                mLineCursor = at;
+                return true;
+            }
             case KEY_HOME: mLineCursor = 0; return true;
             case KEY_END: mLineCursor = mLine.size(); return true;
             case KEY_DELETE:
@@ -3300,7 +3329,7 @@ bool ALVimKeymap::commandLine(ALTextView& view, const Input& input)
     return true;
 }
 
-void ALVimKeymap::takeLine(ALTextView& view, llwchar kind, const std::string& text)
+void ALVimKeymap::takeLine(ALTextView& view, llwchar kind, const std::string& text, bool run)
 {
     clearPending();
     mMode       = kind == ':' ? Mode::Command : Mode::Search;
@@ -3309,6 +3338,15 @@ void ALVimKeymap::takeLine(ALTextView& view, llwchar kind, const std::string& te
     mLineCursor = mLine.size();
     mHistoryAt  = -1;
     mHistoryPrefix.clear();
+    if (run)
+    {
+        // As Enter on the line: vim's window runs the row it is pressed
+        // on. The line is still on the : history, to be recalled and
+        // edited with Up.
+        Input as_key;
+        as_key.key = KEY_RETURN;
+        commandLine(view, as_key);
+    }
     bump();
 }
 
@@ -3949,7 +3987,7 @@ bool ALVimKeymap::global(ALTextView& view, S32 first, S32 last, bool ranged, con
         // Nothing to do to them: the last one is where the caret goes,
         // and how many there were is said.
         moveTo(view, ALTextPos(lines.back(), firstNonBlankColumn(d, lines.back())));
-        say(lines.size() == 1 ? said("VimOneLine", "1 line") : said("VimLines", "[COUNT] lines", { { "[COUNT]", std::to_string(lines.size()) } }));
+        say(alSaidCount("VimLinesPicked", static_cast<S32>(lines.size()), "1 line", "[COUNT] lines"));
         return true;
     }
     // One step to undo for the lot; an asking :s among the commands
