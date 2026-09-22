@@ -3494,9 +3494,15 @@ ALPreprocessor::Result ALPreprocessor::run(std::string_view source, const Option
         asItIs(result.text, options.fileName, result.map);
         return result;
     }
-    if (options.lua)
+    finish(result, options);
+    return result;
+}
+
+void ALPreprocessor::finish(Result& result, const Options& options)
+{
+    if (options.lua || result.overran || result.text.empty())
     {
-        return result;
+        return;
     }
     if (options.optimize)
     {
@@ -3511,7 +3517,6 @@ ALPreprocessor::Result ALPreprocessor::run(std::string_view source, const Option
         result.map  = squeezed.map.composed(result.map);
         result.text = std::move(squeezed.text);
     }
-    return result;
 }
 
 void ALPreprocessor::optimize(Result& result, const Options& options)

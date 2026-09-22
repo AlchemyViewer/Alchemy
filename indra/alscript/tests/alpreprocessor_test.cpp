@@ -754,4 +754,26 @@ namespace tut
         ensure_equals("listed once", twice.includes.size(), size_t(1));
         ensure_equals("and put in once", twice.text.find("integer c;"), twice.text.rfind("integer c;"));
     }
+    template<> template<>
+    void alpreprocessor_object::test<19>()
+    {
+        set_test_name("what a run does after the expansion it will do on its own, and to the same end");
+        // A caller that expands in rounds, waiting on includes from the
+        // world, leaves the compression off until its last round and
+        // calls `finish` itself. What it gets must be what one run
+        // would have made of the same source, or the text a save
+        // uploads is not the text the analyzers were shown.
+        const std::string       source = "// comment\ndefault   {  state_entry ( ) { llSay( 0 , \"a  b\" ) ; } }\n";
+        ALPreprocessor::Options whole  = options();
+        whole.compress                 = true;
+        const ALPreprocessor::Result at_once = ALPreprocessor::run(source, whole);
+
+        ALPreprocessor::Options expanding = options();
+        expanding.compress                = false;
+        ALPreprocessor::Result in_two     = ALPreprocessor::run(source, expanding);
+        ensure("the expansion alone leaves it as it was", in_two.text.find("// comment") != std::string::npos);
+        ALPreprocessor::finish(in_two, whole);
+        ensure_equals("the same text", in_two.text, at_once.text);
+        ensure_equals("and the same way back", in_two.map.toSource(0, 0).line, at_once.map.toSource(0, 0).line);
+    }
 } // namespace tut

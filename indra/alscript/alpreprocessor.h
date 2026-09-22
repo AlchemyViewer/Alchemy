@@ -168,14 +168,20 @@ public:
         bool hasErrors() const;
     };
 
+    // Expands a script and then finishes it. Nothing of the viewer is in
+    // here: the caller's resolver answers for every include, so a run
+    // belongs on whatever thread the caller pleases.
     static Result run(std::string_view source, const Options& options);
 
-    // The optimizer over what a run made, as `run` does it when
-    // `optimize` is set -- but on its own, so that a caller may do it
-    // where a stall does not matter. The result is changed in place: its
-    // text, its map and its problems. Pure but for the builtins, which
-    // are the process's.
-    static void optimize(Result& result, const Options& options);
+    // What a run does once the expansion is done: the optimizer over the
+    // expanded text, then the compression over whatever that left, each
+    // if it was asked for, the result changed in place -- its text, its
+    // map and its problems. `run` ends with this. A caller that expands
+    // in rounds, as one waiting on includes from the world must, leaves
+    // both options off until its last round and calls this itself, so
+    // that it pays for the optimizer once rather than once a round.
+    // Pure but for the builtins, which are the process's.
+    static void finish(Result& result, const Options& options);
 
     // The preprocessor's own tokenizer, for whoever else works over a
     // script's tokens: every byte of the text in one token or another, as
@@ -201,4 +207,8 @@ public:
         S32         column = 0;
     };
     static std::vector<Token> tokenize(std::string_view text, bool lua);
+
+private:
+    // The optimizer alone, which is the first half of `finish`.
+    static void optimize(Result& result, const Options& options);
 };
