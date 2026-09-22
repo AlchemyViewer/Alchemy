@@ -30,6 +30,7 @@
 #include "llrender2dutils.h"
 #include "alchoicelist.h"
 #include "llstring.h"
+#include "llui.h"
 #include "lluicolortable.h"
 #include "llurlaction.h"
 #include "lluictrlfactory.h"
@@ -37,8 +38,9 @@
 #include <boost/unordered/unordered_flat_set.hpp>
 
 #include <algorithm>
-#include <optional>
 #include <cmath>
+#include <map>
+#include <optional>
 
 static LLDefaultChildRegistry::Register<ALCodeEditor> r("code_editor");
 
@@ -1671,6 +1673,50 @@ void ALCodeEditor::refreshCompletion()
 }
 
 // static
+const char* ALCodeEditor::iconNameOf(const Completion& completion)
+{
+    if (!completion.snippet.empty())
+    {
+        return "Symbol_Snippet";
+    }
+    switch (completion.kind)
+    {
+        case ALSyntaxKind::Function:     return "Symbol_Function";
+        case ALSyntaxKind::Event:        return "Symbol_Event";
+        case ALSyntaxKind::Constant:     return "Symbol_Constant";
+        case ALSyntaxKind::Keyword:
+        case ALSyntaxKind::Control:      return "Symbol_Keyword";
+        case ALSyntaxKind::Type:         return "Symbol_Type";
+        case ALSyntaxKind::Variable:     return "Symbol_Variable";
+        case ALSyntaxKind::Parameter:    return "Symbol_Parameter";
+        case ALSyntaxKind::Property:     return "Symbol_Field";
+        case ALSyntaxKind::Label:        return "Symbol_Label";
+        case ALSyntaxKind::Deprecated:   return "Symbol_Deprecated";
+        case ALSyntaxKind::Preprocessor:
+        case ALSyntaxKind::Tag:
+        case ALSyntaxKind::Attribute:    return "Symbol_Module";
+        default:                         return "Symbol_Word";
+    }
+}
+
+// static
+LLUIImagePtr ALCodeEditor::iconOf(const Completion& completion)
+{
+    if (completion.icon)
+    {
+        return completion.icon;
+    }
+    static std::map<std::string, LLUIImagePtr> looked_up;
+    const char*                                name  = iconNameOf(completion);
+    auto                                       found = looked_up.find(name);
+    if (found == looked_up.end())
+    {
+        found = looked_up.emplace(name, LLUI::getUIImage(name)).first;
+    }
+    return found->second;
+}
+
+// static
 const char* ALCodeEditor::badgeOf(const Completion& completion)
 {
     if (!completion.snippet.empty())
@@ -1711,7 +1757,7 @@ void ALCodeEditor::listCompletions()
         ALChoiceList::Choice choice;
         choice.text  = c.text;
         choice.note  = c.detail;
-        choice.icon  = c.icon;
+        choice.icon  = iconOf(c);
         choice.badge = badgeOf(c);
         if (c.kind != ALSyntaxKind::Text)
         {

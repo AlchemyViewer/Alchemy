@@ -221,11 +221,16 @@ public:
         // place of the prefix, with its placeholders to tab through.
         std::string  snippet;
         // The mark before it on the list, where the provider has one;
-        // else a badge for its kind.
+        // else the icon of its kind, or a badge where the icons are not
+        // to be had.
         LLUIImagePtr icon;
     };
-    // The badge a kind wears on the list until it has an icon: a letter.
-    static const char* badgeOf(const Completion& completion);
+    // The icon a kind wears on the list -- Symbol_Function and the rest,
+    // looked up once each -- and the badge, a letter, where there is no
+    // image provider to look them up in.
+    static const char*  iconNameOf(const Completion& completion);
+    static LLUIImagePtr iconOf(const Completion& completion);
+    static const char*  badgeOf(const Completion& completion);
     // Asked for what could go at a position, given the identifier typed
     // so far; answers into `out`, already narrowed to the prefix. The
     // words of the document itself are added after whatever it answers,

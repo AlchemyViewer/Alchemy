@@ -49,6 +49,9 @@ namespace
     // since a bullet is whatever size the face makes it and this is a mark
     // beside text, not text.
     constexpr S32 MARK = 10;
+    // An image before the name, a square this wide, and the room after it.
+    constexpr S32 IMAGE = 16;
+    constexpr S32 IMAGE_GAP = 4;
     constexpr F32 DOT = 3.f;
 }
 
@@ -110,7 +113,8 @@ void ALTabStrip::layout()
     for (size_t i = 0; i < mTabs.size(); ++i)
     {
         const S32 words = fontFor(mTabs[i])->getWidth(textOf(mTabs[i]));
-        mWidths[i] = llclamp(words + MARK + PAD * 2 + CLOSE, mMinTabWidth, mMaxTabWidth);
+        const S32 image = mTabs[i].image ? IMAGE + IMAGE_GAP : 0;
+        mWidths[i] = llclamp(words + MARK + image + PAD * 2 + CLOSE, mMinTabWidth, mMaxTabWidth);
         wanted += mWidths[i];
     }
     const S32 room = getRect().getWidth() - mGap * ((S32)mTabs.size() - 1);
@@ -200,6 +204,14 @@ void ALTabStrip::draw()
             gl_circle_2d((F32)x + DOT, (F32)height * 0.5f, DOT, 12, tab.dirty);
         }
         x += MARK;
+        if (tab.image)
+        {
+            // The image, a square in the middle of the tab's height, in
+            // the ink of the name.
+            const S32 top = (height + IMAGE) / 2;
+            tab.image->draw(LLRect(x, top, x + IMAGE, top - IMAGE), (current ? ink : quiet).get() % alpha);
+            x += IMAGE + IMAGE_GAP;
+        }
 
         // The name stops short of the way out, which every held tab has
         // and a preview does not.

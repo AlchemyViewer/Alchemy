@@ -25,6 +25,7 @@
 #pragma once
 
 #include "lluictrl.h"
+#include "lluiimage.h"
 
 class LLFontGL;
 
@@ -81,6 +82,9 @@ public:
         // alpha where it has not. A dirty tab's dot is the ink unless a
         // badge says otherwise.
         LLColor4    badge = LLColor4::transparent;
+        // What the tab holds, as a mark before its name: a script, a
+        // notecard, a file. None for no mark.
+        LLUIImagePtr image;
     };
 
     // The tabs in order, and which of them is shown, by value.
