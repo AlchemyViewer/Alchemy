@@ -682,4 +682,76 @@ namespace tut
         ensure_equals("a translation is the text with the words put in", ALScriptProblem::fill("[1] hors d'une boucle ([1], [2])", { "continue", "x" }), std::string("continue hors d'une boucle (continue, x)"));
         ensure_equals("a word with a mark in it is not read again", ALScriptProblem::fill("[1]", { "[2]" }), std::string("[2]"));
     }
+    template<> template<>
+    void alpreprocessor_object::test<17>()
+    {
+        set_test_name("a run is bounded: macros that double are stopped, a deep expression is refused, and a deep include is");
+        // Hide sets stop a macro expanding as itself, not one that
+        // doubles: this is 2^24 tokens and would otherwise eat the
+        // machine, on the thread that opened the script.
+        std::string bomb = "#define A0 x\n";
+        for (int i = 1; i <= 24; ++i)
+        {
+            bomb += "#define A" + std::to_string(i) + " A" + std::to_string(i - 1) + " A" + std::to_string(i - 1) + "\n";
+        }
+        bomb += "A24\n";
+        ALPreprocessor::Options o = options();
+        o.tokenBudget             = 100000;
+        ALPreprocessor::Result r  = ALPreprocessor::run(bomb, o);
+        ensure("the run said it ran away", r.overran);
+        ensure("and gave the source back as it was", r.text == bomb);
+        ensure("with the reason", !r.problems.empty() && r.problems.back().key == std::string("PreprocTooMuch"));
+        ensure("an error", r.problems.back().severity == ALScriptProblem::Severity::Error);
+        // A run within the budget is untouched by it.
+        ALPreprocessor::Result fine = ALPreprocessor::run("#define A 1\ninteger n = A;\n", o);
+        ensure("nothing said", !fine.overran);
+        ensure("and the macro put in", fine.text.find("integer n = 1;") != std::string::npos);
+        // An expression nested past the depth is refused rather than
+        // taking the C++ stack down with it.
+        std::string deep = "#if ";
+        for (int i = 0; i < 200; ++i)
+        {
+            deep += "(";
+        }
+        deep += "1";
+        for (int i = 0; i < 200; ++i)
+        {
+            deep += ")";
+        }
+        deep += "\ninteger n;\n#endif\n";
+        ALPreprocessor::Options d = options();
+        d.expressionDepth         = 16;
+        ALPreprocessor::Result nested = ALPreprocessor::run(deep, d);
+        ensure("said", !nested.problems.empty());
+        ensure_equals("with its key", nested.problems.front().key, std::string("PreprocExpressionTooDeep"));
+        // And one within the depth is answered.
+        ALPreprocessor::Result shallow = ALPreprocessor::run("#if ((((1))))\ninteger n;\n#endif\n", d);
+        ensure("nothing said", shallow.problems.empty());
+        ensure("the group taken", shallow.text.find("integer n;") != std::string::npos);
+    }
+
+    template<> template<>
+    void alpreprocessor_object::test<18>()
+    {
+        set_test_name("an include that includes itself is stopped by the depth, and each include is listed once");
+        add("a.lsl", "#include \"b.lsl\"\n");
+        add("b.lsl", "#include \"a.lsl\"\n");
+        ALPreprocessor::Options o = options();
+        o.includeDepth            = 8;
+        ALPreprocessor::Result r  = ALPreprocessor::run("#include \"a.lsl\"\n", o);
+        bool                   deep = false;
+        for (const ALScriptProblem& p : r.problems)
+        {
+            deep = deep || p.key == "PreprocIncludeTooDeep";
+        }
+        ensure("said so", deep);
+        ensure_equals("each listed once", r.includes.size(), size_t(2));
+        // With `#pragma once` it settles rather than going deep at all.
+        files.clear();
+        add("c.lsl", "#pragma once\ninteger c;\n");
+        ALPreprocessor::Result twice = ALPreprocessor::run("#include \"c.lsl\"\n#include \"c.lsl\"\n", o);
+        ensure("nothing said", twice.problems.empty());
+        ensure_equals("listed once", twice.includes.size(), size_t(1));
+        ensure_equals("and put in once", twice.text.find("integer c;"), twice.text.rfind("integer c;"));
+    }
 } // namespace tut

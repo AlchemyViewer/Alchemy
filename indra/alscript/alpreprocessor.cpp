@@ -27,6 +27,11 @@
 
 #include "alpreprocessor.h"
 
+#include "llstl.h"
+
+#include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/unordered/unordered_flat_set.hpp>
+
 #include <algorithm>
 #include <ctime>
 #include <deque>
@@ -57,8 +62,8 @@ namespace
         Paste
     };
 
-    typedef std::set<std::string>                 HideSet;
-    typedef std::shared_ptr<const HideSet>        hide_set_ptr;
+    typedef boost::unordered_flat_set<std::string, ll::string_hash, std::equal_to<>> HideSet;
+    typedef std::shared_ptr<const HideSet>                                          hide_set_ptr;
 
     struct Token
     {
@@ -93,6 +98,25 @@ namespace
         {
             set->insert(a->begin(), a->end());
         }
+        return set;
+    }
+
+    // The union of a token's own hide set with an expansion's, where
+    // most tokens have none of their own and take the expansion's as it
+    // is: one set shared by the tokens one expansion made, as Prosser
+    // has it, rather than a copy of it per token.
+    hide_set_ptr hideWith(const hide_set_ptr& own, const hide_set_ptr& theirs)
+    {
+        if (!own || own == theirs)
+        {
+            return theirs;
+        }
+        if (!theirs)
+        {
+            return own;
+        }
+        auto set = std::make_shared<HideSet>(*theirs);
+        set->insert(own->begin(), own->end());
         return set;
     }
 
@@ -744,6 +768,13 @@ namespace
         bool next(Token& t);
         void unread(const Tokens& tokens);
         void emit(const Token& t) { mSink->push_back(t); }
+        // What a run may make, against the budget: every token put back
+        // to be scanned again and every token given out is one more. A
+        // run that reaches the budget says so once and stops, since hide
+        // sets stop a macro expanding as itself but not one that
+        // doubles.
+        bool spend(size_t made, const Token& at);
+        bool overran() const { return mOverran; }
 
         // -- expansion --
         void   handle(const Token& t);
@@ -767,9 +798,14 @@ namespace
         const ALPreprocessor::Options& mOptions;
         ALPreprocessor::Result&        mResult;
         std::vector<std::unique_ptr<FileState>> mFiles;
-        std::map<std::string, Macro>            mMacros;
-        std::set<std::string>                   mOnce;
-        std::set<std::string>                   mPendingNames;
+        // Looked up for every identifier of the whole script, so flat.
+        boost::unordered_flat_map<std::string, Macro, ll::string_hash, std::equal_to<>> mMacros;
+        boost::unordered_flat_set<std::string, ll::string_hash, std::equal_to<>>        mOnce;
+        boost::unordered_flat_set<std::string, ll::string_hash, std::equal_to<>>        mPendingNames;
+        boost::unordered_flat_set<std::string, ll::string_hash, std::equal_to<>>        mIncluded;
+        // What the run has made so far, against the budget.
+        size_t                                  mMade    = 0;
+        bool                                    mOverran = false;
         // Tokens to read before the file: what an expansion made, to be
         // scanned again, and what a look-ahead gave back.
         std::deque<Token>                       mPending;
@@ -855,7 +891,7 @@ namespace
 
     void Engine::loop(size_t depth)
     {
-        while (mFiles.size() > depth)
+        while (mFiles.size() > depth && !mOverran)
         {
             if (!mPending.empty())
             {
@@ -942,6 +978,23 @@ namespace
         mPending.insert(mPending.begin(), tokens.begin(), tokens.end());
     }
 
+    bool Engine::spend(size_t made, const Token& at)
+    {
+        if (mOverran)
+        {
+            return false;
+        }
+        mMade += made;
+        if (mMade <= mOptions.tokenBudget)
+        {
+            return true;
+        }
+        mOverran         = true;
+        mResult.overran  = true;
+        problem(ALScriptProblem::Severity::Error, "PreprocTooMuch", "the macros expand to more than this preprocessor will make; nothing was preprocessed", {}, at);
+        return false;
+    }
+
     // -- expansion --
 
     void Engine::handle(const Token& t)
@@ -1009,6 +1062,10 @@ namespace
     {
         const hide_set_ptr hs  = hideUnion(t.hide, { m.name });
         Tokens             out = substitute(m, {}, t, hs);
+        if (!spend(out.size(), t))
+        {
+            return true;
+        }
         unread(out);
         return true;
     }
@@ -1123,6 +1180,10 @@ namespace
         }
         const hide_set_ptr hs  = hideUnion(hideIntersect(t.hide, rparen.hide), { m.name });
         Tokens             out = substitute(m, args, t, hs);
+        if (!spend(out.size(), t))
+        {
+            return true;
+        }
         unread(out);
         return true;
     }
@@ -1314,7 +1375,7 @@ namespace
             {
                 continue;
             }
-            t.hide = hideUnion(t.hide, *hs);
+                t.hide = hideWith(t.hide, hs);
             result.push_back(t);
         }
         return result;
@@ -1333,7 +1394,7 @@ namespace
         mSink        = &out;
         mPending.assign(in.begin(), in.end());
         Token t;
-        while (next(t))
+        while (!mOverran && next(t))
         {
             handle(t);
         }
@@ -1430,7 +1491,10 @@ namespace
     class Expr
     {
     public:
-        Expr(const Tokens& tokens, bool lua, Engine& engine, const Token& at) : mTokens(tokens), mLua(lua), mEngine(engine), mAt(at) {}
+        Expr(const Tokens& tokens, bool lua, Engine& engine, const Token& at, S32 depth)
+            : mTokens(tokens), mLua(lua), mEngine(engine), mAt(at), mDepth(std::max(1, depth))
+        {
+        }
 
         S64 parse(bool& ok)
         {
@@ -1570,6 +1634,11 @@ namespace
 
         S64 unary()
         {
+            Deeper deeper(*this);
+            if (!deeper.ok)
+            {
+                return 0;
+            }
             if (accept("+")) return unary();
             if (accept("-")) return S64(0 - U64(unary()));
             if (accept("!")) return unary() == 0 ? 1 : 0;
@@ -1603,6 +1672,11 @@ namespace
             }
             if (accept("("))
             {
+                Deeper deeper(*this);
+                if (!deeper.ok)
+                {
+                    return 0;
+                }
                 S64 v = ternary();
                 if (!accept(")"))
                 {
@@ -1620,11 +1694,30 @@ namespace
         const Token&  mAt;
         size_t        mI  = 0;
         bool          mOk = true;
+        // How deep the recursive descent may go: an expression is the
+        // script's, and `((((((...))))))` would otherwise be the C++
+        // stack's to answer for.
+        S32           mDepth = 64;
+        S32           mIn    = 0;
+        // One level deeper while it stands; false where that is too deep.
+        struct Deeper
+        {
+            Expr& e;
+            bool  ok;
+            explicit Deeper(Expr& expr) : e(expr), ok(++expr.mIn <= expr.mDepth)
+            {
+                if (!ok && e.mOk)
+                {
+                    e.fail("PreprocExpressionTooDeep", "the expression nests too deeply for this preprocessor");
+                }
+            }
+            ~Deeper() { --e.mIn; }
+        };
     };
 
     S64 Engine::evalExpression(const Tokens& tokens, const Token& hash, bool& ok)
     {
-        return Expr(tokens, mOptions.lua, *this, hash).parse(ok);
+        return Expr(tokens, mOptions.lua, *this, hash, mOptions.expressionDepth).parse(ok);
     }
 
     bool Engine::evalCondition(const Tokens& line, size_t at, const Token& hash)
@@ -1869,7 +1962,7 @@ namespace
         {
             return;
         }
-        if (std::find(mResult.includes.begin(), mResult.includes.end(), identity) == mResult.includes.end())
+        if (mIncluded.insert(identity).second)
         {
             mResult.includes.push_back(identity);
         }
@@ -3170,7 +3263,7 @@ namespace
                 mEngine.problem(ALScriptProblem::Severity::Error, "PreprocRequireTooDeep", "require nested too deeply at '[1]'", { name }, at);
                 return false;
             }
-            if (std::find(mResult.includes.begin(), mResult.includes.end(), key) == mResult.includes.end())
+            if (mListed.insert(key).second)
             {
                 mResult.includes.push_back(key);
             }
@@ -3187,9 +3280,10 @@ namespace
         Engine&                                    mEngine;
         const ALPreprocessor::Options&             mOptions;
         ALPreprocessor::Result&                    mResult;
-        std::set<std::string>                      mPendingNames;
-        std::set<std::string>                      mInProgress;
-        std::set<std::string>                      mDone;
+        boost::unordered_flat_set<std::string, ll::string_hash, std::equal_to<>> mPendingNames;
+        boost::unordered_flat_set<std::string, ll::string_hash, std::equal_to<>> mInProgress;
+        boost::unordered_flat_set<std::string, ll::string_hash, std::equal_to<>> mDone;
+        boost::unordered_flat_set<std::string, ll::string_hash, std::equal_to<>> mListed;
         std::vector<std::pair<std::string, Tokens>> mModules;
     };
 
@@ -3286,31 +3380,37 @@ bool ALPreprocessor::Result::hasErrors() const
 
 ALPreprocessor::Result ALPreprocessor::run(std::string_view source, const Options& options)
 {
-    Result result;
-    if (source.find(options.lua ? "--fspreprocessor off" : "//fspreprocessor off") != std::string_view::npos)
-    {
-        result.disabled = true;
-        result.text     = std::string(source);
-        result.map.addFile(options.fileName, std::string());
+    // Every line of a text mapped to itself: what the source is when
+    // nothing was done to it.
+    const auto asItIs = [](const std::string& text, const std::string& name, ALSourceMap& map) {
+        map = ALSourceMap();
+        map.addFile(name, std::string());
         S32    line  = 0;
         size_t start = 0;
-        while (start <= source.size())
+        while (start <= text.size())
         {
-            size_t end = source.find('\n', start);
-            if (end == std::string_view::npos)
+            size_t end = text.find('\n', start);
+            if (end == std::string::npos)
             {
-                end = source.size();
+                end = text.size();
             }
             ALSourceMap::Segment s;
             s.outLine  = line;
             s.line     = line;
             s.length   = S32(end - start);
             s.verbatim = true;
-            result.map.add(s);
+            map.add(s);
             ++line;
             start = end + 1;
         }
-        result.map.finish();
+        map.finish();
+    };
+    Result result;
+    if (source.find(options.lua ? "--fspreprocessor off" : "//fspreprocessor off") != std::string_view::npos)
+    {
+        result.disabled = true;
+        result.text     = std::string(source);
+        asItIs(result.text, options.fileName, result.map);
         return result;
     }
 
@@ -3386,35 +3486,21 @@ ALPreprocessor::Result ALPreprocessor::run(std::string_view source, const Option
         }
     }
     assemble(tokens, result);
+    if (result.overran)
+    {
+        // Nothing that came of a run that ran away is to be compiled or
+        // analysed: the source as it was, with what was said of it.
+        result.text = std::string(source);
+        asItIs(result.text, options.fileName, result.map);
+        return result;
+    }
     if (options.lua)
     {
         return result;
     }
     if (options.optimize)
     {
-        // Over the expanded text, as Firestorm ran its own; what it says
-        // is said of the expanded text and brought back to the source.
-        ALLSLOptimizer::Options optimizing = options.optimizer;
-        optimizing.inlineNames             = result.inlined;
-        optimizing.inlining                = optimizing.inlining || !result.inlined.empty();
-        ALLSLOptimizer::Result optimized   = ALLSLOptimizer::run(result.text, optimizing);
-        for (ALScriptProblem p : optimized.problems)
-        {
-            mapProblem(p, result.map);
-            result.problems.push_back(std::move(p));
-        }
-        if (optimized.optimized)
-        {
-            ALScriptProblem sizes;
-            sizes.severity = ALScriptProblem::Severity::Note;
-            sizes.source   = ALScriptProblem::Source::Optimizer;
-            sizes.message  = "optimized from " + std::to_string(optimized.sizeBefore) + " to " + std::to_string(optimized.sizeAfter) +
-                            " bytes of source; script memory is the simulator's to say";
-            result.problems.push_back(std::move(sizes));
-            result.map       = optimized.map.composed(result.map);
-            result.text      = std::move(optimized.text);
-            result.optimized = true;
-        }
+        optimize(result, options);
     }
     if (options.compress)
     {
@@ -3426,6 +3512,38 @@ ALPreprocessor::Result ALPreprocessor::run(std::string_view source, const Option
         result.text = std::move(squeezed.text);
     }
     return result;
+}
+
+void ALPreprocessor::optimize(Result& result, const Options& options)
+{
+    if (options.lua || result.overran || result.text.empty())
+    {
+        return;
+    }
+    // Over the expanded text, as Firestorm ran its own; what it says is
+    // said of the expanded text and brought back to the source.
+    ALLSLOptimizer::Options optimizing = options.optimizer;
+    optimizing.inlineNames             = result.inlined;
+    optimizing.inlining                = optimizing.inlining || !result.inlined.empty();
+    ALLSLOptimizer::Result optimized   = ALLSLOptimizer::run(result.text, optimizing);
+    for (ALScriptProblem p : optimized.problems)
+    {
+        mapProblem(p, result.map);
+        result.problems.push_back(std::move(p));
+    }
+    if (optimized.optimized)
+    {
+        ALScriptProblem sizes;
+        sizes.severity = ALScriptProblem::Severity::Note;
+        sizes.source   = ALScriptProblem::Source::Optimizer;
+        sizes.key      = "OptimizerSizes";
+        sizes.args     = { std::to_string(optimized.sizeBefore), std::to_string(optimized.sizeAfter) };
+        sizes.message  = ALScriptProblem::fill("optimized from [1] to [2] bytes of source; script memory is the simulator's to say", sizes.args);
+        result.problems.push_back(std::move(sizes));
+        result.map       = optimized.map.composed(result.map);
+        result.text      = std::move(optimized.text);
+        result.optimized = true;
+    }
 }
 
 std::vector<ALPreprocessor::Token> ALPreprocessor::tokenize(std::string_view text, bool lua)

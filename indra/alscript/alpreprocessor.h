@@ -44,6 +44,10 @@
 // whatever the caller resolves a name to, `#pragma once`, `#error`,
 // `#warning`, `#line` passed through as a comment, backslash continuation,
 // directives at the start of a line only, and no expansion inside strings.
+// A run is bounded: no more tokens than the budget, no deeper an
+// expression than the depth, no deeper an include than the depth --
+// hide sets stop a macro expanding as itself, not one that doubles, and
+// a script is opened before anybody has read it.
 // Then the transforms for LSL, each on request: Firestorm's `switch` as a
 // jump table and lazy lists, LSL-PyOptimizer's `break` and `continue` in
 // loops and the extended assignments, and comments and whitespace
@@ -110,9 +114,16 @@ public:
         bool extensions = false;
         // The optimizer over the expanded text, LSL only, with its own
         // options; it needs the builtins loaded.
+        // Whether `run` optimizes what it made. A caller that would
+        // rather do that elsewhere leaves this off and calls `optimize`.
         bool                    optimize = false;
         ALLSLOptimizer::Options optimizer;
         S32  includeDepth = 32;
+        // What one run may make of a script, and how deep an `#if`
+        // expression may nest. A run that reaches either says so and
+        // stops.
+        size_t tokenBudget     = 4u * 1000u * 1000u;
+        S32    expressionDepth = 64;
         // The predefined macros' values. An empty agent id leaves the
         // agent macros undefined; an empty asset id says NOT_IN_WORLD.
         std::string agentId;
@@ -150,11 +161,21 @@ public:
         std::vector<std::string> inlined;
         // The optimizer ran and its text is what came out.
         bool optimized     = false;
+        // The run reached its budget and stopped: the text is as far as
+        // it got, and is nothing to compile or analyse.
+        bool overran       = false;
 
         bool hasErrors() const;
     };
 
     static Result run(std::string_view source, const Options& options);
+
+    // The optimizer over what a run made, as `run` does it when
+    // `optimize` is set -- but on its own, so that a caller may do it
+    // where a stall does not matter. The result is changed in place: its
+    // text, its map and its problems. Pure but for the builtins, which
+    // are the process's.
+    static void optimize(Result& result, const Options& options);
 
     // The preprocessor's own tokenizer, for whoever else works over a
     // script's tokens: every byte of the text in one token or another, as
