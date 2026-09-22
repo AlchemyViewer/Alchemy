@@ -133,6 +133,10 @@ private:
         S32 kindBegin   = 0;
         S32 kindEnd     = 0;
         S32 text        = 0;
+        // How wide the first line is up to what was said, measured once
+        // in the faces it is shown in and kept until the font changes.
+        mutable F32             prefix   = -1.f;
+        mutable const LLFontGL* measured = nullptr;
     };
     void refill();
     void show(const Entry& entry, U32 serial);
@@ -150,7 +154,10 @@ private:
     const Shown* shownAt(S32 line, S32* first_line) const;
     // How wide an entry's first line is up to what was said, in the
     // faces the pieces are shown in: what its other rows hang under.
+    // Measured once and kept on the entry.
     F32          prefixWidth(const Shown& shown, S32 first) const;
+    // The time stamp's width alone, for a narrow pane's hang.
+    F32          stampWidth(const Shown& shown, S32 first) const;
     const Entry* entryOf(U32 serial) const;
     void         followed(const Substitution& link);
 

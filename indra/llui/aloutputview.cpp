@@ -36,6 +36,10 @@ static LLDefaultChildRegistry::Register<ALOutputView> r("output_view");
 
 namespace
 {
+    // Narrower than this, in pixels, and what was said hangs under the
+    // source rather than under its own start.
+    constexpr S32 NARROW_PANE = 360;
+
     // An entry's first line, piece by piece: where the source starts and
     // ends, and where what was said starts, as byte offsets of the line.
     struct Laid
@@ -115,7 +119,9 @@ ALOutputView::ALOutputView(const Params& p)
     onLinkClicked([this](const Substitution& link) { followed(link); });
     // What was said hangs under where it began: an entry's first line
     // wraps under the message's start, and its lines after the first
-    // start there.
+    // start there -- in a pane wide enough for that; in a narrow one
+    // they hang under the source instead, past the time stamp, so that
+    // a long source name does not leave a message a few words wide.
     layout().setIndentProvider([this](S32 line) {
         ALTextLayout::Indent indent;
         S32                  first = 0;
@@ -127,6 +133,10 @@ ALOutputView::ALOutputView(const Params& p)
         F32 hang = prefixWidth(*shown, first);
         if (const S32 wrap = layout().wrapWidth(); wrap > 0)
         {
+            if (wrap < NARROW_PANE)
+            {
+                hang = stampWidth(*shown, first);
+            }
             hang = llmin(hang, static_cast<F32>(wrap) * 0.4f);
         }
         indent.rest  = hang;
@@ -135,12 +145,28 @@ ALOutputView::ALOutputView(const Params& p)
     });
 }
 
+F32 ALOutputView::stampWidth(const Shown& shown, S32 first) const
+{
+    const std::string& line = document().line(first);
+    const LLFontGL*    font = mTimeFont ? mTimeFont : getFont();
+    if (!font || shown.stamp <= 0 || shown.stamp > static_cast<S32>(line.size()))
+    {
+        return 0.f;
+    }
+    return static_cast<F32>(font->getWidth(line.substr(0, static_cast<size_t>(shown.stamp))));
+}
+
 F32 ALOutputView::prefixWidth(const Shown& shown, S32 first) const
 {
     // The first line up to what was said, measured piece by piece in
-    // the faces the pieces are shown in.
+    // the faces the pieces are shown in, once: the layout asks for every
+    // row it lays out, which is every scroll.
+    const LLFontGL* font = getFont();
+    if (shown.measured == font && shown.prefix >= 0.f)
+    {
+        return shown.prefix;
+    }
     const std::string& line = document().line(first);
-    const LLFontGL*    font = getFont();
     if (!font || shown.text > static_cast<S32>(line.size()))
     {
         return 0.f;
@@ -152,6 +178,8 @@ F32 ALOutputView::prefixWidth(const Shown& shown, S32 first) const
     width += static_cast<F32>(font->getWidth(line.substr(static_cast<size_t>(shown.stamp), static_cast<size_t>(shown.sourceBegin - shown.stamp))));
     width += static_cast<F32>((bold ? bold : font)->getWidth(line.substr(static_cast<size_t>(shown.sourceBegin), static_cast<size_t>(shown.sourceEnd - shown.sourceBegin))));
     width += static_cast<F32>(font->getWidth(line.substr(static_cast<size_t>(shown.sourceEnd), static_cast<size_t>(shown.text - shown.sourceEnd))));
+    shown.prefix   = width;
+    shown.measured = font;
     return width;
 }
 
