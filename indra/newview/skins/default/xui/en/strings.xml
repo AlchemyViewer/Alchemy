@@ -429,6 +429,8 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="PreprocExpectedValue">expected a value in preprocessor expression</string>
 	<string name="PreprocIfNeedsExpression">#if with no expression</string>
 	<string name="PreprocIfWithoutEndif">#if without #endif at the end of the file</string>
+	<string name="PreprocTooMuch">the macros expand to more than this preprocessor will make; nothing was preprocessed</string>
+	<string name="PreprocExpressionTooDeep">the expression nests too deeply for this preprocessor</string>
 	<string name="PreprocIncludeNeedsClose">missing '&gt;' in #include</string>
 	<string name="PreprocIncludeNotFound">could not find include file '[1]'</string>
 	<string name="PreprocIncludeTooDeep">#include nested too deeply at '[1]'</string>
@@ -454,6 +456,8 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="OptimizerDroppedCast">dropped the cast in [1]</string>
 	<string name="OptimizerEvaluated">evaluated [1] to [2]</string>
 	<string name="OptimizerFolded">folded [1] to [2]</string>
+	<string name="OptimizerSizes">optimized from [1] to [2] bytes of source; script memory is the simulator's to say</string>
+	<string name="OptimizerStoppedEarly">stopped after [1] rounds: there may be more to do</string>
 	<string name="OptimizerIfAlwaysFalse">the condition of this if is always false; kept only what runs</string>
 	<string name="OptimizerIfAlwaysTrue">the condition of this if is always true; kept only what runs</string>
 	<string name="OptimizerInlinedConstant">inlined [1] to [2]</string>

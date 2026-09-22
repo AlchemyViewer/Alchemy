@@ -228,6 +228,7 @@ void ALScriptAnalysis::ask(Request request, callback_t callback)
             {
                 case Kind::Check:
                     result.problems = mWorker->lsl.check(request.text, request.mono);
+                    result.parsed   = mWorker->lsl.parsed();
                     result.outline  = mWorker->lsl.outline(request.text);
                     if (request.semantics)
                     {

@@ -27,6 +27,10 @@
 
 #include "alscriptpreprocessor.h"
 
+#include "llappviewer.h"
+#include "threadpool.h"
+#include "workqueue.h"
+
 #include "allslservice.h"
 #include "alscriptanalysis.h"
 #include "alluauconfig.h"
@@ -678,7 +682,10 @@ ALPreprocessor::Options ALScriptPreprocessor::optionsFor(const Request& request,
     options.extensions = extensions;
     // The analyzers see the expanded text before the optimizer has been
     // at it, so that their positions stay the author's.
-    options.optimize              = optimize && optimizer && !request.lua && ALLSLService::builtinsLoaded();
+    options.optimize              = optimize && request.optimize && optimizer && !request.lua && ALLSLService::builtinsLoaded();
+    // Nobody reads the notes of a run whose text is only read: the
+    // optimizer prints what a fold was and became to say it.
+    options.optimizer.notes       = request.optimize;
     options.optimizer.shrinknames = shrink;
     options.optimizer.addstrings  = addstrings;
     options.optimizer.inlining    = inlining;
@@ -801,11 +808,7 @@ void ALScriptPreprocessor::attemptJob(const std::shared_ptr<Job>& job)
     }
     if (wanted.empty() || ++job->rounds > MAX_ROUNDS)
     {
-        if (job->callback)
-        {
-            alTranslateScriptProblems(result.problems);
-            job->callback(result);
-        }
+        optimizeAndFinish(job, std::move(result));
         return;
     }
     job->outstanding = S32(wanted.size());
@@ -818,6 +821,53 @@ void ALScriptPreprocessor::attemptJob(const std::shared_ptr<Job>& job)
             }
         });
     }
+}
+
+void ALScriptPreprocessor::ensureWorker()
+{
+    if (!mPool)
+    {
+        mPool = std::make_unique<LL::ThreadPool>("ScriptOptimizer", 1);
+        mPool->start();
+    }
+}
+
+void ALScriptPreprocessor::cleanupSingleton()
+{
+    if (mPool)
+    {
+        mPool->close();
+        mPool.reset();
+    }
+}
+
+void ALScriptPreprocessor::finish(const std::shared_ptr<Job>& job, ALPreprocessor::Result result)
+{
+    if (job->callback)
+    {
+        alTranslateScriptProblems(result.problems);
+        job->callback(result);
+    }
+}
+
+void ALScriptPreprocessor::optimizeAndFinish(const std::shared_ptr<Job>& job, ALPreprocessor::Result result)
+{
+    // The optimizer parses the whole script and goes round until
+    // nothing changes, and the inliner parses it again each round: far
+    // too much to do between two frames, and nothing of the viewer's is
+    // in it -- the text goes in, the text comes out, and the builtins
+    // are the process's. So it goes to a thread of its own.
+    const ALPreprocessor::Options options = optionsFor(job->request, /*optimize*/ true);
+    if (!options.optimize || result.overran || result.text.empty())
+    {
+        finish(job, std::move(result));
+        return;
+    }
+    ensureWorker();
+    mPool->getQueue().post([this, job, result = std::move(result), options]() mutable {
+        ALPreprocessor::optimize(result, options);
+        LLAppViewer::instance()->postToMainCoro([this, job, result = std::move(result)]() mutable { finish(job, std::move(result)); });
+    });
 }
 
 void ALScriptPreprocessor::trimTexts()

@@ -3374,7 +3374,13 @@ void ALFloaterScriptStudio::analysed(const ALScriptAnalysis::Result& result)
     doc.analysis         = result.problems;
     doc.analysisVersion  = result.version;
     doc.definitionsError = result.definitionsError;
-    doc.outline          = result.outline;
+    // A script mid-edit does not parse, and what it declares is then
+    // not nothing but what it last was: the outline and the breadcrumb
+    // keep what they knew until it parses again.
+    if (result.parsed || !result.outline.empty())
+    {
+        doc.outline = result.outline;
+    }
     if (!doc.language.lua)
     {
         // A parse error on one of the preprocessor's words, with its
@@ -4110,6 +4116,10 @@ void ALFloaterScriptStudio::lookupCandidate(const std::string& id, U32 generatio
     request.source        = text;
     request.lua           = doc.language.lua;
     request.compileTarget = doc.language.compileTarget;
+    // Expanded as the compiler would see it, not optimized: a name is
+    // being looked for, and the optimizer may rename it or take it away
+    // -- with shrinknames on it renames every one.
+    request.optimize      = false;
     const LLHandle<LLFloater> handle = getHandle();
     ALScriptPreprocessor::instance().run(request, [handle, id, generation, ref, name](const ALPreprocessor::Result& result) {
         if (ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get()))

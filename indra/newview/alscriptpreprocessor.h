@@ -31,6 +31,12 @@
 #include "llsingleton.h"
 #include "llstl.h"
 
+namespace LL
+{
+    template <class QUEUE> class ThreadPoolUsing;
+    class WorkQueue;
+}
+
 #include <boost/unordered/unordered_flat_map.hpp>
 #include <boost/unordered/unordered_flat_set.hpp>
 
@@ -85,6 +91,11 @@ public:
         // What the script compiles for, which the optimizer's arithmetic
         // follows: mono, lsl2 or lsl-luau.
         std::string compileTarget;
+        // Whether the optimizer runs over what was expanded. A save
+        // wants it; a run made to look a name up does not -- the
+        // optimizer may rename or remove the very name being looked
+        // for, and its work is thrown away with the text.
+        bool        optimize = true;
     };
     typedef std::function<void(const ALPreprocessor::Result&)> callback_t;
 
@@ -138,6 +149,15 @@ private:
     ALPreprocessor::Result attempt(const Request& request, wanted_t* wanted, bool optimize);
     ALPreprocessor::Options optionsFor(const Request& request, bool optimize);
     void                    attemptJob(const std::shared_ptr<Job>& job);
+    // The optimizer over what a job expanded, on a thread of its own:
+    // it parses the whole script and goes round until nothing changes,
+    // and the inliner parses it again each round, which is far too much
+    // to do between two frames. The answer comes back on the main
+    // thread and the job is done. Where there is nothing to optimize
+    // the job finishes here and now.
+    void                    optimizeAndFinish(const std::shared_ptr<Job>& job, ALPreprocessor::Result result);
+    void                    finish(const std::shared_ptr<Job>& job, ALPreprocessor::Result result);
+    void                    ensureWorker();
     // An include by its identity, loaded into the cache -- or noted as
     // failed -- and `done` called either way.
     void                    fetch(const std::string& path, std::function<void()> done);
@@ -161,4 +181,8 @@ private:
     wanted_t                                                                        mFailed;
     // What each prim was last said to hold.
     boost::unordered_flat_map<LLUUID, std::vector<ALScriptWorkspace::Item>>         mContents;
+    // Where the optimizer runs: one thread, since it is the only thing
+    // here that takes long enough to be worth taking off the main one.
+    std::unique_ptr<LL::ThreadPoolUsing<LL::WorkQueue>>                              mPool;
+    void                                                                            cleanupSingleton() override;
 };
