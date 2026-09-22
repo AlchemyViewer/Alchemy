@@ -2741,6 +2741,43 @@ void ALFloaterScriptStudio::analysed(const ALScriptAnalysis::Result& result)
     doc.analysisVersion  = result.version;
     doc.definitionsError = result.definitionsError;
     doc.outline          = result.outline;
+    if (!doc.language.lua)
+    {
+        // A parse error on one of the preprocessor's words, with its
+        // transform off, is the transform's to explain.
+        static LLCachedControl<bool> switches(gSavedSettings, "ALScriptPreprocSwitch", false);
+        static LLCachedControl<bool> extensions(gSavedSettings, "ALScriptPreprocExtensions", false);
+        const bool                   preprocessing = ALScriptPreprocessor::enabled();
+        for (ALScriptProblem& problem : doc.analysis)
+        {
+            if (problem.source != ALScriptProblem::Source::Parser || problem.line < 0 || problem.line >= doc.editor->document().lineCount())
+            {
+                continue;
+            }
+            const std::string& line = doc.editor->document().line(problem.line);
+            size_t             end  = static_cast<size_t>(llmax(0, problem.column));
+            while (end < line.size() && (isalnum(static_cast<unsigned char>(line[end])) || line[end] == '_'))
+            {
+                ++end;
+            }
+            const std::string word = line.substr(static_cast<size_t>(llmax(0, problem.column)), end - static_cast<size_t>(llmax(0, problem.column)));
+            const char*       item = nullptr;
+            if ((word == "switch" || word == "case") && !(preprocessing && switches))
+            {
+                item = "PreprocHintSwitch";
+            }
+            else if ((word == "break" || word == "continue" || word == "inline") && !(preprocessing && extensions))
+            {
+                item = "PreprocHintExtensions";
+            }
+            if (item)
+            {
+                LLStringUtil::format_map_t args;
+                args["[WORD]"] = word;
+                problem.message += " " + getString(item, args);
+            }
+        }
+    }
     // What every name is and what goes beside the text, in the source's
     // places; what stands in an include is the include's.
     const bool         mapped = preprocessed(doc) && doc.expanded.valid && doc.expanded.version == result.version;
