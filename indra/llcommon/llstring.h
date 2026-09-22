@@ -314,6 +314,9 @@ public:
     // string formatted, which is what the merge cost.
     LL_COMMON_API static S32 format(string_type& s, const format_map_t& substitutions, const format_map_t& fallback);
     LL_COMMON_API static S32 format(string_type& s, const LLSD& substitutions);
+    // The map over an LLSD map: a notification's own substitutions under
+    // the defaults, without the defaults copied into every notification.
+    LL_COMMON_API static S32 format(string_type& s, const format_map_t& substitutions, const LLSD& fallback);
     LL_COMMON_API static bool simpleReplacement(string_type& replacement, string_view_type token, const format_map_t& substitutions);
     LL_COMMON_API static bool simpleReplacement(string_type& replacement, string_view_type token, const LLSD& substitutions);
     LL_COMMON_API static void setLocale (std::string inLocale);

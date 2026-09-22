@@ -3154,75 +3154,65 @@ template<>
 S32 LLStringUtil::format(std::string& s, const LLSD& substitutions)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_STRING;
-    S32 res = 0;
-
     if (!substitutions.isMap())
     {
-        return res;
+        return 0;
     }
+    return formatWith(
+        s, [&](std::string& replacement, std::string_view token) { return simpleReplacement(replacement, token, substitutions); },
+        // As it has always been read here: a datetime the map lacks counts
+        // from the epoch rather than being left alone.
+        [&](S32& seconds) {
+            seconds = (S32) substitutions["datetime"].asInteger();
+            return true;
+        });
+}
 
-    // See the format_map_t overload: no '[' means no substitution is possible.
-    if (s.find('[') == std::string::npos)
-    {
-        return res;
-    }
-
-    std::string output;
-    std::vector<std::string> tokens;
-
-    std::string::size_type start = 0;
-    std::string::size_type prev_start = 0;
-    std::string::size_type key_start = 0;
-    while ((key_start = getSubstitution(s, start, tokens)) != std::string::npos)
-    {
-        output += std::string(s, prev_start, key_start-prev_start);
-        prev_start = start;
-
-        bool found_replacement = false;
-        std::string replacement;
-
-        if (tokens.size() == 0)
+// static
+template<>
+S32 LLStringUtil::format(std::string& s, const format_map_t& substitutions, const LLSD& fallback)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_STRING;
+    // What a notification's own substitutions under LLTrans's defaults
+    // come to, as copying the defaults into them had it: the bare token in
+    // either, the first first, then the bracketed one.
+    const bool sd = fallback.isMap();
+    auto in_map = [](const format_map_t& in, std::string_view key, std::string& out) {
+        format_map_t::const_iterator iter = in.find(key);
+        if (iter == in.end())
         {
-            found_replacement = false;
+            return false;
         }
-        else if (tokens.size() == 1)
+        out = iter->second;
+        return true;
+    };
+    auto in_sd = [&](const std::string& key, std::string& out) {
+        if (!sd || !fallback.has(key))
         {
-            found_replacement = simpleReplacement (replacement, tokens[0], substitutions);
+            return false;
         }
-        else if (tokens[1] == "number")
-        {
-            std::string param = "0";
-
-            if (tokens.size() > 2) param = tokens[2];
-            found_replacement = simpleReplacement (replacement, tokens[0], substitutions);
-            if (found_replacement) formatNumber (replacement, param);
-        }
-        else if (tokens[1] == "datetime")
-        {
-            std::string param;
-            if (tokens.size() > 2) param = tokens[2];
-
-            S32 secFromEpoch = (S32) substitutions["datetime"].asInteger();
-            found_replacement = formatDatetime (replacement, tokens[0], param, secFromEpoch);
-        }
-
-        if (found_replacement)
-        {
-            output += replacement;
-            res++;
-        }
-        else
-        {
-            // we had no replacement, use the string as is
-            // e.g. "hello [MISSING_REPLACEMENT]" or "-=[Stylized Name]=-"
-            output += std::string(s, key_start, start-key_start);
-        }
-        tokens.clear();
-    }
-    // send the remainder of the string (with no further matches for bracketed names)
-    output += std::string(s, start);
-    s = output;
-    return res;
+        out = fallback[key].asString();
+        return true;
+    };
+    return formatWith(
+        s,
+        [&](std::string& replacement, std::string_view token) {
+            const std::string key(token);
+            if (in_map(substitutions, token, replacement) || in_sd(key, replacement))
+            {
+                return true;
+            }
+            const std::string bracketed = "[" + key + "]";
+            return in_map(substitutions, bracketed, replacement) || in_sd(bracketed, replacement);
+        },
+        [&](S32& seconds) {
+            if (datetimeOf(substitutions, seconds))
+            {
+                return true;
+            }
+            seconds = sd ? (S32) fallback["datetime"].asInteger() : 0;
+            return sd;
+        });
 }
 
 ////////////////////////////////////////////////////////////

@@ -1119,6 +1119,21 @@ namespace tut
         std::string plain("nothing bracketed");
         ensure_equals("nothing to do", 0, LLStringUtil::format(plain, first, second));
         ensure_equals("and nothing done", plain, std::string("nothing bracketed"));
+
+        // A map over an LLSD map, as a notification's substitutions under
+        // the defaults: the map first, the LLSD where the map has nothing,
+        // and a datetime the LLSD lacks counted from the epoch as the LLSD
+        // form has always had it.
+        LLSD sd;
+        sd["NAME"] = "Rye";
+        sd["[BOTH]"] = "the notification's";
+        std::string over("[APP] for [NAME]: [BOTH]");
+        ensure_equals("three put in", 3, LLStringUtil::format(over, first, sd));
+        ensure_equals("the map first, the LLSD after", over, std::string("Alchemy for Rye: first"));
+        LLSD not_a_map;
+        std::string alone("[APP] [NAME]");
+        ensure_equals("with no LLSD map, the map alone", 1, LLStringUtil::format(alone, first, not_a_map));
+        ensure_equals("what the map had", alone, std::string("Alchemy [NAME]"));
     }
 
     // Both views replaceString takes are allowed to point into the string it is
