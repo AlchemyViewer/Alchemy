@@ -67,6 +67,7 @@
 #include "llexternaleditor.h"
 #include "lllogchat.h"
 #include "llscripteditorws.h"
+#include "llui.h"
 #include "lluicolortable.h"
 #include "lluictrlfactory.h"
 #include "llviewercontrol.h"
@@ -738,7 +739,7 @@ void ALFloaterScriptStudio::applyEditorOptions(ALCodeEditor& editor) const
     {
         auto                      vim    = std::make_unique<ALVimKeymap>();
         const LLHandle<LLFloater> handle = getHandle();
-        vim->shareHistory(mVimHistory);
+        vim->share(mVimShared);
         vim->hooks().command = [handle](ALTextView& view, const std::string& name, const std::string& args) {
             ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get());
             return studio && studio->vimCommand(view, name, args);
@@ -1987,6 +1988,7 @@ void ALFloaterScriptStudio::fillTabs()
         tab.label   = doc.name;
         tab.value   = doc.id;
         tab.dirty   = doc.editor->isDirty();
+        tab.image   = LLUI::getUIImage(imageNameOf(doc));
         // A dot in the worst problem's colour, for a script with any.
         S32 errors = 0, warnings = 0;
         problemCounts(doc, errors, warnings);
@@ -2199,11 +2201,11 @@ bool ALFloaterScriptStudio::vimCommand(ALTextView& view, const std::string& name
         };
         if (commands)
         {
-            list(mVimHistory->command, "cmd");
+            list(mVimShared->command, "cmd");
         }
         if (searches)
         {
-            list(mVimHistory->search, "search");
+            list(mVimShared->search, "search");
         }
         showBottom("output_tab");
         return true;
@@ -4544,6 +4546,40 @@ void ALFloaterScriptStudio::browseReference()
     }, mEditorHost);
 }
 
+// static
+const char* ALFloaterScriptStudio::imageNameOf(const Doc& doc)
+{
+    if (!doc.notecard)
+    {
+        return doc.language.lua ? "Inv_Script_Luau" : "Inv_Script";
+    }
+    if (doc.name == ".luaurc")
+    {
+        return "Studio_Config";
+    }
+    return doc.file.empty() ? "Inv_Notecard" : "Studio_File";
+}
+
+// static
+const char* ALFloaterScriptStudio::imageNameOf(ALScriptSymbolKind kind)
+{
+    switch (kind)
+    {
+        case ALScriptSymbolKind::Keyword:   return "Symbol_Keyword";
+        case ALScriptSymbolKind::Variable:  return "Symbol_Variable";
+        case ALScriptSymbolKind::Parameter: return "Symbol_Parameter";
+        case ALScriptSymbolKind::Function:  return "Symbol_Function";
+        case ALScriptSymbolKind::Field:     return "Symbol_Field";
+        case ALScriptSymbolKind::Type:      return "Symbol_Type";
+        case ALScriptSymbolKind::Constant:  return "Symbol_Constant";
+        case ALScriptSymbolKind::Event:     return "Symbol_Event";
+        case ALScriptSymbolKind::State:
+        case ALScriptSymbolKind::Label:     return "Symbol_Label";
+        case ALScriptSymbolKind::Module:    return "Symbol_Module";
+    }
+    return "Symbol_Word";
+}
+
 std::string ALFloaterScriptStudio::kindName(ALScriptSymbolKind kind) const
 {
     switch (kind)
@@ -4575,11 +4611,14 @@ void ALFloaterScriptStudio::refreshOutline(Doc& doc)
         const ALScriptOutlineEntry& entry = doc.outline[i];
         LLSD                        row;
         row["value"]                = static_cast<S32>(i);
-        row["columns"][0]["column"] = "symbol";
-        row["columns"][0]["value"]  = std::string(static_cast<size_t>(entry.depth) * 4, ' ') + entry.name;
-        row["columns"][0]["tool_tip"] = entry.detail;
-        row["columns"][1]["column"] = "kind";
-        row["columns"][1]["value"]  = kindName(entry.kind);
+        row["columns"][0]["column"] = "icon";
+        row["columns"][0]["type"]   = "icon";
+        row["columns"][0]["value"]  = imageNameOf(entry.kind);
+        row["columns"][1]["column"] = "symbol";
+        row["columns"][1]["value"]  = std::string(static_cast<size_t>(entry.depth) * 4, ' ') + entry.name;
+        row["columns"][1]["tool_tip"] = entry.detail;
+        row["columns"][2]["column"] = "kind";
+        row["columns"][2]["value"]  = kindName(entry.kind);
         mOutline->addElement(row);
     }
     refreshBreadcrumb(doc);
@@ -5497,13 +5536,17 @@ void ALFloaterScriptStudio::fillExplorer()
     std::vector<ExplorerRow> chosen = explorerChoice();
     const S32                scroll = mExplorer->getScrollPos();
     mExplorer->deleteAllItems();
-    auto row = [&](const LLSD& value, const std::string& name, const std::string& kind, const std::string& run, const std::string& tip) {
+    auto row = [&](const LLSD& value, const char* image, const std::string& name, const std::string& kind, const std::string& run, const std::string& tip) {
         LLSD r;
-        r["value"] = value;
-        for (S32 i = 0; i < 3; ++i)
+        r["value"]                  = value;
+        r["columns"][0]["column"]   = "icon";
+        r["columns"][0]["type"]     = "icon";
+        r["columns"][0]["value"]    = image;
+        r["columns"][0]["tool_tip"] = tip;
+        for (S32 i = 1; i < 4; ++i)
         {
-            r["columns"][i]["column"]   = i == 0 ? "name" : i == 1 ? "kind" : "run";
-            r["columns"][i]["value"]    = i == 0 ? name : i == 1 ? kind : run;
+            r["columns"][i]["column"]   = i == 1 ? "name" : i == 2 ? "kind" : "run";
+            r["columns"][i]["value"]    = i == 1 ? name : i == 2 ? kind : run;
             r["columns"][i]["tool_tip"] = tip;
         }
         return mExplorer->addElement(r);
@@ -5531,7 +5574,8 @@ void ALFloaterScriptStudio::fillExplorer()
         args["[NAME]"]   = object.name;
         args["[OBJECT]"] = object.name;
         args["[COUNT]"]  = std::to_string(object.prims.size());
-        LLScrollListItem* line = row(at, pin + object.name, getString(!object.present ? "KindAway" : many ? "KindLinkset" : "KindObject"), LLStringUtil::null,
+        LLScrollListItem* line = row(at, many ? "Inv_Object_Multi" : "Inv_Object", pin + object.name,
+                                     getString(!object.present ? "KindAway" : many ? "KindLinkset" : "KindObject"), LLStringUtil::null,
                                      getString(object.present ? "RowObjectTip" : "RowAwayTip", args));
         line->setSelected(wasChosen(at));
         const std::string indent = many ? "        " : "    ";
@@ -5541,7 +5585,7 @@ void ALFloaterScriptStudio::fillExplorer()
             {
                 at["prim"]     = prim.id;
                 args["[NAME]"] = prim.name.empty() ? getString("ObjectUnnamed") : prim.name;
-                line = row(at, "    " + (prim.name.empty() ? getString("ObjectUnnamed") : prim.name), getString("KindPrim"), LLStringUtil::null,
+                line = row(at, "Studio_Prim", "    " + (prim.name.empty() ? getString("ObjectUnnamed") : prim.name), getString("KindPrim"), LLStringUtil::null,
                            getString("RowPrimTip", args));
                 line->setSelected(wasChosen(at));
             }
@@ -5577,7 +5621,8 @@ void ALFloaterScriptStudio::fillExplorer()
                 args["[NAME]"]         = item.name;
                 args["[KIND]"]         = kind;
                 args["[STATE]"]        = run;
-                line = row(value, indent + item.name, kind, run, getString(item.script ? "RowScriptTip" : "RowNotecardTip", args));
+                const char* image = item.script ? (item.lua ? "Inv_Script_Luau" : "Inv_Script") : item.name == ".luaurc" ? "Studio_Config" : "Inv_Notecard";
+                line = row(value, image, indent + item.name, kind, run, getString(item.script ? "RowScriptTip" : "RowNotecardTip", args));
                 line->setSelected(wasChosen(value));
             }
         }
@@ -7068,6 +7113,11 @@ void ALFloaterScriptStudio::fileChosenToSaveAs(const std::vector<std::string>& f
     doc->file = path;
     doc->id   = "disk:" + path;
     doc->name = gDirUtilp->getBaseFileName(path);
+    doc->editor->setName("editor_" + doc->id);
+    if (doc->expandedEditor)
+    {
+        doc->expandedEditor->setName("editor_" + doc->id + ":expanded");
+    }
     if (const FileLanguage said = languageOfFile(path, false); said.said)
     {
         speakFileLanguage(*doc, said);

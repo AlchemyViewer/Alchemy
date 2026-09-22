@@ -595,82 +595,82 @@
     </menu_bar>
 
     <!-- The toolbar: the buttons an editor keeps in reach (save, save all,
-         undo, redo, find, format, the preprocessed view) at the left, and
-         the three regions' toggles at the right. What the active script
-         compiles for and whether it runs sit in the strip under the
-         editor, with the script. The labels stand in for icons until
-         there are icons. -->
+         undo, redo, find, format, the preprocessed view) at the left, as
+         icons with their words on the tool tips, and the three regions'
+         toggles at the right. What the active script compiles for and
+         whether it runs sit in the strip under the editor, with the
+         script. -->
     <button
      follows="left|top"
      height="22"
-     label="Save"
+     image_overlay="Script_Save"
      layout="topleft"
      left="8"
      name="save_btn"
      tool_tip="Save and compile the script (Control+S); a notecard is saved as it is"
      top="41"
-     width="50" />
+     width="26" />
     <button
      follows="left|top"
      height="22"
-     label="Save All"
+     image_overlay="Studio_SaveAll"
      layout="topleft"
      left_pad="2"
      name="save_all_btn"
      tool_tip="Save every script with unsaved changes (Control+Alt+S)"
      top_delta="0"
-     width="60" />
+     width="26" />
     <button
      follows="left|top"
      height="22"
-     label="Undo"
+     image_overlay="Script_Undo"
      layout="topleft"
      left_pad="8"
      name="undo_btn"
      tool_tip="Undo the last change (Control+Z)"
      top_delta="0"
-     width="46" />
+     width="26" />
     <button
      follows="left|top"
      height="22"
-     label="Redo"
+     image_overlay="Script_Redo"
      layout="topleft"
      left_pad="2"
      name="redo_btn"
      tool_tip="Redo what was undone (Control+Y)"
      top_delta="0"
-     width="46" />
+     width="26" />
     <button
      follows="left|top"
      height="22"
-     label="Find"
+     image_overlay="Studio_Find"
      layout="topleft"
      left_pad="8"
      name="find_btn"
      tool_tip="Find in this script (Control+F); Control+Shift+F finds across scripts"
      top_delta="0"
-     width="46" />
+     width="26" />
     <button
      follows="left|top"
      height="22"
-     label="Format"
+     image_overlay="Studio_Format"
      layout="topleft"
      left_pad="2"
      name="format_btn"
      tool_tip="Put the script's indentation and spacing right (Shift+Alt+F)"
      top_delta="0"
-     width="56" />
+     width="26" />
     <button
      follows="left|top"
      height="22"
+     image_overlay="Studio_Expanded"
      is_toggle="true"
-     label="Expanded"
      layout="topleft"
      left_pad="8"
      name="expanded_btn"
      tool_tip="Show what the preprocessor made of this script, as the server compiles it, in place of the source; press again for the source. Read-only."
      top_delta="0"
-     width="72" />
+     width="26" />
     <button
      follows="right|top"
      height="22"
@@ -751,6 +751,7 @@
              tool_tip="The objects in hand -- pinned, selected in world, or holding a script that is open -- and their scripts and notecards; double-click to open one, right-click for everything else"
              top="0"
              width="240">
+                <scroll_list.columns label="" name="icon" width="20" />
                 <scroll_list.columns dynamic_width="true" label="Name" name="name" tool_tip="The objects in hand, each prim of a linkset, and what each prim holds" />
                 <scroll_list.columns label="Type" name="kind" tool_tip="What each row is: an object, a prim, an LSL or Lua script, or a notecard" width="72" />
                 <scroll_list.columns label="State" name="run" tool_tip="Whether a script runs in its object" width="54" />
@@ -1186,6 +1187,7 @@
                      tool_tip="What the script declares, in the order written; choosing one goes to it"
                      top="0"
                      width="250">
+                        <scroll_list.columns label="" name="icon" width="20" />
                         <scroll_list.columns dynamic_width="true" label="Symbol" name="symbol" />
                         <scroll_list.columns label="Kind" name="kind" width="70" />
                     </scroll_list>

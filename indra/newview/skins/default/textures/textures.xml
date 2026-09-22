@@ -1037,4 +1037,28 @@ with the same filename but different name
   <texture name="Script_Running" file_name="script_editor/green_square.png" preload="false" />
   <texture name="Script_NotRunning" file_name="script_editor/yellow_square.png" preload="false" />
   <texture name="Script_Error" file_name="script_editor/red_square.png" preload="false" />
+
+  <!-- The Script Studio's marks, drawn by scripts/content_tools/generate_studio_icons.py:
+       the kinds of symbol on the completion list and in the outline, the
+       toolbar, and the tabs and the explorer. -->
+  <texture name="Symbol_Function" file_name="studio/Symbol_Function.png" preload="false" />
+  <texture name="Symbol_Event" file_name="studio/Symbol_Event.png" preload="false" />
+  <texture name="Symbol_Constant" file_name="studio/Symbol_Constant.png" preload="false" />
+  <texture name="Symbol_Keyword" file_name="studio/Symbol_Keyword.png" preload="false" />
+  <texture name="Symbol_Type" file_name="studio/Symbol_Type.png" preload="false" />
+  <texture name="Symbol_Variable" file_name="studio/Symbol_Variable.png" preload="false" />
+  <texture name="Symbol_Parameter" file_name="studio/Symbol_Parameter.png" preload="false" />
+  <texture name="Symbol_Field" file_name="studio/Symbol_Field.png" preload="false" />
+  <texture name="Symbol_Label" file_name="studio/Symbol_Label.png" preload="false" />
+  <texture name="Symbol_Snippet" file_name="studio/Symbol_Snippet.png" preload="false" />
+  <texture name="Symbol_Word" file_name="studio/Symbol_Word.png" preload="false" />
+  <texture name="Symbol_Deprecated" file_name="studio/Symbol_Deprecated.png" preload="false" />
+  <texture name="Symbol_Module" file_name="studio/Symbol_Module.png" preload="false" />
+  <texture name="Studio_SaveAll" file_name="studio/Studio_SaveAll.png" preload="false" />
+  <texture name="Studio_Find" file_name="studio/Studio_Find.png" preload="false" />
+  <texture name="Studio_Format" file_name="studio/Studio_Format.png" preload="false" />
+  <texture name="Studio_Expanded" file_name="studio/Studio_Expanded.png" preload="false" />
+  <texture name="Studio_File" file_name="studio/Studio_File.png" preload="false" />
+  <texture name="Studio_Prim" file_name="studio/Studio_Prim.png" preload="false" />
+  <texture name="Studio_Config" file_name="studio/Studio_Config.png" preload="false" />
 </textures>

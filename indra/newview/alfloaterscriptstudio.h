@@ -684,6 +684,10 @@ private:
     // Open Recent; kept with the state.
     void noteRecentFile(const std::string& path);
     void fillRecentMenu();
+    // The marks: what a document is, on its tab; what a symbol's kind
+    // is, in the outline -- by texture name, as a scroll list wants it.
+    static const char* imageNameOf(const Doc& doc);
+    static const char* imageNameOf(ALScriptSymbolKind kind);
 
     void writeState(LLSD& state) const override;
     void readState(const LLSD& state) override;
@@ -691,9 +695,9 @@ private:
     std::vector<std::unique_ptr<Doc>>  mDocs;
     size_t                             mActive = NONE;
     std::vector<std::string>           mRecentFiles;
-    // The : and / lines entered in any of the editors, shared among
-    // their vim keymaps.
-    std::shared_ptr<ALVimKeymap::History> mVimHistory = std::make_shared<ALVimKeymap::History>();
+    // What the editors' vim keymaps share: the : and / lines entered in
+    // any of them, and the settings a :set changes.
+    std::shared_ptr<ALVimKeymap::Shared> mVimShared = std::make_shared<ALVimKeymap::Shared>();
     std::vector<Snippet>               mSnippets[2];
     bool                               mSnippetsLoaded[2] = { false, false };
     bool                               mWordWrap    = false;
