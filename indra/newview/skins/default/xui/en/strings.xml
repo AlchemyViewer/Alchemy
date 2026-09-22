@@ -358,6 +358,19 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="XUITreeHiddenHere">hidden here</string>
 	<string name="XUITreeDisabled">disabled</string>
 
+	<!-- What the code editor's hover card says of a string literal
+	     (alcodeeditor.cpp): its size, which is what the type alone never
+	     says. The bytes are of what the string holds, with each escape
+	     counted as what it stands for; the characters are said only
+	     where they are not the same number, and what it is written as
+	     only where the escapes make that longer. -->
+	<string name="CodeStringHead">string</string>
+	<string name="CodeStringBytesA">[COUNT] byte</string>
+	<string name="CodeStringBytesB">[COUNT] bytes</string>
+	<string name="CodeStringCharactersA">[COUNT] character</string>
+	<string name="CodeStringCharactersB">[COUNT] characters</string>
+	<string name="CodeStringWritten">[COUNT] as written</string>
+
 	<!-- The vim keymap's words, in the band under the editor's text
 	     (alvimkeymap.cpp): the modes, the questions, and what a command
 	     says of what it did or could not do. The E-numbers are vim's own,

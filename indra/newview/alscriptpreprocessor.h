@@ -28,6 +28,7 @@
 #include "alluauconfig.h"
 #include "alpreprocessor.h"
 #include "alscriptworkspace.h"
+#include "llinventorymodel.h"
 #include "llsingleton.h"
 #include "llstl.h"
 
@@ -44,6 +45,39 @@ namespace LL
 #include <memory>
 #include <string>
 #include <vector>
+
+// What the preprocessor needs of the viewer to expand one script, taken
+// on the main thread and read on any other: the settings, the agent and
+// the asset as values, and every include the script asked for when it
+// was last expanded, already resolved to its text. So a run over a
+// snapshot touches nothing of the viewer's -- no inventory, no object,
+// no setting, no cache -- and belongs on a thread of its own while the
+// main one draws. What a run asks for that the snapshot does not hold
+// is noted rather than looked up: the main thread resolves those,
+// fetches what is in the world, and takes another snapshot.
+class ALScriptSnapshot
+{
+public:
+    // Expands a script with what the snapshot holds. Any thread.
+    ALPreprocessor::Result run(std::string_view source);
+    // What the last run asked for and the snapshot could not answer,
+    // each once, in the order asked; taken away by the asking.
+    std::vector<ALPreprocessor::Ask> missed() { return std::move(mMissed); }
+
+private:
+    friend class ALScriptPreprocessor;
+    struct Answer
+    {
+        ALPreprocessor::Found   found = ALPreprocessor::Found::No;
+        ALPreprocessor::Include include;
+    };
+    // One key for the three things that decide what a name stands for.
+    static std::string keyOf(const ALPreprocessor::Ask& ask);
+
+    ALPreprocessor::Options                                                          mOptions;
+    boost::unordered_flat_map<std::string, Answer, ll::string_hash, std::equal_to<>> mAnswers;
+    std::vector<ALPreprocessor::Ask>                                                 mMissed;
+};
 
 // The preprocessor as the viewer runs it: the settings for what it does,
 // the agent and the asset for its predefined macros, and its includes
@@ -100,11 +134,16 @@ public:
     typedef std::function<void(const ALPreprocessor::Result&)> callback_t;
 
     // Runs, fetching whatever is missing and running again until nothing
-    // is, then answers once.
+    // is, then answers once, on the main thread. The expansion, the
+    // optimizer and the compression are all done on a thread of their
+    // own: what the main thread does here is resolve the includes --
+    // inventory, object contents and the disk, which are its alone --
+    // and hand the answers over.
     void run(const Request& request, callback_t callback);
-    // Runs with what is in hand, the rest noted as pending: for the
-    // analyzers, which cannot wait.
-    ALPreprocessor::Result runNow(const Request& request);
+    // The same without the optimizer, for the analyzers: what the
+    // compiler would see, mapped back to what the author wrote, and
+    // none of the renaming the optimizer may do on top of it.
+    void expand(const Request& request, callback_t callback);
     // What the `.luaurc` governing a SLua script says -- its mode, its
     // lints, its globals -- from what is in hand: false, and the
     // defaults, where there is no configuration, it is not in yet, or
@@ -137,24 +176,45 @@ private:
     };
     // `unknown` says the object's contents have not been listed yet, so
     // a name not found may still be there.
-    std::vector<Candidate> candidatesFor(const ALPreprocessor::Ask& ask, const Request& request, bool& unknown) const;
-    ALPreprocessor::Found  resolve(const ALPreprocessor::Ask& ask, ALPreprocessor::Include& out, const Request& request, wanted_t* wanted);
+    std::vector<Candidate> candidatesFor(const ALPreprocessor::Ask& ask, const Request& request, bool& unknown);
+    // Every item of a name, from the walk or from the last one.
+    const LLInventoryModel::item_array_t& namedItems(const std::string& name);
+    // `retry` asks again for what failed before rather than taking the
+    // failure for an answer: what a run's first round does, since an
+    // include that was not there may be there now.
+    ALPreprocessor::Found  resolve(const ALPreprocessor::Ask& ask, ALPreprocessor::Include& out, const Request& request, wanted_t* wanted,
+                                   bool retry);
     // The `.luaurc` that governs a file, by the file's identity: its own
     // identity and its text, fetched like an include where it is in the
     // world. No where there is none.
-    ALPreprocessor::Found  configFor(const std::string& from, const Request& request, wanted_t* wanted, std::string& path, std::string& text);
+    ALPreprocessor::Found  configFor(const std::string& from, const Request& request, wanted_t* wanted, bool retry, std::string& path,
+                                     std::string& text);
     // An include's text, from the cache or a file; Pending, and wanted,
     // where it is in the world and not in hand yet.
-    ALPreprocessor::Found  textOf(const Candidate& candidate, wanted_t* wanted, std::string& text, std::string& assetId);
-    ALPreprocessor::Result attempt(const Request& request, wanted_t* wanted, bool optimize);
+    ALPreprocessor::Found  textOf(const Candidate& candidate, wanted_t* wanted, bool retry, std::string& text, std::string& assetId);
     ALPreprocessor::Options optionsFor(const Request& request, bool optimize);
+    // The identity a script's asks are remembered under.
+    static std::string      keyOf(const Request& request);
+    // What is in hand for a job, on the main thread: the settings and
+    // the agent read off, and every include the script is known to ask
+    // for resolved. `wanted` gathers what is in the world and not in
+    // hand, which the job fetches before it expands anything.
+    ALScriptSnapshot        snapshotFor(const std::shared_ptr<Job>& job, wanted_t& wanted);
+    // `fresh` asks the region what the object holds before anything
+    // else, rather than going by what it last said.
+    void                    start(const Request& request, callback_t callback, bool fresh);
     void                    attemptJob(const std::shared_ptr<Job>& job);
-    // The optimizer over what a job expanded, on a thread of its own:
-    // it parses the whole script and goes round until nothing changes,
-    // and the inliner parses it again each round, which is far too much
-    // to do between two frames. The answer comes back on the main
-    // thread and the job is done. Where there is nothing to optimize
-    // the job finishes here and now.
+    // What the worker made of a job, back on the main thread: another
+    // round where the run asked for an include nobody had looked up
+    // yet, else the optimizer and then the answer.
+    void                    expandedJob(const std::shared_ptr<Job>& job, ALPreprocessor::Result result,
+                                        std::vector<ALPreprocessor::Ask> missed);
+    // The optimizer and the compression over what a job expanded, on
+    // the worker: the optimizer parses the whole script and goes round
+    // until nothing changes, and the inliner parses it again each
+    // round, which is far too much to do between two frames. The answer
+    // comes back on the main thread and the job is done. Where there is
+    // nothing to do the job finishes here and now.
     void                    optimizeAndFinish(const std::shared_ptr<Job>& job, ALPreprocessor::Result result);
     void                    finish(const std::shared_ptr<Job>& job, ALPreprocessor::Result result);
     void                    ensureWorker();
@@ -181,8 +241,31 @@ private:
     wanted_t                                                                        mFailed;
     // What each prim was last said to hold.
     boost::unordered_flat_map<LLUUID, std::vector<ALScriptWorkspace::Item>>         mContents;
-    // Where the optimizer runs: one thread, since it is the only thing
-    // here that takes long enough to be worth taking off the main one.
+    // Every script and notecard of a name, from the last walk of the
+    // inventory for it. The walk is of the whole tree, and a check runs
+    // a moment after every keystroke: a script naming three includes
+    // would otherwise walk the whole inventory three times a keystroke.
+    // What a name stands for changes when the inventory does, which is
+    // all the generation counts; the folders a name gives are weighed
+    // after the walk, so a relative include is still answered afresh.
+    struct Named
+    {
+        U32                            generation = 0;
+        LLInventoryModel::item_array_t items;
+    };
+    boost::unordered_flat_map<std::string, Named, ll::string_hash, std::equal_to<>> mNamed;
+    struct Watcher;
+    std::unique_ptr<Watcher>                                                        mWatcher;
+    U32                                                                             mInventoryGeneration = 1;
+    // What each script asked for the last time it was expanded, by the
+    // script's identity: a snapshot resolves these before the run goes
+    // out, so that a script whose includes have not changed -- which is
+    // every script between one keystroke and the next -- is expanded in
+    // one round rather than one round for each level of include.
+    boost::unordered_flat_map<std::string, std::vector<ALPreprocessor::Ask>, ll::string_hash, std::equal_to<>> mAsked;
+    // Where a run happens: one thread, so that two scripts saved at
+    // once are expanded one after another rather than fighting over the
+    // builtins.
     std::unique_ptr<LL::ThreadPoolUsing<LL::WorkQueue>>                              mPool;
     void                                                                            cleanupSingleton() override;
 };

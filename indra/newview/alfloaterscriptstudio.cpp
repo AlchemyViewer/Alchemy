@@ -28,6 +28,7 @@
 
 #include "alcodeeditor.h"
 #include "alscriptpreprocessor.h"
+#include "alemptystate.h"
 #include "aljumpbar.h"
 #include "aloutputview.h"
 #include "alscopebar.h"
@@ -439,6 +440,23 @@ bool ALFloaterScriptStudio::postBuild()
     mFolds.onChanged([this]() { saveState(); });
 
     mEditorHost    = getChild<LLPanel>("editor_panel");
+    // What the window says with no script open. The editors are made as
+    // scripts are opened and die with them, so with none there is nothing
+    // in this panel at all: a toolbar over a hole, saying nothing about
+    // where a script comes from. Made once, over the whole of the host,
+    // and shown whenever the host is otherwise empty.
+    {
+        ALEmptyState::Params ep(LLUICtrlFactory::getDefaultParams<ALEmptyState>());
+        ep.name               = "no_docs";
+        ep.rect               = mEditorHost->getLocalRect();
+        ep.follows.flags      = FOLLOWS_ALL;
+        ep.background_visible = false;
+        ep.visible            = false;
+        mNoDocs               = LLUICtrlFactory::create<ALEmptyState>(ep);
+        mEditorHost->addChild(mNoDocs);
+        mNoDocs->say(getString("NoScriptOpenHeadline"), getString("NoScriptOpenSentence"), getString("NoScriptOpenAction"));
+        mNoDocs->onAction([this]() { onMenuAction(LLSD("open_file")); });
+    }
     mTabs          = getChild<ALTabStrip>("tabs");
     mBreadcrumb    = getChild<ALJumpBar>("breadcrumb");
     mBottomTabs    = getChild<LLTabContainer>("bottom_tabs");
@@ -456,6 +474,7 @@ bool ALFloaterScriptStudio::postBuild()
         }
     });
     mOutput        = getChild<ALOutputView>("output");
+    mOutput->setPlaceholder(getString("NoOutput"));
     mOutputFilter  = getChild<LLComboBox>("output_filter");
     mExplorer      = getChild<LLScrollListCtrl>("explorer");
     mSearchBar     = getChild<ALScopeBar>("search_bar");
@@ -606,6 +625,9 @@ bool ALFloaterScriptStudio::postBuild()
     refreshExplorer();
     refreshToolbar();
     fillTabs();
+    // A window opened with nothing in it says so from the first frame:
+    // nothing else calls this until a script is activated.
+    showEditors();
     return true;
 }
 
@@ -835,6 +857,7 @@ void ALFloaterScriptStudio::applyEditorOptions(ALCodeEditor& editor) const
     editor.setWordWrap(mWordWrap);
     editor.setShowLineNumbers(mLineNumbers);
     editor.setShowIndentGuides(mIndentGuides);
+    editor.setShowWhitespace(mWhitespace);
     editor.setRelativeLineNumbers(mRelativeNumbers);
     editor.setColorBrackets(mRainbowBrackets);
     editor.setStickyHeaders(mStickyHeaders);
@@ -874,7 +897,11 @@ void ALFloaterScriptStudio::openScript(const ALScriptRef& ref, const std::string
     doc->carriedText = std::move(carried);
     doc->pendingLine = line;
     doc->editor = makeEditor(doc->id, true);
-    doc->editor->setText(getString("Loading"));
+    // What the editor says while there is nothing in it yet. Put in as
+    // text it became a real line, numbered in the gutter and undone back
+    // to by the first edit; the document is empty until the script
+    // arrives, and should read as empty.
+    doc->editor->setPlaceholder(getString("Loading"));
     Doc* raw     = doc.get();
     doc->changed = doc->editor->onTextChanged([this, raw]() {
         fillTabs();
@@ -1528,6 +1555,10 @@ void ALFloaterScriptStudio::toggleExpanded()
 
 void ALFloaterScriptStudio::showEditors()
 {
+    if (mNoDocs)
+    {
+        mNoDocs->setVisible(mDocs.empty());
+    }
     for (size_t i = 0; i < mDocs.size(); ++i)
     {
         Doc&       doc      = *mDocs[i];
@@ -1568,20 +1599,72 @@ ALScriptPreprocessor::Request ALFloaterScriptStudio::preprocessRequest(const Doc
     return request;
 }
 
-const ALFloaterScriptStudio::Doc::Expanded& ALFloaterScriptStudio::expandedFor(Doc& doc)
+void ALFloaterScriptStudio::expandFor(Doc& doc, ALScriptAnalysis::Kind kind, const ALTextPos& at)
 {
-    const U32 version = doc.editor->document().version();
-    if (!doc.expanded.valid || doc.expanded.version != version)
+    // The question waits for the text it is about: one of its kind that
+    // was already waiting is somewhere the caret or the mouse has since
+    // left.
+    const auto same = std::find_if(doc.waiting.begin(), doc.waiting.end(), [kind](const Doc::Waiting& was) { return was.kind == kind; });
+    if (same != doc.waiting.end())
     {
-        ALPreprocessor::Result result = ALScriptPreprocessor::instance().runNow(preprocessRequest(doc));
-        doc.expanded.valid            = true;
-        doc.expanded.disabled         = result.disabled;
-        doc.expanded.version          = version;
-        doc.expanded.text             = std::move(result.text);
-        doc.expanded.map              = std::move(result.map);
-        doc.expanded.problems         = std::move(result.problems);
+        same->at = at;
     }
-    return doc.expanded;
+    else
+    {
+        doc.waiting.push_back(Doc::Waiting{ kind, at });
+    }
+    const U32 version = doc.editor->document().version();
+    if (doc.expanding == version)
+    {
+        // Already on its way; every question waiting takes the one answer.
+        return;
+    }
+    doc.expanding                    = version;
+    const LLHandle<LLFloater> handle = getHandle();
+    const std::string         id     = doc.id;
+    ALScriptPreprocessor::instance().expand(preprocessRequest(doc), [handle, id, version](const ALPreprocessor::Result& result) {
+        if (ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get()))
+        {
+            studio->expandedAnswer(id, version, result);
+        }
+    });
+}
+
+void ALFloaterScriptStudio::expandedAnswer(const std::string& id, U32 version, const ALPreprocessor::Result& result)
+{
+    const size_t index = indexOf(id);
+    if (index == NONE)
+    {
+        return;
+    }
+    Doc& doc = *mDocs[index];
+    if (doc.expanding == version)
+    {
+        doc.expanding = 0;
+    }
+    if (version != doc.editor->document().version())
+    {
+        // The text has moved on. Whatever was waiting was asked about
+        // the text as it was -- a hover over a word the edit may have
+        // moved -- and the edit has scheduled a check of its own, so
+        // the questions go rather than being asked of the wrong text.
+        doc.waiting.clear();
+        return;
+    }
+    doc.expanded.valid    = true;
+    doc.expanded.disabled = result.disabled;
+    doc.expanded.version  = version;
+    doc.expanded.text     = result.text;
+    doc.expanded.map      = result.map;
+    doc.expanded.problems = result.problems;
+    // What the preprocessor found is shown with what the analyzers found.
+    refreshProblems(doc);
+    std::vector<Doc::Waiting> waiting;
+    waiting.swap(doc.waiting);
+    for (const Doc::Waiting& question : waiting)
+    {
+        askAnalyzer(doc, question.kind, question.at);
+    }
 }
 
 void ALFloaterScriptStudio::preprocess(Doc& doc, bool then_save)
@@ -2354,13 +2437,18 @@ void ALFloaterScriptStudio::askAnalyzer(Doc& doc, ALScriptAnalysis::Kind kind, c
     }
     if (preprocessed(doc))
     {
-        // The analyzers see what the compiler would; a position inside a
-        // directive has nothing there to ask about.
-        const Doc::Expanded& expanded = expandedFor(doc);
-        request.text                  = expanded.text;
+        if (!doc.expanded.valid || doc.expanded.version != request.version)
+        {
+            // The analyzers see what the compiler would, and expanding a
+            // script is a thread's work: the question waits for it.
+            expandFor(doc, kind, at);
+            return;
+        }
+        // A position inside a directive has nothing there to ask about.
+        request.text = doc.expanded.text;
         if (kind != ALScriptAnalysis::Kind::Check)
         {
-            const ALSourceMap::Loc loc = expanded.map.toExpanded(0, at.line, at.column);
+            const ALSourceMap::Loc loc = doc.expanded.map.toExpanded(0, at.line, at.column);
             if (!loc.found())
             {
                 return;
@@ -2572,7 +2660,15 @@ void ALFloaterScriptStudio::fillTabs()
             static const LLUIColor warning_color = LLUIColorTable::instance().getColor("CodeMarkWarning", LLColor4::yellow);
             tab.badge                            = errors > 0 ? error_color.get() : warning_color.get();
         }
-        tab.toolTip = !doc.file.empty() ? doc.file : doc.notecard ? getString("TabNotecardTip") : doc.ref.inInventory() ? getString("TabInventoryTip") : getString("TabObjectTip");
+        // The name first, then where it is. The strip halves a name that
+        // does not fit, and the name it cut is the one thing you hover a
+        // cut tab to read; saying only where the script lives answered a
+        // question nobody had asked.
+        const std::string where = !doc.file.empty() ? doc.file
+                                  : doc.notecard    ? getString("TabNotecardTip")
+                                  : doc.ref.inInventory() ? getString("TabInventoryTip")
+                                                          : getString("TabObjectTip");
+        tab.toolTip = doc.name + "\n" + where;
         tabs.push_back(std::move(tab));
         if (i == mActive)
         {
@@ -3766,6 +3862,14 @@ void ALFloaterScriptStudio::fillProblems(const Doc* doc)
         value["fileName"]  = problem->fileName;
         value["level"]     = levelName(problem->level);
         value["origin"]    = problem->origin;
+        // Every column carries the whole of it: a diagnostic longer than
+        // the column is cut at the column's edge, and the squiggle that
+        // would otherwise have to be hovered instead is in a file this
+        // window may not even have open.
+        const std::string place = (problem->file.empty() ? doc->name : problem->fileName) +
+                                  (problem->hasColumn ? llformat(":%d:%d", problem->line + 1, problem->column + 1)
+                                                      : llformat(":%d", problem->line + 1));
+        const std::string tip = place + "\n" + problem->message;
         LLSD row;
         row["value"]                = value;
         row["columns"][0]["column"] = "line";
@@ -3777,6 +3881,10 @@ void ALFloaterScriptStudio::fillProblems(const Doc* doc)
         row["columns"][2]["value"]  = problem->origin;
         row["columns"][3]["column"] = "message";
         row["columns"][3]["value"]  = problem->message;
+        for (S32 i = 0; i < 4; ++i)
+        {
+            row["columns"][i]["tool_tip"] = tip;
+        }
         mProblems->addElement(row);
     }
     const S32 held = mProblemStore.countIn(doc->id);
@@ -4892,8 +5000,13 @@ void ALFloaterScriptStudio::fillReferences(const Doc* doc)
     mReferences->deleteAllItems();
     if (!doc || doc->places.empty())
     {
+        // A list with nothing in it and nothing to say is a pane that
+        // looks broken; this one is empty until it is asked a question,
+        // so it says which question.
+        mReferences->setCommentText(doc ? getString("NoReferences") : LLStringUtil::null);
         return;
     }
+    mReferences->setCommentText(LLStringUtil::null);
     for (size_t i = 0; i < doc->places.size(); ++i)
     {
         const Doc::Place& place = doc->places[i];
@@ -5426,6 +5539,7 @@ void ALFloaterScriptStudio::refreshOutline(Doc& doc)
         row["columns"][2]["value"]  = kindName(entry.kind);
         mOutline->addElement(row);
     }
+    mOutline->setCommentText(doc.outline.empty() ? getString(doc.loaded ? "NoOutline" : "NoOutlineYet") : LLStringUtil::null);
     refreshBreadcrumb(doc);
 }
 
@@ -6543,6 +6657,16 @@ void ALFloaterScriptStudio::fillExplorer()
         }
     }
     mExplorer->setScrollPos(scroll);
+    // The explorer is empty exactly when nothing is selected, so what it
+    // says while empty is what it is for.
+    if (mExplorer->isEmpty())
+    {
+        mExplorer->setCommentText(getString(mExplorerModel.empty() ? "NoExplorerSelection" : "NoExplorerContents"));
+    }
+    else
+    {
+        mExplorer->setCommentText(LLStringUtil::null);
+    }
 }
 
 std::vector<ALFloaterScriptStudio::ExplorerRow> ALFloaterScriptStudio::explorerChoice() const
@@ -7239,6 +7363,7 @@ void ALFloaterScriptStudio::letGoOf(size_t index)
     if (mDocs.empty())
     {
         mActive = NONE;
+        showEditors();
         fillTabs();
         refreshToolbar();
         fillProblems(nullptr);
@@ -7446,6 +7571,14 @@ void ALFloaterScriptStudio::onMenuAction(const LLSD& param)
     else if (action == "map_narrow" || action == "map_medium" || action == "map_wide")
     {
         mScrollMapWidth = action == "map_narrow" ? 60 : action == "map_medium" ? 90 : 130;
+        applyEditorOptions();
+    }
+    else if (action == "blanks_none" || action == "blanks_selection" || action == "blanks_trailing" || action == "blanks_all")
+    {
+        mWhitespace = action == "blanks_none"      ? ALCodeEditor::Whitespace::None
+                      : action == "blanks_selection" ? ALCodeEditor::Whitespace::Selection
+                      : action == "blanks_trailing"  ? ALCodeEditor::Whitespace::Trailing
+                                                     : ALCodeEditor::Whitespace::All;
         applyEditorOptions();
     }
     else if (action == "map_preview")
@@ -7785,6 +7918,22 @@ bool ALFloaterScriptStudio::onMenuCheck(const LLSD& param)
     if (action == "scroll_map")
     {
         return mScrollMap;
+    }
+    if (action == "blanks_none")
+    {
+        return mWhitespace == ALCodeEditor::Whitespace::None;
+    }
+    if (action == "blanks_selection")
+    {
+        return mWhitespace == ALCodeEditor::Whitespace::Selection;
+    }
+    if (action == "blanks_trailing")
+    {
+        return mWhitespace == ALCodeEditor::Whitespace::Trailing;
+    }
+    if (action == "blanks_all")
+    {
+        return mWhitespace == ALCodeEditor::Whitespace::All;
     }
     if (action == "map_narrow")
     {
@@ -8136,6 +8285,7 @@ void ALFloaterScriptStudio::writeState(LLSD& state) const
     state["word_wrap"]    = mWordWrap;
     state["line_numbers"] = mLineNumbers;
     state["indent_guides"]    = mIndentGuides;
+    state["whitespace"]       = static_cast<S32>(mWhitespace);
     state["relative_numbers"] = mRelativeNumbers;
     state["rainbow_brackets"] = mRainbowBrackets;
     state["sticky_headers"]   = mStickyHeaders;
@@ -8178,6 +8328,11 @@ void ALFloaterScriptStudio::readState(const LLSD& state)
     if (state.has("indent_guides"))
     {
         mIndentGuides = state["indent_guides"].asBoolean();
+    }
+    if (state.has("whitespace"))
+    {
+        mWhitespace = static_cast<ALCodeEditor::Whitespace>(
+            llclamp(state["whitespace"].asInteger(), static_cast<S32>(ALCodeEditor::Whitespace::None), static_cast<S32>(ALCodeEditor::Whitespace::All)));
     }
     if (state.has("relative_numbers"))
     {

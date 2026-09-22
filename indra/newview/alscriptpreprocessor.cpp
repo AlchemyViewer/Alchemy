@@ -40,6 +40,7 @@
 #include "llsdjson.h"
 #include "llinventoryfunctions.h"
 #include "llinventorymodel.h"
+#include "llinventoryobserver.h"
 #include "llviewercontrol.h"
 #include "llviewerinventory.h"
 #include "llviewerobject.h"
@@ -52,9 +53,15 @@
 
 namespace
 {
-    // How many times a run fetches and tries again before it answers
-    // with what it has.
-    constexpr S32 MAX_ROUNDS = 8;
+    // How many times a run fetches, or expands and asks for more, before
+    // it answers with what it has. A round is one or the other now, so a
+    // script whose includes are nowhere in hand takes two for each level
+    // of them.
+    constexpr S32 MAX_ROUNDS = 16;
+    // How many include names a script is remembered as asking for. One
+    // that builds its names out of macros could otherwise have a longer
+    // list every time it is expanded.
+    constexpr size_t MAX_REMEMBERED = 128;
 
     const std::string_view OBJECT_PREFIX    = "object:";
     const std::string_view INVENTORY_PREFIX = "inventory:";
@@ -254,14 +261,50 @@ struct ALScriptPreprocessor::Job
     S32        rounds      = 0;
     S32        outstanding = 0;
     // The first round of a run tries again for what failed before: an
-    // include that was not there may be there now. Only this job's own
-    // -- what its first attempt asks for -- rather than every failure
-    // every script ever had.
+    // include that was not there may be there now. Only what this job's
+    // own asks reach, rather than every failure every script ever had.
     bool       retry       = false;
+    // Every include this run knows the script asks for: what it asked
+    // for the last time it was expanded, and whatever this run's
+    // expansions turned up on top. Resolved afresh each round, since a
+    // fetch may have brought one in.
+    std::vector<ALPreprocessor::Ask> asks;
+    wanted_t                         askKeys;
+};
+
+// Anything at all changing in the inventory is enough: what an include
+// name stands for is a walk of the whole tree, and the answer is kept
+// only until the tree moves.
+struct ALScriptPreprocessor::Watcher final : public LLInventoryObserver
+{
+    U32& generation;
+
+    explicit Watcher(U32& generation_in) : generation(generation_in) { gInventory.addObserver(this); }
+    ~Watcher() override { gInventory.removeObserver(this); }
+    void changed(U32) override { ++generation; }
 };
 
 ALScriptPreprocessor::ALScriptPreprocessor() = default;
 ALScriptPreprocessor::~ALScriptPreprocessor() = default;
+
+const LLInventoryModel::item_array_t& ALScriptPreprocessor::namedItems(const std::string& name)
+{
+    if (!mWatcher)
+    {
+        mWatcher = std::make_unique<Watcher>(mInventoryGeneration);
+    }
+    Named& named = mNamed[name];
+    if (named.generation == mInventoryGeneration)
+    {
+        return named.items;
+    }
+    LLInventoryModel::cat_array_t cats;
+    NamedScriptOrNotecard         wanted(name);
+    named.items.clear();
+    gInventory.collectDescendentsIf(gInventory.getRootFolderID(), cats, named.items, LLInventoryModel::EXCLUDE_TRASH, wanted);
+    named.generation = mInventoryGeneration;
+    return named.items;
+}
 
 // static
 bool ALScriptPreprocessor::enabled()
@@ -314,7 +357,7 @@ bool ALScriptPreprocessor::fileOf(const std::string& path, std::string& file)
     return false;
 }
 
-std::vector<ALScriptPreprocessor::Candidate> ALScriptPreprocessor::candidatesFor(const ALPreprocessor::Ask& ask, const Request& request, bool& unknown) const
+std::vector<ALScriptPreprocessor::Candidate> ALScriptPreprocessor::candidatesFor(const ALPreprocessor::Ask& ask, const Request& request, bool& unknown)
 {
     unknown = false;
     std::vector<Candidate> out;
@@ -358,10 +401,7 @@ std::vector<ALScriptPreprocessor::Candidate> ALScriptPreprocessor::candidatesFor
         }
         else if (source == "inventory")
         {
-            LLInventoryModel::cat_array_t  cats;
-            LLInventoryModel::item_array_t items;
-            NamedScriptOrNotecard          named(item_name);
-            gInventory.collectDescendentsIf(gInventory.getRootFolderID(), cats, items, LLInventoryModel::EXCLUDE_TRASH, named);
+            LLInventoryModel::item_array_t items = namedItems(item_name);
             // The folders the name gives, where it gives any, choose among
             // items of the name: the ones under such folders -- under the
             // asking file's, for a name that starts from there -- and no
@@ -478,7 +518,7 @@ std::vector<ALScriptPreprocessor::Candidate> ALScriptPreprocessor::candidatesFor
     return out;
 }
 
-ALPreprocessor::Found ALScriptPreprocessor::textOf(const Candidate& c, wanted_t* wanted, std::string& text, std::string& assetId)
+ALPreprocessor::Found ALScriptPreprocessor::textOf(const Candidate& c, wanted_t* wanted, bool retry, std::string& text, std::string& assetId)
 {
     if (!c.file.empty())
     {
@@ -495,7 +535,13 @@ ALPreprocessor::Found ALScriptPreprocessor::textOf(const Candidate& c, wanted_t*
     }
     if (mFailed.count(c.path))
     {
-        return ALPreprocessor::Found::No;
+        if (!retry)
+        {
+            return ALPreprocessor::Found::No;
+        }
+        // Asked for again, once: an include that was not there when this
+        // script was last expanded may be there now.
+        mFailed.erase(c.path);
     }
     if (wanted)
     {
@@ -504,7 +550,8 @@ ALPreprocessor::Found ALScriptPreprocessor::textOf(const Candidate& c, wanted_t*
     return ALPreprocessor::Found::Pending;
 }
 
-ALPreprocessor::Found ALScriptPreprocessor::configFor(const std::string& from, const Request& request, wanted_t* wanted, std::string& path, std::string& text)
+ALPreprocessor::Found ALScriptPreprocessor::configFor(const std::string& from, const Request& request, wanted_t* wanted, bool retry,
+                                                      std::string& path, std::string& text)
 {
     static const std::string CONFIG_NAME(".luaurc");
     Candidate                candidate;
@@ -589,7 +636,7 @@ ALPreprocessor::Found ALScriptPreprocessor::configFor(const std::string& from, c
         return ALPreprocessor::Found::No;
     }
     std::string                 asset;
-    const ALPreprocessor::Found found = textOf(candidate, wanted, text, asset);
+    const ALPreprocessor::Found found = textOf(candidate, wanted, retry, text, asset);
     if (found == ALPreprocessor::Found::Yes)
     {
         path = candidate.path;
@@ -598,7 +645,7 @@ ALPreprocessor::Found ALScriptPreprocessor::configFor(const std::string& from, c
 }
 
 ALPreprocessor::Found ALScriptPreprocessor::resolve(const ALPreprocessor::Ask& ask_in, ALPreprocessor::Include& out, const Request& request,
-                                                    wanted_t* wanted)
+                                                    wanted_t* wanted, bool retry)
 {
     ALPreprocessor::Ask ask = ask_in;
     if (ask.from.empty())
@@ -614,7 +661,7 @@ ALPreprocessor::Found ALScriptPreprocessor::resolve(const ALPreprocessor::Ask& a
         // path from beside the configuration, so the name is asked for
         // from there.
         std::string                 config_path, config_text;
-        const ALPreprocessor::Found config = configFor(ask.from, request, wanted, config_path, config_text);
+        const ALPreprocessor::Found config = configFor(ask.from, request, wanted, retry, config_path, config_text);
         if (config != ALPreprocessor::Found::Yes)
         {
             return config;
@@ -648,7 +695,7 @@ ALPreprocessor::Found ALScriptPreprocessor::resolve(const ALPreprocessor::Ask& a
     const std::vector<Candidate> candidates = candidatesFor(ask, request, unknown);
     for (const Candidate& c : candidates)
     {
-        const ALPreprocessor::Found found = textOf(c, wanted, out.text, out.assetId);
+        const ALPreprocessor::Found found = textOf(c, wanted, retry, out.text, out.assetId);
         if (found == ALPreprocessor::Found::No)
         {
             continue;
@@ -699,20 +746,82 @@ ALPreprocessor::Options ALScriptPreprocessor::optionsFor(const Request& request,
     return options;
 }
 
-ALPreprocessor::Result ALScriptPreprocessor::attempt(const Request& request, wanted_t* wanted, bool optimize)
+// static
+std::string ALScriptSnapshot::keyOf(const ALPreprocessor::Ask& ask)
 {
-    ALPreprocessor::Options options = optionsFor(request, optimize);
-    options.resolve                 = [this, &request, wanted](const ALPreprocessor::Ask& ask, ALPreprocessor::Include& out) {
-        return resolve(ask, out, request, wanted);
+    // What a name stands for is decided by the name, who is asking, and
+    // whether it is a require or an include of either kind.
+    std::string key = ask.from;
+    key += ask.require ? "\x01r" : ask.angled ? "\x01<" : "\x01\"";
+    key += ask.name;
+    return key;
+}
+
+ALPreprocessor::Result ALScriptSnapshot::run(std::string_view source)
+{
+    mMissed.clear();
+    ALPreprocessor::Options options = mOptions;
+    options.resolve                 = [this](const ALPreprocessor::Ask& ask, ALPreprocessor::Include& out) {
+        const std::string key    = keyOf(ask);
+        const auto        answer = mAnswers.find(key);
+        if (answer == mAnswers.end())
+        {
+            // Nobody has looked this name up yet -- a fresh script, or
+            // one whose includes the author has just changed. Noted for
+            // the main thread, which is the only one that may look
+            // anything up, and pending, so that the run goes on and
+            // says what it wanted.
+            if (std::none_of(mMissed.begin(), mMissed.end(), [&key](const ALPreprocessor::Ask& was) { return keyOf(was) == key; }))
+            {
+                mMissed.push_back(ask);
+            }
+            return ALPreprocessor::Found::Pending;
+        }
+        if (answer->second.found == ALPreprocessor::Found::Yes)
+        {
+            out = answer->second.include;
+        }
+        return answer->second.found;
     };
-    if (request.lua && wanted)
+    return ALPreprocessor::run(source, options);
+}
+
+// static
+std::string ALScriptPreprocessor::keyOf(const Request& request)
+{
+    return request.path.empty() ? pathOf(request.ref) : request.path;
+}
+
+ALScriptSnapshot ALScriptPreprocessor::snapshotFor(const std::shared_ptr<Job>& job, wanted_t& wanted)
+{
+    const Request&   request  = job->request;
+    ALScriptSnapshot snapshot;
+    snapshot.mOptions = optionsFor(request, /*optimize*/ false);
+    // The optimizer and the compression are the job's last step, once
+    // every include is in: a round whose text is thrown away the moment
+    // one arrives should not pay for either.
+    snapshot.mOptions.compress = false;
+    snapshot.mOptions.resolve  = nullptr;
+    for (const ALPreprocessor::Ask& ask : job->asks)
+    {
+        ALScriptSnapshot::Answer answer;
+        answer.found = resolve(ask, answer.include, request, &wanted, job->retry);
+        if (answer.found == ALPreprocessor::Found::Pending)
+        {
+            // In the world and not in hand: fetched, and the snapshot
+            // taken again once it is.
+            continue;
+        }
+        snapshot.mAnswers.emplace(ALScriptSnapshot::keyOf(ask), std::move(answer));
+    }
+    if (request.lua)
     {
         // The script's own `.luaurc` fetched with its includes, whether
         // or not a require goes through it: its mode is wanted anyway.
         std::string path, text;
-        configFor(request.path.empty() ? pathOf(request.ref) : request.path, request, wanted, path, text);
+        configFor(keyOf(request), request, &wanted, job->retry, path, text);
     }
-    return ALPreprocessor::run(request.source, options);
+    return snapshot;
 }
 
 bool ALScriptPreprocessor::configOf(const Request& request, ALLuauConfig& out)
@@ -723,7 +832,7 @@ bool ALScriptPreprocessor::configOf(const Request& request, ALLuauConfig& out)
         return false;
     }
     std::string path, text;
-    if (configFor(request.path.empty() ? pathOf(request.ref) : request.path, request, nullptr, path, text) != ALPreprocessor::Found::Yes)
+    if (configFor(keyOf(request), request, nullptr, /*retry*/ false, path, text) != ALPreprocessor::Found::Yes)
     {
         return false;
     }
@@ -736,14 +845,19 @@ bool ALScriptPreprocessor::configOf(const Request& request, ALLuauConfig& out)
     return true;
 }
 
-ALPreprocessor::Result ALScriptPreprocessor::runNow(const Request& request)
+void ALScriptPreprocessor::run(const Request& request, callback_t callback)
 {
-    ALPreprocessor::Result result = attempt(request, nullptr, false);
-    alTranslateScriptProblems(result.problems);
-    return result;
+    start(request, std::move(callback), /*fresh*/ true);
 }
 
-void ALScriptPreprocessor::run(const Request& request, callback_t callback)
+void ALScriptPreprocessor::expand(const Request& request, callback_t callback)
+{
+    Request without  = request;
+    without.optimize = false;
+    start(without, std::move(callback), /*fresh*/ false);
+}
+
+void ALScriptPreprocessor::start(const Request& request, callback_t callback, bool fresh)
 {
     auto job      = std::make_shared<Job>();
     job->request  = request;
@@ -752,14 +866,33 @@ void ALScriptPreprocessor::run(const Request& request, callback_t callback)
     // another script's failures are its own, and clearing them would
     // have every other tab fetch its missing include again.
     job->retry = true;
+    // What it asked for the last time it was expanded, so that a script
+    // being typed in is expanded in one round rather than one for each
+    // level of its includes.
+    if (const auto asked = mAsked.find(keyOf(request)); asked != mAsked.end())
+    {
+        job->asks = asked->second;
+        for (const ALPreprocessor::Ask& ask : job->asks)
+        {
+            job->askKeys.insert(ALScriptSnapshot::keyOf(ask));
+        }
+    }
     if (request.ref.inInventory())
     {
         attemptJob(job);
         return;
     }
     // The object's contents first, since they are where a name is looked
-    // for.
+    // for. Asked of the region again only where a save wants them or
+    // nobody has told us yet: a check runs a moment after every
+    // keystroke, and asking a prim what it holds that often is a message
+    // a keystroke for an answer that hardly ever changes.
     const LLUUID prim = request.ref.object;
+    if (!fresh && mContents.count(prim))
+    {
+        attemptJob(job);
+        return;
+    }
     ALScriptWorkspace::instance().listContents(prim, [this, job, prim](const ALScriptWorkspace::Contents& contents) {
         if (contents.fetched)
         {
@@ -769,65 +902,88 @@ void ALScriptPreprocessor::run(const Request& request, callback_t callback)
     });
 }
 
+
 void ALScriptPreprocessor::attemptJob(const std::shared_ptr<Job>& job)
 {
-    wanted_t               wanted;
-    ALPreprocessor::Result result = attempt(job->request, &wanted, true);
-    if (job->retry)
+    // Everything the viewer has to say about this script, gathered here
+    // on the main thread: the settings, the agent, and each include
+    // looked up in the inventory, the object's contents or the disk.
+    wanted_t         wanted;
+    ALScriptSnapshot snapshot = snapshotFor(job, wanted);
+    job->retry                = false;
+    if (!wanted.empty() && ++job->rounds <= MAX_ROUNDS)
     {
-        // What this run's own includes failed at before: asked for
-        // again, once.
-        job->retry = false;
-        wanted_t   again;
-        bool       any = false;
-        for (const std::string& path : mFailed)
+        // Something the script includes is in the world and not in hand:
+        // fetched before anything is expanded, since expanding without
+        // it would only ask for it again.
+        job->outstanding = S32(wanted.size()) + 1;
+        for (const std::string& path : wanted)
         {
-            again.insert(path);
-        }
-        for (const std::string& path : again)
-        {
-            // Only what this script names: attempt() with the failures
-            // forgotten says what it wants, which is the ones it reaches.
-            mFailed.erase(path);
-            any = true;
-        }
-        if (any)
-        {
-            wanted.clear();
-            result = attempt(job->request, &wanted, true);
-            // Whatever this run does not name goes back to failed, so
-            // that another tab's missing include stays missing.
-            for (const std::string& path : again)
-            {
-                if (!wanted.count(path))
+            fetch(path, [this, job]() {
+                if (--job->outstanding == 0)
                 {
-                    mFailed.insert(path);
+                    attemptJob(job);
                 }
-            }
+            });
         }
-    }
-    if (wanted.empty() || ++job->rounds > MAX_ROUNDS)
-    {
-        optimizeAndFinish(job, std::move(result));
+        // The one the loop holds, so that a fetch answered on the spot
+        // cannot start the next round from inside it.
+        if (--job->outstanding == 0)
+        {
+            attemptJob(job);
+        }
         return;
     }
-    job->outstanding = S32(wanted.size());
-    for (const std::string& path : wanted)
-    {
-        fetch(path, [this, job]() {
-            if (--job->outstanding == 0)
-            {
-                attemptJob(job);
-            }
+    // And the expansion itself on a thread of its own: it tokenizes the
+    // whole script and rescans what its macros make, which is the one
+    // thing here that has nothing of the viewer in it.
+    ensureWorker();
+    mPool->getQueue().post([this, job, snapshot = std::move(snapshot)]() mutable {
+        ALPreprocessor::Result           result = snapshot.run(job->request.source);
+        std::vector<ALPreprocessor::Ask> missed = snapshot.missed();
+        LLAppViewer::instance()->postToMainCoro([this, job, result = std::move(result), missed = std::move(missed)]() mutable {
+            expandedJob(job, std::move(result), std::move(missed));
         });
+    });
+}
+
+void ALScriptPreprocessor::expandedJob(const std::shared_ptr<Job>& job, ALPreprocessor::Result result, std::vector<ALPreprocessor::Ask> missed)
+{
+    // An include nobody had looked up yet: looked up now, and the run
+    // made again with it in. The run is what says a name was asked for
+    // at all -- an `#include` inside an `#if`, or one a macro made, is
+    // asked for only where the expansion reaches it.
+    bool learned = false;
+    for (ALPreprocessor::Ask& ask : missed)
+    {
+        if (job->askKeys.insert(ALScriptSnapshot::keyOf(ask)).second)
+        {
+            job->asks.push_back(std::move(ask));
+            learned = true;
+        }
     }
+    if (learned && ++job->rounds <= MAX_ROUNDS)
+    {
+        attemptJob(job);
+        return;
+    }
+    // What this script asks for, for the next run over it.
+    if (!job->asks.empty())
+    {
+        if (job->asks.size() > MAX_REMEMBERED)
+        {
+            job->asks.resize(MAX_REMEMBERED);
+        }
+        mAsked[keyOf(job->request)] = job->asks;
+    }
+    optimizeAndFinish(job, std::move(result));
 }
 
 void ALScriptPreprocessor::ensureWorker()
 {
     if (!mPool)
     {
-        mPool = std::make_unique<LL::ThreadPool>("ScriptOptimizer", 1);
+        mPool = std::make_unique<LL::ThreadPool>("ScriptPreproc", 1);
         mPool->start();
     }
 }
@@ -852,20 +1008,22 @@ void ALScriptPreprocessor::finish(const std::shared_ptr<Job>& job, ALPreprocesso
 
 void ALScriptPreprocessor::optimizeAndFinish(const std::shared_ptr<Job>& job, ALPreprocessor::Result result)
 {
-    // The optimizer parses the whole script and goes round until
-    // nothing changes, and the inliner parses it again each round: far
-    // too much to do between two frames, and nothing of the viewer's is
-    // in it -- the text goes in, the text comes out, and the builtins
-    // are the process's. So it goes to a thread of its own.
+    // The optimizer parses the whole script and goes round until nothing
+    // changes, and the inliner parses it again each round: far too much
+    // to do between two frames, and nothing of the viewer's is in it --
+    // the text goes in, the text comes out, and the builtins are the
+    // process's. So it goes to the same thread the expansion did, with
+    // the compression after it, which is where a run would have done
+    // both.
     const ALPreprocessor::Options options = optionsFor(job->request, /*optimize*/ true);
-    if (!options.optimize || result.overran || result.text.empty())
+    if (options.lua || (!options.optimize && !options.compress) || result.overran || result.text.empty())
     {
         finish(job, std::move(result));
         return;
     }
     ensureWorker();
     mPool->getQueue().post([this, job, result = std::move(result), options]() mutable {
-        ALPreprocessor::optimize(result, options);
+        ALPreprocessor::finish(result, options);
         LLAppViewer::instance()->postToMainCoro([this, job, result = std::move(result)]() mutable { finish(job, std::move(result)); });
     });
 }
@@ -940,7 +1098,7 @@ void ALScriptPreprocessor::fetchConfig(const Request& request, std::function<voi
     }
     wanted_t              wanted;
     std::string           path, text;
-    if (configFor(request.path.empty() ? pathOf(request.ref) : request.path, request, &wanted, path, text) != ALPreprocessor::Found::Pending || wanted.empty())
+    if (configFor(keyOf(request), request, &wanted, /*retry*/ false, path, text) != ALPreprocessor::Found::Pending || wanted.empty())
     {
         return;
     }

@@ -52,6 +52,7 @@ namespace
         "ALScriptStudioPreflight",   "ALScriptPreprocEnabled",     "ALScriptPreprocSwitch",
         "ALScriptPreprocLazyLists",  "ALScriptPreprocCompress",    "ALScriptPreprocOptimizer",
         "ALScriptPreprocOptimizerShrinkNames", "ALScriptPreprocOptimizerAddStrings",
+        "ALScriptPreprocOptimizerInlining",     "ALScriptPreprocExtensions",
         "ALScriptPreprocDiskIncludes", "ALScriptPreprocDiskIncludeFolder", "ALScriptPreprocIncludeOrder",
     };
 

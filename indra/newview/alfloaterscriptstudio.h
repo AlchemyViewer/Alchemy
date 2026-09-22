@@ -50,6 +50,7 @@
 #include <string_view>
 #include <vector>
 
+class ALEmptyState;
 class ALJumpBar;
 class ALTabStrip;
 class LLButton;
@@ -224,6 +225,19 @@ private:
         };
         Expanded                                   expanded;
         Expanded                                   uploaded;
+        // The version an expansion has been asked for, or zero: the
+        // preprocessor answers on the main thread a moment later, and
+        // one text is expanded once however many questions wait on it.
+        U32                                        expanding = 0;
+        // The questions held until it comes. A question of a kind
+        // replaces the one of that kind still waiting: a second hover
+        // is a hover of somewhere else, and only the last is wanted.
+        struct Waiting
+        {
+            ALScriptAnalysis::Kind kind = ALScriptAnalysis::Kind::Check;
+            ALTextPos              at;
+        };
+        std::vector<Waiting>                       waiting;
         // A save waiting on the preprocessor.
         bool                                       preprocessing = false;
         // Whether the script's `.luaurc` was asked for once, so that a
@@ -479,7 +493,11 @@ private:
     // envelope. Positions the analyzers answer with are mapped back to
     // the source, and what falls in an include is listed by its file.
     bool                          preprocessed(const Doc& doc) const;
-    const Doc::Expanded&          expandedFor(Doc& doc);
+    // The expansion of the text as it stands, asked for where it is not
+    // in hand: it is a thread's work now, so a question that needs it
+    // waits on the Doc and is asked again when it comes.
+    void                          expandFor(Doc& doc, ALScriptAnalysis::Kind kind, const ALTextPos& at);
+    void                          expandedAnswer(const std::string& id, U32 version, const ALPreprocessor::Result& result);
     // Without the source where only where the script is matters.
     ALScriptPreprocessor::Request preprocessRequest(const Doc& doc, bool with_source = true) const;
     void                          preprocess(Doc& doc, bool then_save);
@@ -813,6 +831,9 @@ private:
     bool                               mWordWrap    = false;
     bool                               mLineNumbers = true;
     bool                               mIndentGuides    = true;
+    // Where the blanks are drawn as marks; under the selection to begin
+    // with, which is where they are wanted and nowhere else.
+    ALCodeEditor::Whitespace           mWhitespace      = ALCodeEditor::Whitespace::Selection;
     bool                               mRelativeNumbers = false;
     bool                               mRainbowBrackets = true;
     // What the analyzers add to the picture: every name coloured by what
@@ -836,6 +857,10 @@ private:
     bool                               mScrollMapPreview = true;
     bool                               mScrollMapLeft    = false;
     LLPanel*                           mEditorHost    = nullptr;
+    // What the window says with no script open, over the room the
+    // editors would be in: it is the only pane with no list of its own to
+    // carry a sentence, and it was the one showing nothing at all.
+    ALEmptyState*                      mNoDocs        = nullptr;
     ALTabStrip*                        mTabs          = nullptr;
     ALJumpBar*                         mBreadcrumb    = nullptr;
     LLTabContainer*                    mBottomTabs    = nullptr;

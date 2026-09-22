@@ -25,6 +25,15 @@
     <floater.string name="FileChangedOutside">[NAME] changed on disk while it was being edited here; saving will overwrite it.</floater.string>
     <floater.string name="SaveToFileFailed">Could not write [PATH]</floater.string>
     <floater.string name="NoProblems">No problems.</floater.string>
+    <floater.string name="NoScriptOpenHeadline">No script open</floater.string>
+    <floater.string name="NoScriptOpenSentence">Choose a script or a notecard in the Explorer, or open a file from your computer.</floater.string>
+    <floater.string name="NoScriptOpenAction">Open File...</floater.string>
+    <floater.string name="NoReferences">Nothing looked up yet. Put the caret on a name and press Find References.</floater.string>
+    <floater.string name="NoOutline">Nothing in this script to outline yet.</floater.string>
+    <floater.string name="NoOutlineYet">Still loading.</floater.string>
+    <floater.string name="NoExplorerSelection">Nothing selected. Select an object in the world to see what it holds.</floater.string>
+    <floater.string name="NoExplorerContents">Nothing selected is holding a script or a notecard.</floater.string>
+    <floater.string name="NoOutput">Nothing yet. Compiling, running and the preprocessor say what they are doing here.</floater.string>
     <floater.string name="PaneExplorer">Explorer</floater.string>
     <floater.string name="PaneBottom">Problems, references, output and search</floater.string>
     <floater.string name="NoReference">Nothing at the caret to look up.</floater.string>
@@ -532,6 +541,30 @@
                 <menu_item_check.on_check function="ScriptStudio.Check" parameter="indent_guides" />
                 <menu_item_check.on_click function="ScriptStudio.Menu" parameter="indent_guides" />
             </menu_item_check>
+            <menu
+             label="Whitespace"
+             layout="topleft"
+             mouse_opaque="false"
+             name="whitespace_menu"
+             tear_off="false"
+             width="200">
+                <menu_item_check label="None" layout="topleft" name="blanks_none">
+                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="blanks_none" />
+                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="blanks_none" />
+                </menu_item_check>
+                <menu_item_check label="Under the Selection" layout="topleft" name="blanks_selection">
+                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="blanks_selection" />
+                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="blanks_selection" />
+                </menu_item_check>
+                <menu_item_check label="Trailing Only" layout="topleft" name="blanks_trailing">
+                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="blanks_trailing" />
+                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="blanks_trailing" />
+                </menu_item_check>
+                <menu_item_check label="All" layout="topleft" name="blanks_all">
+                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="blanks_all" />
+                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="blanks_all" />
+                </menu_item_check>
+            </menu>
             <menu_item_check label="Rainbow Brackets" layout="topleft" name="rainbow_brackets">
                 <menu_item_check.on_check function="ScriptStudio.Check" parameter="rainbow_brackets" />
                 <menu_item_check.on_click function="ScriptStudio.Menu" parameter="rainbow_brackets" />

@@ -314,6 +314,17 @@ end</floater.string>
              top_pad="4"
              width="400" />
             <check_box
+             control_name="ALScriptPreprocExtensions"
+             follows="left|top"
+             height="20"
+             label="Break, continue, &amp;= |= ^= and inline"
+             layout="topleft"
+             left="12"
+             name="preproc_extensions"
+             tool_tip="LSL gains break and continue in loops, the &amp;= |= ^= &lt;&lt;= &gt;&gt;= assignments and inline functions, written out before compiling"
+             top_pad="4"
+             width="400" />
+            <check_box
              control_name="ALScriptPreprocCompress"
              follows="left|top"
              height="20"
@@ -355,6 +366,17 @@ end</floater.string>
              left="32"
              name="preproc_addstrings"
              tool_tip="Adjacent string constants joined into one, which LSL does not do on its own"
+             top_pad="4"
+             width="400" />
+            <check_box
+             control_name="ALScriptPreprocOptimizerInlining"
+             follows="left|top"
+             height="20"
+             label="Inline functions called once"
+             layout="topleft"
+             left="32"
+             name="preproc_inline"
+             tool_tip="A user function called from one place is put in that place and the function dropped"
              top_pad="4"
              width="400" />
             <check_box
