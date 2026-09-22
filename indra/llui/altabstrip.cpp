@@ -36,6 +36,8 @@
 #include "lluictrlfactory.h"
 #include "llwindow.h"
 
+#include <algorithm>
+
 static LLDefaultChildRegistry::Register<ALTabStrip> r("tab_strip");
 
 namespace
@@ -98,9 +100,13 @@ U8 ALTabStrip::styleOf(const Tab& tab)
     return tab.preview ? LLFontGL::ITALIC : LLFontGL::NORMAL;
 }
 
-// Each tab wants the width of its words; each gets that where they all fit,
-// and an equal share where they do not, down to the least a tab may be. The
-// strip is not the place to decide that a document should not be shown, so
+// Each tab wants the width of its words. Where they all fit, each gets
+// that, and a name too long for the usual most a tab may be is let run on
+// into whatever room is spare, up to half the strip, so that a long name
+// shows whole while there is room to show it. Where they do not fit, the
+// room is shared: the narrow ones keep what they want and the wide ones
+// split what is left equally, down to the least a tab may be. The strip
+// is not the place to decide that a document should not be shown, so
 // past that the tabs run off the right edge rather than vanish.
 void ALTabStrip::layout()
 {
@@ -109,22 +115,70 @@ void ALTabStrip::layout()
     {
         return;
     }
-    S32 wanted = 0;
+    const S32        room = getRect().getWidth() - mGap * ((S32)mTabs.size() - 1);
+    std::vector<S32> full(mTabs.size());
+    S32              wanted = 0;
     for (size_t i = 0; i < mTabs.size(); ++i)
     {
         const S32 words = fontFor(mTabs[i])->getWidth(textOf(mTabs[i]));
         const S32 image = mTabs[i].image ? IMAGE + IMAGE_GAP : 0;
-        mWidths[i] = llclamp(words + MARK + image + PAD * 2 + CLOSE, mMinTabWidth, mMaxTabWidth);
+        full[i]         = llmax(words + MARK + image + PAD * 2 + CLOSE, mMinTabWidth);
+        mWidths[i]      = llmin(full[i], mMaxTabWidth);
         wanted += mWidths[i];
     }
-    const S32 room = getRect().getWidth() - mGap * ((S32)mTabs.size() - 1);
-    if (wanted > room)
+    if (wanted <= room)
     {
-        const S32 share = llmax(mMinTabWidth, room / (S32)mTabs.size());
-        for (S32& width : mWidths)
+        // The spare room to the names cut short by the usual most, the
+        // shortest of them served first so that each gets what it wants
+        // before the longer split the rest.
+        std::vector<size_t> cut;
+        for (size_t i = 0; i < mTabs.size(); ++i)
         {
-            width = llmin(width, share);
+            if (full[i] > mWidths[i])
+            {
+                cut.push_back(i);
+            }
         }
+        std::sort(cut.begin(), cut.end(), [&](size_t a, size_t b) { return full[a] < full[b]; });
+        S32 spare = room - wanted;
+        for (size_t k = 0; k < cut.size() && spare > 0; ++k)
+        {
+            const size_t i     = cut[k];
+            const S32    most  = llmax(mMaxTabWidth, room / 2);
+            const S32    share = spare / static_cast<S32>(cut.size() - k);
+            const S32    grow  = llmin(llmin(full[i], most) - mWidths[i], share);
+            if (grow > 0)
+            {
+                mWidths[i] += grow;
+                spare -= grow;
+            }
+        }
+        return;
+    }
+    // Not enough: from the narrowest up, each that wants no more than an
+    // equal share of what is left keeps what it wants; the first that
+    // wants more sets the share, and it and every wider one take that,
+    // down to the least, so that the cut ones are all one width.
+    std::vector<size_t> order(mTabs.size());
+    for (size_t i = 0; i < order.size(); ++i)
+    {
+        order[i] = i;
+    }
+    std::sort(order.begin(), order.end(), [&](size_t a, size_t b) { return mWidths[a] < mWidths[b]; });
+    S32 left = room;
+    for (size_t k = 0; k < order.size(); ++k)
+    {
+        const S32 share = left / static_cast<S32>(order.size() - k);
+        if (mWidths[order[k]] <= share)
+        {
+            left -= mWidths[order[k]];
+            continue;
+        }
+        for (size_t wide = k; wide < order.size(); ++wide)
+        {
+            mWidths[order[wide]] = llmax(mMinTabWidth, share);
+        }
+        break;
     }
 }
 

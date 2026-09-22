@@ -109,7 +109,9 @@ namespace tut
             const LLRect r = strip->rectOf(i);
             ensure_equals("the tab under its own middle", strip->at(r.getCenterX(), r.getCenterY()), (S32)i);
         }
-        ensure_equals("and nothing past the last", strip->at(WIDTH - 1, HEIGHT / 2), -1);
+        // Past the last tab, with room to be past it, nothing.
+        strip->reshape(WIDTH * 2, HEIGHT);
+        ensure_equals("and nothing past the last", strip->at(WIDTH * 2 - 1, HEIGHT / 2), -1);
         strip->die();
     }
 
@@ -203,13 +205,30 @@ namespace tut
         }
         ensure("and the last runs past the edge", strip->rectOf(4).mRight > 200);
 
-        // Given the room, each takes what it wants and no more.
+        // Given the room, each takes what it wants and no more -- the
+        // whole of its words, even a little past the usual most.
         strip->reshape(2000, HEIGHT);
         for (size_t i = 0; i < 5; ++i)
         {
             const S32 w = strip->rectOf(i).getWidth();
-            ensure("wants its words: " + std::to_string(w), w > 64 && w <= 220);
+            ensure("wants its words: " + std::to_string(w), w > 64 && w < 300);
         }
+
+        // A short name beside a long one: the short keeps its words, the
+        // long gives way, where they do not both fit.
+        strip->setTabs({ tab("a.lsl", "a"), tab("a_very_long_name_that_wants_a_great_deal_of_room.lsl", "b") }, "a");
+        strip->reshape(200, HEIGHT);
+        const S32 words = LLFontGL::getFontSansSerifSmall()->getWidth("a.lsl");
+        ensure("the short one keeps what it wants: " + std::to_string(strip->rectOf(0).getWidth()), strip->rectOf(0).getWidth() < 200 / 2 && strip->rectOf(0).getWidth() >= words);
+        ensure("the long one takes the rest: " + std::to_string(strip->rectOf(1).mRight), strip->rectOf(1).mRight <= 200 && strip->rectOf(1).getWidth() > strip->rectOf(0).getWidth());
+
+        // A name past the usual most shows whole while the strip has the
+        // room, up to half the strip.
+        strip->reshape(2000, HEIGHT);
+        const S32 long_words = LLFontGL::getFontSansSerifSmall()->getWidth("a_very_long_name_that_wants_a_great_deal_of_room.lsl");
+        ensure("the long name runs on past the usual most: " + std::to_string(strip->rectOf(1).getWidth()), strip->rectOf(1).getWidth() > 220 && strip->rectOf(1).getWidth() > long_words);
+        strip->reshape(500, HEIGHT);
+        ensure("but to half the strip: " + std::to_string(strip->rectOf(1).getWidth()), strip->rectOf(1).getWidth() <= 250);
         strip->die();
     }
 

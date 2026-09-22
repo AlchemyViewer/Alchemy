@@ -40,8 +40,9 @@ class LLFontGL;
 // things in one place, which is what an editor with several files open is.
 //
 // The tabs are drawn rather than made of buttons, because their widths are
-// one decision over all of them: they share the strip, shrink together when
-// there are many, and cut their names short before they overlap. A name too
+// one decision over all of them: they share the strip, a long name taking
+// the spare room while there is any, the wide ones giving way first when
+// there is not, and cut their names short before they overlap. A name too
 // long for its tab ends in an ellipsis, and the whole of it is the tab's tip.
 //
 // A tab may be a preview: what is being looked at without being held, which
