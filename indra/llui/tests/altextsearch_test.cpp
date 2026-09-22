@@ -39,7 +39,13 @@ namespace tut
             std::string out;
             for (const ALTextRange& m : matches)
             {
-                out += llformat("%s%d:%d-%d", out.empty() ? "" : " ", m.begin.line, m.begin.column, m.end.column);
+                // line:begin-end, the end's line before it where it is another.
+                out += llformat("%s%d:%d-", out.empty() ? "" : " ", m.begin.line, m.begin.column);
+                if (m.end.line != m.begin.line)
+                {
+                    out += llformat("%d:", m.end.line);
+                }
+                out += llformat("%d", m.end.column);
             }
             return out;
         }
@@ -117,5 +123,33 @@ namespace tut
         ensure_equals("no letters, as typed", ALTextSearch::replacement(doc, digits[0], "123", options, "Abc"), std::string("Abc"));
         options.preserveCase = false;
         ensure_equals("not asked, as typed", ALTextSearch::replacement(doc, found[2], "hello", options, "wORld"), std::string("wORld"));
+    }
+
+    template<> template<>
+    void altextsearch_object::test<5>()
+    {
+        set_test_name("a search let across lines finds a match over a line's end, with ^ $ at every line's ends and . within one");
+        ALTextDocument      doc;
+        doc.setText("one two\nthree four\nfive\n");
+        ALTextSearchOptions options;
+        options.regex       = true;
+        options.acrossLines = true;
+        ensure_equals("two\\nthree, over the break", said(ALTextSearch::matches(doc, "two\\nthree", options)), std::string("0:4-1:5"));
+        ensure_equals("$ still ends each line", said(ALTextSearch::matches(doc, "[or]$", options)), std::string("0:6-7 1:9-10"));
+        ensure_equals("^ still starts each line", said(ALTextSearch::matches(doc, "^[a-z]", options)), std::string("0:0-1 1:0-1 2:0-1"));
+        ensure_equals("the dot does not cross", said(ALTextSearch::matches(doc, "two.three", options)), std::string());
+        ensure_equals("a class with a break in it does", said(ALTextSearch::matches(doc, "two[\\s\\n]three", options)), std::string("0:4-1:5"));
+        const ALTextRange stretch(ALTextPos(0, 4), ALTextPos(1, 5));
+        ensure_equals("within a stretch that spans lines", said(ALTextSearch::matches(doc, "\\w+", options, &stretch)), std::string("0:4-7 1:0-5"));
+        ensure_equals("a group over the break, with the whole's start said",
+                      said(ALTextSearch::matches(doc, "two\\n(three)", [&] { ALTextSearchOptions o = options; o.matchGroup = 1; return o; }())), std::string("1:0-5"));
+        ensure_equals("what replaces a match over the break", ALTextSearch::replacement(doc, ALTextRange(ALTextPos(0, 4), ALTextPos(1, 5)), "two\\n(three)", options, "$1"),
+                      std::string("three"));
+        options.regex = false;
+        ensure_equals("plain text with a break in it", said(ALTextSearch::matches(doc, "four\nfive", options)), std::string("1:6-2:4"));
+        ensure_equals("plain text without one stays on its lines", said(ALTextSearch::matches(doc, "e", options)), std::string("0:2-3 1:3-4 1:4-5 2:3-4"));
+        options.acrossLines = false;
+        options.regex       = true;
+        ensure_equals("not let across, nothing crosses", said(ALTextSearch::matches(doc, "two\\nthree", options)), std::string());
     }
 }

@@ -245,6 +245,9 @@ private:
         // the whole began.
         S32         matchGroup = 0;
         std::string wholeRegex;
+        // Whether a match may cross a line's end: the pattern has \n or
+        // a \_ class in it, which is what reaches one.
+        bool        acrossLines = false;
     };
     Pattern patternOf(const std::string& vim, std::optional<bool> force_case = std::nullopt) const;
     // The matches a pattern's places allow, the rest dropped; `wholes`

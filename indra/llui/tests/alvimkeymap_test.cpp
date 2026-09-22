@@ -773,4 +773,39 @@ namespace tut
         keys("gg0ve<Esc>:%s/\\%Vx\\(a\\zsb\\)/Y/g<CR>");
         ensure_equals("the whole starts in the area, the match after the \\zs: only the first", flat(e.text()), std::string("xaY xab|xab|"));
     }
+    template<> template<>
+    void alvimkeymap_object::test<20>()
+    {
+        set_test_name("the asking lights every match still to come and lets Control-E and Control-Y scroll; \\n and \\_s reach across lines");
+        // Enough lines under the matches for the view to scroll.
+        std::string text = "a a\na\na\n";
+        for (int i = 0; i < 30; ++i)
+        {
+            text += "x\n";
+        }
+        ALCodeEditor& e = make(text.c_str());
+        keys(":%s/a/b/gc<CR>");
+        ensure_equals("all four lit", e.highlights().size(), size_t(4));
+        keys("y");
+        ensure_equals("three left lit", e.highlights().size(), size_t(3));
+        ensure("the lit ones are the ones to come", e.highlights()[0] == ALTextRange(ALTextPos(0, 2), ALTextPos(0, 3)));
+        const S32 before = e.scrollY();
+        keys("<C-E>");
+        ensure("still asking", vim->mode() == ALVimKeymap::Mode::Confirm);
+        ensure("scrolled a row", e.scrollY() == before + e.layout().rowHeight());
+        keys("<C-Y>");
+        ensure("and back", e.scrollY() == before);
+        keys("q");
+        ensure("nothing lit once done", e.highlights().empty());
+        ensure_equals("what was said yes to", flat(e.text()).substr(0, 9), std::string("b a|a|a|x"));
+        // Patterns over a line's end.
+        e.setText("one two\nthree four\nfive\n");
+        vim->handleKey(e, KEY_ESCAPE, MASK_NONE);
+        keys("gg0/two\\nthree<CR>");
+        ensure("found over the break", e.caret() == ALTextPos(0, 4));
+        keys(":%s/two\\_sthree/joined/<CR>");
+        ensure_equals("\\_s reaches the next line, and the two lines are one", flat(e.text()), std::string("one joined four|five|"));
+        keys(":%s/four\\n//<CR>");
+        ensure_equals("\\n taken out joins the lines", flat(e.text()), std::string("one joined five|"));
+    }
 }

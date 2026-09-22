@@ -247,6 +247,9 @@ ALTextSearchOptions ALFindBar::options() const
     options.wholeWord     = mWord->getToggleState();
     options.regex         = mRegex->getToggleState();
     options.preserveCase  = mPreserveCase->getToggleState();
+    // A pattern may reach across lines, with \n in it; plain text never
+    // has a line break to.
+    options.acrossLines   = options.regex;
     return options;
 }
 

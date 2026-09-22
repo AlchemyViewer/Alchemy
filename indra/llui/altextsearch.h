@@ -42,6 +42,14 @@ struct ALTextSearchOptions
     // whole, where it is not zero: what vim's \zs asks for. A match in
     // which the group took no part is reported whole.
     S32  matchGroup    = 0;
+    // A match may cross a line's end: the lines are searched as one
+    // text with a line break between them, so that \n in a pattern is
+    // the end of a line and a class with a line break in it -- vim's
+    // \_s -- reaches the next line; ^ and $ still stand at every line's
+    // ends, and . stays within a line. Otherwise each line is searched
+    // on its own and no match crosses one. A query that is not a
+    // pattern crosses lines where it has a line break in it.
+    bool acrossLines   = false;
 };
 
 // Finding in a document: every place a query stands, plain or as a
@@ -54,7 +62,10 @@ class ALTextSearch
 public:
     // Every match in order, within `scope` where one is given. A query
     // that is empty finds nothing; a pattern that does not compile finds
-    // nothing and says why in `error`. Matches stay within a line.
+    // nothing and says why in `error`. Matches stay within a line unless
+    // the options let them cross; `whole_begins`, where asked for, says
+    // where the whole of each match began, which differs from the match
+    // only where a group is what is reported.
     static std::vector<ALTextRange> matches(const ALTextDocument& doc, std::string_view query, const ALTextSearchOptions& options,
                                             const ALTextRange* scope = nullptr, std::string* error = nullptr,
                                             std::vector<ALTextPos>* whole_begins = nullptr);

@@ -28,6 +28,9 @@
 
 #include <boost/regex.hpp>
 
+#include <algorithm>
+#include <functional>
+
 namespace
 {
     // What a word is made of, for matching whole ones: a name's bytes,
@@ -148,12 +151,11 @@ std::vector<ALTextRange> ALTextSearch::matches(const ALTextDocument& doc, std::s
     }
     const ALTextRange within = scope ? scope->normalised() : ALTextRange(doc.start(), doc.end());
     const std::string needle = options.caseSensitive ? std::string(query) : lowered(query);
-    for (S32 line = llmax(0, within.begin.line); line <= within.end.line && line < doc.lineCount(); ++line)
-    {
-        const std::string& text = doc.line(line);
-        const S32          size = static_cast<S32>(text.size());
-        const S32          from = line == within.begin.line ? llclamp(within.begin.column, 0, size) : 0;
-        const S32          to   = line == within.end.line ? llclamp(within.end.column, 0, size) : size;
+
+    // One stretch of text searched from `from` to `to`, each match's
+    // offsets turned into places by `posOf`. The text is a line, or the
+    // lines as one with breaks between them.
+    auto searchIn = [&](const std::string& text, S32 from, S32 to, const std::function<ALTextPos(S32)>& posOf) {
         if (options.regex)
         {
             const char*  base  = text.data();
@@ -162,7 +164,9 @@ std::vector<ALTextRange> ALTextSearch::matches(const ALTextDocument& doc, std::s
             boost::cmatch found;
             while (start <= end)
             {
-                boost::match_flag_type flags = boost::match_default;
+                // The dot stays within a line, as it does when the lines
+                // are searched one by one.
+                boost::match_flag_type flags = boost::match_default | boost::match_not_dot_newline;
                 if (start > base)
                 {
                     flags |= boost::match_prev_avail;
@@ -179,15 +183,15 @@ std::vector<ALTextRange> ALTextSearch::matches(const ALTextDocument& doc, std::s
                 const S32   finish = static_cast<S32>(part.second - base);
                 if (!options.wholeWord || wholeWord(text, begin, finish))
                 {
-                    out.emplace_back(ALTextPos(line, begin), ALTextPos(line, finish));
+                    out.emplace_back(posOf(begin), posOf(finish));
                     if (whole_begins)
                     {
-                        whole_begins->emplace_back(line, static_cast<S32>(found[0].first - base));
+                        whole_begins->push_back(posOf(static_cast<S32>(found[0].first - base)));
                     }
                 }
                 if (found[0].length() == 0)
                 {
-                    // An empty match: on, or the line is done.
+                    // An empty match: on, or the text is done.
                     if (found[0].second >= end)
                     {
                         break;
@@ -215,15 +219,51 @@ std::vector<ALTextRange> ALTextSearch::matches(const ALTextDocument& doc, std::s
                 const S32 finish = static_cast<S32>(found + needle.size());
                 if (!options.wholeWord || wholeWord(text, begin, finish))
                 {
-                    out.emplace_back(ALTextPos(line, begin), ALTextPos(line, finish));
+                    out.emplace_back(posOf(begin), posOf(finish));
                     if (whole_begins)
                     {
-                        whole_begins->emplace_back(line, begin);
+                        whole_begins->push_back(posOf(begin));
                     }
                 }
                 at = found + 1;
             }
         }
+    };
+
+    const S32 first = llmax(0, within.begin.line);
+    const S32 last  = llmin(within.end.line, doc.lineCount() - 1);
+    if (options.acrossLines && (options.regex || query.find('\n') != std::string_view::npos))
+    {
+        // The scope's lines as one text, whole, so that a line's start
+        // is a start and the search runs from the scope's own start.
+        std::string      text;
+        std::vector<S32> starts;
+        for (S32 line = first; line <= last; ++line)
+        {
+            if (line > first)
+            {
+                text += '\n';
+            }
+            starts.push_back(static_cast<S32>(text.size()));
+            text += doc.line(line);
+        }
+        auto posOf = [&](S32 offset) {
+            const auto after = std::upper_bound(starts.begin(), starts.end(), offset);
+            const S32  index = static_cast<S32>(after - starts.begin()) - 1;
+            return ALTextPos(first + index, offset - starts[static_cast<size_t>(index)]);
+        };
+        const S32 from = llclamp(within.begin.column, 0, doc.lineLength(first));
+        const S32 to   = starts.back() + llclamp(within.end.column, 0, doc.lineLength(last));
+        searchIn(text, from, to, posOf);
+        return out;
+    }
+    for (S32 line = first; line <= last; ++line)
+    {
+        const std::string& text = doc.line(line);
+        const S32          size = static_cast<S32>(text.size());
+        const S32          from = line == within.begin.line ? llclamp(within.begin.column, 0, size) : 0;
+        const S32          to   = line == within.end.line ? llclamp(within.end.column, 0, size) : size;
+        searchIn(text, from, to, [line](S32 offset) { return ALTextPos(line, offset); });
     }
     return out;
 }
@@ -265,10 +305,10 @@ std::string ALTextSearch::replacement(const ALTextDocument& doc, const ALTextRan
     if (options.regex)
     {
         boost::regex re;
-        if (compile(query, options, re, nullptr) && boost::regex_search(text, re))
+        if (compile(query, options, re, nullptr) && boost::regex_search(text, re, boost::match_default | boost::match_not_dot_newline))
         {
             out = boost::regex_replace(text, re, std::string(with),
-                                       boost::match_default | boost::format_perl | boost::format_first_only | boost::format_no_copy);
+                                       boost::match_default | boost::match_not_dot_newline | boost::format_perl | boost::format_first_only | boost::format_no_copy);
         }
     }
     return options.preserveCase ? inCaseOf(text, std::move(out)) : out;

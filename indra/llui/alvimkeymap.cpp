@@ -3173,8 +3173,17 @@ void ALVimKeymap::askNext(ALTextView& view)
         return;
     }
     // The match shown as the selection, so that the question is plainly
-    // about it.
+    // about it; the ones still to come lit, as vim lights them.
     view.setSelection(mConfirming.edits[mConfirming.at].first);
+    if (ALCodeEditor* editor = ALViewType::as<ALCodeEditor>(&view))
+    {
+        std::vector<ALTextRange> left;
+        for (size_t k = mConfirming.at; k < mConfirming.edits.size(); ++k)
+        {
+            left.push_back(mConfirming.edits[k].first);
+        }
+        editor->setHighlights(std::move(left));
+    }
     bump();
 }
 
@@ -3223,6 +3232,13 @@ bool ALVimKeymap::confirmKey(ALTextView& view, const Input& input)
         if (input.key == KEY_ESCAPE)
         {
             endConfirming(view);
+            return true;
+        }
+        // Control-E and Control-Y scroll while the question stands, as
+        // they do in vim, the match staying where it is.
+        if ((input.mask & MASK_CONTROL) && (input.key == 'E' || input.key == 'Y'))
+        {
+            view.setScrollY(view.scrollY() + (input.key == 'E' ? 1 : -1) * view.layout().rowHeight());
             return true;
         }
         // A plain key's character follows; a chord or a Return is nobody's.
@@ -3277,6 +3293,10 @@ void ALVimKeymap::endConfirming(ALTextView& view)
     }
     const bool changed = mConfirming.made > 0;
     mConfirming        = Confirming();
+    if (ALCodeEditor* editor = ALViewType::as<ALCodeEditor>(&view))
+    {
+        editor->clearHighlights();
+    }
     finishCommand(changed);
     bump();
 }
@@ -4067,11 +4087,35 @@ ALVimKeymap::Pattern ALVimKeymap::patternOf(const std::string& vim, std::optiona
                     continue;
                 }
                 case '_':
-                    // \_s and the like: the class with a line break in it.
+                    // \_s and the like: the class with a line break in it,
+                    // which the search must then be let cross.
                     if (i + 1 < vim.size())
                     {
-                        const char cls = vim[++i];
-                        out.regex += cls == '.' ? std::string("[\\s\\S]") : "(?:\\" + std::string(1, cls) + "|\\n)";
+                        const char cls  = vim[++i];
+                        out.acrossLines = true;
+                        if (cls == '.')
+                        {
+                            out.regex += "[\\s\\S]";
+                        }
+                        else if (cls == '[')
+                        {
+                            // \_[abc]: the bracket expression with a line
+                            // break in it.
+                            const size_t close = vim.find(']', i + 1);
+                            if (close == std::string::npos)
+                            {
+                                out.regex += "\\[";
+                            }
+                            else
+                            {
+                                out.regex += "[\\n" + vim.substr(i + 1, close - i - 1) + "]";
+                                i = close;
+                            }
+                        }
+                        else
+                        {
+                            out.regex += "(?:\\" + std::string(1, cls) + "|\\n)";
+                        }
                         continue;
                     }
                     literal('_');
@@ -4096,7 +4140,9 @@ ALVimKeymap::Pattern ALVimKeymap::patternOf(const std::string& vim, std::optiona
                 default:
                     // \s \S \d \D \w \W \n \t \r \b \. \* \[ \] \/ and the
                     // rest: as they are, a backslash before a letter or a
-                    // symbol the engine reads the same way.
+                    // symbol the engine reads the same way; \n is a line's
+                    // end, which the search must be let cross.
+                    out.acrossLines |= n == 'n';
                     out.regex += '\\';
                     out.regex += n;
                     continue;
@@ -4125,6 +4171,7 @@ ALVimKeymap::Pattern ALVimKeymap::patternOf(const std::string& vim, std::optiona
             }
             if (j < vim.size())
             {
+                out.acrossLines |= vim.find("\\n", i) < j;
                 out.regex.append(vim, i, j - i + 1);
                 i = j;
             }
@@ -4266,6 +4313,7 @@ std::vector<ALTextRange> ALVimKeymap::matchesOf(ALTextView& view, const Pattern&
 {
     const ALTextDocument& d = view.document();
     options.matchGroup      = pattern.matchGroup;
+    options.acrossLines     = pattern.acrossLines;
     std::vector<ALTextRange> matches = ALTextSearch::matches(d, pattern.regex, options, scope, &error, &wholes);
     if (error.empty() && !pattern.wholeRegex.empty())
     {
