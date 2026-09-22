@@ -44,8 +44,10 @@
 // whatever the caller resolves a name to, `#pragma once`, `#error`,
 // `#warning`, `#line` passed through as a comment, backslash continuation,
 // directives at the start of a line only, and no expansion inside strings.
-// Then Firestorm's transforms for LSL, each on request: `switch` as a jump
-// table, lazy lists, and comments and whitespace squeezed out. For SLua,
+// Then the transforms for LSL, each on request: Firestorm's `switch` as a
+// jump table and lazy lists, LSL-PyOptimizer's `break` and `continue` in
+// loops and the extended assignments, and comments and whitespace
+// squeezed out. For SLua,
 // `require("name")` calls resolved to modules gathered at the top of the
 // text. `//fspreprocessor off` anywhere in the source turns the whole
 // thing off, as it does in Firestorm.
@@ -102,6 +104,9 @@ public:
         bool switches  = false;
         bool lazyLists = false;
         bool compress  = false;
+        // The extensions LSL-PyOptimizer's users know: break and continue
+        // in loops, and &= |= ^= <<= >>=. USE_EXTENSIONS turns it on too.
+        bool extensions = false;
         // The optimizer over the expanded text, LSL only, with its own
         // options; it needs the builtins loaded.
         bool                    optimize = false;
@@ -136,8 +141,9 @@ public:
         // The paths of what was included, each once, in the order opened.
         std::vector<std::string> includes;
         // What the run did, whether asked or by the script's own defines.
-        bool usedSwitches  = false;
-        bool usedLazyLists = false;
+        bool usedSwitches   = false;
+        bool usedLazyLists  = false;
+        bool usedExtensions = false;
         // The optimizer ran and its text is what came out.
         bool optimized     = false;
 

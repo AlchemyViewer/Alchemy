@@ -121,8 +121,10 @@ namespace
     bool isBlank(char c) { return c == ' ' || c == '\t' || c == '\r' || c == '\f' || c == '\v'; }
 
     // Longest first, so that the first match is the longest.
-    const char* const LSL_PUNCT[] = { "<<=", ">>=", "...", "##", "++", "--", "+=", "-=", "*=", "/=", "%=", "==", "!=", "<=",
-                                      ">=",  "&&",  "||",  "<<", ">>", nullptr };
+    // &= |= ^= are not LSL's, but the extensions transform takes them
+    // and plain LSL has no use for an & before an =.
+    const char* const LSL_PUNCT[] = { "<<=", ">>=", "...", "##", "++", "--", "+=", "-=", "*=", "/=", "%=", "&=", "|=", "^=",
+                                      "==",  "!=",  "<=",  ">=", "&&", "||", "<<", ">>", nullptr };
     const char* const LUA_PUNCT[] = { "...", "//=", "..=", "##", "..", "//", "::", "->", "+=", "-=", "*=", "/=", "%=", "^=",
                                       "==",  "~=",  "<=",  ">=", nullptr };
 
@@ -719,6 +721,7 @@ namespace
 
         bool usedSwitches() const { return mUsedSwitches; }
         bool usedLazyLists() const { return mUsedLazyLists; }
+        bool usedExtensions() const { return mUsedExtensions; }
         void problem(ALScriptProblem::Severity severity, const std::string& message, const Token& at);
 
         // A macro of the run's own: `NAME body` or `NAME(params) body` as
@@ -772,6 +775,7 @@ namespace
         Tokens                                  mOut;
         Tokens*                                 mSink;
         bool                                    mUsedSwitches  = false;
+        bool                                    mUsedExtensions = false;
         bool                                    mUsedLazyLists = false;
     };
 
@@ -1786,6 +1790,10 @@ namespace
         {
             mUsedLazyLists = true;
         }
+        else if (m.name == "USE_EXTENSIONS")
+        {
+            mUsedExtensions = true;
+        }
         mMacros[m.name] = std::move(m);
     }
 
@@ -2054,6 +2062,409 @@ namespace
     {
         out.insert(out.end(), more.begin(), more.end());
     }
+
+    // The language extensions LSL-PyOptimizer's users know, lowered to
+    // LSL: `break` and `continue` in a loop -- `break 2` for the loop
+    // outside -- as jumps to labels put after the loop and at the end
+    // of its body, and `&= |= ^= <<= >>=` as the assignment each is.
+    // A `break` whose nearest scope is a `switch` is left for the switch
+    // transform, which runs after; a `continue` inside a switch goes to
+    // the loop around it, as in C. The body of a loop that is one
+    // statement is put in braces where a label has to follow it.
+    class Extensions
+    {
+    public:
+        explicit Extensions(Engine& engine) : mEngine(engine) {}
+
+        Tokens run(const Tokens& in)
+        {
+            Tokens out = assignments(in);
+            mScopes.clear();
+            return statements(out, 0, out.size());
+        }
+
+        bool any() const { return mCounter > 0 || mAssignments > 0; }
+
+    private:
+        struct Scope
+        {
+            bool        loop = false;
+            std::string breakLabel;
+            std::string continueLabel;
+            bool        breakUsed    = false;
+            bool        continueUsed = false;
+        };
+
+        // `a &= b` and the rest as `a = a & (b)`, the left side an
+        // identifier or a vector's component before the operator, the
+        // right side as far as the expression goes: to a `;` or `,` or
+        // a closing bracket at the same depth.
+        Tokens assignments(const Tokens& in)
+        {
+            static const char* const ops[] = { "&=", "|=", "^=", "<<=", ">>=" };
+            Tokens                   out;
+            for (size_t i = 0; i < in.size(); ++i)
+            {
+                const Token& t = in[i];
+                const char*  op = nullptr;
+                for (const char* each : ops)
+                {
+                    if (t.is(Kind::Punct, each))
+                    {
+                        op = each;
+                    }
+                }
+                if (!op)
+                {
+                    out.push_back(t);
+                    continue;
+                }
+                // The left side, off the end of what is out already.
+                size_t back = out.size();
+                while (back > 0 && out[back - 1].blank())
+                {
+                    --back;
+                }
+                size_t lhs_begin = back;
+                if (back >= 1 && out[back - 1].kind == Kind::Ident)
+                {
+                    lhs_begin = back - 1;
+                    if (back >= 3 && out[back - 2].is(Kind::Punct, ".") && out[back - 3].kind == Kind::Ident)
+                    {
+                        lhs_begin = back - 3;
+                    }
+                }
+                if (lhs_begin == back)
+                {
+                    mEngine.problem(ALScriptProblem::Severity::Error, std::string("no variable before '") + op + "'", t);
+                    out.push_back(t);
+                    continue;
+                }
+                const Tokens lhs(out.begin() + static_cast<std::ptrdiff_t>(lhs_begin), out.begin() + static_cast<std::ptrdiff_t>(back));
+                // The right side.
+                size_t end   = i + 1;
+                S32    depth = 0;
+                for (; end < in.size(); ++end)
+                {
+                    const Token& e = in[end];
+                    // Integers on both sides, so < and > are comparisons,
+                    // not a vector's brackets.
+                    if (e.is(Kind::Punct, "(") || e.is(Kind::Punct, "["))
+                    {
+                        ++depth;
+                    }
+                    else if (e.is(Kind::Punct, ")") || e.is(Kind::Punct, "]"))
+                    {
+                        if (depth == 0)
+                        {
+                            break;
+                        }
+                        --depth;
+                    }
+                    else if (depth == 0 && (e.is(Kind::Punct, ";") || e.is(Kind::Punct, ",")))
+                    {
+                        break;
+                    }
+                }
+                const size_t rhs_begin = skipBlank(in, i + 1);
+                while (!out.empty() && out.back().blank())
+                {
+                    out.pop_back();
+                }
+                out.push_back(synth(Kind::Space, " ", t));
+                out.push_back(synth(Kind::Punct, "=", t));
+                out.push_back(synth(Kind::Space, " ", t));
+                append(out, lhs);
+                out.push_back(synth(Kind::Space, " ", t));
+                out.push_back(synth(Kind::Punct, std::string(op, strlen(op) - 1), t));
+                out.push_back(synth(Kind::Space, " ", t));
+                out.push_back(synth(Kind::Punct, "(", t));
+                for (size_t k = rhs_begin; k < end; ++k)
+                {
+                    out.push_back(in[k]);
+                }
+                while (!out.empty() && out.back().blank())
+                {
+                    out.pop_back();
+                }
+                out.push_back(synth(Kind::Punct, ")", t));
+                ++mAssignments;
+                i = end - 1;
+            }
+            return out;
+        }
+
+        // Where a statement starting at `i` ends: the index past its last
+        // token. A block to its brace; if, while, for, do to the end of
+        // what they govern; anything else to its semicolon.
+        size_t statementEnd(const Tokens& t, size_t i) const
+        {
+            i = skipBlank(t, i);
+            if (i >= t.size())
+            {
+                return t.size();
+            }
+            if (t[i].is(Kind::Punct, "{"))
+            {
+                const size_t m = matching(t, i, "{", "}");
+                return m == std::string::npos ? t.size() : m + 1;
+            }
+            if (t[i].is(Kind::Ident, "if") || t[i].is(Kind::Ident, "while") || t[i].is(Kind::Ident, "for"))
+            {
+                const size_t open = skipBlank(t, i + 1);
+                if (open >= t.size() || !t[open].is(Kind::Punct, "("))
+                {
+                    return semicolonAfter(t, i);
+                }
+                const size_t close = matching(t, open, "(", ")");
+                if (close == std::string::npos)
+                {
+                    return t.size();
+                }
+                size_t end = statementEnd(t, close + 1);
+                if (t[i].is(Kind::Ident, "if"))
+                {
+                    const size_t e = skipBlank(t, end);
+                    if (e < t.size() && t[e].is(Kind::Ident, "else"))
+                    {
+                        end = statementEnd(t, e + 1);
+                    }
+                }
+                return end;
+            }
+            if (t[i].is(Kind::Ident, "do"))
+            {
+                const size_t body_end = statementEnd(t, i + 1);
+                return semicolonAfter(t, body_end);
+            }
+            return semicolonAfter(t, i);
+        }
+
+        size_t semicolonAfter(const Tokens& t, size_t i) const
+        {
+            S32 depth = 0;
+            for (; i < t.size(); ++i)
+            {
+                if (t[i].is(Kind::Punct, "(") || t[i].is(Kind::Punct, "[") || t[i].is(Kind::Punct, "{"))
+                {
+                    ++depth;
+                }
+                else if (t[i].is(Kind::Punct, ")") || t[i].is(Kind::Punct, "]") || t[i].is(Kind::Punct, "}"))
+                {
+                    --depth;
+                }
+                else if (depth <= 0 && t[i].is(Kind::Punct, ";"))
+                {
+                    return i + 1;
+                }
+            }
+            return t.size();
+        }
+
+        // The tokens from `from` to `to` with every loop in them lowered,
+        // each statement in turn.
+        Tokens statements(const Tokens& in, size_t from, size_t to)
+        {
+            Tokens out;
+            size_t i = from;
+            while (i < to)
+            {
+                const Token& t = in[i];
+                if (t.blank())
+                {
+                    out.push_back(t);
+                    ++i;
+                    continue;
+                }
+                if (t.is(Kind::Ident, "while") || t.is(Kind::Ident, "for") || t.is(Kind::Ident, "do"))
+                {
+                    const size_t end = std::min(statementEnd(in, i), to);
+                    append(out, loop(in, i, end));
+                    i = end;
+                    continue;
+                }
+                if (t.is(Kind::Ident, "switch"))
+                {
+                    // Its body is a scope of its own for `break`.
+                    const size_t open = skipBlank(in, i + 1);
+                    if (open < to && in[open].is(Kind::Punct, "("))
+                    {
+                        const size_t close = matching(in, open, "(", ")");
+                        const size_t brace = close == std::string::npos ? close : skipBlank(in, close + 1);
+                        if (brace != std::string::npos && brace < to && in[brace].is(Kind::Punct, "{"))
+                        {
+                            const size_t m = matching(in, brace, "{", "}");
+                            if (m != std::string::npos && m < to)
+                            {
+                                for (size_t k = i; k <= brace; ++k)
+                                {
+                                    out.push_back(in[k]);
+                                }
+                                mScopes.push_back(Scope());
+                                append(out, statements(in, brace + 1, m));
+                                mScopes.pop_back();
+                                out.push_back(in[m]);
+                                i = m + 1;
+                                continue;
+                            }
+                        }
+                    }
+                }
+                if (t.is(Kind::Punct, "{"))
+                {
+                    const size_t m = matching(in, i, "{", "}");
+                    if (m != std::string::npos && m < to)
+                    {
+                        out.push_back(t);
+                        append(out, statements(in, i + 1, m));
+                        out.push_back(in[m]);
+                        i = m + 1;
+                        continue;
+                    }
+                }
+                if (t.is(Kind::Ident, "break") || t.is(Kind::Ident, "continue"))
+                {
+                    // `break;`, `break 2;`: so many loops out.
+                    const bool   is_break = t.is(Kind::Ident, "break");
+                    size_t       e        = skipBlank(in, i + 1);
+                    S32          levels   = 1;
+                    if (e < to && in[e].kind == Kind::Number)
+                    {
+                        levels = std::max(1, std::atoi(in[e].text.c_str()));
+                        e      = skipBlank(in, e + 1);
+                    }
+                    if (e < to && in[e].is(Kind::Punct, ";"))
+                    {
+                        Scope* target = nullptr;
+                        if (is_break && levels == 1 && !mScopes.empty() && !mScopes.back().loop)
+                        {
+                            // The switch's own; its transform takes it.
+                        }
+                        else
+                        {
+                            S32 seen = 0;
+                            for (size_t k = mScopes.size(); k-- > 0;)
+                            {
+                                if (mScopes[k].loop && ++seen == levels)
+                                {
+                                    target = &mScopes[k];
+                                    break;
+                                }
+                            }
+                            if (!target)
+                            {
+                                mEngine.problem(ALScriptProblem::Severity::Error, std::string(is_break ? "break" : "continue") + " outside a loop", t);
+                            }
+                        }
+                        if (target)
+                        {
+                            (is_break ? target->breakUsed : target->continueUsed) = true;
+                            out.push_back(synth(Kind::Ident, "jump", t));
+                            out.push_back(synth(Kind::Space, " ", t));
+                            out.push_back(synth(Kind::Ident, is_break ? target->breakLabel : target->continueLabel, t));
+                            out.push_back(synth(Kind::Punct, ";", t));
+                            i = e + 1;
+                            continue;
+                        }
+                    }
+                }
+                out.push_back(t);
+                ++i;
+            }
+            return out;
+        }
+
+        // A loop from `i` to `end`, its body done with a scope of its own
+        // and the labels put where the jumps expect them.
+        Tokens loop(const Tokens& in, size_t i, size_t end)
+        {
+            const Token& site = in[i];
+            Scope        scope;
+            scope.loop          = true;
+            const S32 n         = ++mCounter;
+            scope.breakLabel    = "_brk" + std::to_string(n);
+            scope.continueLabel = "_cnt" + std::to_string(n);
+            // The head: `while (...)`, `for (...)`, or `do`; the body; the
+            // tail of a do: `while (...);`.
+            size_t body_begin, body_end;
+            if (site.is(Kind::Ident, "do"))
+            {
+                body_begin = i + 1;
+                body_end   = statementEnd(in, body_begin);
+            }
+            else
+            {
+                const size_t open  = skipBlank(in, i + 1);
+                const size_t close = open < end && in[open].is(Kind::Punct, "(") ? matching(in, open, "(", ")") : std::string::npos;
+                if (close == std::string::npos || close >= end)
+                {
+                    return slice(in, i, end);
+                }
+                body_begin = close + 1;
+                body_end   = end;
+            }
+            mScopes.push_back(scope);
+            Tokens body = statements(in, body_begin, body_end);
+            const Scope done = mScopes.back();
+            mScopes.pop_back();
+            Tokens out = slice(in, i, body_begin);
+            if (done.continueUsed)
+            {
+                // The label at the body's end, inside braces of its own if
+                // the body has none.
+                size_t     first = 0;
+                while (first < body.size() && body[first].blank())
+                {
+                    ++first;
+                }
+                const bool block = first < body.size() && body[first].is(Kind::Punct, "{");
+                if (block)
+                {
+                    size_t last = body.size();
+                    while (last > 0 && body[last - 1].blank())
+                    {
+                        --last;
+                    }
+                    // Before the closing brace.
+                    Tokens with(body.begin(), body.begin() + static_cast<std::ptrdiff_t>(last - 1));
+                    with.push_back(synth(Kind::Punct, "@", site));
+                    with.push_back(synth(Kind::Ident, done.continueLabel, site));
+                    with.push_back(synth(Kind::Punct, ";", site));
+                    with.insert(with.end(), body.begin() + static_cast<std::ptrdiff_t>(last - 1), body.end());
+                    body.swap(with);
+                }
+                else
+                {
+                    Tokens with;
+                    with.push_back(synth(Kind::Space, " ", site));
+                    with.push_back(synth(Kind::Punct, "{", site));
+                    append(with, body);
+                    with.push_back(synth(Kind::Punct, "@", site));
+                    with.push_back(synth(Kind::Ident, done.continueLabel, site));
+                    with.push_back(synth(Kind::Punct, ";", site));
+                    with.push_back(synth(Kind::Punct, "}", site));
+                    body.swap(with);
+                }
+            }
+            append(out, body);
+            if (site.is(Kind::Ident, "do"))
+            {
+                append(out, slice(in, body_end, end));
+            }
+            if (done.breakUsed)
+            {
+                out.push_back(synth(Kind::Punct, "@", site));
+                out.push_back(synth(Kind::Ident, done.breakLabel, site));
+                out.push_back(synth(Kind::Punct, ";", site));
+            }
+            return out;
+        }
+
+        Engine&            mEngine;
+        std::vector<Scope> mScopes;
+        S32                mCounter     = 0;
+        S32                mAssignments = 0;
+    };
 
     // The shape Firestorm emits: a block whose first statements test the
     // argument against each case in turn and jump to its label, then to
@@ -2809,6 +3220,15 @@ ALPreprocessor::Result ALPreprocessor::run(std::string_view source, const Option
             LazyLists lazy;
             tokens               = lazy.run(tokens);
             result.usedLazyLists = lazy.any();
+        }
+        if (options.extensions || engine.usedExtensions())
+        {
+            // Before the switches, so that a break in a loop inside a
+            // switch is the loop's and one in a switch inside a loop the
+            // switch's.
+            Extensions extensions(engine);
+            tokens                = extensions.run(tokens);
+            result.usedExtensions = extensions.any();
         }
         if (options.switches || engine.usedSwitches())
         {

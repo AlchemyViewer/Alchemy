@@ -607,4 +607,33 @@ namespace tut
         }
         ensure("some golden files", checked > 0 || std::getenv("AL_PREPROCESSOR_WRITE_EXPECTED"));
     }
+    template<> template<>
+    void alpreprocessor_object::test<14>()
+    {
+        set_test_name("break and continue become jumps to labels after the loop and at the body's end, and &= |= ^= <<= >>= the assignments they are");
+        ALPreprocessor::Options o = options();
+        o.extensions              = true;
+        ALPreprocessor::Result r  = ALPreprocessor::run("while (a) { if (b) break; if (c) continue; d++; }\n", o);
+        ensure_equals("problems", messages(r), std::string());
+        ensure("used", r.usedExtensions);
+        ensure_equals("a while", r.text, std::string("while (a) { if (b) jump _brk1; if (c) jump _cnt1; d++; @_cnt1;}@_brk1;\n"));
+        r = ALPreprocessor::run("for (i = 0; i < 3; i++) if (i == 1) continue; else x++;\n", o);
+        ensure_equals("a for with one statement for a body gets braces", r.text, std::string("for (i = 0; i < 3; i++) { if (i == 1) jump _cnt1; else x++;@_cnt1;}\n"));
+        r = ALPreprocessor::run("do { if (x) break 2; } while (y);\n", o);
+        ensure_equals("break 2 with one loop is an error", messages(r), std::string("E 0: break outside a loop\n"));
+        r = ALPreprocessor::run("while (a) { do { if (x) break 2; if (y) break; } while (b); c++; }\n", o);
+        ensure_equals("break 2 goes past the outer loop, break past the inner", r.text,
+                      std::string("while (a) { do { if (x) jump _brk1; if (y) jump _brk2; } while (b);@_brk2; c++; }@_brk1;\n"));
+        r = ALPreprocessor::run("continue;\n", o);
+        ensure_equals("outside a loop", messages(r), std::string("E 0: continue outside a loop\n"));
+        o.switches = true;
+        r          = ALPreprocessor::run("while (a) { switch (b) { case 1: break; } while (c) { break; } }\n", o);
+        ensure_equals("a break in a switch is the switch's, one in a loop inside it the loop's", r.text,
+                      std::string("while (a) { {if((b) == (1))jump _sw1_1;\njump _sw1_end;\n @_sw1_1; jump _sw1_end; \n@_sw1_end;\n} while (c) { jump _brk2; }@_brk2; }\n"));
+        r = ALPreprocessor::run("x &= 6; v.y |= 1 << n; z ^= (a | b); f(k <<= 2, 3); m >>= 1 + p;\n", o);
+        ensure_equals("the assignments", r.text, std::string("x = x & (6); v.y = v.y | (1 << n); z = z ^ ((a | b)); f(k = k << (2), 3); m = m >> (1 + p);\n"));
+        ensure_equals("not used when not asked", ALPreprocessor::run("while (a) break;\n", options()).text, std::string("while (a) break;\n"));
+        r = ALPreprocessor::run("#define USE_EXTENSIONS\nwhile (a) break;\n", options());
+        ensure_equals("USE_EXTENSIONS turns it on", r.text, std::string("\nwhile (a) jump _brk1;@_brk1;\n"));
+    }
 } // namespace tut
