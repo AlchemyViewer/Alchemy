@@ -410,7 +410,7 @@
          name="go"
          tear_off="false"
          width="200">
-            <menu_item_call label="Go to Line..." layout="topleft" name="go_to_line" shortcut="control|G" use_mac_ctrl="true">
+            <menu_item_call label="Go to Line..." layout="topleft" name="go_to_line" shortcut="control|G">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="go_to_line" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="go_to_line" />
             </menu_item_call>

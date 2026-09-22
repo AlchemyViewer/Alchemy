@@ -687,6 +687,15 @@ bool ALFloaterScriptStudio::handleKeyHere(KEY key, MASK mask)
         cycleTab(mask & MASK_SHIFT ? -1 : 1);
         return true;
     }
+#if LL_DARWIN
+    // Command-G goes to a line through the menu, and the Mac's Control-G,
+    // which it answered to before, still does.
+    if (key == 'G' && mask == MASK_MAC_CONTROL)
+    {
+        goToLine();
+        return true;
+    }
+#endif
     // Left and right fold and open the object or the prim chosen in the
     // explorer, as a tree's keys do.
     if ((key == KEY_LEFT || key == KEY_RIGHT) && mask == MASK_NONE && mExplorer && mExplorer->hasFocus())

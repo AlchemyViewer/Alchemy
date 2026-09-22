@@ -181,8 +181,8 @@ ALKeymap ALKeymap::standard()
 #if LL_DARWIN
     // The Mac's own, where MASK_CONTROL is Command: Command with an arrow
     // goes to the ends of the line and of the text, Option with one by
-    // words (above), Command-Backspace back to the line's start, and
-    // Command-G and Command-Shift-G through the matches.
+    // words (above), and Command-Backspace back to the line's start.
+    // Command-G is left to whoever holds the editor, to go to a line.
     map.bind(KEY_LEFT, MASK_CONTROL, C::MoveLineStart);
     map.bind(KEY_RIGHT, MASK_CONTROL, C::MoveLineEnd);
     map.bind(KEY_UP, MASK_CONTROL, C::MoveDocStart);
@@ -193,8 +193,6 @@ ALKeymap ALKeymap::standard()
     map.bind(KEY_DOWN, MASK_CONTROL | MASK_SHIFT, C::SelectDocEnd);
     map.bind(KEY_BACKSPACE, MASK_CONTROL, C::DeleteToLineStart);
     map.bind(KEY_DELETE, MASK_CONTROL, C::DeleteToLineEnd);
-    map.bind('G', MASK_CONTROL, C::FindNext);
-    map.bind('G', MASK_CONTROL | MASK_SHIFT, C::FindPrevious);
     // And the Control keys every text field there takes from the text
     // system. Control-space completes, Command-space being the system's.
     map.bind('A', MASK_MAC_CONTROL, C::MoveLineStart);
