@@ -141,6 +141,25 @@ namespace tut
         ALScriptProblems problems = service.check("local density = ll.Cloud(vector.zero)\n");
         ensure("something said: " + said(problems), !problems.empty());
         ensure("deprecated: " + said(problems), mentions(problems, "deprecated"));
+        // A lint the map knows is taken apart by its name, an unknown
+        // global by its shape, for another language to say.
+        problems = service.check("local unused = 1\nnope()\n");
+        bool keyed_lint = false, keyed_error = false;
+        for (const ALScriptProblem& p : problems)
+        {
+            if (p.key == "LuauLintLocalUnused" && p.args.size() == 1 && p.args[0] == "unused")
+            {
+                keyed_lint = true;
+            }
+            // The checker's, or the lint's, by the mode the script is in.
+            if ((p.key == "LuauUnknownGlobal" || p.key == "LuauUnknownGlobalAssign" || p.key == "LuauLintUnknownGlobal" || p.key == "LuauLintUnknownGlobalAssign") &&
+                p.args.size() == 1 && p.args[0] == "nope")
+            {
+                keyed_error = true;
+            }
+        }
+        ensure("the unused local's lint, keyed with its name: " + said(problems), keyed_lint);
+        ensure("the unknown global, keyed with its name: " + said(problems), keyed_error);
     }
 
     template<> template<>

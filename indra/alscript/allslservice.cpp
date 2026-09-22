@@ -26,6 +26,8 @@
 
 #include "allslservice.h"
 
+#include "almessagemap.h"
+
 #include "llfile.h"
 
 #include <tailslide/tailslide.hh>
@@ -546,6 +548,14 @@ ALScriptProblems ALLSLService::check(std::string_view source, bool mono)
         problem.endColumn  = zeroBased(where->last_column);
         problem.code       = std::to_string(static_cast<int>(code));
         problem.message    = message->getMessage();
+        // Taken apart by its code, where the message is one the map
+        // knows, so that the studio may say it in another language.
+        ALMessageMap::Match known;
+        if (ALMessageMap::lsl(static_cast<int>(code), problem.message, known))
+        {
+            problem.key  = std::move(known.key);
+            problem.args = std::move(known.args);
+        }
         problems.push_back(std::move(problem));
     }
     return problems;

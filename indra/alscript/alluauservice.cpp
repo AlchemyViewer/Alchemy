@@ -26,6 +26,8 @@
 
 #include "alluauservice.h"
 
+#include "almessagemap.h"
+
 #include "llsdjson.h"
 #include "llstl.h"
 
@@ -1161,6 +1163,16 @@ ALScriptProblems ALLuauService::check(std::string_view source)
             args                      = { unknown->key, head, nearest };
             message                   = ALScriptProblem::fill(nearest.empty() ? "Key '[1]' not found in [2]" : "Key '[1]' not found in [2]; did you mean '[3]'?", args);
         }
+        else if (!syntax)
+        {
+            // One of the commonest shapes, taken apart by its words.
+            ALMessageMap::Match known;
+            if (ALMessageMap::luauError(message, known))
+            {
+                key  = std::move(known.key);
+                args = std::move(known.args);
+            }
+        }
         problems.push_back(problemAt(error.location,
                                      ALScriptProblem::Severity::Error,
                                      syntax ? ALScriptProblem::Source::Parser : ALScriptProblem::Source::Types,
@@ -1169,21 +1181,24 @@ ALScriptProblems ALLuauService::check(std::string_view source)
         problems.back().key  = key;
         problems.back().args = std::move(args);
     }
+    // A lint taken apart by its name, where the map knows its words.
+    auto lint = [&problems](const Luau::LintWarning& warning, ALScriptProblem::Severity severity) {
+        const char* name = Luau::LintWarning::getName(warning.code);
+        problems.push_back(problemAt(warning.location, severity, ALScriptProblem::Source::Lint, name, warning.text));
+        ALMessageMap::Match known;
+        if (ALMessageMap::luauLint(name, warning.text, known))
+        {
+            problems.back().key  = std::move(known.key);
+            problems.back().args = std::move(known.args);
+        }
+    };
     for (const Luau::LintWarning& warning : result.lintResult.errors)
     {
-        problems.push_back(problemAt(warning.location,
-                                     ALScriptProblem::Severity::Error,
-                                     ALScriptProblem::Source::Lint,
-                                     Luau::LintWarning::getName(warning.code),
-                                     warning.text));
+        lint(warning, ALScriptProblem::Severity::Error);
     }
     for (const Luau::LintWarning& warning : result.lintResult.warnings)
     {
-        problems.push_back(problemAt(warning.location,
-                                     ALScriptProblem::Severity::Warning,
-                                     ALScriptProblem::Source::Lint,
-                                     Luau::LintWarning::getName(warning.code),
-                                     warning.text));
+        lint(warning, ALScriptProblem::Severity::Warning);
     }
     return problems;
 }

@@ -121,6 +121,14 @@ namespace tut
         ensure("an error", problem->severity == ALScriptProblem::Severity::Error);
         ensure("from the checks", problem->source == ALScriptProblem::Source::Types);
         ensure_equals("on the call's line, zero-based", problem->line, 4);
+        // Taken apart by its code, for another language to say: the
+        // words in the order the marks have them.
+        ensure_equals("the key", problem->key, std::string("LSLArgumentWrongType"));
+        ensure_equals("five words", problem->args.size(), size_t(5));
+        ensure_equals("the type passed", problem->args[0], std::string("string"));
+        ensure_equals("the argument's number", problem->args[1], std::string("1"));
+        ensure_equals("the function", problem->args[2], std::string("llSay"));
+        ensure_equals("put back, the same words", ALScriptProblem::fill("Passing [1] as argument [2] of `[3]' which is declared as `[4] [5]'.", problem->args), problem->message);
     }
 
     template<> template<>

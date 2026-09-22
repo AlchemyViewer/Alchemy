@@ -10,6 +10,7 @@ target_sources(
   alscript
   PRIVATE
     allslinliner.cpp
+    almessagemap.cpp
     allsloptimizer.cpp
     alluauconfig.cpp
     alluauservice.cpp
@@ -27,6 +28,7 @@ target_sources(
     FILE_SET HEADERS
       FILES
         allslinliner.h
+        almessagemap.h
         allsloptimizer.h
         allsltraits.inc
         alluauconfig.h
