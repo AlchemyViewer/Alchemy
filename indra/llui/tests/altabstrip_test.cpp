@@ -231,6 +231,19 @@ namespace tut
         ensure("but to half the strip: " + std::to_string(strip->rectOf(1).getWidth()), strip->rectOf(1).getWidth() <= 250);
         strip->die();
 
+        // One short name alone in a wide strip is shown whole: the tab is
+        // as wide as the drawing needs, the half pad before the way out
+        // included.
+        strip = make(600);
+        strip->setTabs({ tab("New Script", "n") }, "n");
+        {
+            const S32 words = LLFontGL::getFontSansSerifSmall()->getWidth("New Script");
+            const S32 width = strip->rectOf(0).getWidth();
+            // PAD 8 + MARK 10 + words + PAD/2 4 + CLOSE 12 + PAD 8
+            ensure_equals("the tab is the drawing's sum", width, llmax(64, words + 42));
+        }
+        strip->die();
+
         // A name cut to fit keeps its extension and a few letters before
         // it, with an ellipsis in the middle.
         const LLFontGL*   font = LLFontGL::getFontSansSerifSmall();

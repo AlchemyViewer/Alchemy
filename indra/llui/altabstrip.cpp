@@ -167,9 +167,13 @@ void ALTabStrip::layout()
     S32              wanted = 0;
     for (size_t i = 0; i < mTabs.size(); ++i)
     {
+        // What the tab is drawn from: the padding, the mark, the image,
+        // the words, the half pad before the way out, the way out, the
+        // padding -- the same sum the drawing makes, or the words come
+        // up a few pixels short and are cut for no reason.
         const S32 words = fontFor(mTabs[i])->getWidth(textOf(mTabs[i]));
         const S32 image = mTabs[i].image ? IMAGE + IMAGE_GAP : 0;
-        full[i]         = llmax(words + MARK + image + PAD * 2 + CLOSE, mMinTabWidth);
+        full[i]         = llmax(PAD + MARK + image + words + PAD / 2 + CLOSE + PAD, mMinTabWidth);
         mWidths[i]      = llmin(full[i], mMaxTabWidth);
         wanted += mWidths[i];
     }
