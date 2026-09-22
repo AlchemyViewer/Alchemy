@@ -47,6 +47,8 @@ namespace
         S32         stamp       = 0;
         S32         sourceBegin = 0;
         S32         sourceEnd   = 0;
+        S32         kindBegin   = 0;
+        S32         kindEnd     = 0;
         S32         textBegin   = 0;
     };
 
@@ -61,9 +63,14 @@ namespace
         laid.sourceBegin = laid.stamp;
         laid.text += entry.source;
         laid.sourceEnd = static_cast<S32>(laid.text.size());
+        laid.kindBegin = laid.sourceEnd;
+        laid.kindEnd   = laid.sourceEnd;
         if (!entry.kind.empty())
         {
-            laid.text += " (" + entry.kind + ")";
+            laid.text += " ";
+            laid.kindBegin = static_cast<S32>(laid.text.size());
+            laid.text += "(" + entry.kind + ")";
+            laid.kindEnd = static_cast<S32>(laid.text.size());
         }
         if (!entry.source.empty() || !entry.kind.empty())
         {
@@ -90,7 +97,10 @@ namespace
 
 ALOutputView::Params::Params()
 :   capacity("capacity", 500),
-    time_color("time_color")
+    time_color("time_color"),
+    time_font("time_font"),
+    source_color("source_color"),
+    kind_color("kind_color")
 {
     changeDefault(read_only, true);
     changeDefault(word_wrap, true);
@@ -100,7 +110,12 @@ ALOutputView::ALOutputView(const Params& p)
 :   ALTextView(p),
     mCapacity(llmax(1, p.capacity()))
 {
-    mTimeColor = p.time_color.isProvided() ? p.time_color() : LLUIColor(lerp(backgroundColor(), textColor(), 0.55f));
+    // Unless the skin says: the stamps a little dimmer and smaller than
+    // the words, the sources a little brighter, the kinds as the stamps.
+    mTimeColor   = p.time_color.isProvided() ? p.time_color() : LLUIColor(lerp(backgroundColor(), textColor(), 0.55f));
+    mTimeFont    = p.time_font.isProvided() ? p.time_font() : LLFontGL::getFontSansSerifSmall();
+    mSourceColor = p.source_color.isProvided() ? p.source_color() : LLUIColor(lerp(textColor(), LLColor4::white, 0.6f));
+    mKindColor   = p.kind_color.isProvided() ? p.kind_color() : mTimeColor;
     onLinkClicked([this](const Substitution& link) { followed(link); });
 }
 
@@ -148,9 +163,31 @@ ALOutputView::Shown ALOutputView::showAt(const Entry& entry, U32 serial, S32 lin
         first = document().lineCount() - lines;
     }
     Shown shown;
-    shown.serial = serial;
-    shown.lines  = lines;
-    shown.stamp  = laid.stamp;
+    shown.serial      = serial;
+    shown.lines       = lines;
+    shown.stamp       = laid.stamp;
+    shown.sourceBegin = laid.sourceBegin;
+    shown.sourceEnd   = laid.sourceEnd;
+    shown.kindBegin   = laid.kindBegin;
+    shown.kindEnd     = laid.kindEnd;
+    shown.text        = laid.textBegin;
+
+    // The stamp in its smaller face, the source bold; the colours are
+    // laid on as the rows are drawn.
+    if (laid.stamp > 0 && mTimeFont && mTimeFont != getFont())
+    {
+        Style stamp;
+        stamp.range = ALTextRange(ALTextPos(first, 0), ALTextPos(first, laid.stamp));
+        stamp.font  = mTimeFont;
+        addStyle(std::move(stamp));
+    }
+    if (laid.sourceEnd > laid.sourceBegin)
+    {
+        Style source;
+        source.range = ALTextRange(ALTextPos(first, laid.sourceBegin), ALTextPos(first, laid.sourceEnd));
+        source.flags = LLFontGL::BOLD;
+        addStyle(std::move(source));
+    }
 
     if (entry.link && laid.sourceEnd > laid.sourceBegin)
     {
@@ -348,13 +385,17 @@ void ALOutputView::tintRow(S32 line, const ALTextLayout::Line& laid, const ALTex
         return;
     }
     const Entry* entry = entryOf(shown->serial);
-    const bool   stamp = line == first && shown->stamp > 0;
-    if (!stamp && (!entry || !entry->color))
+    const bool   head  = line == first;
+    if (!head && (!entry || !entry->color))
     {
         return;
     }
+    // The first line piece by piece -- the stamp, the source, the kind,
+    // then what was said -- and the lines under it as what was said.
     const LLColor4U time(mTimeColor.get() % alpha);
-    const LLColor4U ink(entry && entry->color ? *entry->color % alpha : textColor() % alpha);
+    const LLColor4U source(mSourceColor.get() % alpha);
+    const LLColor4U kind((entry && entry->color ? *entry->color : mKindColor.get()) % alpha);
+    const LLColor4U ink((entry && entry->color ? *entry->color : textColor()) % alpha);
     for (size_t k = 0; k < colors.size(); ++k)
     {
         const S32 cluster = laid.glyphs[row.glyphBegin + k].cluster;
@@ -363,13 +404,25 @@ void ALOutputView::tintRow(S32 line, const ALTextLayout::Line& laid, const ALTex
         {
             continue;
         }
-        if (stamp && cluster < shown->stamp)
+        if (!head || cluster >= shown->text)
+        {
+            colors[k] = ink;
+        }
+        else if (cluster < shown->stamp)
         {
             colors[k] = time;
         }
-        else if (entry && entry->color)
+        else if (cluster >= shown->sourceBegin && cluster < shown->sourceEnd)
         {
-            colors[k] = ink;
+            colors[k] = source;
+        }
+        else if (cluster >= shown->kindBegin && cluster < shown->kindEnd)
+        {
+            colors[k] = kind;
+        }
+        else
+        {
+            colors[k] = time;
         }
     }
 }

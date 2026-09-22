@@ -1,16 +1,20 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
-<!-- A log shown as text: read-only, wrapped, in the reading face, with
-     the time stamps dimmer than the words and links in the link colour. -->
+<!-- A log shown as text: read-only, wrapped, in the reading face, on the
+     dark ground the panes have, with the time stamps smaller and dimmer
+     than the words, the sources bold and brighter, and links in the link
+     colour. -->
 <output_view
   name="output_view"
   font="SansSerif"
+  time_font="SansSerifSmall"
   mouse_opaque="true"
   tab_stop="true"
   capacity="500"
   read_only="true"
   word_wrap="true"
-  text_color="TextFgColor"
-  text_readonly_color="TextFgColor"
+  text_color="TextFgReadOnlyColor"
+  text_readonly_color="TextFgReadOnlyColor"
+  source_color="White"
   bg_color="TextBgWriteableColor"
   bg_readonly_color="TextBgReadOnlyColor"
   bg_focus_color="TextBgFocusColor"

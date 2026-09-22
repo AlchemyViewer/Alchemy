@@ -55,8 +55,14 @@ public:
     {
         // How many entries are kept; the oldest go past it.
         Optional<S32>       capacity;
-        // The time stamps, dimmer than the text unless a skin says.
-        Optional<LLUIColor> time_color;
+        // The time stamps, dimmer than the text and in a smaller face
+        // unless a skin says; the source -- who said it -- in the ink
+        // that stands out, bold; what kind of thing it was, in the time
+        // stamps' ink, or the entry's own where it has one.
+        Optional<LLUIColor>       time_color;
+        Optional<const LLFontGL*> time_font;
+        Optional<LLUIColor>       source_color;
+        Optional<LLUIColor>       kind_color;
         Params();
     };
 
@@ -114,7 +120,15 @@ private:
     {
         U32 serial = 0;
         S32 lines  = 0;
-        S32 stamp  = 0;  // the bytes of the time stamp on its first line
+        // Where the pieces of its first line lie, as byte offsets: the
+        // time stamp up to `stamp`, the source, the kind in its brackets,
+        // and what was said from `text`.
+        S32 stamp       = 0;
+        S32 sourceBegin = 0;
+        S32 sourceEnd   = 0;
+        S32 kindBegin   = 0;
+        S32 kindEnd     = 0;
+        S32 text        = 0;
     };
     void refill();
     void show(const Entry& entry, U32 serial);
@@ -140,6 +154,9 @@ private:
     filter_t          mFilter;
     S32               mCapacity = 500;
     LLUIColor         mTimeColor;
+    const LLFontGL*   mTimeFont = nullptr;
+    LLUIColor         mSourceColor;
+    LLUIColor         mKindColor;
     entry_signal_t    mEntryChosen;
     url_signal_t      mUrlChosen;
 };
