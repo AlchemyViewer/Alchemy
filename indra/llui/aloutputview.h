@@ -44,6 +44,10 @@
 // text moving under it; and an entry's source is one, where the entry
 // says so, for whoever asked to hear of it.
 //
+// What was said hangs under where it began: an entry's first line wraps
+// under the message's start, and the lines it runs to after the first
+// start there, rather than under the time stamp.
+//
 // The view is the text view's first client that is not an editor:
 // streaming append, head trimming, substitutions, links. It is read-only.
 class ALOutputView : public ALTextView
@@ -144,6 +148,9 @@ private:
     void followTail();
     // The shown entry a line is in, or null.
     const Shown* shownAt(S32 line, S32* first_line) const;
+    // How wide an entry's first line is up to what was said, in the
+    // faces the pieces are shown in: what its other rows hang under.
+    F32          prefixWidth(const Shown& shown, S32 first) const;
     const Entry* entryOf(U32 serial) const;
     void         followed(const Substitution& link);
 

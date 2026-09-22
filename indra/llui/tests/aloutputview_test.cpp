@@ -106,14 +106,14 @@ namespace tut
         v.append(entry("", "one"));
         v.append(entry("error", "two\nmore"));
         ensure_equals("two kept", v.entries().size(), size_t(2));
-        ensure_equals("laid out as lines", v.text(), std::string("[12:00:00] Thing: one\n[12:00:00] Thing (error): two\n    more"));
+        ensure_equals("laid out as lines", v.text(), std::string("[12:00:00] Thing: one\n[12:00:00] Thing (error): two\nmore"));
         v.append(entry("", "three"));
         ensure_equals("still two kept", v.entries().size(), size_t(2));
         ensure_equals("the oldest went", v.entries().front().text, std::string("two\nmore"));
-        ensure_equals("and its line with it", v.text(), std::string("[12:00:00] Thing (error): two\n    more\n[12:00:00] Thing: three"));
+        ensure_equals("and its line with it", v.text(), std::string("[12:00:00] Thing (error): two\nmore\n[12:00:00] Thing: three"));
 
         v.setFilter([](const ALOutputView::Entry& e) { return e.kind == "error"; });
-        ensure_equals("filtered to the errors", v.text(), std::string("[12:00:00] Thing (error): two\n    more"));
+        ensure_equals("filtered to the errors", v.text(), std::string("[12:00:00] Thing (error): two\nmore"));
         ensure_equals("all still kept", v.entries().size(), size_t(2));
         v.append(entry("error", "four"));
         ensure_equals("a new one the filter takes is shown, the dropped one's lines gone", v.text(), std::string("[12:00:00] Thing (error): four"));
@@ -186,7 +186,7 @@ namespace tut
         U32 edits = 0;
         boost::signals2::scoped_connection counting = v.document().onChanged([&edits](const ALTextDocument::Edit&) { ++edits; });
         v.setFilter([](const ALOutputView::Entry& e) { return e.kind == "error"; });
-        ensure_equals("the errors alone", v.text(), std::string("[12:00:00] Thing (error): two\n    more\n[12:00:00] Thing (error): four"));
+        ensure_equals("the errors alone", v.text(), std::string("[12:00:00] Thing (error): two\nmore\n[12:00:00] Thing (error): four"));
         ensure_equals("two edits: the two dropped", edits, U32(2));
         ensure("the first's links went with it", v.substitutions().empty());
         edits = 0;
@@ -196,7 +196,7 @@ namespace tut
         ensure_equals("with its links again", v.substitutions().size(), size_t(2));
         ensure("the URL where it is", v.substitutions()[1].url == "http://example.com/a" && v.substitutions()[1].range.begin == ALTextPos(0, 21));
         v.setFilter(nullptr);
-        ensure_equals("everything, in order", v.text(), std::string("[12:00:00] Thing: at http://example.com/a\n[12:00:00] Thing (error): two\n    more\n[12:00:00] Thing: three\n[12:00:00] Thing (error): four"));
+        ensure_equals("everything, in order", v.text(), std::string("[12:00:00] Thing: at http://example.com/a\n[12:00:00] Thing (error): two\nmore\n[12:00:00] Thing: three\n[12:00:00] Thing (error): four"));
         v.setFilter([](const ALOutputView::Entry& e) { return e.text == "three"; });
         ensure_equals("down to one in the middle", v.text(), std::string("[12:00:00] Thing: three"));
         v.setFilter([](const ALOutputView::Entry&) { return false; });

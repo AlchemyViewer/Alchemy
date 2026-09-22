@@ -36,9 +36,6 @@ static LLDefaultChildRegistry::Register<ALOutputView> r("output_view");
 
 namespace
 {
-    // The lines of what was said after the first, under it.
-    const char* const CONTINUATION = "    ";
-
     // An entry's first line, piece by piece: where the source starts and
     // ends, and where what was said starts, as byte offsets of the line.
     struct Laid
@@ -88,7 +85,6 @@ namespace
                 break;
             }
             laid.text += '\n';
-            laid.text += CONTINUATION;
             from = nl + 1;
         }
         return laid;
@@ -117,6 +113,46 @@ ALOutputView::ALOutputView(const Params& p)
     mSourceColor = p.source_color.isProvided() ? p.source_color() : LLUIColor(lerp(textColor(), LLColor4::white, 0.6f));
     mKindColor   = p.kind_color.isProvided() ? p.kind_color() : mTimeColor;
     onLinkClicked([this](const Substitution& link) { followed(link); });
+    // What was said hangs under where it began: an entry's first line
+    // wraps under the message's start, and its lines after the first
+    // start there.
+    layout().setIndentProvider([this](S32 line) {
+        ALTextLayout::Indent indent;
+        S32                  first = 0;
+        const Shown*         shown = shownAt(line, &first);
+        if (!shown || shown->text <= 0)
+        {
+            return indent;
+        }
+        F32 hang = prefixWidth(*shown, first);
+        if (const S32 wrap = layout().wrapWidth(); wrap > 0)
+        {
+            hang = llmin(hang, static_cast<F32>(wrap) * 0.4f);
+        }
+        indent.rest  = hang;
+        indent.first = line == first ? 0.f : hang;
+        return indent;
+    });
+}
+
+F32 ALOutputView::prefixWidth(const Shown& shown, S32 first) const
+{
+    // The first line up to what was said, measured piece by piece in
+    // the faces the pieces are shown in.
+    const std::string& line = document().line(first);
+    const LLFontGL*    font = getFont();
+    if (!font || shown.text > static_cast<S32>(line.size()))
+    {
+        return 0.f;
+    }
+    const LLFontGL* stamp_font = mTimeFont ? mTimeFont : font;
+    const LLFontGL* bold       = font->faceFor(LLFontGL::BOLD);
+    F32             width      = 0.f;
+    width += static_cast<F32>(stamp_font->getWidth(line.substr(0, static_cast<size_t>(shown.stamp))));
+    width += static_cast<F32>(font->getWidth(line.substr(static_cast<size_t>(shown.stamp), static_cast<size_t>(shown.sourceBegin - shown.stamp))));
+    width += static_cast<F32>((bold ? bold : font)->getWidth(line.substr(static_cast<size_t>(shown.sourceBegin), static_cast<size_t>(shown.sourceEnd - shown.sourceBegin))));
+    width += static_cast<F32>(font->getWidth(line.substr(static_cast<size_t>(shown.sourceEnd), static_cast<size_t>(shown.text - shown.sourceEnd))));
+    return width;
 }
 
 // static
