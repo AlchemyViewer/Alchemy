@@ -585,6 +585,36 @@ namespace tut
         // check that nothing else in the statement changes anything is
         // about what is not being moved.
         ensure_equals("three went", put.inlined, 3);
+        // A temporary above an if whose condition has the call, and above
+        // a for whose first part has it; not above a while, whose
+        // condition is read every time round, nor an else-if.
+        const std::string heads =
+            "integer g;\n"
+            "integer both(integer x)\n"
+            "{\n"
+            "    return x + x;\n"
+            "}\n"
+            "default\n"
+            "{\n"
+            "    state_entry()\n"
+            "    {\n"
+            "        if (both(llAbs(g)) > 3)\n"
+            "        {\n"
+            "            g = 1;\n"
+            "        }\n"
+            "        integer i;\n"
+            "        for (i = both(llAbs(g)); i < 9; ++i) g++;\n"
+            "        while (both(llAbs(g)) < 9) g++;\n"
+            "        if (g) g = 0; else if (both(llAbs(g))) g = 2;\n"
+            "    }\n"
+            "}\n";
+        const ALLSLInliner::Result above = ALLSLInliner::run(heads);
+        auto got = [&above](const char* text) { return above.text.find(text) != std::string::npos; };
+        ensure("above the if: " + above.text, got("        integer _t_1 = llAbs(g);\n        if ((_t_1 + _t_1) > 3)"));
+        ensure("above the for: " + above.text, got("        integer _t_2 = llAbs(g);\n        for (i = (_t_2 + _t_2); i < 9; ++i) g++;"));
+        ensure("the while keeps its call: " + above.text, got("while (both(llAbs(g)) < 9) g++;"));
+        ensure("so does the else-if: " + above.text, got("else if (both(llAbs(g))) g = 2;"));
+        ensure_equals("two went", above.inlined, 2);
     }
     template<> template<>
     void allsloptimizer_object::test<17>()

@@ -652,10 +652,13 @@ namespace
             // A name the expression would read more than once is read once
             // into a temporary before the call's statement, where the
             // statement is one a declaration can stand before -- in a
-            // block, an expression, a declaration or a return -- and
-            // nothing else in it changes anything before the call would
-            // have read the name: no other call, and no assignment but
-            // the statement's own at its root.
+            // block: an expression, a declaration, a return, an `if` with
+            // the call in its condition, or a `for` with the call in its
+            // first part, the parts evaluated first -- and nothing else
+            // evaluated before the call would have read the name changes
+            // anything: no other call, and no assignment but the
+            // statement's own at its root. A `while` condition is read
+            // every time round, so a temporary above it would go stale.
             std::optional<Edit> before;
             if (!wantTemp.empty())
             {
@@ -669,12 +672,35 @@ namespace
                     return false;
                 }
                 const LSLNodeSubType shape = holder->getNodeSubType();
-                if (shape != NODE_EXPRESSION_STATEMENT && shape != NODE_DECLARATION && shape != NODE_RETURN_STATEMENT)
+                // What is evaluated up to the call, and the expression
+                // whose own assignment at the root is allowed.
+                LSLASTNode* scanned = holder;
+                LSLASTNode* root    = nullptr;
+                switch (shape)
+                {
+                    case NODE_EXPRESSION_STATEMENT: root = static_cast<LSLExpressionStatement*>(holder)->getExpr(); break;
+                    case NODE_DECLARATION:
+                    case NODE_RETURN_STATEMENT: break;
+                    case NODE_IF_STATEMENT: scanned = static_cast<LSLIfStatement*>(holder)->getCheckExpr(); break;
+                    case NODE_FOR_STATEMENT:
+                        // The first part's expression the call is in may
+                        // assign at its root, as a statement's may.
+                        scanned = static_cast<LSLForStatement*>(holder)->getInitExprs();
+                        for (LSLASTNode* init = scanned ? scanned->getChild(0) : nullptr; init; init = init->getNext())
+                        {
+                            if (isInside(call, init))
+                            {
+                                root = init;
+                            }
+                        }
+                        break;
+                    default: return false;
+                }
+                if (!scanned || !isInside(call, scanned))
                 {
                     return false;
                 }
-                LSLASTNode* root = shape == NODE_EXPRESSION_STATEMENT ? static_cast<LSLExpressionStatement*>(holder)->getExpr() : nullptr;
-                for (LSLASTNode* n : nodesOf(holder))
+                for (LSLASTNode* n : nodesOf(scanned))
                 {
                     if (n->getNodeType() != NODE_EXPRESSION || isInside(n, call))
                     {
