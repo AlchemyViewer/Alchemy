@@ -471,6 +471,9 @@ private:
     // The text and the items as a save takes them: only the items the
     // text still stands somewhere, numbered afresh in the text.
     void             carriedForSave(Doc& doc, std::string& text, std::vector<LLPointer<LLInventoryItem>>& items);
+    // The editor brought to what a save takes: its placeholders as the
+    // renumbering has them, its list the pruned one, the buttons following.
+    void             renumberCarried(Doc& doc, const std::string& text, const std::vector<LLPointer<LLInventoryItem>>& items);
     // An inventory item dragged onto a notecard: taken where it is
     // dropped, as the legacy notecard takes one, if it may be given on.
     bool             dropOnNotecard(Doc& doc, S32 x, S32 y, bool drop, EDragAndDropType type, void* cargo, EAcceptance* accept, std::string& tooltip);

@@ -1028,6 +1028,17 @@ bool ALFloaterScriptStudio::dropOnNotecard(Doc& doc, S32 x, S32 y, bool drop, ED
         }
         return true;
     }
+    if (!item->getPermissions().allowCopyBy(gAgentID))
+    {
+        // Carrying an item is copying it: one this agent may not copy
+        // cannot go in, whatever the next owner would get.
+        *accept = ACCEPT_NO;
+        if (tooltip.empty())
+        {
+            tooltip = getString("NotecardDropNoCopy");
+        }
+        return true;
+    }
     *accept = ACCEPT_YES_COPY_MULTI;
     if (drop)
     {
@@ -1055,6 +1066,54 @@ bool ALFloaterScriptStudio::dropOnNotecard(Doc& doc, S32 x, S32 y, bool drop, ED
         doc.dropFrame = gFrameCount;
     }
     return true;
+}
+
+void ALFloaterScriptStudio::renumberCarried(Doc& doc, const std::string& text, const std::vector<LLPointer<LLInventoryItem>>& items)
+{
+    // The placeholders whose bytes the renumbering changed, each put
+    // right in the editor as one step to undo; the buttons follow the
+    // edits, each to its item by the new list. Undone, a placeholder
+    // may name a number past the list, which then simply has no button
+    // and is left behind by the next save.
+    const std::string                                before = doc.editor->text();
+    std::vector<std::pair<ALTextRange, std::string>> edits;
+    if (before.size() == text.size())
+    {
+        S32 line = 0, column = 0;
+        for (size_t i = 0; i < before.size(); ++i)
+        {
+            if (before[i] != text[i])
+            {
+                // A placeholder's four bytes differ at their tail; the
+                // edit covers the whole character from its lead byte.
+                size_t start = i;
+                while (start > 0 && (static_cast<unsigned char>(before[start]) & 0xC0) == 0x80)
+                {
+                    --start;
+                }
+                const S32       lead = column - static_cast<S32>(i - start);
+                const ALTextPos at(line, lead);
+                edits.emplace_back(ALTextRange(at, ALTextPos(line, lead + 4)), text.substr(start, 4));
+                i = start + 3;
+                column = lead + 4;
+                continue;
+            }
+            if (before[i] == '\n')
+            {
+                ++line;
+                column = 0;
+            }
+            else
+            {
+                ++column;
+            }
+        }
+    }
+    doc.embedded = items;
+    if (!edits.empty())
+    {
+        doc.editor->replaceAll(std::move(edits));
+    }
 }
 
 ALTextView::Atom ALFloaterScriptStudio::embeddedAtom(Doc& doc, const ALTextPos& at, size_t index)
@@ -2923,10 +2982,15 @@ void ALFloaterScriptStudio::save(Doc& doc)
     {
         // What goes back: the text with the items it still stands
         // somewhere, numbered afresh, and those items alone, as the
-        // legacy notecard prunes what an edit took out.
+        // legacy notecard prunes what an edit took out -- and the editor
+        // brought to the same, so that what it holds is what was saved.
         std::string                             text;
         std::vector<LLPointer<LLInventoryItem>> items;
         carriedForSave(doc, text, items);
+        if (text != doc.editor->text() || items.size() != doc.embedded.size())
+        {
+            renumberCarried(doc, text, items);
+        }
         std::string error;
         if (!ALScriptWorkspace::instance().saveNotecard(doc.ref, text, items, nullptr, error))
         {

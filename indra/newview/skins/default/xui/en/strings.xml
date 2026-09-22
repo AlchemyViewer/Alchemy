@@ -379,17 +379,25 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="VimPatternNotFound">E486: Pattern not found: [PATTERN]</string>
 	<string name="VimUnknownOption">E518: Unknown option: [OPTION]</string>
 	<string name="VimNotACommand">E492: Not an editor command: [LINE]</string>
-	<string name="VimLinesYanked">[COUNT] lines yanked</string>
-	<string name="VimFewerLines">[COUNT] fewer lines</string>
-	<string name="VimLinesShiftedRight">[COUNT] lines >ed 1 time</string>
-	<string name="VimLinesShiftedLeft">[COUNT] lines &lt;ed 1 time</string>
-	<string name="VimSubstitutionsOneLine">[COUNT] substitutions on 1 line</string>
-	<string name="VimSubstitutions">[COUNT] substitutions on [LINES] lines</string>
-	<string name="VimOneMatch">1 match on 1 line</string>
-	<string name="VimMatchesOneLine">[COUNT] matches on 1 line</string>
-	<string name="VimMatches">[COUNT] matches on [LINES] lines</string>
-	<string name="VimOneLine">1 line</string>
-	<string name="VimLines">[COUNT] lines</string>
+	<!-- The counted ones take a form by the count as LLTrans's
+	     getCountString picks it: A for one, B for the rest in English;
+	     a language that counts a third way adds a C (Russian: 2-4). -->
+	<string name="VimLinesYankedA">1 line yanked</string>
+	<string name="VimLinesYankedB">[COUNT] lines yanked</string>
+	<string name="VimFewerLinesA">1 fewer line</string>
+	<string name="VimFewerLinesB">[COUNT] fewer lines</string>
+	<string name="VimLinesShiftedRightA">1 line >ed 1 time</string>
+	<string name="VimLinesShiftedRightB">[COUNT] lines >ed 1 time</string>
+	<string name="VimLinesShiftedLeftA">1 line &lt;ed 1 time</string>
+	<string name="VimLinesShiftedLeftB">[COUNT] lines &lt;ed 1 time</string>
+	<string name="VimOnLinesA">on 1 line</string>
+	<string name="VimOnLinesB">on [COUNT] lines</string>
+	<string name="VimSubstitutionsA">1 substitution [ON_LINES]</string>
+	<string name="VimSubstitutionsB">[COUNT] substitutions [ON_LINES]</string>
+	<string name="VimMatchesA">1 match [ON_LINES]</string>
+	<string name="VimMatchesB">[COUNT] matches [ON_LINES]</string>
+	<string name="VimLinesPickedA">1 line</string>
+	<string name="VimLinesPickedB">[COUNT] lines</string>
 	<string name="VimNothingSubstituted">[MESSAGE] -- nothing substituted</string>
 
 	<!-- Script Studio's own words about a script, from the alscript
@@ -472,6 +480,120 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<!-- What the studio says in place of Luau's own words (alluauservice.cpp) -->
 	<string name="LuauKeyNotFound">Key '[1]' not found in [2]</string>
 	<string name="LuauKeyNotFoundDidYouMean">Key '[1]' not found in [2]; did you mean '[3]'?</string>
+
+	<!-- What the engines say, taken apart by ALMessageMap and said again
+	     with the words put in: Tailslide's messages by their error code,
+	     Luau's lints by their name, Luau's commonest type errors by their
+	     shape. Keep the [1], [2]... marks; a mark may stand twice. -->
+	<string name="LSLDuplicateDeclaration">Duplicate declaration of `[1]'; previously declared at ([2], [3]).</string>
+	<string name="LSLInvalidOperator">Invalid operator: [1] [2] [3].</string>
+	<string name="LSLWrongType">Attempting to use `[1]' as a [2], but it is a [3].</string>
+	<string name="LSLUndeclared">`[1]' is undeclared.</string>
+	<string name="LSLUndeclaredWithSuggestion">`[1]' is undeclared; did you mean [2]?</string>
+	<string name="LSLInvalidMember">Invalid member: `[1].[2]'.</string>
+	<string name="LSLMemberNotVariable">Trying to access `[1].[2]', but `[1]' is a [3]</string>
+	<string name="LSLMemberWrongType">Attempting to access `[1].[2]', but `[1]' is not a vector or rotation.</string>
+	<string name="LSLArgumentWrongType">Passing [1] as argument [2] of `[3]' which is declared as `[4] [5]'.</string>
+	<string name="LSLTooManyArguments">Too many arguments to function `[1]'.</string>
+	<string name="LSLTooFewArguments">Too few arguments to function `[1]'.</string>
+	<string name="LSLChangeStateInFunction">Functions cannot change state.</string>
+	<string name="LSLWrongTypeInAssignment">`[1] [2]' assigned a [3] value.</string>
+	<string name="LSLWrongTypeInMemberAssignment">[1] member assigned [2] value (must be float or integer).</string>
+	<string name="LSLReturnValueInEventHandler">Event handlers cannot return a value.</string>
+	<string name="LSLBadReturnType">Returning a [1] value from a [2] function.</string>
+	<string name="LSLNotAllPathsReturn">Not all code paths return a value.</string>
+	<string name="LSLGlobalInitializerNotConstant">Global initializer must be constant.</string>
+	<string name="LSLNoEventHandlers">State must have at least one event handler.</string>
+	<string name="LSLParserStackDepth">Parser stack depth exceeded; SL will throw a syntax error here.</string>
+	<string name="LSLBuiltinLvalue">`[1]' is a constant and cannot be used as an lvalue.</string>
+	<string name="LSLShadowConstant">`[1]' is a constant and cannot be used in a variable declaration.</string>
+	<string name="LSLArgumentWrongTypeEvent">Declaring `[1]' as parameter [2] of `[3]' which should be `[4] [5]'.</string>
+	<string name="LSLTooManyArgumentsEvent">Too many parameters for event `[1]'.</string>
+	<string name="LSLTooFewArgumentsEvent">Too few parameters for event `[1]'.</string>
+	<string name="LSLInvalidEvent">`[1]' is not a valid event name.</string>
+	<string name="LSLEventAsIdentifier">`[1]' is an event name, and cannot be used as an identifier.</string>
+	<string name="LSLDeclarationInvalidHere">`[1]' may not be declared here, create a new scope with { }.</string>
+	<string name="LSLMultipleEventHandlers">Multiple handlers for event `[1]'</string>
+	<string name="LSLListInList">Lists may not contain other lists</string>
+	<string name="LSLIllegalCast">May not cast [1] to [2]</string>
+	<string name="LSLNullInList">Lists may not contain nulls</string>
+	<string name="LSLStackHeapCollision">Stack-heap collision</string>
+	<string name="LSLVoidInCondition">Void expression used as condition</string>
+	<string name="LSLShadowDeclaration">Declaration of `[1]' in this scope shadows previous declaration at ([2], [3])</string>
+	<string name="LSLAssignmentInComparison">Suggest parentheses around assignment used as truth value.</string>
+	<string name="LSLChangeToCurrentState">Changing state to current state acts the same as return, use return instead.</string>
+	<string name="LSLChangeStateHackCorrupt">Changing state in a list or string function will corrupt the stack</string>
+	<string name="LSLChangeStateHack">Using an if statement to change state in a function is a hack and may have unintended side-effects.</string>
+	<string name="LSLEmptyIf">Empty if statement.</string>
+	<string name="LSLDeclaredButNotUsed">[1] `[2]' declared but never used.</string>
+	<string name="LSLUnusedEventParameter">Unused event parameter `[1]'.</string>
+	<string name="LSLListCompare">Using == on lists only compares lengths.</string>
+	<string name="LSLConditionAlwaysTrue">Condition is always true.</string>
+	<string name="LSLConditionAlwaysFalse">Condition is always false.</string>
+	<string name="LSLEmptyLoop">Empty loop body.</string>
+	<string name="LSLIntFloatMulAssign">`i_val *= f_val' can have unpredictable runtime behavior, prefer `i_val = (integer)(i_val * f_val)'</string>
+	<string name="LSLJumpToWrongLabel">`jump [1];' may jump to the wrong label due to label name clashes within function</string>
+	<string name="LSLDuplicateLabelName">label `@[1]' is declared multiple times in the same function, which may cause undesired behavior</string>
+	<string name="LSLEqAsStatement">== comparison used as a statement</string>
+	<string name="LSLDeprecated">`[1]' is deprecated.</string>
+	<string name="LSLDeprecatedWithReplacement">`[1]' is deprecated, use [2] instead.</string>
+	<string name="LuauLintUnknownGlobal">Unknown global '[1]'</string>
+	<string name="LuauLintUnknownGlobalAssign">Unknown global '[1]'; consider assigning to it first</string>
+	<string name="LuauLintDeprecatedGlobal">Global '[1]' is deprecated, use '[2]' instead</string>
+	<string name="LuauLintGlobalUsedAsLocalFunction">Global '[1]' is only used in the enclosing function '[2]'; consider changing it to local</string>
+	<string name="LuauLintGlobalUsedAsLocalLine">Global '[1]' is only used in the enclosing function defined at line [2]; consider changing it to local</string>
+	<string name="LuauLintGlobalNeverRead">Global '[1]' is never read before being written. Consider changing it to local</string>
+	<string name="LuauLintLocalShadow">Variable '[1]' shadows previous declaration at line [2]</string>
+	<string name="LuauLintLocalShadowGlobal">Variable '[1]' shadows a global variable used at line [2]</string>
+	<string name="LuauLintSameLineStatement">A new statement is on the same line; add semi-colon on previous statement to silence</string>
+	<string name="LuauLintLocalUnused">Variable '[1]' is never used; prefix with '_' to silence</string>
+	<string name="LuauLintFunctionUnused">Function '[1]' is never used; prefix with '_' to silence</string>
+	<string name="LuauLintImportUnused">Import '[1]' is never used; prefix with '_' to silence</string>
+	<string name="LuauLintBuiltinGlobalWrite">Built-in global '[1]' is overwritten here; consider using a local or changing the name</string>
+	<string name="LuauLintUnreachableCode">Unreachable code (previous statement always [1]s)</string>
+	<string name="LuauLintUnknownType">Unknown type '[1]'</string>
+	<string name="LuauLintUnknownTypeExpected">Unknown type '[1]' (expected [2])</string>
+	<string name="LuauLintForRangeEnd">For loop ends at [1] instead of [2]; did you forget to specify step?</string>
+	<string name="LuauLintForRangeBackwards">For loop should iterate backwards; did you forget to specify -1 as step? Also consider changing 0 to 1 since arrays start at 1</string>
+	<string name="LuauLintUnbalancedAssignmentNil">Assigning [1] values to [2] variables initializes extra variables with nil; add 'nil' to value list to silence</string>
+	<string name="LuauLintUnbalancedAssignmentUnused">Assigning [1] values to [2] variables leaves some values unused</string>
+	<string name="LuauLintImplicitReturnNamed">Function '[1]' can implicitly return no values even though there's an explicit return at line [2]; add explicit return to silence</string>
+	<string name="LuauLintImplicitReturn">Function can implicitly return no values even though there's an explicit return at line [1]; add explicit return to silence</string>
+	<string name="LuauLintDuplicateLocalLine">Variable '[1]' already defined on line [2]</string>
+	<string name="LuauLintDuplicateLocalColumn">Variable '[1]' already defined on column [2]</string>
+	<string name="LuauLintDuplicateParameterLine">Function parameter '[1]' already defined on line [2]</string>
+	<string name="LuauLintDuplicateParameterColumn">Function parameter '[1]' already defined on column [2]</string>
+	<string name="LuauLintUninitializedLocal">Variable '[1]' defined at line [2] is never initialized or assigned; initialize with 'nil' to silence</string>
+	<string name="LuauLintDuplicateFunction">Duplicate function definition: '[1]' also defined on line [2]</string>
+	<string name="LuauLintDuplicateConditionLine">Condition has already been checked on line [1]</string>
+	<string name="LuauLintDuplicateConditionColumn">Condition has already been checked on column [1]</string>
+	<string name="LuauLintMisleadingAndOr">The and-or expression always evaluates to the second alternative because the first alternative is [1]; consider using if-then-else expression instead</string>
+	<string name="LuauLintIntegerParsingDecimal">Number literal exceeded available precision and was truncated to closest representable number</string>
+	<string name="LuauLintIntegerParsingHex">Hexadecimal number literal exceeded available precision and was truncated to 2^64</string>
+	<string name="LuauLintIntegerParsingBinary">Binary number literal exceeded available precision and was truncated to 2^64</string>
+	<string name="LuauLintTableInsertZero">table.insert uses index 0 but arrays are 1-based; did you mean 1 instead?</string>
+	<string name="LuauLintTableInsertAppend">table.insert will append the value to the table; consider removing the second argument for efficiency</string>
+	<string name="LuauLintTableRemoveZero">table.remove uses index 0 but arrays are 1-based; did you mean 1 instead?</string>
+	<string name="LuauLintTableMoveZero">table.move uses index 0 but arrays are 1-based; did you mean 1 instead?</string>
+	<string name="LuauLintTableCreateLiteral">table.create with a table literal will reuse the same object for all elements; consider using a for loop instead</string>
+	<string name="LuauLintNotPrecedence">not X [1] Y is equivalent to (not X) [1] Y; add parentheses to silence</string>
+	<string name="LuauLintNotPrecedenceEquality">not X [1] Y is equivalent to (not X) [1] Y; consider using X [2] Y, or add parentheses to silence</string>
+	<string name="LuauLintComparisonChain">X [1] Y [2] Z is equivalent to (X [1] Y) [2] Z; did you mean X [1] Y and Y [2] Z?</string>
+	<string name="LuauLintComparisonPrecedence">X [1] Y [2] Z is equivalent to (X [1] Y) [2] Z; add parentheses to silence</string>
+	<string name="LuauLintRedundantNativeAttribute">native attribute on a function is redundant in a native module; consider removing it</string>
+	<string name="LuauUnknownGlobal">Unknown global '[1]'</string>
+	<string name="LuauUnknownGlobalAssign">Unknown global '[1]'; consider assigning to it first</string>
+	<string name="LuauUnknownType">Unknown type '[1]'</string>
+	<string name="LuauTypeMismatch">Type '[1]' could not be converted into '[2]'</string>
+	<string name="LuauArgumentCount">Argument count mismatch. Function expects [1] arguments, but [2] are specified</string>
+	<string name="LuauArgumentCountAtLeast">Argument count mismatch. Function expects at least [1] arguments, but [2] are specified</string>
+	<string name="LuauArgumentCountRange">Argument count mismatch. Function expects [1] to [2] arguments, but [3] are specified</string>
+	<string name="LuauCannotCall">Cannot call a value of type [1]</string>
+	<string name="LuauCouldBeNil">Value of type '[1]' could be nil</string>
+	<string name="LuauUnknownRequire">Unknown require: [1]</string>
+	<string name="LuauNotTakeSelf">This function does not take self. Did you mean to use a dot instead of a colon?</string>
+	<string name="LuauMissingProperty">Key '[1]' not found in [2] '[3]'</string>
+	<string name="LuauRedefinedType">Redefinition of type '[1]'</string>
 
 	<!-- What the script workspace says when a load, a save or a queue
 	     cannot go ahead (alscriptworkspace.cpp), and the analyzers when
