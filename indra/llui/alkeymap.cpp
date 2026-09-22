@@ -81,6 +81,20 @@ void ALKeymap::unbind(KEY key, MASK mask)
                     mBindings.end());
 }
 
+bool ALKeymap::keysFor(ALEditorCommand command, KEY& key, MASK& mask) const
+{
+    for (const Binding& binding : mBindings)
+    {
+        if (binding.command == command)
+        {
+            key  = binding.key;
+            mask = binding.mask;
+            return true;
+        }
+    }
+    return false;
+}
+
 ALEditorCommand ALKeymap::lookup(KEY key, MASK mask) const
 {
     for (const Binding& binding : mBindings)
@@ -146,6 +160,9 @@ ALKeymap ALKeymap::standard()
     map.bind('C', MASK_CONTROL, C::Copy);
     map.bind('V', MASK_CONTROL, C::Paste);
     map.bind('/', MASK_CONTROL, C::ToggleComment);
+    // Where a slash is Shift-7 -- German, French, Nordic keyboards --
+    // control and the key the slash is on.
+    map.bind('7', MASK_CONTROL | MASK_SHIFT, C::ToggleComment);
     map.bind(KEY_UP, MASK_ALT, C::MoveLineUp);
     map.bind(KEY_DOWN, MASK_ALT, C::MoveLineDown);
     map.bind('D', MASK_CONTROL | MASK_SHIFT, C::DuplicateLine);

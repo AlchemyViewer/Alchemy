@@ -26,6 +26,7 @@
 
 #include "alfindbar.h"
 
+#include "alsaid.h"
 #include "alsurface.h"
 
 #include "llfontgl.h"
@@ -137,10 +138,10 @@ ALFindBar::ALFindBar(const Params& p)
     mBgColor(LLUIColorTable::instance().getColor("CodeCompletionBgColor", LLColor4::black)),
     mInkColor(LLColor4::white)
 {
-    mExpand = flat("expand", ">", false, "Replace as well");
+    mExpand = flat("expand", ">", false, alSaid("FindBarReplaceToo", "Replace as well"));
     mExpand->setCommitCallback([this](LLUICtrl*, const LLSD&) { setReplaceShown(!mReplaceShown); });
 
-    mFind = field("find", "Find", 3 * SMALL_W + 6);
+    mFind = field("find", alSaid("FindBarFind", "Find"), 3 * SMALL_W + 6);
     mFind->setKeystrokeCallback([this](LLLineEditor* editor, void*) {
         mQuery = editor->getText();
         mChanged();
@@ -156,9 +157,9 @@ ALFindBar::ALFindBar(const Params& p)
             mNext();
         }
     });
-    mCase  = flat("match_case", "Aa", true, "Match case");
-    mWord  = flat("whole_word", "ab", true, "Match whole words");
-    mRegex = flat("regex", ".*", true, "Match a regular expression");
+    mCase  = flat("match_case", "Aa", true, alSaid("FindBarCase", "Match case"));
+    mWord  = flat("whole_word", "ab", true, alSaid("FindBarWord", "Match whole words"));
+    mRegex = flat("regex", ".*", true, alSaid("FindBarPattern", "Match a regular expression"));
     for (Flat* toggle : { mCase, mWord, mRegex })
     {
         toggle->setCommitCallback([this](LLUICtrl*, const LLSD&) { mChanged(); });
@@ -174,21 +175,21 @@ ALFindBar::ALFindBar(const Params& p)
     mCount = LLUICtrlFactory::create<LLTextBox>(tp);
     addChild(mCount);
 
-    mPrev        = flat("previous", "\xE2\x86\x91", false, "The one before (shift-return)");
-    mNextButton  = flat("next", "\xE2\x86\x93", false, "The next (return)");
-    mSelection   = flat("in_selection", "\xE2\x89\xA1", true, "In the selection only");
-    mCloseButton = flat("close", "\xC3\x97", false, "Close (escape)");
+    mPrev        = flat("previous", "\xE2\x86\x91", false, alSaid("FindBarPrevious", "The one before (shift-return)"));
+    mNextButton  = flat("next", "\xE2\x86\x93", false, alSaid("FindBarNext", "The next (return)"));
+    mSelection   = flat("in_selection", "\xE2\x89\xA1", true, alSaid("FindBarInSelection", "In the selection only"));
+    mCloseButton = flat("close", "\xC3\x97", false, alSaid("FindBarClose", "Close (escape)"));
     mPrev->setCommitCallback([this](LLUICtrl*, const LLSD&) { mPrevious(); });
     mNextButton->setCommitCallback([this](LLUICtrl*, const LLSD&) { mNext(); });
     mSelection->setCommitCallback([this](LLUICtrl*, const LLSD&) { mChanged(); });
     mCloseButton->setCommitCallback([this](LLUICtrl*, const LLSD&) { mClose(); });
 
-    mReplaceField = field("replace", "Replace", SMALL_W + 6);
+    mReplaceField = field("replace", alSaid("FindBarReplace", "Replace"), SMALL_W + 6);
     mReplaceField->setCommitCallback([this](LLUICtrl*, const LLSD&) { mReplace(); });
-    mPreserveCase = flat("preserve_case", "AB", true, "Keep each match's case: HELLO, Hello or hello");
+    mPreserveCase = flat("preserve_case", "AB", true, alSaid("FindBarKeepCase", "Keep each match's case: HELLO, Hello or hello"));
     // Glyphs standing in for the icons: one replaced and on, all replaced.
-    mReplaceOne   = flat("replace_one", "\xE2\x86\xA6", false, "Replace this one and find the next");
-    mReplaceEvery = flat("replace_all", "\xE2\x87\x89", false, "Replace every one, as one step to undo");
+    mReplaceOne   = flat("replace_one", "\xE2\x86\xA6", false, alSaid("FindBarReplaceOne", "Replace this one and find the next"));
+    mReplaceEvery = flat("replace_all", "\xE2\x87\x89", false, alSaid("FindBarReplaceAll", "Replace every one, as one step to undo"));
     mReplaceOne->setCommitCallback([this](LLUICtrl*, const LLSD&) { mReplace(); });
     mReplaceEvery->setCommitCallback([this](LLUICtrl*, const LLSD&) { mReplaceAll(); });
 
@@ -291,15 +292,15 @@ void ALFindBar::setCount(S32 current, S32 total, const std::string& error)
     std::string said;
     if (!error.empty())
     {
-        said = "Not a pattern";
+        said = alSaid("FindBarBadPattern", "Not a pattern");
     }
     else if (total == 0)
     {
-        said = "No results";
+        said = alSaid("FindBarNone", "No results");
     }
     else if (current >= 0)
     {
-        said = llformat("%d of %d", current + 1, total);
+        said = alSaid("FindBarOf", "[CURRENT] of [TOTAL]", { { "[CURRENT]", std::to_string(current + 1) }, { "[TOTAL]", std::to_string(total) } });
     }
     else
     {

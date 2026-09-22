@@ -791,6 +791,8 @@ private:
     F32          mDesiredX = -1.f;
     S32          mScrollY  = 0;
     F32          mScrollX  = 0.f;
+    // What a wheel moved that did not make a whole pixel yet.
+    F32          mWheelRemainder = 0.f;
     bool         mSelecting = false;
     LLFrameTimer mBlink;
     // The second and the third click of a run count only where they land

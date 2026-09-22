@@ -116,6 +116,9 @@ public:
     void bind(KEY key, MASK mask, ALEditorCommand command);
     void unbind(KEY key, MASK mask);
     ALEditorCommand lookup(KEY key, MASK mask) const;
+    // The first keys bound to a command, for a menu to show beside it;
+    // false where none are.
+    bool keysFor(ALEditorCommand command, KEY& key, MASK& mask) const;
 
     const std::vector<Binding>& bindings() const { return mBindings; }
 

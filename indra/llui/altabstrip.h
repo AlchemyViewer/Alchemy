@@ -102,12 +102,18 @@ public:
     const std::string& chosen() const { return mChosen; }
 
     // Where each tab is, in the strip's coordinates, and where its way out
-    // is. A tab past the right edge is where the arithmetic puts it and is
-    // drawn cut off there; the strip does not scroll.
+    // is. Where the tabs are wider than the strip even at their least,
+    // the strip scrolls -- the chosen tab always in sight, the wheel
+    // moving along them -- and a button at its right end lists them all.
     LLRect rectOf(size_t index) const;
     LLRect closeRectOf(size_t index) const;
-    // The tab under a point, or -1.
+    // The tab under a point, or -1; none under the list button.
     S32 at(S32 x, S32 y) const;
+    // Whether the tabs run past the strip, and where the button that
+    // lists them is while they do.
+    bool   overflowing() const;
+    LLRect listRect() const;
+    S32    scrollOffset() const { return mScroll; }
 
     typedef boost::signals2::signal<void(const std::string&)> tab_signal_t;
     // A tab pressed, by its value. Not sent for the tab already chosen.
@@ -135,6 +141,13 @@ public:
     {
         return mMenuSignal.connect(cb);
     }
+    // The list button pressed, while the tabs run past the strip: for
+    // the caller to offer every tab to choose from.
+    typedef boost::signals2::signal<void()> list_signal_t;
+    boost::signals2::connection onListAsked(const list_signal_t::slot_type& cb)
+    {
+        return mListSignal.connect(cb);
+    }
 
     void draw() override;
     bool handleMouseDown(S32 x, S32 y, MASK mask) override;
@@ -143,6 +156,8 @@ public:
     bool handleMiddleMouseDown(S32 x, S32 y, MASK mask) override;
     bool handleRightMouseDown(S32 x, S32 y, MASK mask) override;
     bool handleHover(S32 x, S32 y, MASK mask) override;
+    bool handleScrollWheel(S32 x, S32 y, LLScrollDelta delta) override;
+    bool handleScrollHWheel(S32 x, S32 y, LLScrollDelta delta) override;
     bool handleToolTip(S32 x, S32 y, MASK mask) override;
     void onMouseLeave(S32 x, S32 y, MASK mask) override;
     void reshape(S32 width, S32 height, bool called_from_parent = true) override;
@@ -159,6 +174,13 @@ public:
 private:
     // Every tab's width, decided together.
     void layout();
+    // The tabs' whole width, and the room they are shown in.
+    S32  contentWidth() const;
+    S32  shownWidth() const;
+    // The scroll kept within the tabs, and moved so the chosen tab is in
+    // sight.
+    void clampScroll();
+    void showChosen();
     std::string textOf(const Tab& tab) const;
     // A preview is set in italic. The face that draws it is the one the
     // font hands the style to, which is what the words are measured in.
@@ -189,6 +211,14 @@ private:
     tab_signal_t        mClosedSignal;
     tab_menu_signal_t   mMenuSignal;
     order_signal_t      mReorderedSignal;
+    list_signal_t       mListSignal;
+    // How far along the tabs the strip is scrolled, in pixels; a wheel's
+    // fractions kept until they make a pixel.
+    S32                 mScroll = 0;
+    F32                 mScrollRemainder = 0.f;
+    // A tab whose way out was pressed: it goes if the press is let go of
+    // over it, and not if the mouse slid off first.
+    S32                 mPressedClose = -1;
     // A tab pressed and perhaps being dragged along the strip: which,
     // where it was pressed, and whether it has moved far enough to be a
     // drag rather than a press.

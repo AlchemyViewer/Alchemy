@@ -371,6 +371,29 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="CodeStringCharactersB">[COUNT] characters</string>
 	<string name="CodeStringWritten">[COUNT] as written</string>
 
+	<!-- The find bar over an editor's top right corner (alfindbar.cpp):
+	     its tips, its fields' labels and what its count says. -->
+	<string name="FindBarReplaceToo">Replace as well</string>
+	<string name="FindBarFind">Find</string>
+	<string name="FindBarCase">Match case</string>
+	<string name="FindBarWord">Match whole words</string>
+	<string name="FindBarPattern">Match a regular expression</string>
+	<string name="FindBarPrevious">The one before (shift-return)</string>
+	<string name="FindBarNext">The next (return)</string>
+	<string name="FindBarInSelection">In the selection only</string>
+	<string name="FindBarClose">Close (escape)</string>
+	<string name="FindBarReplace">Replace</string>
+	<string name="FindBarKeepCase">Keep each match's case: HELLO, Hello or hello</string>
+	<string name="FindBarReplaceOne">Replace this one and find the next</string>
+	<string name="FindBarReplaceAll">Replace every one, as one step to undo</string>
+	<string name="FindBarBadPattern">Not a pattern</string>
+	<string name="FindBarNone">No results</string>
+	<string name="FindBarOf">[CURRENT] of [TOTAL]</string>
+
+	<!-- The row of tabs over an editor (altabstrip.cpp): the button that
+	     lists them all once they run past it. -->
+	<string name="TabStripList">Every tab, to pick one from</string>
+
 	<!-- The vim keymap's words, in the band under the editor's text
 	     (alvimkeymap.cpp): the modes, the questions, and what a command
 	     says of what it did or could not do. The E-numbers are vim's own,

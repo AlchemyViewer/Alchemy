@@ -28,7 +28,9 @@
 
 #include "llfocusmgr.h"
 
+#include "alsaid.h"
 #include "llfontgl.h"
+#include "lllocalcliprect.h"
 #include "llrender.h"
 #include "llrender2dutils.h"
 #include "lltooltip.h"
@@ -55,6 +57,35 @@ namespace
     constexpr S32 IMAGE = 16;
     constexpr S32 IMAGE_GAP = 4;
     constexpr F32 DOT = 3.f;
+    // The button listing every tab, at the right end while they overflow,
+    // and the shade over a tab cut off at either edge.
+    constexpr S32 LIST_W = 20;
+    constexpr S32 SHADE = 12;
+    // Pixels a wheel's notch moves the tabs.
+    constexpr F32 WHEEL_PIXELS = 40.f;
+
+    // A rect shaded across, from one colour at its left to another at its
+    // right.
+    void shadeAcross(const LLRect& r, const LLColor4& left, const LLColor4& right)
+    {
+        gGL.getTextureSlot(0)->unbind();
+        gGL.begin(LLRender::TRIANGLES);
+        {
+            const auto corner = [](const LLColor4& c, S32 x, S32 y)
+            {
+                gGL.color4fv(c.mV);
+                gGL.vertex2i(x, y);
+            };
+            corner(left, r.mLeft, r.mTop);
+            corner(left, r.mLeft, r.mBottom);
+            corner(right, r.mRight, r.mBottom);
+
+            corner(left, r.mLeft, r.mTop);
+            corner(right, r.mRight, r.mBottom);
+            corner(right, r.mRight, r.mTop);
+        }
+        gGL.end();
+    }
 }
 
 ALTabStrip::Params::Params()
@@ -89,16 +120,78 @@ void ALTabStrip::setTabs(std::vector<Tab> tabs, const std::string& chosen)
             }
         }
     }
+    const bool moved = chosen != mChosen || tabs.size() != mTabs.size();
     mTabs   = std::move(tabs);
     mChosen = chosen;
     mHover  = -1;
     mShown.swap(kept);
     layout();
+    if (moved)
+    {
+        showChosen();
+    }
 }
 
 void ALTabStrip::choose(const std::string& value)
 {
     mChosen = value;
+    showChosen();
+}
+
+S32 ALTabStrip::contentWidth() const
+{
+    S32 width = 0;
+    for (const S32 w : mWidths)
+    {
+        width += w;
+    }
+    return width + mGap * llmax(0, static_cast<S32>(mWidths.size()) - 1);
+}
+
+bool ALTabStrip::overflowing() const
+{
+    return contentWidth() > getRect().getWidth();
+}
+
+S32 ALTabStrip::shownWidth() const
+{
+    return getRect().getWidth() - (overflowing() ? LIST_W : 0);
+}
+
+LLRect ALTabStrip::listRect() const
+{
+    if (!overflowing())
+    {
+        return LLRect();
+    }
+    return LLRect(getRect().getWidth() - LIST_W, getRect().getHeight(), getRect().getWidth(), 0);
+}
+
+void ALTabStrip::clampScroll()
+{
+    mScroll = llclamp(mScroll, 0, llmax(0, contentWidth() - shownWidth()));
+}
+
+void ALTabStrip::showChosen()
+{
+    for (size_t i = 0; i < mTabs.size() && i < mWidths.size(); ++i)
+    {
+        if (mTabs[i].value != mChosen)
+        {
+            continue;
+        }
+        const LLRect r = rectOf(i);
+        if (r.mLeft < 0)
+        {
+            mScroll += r.mLeft;
+        }
+        else if (r.mRight > shownWidth())
+        {
+            mScroll += r.mRight - shownWidth();
+        }
+        break;
+    }
+    clampScroll();
 }
 
 std::string ALTabStrip::textOf(const Tab& tab) const
@@ -264,7 +357,7 @@ void ALTabStrip::layout()
 
 LLRect ALTabStrip::rectOf(size_t index) const
 {
-    S32 left = 0;
+    S32 left = -mScroll;
     for (size_t i = 0; i < index && i < mWidths.size(); ++i)
     {
         left += mWidths[i] + mGap;
@@ -282,6 +375,10 @@ LLRect ALTabStrip::closeRectOf(size_t index) const
 
 S32 ALTabStrip::at(S32 x, S32 y) const
 {
+    if (x < 0 || x >= shownWidth())
+    {
+        return -1;
+    }
     for (size_t i = 0; i < mTabs.size(); ++i)
     {
         if (rectOf(i).pointInRect(x, y))
@@ -296,6 +393,7 @@ void ALTabStrip::reshape(S32 width, S32 height, bool called_from_parent)
 {
     LLUICtrl::reshape(width, height, called_from_parent);
     layout();
+    showChosen();
 }
 
 void ALTabStrip::draw()
@@ -308,14 +406,23 @@ void ALTabStrip::draw()
 
     const S32 height = getRect().getHeight();
     const F32 alpha = getDrawContext().mAlpha;
+    const S32 shown_width = shownWidth();
 
+    {
+    // The tabs within the room they are shown in; the list button, when
+    // there is one, has the rest.
+    LLLocalClipRect clip(LLRect(0, height, shown_width, 0));
     for (size_t i = 0; i < mTabs.size(); ++i)
     {
         const Tab& tab = mTabs[i];
         const bool current = tab.value == mChosen;
         const bool hovered = (S32)i == mHover;
         const LLRect r = rectOf(i);
-        if (r.mLeft >= getRect().getWidth())
+        if (r.mRight <= 0)
+        {
+            continue;
+        }
+        if (r.mLeft >= shown_width)
         {
             break;
         }
@@ -388,17 +495,53 @@ void ALTabStrip::draw()
             // Brighter under the pointer, so that a press there is plainly
             // a press on it and not on the tab.
             const LLRect c = closeRectOf(i);
-            const bool over = hovered && c.pointInRect(mHoverX, mHoverY);
+            const bool over = hovered && c.pointInRect(mHoverX, mHoverY) && (mPressedClose < 0 || mPressedClose == (S32)i);
+            if (over && mPressedClose == (S32)i)
+            {
+                // Held: a press let go of here closes it.
+                gl_rect_2d(c.mLeft - 2, c.mTop + 2, c.mRight + 2, c.mBottom - 2, rest.get() % alpha, true);
+            }
             font->renderUTF8("\xC3\x97", 0, (F32)c.getCenterX(), (F32)baseline,
                              (over || current ? ink : quiet).get() % alpha,
                              LLFontGL::HCENTER, LLFontGL::BOTTOM, LLFontGL::NORMAL, LLFontGL::NO_SHADOW);
         }
+    }
+    // A shade over whichever end has tabs past it, so that a cut tab reads
+    // as one that goes on rather than one that ends there.
+    const LLColor4 dark = rest.get() % alpha;
+    const LLColor4 none = LLColor4(dark.mV[VRED], dark.mV[VGREEN], dark.mV[VBLUE], 0.f);
+    if (mScroll > 0)
+    {
+        shadeAcross(LLRect(0, height, SHADE, 0), dark, none);
+    }
+    if (contentWidth() - mScroll > shown_width)
+    {
+        shadeAcross(LLRect(shown_width - SHADE, height, shown_width, 0), none, dark);
+    }
+    }
+
+    if (overflowing())
+    {
+        // The button that lists every tab: a small triangle, brighter
+        // under the pointer.
+        const LLRect list = listRect();
+        const bool   over = mHover < 0 && list.pointInRect(mHoverX, mHoverY) && mHoverX >= 0;
+        gl_rect_2d(list, rest.get() % alpha, true);
+        gl_rect_2d(list, edge.get() % alpha, false);
+        const S32 cx = list.getCenterX();
+        const S32 cy = list.getCenterY();
+        gl_triangle_2d(cx - 4, cy + 2, cx + 4, cy + 2, cx, cy - 3, (over ? ink : quiet).get() % alpha, true);
     }
     LLUICtrl::draw();
 }
 
 bool ALTabStrip::handleMouseDown(S32 x, S32 y, MASK mask)
 {
+    if (listRect().pointInRect(x, y))
+    {
+        mListSignal();
+        return true;
+    }
     const S32 which = at(x, y);
     if (which < 0)
     {
@@ -407,7 +550,10 @@ bool ALTabStrip::handleMouseDown(S32 x, S32 y, MASK mask)
     const Tab& tab = mTabs[which];
     if (!tab.preview && closeRectOf(which).pointInRect(x, y))
     {
-        mClosedSignal(tab.value);
+        // Closed when let go of over the way out, so a press can still be
+        // taken back by sliding off it.
+        mPressedClose = which;
+        gFocusMgr.setMouseCapture(this);
         return true;
     }
     if (tab.value != mChosen)
@@ -425,6 +571,18 @@ bool ALTabStrip::handleMouseDown(S32 x, S32 y, MASK mask)
 
 bool ALTabStrip::handleMouseUp(S32 x, S32 y, MASK mask)
 {
+    if (hasMouseCapture() && mPressedClose >= 0)
+    {
+        // Read before letting go: losing the capture forgets the press.
+        const S32 which = mPressedClose;
+        mPressedClose   = -1;
+        gFocusMgr.setMouseCapture(nullptr);
+        if (which < (S32)mTabs.size() && closeRectOf(which).pointInRect(x, y))
+        {
+            mClosedSignal(mTabs[which].value);
+        }
+        return true;
+    }
     if (hasMouseCapture())
     {
         gFocusMgr.setMouseCapture(nullptr);
@@ -446,8 +604,30 @@ bool ALTabStrip::handleMouseUp(S32 x, S32 y, MASK mask)
 
 void ALTabStrip::onMouseCaptureLost()
 {
-    mPressed  = -1;
-    mDragging = false;
+    mPressed      = -1;
+    mDragging     = false;
+    mPressedClose = -1;
+}
+
+bool ALTabStrip::handleScrollWheel(S32 x, S32 y, LLScrollDelta delta)
+{
+    if (!overflowing())
+    {
+        return LLUICtrl::handleScrollWheel(x, y, delta);
+    }
+    // Along the tabs, by the wheel's own fractions where it has them.
+    mScrollRemainder += delta.mPrecise * WHEEL_PIXELS;
+    const S32 pixels = static_cast<S32>(mScrollRemainder);
+    mScrollRemainder -= static_cast<F32>(pixels);
+    mScroll += pixels;
+    clampScroll();
+    mHover = at(x, y);
+    return true;
+}
+
+bool ALTabStrip::handleScrollHWheel(S32 x, S32 y, LLScrollDelta delta)
+{
+    return handleScrollWheel(x, y, delta);
 }
 
 bool ALTabStrip::handleRightMouseDown(S32 x, S32 y, MASK mask)
@@ -480,6 +660,13 @@ bool ALTabStrip::handleMiddleMouseDown(S32 x, S32 y, MASK mask)
 
 bool ALTabStrip::handleHover(S32 x, S32 y, MASK mask)
 {
+    if (mPressedClose >= 0 && hasMouseCapture())
+    {
+        mHover  = mPressedClose;
+        mHoverX = x;
+        mHoverY = y;
+        return true;
+    }
     if (mPressed >= 0 && hasMouseCapture())
     {
         // A press that has travelled is a drag: the tab moves past a
@@ -534,6 +721,11 @@ void ALTabStrip::onMouseLeave(S32 x, S32 y, MASK mask)
 // A tab's own words, whatever the strip was given as a whole.
 bool ALTabStrip::handleToolTip(S32 x, S32 y, MASK mask)
 {
+    if (listRect().pointInRect(x, y))
+    {
+        LLToolTipMgr::instance().show(alSaid("TabStripList", "Every tab, to pick one from"));
+        return true;
+    }
     const S32 which = at(x, y);
     if (which < 0 || mTabs[which].toolTip.empty())
     {

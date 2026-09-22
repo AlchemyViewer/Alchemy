@@ -154,7 +154,15 @@ namespace tut
         strip->handleHover(out.getCenterX(), out.getCenterY(), MASK_NONE);
         ensure("a press on it is handled",
                strip->handleMouseDown(out.getCenterX(), out.getCenterY(), MASK_NONE));
-        ensure_equals("and asks for it to go", closed.size(), 1u);
+        ensure("which asks nothing until it is let go of", closed.empty());
+        // Slid off before letting go: taken back.
+        strip->handleHover(out.mLeft - 20, out.getCenterY(), MASK_NONE);
+        strip->handleMouseUp(out.mLeft - 20, out.getCenterY(), MASK_NONE);
+        ensure("a press slid off closes nothing", closed.empty());
+        strip->handleHover(out.getCenterX(), out.getCenterY(), MASK_NONE);
+        strip->handleMouseDown(out.getCenterX(), out.getCenterY(), MASK_NONE);
+        strip->handleMouseUp(out.getCenterX(), out.getCenterY(), MASK_NONE);
+        ensure_equals("let go of over it, it asks for it to go", closed.size(), 1u);
         ensure_equals("by value", closed.front(), std::string("a"));
         ensure_equals("without choosing it", strip->chosen(), std::string("b"));
 
@@ -276,6 +284,7 @@ namespace tut
         const LLRect out = strip->closeRectOf(2);
         strip->handleHover(out.getCenterX(), out.getCenterY(), MASK_NONE);
         strip->handleMouseDown(out.getCenterX(), out.getCenterY(), MASK_NONE);
+        strip->handleMouseUp(out.getCenterX(), out.getCenterY(), MASK_NONE);
         strip->handleMiddleMouseDown(out.getCenterX(), out.getCenterY(), MASK_NONE);
         ensure_equals("nothing asks a preview to go", closed, 0);
         ensure_equals("and it stays chosen", strip->chosen(), std::string("c"));
@@ -303,5 +312,49 @@ namespace tut
                (italic->getFontFreetype()->getStyle() & LLFontGL::ITALIC) != 0);
         ensure("and has nothing further to hand over to", italic->faceFor(LLFontGL::ITALIC) == italic);
         ensure("asked twice, the answer is the same face", upright->faceFor(LLFontGL::ITALIC) == italic);
+    }
+
+    // More tabs than the strip holds at their least: it scrolls to keep the
+    // chosen one in sight, the wheel moves along them, and a button at the
+    // right end asks for the whole list.
+    template<> template<>
+    void altabstrip_object::test<6>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        ALTabStrip* strip = make(200);
+        std::vector<ALTabStrip::Tab> many;
+        for (S32 i = 0; i < 6; ++i)
+        {
+            many.push_back(tab("script_" + std::to_string(i) + ".lsl", std::to_string(i)));
+        }
+        strip->setTabs(many, "0");
+        ensure("overflowing", strip->overflowing());
+        const LLRect list = strip->listRect();
+        ensure("a list button at the right end", list.notEmpty() && list.mRight == 200);
+        ensure_equals("no tab under it", strip->at(list.getCenterX(), list.getCenterY()), -1);
+
+        strip->choose("5");
+        const LLRect last = strip->rectOf(5);
+        ensure("the chosen tab brought into sight: " + std::to_string(last.mLeft) + ".." + std::to_string(last.mRight),
+               last.mLeft >= 0 && last.mRight <= list.mLeft);
+        ensure_equals("and pressable where it is drawn", strip->at(last.getCenterX(), last.getCenterY()), 5);
+
+        strip->handleScrollWheel(10, HEIGHT / 2, LLScrollDelta(-10, -10.f));
+        ensure_equals("the wheel back to the start", strip->rectOf(0).mLeft, 0);
+        strip->handleScrollWheel(10, HEIGHT / 2, LLScrollDelta(100, 100.f));
+        ensure("and no further than the end", strip->rectOf(5).mRight <= list.mLeft && strip->rectOf(5).mRight > list.mLeft - 8);
+
+        S32 asked = 0;
+        strip->onListAsked([&asked]() { ++asked; });
+        strip->handleMouseDown(list.getCenterX(), list.getCenterY(), MASK_NONE);
+        ensure_equals("the button asks for the list", asked, 1);
+
+        strip->reshape(2000, HEIGHT);
+        ensure("with room, nothing to list", !strip->overflowing() && strip->listRect().isEmpty());
+        ensure_equals("and nothing scrolled", strip->rectOf(0).mLeft, 0);
+        strip->die();
     }
 }

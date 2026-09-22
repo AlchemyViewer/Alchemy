@@ -331,6 +331,11 @@ bool LLMenuItemGL::addToAcceleratorList(std::list <LLMenuKeyboardBinding*> *list
 
 // This function appends the character string representation of
 // the current accelerator key and mask to the provided string.
+std::string LLMenuItemGL::getAcceleratorString() const
+{
+    return mAcceleratorKey == KEY_NONE ? std::string() : LLKeyboard::stringFromAccelerator(mAcceleratorMask, mAcceleratorKey);
+}
+
 void LLMenuItemGL::appendAcceleratorString( std::string& st ) const
 {
     st = LLKeyboard::stringFromAccelerator( mAcceleratorMask, mAcceleratorKey );

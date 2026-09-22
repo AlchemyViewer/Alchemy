@@ -2701,6 +2701,21 @@ void ALTextView::showContextMenu(S32 x, S32 y)
         mContextMenuHandle = menu->getHandle();
     }
     gEditMenuHandler = this;
+    // Each command's keys beside it, as this view's keymap has them now:
+    // the person's own, where they changed them.
+    for (LLView* child : *menu->getChildList())
+    {
+        LLMenuItemGL* item = dynamic_cast<LLMenuItemGL*>(child);
+        const std::optional<ALEditorCommand> command = item ? alEditorCommandFromName(item->getName()) : std::nullopt;
+        if (!command)
+        {
+            continue;
+        }
+        KEY  key  = KEY_NONE;
+        MASK mask = MASK_NONE;
+        mKeymap.keysFor(*command, key, mask);
+        item->setShownAccelerator(key, mask);
+    }
     // The dictionary's items, where the menu has them: the suggestions
     // show themselves, the rest are shown here.
     const bool misspelled = getSpellCheck() && !mSuggestedFor.empty();
@@ -2782,11 +2797,46 @@ void ALTextView::showFind(bool with_replace)
         mFindBar->onReplaceAll([this]() { replaceAllMatches(); });
         mFindBar->onClose([this]() { hideFind(); });
     }
-    // Seeded with what is selected, when that is a line's worth or less.
+    // Seeded with what is selected, when that is a line's worth or less,
+    // or with the word the caret is in when nothing is; written as a
+    // pattern that finds it, where the bar is looking for patterns.
     const ALTextRange sel = selection().normalised();
+    std::string       seed;
     if (!sel.empty() && sel.begin.line == sel.end.line && sel.end.column - sel.begin.column < 200)
     {
-        mFindBar->setQuery(mDocument.text(sel));
+        seed = mDocument.text(sel);
+    }
+    else if (sel.empty())
+    {
+        const std::string& line  = mDocument.line(mCaret.line);
+        size_t             begin = static_cast<size_t>(llclamp(mCaret.column, 0, static_cast<S32>(line.size())));
+        size_t             end   = begin;
+        while (begin > 0 && alWordByte(line[begin - 1]))
+        {
+            --begin;
+        }
+        while (end < line.size() && alWordByte(line[end]))
+        {
+            ++end;
+        }
+        seed = line.substr(begin, end - begin);
+    }
+    if (!seed.empty())
+    {
+        if (mFindBar->options().regex)
+        {
+            std::string escaped;
+            for (const char c : seed)
+            {
+                if (strchr("\\^$.|?*+()[]{}", c))
+                {
+                    escaped += '\\';
+                }
+                escaped += c;
+            }
+            seed.swap(escaped);
+        }
+        mFindBar->setQuery(seed);
     }
     mFindBar->setReplaceAllowed(!mReadOnly);
     mFindBar->setReplaceShown(with_replace);
@@ -4220,7 +4270,18 @@ void ALTextView::armTripleClick()
 
 bool ALTextView::handleScrollWheel(S32 x, S32 y, LLScrollDelta delta)
 {
-    setScrollY(mScrollY + delta.mClicks * WHEEL_ROWS * mLayout.rowHeight());
+    // Shift turns the wheel sideways, where there is a sideways to go.
+    if (!mWordWrap && gKeyboard && (gKeyboard->currentMask(true) & MASK_SHIFT))
+    {
+        return handleScrollHWheel(x, y, delta);
+    }
+    // By the wheel's own fractions -- a trackpad's glide, a fine wheel's
+    // steps -- three rows to a notch, what is less than a pixel kept for
+    // the next.
+    const F32 pixels = delta.mPrecise * static_cast<F32>(WHEEL_ROWS * mLayout.rowHeight()) + mWheelRemainder;
+    const S32 whole  = static_cast<S32>(pixels);
+    mWheelRemainder  = pixels - static_cast<F32>(whole);
+    setScrollY(mScrollY + whole);
     return true;
 }
 
@@ -4230,7 +4291,7 @@ bool ALTextView::handleScrollHWheel(S32 x, S32 y, LLScrollDelta delta)
     {
         return false;
     }
-    setScrollX(mScrollX + static_cast<F32>(delta.mClicks * WHEEL_ROWS * mLayout.rowHeight()));
+    setScrollX(mScrollX + delta.mPrecise * static_cast<F32>(WHEEL_ROWS * mLayout.rowHeight()));
     return true;
 }
 
