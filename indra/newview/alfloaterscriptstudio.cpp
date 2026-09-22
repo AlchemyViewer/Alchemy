@@ -46,6 +46,7 @@
 #include "llversioninfo.h"
 #include "llbutton.h"
 #include "llcheckboxctrl.h"
+#include "alsaid.h"
 #include "llclipboard.h"
 #include "llcombobox.h"
 #include "lldir.h"
@@ -101,6 +102,10 @@ namespace
     const F64 ANALYSIS_DELAY = 0.35;
     // How often the explorer looks at what is selected in world.
     const F64 EXPLORER_POLL = 1.0;
+    // How many places a find across scripts lists; the rest are counted
+    // and not listed, since a common word in an object's scripts is
+    // thousands of rows nobody reads.
+    const S32 SEARCH_ROWS = 2000;
     // How long a second save goes ahead over what the check found.
     const F64 SAVE_ANYWAY = 10.0;
 }
@@ -348,7 +353,7 @@ void ALFloaterScriptStudio::savedElsewhere(const ALScriptRef& ref, const std::st
         Doc& doc = *window->mDocs[index];
         if (doc.notecard || !doc.loaded || doc.saving)
         {
-            return;
+            continue;
         }
         if (doc.editor->isDirty() && doc.modifiable)
         {
@@ -494,7 +499,27 @@ bool ALFloaterScriptStudio::postBuild()
     mOutputFilter->add(getString("OutputAllObjects"), LLSD(LLUUID::null));
     mOutputFilter->setCommitCallback(boost::bind(&ALFloaterScriptStudio::onOutputFilter, this));
     mOutput->onEntryChosen([this](const ALOutputView::Entry& entry) { onOutputChosen(entry); });
-    getChild<LLButton>("output_clear")->setCommitCallback([this](LLUICtrl*, const LLSD&) { mOutput->clearEntries(); });
+    getChild<LLButton>("output_clear")->setCommitCallback([this](LLUICtrl*, const LLSD&) {
+        mOutput->clearEntries();
+        // The objects offered were the ones that had spoken; none has.
+        mOutputObjects.clear();
+        mOutputFilter->clearRows();
+        mOutputFilter->add(getString("OutputAllObjects"), LLSD(LLUUID::null));
+        mOutputFilter->selectFirstItem();
+        onOutputFilter();
+    });
+    getChild<LLButton>("output_copy")->setCommitCallback([this](LLUICtrl*, const LLSD&) {
+        // Everything the pane shows, as it reads, on the clipboard.
+        std::string all;
+        for (const ALOutputView::Entry& entry : mOutput->entries())
+        {
+            all += ALOutputView::format(entry);
+            all += '\n';
+        }
+        LLClipboard::instance().copyToClipboard(all, 0, static_cast<S32>(all.size()));
+        LLStringUtil::format_map_t args;
+        setStatus(counted("OutputCopied", static_cast<S32>(mOutput->entries().size()), args));
+    });
     // What was said before the window opened, then everything after.
     for (const ALScriptWorkspace::RuntimeEvent& event : ALScriptWorkspace::instance().recentRuntime())
     {
@@ -512,6 +537,10 @@ bool ALFloaterScriptStudio::postBuild()
     mSearchCount      = LLUICtrlFactory::create<LLTextBox>(count);
     mSearchBar->setAdornment(mSearchCount);
     mSearchBar->onRun(boost::bind(&ALFloaterScriptStudio::search, this));
+    mSearchReplacement = getChild<LLLineEditor>("search_replacement");
+    mSearchReplace     = getChild<LLButton>("search_replace");
+    mSearchReplace->setCommitCallback([this](LLUICtrl*, const LLSD&) { replaceAllFound(); });
+    mSearchReplacement->setCommitCallback([this](LLUICtrl*, const LLSD&) { replaceAllFound(); });
     mSearchBar->onChanged(boost::bind(&ALFloaterScriptStudio::onSearchChanged, this));
     mSearchResults->setDoubleClickCallback(boost::bind(&ALFloaterScriptStudio::onSearchResult, this));
     mExplorer->setDoubleClickCallback(boost::bind(&ALFloaterScriptStudio::onExplorerChosen, this));
@@ -658,6 +687,13 @@ bool ALFloaterScriptStudio::hasDoc(const Doc* doc) const
     return false;
 }
 
+std::string ALFloaterScriptStudio::counted(const char* name, S32 count, LLStringUtil::format_map_t args) const
+{
+    args["[COUNT]"] = std::to_string(count);
+    const std::string formed = std::string(name) + LLTrans::countForm(alSaidLanguage(), count);
+    return getString(hasString(formed) ? formed : std::string(name), args);
+}
+
 ALFloaterScriptStudio::Doc* ALFloaterScriptStudio::active()
 {
     return mActive < mDocs.size() ? mDocs[mActive].get() : nullptr;
@@ -675,16 +711,20 @@ size_t ALFloaterScriptStudio::indexOf(const ALScriptRef& ref) const
     return NONE;
 }
 
-size_t ALFloaterScriptStudio::indexOf(std::string_view id) const
+void ALFloaterScriptStudio::reindexDocs()
 {
+    mByDocId.clear();
     for (size_t i = 0; i < mDocs.size(); ++i)
     {
-        if (mDocs[i]->id == id)
-        {
-            return i;
-        }
+        mByDocId.emplace(mDocs[i]->id, i);
     }
-    return NONE;
+}
+
+size_t ALFloaterScriptStudio::indexOf(std::string_view id) const
+{
+    // By the index, which every answer that comes back asks through.
+    const auto found = mByDocId.find(id);
+    return found == mByDocId.end() ? NONE : found->second;
 }
 
 ALCodeEditor* ALFloaterScriptStudio::makeEditor(const std::string& id, bool read_only)
@@ -849,6 +889,7 @@ void ALFloaterScriptStudio::openScript(const ALScriptRef& ref, const std::string
     });
 
     mDocs.push_back(std::move(doc));
+    reindexDocs();
     activate(mDocs.size() - 1);
 
     const LLHandle<LLFloater> handle = getHandle();
@@ -1731,6 +1772,7 @@ void ALFloaterScriptStudio::openFile(const std::string& path, bool lua, S32 line
             scheduleAnalysis(*raw);
         });
         mDocs.push_back(std::move(doc));
+        reindexDocs();
         already = mDocs.size() - 1;
         if (language.script)
         {
@@ -2491,6 +2533,27 @@ void ALFloaterScriptStudio::activate(size_t index)
 
 void ALFloaterScriptStudio::fillTabs()
 {
+    // What the strip would say now: the facts a tab is drawn from. The
+    // strip is filled only where one of them moved, since a keystroke
+    // asks for this and a keystroke changes none of them but the dirty
+    // mark.
+    std::vector<TabFacts> facts(mDocs.size());
+    for (size_t i = 0; i < mDocs.size(); ++i)
+    {
+        const Doc& doc = *mDocs[i];
+        facts[i].id    = doc.id;
+        facts[i].name  = doc.name;
+        facts[i].dirty = doc.editor->isDirty();
+        facts[i].image = imageNameOf(doc);
+        problemCounts(doc, facts[i].errors, facts[i].warnings);
+    }
+    if (facts == mTabFacts && mTabFactsActive == mActive)
+    {
+        return;
+    }
+    mTabFacts       = facts;
+    mTabFactsActive = mActive;
+
     std::vector<ALTabStrip::Tab> tabs;
     std::string                  chosen;
     for (size_t i = 0; i < mDocs.size(); ++i)
@@ -2499,11 +2562,10 @@ void ALFloaterScriptStudio::fillTabs()
         ALTabStrip::Tab tab;
         tab.label   = doc.name;
         tab.value   = doc.id;
-        tab.dirty   = doc.editor->isDirty();
-        tab.image   = LLUI::getUIImage(imageNameOf(doc));
+        tab.dirty   = facts[i].dirty;
+        tab.image   = LLUI::getUIImage(facts[i].image);
         // A dot in the worst problem's colour, for a script with any.
-        S32 errors = 0, warnings = 0;
-        problemCounts(doc, errors, warnings);
+        const S32 errors = facts[i].errors, warnings = facts[i].warnings;
         if (errors > 0 || warnings > 0)
         {
             static const LLUIColor error_color   = LLUIColorTable::instance().getColor("CodeMarkError", LLColor4::red);
@@ -2525,19 +2587,41 @@ void ALFloaterScriptStudio::fillTabs()
     }
 }
 
+// static
+const char* ALFloaterScriptStudio::levelName(Doc::Level level)
+{
+    return level == Doc::Level::Error ? "ERROR" : level == Doc::Level::Warning ? "WARNING" : "NOTE";
+}
+
+// static
+ALFloaterScriptStudio::Doc::Level ALFloaterScriptStudio::levelOf(const std::string& said)
+{
+    // The compiler's own words: anything but a warning is an error, as
+    // the server has only the two.
+    return said == "WARNING" || said == "WARN" ? Doc::Level::Warning : Doc::Level::Error;
+}
+
+// static
+ALFloaterScriptStudio::Doc::Level ALFloaterScriptStudio::levelOf(ALScriptProblem::Severity severity)
+{
+    return severity == ALScriptProblem::Severity::Error     ? Doc::Level::Error
+           : severity == ALScriptProblem::Severity::Warning ? Doc::Level::Warning
+                                                            : Doc::Level::Note;
+}
+
+// static
+ALCodeEditor::Mark ALFloaterScriptStudio::markOf(Doc::Level level)
+{
+    return level == Doc::Level::Error ? ALCodeEditor::Mark::Error : level == Doc::Level::Warning ? ALCodeEditor::Mark::Warning : ALCodeEditor::Mark::Note;
+}
+
 void ALFloaterScriptStudio::problemCounts(const Doc& doc, S32& errors, S32& warnings) const
 {
     errors = warnings = 0;
     for (const Doc::Shown& shown : doc.shown)
     {
-        if (shown.level == "ERROR")
-        {
-            ++errors;
-        }
-        else if (shown.level == "WARNING" || shown.level == "WARN")
-        {
-            ++warnings;
-        }
+        errors += shown.level == Doc::Level::Error ? 1 : 0;
+        warnings += shown.level == Doc::Level::Warning ? 1 : 0;
     }
 }
 
@@ -2560,27 +2644,22 @@ void ALFloaterScriptStudio::refreshTrailer(Doc& doc)
         if (selection.begin.line != selection.end.line)
         {
             const S32 lines = selection.end.line - selection.begin.line + (selection.end.column > 0 ? 1 : 0);
-            args["[COUNT]"] = std::to_string(lines);
-            parts.push_back(getString(lines == 1 ? "SelectedLine" : "SelectedLines", args));
+            parts.push_back(counted("SelectedLines", lines));
         }
         else
         {
-            const S32 chars = selection.end.column - selection.begin.column;
-            args["[COUNT]"] = std::to_string(chars);
-            parts.push_back(getString(chars == 1 ? "SelectedChar" : "SelectedChars", args));
+            parts.push_back(counted("SelectedChars", selection.end.column - selection.begin.column));
         }
     }
     S32 errors = 0, warnings = 0;
     problemCounts(doc, errors, warnings);
     if (errors > 0)
     {
-        args["[COUNT]"] = std::to_string(errors);
-        parts.push_back(getString(errors == 1 ? "ProblemError" : "ProblemErrors", args));
+        parts.push_back(counted("ProblemErrors", errors));
     }
     if (warnings > 0)
     {
-        args["[COUNT]"] = std::to_string(warnings);
-        parts.push_back(getString(warnings == 1 ? "ProblemWarning" : "ProblemWarnings", args));
+        parts.push_back(counted("ProblemWarnings", warnings));
     }
     // Joined by a middle dot with air around it; in code, since a
     // string of the skin's is trimmed of its spaces.
@@ -2596,6 +2675,16 @@ void ALFloaterScriptStudio::refreshTrailer(Doc& doc)
 
 ALFloaterScriptStudio::Doc* ALFloaterScriptStudio::docOf(const ALTextView& view)
 {
+    // The editor carries its document's id in its name, which is what
+    // makeEditor gave it; the index answers the rest.
+    const std::string& name = view.getName();
+    if (name.compare(0, 7, "editor_") == 0)
+    {
+        if (const size_t index = indexOf(std::string_view(name).substr(7)); index != NONE)
+        {
+            return mDocs[index].get();
+        }
+    }
     for (std::unique_ptr<Doc>& doc : mDocs)
     {
         if (doc->editor == &view || doc->expandedEditor == &view)
@@ -2987,6 +3076,7 @@ void ALFloaterScriptStudio::onTabsReordered(const std::vector<std::string>& orde
         }
     }
     mDocs = std::move(reordered);
+    reindexDocs();
     mActive = active_id.empty() ? NONE : indexOf(active_id);
     fillTabs();
 }
@@ -3006,6 +3096,8 @@ void ALFloaterScriptStudio::refreshToolbar()
     Doc*       doc     = active();
     const bool have    = doc && doc->loaded;
     const bool task    = doc && !doc->ref.inInventory() && !doc->notecard;
+    // Whether anything is unsaved: the one fact here that every
+    // keystroke can move, and the only one that costs a walk.
     mCompileTarget->setEnabled(have && doc->modifiable && !doc->notecard && doc->file.empty());
     mSaveButton->setEnabled(have && doc->modifiable && !doc->saving);
     bool anyDirty = false;
@@ -3509,7 +3601,7 @@ void ALFloaterScriptStudio::refreshProblems(Doc& doc)
     const ALTextDocument&                 text = doc.editor->document();
 
     auto add = [&](S32 line, S32 column, bool has_column, S32 end_line, S32 end_column, ALCodeEditor::Mark mark,
-                   const std::string& level, const std::string& origin, const std::string& message, const std::string& file = std::string()) {
+                   Doc::Level level, const std::string& origin, const std::string& message, const std::string& file = std::string()) {
         Doc::Shown row;
         row.line      = line;
         row.column    = column;
@@ -3538,10 +3630,10 @@ void ALFloaterScriptStudio::refreshProblems(Doc& doc)
             end = text.nextWord(begin);
         }
         decoration.range   = ALTextRange(begin, end);
-        decoration.color   = (mark == ALCodeEditor::Mark::Error     ? error_color
-                              : mark == ALCodeEditor::Mark::Warning ? warning_color
-                              : mark == ALCodeEditor::Mark::Runtime ? runtime_color
-                                                                    : note_color)
+        decoration.color   = (mark == ALCodeEditor::Mark::Runtime   ? runtime_color
+                              : level == Doc::Level::Error   ? error_color
+                              : level == Doc::Level::Warning ? warning_color
+                                                             : note_color)
                                  .get();
         decoration.message = origin + ": " + message;
         decorations.push_back(std::move(decoration));
@@ -3549,7 +3641,6 @@ void ALFloaterScriptStudio::refreshProblems(Doc& doc)
 
     for (const ALScriptWorkspace::Diagnostic& problem : doc.problems)
     {
-        const bool  error  = problem.level != "WARNING";
         S32         line   = problem.line;
         S32         column = problem.column;
         std::string file;
@@ -3567,20 +3658,15 @@ void ALFloaterScriptStudio::refreshProblems(Doc& doc)
                 }
             }
         }
-        add(line, column, problem.hasColumn, line, column, error ? ALCodeEditor::Mark::Error : ALCodeEditor::Mark::Warning, problem.level,
-            getString("OriginCompiler"), problem.message, file);
+        const Doc::Level level = levelOf(problem.level);
+        add(line, column, problem.hasColumn, line, column, markOf(level), level, getString("OriginCompiler"), problem.message, file);
     }
     // The preprocessor's own word on the text as it stands, and the
     // optimizer's notes from the last run ahead of a save.
     const auto preprocessorRow = [&](const ALScriptProblem& problem) {
-        const ALCodeEditor::Mark mark  = problem.severity == ALScriptProblem::Severity::Error     ? ALCodeEditor::Mark::Error
-                                         : problem.severity == ALScriptProblem::Severity::Warning ? ALCodeEditor::Mark::Warning
-                                                                                                  : ALCodeEditor::Mark::Note;
-        const std::string        level = problem.severity == ALScriptProblem::Severity::Error     ? "ERROR"
-                                         : problem.severity == ALScriptProblem::Severity::Warning ? "WARNING"
-                                                                                                  : "NOTE";
-        const bool optimizer = problem.source == ALScriptProblem::Source::Optimizer;
-        add(problem.line, problem.column, true, problem.endLine, problem.endColumn, mark, level,
+        const Doc::Level level     = levelOf(problem.severity);
+        const bool       optimizer = problem.source == ALScriptProblem::Source::Optimizer;
+        add(problem.line, problem.column, true, problem.endLine, problem.endColumn, markOf(level), level,
             getString(optimizer ? "OriginOptimizer" : "OriginPreprocessor"), problem.message, problem.file);
     };
     if (doc.expanded.valid)
@@ -3602,28 +3688,23 @@ void ALFloaterScriptStudio::refreshProblems(Doc& doc)
     }
     for (const ALScriptProblem& problem : doc.analysis)
     {
-        const ALCodeEditor::Mark mark = problem.severity == ALScriptProblem::Severity::Error     ? ALCodeEditor::Mark::Error
-                                        : problem.severity == ALScriptProblem::Severity::Warning ? ALCodeEditor::Mark::Warning
-                                                                                                 : ALCodeEditor::Mark::Note;
-        const std::string level  = problem.severity == ALScriptProblem::Severity::Error     ? "ERROR"
-                                   : problem.severity == ALScriptProblem::Severity::Warning ? "WARNING"
-                                                                                            : "NOTE";
+        const Doc::Level  level  = levelOf(problem.severity);
         const std::string origin = problem.source == ALScriptProblem::Source::Parser  ? getString("OriginParser")
                                    : problem.source == ALScriptProblem::Source::Types ? getString("OriginTypes")
                                                                                       : getString("OriginLint");
         const std::string message = problem.code.empty() ? problem.message : problem.message + " [" + problem.code + "]";
-        add(problem.line, problem.column, true, problem.endLine, problem.endColumn, mark, level, origin, message, problem.file);
+        add(problem.line, problem.column, true, problem.endLine, problem.endColumn, markOf(level), level, origin, message, problem.file);
     }
     for (const Doc::RuntimeProblem& problem : doc.runtime)
     {
         const S32 line   = llmax(0, problem.line);
         const S32 column = llmax(0, problem.column);
-        add(line, column, problem.column >= 0, line, column, ALCodeEditor::Mark::Runtime, "ERROR", getString("OriginRuntime"), problem.message);
+        add(line, column, problem.column >= 0, line, column, ALCodeEditor::Mark::Runtime, Doc::Level::Error, getString("OriginRuntime"), problem.message);
     }
     if (!doc.definitionsError.empty())
     {
         Doc::Shown row;
-        row.level   = "NOTE";
+        row.level   = Doc::Level::Note;
         row.origin  = getString("OriginDefinitions");
         row.message = doc.definitionsError;
         doc.shown.push_back(std::move(row));
@@ -3677,7 +3758,7 @@ void ALFloaterScriptStudio::fillProblems(const Doc* doc)
         value["hasColumn"] = problem->hasColumn;
         value["file"]      = problem->file;
         value["fileName"]  = problem->fileName;
-        value["level"]     = problem->level;
+        value["level"]     = levelName(problem->level);
         value["origin"]    = problem->origin;
         LLSD row;
         row["value"]                = value;
@@ -3685,7 +3766,7 @@ void ALFloaterScriptStudio::fillProblems(const Doc* doc)
         row["columns"][0]["value"]  = (problem->fileName.empty() ? std::string() : problem->fileName + ":") +
                                      (problem->hasColumn ? llformat("%d:%d", problem->line + 1, problem->column + 1) : llformat("%d", problem->line + 1));
         row["columns"][1]["column"] = "level";
-        row["columns"][1]["value"]  = problem->level;
+        row["columns"][1]["value"]  = getString(problem->level == Doc::Level::Error ? "LevelError" : problem->level == Doc::Level::Warning ? "LevelWarning" : "LevelNote");
         row["columns"][2]["column"] = "source";
         row["columns"][2]["value"]  = problem->origin;
         row["columns"][3]["column"] = "message";
@@ -3883,12 +3964,34 @@ void ALFloaterScriptStudio::addPlace(Doc::Lookup& lookup, Doc::Place place)
     }
 }
 
+namespace
+{
+    // What a loaded script's author wrote: the source out of the
+    // envelope where one wrapped it, the text as it came otherwise, and
+    // nothing where it could not be read.
+    std::string sourceOf(const ALScriptWorkspace::Loaded& loaded)
+    {
+        if (!loaded.error.empty() || loaded.notecard)
+        {
+            return std::string();
+        }
+        std::string text = loaded.text;
+        if (std::optional<ALScriptEnvelope> envelope = ALScriptEnvelope::parse(text))
+        {
+            text = envelope->source;
+        }
+        return text;
+    }
+}
+
 void ALFloaterScriptStudio::startLookup(Doc& doc, ALEditorCommand command, const ALScriptReferences& refs, bool has_definition, const std::string& home_path,
                                         const ALScriptSpan& definition, std::vector<Doc::Place> places, U32 version)
 {
     Doc::Lookup& lookup   = doc.lookup;
     lookup                = Doc::Lookup();
     lookup.generation     = ++mLookupGeneration;
+    const std::string id_of_lookup   = doc.id;
+    const U32         lookup_generation = lookup.generation;
     lookup.command        = command;
     lookup.name           = refs.name;
     lookup.hasDefinition  = has_definition;
@@ -3915,6 +4018,10 @@ void ALFloaterScriptStudio::startLookup(Doc& doc, ALEditorCommand command, const
     // in an include, or in this script, which another may include. Each
     // is read as it stands in an open tab, else as the region has it,
     // and passed over where it does not so much as mention the name.
+    // One held while the fan-out is built, so that a candidate answered
+    // on the spot -- a script already open -- cannot bring the count to
+    // nothing and finish the lookup with the others still to be asked.
+    ++lookup.pending;
     if (has_definition && !doc.ref.inInventory())
     {
         const LLHandle<LLFloater> handle     = getHandle();
@@ -3943,8 +4050,11 @@ void ALFloaterScriptStudio::startLookup(Doc& doc, ALEditorCommand command, const
                     ++lookup.pending;
                     if (const size_t index = indexOf(ref); index != NONE && mDocs[index]->loaded)
                     {
-                        const Doc& other = *mDocs[index];
-                        lookupCandidate(id, generation, ref, other.name, other.assetId, other.editor->text());
+                        const Doc&        other = *mDocs[index];
+                        const std::string name  = other.name;
+                        const LLUUID      asset = other.assetId;
+                        const std::string text  = other.editor->text();
+                        lookupCandidate(id, generation, ref, name, asset, text);
                         continue;
                     }
                     const std::string name = item.name;
@@ -3954,32 +4064,27 @@ void ALFloaterScriptStudio::startLookup(Doc& doc, ALEditorCommand command, const
                         {
                             return;
                         }
-                        std::string text = loaded.text;
-                        if (loaded.error.empty() && !loaded.notecard)
-                        {
-                            if (std::optional<ALScriptEnvelope> envelope = ALScriptEnvelope::parse(text))
-                            {
-                                text = envelope->source;
-                            }
-                        }
-                        else
-                        {
-                            text.clear();
-                        }
-                        studio->lookupCandidate(id, generation, ref, name, loaded.assetId, text);
+                        studio->lookupCandidate(id, generation, ref, name, loaded.assetId, sourceOf(loaded));
                     });
                 }
             }
         }
     }
-    if (lookup.pending > 0)
+    // What the held one stood for: the doc is found again, since a
+    // candidate answered on the spot may have opened a tab.
+    const size_t still = indexOf(id_of_lookup);
+    if (still == NONE || mDocs[still]->lookup.generation != lookup_generation)
     {
-        LLStringUtil::format_map_t args;
-        args["[NAME]"]  = lookup.name;
-        args["[COUNT]"] = std::to_string(lookup.pending);
-        setStatus(getString("LookingAcross", args));
+        return;
     }
-    lookupSettled(doc);
+    Doc&         now    = *mDocs[still];
+    Doc::Lookup& theirs = now.lookup;
+    --theirs.pending;
+    if (theirs.pending > 0)
+    {
+        setStatus(counted("LookingAcross", theirs.pending, { { "[NAME]", theirs.name } }));
+    }
+    lookupSettled(now);
 }
 
 void ALFloaterScriptStudio::lookupCandidate(const std::string& id, U32 generation, const ALScriptRef& ref, const std::string& name, const LLUUID& asset_id,
@@ -4132,7 +4237,6 @@ void ALFloaterScriptStudio::lookupSettled(Doc& doc)
     }
     LLStringUtil::format_map_t args;
     args["[NAME]"]  = lookup.name;
-    args["[COUNT]"] = std::to_string(lookup.places.size());
     args["[FILES]"] = std::to_string(files.size());
     if (command == ALEditorCommand::FindReferences)
     {
@@ -4148,7 +4252,7 @@ void ALFloaterScriptStudio::lookupSettled(Doc& doc)
         doc.editor->setHighlights(std::move(lit));
         fillReferences(&doc);
         showBottom("references_tab");
-        setStatus(getString(files.size() > 1 ? "ReferencesFoundAcross" : "ReferencesFound", args));
+        setStatus(counted(files.size() > 1 ? "ReferencesFoundAcross" : "ReferencesFound", static_cast<S32>(lookup.places.size()), args));
     }
     else if (command == ALEditorCommand::Rename)
     {
@@ -5107,14 +5211,25 @@ const ALFloaterScriptStudio::Vocab* ALFloaterScriptStudio::vocabWord(bool lua, s
     {
         return nullptr;
     }
-    for (const Vocab& word : vocabulary(lua))
+    // By an index over the words, built with them and thrown away with
+    // them: this is asked on every hover, every completion and every
+    // settling of the caret, over some hundreds of words.
+    static boost::unordered_flat_map<std::string, size_t, ll::string_hash, std::equal_to<>> index[2];
+    static const std::vector<Vocab>*                                                        indexed[2] = { nullptr, nullptr };
+    const std::vector<Vocab>&                                                               words      = vocabulary(lua);
+    const size_t                                                                            which      = lua ? 1 : 0;
+    if (indexed[which] != &words || index[which].size() != words.size())
     {
-        if (word.text == name)
+        index[which].clear();
+        index[which].reserve(words.size());
+        for (size_t i = 0; i < words.size(); ++i)
         {
-            return &word;
+            index[which].emplace(words[i].text, i);
         }
+        indexed[which] = &words;
     }
-    return nullptr;
+    const auto found = index[which].find(name);
+    return found == index[which].end() ? nullptr : &words[found->second];
 }
 
 // static
@@ -5311,6 +5426,43 @@ void ALFloaterScriptStudio::refreshBreadcrumb(Doc& doc)
         return;
     }
     const ALTextPos               caret = doc.editor->caret();
+    // The path the caret is in: which outline entry at each depth holds
+    // it. The crumbs are built from the outline, which a caret move
+    // does not touch, so the bar is told only where the path itself has
+    // changed -- and it is asked on every key.
+    std::vector<size_t> path;
+    {
+        size_t parent = NONE;
+        for (S32 depth = 0;; ++depth)
+        {
+            size_t found = NONE;
+            for (size_t i = 0; i < doc.outline.size(); ++i)
+            {
+                const ALScriptOutlineEntry& entry = doc.outline[i];
+                if (entry.depth == depth && holds(entry.span, caret) && (parent == NONE || within(entry.span, doc.outline[parent].span)))
+                {
+                    found = i;
+                }
+            }
+            if (found == NONE)
+            {
+                break;
+            }
+            path.push_back(found);
+            parent = found;
+        }
+    }
+    if (doc.crumbsOf == doc.analysisVersion && doc.crumbPath == path && doc.crumbName == doc.name)
+    {
+        // The same steps over the same outline: only the trailer, which
+        // says where the caret is.
+        refreshTrailer(doc);
+        return;
+    }
+    doc.crumbsOf  = doc.analysisVersion;
+    doc.crumbPath = path;
+    doc.crumbName = doc.name;
+
     std::vector<ALJumpBar::Crumb> crumbs;
     LLStringUtil::format_map_t    args;
 
@@ -5329,25 +5481,12 @@ void ALFloaterScriptStudio::refreshBreadcrumb(Doc& doc)
     }
     crumbs.push_back(std::move(root));
 
-    // Then each symbol around the caret, the outermost first: at each
-    // depth the last entry that holds the caret, within the one before,
-    // offering the others at its depth in the same holder.
+    // Then each symbol on the path, the outermost first, offering the
+    // others at its depth in the same holder.
     size_t parent = NONE;
-    for (S32 depth = 0;; ++depth)
+    for (S32 depth = 0; depth < static_cast<S32>(path.size()); ++depth)
     {
-        size_t found = NONE;
-        for (size_t i = 0; i < doc.outline.size(); ++i)
-        {
-            const ALScriptOutlineEntry& entry = doc.outline[i];
-            if (entry.depth == depth && holds(entry.span, caret) && (parent == NONE || within(entry.span, doc.outline[parent].span)))
-            {
-                found = i;
-            }
-        }
-        if (found == NONE)
-        {
-            break;
-        }
+        const size_t found = path[static_cast<size_t>(depth)];
         ALJumpBar::Crumb crumb;
         crumb.label    = doc.outline[found].name;
         crumb.value    = std::to_string(found);
@@ -5510,6 +5649,7 @@ void ALFloaterScriptStudio::search()
     mSearchHits    = 0;
     mSearchFiles   = 0;
     mSearchQuery   = mSearchBar->valueOf("query");
+    mSearchFound.clear();
     mSearchResults->deleteAllItems();
     if (mSearchQuery.empty())
     {
@@ -5526,7 +5666,7 @@ void ALFloaterScriptStudio::search()
             return;
         }
         searchDocument(doc.ref, doc.name, doc.ref.inInventory() ? LLStringUtil::null : objectNameOf(gObjectList.findObject(doc.ref.object), getString("ObjectUnnamed")),
-                       doc.editor->document());
+                       doc.editor->document(), doc.editor->document().version());
     };
     if (scope == "open")
     {
@@ -5599,20 +5739,12 @@ void ALFloaterScriptStudio::searchLoaded(U32 generation, const std::string& wher
     if (loaded.error.empty())
     {
         // A wrapped script is searched as its author wrote it.
-        std::string text = loaded.text;
-        if (!loaded.notecard)
-        {
-            if (std::optional<ALScriptEnvelope> envelope = ALScriptEnvelope::parse(text))
-            {
-                text = envelope->source;
-            }
-        }
-        searchDocument(loaded.ref, loaded.name, where, ALTextDocument(text));
+        searchDocument(loaded.ref, loaded.name, where, ALTextDocument(loaded.notecard ? loaded.text : sourceOf(loaded)));
     }
     searchSettled();
 }
 
-void ALFloaterScriptStudio::searchDocument(const ALScriptRef& ref, const std::string& name, const std::string& where, const ALTextDocument& text)
+void ALFloaterScriptStudio::searchDocument(const ALScriptRef& ref, const std::string& name, const std::string& where, const ALTextDocument& text, U32 version)
 {
     ALTextSearchOptions options;
     options.caseSensitive = mSearchBar->valueOf("case") == "exact";
@@ -5630,9 +5762,21 @@ void ALFloaterScriptStudio::searchDocument(const ALScriptRef& ref, const std::st
         return;
     }
     ++mSearchFiles;
+    // The places kept, with the text they were found in, for a replace.
+    Found found;
+    found.ref     = ref;
+    found.name    = name;
+    found.version = version;
+    found.places  = matches;
+    mSearchFound.push_back(std::move(found));
     for (const ALTextRange& match : matches)
     {
         ++mSearchHits;
+        if (mSearchHits > SEARCH_ROWS)
+        {
+            // Past what a list is any use as: counted, not listed.
+            continue;
+        }
         LLSD value;
         value["taskid"] = ref.object;
         value["itemid"] = ref.item;
@@ -5659,7 +5803,76 @@ void ALFloaterScriptStudio::searchSettled()
     LLStringUtil::format_map_t args;
     args["[HITS]"]  = std::to_string(mSearchHits);
     args["[FILES]"] = std::to_string(mSearchFiles);
-    mSearchCount->setText(getString(mSearchPending > 0 ? "SearchCounting" : mSearchHits ? "SearchCount" : "SearchNone", args));
+    mSearchCount->setText(mSearchPending > 0 ? getString("SearchCounting", args)
+                          : mSearchHits > SEARCH_ROWS ? counted("SearchCountCapped", mSearchFiles, [&] { LLStringUtil::format_map_t more = args; more["[SHOWN]"] = std::to_string(SEARCH_ROWS); return more; }())
+                          : mSearchHits     ? counted("SearchCount", mSearchFiles, args)
+                                            : getString("SearchNone", args));
+}
+
+void ALFloaterScriptStudio::replaceAllFound()
+{
+    if (mSearchFound.empty() || mSearchQuery.empty())
+    {
+        setStatus(getString("SearchReplaceNothing"), true);
+        return;
+    }
+    ALTextSearchOptions options;
+    options.caseSensitive = mSearchBar->valueOf("case") == "exact";
+    options.wholeWord     = mSearchBar->valueOf("how") == "word";
+    options.regex         = mSearchBar->valueOf("how") == "pattern";
+    const std::string with = mSearchReplacement ? mSearchReplacement->getText() : std::string();
+
+    // The scripts as they were found, each opened where it is not open,
+    // and every place in it replaced as one step. A script that has been
+    // typed in since the search is left alone.
+    const std::vector<Found> found = mSearchFound;
+    S32                      places = 0, files = 0;
+    bool                     moved = false;
+    for (const Found& one : found)
+    {
+        size_t index = indexOf(one.ref);
+        if (index == NONE)
+        {
+            openScript(one.ref, one.name);
+            index = indexOf(one.ref);
+            if (index == NONE || !mDocs[index]->loaded)
+            {
+                // It has to load first: the places are still in the
+                // list, and another Replace All once it is open does it.
+                moved = true;
+                continue;
+            }
+        }
+        Doc& doc = *mDocs[index];
+        if (!doc.modifiable || doc.notecard)
+        {
+            continue;
+        }
+        if (one.version != 0 && doc.editor->document().version() != one.version)
+        {
+            moved = true;
+            continue;
+        }
+        std::vector<std::pair<ALTextRange, std::string>> edits;
+        for (const ALTextRange& place : one.places)
+        {
+            edits.emplace_back(place, ALTextSearch::replacement(doc.editor->document(), place, mSearchQuery, options, with));
+        }
+        if (edits.empty())
+        {
+            continue;
+        }
+        if (doc.editor->replaceAll(std::move(edits)))
+        {
+            places += static_cast<S32>(one.places.size());
+            ++files;
+        }
+    }
+    LLStringUtil::format_map_t args;
+    args["[FILES]"] = std::to_string(files);
+    setStatus(counted("SearchReplaced", places, args));
+    // Whatever stood before, the places have moved: looked for again.
+    search();
 }
 
 void ALFloaterScriptStudio::onSearchResult()
@@ -5873,8 +6086,11 @@ void ALFloaterScriptStudio::runtimeEvent(const ALScriptWorkspace::RuntimeEvent& 
     static const LLUIColor runtime_color = LLUIColorTable::instance().getColor("CodeMarkRuntime", LLColor4::magenta);
     static const LLUIColor owner_color   = LLUIColorTable::instance().getColor("ObjectChatColor", LLColor4::white);
 
-    // The object, offered in the filter the first time it speaks.
-    if (event.root.notNull() && mOutputObjects.emplace(event.root, event.objectName).second)
+    // The object, offered in the filter the first time it speaks; past
+    // a few dozen the list is no use to anybody, and a busy region
+    // would fill it for the session.
+    constexpr size_t FILTER_OBJECTS = 40;
+    if (event.root.notNull() && mOutputObjects.size() < FILTER_OBJECTS && mOutputObjects.emplace(event.root, event.objectName).second)
     {
         mOutputFilter->add(event.objectName, LLSD(event.root));
     }
@@ -5895,7 +6111,9 @@ void ALFloaterScriptStudio::runtimeEvent(const ALScriptWorkspace::RuntimeEvent& 
         entry.color = runtime_color.get();
         if (event.line >= 0)
         {
-            entry.text += llformat(" (line %d)", event.line + 1);
+            LLStringUtil::format_map_t where;
+            where["[LINE]"] = std::to_string(event.line + 1);
+            entry.text += " " + getString("OutputAtLine", where);
         }
     }
     else if (event.channel == ALScriptWorkspace::RuntimeEvent::Channel::OwnerSay)
@@ -7006,6 +7224,7 @@ void ALFloaterScriptStudio::letGoOf(size_t index)
             doc.expandedEditor->die();
         }
         mDocs.erase(mDocs.begin() + index);
+        reindexDocs();
     }
     if (mDocs.empty())
     {

@@ -58,7 +58,16 @@
     <floater.string name="SearchListed">every object listed</floater.string>
     <floater.string name="SearchCountTip">How many places were found, in how many scripts</floater.string>
     <floater.string name="SearchCounting">[HITS] in [FILES], fetching...</floater.string>
-    <floater.string name="SearchCount">[HITS] in [FILES] file(s)</floater.string>
+    <floater.string name="SearchCountA">[HITS] in 1 file</floater.string>
+    <floater.string name="SearchCountB">[HITS] in [COUNT] files</floater.string>
+    <floater.string name="SearchCountCappedA">[HITS] in 1 file, the first [SHOWN] listed</floater.string>
+    <floater.string name="SearchCountCappedB">[HITS] in [COUNT] files, the first [SHOWN] listed</floater.string>
+    <floater.string name="SearchReplacedA">1 place replaced in [FILES] scripts.</floater.string>
+    <floater.string name="SearchReplacedB">[COUNT] places replaced in [FILES] scripts.</floater.string>
+    <floater.string name="SearchReplaceNothing">Nothing to replace.</floater.string>
+    <floater.string name="SearchReplaceMoved">[NAME] has changed since the search; searched again.</floater.string>
+    <floater.string name="OutputCopiedA">1 line copied.</floater.string>
+    <floater.string name="OutputCopiedB">[COUNT] lines copied.</floater.string>
     <floater.string name="SearchNone">nothing found</floater.string>
     <floater.string name="SearchBadPattern">the pattern does not parse</floater.string>
     <floater.string name="PaneInspector">Inspector</floater.string>
@@ -96,9 +105,15 @@
     <floater.string name="InspectProblem">Problem: [MESSAGE]</floater.string>
     <floater.string name="NoReferences">Nothing is known about [NAME] here.</floater.string>
     <floater.string name="NoDefinition">[NAME] is not defined in this script.</floater.string>
-    <floater.string name="ReferencesFound">[COUNT] place(s) where [NAME] stands.</floater.string>
-    <floater.string name="LookingAcross">Looking for [NAME] across [COUNT] other script(s) of the object...</floater.string>
-    <floater.string name="ReferencesFoundAcross">[COUNT] place(s) where [NAME] stands, in [FILES] scripts.</floater.string>
+    <floater.string name="ReferencesFoundA">1 place where [NAME] stands.</floater.string>
+    <floater.string name="ReferencesFoundB">[COUNT] places where [NAME] stands.</floater.string>
+    <floater.string name="LookingAcrossA">Looking for [NAME] across 1 other script of the object...</floater.string>
+    <floater.string name="LookingAcrossB">Looking for [NAME] across [COUNT] other scripts of the object...</floater.string>
+    <floater.string name="ReferencesFoundAcrossA">1 place where [NAME] stands, in [FILES] scripts.</floater.string>
+    <floater.string name="ReferencesFoundAcrossB">[COUNT] places where [NAME] stands, in [FILES] scripts.</floater.string>
+    <floater.string name="LevelError">ERROR</floater.string>
+    <floater.string name="LevelWarning">WARNING</floater.string>
+    <floater.string name="LevelNote">NOTE</floater.string>
     <floater.string name="NotRenamable">[NAME] is not this script's to rename.</floater.string>
     <floater.string name="RenameBadName">&quot;[NAME]&quot; is not a name.</floater.string>
     <floater.string name="RenameStale">The script changed before the rename; ask again.</floater.string>
@@ -109,13 +124,14 @@
     <floater.string name="RenameMissed">[COUNT] place(s) in [NAME] no longer read as they did, and were not renamed.</floater.string>
     <floater.string name="CaretPosition">Ln [LINE], Col [COL]</floater.string>
     <floater.string name="SelectedLine">1 line selected</floater.string>
-    <floater.string name="SelectedLines">[COUNT] lines selected</floater.string>
-    <floater.string name="SelectedChar">1 character selected</floater.string>
-    <floater.string name="SelectedChars">[COUNT] characters selected</floater.string>
-    <floater.string name="ProblemError">1 error</floater.string>
-    <floater.string name="ProblemErrors">[COUNT] errors</floater.string>
-    <floater.string name="ProblemWarning">1 warning</floater.string>
-    <floater.string name="ProblemWarnings">[COUNT] warnings</floater.string>
+    <floater.string name="SelectedLinesA">1 line selected</floater.string>
+    <floater.string name="SelectedLinesB">[COUNT] lines selected</floater.string>
+    <floater.string name="SelectedCharsA">1 character selected</floater.string>
+    <floater.string name="SelectedCharsB">[COUNT] characters selected</floater.string>
+    <floater.string name="ProblemErrorsA">1 error</floater.string>
+    <floater.string name="ProblemErrorsB">[COUNT] errors</floater.string>
+    <floater.string name="ProblemWarningsA">1 warning</floater.string>
+    <floater.string name="ProblemWarningsB">[COUNT] warnings</floater.string>
     <floater.string name="CrumbRootTip">[NAME]: press to go to the top; its arrow lists what the script declares</floater.string>
     <floater.string name="CrumbTip">Go to [NAME]; its arrow lists what is beside it</floater.string>
     <floater.string name="GoToSymbolTitle">Go to Symbol</floater.string>
@@ -153,6 +169,7 @@
     <floater.string name="OutputAllObjects">All objects</floater.string>
     <floater.string name="OutputOpen">Open [NAME]</floater.string>
     <floater.string name="OutputOpenAtLine">Open [NAME] at line [LINE]</floater.string>
+    <floater.string name="OutputAtLine">(line [LINE])</floater.string>
     <floater.string name="TabInventoryTip">A script in your inventory</floater.string>
     <floater.string name="TabObjectTip">A script in an object's contents</floater.string>
     <floater.string name="TabNotecardTip">A notecard, as plain text</floater.string>
@@ -1164,6 +1181,16 @@
                              tool_tip="Forget what was said so far"
                              top_delta="0"
                              width="60" />
+                            <button
+                             follows="left|top"
+                             height="22"
+                             label="Copy All"
+                             layout="topleft"
+                             left_pad="6"
+                             name="output_copy"
+                             tool_tip="Everything the pane shows, on the clipboard as it reads"
+                             top_delta="0"
+                             width="70" />
                             <output_view
                              follows="all"
                              height="82"
@@ -1191,14 +1218,33 @@
                              tool_tip="A search said as a sentence: the words, how they have to match, and where to look. Return runs it, and changing a word runs it again."
                              top="0"
                              width="574" />
+                            <button
+                             follows="top|right"
+                             height="22"
+                             label="Replace All"
+                             layout="topleft"
+                             name="search_replace"
+                             right="-2"
+                             tool_tip="Every place found replaced by the words in the box, script by script, each script's own one step to undo. A script that is not open is opened with the change unsaved."
+                             top="28"
+                             width="90" />
+                            <line_editor
+                             follows="top|left|right"
+                             height="22"
+                             layout="topleft"
+                             left="0"
+                             name="search_replacement"
+                             tool_tip="What to put in place of the words found"
+                             top_delta="0"
+                             width="478" />
                             <scroll_list
                              follows="all"
-                             height="82"
+                             height="56"
                              layout="topleft"
                              left="0"
                              name="search_results"
                              tool_tip="Every place the words were found; double-click one to open its script there"
-                             top_pad="0"
+                             top_pad="2"
                              width="574">
                                 <scroll_list.columns label="Where" name="where" width="200" />
                                 <scroll_list.columns label="Line" name="line" width="50" />

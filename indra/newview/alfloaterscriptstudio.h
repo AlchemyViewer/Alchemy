@@ -36,7 +36,10 @@
 #include "alvimkeymap.h"
 #include "lllivefile.h"
 
+#include "llstl.h"
+
 #include <boost/signals2.hpp>
+#include <boost/unordered/unordered_flat_map.hpp>
 #include <boost/unordered/unordered_flat_set.hpp>
 
 #include <map>
@@ -53,6 +56,7 @@ class LLButton;
 class LLCheckBoxCtrl;
 class LLComboBox;
 class LLFilterEditor;
+class LLLineEditor;
 class LLPanel;
 class LLScrollListCtrl;
 class LLContextMenu;
@@ -258,13 +262,22 @@ private:
         U32                                        requestedVersion = 0;
         F64                                        analysisDue      = 0.0;
         std::string                                definitionsError;
+        // How bad a problem is: what the marks, the counts, the filters
+        // and the compiler's own words all go by, rather than a word
+        // compared as text in six places.
+        enum class Level : U8
+        {
+            Note,
+            Warning,
+            Error
+        };
         // Both, in the order the pane lists them.
         struct Shown
         {
             S32         line      = 0;
             S32         column    = 0;
             bool        hasColumn = false;
-            std::string level;
+            Level       level     = Level::Note;
             std::string origin;
             std::string message;
             // An included file the problem is in, by identity and by
@@ -311,8 +324,8 @@ private:
             U32                            version   = 0;
             S32                            pending   = 0;
             std::vector<Place>             places;
-            std::set<std::string>          seen;
-            std::map<std::string, U32>     versions;
+            boost::unordered_flat_set<std::string, ll::string_hash, std::equal_to<>>      seen;
+            boost::unordered_flat_map<std::string, U32, ll::string_hash, std::equal_to<>> versions;
         };
         Lookup                                     lookup;
         // Edits to make once the script has loaded: a rename that reached
@@ -335,6 +348,12 @@ private:
         std::string                                liveLog;
         bool                                       subscribed   = false;
         bool                                       externalSave = false;
+        // The crumb path the bar was last told, by the outline it was
+        // read from: a caret that stays within the same symbols asks for
+        // no new crumbs, and it is asked on every key.
+        std::vector<size_t>                        crumbPath;
+        U32                                        crumbsOf = 0;
+        std::string                                crumbName;
         // Where the caret was last seen; when the inspector is due to be
         // told what it is on, or zero; and what it was last told about.
         ALTextPos                                  caretSeen{ -1, -1 };
@@ -347,15 +366,25 @@ private:
     // The problems of every open script, in the store all the studios'
     // findings live in, keyed by the script's id; the pane lists the
     // active script's through its filters.
+    // What the pane's rows say a level is, and what the compiler's own
+    // word for one means.
+    static const char*  levelName(Doc::Level level);
+    static Doc::Level   levelOf(const std::string& said);
+    static Doc::Level   levelOf(ALScriptProblem::Severity severity);
+    static ALCodeEditor::Mark markOf(Doc::Level level);
+
     struct ProblemTraits
     {
-        static ALFindingLevel level(const Doc::Shown& p) { return p.level == "ERROR" ? ALFindingLevel::Error : (p.level == "WARNING" || p.level == "WARN") ? ALFindingLevel::Warning : ALFindingLevel::Note; }
+        static ALFindingLevel level(const Doc::Shown& p)
+        {
+            return p.level == Doc::Level::Error ? ALFindingLevel::Error : p.level == Doc::Level::Warning ? ALFindingLevel::Warning : ALFindingLevel::Note;
+        }
         static std::string    rule(const Doc::Shown& p) { return p.origin; }
         static bool           fixable(const Doc::Shown&) { return false; }
         static bool           mentions(const Doc::Shown& p, std::string_view text)
         {
             return ALStringMatch::containsNoCase(p.message, text) || ALStringMatch::containsNoCase(p.fileName, text) ||
-                   ALStringMatch::containsNoCase(p.origin, text) || ALStringMatch::containsNoCase(p.level, text);
+                   ALStringMatch::containsNoCase(p.origin, text) || ALStringMatch::containsNoCase(levelName(p.level), text);
         }
     };
 
@@ -384,10 +413,21 @@ private:
                            std::function<void(const std::string&)> chose, LLView* anchor = nullptr, S32 width = 0, S32 height = 0,
                            std::function<void()> escaped = {}, std::function<void(const std::string&)> hold = {});
 
+    // A floater string in the form its count takes in the viewer's
+    // language: the name with LLTrans's suffix -- A for one, B for many
+    // in English, C where a language counts a third way -- with [COUNT]
+    // filled in and whatever else the map holds; the plain name where
+    // the skin has no such form, for a skin that has not been brought
+    // up to the forms.
+    std::string counted(const char* name, S32 count, LLStringUtil::format_map_t args = LLStringUtil::format_map_t()) const;
+
     Doc*   active();
     size_t indexOf(const ALScriptRef& ref) const;
     size_t indexOf(std::string_view id) const;
     void   activate(size_t index);
+    // The strip filled from the docs, and the toolbar put right. Both
+    // are asked for on every keystroke; each does its work only when
+    // what it shows has actually changed since the last.
     void   fillTabs();
     void   refreshToolbar();
     // The strip under the editor's right-hand words: the caret's place,
@@ -659,7 +699,13 @@ private:
     void findInFiles();
     void onSearchChanged();
     void search();
-    void searchDocument(const ALScriptRef& ref, const std::string& name, const std::string& where, const ALTextDocument& text);
+    // Every place the last search found replaced by what the box says:
+    // script by script, each script's own one step to undo, a script
+    // that is not open opened with the change unsaved. A script whose
+    // text has moved on since the search is left alone and searched
+    // again.
+    void replaceAllFound();
+    void searchDocument(const ALScriptRef& ref, const std::string& name, const std::string& where, const ALTextDocument& text, U32 version = 0);
     void searchLoaded(U32 generation, const std::string& where, const ALScriptWorkspace::Loaded& loaded);
     void searchSettled();
     void onSearchResult();
@@ -737,6 +783,27 @@ private:
 
     std::vector<std::unique_ptr<Doc>>  mDocs;
     size_t                             mActive = NONE;
+    // What the strip and the toolbar last stood for: a keystroke asks
+    // for both, and neither changes with most of them.
+    struct TabFacts
+    {
+        std::string id;
+        std::string name;
+        bool        dirty  = false;
+        S32         errors = 0;
+        S32         warnings = 0;
+        const char* image  = nullptr;
+        friend bool operator==(const TabFacts& a, const TabFacts& b)
+        {
+            return a.id == b.id && a.name == b.name && a.dirty == b.dirty && a.errors == b.errors && a.warnings == b.warnings && a.image == b.image;
+        }
+        friend bool operator!=(const TabFacts& a, const TabFacts& b) { return !(a == b); }
+    };
+    std::vector<TabFacts>              mTabFacts;
+    size_t                             mTabFactsActive = NONE;
+    // The docs by id, for the lookups every answer makes.
+    boost::unordered_flat_map<std::string, size_t, ll::string_hash, std::equal_to<>> mByDocId;
+    void                               reindexDocs();
     std::vector<std::string>           mRecentFiles;
     // What the editors' vim keymaps share: the : and / lines entered in
     // any of them, and the settings a :set changes.
@@ -787,6 +854,18 @@ private:
     ALScopeBar*                        mSearchBar     = nullptr;
     LLScrollListCtrl*                  mSearchResults = nullptr;
     LLTextBox*                         mSearchCount   = nullptr;
+    LLLineEditor*                      mSearchReplacement = nullptr;
+    LLButton*                          mSearchReplace     = nullptr;
+    // What each script's text was when it was searched, so that a
+    // replace knows whether the places it found still stand.
+    struct Found
+    {
+        ALScriptRef              ref;
+        std::string              name;
+        U32                      version = 0;
+        std::vector<ALTextRange> places;
+    };
+    std::vector<Found>                 mSearchFound;
     // Which search the answers arriving belong to; how many files are
     // still to answer; what was found so far, and in how many files; the
     // words last searched for, so that a changed dropdown asks again
