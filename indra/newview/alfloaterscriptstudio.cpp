@@ -107,8 +107,6 @@ namespace
     // and not listed, since a common word in an object's scripts is
     // thousands of rows nobody reads.
     const S32 SEARCH_ROWS = 2000;
-    // How long a second save goes ahead over what the check found.
-    const F64 SAVE_ANYWAY = 10.0;
 }
 
 namespace
@@ -1737,8 +1735,7 @@ void ALFloaterScriptStudio::preprocessedAnswer(const std::string& id, U32 versio
         }
         return;
     }
-    const F64 now = LLTimer::getTotalSeconds();
-    if (result.hasErrors() && doc.saveAnywayUntil <= now)
+    if (result.hasErrors() && doc.saveAnywayVersion != static_cast<S64>(version))
     {
         S32 errors = 0;
         for (const ALScriptProblem& problem : result.problems)
@@ -1747,7 +1744,8 @@ void ALFloaterScriptStudio::preprocessedAnswer(const std::string& id, U32 versio
         }
         args["[COUNT]"] = std::to_string(errors);
         setStatus(getString("PreprocessErrors", args), true);
-        doc.saveAnywayUntil = now + SAVE_ANYWAY;
+        doc.saveAnywayVersion = version;
+        saveStopped(doc);
         showBottom("problems_tab");
         return;
     }
@@ -3260,9 +3258,11 @@ void ALFloaterScriptStudio::save(Doc& doc)
         std::vector<LLPointer<LLInventoryItem>> items;
         carriedForSave(doc, text, items);
         std::string error;
+        doc.sentAt = doc.editor->savePoint();
         if (!ALScriptWorkspace::instance().saveNotecard(doc.ref, text, items, nullptr, error))
         {
             setStatus(error, true);
+            saveStopped(doc);
             return;
         }
         doc.saving = true;
@@ -3301,13 +3301,17 @@ void ALFloaterScriptStudio::upload(Doc& doc, const std::string& text)
     }
     options.running = doc.ref.inInventory() || mRunning->get();
     std::string error;
+    // Where the journal stands as the text goes, taken before anything
+    // can be typed after it.
+    doc.sentAt = doc.editor->savePoint();
     if (!ALScriptWorkspace::instance().save(doc.ref, text, options, nullptr, error))
     {
         setStatus(error, true);
+        saveStopped(doc);
         return;
     }
-    doc.saveAnywayUntil = 0.0;
-    doc.saving          = true;
+    doc.saveAnywayVersion = -1;
+    doc.saving            = true;
     doc.problems.clear();
     refreshProblems(doc);
     LLStringUtil::format_map_t args;
@@ -3343,15 +3347,20 @@ void ALFloaterScriptStudio::compiled(const ALScriptWorkspace::CompileResult& res
     {
         args["[ERROR]"] = result.error;
         setStatus(getString("SaveFailed", args), true);
+        if (ours)
+        {
+            saveStopped(doc);
+        }
         refreshToolbar();
         return;
     }
     // The text is the server's now, compiled or not -- when it was this
-    // window that sent it; a recompile from the explorer sent the asset
-    // as it was, and what is typed here is still to be saved.
+    // window that sent it, as it was sent, whatever was typed while the
+    // answer came; a recompile from the explorer sent the asset as it
+    // was, and what is typed here is still to be saved.
     if (ours)
     {
-        doc.editor->resetDirty();
+        doc.editor->markSavedAt(doc.sentAt);
     }
     if (result.newAssetId.notNull())
     {
@@ -3406,6 +3415,12 @@ void ALFloaterScriptStudio::compiled(const ALScriptWorkspace::CompileResult& res
     {
         args["[COUNT]"] = std::to_string(doc.problems.size());
         setStatus(getString("CompileFailed", args), true);
+        // Saved, but not running: a close waiting on it leaves the tab
+        // open with what the compiler said, rather than taking both away.
+        if (ours)
+        {
+            saveStopped(doc);
+        }
     }
     if (index == mActive)
     {
@@ -4831,8 +4846,8 @@ void ALFloaterScriptStudio::externalChanged(const std::string& id, const std::st
     {
         return;
     }
-    doc.externalSave    = true;
-    doc.saveAnywayUntil = LLTimer::getTotalSeconds() + 3600.0;
+    doc.externalSave      = true;
+    doc.saveAnywayVersion = doc.editor->document().version();
     save(doc);
 }
 
@@ -4961,6 +4976,7 @@ void ALFloaterScriptStudio::saveFile(Doc& doc)
     if (!out.good())
     {
         setStatus(getString("SaveToFileFailed", args), true);
+        saveStopped(doc);
         return;
     }
     setStatus(getString("SavedToFile", args));
@@ -6057,23 +6073,103 @@ bool ALFloaterScriptStudio::canClose()
     {
         return true;
     }
+    if (mClosingWindow)
+    {
+        // Asked already, and waiting on an answer or a save.
+        return false;
+    }
+    S32 unsaved = 0;
+    for (const std::unique_ptr<Doc>& doc : mDocs)
+    {
+        unsaved += doc->editor->isDirty() && doc->modifiable ? 1 : 0;
+    }
     mClosingWindow = true;
+    if (unsaved > 1)
+    {
+        // One question for all of them rather than one a script.
+        LLSD args;
+        args["COUNT"] = unsaved;
+        LLNotificationsUtil::add("ScriptStudioSaveChangesMany", args, LLSD(),
+                                 [this](const LLSD& notification, const LLSD& response) {
+                                     closeWindowAnswered(LLNotificationsUtil::getSelectedOption(notification, response));
+                                 });
+        return false;
+    }
     continueClosing();
     return mDocs.empty();
 }
 
+void ALFloaterScriptStudio::closeWindowAnswered(S32 option)
+{
+    if (option != 0 && option != 1)
+    {
+        mClosingWindow = false;
+        return;
+    }
+    // The clean ones go now; the unsaved are saved, each closing as its
+    // save comes back, or let go of.
+    std::vector<std::string> saving;
+    for (size_t i = mDocs.size(); i-- > 0;)
+    {
+        Doc& doc = *mDocs[i];
+        if (option == 0 && doc.editor->isDirty() && doc.modifiable)
+        {
+            saving.push_back(doc.id);
+        }
+        else
+        {
+            letGoOf(i);
+        }
+    }
+    for (const std::string& id : saving)
+    {
+        const size_t index = indexOf(id);
+        if (index == NONE || !mClosingWindow)
+        {
+            continue;
+        }
+        Doc& doc           = *mDocs[index];
+        doc.closeAfterSave = true;
+        save(doc);
+        // A save that could not begin -- still loading, say -- says so
+        // by being neither on its way nor done.
+        if (indexOf(id) != NONE && doc.closeAfterSave && !doc.saving && !doc.preprocessing && !doc.saveAfterCheck)
+        {
+            saveStopped(doc);
+        }
+    }
+    if (mClosingWindow && mDocs.empty())
+    {
+        mClosingWindow = false;
+        closeFloater();
+    }
+}
+
+void ALFloaterScriptStudio::saveStopped(Doc& doc)
+{
+    doc.closeAfterSave = false;
+    mClosingWindow     = false;
+}
+
 void ALFloaterScriptStudio::continueClosing()
 {
-    while (mClosingWindow && !mDocs.empty())
+    size_t i = 0;
+    while (mClosingWindow && i < mDocs.size())
     {
-        Doc& doc = *mDocs.front();
+        Doc& doc = *mDocs[i];
+        if (doc.closeAfterSave)
+        {
+            // On its way: it goes when its save comes back.
+            ++i;
+            continue;
+        }
         if (doc.editor->isDirty() && doc.modifiable)
         {
             // Asked; the answer carries on from here, or stops.
             closeDocument(doc.id);
             return;
         }
-        letGoOf(0);
+        letGoOf(i);
     }
     if (mClosingWindow && mDocs.empty())
     {
@@ -6330,8 +6426,8 @@ bool ALFloaterScriptStudio::preflight(Doc& doc)
     {
         return true;
     }
-    const F64 now = LLTimer::getTotalSeconds();
-    if (doc.saveAnywayUntil > now)
+    const S64 version = doc.editor->document().version();
+    if (doc.saveAnywayVersion == version)
     {
         // Asked twice: over whatever was found, by the check here and by
         // the preprocessor after it; the upload closes the window.
@@ -6371,7 +6467,8 @@ bool ALFloaterScriptStudio::preflight(Doc& doc)
     }
     args["[COUNT]"] = std::to_string(errors);
     setStatus(getString("PreflightErrors", args), true);
-    doc.saveAnywayUntil = now + SAVE_ANYWAY;
+    doc.saveAnywayVersion = version;
+    saveStopped(doc);
     // The first of them, in sight.
     showBottom("problems_tab");
     // The first of the checkers' errors among the rows as the filters

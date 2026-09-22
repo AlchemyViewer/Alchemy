@@ -167,6 +167,7 @@ public:
     // gutter bars it, and a save clears them all.
     bool lineChanged(S32 line) const;
     void resetDirty() override;
+    void markSavedAt(const ALTextUndo::SavePoint& point) override;
     void setShowFoldMarkers(bool show);
     bool getShowFoldMarkers() const { return mShowFoldMarkers; }
     // A faint line down each level of indentation, so that a block's

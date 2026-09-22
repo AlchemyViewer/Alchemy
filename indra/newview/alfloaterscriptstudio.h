@@ -185,6 +185,9 @@ private:
         bool                                       modifiable = false;
         bool                                       saving     = false;
         bool                                       closeAfterSave = false;
+        // Where the editor's journal stood when the text went up: what the
+        // answer marks saved, whatever was typed while it came.
+        ALTextUndo::SavePoint                      sentAt;
         // What the preprocessor made of the source, in a read-only editor
         // of its own that the pane can swap to and back; made once there
         // is expanded text to show.
@@ -265,10 +268,13 @@ private:
         // Whether the script runs in its object, as the region last
         // said: -1 until it has.
         S32                                        running = -1;
-        // A save waiting on a check of the text as it stands; and until
-        // when a save goes ahead over what the check found.
-        bool                                       saveAfterCheck  = false;
-        F64                                        saveAnywayUntil = 0.0;
+        // A save waiting on a check of the text as it stands; and the
+        // version of the text a save goes ahead for over what the check or
+        // the preprocessor found -- the one a save was refused over, so
+        // that asking again saves it, however long after, and a change
+        // asks the question afresh -- or -1 for none.
+        bool                                       saveAfterCheck    = false;
+        S64                                        saveAnywayVersion = -1;
         // What the analyzer said of the text at analysisVersion; when the
         // next check is due, or zero; the version last asked about.
         ALScriptProblems                           analysis;
@@ -758,6 +764,13 @@ private:
     void closeDocument(std::string_view id);
     void closeDocumentAnswered(const std::string& id, S32 option);
     void letGoOf(size_t index);
+    // A save that did not go through -- refused over errors, failed, or
+    // compiled with errors: a close waiting on it waits no longer, and a
+    // window closing stops, the tab left for the author to look at.
+    void saveStopped(Doc& doc);
+    // The window's close, with several scripts unsaved, asked about all of
+    // them at once: saved, let go of, or the window kept.
+    void closeWindowAnswered(S32 option);
 
     void onTabChosen(const std::string& value);
     void onMenuAction(const LLSD& param);

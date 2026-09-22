@@ -55,6 +55,18 @@ public:
         ALTextPos                         caretBefore;
         ALTextPos                         caretAfter;
         std::string                       mLabel;
+        // Which step this is, for a save point to find it by; a run
+        // joined to it keeps the number it began with.
+        U64                               serial = 0;
+    };
+    // Where the journal stands, taken when a text is sent to be saved and
+    // marked saved when the answer comes: the step it stood at, or none,
+    // and the era of the bottom of the stack, which forgetting the oldest
+    // step and clearing move on.
+    struct SavePoint
+    {
+        U64 serial = 0;
+        U32 era    = 0;
     };
 
     explicit ALTextUndo(ALTextDocument& document);
@@ -88,6 +100,13 @@ public:
     // The text as it stands is the one that was saved.
     void markSaved();
     bool isPristine() const;
+    // The point the text stands at now, the run ended so that whatever is
+    // typed after is a step of its own; and later, the text at that point
+    // marked as the saved one, wherever stepping reaches it from here --
+    // below, where more was typed meanwhile, above where some was undone,
+    // or nowhere, where a change after an undo threw it away.
+    SavePoint savePoint();
+    void      markSaved(const SavePoint& point);
 
 private:
     // What kind of step an edit makes on its own, which is the key a run
@@ -106,4 +125,6 @@ private:
     // Nowhere, once a change has thrown away the redo steps it was among.
     static constexpr size_t NOWHERE = static_cast<size_t>(-1);
     size_t            mSavedInForce = 0;
+    U64               mNextSerial   = 0;
+    U32               mEra          = 0;
 };

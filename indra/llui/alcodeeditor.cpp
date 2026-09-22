@@ -539,6 +539,18 @@ void ALCodeEditor::resetDirty()
     std::fill(mChanged.begin(), mChanged.end(), 0);
 }
 
+void ALCodeEditor::markSavedAt(const ALTextUndo::SavePoint& point)
+{
+    ALTextView::markSavedAt(point);
+    // The bars go where the text is the saved one; where more was typed
+    // meanwhile they stay, which marks a line or two too many rather than
+    // one too few.
+    if (!isDirty())
+    {
+        std::fill(mChanged.begin(), mChanged.end(), 0);
+    }
+}
+
 LLColor4 ALCodeEditor::highlightColor() const
 {
     if (mHighlightColorSet)

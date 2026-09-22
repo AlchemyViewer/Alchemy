@@ -219,4 +219,51 @@ namespace tut
         undo.undo();
         ensure("back to the saved text, the mark having moved down", undo.isPristine());
     }
+
+    template<> template<>
+    void altextundo_object::test<9>()
+    {
+        set_test_name("a save point taken when a text is sent marks that text saved when the answer comes, whatever was typed meanwhile");
+        ALTextPos       at    = type(ALTextPos(0, 0), "a");
+        at                    = type(at, "b");
+        const ALTextUndo::SavePoint sent = undo.savePoint();
+        // Typed while the save was on its way, within the run's window:
+        // a step of its own all the same.
+        at = type(at, "c");
+        undo.markSaved(sent);
+        ensure("what was typed meanwhile is unsaved", !undo.isPristine());
+        undo.undo();
+        ensure_equals("the step back is only what came after", doc.text(), std::string("ab"));
+        ensure("and that is the saved text", undo.isPristine());
+        undo.redo();
+        ensure("forward again, unsaved", !undo.isPristine());
+
+        // Undone past before the answer came: the saved text is a step
+        // forward.
+        const ALTextUndo::SavePoint again = undo.savePoint();
+        undo.undo();
+        undo.markSaved(again);
+        ensure("a step short of the saved text", !undo.isPristine());
+        undo.redo();
+        ensure("the redo reaches it", undo.isPristine());
+
+        // Undone, then changed: the saved text can no longer be reached.
+        const ALTextUndo::SavePoint lost = undo.savePoint();
+        undo.undo();
+        type(ALTextPos(0, 2), "x", 5.0);
+        undo.markSaved(lost);
+        ensure("unreachable, so never pristine", !undo.isPristine());
+        undo.undo();
+        ensure("not even stepping back", !undo.isPristine());
+
+        // A point before any step at all.
+        undo.clear();
+        doc.setText("");
+        const ALTextUndo::SavePoint empty = undo.savePoint();
+        type(ALTextPos(0, 0), "z", 5.0);
+        undo.markSaved(empty);
+        ensure("the empty text was saved, the z is not", !undo.isPristine());
+        undo.undo();
+        ensure("back to it", undo.isPristine());
+    }
 }

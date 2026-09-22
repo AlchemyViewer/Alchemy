@@ -108,6 +108,7 @@ void ALTextUndo::record(const ALTextDocument::Edit& edit, const ALTextPos& befor
     step.edits.push_back(edit);
     step.caretBefore = before;
     step.caretAfter  = after;
+    step.serial      = ++mNextSerial;
 
     // The key a run is joined by: the open group, or the kind of change
     // where it carries on the last step; anything else ends the run first.
@@ -125,9 +126,13 @@ void ALTextUndo::record(const ALTextDocument::Edit& edit, const ALTextPos& befor
     // past the depth takes the saved mark down with it -- or away, where
     // the saved text was what that step led from, since no stepping
     // back reaches it any more.
-    if (mSteps.note(std::move(step), key, now, mGroupDepth > 0 ? 1e9 : mWindow, join) && mSavedInForce != NOWHERE)
+    if (mSteps.note(std::move(step), key, now, mGroupDepth > 0 ? 1e9 : mWindow, join))
     {
-        mSavedInForce = mSavedInForce == 0 ? NOWHERE : mSavedInForce - 1;
+        ++mEra;
+        if (mSavedInForce != NOWHERE)
+        {
+            mSavedInForce = mSavedInForce == 0 ? NOWHERE : mSavedInForce - 1;
+        }
     }
 }
 
@@ -185,6 +190,7 @@ void ALTextUndo::clear()
     mSteps.clear();
     mGroupDepth   = 0;
     mSavedInForce = 0;
+    ++mEra;
 }
 
 void ALTextUndo::markSaved()
@@ -196,4 +202,44 @@ void ALTextUndo::markSaved()
 bool ALTextUndo::isPristine() const
 {
     return mSavedInForce != NOWHERE && mSteps.inForce() == mSavedInForce;
+}
+
+ALTextUndo::SavePoint ALTextUndo::savePoint()
+{
+    mSteps.breakRun();
+    SavePoint point;
+    point.serial = mSteps.undone().empty() ? 0 : mSteps.undone().back().serial;
+    point.era    = mEra;
+    return point;
+}
+
+void ALTextUndo::markSaved(const SavePoint& point)
+{
+    if (point.serial == 0)
+    {
+        // The text before any step: reachable while the bottom of the
+        // stack is still the one it was.
+        mSavedInForce = point.era == mEra ? 0 : NOWHERE;
+        return;
+    }
+    const std::vector<Step>& undone = mSteps.undone();
+    for (size_t i = 0; i < undone.size(); ++i)
+    {
+        if (undone[i].serial == point.serial)
+        {
+            mSavedInForce = i + 1;
+            return;
+        }
+    }
+    // Among the steps forward, the next of which is the last.
+    const std::vector<Step>& redone = mSteps.redone();
+    for (size_t i = 0; i < redone.size(); ++i)
+    {
+        if (redone[i].serial == point.serial)
+        {
+            mSavedInForce = undone.size() + (redone.size() - i);
+            return;
+        }
+    }
+    mSavedInForce = NOWHERE;
 }

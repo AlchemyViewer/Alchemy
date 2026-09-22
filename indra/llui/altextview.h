@@ -228,6 +228,11 @@ public:
     // Whether the text has changed since it was set or saved.
     bool            isDirty() const override { return !mUndo.isPristine(); }
     void            resetDirty() override { mUndo.markSaved(); }
+    // For a save whose answer comes later: where the text stands when it
+    // is sent, and that text marked saved once the answer comes, whatever
+    // was typed meanwhile staying unsaved.
+    ALTextUndo::SavePoint savePoint() { return mUndo.savePoint(); }
+    virtual void          markSavedAt(const ALTextUndo::SavePoint& point) { mUndo.markSaved(point); }
 
     // --- the caret and the selection -----------------------------------------
 

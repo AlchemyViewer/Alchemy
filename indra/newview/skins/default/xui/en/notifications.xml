@@ -1744,6 +1744,19 @@ Save changes to &quot;[NAME]&quot;?
 
   <notification
    icon="alertmodal.tga"
+   name="ScriptStudioSaveChangesMany"
+   type="alertmodal">
+[COUNT] scripts have unsaved changes. Save them before closing?
+    <tag>confirm</tag>
+    <usetemplate
+     canceltext="Cancel"
+     name="yesnocancelbuttons"
+     notext="Don&apos;t Save"
+     yestext="Save All"/>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
    label="New Item"
    name="ScriptStudioNewItem"
    type="alertmodal">
