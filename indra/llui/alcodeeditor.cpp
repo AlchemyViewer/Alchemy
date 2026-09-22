@@ -570,7 +570,7 @@ void ALCodeEditor::drawGutter(const LLRect& text, F32 alpha)
     {
         return;
     }
-    const LLRect local = getLocalRect();
+    const LLRect local = bodyRect();
     const LLRect gutter(leftEdge(), local.mTop, leftEdge() + width, local.mBottom);
     gl_rect_2d(gutter, gutterColor() % alpha);
 

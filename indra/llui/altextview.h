@@ -93,6 +93,15 @@ public:
     virtual bool inserting() const = 0;
     // What a status line says of it: the mode, and what is pending.
     virtual std::string status() const = 0;
+    // A line being typed into the keymap -- vim's : and / lines -- and
+    // where its caret is in it, in bytes; false while none is. The view
+    // shows it in a band under the text, as vim has its command line
+    // under the buffer, with the status and the message when none is.
+    virtual bool typingLine(std::string& line, S32& caret) const { return false; }
+    // What the keymap last said -- a pattern not found, lines yanked --
+    // until the next key; whether it was an error.
+    virtual std::string message() const { return std::string(); }
+    virtual bool        messageIsError() const { return false; }
     // Goes up with every change of state, for whoever shows the status.
     virtual U32 generation() const = 0;
     // The mouse put the caret somewhere, or dragged a selection: the
@@ -310,6 +319,9 @@ public:
         U8                      flags = 0;
     };
     void                      setStyles(std::vector<Style> styles);
+    // One more, put in its place among the others; dropped where it
+    // would overlap one. What a log adds as it grows, a line at a time.
+    void                      addStyle(Style style);
     void                      clearStyles() { setStyles({}); }
     const std::vector<Style>& styles() const { return mStyles; }
 
@@ -506,13 +518,27 @@ public:
     bool handleScrollWheel(S32 x, S32 y, LLScrollDelta delta) override;
     bool handleScrollHWheel(S32 x, S32 y, LLScrollDelta delta) override;
     bool handleToolTip(S32 x, S32 y, MASK mask) override;
+    bool handleDragAndDrop(S32 x, S32 y, MASK mask, bool drop, EDragAndDropType cargo_type, void* cargo_data, EAcceptance* accept,
+                           std::string& tooltip_msg) override;
     void onMouseCaptureLost() override;
     void setFocus(bool focus) override;
     void onFocusLost() override;
     bool acceptsTextInput() const override { return !mReadOnly; }
 
+    // Whoever wants what is dragged onto the text -- an inventory item
+    // onto a notecard, say: asked on the hover and again on the drop,
+    // with the point, the cargo and its kind, and answers whether the
+    // drop is its and how it is accepted; the text passes the rest by.
+    typedef std::function<bool(S32 x, S32 y, MASK mask, bool drop, EDragAndDropType type, void* cargo, EAcceptance* accept, std::string& tooltip)> drop_handler_t;
+    void setDropHandler(drop_handler_t handler) { mDropHandler = std::move(handler); }
+
     // The rect the text is drawn in.
     LLRect textRect() const;
+    // The view less the band a modal keymap has under the text: where
+    // the text, the gutter and the bars are.
+    LLRect bodyRect() const;
+    // The band's height, zero without a modal keymap.
+    S32    bandHeight() const;
     // The position under a point of the view, on a cluster boundary.
     ALTextPos posAtLocal(S32 x, S32 y, bool round);
     // Comments the selected lines out with the grammar's line comment, or
@@ -656,6 +682,9 @@ private:
     ALTextLayout        mLayout;
     ALKeymap            mKeymap;
     std::unique_ptr<ALModalKeymap> mModal;
+    // The band under the text a modal keymap has: its line, or its
+    // status and message.
+    void drawBand(F32 alpha);
     // Where the mouse rests on the map, or -1: what the preview is of.
     S32                 mMapHoverY = -1;
     const LLFontGL*     mFont       = nullptr;
@@ -752,6 +781,7 @@ private:
     std::vector<Style>                 mStyles;
     LLUIColor                          mLinkColor;
     link_signal_t                      mLinkClicked;
+    drop_handler_t                     mDropHandler;
     atom_signal_t                      mAtomClicked;
     // The link or the atom the mouse is on, by index, or -1; and the
     // link or the atom a press landed on, which a release on the same

@@ -398,9 +398,21 @@ void ALTextView::setTabWidth(S32 spaces)
 
 // --- geometry ----------------------------------------------------------------
 
-LLRect ALTextView::textRect() const
+S32 ALTextView::bandHeight() const
+{
+    return mModal ? mLayout.rowHeight() + 4 : 0;
+}
+
+LLRect ALTextView::bodyRect() const
 {
     LLRect rect = getLocalRect();
+    rect.mBottom += bandHeight();
+    return rect;
+}
+
+LLRect ALTextView::textRect() const
+{
+    LLRect rect = bodyRect();
     rect.mLeft  = leftEdge() + mHPad + leftInset();
     rect.mRight -= mHPad;
     rect.mTop -= mVPad;
@@ -795,6 +807,29 @@ void ALTextView::setStyles(std::vector<Style> styles)
         touched(style);
         mStyles.push_back(std::move(style));
     }
+}
+
+void ALTextView::addStyle(Style style)
+{
+    style.range = style.range.normalised();
+    if (const U8 face = style.flags & (LLFontGL::BOLD | LLFontGL::ITALIC); face && (style.font || mFont))
+    {
+        style.font = (style.font ? style.font : mFont)->faceFor(face);
+    }
+    if (style.range.empty() || (!style.font && !style.color && !(style.flags & LLFontGL::UNDERLINE)))
+    {
+        return;
+    }
+    const auto at = std::lower_bound(mStyles.begin(), mStyles.end(), style.range.begin, [](const Style& s, const ALTextPos& p) { return s.range.begin < p; });
+    if ((at != mStyles.end() && at->range.begin < style.range.end) || (at != mStyles.begin() && style.range.begin < (at - 1)->range.end))
+    {
+        return;
+    }
+    for (S32 line = style.range.begin.line; line <= style.range.end.line; ++line)
+    {
+        mLayout.invalidateLine(line);
+    }
+    mStyles.insert(at, std::move(style));
 }
 
 void ALTextView::provideRuns(S32 line, std::vector<ALTextLayout::Run>& out) const
@@ -2654,7 +2689,7 @@ LLRect ALTextView::rulerRect() const
     {
         return LLRect();
     }
-    const LLRect local = getLocalRect();
+    const LLRect local = bodyRect();
     return LLRect(local.mRight - RULER_W, local.mTop, local.mRight, local.mBottom);
 }
 
@@ -2805,7 +2840,7 @@ LLRect ALTextView::mapRect() const
     {
         return LLRect();
     }
-    const LLRect local = getLocalRect();
+    const LLRect local = bodyRect();
     return mScrollMapLeft ? LLRect(local.mLeft, local.mTop, local.mLeft + mScrollMapWidth, local.mBottom)
                           : LLRect(local.mRight - mScrollMapWidth, local.mTop, local.mRight, local.mBottom);
 }
@@ -3500,6 +3535,10 @@ void ALTextView::draw()
         drawMap(alpha);
     }
     drawBars(alpha);
+    if (mModal)
+    {
+        drawBand(alpha);
+    }
     if (findShown())
     {
         placeFindBar();
@@ -3508,6 +3547,48 @@ void ALTextView::draw()
     if (mMapHoverY >= 0 && !mDraggingMap)
     {
         drawMapPreview(alpha);
+    }
+}
+
+void ALTextView::drawBand(F32 alpha)
+{
+    // The keymap's line under the text, where vim has its command line:
+    // what is being typed after : or /, with a block caret at its end;
+    // else what the keymap last said, an error in the error colour; else
+    // the mode and what is pending. On a ground a shade off the text's,
+    // under a hairline, so that it reads as a strip of its own.
+    const LLRect    local = getLocalRect();
+    const LLRect    band(local.mLeft, local.mBottom + bandHeight(), local.mRight, local.mBottom);
+    const LLColor4& paper = backgroundColor();
+    const LLColor4& ink   = textColor();
+    gl_rect_2d(band, lerp(paper, ink, 0.06f) % alpha);
+    gl_rect_2d(band.mLeft, band.mTop, band.mRight, band.mTop - 1, lerp(paper, ink, 0.2f) % alpha);
+    const LLFontGL* font = getFont();
+    if (!font)
+    {
+        return;
+    }
+    std::string line;
+    S32         caret    = 0;
+    const bool  typing   = mModal->typingLine(line, caret);
+    std::string shown    = typing ? line : mModal->message();
+    LLColor4    colour   = typing || !mModal->messageIsError() ? ink : mSpellErrorColor.get();
+    if (!typing && shown.empty())
+    {
+        shown  = mModal->status();
+        colour = lerp(paper, ink, 0.8f);
+    }
+    const S32 x = local.mLeft + mHPad + 2;
+    const S32 y = band.mBottom + 2 + static_cast<S32>(font->getDescenderHeight());
+    font->renderUTF8(shown, 0, static_cast<F32>(x), static_cast<F32>(y), colour % alpha, LLFontGL::LEFT, LLFontGL::BASELINE, LLFontGL::NORMAL, LLFontGL::NO_SHADOW,
+                     S32_MAX, band.getWidth() - mHPad * 2 - 4, nullptr, true);
+    // The block caret at the caret's byte, blinking as the text's does.
+    const F32 blink = mBlink.getElapsedTimeF32();
+    if (typing && keyboardOnText() && gFocusMgr.getAppHasFocus() && (blink < BLINK_DELAY || (static_cast<S32>(blink * 2.f) & 1)))
+    {
+        const S32 at    = font->getWidth(shown.substr(0, static_cast<size_t>(llclamp(caret, 0, static_cast<S32>(shown.size())))));
+        const S32 width = llmax(2, static_cast<S32>(font->getWidth(" ")));
+        gl_rect_2d(x + at, band.mTop - 2, x + at + width, band.mBottom + 2, ink % (0.6f * alpha));
     }
 }
 
@@ -3807,6 +3888,16 @@ bool ALTextView::handleMouseUp(S32 x, S32 y, MASK mask)
         return true;
     }
     return LLUICtrl::handleMouseUp(x, y, mask);
+}
+
+bool ALTextView::handleDragAndDrop(S32 x, S32 y, MASK mask, bool drop, EDragAndDropType cargo_type, void* cargo_data, EAcceptance* accept,
+                                   std::string& tooltip_msg)
+{
+    if (mDropHandler && mDropHandler(x, y, mask, drop, cargo_type, cargo_data, accept, tooltip_msg))
+    {
+        return true;
+    }
+    return LLUICtrl::handleDragAndDrop(x, y, mask, drop, cargo_type, cargo_data, accept, tooltip_msg);
 }
 
 bool ALTextView::handleDoubleClick(S32 x, S32 y, MASK mask)
