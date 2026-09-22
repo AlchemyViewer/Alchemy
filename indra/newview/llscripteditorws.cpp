@@ -406,7 +406,10 @@ LLWebsocketMgr::WSConnection::ptr_t LLScriptEditorWSServer::connectionFactory(LL
                                                                               LLWebsocketMgr::connection_h handle)
 {
     auto connection = std::make_shared<LLScriptEditorWSConnection>(server, handle);
-    mActiveConnections[connection->getConnectionID()] = connection;
+    {
+        LLMutexLock lock(&mConnectionsMutex);
+        mActiveConnections[connection->getConnectionID()] = connection;
+    }
 
     // Call setupConnectionMethods to register any global methods
     setupConnectionMethods(connection);
@@ -442,7 +445,10 @@ void LLScriptEditorWSServer::onStopped()
     mPublishedObjectManager.clearAllStateWithListenerCleanup();
 
     mSubscriptions.clear();
-    mActiveConnections.clear();
+    {
+        LLMutexLock lock(&mConnectionsMutex);
+        mActiveConnections.clear();
+    }
 
     LL_INFOS("ScriptEditorWS") << "Script editor WebSocket server stopped, all state cleaned up" << LL_ENDL;
 
@@ -465,17 +471,30 @@ void LLScriptEditorWSServer::onConnectionClosed(const LLWebsocketMgr::WSConnecti
 
     LL_INFOS("ScriptEditorWS") << "Script editor client disconnected" << LL_ENDL;
 
-    // Remove from active connections
+    // Remove from active connections. This runs on the server's thread;
+    // the subscriptions are the main thread's, so letting the
+    // connection's go is posted there, guarded against the server having
+    // gone by then.
     auto script_connection = std::dynamic_pointer_cast<LLScriptEditorWSConnection>(connection);
     if (script_connection)
     {
-        U32 connection_id = script_connection->getConnectionID();
-        unsubscribeConnection(connection_id);
-        mActiveConnections.erase(connection_id);
+        U32    connection_id = script_connection->getConnectionID();
+        size_t left          = 0;
+        {
+            LLMutexLock lock(&mConnectionsMutex);
+            mActiveConnections.erase(connection_id);
+            left = mActiveConnections.size();
+        }
+        std::weak_ptr<LLWebsocketMgr::WSServer> weak = weak_from_this();
+        LLAppViewer::instance()->postToMainCoro([weak, connection_id]() {
+            if (auto self = weak.lock())
+            {
+                std::static_pointer_cast<LLScriptEditorWSServer>(self)->unsubscribeConnection(connection_id);
+            }
+        });
 
-        LL_DEBUGS("ScriptEditorWS") << "Removed connection from active connections. Total: "
-                                   << mActiveConnections.size() << LL_ENDL;
-        if (mActiveConnections.empty())
+        LL_DEBUGS("ScriptEditorWS") << "Removed connection from active connections. Total: " << left << LL_ENDL;
+        if (left == 0)
         {
             // Nothing listening: from here the idle time counts, and
             // update() stops the server once it has run out.
@@ -578,10 +597,15 @@ LLScriptEditorWSServer::SubscriptionError LLScriptEditorWSServer::updateScriptSu
             return SubscriptionError::INVALID_EDITOR;
         }
 
-        auto con_it = mActiveConnections.find(connection_id);
-        if (con_it == mActiveConnections.end())
+        LLScriptEditorWSConnection::wptr_t connection;
         {
-            return SubscriptionError::INTERNAL_ERROR;
+            LLMutexLock lock(&mConnectionsMutex);
+            auto        con_it = mActiveConnections.find(connection_id);
+            if (con_it == mActiveConnections.end())
+            {
+                return SubscriptionError::INTERNAL_ERROR;
+            }
+            connection = con_it->second;
         }
 
         if ((it->second.mConnectionID != 0) && !it->second.mConnection.expired()
@@ -598,7 +622,7 @@ LLScriptEditorWSServer::SubscriptionError LLScriptEditorWSServer::updateScriptSu
         // it would have been cleared by unsubscribeConnection, so mConnectionID
         // is always 0 here.
         it->second.mConnectionID = connection_id;
-        it->second.mConnection   = con_it->second;
+        it->second.mConnection   = connection;
         ++mConnectionSubscriptionCounts[connection_id];
         return SubscriptionError::SUCCESS;
     }
@@ -1234,13 +1258,16 @@ LLSD LLScriptEditorWSServer::handleCommandList()
 void LLScriptEditorWSServer::sendCommandExecute(
     U32 connection_id, const std::string& command, const LLSD& params)
 {
-    auto it = mActiveConnections.find(connection_id);
-    if (it == mActiveConnections.end())
+    LLScriptEditorWSConnection::ptr_t connection;
     {
-        return;
+        LLMutexLock lock(&mConnectionsMutex);
+        auto        it = mActiveConnections.find(connection_id);
+        if (it == mActiveConnections.end())
+        {
+            return;
+        }
+        connection = it->second.lock();
     }
-
-    auto connection = it->second.lock();
     if (!connection || !connection->hasFeature("commands"))
     {
         return;
@@ -2377,14 +2404,18 @@ void LLScriptEditorWSServer::sendRuntimeEvent(const ALScriptWorkspace::RuntimeEv
 void LLScriptEditorWSServer::notifyConnection(U32 connection_id, const std::string& method, const LLSD& params) const
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
-    auto it = mActiveConnections.find(connection_id);
-    if (it != mActiveConnections.end())
+    LLScriptEditorWSConnection::ptr_t connection;
     {
-        auto connection = it->second.lock();
-        if (connection)
+        LLMutexLock lock(&mConnectionsMutex);
+        auto        it = mActiveConnections.find(connection_id);
+        if (it != mActiveConnections.end())
         {
-            connection->notify(method, params);
+            connection = it->second.lock();
         }
+    }
+    if (connection)
+    {
+        connection->notify(method, params);
     }
 }
 
@@ -2397,14 +2428,21 @@ void LLScriptEditorWSServer::notifyAll(const std::string& method, const LLSD& pa
         LLSD(), method, params, LLSD(), LLSD());
     std::string payload = LlsdToJson(envelope);
 
-
-    for (const auto& pair : mActiveConnections)
+    // The connections taken under the lock, the sending done outside it.
+    std::vector<LLScriptEditorWSConnection::ptr_t> connections;
     {
-        auto connection = pair.second.lock();
-        if (connection)
+        LLMutexLock lock(&mConnectionsMutex);
+        for (const auto& pair : mActiveConnections)
         {
-            connection->sendMessage(payload);
+            if (auto connection = pair.second.lock())
+            {
+                connections.push_back(std::move(connection));
+            }
         }
+    }
+    for (const auto& connection : connections)
+    {
+        connection->sendMessage(payload);
     }
 }
 

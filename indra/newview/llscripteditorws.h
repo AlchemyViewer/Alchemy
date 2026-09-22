@@ -40,6 +40,8 @@
 #include <vector>
 #include <map>
 #include <set>
+#include "llmutex.h"
+
 #include <atomic>
 #include <functional>
 
@@ -344,6 +346,9 @@ private:
 
     subscriptions_t mSubscriptions;
     std::unordered_map<U32, S32> mConnectionSubscriptionCounts;
+    // Written on the server's thread as connections come and go, read on
+    // the main one as messages go out: under the lock either way.
+    mutable LLMutex                                   mConnectionsMutex;
     std::map<U32, LLScriptEditorWSConnection::wptr_t> mActiveConnections;
 
     // The manager sends through the server and names prims as it does.
