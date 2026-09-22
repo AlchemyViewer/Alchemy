@@ -90,6 +90,11 @@ public:
     };
 
     // The tabs in order, and which of them is shown, by value.
+    // The tabs afresh. What a tab keeps of what it last drew -- its
+    // name as cut for the room it had -- is kept where the tab is the
+    // same tab with the same name, since a host that fills the strip on
+    // every keystroke would otherwise have every name measured again
+    // every frame.
     void setTabs(std::vector<Tab> tabs, const std::string& chosen);
     const std::vector<Tab>& tabs() const { return mTabs; }
 

@@ -74,10 +74,25 @@ ALTabStrip::ALTabStrip(const Params& p)
 
 void ALTabStrip::setTabs(std::vector<Tab> tabs, const std::string& chosen)
 {
-    mTabs = std::move(tabs);
+    // What each tab last drew, kept where it is the same tab by value
+    // with the same name; the cutting measures the words, and a host
+    // may fill the strip on every keystroke.
+    std::vector<Shown> kept(tabs.size());
+    for (size_t i = 0; i < tabs.size(); ++i)
+    {
+        for (size_t was = 0; was < mTabs.size() && was < mShown.size(); ++was)
+        {
+            if (mTabs[was].value == tabs[i].value && mShown[was].label == tabs[i].label)
+            {
+                kept[i] = mShown[was];
+                break;
+            }
+        }
+    }
+    mTabs   = std::move(tabs);
     mChosen = chosen;
-    mHover = -1;
-    mShown.clear();
+    mHover  = -1;
+    mShown.swap(kept);
     layout();
 }
 
