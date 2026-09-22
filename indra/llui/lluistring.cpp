@@ -208,15 +208,13 @@ void LLUIString::updateResult() const
     }
     mResult = mOrig;
 
-    // Merging local args into the defaults costs a full copy of LLTrans' map.
-    // Most LLUIStrings carry no args of their own, so hand format() the shared
-    // map directly in that case. insert() leaves existing keys alone either
-    // way, so a default arg still wins over a local one of the same name.
+    // Most LLUIStrings carry no args of their own, so hand format() the
+    // shared defaults directly in that case; with args of its own, the
+    // format reads the defaults and them side by side, the defaults first
+    // as the merge had it, rather than from a copy of the whole map.
     if (mArgs && !mArgs->empty())
     {
-        LLStringUtil::format_map_t combined_args = LLTrans::getDefaultArgs();
-        combined_args.insert(mArgs->begin(), mArgs->end());
-        LLStringUtil::format(mResult, combined_args);
+        LLStringUtil::format(mResult, LLTrans::getDefaultArgs(), *mArgs);
     }
     else
     {
