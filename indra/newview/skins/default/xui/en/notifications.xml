@@ -1802,7 +1802,7 @@ A new name for &quot;[NAME]&quot;:
    label="Save Theme"
    name="ScriptStudioSaveTheme"
    type="alertmodal">
-A name for the theme, which the colours as they stand are kept under:
+A name for the theme, which the colors as they stand are kept under:
     <tag>confirm</tag>
     <form name="form">
       <input name="name" type="text" value="[NAME]" />
@@ -9483,14 +9483,14 @@ Can not overwrite default preset.
     icon="notifytip.tga"
     name="LightBoxWhiteBalanceTooDark"
     type="notifytip">
-That spot is too dark to read a colour from. Pick something well lit that should look white or grey.
+That spot is too dark to read a color from. Pick something well lit that should look white or grey.
   </notification>
 
   <notification
     icon="notifytip.tga"
     name="LightBoxWhiteBalanceUnreachable"
     type="notifytip">
-Temperature and tint cannot neutralise that. It looks like a coloured surface rather than a neutral one under coloured light.
+Temperature and tint cannot neutralize that. It looks like a colored surface rather than a neutral one under colored light.
   </notification>
 
   <notification

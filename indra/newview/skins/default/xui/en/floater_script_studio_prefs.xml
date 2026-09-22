@@ -25,7 +25,7 @@
     <floater.string name="HeadingEditor">Editor</floater.string>
     <floater.string name="HeadingSyntax">Syntax</floater.string>
     <floater.string name="NoFolder">(no folder chosen)</floater.string>
-    <floater.string name="PreviewLSL">// Every kind of token, to see the colours by
+    <floater.string name="PreviewLSL">// Every kind of token, to see the colors by
 #define GREETING "Hello"
 integer count = 0;
 string  name  = "Avatar\n";
@@ -49,7 +49,7 @@ default
     }
 }</floater.string>
     <floater.string name="PreviewSLua">--!strict
--- Every kind of token, to see the colours by
+-- Every kind of token, to see the colors by
 local count: number = 0
 local name = "Avatar\n"
 
@@ -81,7 +81,7 @@ end</floater.string>
         <panel
          follows="all"
          height="478"
-         label="Colours"
+         label="Colors"
          layout="topleft"
          name="colors_tab"
          width="804">
@@ -101,7 +101,7 @@ end</floater.string>
              layout="topleft"
              left_pad="4"
              name="theme"
-             tool_tip="A set of colours for every part of the editor; Custom is whatever the swatches say"
+             tool_tip="A set of colors for every part of the editor; Custom is whatever the swatches say"
              top_delta="-3"
              width="220" />
             <button
@@ -111,17 +111,17 @@ end</floater.string>
              layout="topleft"
              left_pad="6"
              name="save_theme"
-             tool_tip="The colours as they stand, kept as a theme of your own"
+             tool_tip="The colors as they stand, kept as a theme of your own"
              top_delta="0"
              width="90" />
             <button
              follows="left|top"
              height="22"
-             label="Skin Colours"
+             label="Skin Colors"
              layout="topleft"
              left_pad="4"
              name="restore_skin"
-             tool_tip="Every colour back to what the skin declares"
+             tool_tip="Every color back to what the skin declares"
              top_delta="0"
              width="100" />
             <text
@@ -536,7 +536,7 @@ end</floater.string>
      layout="topleft"
      name="cancel"
      right="-104"
-     tool_tip="Every colour and setting back to what it was when this window opened"
+     tool_tip="Every color and setting back to what it was when this window opened"
      top_delta="0"
      width="90" />
 </floater>

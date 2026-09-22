@@ -548,7 +548,7 @@
             </menu_item_call>
             <menu_item_separator layout="topleft" />
             <menu_item_call
-             label="Colour Settings"
+             label="Color Settings"
              layout="topleft"
              name="colors">
                 <menu_item_call.on_click function="XUIStudio.Menu" parameter="colors" />
@@ -1465,7 +1465,7 @@
                  left_pad="8"
                  menu_filename="menu_xui_studio_backdrop.xml"
                  name="canvas_backdrop"
-                 tool_tip="What is behind the preview: nothing, a pattern that shows what a translucent window does to what is under it, a checkerboard that shows what is transparent, the colour of a window, or a light grey"
+                 tool_tip="What is behind the preview: nothing, a pattern that shows what a translucent window does to what is under it, a checkerboard that shows what is transparent, the color of a window, or a light grey"
                  top_delta="0"
                  width="26" />
                 <check_box

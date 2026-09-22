@@ -518,7 +518,7 @@
                 <menu_item_check.on_click function="ScriptStudio.Menu" parameter="vim_mode" />
             </menu_item_check>
             <menu_item_separator layout="topleft" />
-            <menu_item_check label="Semantic Colouring" layout="topleft" name="semantic_colors">
+            <menu_item_check label="Semantic Coloring" layout="topleft" name="semantic_colors">
                 <menu_item_check.on_check function="ScriptStudio.Check" parameter="semantic_colors" />
                 <menu_item_check.on_click function="ScriptStudio.Menu" parameter="semantic_colors" />
             </menu_item_check>
