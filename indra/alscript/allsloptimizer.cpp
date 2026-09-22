@@ -1167,6 +1167,62 @@ namespace
         return s != "true" && s != "false" && s != "null";
     }
 
+    // Whether a value is one every writer spells alike: integers, plain
+    // strings, true, false and null, and arrays and objects of those.
+    bool jsonPlain(const JsonValue& v)
+    {
+        switch (v.kind)
+        {
+            case JsonValue::Kind::Number: return v.text != "-0" && v.text.size() <= 10;
+            case JsonValue::Kind::String: return plainJsonString(v.text);
+            case JsonValue::Kind::Array:
+                for (const JsonValue& item : v.items)
+                {
+                    if (!jsonPlain(item)) return false;
+                }
+                return true;
+            case JsonValue::Kind::Object:
+                for (const auto& field : v.fields)
+                {
+                    if (!plainJsonString(field.first) || !jsonPlain(field.second)) return false;
+                }
+                return true;
+            default: return true;
+        }
+    }
+
+    // A plain value written the compact way, which is the simulator's.
+    std::string jsonWrite(const JsonValue& v)
+    {
+        switch (v.kind)
+        {
+            case JsonValue::Kind::Null:   return "null";
+            case JsonValue::Kind::True:   return "true";
+            case JsonValue::Kind::False:  return "false";
+            case JsonValue::Kind::Number: return v.text;
+            case JsonValue::Kind::String: return "\"" + v.text + "\"";
+            case JsonValue::Kind::Array:
+            {
+                std::string out = "[";
+                for (size_t i = 0; i < v.items.size(); ++i)
+                {
+                    out += (i ? "," : "") + jsonWrite(v.items[i]);
+                }
+                return out + "]";
+            }
+            case JsonValue::Kind::Object:
+            {
+                std::string out = "{";
+                for (size_t i = 0; i < v.fields.size(); ++i)
+                {
+                    out += (i ? "," : "") + ("\"" + v.fields[i].first + "\":") + jsonWrite(v.fields[i].second);
+                }
+                return out + "}";
+            }
+        }
+        return std::string();
+    }
+
     typedef std::function<LSLConstant*(Ctx&, const Args&)> Evaluator;
 
     const std::unordered_map<std::string, Evaluator>& evaluators()
@@ -1612,8 +1668,91 @@ namespace
                       case JsonValue::Kind::True:   return c.builtin("JSON_TRUE");
                       case JsonValue::Kind::False:  return c.builtin("JSON_FALSE");
                       case JsonValue::Kind::Null:   return c.builtin("JSON_NULL");
-                      default:                      return nullptr;
+                      default:
+                          // A nested value as the simulator writes it, where
+                          // every writer would write it alike.
+                          return jsonPlain(*at) ? c.string(jsonWrite(*at)) : nullptr;
                   }
+              } },
+            { "llJsonSetValue",
+              [](Ctx& c, const Args& a) -> LSLConstant* {
+                  // Over a plain document, down a path that is there but
+                  // for its last step, which may be a new key or the next
+                  // index; the value a plain string, an integer, or true,
+                  // false or null by its constant. Anything the simulator
+                  // might make more of -- a path to create, a deletion, a
+                  // value that reads as JSON -- is left to it.
+                  std::string      json;
+                  LSLListConstant* path;
+                  if (!argString(a, 0, json) || !argList(a, 1, path) || a.size() < 3 || a[2]->getNodeSubType() != NODE_STRING_CONSTANT) return nullptr;
+                  JsonValue  root;
+                  JsonReader reader(json);
+                  if (!reader.whole(root) || !jsonPlain(root)) return nullptr;
+                  const std::string value = static_cast<LSLStringConstant*>(a[2])->getValue();
+                  JsonValue         put;
+                  auto              same = [&](const char* name) {
+                      LSLConstant* builtin = c.builtin(name);
+                      return builtin && value == static_cast<LSLStringConstant*>(builtin)->getValue();
+                  };
+                  if (same("JSON_TRUE")) put.kind = JsonValue::Kind::True;
+                  else if (same("JSON_FALSE")) put.kind = JsonValue::Kind::False;
+                  else if (same("JSON_NULL")) put.kind = JsonValue::Kind::Null;
+                  else if (plainJsonString(value))
+                  {
+                      put.kind = JsonValue::Kind::String;
+                      put.text = value;
+                  }
+                  else
+                  {
+                      // An integer, as JSON writes one.
+                      size_t i = value.size() > 1 && value[0] == '-' ? 1 : 0;
+                      if (i >= value.size() || value.size() > 10 || (value[i] == '0' && value.size() > i + 1)) return nullptr;
+                      for (; i < value.size(); ++i)
+                      {
+                          if (!isdigit(static_cast<unsigned char>(value[i]))) return nullptr;
+                      }
+                      put.kind = JsonValue::Kind::Number;
+                      put.text = value;
+                  }
+                  const std::vector<LSLConstant*> steps = elements(path);
+                  if (steps.empty()) return nullptr;
+                  JsonValue* at = &root;
+                  for (size_t i = 0; i + 1 < steps.size(); ++i)
+                  {
+                      const std::vector<LSLConstant*> one(steps.begin() + static_cast<std::ptrdiff_t>(i), steps.begin() + static_cast<std::ptrdiff_t>(i) + 1);
+                      const JsonValue*                next = jsonAt(*at, one);
+                      if (!next) return nullptr;
+                      at = const_cast<JsonValue*>(next);
+                  }
+                  LSLConstant* last = steps.back();
+                  if (last->getNodeSubType() == NODE_STRING_CONSTANT && at->kind == JsonValue::Kind::Object)
+                  {
+                      std::string key;
+                      if (!argString({ last }, 0, key) || !plainJsonString(key)) return nullptr;
+                      bool replaced = false;
+                      for (auto& field : at->fields)
+                      {
+                          if (field.first == key)
+                          {
+                              field.second = put;
+                              replaced     = true;
+                          }
+                      }
+                      if (!replaced) at->fields.emplace_back(key, put);
+                  }
+                  else if (last->getNodeSubType() == NODE_INTEGER_CONSTANT && at->kind == JsonValue::Kind::Array)
+                  {
+                      const int index = static_cast<LSLIntegerConstant*>(last)->getValue();
+                      if (index == -1 || static_cast<size_t>(index) == at->items.size()) at->items.push_back(put);
+                      else if (index >= 0 && static_cast<size_t>(index) < at->items.size()) at->items[static_cast<size_t>(index)] = put;
+                      else if (index > 0) return c.builtin("JSON_INVALID");
+                      else return nullptr;
+                  }
+                  else
+                  {
+                      return nullptr;
+                  }
+                  return c.string(jsonWrite(root));
               } },
             { "llJsonValueType",
               [](Ctx& c, const Args& a) -> LSLConstant* {

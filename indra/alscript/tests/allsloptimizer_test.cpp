@@ -350,6 +350,20 @@ namespace tut
         ensure("an array to a list: " + m.text, hasm("list i = [1, \"two\", -3];"));
         ensure("an object to a list: " + m.text, hasm("list j = [\"k\", \"v\"];"));
         ensure("a true in it is left: " + m.text, hasm("list k = llJson2List"));
+        // A nested value comes out written the compact way; a set puts a
+        // value in, at a key or an index, where the document is plain.
+        const std::string sets = wrap("", "        string a = llJsonGetValue(\"{\\\"a\\\": [1, {\\\"b\\\": true}, \\\"c\\\"]}\", [\"a\"]);\n        string b = llJsonSetValue(\"{\\\"a\\\": 1}\", [\"b\"], \"two\");\n        string c = llJsonSetValue(\"[1, 2]\", [1], \"9\");\n        string d = llJsonSetValue(\"[1, 2]\", [JSON_APPEND], JSON_TRUE);\n        string e = llJsonSetValue(\"[1, 2]\", [5], \"9\");\n        string f = llJsonSetValue(\"{}\", [\"a\", \"b\"], \"x\");\n        string g = llJsonSetValue(\"[1]\", [0], \"1.5\");\n        string h = llJsonGetValue(\"[1.5]\", []);\n        llSay(0, a + b + c + d + e + f + g + h);\n        a = b = c = d = e = f = g = h = \"\";\n");
+        ALLSLOptimizer::Result n = ALLSLOptimizer::run(sets, options());
+        ensure("optimized", n.optimized);
+        auto hasn = [&n](const char* text) { return n.text.find(text) != std::string::npos; };
+        ensure("a nested value, compact: " + n.text, hasn("string a = \"[1,{\\\"b\\\":true},\\\"c\\\"]\";"));
+        ensure("a new key at the end: " + n.text, hasn("string b = \"{\\\"a\\\":1,\\\"b\\\":\\\"two\\\"}\";"));
+        ensure("an index replaced with a number: " + n.text, hasn("string c = \"[1,9]\";"));
+        ensure("appended by JSON_APPEND with a constant: " + n.text, hasn("string d = \"[1,2,true]\";"));
+        ensure("past the end is JSON_INVALID: " + n.text, hasn("string e = JSON_INVALID;"));
+        ensure("a path to create is left: " + n.text, hasn("string f = llJsonSetValue"));
+        ensure("a value that is a fraction is left: " + n.text, hasn("string g = llJsonSetValue"));
+        ensure("a document with a fraction is left: " + n.text, hasn("string h = llJsonGetValue"));
     }
     template<> template<>
     void allsloptimizer_object::test<13>()
@@ -393,7 +407,7 @@ namespace tut
         ensure("optimized: " + notes(r), r.optimized);
         // The inliner's own text is what the optimizer read.
         const ALLSLInliner::Result put = ALLSLInliner::run(source);
-        ensure_equals("two put in place", put.inlined, 2);
+        ensure_equals("three put in place, in one round", put.inlined, 3);
         ensure("the block where the call was: " + put.text,
                put.text.find("        {\nstring what = \"hi\";\ninteger n = i;\n\n    integer i_1 = n * 2;\n    llSay(0, what + (string)i_1);\n\n}\n") != std::string::npos);
         ensure("the expression where the other call was: " + put.text, put.text.find("g = (i * 2 + g) + thrice(g) + thrice(i);") != std::string::npos);
@@ -403,13 +417,13 @@ namespace tut
         ensure("say is gone: " + r.text, !has("say(string what"));
         ensure("twice became its expression with the argument in: " + r.text, has("(i * 2 + g)"));
         ensure("thrice uses its parameter thrice, so only a constant would do: left: " + r.text, has("thrice(g)") && has("thrice(i)") && has("integer thrice(integer x)"));
-        ensure("loop has a label and a jump: left: " + r.text, has("loop();") && has("@again;"));
+        ensure("loop went in with its label and jump given a fresh name: " + r.text, !has("loop();") && !has("loop()\n") && has("@again_1;") && has("jump again_1;"));
         S32 said = 0;
         for (const ALScriptProblem& p : r.problems)
         {
             said += p.severity == ALScriptProblem::Severity::Note && p.message.find("in place of its one call") != std::string::npos;
         }
-        ensure_equals("two notes", said, 2);
+        ensure_equals("three notes", said, 3);
         // The map leads from the block back to the function's own lines.
         const size_t at = r.text.find("llSay(0, what + (string)i_1);");
         ensure("found", at != std::string::npos);
@@ -474,5 +488,50 @@ namespace tut
         ensure_equals("four rounds", put.inlined, 4);
         ALLSLOptimizer::Result r = ALLSLOptimizer::run(source, o);
         ensure("the optimizer reads the result: " + notes(r), r.optimized && r.text.find("(2 * 2) + (3 * 3)") != std::string::npos);
+    }
+    template<> template<>
+    void allsloptimizer_object::test<15>()
+    {
+        set_test_name("a return in the body becomes a jump to a label after the block, and a round takes every call that does not cross another's edit");
+        const std::string source =
+            "check(integer n)\n"
+            "{\n"
+            "    if (n < 0) return;\n"
+            "    llSay(0, \"ok\");\n"
+            "    if (n > 9)\n"
+            "    {\n"
+            "        return;\n"
+            "    }\n"
+            "    llSay(0, \"small\");\n"
+            "}\n"
+            "inner(integer k)\n"
+            "{\n"
+            "    llSay(1, (string)k);\n"
+            "}\n"
+            "outer()\n"
+            "{\n"
+            "    inner(7);\n"
+            "}\n"
+            "default\n"
+            "{\n"
+            "    state_entry()\n"
+            "    {\n"
+            "        check(3);\n"
+            "        outer();\n"
+            "    }\n"
+            "}\n";
+        ALLSLInliner::Result put = ALLSLInliner::run(source);
+        auto has = [&put](const char* text) { return put.text.find(text) != std::string::npos; };
+        ensure("the returns are jumps: " + put.text, has("if (n < 0) jump _ret_1;") && has("        jump _ret_1;"));
+        ensure("to a label after the block: " + put.text, has("}@_ret_1;"));
+        ensure("check is gone", !has("check(integer n)"));
+        // outer's one call goes in the first round; inner's call is inside
+        // outer, whose lines go that round, so inner waits for the next.
+        ensure("inner went in the end: " + put.text, has("integer k = 7;") && !has("inner(integer k)") && !has("outer()\n"));
+        ensure_equals("three calls went", put.inlined, 3);
+        ALLSLOptimizer::Options o = options();
+        o.inlining                = true;
+        ALLSLOptimizer::Result r  = ALLSLOptimizer::run(source, o);
+        ensure("the optimizer reads it: " + notes(r), r.optimized);
     }
 } // namespace tut
