@@ -223,18 +223,27 @@ private:
                 Visual,
                 Caret,
                 Line,
-                Column
+                Column,
+                FileStart,
+                FileEnd
             };
             Kind kind    = Kind::Line;
             // -1 before, 0 at, 1 after; the number, 1-based as vim counts.
             S32  side    = 0;
             S32  number  = 0;
+            // Written after a \zs: about the match as reported, not the
+            // whole of what the pattern matched.
+            bool afterStart = false;
         };
         std::vector<Where> where;
+        // The group the match is, where a \zs made one; the search is
+        // told, and says where the whole began.
+        S32 matchGroup = 0;
     };
     Pattern patternOf(const std::string& vim, std::optional<bool> force_case = std::nullopt) const;
-    // The matches a pattern's places allow, the rest dropped.
-    void    constrain(ALTextView& view, const Pattern& pattern, std::vector<ALTextRange>& matches) const;
+    // The matches a pattern's places allow, the rest dropped; `wholes`
+    // says where each whole match began, for the places before a \zs.
+    void    constrain(ALTextView& view, const Pattern& pattern, std::vector<ALTextRange>& matches, const std::vector<ALTextPos>& wholes) const;
     // The history of a line kind, and the line entered into it.
     std::vector<std::string>& historyOf(llwchar kind) { return kind == ':' ? mShared->command : mShared->search; }
     void                      remember(llwchar kind, const std::string& line);

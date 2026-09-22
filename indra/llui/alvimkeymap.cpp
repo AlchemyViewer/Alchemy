@@ -2999,14 +2999,16 @@ bool ALVimKeymap::search(ALTextView& view, const std::string& pattern, bool forw
     // ignorecase alone says; a pattern in vim's spelling.
     const Pattern pattern_in = whole_word ? Pattern{ pattern, !mShared->ignoreCase } : patternOf(pattern);
     options.caseSensitive    = pattern_in.caseSensitive;
+    options.matchGroup       = pattern_in.matchGroup;
     std::string              error;
-    std::vector<ALTextRange> matches = ALTextSearch::matches(d, pattern_in.regex, options, nullptr, &error);
+    std::vector<ALTextPos>   wholes;
+    std::vector<ALTextRange> matches = ALTextSearch::matches(d, pattern_in.regex, options, nullptr, &error, &wholes);
     if (!error.empty())
     {
         say("E486: " + error, true);
         return false;
     }
-    constrain(view, pattern_in, matches);
+    constrain(view, pattern_in, matches, wholes);
     if (matches.empty())
     {
         say("E486: Pattern not found: " + pattern, true);
@@ -3617,15 +3619,17 @@ bool ALVimKeymap::global(ALTextView& view, S32 first, S32 last, bool ranged, con
     options.regex         = true;
     const Pattern pattern_in = patternOf(pattern);
     options.caseSensitive    = pattern_in.caseSensitive;
+    options.matchGroup       = pattern_in.matchGroup;
     const ALTextRange        scope(d.lineStart(first), d.lineEnd(last));
     std::string              error;
-    std::vector<ALTextRange> matches = ALTextSearch::matches(d, pattern_in.regex, options, &scope, &error);
+    std::vector<ALTextPos>   wholes;
+    std::vector<ALTextRange> matches = ALTextSearch::matches(d, pattern_in.regex, options, &scope, &error, &wholes);
     if (!error.empty())
     {
         say("E486: " + error, true);
         return false;
     }
-    constrain(view, pattern_in, matches);
+    constrain(view, pattern_in, matches, wholes);
     std::vector<S32> lines;
     for (S32 line = first; line <= last; ++line)
     {
@@ -3687,6 +3691,10 @@ ALVimKeymap::Pattern ALVimKeymap::patternOf(const std::string& vim, std::optiona
     };
     Magic magic    = Magic::Magic;
     bool  looking  = false;
+    bool  zs_seen  = false;
+    // How deep in the engine's brackets the output is, so that a \zs at
+    // the top can split the pattern into groups.
+    S32   depth    = 0;
     auto  literal  = [&](char c) {
         static const std::string specials("\\^$.|?*+()[]{}");
         if (specials.find(c) != std::string::npos)
@@ -3709,8 +3717,14 @@ ALVimKeymap::Pattern ALVimKeymap::patternOf(const std::string& vim, std::optiona
                 case 'V': magic = Magic::None; continue;
                 case 'c': case_in_pattern = false; continue;
                 case 'C': case_in_pattern = true; continue;
-                case '(': out.regex += magic == Magic::Very ? "\\(" : "("; continue;
-                case ')': out.regex += magic == Magic::Very ? "\\)" : ")"; continue;
+                case '(':
+                    out.regex += magic == Magic::Very ? "\\(" : "(";
+                    depth += magic == Magic::Very ? 0 : 1;
+                    continue;
+                case ')':
+                    out.regex += magic == Magic::Very ? "\\)" : ")";
+                    depth -= magic == Magic::Very ? 0 : 1;
+                    continue;
                 case '|': out.regex += magic == Magic::Very ? "\\|" : "|"; continue;
                 case '+': out.regex += magic == Magic::Very ? "\\+" : "+"; continue;
                 case '?':
@@ -3764,7 +3778,19 @@ ALVimKeymap::Pattern ALVimKeymap::patternOf(const std::string& vim, std::optiona
                 case 'z':
                     if (i + 1 < vim.size() && vim[i + 1] == 's')
                     {
-                        out.regex += "\\K";
+                        // At the top level, what came before is put in a
+                        // group of its own and the rest in the group the
+                        // match is; inside brackets, the engine's \K.
+                        if (depth == 0 && !zs_seen)
+                        {
+                            out.regex   = "(?:" + out.regex + ")(";
+                            out.matchGroup = 1;
+                            zs_seen     = true;
+                        }
+                        else
+                        {
+                            out.regex += "\\K";
+                        }
                         ++i;
                         continue;
                     }
@@ -3782,6 +3808,7 @@ ALVimKeymap::Pattern ALVimKeymap::patternOf(const std::string& vim, std::optiona
                     if (i + 1 < vim.size() && vim[i + 1] == '(')
                     {
                         out.regex += "(?:";
+                        ++depth;
                         ++i;
                         continue;
                     }
@@ -3817,6 +3844,51 @@ ALVimKeymap::Pattern ALVimKeymap::patternOf(const std::string& vim, std::optiona
                         i = close;
                         continue;
                     }
+                    // A character by its code: \%d123 \%x7b \%o173 \%u007b.
+                    if (i + 1 < vim.size() && (vim[i + 1] == 'd' || vim[i + 1] == 'x' || vim[i + 1] == 'o' || vim[i + 1] == 'u' || vim[i + 1] == 'U'))
+                    {
+                        const char how   = vim[i + 1];
+                        const int  radix = how == 'd' ? 10 : how == 'o' ? 8 : 16;
+                        size_t     k     = i + 2;
+                        U32        code  = 0;
+                        S32        taken = 0;
+                        while (k < vim.size() && taken < (how == 'U' ? 8 : how == 'u' ? 4 : how == 'x' ? 2 : 12))
+                        {
+                            const char h = vim[k];
+                            int        v = -1;
+                            if (h >= '0' && h <= '9') v = h - '0';
+                            else if (h >= 'a' && h <= 'f') v = h - 'a' + 10;
+                            else if (h >= 'A' && h <= 'F') v = h - 'A' + 10;
+                            if (v < 0 || v >= radix)
+                            {
+                                break;
+                            }
+                            code = code * static_cast<U32>(radix) + static_cast<U32>(v);
+                            ++k;
+                            ++taken;
+                        }
+                        if (taken > 0)
+                        {
+                            // As the bytes it is, each escaped where it is
+                            // anything to the engine.
+                            for (const char b : utf8Of(static_cast<llwchar>(code)))
+                            {
+                                literal(b);
+                            }
+                            i = k - 1;
+                            continue;
+                        }
+                    }
+                    // The file's ends: \%^ and \%$.
+                    if (i + 1 < vim.size() && (vim[i + 1] == '^' || vim[i + 1] == '$'))
+                    {
+                        Pattern::Where place;
+                        place.kind       = vim[i + 1] == '^' ? Pattern::Where::Kind::FileStart : Pattern::Where::Kind::FileEnd;
+                        place.afterStart = zs_seen;
+                        out.where.push_back(place);
+                        ++i;
+                        continue;
+                    }
                     // The places: \%V \%# \%23l \%<23l \%>23l \%23c \%23v.
                     size_t k    = i + 1;
                     S32    side = 0;
@@ -3849,6 +3921,7 @@ ALVimKeymap::Pattern ALVimKeymap::patternOf(const std::string& vim, std::optiona
                         }
                         if (known)
                         {
+                            place.afterStart = zs_seen;
                             out.where.push_back(place);
                             i = k;
                             continue;
@@ -3937,6 +4010,7 @@ ALVimKeymap::Pattern ALVimKeymap::patternOf(const std::string& vim, std::optiona
                         if (i + 1 < vim.size() && vim[i + 1] == '(')
                         {
                             out.regex += "(?:";
+                            ++depth;
                             ++i;
                         }
                         else
@@ -3972,6 +4046,8 @@ ALVimKeymap::Pattern ALVimKeymap::patternOf(const std::string& vim, std::optiona
                             literal(r);
                         }
                         break;
+                    case '(': out.regex += c; ++depth; break;
+                    case ')': out.regex += c; --depth; break;
                     default: out.regex += c; break;
                 }
                 break;
@@ -4006,6 +4082,10 @@ ALVimKeymap::Pattern ALVimKeymap::patternOf(const std::string& vim, std::optiona
     {
         out.regex += ")";
     }
+    if (out.matchGroup)
+    {
+        out.regex += ")";
+    }
     if (case_in_pattern)
     {
         out.caseSensitive = *case_in_pattern;
@@ -4025,7 +4105,7 @@ ALVimKeymap::Pattern ALVimKeymap::patternOf(const std::string& vim, std::optiona
     return out;
 }
 
-void ALVimKeymap::constrain(ALTextView& view, const Pattern& pattern, std::vector<ALTextRange>& matches) const
+void ALVimKeymap::constrain(ALTextView& view, const Pattern& pattern, std::vector<ALTextRange>& matches, const std::vector<ALTextPos>& wholes) const
 {
     if (pattern.where.empty())
     {
@@ -4042,12 +4122,35 @@ void ALVimKeymap::constrain(ALTextView& view, const Pattern& pattern, std::vecto
         visual            = mVisualLast == Mode::VisualLine ? ALTextRange(d.lineStart(a.line), d.lineEnd(b.line)) : ALTextRange(a, d.nextCluster(b));
     }
     const ALTextPos caret = view.caret();
-    auto            allowed = [&](const ALTextRange& match) {
-        const ALTextPos at = match.normalised().begin;
+    auto            allowed = [&](size_t index) {
+        const ALTextRange match = matches[index].normalised();
         for (const Pattern::Where& place : pattern.where)
         {
+            // Before a \zs, the place is the whole match's start; after
+            // it, the reported match's.
+            const ALTextPos at = place.afterStart || index >= wholes.size() ? match.begin : wholes[index];
             switch (place.kind)
             {
+                case Pattern::Where::Kind::FileStart:
+                    if (at != d.start())
+                    {
+                        return false;
+                    }
+                    break;
+                case Pattern::Where::Kind::FileEnd:
+                {
+                    // The end of the text, or of its last line where the
+                    // text ends with a line break, which vim does not
+                    // count as a line.
+                    const ALTextPos end   = d.end();
+                    const bool      last  = match.end == end;
+                    const bool      above = end.column == 0 && end.line > 0 && match.end == d.lineEnd(end.line - 1);
+                    if (!last && !above)
+                    {
+                        return false;
+                    }
+                    break;
+                }
                 case Pattern::Where::Kind::Visual:
                     if (mVisualLast == Mode::Normal || at < visual.begin || !(at < visual.end))
                     {
@@ -4082,7 +4185,15 @@ void ALVimKeymap::constrain(ALTextView& view, const Pattern& pattern, std::vecto
         }
         return true;
     };
-    matches.erase(std::remove_if(matches.begin(), matches.end(), [&](const ALTextRange& m) { return !allowed(m); }), matches.end());
+    std::vector<ALTextRange> kept;
+    for (size_t i = 0; i < matches.size(); ++i)
+    {
+        if (allowed(i))
+        {
+            kept.push_back(matches[i]);
+        }
+    }
+    matches.swap(kept);
 }
 
 std::string ALVimKeymap::replacementOf(const std::string& with) const
@@ -4241,15 +4352,17 @@ bool ALVimKeymap::substitute(ALTextView& view, S32 first, S32 last, const std::s
     options.regex         = true;
     const Pattern pattern_in = patternOf(pattern, exactcase ? std::optional<bool>(true) : anycase ? std::optional<bool>(false) : std::nullopt);
     options.caseSensitive    = pattern_in.caseSensitive;
+    options.matchGroup       = pattern_in.matchGroup;
     const ALTextRange     scope(d.lineStart(first), d.lineEnd(last));
     std::string           error;
-    std::vector<ALTextRange> matches = ALTextSearch::matches(d, pattern_in.regex, options, &scope, &error);
+    std::vector<ALTextPos>   wholes;
+    std::vector<ALTextRange> matches = ALTextSearch::matches(d, pattern_in.regex, options, &scope, &error, &wholes);
     if (!error.empty())
     {
         say("E486: " + error, true);
         return false;
     }
-    constrain(view, pattern_in, matches);
+    constrain(view, pattern_in, matches, wholes);
     if (matches.empty())
     {
         if (!quiet)
@@ -4262,8 +4375,9 @@ bool ALVimKeymap::substitute(ALTextView& view, S32 first, S32 last, const std::s
     std::vector<std::pair<ALTextRange, std::string>> edits;
     S32                                              seen_line = -1;
     S32                                              lines     = 0;
-    for (const ALTextRange& match : matches)
+    for (size_t m = 0; m < matches.size(); ++m)
     {
+        const ALTextRange& match = matches[m];
         if (!every && match.begin.line == seen_line)
         {
             continue;
@@ -4273,7 +4387,11 @@ bool ALVimKeymap::substitute(ALTextView& view, S32 first, S32 last, const std::s
             ++lines;
         }
         seen_line = match.begin.line;
-        edits.emplace_back(match, count_only ? std::string() : ALTextSearch::replacement(d, match, pattern_in.regex, options, format));
+        // The replacement is worked out over the whole of what the pattern
+        // matched, where a \zs made the match a part of it, and put in
+        // place of the part.
+        const ALTextRange whole = pattern_in.matchGroup && m < wholes.size() ? ALTextRange(wholes[m], match.end) : match;
+        edits.emplace_back(match, count_only ? std::string() : ALTextSearch::replacement(d, whole, pattern_in.regex, options, format));
     }
     const S32 count = static_cast<S32>(edits.size());
     if (count_only)

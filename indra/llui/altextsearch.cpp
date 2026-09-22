@@ -126,12 +126,16 @@ namespace
 
 // static
 std::vector<ALTextRange> ALTextSearch::matches(const ALTextDocument& doc, std::string_view query, const ALTextSearchOptions& options,
-                                               const ALTextRange* scope, std::string* error)
+                                               const ALTextRange* scope, std::string* error, std::vector<ALTextPos>* whole_begins)
 {
     std::vector<ALTextRange> out;
     if (error)
     {
         error->clear();
+    }
+    if (whole_begins)
+    {
+        whole_begins->clear();
     }
     if (query.empty() || doc.lineCount() == 0)
     {
@@ -167,11 +171,19 @@ std::vector<ALTextRange> ALTextSearch::matches(const ALTextDocument& doc, std::s
                 {
                     break;
                 }
-                const S32 begin  = static_cast<S32>(found[0].first - base);
-                const S32 finish = static_cast<S32>(found[0].second - base);
+                // The group asked for where it took part, else the whole.
+                const bool grouped = options.matchGroup > 0 && options.matchGroup < static_cast<S32>(found.size()) &&
+                                     found[static_cast<size_t>(options.matchGroup)].matched;
+                const auto& part   = grouped ? found[static_cast<size_t>(options.matchGroup)] : found[0];
+                const S32   begin  = static_cast<S32>(part.first - base);
+                const S32   finish = static_cast<S32>(part.second - base);
                 if (!options.wholeWord || wholeWord(text, begin, finish))
                 {
                     out.emplace_back(ALTextPos(line, begin), ALTextPos(line, finish));
+                    if (whole_begins)
+                    {
+                        whole_begins->emplace_back(line, static_cast<S32>(found[0].first - base));
+                    }
                 }
                 if (found[0].length() == 0)
                 {
@@ -204,6 +216,10 @@ std::vector<ALTextRange> ALTextSearch::matches(const ALTextDocument& doc, std::s
                 if (!options.wholeWord || wholeWord(text, begin, finish))
                 {
                     out.emplace_back(ALTextPos(line, begin), ALTextPos(line, finish));
+                    if (whole_begins)
+                    {
+                        whole_begins->emplace_back(line, begin);
+                    }
                 }
                 at = found + 1;
             }

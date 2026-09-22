@@ -38,6 +38,10 @@ struct ALTextSearchOptions
     // What replaces a match takes the match's case: upper for HELLO,
     // capitalised for Hello, lower for hello, as typed for anything else.
     bool preserveCase  = false;
+    // The match reported is this group of the pattern rather than the
+    // whole, where it is not zero: what vim's \zs asks for. A match in
+    // which the group took no part is reported whole.
+    S32  matchGroup    = 0;
 };
 
 // Finding in a document: every place a query stands, plain or as a
@@ -52,7 +56,8 @@ public:
     // that is empty finds nothing; a pattern that does not compile finds
     // nothing and says why in `error`. Matches stay within a line.
     static std::vector<ALTextRange> matches(const ALTextDocument& doc, std::string_view query, const ALTextSearchOptions& options,
-                                            const ALTextRange* scope = nullptr, std::string* error = nullptr);
+                                            const ALTextRange* scope = nullptr, std::string* error = nullptr,
+                                            std::vector<ALTextPos>* whole_begins = nullptr);
 
     // Going forward, the first match starting at or after `from`; going
     // back, the last starting before it; round the ends either way. -1

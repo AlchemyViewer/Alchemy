@@ -712,4 +712,22 @@ namespace tut
         keys(":set ic<CR>");
         ensure("the setting is shared with whoever shares the state", vim->shared().ignoreCase);
     }
+    template<> template<>
+    void alvimkeymap_object::test<18>()
+    {
+        set_test_name("a place before \\zs is about the whole match, \\%^ and \\%$ are the file's ends, and \\%d \\%x \\%u are characters");
+        ALCodeEditor& e = make("foobar foobar\nfoobar\nfoobar foobar\n");
+        keys("0wve<Esc>:%s/\\%Vfoo\\zsbar/X/g<CR>");
+        ensure_equals("\\%V before \\zs: where the whole match starts, in the visual area", flat(e.text()), std::string("foobar fooX|foobar|foobar foobar|"));
+        keys(":%s/foo\\zs\\(bar\\)/[\\1]/g<CR>");
+        ensure_equals("the group after \\zs, the replacement over the whole", flat(e.text()), std::string("foo[bar] fooX|foo[bar]|foo[bar] foo[bar]|"));
+        keys(":%s/\\%^foo/START/<CR>");
+        ensure_equals("\\%^: the file's start alone", flat(e.text()), std::string("START[bar] fooX|foo[bar]|foo[bar] foo[bar]|"));
+        keys(":%s/\\]\\%$/END/<CR>");
+        ensure_equals("\\%$: the file's end alone", flat(e.text()), std::string("START[bar] fooX|foo[bar]|foo[bar] foo[barEND|"));
+        keys(":%s/\\%d91bar\\%x5d/_/g<CR>");
+        ensure_equals("\\%d91 and \\%x5d are the brackets", flat(e.text()), std::string("START_ fooX|foo_|foo_ foo[barEND|"));
+        keys(":%s/\\%u0058/Y/<CR>");
+        ensure_equals("\\u0058 is X", flat(e.text()), std::string("START_ fooY|foo_|foo_ foo[barEND|"));
+    }
 }
