@@ -76,6 +76,11 @@ public:
         std::function<bool(ALTextView& view, const std::string& name, const std::string& args)> command;
         // The = operator over lines first to last.
         std::function<void(ALTextView& view, S32 first, S32 last)> format;
+        // q: q/ and q?: the history of a line kind shown for one to be
+        // picked -- vim's command-line window -- with what to call with
+        // the pick, which puts it on the line to edit and enter. Without
+        // one, the line opens at the last entered.
+        std::function<void(ALTextView& view, llwchar kind, const std::vector<std::string>& history, std::function<void(const std::string&)> chosen)> historyWindow;
     };
 
     ALVimKeymap();
@@ -86,6 +91,9 @@ public:
     // What was typed after : or / so far.
     const std::string& commandLine() const { return mLine; }
     bool               typingLine(std::string& line, S32& caret) const override;
+    // A line put up to be edited and entered, as the history window
+    // hands one back: the : or / line opened with the text on it.
+    void               takeLine(ALTextView& view, llwchar kind, const std::string& text);
     // What the mode last said: a pattern not found, lines yanked, a
     // command unknown; cleared by the next key.
     std::string message() const override { return mMessage; }
@@ -369,6 +377,8 @@ private:
     std::shared_ptr<Shared>  mShared = std::make_shared<Shared>();
     S32                      mHistoryAt = -1;
     std::string              mHistoryPrefix;
+    // Where in the line the next character goes, in bytes.
+    size_t                   mLineCursor = 0;
     // The last :s, for :s with nothing after it, :&, :&&, & and g&: its
     // replacement as it read once ~ was put in, and its flags.
     std::string mLastReplacement;

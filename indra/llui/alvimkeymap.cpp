@@ -408,6 +408,14 @@ std::string ALVimKeymap::status() const
 
 void ALVimKeymap::mouseChanged(ALTextView& view)
 {
+    // What was said is said; a click is as good as a key at clearing it,
+    // as vim's redraw is.
+    if (!mMessage.empty())
+    {
+        mMessage.clear();
+        mMessageError = false;
+        bump();
+    }
     // Insert mode stays insert mode wherever the click lands; a line
     // being typed is not the mouse's.
     if (mMode == Mode::Insert || mMode == Mode::Replace || mMode == Mode::Command || mMode == Mode::Search || mMode == Mode::Confirm)
@@ -478,8 +486,9 @@ bool ALVimKeymap::typingLine(std::string& line, S32& caret) const
     {
         return false;
     }
-    line  = utf8Of(mLineKind) + mLine;
-    caret = static_cast<S32>(line.size());
+    const std::string kind = utf8Of(mLineKind);
+    line                   = kind + mLine;
+    caret                  = static_cast<S32>(kind.size() + llmin(mLineCursor, mLine.size()));
     return true;
 }
 
@@ -794,11 +803,20 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
                 {
                     clearPending();
                     const std::vector<std::string>& history = historyOf(ch);
-                    mMode                                   = ch == ':' ? Mode::Command : Mode::Search;
-                    mLineKind                               = ch;
+                    if (mHooks.historyWindow && !history.empty())
+                    {
+                        // The host's window of them; what is picked comes
+                        // back onto the line.
+                        const llwchar kind = ch;
+                        mHooks.historyWindow(view, kind, history, [this, &view, kind](const std::string& line) { takeLine(view, kind, line); });
+                        return true;
+                    }
+                    mMode     = ch == ':' ? Mode::Command : Mode::Search;
+                    mLineKind = ch;
                     mHistoryPrefix.clear();
-                    mHistoryAt = history.empty() ? -1 : static_cast<S32>(history.size()) - 1;
-                    mLine      = history.empty() ? std::string() : history.back();
+                    mHistoryAt  = history.empty() ? -1 : static_cast<S32>(history.size()) - 1;
+                    mLine       = history.empty() ? std::string() : history.back();
+                    mLineCursor = mLine.size();
                     return true;
                 }
                 clearPending();
@@ -1673,6 +1691,7 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
             mLineKind  = ':';
             mHistoryAt = -1;
             mLine      = visual ? std::string("'<,'>") : mCount > 0 ? std::string(".,.+") + std::to_string(mCount - 1) : std::string();
+            mLineCursor = mLine.size();
             if (visual)
             {
                 leaveVisual(view);
@@ -1685,6 +1704,7 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
             mLineKind  = ch;
             mHistoryAt = -1;
             mLine.clear();
+            mLineCursor = 0;
             return true;
         case 'n':
         case 'N':
@@ -3064,14 +3084,90 @@ bool ALVimKeymap::search(ALTextView& view, const std::string& pattern, bool forw
 
 bool ALVimKeymap::commandLine(ALTextView& view, const Input& input)
 {
+    // The cursor moves by whole characters.
+    auto back = [this](size_t at) {
+        while (at > 0 && (static_cast<unsigned char>(mLine[--at]) & 0xC0) == 0x80) {}
+        return at;
+    };
+    auto forward = [this](size_t at) {
+        if (at < mLine.size())
+        {
+            ++at;
+            while (at < mLine.size() && (static_cast<unsigned char>(mLine[at]) & 0xC0) == 0x80)
+            {
+                ++at;
+            }
+        }
+        return at;
+    };
+    mLineCursor = llmin(mLineCursor, mLine.size());
     if (!input.isChar)
     {
+        // Vim's own editing of the line: Control-B and Control-E to the
+        // ends, Control-W a word back, Control-U to the start, Control-H
+        // a character back.
+        if ((input.mask & MASK_CONTROL) && !(input.mask & MASK_ALT))
+        {
+            switch (input.key)
+            {
+                case 'B': mLineCursor = 0; return true;
+                case 'E': mLineCursor = mLine.size(); return true;
+                case 'U':
+                    mLine.erase(0, mLineCursor);
+                    mLineCursor = 0;
+                    mHistoryAt  = -1;
+                    return true;
+                case 'W':
+                {
+                    // Blanks before the cursor, then the word or the run
+                    // of other characters before them.
+                    size_t at = mLineCursor;
+                    while (at > 0 && mLine[at - 1] == ' ')
+                    {
+                        --at;
+                    }
+                    if (at > 0)
+                    {
+                        const bool word = isalnum(static_cast<unsigned char>(mLine[at - 1])) || mLine[at - 1] == '_' || static_cast<unsigned char>(mLine[at - 1]) >= 0x80;
+                        while (at > 0 && mLine[at - 1] != ' ' &&
+                               (isalnum(static_cast<unsigned char>(mLine[at - 1])) || mLine[at - 1] == '_' || static_cast<unsigned char>(mLine[at - 1]) >= 0x80) == word)
+                        {
+                            --at;
+                        }
+                    }
+                    mLine.erase(at, mLineCursor - at);
+                    mLineCursor = at;
+                    mHistoryAt  = -1;
+                    return true;
+                }
+                case 'H':
+                {
+                    Input as_key;
+                    as_key.key = KEY_BACKSPACE;
+                    return commandLine(view, as_key);
+                }
+                default:
+                    return true;
+            }
+        }
         switch (input.key)
         {
             case KEY_ESCAPE:
                 mLine.clear();
-                mMode = Mode::Normal;
+                mLineCursor = 0;
+                mMode       = Mode::Normal;
                 moveTo(view, view.caret());
+                return true;
+            case KEY_LEFT: mLineCursor = back(mLineCursor); return true;
+            case KEY_RIGHT: mLineCursor = forward(mLineCursor); return true;
+            case KEY_HOME: mLineCursor = 0; return true;
+            case KEY_END: mLineCursor = mLine.size(); return true;
+            case KEY_DELETE:
+                if (mLineCursor < mLine.size())
+                {
+                    mLine.erase(mLineCursor, forward(mLineCursor) - mLineCursor);
+                    mHistoryAt = -1;
+                }
                 return true;
             case KEY_BACKSPACE:
                 mHistoryAt = -1;
@@ -3079,15 +3175,12 @@ bool ALVimKeymap::commandLine(ALTextView& view, const Input& input)
                 {
                     mMode = Mode::Normal;
                 }
-                else
+                else if (mLineCursor > 0)
                 {
-                    // The last character, whole.
-                    size_t cut = mLine.size() - 1;
-                    while (cut > 0 && (static_cast<unsigned char>(mLine[cut]) & 0xC0) == 0x80)
-                    {
-                        --cut;
-                    }
-                    mLine.erase(cut);
+                    // The character before the cursor, whole.
+                    const size_t cut = back(mLineCursor);
+                    mLine.erase(cut, mLineCursor - cut);
+                    mLineCursor = cut;
                 }
                 return true;
             case KEY_UP:
@@ -3113,14 +3206,16 @@ bool ALVimKeymap::commandLine(ALTextView& view, const Input& input)
                     }
                     if (at >= n)
                     {
-                        mHistoryAt = -1;
-                        mLine      = mHistoryPrefix;
+                        mHistoryAt  = -1;
+                        mLine       = mHistoryPrefix;
+                        mLineCursor = mLine.size();
                         return true;
                     }
                     if (history[static_cast<size_t>(at)].compare(0, mHistoryPrefix.size(), mHistoryPrefix) == 0)
                     {
-                        mHistoryAt = at;
-                        mLine      = history[static_cast<size_t>(at)];
+                        mHistoryAt  = at;
+                        mLine       = history[static_cast<size_t>(at)];
+                        mLineCursor = mLine.size();
                         return true;
                     }
                 }
@@ -3130,8 +3225,9 @@ bool ALVimKeymap::commandLine(ALTextView& view, const Input& input)
                 const std::string line = mLine;
                 const llwchar     kind = mLineKind;
                 mLine.clear();
-                mMode      = Mode::Normal;
-                mHistoryAt = -1;
+                mLineCursor = 0;
+                mMode       = Mode::Normal;
+                mHistoryAt  = -1;
                 remember(kind, line);
                 if (kind == ':')
                 {
@@ -3169,9 +3265,23 @@ bool ALVimKeymap::commandLine(ALTextView& view, const Input& input)
         as_key.key = KEY_RETURN;
         return commandLine(view, as_key);
     }
-    mLine += utf8Of(input.ch);
+    const std::string typed = utf8Of(input.ch);
+    mLine.insert(mLineCursor, typed);
+    mLineCursor += typed.size();
     mHistoryAt = -1;
     return true;
+}
+
+void ALVimKeymap::takeLine(ALTextView& view, llwchar kind, const std::string& text)
+{
+    clearPending();
+    mMode       = kind == ':' ? Mode::Command : Mode::Search;
+    mLineKind   = kind;
+    mLine       = text;
+    mLineCursor = mLine.size();
+    mHistoryAt  = -1;
+    mHistoryPrefix.clear();
+    bump();
 }
 
 void ALVimKeymap::share(std::shared_ptr<Shared> shared)

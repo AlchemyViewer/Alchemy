@@ -123,6 +123,10 @@ namespace tut
                     {
                         editor->handleKeyHere(name == "Up" ? KEY_UP : KEY_DOWN, MASK_NONE);
                     }
+                    else if (name == "Left" || name == "Right" || name == "Home" || name == "End" || name == "Delete")
+                    {
+                        editor->handleKeyHere(name == "Left" ? KEY_LEFT : name == "Right" ? KEY_RIGHT : name == "Home" ? KEY_HOME : name == "End" ? KEY_END : KEY_DELETE, MASK_NONE);
+                    }
                     else if (name.size() == 3 && name[0] == 'C' && name[1] == '-')
                     {
                         editor->handleKeyHere(static_cast<KEY>(toupper(name[2])), MASK_CONTROL);
@@ -831,5 +835,50 @@ namespace tut
         ensure("not asking", vim->mode() == ALVimKeymap::Mode::Normal);
         ensure_equals("the error, and that nothing was done", vim->message(), std::string("E486: Pattern not found: z -- nothing substituted"));
         ensure_equals("nothing was", flat(e.text()), std::string("a x|b|a y|a z|"));
+    }
+    template<> template<>
+    void alvimkeymap_object::test<21>()
+    {
+        set_test_name("the : line is edited in place -- Left Right Home End Delete, Control-B E W U H -- and q: goes through the host's window where it has one");
+        ALCodeEditor& e = make("one\n");
+        std::string   line;
+        S32           caret = 0;
+        keys(":abc");
+        ensure("typing", vim->typingLine(line, caret) && line == ":abc" && caret == 4);
+        keys("<Left><Left>");
+        ensure("two back", vim->typingLine(line, caret) && caret == 2);
+        keys("X");
+        ensure("put in at the cursor", vim->typingLine(line, caret) && line == ":aXbc" && caret == 3);
+        keys("<Home>");
+        ensure("home", vim->typingLine(line, caret) && caret == 1);
+        keys("<Delete>");
+        ensure("the character at the cursor gone", vim->typingLine(line, caret) && line == ":Xbc" && caret == 1);
+        keys("<End><BS>");
+        ensure("the one before the end gone", vim->typingLine(line, caret) && line == ":Xb" && caret == 3);
+        keys(" two words<C-W>");
+        ensure("a word back", vim->typingLine(line, caret) && line == ":Xb two ");
+        keys("<C-B>");
+        ensure("to the start", vim->typingLine(line, caret) && caret == 1);
+        keys("<C-E>q<C-U>");
+        ensure("to the end, then the whole line gone", vim->typingLine(line, caret) && line == ":" && caret == 1);
+        keys("<Esc>");
+        // A message goes at a click, as it does at a key.
+        keys(":nosuch<CR>");
+        ensure("said", !vim->message().empty());
+        e.handleMouseDown(10, 10, MASK_NONE);
+        e.handleMouseUp(10, 10, MASK_NONE);
+        ensure("cleared by the click", vim->message().empty());
+        // q: through the host's window: the history handed over, and
+        // what is picked put on the line to edit.
+        keys(":set number<CR>");
+        std::vector<std::string> offered;
+        vim->hooks().historyWindow = [&offered](ALTextView& view, llwchar kind, const std::vector<std::string>& history, std::function<void(const std::string&)> chosen) {
+            offered = history;
+            chosen(history.front());
+        };
+        keys("q:");
+        ensure("the history was offered", !offered.empty() && std::find(offered.begin(), offered.end(), "set number") != offered.end());
+        ensure("the pick is on the line, to edit", vim->mode() == ALVimKeymap::Mode::Command && vim->typingLine(line, caret) && line == ":" + offered.front());
+        keys("<Esc>");
     }
 }
