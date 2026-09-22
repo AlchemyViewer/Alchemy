@@ -42,14 +42,16 @@
 //
 // Two shapes are taken. A function returning nothing, called as a
 // statement, becomes a block: each parameter a local of the block set
-// to its argument, then the body's statements, provided the body has
-// no return, no label and no jump, and no state change. A function whose
-// body is one `return expression;` becomes that expression wherever it
-// is called, its parameters replaced by the arguments -- which must be
-// constants or plain names, and a parameter used more than once must
-// have a constant -- in parentheses. A name the body declares that is
+// to its argument, then the body's statements, a return in it a jump to
+// a label after the block, its own labels renamed, provided it changes
+// no state. A function whose body is one `return expression;` becomes
+// that expression wherever it is called, its parameters replaced by the
+// arguments -- constants, names, or expressions that change nothing,
+// in parentheses; one a parameter reads more than once goes into a
+// temporary before the statement. A name the body declares that is
 // already visible where the call is gets a new one, since LSL has no
-// shadowing. Anything else is left as the author wrote it.
+// shadowing. A function that reaches itself through calls is never put
+// in place. Anything else is left as the author wrote it.
 class ALLSLInliner
 {
 public:

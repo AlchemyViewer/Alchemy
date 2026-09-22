@@ -29,6 +29,7 @@
 
 #include "allslinliner.h"
 #include "allslservice.h"
+#include "allsltraits.h"
 #include "llmath.h"
 #include "llquaternion.h"
 #include "v3math.h"
@@ -52,34 +53,7 @@ namespace
 
     // ---- what the definitions say of the library -------------------------------------
 
-    struct Trait
-    {
-        const char* name;
-        bool        pure;
-        bool        mustUse;
-        bool        native;
-    };
-    const Trait TRAITS[] = {
-#include "allsltraits.inc"
-    };
-
-    const Trait* traitOf(const char* name)
-    {
-        for (const Trait& t : TRAITS)
-        {
-            if (!strcmp(t.name, name))
-            {
-                return &t;
-            }
-        }
-        return nullptr;
-    }
-
-    bool isPure(const char* name)
-    {
-        const Trait* t = traitOf(name);
-        return t && t->pure;
-    }
+    bool isPure(const char* name) { return ALLSLTraits::pure(name); }
 
     S32 zeroBased(int one) { return std::max(0, one - 1); }
 
@@ -185,60 +159,7 @@ namespace
         return start == std::string::npos ? text : text.substr(start);
     }
 
-    // What an expression can be dropped without losing: no assignment, no
-    // call but to a function the definitions call pure, no print.
-    bool sideEffectFree(LSLASTNode* node)
-    {
-        if (!node)
-        {
-            return true;
-        }
-        switch (node->getNodeType())
-        {
-            case NODE_NULL:
-            case NODE_CONSTANT:
-            case NODE_IDENTIFIER:
-            case NODE_TYPE:
-                return true;
-            case NODE_EXPRESSION:
-            case NODE_AST_NODE_LIST:
-                break;
-            default:
-                return false;
-        }
-        if (node->getNodeType() == NODE_EXPRESSION)
-        {
-            auto* expr = static_cast<LSLExpression*>(node);
-            if (operation_mutates(expr->getOperation()))
-            {
-                return false;
-            }
-            switch (expr->getNodeSubType())
-            {
-                case NODE_PRINT_EXPRESSION:
-                    return false;
-                case NODE_FUNCTION_EXPRESSION:
-                {
-                    LSLSymbol* sym = expr->getSymbol();
-                    if (!sym || sym->getSubType() != SYM_BUILTIN || !isPure(sym->getName()))
-                    {
-                        return false;
-                    }
-                    break;
-                }
-                default:
-                    break;
-            }
-        }
-        for (LSLASTNode* child : *node)
-        {
-            if (!sideEffectFree(child))
-            {
-                return false;
-            }
-        }
-        return true;
-    }
+    bool sideEffectFree(LSLASTNode* node) { return ALLSLTraits::sideEffectFree(node); }
 
     // Skips the parentheses around an expression.
     LSLExpression* bare(LSLExpression* expr)

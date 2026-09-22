@@ -27,6 +27,7 @@
 #include "allslinliner.h"
 
 #include "allslservice.h"
+#include "allsltraits.h"
 
 #include <tailslide/tailslide.hh>
 #include <tailslide/operations.hh>
@@ -508,7 +509,20 @@ namespace
                     lastStatement = child;
                 }
             }
+            // The label a return jumps to: the one already after the
+            // call's statement, where the next statement is a label --
+            // a loop's continue label, say -- since two labels at one
+            // place are one too many; else a fresh one after the block.
             std::string after;
+            bool        afterIsOwn = false;
+            if (LSLASTNode* next = statement->getNext(); next && next->getNodeType() == NODE_STATEMENT && next->getNodeSubType() == NODE_LABEL &&
+                                                          statement->getParent() && statement->getParent()->getNodeSubType() == NODE_COMPOUND_STATEMENT)
+            {
+                if (LSLSymbol* label = static_cast<LSLLabel*>(next)->getIdentifier()->getSymbol())
+                {
+                    after = label->getName();
+                }
+            }
             for (LSLASTNode* r : returns)
             {
                 if (r == lastStatement)
@@ -518,7 +532,8 @@ namespace
                 }
                 if (after.empty())
                 {
-                    after = freshName("_ret", taken, used, context);
+                    after      = freshName("_ret", taken, used, context);
+                    afterIsOwn = true;
                 }
                 renames.push_back(Rename{ beginOf(r), endOf(r), "jump " + after + ";" });
             }
@@ -554,7 +569,7 @@ namespace
                 block.push_back(std::move(line));
             }
             PieceLine closing{ Piece{ "}", endOf(statement), false } };
-            if (!after.empty())
+            if (afterIsOwn)
             {
                 closing.push_back(Piece{ "@" + after + ";", endOf(statement), false });
             }
@@ -569,7 +584,8 @@ namespace
         {
             // The expression in place of the call: the body must be one
             // return of an expression that changes nothing, over
-            // arguments that are constants or names.
+            // arguments that are constants, names, or expressions that
+            // change nothing themselves -- a pure library call, say.
             LSLASTNode* only = body->getChild(0);
             if (!only || only->getNext() || only->getNodeSubType() != NODE_RETURN_STATEMENT)
             {
@@ -603,19 +619,24 @@ namespace
                 }
             }
             std::vector<std::string> argText(args.size());
+            // As written, for a temporary to be set to.
+            std::vector<std::string> argRaw(args.size());
             std::vector<size_t>      wantTemp;
             for (size_t i = 0; i < args.size() && simple; ++i)
             {
                 const LSLNodeSubType kind     = args[i]->getNodeSubType();
                 const bool           constant = kind == NODE_CONSTANT_EXPRESSION;
                 const bool           name     = kind == NODE_LVALUE_EXPRESSION;
-                if (!constant && !name)
+                // Anything else must change nothing, since it may be read
+                // at another time than the call would have, or not at all.
+                if (!constant && !name && !ALLSLTraits::sideEffectFree(args[i]))
                 {
                     simple = false;
                     break;
                 }
-                argText[i] = slice(lines, beginOf(args[i]), endOf(args[i]));
-                if (!constant && static_cast<LSLLValueExpression*>(args[i])->getMember())
+                argRaw[i]  = slice(lines, beginOf(args[i]), endOf(args[i]));
+                argText[i] = argRaw[i];
+                if (!constant && (!name || static_cast<LSLLValueExpression*>(args[i])->getMember()))
                 {
                     argText[i] = "(" + argText[i] + ")";
                 }
@@ -655,8 +676,9 @@ namespace
                 LSLASTNode* root = shape == NODE_EXPRESSION_STATEMENT ? static_cast<LSLExpressionStatement*>(holder)->getExpr() : nullptr;
                 for (LSLASTNode* n : nodesOf(holder))
                 {
-                    if (n->getNodeType() != NODE_EXPRESSION)
+                    if (n->getNodeType() != NODE_EXPRESSION || isInside(n, call))
                     {
+                        // The call's own arguments are what is being moved.
                         continue;
                     }
                     if (n->getNodeSubType() == NODE_FUNCTION_EXPRESSION && n != call &&
@@ -684,7 +706,7 @@ namespace
                     }
                     const std::string temp = freshName("_t", taken, used, context);
                     decls.push_back(PieceLine{ Piece{ std::string(type) + " " + temp + " = ", beginOf(args[i]), false },
-                                               Piece{ argText[i], beginOf(args[i]), true }, Piece{ ";", beginOf(args[i]), false } });
+                                               Piece{ argRaw[i], beginOf(args[i]), true }, Piece{ ";", beginOf(args[i]), false } });
                     argText[i] = temp;
                 }
                 // The statement's own indentation before it, on the line
@@ -743,9 +765,12 @@ namespace
         }
         const Lines lines = splitLines(text);
 
-        // The functions, and every call of each.
+        // The functions, and every call of each; and what each function
+        // calls, since one that reaches itself -- through others or not --
+        // can never go in place: each copy would carry another call of it.
         std::vector<LSLGlobalFunction*>                           functions;
         std::map<LSLSymbol*, std::vector<LSLFunctionExpression*>> calls;
+        std::map<LSLSymbol*, std::set<LSLSymbol*>>                callees;
         for (LSLASTNode* node : nodesOf(script))
         {
             if (node->getNodeType() == NODE_GLOBAL_FUNCTION)
@@ -759,9 +784,39 @@ namespace
                 if (sym && sym->getSubType() != SYM_BUILTIN)
                 {
                     calls[sym].push_back(call);
+                    LSLASTNode* holder = call->getParent();
+                    while (holder && holder->getNodeType() != NODE_GLOBAL_FUNCTION)
+                    {
+                        holder = holder->getParent();
+                    }
+                    if (holder && static_cast<LSLGlobalFunction*>(holder)->getSymbol())
+                    {
+                        callees[static_cast<LSLGlobalFunction*>(holder)->getSymbol()].insert(sym);
+                    }
                 }
             }
         }
+        auto recursive = [&](LSLSymbol* sym) {
+            std::set<LSLSymbol*>    seen;
+            std::vector<LSLSymbol*> stack(callees[sym].begin(), callees[sym].end());
+            while (!stack.empty())
+            {
+                LSLSymbol* at = stack.back();
+                stack.pop_back();
+                if (at == sym)
+                {
+                    return true;
+                }
+                if (seen.insert(at).second)
+                {
+                    for (LSLSymbol* next : callees[at])
+                    {
+                        stack.push_back(next);
+                    }
+                }
+            }
+            return false;
+        };
         // What is taken this round: the stretches edited and the lines
         // dropped, which no other edit may cross.
         std::vector<std::pair<Pos, Pos>> edited;
@@ -795,7 +850,7 @@ namespace
                 continue;
             }
             const auto found = calls.find(sym);
-            if (found == calls.end() || found->second.empty())
+            if (found == calls.end() || found->second.empty() || recursive(sym))
             {
                 continue;
             }

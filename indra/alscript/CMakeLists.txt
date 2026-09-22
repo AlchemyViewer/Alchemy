@@ -14,6 +14,7 @@ target_sources(
     alluauconfig.cpp
     alluauservice.cpp
     allslservice.cpp
+    allsltraits.cpp
     alpreprocessor.cpp
     alscriptenvelope.cpp
     alscriptformatter.cpp
@@ -31,6 +32,7 @@ target_sources(
         alluauconfig.h
         alluauservice.h
         allslservice.h
+        allsltraits.h
         alpreprocessor.h
         alscriptenvelope.h
         alscriptformatter.h

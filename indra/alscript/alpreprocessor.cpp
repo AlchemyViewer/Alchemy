@@ -2096,7 +2096,58 @@ namespace
             std::string continueLabel;
             bool        breakUsed    = false;
             bool        continueUsed = false;
+            // A label the script already has where the loop's would go
+            // -- one right after the loop, one ending its body -- is the
+            // loop's, since two labels at one place are one too many.
+            bool        breakShared    = false;
+            bool        continueShared = false;
         };
+
+        // The name of a label `@name;` whose `@` is at `i`, or nothing.
+        static std::string labelAt(const Tokens& t, size_t i, size_t to)
+        {
+            if (i >= to || !t[i].is(Kind::Punct, "@"))
+            {
+                return std::string();
+            }
+            const size_t name = skipBlank(t, i + 1);
+            if (name >= to || t[name].kind != Kind::Ident)
+            {
+                return std::string();
+            }
+            const size_t semi = skipBlank(t, name + 1);
+            return semi < to && t[semi].is(Kind::Punct, ";") ? t[name].text : std::string();
+        }
+
+        // The name of a label `@name;` that ends before `end`, the last
+        // thing before it but blanks, or nothing.
+        static std::string labelBefore(const Tokens& t, size_t from, size_t end)
+        {
+            size_t at = end;
+            while (at > from && t[at - 1].blank())
+            {
+                --at;
+            }
+            if (at < from + 3 || !t[at - 1].is(Kind::Punct, ";"))
+            {
+                return std::string();
+            }
+            size_t name = at - 1;
+            while (name > from && t[name - 1].blank())
+            {
+                --name;
+            }
+            if (name == from || t[name - 1].kind != Kind::Ident)
+            {
+                return std::string();
+            }
+            size_t sign = name - 1;
+            while (sign > from && t[sign - 1].blank())
+            {
+                --sign;
+            }
+            return sign > from && t[sign - 1].is(Kind::Punct, "@") ? t[name - 1].text : std::string();
+        }
 
         // An `inline` before a function's definition -- `inline f()`,
         // `inline integer f(x)` -- taken off and the name kept.
@@ -2321,7 +2372,7 @@ namespace
                 if (t.is(Kind::Ident, "while") || t.is(Kind::Ident, "for") || t.is(Kind::Ident, "do"))
                 {
                     const size_t end = std::min(statementEnd(in, i), to);
-                    append(out, loop(in, i, end));
+                    append(out, loop(in, i, end, to));
                     i = end;
                     continue;
                 }
@@ -2437,8 +2488,10 @@ namespace
         }
 
         // A loop from `i` to `end`, its body done with a scope of its own
-        // and the labels put where the jumps expect them.
-        Tokens loop(const Tokens& in, size_t i, size_t end)
+        // and the labels put where the jumps expect them; `to` bounds
+        // what follows the loop, where a label of the script's own may
+        // stand in for the break's.
+        Tokens loop(const Tokens& in, size_t i, size_t end, size_t to)
         {
             const Token& site = in[i];
             Scope        scope;
@@ -2465,12 +2518,34 @@ namespace
                 body_begin = close + 1;
                 body_end   = end;
             }
+            // The script's own labels where the loop's would go.
+            if (const std::string following = labelAt(in, skipBlank(in, end), to); !following.empty())
+            {
+                scope.breakLabel  = following;
+                scope.breakShared = true;
+            }
+            {
+                const size_t first = skipBlank(in, body_begin);
+                size_t       last  = body_end;
+                while (last > first && in[last - 1].blank())
+                {
+                    --last;
+                }
+                if (first < last && in[first].is(Kind::Punct, "{") && in[last - 1].is(Kind::Punct, "}") && matching(in, first, "{", "}") == last - 1)
+                {
+                    if (const std::string ending = labelBefore(in, first + 1, last - 1); !ending.empty())
+                    {
+                        scope.continueLabel  = ending;
+                        scope.continueShared = true;
+                    }
+                }
+            }
             mScopes.push_back(scope);
             Tokens body = statements(in, body_begin, body_end);
             const Scope done = mScopes.back();
             mScopes.pop_back();
             Tokens out = slice(in, i, body_begin);
-            if (done.continueUsed)
+            if (done.continueUsed && !done.continueShared)
             {
                 // The label at the body's end, inside braces of its own if
                 // the body has none.
@@ -2513,7 +2588,7 @@ namespace
             {
                 append(out, slice(in, body_end, end));
             }
-            if (done.breakUsed)
+            if (done.breakUsed && !done.breakShared)
             {
                 out.push_back(synth(Kind::Punct, "@", site));
                 out.push_back(synth(Kind::Ident, done.breakLabel, site));

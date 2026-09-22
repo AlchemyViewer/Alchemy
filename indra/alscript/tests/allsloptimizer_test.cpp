@@ -545,4 +545,88 @@ namespace tut
         ALLSLOptimizer::Result r  = ALLSLOptimizer::run(source, o);
         ensure("the optimizer reads it: " + notes(r), r.optimized);
     }
+    template<> template<>
+    void allsloptimizer_object::test<16>()
+    {
+        set_test_name("an argument that changes nothing goes in as a name does, a temporary where it is read twice; one that may change something keeps the call");
+        const std::string source =
+            "integer g;\n"
+            "integer both(integer x)\n"
+            "{\n"
+            "    return x + x;\n"
+            "}\n"
+            "integer once(integer x)\n"
+            "{\n"
+            "    return x + 1;\n"
+            "}\n"
+            "integer bump()\n"
+            "{\n"
+            "    return ++g;\n"
+            "}\n"
+            "default\n"
+            "{\n"
+            "    state_entry()\n"
+            "    {\n"
+            "        integer a = both(llAbs(g));\n"
+            "        integer b = once(g * 2);\n"
+            "        integer c = once(llAbs(g));\n"
+            "        integer d = once(bump());\n"
+            "        integer e = both(llRound(llGetTime()));\n"
+            "    }\n"
+            "}\n";
+        const ALLSLInliner::Result put = ALLSLInliner::run(source);
+        auto has = [&put](const char* text) { return put.text.find(text) != std::string::npos; };
+        ensure("a pure call read twice is made once into a temporary: " + put.text, has("        integer _t_1 = llAbs(g);\n        integer a = (_t_1 + _t_1);"));
+        ensure("an expression read once goes in, in parentheses: " + put.text, has("integer b = ((g * 2) + 1);"));
+        ensure("so does a pure call: " + put.text, has("integer c = ((llAbs(g)) + 1);"));
+        ensure("a call that may change something stays a call: " + put.text, has("integer d = once(bump());") && has("integer once(integer x)"));
+        ensure("so does one whose answer may change -- the time is not pure: " + put.text, has("integer e = both(llRound(llGetTime()));") && has("integer both(integer x)"));
+        // The argument's own call is not the statement's other call: the
+        // check that nothing else in the statement changes anything is
+        // about what is not being moved.
+        ensure_equals("three went", put.inlined, 3);
+    }
+    template<> template<>
+    void allsloptimizer_object::test<17>()
+    {
+        set_test_name("a function that reaches itself is never put in place, marked or not; a label after the call's statement is the return's target");
+        const std::string source =
+            "ping(integer n)\n"
+            "{\n"
+            "    if (n > 0) pong(n - 1);\n"
+            "}\n"
+            "pong(integer n)\n"
+            "{\n"
+            "    if (n > 0) ping(n - 1);\n"
+            "}\n"
+            "self(integer n)\n"
+            "{\n"
+            "    if (n > 0) self(n - 1);\n"
+            "}\n"
+            "early(integer n)\n"
+            "{\n"
+            "    if (n < 0) return;\n"
+            "    llSay(0, \"ok\");\n"
+            "}\n"
+            "default\n"
+            "{\n"
+            "    state_entry()\n"
+            "    {\n"
+            "        ping(3);\n"
+            "        self(3);\n"
+            "        integer i;\n"
+            "        for (i = 0; i < 3; ++i)\n"
+            "        {\n"
+            "            early(i);\n"
+            "            @next;\n"
+            "        }\n"
+            "    }\n"
+            "}\n";
+        const ALLSLInliner::Result put = ALLSLInliner::run(source, { "ping", "pong", "self" });
+        auto has = [&put](const char* text) { return put.text.find(text) != std::string::npos; };
+        ensure("ping and pong, each reaching the other, stay: " + put.text, has("ping(integer n)") && has("pong(integer n)") && has("        ping(3);"));
+        ensure("self stays: " + put.text, has("self(integer n)") && has("        self(3);"));
+        ensure("early went in, its return a jump to the label already there: " + put.text, has("if (n < 0) jump next;") && !has("_ret") && has("            @next;"));
+        ensure_equals("one went", put.inlined, 1);
+    }
 } // namespace tut

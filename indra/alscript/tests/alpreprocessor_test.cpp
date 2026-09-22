@@ -645,4 +645,23 @@ namespace tut
                                   "E 0: 'continue' is a name here, which break and continue reserve\n"));
         ensure_equals("and left as they were", r.text, std::string("integer break; while (a) { break = 1; x = continue; }\n"));
     }
+    template<> template<>
+    void alpreprocessor_object::test<15>()
+    {
+        set_test_name("a label the script has where a loop's would go is the loop's");
+        ALPreprocessor::Options o = options();
+        o.extensions              = true;
+        ALPreprocessor::Result r  = ALPreprocessor::run("while (a) { if (b) break; c++; }\n@out;\n", o);
+        ensure_equals("problems", messages(r), std::string());
+        ensure_equals("a label after the loop is the break's", r.text, std::string("while (a) { if (b) jump out; c++; }\n@out;\n"));
+        r = ALPreprocessor::run("while (a) { if (b) continue; c++; @next; }\n", o);
+        ensure_equals("a label ending the body is the continue's", r.text, std::string("while (a) { if (b) jump next; c++; @next; }\n"));
+        r = ALPreprocessor::run("do { if (b) break 2; } while (a); @x;\n", o);
+        ensure_equals("break 2 with one loop is still an error", messages(r), std::string("E 0: break outside a loop\n"));
+        r = ALPreprocessor::run("for (;;) { while (a) { if (b) break 2; } @in; }\n@after;\n", o);
+        ensure_equals("each loop's own: break 2 to the outer's following label, the inner's ending label unused", r.text,
+                      std::string("for (;;) { while (a) { if (b) jump after; } @in; }\n@after;\n"));
+        r = ALPreprocessor::run("while (a) { break; } x = 1; @late;\n", o);
+        ensure_equals("a label that is not right after the loop is not the loop's", r.text, std::string("while (a) { jump _brk1; }@_brk1; x = 1; @late;\n"));
+    }
 } // namespace tut
