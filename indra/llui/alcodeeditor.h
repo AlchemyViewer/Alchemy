@@ -26,6 +26,7 @@
 
 #include "altextview.h"
 
+#include <array>
 #include <functional>
 #include <optional>
 #include <string>
@@ -96,6 +97,35 @@ public:
     void setMark(S32 line, Mark mark);
     Mark markAt(S32 line) const;
     void clearMarks();
+    // A mark's colour: a theme's, where it names one, else the skin's
+    // CodeMark colour. What a squiggle of that level is drawn in too.
+    LLColor4 markColor(Mark mark) const;
+
+    // The colours a theme may name that a skin need not, looked up under
+    // the view's colour prefix -- ScriptIndentGuideColor -- and, where
+    // the table has none, mixed from the view's own colours as they
+    // always were. Each is what a modern editor's theme sets apart.
+    enum class Paint : U8
+    {
+        ActiveLineNumber,  // the caret's line's number
+        IndentGuide,
+        Whitespace,        // the marks for blanks
+        InlayHint,         // an inlay's word
+        InlayHintBg,       // and its pill
+        StickyHeader,      // the band the pinned headers are on
+        Widget,            // the ground of the hover card, the completions, their documentation, a signature
+        WidgetBorder,
+        WidgetSelection,   // the completion chosen
+        Error,
+        Warning,
+        Note,
+        RuntimeError,
+        SelectionInactive, // the selection once the keyboard has left
+        COUNT
+    };
+    static const char* paintName(Paint which);
+    LLColor4           paint(Paint which) const;
+    LLColor4           selectionDrawColor() const override;
 
     // Something drawn over a range: a squiggle under it, or a wash behind
     // it. Replaced whole by whoever computes them; an edit slides the ones
@@ -552,6 +582,11 @@ private:
     bool      mHighlightColorSet   = false;
     bool      mChangedColorSet     = false;
     LLUIColor mMarkColors[static_cast<size_t>(Mark::COUNT)];
+    // The table's colour for each Paint that it has one for, looked up
+    // again when the table changes.
+    mutable std::array<std::optional<LLUIColor>, static_cast<size_t>(Paint::COUNT)> mPaint;
+    mutable U32                                                                     mPaintGeneration = 0;
+    mutable bool                                                                    mPaintLooked     = false;
 
     boost::signals2::scoped_connection mEditConnection;
     boost::signals2::scoped_connection mChangedConnection;

@@ -219,6 +219,12 @@ public:
     bool keyboardOnText() const;
     const LLColor4& textColor() const { return (mReadOnly ? mTextReadOnlyColor : mTextColor).get(); }
     const LLColor4& selectionColor() const { return mSelectionColor.get(); }
+    // The selection as drawn now: its colour, or a subclass's for a view
+    // the keyboard has left.
+    virtual LLColor4 selectionDrawColor() const { return mSelectionColor.get(); }
+    // What the view's syntax colours are named under in the colour table:
+    // "Syntax", or "Script" for Script Studio's editors.
+    const std::string& colorPrefix() const { return mColorPrefix; }
     // The colour a kind is drawn in here.
     const LLColor4& colorForKind(ALSyntaxKind kind) const;
     // The colour table's name for a kind's colour under a prefix:
@@ -766,6 +772,7 @@ private:
     LLUIColor mBgFocusColor;
     LLUIColor mCursorColor;
     LLUIColor mSelectionColor;
+    std::string mColorPrefix;
     std::array<LLUIColor, static_cast<size_t>(ALSyntaxKind::COUNT)> mKindColors;
 
     bool mBgVisible  = true;

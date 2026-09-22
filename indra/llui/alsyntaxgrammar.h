@@ -66,6 +66,12 @@ enum class ALSyntaxKind : U8
     Property,
     Deprecated,
     Invalid,
+    // What an analyzer tells apart that a grammar cannot: a library
+    // table such as SLua's `ll`, an LSL state's name, and a variable of
+    // the whole script rather than of a block.
+    Namespace,
+    State,
+    GlobalVariable,
     COUNT
 };
 

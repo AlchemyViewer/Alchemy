@@ -30,6 +30,7 @@
 #include "../alsurface.h"
 
 #include "../llfocusmgr.h"
+#include "../lluicolortable.h"
 #include "../lluictrlfactory.h"
 
 #include "alheadlessui_fixture.h"
@@ -944,5 +945,30 @@ namespace tut
         }
         ensure("the head in the editor's face", faced);
         ensure("its type coloured as a type", typed);
+    }
+
+    template<> template<>
+    void alcodeeditor_object::test<24>()
+    {
+        set_test_name("a colour a theme names is drawn in, and one it does not is mixed from the view's own");
+        ALCodeEditor& e = make("x\n");
+        LLUIColorTable& table = LLUIColorTable::instance();
+        const std::string name = e.colorPrefix() + ALCodeEditor::paintName(ALCodeEditor::Paint::ActiveLineNumber);
+        table.resetToDefault(name);
+        ensure("mixed: the text's own", e.paint(ALCodeEditor::Paint::ActiveLineNumber) == e.textColor());
+        ensure("a mark's colour is the skin's without a theme", e.markColor(ALCodeEditor::Mark::Error) == e.paint(ALCodeEditor::Paint::Error));
+        table.setColor(name, LLColor4::green);
+        ensure("named: the theme's", e.paint(ALCodeEditor::Paint::ActiveLineNumber) == LLColor4::green);
+        table.resetToDefault(name);
+        ensure("taken away: mixed again", e.paint(ALCodeEditor::Paint::ActiveLineNumber) == e.textColor());
+        const std::string error = e.colorPrefix() + ALCodeEditor::paintName(ALCodeEditor::Paint::Error);
+        table.setColor(error, LLColor4::blue);
+        ensure("a theme's error colour marks errors", e.markColor(ALCodeEditor::Mark::Error) == LLColor4::blue);
+        table.resetToDefault(error);
+        // The selection is quieter once the keyboard has gone elsewhere.
+        e.setSelectionColor(LLUIColor(LLColor4(0.f, 0.f, 1.f, 1.f)));
+        ensure("focused, the selection's own", e.selectionDrawColor() == e.selectionColor());
+        gFocusMgr.setKeyboardFocus(nullptr);
+        ensure("unfocused, a quieter one", e.selectionDrawColor() == e.paint(ALCodeEditor::Paint::SelectionInactive) && e.selectionDrawColor() != e.selectionColor());
     }
 }

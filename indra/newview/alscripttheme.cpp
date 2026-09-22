@@ -48,17 +48,39 @@ namespace
         { "ScriptBgReadOnlyColor", "Background, read-only" },
         { "ScriptCursorColor", "Cursor" },
         { "ScriptSelectionColor", "Selection" },
+        { "ScriptSelectionInactiveColor", "Selection, window not focused" },
         { "ScriptCurrentLineColor", "Current line" },
         { "ScriptGutterColor", "Gutter" },
         { "ScriptLineNumberColor", "Line numbers" },
+        { "ScriptActiveLineNumberColor", "Line number of the caret's line" },
         { "ScriptBracketMatchColor", "Matched bracket" },
         { "ScriptFindMatchColor", "Find match" },
         { "ScriptFoldColor", "Fold marks" },
+        { "ScriptIndentGuideColor", "Indent guides" },
+        { "ScriptWhitespaceColor", "Blank marks" },
         { "ScriptHighlightColor", "References" },
         { "ScriptChangedColor", "Changed lines" },
+        { "ScriptStickyHeaderColor", "Pinned headers" },
+        { "ScriptInlayHintColor", "Inlay hints" },
+        { "ScriptInlayHintBgColor", "Inlay hints, background" },
+        { "ScriptErrorColor", "Errors" },
+        { "ScriptWarningColor", "Warnings" },
+        { "ScriptNoteColor", "Notes" },
+        { "ScriptRuntimeErrorColor", "Run-time errors" },
+        { "ScriptWidgetColor", "Pop-ups" },
+        { "ScriptWidgetBorderColor", "Pop-ups, border" },
+        { "ScriptWidgetSelectionColor", "Pop-ups, chosen row" },
         { "ScriptBracket1Color", "Brackets, level 1" },
         { "ScriptBracket2Color", "Brackets, level 2" },
         { "ScriptBracket3Color", "Brackets, level 3" },
+    };
+
+    // A kind a theme made before it was told apart takes the colour of
+    // the kind it was drawn as until then.
+    const std::pair<const char*, const char*> KIND_FALLBACKS[] = {
+        { "ScriptNamespace", "ScriptType" },
+        { "ScriptState", "ScriptLabel" },
+        { "ScriptGlobalVariable", "ScriptVariable" },
     };
 
     // A kind's name split for reading: "DocComment" as "Doc comment".
@@ -224,7 +246,12 @@ ALScriptTheme ALScriptTheme::capture(const std::string& name)
     theme.own                   = true;
     for (const std::string& color : names())
     {
-        theme.colors[color] = table.getColor(color).get();
+        // One the table has no colour for is mixed from the others where
+        // it is drawn, and a theme leaves it so.
+        if (table.colorExists(color))
+        {
+            theme.colors[color] = table.getColor(color).get();
+        }
     }
     // Dark where the ground is.
     const LLColor4& ground = theme.colors["ScriptBackground"];
@@ -261,7 +288,17 @@ void ALScriptTheme::apply() const
     LLUIColorTable& table = LLUIColorTable::instance();
     for (const std::string& color : names())
     {
-        const auto found = colors.find(color);
+        auto found = colors.find(color);
+        if (found == colors.end())
+        {
+            for (const auto& [kind, was] : KIND_FALLBACKS)
+            {
+                if (color == kind)
+                {
+                    found = colors.find(was);
+                }
+            }
+        }
         if (found != colors.end())
         {
             table.setColor(color, found->second);

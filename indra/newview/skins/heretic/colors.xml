@@ -1171,4 +1171,59 @@
     <color
         name="EmphasisColor_35"
         value="0.901 0.533 0.729 0.35" />
+
+  <!-- Script Studio's colours that the default skin gives as values for
+       its white ground, taken back to this skin's own script colours.
+       Its gutter and pop-ups are mixed from its text and ground. -->
+  <color
+    name="ScriptEscape"
+    reference="SyntaxLslConstant" />
+  <color
+    name="ScriptNumber"
+    reference="SyntaxLslConstant" />
+  <color
+    name="ScriptKeyword"
+    reference="SyntaxLslControlFlow" />
+  <color
+    name="ScriptTag"
+    reference="SyntaxLslFunction" />
+  <color
+    name="ScriptAttribute"
+    reference="SyntaxLslDataType" />
+  <color
+    name="ScriptAttributeValue"
+    reference="SyntaxLslStringLiteral" />
+  <color
+    name="ScriptVariable"
+    reference="ScriptText" />
+  <color
+    name="ScriptParameter"
+    reference="ScriptText" />
+  <color
+    name="ScriptProperty"
+    reference="SyntaxLslDataType" />
+  <color
+    name="ScriptNamespace"
+    reference="SyntaxLslDataType" />
+  <color
+    name="ScriptState"
+    reference="SyntaxLslControlLabel" />
+  <color
+    name="ScriptGlobalVariable"
+    reference="ScriptText" />
+  <color
+    name="ScriptSelectionColor"
+    value="0.7 0.83 1 1" />
+  <color
+    name="ScriptLineNumberColor"
+    value="0.55 0.55 0.55 1" />
+  <color
+    name="ScriptBracket1Color"
+    value="0.8 0.6 0.05 1" />
+  <color
+    name="ScriptBracket2Color"
+    value="0.7 0.3 0.75 1" />
+  <color
+    name="ScriptBracket3Color"
+    value="0.1 0.55 0.9 1" />
 </colors>

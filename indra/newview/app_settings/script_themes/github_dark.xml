@@ -94,6 +94,20 @@
       <array><real>1</real><real>0.6314</real><real>0.5961</real><real>1</real></array>
       <key>ScriptInvalid</key>
       <array><real>1</real><real>0.6314</real><real>0.5961</real><real>1</real></array>
+      <key>ScriptErrorColor</key>
+      <array><real>0.9725</real><real>0.3176</real><real>0.2863</real><real>1</real></array>
+      <key>ScriptWarningColor</key>
+      <array><real>0.8235</real><real>0.6000</real><real>0.1333</real><real>1</real></array>
+      <key>ScriptNoteColor</key>
+      <array><real>0.3451</real><real>0.6510</real><real>1.0000</real><real>1</real></array>
+      <key>ScriptActiveLineNumberColor</key>
+      <array><real>0.9020</real><real>0.9294</real><real>0.9529</real><real>1</real></array>
+      <key>ScriptWidgetColor</key>
+      <array><real>0.0863</real><real>0.1059</real><real>0.1333</real><real>1</real></array>
+      <key>ScriptWidgetBorderColor</key>
+      <array><real>0.1882</real><real>0.2118</real><real>0.2392</real><real>1</real></array>
+      <key>ScriptWidgetSelectionColor</key>
+      <array><real>0.1647</real><real>0.1922</real><real>0.2353</real><real>1</real></array>
     </map>
   </map>
 </llsd>

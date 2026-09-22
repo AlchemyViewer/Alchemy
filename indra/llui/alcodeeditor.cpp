@@ -345,6 +345,82 @@ ALCodeEditor::Mark ALCodeEditor::markAt(S32 line) const
     return (line >= 0 && line < static_cast<S32>(mMarks.size())) ? mMarks[line] : Mark::None;
 }
 
+// static
+const char* ALCodeEditor::paintName(Paint which)
+{
+    static const char* const NAMES[] = {
+        "ActiveLineNumberColor", "IndentGuideColor", "WhitespaceColor", "InlayHintColor", "InlayHintBgColor", "StickyHeaderColor", "WidgetColor",
+        "WidgetBorderColor", "WidgetSelectionColor", "ErrorColor", "WarningColor", "NoteColor", "RuntimeErrorColor", "SelectionInactiveColor",
+    };
+    static_assert(sizeof(NAMES) / sizeof(NAMES[0]) == static_cast<size_t>(Paint::COUNT), "every paint has a name");
+    const size_t index = static_cast<size_t>(which);
+    return index < static_cast<size_t>(Paint::COUNT) ? NAMES[index] : "";
+}
+
+LLColor4 ALCodeEditor::paint(Paint which) const
+{
+    const LLUIColorTable& table = LLUIColorTable::instance();
+    if (!mPaintLooked || mPaintGeneration != table.generation())
+    {
+        mPaintLooked     = true;
+        mPaintGeneration = table.generation();
+        for (size_t i = 0; i < mPaint.size(); ++i)
+        {
+            const std::string name = colorPrefix() + paintName(static_cast<Paint>(i));
+            mPaint[i]              = table.colorExists(name) ? std::optional<LLUIColor>(table.getColor(name)) : std::nullopt;
+        }
+    }
+    if (const std::optional<LLUIColor>& named = mPaint[static_cast<size_t>(which)])
+    {
+        return named->get();
+    }
+    const LLColor4& ink   = textColor();
+    const LLColor4& paper = backgroundColor();
+    switch (which)
+    {
+        case Paint::ActiveLineNumber:  return ink;
+        case Paint::IndentGuide:       return foldColor() % 0.35f;
+        case Paint::Whitespace:        return foldColor() % 0.55f;
+        case Paint::InlayHint:         return lerp(paper, ink, 0.65f);
+        case Paint::InlayHintBg:       return lerp(paper, ink, 0.12f);
+        case Paint::StickyHeader:
+        case Paint::Widget:            return ALSurface::ground(paper, ink);
+        case Paint::WidgetBorder:      return ALSurface::frame(ink);
+        case Paint::WidgetSelection:   return ALSurface::chosen(paper, ink);
+        case Paint::Error:             return mMarkColors[static_cast<size_t>(Mark::Error)].get();
+        case Paint::Warning:           return mMarkColors[static_cast<size_t>(Mark::Warning)].get();
+        case Paint::Note:              return mMarkColors[static_cast<size_t>(Mark::Note)].get();
+        case Paint::RuntimeError:      return mMarkColors[static_cast<size_t>(Mark::Runtime)].get();
+        case Paint::SelectionInactive:
+        {
+            // Quieter than the selection the keys act on, as every modern
+            // editor has it: nearer the ground, its own alpha kept.
+            const LLColor4& selection = selectionColor();
+            LLColor4        quiet     = lerp(paper, selection, 0.55f);
+            quiet.mV[VALPHA]          = selection.mV[VALPHA];
+            return quiet;
+        }
+        default:                       return ink;
+    }
+}
+
+LLColor4 ALCodeEditor::markColor(Mark mark) const
+{
+    switch (mark)
+    {
+        case Mark::Error:   return paint(Paint::Error);
+        case Mark::Warning: return paint(Paint::Warning);
+        case Mark::Note:    return paint(Paint::Note);
+        case Mark::Runtime: return paint(Paint::RuntimeError);
+        default:            return mMarkColors[static_cast<size_t>(mark)].get();
+    }
+}
+
+LLColor4 ALCodeEditor::selectionDrawColor() const
+{
+    return keyboardOnText() ? selectionColor() : paint(Paint::SelectionInactive);
+}
+
 void ALCodeEditor::clearMarks()
 {
     std::fill(mMarks.begin(), mMarks.end(), Mark::None);
@@ -627,7 +703,7 @@ void ALCodeEditor::drawGutter(const LLRect& text, F32 alpha)
     const S32       ascent = llround(font->getAscenderHeight());
     const S32       numbers_right = gutter.mRight - (mShowFoldMarkers ? FOLD_COLUMN : 0) - GUTTER_PAD;
     const LLColor4  ink     = lineNumberColor() % alpha;
-    const LLColor4  lit     = textColor() % alpha;
+    const LLColor4  lit     = paint(Paint::ActiveLineNumber) % alpha;
     const LLColor4  fold    = foldColor() % alpha;
     const LLColor4  changed = changedColor() % alpha;
     const S32       caret_line = caret().line;
@@ -664,8 +740,7 @@ void ALCodeEditor::drawGutter(const LLRect& text, F32 alpha)
             if (mark != Mark::None)
             {
                 const S32 y = screen_top - (row_h - MARK_SIZE) / 2;
-                gl_rect_2d(gutter.mLeft + MARK_INSET, y, gutter.mLeft + MARK_INSET + MARK_SIZE, y - MARK_SIZE,
-                           mMarkColors[static_cast<size_t>(mark)].get() % alpha);
+                gl_rect_2d(gutter.mLeft + MARK_INSET, y, gutter.mLeft + MARK_INSET + MARK_SIZE, y - MARK_SIZE, markColor(mark) % alpha);
             }
         }
         // A marker at a block's first line: pointing right at a folded
@@ -698,7 +773,7 @@ void ALCodeEditor::drawGutter(const LLRect& text, F32 alpha)
     {
         const S32    rows = static_cast<S32>(pinned.size());
         const LLRect band(gutter.mLeft, text.mTop, gutter.mRight, text.mTop - rows * row_h);
-        gl_rect_2d(band, ALSurface::ground(backgroundColor(), textColor()) % alpha, true);
+        gl_rect_2d(band, paint(Paint::StickyHeader) % alpha, true);
         gl_rect_2d(band.mLeft, band.mBottom, band.mRight, band.mBottom - 1, fold % 0.6f, true);
         for (S32 i = 0; i < rows; ++i)
         {
@@ -980,7 +1055,7 @@ void ALCodeEditor::drawAfterRows(const LLRect& text)
     // On the gutter's ground, a shade off the text's, with a line under
     // the last; each header's first row, at the left as the text is.
     const LLRect band(text.mLeft, text.mTop, text.mRight, text.mTop - rows * row_h);
-    gl_rect_2d(band, ALSurface::ground(backgroundColor(), textColor()) % alpha, true);
+    gl_rect_2d(band, paint(Paint::StickyHeader) % alpha, true);
     gl_rect_2d(band.mLeft, band.mBottom, band.mRight, band.mBottom - 1, foldColor() % (0.6f * alpha), true);
     const F32 left = static_cast<F32>(text.mLeft) - scrollX();
     for (S32 i = 0; i < rows; ++i)
@@ -1181,9 +1256,8 @@ void ALCodeEditor::drawWhitespace(S32 line, S32 r, const LLRect& text, S32 scree
     }
     const S32                row_h = layout().rowHeight();
     const S32                mid   = screen_top - row_h / 2;
-    const LLColor4           mark  = foldColor() % (0.55f * alpha);
-    static const LLUIColor   warning = LLUIColorTable::instance().getColor("CodeMarkWarning", LLColor4::yellow);
-    const LLColor4           alarm = warning.get() % (0.8f * alpha);
+    const LLColor4           mark  = paint(Paint::Whitespace) % alpha;
+    const LLColor4           alarm = markColor(Mark::Warning) % (0.8f * alpha);
     const S32                dot   = llclamp(row_h / 8, 1, 3);
 
     // The glyphs the layout placed and the blanks the line holds, walked
@@ -1255,7 +1329,7 @@ void ALCodeEditor::drawRowExtras(S32 line, S32 row, const LLRect& text, S32 scre
         const S32 tab    = getTabWidth();
         if (indent >= tab && tab > 0)
         {
-            const LLColor4 guide = foldColor() % (0.35f * alpha);
+            const LLColor4 guide = paint(Paint::IndentGuide) % alpha;
             const F32      space = layout().columnWidth();
             for (S32 column = tab; column < indent; column += tab)
             {
@@ -1312,10 +1386,8 @@ void ALCodeEditor::drawRowExtras(S32 line, S32 row, const LLRect& text, S32 scre
                 {
                     continue;
                 }
-                const LLColor4 ink    = textColor();
-                const LLColor4 ground = backgroundColor();
-                const LLColor4 pill   = lerp(ground, ink, 0.12f) % alpha;
-                const LLColor4 word   = lerp(ground, ink, 0.65f) % alpha;
+                const LLColor4 pill   = paint(Paint::InlayHintBg) % alpha;
+                const LLColor4 word   = paint(Paint::InlayHint) % alpha;
                 gl_rect_2d(static_cast<S32>(x0), screen_top - 1, static_cast<S32>(x1), screen_top - row_h + 1, pill);
                 font->renderUTF8(hint.text, 0, x0 + INLAY_PAD, static_cast<F32>(screen_top - llround(font->getAscenderHeight())), word, LLFontGL::LEFT,
                                  LLFontGL::BASELINE, LLFontGL::NORMAL, LLFontGL::NO_SHADOW);
@@ -1865,6 +1937,7 @@ void ALCodeEditor::refreshCompletion()
         {
             case ALSyntaxKind::Parameter:
             case ALSyntaxKind::Variable:
+            case ALSyntaxKind::GlobalVariable:
             case ALSyntaxKind::Property:
                 return 0;
             case ALSyntaxKind::Constant:
@@ -2042,7 +2115,10 @@ const char* ALCodeEditor::iconNameOf(const Completion& completion)
         case ALSyntaxKind::Variable:     return "Symbol_Variable";
         case ALSyntaxKind::Parameter:    return "Symbol_Parameter";
         case ALSyntaxKind::Property:     return "Symbol_Field";
-        case ALSyntaxKind::Label:        return "Symbol_Label";
+        case ALSyntaxKind::Label:
+        case ALSyntaxKind::State:        return "Symbol_Label";
+        case ALSyntaxKind::GlobalVariable: return "Symbol_Variable";
+        case ALSyntaxKind::Namespace:    return "Symbol_Module";
         case ALSyntaxKind::Deprecated:   return "Symbol_Deprecated";
         case ALSyntaxKind::Preprocessor:
         case ALSyntaxKind::Tag:
@@ -2090,7 +2166,10 @@ const char* ALCodeEditor::badgeOf(const Completion& completion)
         case ALSyntaxKind::Variable:     return "v";
         case ALSyntaxKind::Parameter:    return "p";
         case ALSyntaxKind::Property:     return ".";
-        case ALSyntaxKind::Label:        return "L";
+        case ALSyntaxKind::Label:
+        case ALSyntaxKind::State:        return "L";
+        case ALSyntaxKind::GlobalVariable: return "v";
+        case ALSyntaxKind::Namespace:    return "#";
         case ALSyntaxKind::Preprocessor: return "#";
         case ALSyntaxKind::Tag:          return "<";
         case ALSyntaxKind::Attribute:    return "@";
@@ -2126,12 +2205,10 @@ void ALCodeEditor::listCompletions(bool keep_choice)
     // it wears the editor's colours rather than the skin's. It took them
     // from the colour table instead, which is a table the script themes
     // never touch: on a light theme the completions stayed dark.
-    const LLColor4& paper = backgroundColor();
-    const LLColor4& ink   = textColor();
-    mCompletionList->setBackgroundColor(ALSurface::ground(paper, ink));
-    mCompletionList->setTextColor(ink);
-    mCompletionList->setSelectionColor(ALSurface::chosen(paper, ink));
-    mCompletionList->setBorderColor(ALSurface::frame(ink));
+    mCompletionList->setBackgroundColor(paint(Paint::Widget));
+    mCompletionList->setTextColor(textColor());
+    mCompletionList->setSelectionColor(paint(Paint::WidgetSelection));
+    mCompletionList->setBorderColor(paint(Paint::WidgetBorder));
     std::vector<ALChoiceList::Choice> choices;
     choices.reserve(mCompletions.size());
     for (const Completion& c : mCompletions)
@@ -2179,7 +2256,7 @@ void ALCodeEditor::showCompletionDoc()
         return;
     }
     const Completion& c      = mCompletions[index];
-    const LLColor4    ground = ALSurface::ground(backgroundColor(), textColor());
+    const LLColor4    ground = paint(Paint::Widget);
     const S32         WIDTH  = 320;
     const S32         PAD    = 6;
     if (!mCompletionDoc)
@@ -2224,10 +2301,9 @@ void ALCodeEditor::showCompletionDoc()
     styleAsCode(*mCompletionDoc, 0, styles, c.text, c.kind);
     if (c.deprecated)
     {
-        static const LLUIColor warning = LLUIColorTable::instance().getColor("CodeMarkWarning", LLColor4::yellow);
-        ALTextView::Style      note;
+        ALTextView::Style note;
         note.range = ALTextRange(ALTextPos(1, 0), mCompletionDoc->document().lineEnd(1));
-        note.color = warning.get();
+        note.color = markColor(Mark::Warning);
         styles.push_back(note);
     }
     mCompletionDoc->setStyles(std::move(styles));
@@ -2576,7 +2652,7 @@ bool ALCodeEditor::mapMark(S32 line, LLColor4& color) const
     {
         return false;
     }
-    color = mMarkColors[static_cast<size_t>(mark)].get();
+    color = markColor(mark);
     return true;
 }
 
@@ -3347,12 +3423,11 @@ void ALCodeEditor::styleAsCode(const ALTextView& view, S32 line, std::vector<ALT
 
 void ALCodeEditor::showCard(const ALTextRange& about, const std::string& says, const std::vector<CardProblem>& problems)
 {
-    static const LLUIColor warning = LLUIColorTable::instance().getColor("CodeMarkWarning", LLColor4::yellow);
     // The card is one of the studio's small floating things, and they
     // all have the one look: the ground a shade off the text's own, and
     // a frame in a quarter of the ink, which `draw` puts on over it.
     // Taken afresh each time, since the colour table may have moved.
-    const LLColor4         ground    = ALSurface::ground(backgroundColor(), textColor());
+    const LLColor4         ground    = paint(Paint::Widget);
     const S32              MAX_WIDTH = 560;
     const S32              PAD       = 6;
     if (!mCard)
@@ -3446,7 +3521,7 @@ void ALCodeEditor::showCard(const ALTextRange& about, const std::string& says, c
         {
             ALTextView::Style note;
             note.range = ALTextRange(ALTextPos(line, 0), mCard->document().lineEnd(line));
-            note.color = warning.get();
+            note.color = markColor(Mark::Warning);
             styles.push_back(note);
         }
     }
@@ -3663,7 +3738,8 @@ void ALCodeEditor::drawSignature(const LLRect& text)
     const LLColor4 ink    = textColor() % alpha;
     const LLColor4 active = mBracketMatchColor.get() % alpha;
     const LLColor4 faint  = lineNumberColor() % alpha;
-    ALSurface::draw(box, backgroundColor(), textColor(), alpha);
+    gl_rect_2d(box, paint(Paint::Widget) % alpha, true);
+    gl_rect_2d(box, paint(Paint::WidgetBorder) % alpha, false);
 
     // The label in three pieces, the active parameter in its own colour.
     const F32 baseline = static_cast<F32>(box.mTop - SIGNATURE_PAD - llround(font->getAscenderHeight()));
@@ -3737,11 +3813,11 @@ void ALCodeEditor::draw()
     {
         // Over the card rather than under it, so that its own ground
         // cannot paint the frame out along the edge it shares.
-        gl_rect_2d(mCard->getRect(), ALSurface::frame(textColor(), getDrawContext().mAlpha), false);
+        gl_rect_2d(mCard->getRect(), paint(Paint::WidgetBorder) % getDrawContext().mAlpha, false);
     }
     if (mCompletionDoc && mCompletionDoc->getVisible())
     {
-        gl_rect_2d(mCompletionDoc->getRect(), ALSurface::frame(textColor(), getDrawContext().mAlpha), false);
+        gl_rect_2d(mCompletionDoc->getRect(), paint(Paint::WidgetBorder) % getDrawContext().mAlpha, false);
     }
 }
 

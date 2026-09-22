@@ -88,7 +88,7 @@ namespace
         "",           "Comment",     "DocComment",   "String",    "Escape",         "Number",    "Keyword",
         "Control",    "Type",        "Constant",     "Function",  "Event",          "Label",     "Operator",
         "Punctuation", "Preprocessor", "Tag",        "Attribute", "AttributeValue", "Entity",    "Variable",
-        "Parameter",  "Property",    "Deprecated",   "Invalid",
+        "Parameter",  "Property",    "Deprecated",   "Invalid",     "Namespace",      "State",     "GlobalVariable",
     };
     static_assert(sizeof(KIND_COLOR_SUFFIXES) / sizeof(KIND_COLOR_SUFFIXES[0]) == static_cast<size_t>(ALSyntaxKind::COUNT), "every kind has a colour");
 
@@ -226,6 +226,7 @@ ALTextView::ALTextView(const Params& p)
     {
         const LLUIColorTable& colors = LLUIColorTable::instance();
         const std::string     prefix = p.syntax_color_prefix();
+        mColorPrefix                 = prefix;
         mKindColors[0]               = mTextColor;
         for (size_t kind = 1; kind < mKindColors.size(); ++kind)
         {
@@ -3726,7 +3727,7 @@ void ALTextView::drawRows(const LLRect& text)
                 {
                     const F32 x0 = mLayout.xOf(line, lo) ;
                     const F32 x1 = hi > length ? row.width + space : (hi >= row.end && !last_row ? row.width : mLayout.xOf(line, hi));
-                    gl_rect_2d(static_cast<S32>(left + x0), row_screen_top, static_cast<S32>(left + x1), row_screen_top - row.height, mSelectionColor.get() % alpha);
+                    gl_rect_2d(static_cast<S32>(left + x0), row_screen_top, static_cast<S32>(left + x1), row_screen_top - row.height, selectionDrawColor() % alpha);
                 }
             }
 

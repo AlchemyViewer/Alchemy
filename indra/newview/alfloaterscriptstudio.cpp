@@ -2596,8 +2596,9 @@ namespace
             case ALScriptSymbolKind::Type:      return ALSyntaxKind::Type;
             case ALScriptSymbolKind::Constant:  return ALSyntaxKind::Constant;
             case ALScriptSymbolKind::Event:     return ALSyntaxKind::Event;
-            case ALScriptSymbolKind::State:     return ALSyntaxKind::Label;
+            case ALScriptSymbolKind::State:     return ALSyntaxKind::State;
             case ALScriptSymbolKind::Label:     return ALSyntaxKind::Label;
+            case ALScriptSymbolKind::Module:    return ALSyntaxKind::Namespace;
             default:                            return ALSyntaxKind::Text;
         }
     }
@@ -3834,7 +3835,7 @@ void ALFloaterScriptStudio::analysed(const ALScriptAnalysis::Result& result)
         }
         ALCodeEditor::SemanticToken one;
         one.range  = rangeOf(token.span);
-        one.kind   = token.kind == ALScriptSymbolKind::Module ? ALSyntaxKind::Variable : syntaxKindOf(token.kind);
+        one.kind   = syntaxKindOf(token.kind);
         one.strike = (token.modifiers & ALScriptSemanticToken::Deprecated) != 0;
         if (one.kind == ALSyntaxKind::Text)
         {
@@ -3847,6 +3848,12 @@ void ALFloaterScriptStudio::analysed(const ALScriptAnalysis::Result& result)
         else if (token.kind == ALScriptSymbolKind::Variable && (token.modifiers & ALScriptSemanticToken::ReadOnly))
         {
             one.kind = ALSyntaxKind::Constant;
+        }
+        else if (token.kind == ALScriptSymbolKind::Variable && (token.modifiers & ALScriptSemanticToken::Global))
+        {
+            // A name of the whole script apart from a block's: what an
+            // assignment far from its declaration is most often about.
+            one.kind = ALSyntaxKind::GlobalVariable;
         }
         semantics.push_back(std::move(one));
     }
@@ -3972,10 +3979,11 @@ void ALFloaterScriptStudio::slideProblems(Doc& doc, const ALTextDocument::Edit& 
 
 void ALFloaterScriptStudio::refreshProblems(Doc& doc)
 {
-    static const LLUIColor error_color   = LLUIColorTable::instance().getColor("CodeMarkError", LLColor4::red);
-    static const LLUIColor warning_color = LLUIColorTable::instance().getColor("CodeMarkWarning", LLColor4::yellow);
-    static const LLUIColor note_color    = LLUIColorTable::instance().getColor("CodeMarkNote", LLColor4::blue);
-    static const LLUIColor runtime_color = LLUIColorTable::instance().getColor("CodeMarkRuntime", LLColor4::magenta);
+    // In the theme's colours for each level, where it names them.
+    const LLColor4 error_color   = doc.editor->markColor(ALCodeEditor::Mark::Error);
+    const LLColor4 warning_color = doc.editor->markColor(ALCodeEditor::Mark::Warning);
+    const LLColor4 note_color    = doc.editor->markColor(ALCodeEditor::Mark::Note);
+    const LLColor4 runtime_color = doc.editor->markColor(ALCodeEditor::Mark::Runtime);
 
     doc.shown.clear();
     doc.editor->clearMarks();
@@ -4012,11 +4020,10 @@ void ALFloaterScriptStudio::refreshProblems(Doc& doc)
             end = text.nextWord(begin);
         }
         decoration.range   = ALTextRange(begin, end);
-        decoration.color   = (mark == ALCodeEditor::Mark::Runtime   ? runtime_color
-                              : level == Doc::Level::Error   ? error_color
-                              : level == Doc::Level::Warning ? warning_color
-                                                             : note_color)
-                                 .get();
+        decoration.color   = mark == ALCodeEditor::Mark::Runtime   ? runtime_color
+                             : level == Doc::Level::Error   ? error_color
+                             : level == Doc::Level::Warning ? warning_color
+                                                            : note_color;
         decoration.message = origin + ": " + message;
         decorations.push_back(std::move(decoration));
     };

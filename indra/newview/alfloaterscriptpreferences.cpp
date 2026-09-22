@@ -158,7 +158,9 @@ void ALFloaterScriptPreferences::remember()
     mWasColors.clear();
     for (const std::string& name : ALScriptTheme::names())
     {
-        mWasColors[name] = WasColor{ table.getColor(name).get(), table.isDefault(name) };
+        // One the table has no colour for is the editor's to mix, and
+        // going back takes away whatever was set for it since.
+        mWasColors[name] = WasColor{ table.getColor(name).get(), !table.colorExists(name) || table.isDefault(name) };
     }
     mWasSettings = LLSD::emptyMap();
     for (const char* setting : SETTINGS)
@@ -350,8 +352,21 @@ void ALFloaterScriptPreferences::refreshSwatches()
     const LLUIColorTable& table = LLUIColorTable::instance();
     for (auto& [name, swatch] : mSwatchList)
     {
-        swatch->setOriginal(table.getColor(name).get());
-        swatch->set(table.getColor(name).get(), true, true);
+        // A colour the table has none for, as the editor mixes it.
+        LLColor4 shown = table.getColor(name).get();
+        if (!table.colorExists(name))
+        {
+            for (U8 i = 0; i < static_cast<U8>(ALCodeEditor::Paint::COUNT); ++i)
+            {
+                const ALCodeEditor::Paint which = static_cast<ALCodeEditor::Paint>(i);
+                if (name == mPreview->colorPrefix() + ALCodeEditor::paintName(which))
+                {
+                    shown = mPreview->paint(which);
+                }
+            }
+        }
+        swatch->setOriginal(shown);
+        swatch->set(shown, true, true);
     }
     mSettingSwatches = false;
 }
