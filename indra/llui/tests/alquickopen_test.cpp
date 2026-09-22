@@ -278,12 +278,14 @@ namespace tut
         quick->setHint("Type a line number.");
         LLScrollListCtrl* list = quick->findChild<LLScrollListCtrl>("matches");
         ensure("freeform", quick->freeform());
-        ensure("one row, the hint", list && list->getItemCount() == 1 && list->getFirstSelected()->getColumn(0)->getValue().asString() == "Type a line number.");
+        ensure("one row, the hint", list && list->getItemCount() == 1 && list->getFirstData()->getColumn(0)->getValue().asString() == "Type a line number.");
+        // Not chosen: return takes what was typed whatever the row says.
+        ensure("and not chosen", list->getFirstSelected() == nullptr);
         quick->setQuery("12");
         ensure("the query is told", typed.size() == 1 && typed[0] == "12");
         ensure("the candidates stay aside", list->getItemCount() == 1);
         quick->setHint("Go to line 12.");
-        ensure_equals("the row says what return does now", list->getFirstSelected()->getColumn(0)->getValue().asString(), std::string("Go to line 12."));
+        ensure_equals("the row says what return does now", list->getFirstData()->getColumn(0)->getValue().asString(), std::string("Go to line 12."));
         quick->findChild<LLLineEditor>("query")->onCommit();
         ensure("return sends what was typed", chosen.size() == 1 && chosen[0] == "12");
         quick->die();
