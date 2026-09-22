@@ -106,6 +106,11 @@ public:
     // match at all. Exposed for the same reason.
     static S32 score(std::string_view label, std::string_view query);
 
+    // How tall to make one that is to show so many rows under its field
+    // with nothing to scroll: what a freeform question, whose one row is
+    // its hint, asks for.
+    static S32 heightForRows(S32 rows);
+
     // The field, focused, and whatever is in it selected: opening this is
     // asking for something, and the last thing asked for is a poor start on
     // the next one.

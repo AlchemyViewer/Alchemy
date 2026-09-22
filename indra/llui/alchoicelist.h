@@ -103,6 +103,8 @@ protected:
 private:
     // The line under a local point, or -1 off the lines.
     S32  lineAtLocal(S32 x, S32 y);
+    // A mark's square's side: the taller face's height less the inset.
+    S32  markSide() const;
 
     std::vector<Choice> mChoices;
     S32                 mChosen = -1;

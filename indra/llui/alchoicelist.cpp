@@ -89,7 +89,7 @@ void ALChoiceList::setChoices(std::vector<Choice> choices, S32 chosen)
     // The marks' column, a row's height square and a gap, while any
     // choice has one.
     mMarks     = std::any_of(mChoices.begin(), mChoices.end(), [](const Choice& c) { return c.icon || !c.badge.empty(); });
-    mMarkWidth = mMarks ? static_cast<F32>(layout().rowHeight() + MARK_GAP) : 0.f;
+    mMarkWidth = mMarks ? static_cast<F32>(markSide() + 2 * MARK_INSET + MARK_GAP) : 0.f;
     // The text: each choice on a line, its note after a tab. A choice
     // without a note has a space in the note's face there, so that every
     // row is as tall as one with.
@@ -209,25 +209,38 @@ void ALChoiceList::drawRowExtras(S32 line, S32 row, const LLRect& text, S32 scre
     {
         return;
     }
-    // The square: a row's height less the inset, at the row's top left,
-    // in the gap the layout left before the text.
-    const S32    top  = screenTopOf(text, line, 0);
-    const S32    side = layout().rowHeight() - 2 * MARK_INSET;
-    const S32    x0   = static_cast<S32>(left) + MARK_INSET;
-    const LLRect box(x0, top - MARK_INSET, x0 + side, top - MARK_INSET - side);
+    // The square: the mark's side, in the middle of the row's height, in
+    // the gap the layout left before the text.
+    const S32    top   = screenTopOf(text, line, 0);
+    const S32    row_h = layout().rowHeightOf(line, 0);
+    const S32    side  = markSide();
+    const S32    x0    = static_cast<S32>(left) + MARK_INSET;
+    const S32    y1    = top - (row_h - side) / 2;
+    const LLRect box(x0, y1, x0 + side, y1 - side);
     if (choice.icon)
     {
         choice.icon->draw(box, LLColor4::white % alpha);
         return;
     }
+    // The badge's letter in the reading face, which every row is at
+    // least as tall as, so that it reads whatever size the text is.
     const LLColor4 ink = choice.color ? *choice.color : textColor();
     gl_rect_2d(box, lerp(backgroundColor(), ink, 0.25f) % alpha);
-    if (const LLFontGL* font = getFont())
+    if (const LLFontGL* font = mNoteFont ? mNoteFont : getFont())
     {
         const F32 x = static_cast<F32>(box.mLeft + box.mRight) * 0.5f;
         const F32 y = static_cast<F32>(box.mBottom) + (static_cast<F32>(side) - font->getLineHeight()) * 0.5f + font->getDescenderHeight();
         font->renderUTF8(choice.badge, 0, x, y, ink % alpha, LLFontGL::HCENTER, LLFontGL::BASELINE, LLFontGL::NORMAL, LLFontGL::NO_SHADOW);
     }
+}
+
+S32 ALChoiceList::markSide() const
+{
+    // As tall as the taller face, less the inset: a row is at least that,
+    // since every row has its note in the reading face.
+    const S32 text_h = getFont() ? getFont()->getLineHeight() : 0;
+    const S32 note_h = mNoteFont ? mNoteFont->getLineHeight() : 0;
+    return llmax(8, llmax(text_h, note_h) - 2 * MARK_INSET);
 }
 
 void ALChoiceList::draw()

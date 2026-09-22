@@ -231,9 +231,19 @@ namespace tut
         e.setCaret(e.document().end());
         key(' ', MASK_CONTROL);
         ensure("open", e.completionOpen());
-        ensure("the word from the document", !e.completions().empty() && e.completions()[0].text == "count");
+        auto offers = [&e](const char* word) {
+            for (const ALCodeEditor::Completion& c : e.completions())
+            {
+                if (c.text == word)
+                {
+                    return true;
+                }
+            }
+            return false;
+        };
+        ensure("the word from the document, among the grammar's that start the same", offers("count") && offers("continue"));
         type("u");
-        ensure("still open, narrowed", e.completionOpen() && e.completions()[0].text == "count");
+        ensure("still open, narrowed", e.completionOpen() && e.completions()[0].text == "count" && !offers("continue"));
         key(KEY_RETURN);
         ensure("closed by the choice", !e.completionOpen());
         ensure_equals("the choice is in", e.text(), std::string("integer count;\nllSay(0, count"));

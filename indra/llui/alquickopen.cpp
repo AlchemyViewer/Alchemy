@@ -233,6 +233,9 @@ ALQuickOpen::ALQuickOpen(const Params& p)
     // already, and clicking away after typing chose the top match. Return
     // still commits, through LLPanel::handleKeyHere.
     fp.commit_on_focus_lost = false;
+    // The placeholder says what to type, and the field has the keyboard
+    // from the start: it stays until something is typed.
+    fp.show_label_focused = true;
     mField = LLUICtrlFactory::create<LLLineEditor>(fp);
     mField->setKeystrokeCallback([this](LLLineEditor* editor, void*)
     {
@@ -404,6 +407,19 @@ bool ALQuickOpen::handleKeyHere(KEY key, MASK mask)
         return true;
     }
     return LLPanel::handleKeyHere(key, mask);
+}
+
+// static
+S32 ALQuickOpen::heightForRows(S32 rows)
+{
+    // The list's rows are its font's line height and its row padding
+    // each, inside its border; the field and the gap and the insets
+    // above and around.
+    const LLScrollListCtrl::Params& lp   = LLUICtrlFactory::getDefaultParams<LLScrollListCtrl>();
+    const LLFontGL*                 font = lp.font.isProvided() ? lp.font() : LLFontGL::getFontSansSerifSmall();
+    const S32                       row  = (font ? font->getLineHeight() : 16) + lp.row_padding;
+    const S32                       border = 2;
+    return 2 * INSET + FIELD_HEIGHT + GAP + 2 * border + llmax(1, rows) * row;
 }
 
 void ALQuickOpen::layout()
