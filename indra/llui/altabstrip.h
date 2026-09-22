@@ -162,13 +162,15 @@ private:
 
     std::vector<Tab>    mTabs;
     std::vector<S32>    mWidths;
-    // Each tab's name as last drawn: cut for a room, kept while the room
-    // and the name are the same, since the cutting measures the words.
+    // Each tab's name as last drawn: cut for a room, kept while the room,
+    // the face -- italic for a preview, regular once held -- and the
+    // name are the same, since the cutting measures the words.
     struct Shown
     {
-        S32         room = -1;
-        std::string label;
-        std::string text;
+        S32             room = -1;
+        const LLFontGL* font = nullptr;
+        std::string     label;
+        std::string     text;
     };
     std::vector<Shown>  mShown;
     std::string         mChosen;

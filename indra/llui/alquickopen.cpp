@@ -336,15 +336,16 @@ void ALQuickOpen::fill()
     }
 }
 
-void ALQuickOpen::chooseSelected()
+void ALQuickOpen::chooseSelected(bool hold)
 {
+    chose_signal_t& signal = hold && !mChoseToHold.empty() ? mChoseToHold : mChose;
     if (mFreeform)
     {
-        mChose(mQuery);
+        signal(mQuery);
     }
     else if (const LLScrollListItem* item = mList->getFirstSelected())
     {
-        mChose(item->getValue().asString());
+        signal(item->getValue().asString());
     }
 }
 
@@ -400,6 +401,13 @@ void ALQuickOpen::takeFocus()
 // exists to avoid.
 bool ALQuickOpen::handleKeyHere(KEY key, MASK mask)
 {
+    if (key == KEY_RETURN && mask == MASK_SHIFT)
+    {
+        // The panel's own Return asks for no shift; this one the field
+        // leaves alone.
+        chooseSelected(true);
+        return true;
+    }
     if ((key == KEY_UP || key == KEY_DOWN) && mask == MASK_NONE && mList->getItemCount() > 0)
     {
         const S32 at = mList->getFirstSelectedIndex();

@@ -117,7 +117,8 @@ void ALStudioFloater::showHistory(ALHistoryList* list, std::vector<ALHistoryList
 
 ALQuickOpen* ALStudioFloater::quickOpen(std::vector<ALQuickOpen::Candidate> candidates, const std::string& placeholder,
                                         const std::string& title, std::function<void(const std::string&)> chose,
-                                        LLView* anchor, S32 width, S32 height, std::function<void()> escaped)
+                                        LLView* anchor, S32 width, S32 height, std::function<void()> escaped,
+                                        std::function<void(const std::string&)> hold)
 {
     // Asked for again while it is up -- the same key pressed twice -- it is
     // what was typed that is wanted back, not a fresh field. A freeform
@@ -173,6 +174,16 @@ ALQuickOpen* ALStudioFloater::quickOpen(std::vector<ALQuickOpen::Candidate> cand
         }
         chose(value);
     });
+    if (hold)
+    {
+        quick->onChoseToHold([held, hold = std::move(hold)](const std::string& value) {
+            if (ALPopover* up = held.get())
+            {
+                up->settle();
+            }
+            hold(value);
+        });
+    }
     popover->onClosed([this, escaped = std::move(escaped)](bool was_escaped) {
         mQuickPopover.markDead();
         if (was_escaped && escaped)

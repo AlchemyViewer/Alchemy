@@ -67,7 +67,23 @@ public:
         Optional<const LLFontGL*> time_font;
         Optional<LLUIColor>       source_color;
         Optional<LLUIColor>       kind_color;
+        // How many digits of the text's face fit across a pane before it
+        // is wide enough for what was said to hang under its own start;
+        // narrower, and it hangs under the source. In the face's own
+        // measure, so that a larger UI scale narrows nothing.
+        Optional<S32>             narrow_columns;
         Params();
+    };
+
+    // Where an entry's lines after the first start: under what was said
+    // -- or under the source, in a pane too narrow for that -- as a
+    // message reads best; under the source come what may; or at the left
+    // edge, as a listing does, whose rows are a block of their own.
+    enum class Hang : U8
+    {
+        Text,
+        Source,
+        None
     };
 
     struct Entry
@@ -80,6 +96,8 @@ public:
         std::string             text;
         // The entry's ink, where it is not the view's own.
         std::optional<LLColor4> color;
+        // Where its lines after the first start.
+        Hang                    hang = Hang::Text;
         // Whether the source is a link, and what it says when the mouse
         // rests on it.
         bool                    link = false;
@@ -133,6 +151,7 @@ private:
         S32 kindBegin   = 0;
         S32 kindEnd     = 0;
         S32 text        = 0;
+        Hang hang       = Hang::Text;
         // How wide the first line is up to what was said, measured once
         // in the faces it is shown in and kept until the font changes.
         mutable F32             prefix   = -1.f;
@@ -160,6 +179,8 @@ private:
     F32          stampWidth(const Shown& shown, S32 first) const;
     const Entry* entryOf(U32 serial) const;
     void         followed(const Substitution& link);
+    // Narrower than this, and what was said hangs under the source.
+    S32          narrowWidth() const;
 
     std::deque<Entry> mEntries;
     std::deque<U32>   mSerials;
@@ -171,6 +192,7 @@ private:
     const LLFontGL*   mTimeFont = nullptr;
     LLUIColor         mSourceColor;
     LLUIColor         mKindColor;
+    S32               mNarrowColumns = 48;
     entry_signal_t    mEntryChosen;
     url_signal_t      mUrlChosen;
 };

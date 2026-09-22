@@ -872,13 +872,20 @@ namespace tut
         // what is picked put on the line to edit.
         keys(":set number<CR>");
         std::vector<std::string> offered;
-        vim->hooks().historyWindow = [&offered](ALTextView& view, llwchar kind, const std::vector<std::string>& history, std::function<void(const std::string&)> chosen) {
+        bool hold = false;
+        vim->hooks().historyWindow = [&offered, &hold](ALTextView& view, llwchar kind, const std::vector<std::string>& history, std::function<void(const std::string&, bool)> chosen) {
             offered = history;
-            chosen(history.front());
+            chosen(history.front(), !hold);
         };
         keys("q:");
         ensure("the history was offered", !offered.empty() && std::find(offered.begin(), offered.end(), "set number") != offered.end());
         ensure("the pick was run, as vim's window runs a row", vim->mode() == ALVimKeymap::Mode::Normal);
+        // Picked to hold -- the window's Shift-Return -- it is put up to
+        // edit instead.
+        hold = true;
+        keys("q:");
+        ensure("on the line to edit", vim->typingLine(line, caret) && line == ":" + offered.front() && caret == static_cast<S32>(line.size()));
+        keys("<Esc>");
         // Shift-Left and Shift-Right go a WORD at a time on the line.
         keys(":one two three");
         vim->handleKey(e, KEY_LEFT, MASK_SHIFT);
@@ -887,6 +894,66 @@ namespace tut
         ensure("another", vim->typingLine(line, caret) && caret == 5);
         vim->handleKey(e, KEY_RIGHT, MASK_SHIFT);
         ensure("and on to the next word's start", vim->typingLine(line, caret) && caret == 9);
+        keys("<Esc>");
+    }
+
+    template<> template<>
+    void alvimkeymap_object::test<22>()
+    {
+        set_test_name("Tab on the : line completes the word at the cursor, walking the choices with the row up, from what the keymap and the host know");
+        ALCodeEditor& e = make("one\n");
+        std::string   line;
+        S32           caret = 0;
+        std::vector<std::string> items;
+        S32                      chosen = -1;
+        vim->hooks().complete = [](ALTextView&, const std::string& command, std::vector<std::string>& out) {
+            if (command.empty())
+            {
+                out.push_back("write");
+                out.push_back("wq");
+                out.push_back("wall");
+            }
+            else if (command == "set")
+            {
+                out.push_back("number");
+                out.push_back("nonumber");
+            }
+        };
+        // One answer is put in, with no row.
+        keys(":su<Tab>");
+        ensure("substitute", vim->typingLine(line, caret) && line == ":substitute" && caret == 11);
+        ensure("no row for one", !vim->menu(items, chosen));
+        keys("<Esc>");
+        // Several: the first on the line, the row up, Tab walking on and
+        // back round to what was typed; Shift-Tab back.
+        keys(":w<Tab>");
+        ensure("the first in order", vim->typingLine(line, caret) && line == ":wall");
+        ensure("the row up", vim->menu(items, chosen) && items.size() == 3 && chosen == 0 && items[0] == "wall" && items[1] == "wq" && items[2] == "write");
+        keys("<Tab>");
+        ensure("the next", vim->typingLine(line, caret) && line == ":wq" && vim->menu(items, chosen) && chosen == 1);
+        keys("<Tab><Tab>");
+        ensure("past the last, the word as typed", vim->typingLine(line, caret) && line == ":w" && vim->menu(items, chosen) && chosen == -1);
+        vim->handleKey(e, KEY_TAB, MASK_SHIFT);
+        ensure("Shift-Tab back to the last", vim->typingLine(line, caret) && line == ":write" && caret == 6);
+        // Escape with the row up drops it and puts the word back; the
+        // line stays.
+        keys("<Esc>");
+        ensure("the row gone, the word as typed", !vim->menu(items, chosen) && vim->typingLine(line, caret) && line == ":w");
+        keys("<Esc>");
+        ensure("then the line", vim->mode() == ALVimKeymap::Mode::Normal);
+        // An argument: what the command takes, the host's and the
+        // keymap's own; a range in front does not confuse the name.
+        keys(":%set no<Tab>");
+        ensure("the options starting no", vim->typingLine(line, caret) && line == ":%set noexpandtab" && vim->menu(items, chosen) && items.size() == 5);
+        keys("<Tab><Tab>");
+        ensure("nonumber among them", vim->typingLine(line, caret) && line == ":%set nonumber");
+        // Typing on keeps what is on the line and lets the row go.
+        keys("x");
+        ensure("the row gone", !vim->menu(items, chosen) && vim->typingLine(line, caret) && line == ":%set nonumberx");
+        keys("<Esc>");
+        // Nothing to offer changes nothing.
+        keys(":zzz<Tab>");
+        ensure("as typed", vim->typingLine(line, caret) && line == ":zzz" && !vim->menu(items, chosen));
         keys("<Esc>");
     }
 }

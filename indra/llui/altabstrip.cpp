@@ -346,9 +346,10 @@ void ALTabStrip::draw()
             {
                 mShown.resize(mTabs.size());
             }
-            if (mShown[i].room != room || mShown[i].label != tab.label)
+            if (mShown[i].room != room || mShown[i].font != font || mShown[i].label != tab.label)
             {
                 mShown[i].room  = room;
+                mShown[i].font  = font;
                 mShown[i].label = tab.label;
                 mShown[i].text  = shortened(font, tab.label, room);
             }

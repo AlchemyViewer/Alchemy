@@ -113,11 +113,13 @@ protected:
     // keeps what was typed and takes the keyboard back. The widget comes
     // back for a caller with more to say to it -- a hint that follows
     // the typing -- or null where it could not be shown; `escaped` is
-    // told when it goes without a choice.
+    // told when it goes without a choice, and `hold`, where given, of
+    // a choice made with Shift-Return -- the pick to be held rather
+    // than taken, for a caller with two things to do with one.
     ALQuickOpen* quickOpen(std::vector<ALQuickOpen::Candidate> candidates, const std::string& placeholder,
                            const std::string& title, std::function<void(const std::string&)> chose,
                            LLView* anchor = nullptr, S32 width = 0, S32 height = 0,
-                           std::function<void()> escaped = {});
+                           std::function<void()> escaped = {}, std::function<void(const std::string&)> hold = {});
 
     // The regions that fold, which the subclass binds.
     ALPaneFolds mFolds;

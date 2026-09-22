@@ -36,10 +36,6 @@ static LLDefaultChildRegistry::Register<ALOutputView> r("output_view");
 
 namespace
 {
-    // Narrower than this, in pixels, and what was said hangs under the
-    // source rather than under its own start.
-    constexpr S32 NARROW_PANE = 360;
-
     // An entry's first line, piece by piece: where the source starts and
     // ends, and where what was said starts, as byte offsets of the line.
     struct Laid
@@ -100,7 +96,8 @@ ALOutputView::Params::Params()
     time_color("time_color"),
     time_font("time_font"),
     source_color("source_color"),
-    kind_color("kind_color")
+    kind_color("kind_color"),
+    narrow_columns("narrow_columns", 48)
 {
     changeDefault(read_only, true);
     changeDefault(word_wrap, true);
@@ -108,7 +105,8 @@ ALOutputView::Params::Params()
 
 ALOutputView::ALOutputView(const Params& p)
 :   ALTextView(p),
-    mCapacity(llmax(1, p.capacity()))
+    mCapacity(llmax(1, p.capacity())),
+    mNarrowColumns(llmax(1, p.narrow_columns()))
 {
     // Unless the skin says: the stamps a little dimmer and smaller than
     // the words, the sources a little brighter, the kinds as the stamps.
@@ -121,28 +119,41 @@ ALOutputView::ALOutputView(const Params& p)
     // wraps under the message's start, and its lines after the first
     // start there -- in a pane wide enough for that; in a narrow one
     // they hang under the source instead, past the time stamp, so that
-    // a long source name does not leave a message a few words wide.
+    // a long source name does not leave a message a few words wide. An
+    // entry may say otherwise: under the source come what may, or not
+    // at all.
     layout().setIndentProvider([this](S32 line) {
         ALTextLayout::Indent indent;
         S32                  first = 0;
         const Shown*         shown = shownAt(line, &first);
-        if (!shown || shown->text <= 0)
+        if (!shown || shown->text <= 0 || shown->hang == Hang::None)
         {
             return indent;
         }
-        F32 hang = prefixWidth(*shown, first);
-        if (const S32 wrap = layout().wrapWidth(); wrap > 0)
+        F32       hang = 0.f;
+        const S32 wrap = layout().wrapWidth();
+        if (shown->hang == Hang::Source || (wrap > 0 && wrap < narrowWidth()))
         {
-            if (wrap < NARROW_PANE)
-            {
-                hang = stampWidth(*shown, first);
-            }
+            hang = stampWidth(*shown, first);
+        }
+        else
+        {
+            hang = prefixWidth(*shown, first);
+        }
+        if (wrap > 0)
+        {
             hang = llmin(hang, static_cast<F32>(wrap) * 0.4f);
         }
         indent.rest  = hang;
         indent.first = line == first ? 0.f : hang;
         return indent;
     });
+}
+
+S32 ALOutputView::narrowWidth() const
+{
+    const LLFontGL* font = getFont();
+    return font ? mNarrowColumns * llmax(1, font->getWidth("0")) : 0;
 }
 
 F32 ALOutputView::stampWidth(const Shown& shown, S32 first) const
@@ -235,6 +246,7 @@ ALOutputView::Shown ALOutputView::showAt(const Entry& entry, U32 serial, S32 lin
     shown.kindBegin   = laid.kindBegin;
     shown.kindEnd     = laid.kindEnd;
     shown.text        = laid.textBegin;
+    shown.hang        = entry.hang;
 
     // The stamp in its smaller face, the source bold; the colours are
     // laid on as the rows are drawn.

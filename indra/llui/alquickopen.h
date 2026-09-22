@@ -129,6 +129,14 @@ public:
     {
         return mChose.connect(cb);
     }
+    // Shift-Return: the row chosen to be held rather than taken -- for a
+    // caller with a second thing to do with a pick, as vim's window puts
+    // the line up to edit where Return runs it. Without a listener,
+    // Shift-Return is Return.
+    boost::signals2::connection onChoseToHold(const chose_signal_t::slot_type& cb)
+    {
+        return mChoseToHold.connect(cb);
+    }
 
     void reshape(S32 width, S32 height, bool called_from_parent = true) override;
     void draw() override;
@@ -140,7 +148,7 @@ protected:
 
 private:
     void fill();
-    void chooseSelected();
+    void chooseSelected(bool hold = false);
     void layout();
 
     std::vector<Candidate>  mCandidates;
@@ -159,5 +167,6 @@ private:
     LLLineEditor*           mField = nullptr;
     LLScrollListCtrl*       mList = nullptr;
     chose_signal_t          mChose;
+    chose_signal_t          mChoseToHold;
     query_signal_t          mQueryChanged;
 };

@@ -3600,6 +3600,46 @@ void ALTextView::drawBand(F32 alpha)
         const S32 width = llmax(2, static_cast<S32>(font->getWidth(" ")));
         gl_rect_2d(x + at, band.mTop - 2, x + at + width, band.mBottom + 2, ink % (0.6f * alpha));
     }
+    // The keymap's row of choices, over the band on the text's last row
+    // -- vim's wildmenu -- the one on the line set in the ink with the
+    // ink for its ground, and the row slid left so that it shows.
+    std::vector<std::string> items;
+    S32                      chosen = -1;
+    if (typing && mModal->menu(items, chosen) && !items.empty())
+    {
+        const S32    gap = font->getWidth("  ");
+        const LLRect row(local.mLeft, band.mTop + mLayout.rowHeight() + 2, local.mRight, band.mTop);
+        gl_rect_2d(row, lerp(paper, ink, 0.12f) % alpha);
+        std::vector<S32> lefts;
+        S32              at = 0;
+        for (const std::string& item : items)
+        {
+            lefts.push_back(at);
+            at += font->getWidth(item) + gap;
+        }
+        S32 slide = 0;
+        if (chosen >= 0 && chosen < static_cast<S32>(items.size()))
+        {
+            const S32 right = x + lefts[chosen] + font->getWidth(items[chosen]) + gap / 2;
+            slide           = llmax(0, right - row.mRight);
+        }
+        const S32 baseline = row.mBottom + 1 + static_cast<S32>(font->getDescenderHeight());
+        for (size_t i = 0; i < items.size(); ++i)
+        {
+            const S32 left = x + lefts[i] - slide;
+            if (left >= row.mRight)
+            {
+                break;
+            }
+            const bool on = static_cast<S32>(i) == chosen;
+            if (on)
+            {
+                gl_rect_2d(left - gap / 4, row.mTop - 1, left + font->getWidth(items[i]) + gap / 4, row.mBottom + 1, ink % (0.85f * alpha));
+            }
+            font->renderUTF8(items[i], 0, static_cast<F32>(left), static_cast<F32>(baseline), (on ? paper : ink) % alpha, LLFontGL::LEFT, LLFontGL::BASELINE,
+                             LLFontGL::NORMAL, LLFontGL::NO_SHADOW, S32_MAX, row.mRight - left, nullptr, false);
+        }
+    }
 }
 
 // --- input ---------------------------------------------------------------------

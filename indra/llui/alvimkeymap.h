@@ -78,9 +78,15 @@ public:
         std::function<void(ALTextView& view, S32 first, S32 last)> format;
         // q: q/ and q?: the history of a line kind shown for one to be
         // picked -- vim's command-line window -- with what to call with
-        // the pick, which puts it on the line to edit and enter. Without
+        // the pick: run as it is, as the window runs the row Enter is
+        // pressed on, or put on the line to edit and enter. Without
         // one, the line opens at the last entered.
-        std::function<void(ALTextView& view, llwchar kind, const std::vector<std::string>& history, std::function<void(const std::string&)> chosen)> historyWindow;
+        std::function<void(ALTextView& view, llwchar kind, const std::vector<std::string>& history, std::function<void(const std::string&, bool run)> chosen)> historyWindow;
+        // The host's words for Tab on the : line: with no command, its
+        // command names; with one, what may follow it -- a :set option,
+        // a :history kind. Added to the keymap's own, and cut to what
+        // was typed by the keymap.
+        std::function<void(ALTextView& view, const std::string& command, std::vector<std::string>& out)> complete;
     };
 
     ALVimKeymap();
@@ -99,6 +105,8 @@ public:
     // command unknown; cleared by the next key.
     std::string message() const override { return mMessage; }
     bool        messageIsError() const override { return mMessageError; }
+    // The completions Tab offers on the : line, while it does.
+    bool        menu(std::vector<std::string>& items, S32& chosen) const override;
     // A register's text, or nothing.
     std::string registerText(char name) const;
 
@@ -174,6 +182,13 @@ private:
     bool normal(ALTextView& view, const Input& input);
     bool insert(ALTextView& view, const Input& input);
     bool commandLine(ALTextView& view, const Input& input);
+    // Tab on the : line: the word at the cursor completed from what the
+    // keymap and the host know -- a command's name, or what follows
+    // one -- the next of them on each Tab, the one before on Shift-Tab,
+    // and the word as typed again past the last, as vim's wildmenu
+    // walks. Any other key keeps what is on the line and drops the rest.
+    void complete(ALTextView& view, bool forward);
+    void dropCompletion();
 
     // Normal mode's command, once the count, the register and any
     // operator have been read; false where the character is not one.
@@ -386,6 +401,18 @@ private:
     std::string              mHistoryPrefix;
     // Where in the line the next character goes, in bytes.
     size_t                   mLineCursor = 0;
+    // The completions Tab found for the word at the cursor, which of
+    // them is on the line (-1 for the word as typed), where the word
+    // begins, the word as typed and what followed the cursor.
+    struct Completion
+    {
+        std::vector<std::string> items;
+        S32                      at        = -1;
+        size_t                   wordStart = 0;
+        std::string              typed;
+        std::string              tail;
+    };
+    Completion               mCompletion;
     // The last :s, for :s with nothing after it, :&, :&&, & and g&: its
     // replacement as it read once ~ was put in, and its flags.
     std::string mLastReplacement;

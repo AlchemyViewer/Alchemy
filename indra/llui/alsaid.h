@@ -75,6 +75,15 @@ inline std::string alSaid(const char* key, const std::string& english, const LLS
     return out;
 }
 
+// The viewer's language, asked once: it is a settings read, and what
+// is said is said on every frame and every note; like the strings
+// themselves it does not change within a session.
+inline const std::string& alSaidLanguage()
+{
+    static const std::string language = LLUI::getLanguage();
+    return language;
+}
+
 // A counted thing, in the form its count takes in the viewer's language:
 // the key with LLTrans's form suffix -- A for one, B for many in English,
 // and a C where a language counts a third way -- with [COUNT] filled in,
@@ -83,7 +92,7 @@ inline std::string alSaid(const char* key, const std::string& english, const LLS
 inline std::string alSaidCount(const char* key, S32 count, const std::string& english_one, const std::string& english_many,
                                LLStringUtil::format_map_t args = LLStringUtil::format_map_t())
 {
-    const std::string formed = std::string(key) + LLTrans::countForm(LLUI::getLanguage(), count);
+    const std::string formed = std::string(key) + LLTrans::countForm(alSaidLanguage(), count);
     args["[COUNT]"]          = std::to_string(count);
     std::string out          = alSaidTemplate(formed, count == 1 ? english_one : english_many);
     LLStringUtil::format(out, args);

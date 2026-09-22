@@ -102,6 +102,10 @@ public:
     // until the next key; whether it was an error.
     virtual std::string message() const { return std::string(); }
     virtual bool        messageIsError() const { return false; }
+    // A row of choices offered over the line -- vim's wildmenu, the
+    // completions of what is being typed -- and which of them is on the
+    // line, or -1 for none; false while there is no such row.
+    virtual bool menu(std::vector<std::string>& items, S32& chosen) const { return false; }
     // Goes up with every change of state, for whoever shows the status.
     virtual U32 generation() const = 0;
     // The mouse put the caret somewhere, or dragged a selection: the
