@@ -162,6 +162,15 @@ private:
 
     std::vector<Tab>    mTabs;
     std::vector<S32>    mWidths;
+    // Each tab's name as last drawn: cut for a room, kept while the room
+    // and the name are the same, since the cutting measures the words.
+    struct Shown
+    {
+        S32         room = -1;
+        std::string label;
+        std::string text;
+    };
+    std::vector<Shown>  mShown;
     std::string         mChosen;
     S32                 mHover = -1;
     S32                 mHoverX = 0;

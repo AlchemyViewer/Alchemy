@@ -77,6 +77,7 @@ void ALTabStrip::setTabs(std::vector<Tab> tabs, const std::string& chosen)
     mTabs = std::move(tabs);
     mChosen = chosen;
     mHover = -1;
+    mShown.clear();
     layout();
 }
 
@@ -129,22 +130,35 @@ std::string ALTabStrip::shortened(const LLFontGL* font, const std::string& label
     {
         return label;
     }
-    // The start: as many whole characters as fit before the ellipsis.
-    size_t head = 0;
-    while (head < tail)
+    // The start: as many whole characters as fit before the ellipsis,
+    // found by halving over the character boundaries, since a longer
+    // start is never narrower.
+    std::vector<size_t> bounds;
+    for (size_t at = 0; at < tail; ++at)
     {
-        size_t next = head + 1;
-        while (next < tail && (static_cast<unsigned char>(label[next]) & 0xC0) == 0x80)
+        if ((static_cast<unsigned char>(label[at]) & 0xC0) != 0x80)
         {
-            ++next;
+            bounds.push_back(at);
         }
-        if (font->getWidth(label.substr(0, next)) + fixed > room)
-        {
-            break;
-        }
-        head = next;
     }
-    return head == 0 ? label : label.substr(0, head) + ELLIPSIS + end;
+    bounds.push_back(tail);
+    // bounds[fits] is the longest start that fits; bounds[0] is nothing.
+    size_t fits = 0;
+    size_t lo = 0, hi = bounds.size() - 1;
+    while (lo < hi)
+    {
+        const size_t mid = (lo + hi + 1) / 2;
+        if (font->getWidth(label.substr(0, bounds[mid])) + fixed <= room)
+        {
+            lo = mid;
+        }
+        else
+        {
+            hi = mid - 1;
+        }
+    }
+    fits = lo;
+    return fits == 0 ? label : label.substr(0, bounds[fits]) + ELLIPSIS + end;
 }
 
 // Each tab wants the width of its words. Where they all fit, each gets
@@ -326,7 +340,19 @@ void ALTabStrip::draw()
         {
             const U8 style = styleOf(tab);
             F32 after = (F32)x;
-            font->renderUTF8(shortened(font, tab.label, room), 0, (F32)x, (F32)baseline, (current ? ink : quiet).get() % alpha,
+            // The name as cut for this room, kept from one frame to the
+            // next until the room changes.
+            if (i >= mShown.size())
+            {
+                mShown.resize(mTabs.size());
+            }
+            if (mShown[i].room != room || mShown[i].label != tab.label)
+            {
+                mShown[i].room  = room;
+                mShown[i].label = tab.label;
+                mShown[i].text  = shortened(font, tab.label, room);
+            }
+            font->renderUTF8(mShown[i].text, 0, (F32)x, (F32)baseline, (current ? ink : quiet).get() % alpha,
                              LLFontGL::LEFT, LLFontGL::BOTTOM, style, LLFontGL::NO_SHADOW,
                              S32_MAX, room, &after, /*use_ellipses=*/true);
             if (!tab.detail.empty())
