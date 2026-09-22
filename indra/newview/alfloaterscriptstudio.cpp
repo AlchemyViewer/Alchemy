@@ -635,15 +635,27 @@ bool ALFloaterScriptStudio::redo()
 
 ALQuickOpen* ALFloaterScriptStudio::quickOpen(std::vector<ALQuickOpen::Candidate> candidates, const std::string& placeholder, const std::string& title,
                                               std::function<void(const std::string&)> chose, LLView* anchor, S32 width, S32 height,
-                                              std::function<void()> escaped)
+                                              std::function<void()> escaped, std::function<void(const std::string&)> hold)
 {
-    ALQuickOpen* quick = ALStudioFloater::quickOpen(std::move(candidates), placeholder, title, std::move(chose), anchor, width, height, std::move(escaped));
+    ALQuickOpen* quick = ALStudioFloater::quickOpen(std::move(candidates), placeholder, title, std::move(chose), anchor, width, height, std::move(escaped), std::move(hold));
     if (quick)
     {
         const LLUIColorTable& colors = LLUIColorTable::instance();
         quick->setColors(colors.getColor("ScriptBackground").get(), colors.getColor("ScriptText").get());
     }
     return quick;
+}
+
+bool ALFloaterScriptStudio::hasDoc(const Doc* doc) const
+{
+    for (const std::unique_ptr<Doc>& each : mDocs)
+    {
+        if (each.get() == doc)
+        {
+            return true;
+        }
+    }
+    return false;
 }
 
 ALFloaterScriptStudio::Doc* ALFloaterScriptStudio::active()
@@ -762,10 +774,16 @@ void ALFloaterScriptStudio::applyEditorOptions(ALCodeEditor& editor) const
                 studio->vimFormat(view, first, last);
             }
         };
-        vim->hooks().historyWindow = [handle](ALTextView& view, llwchar kind, const std::vector<std::string>& history, std::function<void(const std::string&)> chosen) {
+        vim->hooks().historyWindow = [handle](ALTextView& view, llwchar kind, const std::vector<std::string>& history, std::function<void(const std::string&, bool run)> chosen) {
             if (ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get()))
             {
                 studio->vimHistoryWindow(view, kind, history, std::move(chosen));
+            }
+        };
+        vim->hooks().complete = [handle](ALTextView& view, const std::string& command, std::vector<std::string>& out) {
+            if (ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get()))
+            {
+                studio->vimComplete(view, command, out);
             }
         };
         editor.setModalKeymap(std::move(vim));
@@ -1068,54 +1086,6 @@ bool ALFloaterScriptStudio::dropOnNotecard(Doc& doc, S32 x, S32 y, bool drop, ED
     return true;
 }
 
-void ALFloaterScriptStudio::renumberCarried(Doc& doc, const std::string& text, const std::vector<LLPointer<LLInventoryItem>>& items)
-{
-    // The placeholders whose bytes the renumbering changed, each put
-    // right in the editor as one step to undo; the buttons follow the
-    // edits, each to its item by the new list. Undone, a placeholder
-    // may name a number past the list, which then simply has no button
-    // and is left behind by the next save.
-    const std::string                                before = doc.editor->text();
-    std::vector<std::pair<ALTextRange, std::string>> edits;
-    if (before.size() == text.size())
-    {
-        S32 line = 0, column = 0;
-        for (size_t i = 0; i < before.size(); ++i)
-        {
-            if (before[i] != text[i])
-            {
-                // A placeholder's four bytes differ at their tail; the
-                // edit covers the whole character from its lead byte.
-                size_t start = i;
-                while (start > 0 && (static_cast<unsigned char>(before[start]) & 0xC0) == 0x80)
-                {
-                    --start;
-                }
-                const S32       lead = column - static_cast<S32>(i - start);
-                const ALTextPos at(line, lead);
-                edits.emplace_back(ALTextRange(at, ALTextPos(line, lead + 4)), text.substr(start, 4));
-                i = start + 3;
-                column = lead + 4;
-                continue;
-            }
-            if (before[i] == '\n')
-            {
-                ++line;
-                column = 0;
-            }
-            else
-            {
-                ++column;
-            }
-        }
-    }
-    doc.embedded = items;
-    if (!edits.empty())
-    {
-        doc.editor->replaceAll(std::move(edits));
-    }
-}
-
 ALTextView::Atom ALFloaterScriptStudio::embeddedAtom(Doc& doc, const ALTextPos& at, size_t index)
 {
     const LLPointer<LLInventoryItem> item = doc.embedded[index];
@@ -1144,8 +1114,8 @@ ALTextView::Atom ALFloaterScriptStudio::embeddedAtom(Doc& doc, const ALTextPos& 
     const S32 width           = font->getWidth(item->getName()) + 16 + 12;
     p.rect                    = LLRect(0, 0, width, 0);
     LLButton*         button  = LLUICtrlFactory::create<LLButton>(p);
-    const ALScriptRef ref     = doc.ref;
-    button->setClickedCallback([this, ref, item](LLUICtrl*, const LLSD&) { openEmbeddedItem(ref, item); });
+    Doc* raw = &doc;
+    button->setClickedCallback([this, raw, item](LLUICtrl*, const LLSD&) { openEmbeddedItem(*raw, item); });
     ALTextView::Atom atom;
     atom.at      = at;
     atom.length  = 4;
@@ -1156,12 +1126,72 @@ ALTextView::Atom ALFloaterScriptStudio::embeddedAtom(Doc& doc, const ALTextPos& 
     return atom;
 }
 
-void ALFloaterScriptStudio::openEmbeddedItem(const ALScriptRef& ref, LLPointer<LLInventoryItem> item)
+bool ALFloaterScriptStudio::copyEmbeddedItem(Doc& doc, LLPointer<LLInventoryItem> item, const LLUUID& folder, U32 callback_id)
+{
+    if (item.isNull())
+    {
+        return false;
+    }
+    LLStringUtil::format_map_t args;
+    args["[NAME]"] = item->getName();
+    if (!doc.inAsset.count(item->getUUID()))
+    {
+        // The server copies out of the asset it has, which a drop is
+        // only in once saved.
+        setStatus(getString("NotecardCopyUnsaved", args), true);
+        return false;
+    }
+    // As copy_inventory_from_notecard does, with an ear for the answer:
+    // the request under the agent's policy, to the object's region or
+    // the agent's.
+    LLViewerRegion* region = nullptr;
+    if (doc.ref.object.notNull())
+    {
+        if (LLViewerObject* object = gObjectList.findObject(doc.ref.object))
+        {
+            region = object->getRegion();
+        }
+    }
+    if (!region)
+    {
+        region = gAgent.getRegion();
+    }
+    if (!region)
+    {
+        setStatus(getString("NotecardCopyFailed", args), true);
+        return false;
+    }
+    LLSD body;
+    body["notecard-id"] = doc.ref.item;
+    body["object-id"]   = doc.ref.object;
+    body["item-id"]     = item->getUUID();
+    body["folder-id"]   = folder;
+    body["callback-id"] = static_cast<LLSD::Integer>(callback_id);
+    const LLHandle<LLFloater> handle = getHandle();
+    const bool                asked  = region->requestPostCapability("CopyInventoryFromNotecard", body, nullptr, [handle, args](const LLSD& results) {
+        if (ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get()))
+        {
+            LLStringUtil::format_map_t why = args;
+            why["[ERROR]"]                 = results.has(LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS_MESSAGE) ?
+                                                 results[LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS_MESSAGE].asString() :
+                                                 std::string();
+            studio->setStatus(studio->getString("NotecardCopyRefused", why), true);
+        }
+    });
+    if (!asked)
+    {
+        setStatus(getString("NotecardCopyFailed", args), true);
+    }
+    return asked;
+}
+
+void ALFloaterScriptStudio::openEmbeddedItem(Doc& doc, LLPointer<LLInventoryItem> item)
 {
     if (item.isNull())
     {
         return;
     }
+    const ALScriptRef ref = doc.ref;
     // As the legacy notecard does: a texture or a material opens in its
     // preview, with the notecard named so that a save from there can
     // reach it; a calling card opens the profile; a sound plays; the
@@ -1209,7 +1239,8 @@ void ALFloaterScriptStudio::openEmbeddedItem(const ALScriptRef& ref, LLPointer<L
                 key["id"]   = landmark_id;
                 LLFloaterSidePanelContainer::showPanel("places", key);
             };
-            auto placed = [ref, item, show](LLLandmark* landmark) {
+            Doc* raw    = &doc;
+            auto placed = [this, raw, item, show](LLLandmark* landmark) {
                 LLVector3d where;
                 if (!landmark || !landmark->getGlobalPos(where))
                 {
@@ -1220,8 +1251,10 @@ void ALFloaterScriptStudio::openEmbeddedItem(const ALScriptRef& ref, LLPointer<L
                     show(mine->getUUID());
                     return;
                 }
-                copy_inventory_from_notecard(get_folder_by_itemtype(item), ref.object, ref.item, item,
-                                             gInventoryCallbacks.registerCB(new LLBoostFuncInventoryCallback(show)));
+                if (hasDoc(raw))
+                {
+                    copyEmbeddedItem(*raw, item, get_folder_by_itemtype(item), gInventoryCallbacks.registerCB(new LLBoostFuncInventoryCallback(show)));
+                }
             };
             if (LLLandmark* landmark = gLandmarkList.getAsset(item->getAssetUUID(), placed))
             {
@@ -1255,11 +1288,21 @@ void ALFloaterScriptStudio::openEmbeddedItem(const ALScriptRef& ref, LLPointer<L
         default:
             break;
     }
-    LLNotificationsUtil::add("ConfirmItemCopy", LLSD(), LLSD(), [ref, item](const LLSD& notification, const LLSD& response) {
-        if (LLNotificationsUtil::getSelectedOption(notification, response) == 0 && item.notNull())
+    // A drop not yet saved is said so before the question, since the
+    // answer would be no.
+    if (!doc.inAsset.count(item->getUUID()))
+    {
+        LLStringUtil::format_map_t args;
+        args["[NAME]"] = item->getName();
+        setStatus(getString("NotecardCopyUnsaved", args), true);
+        return;
+    }
+    Doc* raw = &doc;
+    LLNotificationsUtil::add("ConfirmItemCopy", LLSD(), LLSD(), [this, raw, item](const LLSD& notification, const LLSD& response) {
+        if (LLNotificationsUtil::getSelectedOption(notification, response) == 0 && item.notNull() && hasDoc(raw))
         {
             // The server finds the folder for it.
-            copy_inventory_from_notecard(LLUUID::null, ref.object, ref.item, item);
+            copyEmbeddedItem(*raw, item, LLUUID::null);
         }
     });
 }
@@ -1292,6 +1335,14 @@ void ALFloaterScriptStudio::loaded(const ALScriptWorkspace::Loaded& answer)
         // with it; nothing to analyse or compile.
         doc.loaded   = true;
         doc.embedded = answer.embedded;
+        doc.inAsset.clear();
+        for (const LLPointer<LLInventoryItem>& each : doc.embedded)
+        {
+            if (each.notNull())
+            {
+                doc.inAsset.insert(each->getUUID());
+            }
+        }
         doc.editor->setSyntax("text");
         doc.editor->setText(answer.text);
         takeCarriedText(doc);
@@ -2575,12 +2626,13 @@ void ALFloaterScriptStudio::pumpVim()
     }
 }
 
-void ALFloaterScriptStudio::vimHistoryWindow(ALTextView& view, llwchar kind, const std::vector<std::string>& history, std::function<void(const std::string&)> chosen)
+void ALFloaterScriptStudio::vimHistoryWindow(ALTextView& view, llwchar kind, const std::vector<std::string>& history, std::function<void(const std::string&, bool run)> chosen)
 {
     // Vim's command-line window as a quick-open over the editor: the
     // lines entered, the last first, ranked as they are typed at; the
-    // one picked goes back onto the line to be edited and entered. The
-    // editor takes the keyboard back either way.
+    // one picked runs, as the window runs the row Enter is pressed on,
+    // or with Shift goes back onto the line to be edited and entered.
+    // The editor takes the keyboard back either way.
     std::vector<ALQuickOpen::Candidate> candidates;
     for (size_t i = history.size(); i-- > 0;)
     {
@@ -2601,9 +2653,13 @@ void ALFloaterScriptStudio::vimHistoryWindow(ALTextView& view, llwchar kind, con
     quickOpen(std::move(candidates), getString("VimHistoryPlaceholder", args), getString("VimHistoryTitle", args),
               [chosen, back](const std::string& line) {
                   back();
-                  chosen(line);
+                  chosen(line, true);
               },
-              mEditorHost, 420, ALQuickOpen::heightForRows(llclamp(static_cast<S32>(history.size()), 1, 8)), back);
+              mEditorHost, 420, ALQuickOpen::heightForRows(llclamp(static_cast<S32>(history.size()), 1, 8)), back,
+              [chosen, back](const std::string& line) {
+                  back();
+                  chosen(line, false);
+              });
 }
 
 bool ALFloaterScriptStudio::vimCommand(ALTextView& view, const std::string& name, const std::string& args)
@@ -2653,6 +2709,8 @@ bool ALFloaterScriptStudio::vimCommand(ALTextView& view, const std::string& name
         const bool        commands = args.empty() || args == ":" || args == "cmd" || args == "all";
         ALOutputView::Entry entry;
         entry.source = getString("OutputSourceVim");
+        // A listing: its numbered rows a block at the left edge.
+        entry.hang   = ALOutputView::Hang::None;
         auto list = [&](const std::vector<std::string>& lines, const char* kind) {
             entry.text = std::string(kind) + " history:";
             for (size_t i = 0; i < lines.size(); ++i)
@@ -2735,6 +2793,29 @@ bool ALFloaterScriptStudio::vimCommand(ALTextView& view, const std::string& name
         return true;
     }
     return false;
+}
+
+void ALFloaterScriptStudio::vimComplete(ALTextView& view, const std::string& command, std::vector<std::string>& out)
+{
+    // The names vimCommand answers to, in their long forms, and the
+    // menu's actions; what :set and :history take after them.
+    static const char* NAMES[] = { "close", "history", "qall", "quit", "wall", "wq", "write", "xit",
+                                   "format", "problems", "references", "output", "search", "preferences", "pop_out", "reveal", "save_all",
+                                   "revert", "external_editor", "save_file", "save_as", "load_file", "open_file", "fold_all", "unfold_all", "go_to_line" };
+    static const char* OPTIONS[] = { "number", "nonumber", "relativenumber", "norelativenumber" };
+    static const char* KINDS[]   = { "all", "cmd", "search" };
+    if (command.empty())
+    {
+        out.insert(out.end(), std::begin(NAMES), std::end(NAMES));
+    }
+    else if (command == "set" || command == "se")
+    {
+        out.insert(out.end(), std::begin(OPTIONS), std::end(OPTIONS));
+    }
+    else if (command == "history" || command == "his")
+    {
+        out.insert(out.end(), std::begin(KINDS), std::end(KINDS));
+    }
 }
 
 void ALFloaterScriptStudio::vimFormat(ALTextView& view, S32 first, S32 last)
@@ -2982,15 +3063,13 @@ void ALFloaterScriptStudio::save(Doc& doc)
     {
         // What goes back: the text with the items it still stands
         // somewhere, numbered afresh, and those items alone, as the
-        // legacy notecard prunes what an edit took out -- and the editor
-        // brought to the same, so that what it holds is what was saved.
+        // legacy notecard prunes what an edit took out. The editor keeps
+        // its own numbering and its whole list: a placeholder undone
+        // back into the text still names its item, and the next save
+        // numbers afresh from whatever the text then stands.
         std::string                             text;
         std::vector<LLPointer<LLInventoryItem>> items;
         carriedForSave(doc, text, items);
-        if (text != doc.editor->text() || items.size() != doc.embedded.size())
-        {
-            renumberCarried(doc, text, items);
-        }
         std::string error;
         if (!ALScriptWorkspace::instance().saveNotecard(doc.ref, text, items, nullptr, error))
         {
@@ -2998,6 +3077,11 @@ void ALFloaterScriptStudio::save(Doc& doc)
             return;
         }
         doc.saving = true;
+        doc.saving_items.clear();
+        for (const LLPointer<LLInventoryItem>& each : items)
+        {
+            doc.saving_items.push_back(each->getUUID());
+        }
         LLStringUtil::format_map_t args;
         args["[NAME]"] = doc.name;
         setStatus(getString("Saving", args));
@@ -3086,6 +3170,13 @@ void ALFloaterScriptStudio::compiled(const ALScriptWorkspace::CompileResult& res
     }
     if (result.notecard)
     {
+        // The asset carries what was sent, and the server can copy it out.
+        if (ours)
+        {
+            doc.inAsset.clear();
+            doc.inAsset.insert(doc.saving_items.begin(), doc.saving_items.end());
+            doc.saving_items.clear();
+        }
         setStatus(getString("SavedNotecard", args));
         refreshToolbar();
         fillTabs();

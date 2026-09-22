@@ -37,6 +37,7 @@
 #include "lllivefile.h"
 
 #include <boost/signals2.hpp>
+#include <boost/unordered/unordered_flat_set.hpp>
 
 #include <map>
 #include <memory>
@@ -188,6 +189,11 @@ private:
         // notecard with the items it came with, never analysed.
         bool                                       notecard = false;
         std::vector<LLPointer<LLInventoryItem>>    embedded;
+        // The items the saved asset carries, by id: what the server can
+        // copy out of it. An item dropped since is only here once a save
+        // has taken it.
+        boost::unordered_flat_set<LLUUID>          inAsset;
+        std::vector<LLUUID>                        saving_items;
         // An edit that put a placeholder back -- an undo of a deletion,
         // a redo of a drop -- has the items placed again.
         boost::signals2::scoped_connection         embeddedEdits;
@@ -376,7 +382,7 @@ private:
     // over the text reads as the text's.
     ALQuickOpen* quickOpen(std::vector<ALQuickOpen::Candidate> candidates, const std::string& placeholder, const std::string& title,
                            std::function<void(const std::string&)> chose, LLView* anchor = nullptr, S32 width = 0, S32 height = 0,
-                           std::function<void()> escaped = {});
+                           std::function<void()> escaped = {}, std::function<void(const std::string&)> hold = {});
 
     Doc*   active();
     size_t indexOf(const ALScriptRef& ref) const;
@@ -392,10 +398,15 @@ private:
     bool vimCommand(ALTextView& view, const std::string& name, const std::string& args);
     // q: q/ and q?: the lines entered, in a quick-open over the editor,
     // the one picked going back onto the line.
-    void vimHistoryWindow(ALTextView& view, llwchar kind, const std::vector<std::string>& history, std::function<void(const std::string&)> chosen);
+    void vimHistoryWindow(ALTextView& view, llwchar kind, const std::vector<std::string>& history, std::function<void(const std::string&, bool run)> chosen);
     void vimFormat(ALTextView& view, S32 first, S32 last);
+    // The words Tab completes on the : line: the studio's command names,
+    // its :set options, :history's kinds.
+    void vimComplete(ALTextView& view, const std::string& command, std::vector<std::string>& out);
     void pumpVim();
     Doc* docOf(const ALTextView& view);
+    // Whether a doc a callback held on to is still one of the tabs.
+    bool hasDoc(const Doc* doc) const;
     // The tab pressed with the right button: a menu about it.
     void   showTabMenu(const std::string& value, S32 x, S32 y);
     void   onTabAction(const std::string& action);
@@ -469,15 +480,18 @@ private:
     void             placeEmbeddedItems(Doc& doc, S32 first_line, S32 last_line);
     ALTextView::Atom embeddedAtom(Doc& doc, const ALTextPos& at, size_t index);
     // The text and the items as a save takes them: only the items the
-    // text still stands somewhere, numbered afresh in the text.
+    // text still stands somewhere, numbered afresh in the text. The
+    // editor's own text and list are left as they are.
     void             carriedForSave(Doc& doc, std::string& text, std::vector<LLPointer<LLInventoryItem>>& items);
-    // The editor brought to what a save takes: its placeholders as the
-    // renumbering has them, its list the pruned one, the buttons following.
-    void             renumberCarried(Doc& doc, const std::string& text, const std::vector<LLPointer<LLInventoryItem>>& items);
     // An inventory item dragged onto a notecard: taken where it is
     // dropped, as the legacy notecard takes one, if it may be given on.
     bool             dropOnNotecard(Doc& doc, S32 x, S32 y, bool drop, EDragAndDropType type, void* cargo, EAcceptance* accept, std::string& tooltip);
-    void             openEmbeddedItem(const ALScriptRef& ref, LLPointer<LLInventoryItem> item);
+    void             openEmbeddedItem(Doc& doc, LLPointer<LLInventoryItem> item);
+    // A copy of an embedded item taken into the inventory by the server,
+    // into a folder or the one it picks; what the server says of it
+    // reaches the status bar. False, said why, for an item the saved
+    // asset does not carry, which the server could not find.
+    bool             copyEmbeddedItem(Doc& doc, LLPointer<LLInventoryItem> item, const LLUUID& folder, U32 callback_id = 0);
     void save(Doc& doc);
     void saveAll();
     void compiled(const ALScriptWorkspace::CompileResult& result);
