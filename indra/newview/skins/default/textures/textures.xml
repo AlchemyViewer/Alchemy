@@ -1061,4 +1061,7 @@ with the same filename but different name
   <texture name="Studio_File" file_name="studio/Studio_File.png" preload="false" />
   <texture name="Studio_Prim" file_name="studio/Studio_Prim.png" preload="false" />
   <texture name="Studio_Config" file_name="studio/Studio_Config.png" preload="false" />
+  <texture name="Problem_Error" file_name="studio/Problem_Error.png" preload="false" />
+  <texture name="Problem_Warning" file_name="studio/Problem_Warning.png" preload="false" />
+  <texture name="Problem_Note" file_name="studio/Problem_Note.png" preload="false" />
 </textures>

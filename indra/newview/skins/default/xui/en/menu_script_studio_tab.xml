@@ -1,8 +1,14 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <!-- The right-click menu of a tab in Script Studio: the tab pressed is
-     the one shown, and everything here is about it. -->
+     the one shown, and everything here is about it. A preview, a script
+     opened by walking a list past it, is kept open from here, as by a
+     double-click on it or by typing in it. -->
 <context_menu
  name="Script studio tab menu">
+  <menu_item_call label="Keep Open" layout="topleft" name="keep">
+    <menu_item_call.on_click function="Tab.Action" parameter="keep" />
+    <menu_item_call.on_enable function="Tab.Enable" parameter="keep" />
+  </menu_item_call>
   <menu_item_call label="Close" layout="topleft" name="close">
     <menu_item_call.on_click function="Tab.Action" parameter="close" />
   </menu_item_call>

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<!-- A studio pane's list, whose rows are places: a scroll list in all but
+     its keys, with the scroll list's own look. -->
+<pane_list name="pane_list"
+           />

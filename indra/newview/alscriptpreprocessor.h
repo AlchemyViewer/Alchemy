@@ -165,6 +165,10 @@ public:
     static bool        refOf(const std::string& path, ALScriptRef& ref);
     static bool        fileOf(const std::string& path, std::string& file);
     static std::string pathOf(const ALScriptRef& ref);
+    // An include's text as it was last read, by its identity: what the
+    // cache holds of one in the world, a file's as the disk has it now.
+    // False where neither is in hand; nothing is fetched.
+    bool               heldText(const std::string& path, std::string& text) const;
 
 private:
     typedef boost::unordered_flat_set<std::string, ll::string_hash, std::equal_to<>> wanted_t;

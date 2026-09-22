@@ -31,9 +31,12 @@
 #include "alemptystate.h"
 #include "aljumpbar.h"
 #include "aloutputview.h"
+#include "alpanelist.h"
+#include "llsdutil.h"
 #include "alscopebar.h"
 #include "alscriptformatter.h"
 #include "alscriptkeymap.h"
+#include "alscriptmessages.h"
 #include "altabstrip.h"
 #include "altextsearch.h"
 #include "alvimkeymap.h"
@@ -491,6 +494,17 @@ bool ALFloaterScriptStudio::postBuild()
     keys_in_tip("fold_explorer", { "explorer" });
     keys_in_tip("fold_bottom", { "problems", "references", "output", "find_in_files" });
     keys_in_tip("fold_inspector", { "inspector" });
+    // What the words past the breadcrumb do when pressed, with the keys
+    // that do the same; asked on every move of the caret, so said once.
+    for (auto [item_name, tip, keyless, out] : { std::make_tuple("go_to_line", "TrailerLineTip", "TrailerLineTipNoKeys", &mTrailerLineTip),
+                                                std::make_tuple("problems", "TrailerProblemsTip", "TrailerProblemsTipNoKeys", &mTrailerProblemsTip) })
+    {
+        const LLMenuItemGL*        item = menuBar()->findChild<LLMenuItemGL>(item_name, true);
+        const std::string          keys = item ? item->getAcceleratorString() : std::string();
+        LLStringUtil::format_map_t args;
+        args["[KEYS]"] = keys;
+        *out           = getString(keys.empty() ? keyless : tip, args);
+    }
     setStatusLine(getChild<LLTextBox>("status"));
     mFolds.bind(this, { { "explorer", "explorer_panel", "fold_explorer", getString("PaneExplorer") },
                         { "bottom", "bottom_panel", "fold_bottom", getString("PaneBottom") },
@@ -518,25 +532,29 @@ bool ALFloaterScriptStudio::postBuild()
     mTabs          = getChild<ALTabStrip>("tabs");
     mBreadcrumb    = getChild<ALJumpBar>("breadcrumb");
     mBottomTabs    = getChild<LLTabContainer>("bottom_tabs");
-    mProblems      = getChild<LLScrollListCtrl>("problems");
-    mReferences    = getChild<LLScrollListCtrl>("references");
-    mOutline       = getChild<LLScrollListCtrl>("outline");
+    mProblems      = getChild<ALPaneList>("problems");
+    mReferences    = getChild<ALPaneList>("references");
+    mOutline       = getChild<ALPaneList>("outline");
     mSymbol        = getChild<ALTextView>("symbol");
-    mSymbol->onLinkClicked([this](const ALTextView::Substitution& link) {
-        // The declaration's line, in the script the inspector is about.
-        Doc* doc = active();
-        if (doc && link.value.has("line"))
+    // The declaration, in the script the inspector is about or in the
+    // include it was declared in.
+    mSymbol->onLinkClicked([this](const ALTextView::Substitution& link) { goToDeclared(link.value); });
+    mReferencesHead = getChild<LLTextBox>("references_head");
+    mOutlineFilter  = getChild<LLFilterEditor>("outline_filter");
+    mOutlineFilter->setCommitCallback([this](LLUICtrl*, const LLSD&) {
+        if (Doc* doc = active())
         {
-            doc->editor->goToLine(link.value["line"].asInteger());
-            doc->editor->setFocus(true);
+            refreshOutline(*doc);
         }
     });
     mOutput        = getChild<ALOutputView>("output");
     mOutput->setPlaceholder(getString("NoOutput"));
     mOutputFilter  = getChild<LLComboBox>("output_filter");
+    mOutputKind    = getChild<LLComboBox>("output_kind");
+    mOutputFind    = getChild<LLFilterEditor>("output_find");
     mExplorer      = getChild<LLScrollListCtrl>("explorer");
     mSearchBar     = getChild<ALScopeBar>("search_bar");
-    mSearchResults = getChild<LLScrollListCtrl>("search_results");
+    mSearchResults = getChild<ALPaneList>("search_results");
     mCompileTarget = getChild<LLComboBox>("compile_target");
     mRunning       = getChild<LLCheckBoxCtrl>("running");
     mResetButton   = getChild<LLButton>("reset_btn");
@@ -553,13 +571,26 @@ bool ALFloaterScriptStudio::postBuild()
     mTabs->onMenu(boost::bind(&ALFloaterScriptStudio::showTabMenu, this, _1, _2, _3));
     mTabs->onReordered(boost::bind(&ALFloaterScriptStudio::onTabsReordered, this, _1));
     mTabs->onListAsked([this]() { showAllTabs(); });
+    // A preview double-clicked is held.
+    mTabs->onHeld([this](const std::string& id) {
+        const size_t index = indexOf(id);
+        if (index != NONE)
+        {
+            holdPreview(*mDocs[index]);
+        }
+    });
     mBreadcrumb->onChose(boost::bind(&ALFloaterScriptStudio::onCrumbChosen, this, _1, _2));
-    mProblems->setCommitCallback(boost::bind(&ALFloaterScriptStudio::onProblemSelected, this));
+    mBreadcrumb->onTrailerChosen([this](const std::string& value) { onTrailerChosen(value); });
+    // A row chosen shows its place and keeps the keyboard in the list, so
+    // that the arrows walk on through them; a double-click goes there.
+    mProblems->setCommitCallback([this](LLUICtrl*, const LLSD&) { onProblemSelected(false); });
+    mProblems->setDoubleClickCallback([this]() { onProblemSelected(true); });
     mProblems->setRightMouseDownCallback([this](LLUICtrl*, S32 x, S32 y, MASK) { showProblemMenu(x, y); });
-    // The pane's filters: which levels, which source, which words.
+    // The pane's filters: whose, which levels, which source, which words.
     mProblemErrors   = getChild<LLCheckBoxCtrl>("problems_errors");
     mProblemWarnings = getChild<LLCheckBoxCtrl>("problems_warnings");
     mProblemNotes    = getChild<LLCheckBoxCtrl>("problems_notes");
+    mProblemScope    = getChild<LLComboBox>("problems_scope");
     mProblemOrigin   = getChild<LLComboBox>("problems_origin");
     mProblemFilter   = getChild<LLFilterEditor>("problems_filter");
     mProblemOrigin->add(getString("OriginAny"), LLSD(""));
@@ -568,36 +599,49 @@ bool ALFloaterScriptStudio::postBuild()
         mProblemOrigin->add(getString(origin), LLSD(getString(origin)));
     }
     mProblemOrigin->selectFirstItem();
+    mProblemScope->selectFirstItem();
     for (LLUICtrl* filter : { static_cast<LLUICtrl*>(mProblemErrors), static_cast<LLUICtrl*>(mProblemWarnings), static_cast<LLUICtrl*>(mProblemNotes),
-                              static_cast<LLUICtrl*>(mProblemOrigin), static_cast<LLUICtrl*>(mProblemFilter) })
+                              static_cast<LLUICtrl*>(mProblemScope), static_cast<LLUICtrl*>(mProblemOrigin), static_cast<LLUICtrl*>(mProblemFilter) })
     {
-        filter->setCommitCallback([this](LLUICtrl*, const LLSD&) { fillProblems(active()); });
+        filter->setCommitCallback([this](LLUICtrl*, const LLSD&) {
+            fillProblems(problemsDoc());
+            saveState();
+        });
     }
-    mReferences->setCommitCallback(boost::bind(&ALFloaterScriptStudio::onReferenceChosen, this));
-    mOutline->setCommitCallback(boost::bind(&ALFloaterScriptStudio::onOutlineChosen, this));
-    mOutputFilter->add(getString("OutputAllObjects"), LLSD(LLUUID::null));
-    mOutputFilter->setCommitCallback(boost::bind(&ALFloaterScriptStudio::onOutputFilter, this));
+    mReferences->setCommitCallback([this](LLUICtrl*, const LLSD&) { onReferenceChosen(false); });
+    mReferences->setDoubleClickCallback([this]() { onReferenceChosen(true); });
+    mOutline->setCommitCallback([this](LLUICtrl*, const LLSD&) { onOutlineChosen(false); });
+    mOutline->setDoubleClickCallback([this]() { onOutlineChosen(true); });
+    offerOutputObject(LLUUID::null, std::string());
+    for (LLUICtrl* filter : { static_cast<LLUICtrl*>(mOutputFilter), static_cast<LLUICtrl*>(mOutputKind), static_cast<LLUICtrl*>(mOutputFind) })
+    {
+        filter->setCommitCallback([this](LLUICtrl*, const LLSD&) { onOutputFilter(); });
+    }
+    mOutputKind->selectFirstItem();
     mOutput->onEntryChosen([this](const ALOutputView::Entry& entry) { onOutputChosen(entry); });
     getChild<LLButton>("output_clear")->setCommitCallback([this](LLUICtrl*, const LLSD&) {
+        // What was said goes; whose words are listened to stays.
         mOutput->clearEntries();
-        // The objects offered were the ones that had spoken; none has.
-        mOutputObjects.clear();
-        mOutputFilter->clearRows();
-        mOutputFilter->add(getString("OutputAllObjects"), LLSD(LLUUID::null));
-        mOutputFilter->selectFirstItem();
-        onOutputFilter();
+        mOutputUnread = false;
+        refreshBottomTabs();
     });
     getChild<LLButton>("output_copy")->setCommitCallback([this](LLUICtrl*, const LLSD&) {
-        // Everything the pane shows, as it reads, on the clipboard.
+        // What the pane shows through its filters, as it reads, on the
+        // clipboard.
         std::string all;
+        S32         lines = 0;
         for (const ALOutputView::Entry& entry : mOutput->entries())
         {
+            if (!mOutput->shows(entry))
+            {
+                continue;
+            }
             all += ALOutputView::format(entry);
             all += '\n';
+            ++lines;
         }
         LLClipboard::instance().copyToClipboard(all, 0, static_cast<S32>(all.size()));
-        LLStringUtil::format_map_t args;
-        setStatus(counted("OutputCopied", static_cast<S32>(mOutput->entries().size()), args));
+        setStatus(counted("OutputCopied", lines));
     });
     // What was said before the window opened, then everything after.
     for (const ALScriptWorkspace::RuntimeEvent& event : ALScriptWorkspace::instance().recentRuntime())
@@ -621,7 +665,132 @@ bool ALFloaterScriptStudio::postBuild()
     mSearchReplace->setCommitCallback([this](LLUICtrl*, const LLSD&) { replaceAllFound(); });
     mSearchReplacement->setCommitCallback([this](LLUICtrl*, const LLSD&) { replaceAllFound(); });
     mSearchBar->onChanged(boost::bind(&ALFloaterScriptStudio::onSearchChanged, this));
-    mSearchResults->setDoubleClickCallback(boost::bind(&ALFloaterScriptStudio::onSearchResult, this));
+    mSearchResults->setCommitCallback([this](LLUICtrl*, const LLSD&) { onSearchResult(false); });
+    mSearchResults->setDoubleClickCallback([this]() { onSearchResult(true); });
+    // In a pane's list, return goes to the place chosen, to type there, and
+    // escape goes back to the script without going anywhere -- asked of
+    // the list first, since the panel it is in takes escape to mean
+    // nothing is to have the keyboard.
+    const std::pair<ALPaneList*, std::function<void()>> lists[] = { { mProblems, [this]() { onProblemSelected(true); } },
+                                                                          { mReferences, [this]() { onReferenceChosen(true); } },
+                                                                          { mOutline, [this]() { onOutlineChosen(true); } },
+                                                                          { mSearchResults, [this]() { onSearchResult(true); } } };
+    for (const auto& [list, go] : lists)
+    {
+        list->setKeyHandler([this, list, go](KEY key, MASK mask) {
+            // The outline's left and right fold and open, as a tree's do.
+            if (list == mOutline && mask == MASK_NONE && (key == KEY_LEFT || key == KEY_RIGHT))
+            {
+                LLScrollListItem* item = mOutline->getFirstSelected();
+                if (!item)
+                {
+                    return false;
+                }
+                const size_t index = static_cast<size_t>(item->getValue().asInteger());
+                foldOutline(index, key == KEY_LEFT);
+                return true;
+            }
+            if (mask != MASK_NONE || (key != KEY_RETURN && key != KEY_ESCAPE))
+            {
+                return false;
+            }
+            if (key == KEY_RETURN)
+            {
+                go();
+            }
+            else
+            {
+                revealed(list, true);
+            }
+            return true;
+        });
+    }
+    // Sorted by a column's title: the problems within their scripts and
+    // includes, each heading over its own; a line as a number, and a
+    // problem's level as how bad it is.
+    mProblems->setGrouping([](const LLScrollListItem* item, S32& group, bool& heading) {
+        group   = item->getValue()["group"].asInteger();
+        heading = item->getValue().has("heading");
+    });
+    mProblems->setComparison([](S32 column, const LLScrollListItem* a, const LLScrollListItem* b) {
+        const LLSD& x = a->getValue();
+        const LLSD& y = b->getValue();
+        const auto  place = [&]() {
+            const S32 lx = x["line"].asInteger(), ly = y["line"].asInteger();
+            return lx != ly ? (lx < ly ? -1 : 1) : x["column"].asInteger() < y["column"].asInteger() ? -1 : x["column"].asInteger() > y["column"].asInteger() ? 1 : 0;
+        };
+        const auto rank = [](const LLSD& one) {
+            const std::string level = one["level"].asString();
+            return level == "ERROR" ? 0 : level == "WARNING" ? 1 : 2;
+        };
+        S32 said = 0;
+        switch (column)
+        {
+            case 0: said = rank(x) - rank(y); break;
+            case 1: said = LLStringUtil::compareDict(x["message"].asString(), y["message"].asString()); break;
+            case 2: said = LLStringUtil::compareDict(x["origin"].asString(), y["origin"].asString()); break;
+            default: break;
+        }
+        return said != 0 ? said : place();
+    });
+    mReferences->setComparison([this](S32 column, const LLScrollListItem* a, const LLScrollListItem* b) {
+        const size_t i = static_cast<size_t>(a->getValue().asInteger());
+        const size_t j = static_cast<size_t>(b->getValue().asInteger());
+        if (i >= mFound.places.size() || j >= mFound.places.size())
+        {
+            return 0;
+        }
+        const Doc::Place& x    = mFound.places[i];
+        const Doc::Place& y    = mFound.places[j];
+        const auto        cell = [](const LLScrollListItem* item, S32 at) { return item->getColumn(at) ? item->getColumn(at)->getValue().asString() : std::string(); };
+        S32               said = 0;
+        switch (column)
+        {
+            case 0: said = LLStringUtil::compareDict(cell(a, 0), cell(b, 0)); break;
+            case 2: said = cell(b, 2).size() < cell(a, 2).size() ? -1 : cell(b, 2).size() > cell(a, 2).size() ? 1 : 0; break;
+            case 3: said = LLStringUtil::compareDict(x.text, y.text); break;
+            default: break;
+        }
+        if (said == 0 && column != 1 && x.file != y.file)
+        {
+            said = LLStringUtil::compareDict(cell(a, 0), cell(b, 0));
+        }
+        return said != 0 ? said : x.span < y.span ? -1 : y.span < x.span ? 1 : 0;
+    });
+    mSearchResults->setComparison([this](S32 column, const LLScrollListItem* a, const LLScrollListItem* b) {
+        const size_t fa = static_cast<size_t>(a->getValue()["found"].asInteger()), pa = static_cast<size_t>(a->getValue()["place"].asInteger());
+        const size_t fb = static_cast<size_t>(b->getValue()["found"].asInteger()), pb = static_cast<size_t>(b->getValue()["place"].asInteger());
+        if (fa >= mSearchFound.size() || fb >= mSearchFound.size() || pa >= mSearchFound[fa].places.size() || pb >= mSearchFound[fb].places.size())
+        {
+            return 0;
+        }
+        const ALTextPos x = mSearchFound[fa].places[pa].begin;
+        const ALTextPos y = mSearchFound[fb].places[pb].begin;
+        S32             said = 0;
+        switch (column)
+        {
+            case 0: said = LLStringUtil::compareDict(mSearchFound[fa].where, mSearchFound[fb].where); break;
+            case 2: said = LLStringUtil::compareDict(mSearchFound[fa].lines[pa], mSearchFound[fb].lines[pb]); break;
+            default: break;
+        }
+        if (said == 0 && column == 0 && fa != fb)
+        {
+            said = fa < fb ? -1 : 1;
+        }
+        return said != 0 ? said : x < y ? -1 : y < x ? 1 : fa < fb ? -1 : fa > fb ? 1 : 0;
+    });
+    mOutlineSort = getChild<LLComboBox>("outline_sort");
+    mOutlineSort->selectFirstItem();
+    mOutlineSort->setCommitCallback([this](LLUICtrl*, const LLSD&) {
+        if (Doc* doc = active())
+        {
+            refreshOutline(*doc);
+        }
+        saveState();
+    });
+    // What the studio did has its own lane in the log, so that a busy
+    // debug channel does not push it out.
+    mOutput->setCapacity(200, 1);
     mExplorer->setDoubleClickCallback(boost::bind(&ALFloaterScriptStudio::onExplorerChosen, this));
     mExplorer->setRightMouseDownCallback([this](LLUICtrl*, S32 x, S32 y, MASK) { showExplorerMenu(x, y); });
     for (const char* action : { "open", "start", "stop", "reset", "refresh" })
@@ -719,6 +888,19 @@ void ALFloaterScriptStudio::draw()
     pumpCaret();
     pumpExplorer();
     pumpVim();
+    pumpSearch();
+    pumpSettle();
+    if (mPlacesStale)
+    {
+        fillReferences();
+    }
+    // What the Output tab had not shown, it has once it is looked at.
+    if (mOutputUnread && !mFolds.collapsed("bottom") && mBottomTabs->getCurrentPanel() &&
+        mBottomTabs->getCurrentPanel()->getName() == "output_tab")
+    {
+        mOutputUnread = false;
+        refreshBottomTabs();
+    }
     ALStudioFloater::draw();
 }
 
@@ -839,6 +1021,12 @@ void ALFloaterScriptStudio::reindexDocs()
     {
         mByDocId.emplace(mDocs[i]->id, i);
     }
+    // Output listening to the scripts open here: which those are has
+    // changed, and so has what it shows of what was said before.
+    if (mOutputFilter && mOutputFilter->getValue().asString() == "open")
+    {
+        onOutputFilter();
+    }
 }
 
 size_t ALFloaterScriptStudio::indexOf(std::string_view id) const
@@ -886,6 +1074,8 @@ ALCodeEditor* ALFloaterScriptStudio::makeEditor(const std::string& id, bool read
     p.bracket_color_3.control    = "ScriptBracket3Color";
     ALCodeEditor* editor = LLUICtrlFactory::create<ALCodeEditor>(p);
     editor->setVisible(false);
+    // Where a hover card says a name was declared, gone to when pressed.
+    editor->setCardLinkHandler([this](const LLSD& value) { goToDeclared(value); });
     applyEditorOptions(*editor);
     mEditorHost->addChild(editor);
     return editor;
@@ -1004,11 +1194,22 @@ void ALFloaterScriptStudio::openScript(const ALScriptRef& ref, const std::string
     const size_t already = indexOf(ref);
     if (already != NONE)
     {
+        // Asked for outright, a preview is held.
+        if (mOpenPreview == 0)
+        {
+            holdPreview(*mDocs[already]);
+        }
         activate(already);
         return;
     }
+    const bool preview = mOpenPreview > 0;
+    if (preview)
+    {
+        closePreview();
+    }
 
     auto doc         = std::make_unique<Doc>();
+    doc->preview     = preview;
     doc->ref         = ref;
     doc->id          = ref.id();
     doc->name        = name.empty() ? getString("Untitled") : name;
@@ -1022,11 +1223,20 @@ void ALFloaterScriptStudio::openScript(const ALScriptRef& ref, const std::string
     doc->editor->setPlaceholder(getString("Loading"));
     Doc* raw     = doc.get();
     doc->changed = doc->editor->onTextChanged([this, raw]() {
+        // Typed in, a preview is held.
+        if (raw->preview && raw->editor->isDirty())
+        {
+            raw->preview = false;
+        }
         fillTabs();
         refreshToolbar();
         scheduleAnalysis(*raw);
+        researchOpen(*raw);
     });
-    doc->placedEdits = doc->editor->document().onChanged([this, raw](const ALTextDocument::Edit& edit) { slideProblems(*raw, edit); });
+    doc->placedEdits = doc->editor->document().onChanged([this, raw](const ALTextDocument::Edit& edit) {
+        slideProblems(*raw, edit);
+        slidePlaces(*raw, edit);
+    });
 
     mDocs.push_back(std::move(doc));
     reindexDocs();
@@ -1508,7 +1718,7 @@ void ALFloaterScriptStudio::loaded(const ALScriptWorkspace::Loaded& answer)
     {
         doc.editor->setText(answer.error);
         doc.editor->setReadOnly(true);
-        setStatus(answer.error, true);
+        report(answer.error, true, &doc);
     }
     else if (answer.notecard)
     {
@@ -1840,12 +2050,19 @@ void ALFloaterScriptStudio::preprocessedAnswer(const std::string& id, U32 versio
     {
         if (!result.pending.empty())
         {
+            // Which, by the names the script gave them.
+            std::string names;
+            for (const std::string& name : result.pending)
+            {
+                names += (names.empty() ? "" : ", ") + name;
+            }
             args["[COUNT]"] = std::to_string(result.pending.size());
-            setStatus(getString("PreprocessedPending", args), true);
+            args["[FILES]"] = names;
+            report(getString("PreprocessedPending", args), true, &doc);
         }
         else
         {
-            setStatus(getString("Preprocessed", args));
+            report(getString("Preprocessed", args), false, &doc);
         }
         return;
     }
@@ -1857,7 +2074,7 @@ void ALFloaterScriptStudio::preprocessedAnswer(const std::string& id, U32 versio
             errors += problem.severity == ALScriptProblem::Severity::Error ? 1 : 0;
         }
         args["[COUNT]"] = std::to_string(errors);
-        setStatus(getString("PreprocessErrors", args), true);
+        report(getString("PreprocessErrors", args), true, &doc);
         doc.saveAnywayVersion = version;
         saveStopped(doc);
         showBottom("problems_tab");
@@ -1933,6 +2150,10 @@ void ALFloaterScriptStudio::openFile(const std::string& path, bool lua, S32 line
 {
     const std::string id      = "disk:" + path;
     size_t            already = indexOf(id);
+    if (already != NONE && mOpenPreview == 0)
+    {
+        holdPreview(*mDocs[already]);
+    }
     if (already == NONE)
     {
         std::ifstream in(path, std::ios::binary);
@@ -1946,9 +2167,15 @@ void ALFloaterScriptStudio::openFile(const std::string& path, bool lua, S32 line
         std::stringstream buffer;
         buffer << in.rdbuf();
 
-        auto doc  = std::make_unique<Doc>();
-        doc->file = path;
-        doc->id   = id;
+        const bool preview = mOpenPreview > 0;
+        if (preview)
+        {
+            closePreview();
+        }
+        auto doc     = std::make_unique<Doc>();
+        doc->preview = preview;
+        doc->file    = path;
+        doc->id      = id;
         doc->name = gDirUtilp->getBaseFileName(path);
         // The language its extension says; else the one it was asked for
         // from, where it was; else plain text.
@@ -1963,9 +2190,18 @@ void ALFloaterScriptStudio::openFile(const std::string& path, bool lua, S32 line
         doc->modifiable = true;
         Doc* raw        = doc.get();
         doc->changed    = doc->editor->onTextChanged([this, raw]() {
+            if (raw->preview && raw->editor->isDirty())
+            {
+                raw->preview = false;
+            }
             fillTabs();
             refreshToolbar();
             scheduleAnalysis(*raw);
+            researchOpen(*raw);
+        });
+        doc->placedEdits = doc->editor->document().onChanged([this, raw](const ALTextDocument::Edit& edit) {
+            slideProblems(*raw, edit);
+            slidePlaces(*raw, edit);
         });
         mDocs.push_back(std::move(doc));
         reindexDocs();
@@ -2716,6 +2952,18 @@ void ALFloaterScriptStudio::answered(const ALScriptAnalysis::Result& result)
                 break;
             }
             std::string text = result.hover.label;
+            // Where it was declared, as the inspector says it: a link there.
+            std::vector<ALCodeEditor::CardLink> links;
+            const Declared                      declared = declaredOf(doc, result);
+            if (declared.line >= 0)
+            {
+                LLStringUtil::format_map_t args;
+                args["[LINE]"]          = std::to_string(declared.line + 1);
+                args["[FILE]"]          = declared.name;
+                const std::string where = getString(declared.path.empty() ? "InspectDeclared" : "InspectDeclaredIn", args);
+                text += "\n" + where;
+                links.push_back({ where, getString("InspectDeclaredTip"), declared.value() });
+            }
             if (!result.hover.expected.empty())
             {
                 LLStringUtil::format_map_t args;
@@ -2730,7 +2978,7 @@ void ALFloaterScriptStudio::answered(const ALScriptAnalysis::Result& result)
             {
                 text += "\n" + result.hover.link;
             }
-            doc.editor->supplyHover(at, text);
+            doc.editor->supplyHover(at, text, std::move(links));
             break;
         }
         case ALScriptAnalysis::Kind::Signature:
@@ -2749,10 +2997,10 @@ void ALFloaterScriptStudio::answered(const ALScriptAnalysis::Result& result)
             break;
         }
         case ALScriptAnalysis::Kind::References:
-            symbolAnswered(doc, result);
+            symbolAnswered(doc, result, at);
             break;
         case ALScriptAnalysis::Kind::Inspect:
-            inspected(doc, result);
+            inspected(doc, result, at);
             break;
     }
 }
@@ -2768,8 +3016,13 @@ void ALFloaterScriptStudio::activate(size_t index)
     (mDocs[index]->showingExpanded && mDocs[index]->expandedEditor ? mDocs[index]->expandedEditor : mDocs[index]->editor)->setFocus(true);
     fillTabs();
     refreshToolbar();
-    fillProblems(mDocs[index].get());
-    fillReferences(mDocs[index].get());
+    // The problems are the script's in front, but for a tab opened by
+    // following one of another script's: the list stays that script's,
+    // to go on down. The references are whichever script's asked.
+    if (mHoldPanes == 0 || mProblemsShownFor.empty() || indexOf(mProblemsShownFor) == NONE)
+    {
+        fillProblems(mDocs[index].get());
+    }
     refreshOutline(*mDocs[index]);
     // The inspector is about this script now: told again once the caret
     // is seen.
@@ -2791,6 +3044,7 @@ void ALFloaterScriptStudio::fillTabs()
         facts[i].id    = doc.id;
         facts[i].name  = doc.name;
         facts[i].dirty = doc.editor->isDirty();
+        facts[i].preview = doc.preview;
         facts[i].image = imageNameOf(doc);
         problemCounts(doc, facts[i].errors, facts[i].warnings);
     }
@@ -2810,6 +3064,7 @@ void ALFloaterScriptStudio::fillTabs()
         tab.label   = doc.name;
         tab.value   = doc.id;
         tab.dirty   = facts[i].dirty;
+        tab.preview = facts[i].preview;
         tab.image   = LLUI::getUIImage(facts[i].image);
         // A dot in the worst problem's colour, for a script with any.
         const S32 errors = facts[i].errors, warnings = facts[i].warnings;
@@ -2889,12 +3144,12 @@ void ALFloaterScriptStudio::refreshTrailer(Doc& doc)
     // Where the caret is as it is seen -- a character a column, a tab to
     // its stop -- rather than its byte in the line.
     args["[COL]"]   = std::to_string(text.displayColumn(caret, doc.editor->getTabWidth()) + 1);
-    std::vector<std::string> parts;
+    std::vector<ALJumpBar::TrailerPart> parts;
     if (!mVimBanner.empty())
     {
-        parts.push_back(mVimBanner);
+        parts.push_back({ mVimBanner, std::string(), std::string() });
     }
-    parts.push_back(getString("CaretPosition", args));
+    parts.push_back({ getString("CaretPosition", args), "line", mTrailerLineTip });
     // What is selected: lines across lines, characters within one.
     const ALTextRange selection = doc.editor->selection().normalised();
     if (!selection.empty())
@@ -2902,33 +3157,50 @@ void ALFloaterScriptStudio::refreshTrailer(Doc& doc)
         if (selection.begin.line != selection.end.line)
         {
             const S32 lines = selection.end.line - selection.begin.line + (selection.end.column > 0 ? 1 : 0);
-            parts.push_back(counted("SelectedLines", lines));
+            parts.push_back({ counted("SelectedLines", lines), std::string(), std::string() });
         }
         else
         {
             // Characters as they are seen, not the bytes they are
             // written in; a tab is one.
-            parts.push_back(counted("SelectedChars", text.displayColumn(selection.end, 1) - text.displayColumn(selection.begin, 1)));
+            parts.push_back({ counted("SelectedChars", text.displayColumn(selection.end, 1) - text.displayColumn(selection.begin, 1)), std::string(),
+                              std::string() });
         }
     }
     S32 errors = 0, warnings = 0;
     problemCounts(doc, errors, warnings);
     if (errors > 0)
     {
-        parts.push_back(counted("ProblemErrors", errors));
+        parts.push_back({ counted("ProblemErrors", errors), "problems", mTrailerProblemsTip });
     }
     if (warnings > 0)
     {
-        parts.push_back(counted("ProblemWarnings", warnings));
+        parts.push_back({ counted("ProblemWarnings", warnings), "problems", mTrailerProblemsTip });
     }
     // Joined by a middle dot with air around it; in code, since a
     // string of the skin's is trimmed of its spaces.
-    std::string said;
-    for (const std::string& part : parts)
+    std::vector<ALJumpBar::TrailerPart> said;
+    for (ALJumpBar::TrailerPart& part : parts)
     {
-        said += (said.empty() ? "" : "   \xC2\xB7   ") + part;
+        if (!said.empty())
+        {
+            said.push_back({ "   \xC2\xB7   ", std::string(), std::string() });
+        }
+        said.push_back(std::move(part));
     }
-    mBreadcrumb->setTrailer(said);
+    mBreadcrumb->setTrailer(std::move(said));
+}
+
+void ALFloaterScriptStudio::onTrailerChosen(const std::string& value)
+{
+    if (value == "line")
+    {
+        goToLine();
+    }
+    else if (value == "problems")
+    {
+        showBottom("problems_tab", true);
+    }
 }
 
 // --- vim ----------------------------------------------------------------------------------
@@ -3057,7 +3329,9 @@ bool ALFloaterScriptStudio::vimCommand(ALTextView& view, const std::string& name
         const bool        searches = args == "/" || args == "search" || args == "all";
         const bool        commands = args.empty() || args == ":" || args == "cmd" || args == "all";
         ALOutputView::Entry entry;
-        entry.source = getString("OutputSourceVim");
+        entry.source      = getString("OutputSourceVim");
+        entry.key["kind"] = "studio";
+        entry.lane        = 1;
         // A listing: its numbered rows a block at the left edge.
         entry.hang   = ALOutputView::Hang::None;
         auto list = [&](const std::vector<std::string>& lines, const char* kind) {
@@ -3215,6 +3489,11 @@ void ALFloaterScriptStudio::showTabMenu(const std::string& value, S32 x, S32 y)
             const Doc* doc = active();
             return doc && !doc->ref.inInventory();
         }
+        if (action == "keep")
+        {
+            const Doc* doc = active();
+            return doc && doc->preview;
+        }
         return active() != nullptr;
     });
     LLContextMenu* menu = LLUICtrlFactory::createFromFile<LLContextMenu>("menu_script_studio_tab.xml", LLMenuGL::sMenuContainer,
@@ -3238,6 +3517,10 @@ void ALFloaterScriptStudio::onTabAction(const std::string& action)
     if (action == "close")
     {
         closeDocument(doc->id);
+    }
+    else if (action == "keep")
+    {
+        holdPreview(*doc);
     }
     else if (action == "close_others" || action == "close_all" || action == "close_saved")
     {
@@ -3406,6 +3689,8 @@ void ALFloaterScriptStudio::save(Doc& doc)
     {
         return;
     }
+    // Saved, a preview is held.
+    holdPreview(doc);
     // Tidied as the scripter asked before anything is sent or checked: a
     // step each to undo, and nothing where the text is tidy already.
     if (!doc.notecard)
@@ -3439,7 +3724,10 @@ void ALFloaterScriptStudio::save(Doc& doc)
         doc.sentAt = doc.editor->savePoint();
         if (!ALScriptWorkspace::instance().saveNotecard(doc.ref, text, items, nullptr, error))
         {
-            setStatus(error, true);
+            LLStringUtil::format_map_t failed;
+            failed["[NAME]"]  = doc.name;
+            failed["[ERROR]"] = error;
+            report(getString("SaveFailed", failed), true, &doc);
             saveStopped(doc);
             return;
         }
@@ -3484,7 +3772,10 @@ void ALFloaterScriptStudio::upload(Doc& doc, const std::string& text)
     doc.sentAt = doc.editor->savePoint();
     if (!ALScriptWorkspace::instance().save(doc.ref, text, options, nullptr, error))
     {
-        setStatus(error, true);
+        LLStringUtil::format_map_t failed;
+        failed["[NAME]"]  = doc.name;
+        failed["[ERROR]"] = error;
+        report(getString("SaveFailed", failed), true, &doc);
         saveStopped(doc);
         return;
     }
@@ -3524,7 +3815,7 @@ void ALFloaterScriptStudio::compiled(const ALScriptWorkspace::CompileResult& res
     if (!result.error.empty())
     {
         args["[ERROR]"] = result.error;
-        setStatus(getString("SaveFailed", args), true);
+        report(getString("SaveFailed", args), true, &doc);
         if (ours)
         {
             saveStopped(doc);
@@ -3553,7 +3844,7 @@ void ALFloaterScriptStudio::compiled(const ALScriptWorkspace::CompileResult& res
             doc.inAsset.insert(doc.saving_items.begin(), doc.saving_items.end());
             doc.saving_items.clear();
         }
-        setStatus(getString("SavedNotecard", args));
+        report(getString("SavedNotecard", args), false, &doc);
         refreshToolbar();
         fillTabs();
         if (doc.closeAfterSave)
@@ -3611,17 +3902,24 @@ void ALFloaterScriptStudio::compiled(const ALScriptWorkspace::CompileResult& res
 
     if (result.success)
     {
-        setStatus(getString("Compiled", args));
+        report(getString("Compiled", args), false, &doc);
     }
     else
     {
         args["[COUNT]"] = std::to_string(doc.problems.size());
-        setStatus(getString("CompileFailed", args), true);
+        report(getString("CompileFailed", args), true, &doc);
         // Saved, but not running: a close waiting on it leaves the tab
         // open with what the compiler said, rather than taking both away.
         if (ours)
         {
             saveStopped(doc);
+        }
+        // What the compiler said, in sight, as the checks before a save
+        // show theirs: the first error chosen.
+        if (ours && index == mActive && !doc.closeAfterSave)
+        {
+            showBottom("problems_tab");
+            selectFirstError(false);
         }
     }
     if (index == mActive)
@@ -4057,6 +4355,8 @@ void ALFloaterScriptStudio::refreshProblems(Doc& doc)
         row.line      = line;
         row.column    = column;
         row.hasColumn = has_column;
+        row.endLine   = end_line;
+        row.endColumn = end_column;
         row.level     = level;
         row.origin    = origin;
         row.message   = message;
@@ -4154,7 +4454,15 @@ void ALFloaterScriptStudio::refreshProblems(Doc& doc)
     {
         const S32 line   = llmax(0, problem.line);
         const S32 column = llmax(0, problem.column);
-        add(line, column, problem.column >= 0, line, column, ALCodeEditor::Mark::Runtime, Doc::Level::Error, getString("OriginRuntime"), problem.message,
+        // Said again and again, it is one problem, with how many times.
+        std::string message = problem.message;
+        if (problem.count > 1)
+        {
+            LLStringUtil::format_map_t args;
+            args["[COUNT]"] = std::to_string(problem.count);
+            message += " " + getString("RepeatedTimes", args);
+        }
+        add(line, column, problem.column >= 0, line, column, ALCodeEditor::Mark::Runtime, Doc::Level::Error, getString("OriginRuntime"), message,
             problem.file);
     }
     if (!doc.definitionsError.empty())
@@ -4175,9 +4483,15 @@ void ALFloaterScriptStudio::refreshProblems(Doc& doc)
     });
     mProblemStore.replace(doc.id, doc.shown);
     doc.editor->setDecorations(std::move(decorations));
+    // The pane, where it lists this script's: the one it is about, or
+    // every one open.
+    Doc* listed = problemsDoc();
+    if (listed && (listed == &doc || (mProblemScope && mProblemScope->getValue().asString() == "all")))
+    {
+        fillProblems(listed);
+    }
     if (&doc == active())
     {
-        fillProblems(&doc);
         refreshTrailer(doc);
     }
     fillTabs();
@@ -4196,6 +4510,33 @@ ALFindings<ALFloaterScriptStudio::Doc::Shown, ALFloaterScriptStudio::ProblemTrai
     return query;
 }
 
+std::vector<const ALFloaterScriptStudio::Doc*> ALFloaterScriptStudio::problemDocs(const Doc* doc) const
+{
+    std::vector<const Doc*> docs;
+    if (!doc)
+    {
+        return docs;
+    }
+    docs.push_back(doc);
+    if (mProblemScope && mProblemScope->getValue().asString() == "all")
+    {
+        for (const std::unique_ptr<Doc>& other : mDocs)
+        {
+            if (other.get() != doc && !other->notecard)
+            {
+                docs.push_back(other.get());
+            }
+        }
+    }
+    return docs;
+}
+
+ALFloaterScriptStudio::Doc* ALFloaterScriptStudio::problemsDoc()
+{
+    const size_t index = mProblemsShownFor.empty() ? NONE : indexOf(mProblemsShownFor);
+    return index != NONE ? mDocs[index].get() : active();
+}
+
 void ALFloaterScriptStudio::fillProblems(const Doc* doc)
 {
     // The row chosen and how far the list was scrolled are kept through a
@@ -4210,69 +4551,212 @@ void ALFloaterScriptStudio::fillProblems(const Doc* doc)
     const bool same = doc && doc->id == mProblemsShownFor;
     mProblemsShownFor = doc ? doc->id : std::string();
     mProblems->deleteAllItems();
+    mProblems->setCommentText(LLStringUtil::null);
+
+    // How many of each there are before the filters: what the level
+    // boxes and the tab say.
+    const std::vector<const Doc*> docs = problemDocs(doc);
+    S32                           errors = 0, warnings = 0, notes = 0;
+    for (const Doc* each : docs)
+    {
+        for (const Doc::Shown& shown : each->shown)
+        {
+            errors += shown.level == Doc::Level::Error ? 1 : 0;
+            warnings += shown.level == Doc::Level::Warning ? 1 : 0;
+            notes += shown.level == Doc::Level::Note ? 1 : 0;
+        }
+    }
+    const S32 held = errors + warnings + notes;
+    const auto label = [this](LLCheckBoxCtrl* box, const char* name, S32 count) {
+        LLStringUtil::format_map_t args;
+        args["[COUNT]"] = std::to_string(count);
+        const std::string said = count > 0 ? getString(std::string(name) + "Count", args) : getString(name);
+        if (box->getLabel() != said)
+        {
+            box->setLabel(said);
+        }
+    };
+    label(mProblemErrors, "FilterErrors", errors);
+    label(mProblemWarnings, "FilterWarnings", warnings);
+    label(mProblemNotes, "FilterNotes", notes);
+    layoutProblemFilters();
+    mProblemsHeld = held;
+    refreshBottomTabs();
     if (!doc)
     {
         return;
     }
-    const auto selected = mProblemStore.select(problemQuery(*doc));
-    for (const Doc::Shown* problem : selected.found)
+
+    // What the filters take, by script and, within one, by the file it is
+    // in: the script's own, then each include's.
+    struct Group
     {
-        // The row carries the place, so that choosing it needs no index
-        // into anything that a filter reorders.
-        LLSD value;
-        value["line"]      = problem->line;
-        value["column"]    = problem->column;
-        value["hasColumn"] = problem->hasColumn;
-        value["file"]      = problem->file;
-        value["fileName"]  = problem->fileName;
-        value["level"]     = levelName(problem->level);
-        value["origin"]    = problem->origin;
-        value["message"]   = problem->message;
-        value["lint"]      = problem->lint;
-        // Every column carries the whole of it: a diagnostic longer than
-        // the column is cut at the column's edge, and the squiggle that
-        // would otherwise have to be hovered instead is in a file this
-        // window may not even have open.
-        // The column as the status line counts it, where the problem is in
-        // the text open here; an include's is its byte, for want of its text.
-        const S32 column = problem->file.empty() && problem->line < doc->editor->document().lineCount()
-                               ? doc->editor->document().displayColumn(ALTextPos(problem->line, problem->column), doc->editor->getTabWidth())
-                               : problem->column;
-        const std::string place = (problem->file.empty() ? doc->name : problem->fileName) +
-                                  (problem->hasColumn ? llformat(":%d:%d", problem->line + 1, column + 1)
-                                                      : llformat(":%d", problem->line + 1));
-        const std::string tip = place + "\n" + problem->message;
-        LLSD row;
-        row["value"]                = value;
-        row["columns"][0]["column"] = "line";
-        row["columns"][0]["value"]  = (problem->fileName.empty() ? std::string() : problem->fileName + ":") +
-                                     (problem->hasColumn ? llformat("%d:%d", problem->line + 1, column + 1) : llformat("%d", problem->line + 1));
-        row["columns"][1]["column"] = "level";
-        row["columns"][1]["value"]  = getString(problem->level == Doc::Level::Error ? "LevelError" : problem->level == Doc::Level::Warning ? "LevelWarning" : "LevelNote");
-        row["columns"][2]["column"] = "source";
-        row["columns"][2]["value"]  = problem->origin;
-        row["columns"][3]["column"] = "message";
-        row["columns"][3]["value"]  = problem->message;
-        for (S32 i = 0; i < 4; ++i)
+        const Doc*                       doc = nullptr;
+        std::string                      file;
+        std::string                      fileName;
+        std::vector<const Doc::Shown*>   rows;
+    };
+    std::vector<Group> groups;
+    S32                listed = 0;
+    for (const Doc* each : docs)
+    {
+        const auto selected = mProblemStore.select(problemQuery(*each));
+        for (const Doc::Shown* problem : selected.found)
         {
-            row["columns"][i]["tool_tip"] = tip;
+            if (groups.empty() || groups.back().doc != each || groups.back().file != problem->file)
+            {
+                groups.push_back({ each, problem->file, problem->fileName, {} });
+            }
+            groups.back().rows.push_back(problem);
+            ++listed;
         }
-        mProblems->addElement(row);
+    }
+
+    static const LLUIColor ink = LLUIColorTable::instance().getColor("ScrollUnselectedColor", LLColor4::white);
+    const bool all      = docs.size() > 1 || (mProblemScope && mProblemScope->getValue().asString() == "all");
+    // Whose they are, over them, wherever that is not plain: more than one
+    // script's or file's, or another script's than the one in front, which
+    // a row followed into an include leaves the list on.
+    const bool elsewhere = doc != active();
+    const bool headings  = all || groups.size() > 1 || elsewhere;
+    for (size_t group_index = 0; group_index < groups.size(); ++group_index)
+    {
+        const Group& group = groups[group_index];
+        if (headings)
+        {
+            // Whose they are, over them: the script, or the include and,
+            // among every script's, which script includes it.
+            S32 group_errors = 0, group_warnings = 0, group_notes = 0;
+            for (const Doc::Shown* problem : group.rows)
+            {
+                group_errors += problem->level == Doc::Level::Error ? 1 : 0;
+                group_warnings += problem->level == Doc::Level::Warning ? 1 : 0;
+                group_notes += problem->level == Doc::Level::Note ? 1 : 0;
+            }
+            std::vector<std::string> counts;
+            if (group_errors > 0)
+            {
+                counts.push_back(counted("ProblemErrors", group_errors));
+            }
+            if (group_warnings > 0)
+            {
+                counts.push_back(counted("ProblemWarnings", group_warnings));
+            }
+            if (group_notes > 0)
+            {
+                counts.push_back(counted("ProblemNotes", group_notes));
+            }
+            LLStringUtil::format_map_t args;
+            args["[NAME]"] = group.doc->name;
+            args["[FILE]"] = group.fileName;
+            std::string name = group.file.empty() ? group.doc->name : getString(all ? "ProblemsIncludedBy" : "ProblemsIncluded", args);
+            for (size_t i = 0; i < counts.size(); ++i)
+            {
+                name += (i == 0 ? "   \xC2\xB7   " : ", ") + counts[i];
+            }
+            LLSD heading;
+            heading["value"]["heading"]      = true;
+            heading["value"]["group"]        = static_cast<S32>(group_index);
+            heading["columns"][0]["column"]  = "icon";
+            heading["columns"][0]["type"]    = "icon";
+            heading["columns"][0]["value"]   = group.file.empty() ? imageNameOf(*group.doc) : includeImage(group.file, group.doc->language.lua);
+            heading["columns"][1]["column"]  = "message";
+            heading["columns"][1]["value"]   = name;
+            heading["columns"][1]["color"]   = ink.get().getValue();
+            heading["columns"][1]["font"]["style"] = "BOLD";
+            if (LLScrollListItem* item = mProblems->addElement(heading))
+            {
+                item->setEnabled(false);
+            }
+        }
+        for (const Doc::Shown* problem : group.rows)
+        {
+            // The row carries the place and whose it is, so that choosing
+            // it needs no index into anything that a filter reorders.
+            LLSD value;
+            value["group"]     = static_cast<S32>(group_index);
+            value["doc"]       = group.doc->id;
+            value["line"]      = problem->line;
+            value["column"]    = problem->column;
+            value["hasColumn"] = problem->hasColumn;
+            value["endLine"]   = problem->endLine;
+            value["endColumn"] = problem->endColumn;
+            value["file"]      = problem->file;
+            value["fileName"]  = problem->fileName;
+            value["level"]     = levelName(problem->level);
+            value["origin"]    = problem->origin;
+            value["message"]   = problem->message;
+            value["lint"]      = problem->lint;
+            // The column as the status line counts it, where the problem is
+            // in the text open here; an include's is its byte, for want of
+            // its text.
+            const ALTextDocument& text   = group.doc->editor->document();
+            const S32             column = problem->file.empty() && problem->line < text.lineCount()
+                                               ? text.displayColumn(ALTextPos(problem->line, problem->column), group.doc->editor->getTabWidth())
+                                               : problem->column;
+            const std::string where = problem->hasColumn ? llformat("%d:%d", problem->line + 1, column + 1) : llformat("%d", problem->line + 1);
+            const std::string level = getString(problem->level == Doc::Level::Error     ? "LevelError"
+                                                 : problem->level == Doc::Level::Warning ? "LevelWarning"
+                                                                                         : "LevelNote");
+            // Every column carries the whole of it: a diagnostic longer
+            // than the column is cut at the column's edge.
+            const std::string tip = level + "   \xC2\xB7   " + (problem->file.empty() ? group.doc->name : problem->fileName) + ":" + where + "\n" +
+                                    problem->message;
+            const ALCodeEditor::Mark mark = problem->origin == getString("OriginRuntime") ? ALCodeEditor::Mark::Runtime : markOf(problem->level);
+            LLSD row;
+            row["value"]                = value;
+            row["columns"][0]["column"] = "icon";
+            row["columns"][0]["type"]   = "icon";
+            row["columns"][0]["value"]  = problem->level == Doc::Level::Error     ? "Problem_Error"
+                                          : problem->level == Doc::Level::Warning ? "Problem_Warning"
+                                                                                  : "Problem_Note";
+            row["columns"][0]["color"]  = group.doc->editor->markColor(mark).getValue();
+            row["columns"][1]["column"] = "message";
+            row["columns"][1]["value"]  = problem->message;
+            row["columns"][2]["column"] = "source";
+            row["columns"][2]["value"]  = problem->origin;
+            row["columns"][3]["column"] = "line";
+            row["columns"][3]["value"]  = where;
+            for (S32 i = 0; i < 4; ++i)
+            {
+                row["columns"][i]["tool_tip"] = tip;
+            }
+            mProblems->addElement(row);
+        }
+    }
+    // What the filters hide, said under what they let through.
+    if (listed > 0 && held > listed)
+    {
+        LLSD more;
+        more["value"]["heading"]     = true;
+        more["value"]["group"]       = static_cast<S32>(groups.size());
+        more["columns"][0]["column"] = "icon";
+        more["columns"][0]["value"]  = std::string();
+        more["columns"][1]["column"] = "message";
+        more["columns"][1]["value"]  = counted("ProblemsHidden", held - listed);
+        if (LLScrollListItem* item = mProblems->addElement(more))
+        {
+            item->setEnabled(false);
+        }
     }
     if (same)
     {
-        // The same problem, found by what it says and where it is from;
-        // nearest the line it was on, since an edit above moves it.
-        S32 best = -1;
+        // The same problem, found by what it says, where it is from and
+        // whose it is; nearest the line it was on, since an edit above
+        // moves it.
+        S32 best          = -1;
         S32 best_distance = S32_MAX;
-        if (chosen.isMap())
+        if (chosen.isMap() && !chosen.has("heading"))
         {
+            // In the order shown, which a sort by a column has changed.
+            mProblems->updateSort();
             const std::vector<LLScrollListItem*> rows = mProblems->getAllData();
             for (size_t i = 0; i < rows.size(); ++i)
             {
                 const LLSD& value = rows[i]->getValue();
-                if (value["message"].asString() != chosen["message"].asString() || value["origin"].asString() != chosen["origin"].asString() ||
-                    value["file"].asString() != chosen["file"].asString())
+                if (value.has("heading") || value["message"].asString() != chosen["message"].asString() ||
+                    value["origin"].asString() != chosen["origin"].asString() || value["file"].asString() != chosen["file"].asString() ||
+                    value["doc"].asString() != chosen["doc"].asString())
                 {
                     continue;
                 }
@@ -4290,19 +4774,76 @@ void ALFloaterScriptStudio::fillProblems(const Doc* doc)
         }
         mProblems->setScrollPos(scrolled);
     }
-    const S32 held = mProblemStore.countIn(doc->id);
     if (held == 0)
     {
-        const bool current = doc->loaded && doc->analysisVersion == doc->editor->document().version();
-        mProblems->setCommentText(current ? getString("NoProblems") : std::string());
+        bool current = true;
+        for (const Doc* each : docs)
+        {
+            current = current && each->loaded && each->analysisVersion == each->editor->document().version();
+        }
+        LLStringUtil::format_map_t named;
+        named["[NAME]"] = doc->name;
+        mProblems->setCommentText(!current ? std::string() : all ? getString("NoProblemsOpen") : elsewhere ? getString("NoProblemsIn", named) : getString("NoProblems"));
     }
-    else if (selected.found.empty())
+    else if (listed == 0)
     {
         LLStringUtil::format_map_t args;
         args["[SHOWN]"] = "0";
         args["[TOTAL]"] = std::to_string(held);
         mProblems->setCommentText(getString("ProblemsShown", args));
     }
+}
+
+void ALFloaterScriptStudio::layoutProblemFilters()
+{
+    // The level boxes as wide as what they say, the rest after them, the
+    // words' box taking what is left.
+    const LLFontGL* font = LLFontGL::getFontSansSerifSmall();
+    S32             left = 4;
+    for (LLCheckBoxCtrl* box : { mProblemErrors, mProblemWarnings, mProblemNotes })
+    {
+        const S32 width = 24 + font->getWidth(box->getLabel());
+        box->reshape(width, box->getRect().getHeight());
+        box->setOrigin(left, box->getRect().mBottom);
+        left += width + 4;
+    }
+    left += 6;
+    for (LLUICtrl* combo : { static_cast<LLUICtrl*>(mProblemScope), static_cast<LLUICtrl*>(mProblemOrigin) })
+    {
+        combo->setOrigin(left, combo->getRect().mBottom);
+        left += combo->getRect().getWidth() + 6;
+    }
+    left += 2;
+    const LLRect filter = mProblemFilter->getRect();
+    const S32    right  = mProblemFilter->getParent() ? mProblemFilter->getParent()->getRect().getWidth() - 4 : filter.mRight;
+    const S32    width  = llmax(60, right - left);
+    if (filter.mLeft != left || filter.getWidth() != width)
+    {
+        mProblemFilter->reshape(width, filter.getHeight());
+        mProblemFilter->setOrigin(left, filter.mBottom);
+    }
+}
+
+void ALFloaterScriptStudio::refreshBottomTabs()
+{
+    if (!mBottomTabs)
+    {
+        return;
+    }
+    const auto title = [this](const char* tab, const std::string& said) {
+        LLPanel* panel = mBottomTabs->getChild<LLPanel>(tab);
+        const S32 index = mBottomTabs->getIndexForPanel(panel);
+        if (index >= 0 && mBottomTabs->getPanelTitle(index) != said)
+        {
+            mBottomTabs->setPanelTitle(index, said);
+        }
+    };
+    LLStringUtil::format_map_t args;
+    args["[COUNT]"] = std::to_string(mProblemsHeld);
+    title("problems_tab", getString(mProblemsHeld > 0 ? "TabProblemsCount" : "TabProblems", args));
+    args["[COUNT]"] = std::to_string(mFound.places.size());
+    title("references_tab", getString(mFound.places.empty() ? "TabReferences" : "TabReferencesCount", args));
+    title("output_tab", getString(mOutputUnread ? "TabOutputUnread" : "TabOutput"));
 }
 
 void ALFloaterScriptStudio::goToProblem(Doc& doc, S32 direction)
@@ -4348,13 +4889,18 @@ void ALFloaterScriptStudio::goToProblem(Doc& doc, S32 direction)
     }
     doc.editor->goTo(ALTextRange(to, to));
     doc.editor->setFocus(true);
+    showProblemCard(doc, to);
+}
+
+void ALFloaterScriptStudio::showProblemCard(Doc& doc, const ALTextPos& at)
+{
     // What is wrong there, in the card the mouse would bring up.
     std::vector<ALCodeEditor::CardProblem> problems;
     ALTextRange                            about;
     for (const ALCodeEditor::Decoration& decoration : doc.editor->decorations())
     {
         const ALTextRange range = decoration.range.normalised();
-        if (!decoration.message.empty() && range.begin <= to && (to < range.end || range.begin == to))
+        if (!decoration.message.empty() && range.begin <= at && (at < range.end || range.begin == at))
         {
             problems.push_back({ decoration.message, decoration.color });
             about = about.empty() ? range : ALTextRange(std::min(about.begin, range.begin), std::max(about.end, range.end));
@@ -4384,31 +4930,183 @@ void ALFloaterScriptStudio::showEditorKeys()
     }
 }
 
-void ALFloaterScriptStudio::onProblemSelected()
+void ALFloaterScriptStudio::onProblemSelected(bool to_editor)
 {
-    Doc*              doc  = active();
     LLScrollListItem* item = mProblems->getFirstSelected();
-    if (!doc || !item)
+    if (!item)
     {
         return;
     }
     const LLSD& problem = item->getValue();
-    if (!problem.isMap())
+    if (!problem.isMap() || problem.has("heading"))
+    {
+        return;
+    }
+    const size_t index = indexOf(problem["doc"].asString());
+    if (index == NONE)
     {
         return;
     }
     const S32  line       = problem["line"].asInteger();
     const S32  column     = problem["column"].asInteger();
     const bool has_column = problem["hasColumn"].asBoolean();
+    if (!to_editor && deferOpen(mProblems, problem["file"].asString()))
+    {
+        return;
+    }
+    ++mHoldPanes;
     if (!problem["file"].asString().empty())
     {
         // In an include: opened in a tab of its own where it is a script
-        // or a notecard in the world; a file on disk is only named.
+        // or a notecard in the world, or a file on disk.
         openIncludeAt(problem["file"].asString(), problem["fileName"].asString(), line, has_column ? column : -1, 0);
+    }
+    else
+    {
+        if (index != mActive)
+        {
+            activate(index);
+        }
+        // What the problem is about, selected, with what it says in the
+        // card the mouse would bring up there.
+        Doc&            doc   = *mDocs[index];
+        const ALTextPos begin = doc.editor->document().clamp(ALTextPos(line, has_column ? column : 0));
+        const S32       end_line = problem["endLine"].asInteger();
+        ALTextPos       end      = end_line >= 0 ? doc.editor->document().clamp(ALTextPos(end_line, problem["endColumn"].asInteger())) : begin;
+        if (end < begin)
+        {
+            end = begin;
+        }
+        doc.editor->goTo(ALTextRange(begin, end));
+        showProblemCard(doc, begin);
+    }
+    --mHoldPanes;
+    revealed(mProblems, to_editor);
+}
+
+bool ALFloaterScriptStudio::deferOpen(ALPaneList* list, const std::string& path)
+{
+    // Once the list has stayed on it -- the arrows walking past each row
+    // they go by -- it is opened, as a preview, which the next one opened
+    // so takes the place of.
+    if (mSettled || path.empty())
+    {
+        return false;
+    }
+    ALScriptRef ref;
+    std::string file;
+    const bool  open = ALScriptPreprocessor::refOf(path, ref) ? indexOf(ref) != NONE
+                       : ALScriptPreprocessor::fileOf(path, file) ? indexOf("disk:" + file) != NONE
+                                                                   : true;
+    if (open)
+    {
+        return false;
+    }
+    constexpr F64     SETTLE = 0.35;
+    LLScrollListItem* item   = list->getFirstSelected();
+    mSettleList              = list;
+    mSettleValue             = item ? item->getValue() : LLSD();
+    mSettleDue               = LLTimer::getTotalSeconds() + SETTLE;
+    return true;
+}
+
+void ALFloaterScriptStudio::pumpSettle()
+{
+    if (!mSettleList || LLTimer::getTotalSeconds() < mSettleDue)
+    {
         return;
     }
-    doc->editor->setCaret(ALTextPos(line, has_column ? column : 0));
-    doc->editor->setFocus(true);
+    ALPaneList* list = mSettleList;
+    mSettleList      = nullptr;
+    // Still there, and still being walked: gone from, or left for
+    // something else, it is not opened.
+    LLScrollListItem* item = list->getFirstSelected();
+    if (!item || !list->hasFocus() || !llsd_equals(item->getValue(), mSettleValue))
+    {
+        return;
+    }
+    mSettled = true;
+    ++mOpenPreview;
+    if (list == mProblems)
+    {
+        onProblemSelected(false);
+    }
+    else if (list == mReferences)
+    {
+        onReferenceChosen(false);
+    }
+    else if (list == mSearchResults)
+    {
+        onSearchResult(false);
+    }
+    --mOpenPreview;
+    mSettled = false;
+}
+
+void ALFloaterScriptStudio::closePreview()
+{
+    for (size_t i = 0; i < mDocs.size(); ++i)
+    {
+        Doc& doc = *mDocs[i];
+        if (!doc.preview)
+        {
+            continue;
+        }
+        // One a pane is listing -- its problems, the places a name was
+        // looked up from it -- is being worked from, and stays.
+        if (doc.editor->isDirty() || doc.saving || doc.id == mProblemsShownFor || doc.id == mFound.from)
+        {
+            holdPreview(doc);
+            return;
+        }
+        // Nothing held there: the next look takes its place.
+        letGoOf(i);
+        return;
+    }
+}
+
+void ALFloaterScriptStudio::holdPreview(Doc& doc)
+{
+    if (doc.preview)
+    {
+        doc.preview = false;
+        fillTabs();
+    }
+}
+
+void ALFloaterScriptStudio::revealed(LLUICtrl* list, bool to_editor)
+{
+    // To the script to type there, held where it was a preview, or back
+    // to the list to walk on.
+    if (to_editor)
+    {
+        mSettleList = nullptr;
+        if (Doc* doc = active())
+        {
+            holdPreview(*doc);
+            (doc->showingExpanded && doc->expandedEditor ? doc->expandedEditor : doc->editor)->setFocus(true);
+        }
+        return;
+    }
+    list->setFocus(true);
+}
+
+void ALFloaterScriptStudio::selectFirstError(bool checkers_only)
+{
+    mProblems->updateSort();
+    const std::vector<LLScrollListItem*> rows     = mProblems->getAllData();
+    const std::string                    compiler = getString("OriginCompiler");
+    for (size_t i = 0; i < rows.size(); ++i)
+    {
+        const LLSD& value = rows[i]->getValue();
+        if (value.isMap() && !value.has("heading") && value["level"].asString() == "ERROR" && (!checkers_only || value["origin"].asString() != compiler))
+        {
+            mProblems->selectNthItem(static_cast<S32>(i));
+            mProblems->scrollToShowSelected();
+            onProblemSelected(true);
+            return;
+        }
+    }
 }
 
 // --- the name at the caret ----------------------------------------------------------
@@ -4423,7 +5121,7 @@ void ALFloaterScriptStudio::askSymbol(Doc& doc, ALEditorCommand command, const A
 
 namespace
 {
-    // A line of a text, trimmed, for a row of the pane.
+    // A line of a text, as it is, for a row of a pane.
     std::string lineOf(const std::string& text, S32 line)
     {
         size_t begin = 0;
@@ -4439,10 +5137,12 @@ namespace
         {
             return std::string();
         }
-        size_t      end = text.find('\n', begin);
-        std::string out = text.substr(begin, end == std::string::npos ? std::string::npos : end - begin);
-        LLStringUtil::trim(out);
-        return out;
+        size_t end = text.find('\n', begin);
+        if (end != std::string::npos && end > begin && text[end - 1] == '\r')
+        {
+            --end;
+        }
+        return text.substr(begin, end == std::string::npos ? std::string::npos : end - begin);
     }
 
     std::string lineOf(const ALTextDocument& text, S32 line)
@@ -4451,16 +5151,129 @@ namespace
         {
             return std::string();
         }
-        std::string out = text.text(ALTextRange(ALTextPos(line, 0), ALTextPos(line, text.lineLength(line))));
-        LLStringUtil::trim(out);
-        return out;
+        return text.line(line);
     }
 }
 
-void ALFloaterScriptStudio::symbolAnswered(Doc& doc, const ALScriptAnalysis::Result& result)
+// static
+void ALFloaterScriptStudio::placeText(Doc::Place& place, const std::string& line)
 {
-    // Of another question, or of a text that has moved on.
-    if (result.version != doc.symbolVersion || ALTextPos(result.line, result.column) != doc.symbolAt || doc.symbolCommand == ALEditorCommand::None)
+    // Trimmed for the row, and the name's place moved with the trimming.
+    const size_t first = line.find_first_not_of(" \t");
+    if (first == std::string::npos)
+    {
+        place.text.clear();
+        place.at = -1;
+        return;
+    }
+    const size_t last = line.find_last_not_of(" \t\r");
+    place.text        = line.substr(first, last - first + 1);
+    const S32 at      = place.span.column - static_cast<S32>(first);
+    place.at          = at >= 0 && at < static_cast<S32>(place.text.size()) ? at : -1;
+}
+
+const char* ALFloaterScriptStudio::includeImage(const std::string& path, bool lua) const
+{
+    // What the include is, where the item can be found: a notecard, or a
+    // script in the language asking; a file on disk.
+    ALScriptRef ref;
+    if (!ALScriptPreprocessor::refOf(path, ref))
+    {
+        return "Studio_File";
+    }
+    LLViewerObject*        object = ref.inInventory() ? nullptr : gObjectList.findObject(ref.object);
+    const LLInventoryItem* item   = ref.inInventory() ? gInventory.getItem(ref.item) : object ? object->getInventoryItem(ref.item) : nullptr;
+    if (item && item->getType() == LLAssetType::AT_NOTECARD)
+    {
+        return "Inv_Notecard";
+    }
+    return lua ? "Inv_Script_Luau" : "Inv_Script";
+}
+
+LLSD ALFloaterScriptStudio::Declared::value() const
+{
+    LLSD out;
+    out["line"]   = line;
+    out["column"] = column;
+    out["path"]   = path;
+    out["name"]   = name;
+    return out;
+}
+
+ALFloaterScriptStudio::Declared ALFloaterScriptStudio::declaredOf(const Doc& doc, const ALScriptAnalysis::Result& result) const
+{
+    // Where the analyzer read it declared: in the expansion, where the
+    // preprocessor ran, and so back to the source -- this script's, or an
+    // include's.
+    Declared declared;
+    if (!result.hover.found || !result.hover.hasDefinition)
+    {
+        return declared;
+    }
+    declared.line   = result.hover.definitionLine;
+    declared.column = result.hover.definitionColumn;
+    if (preprocessed(doc))
+    {
+        const ALSourceMap::Loc loc = doc.expanded.map.toSource(declared.line, declared.column);
+        declared.line              = loc.found() ? loc.line : -1;
+        declared.column            = loc.found() ? loc.column : -1;
+        if (loc.found() && loc.file > 0)
+        {
+            declared.path = doc.expanded.map.files()[loc.file].path;
+            declared.name = doc.expanded.map.files()[loc.file].name;
+        }
+    }
+    return declared;
+}
+
+void ALFloaterScriptStudio::goToDeclared(const LLSD& value)
+{
+    Doc* doc = active();
+    if (!doc || !value.has("line"))
+    {
+        return;
+    }
+    const S32 line   = value["line"].asInteger();
+    const S32 column = value["column"].asInteger();
+    if (!value["path"].asString().empty())
+    {
+        openIncludeAt(value["path"].asString(), value["name"].asString(), line, column, 0);
+        return;
+    }
+    doc->editor->goTo(ALTextPos(line, llmax(0, column)));
+    doc->editor->setFocus(true);
+}
+
+bool ALFloaterScriptStudio::sourceLine(const std::string& path, S32 line, std::string& out) const
+{
+    // In its tab, as it stands there, where it is open.
+    for (const std::unique_ptr<Doc>& doc : mDocs)
+    {
+        if (doc->loaded && (doc->file.empty() ? ALScriptPreprocessor::pathOf(doc->ref) : doc->id) == path)
+        {
+            if (line < 0 || line >= doc->editor->document().lineCount())
+            {
+                return false;
+            }
+            out = doc->editor->document().line(line);
+            return true;
+        }
+    }
+    std::string text;
+    if (!ALScriptPreprocessor::instance().heldText(path, text))
+    {
+        return false;
+    }
+    out = lineOf(text, line);
+    return true;
+}
+
+void ALFloaterScriptStudio::symbolAnswered(Doc& doc, const ALScriptAnalysis::Result& result, const ALTextPos& at)
+{
+    // Of another question, or of a text that has moved on. Where it was
+    // asked is the source's place, which the result's own is not where
+    // the preprocessor ran and an include moved the lines.
+    if (result.version != doc.symbolVersion || at != doc.symbolAt || doc.symbolCommand == ALEditorCommand::None)
     {
         return;
     }
@@ -4514,13 +5327,25 @@ void ALFloaterScriptStudio::symbolAnswered(Doc& doc, const ALScriptAnalysis::Res
             {
                 place.file     = map->files()[file].path;
                 place.fileName = map->files()[file].name;
-                place.text     = lineOf(doc.expanded.text, raw.line);
             }
         }
         place.span = span;
+        // The line as it was written: this script's, or the include's
+        // where it is in hand; the expansion's, with its macros put in
+        // place, only where it is not.
+        std::string line;
         if (place.file.empty())
         {
-            place.text = lineOf(doc.editor->document(), span.line);
+            placeText(place, lineOf(doc.editor->document(), span.line));
+        }
+        else if (sourceLine(place.file, span.line, line))
+        {
+            placeText(place, line);
+        }
+        else
+        {
+            placeText(place, lineOf(doc.expanded.text, raw.line));
+            place.at = -1;
         }
         places.push_back(std::move(place));
     }
@@ -4585,6 +5410,9 @@ namespace
 void ALFloaterScriptStudio::startLookup(Doc& doc, ALEditorCommand command, const ALScriptReferences& refs, bool has_definition, const std::string& home_path,
                                         const ALScriptSpan& definition, std::vector<Doc::Place> places, U32 version)
 {
+    // A script names are looked up from is being worked in: a preview of
+    // it is held, so that following what it finds does not close it.
+    holdPreview(doc);
     Doc::Lookup& lookup   = doc.lookup;
     lookup                = Doc::Lookup();
     lookup.generation     = ++mLookupGeneration;
@@ -4713,16 +5541,16 @@ void ALFloaterScriptStudio::lookupCandidate(const std::string& id, U32 generatio
     // -- with shrinknames on it renames every one.
     request.optimize      = false;
     const LLHandle<LLFloater> handle = getHandle();
-    ALScriptPreprocessor::instance().run(request, [handle, id, generation, ref, name](const ALPreprocessor::Result& result) {
+    ALScriptPreprocessor::instance().run(request, [handle, id, generation, ref, name, text](const ALPreprocessor::Result& result) {
         if (ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get()))
         {
-            studio->lookupExpanded(id, generation, ref, name, result);
+            studio->lookupExpanded(id, generation, ref, name, text, result);
         }
     });
 }
 
 void ALFloaterScriptStudio::lookupExpanded(const std::string& id, U32 generation, const ALScriptRef& ref, const std::string& name,
-                                           const ALPreprocessor::Result& result)
+                                           const std::string& source, const ALPreprocessor::Result& result)
 {
     const size_t index = indexOf(id);
     if (index == NONE || mDocs[index]->lookup.generation != generation)
@@ -4759,17 +5587,17 @@ void ALFloaterScriptStudio::lookupExpanded(const std::string& id, U32 generation
     request.line    = at.line;
     request.column  = at.column;
     const LLHandle<LLFloater> handle = getHandle();
-    ALScriptAnalysis::instance().ask(std::move(request),
-                                     [handle, id, generation, ref, name, map = result.map, expanded = result.text](const ALScriptAnalysis::Result& answer) {
-                                         if (ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get()))
-                                         {
-                                             studio->lookupAnswered(id, generation, ref, name, map, expanded, answer);
-                                         }
-                                     });
+    ALScriptAnalysis::instance().ask(std::move(request), [handle, id, generation, ref, name, source, map = result.map,
+                                                          expanded = result.text](const ALScriptAnalysis::Result& answer) {
+        if (ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get()))
+        {
+            studio->lookupAnswered(id, generation, ref, name, map, source, expanded, answer);
+        }
+    });
 }
 
 void ALFloaterScriptStudio::lookupAnswered(const std::string& id, U32 generation, const ALScriptRef& ref, const std::string& name, const ALSourceMap& map,
-                                           const std::string& expanded, const ALScriptAnalysis::Result& result)
+                                           const std::string& source, const std::string& expanded, const ALScriptAnalysis::Result& result)
 {
     const size_t index = indexOf(id);
     if (index == NONE || mDocs[index]->lookup.generation != generation)
@@ -4794,7 +5622,21 @@ void ALFloaterScriptStudio::lookupAnswered(const std::string& id, U32 generation
             place.span     = span;
             place.file     = file == 0 ? self : map.files()[file].path;
             place.fileName = file == 0 ? name : map.files()[file].name;
-            place.text     = lineOf(expanded, raw.line);
+            // As the other script, or its include, was written.
+            std::string line;
+            if (file == 0)
+            {
+                placeText(place, lineOf(source, span.line));
+            }
+            else if (sourceLine(place.file, span.line, line))
+            {
+                placeText(place, line);
+            }
+            else
+            {
+                placeText(place, lineOf(expanded, raw.line));
+                place.at = -1;
+            }
             if (place.file == own)
             {
                 // This script's own, which its own answer listed.
@@ -4842,9 +5684,16 @@ void ALFloaterScriptStudio::lookupSettled(Doc& doc)
     args["[FILES]"] = std::to_string(files.size());
     if (command == ALEditorCommand::FindReferences)
     {
-        doc.places = lookup.places;
+        mFound               = References();
+        mFound.from          = doc.id;
+        mFound.fromName      = doc.name;
+        mFound.name          = lookup.name;
+        mFound.places        = lookup.places;
+        mFound.hasDefinition = lookup.hasDefinition;
+        mFound.home          = lookup.homePath;
+        mFound.definition    = lookup.definition;
         std::vector<ALTextRange> lit;
-        for (const Doc::Place& place : doc.places)
+        for (const Doc::Place& place : mFound.places)
         {
             if (place.file.empty())
             {
@@ -4852,7 +5701,7 @@ void ALFloaterScriptStudio::lookupSettled(Doc& doc)
             }
         }
         doc.editor->setHighlights(std::move(lit));
-        fillReferences(&doc);
+        fillReferences();
         showBottom("references_tab");
         setStatus(counted(files.size() > 1 ? "ReferencesFoundAcross" : "ReferencesFound", static_cast<S32>(lookup.places.size()), args));
     }
@@ -5057,11 +5906,11 @@ void ALFloaterScriptStudio::renameTo(const std::string& id, U32 generation, cons
     args["[STALE]"]  = std::to_string(stale);
     if (scripts > 1 || opened > 0)
     {
-        setStatus(getString(stale > 0 ? "RenamedAcrossStale" : "RenamedAcross", args), stale > 0);
+        report(getString(stale > 0 ? "RenamedAcrossStale" : "RenamedAcross", args), stale > 0);
     }
     else
     {
-        setStatus(getString(stale > 0 ? "RenamedStale" : "Renamed", args), stale > 0);
+        report(getString(stale > 0 ? "RenamedStale" : "Renamed", args), stale > 0);
     }
     activate(index);
     doc.editor->setFocus(true);
@@ -5103,7 +5952,7 @@ void ALFloaterScriptStudio::applyPendingEdits(Doc& doc)
         LLStringUtil::format_map_t args;
         args["[NAME]"]  = doc.name;
         args["[COUNT]"] = std::to_string(missed);
-        setStatus(getString("RenameMissed", args), true);
+        report(getString("RenameMissed", args), true, &doc);
     }
 }
 
@@ -5204,7 +6053,7 @@ void ALFloaterScriptStudio::editExternally(Doc& doc)
     if (!on_disk && !writeWhole(filename, doc.editor->text()))
     {
         args["[FILE]"] = filename;
-        setStatus(getString("ExternalWriteFailed", args), true);
+        report(getString("ExternalWriteFailed", args), true, &doc);
         return;
     }
     if (on_disk)
@@ -5262,7 +6111,7 @@ void ALFloaterScriptStudio::editExternally(Doc& doc)
             LLNotificationsUtil::add("GenericAlert", LLSD().with("MESSAGE", LLTrans::getString("VSCodeLaunchFailed")));
             return;
         }
-        setStatus(getString("ExternalOpenedVSCode", args));
+        report(getString("ExternalOpenedVSCode", args), false, &doc);
         return;
     }
     LLExternalEditor             editor;
@@ -5280,7 +6129,7 @@ void ALFloaterScriptStudio::editExternally(Doc& doc)
         LLNotificationsUtil::add("GenericAlert", LLSD().with("MESSAGE", LLExternalEditor::getErrorMessage(status)));
         return;
     }
-    setStatus(getString("ExternalOpened", args));
+    report(getString("ExternalOpened", args), false, &doc);
 }
 
 void ALFloaterScriptStudio::externalChanged(const std::string& id, const std::string& file)
@@ -5415,7 +6264,7 @@ void ALFloaterScriptStudio::fileChangedOutside(const std::string& id, const std:
     if (doc.editor->isDirty())
     {
         // What is typed here is not thrown away for it; the author is told.
-        setStatus(getString("FileChangedOutside", args), true);
+        report(getString("FileChangedOutside", args), true, &doc);
         return;
     }
     const std::string text = readWholeFile(file);
@@ -5427,7 +6276,7 @@ void ALFloaterScriptStudio::fileChangedOutside(const std::string& id, const std:
     doc.carriedText = text;
     takeCarriedText(doc);
     fileSettled(doc);
-    setStatus(getString("FileReloaded", args));
+    report(getString("FileReloaded", args), false, &doc);
 }
 
 void ALFloaterScriptStudio::saveFile(Doc& doc)
@@ -5443,11 +6292,11 @@ void ALFloaterScriptStudio::saveFile(Doc& doc)
     args["[PATH]"] = doc.file;
     if (!out.good())
     {
-        setStatus(getString("SaveToFileFailed", args), true);
+        report(getString("SaveToFileFailed", args), true, &doc);
         saveStopped(doc);
         return;
     }
-    setStatus(getString("SavedToFile", args));
+    report(getString("SavedToFile", args), false, &doc);
     fileSettled(doc);
     // The scripter's snippets, offered as saved from here on.
     for (bool lua : { false, true })
@@ -5488,56 +6337,177 @@ void ALFloaterScriptStudio::fileSettled(Doc& doc)
     }
 }
 
-void ALFloaterScriptStudio::fillReferences(const Doc* doc)
+void ALFloaterScriptStudio::fillReferences()
 {
+    // The row chosen and the scroll kept through a refill, which an edit
+    // moving the places asks for.
+    mPlacesStale        = false;
+    const S32 scrolled  = mReferences->getScrollPos();
+    const S32 chosen    = mReferences->getFirstSelected() ? mReferences->getFirstSelected()->getValue().asInteger() : -1;
     mReferences->deleteAllItems();
-    if (!doc || doc->places.empty())
+    refreshBottomTabs();
+    if (mFound.places.empty())
     {
         // A list with nothing in it and nothing to say is a pane that
         // looks broken; this one is empty until it is asked a question,
         // so it says which question.
-        mReferences->setCommentText(doc ? getString("NoReferences") : LLStringUtil::null);
+        mReferencesHead->setText(getString("NoReferences"));
         return;
     }
-    mReferences->setCommentText(LLStringUtil::null);
-    for (size_t i = 0; i < doc->places.size(); ++i)
+    // What was looked up, and where it was found, over the places: the
+    // status line says it once, and the next thing said takes it away.
+    std::set<std::string> files;
+    for (const Doc::Place& place : mFound.places)
     {
-        const Doc::Place& place = doc->places[i];
-        LLSD              row;
+        files.insert(place.file);
+    }
+    LLStringUtil::format_map_t args;
+    args["[NAME]"]  = mFound.name;
+    args["[FILES]"] = std::to_string(files.size());
+    mReferencesHead->setText(counted(files.size() > 1 ? "ReferencesFoundAcross" : "ReferencesFound", static_cast<S32>(mFound.places.size()), args));
+
+    LLStringUtil::format_map_t named;
+    named["[NAME]"] = mFound.name;
+    const std::string declared_tip = getString("ReferenceDeclarationTip", named);
+    for (size_t i = 0; i < mFound.places.size(); ++i)
+    {
+        const Doc::Place& place = mFound.places[i];
+        // The declaration, marked: in the script it was looked up from
+        // where no include declares it, else in the include that does.
+        const std::string& in_file     = place.file;
+        const bool         declaration = mFound.hasDefinition && place.span.line == mFound.definition.line &&
+                                 place.span.column == mFound.definition.column && in_file == mFound.home;
+        LLSD row;
         row["value"]                = static_cast<S32>(i);
         row["columns"][0]["column"] = "where";
-        row["columns"][0]["value"]  = place.file.empty() ? doc->name : place.fileName;
+        row["columns"][0]["value"]  = place.file.empty() ? mFound.fromName : place.fileName;
         row["columns"][1]["column"] = "line";
         row["columns"][1]["value"]  = llformat("%d:%d", place.span.line + 1, place.span.column + 1);
-        row["columns"][2]["column"] = "text";
-        row["columns"][2]["value"]  = place.text;
-        mReferences->addElement(row);
+        row["columns"][2]["column"] = "role";
+        row["columns"][2]["value"]  = declaration ? getString("ReferenceDeclaration") : std::string();
+        row["columns"][3]["column"] = "text";
+        row["columns"][3]["value"]  = place.text;
+        if (declaration)
+        {
+            for (S32 c = 0; c < 4; ++c)
+            {
+                row["columns"][c]["font"]["style"] = "BOLD";
+                row["columns"][c]["tool_tip"]      = declared_tip;
+            }
+        }
+        LLScrollListItem* item = mReferences->addElement(row);
+        // The name, lit where it stands in the line.
+        if (item && place.at >= 0)
+        {
+            if (LLScrollListCell* text = item->getColumn(3))
+            {
+                text->highlightText(place.at, static_cast<S32>(mFound.name.size()));
+            }
+        }
     }
+    if (chosen >= 0)
+    {
+        mReferences->selectByValue(LLSD(llmin(chosen, static_cast<S32>(mFound.places.size()) - 1)));
+    }
+    mReferences->setScrollPos(scrolled);
 }
 
-void ALFloaterScriptStudio::onReferenceChosen()
+void ALFloaterScriptStudio::slidePlaces(Doc& doc, const ALTextDocument::Edit& edit)
 {
-    Doc*              doc  = active();
+    if (mFound.places.empty())
+    {
+        return;
+    }
+    // This script's places: its own, where it was looked up from, or the
+    // ones in it as an include or another of the object's scripts.
+    const std::string path    = doc.file.empty() ? ALScriptPreprocessor::pathOf(doc.ref) : doc.id;
+    const size_t      before  = mFound.places.size();
+    const S32         first   = edit.range.normalised().begin.line;
+    const S32         last    = edit.rangeAfter().normalised().end.line;
+    bool              changed = false;
+    const auto        mine    = [&](const std::string& file) { return file.empty() ? doc.id == mFound.from : file == path; };
+    const auto        slide   = [&](ALScriptSpan& span) {
+        ALTextRange       range(ALTextPos(span.line, span.column), ALTextPos(span.endLine, span.endColumn));
+        const ALTextRange was = range;
+        if (!edit.slide(range))
+        {
+            return false;
+        }
+        if (range != was)
+        {
+            span.line      = range.begin.line;
+            span.column    = range.begin.column;
+            span.endLine   = range.end.line;
+            span.endColumn = range.end.column;
+            changed        = true;
+        }
+        return true;
+    };
+    mFound.places.erase(std::remove_if(mFound.places.begin(), mFound.places.end(),
+                                       [&](Doc::Place& place) {
+                                           if (!mine(place.file))
+                                           {
+                                               return false;
+                                           }
+                                           // The name itself edited: no longer a place it stands.
+                                           if (!slide(place.span))
+                                           {
+                                               return true;
+                                           }
+                                           // Its line's words, where the edit was on it.
+                                           if (place.span.line >= first && place.span.line <= last)
+                                           {
+                                               placeText(place, doc.editor->document().line(place.span.line));
+                                               changed = true;
+                                           }
+                                           return false;
+                                       }),
+                        mFound.places.end());
+    if (mFound.hasDefinition && mine(mFound.home))
+    {
+        mFound.hasDefinition = slide(mFound.definition);
+    }
+    // Refilled once this frame is drawn, however many edits it has.
+    mPlacesStale = mPlacesStale || changed || mFound.places.size() != before;
+}
+
+void ALFloaterScriptStudio::onReferenceChosen(bool to_editor)
+{
     LLScrollListItem* item = mReferences->getFirstSelected();
-    if (!doc || !item)
+    if (!item)
     {
         return;
     }
     const size_t index = static_cast<size_t>(item->getValue().asInteger());
-    if (index >= doc->places.size())
+    if (index >= mFound.places.size())
     {
         return;
     }
-    const Doc::Place& place = doc->places[index];
+    const Doc::Place place = mFound.places[index];
+    if (!to_editor && deferOpen(mReferences, place.file))
+    {
+        return;
+    }
+    ++mHoldPanes;
     if (place.file.empty())
     {
-        doc->editor->goTo(rangeOf(place.span));
-        doc->editor->setFocus(true);
+        // The script it was looked up from, whichever tab is in front.
+        const size_t from = indexOf(mFound.from);
+        if (from != NONE)
+        {
+            if (from != mActive)
+            {
+                activate(from);
+            }
+            mDocs[from]->editor->goTo(rangeOf(place.span));
+        }
     }
     else
     {
         openIncludeAt(place.file, place.fileName, place.span.line, place.span.column, place.span.endColumn - place.span.column);
     }
+    --mHoldPanes;
+    revealed(mReferences, to_editor);
 }
 
 void ALFloaterScriptStudio::openIncludeAt(const std::string& path, const std::string& name, S32 line, S32 column, S32 length)
@@ -5799,9 +6769,15 @@ void ALFloaterScriptStudio::pumpCaret()
         const U32         version = doc->editor->document().version();
         if (word.empty())
         {
-            // No name here; what is wrong here, if anything, still is.
-            doc->inspectAt = ALTextPos(-1, -1);
-            showSymbol(problemsAt(*doc, caret));
+            // No name here: what is wrong here, where anything is, and
+            // otherwise the last name's words stay, rather than the pane
+            // blanking at every space and bracket the caret passes.
+            const std::string problems = problemsAt(*doc, caret);
+            if (!problems.empty())
+            {
+                doc->inspectAt = ALTextPos(-1, -1);
+                showSymbol(problems);
+            }
         }
         else if (word.begin != doc->inspectAt || version != doc->inspectVersion)
         {
@@ -5812,25 +6788,30 @@ void ALFloaterScriptStudio::pumpCaret()
     }
 }
 
-void ALFloaterScriptStudio::inspected(Doc& doc, const ALScriptAnalysis::Result& result)
+void ALFloaterScriptStudio::inspected(Doc& doc, const ALScriptAnalysis::Result& result, const ALTextPos& at)
 {
-    // Still about the word the caret is on, and this script.
-    if (&doc != active() || ALTextPos(result.line, result.column) != doc.inspectAt)
+    // Still about the word the caret is on, and this script: by the
+    // source's place it was asked about, which the result's is not where
+    // the analyzer read the expansion.
+    if (&doc != active() || at != doc.inspectAt)
     {
         return;
     }
     std::string      text;
     std::vector<S32> code_lines;
+    Declared         declared;
     auto             lines_so_far = [&text]() { return static_cast<S32>(std::count(text.begin(), text.end(), '\n')); };
     if (result.hover.found)
     {
         text = result.hover.label;
         code_lines.push_back(0);
         LLStringUtil::format_map_t args;
-        if (result.hover.hasDefinition)
+        declared = declaredOf(doc, result);
+        if (declared.line >= 0)
         {
-            args["[LINE]"] = std::to_string(result.hover.definitionLine + 1);
-            text += "\n" + getString("InspectDeclared", args);
+            args["[LINE]"] = std::to_string(declared.line + 1);
+            args["[FILE]"] = declared.name;
+            text += "\n" + getString(declared.path.empty() ? "InspectDeclared" : "InspectDeclaredIn", args);
         }
         if (!result.hover.expected.empty())
         {
@@ -5875,10 +6856,10 @@ void ALFloaterScriptStudio::inspected(Doc& doc, const ALScriptAnalysis::Result& 
     {
         text += (text.empty() ? "" : "\n\n") + problems;
     }
-    showSymbol(text, result.hover.found && result.hover.hasDefinition ? result.hover.definitionLine : -1, code_lines);
+    showSymbol(text, declared, code_lines);
 }
 
-void ALFloaterScriptStudio::showSymbol(const std::string& text, S32 declared_line, const std::vector<S32>& code_lines)
+void ALFloaterScriptStudio::showSymbol(const std::string& text, const Declared& declared, const std::vector<S32>& code_lines)
 {
     mSymbol->setText(text);
     std::vector<ALTextView::Style> styles;
@@ -5904,13 +6885,13 @@ void ALFloaterScriptStudio::showSymbol(const std::string& text, S32 declared_lin
         mSymbol->linkUrlsOn(line);
     }
     // The declaration's line comes right after the name.
-    if (declared_line >= 0 && lines > 1 && mSymbol->document().lineLength(1) > 0)
+    if (declared.line >= 0 && lines > 1 && mSymbol->document().lineLength(1) > 0)
     {
         ALTextView::Substitution to_line;
-        to_line.range         = ALTextRange(ALTextPos(1, 0), mSymbol->document().lineEnd(1));
-        to_line.link          = true;
-        to_line.tooltip       = getString("InspectDeclaredTip");
-        to_line.value["line"] = declared_line;
+        to_line.range           = ALTextRange(ALTextPos(1, 0), mSymbol->document().lineEnd(1));
+        to_line.link            = true;
+        to_line.tooltip         = getString("InspectDeclaredTip");
+        to_line.value           = declared.value();
         mSymbol->addSubstitution(std::move(to_line));
     }
 }
@@ -6002,7 +6983,7 @@ void ALFloaterScriptStudio::showReference(const Vocab& word, bool lua)
         text += "\n\n" + word.tooltip;
     }
     text += "\n" + helpUrl(lua, word.text);
-    showSymbol(text, -1, { 0 });
+    showSymbol(text, Declared(), { 0 });
 }
 
 void ALFloaterScriptStudio::reference(Doc& doc)
@@ -6130,24 +7111,240 @@ void ALFloaterScriptStudio::refreshOutline(Doc& doc)
     {
         return;
     }
-    mOutline->deleteAllItems();
-    for (size_t i = 0; i < doc.outline.size(); ++i)
+    // The symbols as a tree, each under what holds it -- the outline is
+    // flat, each entry after its holder one deeper -- keyed by the names
+    // down to it, so that a fold outlives a check that numbers them anew.
+    const size_t count = doc.outline.size();
+    std::vector<std::vector<size_t>> children(count);
+    std::vector<size_t>              roots;
+    mOutlineKeys.assign(count, std::string());
+    mOutlineParents.assign(count, false);
     {
-        const ALScriptOutlineEntry& entry = doc.outline[i];
-        LLSD                        row;
-        row["value"]                = static_cast<S32>(i);
-        row["columns"][0]["column"] = "icon";
-        row["columns"][0]["type"]   = "icon";
-        row["columns"][0]["value"]  = imageNameOf(entry.kind);
-        row["columns"][1]["column"] = "symbol";
-        row["columns"][1]["value"]  = std::string(static_cast<size_t>(entry.depth) * 4, ' ') + entry.name;
-        row["columns"][1]["tool_tip"] = entry.detail;
-        row["columns"][2]["column"] = "kind";
-        row["columns"][2]["value"]  = kindName(entry.kind);
-        mOutline->addElement(row);
+        std::vector<size_t> holders;
+        for (size_t i = 0; i < count; ++i)
+        {
+            const S32 depth = doc.outline[i].depth;
+            while (!holders.empty() && doc.outline[holders.back()].depth >= depth)
+            {
+                holders.pop_back();
+            }
+            if (holders.empty())
+            {
+                roots.push_back(i);
+                mOutlineKeys[i] = doc.outline[i].name;
+            }
+            else
+            {
+                children[holders.back()].push_back(i);
+                mOutlineParents[holders.back()] = true;
+                mOutlineKeys[i]                 = mOutlineKeys[holders.back()] + "\x1f" + doc.outline[i].name;
+            }
+            holders.push_back(i);
+        }
     }
-    mOutline->setCommentText(doc.outline.empty() ? getString(doc.loaded ? "NoOutline" : "NoOutlineYet") : LLStringUtil::null);
+    // In the order asked for, under each holder: as written, by name, or
+    // by kind and then name.
+    const std::string sort = mOutlineSort ? mOutlineSort->getValue().asString() : std::string("order");
+    const auto        before = [&](size_t a, size_t b) {
+        const ALScriptOutlineEntry& x = doc.outline[a];
+        const ALScriptOutlineEntry& y = doc.outline[b];
+        if (sort == "kind" && x.kind != y.kind)
+        {
+            return static_cast<S32>(x.kind) < static_cast<S32>(y.kind);
+        }
+        if (sort == "name" || sort == "kind")
+        {
+            const S32 said = LLStringUtil::compareDict(x.name, y.name);
+            if (said != 0)
+            {
+                return said < 0;
+            }
+        }
+        return a < b;
+    };
+    std::string filter = mOutlineFilter ? mOutlineFilter->getText() : std::string();
+    LLStringUtil::trim(filter);
+    // The rows: through the filter, every symbol with the letters, flat;
+    // else the tree, down to what is folded shut.
+    struct Row
+    {
+        size_t index = 0;
+        S32    depth = 0;
+    };
+    std::vector<Row> rows;
+    if (!filter.empty())
+    {
+        std::vector<size_t> matched;
+        for (size_t i = 0; i < count; ++i)
+        {
+            if (ALStringMatch::containsNoCase(doc.outline[i].name, filter))
+            {
+                matched.push_back(i);
+            }
+        }
+        std::stable_sort(matched.begin(), matched.end(), before);
+        for (const size_t i : matched)
+        {
+            rows.push_back({ i, 0 });
+        }
+    }
+    else
+    {
+        std::function<void(std::vector<size_t>, S32)> walk = [&](std::vector<size_t> level, S32 depth) {
+            std::stable_sort(level.begin(), level.end(), before);
+            for (const size_t i : level)
+            {
+                rows.push_back({ i, depth });
+                if (!children[i].empty() && !doc.outlineFolded.contains(mOutlineKeys[i]))
+                {
+                    walk(children[i], depth + 1);
+                }
+            }
+        };
+        walk(roots, 0);
+    }
+    // What the rows say. A check comes at every pause in typing and most
+    // change nothing the outline shows; the list is only made again where
+    // something did, and then keeps its scroll, so that whoever is
+    // reading down it is not sent back to the top.
+    const std::string open   = getString("ArrowOpen");
+    const std::string folded = getString("ArrowFolded");
+    std::vector<std::string> said;
+    said.reserve(rows.size() + 1);
+    for (const Row& row : rows)
+    {
+        const ALScriptOutlineEntry& entry = doc.outline[row.index];
+        const bool parent = filter.empty() && mOutlineParents[row.index];
+        const std::string arrow = !parent ? std::string("   ") : doc.outlineFolded.contains(mOutlineKeys[row.index]) ? folded : open;
+        said.push_back(std::string(static_cast<size_t>(row.depth) * 4, ' ') + arrow + entry.name + "|" +
+                       std::to_string(static_cast<S32>(entry.kind)) + "|" + std::to_string(row.index) + "|" + entry.detail);
+    }
+    said.push_back(doc.id);
+    if (said != mOutlineSaid)
+    {
+        mOutlineSaid     = said;
+        const S32 scroll = mOutline->getScrollPos();
+        mOutline->deleteAllItems();
+        for (size_t r = 0; r < rows.size(); ++r)
+        {
+            const ALScriptOutlineEntry& entry = doc.outline[rows[r].index];
+            LLSD                        row;
+            row["value"]                = static_cast<S32>(rows[r].index);
+            row["columns"][0]["column"] = "icon";
+            row["columns"][0]["type"]   = "icon";
+            row["columns"][0]["value"]  = imageNameOf(entry.kind);
+            row["columns"][0]["tool_tip"] = kindName(entry.kind);
+            row["columns"][1]["column"] = "symbol";
+            // Nested under what holds it, with the arrow that folds what
+            // it holds; what it is, and its declaration, on the mouse.
+            row["columns"][1]["value"]    = said[r].substr(0, said[r].find('|'));
+            row["columns"][1]["tool_tip"] = entry.detail.empty() ? kindName(entry.kind) : kindName(entry.kind) + "\n" + entry.detail;
+            mOutline->addElement(row);
+        }
+        mOutline->setScrollPos(scroll);
+    }
+    mOutline->setCommentText(doc.outline.empty() ? getString(doc.loaded ? "NoOutline" : "NoOutlineYet")
+                             : rows.empty()      ? getString("OutlineNoMatch")
+                                                 : LLStringUtil::null);
     refreshBreadcrumb(doc);
+    followCaretInOutline(doc);
+}
+
+bool ALFloaterScriptStudio::outlineArrowAt(S32 x, S32 y, size_t& index)
+{
+    LLScrollListItem* item = mOutline->hitItem(x, y);
+    if (!item)
+    {
+        return false;
+    }
+    index = static_cast<size_t>(item->getValue().asInteger());
+    if (index >= mOutlineParents.size() || !mOutlineParents[index])
+    {
+        return false;
+    }
+    // The arrow comes after the symbol's indent, from the name column's
+    // edge: as far as the indent and the arrow go.
+    const LLScrollListCell* name = item->getColumn(1);
+    const std::string       text = name ? name->getValue().asString() : std::string();
+    const size_t            arrow_end = text.find_first_not_of(' ') == std::string::npos ? 0 : text.find_first_not_of(' ') + getString("ArrowOpen").size();
+    const LLScrollListColumn* icon = mOutline->getColumn("icon");
+    const S32 left  = mOutline->getItemListRect().mLeft + (icon ? icon->getWidth() : 0) + mOutline->getColumnPadding();
+    const S32 right = left + LLFontGL::getFontSansSerifSmall()->getWidth(text.substr(0, arrow_end)) + 4;
+    return x >= left - 2 && x <= right;
+}
+
+void ALFloaterScriptStudio::foldOutline(size_t index, std::optional<bool> folded)
+{
+    Doc* doc = active();
+    if (!doc || index >= mOutlineKeys.size())
+    {
+        return;
+    }
+    const std::string& key   = mOutlineKeys[index];
+    const bool         shut  = doc->outlineFolded.contains(key);
+    const bool         want  = folded.value_or(!shut);
+    if (!mOutlineParents[index] || want == shut)
+    {
+        // Left on a symbol with nothing to fold: to what holds it, shown
+        // as any row walked to is.
+        if (folded.has_value() && *folded)
+        {
+            const size_t at = key.rfind('\x1f');
+            if (at != std::string::npos)
+            {
+                const std::string holder = key.substr(0, at);
+                for (size_t i = 0; i < mOutlineKeys.size(); ++i)
+                {
+                    if (mOutlineKeys[i] == holder && mOutline->selectByValue(LLSD(static_cast<S32>(i))))
+                    {
+                        mOutline->scrollToShowSelected();
+                        onOutlineChosen(false);
+                        break;
+                    }
+                }
+            }
+        }
+        return;
+    }
+    if (want)
+    {
+        doc->outlineFolded.insert(key);
+    }
+    else
+    {
+        doc->outlineFolded.erase(key);
+    }
+    refreshOutline(*doc);
+    mOutline->selectByValue(LLSD(static_cast<S32>(index)));
+}
+
+void ALFloaterScriptStudio::followCaretInOutline(Doc& doc)
+{
+    if (&doc != active())
+    {
+        return;
+    }
+    // The innermost symbol the caret is in, as the breadcrumb found it.
+    if (doc.crumbPath.empty())
+    {
+        mOutline->deselectAllItems(true);
+        return;
+    }
+    LLScrollListItem* now = mOutline->getFirstSelected();
+    for (auto step = doc.crumbPath.rbegin(); step != doc.crumbPath.rend(); ++step)
+    {
+        const S32 index = static_cast<S32>(*step);
+        if (now && now->getValue().asInteger() == index)
+        {
+            return;
+        }
+        if (mOutline->selectByValue(LLSD(index)))
+        {
+            mOutline->scrollToShowSelected();
+            return;
+        }
+    }
+    mOutline->deselectAllItems(true);
 }
 
 void ALFloaterScriptStudio::refreshBreadcrumb(Doc& doc)
@@ -6193,6 +7390,7 @@ void ALFloaterScriptStudio::refreshBreadcrumb(Doc& doc)
     doc.crumbsOf  = doc.analysisVersion;
     doc.crumbPath = path;
     doc.crumbName = doc.name;
+    followCaretInOutline(doc);
 
     std::vector<ALJumpBar::Crumb> crumbs;
     LLStringUtil::format_map_t    args;
@@ -6264,7 +7462,7 @@ void ALFloaterScriptStudio::onCrumbChosen(size_t, const std::string& value)
     doc->editor->setFocus(true);
 }
 
-void ALFloaterScriptStudio::onOutlineChosen()
+void ALFloaterScriptStudio::onOutlineChosen(bool to_editor)
 {
     Doc*              doc  = active();
     LLScrollListItem* item = mOutline->getFirstSelected();
@@ -6276,14 +7474,82 @@ void ALFloaterScriptStudio::onOutlineChosen()
     if (index < doc->outline.size())
     {
         doc->editor->goTo(rangeOf(doc->outline[index].nameSpan));
-        doc->editor->setFocus(true);
+        revealed(mOutline, to_editor);
     }
 }
 
-void ALFloaterScriptStudio::showBottom(const char* tab)
+void ALFloaterScriptStudio::showBottom(const char* tab, bool focus)
 {
     mFolds.setCollapsed("bottom", false);
     mBottomTabs->selectTabByName(tab);
+    if (!focus)
+    {
+        return;
+    }
+    // Asked for by its key: the keyboard to the list, to walk it.
+    const std::string name(tab);
+    LLUICtrl* list = name == "problems_tab" ? static_cast<LLUICtrl*>(mProblems)
+                     : name == "references_tab" ? static_cast<LLUICtrl*>(mReferences)
+                     : name == "output_tab"     ? static_cast<LLUICtrl*>(mOutput)
+                                                : nullptr;
+    if (list)
+    {
+        list->setFocus(true);
+        if (LLScrollListCtrl* rows = dynamic_cast<LLScrollListCtrl*>(list); rows && !rows->getFirstSelected())
+        {
+            // Somewhere to start from: the first row there is to choose,
+            // in the order shown.
+            rows->updateSort();
+            const std::vector<LLScrollListItem*> all = rows->getAllData();
+            for (size_t i = 0; i < all.size(); ++i)
+            {
+                if (all[i]->getEnabled())
+                {
+                    rows->selectNthItem(static_cast<S32>(i));
+                    break;
+                }
+            }
+        }
+    }
+}
+
+void ALFloaterScriptStudio::report(const std::string& text, bool failure, const Doc* doc)
+{
+    static const LLUIColor alarm = LLUIColorTable::instance().getColor("LtOrange", LLColor4::yellow);
+    setStatus(text, failure);
+    ALOutputView::Entry entry;
+    entry.time        = clockOf(LLDate::now().secondsSinceEpoch());
+    entry.source      = getString("OutputSourceStudio");
+    entry.text        = text;
+    entry.key["kind"] = "studio";
+    entry.lane        = 1;
+    if (failure)
+    {
+        entry.color = alarm.get();
+        // Said while the Output tab is not in sight: its title says so.
+        if (mFolds.collapsed("bottom") || !mBottomTabs->getCurrentPanel() || mBottomTabs->getCurrentPanel()->getName() != "output_tab")
+        {
+            mOutputUnread = true;
+            refreshBottomTabs();
+        }
+    }
+    // The script's name where the words say it, a link to its tab.
+    const size_t at = doc && !doc->name.empty() ? text.find(doc->name) : std::string::npos;
+    if (at != std::string::npos)
+    {
+        const size_t              line_start = text.rfind('\n', at);
+        ALOutputView::Entry::Link link;
+        link.line  = static_cast<S32>(std::count(text.begin(), text.begin() + at, '\n'));
+        link.begin = static_cast<S32>(line_start == std::string::npos ? at : at - line_start - 1);
+        link.end   = link.begin + static_cast<S32>(doc->name.size());
+        LLStringUtil::format_map_t args;
+        args["[NAME]"]      = doc->name;
+        link.tooltip        = getString("OutputStudioShow", args);
+        link.value["doc"]   = doc->id;
+        link.value["issue"] = failure;
+        entry.links.push_back(std::move(link));
+    }
+    mOutput->append(std::move(entry));
 }
 
 // --- find in files -------------------------------------------------------------------
@@ -6381,6 +7647,9 @@ void ALFloaterScriptStudio::search()
     mSearchFiles   = 0;
     mSearchQuery   = mSearchBar->valueOf("query");
     mSearchFound.clear();
+    mSearchStale.clear();
+    mSearchDue     = 0.0;
+    mSearchRoot.setNull();
     mSearchResults->deleteAllItems();
     if (mSearchQuery.empty())
     {
@@ -6397,7 +7666,7 @@ void ALFloaterScriptStudio::search()
             return;
         }
         searchDocument(doc.ref, doc.name, doc.ref.inInventory() ? LLStringUtil::null : objectNameOf(gObjectList.findObject(doc.ref.object), getString("ObjectUnnamed")),
-                       doc.editor->document(), doc.editor->document().version());
+                       doc.editor->document(), doc.editor->document().version(), doc.id);
     };
     if (scope == "open")
     {
@@ -6428,6 +7697,7 @@ void ALFloaterScriptStudio::search()
             searchSettled();
             return;
         }
+        mSearchRoot = only;
     }
     const U32                 generation = mSearchGeneration;
     const LLHandle<LLFloater> handle     = getHandle();
@@ -6475,7 +7745,8 @@ void ALFloaterScriptStudio::searchLoaded(U32 generation, const std::string& wher
     searchSettled();
 }
 
-void ALFloaterScriptStudio::searchDocument(const ALScriptRef& ref, const std::string& name, const std::string& where, const ALTextDocument& text, U32 version)
+void ALFloaterScriptStudio::searchDocument(const ALScriptRef& ref, const std::string& name, const std::string& where, const ALTextDocument& text, U32 version,
+                                           const std::string& doc_id)
 {
     ALTextSearchOptions options;
     options.caseSensitive = mSearchBar->valueOf("case") == "exact";
@@ -6488,45 +7759,245 @@ void ALFloaterScriptStudio::searchDocument(const ALScriptRef& ref, const std::st
         mSearchCount->setText(getString("SearchBadPattern"));
         return;
     }
+    // The places kept, with the text they were found in, for a replace,
+    // and each one's line as the row lists it.
+    Found found;
+    found.ref     = ref;
+    found.doc     = doc_id;
+    found.name    = name;
+    found.where   = where.empty() ? name : where + ": " + name;
+    found.version = version;
+    found.places  = matches;
+    for (const ALTextRange& match : matches)
+    {
+        const std::string& line  = text.line(match.begin.line);
+        const size_t       first = line.find_first_not_of(" \t");
+        const size_t       last  = line.find_last_not_of(" \t\r");
+        found.lines.push_back(first == std::string::npos ? std::string() : line.substr(first, last - first + 1));
+        found.at.push_back(first == std::string::npos ? -1 : match.begin.column - static_cast<S32>(first));
+    }
+    // A script searched again as it stands: in its place among the rest.
+    for (size_t i = 0; i < mSearchFound.size(); ++i)
+    {
+        if ((!doc_id.empty() && mSearchFound[i].doc == doc_id) || (doc_id.empty() && !ref.isNull() && mSearchFound[i].ref == ref))
+        {
+            mSearchFound[i] = std::move(found);
+            return;
+        }
+    }
     if (matches.empty())
     {
         return;
     }
     ++mSearchFiles;
-    // The places kept, with the text they were found in, for a replace.
-    Found found;
-    found.ref     = ref;
-    found.name    = name;
-    found.version = version;
-    found.places  = matches;
+    mSearchHits += static_cast<S32>(matches.size());
     mSearchFound.push_back(std::move(found));
-    for (const ALTextRange& match : matches)
+    addSearchRows(mSearchFound.size() - 1);
+}
+
+void ALFloaterScriptStudio::addSearchRows(size_t index)
+{
+    const Found& found = mSearchFound[index];
+    for (size_t i = 0; i < found.places.size(); ++i)
     {
-        ++mSearchHits;
-        if (mSearchHits > SEARCH_ROWS)
+        if (mSearchResults->getItemCount() >= SEARCH_ROWS)
         {
             // Past what a list is any use as: counted, not listed.
-            continue;
+            return;
         }
-        LLSD value;
-        value["taskid"] = ref.object;
-        value["itemid"] = ref.item;
-        value["name"]   = name;
-        value["line"]   = match.begin.line;
-        value["column"] = match.begin.column;
-        value["length"] = match.end.column - match.begin.column;
-        std::string snippet = text.line(match.begin.line);
-        LLStringUtil::trim(snippet);
+        const ALTextRange& match = found.places[i];
+        LLSD               value;
+        value["found"] = static_cast<S32>(index);
+        value["place"] = static_cast<S32>(i);
         LLSD row;
         row["value"]                = value;
         row["columns"][0]["column"] = "where";
-        row["columns"][0]["value"]  = where.empty() ? name : where + ": " + name;
+        row["columns"][0]["value"]  = found.where;
         row["columns"][1]["column"] = "line";
-        row["columns"][1]["value"]  = std::to_string(match.begin.line + 1);
+        row["columns"][1]["value"]  = llformat("%d:%d", match.begin.line + 1, match.begin.column + 1);
         row["columns"][2]["column"] = "text";
-        row["columns"][2]["value"]  = snippet;
-        mSearchResults->addElement(row);
+        row["columns"][2]["value"]  = found.lines[i];
+        LLScrollListItem* item      = mSearchResults->addElement(row);
+        // The words found, lit in the line: as far as the line goes, for
+        // a pattern that runs on past it.
+        const S32 at = found.at[i];
+        if (item && at >= 0 && at < static_cast<S32>(found.lines[i].size()))
+        {
+            const S32 length = match.end.line == match.begin.line ? match.end.column - match.begin.column : static_cast<S32>(found.lines[i].size()) - at;
+            if (LLScrollListCell* text = item->getColumn(2))
+            {
+                text->highlightText(at, llmin(length, static_cast<S32>(found.lines[i].size()) - at));
+            }
+        }
     }
+}
+
+void ALFloaterScriptStudio::fillSearchResults()
+{
+    // The row chosen and the scroll kept, by where the row's place is.
+    const S32 scrolled = mSearchResults->getScrollPos();
+    LLSD      chosen;
+    if (LLScrollListItem* item = mSearchResults->getFirstSelected())
+    {
+        chosen = item->getValue();
+    }
+    mSearchResults->deleteAllItems();
+    // What found nothing any more goes; what did is listed again, the hits
+    // counted afresh.
+    mSearchFound.erase(std::remove_if(mSearchFound.begin(), mSearchFound.end(), [](const Found& one) { return one.places.empty(); }),
+                       mSearchFound.end());
+    mSearchHits  = 0;
+    mSearchFiles = static_cast<S32>(mSearchFound.size());
+    for (size_t i = 0; i < mSearchFound.size(); ++i)
+    {
+        mSearchHits += static_cast<S32>(mSearchFound[i].places.size());
+        addSearchRows(i);
+    }
+    if (chosen.isMap())
+    {
+        // By the row's own numbers: a list compares a map it is given as
+        // text, and every map reads as the same text.
+        mSearchResults->updateSort();
+        const std::vector<LLScrollListItem*> rows = mSearchResults->getAllData();
+        for (size_t i = 0; i < rows.size(); ++i)
+        {
+            const LLSD& value = rows[i]->getValue();
+            if (value["found"].asInteger() == chosen["found"].asInteger() && value["place"].asInteger() == chosen["place"].asInteger())
+            {
+                mSearchResults->selectNthItem(static_cast<S32>(i));
+                break;
+            }
+        }
+    }
+    mSearchResults->setScrollPos(scrolled);
+    searchSettled();
+}
+
+void ALFloaterScriptStudio::researchOpen(Doc& doc)
+{
+    // Only a script this search is over: any open one, for a search of
+    // the scripts open; one of the object searched, or of any listed.
+    if (mSearchQuery.empty() || !doc.loaded)
+    {
+        return;
+    }
+    const std::string scope = mSearchBar->valueOf("scope");
+    if (scope != "open")
+    {
+        if (doc.ref.inInventory() || doc.ref.isNull())
+        {
+            return;
+        }
+        LLViewerObject* object = gObjectList.findObject(doc.ref.object);
+        const LLUUID    root   = object ? (object->getRootEdit() ? object->getRootEdit()->getID() : object->getID()) : LLUUID::null;
+        if (root.isNull() || (mSearchRoot.notNull() && root != mSearchRoot))
+        {
+            return;
+        }
+    }
+    if (std::find(mSearchStale.begin(), mSearchStale.end(), doc.id) == mSearchStale.end())
+    {
+        mSearchStale.push_back(doc.id);
+    }
+    constexpr F64 SEARCH_AGAIN = 0.6;
+    mSearchDue                 = LLTimer::getTotalSeconds() + SEARCH_AGAIN;
+}
+
+void ALFloaterScriptStudio::pumpSearch()
+{
+    if (mSearchDue <= 0.0 || LLTimer::getTotalSeconds() < mSearchDue)
+    {
+        return;
+    }
+    if (mSearchPending > 0)
+    {
+        // Still fetching the rest: once they are in.
+        mSearchDue = LLTimer::getTotalSeconds() + 0.5;
+        return;
+    }
+    mSearchDue = 0.0;
+    const std::vector<std::string> stale = std::move(mSearchStale);
+    mSearchStale.clear();
+    // Each script searched again, and its own rows told what it holds
+    // now, where they are; the list made again only where a script holds
+    // more places or fewer, or none any more.
+    bool rebuild = false;
+    for (const std::string& id : stale)
+    {
+        const size_t index = indexOf(id);
+        if (index == NONE)
+        {
+            continue;
+        }
+        const Doc& doc = *mDocs[index];
+        size_t     at  = NONE;
+        size_t     had = 0;
+        for (size_t i = 0; i < mSearchFound.size(); ++i)
+        {
+            if (mSearchFound[i].doc == doc.id)
+            {
+                at  = i;
+                had = mSearchFound[i].places.size();
+                break;
+            }
+        }
+        searchDocument(doc.ref, doc.name,
+                       doc.ref.inInventory() ? LLStringUtil::null : objectNameOf(gObjectList.findObject(doc.ref.object), getString("ObjectUnnamed")),
+                       doc.editor->document(), doc.editor->document().version(), doc.id);
+        if (at != NONE && (mSearchFound[at].places.size() != had || !refreshSearchRows(at)))
+        {
+            rebuild = true;
+        }
+    }
+    if (rebuild)
+    {
+        fillSearchResults();
+        return;
+    }
+    mSearchHits  = 0;
+    mSearchFiles = static_cast<S32>(mSearchFound.size());
+    for (const Found& one : mSearchFound)
+    {
+        mSearchHits += static_cast<S32>(one.places.size());
+    }
+    searchSettled();
+}
+
+bool ALFloaterScriptStudio::refreshSearchRows(size_t index)
+{
+    if (index >= mSearchFound.size())
+    {
+        return false;
+    }
+    const Found& found = mSearchFound[index];
+    for (LLScrollListItem* item : mSearchResults->getAllData())
+    {
+        const LLSD& value = item->getValue();
+        if (static_cast<size_t>(value["found"].asInteger()) != index)
+        {
+            continue;
+        }
+        const size_t place = static_cast<size_t>(value["place"].asInteger());
+        if (place >= found.places.size())
+        {
+            return false;
+        }
+        const ALTextRange& match = found.places[place];
+        LLScrollListCell*  line  = item->getColumn(1);
+        LLScrollListCell*  text  = item->getColumn(2);
+        if (!line || !text)
+        {
+            return false;
+        }
+        line->setValue(llformat("%d:%d", match.begin.line + 1, match.begin.column + 1));
+        text->setValue(found.lines[place]);
+        const S32 at = found.at[place];
+        const S32 length = at < 0 || at >= static_cast<S32>(found.lines[place].size())
+                               ? 0
+                               : match.end.line == match.begin.line ? match.end.column - match.begin.column : static_cast<S32>(found.lines[place].size()) - at;
+        text->highlightText(llmax(0, at), llmin(length, static_cast<S32>(found.lines[place].size()) - llmax(0, at)));
+    }
+    return true;
 }
 
 void ALFloaterScriptStudio::searchSettled()
@@ -6601,21 +8072,57 @@ void ALFloaterScriptStudio::replaceAllFound()
     }
     LLStringUtil::format_map_t args;
     args["[FILES]"] = std::to_string(files);
-    setStatus(counted("SearchReplaced", places, args));
+    report(counted("SearchReplaced", places, args));
     // Whatever stood before, the places have moved: looked for again.
     search();
 }
 
-void ALFloaterScriptStudio::onSearchResult()
+void ALFloaterScriptStudio::onSearchResult(bool to_editor)
 {
     const LLScrollListItem* item = mSearchResults->getFirstSelected();
     if (!item)
     {
         return;
     }
-    const LLSD& value = item->getValue();
-    goToPlace(ALScriptRef(value["taskid"].asUUID(), value["itemid"].asUUID()), value["name"].asString(), value["line"].asInteger(),
-              value["column"].asInteger(), value["length"].asInteger());
+    const LLSD&  value = item->getValue();
+    const size_t found = static_cast<size_t>(value["found"].asInteger());
+    const size_t place = static_cast<size_t>(value["place"].asInteger());
+    if (found >= mSearchFound.size() || place >= mSearchFound[found].places.size())
+    {
+        return;
+    }
+    const Found&      one   = mSearchFound[found];
+    const ALTextRange match = one.places[place];
+    const bool gone = !one.doc.empty() && indexOf(one.doc) == NONE;
+    if (gone && one.ref.isNull())
+    {
+        // A file on disk, closed since it was searched: its tab is how it
+        // was gone to, and it has no item to open it by.
+        return;
+    }
+    if (!to_editor && (one.doc.empty() || gone) && deferOpen(mSearchResults, ALScriptPreprocessor::pathOf(one.ref)))
+    {
+        return;
+    }
+    ++mHoldPanes;
+    // A script open when it was searched -- a file on disk among them,
+    // which has no item to open it by -- is gone to in its tab.
+    const size_t open = one.doc.empty() ? NONE : indexOf(one.doc);
+    if (open != NONE)
+    {
+        if (open != mActive)
+        {
+            activate(open);
+        }
+        mDocs[open]->editor->goTo(match);
+    }
+    else
+    {
+        const S32 length = match.end.line == match.begin.line ? match.end.column - match.begin.column : 0;
+        goToPlace(one.ref, one.name, match.begin.line, match.begin.column, length);
+    }
+    --mHoldPanes;
+    revealed(mSearchResults, to_editor);
 }
 
 void ALFloaterScriptStudio::goToPlace(const ALScriptRef& ref, const std::string& name, S32 line, S32 column, S32 length)
@@ -6927,14 +8434,60 @@ void ALFloaterScriptStudio::runtimeEvent(const ALScriptWorkspace::RuntimeEvent& 
     static const LLUIColor runtime_color = LLUIColorTable::instance().getColor("CodeMarkRuntime", LLColor4::magenta);
     static const LLUIColor owner_color   = LLUIColorTable::instance().getColor("ObjectChatColor", LLColor4::white);
 
-    // The object, offered in the filter the first time it speaks; past
-    // a few dozen the list is no use to anybody, and a busy region
-    // would fill it for the session.
-    constexpr size_t FILTER_OBJECTS = 40;
-    if (event.root.notNull() && mOutputObjects.size() < FILTER_OBJECTS && mOutputObjects.emplace(event.root, event.objectName).second)
+    // The object, offered in the filter the first time it speaks.
+    if (event.root.notNull())
     {
-        mOutputFilter->add(event.objectName, LLSD(event.root));
+        offerOutputObject(event.root, event.objectName);
     }
+
+    // The script, where it is open here: what runs is its expansion,
+    // where the preprocessor ran, and a line the run names is the
+    // expansion's -- back to the source's, or an include's.
+    const size_t open = event.item.notNull() ? indexOf(ALScriptRef(event.prim, event.item)) : NONE;
+    struct Where
+    {
+        S32         line   = -1;
+        S32         column = -1;
+        std::string file;
+        std::string fileName;
+    };
+    const auto where_of = [&](S32 line, S32 column) {
+        Where where;
+        where.line   = line;
+        where.column = column;
+        if (line < 0 || open == NONE)
+        {
+            return where;
+        }
+        const Doc& doc = *mDocs[open];
+        if (doc.uploaded.valid && !doc.uploaded.disabled)
+        {
+            const ALSourceMap::Loc loc = doc.uploaded.map.toSource(line, llmax(0, column));
+            if (loc.found())
+            {
+                where.line   = loc.line;
+                where.column = column >= 0 ? loc.column : -1;
+                if (loc.file > 0)
+                {
+                    where.file     = doc.uploaded.map.files()[loc.file].path;
+                    where.fileName = doc.uploaded.map.files()[loc.file].name;
+                }
+            }
+        }
+        return where;
+    };
+    const auto link_value = [&](const Where& where) {
+        LLSD value;
+        value["prim"]     = event.prim;
+        value["item"]     = event.item;
+        value["name"]     = event.scriptName;
+        value["line"]     = where.line;
+        value["column"]   = where.column;
+        value["file"]     = where.file;
+        value["fileName"] = where.fileName;
+        return value;
+    };
+    const Where at = where_of(event.line, event.column);
 
     // One line of the log, or more where the script said more; the
     // script's name a link to it, at the line of a run-time error.
@@ -6947,14 +8500,57 @@ void ALFloaterScriptStudio::runtimeEvent(const ALScriptWorkspace::RuntimeEvent& 
     {
         entry.text.pop_back();
     }
+    // What the filters go by: whose it is, and what kind of thing.
+    LLViewerObject* root = event.root.notNull() ? gObjectList.findObject(event.root) : nullptr;
+    entry.key["root"] = event.root;
+    entry.key["prim"] = event.prim;
+    entry.key["item"] = event.item;
+    entry.key["kind"] = event.isError ? "error" : event.channel == ALScriptWorkspace::RuntimeEvent::Channel::OwnerSay ? "owner" : "debug";
+    entry.key["mine"] = event.channel == ALScriptWorkspace::RuntimeEvent::Channel::OwnerSay || (root && root->permYouOwner());
     if (event.isError)
     {
         entry.color = runtime_color.get();
-        if (event.line >= 0)
+        if (at.line >= 0)
         {
-            LLStringUtil::format_map_t where;
-            where["[LINE]"] = std::to_string(event.line + 1);
-            entry.text += " " + getString("OutputAtLine", where);
+            LLStringUtil::format_map_t line;
+            line["[LINE]"] = std::to_string(at.line + 1);
+            entry.text += " " + getString("OutputAtLine", line);
+        }
+        // The stack under it, as the VM said it: each frame of the
+        // script's own chunk -- the one the error's line names, which the
+        // simulator loads a script under as `lua_script`, or `lsl_script`
+        // for LSL on Luau -- a link to its line. The error's own line is
+        // what the entry says first.
+        std::string chunk;
+        for (const std::string& line : event.stack)
+        {
+            if (!event.error.empty() && line.size() >= event.error.size() &&
+                line.compare(line.size() - event.error.size(), event.error.size(), event.error) == 0)
+            {
+                const size_t colon = line.find(':');
+                chunk              = colon == std::string::npos ? std::string() : line.substr(0, colon);
+                LLStringUtil::trim(chunk);
+                continue;
+            }
+            if (line.empty())
+            {
+                continue;
+            }
+            entry.text += "\n" + line;
+            ALScriptMessages::Frame frame;
+            if (event.item.notNull() && ALScriptMessages::readStackFrame(line, frame) &&
+                (frame.chunk == chunk || frame.chunk == event.scriptName || frame.chunk == "lua_script" || frame.chunk == "lsl_script"))
+            {
+                const Where               there = where_of(frame.line, -1);
+                ALOutputView::Entry::Link link;
+                link.line = static_cast<S32>(std::count(entry.text.begin(), entry.text.end(), '\n'));
+                LLStringUtil::format_map_t args;
+                args["[NAME]"] = there.file.empty() ? event.scriptName : there.fileName;
+                args["[LINE]"] = std::to_string(there.line + 1);
+                link.tooltip   = getString("OutputOpenAtLine", args);
+                link.value     = link_value(there);
+                entry.links.push_back(std::move(link));
+            }
         }
     }
     else if (event.channel == ALScriptWorkspace::RuntimeEvent::Channel::OwnerSay)
@@ -6963,77 +8559,189 @@ void ALFloaterScriptStudio::runtimeEvent(const ALScriptWorkspace::RuntimeEvent& 
         // words in; the debug channel's in the plain ink.
         entry.color = owner_color.get();
     }
-    entry.key = event.root;
     if (event.item.notNull())
     {
         LLStringUtil::format_map_t args;
         args["[NAME]"] = event.scriptName;
-        args["[LINE]"] = llformat("%d", event.line + 1);
-        entry.link            = true;
-        entry.tooltip         = getString(event.isError && event.line >= 0 ? "OutputOpenAtLine" : "OutputOpen", args);
-        entry.value["prim"]   = event.prim;
-        entry.value["item"]   = event.item;
-        entry.value["name"]   = event.scriptName;
-        entry.value["line"]   = event.line;
-        entry.value["column"] = event.column;
+        args["[LINE]"] = llformat("%d", at.line + 1);
+        entry.link     = true;
+        entry.tooltip  = getString(event.isError && at.line >= 0 ? "OutputOpenAtLine" : "OutputOpen", args);
+        entry.value    = link_value(at);
     }
     mOutput->append(std::move(entry));
 
-    // A run-time error in a script that is open marks its line.
-    if (event.isError && event.item.notNull())
+    // An error the Output tab is not showing, said on its title.
+    if (event.isError && (mFolds.collapsed("bottom") || !mBottomTabs->getCurrentPanel() || mBottomTabs->getCurrentPanel()->getName() != "output_tab"))
     {
-        const size_t index = indexOf(ALScriptRef(event.prim, event.item));
-        if (index != NONE)
+        mOutputUnread = true;
+        refreshBottomTabs();
+    }
+
+    // A run-time error in a script that is open marks its line: said
+    // again, as a script failing in a timer says it every tick, it is
+    // the same problem, counted.
+    if (event.isError && open != NONE)
+    {
+        Doc&                doc = *mDocs[open];
+        Doc::RuntimeProblem problem;
+        problem.line    = at.line;
+        problem.column  = at.column;
+        problem.file    = at.file;
+        problem.message = event.error.empty() ? oneLine(event.message) : event.error;
+        const auto same = std::find_if(doc.runtime.begin(), doc.runtime.end(), [&problem](const Doc::RuntimeProblem& one) {
+            return one.line == problem.line && one.column == problem.column && one.file == problem.file && one.message == problem.message;
+        });
+        if (same != doc.runtime.end())
         {
-            Doc&                doc = *mDocs[index];
-            Doc::RuntimeProblem problem;
-            problem.line    = event.line;
-            problem.column  = event.column;
-            problem.message = event.error.empty() ? oneLine(event.message) : event.error;
-            if (problem.line >= 0 && doc.uploaded.valid && !doc.uploaded.disabled)
+            ++same->count;
+        }
+        else
+        {
+            doc.runtime.push_back(std::move(problem));
+            // A script failing many ways at once is failing: the oldest go
+            // past a few dozen.
+            constexpr size_t RUNTIME_PROBLEMS = 50;
+            if (doc.runtime.size() > RUNTIME_PROBLEMS)
             {
-                // What runs is the expanded text: its line is the
-                // source's, or an include's.
-                const ALSourceMap::Loc loc = doc.uploaded.map.toSource(problem.line, llmax(0, problem.column));
-                if (loc.found())
+                doc.runtime.erase(doc.runtime.begin());
+            }
+        }
+        refreshProblems(doc);
+    }
+}
+
+void ALFloaterScriptStudio::offerOutputObject(const LLUUID& root, const std::string& name)
+{
+    // Past a few dozen the list is no use to anybody, and a busy region
+    // would fill it for the session: the one least lately heard from
+    // gives way, unless it is the one chosen.
+    constexpr size_t FILTER_OBJECTS = 40;
+    const std::string chosen        = mOutputFilter->getValue().asString();
+    bool              changed       = root.isNull();
+    if (root.notNull())
+    {
+        const auto known = std::find_if(mOutputObjects.begin(), mOutputObjects.end(), [&root](const auto& one) { return one.first == root; });
+        if (known != mOutputObjects.end())
+        {
+            // Heard from again: the last to give way.
+            std::pair<LLUUID, std::string> again = *known;
+            changed                              = again.second != name;
+            again.second                         = name;
+            mOutputObjects.erase(known);
+            mOutputObjects.push_back(std::move(again));
+            if (!changed)
+            {
+                return;
+            }
+        }
+        else
+        {
+            if (mOutputObjects.size() >= FILTER_OBJECTS)
+            {
+                const auto oldest = std::find_if(mOutputObjects.begin(), mOutputObjects.end(),
+                                                 [&chosen](const auto& one) { return one.first.asString() != chosen; });
+                if (oldest != mOutputObjects.end())
                 {
-                    problem.line   = loc.line;
-                    problem.column = problem.column >= 0 ? loc.column : -1;
-                    if (loc.file > 0)
-                    {
-                        problem.file = doc.uploaded.map.files()[loc.file].path;
-                    }
+                    mOutputObjects.erase(oldest);
                 }
             }
-            doc.runtime.push_back(std::move(problem));
-            refreshProblems(*mDocs[index]);
+            mOutputObjects.emplace_back(root, name);
+            changed = true;
         }
+    }
+    if (!changed)
+    {
+        return;
+    }
+    // The list again, by name, the choice kept.
+    std::vector<std::pair<LLUUID, std::string>> ordered = mOutputObjects;
+    std::sort(ordered.begin(), ordered.end(), [](const auto& a, const auto& b) { return LLStringUtil::compareDict(a.second, b.second) < 0; });
+    mOutputFilter->clearRows();
+    mOutputFilter->add(getString("OutputAllObjects"), LLSD(""));
+    mOutputFilter->add(getString("OutputOpenScripts"), LLSD("open"));
+    mOutputFilter->add(getString("OutputMyObjects"), LLSD("mine"));
+    mOutputFilter->addSeparator();
+    for (const auto& [id, label] : ordered)
+    {
+        mOutputFilter->add(label.empty() ? getString("ObjectUnnamed") : label, LLSD(id.asString()));
+    }
+    if (!mOutputFilter->selectByValue(LLSD(chosen)))
+    {
+        mOutputFilter->selectFirstItem();
     }
 }
 
 void ALFloaterScriptStudio::onOutputFilter()
 {
-    const LLUUID root = mOutputFilter->getValue().asUUID();
-    if (root.isNull())
+    const std::string whose = mOutputFilter->getValue().asString();
+    const std::string kind  = mOutputKind ? mOutputKind->getValue().asString() : std::string();
+    std::string       words = mOutputFind ? mOutputFind->getText() : std::string();
+    LLStringUtil::trim(words);
+    if (whose.empty() && kind.empty() && words.empty())
     {
         mOutput->setFilter(nullptr);
+        return;
     }
-    else
-    {
-        mOutput->setFilter([root](const ALOutputView::Entry& entry) { return entry.key.asUUID() == root; });
-    }
+    mOutput->setFilter([this, whose, kind, words](const ALOutputView::Entry& entry) {
+        const std::string said = entry.key["kind"].asString();
+        if (!kind.empty() && said != kind)
+        {
+            return false;
+        }
+        // The studio's own words are about no object: shown whoever's
+        // are, but for one object's alone.
+        if (whose == "open")
+        {
+            if (said != "studio" && indexOf(ALScriptRef(entry.key["prim"].asUUID(), entry.key["item"].asUUID())) == NONE)
+            {
+                return false;
+            }
+        }
+        else if (whose == "mine")
+        {
+            if (said != "studio" && !entry.key["mine"].asBoolean())
+            {
+                return false;
+            }
+        }
+        else if (!whose.empty() && entry.key["root"].asString() != whose)
+        {
+            return false;
+        }
+        return words.empty() || ALStringMatch::containsNoCase(entry.text, words) || ALStringMatch::containsNoCase(entry.source, words);
+    });
 }
 
 void ALFloaterScriptStudio::onOutputChosen(const ALOutputView::Entry& entry)
 {
+    // A line of the studio's own: the script it names, brought forward.
+    if (entry.value.has("doc"))
+    {
+        const size_t index = indexOf(entry.value["doc"].asString());
+        if (index != NONE)
+        {
+            activate(index);
+            if (entry.value["issue"].asBoolean())
+            {
+                showBottom("problems_tab");
+            }
+        }
+        return;
+    }
     if (entry.value["item"].asUUID().isNull())
     {
         return;
     }
+    const S32 line   = entry.value["line"].asInteger();
+    const S32 column = entry.value["column"].asInteger();
+    // A frame in an include: the include, where it can be opened.
+    if (!entry.value["file"].asString().empty())
+    {
+        openIncludeAt(entry.value["file"].asString(), entry.value["fileName"].asString(), line, column, 0);
+        return;
+    }
     const ALScriptRef ref(entry.value["prim"].asUUID(), entry.value["item"].asUUID());
-    const S32         line   = entry.value["line"].asInteger();
-    const S32         column = entry.value["column"].asInteger();
-    size_t            index  = indexOf(ref);
+    size_t            index = indexOf(ref);
     if (index == NONE)
     {
         // The script it names, opened; the line once it has loaded.
@@ -7102,25 +8810,12 @@ bool ALFloaterScriptStudio::preflight(Doc& doc)
         return true;
     }
     args["[COUNT]"] = std::to_string(errors);
-    setStatus(getString("PreflightErrors", args), true);
+    report(getString("PreflightErrors", args), true, &doc);
     doc.saveAnywayVersion = version;
     saveStopped(doc);
-    // The first of them, in sight.
+    // The first of the checkers' errors, in sight.
     showBottom("problems_tab");
-    // The first of the checkers' errors among the rows as the filters
-    // have them; where a filter hides them all, the row is the first error
-    // the store holds.
-    const std::vector<LLScrollListItem*> rows = mProblems->getAllData();
-    for (size_t i = 0; i < rows.size(); ++i)
-    {
-        const LLSD& value = rows[i]->getValue();
-        if (value.isMap() && value["level"].asString() == "ERROR" && value["origin"].asString() != getString("OriginCompiler"))
-        {
-            mProblems->selectNthItem(static_cast<S32>(i));
-            onProblemSelected();
-            break;
-        }
-    }
+    selectFirstError(true);
     return false;
 }
 
@@ -7557,6 +9252,18 @@ bool ALFloaterScriptStudio::handleMouseDown(S32 x, S32 y, MASK mask)
             explorerFold(id, prim);
         }
     }
+    // And one in the outline its symbol.
+    if (mask == MASK_NONE && mOutline && mOutline->isInVisibleChain())
+    {
+        S32 lx = 0, ly = 0;
+        localPointToOtherView(x, y, &lx, &ly, mOutline);
+        size_t index = 0;
+        if (mOutline->pointInView(lx, ly) && outlineArrowAt(lx, ly, index))
+        {
+            foldOutline(index);
+            return true;
+        }
+    }
     return ALStudioFloater::handleMouseDown(x, y, mask);
 }
 
@@ -7704,7 +9411,7 @@ void ALFloaterScriptStudio::onExplorerAction(const std::string& action)
                 std::string error;
                 if (!workspace.queue(kind, prims, LLStringUtil::null, error))
                 {
-                    setStatus(error, true);
+                    report(error, true);
                 }
             }
         }
@@ -7799,8 +9506,10 @@ void ALFloaterScriptStudio::showProblemMenu(S32 x, S32 y)
     {
         return;
     }
-    // The row under the mouse is the one the menu is about.
-    if (!mProblems->hitItem(x, y))
+    // The row under the mouse is the one the menu is about; a heading is
+    // about no problem.
+    LLScrollListItem* hit = mProblems->hitItem(x, y);
+    if (!hit || !hit->getEnabled())
     {
         return;
     }
@@ -7810,10 +9519,15 @@ void ALFloaterScriptStudio::showProblemMenu(S32 x, S32 y)
         old->die();
         mProblemMenuHandle.markDead();
     }
-    // The lint the chosen problem is, where it is one there is a choice
-    // about, in the active script's language.
-    const auto lint_of = [this](bool& lua) -> std::string {
-        Doc*              doc  = active();
+    // The script the chosen problem is of, in its language, and the lint
+    // it is where it is one there is a choice about.
+    const auto doc_of = [this]() -> Doc* {
+        LLScrollListItem* item = mProblems->getFirstSelected();
+        const size_t      index = item ? indexOf(item->getValue()["doc"].asString()) : NONE;
+        return index == NONE ? nullptr : mDocs[index].get();
+    };
+    const auto lint_of = [this, doc_of](bool& lua) -> std::string {
+        Doc*              doc  = doc_of();
         LLScrollListItem* item = mProblems->getFirstSelected();
         if (!doc || !item)
         {
@@ -7833,9 +9547,19 @@ void ALFloaterScriptStudio::showProblemMenu(S32 x, S32 y)
     LLUICtrl::CommitCallbackRegistry::ScopedRegistrar commit;
     LLUICtrl::EnableCallbackRegistry::ScopedRegistrar enable;
     commit.add("Problem.Action", [this](LLUICtrl*, const LLSD& param) { onProblemMenu(param.asString()); });
-    enable.add("Problem.Enable", [lint_of](LLUICtrl*, const LLSD& param) {
+    enable.add("Problem.Enable", [lint_of, doc_of](LLUICtrl*, const LLSD& param) {
+        const std::string what = param.asString();
+        if (what == "copy" || what == "copy_where" || what == "copy_all" || what == "settings")
+        {
+            return true;
+        }
+        if (what == "clear_runtime")
+        {
+            const Doc* doc = doc_of();
+            return doc && !doc->runtime.empty();
+        }
         bool lua = false;
-        return param.asString() == "copy" || param.asString() == "settings" || !lint_of(lua).empty();
+        return !lint_of(lua).empty();
     });
     enable.add("Problem.Check", [lint_of](LLUICtrl*, const LLSD&) {
         bool              lua  = false;
@@ -7855,19 +9579,56 @@ void ALFloaterScriptStudio::showProblemMenu(S32 x, S32 y)
 
 void ALFloaterScriptStudio::onProblemMenu(const std::string& action)
 {
-    Doc*              doc  = active();
-    LLScrollListItem* item = mProblems->getFirstSelected();
-    if (!doc || !item)
+    LLScrollListItem* item  = mProblems->getFirstSelected();
+    const size_t      index = item ? indexOf(item->getValue()["doc"].asString()) : NONE;
+    if (index == NONE)
     {
         return;
     }
+    Doc&              doc   = *mDocs[index];
     const LLSD&       value = item->getValue();
     const std::string lint  = value["lint"].asString();
-    const bool        lua   = doc->language.lua;
+    const bool        lua   = doc.language.lua;
+    // A problem as a line of text: where, what level, from whom, what.
+    const auto as_text = [this](const LLSD& one) {
+        const std::string name  = one["fileName"].asString().empty() ? mDocs[indexOf(one["doc"].asString())]->name : one["fileName"].asString();
+        const S32         line  = one["line"].asInteger() + 1;
+        const std::string where = one["hasColumn"].asBoolean() ? llformat("%s:%d:%d", name.c_str(), line, one["column"].asInteger() + 1)
+                                                               : llformat("%s:%d", name.c_str(), line);
+        const std::string level = one["level"].asString() == "ERROR" ? "error" : one["level"].asString() == "WARNING" ? "warning" : "note";
+        return where + ": " + level + ": " + one["message"].asString() + " [" + one["origin"].asString() + "]";
+    };
+    const auto copy = [](const std::string& text) { LLClipboard::instance().copyToClipboard(text, 0, static_cast<S32>(text.size())); };
     if (action == "copy")
     {
-        const std::string text = value["message"].asString();
-        LLClipboard::instance().copyToClipboard(text, 0, static_cast<S32>(text.size()));
+        copy(value["message"].asString());
+    }
+    else if (action == "copy_where")
+    {
+        copy(as_text(value));
+    }
+    else if (action == "copy_all")
+    {
+        // Every problem the list shows, as a compiler lists them.
+        std::string all;
+        S32         count = 0;
+        for (LLScrollListItem* row : mProblems->getAllData())
+        {
+            const LLSD& one = row->getValue();
+            if (one.isMap() && !one.has("heading") && indexOf(one["doc"].asString()) != NONE)
+            {
+                all += as_text(one) + "\n";
+                ++count;
+            }
+        }
+        copy(all);
+        setStatus(counted("ProblemsCopied", count));
+    }
+    else if (action == "clear_runtime")
+    {
+        // What the script said as it ran, let go of until it says it again.
+        doc.runtime.clear();
+        refreshProblems(doc);
     }
     else if (action == "off" && !lint.empty())
     {
@@ -7916,7 +9677,7 @@ void ALFloaterScriptStudio::explorerCreate(const LLUUID& prim, bool notecard, bo
         }, error);
         if (!asked)
         {
-            studio->setStatus(error, true);
+            studio->report(error, true);
         }
     });
 }
@@ -7928,7 +9689,7 @@ void ALFloaterScriptStudio::explorerCreated(const ALScriptWorkspace::Created& ma
         LLStringUtil::format_map_t args;
         args["[NAME]"]  = made.name;
         args["[ERROR]"] = made.error;
-        setStatus(getString("CreateFailed", args), true);
+        report(getString("CreateFailed", args), true);
         mOpenWhenListedText.reset();
         return;
     }
@@ -7961,7 +9722,7 @@ void ALFloaterScriptStudio::explorerRename(const ExplorerRow& row)
         std::string error;
         if (!ALScriptWorkspace::instance().rename(ref, name, error))
         {
-            studio->setStatus(error, true);
+            studio->report(error, true);
             return;
         }
         // The tab, if it is open, and the list.
@@ -8005,7 +9766,7 @@ void ALFloaterScriptStudio::explorerDelete(const std::vector<ExplorerRow>& rows)
                                      std::string       error;
                                      if (!ALScriptWorkspace::instance().remove(ref, error))
                                      {
-                                         studio->setStatus(error, true);
+                                         studio->report(error, true);
                                          continue;
                                      }
                                      // Its tab goes with it, whatever was typed there.
@@ -8048,16 +9809,16 @@ void ALFloaterScriptStudio::explorerRecompile(const std::vector<ExplorerRow>& ro
             if (!result.error.empty())
             {
                 args["[ERROR]"] = result.error;
-                studio->setStatus(studio->getString("SaveFailed", args), true);
+                studio->report(studio->getString("SaveFailed", args), true);
             }
             else if (result.success)
             {
-                studio->setStatus(studio->getString("Compiled", args));
+                studio->report(studio->getString("Compiled", args));
             }
             else
             {
                 args["[COUNT]"] = std::to_string(result.diagnostics.size());
-                studio->setStatus(studio->getString("CompileFailed", args), true);
+                studio->report(studio->getString("CompileFailed", args), true);
             }
         });
     }
@@ -8067,7 +9828,7 @@ void ALFloaterScriptStudio::explorerRecompile(const std::vector<ExplorerRow>& ro
         std::string error;
         if (!ALScriptWorkspace::instance().queue(ALScriptWorkspace::Queue::Recompile, prims, "auto", error))
         {
-            setStatus(error, true);
+            report(error, true);
         }
     }
 }
@@ -8263,6 +10024,16 @@ void ALFloaterScriptStudio::letGoOf(size_t index)
         Doc& doc = *mDocs[index];
         stopExternal(doc);
         mProblemStore.forget(doc.id);
+        if (doc.id == mFound.from)
+        {
+            // Its own places cannot be gone to with it closed.
+            mFound = References();
+            fillReferences();
+        }
+        if (doc.id == mProblemsShownFor)
+        {
+            mProblemsShownFor.clear();
+        }
         doc.changed.release();
         mEditorHost->removeChild(doc.editor);
         doc.editor->die();
@@ -8281,7 +10052,6 @@ void ALFloaterScriptStudio::letGoOf(size_t index)
         fillTabs();
         refreshToolbar();
         fillProblems(nullptr);
-        fillReferences(nullptr);
         mOutline->deleteAllItems();
         mBreadcrumb->setPath({});
         mBreadcrumb->setTrailer(LLStringUtil::null);
@@ -8616,9 +10386,13 @@ void ALFloaterScriptStudio::onMenuAction(const LLSD& param)
         {
             mFolds.setCollapsed("bottom", true);
         }
-        else
+        else if (action == "search")
         {
             showBottom(tab);
+        }
+        else
+        {
+            showBottom(tab, true);
         }
     }
     else if (action == "inspector")
@@ -9084,7 +10858,7 @@ void ALFloaterScriptStudio::fileChosenToSave(const std::vector<std::string>& fil
     out << doc->editor->text();
     LLStringUtil::format_map_t args;
     args["[PATH]"] = files.front();
-    setStatus(getString(out.good() ? "SavedToFile" : "SaveToFileFailed", args), !out.good());
+    report(getString(out.good() ? "SavedToFile" : "SaveToFileFailed", args), !out.good(), doc);
 }
 
 void ALFloaterScriptStudio::saveFileAs()
@@ -9131,7 +10905,7 @@ void ALFloaterScriptStudio::fileChosenToSaveAs(const std::vector<std::string>& f
     out << doc->editor->text();
     if (!out.good())
     {
-        setStatus(getString("SaveToFileFailed", args), true);
+        report(getString("SaveToFileFailed", args), true, doc);
         return;
     }
     // The tab is the new file from here on: keyed by it, named after
@@ -9153,7 +10927,7 @@ void ALFloaterScriptStudio::fileChosenToSaveAs(const std::vector<std::string>& f
     }
     watchFile(*doc);
     noteRecentFile(path);
-    setStatus(getString("SavedToFile", args));
+    report(getString("SavedToFile", args), false, doc);
     fileSettled(*doc);
     scheduleAnalysis(*doc, true);
 }
@@ -9260,6 +11034,43 @@ void ALFloaterScriptStudio::writeState(LLSD& state) const
         recent.append(path);
     }
     state["recent_files"] = recent;
+    // What the panes were set to list: the problems' levels, whose, and
+    // from where; what kind of output; how the search matches and where;
+    // and which of the bottom tabs was in front.
+    if (mProblemErrors)
+    {
+        state["problem_levels"] = LLSD::emptyArray().with(0, mProblemErrors->get()).with(1, mProblemWarnings->get()).with(2, mProblemNotes->get());
+        state["problem_scope"]  = mProblemScope->getValue().asString();
+        state["problem_origin"] = mProblemOrigin->getValue().asString();
+    }
+    if (mOutputKind)
+    {
+        state["output_kind"] = mOutputKind->getValue().asString();
+    }
+    if (mSearchBar)
+    {
+        for (const char* choice : { "how", "case", "scope" })
+        {
+            state["search"][choice] = mSearchBar->valueOf(choice);
+        }
+    }
+    if (mBottomTabs && mBottomTabs->getCurrentPanel())
+    {
+        state["bottom_tab"] = mBottomTabs->getCurrentPanel()->getName();
+    }
+    // How each list was sorted, by a column's title, and the outline.
+    for (auto [name, list] : { std::make_pair("problems", mProblems), std::make_pair("references", mReferences), std::make_pair("search", mSearchResults) })
+    {
+        if (list && !list->getSortColumnName().empty())
+        {
+            state["sort"][name]["column"] = list->getSortColumnName();
+            state["sort"][name]["up"]     = list->getSortAscending();
+        }
+    }
+    if (mOutlineSort)
+    {
+        state["outline_sort"] = mOutlineSort->getValue().asString();
+    }
 }
 
 void ALFloaterScriptStudio::readState(const LLSD& state)
@@ -9340,6 +11151,51 @@ void ALFloaterScriptStudio::readState(const LLSD& state)
                 mPinned.push_back(Pinned{ id, (*it)["name"].asString() });
             }
         }
+    }
+    if (state.has("problem_levels") && mProblemErrors)
+    {
+        const LLSD& levels = state["problem_levels"];
+        mProblemErrors->set(levels[0].asBoolean());
+        mProblemWarnings->set(levels[1].asBoolean());
+        mProblemNotes->set(levels[2].asBoolean());
+    }
+    if (state.has("problem_scope") && mProblemScope)
+    {
+        mProblemScope->selectByValue(state["problem_scope"]);
+    }
+    if (state.has("problem_origin") && mProblemOrigin && !mProblemOrigin->selectByValue(state["problem_origin"]))
+    {
+        mProblemOrigin->selectFirstItem();
+    }
+    if (state.has("output_kind") && mOutputKind)
+    {
+        mOutputKind->selectByValue(state["output_kind"]);
+        onOutputFilter();
+    }
+    if (state.has("search") && mSearchBar)
+    {
+        for (const char* choice : { "how", "case", "scope" })
+        {
+            if (state["search"].has(choice))
+            {
+                mSearchBar->setValue(choice, state["search"][choice].asString());
+            }
+        }
+    }
+    if (state.has("bottom_tab") && mBottomTabs)
+    {
+        mBottomTabs->selectTabByName(state["bottom_tab"].asString());
+    }
+    for (auto [name, list] : { std::make_pair("problems", mProblems), std::make_pair("references", mReferences), std::make_pair("search", mSearchResults) })
+    {
+        if (list && state["sort"].has(name))
+        {
+            list->sortByColumn(state["sort"][name]["column"].asString(), state["sort"][name]["up"].asBoolean());
+        }
+    }
+    if (state.has("outline_sort") && mOutlineSort)
+    {
+        mOutlineSort->selectByValue(state["outline_sort"]);
     }
     if (state.has("recent_files"))
     {

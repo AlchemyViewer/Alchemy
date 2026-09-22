@@ -113,6 +113,7 @@
     <floater.string name="HoverExpected">Expected here: [TYPE]</floater.string>
     <floater.string name="InspectDeclared">Declared on line [LINE].</floater.string>
     <floater.string name="InspectDeclaredTip">Go to the declaration</floater.string>
+    <floater.string name="InspectDeclaredIn">Declared in [FILE] on line [LINE].</floater.string>
     <floater.string name="InspectProblem">Problem: [MESSAGE]</floater.string>
     <floater.string name="NothingKnown">Nothing is known about [NAME] here.</floater.string>
     <floater.string name="NoProblemsHere">There are no problems in [NAME].</floater.string>
@@ -183,7 +184,41 @@
     <floater.string name="OriginRuntime">Runtime</floater.string>
     <floater.string name="OriginAny">Every source</floater.string>
     <floater.string name="ProblemsShown">[SHOWN] of [TOTAL] problems shown; the filters hide the rest.</floater.string>
+    <floater.string name="ProblemsHiddenA">1 more hidden by the filters</floater.string>
+    <floater.string name="ProblemsHiddenB">[COUNT] more hidden by the filters</floater.string>
+    <floater.string name="ProblemsCopiedA">1 problem copied.</floater.string>
+    <floater.string name="ProblemsCopiedB">[COUNT] problems copied.</floater.string>
+    <floater.string name="ProblemNotesA">1 note</floater.string>
+    <floater.string name="ProblemNotesB">[COUNT] notes</floater.string>
+    <floater.string name="ProblemsIncluded">[FILE]</floater.string>
+    <floater.string name="ProblemsIncludedBy">[FILE], as [NAME] includes it</floater.string>
+    <floater.string name="NoProblemsOpen">No problems in the scripts open.</floater.string>
+    <floater.string name="NoProblemsIn">No problems in [NAME].</floater.string>
+    <floater.string name="RepeatedTimes">([COUNT] times)</floater.string>
+    <floater.string name="FilterErrors">Errors</floater.string>
+    <floater.string name="FilterErrorsCount">Errors ([COUNT])</floater.string>
+    <floater.string name="FilterWarnings">Warnings</floater.string>
+    <floater.string name="FilterWarningsCount">Warnings ([COUNT])</floater.string>
+    <floater.string name="FilterNotes">Notes</floater.string>
+    <floater.string name="FilterNotesCount">Notes ([COUNT])</floater.string>
+    <floater.string name="TabProblems">Problems</floater.string>
+    <floater.string name="TabProblemsCount">Problems ([COUNT])</floater.string>
+    <floater.string name="TabReferences">References</floater.string>
+    <floater.string name="TabReferencesCount">References ([COUNT])</floater.string>
+    <floater.string name="TabOutput">Output</floater.string>
+    <floater.string name="TabOutputUnread">Output &#8226;</floater.string>
+    <floater.string name="TrailerLineTip">Go to a line ([KEYS])</floater.string>
+    <floater.string name="TrailerLineTipNoKeys">Go to a line</floater.string>
+    <floater.string name="TrailerProblemsTip">Show the problems ([KEYS])</floater.string>
+    <floater.string name="TrailerProblemsTipNoKeys">Show the problems</floater.string>
+    <floater.string name="ReferenceDeclaration">declaration</floater.string>
+    <floater.string name="ReferenceDeclarationTip">Where [NAME] is declared</floater.string>
+    <floater.string name="OutlineNoMatch">No symbol has those letters in its name.</floater.string>
     <floater.string name="OutputAllObjects">All objects</floater.string>
+    <floater.string name="OutputOpenScripts">Scripts open here</floater.string>
+    <floater.string name="OutputMyObjects">My objects</floater.string>
+    <floater.string name="OutputSourceStudio">Studio</floater.string>
+    <floater.string name="OutputStudioShow">Show [NAME]</floater.string>
     <floater.string name="OutputOpen">Open [NAME]</floater.string>
     <floater.string name="OutputOpenAtLine">Open [NAME] at line [LINE]</floater.string>
     <floater.string name="OutputAtLine">(line [LINE])</floater.string>
@@ -194,7 +229,7 @@
     <floater.string name="OriginOptimizer">Optimizer</floater.string>
     <floater.string name="Preprocessing">Preprocessing [NAME]...</floater.string>
     <floater.string name="Preprocessed">Preprocessed [NAME].</floater.string>
-    <floater.string name="PreprocessedPending">Preprocessed [NAME]; [COUNT] include(s) could not be fetched.</floater.string>
+    <floater.string name="PreprocessedPending">Preprocessed [NAME]; [COUNT] include(s) could not be fetched: [FILES].</floater.string>
     <floater.string name="PreprocessErrors">The preprocessor found [COUNT] error(s) in [NAME]; save again to upload anyway.</floater.string>
     <floater.string name="ExternalWriteFailed">[FILE] could not be written.</floater.string>
     <floater.string name="ExternalOpened">[NAME] is open in the external editor; its saves are saved from here.</floater.string>
@@ -1171,10 +1206,22 @@
                                      height="20"
                                      layout="topleft"
                                      left_pad="10"
+                                     name="problems_scope"
+                                     tool_tip="Whose problems: the script in front, or every script open here, each under its name"
+                                     top_delta="-1"
+                                     width="110">
+                                        <combo_box.item label="This script" name="problems_scope_this" value="this" />
+                                        <combo_box.item label="All open scripts" name="problems_scope_all" value="all" />
+                                    </combo_box>
+                                    <combo_box
+                                     follows="left|top"
+                                     height="20"
+                                     layout="topleft"
+                                     left_pad="6"
                                      name="problems_origin"
                                      tool_tip="Only what one source said: the checkers, the compiler, the preprocessor, the optimizer, the script as it ran"
-                                     top_delta="-1"
-                                     width="120" />
+                                     top_delta="0"
+                                     width="100" />
                                     <filter_editor
                                      follows="left|top|right"
                                      height="20"
@@ -1184,7 +1231,7 @@
                                      name="problems_filter"
                                      tool_tip="Only problems with these words in them"
                                      top_delta="0"
-                                     width="180" />
+                                     width="100" />
                                 </layout_panel>
                                 <layout_panel
                                  auto_resize="true"
@@ -1193,20 +1240,22 @@
                                  min_dim="20"
                                  name="problems_list_panel"
                                  width="574">
-                                    <scroll_list
+                                    <pane_list
+                                     draw_heading="true"
+                                     heading_height="18"
                                      follows="all"
                                      height="84"
                                      layout="topleft"
                                      left="0"
                                      name="problems"
-                                     tool_tip="What the compiler and the analyzers said; choosing one goes to its line"
+                                     tool_tip="What the compiler and the analyzers said. Choosing one shows it in the script, and the arrow keys walk the list; return or a double-click goes there to type, escape goes back."
                                      top="0"
                                      width="574">
-                                        <scroll_list.columns label="Line" name="line" width="70" />
-                                        <scroll_list.columns label="Level" name="level" width="64" />
-                                        <scroll_list.columns label="Source" name="source" width="90" />
-                                        <scroll_list.columns dynamic_width="true" label="Message" name="message" />
-                                    </scroll_list>
+                                        <pane_list.columns label="" name="icon" width="20" />
+                                        <pane_list.columns dynamic_width="true" label="Message" name="message" />
+                                        <pane_list.columns label="Source" name="source" width="80" />
+                                        <pane_list.columns label="Line" name="line" width="70" />
+                                    </pane_list>
                                 </layout_panel>
                             </layout_stack>
                         </panel>
@@ -1217,19 +1266,31 @@
                          layout="topleft"
                          name="references_tab"
                          width="574">
-                            <scroll_list
+                            <text
+                             follows="left|top|right"
+                             height="18"
+                             layout="topleft"
+                             left="6"
+                             name="references_head"
+                             top="3"
+                             use_ellipses="true"
+                             width="562" />
+                            <pane_list
+                             draw_heading="true"
+                             heading_height="18"
                              follows="all"
-                             height="108"
+                             height="84"
                              layout="topleft"
                              left="0"
                              name="references"
-                             tool_tip="Every place the name last looked up stands, in this script and in the object's others; choosing one goes there"
-                             top="0"
+                             tool_tip="Every place the name last looked up stands, in the script it was looked up from and in the object's others, whichever tab is in front. Choosing one shows it, and the arrow keys walk the list; return or a double-click goes there to type."
+                             top_pad="3"
                              width="574">
-                                <scroll_list.columns label="Script" name="where" width="130" />
-                                <scroll_list.columns label="Line" name="line" width="70" />
-                                <scroll_list.columns dynamic_width="true" label="Text" name="text" />
-                            </scroll_list>
+                                <pane_list.columns label="Script" name="where" width="130" />
+                                <pane_list.columns label="Line" name="line" width="60" />
+                                <pane_list.columns label="" name="role" width="76" />
+                                <pane_list.columns dynamic_width="true" label="Text" name="text" />
+                            </pane_list>
                         </panel>
                         <panel
                          follows="all"
@@ -1244,27 +1305,52 @@
                              layout="topleft"
                              left="2"
                              name="output_filter"
-                             tool_tip="Which object's scripts to listen to"
+                             tool_tip="Whose words to show: every object's, the scripts open here, your own objects', or one object's"
                              top="2"
-                             width="220" />
-                            <button
+                             width="170" />
+                            <combo_box
                              follows="left|top"
+                             height="22"
+                             layout="topleft"
+                             left_pad="6"
+                             name="output_kind"
+                             tool_tip="What kind of thing to show: the run-time errors alone, what scripts told their owner, the debug channel, or what the studio itself did -- saving, compiling, preprocessing"
+                             top_delta="0"
+                             width="110">
+                                <combo_box.item label="Everything" name="output_kind_all" value="" />
+                                <combo_box.item label="Errors" name="output_kind_error" value="error" />
+                                <combo_box.item label="Owner says" name="output_kind_owner" value="owner" />
+                                <combo_box.item label="Debug channel" name="output_kind_debug" value="debug" />
+                                <combo_box.item label="Studio" name="output_kind_studio" value="studio" />
+                            </combo_box>
+                            <filter_editor
+                             follows="left|top|right"
+                             height="22"
+                             label="Filter"
+                             layout="topleft"
+                             left_pad="6"
+                             name="output_find"
+                             tool_tip="Only what says these words, or comes from a name with them in it"
+                             top_delta="0"
+                             width="136" />
+                            <button
+                             follows="right|top"
                              height="22"
                              label="Clear"
                              layout="topleft"
                              left_pad="6"
                              name="output_clear"
-                             tool_tip="Forget what was said so far"
+                             tool_tip="Forget what was said so far; the filters stay as they are"
                              top_delta="0"
                              width="60" />
                             <button
-                             follows="left|top"
+                             follows="right|top"
                              height="22"
                              label="Copy All"
                              layout="topleft"
                              left_pad="6"
                              name="output_copy"
-                             tool_tip="Everything the pane shows, on the clipboard as it reads"
+                             tool_tip="What the pane shows through its filters, on the clipboard as it reads"
                              top_delta="0"
                              width="70" />
                             <output_view
@@ -1312,19 +1398,21 @@
                              tool_tip="What to put in place of the words found"
                              top_delta="0"
                              width="478" />
-                            <scroll_list
+                            <pane_list
+                             draw_heading="true"
+                             heading_height="18"
                              follows="all"
                              height="56"
                              layout="topleft"
                              left="0"
                              name="search_results"
-                             tool_tip="Every place the words were found; double-click one to open its script there"
+                             tool_tip="Every place the words were found, kept up to date as the scripts open here are typed in. Choosing one shows it, and the arrow keys walk the list; return or a double-click goes there to type."
                              top_pad="2"
                              width="574">
-                                <scroll_list.columns label="Where" name="where" width="200" />
-                                <scroll_list.columns label="Line" name="line" width="50" />
-                                <scroll_list.columns dynamic_width="true" label="Text" name="text" />
-                            </scroll_list>
+                                <pane_list.columns label="Where" name="where" width="200" />
+                                <pane_list.columns label="Line" name="line" width="60" />
+                                <pane_list.columns dynamic_width="true" label="Text" name="text" />
+                            </pane_list>
                         </panel>
                     </tab_container>
                 </layout_panel>
@@ -1368,19 +1456,53 @@
                  name="outline_panel"
                  user_resize="true"
                  width="250">
-                    <scroll_list
+                    <text
+                     follows="left|top"
+                     font="SansSerifSmall"
+                     font.style="BOLD"
+                     height="16"
+                     layout="topleft"
+                     left="6"
+                     name="outline_head"
+                     top="5"
+                     width="56">
+                        OUTLINE
+                    </text>
+                    <combo_box
+                     follows="left|top"
+                     height="20"
+                     layout="topleft"
+                     left_pad="2"
+                     name="outline_sort"
+                     tool_tip="How the symbols are ordered under what holds them: as the script has them, by name, or by kind"
+                     top="2"
+                     width="64">
+                        <combo_box.item label="Order" name="outline_sort_order" value="order" />
+                        <combo_box.item label="Name" name="outline_sort_name" value="name" />
+                        <combo_box.item label="Kind" name="outline_sort_kind" value="kind" />
+                    </combo_box>
+                    <filter_editor
+                     follows="left|top|right"
+                     height="20"
+                     label="Filter"
+                     layout="topleft"
+                     left_pad="4"
+                     name="outline_filter"
+                     tool_tip="Only the symbols with these letters in their names"
+                     top="2"
+                     width="112" />
+                    <pane_list
                      follows="all"
-                     height="300"
+                     height="274"
                      layout="topleft"
                      left="0"
                      name="outline"
-                     tool_tip="What the script declares, in the order written; choosing one goes to it"
-                     top="0"
+                     tool_tip="What the script declares, the one the caret is in chosen; the arrow before a symbol folds what it holds. Choosing one shows it, and the arrow keys walk the list, left and right folding; return or a double-click goes there to type."
+                     top="26"
                      width="250">
-                        <scroll_list.columns label="" name="icon" width="20" />
-                        <scroll_list.columns dynamic_width="true" label="Symbol" name="symbol" />
-                        <scroll_list.columns label="Kind" name="kind" width="70" />
-                    </scroll_list>
+                        <pane_list.columns label="" name="icon" width="20" />
+                        <pane_list.columns dynamic_width="true" label="Symbol" name="symbol" />
+                    </pane_list>
                 </layout_panel>
                 <layout_panel
                  auto_resize="false"
@@ -1391,16 +1513,28 @@
                  name="symbol_panel"
                  user_resize="true"
                  width="250">
+                    <text
+                     follows="left|top|right"
+                     font="SansSerifSmall"
+                     font.style="BOLD"
+                     height="16"
+                     layout="topleft"
+                     left="6"
+                     name="symbol_head"
+                     top="3"
+                     width="238">
+                        AT THE CARET
+                    </text>
                     <text_view
                      follows="all"
                      font="SansSerif"
-                     height="154"
+                     height="134"
                      layout="topleft"
                      left="0"
                      name="symbol"
                      placeholder="The symbol at the caret: its declaration, its documentation and its page on the wiki. F1 looks up the word at the caret; Help browses the whole reference."
                      read_only="true"
-                     top="0"
+                     top="20"
                      width="250"
                      word_wrap="true" />
                 </layout_panel>

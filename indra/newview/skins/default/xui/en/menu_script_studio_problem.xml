@@ -1,12 +1,26 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
-<!-- The right-click menu of Script Studio's problems: the message, and
-     the lint the problem is, which a scripter may turn off or make an
-     error, as the Lints tab of the preferences does. -->
+<!-- The right-click menu of Script Studio's problems: the message, with
+     or without where it is, and every problem listed; the run-time errors
+     let go of; and the lint the problem is, which a scripter may turn off
+     or make an error, as the Lints tab of the preferences does. -->
 <context_menu
  name="Script studio problem menu">
   <menu_item_call label="Copy Message" layout="topleft" name="copy">
     <menu_item_call.on_click function="Problem.Action" parameter="copy" />
     <menu_item_call.on_enable function="Problem.Enable" parameter="copy" />
+  </menu_item_call>
+  <menu_item_call label="Copy With Location" layout="topleft" name="copy_where">
+    <menu_item_call.on_click function="Problem.Action" parameter="copy_where" />
+    <menu_item_call.on_enable function="Problem.Enable" parameter="copy_where" />
+  </menu_item_call>
+  <menu_item_call label="Copy All Listed" layout="topleft" name="copy_all">
+    <menu_item_call.on_click function="Problem.Action" parameter="copy_all" />
+    <menu_item_call.on_enable function="Problem.Enable" parameter="copy_all" />
+  </menu_item_call>
+  <menu_item_separator layout="topleft" />
+  <menu_item_call label="Clear Run-time Errors" layout="topleft" name="clear_runtime">
+    <menu_item_call.on_click function="Problem.Action" parameter="clear_runtime" />
+    <menu_item_call.on_enable function="Problem.Enable" parameter="clear_runtime" />
   </menu_item_call>
   <menu_item_separator layout="topleft" />
   <menu_item_call label="Turn Off This Warning" layout="topleft" name="off">

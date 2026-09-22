@@ -53,6 +53,7 @@
 
 class ALEmptyState;
 class ALJumpBar;
+class ALPaneList;
 class ALTabStrip;
 class LLButton;
 class LLCheckBoxCtrl;
@@ -206,6 +207,13 @@ private:
         // A notecard rather than a script: plain text, saved as a
         // notecard with the items it came with, never analysed.
         bool                                       notecard = false;
+        // Opened by walking a pane's list past a place in it: looked at
+        // without being held, and replaced by the next one looked at, until
+        // it is typed in, saved, gone to or double-clicked.
+        bool                                       preview = false;
+        // The outline's symbols folded shut, each by the names from the
+        // outermost down to it.
+        boost::unordered_flat_set<std::string, ll::string_hash, std::equal_to<>> outlineFolded;
         std::vector<LLPointer<LLInventoryItem>>    embedded;
         // The items the saved asset carries, by id: what the server can
         // copy out of it. An item dropped since is only here once a save
@@ -278,6 +286,9 @@ private:
             S32         column = -1;
             std::string file;
             std::string message;
+            // How many times it was said: a script failing in a timer
+            // says the same thing every tick, and is one problem.
+            S32         count  = 1;
         };
         std::vector<RuntimeProblem>                runtime;
         // Both were said of the text as it was: each moves with the edits
@@ -324,6 +335,10 @@ private:
             S32         line      = 0;
             S32         column    = 0;
             bool        hasColumn = false;
+            // Where what it is about ends, as the squiggle has it; -1 for
+            // a place with no stretch to it.
+            S32         endLine   = -1;
+            S32         endColumn = -1;
             Level       level     = Level::Note;
             std::string origin;
             std::string message;
@@ -353,9 +368,10 @@ private:
             std::string  file;
             std::string  fileName;
             std::string  text;
+            // Where the name is in the text as listed, in bytes, or -1
+            // where the text is not the line the place is on.
+            S32          at = -1;
         };
-        // The places last found, listed in the pane.
-        std::vector<Place>                         places;
         // The name being looked up across the object's scripts: what
         // was asked, the script that declares it (this one, or the
         // include, by identity) and where, how many scripts are still
@@ -565,10 +581,30 @@ private:
     void                          openFileFromDisk();
     // The inspector's words about the symbol at the caret: the text, with
     // every URL in it a link, and the line it says the symbol is
-    // declared on a link to the line, where it says one.
-    // The inspector's text; the lines given are code, styled as the
-    // active script's editor would colour them.
-    void                          showSymbol(const std::string& text, S32 declared_line = -1, const std::vector<S32>& code_lines = {});
+    // declared on a link to the place, where it says one -- in the
+    // script, or in the include it was declared in. The lines given are
+    // code, styled as the active script's editor would colour them.
+    struct Declared
+    {
+        // As a link's value: where to go.
+        LLSD        value() const;
+        S32         line   = -1;
+        S32         column = -1;
+        // The include it is in, by identity and by name; empty for the
+        // script itself.
+        std::string path;
+        std::string name;
+    };
+    void                          showSymbol(const std::string& text, const Declared& declared, const std::vector<S32>& code_lines);
+    void                          showSymbol(const std::string& text) { showSymbol(text, Declared(), {}); }
+    Declared                      declaredOf(const Doc& doc, const ALScriptAnalysis::Result& result) const;
+    // A line of an include as it reads -- in its tab where it is open,
+    // else as the preprocessor last read it -- untrimmed; false where
+    // neither has it.
+    bool                          sourceLine(const std::string& path, S32 line, std::string& out) const;
+    // A place's line as the pane lists it: trimmed, with where the name
+    // stands in what is left.
+    static void                   placeText(Doc::Place& place, const std::string& line);
 
     void loaded(const ALScriptWorkspace::Loaded& answer);
     void takeCarriedText(Doc& doc);
@@ -599,7 +635,52 @@ private:
     void fillProblems(const Doc* doc);
     // The pane's filters as a query over the store, for one script.
     ALFindings<Doc::Shown, ProblemTraits>::Query problemQuery(const Doc& doc) const;
-    void onProblemSelected();
+    // The scripts the pane lists: the one it is about, and the others
+    // open when it lists every script's, in the tabs' order.
+    std::vector<const Doc*> problemDocs(const Doc* doc) const;
+    // The script the pane is about: the one in front, unless the pane was
+    // left on another's while a row of it was followed into another tab.
+    Doc* problemsDoc();
+    // A row, a reference, a place found, an outline entry chosen: the
+    // place shown in its script, and the keyboard left in the list to walk
+    // on through it; or, asked for with return or a double-click, taken
+    // to the script to type there. Tabs opened on the way leave the panes
+    // on what they were listing.
+    void onProblemSelected(bool to_editor);
+    void revealed(LLUICtrl* list, bool to_editor);
+    // A place, by the identity of the script or file it is in, in one that
+    // is not open, chosen by walking the list: opened a moment later as a
+    // preview, if the list is still on it, rather than a tab for every row
+    // passed -- each fetched from the region. True where it is put off.
+    bool deferOpen(ALPaneList* list, const std::string& path);
+    void pumpSettle();
+    // The preview in hand let go of, for the next; and one held.
+    void closePreview();
+    void holdPreview(Doc& doc);
+    // The places found moved with an edit to the script they are in, as the
+    // problems are; gone where the edit touched the name.
+    void slidePlaces(Doc& doc, const ALTextDocument::Edit& edit);
+    // What an include is, as a mark: a file on disk, a notecard, a script.
+    const char* includeImage(const std::string& path, bool lua) const;
+    // Where a hover or the inspector says a name was declared, gone to: in
+    // the script, or in the include.
+    void goToDeclared(const LLSD& value);
+    // What is wrong at a place of a script, in the card the mouse would
+    // bring up there.
+    void showProblemCard(Doc& doc, const ALTextPos& at);
+    // The first error in the list, chosen and shown; the checkers' own,
+    // passing over the compiler's, where asked.
+    void selectFirstError(bool checkers_only);
+    // The bottom tabs' titles: how many problems and places each lists,
+    // and whether a script has said something the Output tab has not
+    // shown yet.
+    void refreshBottomTabs();
+    // The filters' row laid out again for the counts their labels carry.
+    void layoutProblemFilters();
+    // What the studio did, said in the status line and kept in the
+    // Output tab, where it can be read again: saving, compiling,
+    // preprocessing, renaming. The script's name in it is a link to it.
+    void report(const std::string& text, bool failure = false, const Doc* doc = nullptr);
 
     // The analyzers: a check is due a moment after the last keystroke,
     // sent from draw, answered whenever the worker gets to it, and kept
@@ -620,7 +701,9 @@ private:
     // answered by going there, lighting its places, or asking for a new
     // name and putting it everywhere as one step.
     void askSymbol(Doc& doc, ALEditorCommand command, const ALTextRange& word);
-    void symbolAnswered(Doc& doc, const ALScriptAnalysis::Result& result);
+    // `at` is where the question was about in the source, which the
+    // result's own place is not where the analyzer read the expansion.
+    void symbolAnswered(Doc& doc, const ALScriptAnalysis::Result& result, const ALTextPos& at);
     // A name looked for beyond the script: in every other script of the
     // object that includes the script declaring it, or is that script,
     // each expanded as the compiler would see it and asked where the
@@ -631,9 +714,10 @@ private:
                      const ALScriptSpan& definition, std::vector<Doc::Place> places, U32 version);
     void lookupCandidate(const std::string& id, U32 generation, const ALScriptRef& ref, const std::string& name, const LLUUID& asset_id,
                          const std::string& text);
-    void lookupExpanded(const std::string& id, U32 generation, const ALScriptRef& ref, const std::string& name, const ALPreprocessor::Result& result);
+    void lookupExpanded(const std::string& id, U32 generation, const ALScriptRef& ref, const std::string& name, const std::string& source,
+                        const ALPreprocessor::Result& result);
     void lookupAnswered(const std::string& id, U32 generation, const ALScriptRef& ref, const std::string& name, const ALSourceMap& map,
-                        const std::string& expanded, const ALScriptAnalysis::Result& result);
+                        const std::string& source, const std::string& expanded, const ALScriptAnalysis::Result& result);
     void lookupSettled(Doc& doc);
     static void addPlace(Doc::Lookup& lookup, Doc::Place place);
     // The new name asked for in a popover over the window, with a row
@@ -656,8 +740,10 @@ private:
     void               logExternal(Doc& doc, const ALScriptWorkspace::CompileResult& result);
     void               stopExternal(Doc& doc);
     static std::string externalFileName(const Doc& doc);
-    void fillReferences(const Doc* doc);
-    void onReferenceChosen();
+    // The places last found, whichever tab is in front: following them
+    // opens other scripts, and the list stays what it was.
+    void fillReferences();
+    void onReferenceChosen(bool to_editor);
     // A place in an include opened in a tab of its own where the include
     // is a script or a notecard in the world; one on disk is only named.
     void openIncludeAt(const std::string& path, const std::string& name, S32 line, S32 column, S32 length);
@@ -679,22 +765,39 @@ private:
     // declares; the inspector, from what is at the caret, a moment after
     // it has settled.
     void        pumpCaret();
-    void        inspected(Doc& doc, const ALScriptAnalysis::Result& result);
+    void        inspected(Doc& doc, const ALScriptAnalysis::Result& result, const ALTextPos& at);
     // What is squiggled under a position, from the checkers and the
     // compiler, each with what it says; empty where nothing is.
     std::string problemsAt(const Doc& doc, const ALTextPos& at) const;
     void        refreshOutline(Doc& doc);
+    // The outline's row for the innermost symbol the caret is in, chosen
+    // without going anywhere, and scrolled to where it is out of sight.
+    void        followCaretInOutline(Doc& doc);
+    // An outline row's arrow, under a point of the list; and a symbol
+    // folded shut or opened, by its row.
+    bool        outlineArrowAt(S32 x, S32 y, size_t& index);
+    void        foldOutline(size_t index, std::optional<bool> folded = std::nullopt);
     void        refreshBreadcrumb(Doc& doc);
+    // The words past the breadcrumb: where the caret is, what is
+    // selected, how many problems; the caret's place opens Go to Line and
+    // the counts the problems.
+    void        onTrailerChosen(const std::string& value);
     void        onCrumbChosen(size_t at, const std::string& value);
-    void        onOutlineChosen();
-    void        showBottom(const char* tab);
+    void        onOutlineChosen(bool to_editor);
+    // A bottom tab shown; and the keyboard put in its list, where asked.
+    void        showBottom(const char* tab, bool focus = false);
     std::string kindName(ALScriptSymbolKind kind) const;
 
     // What scripts say, from the workspace: listed in the Output tab, and
     // a run-time error in a script that is open marked on its line.
     void runtimeEvent(const ALScriptWorkspace::RuntimeEvent& event);
+    // The Output tab's filters, over whose words, of what kind, with what
+    // in them, as one filter.
     void onOutputFilter();
     void onOutputChosen(const ALOutputView::Entry& entry);
+    // An object offered in the Output tab's filter, the one least lately
+    // heard from giving way past a few dozen.
+    void offerOutputObject(const LLUUID& root, const std::string& name);
 
     // The explorer: the objects in hand -- pinned, selected in world, or
     // holding a script that is open -- each prim's scripts and notecards
@@ -785,10 +888,22 @@ private:
     // text has moved on since the search is left alone and searched
     // again.
     void replaceAllFound();
-    void searchDocument(const ALScriptRef& ref, const std::string& name, const std::string& where, const ALTextDocument& text, U32 version = 0);
+    void searchDocument(const ALScriptRef& ref, const std::string& name, const std::string& where, const ALTextDocument& text, U32 version = 0,
+                        const std::string& doc_id = std::string());
+    // A script's places as rows, after the rest, up to what a list holds;
+    // and its rows told what it holds now, in place, where it holds as
+    // many places as its rows are -- false where it does not.
+    void addSearchRows(size_t index);
+    bool refreshSearchRows(size_t index);
     void searchLoaded(U32 generation, const std::string& where, const ALScriptWorkspace::Loaded& loaded);
     void searchSettled();
-    void onSearchResult();
+    // The rows from what was found, the row chosen and the scroll kept.
+    void fillSearchResults();
+    // A script open here searched again as it stands now, a moment after
+    // it was typed in, its rows replaced where they were.
+    void researchOpen(Doc& doc);
+    void pumpSearch();
+    void onSearchResult(bool to_editor);
     // Where to go in a script once it is open, or now.
     void goToPlace(const ALScriptRef& ref, const std::string& name, S32 line, S32 column, S32 length);
 
@@ -879,12 +994,14 @@ private:
         std::string id;
         std::string name;
         bool        dirty  = false;
+        bool        preview = false;
         S32         errors = 0;
         S32         warnings = 0;
         const char* image  = nullptr;
         friend bool operator==(const TabFacts& a, const TabFacts& b)
         {
-            return a.id == b.id && a.name == b.name && a.dirty == b.dirty && a.errors == b.errors && a.warnings == b.warnings && a.image == b.image;
+            return a.id == b.id && a.name == b.name && a.dirty == b.dirty && a.preview == b.preview && a.errors == b.errors && a.warnings == b.warnings &&
+                   a.image == b.image;
         }
         friend bool operator!=(const TabFacts& a, const TabFacts& b) { return !(a == b); }
     };
@@ -933,23 +1050,68 @@ private:
     ALTabStrip*                        mTabs          = nullptr;
     ALJumpBar*                         mBreadcrumb    = nullptr;
     LLTabContainer*                    mBottomTabs    = nullptr;
-    LLScrollListCtrl*                  mProblems      = nullptr;
+    ALPaneList*                        mProblems      = nullptr;
     ALFindings<Doc::Shown, ProblemTraits> mProblemStore;
     LLCheckBoxCtrl*                    mProblemErrors   = nullptr;
     LLCheckBoxCtrl*                    mProblemWarnings = nullptr;
     LLCheckBoxCtrl*                    mProblemNotes    = nullptr;
     LLComboBox*                        mProblemOrigin   = nullptr;
     LLFilterEditor*                    mProblemFilter   = nullptr;
-    LLScrollListCtrl*                  mReferences    = nullptr;
-    LLScrollListCtrl*                  mOutline       = nullptr;
+    ALPaneList*                        mReferences    = nullptr;
+    ALPaneList*                        mOutline       = nullptr;
     ALTextView*                        mSymbol        = nullptr;
     // Whose problems the list holds, so that a refill of the same
     // script's keeps the row chosen and the scroll.
     std::string                        mProblemsShownFor;
+    LLComboBox*                        mProblemScope    = nullptr;
+    // How many problems the pane has to list before its filters.
+    S32                                mProblemsHeld    = 0;
+    // Held while a pane's row is followed into a tab, so that the panes
+    // go on listing what they were rather than the tab's.
+    S32                                mHoldPanes       = 0;
+    // The places the last Find References found, and what was looked up
+    // from where: the script's own places are its, whichever is in front.
+    struct References
+    {
+        std::string             from;
+        std::string             fromName;
+        std::string             name;
+        std::vector<Doc::Place> places;
+        bool                    hasDefinition = false;
+        std::string             home;
+        ALScriptSpan            definition;
+    };
+    References                         mFound;
+    // Whether an edit has moved the places since the list was filled.
+    bool                               mPlacesStale    = false;
+    LLTextBox*                         mReferencesHead = nullptr;
+    LLFilterEditor*                    mOutlineFilter  = nullptr;
+    // What the outline's rows last said, and whose they were: a check
+    // that changes none of it leaves the list as it is.
+    std::vector<std::string>           mOutlineSaid;
+    LLComboBox*                        mOutlineSort    = nullptr;
+    // Each outline entry's key -- the names down to it -- and whether it
+    // holds others, as the rows were last made.
+    std::vector<std::string>           mOutlineKeys;
+    std::vector<bool>                  mOutlineParents;
+    // A preview being opened, and a place chosen in a list that is to be
+    // opened as one once the list has stayed on it.
+    S32                                mOpenPreview = 0;
+    bool                               mSettled     = false;
+    ALPaneList*                        mSettleList  = nullptr;
+    LLSD                               mSettleValue;
+    F64                                mSettleDue   = 0.0;
+    std::string                        mTrailerLineTip;
+    std::string                        mTrailerProblemsTip;
+    // Whether a run-time error has come since the Output tab was last
+    // looked at, which its title says until it is.
+    bool                               mOutputUnread   = false;
+    LLComboBox*                        mOutputKind     = nullptr;
+    LLFilterEditor*                    mOutputFind     = nullptr;
     ALOutputView*                      mOutput        = nullptr;
     LLComboBox*                        mOutputFilter  = nullptr;
     ALScopeBar*                        mSearchBar     = nullptr;
-    LLScrollListCtrl*                  mSearchResults = nullptr;
+    ALPaneList*                        mSearchResults = nullptr;
     LLTextBox*                         mSearchCount   = nullptr;
     LLLineEditor*                      mSearchReplacement = nullptr;
     LLButton*                          mSearchReplace     = nullptr;
@@ -958,11 +1120,25 @@ private:
     struct Found
     {
         ALScriptRef              ref;
+        // The tab it was searched in, where it was open.
+        std::string              doc;
         std::string              name;
+        // What the row says it is in: the object and the script.
+        std::string              where;
         U32                      version = 0;
         std::vector<ALTextRange> places;
+        // Each place's line as listed, trimmed, and where the words start
+        // in it.
+        std::vector<std::string> lines;
+        std::vector<S32>         at;
     };
     std::vector<Found>                 mSearchFound;
+    // When the scripts typed in since the search are searched again, or
+    // zero; and which.
+    F64                                mSearchDue = 0.0;
+    std::vector<std::string>           mSearchStale;
+    // The object searched, for a search of one; null otherwise.
+    LLUUID                             mSearchRoot;
     // Which search the answers arriving belong to; how many files are
     // still to answer; what was found so far, and in how many files; the
     // words last searched for, so that a changed dropdown asks again
@@ -1000,8 +1176,9 @@ private:
     bool                               mClosingWindow = false;
     LLHandle<LLContextMenu>            mListMenuHandle;
     LLScrollListCtrl*                  mListMenuFor   = nullptr;
-    // The objects heard from, offered in the filter.
-    std::map<LLUUID, std::string>      mOutputObjects;
+    // The objects heard from, offered in the filter, the one heard from
+    // most lately last.
+    std::vector<std::pair<LLUUID, std::string>> mOutputObjects;
     LLComboBox*                        mCompileTarget = nullptr;
     LLCheckBoxCtrl*                    mRunning       = nullptr;
     LLButton*                          mResetButton   = nullptr;

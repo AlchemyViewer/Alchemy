@@ -357,6 +357,26 @@ bool ALScriptPreprocessor::fileOf(const std::string& path, std::string& file)
     return false;
 }
 
+bool ALScriptPreprocessor::heldText(const std::string& path, std::string& text) const
+{
+    const auto held = mTexts.find(path);
+    if (held != mTexts.end())
+    {
+        text = held->second.text;
+        return true;
+    }
+    std::string file;
+    if (fileOf(path, file) && LLFile::isfile(file))
+    {
+        llifstream        in(file.c_str(), std::ios::binary);
+        std::stringstream read;
+        read << in.rdbuf();
+        text = read.str();
+        return true;
+    }
+    return false;
+}
+
 std::vector<ALScriptPreprocessor::Candidate> ALScriptPreprocessor::candidatesFor(const ALPreprocessor::Ask& ask, const Request& request, bool& unknown)
 {
     unknown = false;
