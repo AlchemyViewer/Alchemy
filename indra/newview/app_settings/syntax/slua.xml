@@ -15,6 +15,11 @@
 
   words: the words the grammar itself puts in its tables; the language
   service adds the rest at runtime.
+
+  indent: how the language indents -- opens, a pattern found at the end
+  of the text before the caret, which sends a new line in a level, and
+  closes, one matched at the start of a line's text, which brings the
+  line out to the level of what opened it as it is typed.
 -->
 <llsd>
   <map>
@@ -27,6 +32,13 @@
       <string>luau</string>
       <string>lua</string>
     </array>
+    <key>indent</key>
+    <map>
+      <key>opens</key>
+      <string>(\b(then|do|else|repeat)|\bfunction\b(?!.*\bend\b).*\)([ \t]*:[^=]*)?|[{(\[])[ \t]*(--.*)?$</string>
+      <key>closes</key>
+      <string>(end|else|elseif|until)\b|[})\]]</string>
+    </map>
     <key>words</key>
     <map>
       <key>control</key>

@@ -262,6 +262,10 @@ struct ALSyntaxGrammar::Impl
     std::vector<std::string> wordTables;
     std::string              lineComment;
     bool                     prose = false;
+    // What opens a block, searched for at the end of the text before the
+    // caret, and what closes one, matched at the start of a line's text.
+    std::shared_ptr<boost::regex> indentOpens;
+    std::shared_ptr<boost::regex> indentCloses;
     std::vector<State>       states;
     // The words the grammar declares for its tables, ahead of whatever is
     // filled in at runtime.
@@ -683,6 +687,20 @@ bool ALSyntaxGrammar::load(const LLSD& description, std::string& error)
     }
     impl->lineComment = description["line_comment"].asString();
     impl->prose       = description["prose"].asBoolean();
+    if (description.has("indent"))
+    {
+        const LLSD& indent = description["indent"];
+        if (!indent.isMap() || !indent.has("opens") || !indent.has("closes") ||
+            !impl->compileRegex(indent["opens"].asString(), impl->indentOpens, error) ||
+            !impl->compileRegex(indent["closes"].asString(), impl->indentCloses, error))
+        {
+            if (error.empty())
+            {
+                error = "indent is a map with opens and closes";
+            }
+            return false;
+        }
+    }
     const LLSD& extensions = description["extensions"];
     for (LLSD::array_const_iterator it = extensions.beginArray(); it != extensions.endArray(); ++it)
     {
@@ -822,6 +840,30 @@ const std::string& ALSyntaxGrammar::lineComment() const
 bool ALSyntaxGrammar::prose() const
 {
     return mImpl->prose;
+}
+
+bool ALSyntaxGrammar::indents() const
+{
+    return mImpl->indentOpens && mImpl->indentCloses;
+}
+
+bool ALSyntaxGrammar::opensBlock(std::string_view before) const
+{
+    return mImpl->indentOpens && boost::regex_search(before.begin(), before.end(), *mImpl->indentOpens);
+}
+
+size_t ALSyntaxGrammar::closesBlock(std::string_view text) const
+{
+    if (!mImpl->indentCloses)
+    {
+        return 0;
+    }
+    boost::match_results<std::string_view::const_iterator> found;
+    if (!boost::regex_search(text.begin(), text.end(), found, *mImpl->indentCloses, boost::match_continuous))
+    {
+        return 0;
+    }
+    return static_cast<size_t>(found.length(0));
 }
 
 ALSyntaxState ALSyntaxGrammar::initialState() const

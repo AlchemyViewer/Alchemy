@@ -164,6 +164,16 @@ public:
     // Whether the text is prose rather than code: the spell check then
     // looks at all of it, not only at comments and strings.
     bool prose() const;
+    // How the language indents, where its file says (`indent`, with
+    // `opens` and `closes`): whether what stands before the caret opens a
+    // block, so the line under it goes in a level -- a brace, `then`,
+    // `do` -- and how long the word or bracket a line's text begins with
+    // that closes one is, so that line comes out to the level of what
+    // opened it -- a brace, `end`, `else` -- or 0. A grammar that says
+    // nothing indents a new line as the one above it.
+    bool   indents() const;
+    bool   opensBlock(std::string_view before) const;
+    size_t closesBlock(std::string_view text) const;
     // The words the grammar itself declares that begin with the prefix,
     // as the word and its table.
     void collectWords(std::string_view prefix, std::vector<std::pair<std::string, std::string>>& out) const;

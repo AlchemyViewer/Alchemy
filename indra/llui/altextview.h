@@ -556,6 +556,13 @@ public:
     // What a tab typed at a place puts in: a tab, or spaces to the next
     // stop where tabs are soft.
     std::string tabText(const ALTextPos& at) const;
+    // The blanks a line begins with.
+    std::string leadingBlanks(S32 line) const;
+    // Where a line that closes a block belongs, by the grammar's rules:
+    // level with the line that opened it -- the bracket it closes, where
+    // a subclass can match one, or else the line above, if that opens a
+    // block, or a level out from it.
+    std::string closingIndent(S32 line);
     // The rect the text is drawn in.
     LLRect textRect() const;
     // The view less the band a modal keymap has under the text: where
@@ -605,6 +612,9 @@ protected:
     // What the map shows beside a line: a mark's colour, where the
     // subclass has one for it.
     virtual bool mapMark(S32 line, LLColor4& color) const { return false; }
+    // The bracket a closing one at a place closes, where the subclass
+    // knows how to match them past strings and comments.
+    virtual bool closerOpenedAt(const ALTextPos& closer, ALTextPos& opener) { return false; }
     // The x span of a range on a row, if it touches the row; a range past
     // the line's end reaches a little past the last glyph.
     bool spanOnRow(S32 line, S32 row, const ALTextRange& range, F32& x0, F32& x1);
@@ -642,6 +652,20 @@ protected:
 
 private:
     void                 moveVertically(S32 rows, bool extend);
+    // Return: the line split with the new one indented as the grammar
+    // says, and a closing word before the caret brought out first.
+    void                 newLine();
+    // A character just typed that finishes what closes a block, as the
+    // first thing on its line: the line brought out to where it belongs;
+    // and a word so brought out that goes on into a longer one put back.
+    void                 outdentAsTyped(llwchar typed);
+    // A line's blanks put to an indentation, the caret keeping its place;
+    // only ever further out. True where the line moved.
+    bool                 reindentLine(S32 line, const std::string& indent);
+    // An indentation one level in from, or out from, another, in the kind
+    // of blank it is written in.
+    std::string          indentUnit(const std::string& like) const;
+    std::string          outdented(const std::string& indent) const;
     void                 indentLines(bool in);
     void                 duplicateLines();
     void                 moveLines(S32 direction);
@@ -741,6 +765,16 @@ private:
     bool mTakesFocus = true;
     bool mReadOnly   = false;
     bool mWordWrap  = false;
+    // The line a closing word last brought out, where the caret stood
+    // after it, and the blanks it had: undone if the next character makes
+    // the word a longer one.
+    struct AutoOutdent
+    {
+        S32         line   = -1;
+        S32         column = -1;
+        std::string indent;
+    };
+    AutoOutdent mAutoOutdent;
     bool mSoftTabs  = false;
     S32  mTabWidth  = 4;
     S32  mHPad      = 4;

@@ -738,4 +738,78 @@ namespace tut
         ensure("still open", e.completionOpen());
         ensure_equals("and not asked again about the same word", asked, 1);
     }
+
+    template<> template<>
+    void alcodeeditor_object::test<20>()
+    {
+        set_test_name("Return goes a level in under what opens a block, and what closes one comes out as it is typed");
+        ALCodeEditor& e = make("");
+        e.setAutoComplete(false);
+        e.setSoftTabs(true);
+        type("default\n{\nstate_entry()\n{\nllSay(0, \"hi\");\n}\n}");
+        ensure_equals("braces in and out", e.text(),
+                      std::string("default\n{\n    state_entry()\n    {\n        llSay(0, \"hi\");\n    }\n}"));
+
+        // Between a bracket and the one that closes it.
+        e.setText("list l = [];");
+        e.setCaret(ALTextPos(0, 10));
+        key(KEY_RETURN);
+        ensure_equals("the closer on a line of its own", e.text(), std::string("list l = [\n    \n];"));
+        ensure("the caret on the line between", e.caret() == ALTextPos(1, 4));
+
+        // A blank line left behind keeps no blanks; a comment after the
+        // brace still opens.
+        e.setText("if (x) { // yes");
+        e.setCaret(e.document().end());
+        type("\n\nz");
+        ensure_equals("in under the brace, the blank line bare", e.text(), std::string("if (x) { // yes\n\n    z"));
+
+        // A closer typed further in than its opener comes out to it, one
+        // typed further out stays, and one not first on its line is text.
+        e.setText("f(\n        a,\n        b");
+        e.setCaret(e.document().end());
+        type("\n)");
+        ensure_equals("level with the line that opened it", e.document().line(3), std::string(")"));
+        e.setText("{\n    x;\n");
+        e.setCaret(e.document().end());
+        type("y}");
+        ensure_equals("not first on the line, left alone", e.document().line(2), std::string("y}"));
+    }
+
+    template<> template<>
+    void alcodeeditor_object::test<21>()
+    {
+        set_test_name("in SLua a block opens with then, do and function, and end, else and elseif come out once the word is whole");
+        ALCodeEditor& e = make("", "slua");
+        e.setAutoComplete(false);
+        e.setSoftTabs(true);
+        type("local function f(a: number): string\nif a then\nreturn \"x\"\nelseif a > 1 then\nfor i = 1, 2 do\nprint(i)\nend\nelse\nreturn \"y\"\nend\nend");
+        ensure_equals("nested and closed", e.text(),
+                      std::string("local function f(a: number): string\n"
+                                  "    if a then\n"
+                                  "        return \"x\"\n"
+                                  "    elseif a > 1 then\n"
+                                  "        for i = 1, 2 do\n"
+                                  "            print(i)\n"
+                                  "        end\n"
+                                  "    else\n"
+                                  "        return \"y\"\n"
+                                  "    end\n"
+                                  "end"));
+        // A word that begins as a closing one and goes on is a name.
+        e.setText("do\n");
+        e.setCaret(e.document().end());
+        type("    endpoint = 1");
+        ensure_equals("a name, left where it is", e.document().line(1), std::string("    endpoint = 1"));
+        // A function closed on its own line opens nothing.
+        e.setText("local f = function() return 1 end");
+        e.setCaret(e.document().end());
+        key(KEY_RETURN);
+        ensure_equals("level with it", e.text(), std::string("local f = function() return 1 end\n"));
+        // In a text indented with tabs, a level is a tab.
+        e.setText("\tif x then");
+        e.setCaret(e.document().end());
+        type("\ny()\nend");
+        ensure_equals("tabs in and out", e.text(), std::string("\tif x then\n\t\ty()\n\tend"));
+    }
 }

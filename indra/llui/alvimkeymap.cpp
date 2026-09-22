@@ -1496,8 +1496,10 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
             view.undoJournal().beginGroup();
             if (ch == 'o')
             {
+                // The view's own Return, which goes a level in under what
+                // opens a block, as the language's rules have it.
                 view.setCaret(d.lineEnd(line));
-                view.insertText("\n" + indent);
+                view.perform(ALEditorCommand::NewLine);
             }
             else
             {

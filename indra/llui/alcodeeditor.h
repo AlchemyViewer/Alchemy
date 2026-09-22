@@ -429,6 +429,7 @@ protected:
     bool performSymbol(ALEditorCommand command) override;
     bool canSymbol(ALEditorCommand command) const override;
     bool mapMark(S32 line, LLColor4& color) const override;
+    bool closerOpenedAt(const ALTextPos& closer, ALTextPos& opener) override;
 
 private:
     void onEdit(const ALTextDocument::Edit& edit);

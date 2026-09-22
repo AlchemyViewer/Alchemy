@@ -402,6 +402,11 @@ bool ALCodeEditor::matchingBrackets(ALTextPos& open, ALTextPos& close)
     return true;
 }
 
+bool ALCodeEditor::closerOpenedAt(const ALTextPos& closer, ALTextPos& opener)
+{
+    return matchBracketAt(closer, opener) && opener < closer;
+}
+
 bool ALCodeEditor::matchBracketAt(const ALTextPos& from, ALTextPos& match)
 {
     const ALTextDocument& doc  = document();
