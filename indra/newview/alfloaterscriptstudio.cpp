@@ -1501,9 +1501,19 @@ void ALFloaterScriptStudio::teachWords(ALCodeEditor& editor, bool lua)
     }
     if (!lua)
     {
-        // The preprocessor's words, which the grid's keywords do not list:
-        // Firestorm's switch and LSL-PyOptimizer's break and continue.
-        for (const char* word : { "switch", "case", "break", "continue" })
+        // The preprocessor's words, which the grid's keywords do not list,
+        // while their transforms are on: Firestorm's switch and case, the
+        // extensions' break, continue and inline.
+        std::vector<const char*> extra;
+        if (gSavedSettings.getBOOL("ALScriptPreprocSwitch"))
+        {
+            extra.insert(extra.end(), { "switch", "case" });
+        }
+        if (gSavedSettings.getBOOL("ALScriptPreprocExtensions"))
+        {
+            extra.insert(extra.end(), { "break", "continue", "inline" });
+        }
+        for (const char* word : extra)
         {
             if (std::find(controls.begin(), controls.end(), word) == controls.end())
             {
@@ -6680,10 +6690,16 @@ void ALFloaterScriptStudio::onMenuAction(const LLSD& param)
                               : action == "preproc_extensions" ? "ALScriptPreprocExtensions"
                                                                : "ALScriptPreprocDiskIncludes";
         gSavedSettings.setBOOL(setting, !gSavedSettings.getBOOL(setting));
-        // What the analyzers see changes with the setting.
+        // What the analyzers see changes with the setting, and what the
+        // editors colour as the transforms' words.
+        const bool words = action == "preproc_switch" || action == "preproc_extensions";
         for (std::unique_ptr<Doc>& doc : mDocs)
         {
             doc->expanded.valid = false;
+            if (words && !doc->notecard && !doc->language.lua)
+            {
+                teachWords(*doc->editor, false);
+            }
             if (preprocessed(*doc))
             {
                 preprocess(*doc, false);

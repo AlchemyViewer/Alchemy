@@ -227,40 +227,6 @@
                     <menu_item_check.on_check function="ScriptStudio.Check" parameter="preproc_enabled" />
                     <menu_item_check.on_click function="ScriptStudio.Menu" parameter="preproc_enabled" />
                 </menu_item_check>
-                <menu_item_check label="Switch Statements" layout="topleft" name="preproc_switch">
-                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="preproc_switch" />
-                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="preproc_switch" />
-                </menu_item_check>
-                <menu_item_check label="Lazy Lists" layout="topleft" name="preproc_lazy">
-                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="preproc_lazy" />
-                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="preproc_lazy" />
-                </menu_item_check>
-                <menu_item_check label="Break, Continue and &amp;= |= ^=" layout="topleft" name="preproc_extensions">
-                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="preproc_extensions" />
-                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="preproc_extensions" />
-                </menu_item_check>
-                <menu_item_check label="Compress Output" layout="topleft" name="preproc_compress">
-                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="preproc_compress" />
-                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="preproc_compress" />
-                </menu_item_check>
-                <menu_item_separator layout="topleft" />
-                <menu_item_check label="Optimize" layout="topleft" name="preproc_optimize">
-                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="preproc_optimize" />
-                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="preproc_optimize" />
-                </menu_item_check>
-                <menu_item_check label="Shrink Names" layout="topleft" name="preproc_shrink">
-                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="preproc_shrink" />
-                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="preproc_shrink" />
-                </menu_item_check>
-                <menu_item_check label="Join Strings" layout="topleft" name="preproc_addstrings">
-                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="preproc_addstrings" />
-                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="preproc_addstrings" />
-                </menu_item_check>
-                <menu_item_check label="Inline Functions Called Once" layout="topleft" name="preproc_inline">
-                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="preproc_inline" />
-                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="preproc_inline" />
-                </menu_item_check>
-                <menu_item_separator layout="topleft" />
                 <menu_item_check label="Include from Disk" layout="topleft" name="preproc_disk">
                     <menu_item_check.on_check function="ScriptStudio.Check" parameter="preproc_disk" />
                     <menu_item_check.on_click function="ScriptStudio.Menu" parameter="preproc_disk" />
@@ -268,6 +234,64 @@
                 <menu_item_call label="Choose Include Folder..." layout="topleft" name="preproc_folder">
                     <menu_item_call.on_click function="ScriptStudio.Menu" parameter="preproc_folder" />
                 </menu_item_call>
+                <menu_item_separator layout="topleft" />
+                <menu
+                 label="Firestorm"
+                 layout="topleft"
+                 mouse_opaque="false"
+                 name="preproc_firestorm_menu"
+                 tear_off="false"
+                 width="200">
+                    <menu_item_check label="Switch Statements" layout="topleft" name="preproc_switch">
+                        <menu_item_check.on_check function="ScriptStudio.Check" parameter="preproc_switch" />
+                        <menu_item_check.on_click function="ScriptStudio.Menu" parameter="preproc_switch" />
+                    </menu_item_check>
+                    <menu_item_check label="Lazy Lists" layout="topleft" name="preproc_lazy">
+                        <menu_item_check.on_check function="ScriptStudio.Check" parameter="preproc_lazy" />
+                        <menu_item_check.on_click function="ScriptStudio.Menu" parameter="preproc_lazy" />
+                    </menu_item_check>
+                    <menu_item_check label="Compress Output" layout="topleft" name="preproc_compress">
+                        <menu_item_check.on_check function="ScriptStudio.Check" parameter="preproc_compress" />
+                        <menu_item_check.on_click function="ScriptStudio.Menu" parameter="preproc_compress" />
+                    </menu_item_check>
+                </menu>
+                <menu
+                 label="Extensions"
+                 layout="topleft"
+                 mouse_opaque="false"
+                 name="preproc_extensions_menu"
+                 tear_off="false"
+                 width="200">
+                    <menu_item_check label="Break, Continue, &amp;= |= ^= and inline" layout="topleft" name="preproc_extensions">
+                        <menu_item_check.on_check function="ScriptStudio.Check" parameter="preproc_extensions" />
+                        <menu_item_check.on_click function="ScriptStudio.Menu" parameter="preproc_extensions" />
+                    </menu_item_check>
+                </menu>
+                <menu
+                 label="Optimizer"
+                 layout="topleft"
+                 mouse_opaque="false"
+                 name="preproc_optimizer_menu"
+                 tear_off="false"
+                 width="200">
+                    <menu_item_check label="Optimize" layout="topleft" name="preproc_optimize">
+                        <menu_item_check.on_check function="ScriptStudio.Check" parameter="preproc_optimize" />
+                        <menu_item_check.on_click function="ScriptStudio.Menu" parameter="preproc_optimize" />
+                    </menu_item_check>
+                    <menu_item_separator layout="topleft" />
+                    <menu_item_check label="Shrink Names" layout="topleft" name="preproc_shrink">
+                        <menu_item_check.on_check function="ScriptStudio.Check" parameter="preproc_shrink" />
+                        <menu_item_check.on_click function="ScriptStudio.Menu" parameter="preproc_shrink" />
+                    </menu_item_check>
+                    <menu_item_check label="Join Strings" layout="topleft" name="preproc_addstrings">
+                        <menu_item_check.on_check function="ScriptStudio.Check" parameter="preproc_addstrings" />
+                        <menu_item_check.on_click function="ScriptStudio.Menu" parameter="preproc_addstrings" />
+                    </menu_item_check>
+                    <menu_item_check label="Inline Functions Called Once" layout="topleft" name="preproc_inline">
+                        <menu_item_check.on_check function="ScriptStudio.Check" parameter="preproc_inline" />
+                        <menu_item_check.on_click function="ScriptStudio.Menu" parameter="preproc_inline" />
+                    </menu_item_check>
+                </menu>
             </menu>
             <menu_item_separator layout="topleft" />
             <menu_item_call label="Open File..." layout="topleft" name="open_file">
