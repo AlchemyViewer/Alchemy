@@ -2750,18 +2750,41 @@ void ALFloaterScriptStudio::analysed(const ALScriptAnalysis::Result& result)
         const bool                   preprocessing = ALScriptPreprocessor::enabled();
         for (ALScriptProblem& problem : doc.analysis)
         {
-            if (problem.source != ALScriptProblem::Source::Parser || problem.line < 0 || problem.line >= doc.editor->document().lineCount())
+            if (problem.severity != ALScriptProblem::Severity::Error || problem.line < 0 || problem.line >= doc.editor->document().lineCount())
             {
                 continue;
             }
+            // The word at the error, or the one just before it: the parser
+            // says where it stopped, which may be the token after the one
+            // that is the trouble, and a `break;` on its own is a name
+            // nobody declared rather than a parse error at all.
             const std::string& line = doc.editor->document().line(problem.line);
-            size_t             end  = static_cast<size_t>(llmax(0, problem.column));
-            while (end < line.size() && (isalnum(static_cast<unsigned char>(line[end])) || line[end] == '_'))
+            auto               wordAt = [&line](size_t at) {
+                size_t end = at;
+                while (end < line.size() && (isalnum(static_cast<unsigned char>(line[end])) || line[end] == '_'))
+                {
+                    ++end;
+                }
+                return line.substr(at, end - at);
+            };
+            const size_t column = static_cast<size_t>(llmax(0, problem.column));
+            std::string  word   = wordAt(llmin(column, line.size()));
+            static const std::set<std::string> ours{ "switch", "case", "break", "continue", "inline" };
+            if (!ours.count(word))
             {
-                ++end;
+                size_t back = llmin(column, line.size());
+                while (back > 0 && line[back - 1] == ' ')
+                {
+                    --back;
+                }
+                size_t start = back;
+                while (start > 0 && (isalnum(static_cast<unsigned char>(line[start - 1])) || line[start - 1] == '_'))
+                {
+                    --start;
+                }
+                word = line.substr(start, back - start);
             }
-            const std::string word = line.substr(static_cast<size_t>(llmax(0, problem.column)), end - static_cast<size_t>(llmax(0, problem.column)));
-            const char*       item = nullptr;
+            const char* item = nullptr;
             if ((word == "switch" || word == "case") && !(preprocessing && switches))
             {
                 item = "PreprocHintSwitch";
