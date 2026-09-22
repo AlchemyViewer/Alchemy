@@ -379,6 +379,8 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="VimPatternNotFound">E486: Pattern not found: [PATTERN]</string>
 	<string name="VimUnknownOption">E518: Unknown option: [OPTION]</string>
 	<string name="VimNotACommand">E492: Not an editor command: [LINE]</string>
+	<string name="VimInvalidAddress">E14: Invalid address</string>
+	<string name="VimMoveIntoItself">E134: Cannot move a range of lines into itself</string>
 	<!-- The counted ones take a form by the count as LLTrans's
 	     getCountString picks it: A for one, B for the rest in English;
 	     a language that counts a third way adds a C (Russian: 2-4). -->
