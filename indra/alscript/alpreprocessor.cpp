@@ -2078,12 +2078,15 @@ namespace
 
         Tokens run(const Tokens& in)
         {
-            Tokens out = assignments(in);
+            Tokens out = markers(assignments(in));
             mScopes.clear();
             return statements(out, 0, out.size());
         }
 
-        bool any() const { return mCounter > 0 || mAssignments > 0; }
+        bool any() const { return mCounter > 0 || mAssignments > 0 || !mInlined.empty(); }
+        // The functions marked `inline`, for the optimizer to put in
+        // place wherever they are called.
+        const std::vector<std::string>& inlined() const { return mInlined; }
 
     private:
         struct Scope
@@ -2094,6 +2097,45 @@ namespace
             bool        breakUsed    = false;
             bool        continueUsed = false;
         };
+
+        // An `inline` before a function's definition -- `inline f()`,
+        // `inline integer f(x)` -- taken off and the name kept.
+        Tokens markers(const Tokens& in)
+        {
+            Tokens out;
+            for (size_t i = 0; i < in.size(); ++i)
+            {
+                if (in[i].is(Kind::Ident, "inline"))
+                {
+                    size_t j = skipBlank(in, i + 1);
+                    size_t name = std::string::npos;
+                    if (j < in.size() && in[j].kind == Kind::Ident)
+                    {
+                        const size_t k = skipBlank(in, j + 1);
+                        if (k < in.size() && in[k].is(Kind::Punct, "("))
+                        {
+                            name = j;
+                        }
+                        else if (k < in.size() && in[k].kind == Kind::Ident)
+                        {
+                            const size_t l = skipBlank(in, k + 1);
+                            if (l < in.size() && in[l].is(Kind::Punct, "("))
+                            {
+                                name = k;
+                            }
+                        }
+                    }
+                    if (name != std::string::npos)
+                    {
+                        mInlined.push_back(in[name].text);
+                        i = j - 1;
+                        continue;
+                    }
+                }
+                out.push_back(in[i]);
+            }
+            return out;
+        }
 
         // `a &= b` and the rest as `a = a & (b)`, the left side an
         // identifier or a vector's component before the operator, the
@@ -2324,6 +2366,26 @@ namespace
                 }
                 if (t.is(Kind::Ident, "break") || t.is(Kind::Ident, "continue"))
                 {
+                    // Only as a statement: what comes before it ends one,
+                    // or opens the body one belongs to. Anywhere else the
+                    // word is a name, which the extension reserves.
+                    size_t back = out.size();
+                    while (back > 0 && out[back - 1].blank())
+                    {
+                        --back;
+                    }
+                    const bool statement_position =
+                        back == 0 || out[back - 1].is(Kind::Punct, ";") || out[back - 1].is(Kind::Punct, "{") || out[back - 1].is(Kind::Punct, "}") ||
+                        out[back - 1].is(Kind::Punct, ")") || out[back - 1].is(Kind::Punct, ":") || out[back - 1].is(Kind::Ident, "else");
+                    const size_t after_word = skipBlank(in, i + 1);
+                    const bool   ends_well  = after_word < to && (in[after_word].is(Kind::Punct, ";") || in[after_word].kind == Kind::Number);
+                    if (!statement_position || !ends_well)
+                    {
+                        mEngine.problem(ALScriptProblem::Severity::Error, "'" + t.text + "' is a name here, which break and continue reserve", t);
+                        out.push_back(t);
+                        ++i;
+                        continue;
+                    }
                     // `break;`, `break 2;`: so many loops out.
                     const bool   is_break = t.is(Kind::Ident, "break");
                     size_t       e        = skipBlank(in, i + 1);
@@ -2460,10 +2522,11 @@ namespace
             return out;
         }
 
-        Engine&            mEngine;
-        std::vector<Scope> mScopes;
-        S32                mCounter     = 0;
-        S32                mAssignments = 0;
+        Engine&                  mEngine;
+        std::vector<Scope>       mScopes;
+        S32                      mCounter     = 0;
+        S32                      mAssignments = 0;
+        std::vector<std::string> mInlined;
     };
 
     // The shape Firestorm emits: a block whose first statements test the
@@ -3229,6 +3292,7 @@ ALPreprocessor::Result ALPreprocessor::run(std::string_view source, const Option
             Extensions extensions(engine);
             tokens                = extensions.run(tokens);
             result.usedExtensions = extensions.any();
+            result.inlined        = extensions.inlined();
         }
         if (options.switches || engine.usedSwitches())
         {
@@ -3245,7 +3309,10 @@ ALPreprocessor::Result ALPreprocessor::run(std::string_view source, const Option
     {
         // Over the expanded text, as Firestorm ran its own; what it says
         // is said of the expanded text and brought back to the source.
-        ALLSLOptimizer::Result optimized = ALLSLOptimizer::run(result.text, options.optimizer);
+        ALLSLOptimizer::Options optimizing = options.optimizer;
+        optimizing.inlineNames             = result.inlined;
+        optimizing.inlining                = optimizing.inlining || !result.inlined.empty();
+        ALLSLOptimizer::Result optimized   = ALLSLOptimizer::run(result.text, optimizing);
         for (ALScriptProblem p : optimized.problems)
         {
             mapProblem(p, result.map);

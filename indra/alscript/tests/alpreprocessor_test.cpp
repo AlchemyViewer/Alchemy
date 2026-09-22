@@ -635,5 +635,14 @@ namespace tut
         ensure_equals("not used when not asked", ALPreprocessor::run("while (a) break;\n", options()).text, std::string("while (a) break;\n"));
         r = ALPreprocessor::run("#define USE_EXTENSIONS\nwhile (a) break;\n", options());
         ensure_equals("USE_EXTENSIONS turns it on", r.text, std::string("\nwhile (a) jump _brk1;@_brk1;\n"));
+        r = ALPreprocessor::run("inline f() { }\ninline integer g(integer x) { return x; }\ninline = 3;\n", o);
+        ensure_equals("inline before a function is taken off and the name kept", r.text, std::string("f() { }\ninteger g(integer x) { return x; }\ninline = 3;\n"));
+        ensure("the names", r.inlined.size() == 2 && r.inlined[0] == "f" && r.inlined[1] == "g");
+        r = ALPreprocessor::run("integer break; while (a) { break = 1; x = continue; }\n", o);
+        ensure_equals("the words as names are errors, not rewrites", messages(r),
+                      std::string("E 0: 'break' is a name here, which break and continue reserve\n"
+                                  "E 0: 'break' is a name here, which break and continue reserve\n"
+                                  "E 0: 'continue' is a name here, which break and continue reserve\n"));
+        ensure_equals("and left as they were", r.text, std::string("integer break; while (a) { break = 1; x = continue; }\n"));
     }
 } // namespace tut

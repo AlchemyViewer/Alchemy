@@ -105,7 +105,8 @@ public:
         bool lazyLists = false;
         bool compress  = false;
         // The extensions LSL-PyOptimizer's users know: break and continue
-        // in loops, and &= |= ^= <<= >>=. USE_EXTENSIONS turns it on too.
+        // in loops, &= |= ^= <<= >>=, and `inline` before a function.
+        // USE_EXTENSIONS turns it on too.
         bool extensions = false;
         // The optimizer over the expanded text, LSL only, with its own
         // options; it needs the builtins loaded.
@@ -144,6 +145,9 @@ public:
         bool usedSwitches   = false;
         bool usedLazyLists  = false;
         bool usedExtensions = false;
+        // The functions the script marked `inline`, which the optimizer
+        // puts in place wherever they are called.
+        std::vector<std::string> inlined;
         // The optimizer ran and its text is what came out.
         bool optimized     = false;
 
