@@ -28,6 +28,7 @@
 
 #include "../test/lltut.h"
 
+#include <cstring>
 #include <fstream>
 #include <sstream>
 
@@ -485,5 +486,41 @@ namespace tut
         service.setConfig(ALLuauConfig());
         ALScriptProblems again = service.check(script);
         ensure("unknown again: " + said(again), mentions(again, "Alchemy"));
+    }
+
+    template<> template<>
+    void alluauservice_object::test<19>()
+    {
+        set_test_name("the engine's commonest messages come back keyed, which an upgrade that rewords them would end");
+        ensure("definitions loaded: " + error, loaded);
+        // Each script says one thing the map has a row for; a Luau whose
+        // wording moved on gives the message with no key, and this is
+        // where that shows -- run check_script_strings.py then.
+        struct Case
+        {
+            const char* script;
+            const char* key;
+        };
+        const Case cases[] = {
+            { "local n: number = \"s\"\n", "LuauTypeMismatch" },
+            { "ll.Say(0)\n", "LuauArgumentCountOnlyOne" },
+            { "ll.Say(0, \"a\", 1)\n", "LuauArgumentCount" },
+            // A key not found the studio rewords itself, keyed as its own.
+            { "local t = { a = 1 }\nprint(t.b)\n", "LuauKeyNotFound" },
+            { "local x = table.getn({})\n", "LuauLintDeprecatedMember" },
+            { "local a, b = 1, 2\nif not a == b then end\n", "LuauLintNotPrecedence" },
+            { "local unused = 1\n", "LuauLintLocalUnused" },
+            { "for i = 10, 1 do end\n", "LuauLintForRange" },
+        };
+        for (const Case& c : cases)
+        {
+            ALScriptProblems problems = service.check(c.script);
+            bool             keyed    = false;
+            for (const ALScriptProblem& p : problems)
+            {
+                keyed |= p.key.compare(0, strlen(c.key), c.key) == 0;
+            }
+            ensure(std::string("keyed ") + c.key + " for " + c.script + ": " + said(problems), keyed);
+        }
     }
 }
