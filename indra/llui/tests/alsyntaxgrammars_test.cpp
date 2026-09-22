@@ -108,6 +108,13 @@ namespace tut
                                   "|function:llSay|punctuation:(|number:0|punctuation:,|text: |string:\"hi |escape:\\\"|string:there|escape:\\\"|string:\""
                                   "|punctuation:);|text: |label:@loop|punctuation:;|text: |control:jump|text: loop|punctuation:;|text: |punctuation:}|text: |punctuation:}"));
         ensure_equals("a directive and a float", lexed("lsl", "#define X 1.5e3", state, words), std::string("preprocessor:#define X 1.5e3"));
+        ensure_equals("a comment after a directive is a comment", lexed("lsl", "#define X 1 // the x", state, words),
+                      std::string("preprocessor:#define X 1 |comment:// the x"));
+        ensure_equals("an include's name is a string", lexed("lsl", "#include \"lib.lsl\"", state, words),
+                      std::string("preprocessor:#include |string:\"lib.lsl\""));
+        ensure_equals("a directive continued", lexed("lsl", "#define TWICE(a) \\", state, words), std::string("preprocessor:#define TWICE(a) \\"));
+        ensure_equals("goes on onto the next line", lexed("lsl", "    ((a) * 2)", state, words), std::string("preprocessor:    ((a) * 2)"));
+        ensure_equals("and ends with it", lexed("lsl", "integer y;", state, words), std::string("type:integer|text: y|punctuation:;"));
         ensure_equals("a block comment opens", lexed("lsl", "x /* y", state, words), std::string("text:x |comment:/* y"));
         ensure_equals("and closes", lexed("lsl", "z */ 2.", state, words), std::string("comment:z */|text: |number:2."));
     }

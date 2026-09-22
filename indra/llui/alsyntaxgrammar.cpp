@@ -413,6 +413,9 @@ bool ALSyntaxGrammar::Impl::loadRule(const LLSD& in, const std::string& state_na
     {
         ++matchers;
         rule.match = Rule::Match::Eol;
+        // What, ending a line, carries the state on to the next rather
+        // than letting the line's end end it: a C directive's backslash.
+        rule.text = in["unless_after"].asString();
     }
     if (in.has("span") || in.has("span_regex"))
     {
@@ -969,6 +972,18 @@ void ALSyntaxGrammar::lexLine(std::string_view line, ALSyntaxState& state, std::
         if (!eol)
         {
             break;
+        }
+        if (!eol->text.empty())
+        {
+            std::string_view kept = line;
+            while (!kept.empty() && (kept.back() == ' ' || kept.back() == '\t'))
+            {
+                kept.remove_suffix(1);
+            }
+            if (kept.size() >= eol->text.size() && kept.compare(kept.size() - eol->text.size(), eol->text.size(), eol->text) == 0)
+            {
+                break;
+            }
         }
         go(*eol, std::string());
     }
