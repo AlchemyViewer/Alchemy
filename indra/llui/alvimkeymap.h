@@ -180,6 +180,14 @@ private:
 
     bool feed(ALTextView& view, const Input& input);
     bool normal(ALTextView& view, const Input& input);
+    // The bracket at a position and its match, through the editor where
+    // the view is one, so that a bracket inside a string or a comment
+    // is passed over as the editor's box passes it.
+    bool matchBracketIn(ALTextView& view, const ALTextPos& from, ALTextPos& match) const;
+    // The position a range address names on the : line -- a number, .,
+    // $, 'x, '< '>, with an offset -- read from `at` on; false where
+    // the line has none there.
+    bool lineAddress(ALTextView& view, const std::string& line, size_t& at, S32& out) const;
     bool insert(ALTextView& view, const Input& input);
     bool commandLine(ALTextView& view, const Input& input);
     // Tab on the : line: the word at the cursor completed from what the
@@ -364,9 +372,25 @@ private:
     bool        mSearchForward   = true;
     bool        mSearchWholeWord = false;
 
+    // The registers by name: a-z, 0 for the last yank, 1-9 for the last
+    // deletes of a line or more, newest first, and - for the last
+    // smaller one.
     std::map<char, Register>  mRegisters;
     Register                  mUnnamed;
+    // The marks, which move with the text as it is edited: the document
+    // they are in is listened to from the first key on it.
     std::map<char, ALTextPos> mMarks;
+    const ALTextDocument*     mMarksIn = nullptr;
+    boost::signals2::scoped_connection mMarksSlide;
+    void                      slideMarks(const ALTextDocument::Edit& edit);
+    void                      followDocument(ALTextView& view);
+
+    // The column j and k want, as vim's curswant: where the caret was
+    // drawn before a vertical move, kept through short lines, or past
+    // every line's end after $; forgotten by any other move. -1 for
+    // none.
+    S32  mWantColumn  = -1;
+    bool mVerticalMove = false;
 
     // Visual mode: where it started and where its caret is -- on a
     // character, which the view's selection reaches past -- and the last

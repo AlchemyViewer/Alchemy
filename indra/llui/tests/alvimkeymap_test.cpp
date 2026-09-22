@@ -956,4 +956,107 @@ namespace tut
         ensure("as typed", vim->typingLine(line, caret) && line == ":zzz" && !vim->menu(items, chosen));
         keys("<Esc>");
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<23>()
+    {
+        set_test_name("j and k keep the column wanted through a short line, $ wants every end, and gj gk walk the display's rows");
+        ALCodeEditor& e = make("a long first line here\nab\nanother long line there\n");
+        e.setCaret(ALTextPos(0, 10));
+        keys("j");
+        ensure("clamped to the short line", e.caret() == ALTextPos(1, 1));
+        keys("j");
+        ensure("the column wanted again below", e.caret() == ALTextPos(2, 10));
+        keys("kk");
+        ensure("and above", e.caret() == ALTextPos(0, 10));
+        keys("l");
+        keys("jj");
+        ensure("a sideways move sets a new wanted column", e.caret() == ALTextPos(2, 11));
+        keys("$");
+        keys("kk");
+        ensure("after $, every line's end", e.caret() == ALTextPos(0, 21));
+        keys("j");
+        ensure("the short one's too", e.caret() == ALTextPos(1, 1));
+        // A count typed does not forget the column on its way.
+        keys("gg05lj1j");
+        ensure("through the short line with a count", e.caret() == ALTextPos(2, 5));
+        // Wrapped: gj goes a row down within the line.
+        e.setWordWrap(true);
+        e.reshape(120, 200);
+        e.setCaret(ALTextPos(0, 0));
+        keys("gj");
+        ensure("a row down, still on the first line", e.caret().line == 0 && e.caret().column > 0);
+        keys("gk");
+        ensure("and back", e.caret() == ALTextPos(0, 0));
+    }
+
+    template<> template<>
+    void alvimkeymap_object::test<24>()
+    {
+        set_test_name("dge takes to the previous word's end, the numbered registers hold the deletes, and the case changes reach past ASCII");
+        ALCodeEditor& e = make("one two three\ncaf\xc3\xa9\nline three\nline four\n");
+        e.setCaret(ALTextPos(0, 9));
+        keys("dge");
+        ensure_equals("from the previous word's end through the caret", e.document().line(0), std::string("one twree"));
+        keys("u");
+        keys("jdd");
+        keys("dd");
+        ensure_equals("two lines gone", e.document().lineCount(), 3);
+        ensure_equals("the last delete in 1", vim->registerText('1'), std::string("line three"));
+        ensure_equals("the one before in 2", vim->registerText('2'), std::string("caf\xc3\xa9"));
+        keys("\"2p");
+        ensure_equals("put back from 2", e.document().line(2), std::string("caf\xc3\xa9"));
+        keys("0x");
+        ensure_equals("a small delete goes to -", vim->registerText('-'), std::string("c"));
+        keys("\"-P");
+        keys("0~~~~");
+        ensure_equals("swapped past ASCII", e.document().line(2), std::string("CAF\xc3\x89"));
+        keys("0gUU");
+        keys("0guu");
+        ensure_equals("lowered past ASCII", e.document().line(2), std::string("caf\xc3\xa9"));
+    }
+
+    template<> template<>
+    void alvimkeymap_object::test<25>()
+    {
+        set_test_name("a repeated insert repeats what stood after a backspace, and marks move with the text");
+        ALCodeEditor& e = make("\nsecond\nthird\n");
+        keys("3ihelo<BS>lo<Esc>");
+        ensure_equals("what stood, three times", e.document().line(0), std::string("hellohellohello"));
+        keys("jma");
+        keys("ggO<Esc>");
+        keys("ggOnew<Esc>");
+        keys("`a");
+        ensure("the mark two lines further down", e.caret() == ALTextPos(3, 5));
+        keys("kdd");
+        keys("`a");
+        ensure("and back up with a line above it gone", e.caret() == ALTextPos(2, 5));
+    }
+
+    template<> template<>
+    void alvimkeymap_object::test<26>()
+    {
+        set_test_name(":sort orders the lines, :m moves them and :t copies them, by the addresses the : line knows");
+        ALCodeEditor& e = make("pear\napple\nFig\nbanana\n");
+        keys(":sort<CR>");
+        ensure_equals("sorted, capitals first as bytes are", e.text(), std::string("Fig\napple\nbanana\npear\n"));
+        keys(":sort! i<CR>");
+        ensure_equals("the other way round, case aside", e.text(), std::string("pear\nFig\nbanana\napple\n"));
+        keys(":%sort i<CR>");
+        keys(":1m$<CR>");
+        ensure_equals("the first moved to the end", e.text(), std::string("banana\nFig\npear\napple\n"));
+        ensure("the caret on the moved line", e.caret().line == 3);
+        keys(":3,4m0<CR>");
+        ensure_equals("two moved to the top", e.text(), std::string("pear\napple\nbanana\nFig\n"));
+        keys(":1t1<CR>");
+        ensure_equals("the first copied below itself", e.text(), std::string("pear\npear\napple\nbanana\nFig\n"));
+        keys(":2,3m1<CR>");
+        ensure_equals("moving lines to just above themselves changes nothing", e.text(), std::string("pear\npear\napple\nbanana\nFig\n"));
+        keys(":1,3m2<CR>");
+        ensure("moving a range into itself is refused", !vim->message().empty());
+        keys(":2,3> 1<CR>");
+        ensure_equals("a count after > shifts so many from the range's end", e.document().line(2), std::string("\tapple"));
+        keys(":1>><CR>");
+        ensure_equals("doubled, two steps", e.document().line(0), std::string("\t\tpear"));
+    }
 }
