@@ -37,6 +37,7 @@
 #include "altextsearch.h"
 #include "alvimkeymap.h"
 #include "llagent.h"
+#include "llappviewer.h"
 #include "llaudioengine.h"
 #include "llavataractions.h"
 #include "lldate.h"
@@ -44,7 +45,6 @@
 #include "llsyntaxid.h"
 #include "llversioninfo.h"
 #include "llbutton.h"
-#include "llcallbacklist.h"
 #include "llcheckboxctrl.h"
 #include "llclipboard.h"
 #include "llcombobox.h"
@@ -762,6 +762,12 @@ void ALFloaterScriptStudio::applyEditorOptions(ALCodeEditor& editor) const
                 studio->vimFormat(view, first, last);
             }
         };
+        vim->hooks().historyWindow = [handle](ALTextView& view, llwchar kind, const std::vector<std::string>& history, std::function<void(const std::string&)> chosen) {
+            if (ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get()))
+            {
+                studio->vimHistoryWindow(view, kind, history, std::move(chosen));
+            }
+        };
         editor.setModalKeymap(std::move(vim));
     }
     else if (!mVimMode && editor.modalKeymap())
@@ -851,6 +857,34 @@ void ALFloaterScriptStudio::takeCarriedText(Doc& doc)
         doc.editor->insertText(*doc.carriedText);
     }
     doc.carriedText.reset();
+}
+
+void ALFloaterScriptStudio::placeEmbeddedItems(Doc& doc, S32 first_line, S32 last_line)
+{
+    const ALTextDocument& text = doc.editor->document();
+    for (S32 line = llmax(0, first_line); line <= last_line && line < text.lineCount() && !doc.embedded.empty(); ++line)
+    {
+        const std::string& bytes = text.line(line);
+        for (size_t i = 0; i + 3 < bytes.size(); ++i)
+        {
+            const unsigned char b0 = static_cast<unsigned char>(bytes[i]);
+            const unsigned char b1 = static_cast<unsigned char>(bytes[i + 1]);
+            const unsigned char b2 = static_cast<unsigned char>(bytes[i + 2]);
+            const unsigned char b3 = static_cast<unsigned char>(bytes[i + 3]);
+            if (b0 != 0xF4 || (b1 & 0xF0) != 0x80 || (b2 & 0xC0) != 0x80 || (b3 & 0xC0) != 0x80)
+            {
+                continue;
+            }
+            const U32       code  = ((b0 & 7u) << 18) | ((b1 & 0x3Fu) << 12) | ((b2 & 0x3Fu) << 6) | (b3 & 0x3Fu);
+            const U32       index = code - static_cast<U32>(LLTextEditor::FIRST_EMBEDDED_CHAR);
+            const ALTextPos at(line, static_cast<S32>(i));
+            if (index < doc.embedded.size() && doc.embedded[index].notNull() && !doc.editor->atomAt(at))
+            {
+                doc.editor->addAtom(embeddedAtom(doc, at, index));
+            }
+            i += 3;
+        }
+    }
 }
 
 void ALFloaterScriptStudio::placeEmbeddedItems(Doc& doc)
@@ -945,6 +979,10 @@ bool ALFloaterScriptStudio::dropOnNotecard(Doc& doc, S32 x, S32 y, bool drop, ED
     if (!doc.loaded || !doc.modifiable || doc.editor->isReadOnly())
     {
         *accept = ACCEPT_NO;
+        if (tooltip.empty())
+        {
+            tooltip = getString("NotecardReadOnlyDrop");
+        }
         return true;
     }
     bool supported = false;
@@ -1003,8 +1041,18 @@ bool ALFloaterScriptStudio::dropOnNotecard(Doc& doc, S32 x, S32 y, bool drop, ED
             return true;
         }
         doc.embedded.push_back(item);
-        const ALTextPos at = doc.editor->posAtLocal(x, y, true);
-        doc.editor->replaceAll({ { ALTextRange(at, at), utf8str_from_cp(static_cast<llwchar>(LLTextEditor::FIRST_EMBEDDED_CHAR + index)) } });
+        // Where the drop landed -- or, for the second and later of several
+        // dropped together, which come one call each in the same frame,
+        // right after the one before, so that they keep their order.
+        ALTextPos at = doc.editor->posAtLocal(x, y, true);
+        if (doc.dropFrame == gFrameCount && doc.dropEnd.line >= 0)
+        {
+            at = doc.dropEnd;
+        }
+        const std::string placeholder = utf8str_from_cp(static_cast<llwchar>(LLTextEditor::FIRST_EMBEDDED_CHAR + index));
+        doc.editor->replaceAll({ { ALTextRange(at, at), placeholder } });
+        doc.dropEnd   = ALTextPos(at.line, at.column + static_cast<S32>(placeholder.size()));
+        doc.dropFrame = gFrameCount;
     }
     return true;
 }
@@ -1195,21 +1243,13 @@ void ALFloaterScriptStudio::loaded(const ALScriptWorkspace::Loaded& answer)
             doc.editor->setDropHandler([this, raw](S32 x, S32 y, MASK, bool drop, EDragAndDropType type, void* cargo, EAcceptance* accept, std::string& tooltip) {
                 return dropOnNotecard(*raw, x, y, drop, type, cargo, accept, tooltip);
             });
-            // A placeholder put back by an edit -- an undo, a redo, a
-            // paste -- gets its button again, once the edit is through.
-            const std::string id = doc.id;
-            doc.embeddedEdits    = doc.editor->document().onChanged([this, id](const ALTextDocument::Edit& edit) {
+            // A placeholder put in by an edit -- a drop, an undo, a redo,
+            // a paste -- gets its button as the edit lands, on the lines
+            // the edit touched; the view has slid its own atoms by then.
+            doc.embeddedEdits = doc.editor->document().onChanged([this, raw](const ALTextDocument::Edit& edit) {
                 if (edit.inserted.find('\xF4') != std::string::npos)
                 {
-                    const LLHandle<LLFloater> handle = getHandle();
-                    doOnIdleOneTime([handle, id]() {
-                        ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get());
-                        const size_t           index  = studio ? studio->indexOf(id) : NONE;
-                        if (index != NONE)
-                        {
-                            studio->placeEmbeddedItems(*studio->mDocs[index]);
-                        }
-                    });
+                    placeEmbeddedItems(*raw, edit.range.begin.line, edit.endAfter().line);
                 }
             });
         }
@@ -2474,6 +2514,37 @@ void ALFloaterScriptStudio::pumpVim()
         mVimBanner = banner;
         refreshTrailer(*doc);
     }
+}
+
+void ALFloaterScriptStudio::vimHistoryWindow(ALTextView& view, llwchar kind, const std::vector<std::string>& history, std::function<void(const std::string&)> chosen)
+{
+    // Vim's command-line window as a quick-open over the editor: the
+    // lines entered, the last first, ranked as they are typed at; the
+    // one picked goes back onto the line to be edited and entered. The
+    // editor takes the keyboard back either way.
+    std::vector<ALQuickOpen::Candidate> candidates;
+    for (size_t i = history.size(); i-- > 0;)
+    {
+        ALQuickOpen::Candidate c;
+        c.label = history[i];
+        c.value = history[i];
+        candidates.push_back(std::move(c));
+    }
+    const LLHandle<LLUICtrl> editor = view.getHandle();
+    auto                     back   = [editor]() {
+        if (LLUICtrl* e = editor.get())
+        {
+            e->setFocus(true);
+        }
+    };
+    LLStringUtil::format_map_t args;
+    args["[KIND]"] = utf8str_from_cp(kind);
+    quickOpen(std::move(candidates), getString("VimHistoryPlaceholder", args), getString("VimHistoryTitle", args),
+              [chosen, back](const std::string& line) {
+                  back();
+                  chosen(line);
+              },
+              mEditorHost, 420, ALQuickOpen::heightForRows(llclamp(static_cast<S32>(history.size()), 1, 8)), back);
 }
 
 bool ALFloaterScriptStudio::vimCommand(ALTextView& view, const std::string& name, const std::string& args)
@@ -5007,7 +5078,7 @@ const char* ALFloaterScriptStudio::imageNameOf(const Doc& doc)
     {
         return doc.language.lua ? "Inv_Script_Luau" : "Inv_Script";
     }
-    if (doc.name == ".luaurc")
+    if (doc.name == ".luaurc" || doc.name == ".lslrc")
     {
         return "Studio_Config";
     }
@@ -5645,6 +5716,7 @@ void ALFloaterScriptStudio::format(Doc& doc, bool selection_only)
 void ALFloaterScriptStudio::runtimeEvent(const ALScriptWorkspace::RuntimeEvent& event)
 {
     static const LLUIColor runtime_color = LLUIColorTable::instance().getColor("CodeMarkRuntime", LLColor4::magenta);
+    static const LLUIColor owner_color   = LLUIColorTable::instance().getColor("ObjectChatColor", LLColor4::white);
 
     // The object, offered in the filter the first time it speaks.
     if (event.root.notNull() && mOutputObjects.emplace(event.root, event.objectName).second)
@@ -5670,6 +5742,12 @@ void ALFloaterScriptStudio::runtimeEvent(const ALScriptWorkspace::RuntimeEvent& 
         {
             entry.text += llformat(" (line %d)", event.line + 1);
         }
+    }
+    else if (event.channel == ALScriptWorkspace::RuntimeEvent::Channel::OwnerSay)
+    {
+        // What the owner was told, in the colour chat shows an object's
+        // words in; the debug channel's in the plain ink.
+        entry.color = owner_color.get();
     }
     entry.key = event.root;
     if (event.item.notNull())
@@ -6075,7 +6153,7 @@ void ALFloaterScriptStudio::fillExplorer()
                 args["[NAME]"]         = item.name;
                 args["[KIND]"]         = kind;
                 args["[STATE]"]        = run;
-                const char* image = item.script ? (item.lua ? "Inv_Script_Luau" : "Inv_Script") : item.name == ".luaurc" ? "Studio_Config" : "Inv_Notecard";
+                const char* image = item.script ? (item.lua ? "Inv_Script_Luau" : "Inv_Script") : item.name == ".luaurc" || item.name == ".lslrc" ? "Studio_Config" : "Inv_Notecard";
                 line = row(value, image, indent + item.name, kind, run, getString(item.script ? "RowScriptTip" : "RowNotecardTip", args));
                 line->setSelected(wasChosen(value));
             }

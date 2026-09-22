@@ -121,6 +121,8 @@
     <floater.string name="GoToSymbolTitle">Go to Symbol</floater.string>
     <floater.string name="GoToSymbolPlaceholder">Type a symbol's name</floater.string>
     <floater.string name="GoToLineTitle">Go to Line</floater.string>
+    <floater.string name="VimHistoryTitle">[KIND] lines entered</floater.string>
+    <floater.string name="VimHistoryPlaceholder">Type to find a line; return puts it up to edit and enter</floater.string>
     <floater.string name="GoToLinePlaceholder">Line, or line:column</floater.string>
     <floater.string name="GoToLineHint">Type a line number to go to (from 1 to [COUNT]).</floater.string>
     <floater.string name="GoToLineGo">Go to line [LINE].</floater.string>
@@ -170,6 +172,7 @@
     <floater.string name="EmbeddedItemOpenTip">[NAME], carried in the notecard: press to open it</floater.string>
     <floater.string name="EmbeddedItemPlayTip">[NAME], carried in the notecard: press to play it and take a copy</floater.string>
     <floater.string name="EmbeddedItemCopyTip">[NAME], carried in the notecard: press to take a copy</floater.string>
+    <floater.string name="NotecardReadOnlyDrop">This notecard can't be changed</floater.string>
     <floater.string name="PreprocHintSwitch">([WORD] is Firestorm's: turn on Preprocess on Save and Preprocessor > Firestorm > Switch Statements)</floater.string>
     <floater.string name="PreprocHintExtensions">([WORD] is an extension: turn on Preprocess on Save and Preprocessor > Extensions)</floater.string>
     <floater.string name="ClearRecentFiles">Clear Menu</floater.string>
@@ -1163,6 +1166,7 @@
                              layout="topleft"
                              left="0"
                              name="output"
+                             placeholder="What the scripts say on the debug channel and to their owner appears here, as it is said."
                              tool_tip="What the scripts said on the debug channel and to their owner; a script's name is a link to it, at the line of a run-time error, and a URL in what was said is one too"
                              top_pad="2"
                              width="574" />

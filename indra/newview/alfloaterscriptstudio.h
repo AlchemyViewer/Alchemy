@@ -191,6 +191,11 @@ private:
         // An edit that put a placeholder back -- an undo of a deletion,
         // a redo of a drop -- has the items placed again.
         boost::signals2::scoped_connection         embeddedEdits;
+        // Where the last drop's placeholder ended, and in which frame:
+        // several items dropped at once come one call each, at one point,
+        // and each goes after the one before.
+        ALTextPos                                  dropEnd{ -1, -1 };
+        U32                                        dropFrame = 0;
         // The envelope the asset came in, whose source the editor holds
         // and whose expanded code the other editor shows; a save runs
         // the preprocessor over the source and wraps both again.
@@ -385,6 +390,9 @@ private:
     // The vim mode's : commands the mode does not answer itself, and
     // its = over lines; and its mode and its words shown as they change.
     bool vimCommand(ALTextView& view, const std::string& name, const std::string& args);
+    // q: q/ and q?: the lines entered, in a quick-open over the editor,
+    // the one picked going back onto the line.
+    void vimHistoryWindow(ALTextView& view, llwchar kind, const std::vector<std::string>& history, std::function<void(const std::string&)> chosen);
     void vimFormat(ALTextView& view, S32 first, S32 last);
     void pumpVim();
     Doc* docOf(const ALTextView& view);
@@ -456,6 +464,9 @@ private:
     // placeholder is -- the character that stands for it in the format
     // -- that opens the item or offers a copy of it; and the opening.
     void             placeEmbeddedItems(Doc& doc);
+    // The buttons for the placeholders on a stretch of lines that have
+    // none yet: what an edit that put one back asks for.
+    void             placeEmbeddedItems(Doc& doc, S32 first_line, S32 last_line);
     ALTextView::Atom embeddedAtom(Doc& doc, const ALTextPos& at, size_t index);
     // The text and the items as a save takes them: only the items the
     // text still stands somewhere, numbered afresh in the text.
