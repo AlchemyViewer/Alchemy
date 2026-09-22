@@ -29,6 +29,7 @@
 #include "allslservice.h"
 #include "alluauservice.h"
 #include "llappviewer.h"
+#include "llviewercontrol.h"
 #include "llfile.h"
 #include "llsyntaxid.h"
 #include "alsaid.h"
@@ -36,6 +37,7 @@
 #include "threadpool.h"
 #include "workqueue.h"
 
+#include <algorithm>
 #include <sstream>
 
 // What lives on the worker: the two services and what they were loaded
@@ -295,5 +297,152 @@ void alTranslateScriptProblems(ALScriptProblems& problems)
         {
             problem.message = alScriptProblemWords(problem);
         }
+    }
+}
+
+// --- the scripter's choice of lints ------------------------------------------------------
+
+namespace ALScriptLints
+{
+    namespace
+    {
+        // The warnings Tailslide gives, by number: every one it has but
+        // those it never says (20006, 20008, 20010).
+        const char* const LSL_WARNINGS[] = { "20001", "20002", "20003", "20004", "20005", "20007", "20009", "20011", "20012",
+                                             "20013", "20014", "20015", "20016", "20017", "20018", "20019", "20020" };
+
+        std::string keyOf(bool lua, std::string_view id)
+        {
+            return std::string(lua ? "luau:" : "lsl:") + std::string(id);
+        }
+
+        const char* nameOf(Level level)
+        {
+            return level == Level::Off ? "off" : level == Level::Error ? "error" : "warning";
+        }
+    }
+
+    const std::vector<Lint>& all()
+    {
+        static const std::vector<Lint> lints = [] {
+            std::vector<Lint> out;
+            for (const char* id : LSL_WARNINGS)
+            {
+                out.push_back(Lint{ id, false });
+            }
+            for (const std::string& name : ALLuauConfig::lintNames())
+            {
+                out.push_back(Lint{ name, true });
+            }
+            return out;
+        }();
+        return lints;
+    }
+
+    Level level(bool lua, std::string_view id)
+    {
+        const LLSD        levels = gSavedSettings.getLLSD("ALScriptLintLevels");
+        const std::string said   = levels.has(keyOf(lua, id)) ? levels[keyOf(lua, id)].asString() : std::string();
+        return said == "off" ? Level::Off : said == "error" ? Level::Error : Level::Warning;
+    }
+
+    void setLevel(bool lua, std::string_view id, Level to)
+    {
+        LLSD levels = gSavedSettings.getLLSD("ALScriptLintLevels");
+        if (!levels.isMap())
+        {
+            levels = LLSD::emptyMap();
+        }
+        // Only what differs from the default is kept, so that a default
+        // that changes reaches everyone who did not choose otherwise.
+        if (to == Level::Warning)
+        {
+            levels.erase(keyOf(lua, id));
+        }
+        else
+        {
+            levels[keyOf(lua, id)] = nameOf(to);
+        }
+        gSavedSettings.setLLSD("ALScriptLintLevels", levels);
+    }
+
+    void setLevels(bool lua, const std::vector<std::pair<std::string, Level>>& chosen)
+    {
+        LLSD levels = gSavedSettings.getLLSD("ALScriptLintLevels");
+        if (!levels.isMap())
+        {
+            levels = LLSD::emptyMap();
+        }
+        for (const auto& [id, to] : chosen)
+        {
+            if (to == Level::Warning)
+            {
+                levels.erase(keyOf(lua, id));
+            }
+            else
+            {
+                levels[keyOf(lua, id)] = nameOf(to);
+            }
+        }
+        // The setting tells its listeners only of a value that changed.
+        gSavedSettings.setLLSD("ALScriptLintLevels", levels);
+    }
+
+    void reset()
+    {
+        gSavedSettings.setLLSD("ALScriptLintLevels", LLSD::emptyMap());
+        gSavedSettings.setString("ALScriptLuauMode", "nonstrict");
+    }
+
+    void apply(ALScriptProblems& problems)
+    {
+        const LLSD levels = gSavedSettings.getLLSD("ALScriptLintLevels");
+        if (!levels.isMap() || levels.size() == 0)
+        {
+            return;
+        }
+        problems.erase(std::remove_if(problems.begin(), problems.end(),
+                                      [&levels](ALScriptProblem& problem) {
+                                          if (problem.severity != ALScriptProblem::Severity::Warning || problem.code.empty())
+                                          {
+                                              return false;
+                                          }
+                                          const std::string said = levels.has("lsl:" + problem.code) ? levels["lsl:" + problem.code].asString() : std::string();
+                                          if (said == "error")
+                                          {
+                                              problem.severity = ALScriptProblem::Severity::Error;
+                                          }
+                                          return said == "off";
+                                      }),
+                       problems.end());
+    }
+
+    ALLuauConfig luauBase()
+    {
+        ALLuauConfig base;
+        for (const Lint& lint : all())
+        {
+            if (!lint.lua)
+            {
+                continue;
+            }
+            const uint64_t bit = ALLuauConfig::lintBit(lint.id);
+            switch (level(true, lint.id))
+            {
+                case Level::Off:
+                    base.lints &= ~bit;
+                    break;
+                case Level::Error:
+                    base.lints |= bit;
+                    base.fatalLints |= bit;
+                    break;
+                default:
+                    base.lints |= bit;
+                    break;
+            }
+        }
+        const std::string mode = gSavedSettings.getString("ALScriptLuauMode");
+        base.mode              = mode == "strict" || mode == "nocheck" ? mode : std::string("nonstrict");
+        return base;
     }
 }

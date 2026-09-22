@@ -63,6 +63,42 @@ namespace LL
 std::string alScriptProblemWords(const ALScriptProblem& problem);
 void        alTranslateScriptProblems(ALScriptProblems& problems);
 
+// What a scripter chose the linters say: each of LSL's warnings and each
+// of Luau's lints off, a warning, or an error, by the setting
+// ALScriptLintLevels, which holds only what differs from the default; and
+// the mode an SLua script is checked in where it says none.
+namespace ALScriptLints
+{
+    enum class Level : U8
+    {
+        Off,
+        Warning,
+        Error
+    };
+    // A lint by what names it: Tailslide's number for LSL, the name a
+    // `.luaurc` uses for Luau.
+    struct Lint
+    {
+        std::string id;
+        bool        lua = false;
+    };
+    // Every one there is a choice about, LSL's then Luau's.
+    const std::vector<Lint>& all();
+    Level                    level(bool lua, std::string_view id);
+    void                     setLevel(bool lua, std::string_view id, Level level);
+    // A whole language's at once, so that what follows the setting --
+    // every script checked again -- follows it once.
+    void                     setLevels(bool lua, const std::vector<std::pair<std::string, Level>>& levels);
+    // Everything back to the default, the mode too.
+    void                     reset();
+    // LSL's problems as chosen: a warning turned off dropped, one made an
+    // error raised; the rest as they were. Errors are not a choice.
+    void                     apply(ALScriptProblems& problems);
+    // What an SLua script is checked with where no `.luaurc` says: the
+    // lints on and the ones that are errors, and the mode.
+    ALLuauConfig             luauBase();
+}
+
 class ALScriptAnalysis : public LLSingleton<ALScriptAnalysis>
 {
     LLSINGLETON(ALScriptAnalysis);

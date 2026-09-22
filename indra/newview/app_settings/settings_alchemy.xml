@@ -280,7 +280,7 @@
         <key>ALScriptPreprocDiskIncludeFolder</key>
         <map>
             <key>Comment</key>
-            <string>The folder #include looks in when includes from disk are on.</string>
+            <string>The folders #include looks in when includes from disk are on, one to a line, in the order looked in.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
@@ -463,6 +463,193 @@
             <string>S32</string>
             <key>Value</key>
             <integer>4</integer>
+        </map>
+        <key>ALScriptLintLevels</key>
+        <map>
+            <key>Comment</key>
+            <string>What Script Studio's linters say of each warning a scripter changed from its default: "off", "warning" or "error", by "lsl:" and Tailslide's number or "luau:" and the lint's name. A .luaurc beside an SLua script overrides these for its lints.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>LLSD</string>
+            <key>Value</key>
+            <map />
+        </map>
+        <key>ALScriptLuauMode</key>
+        <map>
+            <key>Comment</key>
+            <string>The type checking an SLua script is analyzed in where neither a --! comment nor a .luaurc says: "nonstrict", as the grid compiles, "strict" or "nocheck".</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>String</string>
+            <key>Value</key>
+            <string>nonstrict</string>
+        </map>
+        <key>ALScriptStudioAutoComplete</key>
+        <map>
+            <key>Comment</key>
+            <string>Script Studio's completion list opens on its own as a name is typed; off, only when asked for (Control-Space).</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>ALScriptStudioCompleteAfter</key>
+        <map>
+            <key>Comment</key>
+            <string>How many letters of a name are typed before Script Studio's completion list opens on its own.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>2</integer>
+        </map>
+        <key>ALScriptStudioAcceptOnEnter</key>
+        <map>
+            <key>Comment</key>
+            <string>Return takes the completion chosen in Script Studio's list, as Tab does; off, Return starts a new line and only Tab takes it.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>ALScriptStudioAutoClose</key>
+        <map>
+            <key>Comment</key>
+            <string>Script Studio closes a bracket or a quote as it is opened, types over the closer, wraps a selection in the pair typed, and takes both away with one Backspace between them.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>ALScriptStudioCaretStyle</key>
+        <map>
+            <key>Comment</key>
+            <string>How Script Studio draws the caret outside vim's normal mode: line, block or underline.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>String</string>
+            <key>Value</key>
+            <string>line</string>
+        </map>
+        <key>ALScriptStudioCaretBlink</key>
+        <map>
+            <key>Comment</key>
+            <string>Script Studio's caret blinks; off, it stays lit.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>ALScriptStudioHoverCards</key>
+        <map>
+            <key>Comment</key>
+            <string>Script Studio shows what a name or a problem is in a card when the mouse rests on it.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>ALScriptStudioHoverDelay</key>
+        <map>
+            <key>Comment</key>
+            <string>How long in seconds the mouse rests on a name in Script Studio before its card shows.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.5</real>
+        </map>
+        <key>ALScriptFormatBlankLines</key>
+        <map>
+            <key>Comment</key>
+            <string>How many blank lines in a row Script Studio's formatter leaves.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>2</integer>
+        </map>
+        <key>ALScriptFormatSpacing</key>
+        <map>
+            <key>Comment</key>
+            <string>Script Studio's formatter sets the spaces within a line -- around operators, after commas -- as well as the indentation; off, only the indentation.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>ALScriptFormatOnSave</key>
+        <map>
+            <key>Comment</key>
+            <string>Script Studio formats a script before saving it, as one step to undo.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>ALScriptTrimOnSave</key>
+        <map>
+            <key>Comment</key>
+            <string>Script Studio takes the blanks off the end of every line before saving a script, as one step to undo.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>ALScriptTemplateLSL</key>
+        <map>
+            <key>Comment</key>
+            <string>What a new LSL script made in Script Studio starts with; empty, the grid's own.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>String</string>
+            <key>Value</key>
+            <string />
+        </map>
+        <key>ALScriptTemplateSLua</key>
+        <map>
+            <key>Comment</key>
+            <string>What a new SLua script made in Script Studio starts with; empty, the grid's own.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>String</string>
+            <key>Value</key>
+            <string />
+        </map>
+        <key>ALScriptPreprocDefines</key>
+        <map>
+            <key>Comment</key>
+            <string>Macros the preprocessor defines for every script, one to a line: NAME, which is 1, or NAME=value.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>String</string>
+            <key>Value</key>
+            <string />
         </map>
         <key>ALScriptStudioInsertSpaces</key>
         <map>

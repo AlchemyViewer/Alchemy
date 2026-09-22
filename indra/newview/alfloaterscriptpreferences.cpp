@@ -28,6 +28,7 @@
 
 #include "alcodeeditor.h"
 #include "alfloaterscriptstudio.h"
+#include "alscriptanalysis.h"
 #include "alfontfield.h"
 #include "alscriptkeymap.h"
 #include "llbutton.h"
@@ -42,6 +43,12 @@
 #include "lluicolortable.h"
 #include "lluictrlfactory.h"
 #include "llviewercontrol.h"
+#include "alscriptsnippets.h"
+#include "lllineeditor.h"
+#include "llviewermenufile.h"
+#include "lltexteditor.h"
+#include "llfloaterreg.h"
+#include "alscriptpreprocessor.h"
 
 #include <algorithm>
 #include <sstream>
@@ -59,6 +66,11 @@ namespace
         "ALScriptPreprocOptimizerInlining",     "ALScriptPreprocExtensions",
         "ALScriptPreprocDiskIncludes", "ALScriptPreprocDiskIncludeFolder", "ALScriptPreprocIncludeOrder",
         "ALScriptStudioTabWidth",    "ALScriptStudioInsertSpaces",
+        "ALScriptLintLevels",        "ALScriptLuauMode",
+        "ALScriptStudioAutoComplete", "ALScriptStudioCompleteAfter", "ALScriptStudioAcceptOnEnter", "ALScriptStudioAutoClose",
+        "ALScriptStudioCaretStyle",  "ALScriptStudioCaretBlink",   "ALScriptStudioHoverCards",  "ALScriptStudioHoverDelay",
+        "ALScriptFormatBlankLines",  "ALScriptFormatSpacing",      "ALScriptFormatOnSave",      "ALScriptTrimOnSave",
+        "ALScriptTemplateLSL",       "ALScriptTemplateSLua",       "ALScriptPreprocDefines",    "ExternalEditor",
     };
 
     // The places an include is looked for, as the setting spells them.
@@ -83,22 +95,75 @@ bool ALFloaterScriptPreferences::postBuild()
     mFont        = getChild<ALFontField>("font");
     mSwatches    = getChild<LLPanel>("swatches");
     mPreview     = getChild<ALCodeEditor>("preview");
-    mFolder      = getChild<LLTextBox>("include_folder");
-    mOrder       = getChild<LLScrollListCtrl>("include_order");
+    mFolders      = getChild<LLScrollListCtrl>("include_folders");
+    mOrder        = getChild<LLScrollListCtrl>("include_order");
+    mTemplateLSL  = getChild<ALCodeEditor>("template_lsl");
+    mTemplateSLua = getChild<ALCodeEditor>("template_slua");
+    mDefines      = getChild<LLTextEditor>("preproc_defines");
+    mSnippetLang   = getChild<LLComboBox>("snippet_language");
+    mSnippetList   = getChild<LLScrollListCtrl>("snippet_list");
+    mSnippetName   = getChild<LLLineEditor>("snippet_name");
+    mSnippetPrefix = getChild<LLLineEditor>("snippet_prefix");
+    mSnippetDetail = getChild<LLLineEditor>("snippet_detail");
+    mSnippetBody   = getChild<ALCodeEditor>("snippet_body");
 
     mThemes->setCommitCallback([this](LLUICtrl*, const LLSD&) { onTheme(); });
     getChild<LLButton>("save_theme")->setCommitCallback([this](LLUICtrl*, const LLSD&) { onSaveTheme(); });
     getChild<LLButton>("restore_skin")->setCommitCallback([this](LLUICtrl*, const LLSD&) { onRestoreSkin(); });
     mPreviewLang->setCommitCallback([this](LLUICtrl*, const LLSD&) { refreshPreview(); });
-    getChild<LLButton>("choose_folder")->setCommitCallback([this](LLUICtrl*, const LLSD&) { onIncludeFolder(); });
+    getChild<LLButton>("add_folder")->setCommitCallback([this](LLUICtrl*, const LLSD&) { onAddIncludeFolder(); });
+    getChild<LLButton>("remove_folder")->setCommitCallback([this](LLUICtrl*, const LLSD&) { onRemoveIncludeFolder(); });
+    getChild<LLButton>("external_browse")->setCommitCallback([this](LLUICtrl*, const LLSD&) { onBrowseExternalEditor(); });
+    getChild<LLButton>("scripting_settings")->setCommitCallback([](LLUICtrl*, const LLSD&) { LLFloaterReg::showInstance("scripting_settings"); });
+    getChild<LLButton>("snippet_xml")->setCommitCallback([this](LLUICtrl*, const LLSD&) { ALFloaterScriptStudio::editSnippets(snippetLua()); });
+    getChild<LLButton>("snippet_new")->setCommitCallback([this](LLUICtrl*, const LLSD&) { onSnippetNew(); });
+    getChild<LLButton>("snippet_copy")->setCommitCallback([this](LLUICtrl*, const LLSD&) { onSnippetCopy(); });
+    getChild<LLButton>("snippet_delete")->setCommitCallback([this](LLUICtrl*, const LLSD&) { onSnippetDelete(); });
+    mSnippetLang->setCommitCallback([this](LLUICtrl*, const LLSD&) { fillSnippets(true); });
+    mSnippetList->setCommitCallback([this](LLUICtrl*, const LLSD&) { showSnippet(); });
+    for (LLLineEditor* field : { mSnippetName, mSnippetPrefix, mSnippetDetail })
+    {
+        field->setKeystrokeCallback([this](LLLineEditor*, void*) { onSnippetEdited(); }, nullptr);
+    }
+    mSnippetBodyChanged = mSnippetBody->onTextChanged([this]() { onSnippetEdited(); });
+    mDefines->setCommitCallback([this](LLUICtrl*, const LLSD&) { storeDefines(); });
+    mTemplateLSLChanged  = mTemplateLSL->onTextChanged([this]() { storeTemplate(false); });
+    mTemplateSLuaChanged = mTemplateSLua->onTextChanged([this]() { storeTemplate(true); });
+    ALFloaterScriptStudio::teachWords(*mTemplateLSL, false);
+    ALFloaterScriptStudio::teachWords(*mTemplateSLua, true);
     mOrder->setCommitCallback([this](LLUICtrl*, const LLSD&) { storeIncludeOrder(); });
     getChild<LLButton>("order_up")->setCommitCallback([this](LLUICtrl*, const LLSD&) { moveIncludePlace(-1); });
     getChild<LLButton>("order_down")->setCommitCallback([this](LLUICtrl*, const LLSD&) { moveIncludePlace(1); });
-    // The editors open take the typing settings as they change.
-    for (const char* name : { "tab_width", "insert_spaces" })
+    // The editors open, and the ones here, take the typing settings as
+    // they change -- by the settings' own signals, so a Cancel reaches
+    // them as a click does.
+    for (const char* setting : { "ALScriptStudioTabWidth", "ALScriptStudioInsertSpaces", "ALScriptStudioAutoComplete", "ALScriptStudioCompleteAfter",
+                                 "ALScriptStudioAcceptOnEnter", "ALScriptStudioAutoClose", "ALScriptStudioCaretStyle", "ALScriptStudioCaretBlink",
+                                 "ALScriptStudioHoverCards", "ALScriptStudioHoverDelay" })
     {
-        getChild<LLUICtrl>(name)->setCommitCallback([](LLUICtrl*, const LLSD&) { ALFloaterScriptStudio::refreshAll(); });
+        if (LLControlVariable* control = gSavedSettings.getControl(setting))
+        {
+            mEnableWatches.emplace_back(control->getSignal()->connect([this](LLControlVariable*, const LLSD&, const LLSD&) {
+                ALFloaterScriptStudio::refreshAll();
+                for (ALCodeEditor* editor : { mPreview, mTemplateLSL, mTemplateSLua, mSnippetBody })
+                {
+                    ALFloaterScriptStudio::applyTypingOptions(*editor);
+                }
+            }));
+        }
     }
+    for (ALCodeEditor* editor : { mPreview, mTemplateLSL, mTemplateSLua, mSnippetBody })
+    {
+        ALFloaterScriptStudio::applyTypingOptions(*editor);
+    }
+    mLintsLSL  = getChild<LLScrollListCtrl>("lints_lsl");
+    mLintsLuau = getChild<LLScrollListCtrl>("lints_luau");
+    mLintsLSL->setCommitCallback([this](LLUICtrl*, const LLSD&) { storeLints(false); });
+    mLintsLuau->setCommitCallback([this](LLUICtrl*, const LLSD&) { storeLints(true); });
+    getChild<LLButton>("lints_defaults")->setCommitCallback([this](LLUICtrl*, const LLSD&) {
+        ALScriptLints::reset();
+        fillLints();
+    });
     getChild<LLButton>("ok")->setCommitCallback([this](LLUICtrl*, const LLSD&) { onOK(); });
     getChild<LLButton>("cancel")->setCommitCallback([this](LLUICtrl*, const LLSD&) { onCancel(); });
 
@@ -106,13 +171,136 @@ bool ALFloaterScriptPreferences::postBuild()
     refreshFont();
     mFont->onPartCommit([this](const std::string& part, const std::string& value) { onFontPart(part, value); });
 
+    for (const char* setting : { "ALScriptPreprocOptimizer", "ALScriptPreprocDiskIncludes", "ALScriptStudioAutoComplete", "ALScriptStudioHoverCards",
+                                 "ALScriptPreprocDiskIncludeFolder", "ALScriptTemplateLSL", "ALScriptTemplateSLua", "ALScriptPreprocDefines" })
+    {
+        if (LLControlVariable* control = gSavedSettings.getControl(setting))
+        {
+            mEnableWatches.emplace_back(control->getSignal()->connect([this](LLControlVariable*, const LLSD&, const LLSD&) { refreshEnabled(); }));
+        }
+    }
+    refreshEnabled();
+
     buildSwatches();
     fillThemes();
     refreshSwatches();
     refreshPreview();
+    mFolders->setCommitCallback([this](LLUICtrl*, const LLSD&) { refreshEnabled(); });
     refreshIncludeFolder();
     refreshIncludeOrder();
+    refreshTemplates();
+    fillSnippets(true);
+    fillLints();
     return true;
+}
+
+void ALFloaterScriptPreferences::fillLints()
+{
+    fillLints(false);
+    fillLints(true);
+}
+
+void ALFloaterScriptPreferences::fillLints(bool lua)
+{
+    LLScrollListCtrl* list     = lua ? mLintsLuau : mLintsLSL;
+    const S32         scrolled = list->getScrollPos();
+    const S32         chosen   = list->getFirstSelectedIndex();
+    list->deleteAllItems();
+    for (const ALScriptLints::Lint& lint : ALScriptLints::all())
+    {
+        if (lint.lua != lua)
+        {
+            continue;
+        }
+        const ALScriptLints::Level level       = ALScriptLints::level(lua, lint.id);
+        const std::string          description = getString((lua ? "LintLuau" : "LintLSL") + lint.id);
+        std::string                tip         = description;
+        if (lua)
+        {
+            // The name a .luaurc gives it, for whoever keeps one.
+            LLStringUtil::format_map_t args;
+            args["[DESCRIPTION]"] = description;
+            args["[NAME]"]        = lint.id;
+            tip                   = getString("LintLuauName", args);
+        }
+        LLSD row;
+        row["value"]                  = lint.id;
+        row["columns"][0]["column"]   = "on";
+        row["columns"][0]["type"]     = "checkbox";
+        row["columns"][0]["value"]    = level != ALScriptLints::Level::Off;
+        row["columns"][1]["column"]   = "error";
+        row["columns"][1]["type"]     = "checkbox";
+        row["columns"][1]["value"]    = level == ALScriptLints::Level::Error;
+        row["columns"][2]["column"]   = "lint";
+        row["columns"][2]["value"]    = description;
+        row["columns"][2]["tool_tip"] = tip;
+        list->addElement(row);
+    }
+    if (chosen >= 0)
+    {
+        list->selectNthItem(chosen);
+    }
+    list->setScrollPos(scrolled);
+}
+
+void ALFloaterScriptPreferences::storeLints(bool lua)
+{
+    LLScrollListCtrl* list = lua ? mLintsLuau : mLintsLSL;
+    std::vector<std::pair<std::string, ALScriptLints::Level>> levels;
+    for (LLScrollListItem* item : list->getAllData())
+    {
+        const LLScrollListCell* on    = item->getColumn(0);
+        const LLScrollListCell* error = item->getColumn(1);
+        const std::string       id    = item->getValue().asString();
+        // An error is on; one turned off is no error. Which box was just
+        // ticked decides where the two disagree.
+        const bool was_error = ALScriptLints::level(lua, id) == ALScriptLints::Level::Error;
+        bool       is_on     = on && on->getValue().asBoolean();
+        bool       is_error  = error && error->getValue().asBoolean();
+        if (is_error && !is_on)
+        {
+            if (!was_error)
+            {
+                is_on = true;   // Error just ticked: on with it.
+            }
+            else
+            {
+                is_error = false;   // On just unticked: off, and no error.
+            }
+        }
+        levels.emplace_back(id, !is_on ? ALScriptLints::Level::Off : is_error ? ALScriptLints::Level::Error : ALScriptLints::Level::Warning);
+    }
+    ALScriptLints::setLevels(lua, levels);
+    fillLints(lua);
+}
+
+void ALFloaterScriptPreferences::refreshEnabled()
+{
+    const bool optimize = gSavedSettings.getBOOL("ALScriptPreprocOptimizer");
+    for (const char* name : { "preproc_shrink", "preproc_addstrings", "preproc_inline" })
+    {
+        getChildView(name)->setEnabled(optimize);
+    }
+    const bool disk = gSavedSettings.getBOOL("ALScriptPreprocDiskIncludes");
+    for (const char* name : { "include_folders", "add_folder" })
+    {
+        getChildView(name)->setEnabled(disk);
+    }
+    getChildView("remove_folder")->setEnabled(disk && mFolders->getFirstSelected() != nullptr);
+    const bool complete = gSavedSettings.getBOOL("ALScriptStudioAutoComplete");
+    for (const char* name : { "complete_after_label", "complete_after" })
+    {
+        getChildView(name)->setEnabled(complete);
+    }
+    const bool hover = gSavedSettings.getBOOL("ALScriptStudioHoverCards");
+    for (const char* name : { "hover_delay_label", "hover_delay" })
+    {
+        getChildView(name)->setEnabled(hover);
+    }
+    // What the settings hold, where something other than these fields
+    // changed them: the menu adding a folder, a Cancel.
+    refreshIncludeFolder();
+    refreshTemplates();
 }
 
 void ALFloaterScriptPreferences::onOpen(const LLSD& key)
@@ -121,6 +309,14 @@ void ALFloaterScriptPreferences::onOpen(const LLSD& key)
     {
         mTabs->selectTabByName(key["tab"].asString() + "_tab");
     }
+    if (mShowing)
+    {
+        // Asked for again while open -- for a tab, from the problems --
+        // with what Cancel goes back to still what it was when it opened.
+        fillLints();
+        return;
+    }
+    mShowing = true;
     remember();
     mKept = false;
     fillThemes();
@@ -129,6 +325,8 @@ void ALFloaterScriptPreferences::onOpen(const LLSD& key)
     refreshPreview();
     refreshIncludeFolder();
     refreshIncludeOrder();
+    fillSnippets(true);
+    fillLints();
     if (ALPanelScriptKeymap* keys = findChild<ALPanelScriptKeymap>("keys_tab"))
     {
         keys->refresh();
@@ -137,6 +335,7 @@ void ALFloaterScriptPreferences::onOpen(const LLSD& key)
 
 void ALFloaterScriptPreferences::onClose(bool app_quitting)
 {
+    mShowing = false;
     if (app_quitting)
     {
         // The viewer writes the colours itself on the way out.
@@ -161,6 +360,10 @@ void ALFloaterScriptPreferences::remember()
         // One the table has no colour for is the editor's to mix, and
         // going back takes away whatever was set for it since.
         mWasColors[name] = WasColor{ table.getColor(name).get(), !table.colorExists(name) || table.isDefault(name) };
+    }
+    for (bool lua : { false, true })
+    {
+        mWasSnippets[lua ? 1 : 0] = ALScriptSnippets::fileText(lua, mWasSnippetsFile[lua ? 1 : 0]);
     }
     mWasSettings = LLSD::emptyMap();
     for (const char* setting : SETTINGS)
@@ -192,6 +395,16 @@ void ALFloaterScriptPreferences::revert()
         if (control && mWasSettings.has(setting))
         {
             control->setValue(mWasSettings[setting]);
+        }
+    }
+    // The snippets as they were, where they were changed here.
+    for (bool lua : { false, true })
+    {
+        bool              exists = false;
+        const std::string now    = ALScriptSnippets::fileText(lua, exists);
+        if (exists != mWasSnippetsFile[lua ? 1 : 0] || now != mWasSnippets[lua ? 1 : 0])
+        {
+            ALScriptSnippets::restoreFileText(lua, mWasSnippets[lua ? 1 : 0], mWasSnippetsFile[lua ? 1 : 0]);
         }
     }
     ALFloaterScriptStudio::refreshAll();
@@ -340,6 +553,10 @@ void ALFloaterScriptPreferences::buildSwatches()
         lp.name          = "label_" + name;
         lp.rect          = LLRect(SWATCH_PAD + SWATCH_WIDTH + 8, y - 2, width - SWATCH_PAD, y - SWATCH_HEIGHT + 2);
         lp.initial_value = ALScriptTheme::labelOf(name);
+        // Cut with an ellipsis where the column is narrower than the words,
+        // which the tip then says whole.
+        lp.use_ellipses  = true;
+        lp.tool_tip      = ALScriptTheme::labelOf(name);
         mSwatches->addChild(LLUICtrlFactory::create<LLTextBox>(lp));
         mSwatchList.emplace_back(name, swatch);
         y -= SWATCH_ROW;
@@ -428,8 +645,87 @@ void ALFloaterScriptPreferences::onFontPart(const std::string& part, const std::
 
 void ALFloaterScriptPreferences::refreshIncludeFolder()
 {
-    const std::string folder = gSavedSettings.getString("ALScriptPreprocDiskIncludeFolder");
-    mFolder->setText(folder.empty() ? getString("NoFolder") : folder);
+    const S32 chosen = mFolders->getFirstSelectedIndex();
+    mFolders->deleteAllItems();
+    for (const std::string& folder : ALScriptPreprocessor::includeFolders())
+    {
+        LLSD row;
+        row["value"]                  = folder;
+        row["columns"][0]["column"]   = "folder";
+        row["columns"][0]["value"]    = folder;
+        row["columns"][0]["tool_tip"] = folder;
+        mFolders->addElement(row);
+    }
+    if (mFolders->getItemCount() == 0)
+    {
+        mFolders->setCommentText(getString("NoFolder"));
+    }
+    else if (chosen >= 0)
+    {
+        mFolders->selectNthItem(llmin(chosen, mFolders->getItemCount() - 1));
+    }
+}
+
+void ALFloaterScriptPreferences::onRemoveIncludeFolder()
+{
+    LLScrollListItem* item = mFolders->getFirstSelected();
+    if (!item)
+    {
+        return;
+    }
+    std::vector<std::string> folders = ALScriptPreprocessor::includeFolders();
+    folders.erase(std::remove(folders.begin(), folders.end(), item->getValue().asString()), folders.end());
+    ALScriptPreprocessor::setIncludeFolders(folders);
+}
+
+void ALFloaterScriptPreferences::onBrowseExternalEditor()
+{
+    const LLHandle<LLFloater> handle = getHandle();
+    LLFilePickerReplyThread::startPicker(
+        [handle](const std::vector<std::string>& files, LLFilePicker::ELoadFilter, LLFilePicker::ESaveFilter) {
+            if (files.empty() || !handle.get())
+            {
+                return;
+            }
+            // The program, then the file it is to open, each quoted as a
+            // path with spaces in it needs.
+            gSavedSettings.setString("ExternalEditor", "\"" + files.front() + "\" \"%s\"");
+        },
+        LLFilePicker::FFLOAD_EXE, false);
+}
+
+void ALFloaterScriptPreferences::refreshTemplates()
+{
+    mSettingTemplates = true;
+    for (bool lua : { false, true })
+    {
+        ALCodeEditor*     editor = lua ? mTemplateSLua : mTemplateLSL;
+        const std::string text   = gSavedSettings.getString(lua ? "ALScriptTemplateSLua" : "ALScriptTemplateLSL");
+        if (editor->text() != text)
+        {
+            editor->setText(text);
+        }
+    }
+    const std::string defines = gSavedSettings.getString("ALScriptPreprocDefines");
+    if (!mDefines->hasFocus() && mDefines->getText() != defines)
+    {
+        mDefines->setText(defines);
+    }
+    mSettingTemplates = false;
+}
+
+void ALFloaterScriptPreferences::storeTemplate(bool lua)
+{
+    if (mSettingTemplates)
+    {
+        return;
+    }
+    gSavedSettings.setString(lua ? "ALScriptTemplateSLua" : "ALScriptTemplateLSL", (lua ? mTemplateSLua : mTemplateLSL)->text());
+}
+
+void ALFloaterScriptPreferences::storeDefines()
+{
+    gSavedSettings.setString("ALScriptPreprocDefines", mDefines->getText());
 }
 
 void ALFloaterScriptPreferences::refreshIncludeOrder()
@@ -510,20 +806,215 @@ void ALFloaterScriptPreferences::moveIncludePlace(S32 by)
     storeIncludeOrder();
 }
 
-void ALFloaterScriptPreferences::onIncludeFolder()
+void ALFloaterScriptPreferences::onAddIncludeFolder()
 {
-    const LLHandle<LLFloater> handle = getHandle();
+    const std::vector<std::string> now = ALScriptPreprocessor::includeFolders();
     (new LLDirPickerThread(
-         [handle](const std::vector<std::string>& folders, std::string) {
-             ALFloaterScriptPreferences* self = ALViewType::as<ALFloaterScriptPreferences>(handle.get());
-             if (folders.empty() || !self)
+         [](const std::vector<std::string>& folders, std::string) {
+             if (folders.empty())
              {
                  return;
              }
-             gSavedSettings.setString("ALScriptPreprocDiskIncludeFolder", folders.front());
+             // One more to look in, after those there are.
+             std::vector<std::string> list = ALScriptPreprocessor::includeFolders();
+             if (std::find(list.begin(), list.end(), folders.front()) == list.end())
+             {
+                 list.push_back(folders.front());
+             }
+             ALScriptPreprocessor::setIncludeFolders(list);
              gSavedSettings.setBOOL("ALScriptPreprocDiskIncludes", true);
-             self->refreshIncludeFolder();
          },
-         gSavedSettings.getString("ALScriptPreprocDiskIncludeFolder")))
+         now.empty() ? std::string() : now.back()))
         ->getFile();
+}
+
+// --- snippets ------------------------------------------------------------------------
+
+bool ALFloaterScriptPreferences::snippetLua() const
+{
+    return mSnippetLang->getValue().asString() == "slua";
+}
+
+S32 ALFloaterScriptPreferences::chosenOwnSnippet() const
+{
+    // A row's value says whose it is and where, as the list compares
+    // values by their words: "own:2", "builtin:5".
+    const LLScrollListItem* item  = mSnippetList->getFirstSelected();
+    const std::string       value = item ? item->getValue().asString() : std::string();
+    if (value.compare(0, 4, "own:") != 0)
+    {
+        return -1;
+    }
+    const S32 index = atoi(value.c_str() + 4);
+    return index >= 0 && index < static_cast<S32>(mOwnSnippets.size()) ? index : -1;
+}
+
+void ALFloaterScriptPreferences::fillSnippets(bool reread)
+{
+    const bool lua = snippetLua();
+    if (reread || lua != mSnippetsLua)
+    {
+        mSnippetsLua = lua;
+        mOwnSnippets = ALScriptSnippets::own(lua);
+    }
+    const LLSD chosen   = mSnippetList->getFirstSelected() ? mSnippetList->getFirstSelected()->getValue() : LLSD();
+    const S32  scrolled = mSnippetList->getScrollPos();
+    mSnippetList->deleteAllItems();
+    static const LLUIColor theirs = LLUIColorTable::instance().getColor("LabelDisabledColor", LLColor4::grey);
+    const auto add = [this](const ALScriptSnippets::Snippet& one, bool own, S32 index) {
+        LLSD row;
+        row["value"]                  = (own ? "own:" : "builtin:") + std::to_string(index);
+        row["columns"][0]["column"]   = "name";
+        row["columns"][0]["value"]    = one.name.empty() ? getString("SnippetUnnamed") : one.name;
+        row["columns"][0]["tool_tip"] = own ? one.detail : getString("SnippetBuiltin");
+        row["columns"][1]["column"]   = "prefix";
+        row["columns"][1]["value"]    = one.prefix;
+        if (!own)
+        {
+            // The viewer's, quieter than the scripter's own.
+            row["columns"][0]["color"] = theirs.get().getValue();
+            row["columns"][1]["color"] = theirs.get().getValue();
+        }
+        mSnippetList->addElement(row);
+    };
+    for (size_t i = 0; i < mOwnSnippets.size(); ++i)
+    {
+        add(mOwnSnippets[i], true, static_cast<S32>(i));
+    }
+    S32 builtin = 0;
+    for (const ALScriptSnippets::Snippet& one : ALScriptSnippets::all(lua))
+    {
+        if (one.builtin)
+        {
+            add(one, false, builtin++);
+        }
+    }
+    if (chosen.isString())
+    {
+        mSnippetList->selectByValue(chosen);
+    }
+    mSnippetList->setScrollPos(scrolled);
+    mSnippetBody->setSyntax(lua ? "slua" : "lsl");
+    ALFloaterScriptStudio::teachWords(*mSnippetBody, lua);
+    showSnippet();
+}
+
+void ALFloaterScriptPreferences::showSnippet()
+{
+    const LLScrollListItem*          item  = mSnippetList->getFirstSelected();
+    const S32                        own   = chosenOwnSnippet();
+    const ALScriptSnippets::Snippet* shown = nullptr;
+    if (own >= 0)
+    {
+        shown = &mOwnSnippets[static_cast<size_t>(own)];
+    }
+    else if (item)
+    {
+        // One of the viewer's, by its place among them.
+        S32 builtin = 0;
+        for (const ALScriptSnippets::Snippet& one : ALScriptSnippets::all(snippetLua()))
+        {
+            if (one.builtin && builtin++ == atoi(item->getValue().asString().c_str() + 8))
+            {
+                shown = &one;
+                break;
+            }
+        }
+    }
+    mSettingSnippet = true;
+    mSnippetName->setText(shown ? shown->name : std::string());
+    mSnippetPrefix->setText(shown ? shown->prefix : std::string());
+    mSnippetDetail->setText(shown ? shown->detail : std::string());
+    const std::string body = shown ? shown->body : std::string();
+    if (mSnippetBody->text() != body)
+    {
+        mSnippetBody->setText(body);
+    }
+    mSettingSnippet = false;
+    // The scripter's own are edited here; the viewer's are read, and copied.
+    const bool editable = own >= 0;
+    mSnippetName->setEnabled(editable);
+    mSnippetPrefix->setEnabled(editable);
+    mSnippetDetail->setEnabled(editable);
+    mSnippetBody->setReadOnly(!editable);
+    getChildView("snippet_copy")->setEnabled(shown != nullptr);
+    getChildView("snippet_delete")->setEnabled(editable);
+}
+
+void ALFloaterScriptPreferences::onSnippetEdited()
+{
+    const S32 own = chosenOwnSnippet();
+    if (mSettingSnippet || own < 0)
+    {
+        return;
+    }
+    ALScriptSnippets::Snippet& one = mOwnSnippets[static_cast<size_t>(own)];
+    one.name   = mSnippetName->getText();
+    one.prefix = mSnippetPrefix->getText();
+    one.detail = mSnippetDetail->getText();
+    one.body   = mSnippetBody->text();
+    // The row says what the fields do, and the file holds it -- whatever
+    // has a name and a body -- for the studio to offer at once.
+    if (LLScrollListItem* item = mSnippetList->getFirstSelected())
+    {
+        if (LLScrollListCell* name = item->getColumn(0))
+        {
+            name->setValue(one.name.empty() ? getString("SnippetUnnamed") : one.name);
+        }
+        if (LLScrollListCell* prefix = item->getColumn(1))
+        {
+            prefix->setValue(one.prefix);
+        }
+    }
+    ALScriptSnippets::saveOwn(snippetLua(), mOwnSnippets);
+}
+
+void ALFloaterScriptPreferences::onSnippetNew()
+{
+    ALScriptSnippets::Snippet one;
+    one.name = getString("SnippetNewName");
+    mOwnSnippets.push_back(one);
+    mSnippetList->deselectAllItems();
+    fillSnippets(false);
+    mSnippetList->selectByValue(LLSD("own:" + std::to_string(mOwnSnippets.size() - 1)));
+    mSnippetList->scrollToShowSelected();
+    showSnippet();
+    mSnippetName->setFocus(true);
+    mSnippetName->selectAll();
+}
+
+void ALFloaterScriptPreferences::onSnippetCopy()
+{
+    const std::string body = mSnippetBody->text();
+    if (body.empty() && mSnippetName->getText().empty())
+    {
+        return;
+    }
+    LLStringUtil::format_map_t args;
+    args["[NAME]"] = mSnippetName->getText();
+    ALScriptSnippets::Snippet one;
+    one.name   = getString("SnippetCopyName", args);
+    one.prefix = mSnippetPrefix->getText();
+    one.detail = mSnippetDetail->getText();
+    one.body   = body;
+    mOwnSnippets.push_back(one);
+    ALScriptSnippets::saveOwn(snippetLua(), mOwnSnippets);
+    mSnippetList->deselectAllItems();
+    fillSnippets(false);
+    mSnippetList->selectByValue(LLSD("own:" + std::to_string(mOwnSnippets.size() - 1)));
+    mSnippetList->scrollToShowSelected();
+    showSnippet();
+}
+
+void ALFloaterScriptPreferences::onSnippetDelete()
+{
+    const S32 own = chosenOwnSnippet();
+    if (own < 0)
+    {
+        return;
+    }
+    mOwnSnippets.erase(mOwnSnippets.begin() + own);
+    ALScriptSnippets::saveOwn(snippetLua(), mOwnSnippets);
+    mSnippetList->deselectAllItems();
+    fillSnippets(false);
 }

@@ -649,7 +649,7 @@
                 <menu_item_check.on_check function="ScriptStudio.Check" parameter="preproc_disk" />
                 <menu_item_check.on_click function="ScriptStudio.Menu" parameter="preproc_disk" />
             </menu_item_check>
-            <menu_item_call label="Choose Include Folder..." layout="topleft" name="preproc_folder">
+            <menu_item_call label="Add Include Folder..." layout="topleft" name="preproc_folder">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="preproc_folder" />
             </menu_item_call>
             <menu_item_separator layout="topleft" />

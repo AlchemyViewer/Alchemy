@@ -364,7 +364,6 @@ std::vector<ALScriptPreprocessor::Candidate> ALScriptPreprocessor::candidatesFor
     const std::string      item_name = itemNameOf(ask.name);
     static LLCachedControl<std::string> order(gSavedSettings, "ALScriptPreprocIncludeOrder", "inventory object disk");
     static LLCachedControl<bool>        disk(gSavedSettings, "ALScriptPreprocDiskIncludes", false);
-    static LLCachedControl<std::string> folder(gSavedSettings, "ALScriptPreprocDiskIncludeFolder", "");
     std::istringstream                  sources(order());
     std::string                         source;
     while (sources >> source)
@@ -454,22 +453,20 @@ std::vector<ALScriptPreprocessor::Candidate> ALScriptPreprocessor::candidatesFor
                 // Beside the file asking first, as a require expects.
                 dirs.push_back(gDirUtilp->getDirName(from));
             }
-            if (disk && !folder().empty())
-            {
-                dirs.push_back(folder());
-            }
+            const std::vector<std::string> folders = disk ? includeFolders() : std::vector<std::string>();
+            dirs.insert(dirs.end(), folders.begin(), folders.end());
             if (!request.lua)
             {
                 // Then wherever an `.lslrc` says: the nearest up from the
-                // asking file, and the include folder's own.
+                // asking file, and each include folder's own.
                 std::vector<std::string> more;
                 if (!from.empty())
                 {
                     more = nearestLslrcFolders(gDirUtilp->getDirName(from));
                 }
-                if (disk && !folder().empty())
+                for (const std::string& folder : folders)
                 {
-                    for (const std::string& dir : lslrcFolders(folder()))
+                    for (const std::string& dir : lslrcFolders(folder))
                     {
                         more.push_back(dir);
                     }
@@ -743,7 +740,46 @@ ALPreprocessor::Options ALScriptPreprocessor::optionsFor(const Request& request,
     options.agentName = isAgentAvatarValid() ? gAgentAvatarp->getFullname() : std::string();
     options.assetId   = request.assetId.isNull() ? std::string() : request.assetId.asString();
     options.fileName  = request.name;
+    // The scripter's own macros, one to a line.
+    std::istringstream defines(gSavedSettings.getString("ALScriptPreprocDefines"));
+    for (std::string line; std::getline(defines, line);)
+    {
+        LLStringUtil::trim(line);
+        if (!line.empty())
+        {
+            options.defines.push_back(line);
+        }
+    }
     return options;
+}
+
+// static
+std::vector<std::string> ALScriptPreprocessor::includeFolders()
+{
+    // One to a line, in the order looked in; a setting from before there
+    // could be several is the one folder it named.
+    std::vector<std::string> folders;
+    std::istringstream       lines(gSavedSettings.getString("ALScriptPreprocDiskIncludeFolder"));
+    for (std::string line; std::getline(lines, line);)
+    {
+        LLStringUtil::trim(line);
+        if (!line.empty() && std::find(folders.begin(), folders.end(), line) == folders.end())
+        {
+            folders.push_back(line);
+        }
+    }
+    return folders;
+}
+
+// static
+void ALScriptPreprocessor::setIncludeFolders(const std::vector<std::string>& folders)
+{
+    std::string joined;
+    for (const std::string& folder : folders)
+    {
+        joined += (joined.empty() ? "" : "\n") + folder;
+    }
+    gSavedSettings.setString("ALScriptPreprocDiskIncludeFolder", joined);
 }
 
 // static
@@ -824,9 +860,9 @@ ALScriptSnapshot ALScriptPreprocessor::snapshotFor(const std::shared_ptr<Job>& j
     return snapshot;
 }
 
-bool ALScriptPreprocessor::configOf(const Request& request, ALLuauConfig& out)
+bool ALScriptPreprocessor::configOf(const Request& request, ALLuauConfig& out, const ALLuauConfig* base)
 {
-    out = ALLuauConfig();
+    out = base ? *base : ALLuauConfig();
     if (!request.lua)
     {
         return false;
@@ -837,9 +873,9 @@ bool ALScriptPreprocessor::configOf(const Request& request, ALLuauConfig& out)
         return false;
     }
     std::string error;
-    if (!ALLuauConfig::parse(text, out, error))
+    if (!ALLuauConfig::parse(text, out, error, base))
     {
-        out = ALLuauConfig();
+        out = base ? *base : ALLuauConfig();
         return false;
     }
     return true;

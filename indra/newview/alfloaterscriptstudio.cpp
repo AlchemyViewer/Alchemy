@@ -332,6 +332,27 @@ ALFloaterScriptStudio* ALFloaterScriptStudio::open(const ALScriptRef& ref, const
 }
 
 // static
+void ALFloaterScriptStudio::editSnippets(bool lua)
+{
+    const std::string path = ALScriptSnippets::path(lua);
+    if (!LLFile::isfile(path))
+    {
+        // A first one to copy from; the file says how they are written.
+        ALScriptSnippets::Snippet example;
+        example.name   = "Say to the owner";
+        example.prefix = "ownersay";
+        example.detail = "A message to whoever owns the object";
+        example.body   = lua ? "ll.OwnerSay(${1:\"message\"})$0" : "llOwnerSay(${1:\"message\"});$0";
+        ALScriptSnippets::saveOwn(lua, { example });
+    }
+    if (ALFloaterScriptStudio* studio = LLFloaterReg::showTypedInstance<ALFloaterScriptStudio>("script_studio", LLSD(), TAKE_FOCUS_YES))
+    {
+        // As the XML it is, whichever language it holds snippets for.
+        studio->openFile(path, false);
+    }
+}
+
+// static
 ALFloaterScriptStudio* ALFloaterScriptStudio::explore(const LLUUID& root)
 {
     ALFloaterScriptStudio* studio = LLFloaterReg::showTypedInstance<ALFloaterScriptStudio>("script_studio", LLSD(), TAKE_FOCUS_YES);
@@ -534,6 +555,7 @@ bool ALFloaterScriptStudio::postBuild()
     mTabs->onListAsked([this]() { showAllTabs(); });
     mBreadcrumb->onChose(boost::bind(&ALFloaterScriptStudio::onCrumbChosen, this, _1, _2));
     mProblems->setCommitCallback(boost::bind(&ALFloaterScriptStudio::onProblemSelected, this));
+    mProblems->setRightMouseDownCallback([this](LLUICtrl*, S32 x, S32 y, MASK) { showProblemMenu(x, y); });
     // The pane's filters: which levels, which source, which words.
     mProblemErrors   = getChild<LLCheckBoxCtrl>("problems_errors");
     mProblemWarnings = getChild<LLCheckBoxCtrl>("problems_warnings");
@@ -657,6 +679,23 @@ bool ALFloaterScriptStudio::postBuild()
             }
         }
     });
+
+    // The lints chosen again, or the mode: every script checked again.
+    for (const char* setting : { "ALScriptLintLevels", "ALScriptLuauMode" })
+    {
+        if (LLControlVariable* control = gSavedSettings.getControl(setting))
+        {
+            mLintConnections.emplace_back(control->getSignal()->connect([this](LLControlVariable*, const LLSD&, const LLSD&) {
+                for (std::unique_ptr<Doc>& doc : mDocs)
+                {
+                    if (doc->loaded)
+                    {
+                        scheduleAnalysis(*doc, true);
+                    }
+                }
+            }));
+        }
+    }
 
     loadState();
     // With the pins read, the objects in hand.
@@ -876,6 +915,22 @@ void ALFloaterScriptStudio::refreshAll()
     }
 }
 
+// static
+void ALFloaterScriptStudio::applyTypingOptions(ALCodeEditor& editor)
+{
+    editor.setSoftTabs(gSavedSettings.getBOOL("ALScriptStudioInsertSpaces"));
+    editor.setTabWidth(llclamp(gSavedSettings.getS32("ALScriptStudioTabWidth"), 1, 16));
+    editor.setAutoComplete(gSavedSettings.getBOOL("ALScriptStudioAutoComplete"));
+    editor.setCompleteAfter(gSavedSettings.getS32("ALScriptStudioCompleteAfter"));
+    editor.setAcceptOnEnter(gSavedSettings.getBOOL("ALScriptStudioAcceptOnEnter"));
+    editor.setAutoClose(gSavedSettings.getBOOL("ALScriptStudioAutoClose"));
+    const std::string caret = gSavedSettings.getString("ALScriptStudioCaretStyle");
+    editor.setCaretStyle(caret == "block" ? ALTextView::CaretStyle::Block : caret == "underline" ? ALTextView::CaretStyle::Underline : ALTextView::CaretStyle::Line);
+    editor.setCaretBlink(gSavedSettings.getBOOL("ALScriptStudioCaretBlink"));
+    editor.setHoverCards(gSavedSettings.getBOOL("ALScriptStudioHoverCards"));
+    editor.setHoverDelay(llclamp(gSavedSettings.getF32("ALScriptStudioHoverDelay"), 0.f, 5.f));
+}
+
 void ALFloaterScriptStudio::applyEditorOptions(ALCodeEditor& editor) const
 {
     editor.setFont(editorFont());
@@ -917,8 +972,7 @@ void ALFloaterScriptStudio::applyEditorOptions(ALCodeEditor& editor) const
     }
     editor.setWordWrap(mWordWrap);
     editor.setShowLineNumbers(mLineNumbers);
-    editor.setSoftTabs(gSavedSettings.getBOOL("ALScriptStudioInsertSpaces"));
-    editor.setTabWidth(llclamp(gSavedSettings.getS32("ALScriptStudioTabWidth"), 1, 16));
+    applyTypingOptions(editor);
     editor.setShowIndentGuides(mIndentGuides);
     editor.setShowWhitespace(mWhitespace);
     editor.setRelativeLineNumbers(mRelativeNumbers);
@@ -1903,7 +1957,7 @@ void ALFloaterScriptStudio::openFile(const std::string& path, bool lua, S32 line
         doc->language.compileTarget  = language.lua ? "luau" : "mono";
         doc->notecard                = !language.script;
         doc->editor                  = makeEditor(doc->id, false);
-        doc->editor->setSyntax(!language.script ? "text" : language.lua ? "slua" : "lsl");
+        doc->editor->setSyntax(!language.script ? textSyntaxOf(path) : language.lua ? "slua" : "lsl");
         doc->editor->setText(buffer.str());
         doc->loaded     = true;
         doc->modifiable = true;
@@ -1946,6 +2000,16 @@ void ALFloaterScriptStudio::openFile(const std::string& path, bool lua, S32 line
 }
 
 // static
+std::string ALFloaterScriptStudio::textSyntaxOf(const std::string& path)
+{
+    // A file that is no script: coloured where it is XML or JSON, which
+    // the studio has grammars for -- its snippets are XML -- else text.
+    std::string extension = gDirUtilp->getExtension(path);
+    LLStringUtil::toLower(extension);
+    return extension == "xml" || extension == "xui" ? "xml" : extension == "json" ? "json" : "text";
+}
+
+// static
 ALFloaterScriptStudio::FileLanguage ALFloaterScriptStudio::languageOfFile(const std::string& path, bool lua_hint)
 {
     std::string extension = gDirUtilp->getExtension(path);
@@ -1966,7 +2030,7 @@ void ALFloaterScriptStudio::speakFileLanguage(Doc& doc, const FileLanguage& lang
     doc.language.lua           = language.lua;
     doc.language.compileTarget = language.lua ? "luau" : "mono";
     doc.notecard               = !language.script;
-    doc.editor->setSyntax(!language.script ? "text" : language.lua ? "slua" : "lsl");
+    doc.editor->setSyntax(!language.script ? textSyntaxOf(doc.file) : language.lua ? "slua" : "lsl");
     if (language.script)
     {
         teachEditor(doc);
@@ -2002,10 +2066,16 @@ void ALFloaterScriptStudio::chooseIncludeFolder()
              {
                  return;
              }
-             gSavedSettings.setString("ALScriptPreprocDiskIncludeFolder", folders.front());
+             // One more folder to look in, after those there are.
+             std::vector<std::string> now = ALScriptPreprocessor::includeFolders();
+             if (std::find(now.begin(), now.end(), folders.front()) == now.end())
+             {
+                 now.push_back(folders.front());
+             }
+             ALScriptPreprocessor::setIncludeFolders(now);
              gSavedSettings.setBOOL("ALScriptPreprocDiskIncludes", true);
          },
-         gSavedSettings.getString("ALScriptPreprocDiskIncludeFolder")))
+         ALScriptPreprocessor::includeFolders().empty() ? std::string() : ALScriptPreprocessor::includeFolders().back()))
         ->getFile();
 }
 
@@ -2386,43 +2456,6 @@ ALCodeEditor::Completion ALFloaterScriptStudio::completionFor(const Vocab& word,
     return c;
 }
 
-const std::vector<ALFloaterScriptStudio::Snippet>& ALFloaterScriptStudio::snippets(bool lua)
-{
-    std::vector<Snippet>& out = mSnippets[lua ? 1 : 0];
-    if (mSnippetsLoaded[lua ? 1 : 0])
-    {
-        return out;
-    }
-    mSnippetsLoaded[lua ? 1 : 0] = true;
-    const std::string file = std::string("snippets") + gDirUtilp->getDirDelimiter() + (lua ? "slua.xml" : "lsl.xml");
-    for (const std::string& path : { gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS, file), gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, file) })
-    {
-        llifstream in(path.c_str());
-        if (!in.is_open())
-        {
-            continue;
-        }
-        LLSD list;
-        if (LLSDSerialize::fromXML(list, in) == LLSDParser::PARSE_FAILURE || !list.isArray())
-        {
-            LL_WARNS("ScriptStudio") << "The snippets at " << path << " could not be read" << LL_ENDL;
-            continue;
-        }
-        for (LLSD::array_const_iterator it = list.beginArray(); it != list.endArray(); ++it)
-        {
-            Snippet one;
-            one.name   = (*it)["name"].asString();
-            one.prefix = (*it)["prefix"].asString();
-            one.detail = (*it)["detail"].asString();
-            one.body   = (*it)["body"].asString();
-            if (!one.name.empty() && !one.body.empty())
-            {
-                out.push_back(std::move(one));
-            }
-        }
-    }
-    return out;
-}
 
 void ALFloaterScriptStudio::insertFromLibrary(const std::string& what)
 {
@@ -2530,8 +2563,15 @@ void ALFloaterScriptStudio::askAnalyzer(Doc& doc, ALScriptAnalysis::Kind kind, c
     {
         // What the script's `.luaurc` says, where it has one; one not in
         // hand yet is fetched, and the check made again when it is.
+        // Over the scripter's own choice of lints and mode, which the
+        // file overrides key by key; that choice alone where there is none.
+        const ALLuauConfig                  base  = ALScriptLints::luauBase();
         const ALScriptPreprocessor::Request root  = preprocessRequest(doc, /*with_source*/ false);
-        const bool                          found = ALScriptPreprocessor::instance().configOf(root, request.config);
+        const bool                          found = ALScriptPreprocessor::instance().configOf(root, request.config, &base);
+        if (!found)
+        {
+            request.config = base;
+        }
         if (!found && kind == ALScriptAnalysis::Kind::Check && !doc.configAsked)
         {
             doc.configAsked                  = true;
@@ -3366,6 +3406,19 @@ void ALFloaterScriptStudio::save(Doc& doc)
     {
         return;
     }
+    // Tidied as the scripter asked before anything is sent or checked: a
+    // step each to undo, and nothing where the text is tidy already.
+    if (!doc.notecard)
+    {
+        if (gSavedSettings.getBOOL("ALScriptFormatOnSave"))
+        {
+            format(doc, false);
+        }
+        if (gSavedSettings.getBOOL("ALScriptTrimOnSave"))
+        {
+            trimTrailing(doc);
+        }
+    }
     if (!doc.file.empty())
     {
         saveFile(doc);
@@ -3676,6 +3729,12 @@ void ALFloaterScriptStudio::analysed(const ALScriptAnalysis::Result& result)
     }
     doc.analysis         = result.problems;
     doc.analysisVersion  = result.version;
+    // LSL's warnings as the scripter chose them; Luau's lints were chosen
+    // in the configuration the check ran with.
+    if (!doc.language.lua)
+    {
+        ALScriptLints::apply(doc.analysis);
+    }
     doc.definitionsError = result.definitionsError;
     // A script mid-edit is answered from a copy mended to parse; one past
     // mending answers nothing, and what it declares, what its names are
@@ -3991,8 +4050,10 @@ void ALFloaterScriptStudio::refreshProblems(Doc& doc)
     const ALTextDocument&                 text = doc.editor->document();
 
     auto add = [&](S32 line, S32 column, bool has_column, S32 end_line, S32 end_column, ALCodeEditor::Mark mark,
-                   Doc::Level level, const std::string& origin, const std::string& message, const std::string& file = std::string()) {
+                   Doc::Level level, const std::string& origin, const std::string& message, const std::string& file = std::string(),
+                   const std::string& lint = std::string()) {
         Doc::Shown row;
+        row.lint      = lint;
         row.line      = line;
         row.column    = column;
         row.hasColumn = has_column;
@@ -4086,7 +4147,8 @@ void ALFloaterScriptStudio::refreshProblems(Doc& doc)
         // error's number says nothing to whoever reads it.
         const bool        named   = !problem.code.empty() && problem.code.find_first_not_of("0123456789") != std::string::npos;
         const std::string message = named ? problem.message + " [" + problem.code + "]" : problem.message;
-        add(problem.line, problem.column, true, problem.endLine, problem.endColumn, markOf(level), level, origin, message, problem.file);
+        add(problem.line, problem.column, true, problem.endLine, problem.endColumn, markOf(level), level, origin, message, problem.file,
+            problem.source == ALScriptProblem::Source::Lint ? problem.code : std::string());
     }
     for (const Doc::RuntimeProblem& problem : doc.runtime)
     {
@@ -4166,6 +4228,7 @@ void ALFloaterScriptStudio::fillProblems(const Doc* doc)
         value["level"]     = levelName(problem->level);
         value["origin"]    = problem->origin;
         value["message"]   = problem->message;
+        value["lint"]      = problem->lint;
         // Every column carries the whole of it: a diagnostic longer than
         // the column is cut at the column's edge, and the squiggle that
         // would otherwise have to be hovered instead is in a file this
@@ -5386,6 +5449,14 @@ void ALFloaterScriptStudio::saveFile(Doc& doc)
     }
     setStatus(getString("SavedToFile", args));
     fileSettled(doc);
+    // The scripter's snippets, offered as saved from here on.
+    for (bool lua : { false, true })
+    {
+        if (doc.file == ALScriptSnippets::path(lua))
+        {
+            ALScriptSnippets::forget(lua);
+        }
+    }
 }
 
 void ALFloaterScriptStudio::fileSettled(Doc& doc)
@@ -6745,9 +6816,11 @@ void ALFloaterScriptStudio::format(Doc& doc, bool selection_only)
         last = to.line > from.line && to.column == 0 ? to.line - 1 : to.line;
     }
     ALScriptFormatter::Options options;
-    options.lua    = doc.language.lua;
-    options.indent = llclamp(gSavedSettings.getS32("ALScriptStudioTabWidth"), 1, 16);
-    options.tabs   = !gSavedSettings.getBOOL("ALScriptStudioInsertSpaces");
+    options.lua           = doc.language.lua;
+    options.indent        = llclamp(gSavedSettings.getS32("ALScriptStudioTabWidth"), 1, 16);
+    options.tabs          = !gSavedSettings.getBOOL("ALScriptStudioInsertSpaces");
+    options.maxBlankLines = llclamp(gSavedSettings.getS32("ALScriptFormatBlankLines"), 0, 10);
+    options.spacing       = gSavedSettings.getBOOL("ALScriptFormatSpacing");
     const std::string text      = document.text();
     const std::string formatted = ALScriptFormatter::formatLines(text, options, first, last);
     // Line for line, since only some lines were asked for and the
@@ -6819,6 +6892,32 @@ void ALFloaterScriptStudio::format(Doc& doc, bool selection_only)
         return;
     }
     setStatus(getString(selection_only ? "FormattedSelection" : "Formatted", args));
+}
+
+void ALFloaterScriptStudio::trimTrailing(Doc& doc)
+{
+    if (!doc.loaded || !doc.modifiable || doc.notecard)
+    {
+        return;
+    }
+    // Every line's blanks at its end, the one the caret is on too, as
+    // one step to undo.
+    const ALTextDocument&                            document = doc.editor->document();
+    std::vector<std::pair<ALTextRange, std::string>> edits;
+    for (S32 line = 0; line < document.lineCount(); ++line)
+    {
+        const std::string& text = document.line(line);
+        const size_t       kept = text.find_last_not_of(" \t");
+        const size_t       end  = kept == std::string::npos ? 0 : kept + 1;
+        if (end < text.size())
+        {
+            edits.emplace_back(ALTextRange(ALTextPos(line, static_cast<S32>(end)), ALTextPos(line, static_cast<S32>(text.size()))), std::string());
+        }
+    }
+    if (!edits.empty())
+    {
+        doc.editor->replaceAll(std::move(edits));
+    }
 }
 
 // --- what scripts say ---------------------------------------------------------------
@@ -7183,7 +7282,9 @@ void ALFloaterScriptStudio::explorerContents(const ALScriptWorkspace::Contents& 
                         mOpenWhenListedPrim.setNull();
                         mOpenWhenListedItem.setNull();
                         mOpenWhenListedName.clear();
-                        openScript(ALScriptRef(prim.id, item.id), item.name);
+                        std::optional<std::string> opening = std::move(mOpenWhenListedText);
+                        mOpenWhenListedText.reset();
+                        openScript(ALScriptRef(prim.id, item.id), item.name, std::move(opening));
                         break;
                     }
                 }
@@ -7692,6 +7793,98 @@ void ALFloaterScriptStudio::showExplorerMenu(S32 x, S32 y)
     LLMenuGL::showPopup(mExplorer, menu, x, y);
 }
 
+void ALFloaterScriptStudio::showProblemMenu(S32 x, S32 y)
+{
+    if (!LLMenuGL::sMenuContainer)
+    {
+        return;
+    }
+    // The row under the mouse is the one the menu is about.
+    if (!mProblems->hitItem(x, y))
+    {
+        return;
+    }
+    mProblems->selectItemAt(x, y, MASK_NONE);
+    if (LLContextMenu* old = mProblemMenuHandle.get())
+    {
+        old->die();
+        mProblemMenuHandle.markDead();
+    }
+    // The lint the chosen problem is, where it is one there is a choice
+    // about, in the active script's language.
+    const auto lint_of = [this](bool& lua) -> std::string {
+        Doc*              doc  = active();
+        LLScrollListItem* item = mProblems->getFirstSelected();
+        if (!doc || !item)
+        {
+            return std::string();
+        }
+        lua                    = doc->language.lua;
+        const std::string lint = item->getValue()["lint"].asString();
+        for (const ALScriptLints::Lint& one : ALScriptLints::all())
+        {
+            if (one.lua == lua && one.id == lint)
+            {
+                return lint;
+            }
+        }
+        return std::string();
+    };
+    LLUICtrl::CommitCallbackRegistry::ScopedRegistrar commit;
+    LLUICtrl::EnableCallbackRegistry::ScopedRegistrar enable;
+    commit.add("Problem.Action", [this](LLUICtrl*, const LLSD& param) { onProblemMenu(param.asString()); });
+    enable.add("Problem.Enable", [lint_of](LLUICtrl*, const LLSD& param) {
+        bool lua = false;
+        return param.asString() == "copy" || param.asString() == "settings" || !lint_of(lua).empty();
+    });
+    enable.add("Problem.Check", [lint_of](LLUICtrl*, const LLSD&) {
+        bool              lua  = false;
+        const std::string lint = lint_of(lua);
+        return !lint.empty() && ALScriptLints::level(lua, lint) == ALScriptLints::Level::Error;
+    });
+    LLContextMenu* menu = LLUICtrlFactory::createFromFile<LLContextMenu>("menu_script_studio_problem.xml", LLMenuGL::sMenuContainer,
+                                                                          LLMenuHolderGL::child_registry_t::instance());
+    if (!menu)
+    {
+        return;
+    }
+    mProblemMenuHandle = menu->getHandle();
+    menu->show(x, y);
+    LLMenuGL::showPopup(mProblems, menu, x, y);
+}
+
+void ALFloaterScriptStudio::onProblemMenu(const std::string& action)
+{
+    Doc*              doc  = active();
+    LLScrollListItem* item = mProblems->getFirstSelected();
+    if (!doc || !item)
+    {
+        return;
+    }
+    const LLSD&       value = item->getValue();
+    const std::string lint  = value["lint"].asString();
+    const bool        lua   = doc->language.lua;
+    if (action == "copy")
+    {
+        const std::string text = value["message"].asString();
+        LLClipboard::instance().copyToClipboard(text, 0, static_cast<S32>(text.size()));
+    }
+    else if (action == "off" && !lint.empty())
+    {
+        // The scripts are checked again as the setting changes.
+        ALScriptLints::setLevel(lua, lint, ALScriptLints::Level::Off);
+    }
+    else if (action == "error" && !lint.empty())
+    {
+        const bool now = ALScriptLints::level(lua, lint) == ALScriptLints::Level::Error;
+        ALScriptLints::setLevel(lua, lint, now ? ALScriptLints::Level::Warning : ALScriptLints::Level::Error);
+    }
+    else if (action == "settings")
+    {
+        LLFloaterReg::showInstance("script_studio_prefs", LLSD().with("tab", "lints"));
+    }
+}
+
 void ALFloaterScriptStudio::explorerCreate(const LLUUID& prim, bool notecard, bool lua)
 {
     LLSD args;
@@ -7710,6 +7903,10 @@ void ALFloaterScriptStudio::explorerCreate(const LLUUID& prim, bool notecard, bo
         {
             return;
         }
+        // What the new script starts with, where the scripter wrote one:
+        // put in when it opens, in place of the region's, to be saved.
+        const std::string opening = notecard ? std::string() : gSavedSettings.getString(lua ? "ALScriptTemplateSLua" : "ALScriptTemplateLSL");
+        studio->mOpenWhenListedText = opening.empty() ? std::nullopt : std::optional<std::string>(opening);
         std::string error;
         const bool  asked = ALScriptWorkspace::instance().create(prim, notecard, lua, name, [handle](const ALScriptWorkspace::Created& made) {
             if (ALFloaterScriptStudio* again = ALViewType::as<ALFloaterScriptStudio>(handle.get()))
@@ -7732,6 +7929,7 @@ void ALFloaterScriptStudio::explorerCreated(const ALScriptWorkspace::Created& ma
         args["[NAME]"]  = made.name;
         args["[ERROR]"] = made.error;
         setStatus(getString("CreateFailed", args), true);
+        mOpenWhenListedText.reset();
         return;
     }
     // Opened once the prim lists it: by id where the region said, by

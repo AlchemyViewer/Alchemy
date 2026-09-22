@@ -28,6 +28,7 @@
 #include "alfindings.h"
 #include "aloutputview.h"
 #include "alscriptanalysis.h"
+#include "alscriptsnippets.h"
 #include "alscriptenvelope.h"
 #include "alscriptpreprocessor.h"
 #include "alscriptworkspace.h"
@@ -95,6 +96,10 @@ public:
     // open already, else the main one; null where a restriction keeps
     // the studio from opening.
     static ALFloaterScriptStudio* open(const ALScriptRef& ref, const std::string& name = std::string(), bool take_focus = true);
+    // The scripter's own snippets for a language, opened in the studio as
+    // the XML they are kept in: made with an example in it where there is
+    // none yet. What is saved there is offered at once.
+    static void editSnippets(bool lua);
     // The studio, with this object pinned in its explorer and chosen
     // there: what the build tool's Explore in IDE button means when no
     // external editor is listening.
@@ -156,6 +161,10 @@ public:
     // The region's words put in an editor's tables, so that they colour:
     // what the studio's editors and the preferences' preview share.
     static void teachWords(ALCodeEditor& editor, bool lua);
+    // The typing settings put on an editor: tabs, completion, pairs, the
+    // caret, the hover card. The studio's editors and the preferences'
+    // preview share them.
+    static void applyTypingOptions(ALCodeEditor& editor);
     // The font the settings name, or the monospace default.
     static const LLFontGL* editorFont();
 
@@ -322,6 +331,9 @@ private:
             // name; empty for the script itself.
             std::string file;
             std::string fileName;
+            // A lint's name or an LSL warning's number, where the problem
+            // is one a scripter may turn off or make an error.
+            std::string lint;
         };
         std::vector<Shown>                         shown;
         // What the analyzer said the script declares, at analysisVersion.
@@ -434,20 +446,15 @@ private:
     };
 
     // A snippet: a body with placeholders, offered by name from the
-    // Insert menu and by prefix among the completions. From the files
-    // under app_settings/snippets/, and a person's own under the
-    // settings folder.
-    struct Snippet
-    {
-        std::string name;
-        std::string prefix;
-        std::string detail;
-        std::string body;
-    };
-    const std::vector<Snippet>& snippets(bool lua);
+    // Insert menu and by prefix among the completions; the viewer's and
+    // the scripter's own (ALScriptSnippets).
+    typedef ALScriptSnippets::Snippet Snippet;
+    static const std::vector<Snippet>& snippets(bool lua) { return ALScriptSnippets::all(lua); }
     // Whether a position of an LSL script is straight inside a state,
     // where an event's handler goes.
     static bool                 inStateBody(ALCodeEditor& editor, const ALTextPos& at);
+    // The grammar a file that is no script is read with: XML, JSON, text.
+    static std::string          textSyntaxOf(const std::string& path);
     // A word of the vocabulary as a completion: a function with its
     // call, an event as a handler to fill in, a constant as itself.
     ALCodeEditor::Completion completionFor(const Vocab& word, bool lua) const;
@@ -742,6 +749,10 @@ private:
     void                     onExplorerChosen();
     void                     onExplorerAction(const std::string& action);
     void                     showExplorerMenu(S32 x, S32 y);
+    // The problems list's right-click menu: the message copied, and the
+    // lint it is turned off, made an error, or looked up in the settings.
+    void                     showProblemMenu(S32 x, S32 y);
+    void                     onProblemMenu(const std::string& action);
     bool                     explorerActionEnabled(const std::string& action) const;
     // A script or notecard made in a prim, named through a dialog and
     // opened once the region lists it.
@@ -795,6 +806,8 @@ private:
     // every line put right as one step to undo, the caret keeping its
     // place.
     void format(Doc& doc, bool selection_only);
+    // The blanks at every line's end taken away, as one step to undo.
+    void trimTrailing(Doc& doc);
 
     // Whether a save may go ahead: the analyzers' check of the text as it
     // stands found no errors, or the person asked twice.
@@ -884,8 +897,6 @@ private:
     // What the editors' vim keymaps share: the : and / lines entered in
     // any of them, and the settings a :set changes.
     std::shared_ptr<ALVimKeymap::Shared> mVimShared = std::make_shared<ALVimKeymap::Shared>();
-    std::vector<Snippet>               mSnippets[2];
-    bool                               mSnippetsLoaded[2] = { false, false };
     bool                               mWordWrap    = false;
     bool                               mLineNumbers = true;
     bool                               mIndentGuides    = true;
@@ -975,7 +986,10 @@ private:
     LLUUID                             mOpenWhenListedPrim;
     LLUUID                             mOpenWhenListedItem;
     std::string                        mOpenWhenListedName;
+    // The scripter's template for it, put in place of the region's.
+    std::optional<std::string>         mOpenWhenListedText;
     LLHandle<LLContextMenu>            mExplorerMenuHandle;
+    LLHandle<LLContextMenu>            mProblemMenuHandle;
     LLHandle<LLContextMenu>            mTabMenuHandle;
     // The roots selected in world when last looked, and when.
     std::vector<LLUUID>                mExplorerRoots;
@@ -1000,6 +1014,7 @@ private:
     LLButton*                          mExpandedButton = nullptr;
     boost::signals2::scoped_connection mCompiledConnection;
     boost::signals2::scoped_connection mDefinitionsConnection;
+    std::vector<boost::signals2::scoped_connection> mLintConnections;
     boost::signals2::scoped_connection mRuntimeConnection;
     boost::signals2::scoped_connection mRunningConnection;
 };

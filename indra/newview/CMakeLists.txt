@@ -173,6 +173,7 @@ if(AL_BUILD_VIEWER)
     alfloaterscriptpreferences.cpp
     alscriptkeymap.cpp
     alscriptpreprocessor.cpp
+    alscriptsnippets.cpp
     alscriptmessages.cpp
     alscripttheme.cpp
     alscriptworkspace.cpp
@@ -968,6 +969,7 @@ if(AL_BUILD_VIEWER)
     alfloaterscriptpreferences.h
     alscriptkeymap.h
     alscriptpreprocessor.h
+    alscriptsnippets.h
     alscriptmessages.h
     alscripttheme.h
     alscriptworkspace.h

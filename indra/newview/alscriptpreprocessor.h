@@ -145,11 +145,16 @@ public:
     // none of the renaming the optimizer may do on top of it.
     void expand(const Request& request, callback_t callback);
     // What the `.luaurc` governing a SLua script says -- its mode, its
-    // lints, its globals -- from what is in hand: false, and the
+    // lints, its globals -- over the base given, a scripter's own lints
+    // and mode, from what is in hand: false, and the base or the
     // defaults, where there is no configuration, it is not in yet, or
     // it does not parse. A run fetches the configuration along with the
     // includes.
-    bool configOf(const Request& request, ALLuauConfig& out);
+    bool configOf(const Request& request, ALLuauConfig& out, const ALLuauConfig* base = nullptr);
+    // The folders an include is looked for in on disk, in order, as the
+    // setting holds them one to a line; and them put back.
+    static std::vector<std::string> includeFolders();
+    static void                     setIncludeFolders(const std::vector<std::string>& folders);
     // The configuration fetched where it is in the world and not in hand,
     // and `fetched` called once it is; nothing where it is in hand, or
     // there is none.
