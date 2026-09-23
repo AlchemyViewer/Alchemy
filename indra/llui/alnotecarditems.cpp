@@ -26,7 +26,15 @@
 
 #include "alnotecarditems.h"
 
+#include "lltexteditor.h"
+
 #include <boost/unordered/unordered_flat_map.hpp>
+
+// The characters are read here and made by the text editor the legacy
+// notecard uses: the two must agree.
+static_assert(ALNotecardItems::FIRST_CHAR == LLTextEditor::FIRST_EMBEDDED_CHAR &&
+                  ALNotecardItems::MOST == static_cast<size_t>(LLTextEditor::MAX_EMBEDDED_ITEMS),
+              "a notecard's item characters are numbered one way");
 
 namespace ALNotecardItems
 {

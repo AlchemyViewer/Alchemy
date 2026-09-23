@@ -33,10 +33,10 @@
 
 // The notecard format stands each item a notecard carries in its text as a
 // character past the last the standard assigns, the first item's the first
-// of them -- LLTextEditor::FIRST_EMBEDDED_CHAR, which Script Studio checks
-// this agrees with. Every one of them is four bytes in UTF-8, the first of
-// them F4, so a text is read and renumbered in its bytes, where the editor
-// keeps it.
+// of them -- LLTextEditor::FIRST_EMBEDDED_CHAR, which alnotecarditems.cpp
+// checks this agrees with. Every one of them is four bytes in UTF-8, the
+// first of them F4, so a text is read and renumbered in its bytes, where
+// the editor keeps it.
 namespace ALNotecardItems
 {
     constexpr U32    FIRST_CHAR = 0x100000;

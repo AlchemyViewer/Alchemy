@@ -147,6 +147,7 @@ target_sources(
     altextsearch.cpp
     altextview.cpp
     altextundo.cpp
+    alnotecarditems.cpp
     alfollowscontrol.cpp
     alfontfield.cpp
     alcolorpicker.cpp
@@ -331,6 +332,7 @@ target_sources(
         altextsearch.h
         altextview.h
         altextundo.h
+        alnotecarditems.h
         alfollowscontrol.h
         alfontfield.h
         alcolorpicker.h
@@ -423,6 +425,7 @@ if(AL_BUILD_TESTS)
   al_add_test(llurlmatch UNIT PROJECT llui LIBRARIES ${test_libs})
   al_add_test(altextdocument UNIT PROJECT llui LIBRARIES ${test_libs})
   al_add_test(altextundo UNIT PROJECT llui SOURCES altextdocument.cpp LIBRARIES ${test_libs})
+  al_add_test(alnotecarditems UNIT PROJECT llui LIBRARIES ${test_libs})
   al_add_test(
     alsyntaxhighlighter
     UNIT

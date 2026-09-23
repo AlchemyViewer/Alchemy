@@ -128,12 +128,6 @@ namespace
     // come into view after a login.
     const F64 RESTORE_WAIT = 5.0 * 60.0;
     const F64 DISCARDED_KEPT = 7.0 * 24.0 * 60.0 * 60.0;
-
-    // The notecard's item characters are read by ALNotecardItems and made
-    // by the text editor the legacy notecard uses: the two must agree.
-    static_assert(ALNotecardItems::FIRST_CHAR == LLTextEditor::FIRST_EMBEDDED_CHAR &&
-                      ALNotecardItems::MOST == static_cast<size_t>(LLTextEditor::MAX_EMBEDDED_ITEMS),
-                  "a notecard's item characters are numbered one way");
 }
 
 namespace
