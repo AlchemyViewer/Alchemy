@@ -53,15 +53,12 @@ ALPanelFloater::ALPanelFloater(const LLFloater::Params& p, ALDockPanel* pane, LL
 
 void ALPanelFloater::onClose(bool app_quitting)
 {
-    // The pane is only borrowed. A window closing gives it back, unless the
-    // application is going away, in which case there is nothing to give it
-    // back to.
-    if (!app_quitting)
+    // The pane is only borrowed, and a window closing gives it back
+    // whatever the reason. Its home goes on without it only where home is
+    // gone already.
+    if (ALDockPanel* pane = mPane.get() ? mPane.get()->as<ALDockPanel>() : nullptr)
     {
-        if (ALDockPanel* pane = mPane.get() ? mPane.get()->as<ALDockPanel>() : nullptr)
-        {
-            pane->dock();
-        }
+        pane->goHome(true, app_quitting);
     }
     LLFloater::onClose(app_quitting);
 }
@@ -133,6 +130,7 @@ void ALDockPanel::popOut()
 
     mHome = home->getHandle();
     mHomeFollows = getFollows();
+    mOutAtQuit = false;
 
     // The window is the pane AND a title bar: a window made the size of the
     // pane has to put one of them over the other, and what the pane draws
@@ -206,6 +204,11 @@ void ALDockPanel::popOut()
 
 void ALDockPanel::dock()
 {
+    goHome(false, false);
+}
+
+void ALDockPanel::goHome(bool window_closing, bool quitting)
+{
     LLFloater* floater = mFloater.get();
     // Cleared first: the window's own close puts the pane back, so this must
     // not come round again through it.
@@ -216,6 +219,12 @@ void ALDockPanel::dock()
     // home and put in again for nothing.
     LLView* home = mHome.get();
     mHome.markDead();
+    if (!floater && !home)
+    {
+        // Home already.
+        return;
+    }
+    mOutAtQuit = quitting && home;
     if (home)
     {
         if (floater)
@@ -240,7 +249,7 @@ void ALDockPanel::dock()
             }
         }
     }
-    if (floater)
+    if (floater && !window_closing)
     {
         floater->closeFloater();
     }

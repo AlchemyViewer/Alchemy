@@ -75,7 +75,9 @@ public:
     // in a pane that can leave.
     void bind(LLView* window, std::vector<Pane> panes);
 
-    // A region by its key or its panel's name.
+    // A region by its key or its panel's name. A region out in a window
+    // of its own is showing, whatever became of the room it left: folding
+    // it puts it back folded, and unfolding it brings its window forward.
     void toggle(std::string_view pane);
     void setCollapsed(std::string_view pane, bool collapsed);
     bool collapsed(std::string_view pane) const;
@@ -92,6 +94,10 @@ public:
     bool out(std::string_view pane) const;
     void toggleOut(std::string_view pane);
     void dockAll();
+    // Out again, every region its window put back only because the viewer
+    // was quitting: what a window does when the quit it was holding up is
+    // called off.
+    void putBackOut();
     // The window a region is out in, or null while it is home.
     LLFloater* window(std::string_view pane) const;
 

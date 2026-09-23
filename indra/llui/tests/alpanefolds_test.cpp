@@ -225,4 +225,75 @@ namespace tut
             w.floater->die();
         }
     }
+    // A region out in a window of its own is showing, whatever became of
+    // the room it left: asked to unfold, the studio's own Show Problems,
+    // it does not open that room as an empty band, and folding it puts it
+    // back, folded. Its button says it shows while it is out.
+    template<> template<>
+    void alpanefolds_object::test<4>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        Window w = build();
+        ALPaneFolds folds;
+        folds.bind(w.floater, panes());
+
+        folds.toggleOut("side");
+        ensure("out", folds.out("side"));
+        ensure("the room it left is folded", w.side->isCollapsed());
+        ensure("but the region is showing", !folds.collapsed("side"));
+        ensure("and its button says so", w.fold->getToggleState());
+
+        folds.setCollapsed("side", false);
+        ensure("unfolding it leaves it out", folds.out("side"));
+        ensure("and the room it left folded", w.side->isCollapsed());
+
+        folds.setCollapsed("side", true);
+        ensure("folding it puts it back", !folds.out("side"));
+        ensure("into its room", w.side->findChild<ALDockPanel>("side_pane", false) != nullptr);
+        ensure("folded", folds.collapsed("side") && w.side->isCollapsed());
+        ensure("and its button says that", !w.fold->getToggleState());
+
+        folds.toggleOut("side");
+        folds.toggle("side");
+        ensure("the button's own press does the same", !folds.out("side") && folds.collapsed("side"));
+        w.floater->die();
+    }
+
+    // A region put back only because the viewer was quitting is written
+    // down as out, so that the next session puts it out again; and where
+    // the quit is called off, it goes out again now.
+    template<> template<>
+    void alpanefolds_object::test<5>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        Window w = build();
+        ALPaneFolds folds;
+        folds.bind(w.floater, panes());
+
+        folds.toggleOut("page");
+        LLFloater* window = folds.window("page");
+        ensure("in a window", window != nullptr);
+        window->closeFloater(true);
+        ensure("home", !folds.out("page"));
+
+        LLSD state;
+        folds.save(state);
+        ensure("written as out all the same", state["out_page"].asBoolean());
+
+        folds.putBackOut();
+        ensure("the quit called off, it is out again", folds.out("page"));
+        folds.dockAll();
+        LLSD after;
+        folds.save(after);
+        ensure("put back by hand, it is written as home", !after["out_page"].asBoolean());
+        folds.putBackOut();
+        ensure("and stays there", !folds.out("page"));
+        w.floater->die();
+    }
 }

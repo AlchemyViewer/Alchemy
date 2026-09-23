@@ -305,4 +305,31 @@ namespace tut
         ensure("a fourth piece", bar->findChild<LLTextBox>("trailer_3", true) != nullptr);
         delete bar;
     }
+    // The same path said again is the same bar: a caller says it whenever
+    // its reasons for asking move -- a check come back -- and building it
+    // again would close a crumb's list under the person choosing from it.
+    // Another path is built afresh.
+    template<> template<>
+    void aljumpbar_object::test<7>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        ALJumpBar* bar = make();
+        bar->setPath(path());
+        LLView* crumb = bar->findChild<LLView>("crumb_3", false);
+        ensure("a crumb", crumb != nullptr);
+        const LLHandle<LLView> held = crumb->getHandle();
+
+        bar->setPath(path());
+        ensure("said again, the crumb is the one it was", !held.isDead() && bar->findChild<LLView>("crumb_3", false) == crumb);
+
+        std::vector<ALJumpBar::Crumb> other = path();
+        other[3].alternatives.push_back({ "ok_btn", "ok_btn" });
+        bar->setPath(other);
+        ensure("another path, built again", held.isDead());
+        ensure_equals("with as many crumbs", crumbsIn(bar), 4);
+        delete bar;
+    }
 }

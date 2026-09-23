@@ -287,4 +287,34 @@ namespace tut
         v.append(in_lane("chat4", 0));
         ensure_equals("the middle one of a lane goes from the middle", v.document().line(0), std::string("[12:00:00] Thing: chat2"));
     }
+    template<> template<>
+    void aloutputview_object::test<6>()
+    {
+        set_test_name("scrolled back in a full log, what is in sight stays in sight as the oldest go");
+        ALOutputView& v = make(40);
+        for (S32 i = 0; i < 40; ++i)
+        {
+            v.append(entry("", llformat("line %02d", i).c_str()));
+        }
+        v.setScrollY(v.layout().lineTop(10));
+        const auto top_line = [&v]() { return v.document().line(v.layout().lineAtY(v.scrollY())); };
+        ensure_equals("reading from the eleventh", top_line(), std::string("[12:00:00] Thing: line 10"));
+        for (S32 i = 40; i < 45; ++i)
+        {
+            v.append(entry("", llformat("line %02d", i).c_str()));
+        }
+        ensure_equals("five of the oldest gone", v.entries().front().text, std::string("line 05"));
+        ensure_equals("and the line read is where it was", top_line(), std::string("[12:00:00] Thing: line 10"));
+
+        // Read back past the oldest: the view keeps what is left of it.
+        v.setScrollY(0);
+        v.append(entry("", "line 45"));
+        ensure_equals("at the top, the top is the oldest left", top_line(), std::string("[12:00:00] Thing: line 06"));
+
+        // Following the end, it still follows.
+        v.setScrollY(v.layout().totalHeight());
+        v.append(entry("", "line 46"));
+        ensure("the last line in sight",
+               v.scrollY() + v.textRect().getHeight() >= v.layout().totalHeight() - v.layout().rowHeight());
+    }
 }

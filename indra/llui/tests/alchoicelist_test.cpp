@@ -169,4 +169,20 @@ namespace tut
         v.setChoices({ choice("llSay", ""), choice("plain", "") });
         ensure("no marks, no column", v.layout().xOf(0, 0) < 1.f);
     }
+    template<> template<>
+    void alchoicelist_object::test<4>()
+    {
+        set_test_name("a choice is one line and its note one column, whatever their words hold");
+        ALChoiceList& v = make();
+        v.setChoices({ choice("snippet", "for each\nitem in a list"), choice("odd\tone", "(string)"), choice("last", "") }, 0);
+        ensure_equals("a line a choice", v.document().lineCount(), 3);
+        ensure_equals("the note's break shown as a space", v.document().line(0), std::string("snippet\tfor each item in a list"));
+        ensure_equals("the text's tab too, so its note starts after the whole of it", v.document().line(1), std::string("odd one\t(string)"));
+        ensure_equals("the choice below is on its own line", v.document().line(2), std::string("last\t "));
+        ensure_equals("the words handed back as given", v.choices()[0].note, std::string("for each\nitem in a list"));
+        S32 x, y;
+        pointOf(2, x, y);
+        v.handleMouseDown(x, y, MASK_NONE);
+        ensure_equals("the line pressed is the choice picked", v.chosen(), 2);
+    }
 }

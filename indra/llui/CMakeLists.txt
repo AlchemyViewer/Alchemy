@@ -491,6 +491,7 @@ if(AL_BUILD_TESTS)
     alspecimenlist
     altabstrip
     alquickopen
+    alstudiofloater
     alxuischema
     alxuiselection
     alxuisourcemap

@@ -42,7 +42,11 @@ public:
 
     ALPanelFloater(const LLFloater::Params& p, ALDockPanel* pane, LLFloater* home);
 
-    // Closing a window that is only borrowing a pane puts the pane back.
+    // Closing a window that is only borrowing a pane puts the pane back,
+    // the viewer quitting or not: the window it came from may outlive the
+    // quit -- one asking about unsaved work holds it up, and the quit may
+    // be called off -- and a pane left in here would go down with this
+    // window while that one still points into it.
     void onClose(bool app_quitting) override;
 
     // A pane out of its window is a different focused floater, and the
@@ -104,6 +108,11 @@ public:
     void popOut();
     void dock();
     bool poppedOut() const { return !mFloater.isDead(); }
+    // Put back only because the viewer was quitting: out as far as whoever
+    // writes down where it is goes, so that the next session puts it out
+    // again. Forgotten as soon as it is taken out or put back for any
+    // other reason.
+    bool outAtQuit() const { return mOutAtQuit; }
 
     // What is left of a window once its title bar has had its band. A pane
     // given the whole of a floater covers the title, the buttons and the
@@ -119,9 +128,16 @@ protected:
     ALDockPanel(const Params& p);
 
 private:
+    friend class ALPanelFloater;
+    // Back home: from the window it is out in, which is closing already
+    // where it asks -- and so is not closed again from here -- and because
+    // the viewer is quitting or not.
+    void goHome(bool window_closing, bool quitting);
+
     std::string         mTitle;
     LLHandle<LLView>    mHome;          // the parent it was declared in
     LLHandle<LLFloater> mFloater;       // the window it is in, while it is out
     LLRect              mFloatingRect;
     U32                 mHomeFollows = FOLLOWS_ALL;
+    bool                mOutAtQuit = false;
 };

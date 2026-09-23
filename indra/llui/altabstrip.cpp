@@ -121,6 +121,25 @@ void ALTabStrip::setTabs(std::vector<Tab> tabs, const std::string& chosen)
         }
     }
     const bool moved = chosen != mChosen || tabs.size() != mTabs.size();
+    // A press held follows its tab into the new tabs, by value.
+    const auto follow = [&](S32 at)
+    {
+        if (at < 0 || at >= static_cast<S32>(mTabs.size()))
+        {
+            return -1;
+        }
+        for (size_t i = 0; i < tabs.size(); ++i)
+        {
+            if (tabs[i].value == mTabs[static_cast<size_t>(at)].value)
+            {
+                return static_cast<S32>(i);
+            }
+        }
+        return -1;
+    };
+    const bool pressing = mPressed >= 0 || mPressedClose >= 0;
+    mPressed      = follow(mPressed);
+    mPressedClose = follow(mPressedClose);
     mTabs   = std::move(tabs);
     mChosen = chosen;
     mHover  = -1;
@@ -130,6 +149,35 @@ void ALTabStrip::setTabs(std::vector<Tab> tabs, const std::string& chosen)
     {
         showChosen();
     }
+    if (pressing && mPressed < 0 && mPressedClose < 0 && hasMouseCapture())
+    {
+        // The tab held is gone: so is the press.
+        mDragging = false;
+        gFocusMgr.setMouseCapture(nullptr);
+    }
+}
+
+S32 ALTabStrip::indexOf(const std::string& value) const
+{
+    for (size_t i = 0; i < mTabs.size(); ++i)
+    {
+        if (mTabs[i].value == value)
+        {
+            return static_cast<S32>(i);
+        }
+    }
+    return -1;
+}
+
+void ALTabStrip::sayOrder()
+{
+    std::vector<std::string> order;
+    order.reserve(mTabs.size());
+    for (const Tab& tab : mTabs)
+    {
+        order.push_back(tab.value);
+    }
+    mReorderedSignal(order);
 }
 
 void ALTabStrip::choose(const std::string& value)
@@ -546,7 +594,6 @@ bool ALTabStrip::handleMouseDown(S32 x, S32 y, MASK mask)
     {
         return LLUICtrl::handleMouseDown(x, y, mask);
     }
-    const Tab& tab = mTabs[which];
     if (closeRectOf(which).pointInRect(x, y))
     {
         // Closed when let go of over the way out, so a press can still be
@@ -555,13 +602,21 @@ bool ALTabStrip::handleMouseDown(S32 x, S32 y, MASK mask)
         gFocusMgr.setMouseCapture(this);
         return true;
     }
-    if (tab.value != mChosen)
+    // The value, copied: whoever hears of the choice fills the strip
+    // afresh, and the tab it was read from goes with the old tabs.
+    const std::string value = mTabs[which].value;
+    if (value != mChosen)
     {
-        mChosen = tab.value;
-        mChosenSignal(tab.value);
+        mChosen = value;
+        mChosenSignal(value);
     }
-    // Held, so that a drag along the strip may reorder.
-    mPressed  = which;
+    // Held, so that a drag along the strip may reorder: the tab, wherever
+    // the choice left it.
+    mPressed = indexOf(value);
+    if (mPressed < 0)
+    {
+        return true;
+    }
     mPressX   = x;
     mDragging = false;
     gFocusMgr.setMouseCapture(this);
@@ -578,34 +633,41 @@ bool ALTabStrip::handleMouseUp(S32 x, S32 y, MASK mask)
         gFocusMgr.setMouseCapture(nullptr);
         if (which < (S32)mTabs.size() && closeRectOf(which).pointInRect(x, y))
         {
-            mClosedSignal(mTabs[which].value);
+            const std::string value = mTabs[which].value;
+            mClosedSignal(value);
         }
         return true;
     }
     if (hasMouseCapture())
     {
+        // Likewise: letting go forgets the drag, and a drag forgotten
+        // before it was told left the host's tabs in the old order.
+        const bool dragged = mDragging;
+        mPressed           = -1;
+        mDragging          = false;
         gFocusMgr.setMouseCapture(nullptr);
-        if (mDragging)
+        if (dragged)
         {
-            std::vector<std::string> order;
-            for (const Tab& tab : mTabs)
-            {
-                order.push_back(tab.value);
-            }
-            mReorderedSignal(order);
+            sayOrder();
         }
-        mPressed  = -1;
-        mDragging = false;
         return true;
     }
     return LLUICtrl::handleMouseUp(x, y, mask);
 }
 
+// Taken away mid-drag: the tabs are where the drag left them, which the
+// host is told, rather than the strip and the host going on in two
+// orders until the next fill.
 void ALTabStrip::onMouseCaptureLost()
 {
+    const bool dragged = mDragging;
     mPressed      = -1;
     mDragging     = false;
     mPressedClose = -1;
+    if (dragged)
+    {
+        sayOrder();
+    }
 }
 
 bool ALTabStrip::handleScrollWheel(S32 x, S32 y, LLScrollDelta delta)
@@ -634,13 +696,15 @@ bool ALTabStrip::handleRightMouseDown(S32 x, S32 y, MASK mask)
     const S32 which = at(x, y);
     if (which >= 0)
     {
-        // Chosen first, so that the menu is about what is in view.
-        if (mTabs[which].value != mChosen)
+        // Chosen first, so that the menu is about what is in view; by a
+        // copy of the value, which the choice may fill the strip under.
+        const std::string value = mTabs[which].value;
+        if (value != mChosen)
         {
-            mChosen = mTabs[which].value;
-            mChosenSignal(mChosen);
+            mChosen = value;
+            mChosenSignal(value);
         }
-        mMenuSignal(mTabs[which].value, x, y);
+        mMenuSignal(value, x, y);
         return true;
     }
     return LLUICtrl::handleRightMouseDown(x, y, mask);
@@ -651,7 +715,8 @@ bool ALTabStrip::handleMiddleMouseDown(S32 x, S32 y, MASK mask)
     const S32 which = at(x, y);
     if (which >= 0)
     {
-        mClosedSignal(mTabs[which].value);
+        const std::string value = mTabs[which].value;
+        mClosedSignal(value);
         return true;
     }
     return LLUICtrl::handleMiddleMouseDown(x, y, mask);
@@ -662,7 +727,8 @@ bool ALTabStrip::handleDoubleClick(S32 x, S32 y, MASK mask)
     const S32 which = at(x, y);
     if (which >= 0 && !closeRectOf(which).pointInRect(x, y))
     {
-        mHeldSignal(mTabs[which].value);
+        const std::string value = mTabs[which].value;
+        mHeldSignal(value);
         return true;
     }
     return LLUICtrl::handleDoubleClick(x, y, mask);
@@ -688,21 +754,29 @@ bool ALTabStrip::handleHover(S32 x, S32 y, MASK mask)
         if (mDragging)
         {
             bool moved = true;
-            while (moved)
+            // Each tab's cut name goes with it, since it is kept by place.
+            const auto trade = [this](size_t a, size_t b)
+            {
+                std::swap(mTabs[a], mTabs[b]);
+                if (a < mShown.size() && b < mShown.size())
+                {
+                    std::swap(mShown[a], mShown[b]);
+                }
+                layout();
+            };
+            while (moved && mPressed < (S32)mTabs.size())
             {
                 moved = false;
                 if (mPressed > 0 && x < rectOf((size_t)mPressed - 1).getCenterX())
                 {
-                    std::swap(mTabs[(size_t)mPressed], mTabs[(size_t)mPressed - 1]);
+                    trade((size_t)mPressed, (size_t)mPressed - 1);
                     --mPressed;
-                    layout();
                     moved = true;
                 }
                 else if (mPressed + 1 < (S32)mTabs.size() && x > rectOf((size_t)mPressed + 1).getCenterX())
                 {
-                    std::swap(mTabs[(size_t)mPressed], mTabs[(size_t)mPressed + 1]);
+                    trade((size_t)mPressed, (size_t)mPressed + 1);
                     ++mPressed;
-                    layout();
                     moved = true;
                 }
             }

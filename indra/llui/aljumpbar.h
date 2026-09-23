@@ -72,8 +72,16 @@ public:
         // value it stands for. Empty leaves the crumb a plain button.
         std::vector<std::pair<std::string, std::string> > alternatives;
         std::string toolTip;
+        friend bool operator==(const Crumb& a, const Crumb& b)
+        {
+            return a.label == b.label && a.value == b.value && a.alternatives == b.alternatives && a.toolTip == b.toolTip;
+        }
     };
 
+    // The path, and the bar built again for it -- but for the same path
+    // said again, which is what a caller does whenever its reasons for
+    // asking move, and which would close a crumb's list under the person
+    // choosing from it.
     void setPath(std::vector<Crumb> crumbs);
     const std::vector<Crumb>& path() const { return mCrumbs; }
 

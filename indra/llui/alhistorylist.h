@@ -58,6 +58,11 @@ public:
         // nothing in it is still saying something.
         Optional<std::string> empty_headline;
         Optional<std::string> empty_sentence;
+        // What the row under every step says: the document before any of
+        // them, which choosing asks for none to be in force -- undoing
+        // everything, the one trip back a person is most likely to want,
+        // and one no step's row can ask for. None, and there is no row.
+        Optional<std::string> start_label;
         Params();
     };
 
@@ -120,6 +125,7 @@ private:
     size_t              mInForce = 0;
     std::string         mEmptyHeadline;
     std::string         mEmptySentence;
+    std::string         mStartLabel;
     goto_signal_t       mGoTo;
     chose_signal_t      mChose;
 };

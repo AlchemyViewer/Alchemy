@@ -33,6 +33,7 @@
 #include <string>
 #include <vector>
 
+class ALPopover;
 class LLMenuBarGL;
 class LLMenuItemGL;
 class LLTextBox;
@@ -110,18 +111,24 @@ protected:
     // Open quickly: the candidates against a few letters, over the
     // window, gone as soon as one is chosen or the person looks away.
     // Centred over the top of `anchor` where one is given, else of the
-    // window; as wide
-    // and as tall as given, where given. Asked again while it is up, it
-    // keeps what was typed and takes the keyboard back. The widget comes
-    // back for a caller with more to say to it -- a hint that follows
-    // the typing -- or null where it could not be shown; `escaped` is
-    // told when it goes without a choice, and `hold`, where given, of
-    // a choice made with Shift-Return -- the pick to be held rather
-    // than taken, for a caller with two things to do with one.
+    // window; as wide and as tall as given, where given. Asked the same
+    // question again while it is up -- the same title and placeholder --
+    // it keeps what was typed, takes the keyboard back and answers the
+    // latest asking; another question puts the one up away, escaped, and
+    // is asked afresh. The widget comes back for a caller with more to
+    // say to it -- a hint that follows the typing -- or null where it
+    // could not be shown. `escaped` is told when it goes by Escape, or
+    // put away for another question -- whatever it previewed to be put
+    // back -- and `left` when it goes by the person looking away with
+    // nothing chosen, where what it previewed stands, the reader having
+    // looked at it and moved on; and `hold`, where given, of a choice made
+    // with Shift-Return -- the pick to be held rather than taken, for a
+    // caller with two things to do with one.
     ALQuickOpen* quickOpen(std::vector<ALQuickOpen::Candidate> candidates, const std::string& placeholder,
                            const std::string& title, std::function<void(const std::string&)> chose,
                            LLView* anchor = nullptr, S32 width = 0, S32 height = 0,
-                           std::function<void()> escaped = {}, std::function<void(const std::string&)> hold = {});
+                           std::function<void()> escaped = {}, std::function<void(const std::string&)> hold = {},
+                           std::function<void()> left = {});
 
     // The regions that fold, which the subclass binds.
     ALPaneFolds mFolds;
@@ -139,6 +146,10 @@ private:
     // each region -- noticed once the drag is over, rather than written
     // on every pixel of it.
     void rememberShape();
+    // The quick open up told whom its answer goes to: the latest asking.
+    void answerQuickOpen(ALPopover* popover, ALQuickOpen* quick, std::function<void(const std::string&)> chose,
+                         std::function<void()> escaped, std::function<void(const std::string&)> hold,
+                         std::function<void()> left);
 
     std::string         mStateSetting;
     LLMenuBarGL*        mMenuBar = nullptr;
@@ -156,4 +167,9 @@ private:
     LLRect              mShapeRect;
     std::vector<S32>    mShapeDims;
     LLHandle<LLView>    mQuickPopover;
+    // The question the quick open up asks, and what carries its answer.
+    std::string                        mQuickQuestion;
+    boost::signals2::scoped_connection mQuickChose;
+    boost::signals2::scoped_connection mQuickHold;
+    boost::signals2::scoped_connection mQuickClosed;
 };

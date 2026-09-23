@@ -93,6 +93,18 @@ void ALChoiceList::setChoices(std::vector<Choice> choices, S32 chosen)
     // The text: each choice on a line, its note after a tab. A choice
     // without a note has a space in the note's face there, so that every
     // row is as tall as one with.
+    //
+    // A choice is one line and its note one column, whatever their words
+    // hold: a line break in either -- a snippet's detail, written by hand
+    // -- would put every choice after it a line off from the one a click
+    // or Return picks, and a tab in the text would start its note early.
+    // Each is shown as a space, byte for byte, so that the text's length is
+    // still where the note starts.
+    const auto flat = [](std::string words)
+    {
+        std::replace_if(words.begin(), words.end(), [](char c) { return c == '\n' || c == '\r' || c == '\t'; }, ' ');
+        return words;
+    };
     std::string text;
     F32         widest = 0.f;
     for (size_t i = 0; i < mChoices.size(); ++i)
@@ -102,9 +114,9 @@ void ALChoiceList::setChoices(std::vector<Choice> choices, S32 chosen)
         {
             text += '\n';
         }
-        text += choice.text;
+        text += flat(choice.text);
         text += '\t';
-        text += choice.note.empty() ? std::string(" ") : choice.note;
+        text += choice.note.empty() ? std::string(" ") : flat(choice.note);
         if (getFont())
         {
             widest = llmax(widest, getFont()->getWidthF32(choice.text));

@@ -26,6 +26,7 @@
 
 #include "../altabstrip.h"
 
+#include "../llfocusmgr.h"
 #include "../lluictrlfactory.h"
 
 #include "llfontfreetype.h"
@@ -379,6 +380,145 @@ namespace tut
         ensure_equals("said once", held.size(), 1u);
         ensure_equals("of the tab under it", held.back(), std::string("c"));
         ensure("nowhere, nothing", !strip->handleDoubleClick(2000, 2000, MASK_NONE) || held.size() == 1u);
+        strip->die();
+    }
+    // A tab dragged past its neighbour's middle moves, and the host hears
+    // the new order when it is let go of -- told before letting go forgets
+    // the drag, which it did before this was said, the host never hearing
+    // and filling the strip back in the old order on the next keystroke.
+    template<> template<>
+    void altabstrip_object::test<8>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        ALTabStrip* strip = make();
+        strip->setTabs(three(), "a");
+        std::vector<std::vector<std::string>> orders;
+        strip->onReordered([&orders](const std::vector<std::string>& order) { orders.push_back(order); });
+
+        const LLRect first  = strip->rectOf(0);
+        const LLRect second = strip->rectOf(1);
+        strip->handleMouseDown(first.getCenterX(), first.getCenterY(), MASK_NONE);
+        strip->handleHover(second.getCenterX() + 4, second.getCenterY(), MASK_NONE);
+        ensure("dragged past its neighbour, it moved", strip->tabs()[1].value == "a");
+        ensure("nothing said while it is held", orders.empty());
+        strip->handleMouseUp(second.getCenterX() + 4, second.getCenterY(), MASK_NONE);
+        ensure_equals("let go of, the order is told", orders.size(), (size_t)1);
+        ensure("as it now is", orders.back() == std::vector<std::string>({ "b", "a", "c" }));
+
+        // A press that never travelled is a press, and says no order.
+        const LLRect third = strip->rectOf(2);
+        strip->handleMouseDown(third.getCenterX(), third.getCenterY(), MASK_NONE);
+        strip->handleMouseUp(third.getCenterX(), third.getCenterY(), MASK_NONE);
+        ensure_equals("a press is not a drag", orders.size(), (size_t)1);
+
+        // Taken away mid-drag, the tabs are where the drag left them, and
+        // the host is told so.
+        strip->setTabs(three(), "a");
+        strip->handleMouseDown(strip->rectOf(0).getCenterX(), HEIGHT / 2, MASK_NONE);
+        strip->handleHover(strip->rectOf(1).getCenterX() + 4, HEIGHT / 2, MASK_NONE);
+        gFocusMgr.setMouseCapture(nullptr);
+        ensure_equals("a drag cut short is told", orders.size(), (size_t)2);
+        ensure("where it got to", orders.back() == std::vector<std::string>({ "b", "a", "c" }));
+        strip->die();
+    }
+
+    // The host fills the strip afresh whenever a fact about a tab moves,
+    // and may while a press is held: the press follows its tab, not its
+    // place. A drag goes on with the tab it began with; a way out pressed
+    // closes the tab it was pressed on or nothing; and a press whose tab
+    // has gone is let go of.
+    template<> template<>
+    void altabstrip_object::test<9>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        ALTabStrip* strip = make();
+        std::vector<std::vector<std::string>> orders;
+        std::vector<std::string>              closed;
+        strip->onReordered([&orders](const std::vector<std::string>& order) { orders.push_back(order); });
+        strip->onClosed([&closed](const std::string& value) { closed.push_back(value); });
+
+        // A drag of "a", the host filling the strip in its own order mid-way
+        // -- a check come back, a badge on "c".
+        strip->setTabs(three(), "a");
+        strip->handleMouseDown(strip->rectOf(0).getCenterX(), HEIGHT / 2, MASK_NONE);
+        strip->handleHover(strip->rectOf(1).getCenterX() + 4, HEIGHT / 2, MASK_NONE);
+        std::vector<ALTabStrip::Tab> refill = three();
+        refill[2].badge = LLColor4::red;
+        strip->setTabs(refill, "a");
+        strip->handleHover(strip->rectOf(2).getCenterX() + 4, HEIGHT / 2, MASK_NONE);
+        strip->handleMouseUp(strip->rectOf(2).getCenterX() + 4, HEIGHT / 2, MASK_NONE);
+        ensure_equals("told once", orders.size(), (size_t)1);
+        ensure("the tab dragged is the one pressed, to the end",
+               orders.back() == std::vector<std::string>({ "b", "c", "a" }));
+
+        // The way out of "b" pressed, then "a" gone from the strip: "c" now
+        // sits where "b" was. Let go of there, nothing closes -- the press
+        // was on "b" -- and let go of over "b"'s way out, "b" does.
+        strip->setTabs(three(), "a");
+        const LLRect out = strip->closeRectOf(1);
+        strip->handleHover(out.getCenterX(), out.getCenterY(), MASK_NONE);
+        strip->handleMouseDown(out.getCenterX(), out.getCenterY(), MASK_NONE);
+        strip->setTabs({ tab("floater_b.xml", "b"), tab("panel_c.xml", "c") }, "b");
+        strip->handleMouseUp(out.getCenterX(), out.getCenterY(), MASK_NONE);
+        ensure("not the tab that came to sit there", closed.empty());
+        const LLRect moved = strip->closeRectOf(0);
+        strip->handleHover(moved.getCenterX(), moved.getCenterY(), MASK_NONE);
+        strip->handleMouseDown(moved.getCenterX(), moved.getCenterY(), MASK_NONE);
+        strip->setTabs({ tab("floater_b.xml", "b"), tab("panel_c.xml", "c") }, "b");
+        strip->handleMouseUp(moved.getCenterX(), moved.getCenterY(), MASK_NONE);
+        ensure("the tab pressed, followed", closed.size() == 1 && closed.back() == "b");
+
+        // A drag whose tab goes: let go of, nothing moves after, nothing
+        // is told.
+        strip->setTabs(three(), "a");
+        strip->handleMouseDown(strip->rectOf(0).getCenterX(), HEIGHT / 2, MASK_NONE);
+        strip->handleHover(strip->rectOf(1).getCenterX() + 4, HEIGHT / 2, MASK_NONE);
+        orders.clear();
+        strip->setTabs({ tab("floater_b.xml", "b"), tab("panel_c.xml", "c") }, "b");
+        ensure("the press let go of", !strip->hasMouseCapture());
+        strip->handleHover(strip->rectOf(1).getCenterX() + 4, HEIGHT / 2, MASK_NONE);
+        strip->handleMouseUp(strip->rectOf(1).getCenterX() + 4, HEIGHT / 2, MASK_NONE);
+        ensure("nothing moved", strip->tabs()[0].value == "b" && strip->tabs()[1].value == "c");
+        ensure("nothing told", orders.empty());
+        strip->die();
+    }
+
+    // Whoever hears of a choice fills the strip afresh, as the studio does:
+    // the value it heard stays the value, and the menu asked for by the
+    // right button is about the tab pressed.
+    template<> template<>
+    void altabstrip_object::test<10>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        ALTabStrip* strip = make();
+        strip->setTabs(three(), "a");
+        std::vector<std::string> heard;
+        std::vector<std::string> menus;
+        strip->onChosen([&](const std::string& value) {
+            strip->setTabs(three(), value);
+            heard.push_back(value);
+        });
+        strip->onMenu([&](const std::string& value, S32, S32) { menus.push_back(value); });
+
+        const LLRect second = strip->rectOf(1);
+        strip->handleMouseDown(second.getCenterX(), second.getCenterY(), MASK_NONE);
+        strip->handleMouseUp(second.getCenterX(), second.getCenterY(), MASK_NONE);
+        ensure("heard as it was chosen", heard.size() == 1 && heard.back() == "b");
+        ensure_equals("and chosen", strip->chosen(), std::string("b"));
+
+        const LLRect third = strip->rectOf(2);
+        strip->handleRightMouseDown(third.getCenterX(), third.getCenterY(), MASK_NONE);
+        ensure("the right button chooses", heard.size() == 2 && heard.back() == "c");
+        ensure("and asks for a menu about it", menus.size() == 1 && menus.back() == "c");
         strip->die();
     }
 }

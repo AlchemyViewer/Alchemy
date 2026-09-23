@@ -325,4 +325,29 @@ namespace tut
         ensure("the saying goes with a list to show", comment->getText().empty());
         quick->die();
     }
+    template<> template<>
+    void alquickopen_object::test<10>()
+    {
+        set_test_name("a long label is still an answer, and each degree of meaning it stays in its own tier however far in");
+        const std::string scattered = std::string(300, 'x') + "a_b_c";
+        ensure("letters scattered far into a long line still match", ALQuickOpen::score(scattered, "abc") > 0);
+        const std::string run = std::string(1200, 'y') + "abc";
+        ensure("a run far into a longer one still matches", ALQuickOpen::score(run, "abc") > 0);
+        ensure("and still outranks the best scattered letters",
+               ALQuickOpen::score(run, "abc") > ALQuickOpen::score("aXbXc", "abc"));
+        ensure("which outrank the worst", ALQuickOpen::score("aXbXc", "abc") >= ALQuickOpen::score(scattered, "abc"));
+        ensure("a word start outranks the best run", ALQuickOpen::score("x_abc", "abc") > ALQuickOpen::score("xabc", "abc"));
+
+        std::vector<ALQuickOpen::Candidate> history;
+        for (const std::string& line : { scattered, run })
+        {
+            ALQuickOpen::Candidate one;
+            one.label = line;
+            one.value = line;
+            history.push_back(one);
+        }
+        const std::vector<size_t> order = ALQuickOpen::rank(history, "abc");
+        ensure_equals("both are offered", order.size(), size_t(2));
+        ensure_equals("the run first", order.front(), size_t(1));
+    }
 }

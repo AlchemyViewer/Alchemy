@@ -456,6 +456,13 @@ void ALOutputView::removeAt(size_t index)
     {
         if (mShown[i].serial == serial)
         {
+            // What is in sight stays in sight: lines let go of above the
+            // top of the view take their height off the scroll, or the
+            // text a reader has scrolled back to crawls up by an entry for
+            // every entry that comes in.
+            const S32 top    = layout().lineTop(line);
+            const S32 height = layout().lineTop(line + mShown[i].lines) - top;
+            const S32 above  = llclamp(scrollY() - top, 0, height);
             if (i == 0)
             {
                 document().removeFirstLines(mShown.front().lines);
@@ -466,6 +473,10 @@ void ALOutputView::removeAt(size_t index)
             }
             mShown.erase(mShown.begin() + static_cast<std::ptrdiff_t>(i));
             ++mShownGeneration;
+            if (above > 0)
+            {
+                setScrollY(scrollY() - above);
+            }
             return;
         }
         if (mShown[i].serial > serial)

@@ -221,4 +221,28 @@ namespace tut
         }
         ensure_equals("and they add up to what is held", total, 4);
     }
+    // Checked again, a file keeps its place among the files, and its
+    // findings theirs among everyone's: the file in front is re-checked on
+    // every rebuild, and its rows do not jump to the end of the list.
+    template<> template<>
+    void alxuifindings_object::test<6>()
+    {
+        ALXUIFindings store;
+        fill(store);
+        store.replace("three.xml", {
+            one(ALXUILint::Rule::Overlap, ALXUILint::Severity::Warning, "c", "overlaps d") });
+
+        store.replace("one.xml", {
+            one(ALXUILint::Rule::Overlap, ALXUILint::Severity::Warning, "a", "overlaps b") });
+        ensure("still first of the files", store.files() == std::vector<std::string>({ "one.xml", "two.xml", "three.xml" }));
+        const auto selected = store.select(ALXUIFindings::Query());
+        ensure_equals("three findings", selected.found.size(), size_t(3));
+        ensure_equals("its own first", selected.found.front()->what, std::string("a"));
+
+        // Let go of and checked again, it is a file checked anew, at the end.
+        store.forget("one.xml");
+        store.replace("one.xml", {});
+        ensure("at the end", store.files() == std::vector<std::string>({ "two.xml", "three.xml", "one.xml" }));
+        ensure_equals("counted once", store.files().size(), size_t(3));
+    }
 }

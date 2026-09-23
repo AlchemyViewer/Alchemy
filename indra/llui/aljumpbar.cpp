@@ -64,6 +64,10 @@ ALJumpBar::~ALJumpBar() = default;
 
 void ALJumpBar::setPath(std::vector<Crumb> crumbs)
 {
+    if (crumbs == mCrumbs)
+    {
+        return;
+    }
     mCrumbs = std::move(crumbs);
     mRebuild.request();
 }

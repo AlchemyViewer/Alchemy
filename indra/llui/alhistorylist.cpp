@@ -40,18 +40,22 @@ namespace
 {
     constexpr S32 MARK_WIDTH = 18;
     constexpr S32 WHERE_WIDTH = 120;
+    // The start's row, which is before every step's index.
+    constexpr S32 START = -1;
 }
 
 ALHistoryList::Params::Params()
 :   empty_headline("empty_headline"),
-    empty_sentence("empty_sentence")
+    empty_sentence("empty_sentence"),
+    start_label("start_label")
 {
 }
 
 ALHistoryList::ALHistoryList(const Params& p)
 :   LLPanel(p),
     mEmptyHeadline(p.empty_headline),
-    mEmptySentence(p.empty_sentence)
+    mEmptySentence(p.empty_sentence),
+    mStartLabel(p.start_label)
 {
     LLScrollListCtrl::Params lp(LLUICtrlFactory::getDefaultParams<LLScrollListCtrl>());
     lp.name = "steps";
@@ -106,7 +110,8 @@ void ALHistoryList::fill()
     // just changed: a document that has grown by one has the same first
     // steps, so keeping the row keeps a person's place in the list.
     const LLScrollListItem* was = mList->getFirstSelected();
-    const S32 kept = was ? was->getValue().asInteger() : -1;
+    const bool had  = was != nullptr;
+    const S32  kept = was ? was->getValue().asInteger() : START;
 
     mList->deleteAllItems();
 
@@ -160,9 +165,24 @@ void ALHistoryList::fill()
         }
     }
 
+    // Under the oldest, where there is a step to be under: before any of
+    // them. Never put back, so never in the quiet ink, and in no column
+    // of where, being before all of them.
+    if (!mStartLabel.empty() && !mSteps.empty())
+    {
+        LLSD row;
+        row["value"]                = START;
+        LLSD& columns               = row["columns"];
+        columns[0]["column"]        = "mark";
+        columns[0]["value"]         = mInForce == 0 ? "\xe2\x96\xb8" : "";
+        columns[1]["column"]        = "what";
+        columns[1]["value"]         = mStartLabel;
+        mList->addElement(row);
+    }
+
     // Kept without being chosen again: the row is where it was, and a
     // caller told it had been pointed at would go and look at it.
-    if (kept >= 0 && kept < (S32)mSteps.size())
+    if (had && (kept == START ? !mStartLabel.empty() && !mSteps.empty() : kept >= 0 && kept < (S32)mSteps.size()))
     {
         mList->setCommitOnSelectionChange(false);
         mList->setSelectedByValue(LLSD(kept), true);
@@ -176,7 +196,9 @@ void ALHistoryList::fill()
 
 void ALHistoryList::onRowChosen()
 {
-    if (const LLScrollListItem* item = mList->getFirstSelected())
+    // The start is no step, and has nothing of its own to be shown.
+    const LLScrollListItem* item = mList->getFirstSelected();
+    if (item && item->getValue().asInteger() != START)
     {
         mChose((size_t)item->getValue().asInteger());
     }
@@ -204,7 +226,8 @@ void ALHistoryList::goToSelected()
     {
         return;
     }
-    const size_t want = (size_t)item->getValue().asInteger() + 1;
+    const S32    index = item->getValue().asInteger();
+    const size_t want  = index == START ? 0 : (size_t)index + 1;
     if (want != mInForce)
     {
         mGoTo(want);

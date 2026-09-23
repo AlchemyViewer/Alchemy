@@ -32,6 +32,8 @@
 #include "../lltabcontainer.h"
 #include "../lluictrlfactory.h"
 
+#include "llmortician.h"
+
 #include "alheadlessui_fixture.h"
 
 #include "../test/lltut.h"
@@ -371,5 +373,39 @@ namespace tut
                       floater->findChild<LLButton>("on_the_page", true), on_page);
         ensure("and its tab shows it", tabs->getCurrentPanel() == one);
         floater->die();
+    }
+
+    // The viewer quitting closes every window, the one a pane is borrowing
+    // among them, and a window asking about unsaved work may hold the quit
+    // up or call it off: the pane goes home all the same, and outlives the
+    // window it was in. It remembers it was out, for the next session, and
+    // forgets that as soon as it is moved for any other reason.
+    template<> template<>
+    void aldockpanel_object::test<12>()
+    {
+        Window w = build();
+        ALDockPanel* pane = ALDockPanel::wrap(w.side, "Side");
+        const LLHandle<LLView> held = pane->getHandle();
+        pane->popOut();
+
+        ALPanelFloater* window = pane->getParentByType<ALPanelFloater>();
+        ensure("there is a window", window != nullptr);
+        const LLHandle<LLFloater> window_held = window->getHandle();
+        window->closeFloater(true);
+        LLMortician::updateClass();
+
+        ensure("the window is gone", window_held.isDead());
+        ensure("the pane is not", !held.isDead());
+        ensure_equals("it is home", pane->getParent(), (LLView*)w.side);
+        ensure("no longer out", !pane->poppedOut());
+        ensure("but out when the viewer went", pane->outAtQuit());
+        ensure_equals("and the window still finds what is in it",
+                      w.floater->findChild<LLButton>("in_the_side", true), w.inside);
+
+        pane->popOut();
+        ensure("out again, it is simply out", pane->poppedOut() && !pane->outAtQuit());
+        pane->getParentByType<ALPanelFloater>()->closeFloater();
+        ensure("closed by hand, it is simply home", !pane->poppedOut() && !pane->outAtQuit());
+        w.floater->die();
     }
 }

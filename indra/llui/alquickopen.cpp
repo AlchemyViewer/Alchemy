@@ -56,6 +56,9 @@ namespace
     constexpr S32 SCORE_WORD_START  = 2000;
     constexpr S32 SCORE_RUN         = 1000;
     constexpr S32 SCORE_SCATTERED   = 100;
+    // The most scattered letters are worth: with the shortest label, the
+    // soonest finish.
+    constexpr S32 SCORE_SCATTERED_MOST = SCORE_SCATTERED + 200;
     // What the other words a candidate answers to score below what its
     // label would for the same match: a tier. A label that answers is
     // still what was typed, and the words are how else it is known.
@@ -169,16 +172,20 @@ S32 ALQuickOpen::score(std::string_view label, std::string_view query)
         }
     }
 
+    // The two that are worth less the further in they are found keep to
+    // their own tier however far that is: a run never sinks to scattered
+    // letters, and scattered letters never to nothing -- a long line of
+    // history is still an answer.
     if (const size_t at = lowered.find(wanted); at != std::string::npos)
     {
         // A run anywhere, worth less the further in it starts.
-        return SCORE_RUN + brevity - (S32)at;
+        return llmax(SCORE_SCATTERED_MOST + 1, SCORE_RUN + brevity - (S32)llmin(at, (size_t)SCORE_RUN));
     }
 
     size_t reach = 0;
     if (inOrder(lowered, wanted, reach))
     {
-        return SCORE_SCATTERED + brevity - (S32)reach;
+        return llmax(1, SCORE_SCATTERED + brevity - (S32)llmin(reach, (size_t)SCORE_SCATTERED_MOST));
     }
     return 0;
 }

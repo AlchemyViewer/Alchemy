@@ -78,14 +78,20 @@ public:
 
     // Everything one file said, in place of whatever it said before. A file
     // that said nothing is still a file that was checked, and is kept as one
-    // -- "no findings" and "not looked at" are different answers.
+    // -- "no findings" and "not looked at" are different answers. Checked
+    // again, a file keeps its place: the file in front is checked on every
+    // rebuild, and its rows should not jump to the end of a list of every
+    // file's each time.
     void replace(const std::string& file, std::vector<Finding> found)
     {
         if (file.empty())
         {
             return;
         }
-        forget(file);
+        if (!drop(file))
+        {
+            mFiles.push_back(file);
+        }
 
         Counts counts;
         for (const Finding& finding : found)
@@ -93,25 +99,16 @@ public:
             counts.take(finding, 1);
             mTotal.take(finding, 1);
         }
-        mFiles.push_back(file);
         mCountByFile.emplace(file, counts);
         mByFile.emplace(file, std::move(found));
     }
 
     void forget(std::string_view file)
     {
-        const auto held = mByFile.find(file);
-        if (held == mByFile.end())
+        if (drop(file))
         {
-            return;
+            mFiles.erase(std::remove(mFiles.begin(), mFiles.end(), file), mFiles.end());
         }
-        for (const Finding& finding : held->second)
-        {
-            mTotal.take(finding, -1);
-        }
-        mByFile.erase(held);
-        mCountByFile.erase(std::string(file));
-        mFiles.erase(std::remove(mFiles.begin(), mFiles.end(), file), mFiles.end());
     }
 
     void clear()
@@ -247,6 +244,24 @@ public:
     }
 
 private:
+    // What a file said let go of, and its counts with it; not its place
+    // among the files. False where it had said nothing to let go of.
+    bool drop(std::string_view file)
+    {
+        const auto held = mByFile.find(file);
+        if (held == mByFile.end())
+        {
+            return false;
+        }
+        for (const Finding& finding : held->second)
+        {
+            mTotal.take(finding, -1);
+        }
+        mByFile.erase(held);
+        mCountByFile.erase(std::string(file));
+        return true;
+    }
+
     // What a file's findings add up to, kept beside them so that a count
     // over a tree is arithmetic rather than a walk.
     struct Counts

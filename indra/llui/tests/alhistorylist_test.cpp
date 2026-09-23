@@ -48,12 +48,16 @@ namespace tut
         ll_test::HeadlessUI& ui = ll_test::HeadlessUI::get();
 
         // Held by pointer because a view is deleted, never scoped.
-        ALHistoryList* make() const
+        ALHistoryList* make(const std::string& start = std::string()) const
         {
             ALHistoryList::Params p(LLUICtrlFactory::getDefaultParams<ALHistoryList>());
             p.rect = LLRect(0, 200, 300, 0);
             p.empty_headline = "Nothing done yet.";
             p.empty_sentence = "Edits show up here as you make them.";
+            if (!start.empty())
+            {
+                p.start_label = start;
+            }
             return LLUICtrlFactory::create<ALHistoryList>(p);
         }
 
@@ -245,6 +249,54 @@ namespace tut
 
         history->setSteps(three(), 3);
         ensure("and is back when something does", where->getWidth() > 0);
+        delete history;
+    }
+    // Given words for it, a row under the oldest step is the document
+    // before any of them, and choosing it asks for none in force: undoing
+    // everything, which no step's row can ask for. It is no step, so a
+    // caller showing what a step touched is not told of it, and without
+    // words, or without steps, there is no such row.
+    template<> template<>
+    void alhistorylist_object::test<8>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        ALHistoryList* history = make("As the files were opened");
+        history->setSteps(three(), 2);
+        LLScrollListCtrl* list = listOf(history);
+        ensure_equals("a row a step, and the start", list->getItemCount(), 4);
+        ensure_equals("still three steps", history->count(), 3u);
+
+        std::vector<size_t> asked;
+        std::vector<size_t> pointed;
+        history->onGoTo([&asked](size_t want) { asked.push_back(want); });
+        history->onStepChosen([&pointed](size_t index) { pointed.push_back(index); });
+
+        const std::vector<LLScrollListItem*> rows = list->getAllData();
+        ensure_equals("at the bottom, under the oldest", rows.back()->getColumn(1)->getValue().asString(),
+                      std::string("As the files were opened"));
+        list->selectNthItem(3);
+        ensure("pointed at, it tells nobody of a step", pointed.empty());
+        history->goToSelected();
+        ensure("chosen, it asks for none in force", asked.size() == 1 && asked.back() == 0u);
+
+        // Where none are in force, the mark is on it, and choosing it asks
+        // for nothing.
+        history->setSteps(three(), 0);
+        ensure_equals("still chosen after a refill", list->getFirstSelectedIndex(), 3);
+        ensure("the present is the start", !list->getAllData().back()->getColumn(0)->getValue().asString().empty());
+        history->goToSelected();
+        ensure_equals("and asks for nothing", asked.size(), 1u);
+
+        history->setSteps({}, 0);
+        ensure_equals("no steps, no start", list->getItemCount(), 0);
+        delete history;
+
+        history = make();
+        history->setSteps(three(), 3);
+        ensure_equals("no words, no start", listOf(history)->getItemCount(), 3);
         delete history;
     }
 }

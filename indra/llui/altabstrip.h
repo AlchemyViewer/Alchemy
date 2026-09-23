@@ -190,6 +190,10 @@ private:
     // sight.
     void clampScroll();
     void showChosen();
+    // The tab with a value, or -1.
+    S32  indexOf(const std::string& value) const;
+    // The order the tabs were dragged into, told.
+    void sayOrder();
     std::string textOf(const Tab& tab) const;
     // A preview is set in italic. The face that draws it is the one the
     // font hands the style to, which is what the words are measured in.
@@ -228,6 +232,11 @@ private:
     F32                 mScrollRemainder = 0.f;
     // A tab whose way out was pressed: it goes if the press is let go of
     // over it, and not if the mouse slid off first.
+    //
+    // Both presses follow their tab, not its place: the host fills the
+    // strip afresh whenever a fact about a tab moves -- a check done, a
+    // save come back -- and may while a press is held, and a press whose
+    // tab has gone is let go of.
     S32                 mPressedClose = -1;
     // A tab pressed and perhaps being dragged along the strip: which,
     // where it was pressed, and whether it has moved far enough to be a
