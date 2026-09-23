@@ -266,4 +266,110 @@ namespace tut
         undo.undo();
         ensure("back to it", undo.isPristine());
     }
+
+    template<> template<>
+    void altextundo_object::test<10>()
+    {
+        set_test_name("a text marked never saved is unsaved at every step the journal can reach, until a save marks it");
+        ALTextPos at = type(ALTextPos(0, 0), "a");
+        undo.markSaved();
+        ensure("saved", undo.isPristine());
+        undo.markNeverSaved();
+        ensure("never saved: unsaved as it stands", !undo.isPristine());
+        at = type(at, "b", 5.0);
+        undo.undo();
+        ensure("and stepping back does not find a saved text", !undo.isPristine());
+        undo.redo();
+        undo.markSaved();
+        ensure("a save marks it again", undo.isPristine());
+    }
+
+    template<> template<>
+    void altextundo_object::test<11>()
+    {
+        set_test_name("a history written out comes back over the same text in another journal, every step back and forward as it was");
+        ALTextPos at = type(ALTextPos(0, 0), "one");
+        at           = type(at, "\n", 5.0);
+        at           = type(at, "two", 5.0);
+        undo.markSaved();
+        at = type(at, " three", 5.0);
+        at = backspace(at, 5.0);
+        undo.label("rename");
+        undo.undo();
+        ensure_equals("where it stands", doc.text(), std::string("one\ntwo three"));
+        const LLSD written = undo.asLLSD();
+
+        // Another session: the same text, a journal of its own.
+        ALTextDocument later(doc.text());
+        ALTextUndo     again(later);
+        ensure("put back", again.fromLLSD(written));
+        ensure("unsaved, as it was", !again.isPristine());
+        ensure("a step forward still to take", again.canRedo());
+        again.redo();
+        ensure_equals("the step forward", later.text(), std::string("one\ntwo thre"));
+        ensure_equals("with its name", again.undoLabel(), std::string("rename"));
+        again.undo();
+        again.undo();
+        ensure_equals("back past the typing", later.text(), std::string("one\ntwo"));
+        ensure("to the saved text", again.isPristine());
+        again.undo();
+        again.undo();
+        again.undo();
+        ensure_equals("back to the start", later.text(), std::string());
+        ensure("and no further", !again.canUndo());
+    }
+
+    template<> template<>
+    void altextundo_object::test<12>()
+    {
+        set_test_name("a history is not put over another text; the saved text is found by stepping to it");
+        ALTextPos at = type(ALTextPos(0, 0), "alpha");
+        undo.markSaved();
+        at = type(at, " beta", 5.0);
+        const LLSD written = undo.asLLSD();
+        const std::optional<std::string> saved = undo.savedText();
+        ensure("the saved text is found", saved.has_value() && *saved == "alpha");
+
+        ALTextDocument other("alpha gamma");
+        ALTextUndo     wrong(other);
+        ensure("refused over a text it was not written with", !wrong.fromLLSD(written));
+        ensure("and that journal left as it was", !wrong.canUndo() && !wrong.canRedo());
+        ensure_equals("and the text as it was", other.text(), std::string("alpha gamma"));
+
+        // A saved text among the steps forward is found forward.
+        undo.undo();
+        undo.markSaved();
+        undo.redo();
+        ensure("saved a step back", undo.savedText() == std::optional<std::string>("alpha"));
+        undo.undo();
+        ensure("the saved text is the one standing", undo.savedText() == std::optional<std::string>("alpha"));
+        undo.markSaved();
+        undo.redo();
+        undo.undo();
+        undo.markNeverSaved();
+        ensure("never saved has none", !undo.savedText().has_value());
+    }
+
+    template<> template<>
+    void altextundo_object::test<13>()
+    {
+        set_test_name("a history past its budget keeps the newest steps, and the saved mark only where they reach it");
+        ALTextPos at = type(ALTextPos(0, 0), std::string(100, 'a').c_str());
+        undo.markSaved();
+        at = type(at, std::string(100, 'b').c_str(), 5.0);
+        at = type(at, std::string(100, 'c').c_str(), 5.0);
+        const LLSD kept = undo.asLLSD(250);
+        ensure_equals("the two newest steps", kept["undo"].size(), 2);
+        ensure_equals("the saved mark at the oldest kept", kept["saved"].asInteger(), 0);
+        ALTextDocument later(doc.text());
+        ALTextUndo     again(later);
+        ensure("put back", again.fromLLSD(kept));
+        again.undo();
+        again.undo();
+        ensure("to the saved text", again.isPristine());
+        ensure("and no further", !again.canUndo());
+        const LLSD tight = undo.asLLSD(150);
+        ensure_equals("only the newest", tight["undo"].size(), 1);
+        ensure_equals("the saved text out of reach", tight["saved"].asInteger(), -1);
+    }
 }

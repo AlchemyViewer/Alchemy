@@ -148,6 +148,23 @@ public:
         mLastKey.clear();
     }
 
+    // Both stacks put back whole, as they were written somewhere: the
+    // oldest steps back past the depth forgotten. How many were forgotten,
+    // for whoever counts steps from the bottom.
+    size_t restore(std::vector<Step> undo, std::vector<Step> redo)
+    {
+        clear();
+        size_t dropped = 0;
+        if (undo.size() > mDepth)
+        {
+            dropped = undo.size() - mDepth;
+            undo.erase(undo.begin(), undo.begin() + static_cast<std::ptrdiff_t>(dropped));
+        }
+        mUndo = std::move(undo);
+        mRedo = std::move(redo);
+        return dropped;
+    }
+
 private:
     std::vector<Step>   mUndo;
     std::vector<Step>   mRedo;

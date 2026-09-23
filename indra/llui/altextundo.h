@@ -26,6 +26,7 @@
 
 #include "altextdocument.h"
 #include "alundostack.h"
+#include "llsd.h"
 
 #include <optional>
 #include <string>
@@ -100,6 +101,26 @@ public:
     // The text as it stands is the one that was saved.
     void markSaved();
     bool isPristine() const;
+    // No text this journal can reach was ever saved: what a tab holds that
+    // came from nowhere a save could reach -- work recovered after a crash,
+    // a script whose object has gone -- until it is saved somewhere.
+    void markNeverSaved();
+
+    // The journal as data -- every step back and forward, its edits, its
+    // carets and its name, and where among them the saved text stands --
+    // for the same text to be given its history back in another session,
+    // as an editor's history outlives its window. At most about this many
+    // bytes of edited text: the oldest steps back go first past it, and
+    // the steps forward all go where they alone would pass a quarter of it.
+    LLSD asLLSD(size_t budget = 1024 * 1024) const;
+    // That history put back over the document as it stands, which must be
+    // the text it was written with: every step is tried first on copies,
+    // back from here and forward again, each edit's text standing where it
+    // says it stood. False, and the journal as it was, where one does not.
+    bool fromLLSD(const LLSD& sd);
+    // The text the saved mark stands at, stepped to from the document as it
+    // stands; nothing where no step reaches a saved text.
+    std::optional<std::string> savedText() const;
     // The point the text stands at now, the run ended so that whatever is
     // typed after is a step of its own; and later, the text at that point
     // marked as the saved one, wherever stepping reaches it from here --
