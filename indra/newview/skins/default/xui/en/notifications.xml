@@ -1852,9 +1852,105 @@ Delete [COUNT] items from their objects? An item taken out of an object is gone 
 
   <notification
    icon="alertmodal.tga"
+   name="ScriptStudioQuitUnsaved"
+   type="alertmodal">
+&quot;[NAME]&quot; has unsaved changes. Save them, keep them to be opened again next time, or let them go?
+    <tag>confirm</tag>
+    <form name="form">
+      <button
+       index="0"
+       name="Save"
+       text="Save"/>
+      <button
+       index="1"
+       name="Keep"
+       text="Keep for Next Time"/>
+      <button
+       index="2"
+       name="Discard"
+       text="Don&apos;t Save"/>
+      <button
+       index="3"
+       name="Cancel"
+       text="Cancel"/>
+    </form>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="ScriptStudioQuitUnsavedMany"
+   type="alertmodal">
+[COUNT] scripts and notecards have unsaved changes. Save them, keep them to be opened again next time, or let them go?
+    <tag>confirm</tag>
+    <form name="form">
+      <button
+       index="0"
+       name="Save"
+       text="Save"/>
+      <button
+       index="1"
+       name="Keep"
+       text="Keep for Next Time"/>
+      <button
+       index="2"
+       name="Discard"
+       text="Don&apos;t Save"/>
+      <button
+       index="3"
+       name="Cancel"
+       text="Cancel"/>
+    </form>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="ScriptStudioRecoveredOne"
+   type="alertmodal">
+Script Studio kept unsaved changes to [NAMES] when the viewer last stopped before they were saved. Open them to look over and save, or discard them; File &gt; Recover Unsaved Changes has them meanwhile.
+    <tag>confirm</tag>
+    <form name="form">
+      <button
+       index="0"
+       name="Open"
+       text="Open Them"/>
+      <button
+       index="1"
+       name="Later"
+       text="Later"/>
+      <button
+       index="2"
+       name="Discard"
+       text="Discard Them"/>
+    </form>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="ScriptStudioRecovered"
+   type="alertmodal">
+Script Studio kept unsaved changes to [COUNT] scripts and notecards when the viewer last stopped before they were saved: [NAMES]. Open them to look over and save, or discard them; File &gt; Recover Unsaved Changes has them meanwhile.
+    <tag>confirm</tag>
+    <form name="form">
+      <button
+       index="0"
+       name="Open"
+       text="Open Them"/>
+      <button
+       index="1"
+       name="Later"
+       text="Later"/>
+      <button
+       index="2"
+       name="Discard"
+       text="Discard Them"/>
+    </form>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
    name="ScriptStudioDeleteItemOpen"
    type="alertmodal">
-Delete &quot;[NAME]&quot; from the object? It is open with unsaved changes, and they go with it. An item taken out of an object is gone for good.
+Delete &quot;[NAME]&quot; from the object? It is open with unsaved changes, which are set aside for a week under File &gt; Recover Unsaved Changes. An item taken out of an object is gone for good.
     <tag>confirm</tag>
     <usetemplate
      name="okcancelbuttons"
@@ -1866,7 +1962,7 @@ Delete &quot;[NAME]&quot; from the object? It is open with unsaved changes, and 
    icon="alertmodal.tga"
    name="ScriptStudioDeleteItemsOpen"
    type="alertmodal">
-Delete [COUNT] items from their objects? Among them are items open with unsaved changes, and those changes go with them. An item taken out of an object is gone for good.
+Delete [COUNT] items from their objects? Among them are items open with unsaved changes, which are set aside for a week under File &gt; Recover Unsaved Changes. An item taken out of an object is gone for good.
     <tag>confirm</tag>
     <usetemplate
      name="okcancelbuttons"
@@ -1890,7 +1986,7 @@ Replace [PLACES] in [SCRIPTS] with &quot;[WITH]&quot;? Each script's change is o
    icon="alertmodal.tga"
    name="ScriptStudioRevert"
    type="alertmodal">
-Revert &quot;[NAME]&quot; to its saved text? What was changed since it was last saved is thrown away.
+Revert &quot;[NAME]&quot; to its saved text? What was changed since it was last saved is set aside; File &gt; Recover Unsaved Changes has it for a week.
     <tag>confirm</tag>
     <usetemplate
      name="okcancelbuttons"

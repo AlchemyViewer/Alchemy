@@ -31,6 +31,7 @@
 #include "alscriptsnippets.h"
 #include "alscriptenvelope.h"
 #include "alscriptpreprocessor.h"
+#include "alscriptrecovery.h"
 #include "alscriptworkspace.h"
 #include "alsourcemap.h"
 #include "alstudiofloater.h"
@@ -59,6 +60,7 @@ class LLButton;
 class LLCheckBoxCtrl;
 class LLComboBox;
 class LLFilterEditor;
+class LLLayoutPanel;
 class LLLineEditor;
 class LLPanel;
 class LLScrollListCtrl;
@@ -105,6 +107,10 @@ public:
     // there: what the build tool's Explore in IDE button means when no
     // external editor is listening.
     static ALFloaterScriptStudio* explore(const LLUUID& root);
+    // At login: what an earlier session left unsaved -- a crash, a lost
+    // connection -- offered back, to open, to leave for later, or to
+    // discard.
+    static void offerRecovery();
     // A script saved from outside the studio -- by an external editor
     // over the bridge -- with this text: the tab that holds it, if one
     // does, shows the text as saved. A tab with unsaved changes takes
@@ -217,6 +223,53 @@ private:
         // A file changed on disk while this tab had unsaved changes, and
         // the author asked what to do: once, however often it changes.
         bool                                       askingReload = false;
+        // What keeps the unsaved text against a crash (ALScriptRecoveryStore):
+        // whose text it is; when it is next written there, or zero; and
+        // whether writing it failed, which is said once.
+        std::string                                recoveryKey;
+        F64                                        recoveryDue    = 0.0;
+        bool                                       recoveryFailed = false;
+        // What an earlier session left of this, found as it opened, offered
+        // in the notice until it is restored or discarded; and one being
+        // taken up here, whose file goes once this tab's own is written.
+        std::optional<ALScriptRecoveryEntry>       recoverable;
+        std::optional<ALScriptRecoveryEntry>       recovering;
+        // A recovered or copied notecard's items, in place of what it loads
+        // with, since its text says them by their places in this list.
+        std::optional<std::vector<LLPointer<LLInventoryItem>>> carriedEmbedded;
+        // A copy saved into the inventory from another tab: wrapped as that
+        // one was, saved as soon as it is in, and that tab closed once the
+        // copy is saved -- by its id.
+        bool                                       wrapOnLoad = false;
+        bool                                       saveOnLoad = false;
+        std::string                                copyOf;
+        // What it is to compile for once it has loaded, which the load
+        // would otherwise say: a copy compiles for what its original did.
+        std::string                                targetOnLoad;
+        // Where it stands with what holds it: its object out of sight --
+        // deleted, returned, far away -- the item gone from the object or
+        // the inventory, the connection lost, the item in the Trash, the
+        // file gone from disk. Said in the notice over the editor, which a
+        // person may hide until it changes.
+        enum class Orphan : U8
+        {
+            None,
+            Away,
+            Removed,
+            Offline,
+            Trashed,
+            FileGone
+        };
+        Orphan                                     orphan          = Orphan::None;
+        bool                                       noticeDismissed = false;
+        // Since when its object has been out of sight, or zero: an object
+        // at the edge of what is in view comes and goes, and is taken for
+        // gone only once it has been gone a moment.
+        F64                                        awaySince       = 0.0;
+        // What its object and region were called, while they were in sight:
+        // what a kept text says it came from once they are not.
+        std::string                                objectName;
+        std::string                                regionName;
         // Where the caret and the view were before the text was loaded
         // again -- a revert, an external editor's save -- to be put back;
         // a line of -1 for none.
@@ -646,6 +699,7 @@ private:
     void save(Doc& doc);
     void saveAll();
     void compiled(const ALScriptWorkspace::CompileResult& result);
+    void compiledHere(const ALScriptWorkspace::CompileResult& result);
     void fillProblems(const Doc* doc);
     // The pane's filters as a query over the store, for one script.
     ALFindings<Doc::Shown, ProblemTraits>::Query problemQuery(const Doc& doc) const;
@@ -694,9 +748,9 @@ private:
     // What the studio did, said in the status line and kept in the
     // Output tab, where it can be read again: saving, compiling,
     // preprocessing, renaming. The script's name in it is a link to it;
-    // and, for a save held over what was found, a link after it that saves
-    // anyway.
-    void report(const std::string& text, bool failure = false, const Doc* doc = nullptr, bool save_anyway = false);
+    // and after it a link for each thing to be done about it: save anyway,
+    // try again, save a copy, export.
+    void report(const std::string& text, bool failure = false, const Doc* doc = nullptr, const std::vector<std::string>& actions = {});
 
     // The analyzers: a check is due a moment after the last keystroke,
     // sent from draw, answered whenever the worker gets to it, and kept
@@ -954,6 +1008,9 @@ private:
 
     void closeDocument(std::string_view id);
     void closeDocumentAnswered(const std::string& id, S32 option);
+    // The quit's question about what is unsaved: saved, kept to be opened
+    // again next time, let go of, or the quit called off.
+    void quitAnswered(S32 option);
     // Several tabs closed at once -- the others, all of them, `:qa` -- the
     // unsaved among them asked about in one question, not one each.
     void closeMany(const std::vector<std::string>& ids);
@@ -962,7 +1019,10 @@ private:
     void stopClosing();
     // Whether the viewer is quitting on this window's answer.
     bool quittingOnUs() const;
-    void letGoOf(size_t index);
+    // A tab let go of: its unsaved text set aside among the discarded,
+    // where it can be had back for a while, unless it is kept -- moved to
+    // another window, kept for next time, or kept as the viewer goes.
+    void letGoOf(size_t index, bool keep = false);
     // A save that did not go through -- refused over errors, failed, or
     // compiled with errors: a close waiting on it waits no longer, and a
     // window closing stops, the tab left for the author to look at.
@@ -975,6 +1035,52 @@ private:
     // A script made in the inventory, named first and opened here once the
     // inventory has it, with the scripter's template in it.
     void newInventoryScript(bool lua);
+
+    // Recovery. The store for this account, made on first asking, and the
+    // session every entry this process writes is under.
+    static ALScriptRecoveryStore* recoveryStore();
+    // A tab's text as an entry of the store.
+    ALScriptRecoveryEntry recoveryEntryOf(const Doc& doc) const;
+    // The tab's unsaved text written now, in the state given; a clean tab's
+    // entry forgotten, and an entry it took up let go of.
+    void keepForRecovery(Doc& doc, ALScriptRecoveryEntry::State state = ALScriptRecoveryEntry::State::Unsaved);
+    // Written a moment after the first change since the last writing,
+    // whatever is typed meanwhile; a tab gone clean forgotten at once.
+    void scheduleRecovery(Doc& doc);
+    // Due writings, a lost connection, and what holds each tab, looked at
+    // as the window draws.
+    void pumpRecovery();
+    void checkOrphans();
+    Doc::Orphan orphanOf(const Doc& doc) const;
+    // An entry put back: into the tab that has its script or file, opened
+    // where it is not, or into a tab of its own where what it came from
+    // is gone.
+    void recoverEntry(const ALScriptRecoveryEntry& entry);
+    void takeUpEntry(Doc& doc, const ALScriptRecoveryEntry& entry);
+    // A kept text put back with its undo history and its caret, where the
+    // history fits the text; false, and nothing changed, where it does not.
+    bool restoreHistory(Doc& doc, const ALScriptRecoveryEntry& entry);
+    void openOrphan(const ALScriptRecoveryEntry& entry, Doc::Orphan orphan);
+    // A tab made to hold a kept text with nothing loaded under it: unsaved,
+    // with whatever its script or file was.
+    void becomeOrphan(Doc& doc, const ALScriptRecoveryEntry& entry, Doc::Orphan orphan);
+    // File > Recover Unsaved Changes: what earlier sessions left and what
+    // was discarded lately, to open or to discard.
+    void showRecovery();
+    // A notecard's items as an entry keeps them, and back.
+    static LLSD                                    itemsAsLLSD(const std::vector<LLPointer<LLInventoryItem>>& items);
+    static std::vector<LLPointer<LLInventoryItem>> itemsFrom(const LLSD& items);
+    // What a tab needs from the moment it is made: its text's changes
+    // heard, its places slid; and a notecard's drops and items.
+    void wireDoc(Doc& doc);
+    void wireNotecard(Doc& doc);
+    // The notice over the editor, for the tab in front, and what its
+    // buttons do.
+    void refreshNotice();
+    void onNoticeAction(const std::string& action);
+    // What a tab holds saved as a new item in the inventory -- a script or
+    // a notecard, its items with it -- and the tab closed once it is.
+    void saveCopyToInventory(Doc& doc);
     // Revert to Saved, asked about where something would be lost.
     void askRevert(Doc& doc);
     // Replace All, asked about first.
@@ -1104,6 +1210,16 @@ private:
     std::string                        mRedoSaid;
     // Whether the last search's pattern did not parse.
     bool                               mSearchBadPattern = false;
+    // The notice over the editor.
+    LLLayoutPanel*                     mNoticePanel  = nullptr;
+    LLTextBox*                         mNoticeText   = nullptr;
+    LLButton*                          mNoticeFirst  = nullptr;
+    LLButton*                          mNoticeSecond = nullptr;
+    std::string                        mNoticeActions[2];
+    // Whether the connection was seen lost; and when what holds each tab
+    // was last looked at.
+    bool                               mOffline        = false;
+    F64                                mOrphansChecked = 0.0;
     LLFilterEditor*                    mExplorerFilter = nullptr;
     // What the editors' vim keymaps share: the : and / lines entered in
     // any of them, and the settings a :set changes.

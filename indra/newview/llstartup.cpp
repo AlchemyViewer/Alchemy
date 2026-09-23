@@ -213,6 +213,7 @@
 #include "llpanelgroupnotices.h"
 #include "llparcel.h"
 #include "llpreview.h"
+#include "alfloaterscriptstudio.h"
 #include "alscriptworkspace.h"
 #include "llpreviewscript.h"
 #include "llproxy.h"
@@ -2753,6 +2754,10 @@ bool idle_startup()
         gFocusMgr.setKeyboardFocus(NULL);
 
         LLAppViewer::instance()->handleLoginComplete();
+
+        // What Script Studio kept of a session that ended before its scripts
+        // were saved, offered back now the world is in.
+        ALFloaterScriptStudio::offerRecovery();
 
         LLAgentPicksInfo::getInstance()->requestNumberOfPicks();
 

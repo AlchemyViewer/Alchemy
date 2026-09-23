@@ -262,6 +262,52 @@
     <floater.string name="PreprocessErrorsA">The preprocessor found 1 error in [NAME]; save again to upload anyway.</floater.string>
     <floater.string name="PreprocessErrorsB">The preprocessor found [COUNT] errors in [NAME]; save again to upload anyway.</floater.string>
     <floater.string name="SaveAnyway">Save anyway</floater.string>
+    <floater.string name="RecoveryWriteFailed">[NAME] could not be kept on this computer against a crash: the recovery folder could not be written.</floater.string>
+    <floater.string name="OfflineKeptA">Disconnected: 1 unsaved script or notecard is kept on this computer and offered at your next login.</floater.string>
+    <floater.string name="OfflineKeptB">Disconnected: [COUNT] unsaved scripts and notecards are kept on this computer and offered at your next login.</floater.string>
+    <floater.string name="OrphanAwayKept">The object holding [NAME] is not in sight; its unsaved changes are kept.</floater.string>
+    <floater.string name="OrphanRemovedKept">[NAME] is not where it was any more; its tab stays, with its unsaved changes kept on this computer.</floater.string>
+    <floater.string name="OrphanBack">[NAME] can be saved again.</floater.string>
+    <floater.string name="ItemRemovedClosed">[NAME] was taken out of its object; its tab, with nothing unsaved in it, closed.</floater.string>
+    <floater.string name="NoticeRecoverable">Unsaved changes to this from an earlier session were kept, from [WHEN].</floater.string>
+    <floater.string name="NoticeAway">The object holding this is not in sight -- deleted, returned, or out of range. Saving waits for it; what is here is kept meanwhile.</floater.string>
+    <floater.string name="NoticeRemoved">This is not in its object any more. What is here is kept; save a copy to keep it for good.</floater.string>
+    <floater.string name="NoticeRemovedInventory">This is gone from your inventory. What is here is kept; save a copy to keep it for good.</floater.string>
+    <floater.string name="NoticeOffline">Disconnected: nothing can be saved. What is here is kept on this computer and offered at your next login.</floater.string>
+    <floater.string name="NoticeTrashed">This is in your Trash: saving still works there, until the Trash is emptied.</floater.string>
+    <floater.string name="NoticeFileGone">[FILE] is not on disk any more; saving writes it again.</floater.string>
+    <floater.string name="NoticeRestore">Restore Them</floater.string>
+    <floater.string name="NoticeRestoreTip">The kept changes put in, as one step to undo</floater.string>
+    <floater.string name="NoticeDiscard">Discard</floater.string>
+    <floater.string name="NoticeDiscardTip">Let the kept changes go; File > Recover Unsaved Changes still has them for a week</floater.string>
+    <floater.string name="NoticeCopy">Save a Copy</floater.string>
+    <floater.string name="NoticeCopyTip">A new item in your inventory with what is here, saved; this tab closes once it is</floater.string>
+    <floater.string name="NoticeExport">Export...</floater.string>
+    <floater.string name="NoticeExportTip">What is here, written to a file on this computer</floater.string>
+    <floater.string name="NoticeSaveAgain">Save It Again</floater.string>
+    <floater.string name="NoticeSaveAgainTip">Write the file again where it was</floater.string>
+    <floater.string name="SaveBlockedAway">[NAME] cannot be saved while its object is not in sight; save a copy, or export it.</floater.string>
+    <floater.string name="SaveBlockedRemoved">[NAME] is not where it was any more; save a copy, or export it.</floater.string>
+    <floater.string name="SaveBlockedOffline">Disconnected: [NAME] cannot be saved; it is kept for your next login.</floater.string>
+    <floater.string name="CopyingTo">Saving a copy of [NAME] to your inventory...</floater.string>
+    <floater.string name="CopiedTo">A copy of [NAME] is saved in your inventory; the tab it came from closed.</floater.string>
+    <floater.string name="RecoverTitle">Unsaved Changes</floater.string>
+    <floater.string name="RecoverPlaceholder">Return opens one with its changes; Shift-Return discards it</floater.string>
+    <floater.string name="RecoverUnsaved">unsaved when the viewer stopped</floater.string>
+    <floater.string name="RecoverKept">kept at quit</floater.string>
+    <floater.string name="RecoverDiscarded">discarded</floater.string>
+    <floater.string name="RecoverNone">Nothing unsaved is kept from before, and nothing was discarded lately.</floater.string>
+    <floater.string name="RecoveryReopenedA">1 script kept from last time opened again, with its unsaved changes.</floater.string>
+    <floater.string name="RecoveryReopenedB">[COUNT] scripts kept from last time opened again, with their unsaved changes.</floater.string>
+    <floater.string name="RecoveryRestored">[NAME]'s kept changes put in; undo takes them out again.</floater.string>
+    <floater.string name="RecoveryDiscarded">[NAME]'s kept changes let go of; File > Recover Unsaved Changes still has them for a week.</floater.string>
+    <floater.string name="RecoveryGone">[NAME]'s kept changes let go of for good.</floater.string>
+    <floater.string name="ActionRetry">Try again</floater.string>
+    <floater.string name="ActionRetryTip">Save [NAME] again</floater.string>
+    <floater.string name="ActionCopy">Save a copy to inventory</floater.string>
+    <floater.string name="ActionCopyTip">A new item in your inventory with what [NAME] holds, saved</floater.string>
+    <floater.string name="ActionExport">Export to a file</floater.string>
+    <floater.string name="ActionExportTip">What [NAME] holds, written to a file on this computer</floater.string>
     <floater.string name="SaveAnywayTip">Save [NAME] as it stands, over what was found</floater.string>
     <floater.string name="ExternalWriteFailed">[FILE] could not be written.</floater.string>
     <floater.string name="ExternalOpened">[NAME] is open in the external editor; its saves are saved from here.</floater.string>
@@ -348,6 +394,10 @@
              name="open_recent"
              tear_off="false"
              width="200" />
+            <menu_item_call label="Recover Unsaved Changes..." layout="topleft" name="recover">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="recover" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="recover" />
+            </menu_item_call>
             <menu_item_call label="Replace Text from File..." layout="topleft" name="load_file">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="load_file" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="load_file" />
@@ -1115,6 +1165,59 @@
                      right="-4"
                      tool_tip="The scripts open here, one tab each; the tab shown is the script being edited"
                      top="1" />
+                </layout_panel>
+                <!-- What the script in front has to reckon with, with what
+                     can be done about it: changes kept from an earlier
+                     session, an object gone, a lost connection. Hidden while
+                     there is nothing to say. -->
+                <layout_panel
+                 auto_resize="false"
+                 height="28"
+                 layout="topleft"
+                 min_dim="28"
+                 name="editor_notice"
+                 visible="false"
+                 width="574"
+                 background_visible="true"
+                 background_opaque="true"
+                 bg_opaque_color="DkGray"
+                 border="true">
+                    <text
+                     follows="left|top|right"
+                     height="16"
+                     layout="topleft"
+                     left="8"
+                     name="notice_text"
+                     text_color="AlertCautionTextColor"
+                     top="6"
+                     use_ellipses="true"
+                     width="300" />
+                    <button
+                     follows="right|top"
+                     height="22"
+                     layout="topleft"
+                     name="notice_first"
+                     right="-120"
+                     top="3"
+                     width="100" />
+                    <button
+                     follows="right|top"
+                     height="22"
+                     layout="topleft"
+                     name="notice_second"
+                     right="-30"
+                     top="3"
+                     width="86" />
+                    <button
+                     follows="right|top"
+                     height="22"
+                     label="&#215;"
+                     layout="topleft"
+                     name="notice_close"
+                     right="-4"
+                     tool_tip="Hide this until there is something else to say"
+                     top="3"
+                     width="22" />
                 </layout_panel>
                 <layout_panel
                  auto_resize="true"

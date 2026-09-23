@@ -173,6 +173,7 @@ if(AL_BUILD_VIEWER)
     alfloaterscriptpreferences.cpp
     alscriptkeymap.cpp
     alscriptpreprocessor.cpp
+    alscriptrecovery.cpp
     alscriptsnippets.cpp
     alscriptmessages.cpp
     alscripttheme.cpp
@@ -969,6 +970,7 @@ if(AL_BUILD_VIEWER)
     alfloaterscriptpreferences.h
     alscriptkeymap.h
     alscriptpreprocessor.h
+    alscriptrecovery.h
     alscriptsnippets.h
     alscriptmessages.h
     alscripttheme.h
@@ -2355,6 +2357,7 @@ if(AL_BUILD_TESTS)
     almotionpredictor
     alsceneexplorerpredicate
     alscriptmessages
+    alscriptrecovery
     alwhitebalancesolver
     llagentaccess
     lldateutil
