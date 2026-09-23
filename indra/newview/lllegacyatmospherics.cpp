@@ -435,7 +435,8 @@ void LLAtmospherics::updateFog(const F32 distance, const LLVector3& tosun_in)
     vars.density_multiplier = psky->getDensityMultiplier();
     vars.distance_multiplier = psky->getDistanceMultiplier();
     vars.max_y = psky->getMaxY();
-    vars.sun_norm = LLEnvironment::instance().getSunDirectionCFR();
+    // calcSkyColorWLVert wants OGL order ([1] is elevation), not CFR (y, x, z)
+    vars.sun_norm = LLEnvironment::instance().getClampedLightNorm();
     vars.sunlight = psky->getSunlightColor();
     vars.ambient = psky->getAmbientColor();
     vars.glow = psky->getGlow();
