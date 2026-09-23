@@ -246,11 +246,12 @@ void main()
     {
         //should only be true of WL sky, port over base color value and scale for fake HDR
 #if defined(HAS_EMISSIVE)
-        color = colorEmissive.rgb;
+        color = srgb_to_linear(colorEmissive.rgb);
 #else
+        // the sky wrote display-encoded values raw into the sRGB albedo target, and this pass reads it
+        // with hardware decode, so baseColor is already linear; decoding again darkened the vintage sky
         color = baseColor.rgb;
 #endif
-        color = srgb_to_linear(color);
         color *= sky_hdr_scale;
     }
     else
