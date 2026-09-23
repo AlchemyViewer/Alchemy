@@ -211,6 +211,8 @@ private:
         bool                                       modifiable = false;
         bool                                       saving     = false;
         bool                                       closeAfterSave = false;
+        // A save asked for while one was on its way, made when it answers.
+        bool                                       saveAgain  = false;
         // Where the editor's journal stood when the text went up: what the
         // answer marks saved, whatever was typed while it came.
         ALTextUndo::SavePoint                      sentAt;
@@ -537,8 +539,10 @@ private:
     // What the pane's rows say a level is, and what the compiler's own
     // word for one means.
     static const char*  levelName(Doc::Level level);
-    // The compiler's and the run's problems moved along with an edit.
+    // The compiler's and the run's problems moved along with an edit; and
+    // the outline, until the next check says it again.
     void                slideProblems(Doc& doc, const ALTextDocument::Edit& edit);
+    void                slideOutline(Doc& doc, const ALTextDocument::Edit& edit);
     // The caret to the next problem of the script after it, or the one
     // before, round past the ends, with what it says in a card.
     void                goToProblem(Doc& doc, S32 direction);
@@ -747,6 +751,9 @@ private:
     // asset does not carry, which the server could not find.
     bool             copyEmbeddedItem(Doc& doc, LLPointer<LLInventoryItem> item, const LLUUID& folder, U32 callback_id = 0);
     void save(Doc& doc);
+    // The save asked for while the last was on its way, made now where
+    // anything is still unsaved; true where one is under way again.
+    bool sendQueuedSave(Doc& doc);
     void saveAll();
     void compiled(const ALScriptWorkspace::CompileResult& result);
     void compiledHere(const ALScriptWorkspace::CompileResult& result);
@@ -909,6 +916,11 @@ private:
     // the counts the problems.
     void        onTrailerChosen(const std::string& value);
     void        onCrumbChosen(size_t at, const std::string& value);
+    // An outline entry as a picker's value, and back: by where it was and
+    // what it is called, so that an outline made again while a list is up
+    // -- a check answering -- still finds it, or nothing.
+    static std::string outlineValue(const Doc& doc, size_t index);
+    static size_t      outlineEntryOf(const Doc& doc, const std::string& value);
     void        onOutlineChosen(bool to_editor);
     // A bottom tab shown; and the keyboard put in its list, where asked.
     void        showBottom(const char* tab, bool focus = false);
@@ -1165,6 +1177,9 @@ private:
         ALTextPos   at;
     };
     void noteJump(bool walking = false);
+    // A place to go back to, the way forward from it gone: once for a line,
+    // and the fifty latest.
+    void rememberPlace(const NavPlace& place);
     void goBack(bool forward);
     // The editor commands' keys as the keymap has them, and the menus'
     // own as a person rebound them, on the menus and the tips that say
@@ -1253,6 +1268,10 @@ private:
     // The docs by id, for the lookups every answer makes.
     boost::unordered_flat_map<std::string, size_t, ll::string_hash, std::equal_to<>> mByDocId;
     void                               reindexDocs();
+    // A tab known by another id from here on -- a file saved under
+    // another name: the index, its editors' names, and whatever holds it
+    // by its id, the panes and the history, told.
+    void                               rekeyDoc(Doc& doc, const std::string& id);
     std::vector<std::string>           mRecentFiles;
     struct Recent
     {
