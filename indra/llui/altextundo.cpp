@@ -85,6 +85,77 @@ namespace
         return !text.empty() && text.find('\n') == std::string::npos &&
                utf8str_step_grapheme_forward(text, 0) == text.size();
     }
+
+    // What the history written out is, for a reader to refuse another.
+    constexpr S32 HISTORY_VERSION = 2;
+    // About what a step and an edit cost written beyond their text: the
+    // carets, the label's quotes, the edit's places. What the budget
+    // counts, so that a history of many small edits is held to it too.
+    constexpr size_t STEP_WRITTEN = 48;
+    constexpr size_t EDIT_WRITTEN = 16;
+
+    // An edit as it is written: where it begins and ends, what it took and
+    // what it put -- an array rather than a map, since a history is mostly
+    // edits, and their names would be most of what was written.
+    LLSD editAsLLSD(const ALTextDocument::Edit& edit)
+    {
+        return LLSD::emptyArray()
+            .with(0, edit.range.begin.line)
+            .with(1, edit.range.begin.column)
+            .with(2, edit.range.end.line)
+            .with(3, edit.range.end.column)
+            .with(4, edit.removed)
+            .with(5, edit.inserted);
+    }
+
+    bool editFrom(const LLSD& sd, ALTextDocument::Edit& edit)
+    {
+        if (!sd.isArray() || sd.size() != 6)
+        {
+            return false;
+        }
+        edit.range    = ALTextRange(ALTextPos(sd[0].asInteger(), sd[1].asInteger()), ALTextPos(sd[2].asInteger(), sd[3].asInteger()));
+        edit.removed  = sd[4].asString();
+        edit.inserted = sd[5].asString();
+        return true;
+    }
+
+    // An edit and the one made right after it folded into one that does
+    // both, where the second carries on from the first: typed on where the
+    // first's text ended, or erased back from where the first began or on
+    // from there. A run of typing -- an edit a character -- is written as
+    // the one edit it amounts to.
+    bool fold(ALTextDocument::Edit& first, const ALTextDocument::Edit& next)
+    {
+        if (first.removed.empty() && next.removed.empty() && next.range.begin == next.range.end && next.range.begin == first.endAfter())
+        {
+            first.inserted += next.inserted;
+            return true;
+        }
+        if (!first.inserted.empty() || !next.inserted.empty())
+        {
+            return false;
+        }
+        if (next.range.end == first.range.begin)
+        {
+            // Backspaced: what it took stood right before what the first took.
+            first.range   = ALTextRange(next.range.begin, first.range.end);
+            first.removed = next.removed + first.removed;
+            return true;
+        }
+        if (next.range.begin == first.range.begin)
+        {
+            // Deleted forward: what it took stood right after what the first
+            // took, and ends where both, laid from the start, reach.
+            first.removed += next.removed;
+            ALTextDocument::Edit reach;
+            reach.range    = ALTextRange(first.range.begin, first.range.begin);
+            reach.inserted = first.removed;
+            first.range    = ALTextRange(first.range.begin, reach.endAfter());
+            return true;
+        }
+        return false;
+    }
 }
 
 ALTextUndo::ALTextUndo(ALTextDocument& document)
@@ -92,17 +163,27 @@ ALTextUndo::ALTextUndo(ALTextDocument& document)
 {
 }
 
-const char* ALTextUndo::kindOf(const ALTextDocument::Edit& edit)
+ALTextUndo::Kind ALTextUndo::kindOf(const ALTextDocument::Edit& edit)
 {
     if (edit.removed.empty() && oneCluster(edit.inserted))
     {
-        return "typing";
+        return Kind::Typing;
     }
     if (edit.inserted.empty() && oneCluster(edit.removed))
     {
-        return "erasing";
+        return Kind::Erasing;
     }
-    return "step";
+    return Kind::Other;
+}
+
+std::string_view ALTextUndo::keyOf(Kind kind)
+{
+    switch (kind)
+    {
+        case Kind::Typing:  return "typing";
+        case Kind::Erasing: return "erasing";
+        default:            return "step";
+    }
 }
 
 bool ALTextUndo::carriesOn(const Step& last, const ALTextDocument::Edit& next)
@@ -112,23 +193,23 @@ bool ALTextUndo::carriesOn(const Step& last, const ALTextDocument::Edit& next)
         return false;
     }
     const ALTextDocument::Edit& tail = last.edits.back();
-    const char* kind = kindOf(next);
+    const Kind                  kind = kindOf(next);
     if (kind != kindOf(tail))
     {
         return false;
     }
-    if (kind[0] == 't')
+    switch (kind)
     {
-        // Typed where the last character ended.
-        return next.range.begin == tail.endAfter();
+        case Kind::Typing:
+            // Typed where the last character ended.
+            return next.range.begin == tail.endAfter();
+        case Kind::Erasing:
+            // A backspace takes the character before the last one taken; a
+            // delete takes the one that moved into its place.
+            return next.range.end == tail.range.begin || next.range.begin == tail.range.begin;
+        default:
+            return false;
     }
-    if (kind[0] == 'e')
-    {
-        // A backspace takes the character before the last one taken; a
-        // delete takes the one that moved into its place.
-        return next.range.end == tail.range.begin || next.range.begin == tail.range.begin;
-    }
-    return false;
 }
 
 void ALTextUndo::join(Step& last, Step&& next)
@@ -164,7 +245,7 @@ void ALTextUndo::record(const ALTextDocument::Edit& edit, const ALTextPos& befor
     std::string_view key = "group";
     if (mGroupDepth == 0)
     {
-        key = kindOf(edit);
+        key = keyOf(kindOf(edit));
         if (mSteps.undone().empty() || !carriesOn(mSteps.undone().back(), edit))
         {
             mSteps.breakRun();
@@ -255,16 +336,29 @@ LLSD ALTextUndo::asLLSD(size_t budget) const
         out["label"]  = step.mLabel;
         out["before"] = posAsLLSD(step.caretBefore);
         out["after"]  = posAsLLSD(step.caretAfter);
-        LLSD edits    = LLSD::emptyArray();
+        bytes += STEP_WRITTEN + step.mLabel.size();
+        LLSD       edits = LLSD::emptyArray();
+        const auto write = [&edits, &bytes](const ALTextDocument::Edit& edit) {
+            bytes += EDIT_WRITTEN + edit.removed.size() + edit.inserted.size();
+            edits.append(editAsLLSD(edit));
+        };
+        // Each run folded into the one edit it amounts to as it is written.
+        std::optional<ALTextDocument::Edit> pending;
         for (const ALTextDocument::Edit& edit : step.edits)
         {
-            LLSD one;
-            one["begin"]    = posAsLLSD(edit.range.begin);
-            one["end"]      = posAsLLSD(edit.range.end);
-            one["removed"]  = edit.removed;
-            one["inserted"] = edit.inserted;
-            bytes += edit.removed.size() + edit.inserted.size();
-            edits.append(one);
+            if (pending && fold(*pending, edit))
+            {
+                continue;
+            }
+            if (pending)
+            {
+                write(*pending);
+            }
+            pending = edit;
+        }
+        if (pending)
+        {
+            write(*pending);
         }
         out["edits"] = edits;
         return out;
@@ -300,7 +394,7 @@ LLSD ALTextUndo::asLLSD(size_t budget) const
         --first;
     }
     LLSD out;
-    out["version"] = 1;
+    out["version"] = HISTORY_VERSION;
     out["undo"]    = LLSD::emptyArray();
     for (auto it = back.rbegin(); it != back.rend(); ++it)
     {
@@ -325,14 +419,14 @@ LLSD ALTextUndo::asLLSD(size_t budget) const
 
 bool ALTextUndo::fromLLSD(const LLSD& sd)
 {
-    if (!sd.isMap() || !sd["undo"].isArray() || !sd["redo"].isArray())
+    if (!sd.isMap() || sd["version"].asInteger() != HISTORY_VERSION || !sd["undo"].isArray() || !sd["redo"].isArray())
     {
         return false;
     }
     // Numbered afresh as they are read: a save point taken before this is
     // of another journal.
     U64        serial   = mNextSerial;
-    const auto stepFrom = [&serial](const LLSD& one) {
+    const auto stepFrom = [&serial](const LLSD& one, std::vector<Step>& into) {
         Step step;
         step.serial      = ++serial;
         step.mLabel      = one["label"].asString();
@@ -341,22 +435,30 @@ bool ALTextUndo::fromLLSD(const LLSD& sd)
         for (LLSD::array_const_iterator it = one["edits"].beginArray(); it != one["edits"].endArray(); ++it)
         {
             ALTextDocument::Edit edit;
-            edit.range    = ALTextRange(posFrom((*it)["begin"]), posFrom((*it)["end"]));
-            edit.removed  = (*it)["removed"].asString();
-            edit.inserted = (*it)["inserted"].asString();
+            if (!editFrom(*it, edit))
+            {
+                return false;
+            }
             step.edits.push_back(std::move(edit));
         }
-        return step;
+        into.push_back(std::move(step));
+        return true;
     };
     std::vector<Step> undo;
     std::vector<Step> redo;
     for (LLSD::array_const_iterator it = sd["undo"].beginArray(); it != sd["undo"].endArray(); ++it)
     {
-        undo.push_back(stepFrom(*it));
+        if (!stepFrom(*it, undo))
+        {
+            return false;
+        }
     }
     for (LLSD::array_const_iterator it = sd["redo"].beginArray(); it != sd["redo"].endArray(); ++it)
     {
-        redo.push_back(stepFrom(*it));
+        if (!stepFrom(*it, redo))
+        {
+            return false;
+        }
     }
     // Every step tried first: back from the text as it stands, the newest
     // first, and forward from it, the next first. A history of another

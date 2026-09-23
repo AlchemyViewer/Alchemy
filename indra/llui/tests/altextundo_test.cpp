@@ -358,7 +358,9 @@ namespace tut
         undo.markSaved();
         at = type(at, std::string(100, 'b').c_str(), 5.0);
         at = type(at, std::string(100, 'c').c_str(), 5.0);
-        const LLSD kept = undo.asLLSD(250);
+        // Each step about a hundred and sixty written: its hundred
+        // characters, and its carets, label and edit's places.
+        const LLSD kept = undo.asLLSD(400);
         ensure_equals("the two newest steps", kept["undo"].size(), 2);
         ensure_equals("the saved mark at the oldest kept", kept["saved"].asInteger(), 0);
         ALTextDocument later(doc.text());
@@ -368,8 +370,121 @@ namespace tut
         again.undo();
         ensure("to the saved text", again.isPristine());
         ensure("and no further", !again.canUndo());
-        const LLSD tight = undo.asLLSD(150);
+        const LLSD tight = undo.asLLSD(200);
         ensure_equals("only the newest", tight["undo"].size(), 1);
         ensure_equals("the saved text out of reach", tight["saved"].asInteger(), -1);
+    }
+
+    template<> template<>
+    void altextundo_object::test<14>()
+    {
+        set_test_name("a run of typing or erasing is written as the one edit it amounts to, and steps back and forward as before");
+        ALTextPos at = type(ALTextPos(0, 0), "one two");
+        at           = type(at, "\n", 5.0);
+        // Typed a character at a time: one step, an edit a character.
+        for (const char* c : { "t", "h", "r", "e", "e" })
+        {
+            at = type(at, c);
+        }
+        // Backspaced over two of them.
+        at = backspace(at, 5.0);
+        at = backspace(at);
+        // Deleted forward twice from the middle of the first line: each
+        // takes the character that moved into the place of the last.
+        now += 5.0;
+        ALTextDocument::Edit first = doc.remove(ALTextRange(ALTextPos(0, 3), ALTextPos(0, 4)));
+        undo.record(first, ALTextPos(0, 3), ALTextPos(0, 3), now);
+        now += 0.1;
+        ALTextDocument::Edit second = doc.remove(ALTextRange(ALTextPos(0, 3), ALTextPos(0, 4)));
+        undo.record(second, ALTextPos(0, 3), ALTextPos(0, 3), now);
+        ensure_equals("where it stands", doc.text(), std::string("onewo\nthr"));
+
+        const LLSD written = undo.asLLSD();
+        ensure_equals("five steps", written["undo"].size(), 5);
+        ensure_equals("the typing one edit", written["undo"][2]["edits"].size(), 1);
+        ensure_equals("with all it typed", written["undo"][2]["edits"][0][5].asString(), std::string("three"));
+        ensure_equals("the backspacing one edit", written["undo"][3]["edits"].size(), 1);
+        ensure_equals("with all it took, in order", written["undo"][3]["edits"][0][4].asString(), std::string("ee"));
+        ensure_equals("the deleting one edit", written["undo"][4]["edits"].size(), 1);
+        ensure_equals("with all it took, in order", written["undo"][4]["edits"][0][4].asString(), std::string(" t"));
+
+        ALTextDocument later(doc.text());
+        ALTextUndo     again(later);
+        ensure("put back", again.fromLLSD(written));
+        again.undo();
+        ensure_equals("the deletes back", later.text(), std::string("one two\nthr"));
+        again.undo();
+        ensure_equals("the backspaces back", later.text(), std::string("one two\nthree"));
+        again.undo();
+        ensure_equals("the typing back", later.text(), std::string("one two\n"));
+        again.redo();
+        again.redo();
+        again.redo();
+        ensure_equals("and forward again", later.text(), doc.text());
+        LLSD older       = written;
+        older["version"] = 1;
+        ensure("a history of another version is refused", !again.fromLLSD(older));
+    }
+
+    template<> template<>
+    void altextundo_object::test<15>()
+    {
+        set_test_name("a group's edits fold where each carries on from the last, across lines too, and a run of erasing both ways folds as one");
+        doc.setText("a\nbc\ndef");
+        const std::string before = doc.text();
+        const auto        edit   = [this](ALTextDocument::Edit made) {
+            undo.record(made, made.range.begin, made.endAfter(), now);
+            return made;
+        };
+        now += 5.0;
+        undo.beginGroup();
+        // Two lines put in, and typed on at their end: one insertion.
+        ALTextDocument::Edit made = edit(doc.insert(ALTextPos(0, 1), "x\ny"));
+        edit(doc.insert(made.endAfter(), "z"));
+        ensure_equals("put in", doc.text(), std::string("ax\nyz\nbc\ndef"));
+        // A line break taken, then the letter that moved into its place,
+        // then the letter before them: one removal, across a line.
+        edit(doc.remove(ALTextRange(ALTextPos(1, 2), ALTextPos(2, 0))));
+        edit(doc.remove(ALTextRange(ALTextPos(1, 2), ALTextPos(1, 3))));
+        edit(doc.remove(ALTextRange(ALTextPos(1, 1), ALTextPos(1, 2))));
+        ensure_equals("taken", doc.text(), std::string("ax\nyc\ndef"));
+        // And somewhere else: an edit of its own.
+        edit(doc.insert(ALTextPos(2, 3), "!"));
+        undo.endGroup();
+        const std::string after = doc.text();
+
+        const LLSD written = undo.asLLSD();
+        const LLSD edits   = written["undo"][0]["edits"];
+        ensure_equals("three edits written for six made", edits.size(), 3);
+        ensure_equals("the insertion whole", edits[0][5].asString(), std::string("x\nyz"));
+        ensure_equals("the removal whole, in the order it stood", edits[1][4].asString(), std::string("z\nb"));
+
+        ALTextDocument later(after);
+        ALTextUndo     again(later);
+        ensure("put back", again.fromLLSD(written));
+        again.undo();
+        ensure_equals("stepped back to where it began", later.text(), before);
+        again.redo();
+        ensure_equals("and forward to where it ended", later.text(), after);
+
+        // A backspace and then a delete where the caret stood: one run, and
+        // one edit written, taking what stood on both sides.
+        doc.setText("abcdefg");
+        undo.clear();
+        now += 5.0;
+        ALTextDocument::Edit back = doc.remove(ALTextRange(ALTextPos(0, 4), ALTextPos(0, 5)));
+        undo.record(back, ALTextPos(0, 5), ALTextPos(0, 4), now);
+        now += 0.1;
+        ALTextDocument::Edit ahead = doc.remove(ALTextRange(ALTextPos(0, 4), ALTextPos(0, 5)));
+        undo.record(ahead, ALTextPos(0, 4), ALTextPos(0, 4), now);
+        const LLSD run = undo.asLLSD();
+        ensure_equals("one step", run["undo"].size(), 1);
+        ensure_equals("one edit", run["undo"][0]["edits"].size(), 1);
+        ensure_equals("both letters", run["undo"][0]["edits"][0][4].asString(), std::string("ef"));
+        ALTextDocument erased(doc.text());
+        ALTextUndo     restored(erased);
+        ensure("put back", restored.fromLLSD(run));
+        restored.undo();
+        ensure_equals("stepped back whole", erased.text(), std::string("abcdefg"));
     }
 }

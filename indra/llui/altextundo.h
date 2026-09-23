@@ -90,6 +90,9 @@ public:
     std::optional<ALTextPos> redo();
     bool                     canUndo() const { return mSteps.canUndo(); }
     bool                     canRedo() const { return mSteps.canRedo(); }
+    // Nothing to step back or forward to, and the text as it stands taken
+    // for the saved one -- what a text just loaded is; markNeverSaved()
+    // after, where it is not.
     void                     clear();
 
     // What the next step back and forward are called: the first thing
@@ -109,9 +112,11 @@ public:
     // The journal as data -- every step back and forward, its edits, its
     // carets and its name, and where among them the saved text stands --
     // for the same text to be given its history back in another session,
-    // as an editor's history outlives its window. At most about this many
-    // bytes of edited text: the oldest steps back go first past it, and
-    // the steps forward all go where they alone would pass a quarter of it.
+    // as an editor's history outlives its window. A run of typing or of
+    // erasing is written as the one edit it amounts to rather than one a
+    // character. At most about this many bytes written: the oldest steps
+    // back go first past it, and the steps forward all go where they alone
+    // would pass a quarter of it.
     LLSD asLLSD(size_t budget = 1024 * 1024) const;
     // That history put back over the document as it stands, which must be
     // the text it was written with: every step is tried first on copies,
@@ -130,9 +135,16 @@ public:
     void      markSaved(const SavePoint& point);
 
 private:
-    // What kind of step an edit makes on its own, which is the key a run
-    // is joined by.
-    static const char* kindOf(const ALTextDocument::Edit& edit);
+    // What kind of step an edit makes on its own, and the key a run of
+    // that kind is joined by.
+    enum class Kind : U8
+    {
+        Typing,
+        Erasing,
+        Other
+    };
+    static Kind             kindOf(const ALTextDocument::Edit& edit);
+    static std::string_view keyOf(Kind kind);
     // Whether an edit carries on the run the last step is: the same kind,
     // and in the place the run had reached.
     static bool carriesOn(const Step& last, const ALTextDocument::Edit& next);

@@ -633,6 +633,46 @@ void ALCodeEditor::resetDirty()
     std::fill(mChanged.begin(), mChanged.end(), 0);
 }
 
+void ALCodeEditor::markUnsaved()
+{
+    ALTextView::markUnsaved();
+    mChanged.assign(static_cast<size_t>(document().lineCount()), 1);
+}
+
+void ALCodeEditor::barChangesSince(std::string_view saved)
+{
+    std::vector<std::string_view> was;
+    for (size_t at = 0;;)
+    {
+        const size_t nl = saved.find('\n', at);
+        was.push_back(saved.substr(at, nl == std::string_view::npos ? std::string_view::npos : nl - at));
+        if (nl == std::string_view::npos)
+        {
+            break;
+        }
+        at = nl + 1;
+    }
+    const size_t now  = static_cast<size_t>(document().lineCount());
+    size_t       head = 0;
+    while (head < now && head < was.size() && document().line(static_cast<S32>(head)) == was[head])
+    {
+        ++head;
+    }
+    size_t tail = 0;
+    while (tail < now - head && tail < was.size() - head && document().line(static_cast<S32>(now - 1 - tail)) == was[was.size() - 1 - tail])
+    {
+        ++tail;
+    }
+    mChanged.assign(now, 0);
+    std::fill(mChanged.begin() + static_cast<std::ptrdiff_t>(head), mChanged.end() - static_cast<std::ptrdiff_t>(tail), 1);
+    if (head + tail == now && was.size() != now && now > 0)
+    {
+        // Lines taken away and nothing else: the line they were taken from
+        // barred, as the edit that took them would bar it.
+        mChanged[std::min(head, now - 1)] = 1;
+    }
+}
+
 void ALCodeEditor::markSavedAt(const ALTextUndo::SavePoint& point)
 {
     ALTextView::markSavedAt(point);

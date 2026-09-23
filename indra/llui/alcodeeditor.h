@@ -198,6 +198,13 @@ public:
     bool lineChanged(S32 line) const;
     void resetDirty() override;
     void markSavedAt(const ALTextUndo::SavePoint& point) override;
+    // Nothing saved is known to measure against: every line barred.
+    void markUnsaved() override;
+    // The bars as the text differs from a saved one, where the text came
+    // in whole rather than edit by edit -- put back from a crash, say: the
+    // lines from the first that differs to the last, counted from each end;
+    // where lines were only taken away, the line they were taken from.
+    void barChangesSince(std::string_view saved);
     void setShowFoldMarkers(bool show);
     bool getShowFoldMarkers() const { return mShowFoldMarkers; }
     // A faint line down each level of indentation, so that a block's

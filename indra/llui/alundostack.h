@@ -130,8 +130,10 @@ public:
     void pushUndo(Step step) { mUndo.push_back(std::move(step)); }
     void pushRedo(Step step) { mRedo.push_back(std::move(step)); }
 
-    // Everything done, oldest first, and how many are in force: the steps
-    // back, then the steps forward in the order they would be taken.
+    // Everything done, and how many are in force: the steps back, oldest
+    // first, the last the next to be taken back; and the steps forward,
+    // likewise the last the next to be taken -- the reverse of the order
+    // they would be taken in.
     const std::vector<Step>& undone() const { return mUndo; }
     const std::vector<Step>& redone() const { return mRedo; }
     size_t inForce() const { return mUndo.size(); }

@@ -155,4 +155,21 @@ namespace tut
         ensure_equals("the earlier step is unchanged", stack.undone().front().mNames.size(), size_t(1));
     }
 
+    template<> template<>
+    void alundostack_object::test<6>()
+    {
+        set_test_name("both stacks put back whole: the oldest steps back past the depth forgotten and counted, the last step forward the next taken");
+        ALUndoStack<Step> stack(3);
+        std::vector<Step> undo{ { { "1" } }, { { "2" } }, { { "3" } }, { { "4" } }, { { "5" } } };
+        std::vector<Step> redo{ { { "z" } }, { { "y" } } };
+        ensure_equals("two forgotten", stack.restore(undo, redo), size_t(2));
+        ensure_equals("three kept", stack.inForce(), size_t(3));
+        ensure_equals("from the third", stack.undone().front().mNames.front(), std::string("3"));
+        std::optional<Step> back = stack.takeUndo();
+        ensure("the newest taken back first", back && back->mNames.front() == "5");
+        std::optional<Step> forward = stack.takeRedo();
+        ensure("the last of the steps forward taken first", forward && forward->mNames.front() == "y");
+        stack.note({ { "n" } }, "slider", 0.0, 1.0, join);
+        ensure("a change after is a step of its own, and forgets the steps forward", stack.inForce() == 3 && !stack.canRedo());
+    }
 }

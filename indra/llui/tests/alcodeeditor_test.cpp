@@ -1084,4 +1084,36 @@ namespace tut
         e.handleToolTip(x, y, MASK_NONE);
         ensure("off: no card", !e.cardShown());
     }
+
+    template<> template<>
+    void alcodeeditor_object::test<28>()
+    {
+        set_test_name("a text put back whole is barred where it differs from what was saved, and everywhere where nothing saved is known");
+        ALCodeEditor& e = make("one\ntwo\nthree\nfour");
+        e.resetDirty();
+        ensure("saved: nothing barred", !e.lineChanged(0) && !e.lineChanged(1) && !e.lineChanged(2) && !e.lineChanged(3));
+        ensure("and clean", !e.isDirty());
+
+        e.markUnsaved();
+        ensure("never saved: unsaved", e.isDirty());
+        ensure("and every line barred", e.lineChanged(0) && e.lineChanged(1) && e.lineChanged(2) && e.lineChanged(3));
+
+        e.barChangesSince("one\n2\n3\nfour");
+        ensure("the lines that differ barred", e.lineChanged(1) && e.lineChanged(2));
+        ensure("the ones around them not", !e.lineChanged(0) && !e.lineChanged(3));
+
+        e.barChangesSince("one\ntwo\nthree\nfour");
+        ensure("the same text bars nothing", !e.lineChanged(0) && !e.lineChanged(1) && !e.lineChanged(2) && !e.lineChanged(3));
+
+        e.barChangesSince("one\nfour");
+        ensure("lines put in between barred", e.lineChanged(1) && e.lineChanged(2));
+        ensure("and not the lines around them", !e.lineChanged(0) && !e.lineChanged(3));
+
+        e.barChangesSince("zero\none\ntwo\nthree\nfour");
+        ensure("a line taken away bars the line it was taken from", e.lineChanged(0));
+        ensure("and nothing else", !e.lineChanged(1) && !e.lineChanged(2) && !e.lineChanged(3));
+
+        e.resetDirty();
+        ensure("a save clears the bars", !e.lineChanged(0));
+    }
 }

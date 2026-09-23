@@ -248,8 +248,9 @@ public:
     bool            isDirty() const override { return !mUndo.isPristine(); }
     void            resetDirty() override { mUndo.markSaved(); }
     // Unsaved from here, whatever the journal was told: nothing it can
-    // step to was ever saved.
-    void            markUnsaved() { mUndo.markNeverSaved(); mChanged(); }
+    // step to was ever saved. Through the virtual, so that what a subclass
+    // keeps about changes since the last save says so too.
+    virtual void    markUnsaved() { mUndo.markNeverSaved(); mChanged(); }
     // For a save whose answer comes later: where the text stands when it
     // is sent, and that text marked saved once the answer comes, whatever
     // was typed meanwhile staying unsaved.
