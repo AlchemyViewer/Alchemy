@@ -364,8 +364,9 @@ void main()
         }
     }
 
-    float spec = min(max(max(punctual.r, punctual.g), punctual.b), 0);
-
-    frag_color = min(vec4(1),max(vec4(color.rgb, spec * water_mask), vec4(0)));
+    // Not capped at 1: the glint and bright reflections are HDR and have to reach white and bloom, and
+    // what shows through the surface must match the shore beside it. The alpha is not written (the pool
+    // masks it), so the glow of what lies beneath survives.
+    frag_color = vec4(max(color.rgb, vec3(0)), 0.0);
 }
 

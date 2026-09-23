@@ -130,7 +130,9 @@ void LLDrawPoolWater::renderPostDeferred(S32 pass)
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
     LLGLDisable blend(GL_BLEND);
 
-    gGL.setColorMask(true, true);
+    // Leave the alpha alone, as WindLight's deferred water did: it is the glow channel, and the
+    // water's zero there wiped the glow of whatever lies beneath the surface.
+    gGL.setColorMask(true, false);
 
     LLColor3 light_diffuse(0, 0, 0);
 
