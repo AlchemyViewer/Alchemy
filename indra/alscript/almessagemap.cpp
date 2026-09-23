@@ -267,31 +267,29 @@ namespace
 
     Cut cut(std::string_view text)
     {
+        // A bracket that is no mark -- `[a]`, `[10]` -- stays in the
+        // literal it is in, which goes on to the next mark or the end.
         Cut    out;
-        size_t at = 0;
-        while (at <= text.size())
+        size_t at   = 0;
+        size_t look = 0;
+        while (true)
         {
-            const size_t open = text.find('[', at);
-            if (open == std::string_view::npos || open + 2 >= text.size() || text[open + 1] < '1' || text[open + 1] > '9' || text[open + 2] != ']')
+            const size_t open = text.find('[', look);
+            if (open == std::string_view::npos)
             {
-                if (open != std::string_view::npos && open + 2 < text.size())
-                {
-                    // A bracket that is no mark: on past it.
-                    const size_t next = text.find('[', open + 1);
-                    if (next != std::string_view::npos)
-                    {
-                        // Look again from the next bracket, with this one
-                        // in the literal.
-                        at = open + 1;
-                        continue;
-                    }
-                }
                 out.literals.push_back(text.substr(at));
                 break;
             }
-            out.literals.push_back(text.substr(at, open - at));
-            out.marks.push_back(text[open + 1] - '0');
-            at = open + 3;
+            if (open + 2 < text.size() && text[open + 1] >= '1' && text[open + 1] <= '9' && text[open + 2] == ']')
+            {
+                out.literals.push_back(text.substr(at, open - at));
+                out.marks.push_back(text[open + 1] - '0');
+                at = look = open + 3;
+            }
+            else
+            {
+                look = open + 1;
+            }
         }
         return out;
     }
@@ -316,6 +314,12 @@ bool ALMessageMap::match(std::string_view text, std::string_view message, std::v
         if (first)
         {
             if (message.compare(0, literal.size(), literal) != 0)
+            {
+                return false;
+            }
+            // A template with no marks is its message whole, not the
+            // start of a longer one.
+            if (last && message.size() != literal.size())
             {
                 return false;
             }

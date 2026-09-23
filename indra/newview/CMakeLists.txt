@@ -2358,6 +2358,7 @@ if(AL_BUILD_TESTS)
     alsceneexplorerpredicate
     alscriptmessages
     alscriptrecovery
+    alscriptsnippets
     alwhitebalancesolver
     llagentaccess
     lldateutil

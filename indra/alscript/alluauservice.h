@@ -99,6 +99,11 @@ public:
     // the type a `local` was given without saying.
     std::vector<ALScriptInlayHint> inlayHints(std::string_view source, bool parameters, bool types);
 
+    // How many times a script has been type checked: a question asked
+    // again of the same text, with the same configuration, is answered
+    // from the check already made. For the test that says so.
+    size_t typeChecks() const;
+
 private:
     struct Impl;
     std::unique_ptr<Impl> mImpl;

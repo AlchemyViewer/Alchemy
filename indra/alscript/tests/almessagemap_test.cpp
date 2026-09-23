@@ -25,6 +25,7 @@
 #include "linden_common.h"
 
 #include "../almessagemap.h"
+#include "../alscriptproblem.h"
 
 #include "../test/lltut.h"
 
@@ -152,5 +153,19 @@ namespace tut
         ensure_equals("did you mean", m.key, std::string("LuauMissingPropertyDidYouMean"));
         ensure_equals("its words", joined(m.args), std::string("<b><{ a: number }><a>"));
         ensure("nothing the table knows", !ALMessageMap::luauError("Some words nobody wrote", m));
+    }
+    template<> template<>
+    void almessagemap_object::test<7>()
+    {
+        set_test_name("a template without marks is its message whole; a bracket that is no mark is part of a literal; and a word is put in as it is");
+        std::vector<std::string> args;
+        ensure("not the start of a longer one", !ALMessageMap::match("Functions cannot change state.", "Functions cannot change state. And more.", args));
+        ensure("a bracket before a mark stays in the literal", ALMessageMap::match("Index [a] of [1] is out", "Index [a] of list is out", args));
+        ensure_equals("and the word is found after it", joined(args), std::string("<list>"));
+        ensure("the literal still has to begin the message", !ALMessageMap::match("Index [a] of [1] is out", "a] of list is out", args));
+        ensure("a bracket after the last mark too", ALMessageMap::match("[1] is [10] long", "list is [10] long", args) && joined(args) == "<list>");
+        ensure_equals("a word with a mark in it is not filled again", ALScriptProblem::fill("[1] and [2]", { "a[2]", "b" }), std::string("a[2] and b"));
+        ensure_equals("a mark with no word stays", ALScriptProblem::fill("[1] and [3]", { "a" }), std::string("a and [3]"));
+        ensure_equals("each mark as often as it is used", ALScriptProblem::fill("[1][1]", { "x" }), std::string("xx"));
     }
 }

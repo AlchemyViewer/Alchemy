@@ -789,4 +789,97 @@ namespace tut
         ensure("a value around blanks: " + r.text, r.text.find("y = 7;") != std::string::npos);
         ensure("undefined by the script: " + r.text, r.text.find("z = LEVEL;") != std::string::npos);
     }
+    template<> template<>
+    void alpreprocessor_object::test<21>()
+    {
+        set_test_name("a run is bounded however the script nests: chained ?:, macros in macros' arguments, files that include themselves");
+        // A chain of ?: is a level each, as a bracket is: said, and not
+        // followed down the machine's stack.
+        std::string chain = "#if ";
+        for (int i = 0; i < 300000; ++i)
+        {
+            chain += "1?";
+        }
+        chain += "1";
+        for (int i = 0; i < 300000; ++i)
+        {
+            chain += ":0";
+        }
+        chain += "\nyes\n#endif\n";
+        ALPreprocessor::Result r = ALPreprocessor::run(chain, options());
+        ensure("the chain is too deep: " + messages(r).substr(0, 200), messages(r).find("nests too deeply") != std::string::npos);
+
+        // A macro invoked in its own argument, deeper than the bound.
+        std::string nested = "#define F(x) x\n";
+        for (int i = 0; i < 5000; ++i)
+        {
+            nested += "F(";
+        }
+        nested += "1";
+        for (int i = 0; i < 5000; ++i)
+        {
+            nested += ")";
+        }
+        nested += ";\n";
+        r = ALPreprocessor::run(nested, options());
+        ensure("overran", r.overran);
+        ensure("and said why: " + messages(r).substr(0, 200), messages(r).find("more deeply than this preprocessor follows") != std::string::npos);
+        ensure_equals("the text is the source as it was", r.text, nested);
+
+        // Within the bound, as deep as a person writes, it expands.
+        r = ALPreprocessor::run("#define F(x) x\nF(F(F(F(F(1)))));\n", options());
+        ensure("five deep is nothing: " + messages(r), !r.overran && r.text.find("1;") != std::string::npos);
+
+        // A file that includes itself twice: each level doubles, and the
+        // files it opens are counted against the budget like any tokens.
+        add("twice.lsl", "#include \"twice.lsl\"\n#include \"twice.lsl\"\ninteger x;\n");
+        ALPreprocessor::Options opts = options();
+        opts.tokenBudget             = 200000;
+        r                            = ALPreprocessor::run("#include \"twice.lsl\"\n", opts);
+        ensure("overran, rather than opening two to the thirty-second files", r.overran);
+    }
+
+    template<> template<>
+    void alpreprocessor_object::test<22>()
+    {
+        set_test_name("a name put in a string literal is escaped: a script's, and a module's path");
+        ALPreprocessor::Options opts = options();
+        opts.fileName                = "Say \"hi\" \\ there";
+        ALPreprocessor::Result r     = ALPreprocessor::run("llSay(0, __FILE__);\nllSay(0, __SHORTFILE__);\n", opts);
+        ensure("the quote and the backslash escaped: " + r.text, r.text.find("\"Say \\\"hi\\\" \\\\ there\"") != std::string::npos);
+
+        // A module found on a Windows disk: its path is the key it is
+        // looked up under, which must read back as itself in Luau.
+        ALPreprocessor::Include module;
+        module.text = "return { x = 1 }\n";
+        module.name = "util.luau";
+        module.path = "disk:C:\\Users\\me\\lib\\util.luau";
+        files["./util"] = module;
+        r = ALPreprocessor::run("local util = require(\"./util\")\n", options(true));
+        ensure_equals("nothing wrong", messages(r), std::string());
+        const std::string key = "\"disk:C:\\\\Users\\\\me\\\\lib\\\\util.luau\"";
+        ensure("the table filled under the escaped key: " + r.text, r.text.find("__modules[" + key + "] = (function()") != std::string::npos);
+        ensure("and the call looks it up under the same: " + r.text, r.text.find("local util = __modules[" + key + "]") != std::string::npos);
+    }
+
+    template<> template<>
+    void alpreprocessor_object::test<23>()
+    {
+        set_test_name("an interpolated SLua string whose expression holds a string with a brace or a backtick ends where it ends");
+        const std::vector<ALPreprocessor::Token> tokens = ALPreprocessor::tokenize("local s = `a{ \"{\" .. `{'}'}` }b` .. X\n", true);
+        std::vector<std::string> kinds;
+        for (const ALPreprocessor::Token& t : tokens)
+        {
+            if (t.kind != ALPreprocessor::Token::Kind::Space)
+            {
+                kinds.push_back(t.text);
+            }
+        }
+        ensure("the string whole, then what follows it: " + std::to_string(kinds.size()),
+               kinds.size() >= 6 && kinds[3] == "`a{ \"{\" .. `{'}'}` }b`" && kinds[4] == ".." && kinds[5] == "X");
+
+        // And the macro after it is expanded.
+        ALPreprocessor::Result r = ALPreprocessor::run("#define X 42\nlocal s = `{\"{\"}` .. X\n", options(true));
+        ensure("the macro after the string expanded: " + r.text, r.text.find(".. 42") != std::string::npos);
+    }
 } // namespace tut

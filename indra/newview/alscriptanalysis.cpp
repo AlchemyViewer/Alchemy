@@ -28,6 +28,7 @@
 
 #include "allslservice.h"
 #include "alluauservice.h"
+#include "alscriptstack.h"
 #include "llappviewer.h"
 #include "llviewercontrol.h"
 #include "llfile.h"
@@ -180,80 +181,85 @@ void ALScriptAnalysis::ask(Request request, callback_t callback)
                 return;
             }
         }
-        if (!mWorker)
-        {
-            mWorker = std::make_unique<Worker>();
-        }
+        // The engines recurse on how the script nests; the pool's thread
+        // has what the platform gives a thread, which on a Mac is half a
+        // megabyte. The work goes on a stack as deep as a script needs.
         Result result;
-        result.kind    = request.kind;
-        result.id      = request.id;
-        result.version = request.version;
-        result.lua     = request.lua;
-        result.line    = request.line;
-        result.column  = request.column;
-        if (request.lua)
-        {
-            mWorker->loadLuau(luau_path, docs_path, generation);
-            result.definitionsError = mWorker->luauError;
-            mWorker->luau.setConfig(request.config);
-            switch (request.kind)
+        alScriptOnLargeStack([&]() {
+            if (!mWorker)
             {
-                case Kind::Check:
-                    result.problems = mWorker->luau.check(request.text);
-                    result.outline  = mWorker->luau.outline(request.text);
-                    if (request.semantics)
-                    {
-                        result.semantics = mWorker->luau.semanticTokens(request.text);
-                    }
-                    result.hints = mWorker->luau.inlayHints(request.text, request.hintParameters, request.hintTypes);
-                    break;
-                case Kind::Complete:
-                    result.completions = mWorker->luau.complete(request.text, request.line, request.column);
-                    break;
-                case Kind::Hover:
-                case Kind::Inspect:
-                    result.hover = mWorker->luau.hover(request.text, request.line, request.column);
-                    break;
-                case Kind::Signature:
-                    result.signature = mWorker->luau.signature(request.text, request.line, request.column);
-                    break;
-                case Kind::References:
-                    result.references = mWorker->luau.references(request.text, request.line, request.column);
-                    break;
+                mWorker = std::make_unique<Worker>();
             }
-        }
-        else
-        {
-            mWorker->loadLSL(lsl_path);
-            result.definitionsError = mWorker->lslError;
-            switch (request.kind)
+            result.kind    = request.kind;
+            result.id      = request.id;
+            result.version = request.version;
+            result.lua     = request.lua;
+            result.line    = request.line;
+            result.column  = request.column;
+            if (request.lua)
             {
-                case Kind::Check:
-                    result.problems = mWorker->lsl.check(request.text, request.mono);
-                    result.outline  = mWorker->lsl.outline(request.text);
-                    if (request.semantics)
-                    {
-                        result.semantics = mWorker->lsl.semanticTokens(request.text);
-                    }
-                    result.hints = mWorker->lsl.inlayHints(request.text, request.hintParameters);
-                    break;
-                case Kind::Complete:
-                    result.completions = mWorker->lsl.symbols(request.text, request.line, request.column);
-                    break;
-                case Kind::Hover:
-                case Kind::Inspect:
-                    result.hover = mWorker->lsl.hover(request.text, request.line, request.column);
-                    break;
-                case Kind::Signature:
-                    result.signature = mWorker->lsl.signature(request.text, request.line, request.column);
-                    break;
-                case Kind::References:
-                    result.references = mWorker->lsl.references(request.text, request.line, request.column);
-                    break;
+                mWorker->loadLuau(luau_path, docs_path, generation);
+                result.definitionsError = mWorker->luauError;
+                mWorker->luau.setConfig(request.config);
+                switch (request.kind)
+                {
+                    case Kind::Check:
+                        result.problems = mWorker->luau.check(request.text);
+                        result.outline  = mWorker->luau.outline(request.text);
+                        if (request.semantics)
+                        {
+                            result.semantics = mWorker->luau.semanticTokens(request.text);
+                        }
+                        result.hints = mWorker->luau.inlayHints(request.text, request.hintParameters, request.hintTypes);
+                        break;
+                    case Kind::Complete:
+                        result.completions = mWorker->luau.complete(request.text, request.line, request.column);
+                        break;
+                    case Kind::Hover:
+                    case Kind::Inspect:
+                        result.hover = mWorker->luau.hover(request.text, request.line, request.column);
+                        break;
+                    case Kind::Signature:
+                        result.signature = mWorker->luau.signature(request.text, request.line, request.column);
+                        break;
+                    case Kind::References:
+                        result.references = mWorker->luau.references(request.text, request.line, request.column);
+                        break;
+                }
             }
-            result.parsed     = mWorker->lsl.parsed();
-            result.understood = mWorker->lsl.understood();
-        }
+            else
+            {
+                mWorker->loadLSL(lsl_path);
+                result.definitionsError = mWorker->lslError;
+                switch (request.kind)
+                {
+                    case Kind::Check:
+                        result.problems = mWorker->lsl.check(request.text, request.mono);
+                        result.outline  = mWorker->lsl.outline(request.text);
+                        if (request.semantics)
+                        {
+                            result.semantics = mWorker->lsl.semanticTokens(request.text);
+                        }
+                        result.hints = mWorker->lsl.inlayHints(request.text, request.hintParameters);
+                        break;
+                    case Kind::Complete:
+                        result.completions = mWorker->lsl.symbols(request.text, request.line, request.column);
+                        break;
+                    case Kind::Hover:
+                    case Kind::Inspect:
+                        result.hover = mWorker->lsl.hover(request.text, request.line, request.column);
+                        break;
+                    case Kind::Signature:
+                        result.signature = mWorker->lsl.signature(request.text, request.line, request.column);
+                        break;
+                    case Kind::References:
+                        result.references = mWorker->lsl.references(request.text, request.line, request.column);
+                        break;
+                }
+                result.parsed     = mWorker->lsl.parsed();
+                result.understood = mWorker->lsl.understood();
+            }
+        });
         // The words in the viewer's language, on the main thread, where
         // the strings are.
         LLAppViewer::instance()->postToMainCoro([result = std::move(result), callback]() mutable {

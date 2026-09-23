@@ -119,11 +119,15 @@ public:
         bool                    optimize = false;
         ALLSLOptimizer::Options optimizer;
         S32  includeDepth = 32;
-        // What one run may make of a script, and how deep an `#if`
-        // expression may nest. A run that reaches either says so and
-        // stops.
+        // What one run may make of a script -- every token of every file
+        // it opens counts, as well as every token a macro makes -- and how
+        // deep an `#if` expression may nest. A run that reaches either
+        // says so and stops.
         size_t tokenBudget     = 4u * 1000u * 1000u;
         S32    expressionDepth = 64;
+        // How deep macros may be invoked inside the arguments of others,
+        // each level of which is a level of the machine's own stack.
+        S32    macroDepth      = 200;
         // The predefined macros' values. An empty agent id leaves the
         // agent macros undefined; an empty asset id says NOT_IN_WORLD.
         std::string agentId;

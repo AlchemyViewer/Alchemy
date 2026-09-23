@@ -31,10 +31,12 @@
 #include "threadpool.h"
 #include "workqueue.h"
 
+#include "aldiskincludes.h"
 #include "allslservice.h"
 #include "alscriptanalysis.h"
 #include "alluauconfig.h"
 #include "alscriptenvelope.h"
+#include "alscriptstack.h"
 #include "llagent.h"
 #include "lldir.h"
 #include "llsdjson.h"
@@ -171,87 +173,6 @@ namespace
     private:
         std::string mName;
     };
-
-    bool readFile(const std::string& path, std::string& out)
-    {
-        std::ifstream in(path, std::ios::binary);
-        if (!in)
-        {
-            return false;
-        }
-        std::stringstream buffer;
-        buffer << in.rdbuf();
-        out = buffer.str();
-        return true;
-    }
-
-    // The folders an `.lslrc` in a folder adds to an LSL include's
-    // search -- `{"include": ["../lib", "/abs/path"]}`, each relative to
-    // the folder the file is in unless from a root -- as `.luaurc`
-    // aliases do for `require`. Nothing where there is no such file, or
-    // it is not what it should be.
-    std::vector<std::string> lslrcFolders(const std::string& folder)
-    {
-        std::vector<std::string> out;
-        if (folder.empty())
-        {
-            return out;
-        }
-        std::string text;
-        if (!readFile(gDirUtilp->add(folder, ".lslrc"), text))
-        {
-            return out;
-        }
-        LLSD        config;
-        std::string error;
-        if (!LlsdFromJsonString(text, config, &error) || !config.isMap() || !config.has("include"))
-        {
-            if (!error.empty())
-            {
-                LL_WARNS("ScriptPreprocessor") << folder << "/.lslrc is not a configuration: " << error << LL_ENDL;
-            }
-            return out;
-        }
-        const LLSD& listed = config["include"];
-        for (LLSD::array_const_iterator it = listed.beginArray(); it != listed.endArray(); ++it)
-        {
-            std::string dir = it->asString();
-            if (dir.empty())
-            {
-                continue;
-            }
-            if (!ALLuauConfig::absolute(dir))
-            {
-                dir = gDirUtilp->add(folder, dir);
-            }
-            while (dir.size() > 1 && (dir.back() == '/' || dir.back() == '\\'))
-            {
-                dir.pop_back();
-            }
-            out.push_back(dir);
-        }
-        return out;
-    }
-
-    // The nearest `.lslrc` up from a folder: its folders, or none.
-    std::vector<std::string> nearestLslrcFolders(std::string folder)
-    {
-        for (int depth = 0; depth < 32 && !folder.empty(); ++depth)
-        {
-            std::vector<std::string> found = lslrcFolders(folder);
-            if (!found.empty() || gDirUtilp->fileExists(gDirUtilp->add(folder, ".lslrc")))
-            {
-                return found;
-            }
-            const std::string up = gDirUtilp->getDirName(folder);
-            if (up == folder)
-            {
-                break;
-            }
-            folder = up;
-        }
-        return {};
-    }
 } // namespace
 
 struct ALScriptPreprocessor::Job
@@ -270,6 +191,9 @@ struct ALScriptPreprocessor::Job
     // fetch may have brought one in.
     std::vector<ALPreprocessor::Ask> asks;
     wanted_t                         askKeys;
+    // The folders an alias of a `.luaurc` on disk has blessed in this run,
+    // so that a module one brought in may require the modules beside it.
+    std::vector<std::string>         aliasFolders;
 };
 
 // Anything at all changing in the inventory is enough: what an include
@@ -365,25 +289,55 @@ bool ALScriptPreprocessor::heldText(const std::string& path, std::string& text) 
         text = held->second.text;
         return true;
     }
+    // A file on disk only where a run admitted it, which is the only way
+    // its identity reaches anybody to ask with.
     std::string file;
-    if (fileOf(path, file) && LLFile::isfile(file))
-    {
-        llifstream        in(file.c_str(), std::ios::binary);
-        std::stringstream read;
-        read << in.rdbuf();
-        text = read.str();
-        return true;
-    }
-    return false;
+    return mAdmitted.count(path) && fileOf(path, file) && ALDiskIncludes::readOrdinary(file, text);
 }
 
-std::vector<ALScriptPreprocessor::Candidate> ALScriptPreprocessor::candidatesFor(const ALPreprocessor::Ask& ask, const Request& request, bool& unknown)
+ALDiskIncludes ALScriptPreprocessor::blessedFor(const ALPreprocessor::Ask& ask, const Request& request, const std::vector<std::string>& alias_folders)
+{
+    static LLCachedControl<bool> disk(gSavedSettings, "ALScriptPreprocDiskIncludes", false);
+    ALDiskIncludes               blessed;
+    // The scripter's own, while disk includes are on, and what each of
+    // those folders' own `.lslrc` lists.
+    const std::vector<std::string> folders = disk ? includeFolders() : std::vector<std::string>();
+    for (const std::string& folder : folders)
+    {
+        blessed.bless(folder);
+        if (!request.lua)
+        {
+            for (const std::string& listed : ALDiskIncludes::lslrcFolders(folder))
+            {
+                blessed.bless(listed);
+            }
+        }
+    }
+    // The nearest `.lslrc` up from a file asking that is itself on disk --
+    // a configuration in the world is anybody's.
+    std::string from;
+    if (!request.lua && fileOf(ask.from, from))
+    {
+        for (const std::string& listed : ALDiskIncludes::nearestLslrcFolders(gDirUtilp->getDirName(from)))
+        {
+            blessed.bless(listed);
+        }
+    }
+    // And the aliases of a `.luaurc` on disk this run has gone through.
+    for (const std::string& folder : alias_folders)
+    {
+        blessed.bless(folder);
+    }
+    return blessed;
+}
+
+std::vector<ALScriptPreprocessor::Candidate> ALScriptPreprocessor::candidatesFor(const ALPreprocessor::Ask& ask, const Request& request,
+                                                                                const std::vector<std::string>& alias_folders, bool& unknown)
 {
     unknown = false;
     std::vector<Candidate> out;
     const std::string      item_name = itemNameOf(ask.name);
     static LLCachedControl<std::string> order(gSavedSettings, "ALScriptPreprocIncludeOrder", "inventory object disk");
-    static LLCachedControl<bool>        disk(gSavedSettings, "ALScriptPreprocDiskIncludes", false);
     std::istringstream                  sources(order());
     std::string                         source;
     while (sources >> source)
@@ -466,37 +420,28 @@ std::vector<ALScriptPreprocessor::Candidate> ALScriptPreprocessor::candidatesFor
         }
         else if (source == "disk")
         {
+            // Only under a folder somebody blessed: the scripter's own
+            // include folders, and what a `.lslrc` or a `.luaurc` that is
+            // itself on disk lists. Nothing in the world blesses anything,
+            // nor does the folder a script is in, nor a path from a root.
+            const ALDiskIncludes blessed = blessedFor(ask, request, alias_folders);
+            if (!blessed.blessed())
+            {
+                continue;
+            }
+            // Where a name is looked for: beside the file asking, where it
+            // is on disk, as a require expects; then the blessed folders.
             std::vector<std::string> dirs;
             std::string              from;
             if (fileOf(ask.from, from))
             {
-                // Beside the file asking first, as a require expects.
                 dirs.push_back(gDirUtilp->getDirName(from));
             }
-            const std::vector<std::string> folders = disk ? includeFolders() : std::vector<std::string>();
-            dirs.insert(dirs.end(), folders.begin(), folders.end());
-            if (!request.lua)
+            for (const std::string& folder : blessed.folders())
             {
-                // Then wherever an `.lslrc` says: the nearest up from the
-                // asking file, and each include folder's own.
-                std::vector<std::string> more;
-                if (!from.empty())
+                if (std::find(dirs.begin(), dirs.end(), folder) == dirs.end())
                 {
-                    more = nearestLslrcFolders(gDirUtilp->getDirName(from));
-                }
-                for (const std::string& folder : folders)
-                {
-                    for (const std::string& dir : lslrcFolders(folder))
-                    {
-                        more.push_back(dir);
-                    }
-                }
-                for (const std::string& dir : more)
-                {
-                    if (std::find(dirs.begin(), dirs.end(), dir) == dirs.end())
-                    {
-                        dirs.push_back(dir);
-                    }
+                    dirs.push_back(folder);
                 }
             }
             std::vector<std::string> names{ ask.name };
@@ -512,22 +457,25 @@ std::vector<ALScriptPreprocessor::Candidate> ALScriptPreprocessor::candidatesFor
             if (ALLuauConfig::absolute(ask.name))
             {
                 // A path from a root, which an alias may stand for: the
-                // file itself, wherever it is.
+                // file itself, where a blessed folder holds it.
                 dirs.assign(1, std::string());
             }
             for (const std::string& dir : dirs)
             {
                 for (const std::string& name : names)
                 {
-                    const std::string file = dir.empty() ? name : gDirUtilp->add(dir, name);
-                    if (gDirUtilp->fileExists(file))
+                    const std::string                file = dir.empty() ? name : gDirUtilp->add(dir, name);
+                    const std::optional<std::string> real = blessed.admits(file);
+                    if (!real)
                     {
-                        Candidate c;
-                        c.name = gDirUtilp->getBaseFileName(file);
-                        c.path = std::string(DISK_PREFIX) + file;
-                        c.file = file;
-                        out.push_back(std::move(c));
+                        continue;
                     }
+                    Candidate c;
+                    c.name = gDirUtilp->getBaseFileName(*real);
+                    c.path = std::string(DISK_PREFIX) + *real;
+                    c.file = *real;
+                    mAdmitted.insert(c.path);
+                    out.push_back(std::move(c));
                 }
             }
         }
@@ -540,7 +488,7 @@ ALPreprocessor::Found ALScriptPreprocessor::textOf(const Candidate& c, wanted_t*
     if (!c.file.empty())
     {
         assetId.clear();
-        return readFile(c.file, text) ? ALPreprocessor::Found::Yes : ALPreprocessor::Found::No;
+        return ALDiskIncludes::readOrdinary(c.file, text) ? ALPreprocessor::Found::Yes : ALPreprocessor::Found::No;
     }
     auto cached = mTexts.find(c.path);
     if (cached != mTexts.end() && cached->second.assetId == c.assetId)
@@ -662,7 +610,7 @@ ALPreprocessor::Found ALScriptPreprocessor::configFor(const std::string& from, c
 }
 
 ALPreprocessor::Found ALScriptPreprocessor::resolve(const ALPreprocessor::Ask& ask_in, ALPreprocessor::Include& out, const Request& request,
-                                                    wanted_t* wanted, bool retry)
+                                                    wanted_t* wanted, bool retry, std::vector<std::string>* alias_folders)
 {
     ALPreprocessor::Ask ask = ask_in;
     if (ask.from.empty())
@@ -706,10 +654,22 @@ ALPreprocessor::Found ALScriptPreprocessor::resolve(const ALPreprocessor::Ask& a
         }
         ask.name = rest.empty() ? value : value + "/" + rest;
         ask.from = config_path;
+        // A `.luaurc` on disk blesses where its aliases point, for this
+        // run; one in the world blesses nothing, and its alias is only
+        // ever a name to look for in the world.
+        std::string config_file;
+        if (alias_folders && fileOf(config_path, config_file))
+        {
+            const std::string folder = ALLuauConfig::absolute(value) ? value : gDirUtilp->add(gDirUtilp->getDirName(config_file), value);
+            if (std::find(alias_folders->begin(), alias_folders->end(), folder) == alias_folders->end())
+            {
+                alias_folders->push_back(folder);
+            }
+        }
     }
 
     bool                         unknown    = false;
-    const std::vector<Candidate> candidates = candidatesFor(ask, request, unknown);
+    const std::vector<Candidate> candidates = candidatesFor(ask, request, alias_folders ? *alias_folders : std::vector<std::string>(), unknown);
     for (const Candidate& c : candidates)
     {
         const ALPreprocessor::Found found = textOf(c, wanted, retry, out.text, out.assetId);
@@ -861,7 +821,7 @@ ALScriptSnapshot ALScriptPreprocessor::snapshotFor(const std::shared_ptr<Job>& j
     for (const ALPreprocessor::Ask& ask : job->asks)
     {
         ALScriptSnapshot::Answer answer;
-        answer.found = resolve(ask, answer.include, request, &wanted, job->retry);
+        answer.found = resolve(ask, answer.include, request, &wanted, job->retry, &job->aliasFolders);
         if (answer.found == ALPreprocessor::Found::Pending)
         {
             // In the world and not in hand: fetched, and the snapshot
@@ -995,7 +955,11 @@ void ALScriptPreprocessor::attemptJob(const std::shared_ptr<Job>& job)
     // thing here that has nothing of the viewer in it.
     ensureWorker();
     mPool->getQueue().post([this, job, snapshot = std::move(snapshot)]() mutable {
-        ALPreprocessor::Result           result = snapshot.run(job->request.source);
+        // On a stack as deep as a script needs: the expansion recurses on
+        // how the script nests, and a pool's thread on a Mac has half a
+        // megabyte.
+        ALPreprocessor::Result result;
+        alScriptOnLargeStack([&]() { result = snapshot.run(job->request.source); });
         std::vector<ALPreprocessor::Ask> missed = snapshot.missed();
         LLAppViewer::instance()->postToMainCoro([this, job, result = std::move(result), missed = std::move(missed)]() mutable {
             expandedJob(job, std::move(result), std::move(missed));
@@ -1079,7 +1043,7 @@ void ALScriptPreprocessor::optimizeAndFinish(const std::shared_ptr<Job>& job, AL
     }
     ensureWorker();
     mPool->getQueue().post([this, job, result = std::move(result), options]() mutable {
-        ALPreprocessor::finish(result, options);
+        alScriptOnLargeStack([&]() { ALPreprocessor::finish(result, options); });
         LLAppViewer::instance()->postToMainCoro([this, job, result = std::move(result)]() mutable { finish(job, std::move(result)); });
     });
 }

@@ -1,0 +1,174 @@
+/**
+ * @file aldiskincludes_test.cpp
+ * @brief Which files on disk a script's includes may be read from.
+ *
+ * $LicenseInfo:firstyear=2026&license=viewerlgpl$
+ * Alchemy Viewer Source Code
+ * Copyright (C) 2026, Rye <rye@alchemyviewer.org>
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation;
+ * version 2.1 of the License only.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * $/LicenseInfo$
+ */
+
+#include "linden_common.h"
+
+#include "../aldiskincludes.h"
+
+#include "fsyspath.h"
+
+#include "../test/lltut.h"
+
+#include <chrono>
+#include <filesystem>
+#include <fstream>
+
+#if LL_DARWIN || LL_LINUX
+#include <sys/stat.h>
+#endif
+
+namespace
+{
+    namespace fs = std::filesystem;
+
+    // A folder of its own for each test, gone with it.
+    struct Scratch
+    {
+        fs::path root;
+
+        Scratch()
+        {
+            const auto stamp = std::chrono::steady_clock::now().time_since_epoch().count();
+            root             = fs::temp_directory_path() / ("aldiskincludes_" + std::to_string(stamp));
+            fs::create_directories(root);
+            // Where links are followed to: the answers are in those terms.
+            root = fs::canonical(root);
+        }
+        ~Scratch()
+        {
+            std::error_code ec;
+            fs::remove_all(root, ec);
+        }
+
+        std::string write(const std::string& relative, const std::string& text) const
+        {
+            const fs::path path = root / relative;
+            fs::create_directories(path.parent_path());
+            std::ofstream out(path, std::ios::binary);
+            out << text;
+            return fsyspath(path).string();
+        }
+        std::string at(const std::string& relative) const { return fsyspath(root / relative).string(); }
+    };
+}
+
+namespace tut
+{
+    struct aldiskincludes_data
+    {
+    };
+
+    typedef test_group<aldiskincludes_data> aldiskincludes_group;
+    typedef aldiskincludes_group::object    aldiskincludes_object;
+    aldiskincludes_group                    aldiskincludes_instance("aldiskincludes");
+
+    template<> template<>
+    void aldiskincludes_object::test<1>()
+    {
+        set_test_name("nothing on the disk is read but under a blessed folder, however the path is put");
+        Scratch            s;
+        const std::string  lib    = s.write("lib/util.lsl", "integer util() { return 1; }\n");
+        const std::string  secret = s.write("private/secret.txt", "the author's own\n");
+        s.write("lib2/other.lsl", "x\n");
+        ALDiskIncludes none;
+        ensure("nothing blessed, nothing read", !none.blessed() && !none.admits(lib));
+
+        ALDiskIncludes blessed;
+        blessed.bless(s.at("lib"));
+        ensure("blessed", blessed.blessed() && blessed.folders().size() == 1);
+        ensure_equals("a file under it is read, as it stands", blessed.admits(lib).value_or(""), lib);
+        ensure("a path from a root elsewhere is not", !blessed.admits(secret));
+        ensure("nor one climbing out of the blessed folder", !blessed.admits(s.at("lib/../private/secret.txt")));
+        ensure("nor one in a folder whose name only begins with it", !blessed.admits(s.at("lib2/other.lsl")));
+        ensure("nor the folder itself", !blessed.admits(s.at("lib")));
+        ensure("nor what is not there", !blessed.admits(s.at("lib/missing.lsl")));
+
+        blessed.bless(s.at("nowhere"));
+        blessed.bless(lib);
+        ensure_equals("what is not a folder blesses nothing", blessed.folders().size(), size_t(1));
+        blessed.bless(s.at("lib/../lib"));
+        ensure_equals("and one folder is blessed once however it is named", blessed.folders().size(), size_t(1));
+    }
+
+    template<> template<>
+    void aldiskincludes_object::test<2>()
+    {
+        set_test_name("a link is followed before it is judged, and only an ordinary file of a sensible size is read");
+        Scratch           s;
+        const std::string secret = s.write("private/secret.txt", "the author's own\n");
+        s.write("lib/util.lsl", "x\n");
+        ALDiskIncludes blessed;
+        blessed.bless(s.at("lib"));
+
+        std::error_code ec;
+        fs::create_symlink(fsyspath(secret), s.root / "lib" / "innocent.lsl", ec);
+        if (!ec)
+        {
+            ensure("a link out of the folder is not read", !blessed.admits(s.at("lib/innocent.lsl")));
+        }
+        fs::create_directory_symlink(s.root / "private", s.root / "lib" / "door", ec);
+        if (!ec)
+        {
+            ensure("nor a file through a linked folder", !blessed.admits(s.at("lib/door/secret.txt")));
+        }
+
+        const std::string big = s.write("lib/big.lsl", std::string(static_cast<size_t>(ALDiskIncludes::MAX_BYTES) + 1, 'x'));
+        ensure("a file past the limit is not read", !blessed.admits(big));
+        std::string text;
+        ensure("nor read by the reader", !ALDiskIncludes::readOrdinary(big, text) && text.empty());
+        ensure("a folder is not read", !ALDiskIncludes::readOrdinary(s.at("lib"), text));
+        ensure("an ordinary one is", ALDiskIncludes::readOrdinary(s.at("lib/util.lsl"), text) && text == "x\n");
+
+#if LL_DARWIN || LL_LINUX
+        // What would be read for ever, or never answer: refused at once.
+        ALDiskIncludes devices;
+        devices.bless("/dev");
+        ensure("a device is not an include", !devices.admits("/dev/zero"));
+        ensure("nor read", !ALDiskIncludes::readOrdinary("/dev/zero", text));
+        const std::string pipe = s.at("lib/pipe");
+        if (mkfifo(pipe.c_str(), 0600) == 0)
+        {
+            ensure("a pipe is not an include", !blessed.admits(pipe));
+            ensure("nor read, and the reading does not wait on it", !ALDiskIncludes::readOrdinary(pipe, text));
+        }
+#endif
+    }
+
+    template<> template<>
+    void aldiskincludes_object::test<3>()
+    {
+        set_test_name("a .lslrc lists folders from beside it, and the nearest up from a folder is found");
+        Scratch s;
+        s.write("project/.lslrc", "{\"include\": [\"../lib\", \"shared/\"]}");
+        s.write("project/src/deep/main.lsl", "x\n");
+        const std::vector<std::string> listed = ALDiskIncludes::lslrcFolders(s.at("project"));
+        ensure_equals("both", listed.size(), size_t(2));
+        ensure_equals("the one above, from beside the file", listed[0], s.at("lib"));
+        ensure_equals("the one below, without its slash", listed[1], s.at("project/shared"));
+        ensure("the nearest up", ALDiskIncludes::nearestLslrcFolders(s.at("project/src/deep")) == listed);
+        ensure("none where there is none", ALDiskIncludes::lslrcFolders(s.at("project/src")).empty());
+        s.write("broken/.lslrc", "{not json");
+        ensure("nor where it is not a configuration", ALDiskIncludes::lslrcFolders(s.at("broken")).empty());
+    }
+}

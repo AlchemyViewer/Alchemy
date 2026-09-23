@@ -539,65 +539,14 @@ namespace
             else if (c == '"' || c == '\'')
             {
                 start(Kind::String);
-                take();
-                while (mPos < mText.size())
-                {
-                    const char d = at(mPos);
-                    if (d == '\\' && mPos + 1 < mText.size())
-                    {
-                        take();
-                        take();
-                    }
-                    else if (d == c)
-                    {
-                        take();
-                        break;
-                    }
-                    else if (d == '\n')
-                    {
-                        // Luau's error; the string ends where the line does.
-                        break;
-                    }
-                    else
-                    {
-                        take();
-                    }
-                }
+                takeQuoted(c);
                 finish();
             }
             else if (c == '`')
             {
                 start(Kind::String);
-                take();
-                S32 depth = 0;
-                while (mPos < mText.size())
-                {
-                    const char d = at(mPos);
-                    if (d == '\\' && mPos + 1 < mText.size())
-                    {
-                        take();
-                        take();
-                    }
-                    else if (d == '{')
-                    {
-                        ++depth;
-                        take();
-                    }
-                    else if (d == '}' && depth > 0)
-                    {
-                        --depth;
-                        take();
-                    }
-                    else if (d == '`' && depth == 0)
-                    {
-                        take();
-                        break;
-                    }
-                    else
-                    {
-                        take();
-                    }
-                }
+                mInterpolating = 0;
+                takeInterpolated();
                 finish();
             }
             else
@@ -606,9 +555,113 @@ namespace
             }
         }
 
+        // A string in quotes, to its closing quote or the end of its line,
+        // where Luau ends one that is not closed.
+        void takeQuoted(char quote)
+        {
+            take();
+            while (mPos < mText.size())
+            {
+                const char d = at(mPos);
+                if (d == '\\' && mPos + 1 < mText.size())
+                {
+                    take();
+                    take();
+                }
+                else if (d == quote)
+                {
+                    take();
+                    return;
+                }
+                else if (d == '\n')
+                {
+                    return;
+                }
+                else
+                {
+                    take();
+                }
+            }
+        }
+
+        // An interpolated string, to its closing backtick, each `{...}` in
+        // it an expression whose own strings -- quoted, long or
+        // interpolated -- are taken whole, so that a brace or a backtick
+        // inside one ends nothing. Nested past a sensible depth, the rest
+        // is taken as it comes.
+        void takeInterpolated()
+        {
+            ++mInterpolating;
+            take();
+            while (mPos < mText.size())
+            {
+                const char d = at(mPos);
+                if (d == '\\' && mPos + 1 < mText.size())
+                {
+                    take();
+                    take();
+                }
+                else if (d == '`')
+                {
+                    take();
+                    break;
+                }
+                else if (d == '{')
+                {
+                    take();
+                    takeInterpolation();
+                }
+                else
+                {
+                    take();
+                }
+            }
+            --mInterpolating;
+        }
+
+        void takeInterpolation()
+        {
+            constexpr S32 MOST_NESTED = 32;
+            S32           depth       = 0;
+            while (mPos < mText.size())
+            {
+                const char d = at(mPos);
+                if ((d == '"' || d == '\'') && mInterpolating < MOST_NESTED)
+                {
+                    takeQuoted(d);
+                }
+                else if (d == '`' && mInterpolating < MOST_NESTED)
+                {
+                    takeInterpolated();
+                }
+                else if (d == '[' && longBracket(mPos) >= 0 && mInterpolating < MOST_NESTED)
+                {
+                    takeLong(longBracket(mPos));
+                }
+                else if (d == '{')
+                {
+                    ++depth;
+                    take();
+                }
+                else if (d == '}')
+                {
+                    take();
+                    if (depth-- == 0)
+                    {
+                        return;
+                    }
+                }
+                else
+                {
+                    take();
+                }
+            }
+        }
+
         bool             mLua;
         S32              mFile;
         bool             mVerbatim;
+        S32              mInterpolating = 0;
         std::string_view mText;
         size_t           mPos    = 0;
         S32              mLine   = 0;
@@ -642,6 +695,28 @@ namespace
             ++i;
         }
         return s.substr(i);
+    }
+
+    // Text as a string literal both languages read back as the text: a
+    // name -- a script's, a file's, an agent's -- may hold a quote or a
+    // backslash, and a Windows path holds nothing but.
+    std::string literalOf(std::string_view text)
+    {
+        std::string out = "\"";
+        for (const char c : text)
+        {
+            switch (c)
+            {
+                case '"':  out += "\\\""; break;
+                case '\\': out += "\\\\"; break;
+                case '\n': out += "\\n"; break;
+                case '\r': out += "\\r"; break;
+                case '\t': out += "\\t"; break;
+                default:   out += c; break;
+            }
+        }
+        out += '"';
+        return out;
     }
 
     size_t skipBlank(const Tokens& tokens, size_t i)
@@ -806,6 +881,8 @@ namespace
         // What the run has made so far, against the budget.
         size_t                                  mMade    = 0;
         bool                                    mOverran = false;
+        // How deep argument expansion has gone.
+        S32                                     mExpandDepth = 0;
         // Tokens to read before the file: what an expansion made, to be
         // scanned again, and what a look-ahead gave back.
         std::deque<Token>                       mPending;
@@ -867,6 +944,20 @@ namespace
         f->name    = name;
         f->assetId = assetId;
         f->tokens  = Lexer(mOptions.lua, f->index).run(text);
+        // A file opened is tokens made, against the budget like any
+        // other: a file that includes itself twice, as many levels down as
+        // the include depth allows, is more files than there are.
+        Token at;
+        at.file = mFiles.empty() ? 0 : mFiles.back()->index;
+        if (!mFiles.empty() && !mFiles.back()->tokens.empty())
+        {
+            const FileState& asking = *mFiles.back();
+            at = asking.tokens[std::min(asking.pos, asking.tokens.size()) - (asking.pos > 0 ? 1 : 0)];
+        }
+        if (!spend(f->tokens.size(), at))
+        {
+            return;
+        }
         mFiles.push_back(std::move(f));
     }
 
@@ -1045,11 +1136,11 @@ namespace
             case Macro::Dynamic::File:
             case Macro::Dynamic::ShortFile:
                 out.kind = Kind::String;
-                out.text = "\"" + f.name + "\"";
+                out.text = literalOf(f.name);
                 break;
             case Macro::Dynamic::AssetId:
                 out.kind = Kind::String;
-                out.text = "\"" + (f.assetId.empty() ? std::string("NOT_IN_WORLD") : f.assetId) + "\"";
+                out.text = literalOf(f.assetId.empty() ? std::string("NOT_IN_WORLD") : f.assetId);
                 break;
             case Macro::Dynamic::None:
                 return false;
@@ -1383,8 +1474,28 @@ namespace
 
     Tokens Engine::expandAll(const Tokens& in)
     {
-        // The list on its own: nothing of the file behind it, and its
-        // output to a list of its own.
+        // A macro's argument expanded before it goes in, and a macro in
+        // that argument's own argument before that: each a level of the
+        // machine's stack, so `F(F(F(...)))` is bounded as an expression
+        // is, and a run that reaches the bound stops.
+        struct Level
+        {
+            S32& depth;
+            explicit Level(S32& d) : depth(++d) {}
+            ~Level() { --depth; }
+        } level(mExpandDepth);
+        if (mExpandDepth > mOptions.macroDepth)
+        {
+            if (!mOverran)
+            {
+                mOverran        = true;
+                mResult.overran = true;
+                problem(ALScriptProblem::Severity::Error, "PreprocMacrosTooDeep",
+                        "macros are invoked inside each other's arguments more deeply than this preprocessor follows; nothing was preprocessed", {},
+                        in.empty() ? Token() : in.front());
+            }
+            return in;
+        }
         std::deque<Token> pending;
         pending.swap(mPending);
         const bool isolated = mIsolated;
@@ -1541,6 +1652,13 @@ namespace
 
         S64 ternary()
         {
+            // A chain of them -- `a ? b ? c ? ...` -- is a level each, as
+            // a bracket is.
+            Deeper deeper(*this);
+            if (!deeper.ok)
+            {
+                return 0;
+            }
             S64 c = binary(1);
             if (accept("?"))
             {
@@ -3164,7 +3282,7 @@ namespace
                         {
                             out.push_back(synth(Kind::Ident, "__modules", t));
                             out.push_back(synth(Kind::Punct, "[", t));
-                            out.push_back(synth(Kind::String, "\"" + key + "\"", t));
+                            out.push_back(synth(Kind::String, literalOf(key), t));
                             out.push_back(synth(Kind::Punct, "]", t));
                             i = c + 1;
                             continue;
@@ -3202,7 +3320,7 @@ namespace
             {
                 word(Kind::Ident, "__modules");
                 word(Kind::Punct, "[");
-                word(Kind::String, "\"" + module.first + "\"");
+                word(Kind::String, literalOf(module.first));
                 word(Kind::Punct, "]");
                 word(Kind::Space, " ");
                 word(Kind::Punct, "=");
@@ -3425,10 +3543,10 @@ ALPreprocessor::Result ALPreprocessor::run(std::string_view source, const Option
     engine.predefine("__UNIXTIME__ " + std::to_string(now));
     if (!options.agentId.empty())
     {
-        engine.predefine("__AGENTKEY__ \"" + options.agentId + "\"");
-        engine.predefine("__AGENTID__ \"" + options.agentId + "\"");
+        engine.predefine("__AGENTKEY__ " + literalOf(options.agentId));
+        engine.predefine("__AGENTID__ " + literalOf(options.agentId));
         engine.predefine("__AGENTIDRAW__ " + options.agentId);
-        engine.predefine("__AGENTNAME__ \"" + options.agentName + "\"");
+        engine.predefine("__AGENTNAME__ " + literalOf(options.agentName));
     }
     for (const std::string& define : options.defines)
     {

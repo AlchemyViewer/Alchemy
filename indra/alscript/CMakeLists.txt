@@ -9,6 +9,7 @@ add_library(alscript STATIC)
 target_sources(
   alscript
   PRIVATE
+    aldiskincludes.cpp
     allslinliner.cpp
     almessagemap.cpp
     allsloptimizer.cpp
@@ -19,6 +20,7 @@ target_sources(
     alpreprocessor.cpp
     alscriptenvelope.cpp
     alscriptformatter.cpp
+    alscriptstack.cpp
     alsourcemap.cpp
 )
 
@@ -27,6 +29,7 @@ target_sources(
   PUBLIC
     FILE_SET HEADERS
       FILES
+        aldiskincludes.h
         allslinliner.h
         almessagemap.h
         allsloptimizer.h
@@ -40,6 +43,7 @@ target_sources(
         alscriptenvelope.h
         alscriptformatter.h
         alscriptproblem.h
+        alscriptstack.h
         alscriptsymbol.h
         alsourcemap.h
 )
@@ -65,6 +69,8 @@ if(AL_BUILD_TESTS)
     LIBRARIES alscript llcommon
     DEFINES ${definitions_defines}
   )
+  al_add_test(aldiskincludes PROJECT alscript LIBRARIES alscript llcommon)
+  al_add_test(alscriptstack PROJECT alscript LIBRARIES alscript llcommon)
   al_add_test(alscriptenvelope PROJECT alscript LIBRARIES alscript llcommon)
   al_add_test(almessagemap PROJECT alscript LIBRARIES alscript llcommon)
   al_add_test(alluauconfig PROJECT alscript LIBRARIES alscript llcommon)

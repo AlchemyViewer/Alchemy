@@ -969,11 +969,35 @@ struct ALLuauService::Impl
     };
     boost::unordered_flat_map<std::string, Doc, ll::string_hash, std::equal_to<>> docs;
 
-    // The script checked, for a query; the text is what the resolver
-    // serves, and the front end lays out the module again only when it
-    // has been marked.
+    // What each of the front end's two modules -- a query's and
+    // autocomplete's -- was last checked from: the text, and whether in
+    // strict mode, which is a query's, rather than the script's own. A
+    // check of one dirties the other, the source being one.
+    struct Checked
+    {
+        std::string text;
+        bool        strict = false;
+        bool        valid  = false;
+    };
+    Checked plain;
+    Checked autocomplete;
+    // How many times a script has been type checked, for a test that
+    // says a question asked again is not.
+    size_t  checks = 0;
+
+    // The script checked, for a query, unless the module is already the
+    // one it would make: every hover, every signature and every
+    // completion asked it again, and a type check of a long script is
+    // the dearest thing here. Strict, whatever the script's own mode, so
+    // that what a query reads -- every local's type, which nonstrict
+    // mode does not work out -- is the same whichever came first.
     void checked(std::string_view source, bool for_autocomplete)
     {
+        Checked& was = for_autocomplete ? autocomplete : plain;
+        if (was.valid && was.strict && was.text == source && frontend->getSourceModule(SCRIPT_MODULE))
+        {
+            return;
+        }
         if (files.text != source)
         {
             files.text.assign(source);
@@ -985,11 +1009,20 @@ struct ALLuauService::Impl
         {
             options.forAutocomplete = true;
         }
-        // A query wants every local's type, which nonstrict mode does not
-        // work out.
         configs.config.mode = Luau::Mode::Strict;
         frontend->check(SCRIPT_MODULE, options);
         configs.config.mode = configs.checkMode;
+        ++checks;
+        (for_autocomplete ? plain : autocomplete).valid = false;
+        was.text   = std::string(source);
+        was.strict = true;
+        was.valid  = true;
+    }
+
+    void forgetChecks()
+    {
+        plain.valid        = false;
+        autocomplete.valid = false;
     }
 
     const Doc* docFor(const std::optional<std::string>& symbol) const
@@ -1068,8 +1101,14 @@ bool ALLuauService::loadDefinitions(std::string_view source, std::string& error)
     Luau::freeze(frontend->globalsForAutocomplete.globalTypes);
     mImpl->frontend    = std::move(frontend);
     mImpl->definitions = true;
+    mImpl->forgetChecks();
     error.clear();
     return true;
+}
+
+size_t ALLuauService::typeChecks() const
+{
+    return mImpl->checks;
 }
 
 bool ALLuauService::hasDefinitions() const
@@ -1107,8 +1146,17 @@ bool ALLuauService::hasDocs() const
 
 void ALLuauService::setConfig(const ALLuauConfig& config)
 {
-    ModeResolver& configs = mImpl->configs;
-    configs.checkMode     = config.mode == "strict" ? Luau::Mode::Strict : config.mode == "nocheck" ? Luau::Mode::NoCheck : Luau::Mode::Nonstrict;
+    ModeResolver&    configs = mImpl->configs;
+    const Luau::Mode mode    = config.mode == "strict" ? Luau::Mode::Strict : config.mode == "nocheck" ? Luau::Mode::NoCheck : Luau::Mode::Nonstrict;
+    // Told before every question whether or not anything changed: the
+    // same configuration leaves what was checked as it is.
+    if (mImpl->frontend && configs.checkMode == mode && configs.config.enabledLint.warningMask == config.lints &&
+        configs.config.fatalLint.warningMask == config.fatalLints && configs.config.lintErrors == config.lintErrors &&
+        configs.config.globals == config.globals)
+    {
+        return;
+    }
+    configs.checkMode     = mode;
     configs.config.mode   = configs.checkMode;
     configs.config.enabledLint.warningMask = config.lints;
     configs.config.fatalLint.warningMask   = config.fatalLints;
@@ -1117,6 +1165,7 @@ void ALLuauService::setConfig(const ALLuauConfig& config)
     // The globals are bound into the environment as the script is
     // checked; a change to them is a change to the script.
     mImpl->frontend->markDirty(SCRIPT_MODULE);
+    mImpl->forgetChecks();
 }
 
 ALScriptProblems ALLuauService::check(std::string_view source)
@@ -1126,6 +1175,13 @@ ALScriptProblems ALLuauService::check(std::string_view source)
     impl.frontend->markDirty(SCRIPT_MODULE);
     impl.configs.config.mode = impl.configs.checkMode;
     Luau::CheckResult result = impl.frontend->check(SCRIPT_MODULE);
+    ++impl.checks;
+    // The module is the script's own mode's now: a query's is checked
+    // again, strict, unless that is the script's mode too.
+    impl.forgetChecks();
+    impl.plain.text   = std::string(source);
+    impl.plain.strict = impl.configs.checkMode == Luau::Mode::Strict;
+    impl.plain.valid  = true;
 
     ALScriptProblems problems;
     problems.reserve(result.errors.size() + result.lintResult.errors.size() + result.lintResult.warnings.size());
@@ -1469,7 +1525,10 @@ ALScriptSignature ALLuauService::signature(std::string_view source, S32 line, S3
     // The parameters as they print, the first dropped when the call
     // passes it as self.
     const auto [arg_types, tail] = Luau::flatten(function->argTypes);
-    const size_t skip = (call->self || function->hasSelf) && !arg_types.empty() ? 1 : 0;
+    // Only where the call itself passes it: a method called with a dot
+    // is given its object as its first argument, which is a parameter
+    // like any other there.
+    const size_t skip = call->self && !arg_types.empty() ? 1 : 0;
     for (size_t i = skip; i < arg_types.size(); ++i)
     {
         std::string parameter;
@@ -1579,12 +1638,10 @@ ALScriptReferences ALLuauService::references(std::string_view source, S32 line, 
 std::vector<ALScriptOutlineEntry> ALLuauService::outline(std::string_view source)
 {
     Impl& impl = *mImpl;
-    // The text just checked is laid out already; anything else is checked
-    // now, since the types beside the names come from the check.
-    if (impl.files.text != source || !impl.frontend->getSourceModule(SCRIPT_MODULE))
-    {
-        impl.checked(source, /*for_autocomplete*/ false);
-    }
+    // The types beside the names come from a query's check, as a hover's
+    // do, whatever came before: a check in the script's own mode works out
+    // fewer of them.
+    impl.checked(source, /*for_autocomplete*/ false);
     const Luau::SourceModule* module_source = impl.frontend->getSourceModule(SCRIPT_MODULE);
     const Luau::ModulePtr     module        = impl.frontend->moduleResolver.getModule(SCRIPT_MODULE);
     if (!module_source || !module_source->root)
@@ -1601,10 +1658,7 @@ std::vector<ALScriptOutlineEntry> ALLuauService::outline(std::string_view source
 std::vector<ALScriptSemanticToken> ALLuauService::semanticTokens(std::string_view source)
 {
     Impl& impl = *mImpl;
-    if (impl.files.text != source || !impl.frontend->getSourceModule(SCRIPT_MODULE))
-    {
-        impl.checked(source, /*for_autocomplete*/ false);
-    }
+    impl.checked(source, /*for_autocomplete*/ false);
     const Luau::SourceModule* module_source = impl.frontend->getSourceModule(SCRIPT_MODULE);
     const Luau::ModulePtr     module        = impl.frontend->moduleResolver.getModule(SCRIPT_MODULE);
     if (!module_source || !module || !module_source->root)
@@ -1629,10 +1683,7 @@ std::vector<ALScriptInlayHint> ALLuauService::inlayHints(std::string_view source
     {
         return {};
     }
-    if (impl.files.text != source || !impl.frontend->getSourceModule(SCRIPT_MODULE))
-    {
-        impl.checked(source, /*for_autocomplete*/ false);
-    }
+    impl.checked(source, /*for_autocomplete*/ false);
     const Luau::SourceModule* module_source = impl.frontend->getSourceModule(SCRIPT_MODULE);
     const Luau::ModulePtr     module        = impl.frontend->moduleResolver.getModule(SCRIPT_MODULE);
     if (!module_source || !module || !module_source->root)

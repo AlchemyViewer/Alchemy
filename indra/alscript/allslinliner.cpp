@@ -333,6 +333,44 @@ namespace
         return names;
     }
 
+    // Whether every variable a stretch of the function reads that the
+    // function does not declare -- a global -- is the same variable where
+    // the call is. A local of the caller's may have the global's name, and
+    // the text put in place would then read or write the local: a body is
+    // put in place only where each such name means there what it means in
+    // the function.
+    bool meansTheSameAt(LSLASTNode* stretch, const std::set<LSLSymbol*>& own, LSLASTNode* at)
+    {
+        for (LSLASTNode* n : nodesOf(stretch))
+        {
+            if (n->getNodeType() != NODE_EXPRESSION || n->getNodeSubType() != NODE_LVALUE_EXPRESSION)
+            {
+                continue;
+            }
+            LSLIdentifier* id  = static_cast<LSLLValueExpression*>(n)->getIdentifier();
+            LSLSymbol*     sym = id ? id->getSymbol() : nullptr;
+            if (!sym || own.count(sym) || sym->getSubType() == SYM_BUILTIN)
+            {
+                continue;
+            }
+            // The first scope up from the call that has the name has the
+            // variable the text there would mean.
+            LSLSymbol* there = nullptr;
+            for (LSLASTNode* up = at; up && !there; up = up->getParent())
+            {
+                if (LSLSymbolTable* table = up->getSymbolTable())
+                {
+                    there = table->lookup(sym->getName(), SYM_VARIABLE);
+                }
+            }
+            if (there != sym)
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
     bool isBuiltinOrKeyword(const std::string& name, ScriptContext& context)
     {
         static const char* const keywords[] = { "default", "state", "event", "jump", "return", "if", "else", "for", "do", "while", "print", "integer",
@@ -472,6 +510,12 @@ namespace
                 {
                     declared.insert(static_cast<LSLDeclaration*>(n)->getIdentifier()->getSymbol());
                 }
+            }
+            // What the body reads of the script's own must be what the
+            // same names are where the call is.
+            if (!meansTheSameAt(body, declared, statement))
+            {
+                return false;
             }
             const Names visible = visibleFrom(statement);
             Names       taken   = visible;
@@ -620,6 +664,17 @@ namespace
                 {
                     simple = false;
                 }
+            }
+            // What the expression reads that is not a parameter must be
+            // what the same name is where the call is.
+            std::set<LSLSymbol*> own;
+            for (LSLIdentifier* p : params)
+            {
+                own.insert(p->getSymbol());
+            }
+            if (!meansTheSameAt(expr, own, call))
+            {
+                return false;
             }
             std::map<LSLSymbol*, int> uses;
             for (LSLASTNode* n : nodesOf(expr))

@@ -523,4 +523,62 @@ namespace tut
             ensure(std::string("keyed ") + c.key + " for " + c.script + ": " + said(problems), keyed);
         }
     }
+    template<> template<>
+    void alluauservice_object::test<20>()
+    {
+        set_test_name("a question asked again of the same text is answered from the check made, and what goes beside the text is the same whatever came first");
+        ensure("definitions loaded: " + error, loaded);
+        const std::string script = "local function f(a) return a + 1 end\nlocal y = f(2)\nlocal z = y * 2\nprint(z)\n";
+        ALLuauConfig      config;
+        service.setConfig(config);
+        // Hints after a check, in the script's own mode.
+        service.check(script);
+        const std::vector<ALScriptInlayHint> after_check = service.inlayHints(script, true, true);
+        const size_t                         checked     = service.typeChecks();
+        // Asked again, in every way, of the same text: nothing checked again.
+        service.hover(script, 1, 6);
+        service.hover(script, 2, 6);
+        service.signature(script, 1, 13);
+        service.references(script, 1, 6);
+        service.outline(script);
+        service.semanticTokens(script);
+        ensure_equals("the queries share the one check", service.typeChecks(), checked);
+        service.setConfig(config);
+        service.hover(script, 1, 6);
+        ensure_equals("the same configuration again changes nothing", service.typeChecks(), checked);
+        // A text asked about before a check has what a hover does.
+        const std::vector<ALScriptInlayHint> after_hover = service.inlayHints(script, true, true);
+        ensure_equals("as many hints", after_hover.size(), after_check.size());
+        for (size_t i = 0; i < after_hover.size(); ++i)
+        {
+            ensure("the same hint: " + after_hover[i].text + " / " + after_check[i].text,
+                   after_hover[i].text == after_check[i].text && after_hover[i].line == after_check[i].line);
+        }
+        // Another configuration, or another text, is checked again.
+        ALLuauConfig strict;
+        strict.mode = "strict";
+        service.setConfig(strict);
+        service.hover(script, 1, 6);
+        ensure("another configuration, checked again", service.typeChecks() > checked);
+        const size_t now = service.typeChecks();
+        service.hover(script + "print(y)\n", 1, 6);
+        ensure("another text, checked again", service.typeChecks() > now);
+        service.setConfig(config);
+    }
+
+    template<> template<>
+    void alluauservice_object::test<21>()
+    {
+        set_test_name("a method called with a dot is given its object as its first argument, and the signature counts it");
+        ensure("definitions loaded: " + error, loaded);
+        const std::string script = "local T = {}\nfunction T:m(a: number, b: string) end\nT.m(T, 1, \"x\")\nT:m(1, \"x\")\n";
+        ALScriptSignature dotted = service.signature(script, 2, 12);  // in "x"
+        ensure("found", dotted.found);
+        ensure_equals("self, a and b: " + dotted.label, dotted.parameters.size(), size_t(3));
+        ensure_equals("at the third", dotted.active, 2);
+        ensure("which is b: " + dotted.parameters[2], dotted.parameters[2].find("b") == 0);
+        ALScriptSignature colon = service.signature(script, 3, 9);  // in "x"
+        ensure_equals("with a colon, a and b", colon.parameters.size(), size_t(2));
+        ensure("at b: " + colon.parameters[static_cast<size_t>(std::max(0, colon.active))], colon.active == 1 && colon.parameters[1].find("b") == 0);
+    }
 }

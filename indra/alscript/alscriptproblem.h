@@ -79,17 +79,26 @@ struct ALScriptProblem
     std::string              key;
     std::vector<std::string> args;
 
-    // `text` with [1], [2] ... replaced by the args, in order.
+    // `text` with [1], [2] ... replaced by the args, in one pass: a word
+    // that holds a mark of its own -- a file named `a[2].lsl` -- is put in
+    // as it is, not filled in turn.
     static std::string fill(std::string_view text, const std::vector<std::string>& args)
     {
-        std::string out(text);
-        for (size_t i = 0; i < args.size() && i < 9; ++i)
+        std::string out;
+        out.reserve(text.size());
+        for (size_t i = 0; i < text.size(); ++i)
         {
-            const std::string mark = "[" + std::to_string(i + 1) + "]";
-            for (size_t at = out.find(mark); at != std::string::npos; at = out.find(mark, at + args[i].size()))
+            if (text[i] == '[' && i + 2 < text.size() && text[i + 1] >= '1' && text[i + 1] <= '9' && text[i + 2] == ']')
             {
-                out.replace(at, mark.size(), args[i]);
+                const size_t n = static_cast<size_t>(text[i + 1] - '1');
+                if (n < args.size())
+                {
+                    out += args[n];
+                    i += 2;
+                    continue;
+                }
             }
+            out += text[i];
         }
         return out;
     }

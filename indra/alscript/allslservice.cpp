@@ -850,6 +850,11 @@ struct ALLSLService::Impl
     std::string                                    text;
     Tailslide::LSLScript*                          script = nullptr;
     bool                                           parsed = false;
+    // Whether a check has run its later passes over the tree: each says
+    // what it finds into the parser's log, so a second run over the same
+    // tree says everything twice, and one for the other target says it
+    // on top of what the first said.
+    bool                                           passesRan = false;
 
     // The tree for a text, parsed and resolved if it is not the one in
     // hand. Null where it does not parse.
@@ -861,8 +866,9 @@ struct ALLSLService::Impl
         }
         parser = std::make_unique<Tailslide::ScopedScriptParser>(nullptr);
         text.assign(source);
-        script = parser->parseLSLBytes(text.data(), static_cast<int>(text.size()));
-        parsed = script != nullptr && !parser->logger.getErrors();
+        script    = parser->parseLSLBytes(text.data(), static_cast<int>(text.size()));
+        parsed    = script != nullptr && !parser->logger.getErrors();
+        passesRan = false;
         if (script)
         {
             script->collectSymbols();
@@ -871,14 +877,16 @@ struct ALLSLService::Impl
         return script;
     }
 
-    // The tree let go of: what a check that runs the later passes over
-    // it leaves behind, since those passes change it.
+    // The tree let go of: what a check that has run the later passes
+    // over it leaves behind, since those passes change it and say what
+    // they find into its log.
     void forget()
     {
         parser.reset();
         text.clear();
-        script = nullptr;
-        parsed = false;
+        script    = nullptr;
+        parsed    = false;
+        passesRan = false;
         mendedParser.reset();
         mendedFor.clear();
         mended = nullptr;
@@ -1002,6 +1010,12 @@ ALScriptProblems ALLSLService::check(std::string_view source, bool mono)
     // passes change it, but only in ways the queries read -- the
     // symbols, the types and the reference data they themselves ask
     // for -- so the four questions of one request share one parse.
+    // A tree already checked is parsed afresh: the passes have spoken
+    // into its log once, and would say it all again.
+    if (mImpl->passesRan)
+    {
+        mImpl->forget();
+    }
     Tailslide::LSLScript* script = mImpl->resolve(source);
     if (script)
     {
@@ -1010,6 +1024,7 @@ ALScriptProblems ALLSLService::check(std::string_view source, bool mono)
         script->finalPass();
         script->validateGlobals(mono);
         script->checkSymbols();
+        mImpl->passesRan = true;
     }
     Tailslide::ScopedScriptParser& parser = *mImpl->parser;
 

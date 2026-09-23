@@ -202,4 +202,33 @@ namespace tut
         ensure_equals("const and export", lua("export const n=1\nconst function f(a,b)\nreturn a+b\nend\n"),
                       std::string("export const n = 1\nconst function f(a, b)\n    return a + b\nend\n"));
     }
+    template<> template<>
+    void alscriptformatter_object::test<7>()
+    {
+        set_test_name("a directive continued over several lines is the directive's: its braces open and close nothing of the script's");
+        const std::string text =
+            "#define BLOCK(x) { \\\n"
+            "      llSay(0, x); \\\n"
+            "}\n"
+            "default\n"
+            "{\n"
+            "state_entry()\n"
+            "{\n"
+            "BLOCK(\"hi\")\n"
+            "}\n"
+            "}\n";
+        const std::string out = lsl(text);
+        ensure_equals("the macro as written, the script as it should be",
+                      out,
+                      std::string("#define BLOCK(x) { \\\n"
+                                  "      llSay(0, x); \\\n"
+                                  "}\n"
+                                  "default\n"
+                                  "{\n"
+                                  "    state_entry()\n"
+                                  "    {\n"
+                                  "        BLOCK(\"hi\")\n"
+                                  "    }\n"
+                                  "}\n"));
+    }
 }

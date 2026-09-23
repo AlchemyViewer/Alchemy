@@ -724,7 +724,7 @@ end</floater.string>
              layout="topleft"
              left="12"
              name="preproc_disk"
-             tool_tip="An #include may name a file in the folders below, looked for in order after the object and inventory unless the order below says otherwise"
+             tool_tip="An #include may name a file in the folders below, looked for in order after the object and inventory unless the order below says otherwise. Nothing else on the disk is read, but where a .lslrc or .luaurc on disk points"
              top_pad="6"
              width="370" />
             <scroll_list

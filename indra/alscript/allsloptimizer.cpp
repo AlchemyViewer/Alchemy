@@ -2173,18 +2173,35 @@ namespace
             const LSLIType    type = expr->getIType();
             const bool        keepLeft  = left->getIType() == type;
             const bool        keepRight = right->getIType() == type;
+            const bool        numeric   = type == LST_INTEGER || type == LST_FLOATINGPOINT;
             const auto        zero      = [](LSLASTNode* n) { return isInteger(n, 0) || isFloat(n, 0.0); };
             const auto        one       = [](LSLASTNode* n) { return isInteger(n, 1) || isFloat(n, 1.0); };
             switch (op)
             {
                 case OP_PLUS:
-                    if (keepLeft && (zero(right) || isEmptyString(right) || isEmptyList(right))) return keep(expr, 0);
-                    if (keepRight && (zero(left) || isEmptyString(left) || isEmptyList(left))) return keep(expr, 1);
-                    if (keepLeft && negative(right)) return resign(expr, OP_MINUS);
+                    // What adds nothing, by what the sum is: an empty
+                    // string to a string, an empty list to a list, and a
+                    // zero to an integer. A list plus anything else is that
+                    // list with one more element -- `l + 0` appends a zero,
+                    // and so does `(list)a + 0`, which is what a list's
+                    // literal is written as -- and a float plus zero is not
+                    // the float where the float is -0.0.
+                    if (keepLeft && ((type == LST_INTEGER && zero(right)) || (type == LST_STRING && isEmptyString(right)) ||
+                                     (type == LST_LIST && isEmptyList(right))))
+                    {
+                        return keep(expr, 0);
+                    }
+                    if (keepRight && ((type == LST_INTEGER && zero(left)) || (type == LST_STRING && isEmptyString(left)) ||
+                                      (type == LST_LIST && isEmptyList(left))))
+                    {
+                        return keep(expr, 1);
+                    }
+                    if (numeric && keepLeft && negative(right)) return resign(expr, OP_MINUS);
                     break;
                 case OP_MINUS:
-                    if (keepLeft && zero(right)) return keep(expr, 0);
-                    if (keepLeft && negative(right)) return resign(expr, OP_PLUS);
+                    // Taking zero away leaves a number as it was, -0.0 too.
+                    if (numeric && keepLeft && zero(right)) return keep(expr, 0);
+                    if (numeric && keepLeft && negative(right)) return resign(expr, OP_PLUS);
                     break;
                 case OP_MUL:
                     if (keepLeft && one(right)) return keep(expr, 0);
@@ -2253,14 +2270,19 @@ namespace
                 inner = bare(child);
                 if (inner->getNodeSubType() == NODE_BINARY_EXPRESSION && inner->getIType() == LST_INTEGER)
                 {
-                    // !(a == b) is a != b, and the other way; the orderings
-                    // only for integers, which have no NaN.
+                    // !(a != b) is a == b, whatever they are: both are
+                    // true or false. !(a == b) is a != b only for numbers --
+                    // a list's != is the difference of the lengths, and
+                    // LSO's for a string is not only one or zero -- and the
+                    // orderings only for integers, which have no NaN.
                     auto*       bin      = static_cast<LSLBinaryExpression*>(inner);
                     LSLOperator opposite = OP_NONE;
+                    const auto  number   = [](LSLExpression* e) { return e->getIType() == LST_INTEGER || e->getIType() == LST_FLOATINGPOINT; };
                     const bool  ints     = bin->getLHS()->getIType() == LST_INTEGER && bin->getRHS()->getIType() == LST_INTEGER;
+                    const bool  numbers  = number(bin->getLHS()) && number(bin->getRHS());
                     switch (bin->getOperation())
                     {
-                        case OP_EQ: opposite = OP_NEQ; break;
+                        case OP_EQ: opposite = numbers ? OP_NEQ : OP_NONE; break;
                         case OP_NEQ: opposite = OP_EQ; break;
                         case OP_LESS: opposite = ints ? OP_GEQ : OP_NONE; break;
                         case OP_GREATER: opposite = ints ? OP_LEQ : OP_NONE; break;
@@ -2268,7 +2290,7 @@ namespace
                         case OP_GEQ: opposite = ints ? OP_LESS : OP_NONE; break;
                         default: break;
                     }
-                    if (opposite != OP_NONE && (bin->getLHS()->getIType() != LST_LIST || opposite == OP_EQ || opposite == OP_NEQ))
+                    if (opposite != OP_NONE)
                     {
                         const std::string was = render(expr);
                         bin->setOperation(opposite);

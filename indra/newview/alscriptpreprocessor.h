@@ -25,6 +25,7 @@
 
 #pragma once
 
+#include "aldiskincludes.h"
 #include "alluauconfig.h"
 #include "alpreprocessor.h"
 #include "alscriptworkspace.h"
@@ -185,14 +186,22 @@ private:
     };
     // `unknown` says the object's contents have not been listed yet, so
     // a name not found may still be there.
-    std::vector<Candidate> candidatesFor(const ALPreprocessor::Ask& ask, const Request& request, bool& unknown);
+    std::vector<Candidate> candidatesFor(const ALPreprocessor::Ask& ask, const Request& request, const std::vector<std::string>& alias_folders,
+                                         bool& unknown);
+    // The folders on disk an include asked for may come from: the
+    // scripter's include folders while disk includes are on, and what a
+    // `.lslrc` or `.luaurc` on disk lists -- `alias_folders` being those
+    // the run's aliases have blessed so far. Nothing else, ever.
+    ALDiskIncludes         blessedFor(const ALPreprocessor::Ask& ask, const Request& request, const std::vector<std::string>& alias_folders);
     // Every item of a name, from the walk or from the last one.
     const LLInventoryModel::item_array_t& namedItems(const std::string& name);
     // `retry` asks again for what failed before rather than taking the
     // failure for an answer: what a run's first round does, since an
     // include that was not there may be there now.
+    // `alias_folders` gathers the folders the aliases of a `.luaurc` on
+    // disk bless, for the rest of a run.
     ALPreprocessor::Found  resolve(const ALPreprocessor::Ask& ask, ALPreprocessor::Include& out, const Request& request, wanted_t* wanted,
-                                   bool retry);
+                                   bool retry, std::vector<std::string>* alias_folders = nullptr);
     // The `.luaurc` that governs a file, by the file's identity: its own
     // identity and its text, fetched like an include where it is in the
     // world. No where there is none.
@@ -248,6 +257,9 @@ private:
     // The oldest let go of until what is held is within the budget.
     void                                                                            trimTexts();
     wanted_t                                                                        mFailed;
+    // The files on disk a run has admitted, by identity: what the studio
+    // may ask the text of, and nothing else on the disk.
+    wanted_t                                                                        mAdmitted;
     // What each prim was last said to hold.
     boost::unordered_flat_map<LLUUID, std::vector<ALScriptWorkspace::Item>>         mContents;
     // Every script and notecard of a name, from the last walk of the

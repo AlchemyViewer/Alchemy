@@ -543,4 +543,21 @@ namespace tut
         ensure("said as written: " + p.message, p.message.find("'default'") != std::string::npos);
         ensure("no bison left in it: " + p.message, p.message.find("syntax error") == std::string::npos && p.message.find("STATE_DEFAULT") == std::string::npos);
     }
+    template<> template<>
+    void allslservice_object::test<15>()
+    {
+        set_test_name("the same text checked again says what it says once, whatever was asked between, for either target");
+        ensure("builtins loaded: " + error, loaded);
+        const std::string script = "integer unused;\nlist g = [1, 2];\ninteger h = g;\ndefault\n{\n    state_entry()\n    {\n        integer never;\n    }\n}\n";
+        const ALScriptProblems first = service.check(script, true);
+        ensure("something to say: " + said(first), !first.empty());
+        service.outline(script);
+        service.hover(script, 0, 9);
+        const ALScriptProblems again = service.check(script, true);
+        ensure_equals("said once, the second time too", said(again), said(first));
+        const ALScriptProblems lso = service.check(script, false);
+        const ALScriptProblems back = service.check(script, true);
+        ensure_equals("and after the other target, nothing of it left", said(back), said(first));
+        ensure_equals("the other target, asked twice, the same", said(service.check(script, false)), said(lso));
+    }
 }

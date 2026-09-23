@@ -22,7 +22,7 @@
  * $/LicenseInfo$
  */
 
-#include "llviewerprecompiledheaders.h"
+#include "linden_common.h"
 
 #include "alscriptsnippets.h"
 
@@ -44,62 +44,66 @@ namespace ALScriptSnippets
             return std::string("snippets") + gDirUtilp->getDirDelimiter() + (lua ? "slua.xml" : "lsl.xml");
         }
 
-        void readInto(const std::string& file, bool builtin, std::vector<Snippet>& out)
+        // A backup's name beside a file: the first of `.unreadable`,
+        // `.unreadable.1` and on that is not taken.
+        std::string asideOf(const std::string& file)
         {
-            llifstream in(file.c_str());
-            if (!in.is_open())
+            std::string aside = file + ".unreadable";
+            for (int n = 1; LLFile::isfile(aside); ++n)
             {
-                return;
+                aside = file + ".unreadable." + std::to_string(n);
             }
-            LLSD list;
-            if (LLSDSerialize::fromXML(list, in) == LLSDParser::PARSE_FAILURE || !list.isArray())
-            {
-                LL_WARNS("ScriptStudio") << "The snippets at " << file << " could not be read" << LL_ENDL;
-                return;
-            }
-            for (LLSD::array_const_iterator it = list.beginArray(); it != list.endArray(); ++it)
-            {
-                Snippet one;
-                one.name    = (*it)["name"].asString();
-                one.prefix  = (*it)["prefix"].asString();
-                one.detail  = (*it)["detail"].asString();
-                one.body    = (*it)["body"].asString();
-                one.builtin = builtin;
-                if (!one.name.empty() && !one.body.empty())
-                {
-                    out.push_back(std::move(one));
-                }
-            }
+            return aside;
         }
     }
 
-    std::string path(bool lua)
+    bool readFrom(const std::string& file, bool builtin, std::vector<Snippet>& out)
     {
-        return gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, fileName(lua));
-    }
-
-    const std::vector<Snippet>& all(bool lua)
-    {
-        std::vector<Snippet>& out = sAll[lua ? 1 : 0];
-        if (!sLoaded[lua ? 1 : 0])
+        llifstream in(file.c_str());
+        if (!in.is_open())
         {
-            sLoaded[lua ? 1 : 0] = true;
-            out.clear();
-            readInto(gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS, fileName(lua)), true, out);
-            readInto(path(lua), false, out);
+            // No file is no snippets, which is nothing wrong.
+            return !LLFile::isfile(file);
         }
-        return out;
+        LLSD list;
+        if (LLSDSerialize::fromXML(list, in) == LLSDParser::PARSE_FAILURE || !list.isArray())
+        {
+            LL_WARNS("ScriptStudio") << "The snippets at " << file << " could not be read" << LL_ENDL;
+            return false;
+        }
+        for (LLSD::array_const_iterator it = list.beginArray(); it != list.endArray(); ++it)
+        {
+            Snippet one;
+            one.name    = (*it)["name"].asString();
+            one.prefix  = (*it)["prefix"].asString();
+            one.detail  = (*it)["detail"].asString();
+            one.body    = (*it)["body"].asString();
+            one.builtin = builtin;
+            if (!one.name.empty() && !one.body.empty())
+            {
+                out.push_back(std::move(one));
+            }
+        }
+        return true;
     }
 
-    std::vector<Snippet> own(bool lua)
+    bool writeTo(const std::string& file, const std::vector<Snippet>& snippets)
     {
-        std::vector<Snippet> out;
-        readInto(path(lua), false, out);
-        return out;
-    }
-
-    bool saveOwn(bool lua, const std::vector<Snippet>& snippets)
-    {
+        // A file there already that does not read as snippets is somebody's
+        // work all the same -- written by hand, and wrong by a comma -- and
+        // the tab could make nothing of it: kept beside, rather than
+        // written over with that nothing.
+        std::vector<Snippet> ignored;
+        if (LLFile::isfile(file) && !readFrom(file, false, ignored))
+        {
+            const std::string aside = asideOf(file);
+            if (LLFile::rename(file, aside) != 0)
+            {
+                LL_WARNS("ScriptStudio") << "The snippets at " << file << " could not be read, nor kept aside; not written over" << LL_ENDL;
+                return false;
+            }
+            LL_INFOS("ScriptStudio") << "The snippets at " << file << " could not be read, and are kept as " << aside << LL_ENDL;
+        }
         LLSD list = LLSD::emptyArray();
         for (const Snippet& one : snippets)
         {
@@ -126,11 +130,42 @@ namespace ALScriptSnippets
                                  "     where ${1:text}, ${2} and $1 are the places Tab goes through in order\n"
                                  "     and $0 is where the caret ends. The preferences' Snippets tab edits these. -->";
         text.insert(declared == std::string::npos ? 0 : declared + 2, note);
-        LLFile::mkdir(gDirUtilp->getDirName(path(lua)));
-        llofstream out(path(lua).c_str(), std::ios::binary);
+        llofstream out(file.c_str(), std::ios::binary);
         out << text;
         const bool written = out.good();
         out.close();
+        return written;
+    }
+
+    std::string path(bool lua)
+    {
+        return gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, fileName(lua));
+    }
+
+    const std::vector<Snippet>& all(bool lua)
+    {
+        std::vector<Snippet>& out = sAll[lua ? 1 : 0];
+        if (!sLoaded[lua ? 1 : 0])
+        {
+            sLoaded[lua ? 1 : 0] = true;
+            out.clear();
+            readFrom(gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS, fileName(lua)), true, out);
+            readFrom(path(lua), false, out);
+        }
+        return out;
+    }
+
+    std::vector<Snippet> own(bool lua)
+    {
+        std::vector<Snippet> out;
+        readFrom(path(lua), false, out);
+        return out;
+    }
+
+    bool saveOwn(bool lua, const std::vector<Snippet>& snippets)
+    {
+        LLFile::mkdir(gDirUtilp->getDirName(path(lua)));
+        const bool written = writeTo(path(lua), snippets);
         forget(lua);
         return written;
     }

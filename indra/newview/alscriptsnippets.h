@@ -55,6 +55,14 @@ namespace ALScriptSnippets
     // where the file could not be written.
     bool                        saveOwn(bool lua, const std::vector<Snippet>& snippets);
 
+    // The same, by file: the snippets a file holds, added to `out` --
+    // false where there is a file and it does not read as snippets; and
+    // snippets written to a file, one there already that does not read
+    // as snippets kept beside it, as its name with `.unreadable` after,
+    // rather than written over.
+    bool readFrom(const std::string& file, bool builtin, std::vector<Snippet>& out);
+    bool writeTo(const std::string& file, const std::vector<Snippet>& snippets);
+
     // Where the scripter's own are kept.
     std::string path(bool lua);
     // The file's text as it stands, or nothing where there is no file; and

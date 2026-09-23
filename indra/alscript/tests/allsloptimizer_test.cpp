@@ -681,4 +681,114 @@ namespace tut
         ensure("and said so: " + notes(stopped), !stopped.problems.empty() && stopped.problems.back().key == std::string("OptimizerStoppedEarly"));
         ensure("what it has stands", !stopped.text.empty());
     }
+    template<> template<>
+    void allsloptimizer_object::test<19>()
+    {
+        set_test_name("a list plus anything is one element longer: no zero, empty string or float is dropped from one, nor a literal's element");
+        const std::string source =
+            wrap("", "        list l = llGetPrimitiveParams([PRIM_SIZE]);\n"
+                     "        l = l + 0;\n"
+                     "        l = l + \"\";\n"
+                     "        l = 0.0 + l;\n"
+                     "        l = l + -1;\n"
+                     "        l = l + [];\n"
+                     "        string s = llList2String(l, 0) + \"\";\n"
+                     "        integer n = llGetListLength(l) + 0;\n"
+                     "        llSetPrimitiveParams([PRIM_TEXTURE, 0, s, <1, 1, 0>, ZERO_VECTOR, 0.0]);\n"
+                     "        llSay(n, llList2CSV(l) + s);\n");
+        ALLSLOptimizer::Result r = ALLSLOptimizer::run(source, options());
+        ensure("optimized", r.optimized);
+        ensure("a zero appended stays: " + r.text, r.text.find("l = l + 0;") != std::string::npos);
+        ensure("an empty string appended stays: " + r.text, r.text.find("l = l + \"\";") != std::string::npos);
+        ensure("a zero put in front stays: " + r.text, r.text.find("l = 0") != std::string::npos && r.text.find("+ l;") != std::string::npos);
+        ensure("a negative appended is not turned into a subtraction: " + r.text, r.text.find("l - 1") == std::string::npos);
+        ensure("an empty list adds nothing: " + r.text, r.text.find("l + [];") == std::string::npos);
+        ensure("nor an empty string to a string: " + r.text, r.text.find("llList2String(l, 0) + \"\"") == std::string::npos);
+        const size_t n_at = r.text.find("integer n = ");
+        ensure("the count", n_at != std::string::npos);
+        const std::string n_line = r.text.substr(n_at, r.text.find(';', n_at) - n_at);
+        ensure("nor a zero to an integer: " + n_line, n_line.find("+ 0") == std::string::npos);
+        // The literal's elements, however it is written now, all there:
+        // the texture's face and the glow.
+        const size_t call = r.text.find("llSetPrimitiveParams(");
+        ensure("the call", call != std::string::npos);
+        const std::string args = r.text.substr(call, r.text.find(';', call) - call);
+        ensure("the face, a zero: " + args, args.find("PRIM_TEXTURE + 0") != std::string::npos || args.find("PRIM_TEXTURE, 0") != std::string::npos);
+        ensure("and the last element: " + args, args.find("ZERO_VECTOR + 0") != std::string::npos || args.find("ZERO_VECTOR, 0") != std::string::npos);
+        // And what it wrote compiles.
+        ALLSLService service;
+        const ALScriptProblems said = service.check(r.text);
+        for (const ALScriptProblem& p : said)
+        {
+            ensure("no error in what was written: " + p.message + "\n" + r.text, p.severity != ALScriptProblem::Severity::Error);
+        }
+
+        // The preprocessor's lazy-list helper grows its list one zero at a
+        // time, and ends.
+        const std::string lazy = "list lazy_list_set(list L, integer i, list v)\n{\n    while (llGetListLength(L) < i)\n        L = L + 0;\n    return llListReplaceList(L, v, i, i);\n}\n" +
+                                 wrap("", "        list x;\n        x = lazy_list_set(x, 3, [1]);\n        llSay(0, llList2CSV(x));\n");
+        r = ALLSLOptimizer::run(lazy, options());
+        ensure("the list still grows: " + r.text, r.text.find("L = L + 0;") != std::string::npos);
+        ensure("rather than standing still", r.text.find("L = L;") == std::string::npos);
+    }
+
+    template<> template<>
+    void allsloptimizer_object::test<20>()
+    {
+        set_test_name("not-equal only takes the place of not-equals where the two say the same: numbers, or any two that are compared not-equal");
+        const std::string source =
+            wrap("", "        list a = llGetPrimitiveParams([PRIM_SIZE]);\n"
+                     "        list b = llGetPrimitiveParams([PRIM_TYPE]);\n"
+                     "        integer i = llGetListLength(a);\n"
+                     "        integer j = llGetListLength(b);\n"
+                     "        integer lists = !(a == b);\n"
+                     "        integer same = !(a != b);\n"
+                     "        integer ints = !(i == j);\n"
+                     "        llSay(0, (string)(lists + same + ints));\n"
+                     "        a = b = [];\n        i = j = 0;\n");
+        ALLSLOptimizer::Result r = ALLSLOptimizer::run(source, options());
+        ensure("a list's not-equal is the difference of the lengths, so !(a == b) stays: " + r.text, r.text.find("!(a == b)") != std::string::npos);
+        ensure("!(a != b) is a == b for lists too: " + r.text, r.text.find("same = a == b;") != std::string::npos);
+        ensure("and for integers !(i == j) is i != j: " + r.text, r.text.find("ints = i != j;") != std::string::npos);
+    }
+    template<> template<>
+    void allsloptimizer_object::test<21>()
+    {
+        set_test_name("a function goes in place only where the globals it reads are the same there: a caller's local of the name keeps the call");
+        const std::string source =
+            "integer count;\n"
+            "bump()\n"
+            "{\n"
+            "    count = count + 1;\n"
+            "}\n"
+            "integer plus(integer x)\n"
+            "{\n"
+            "    return x + count;\n"
+            "}\n"
+            "default\n"
+            "{\n"
+            "    state_entry()\n"
+            "    {\n"
+            "        integer count = 5;\n"
+            "        bump();\n"
+            "        llSay(0, (string)plus(1) + (string)count);\n"
+            "    }\n"
+            "    touch_start(integer n)\n"
+            "    {\n"
+            "        bump();\n"
+            "        llSay(0, (string)plus(n));\n"
+            "    }\n"
+            "}\n";
+        const ALLSLInliner::Result put = ALLSLInliner::run(source, { "bump", "plus" });
+        const size_t               touch = put.text.find("touch_start");
+        ensure("both events there", touch != std::string::npos);
+        const std::string entry = put.text.substr(0, touch);
+        const std::string touched = put.text.substr(touch);
+        ensure("where count is the caller's own, the calls stay: " + entry,
+               entry.find("        bump();") != std::string::npos && entry.find("plus(1)") != std::string::npos);
+        ensure("where it is the global, bump goes in: " + touched, touched.find("bump();") == std::string::npos && touched.find("count = count + 1;") != std::string::npos);
+        ensure("and plus: " + touched, touched.find("(n + count)") != std::string::npos);
+        ensure("so both functions stay, for the calls that kept them: " + put.text,
+               put.text.find("bump()\n{") != std::string::npos && put.text.find("integer plus(integer x)") != std::string::npos);
+    }
 } // namespace tut

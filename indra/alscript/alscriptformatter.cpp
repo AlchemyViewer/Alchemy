@@ -471,6 +471,10 @@ namespace
             }
             return lua && t.kind == Kind::Ident && (t.text == "end" || t.text == "until" || t.text == "else" || t.text == "elseif");
         };
+        // A directive's line continued by a backslash at its end: the
+        // lines it runs on to are the directive's too -- a macro's body,
+        // whose braces open and close nothing of the script's.
+        bool continued = false;
         for (Line& line : lines)
         {
             const Token* first = nullptr;
@@ -483,12 +487,13 @@ namespace
                     last  = &t;
                 }
             }
-            if (!lua && first && first->kind == Kind::Punct && first->text == "#")
+            if (!lua && (continued || (first && first->kind == Kind::Punct && first->text == "#")))
             {
                 // A preprocessor line: as written, and no part of the
                 // structure.
                 line.directive = true;
                 line.indent    = 0;
+                continued      = last && last->text == "\\";
                 continue;
             }
             // Where the line starts: one further in than the line that
