@@ -552,6 +552,17 @@
             <key>Value</key>
             <integer>1</integer>
         </map>
+        <key>ALScriptStudioVimClipboard</key>
+        <map>
+            <key>Comment</key>
+            <string>In Script Studio's vim mode, what is yanked, deleted and put with no register named goes by the system clipboard, as vim's clipboard=unnamed; off, it stays the editor's own, and only "+ and "* reach the clipboard. :set clipboard changes it for the session.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
         <key>ALScriptStudioHoverCards</key>
         <map>
             <key>Comment</key>

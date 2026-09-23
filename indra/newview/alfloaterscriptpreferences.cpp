@@ -69,6 +69,7 @@ namespace
         "ALScriptLintLevels",        "ALScriptLuauMode",
         "ALScriptStudioAutoComplete", "ALScriptStudioCompleteAfter", "ALScriptStudioAcceptOnEnter", "ALScriptStudioAutoClose",
         "ALScriptStudioCaretStyle",  "ALScriptStudioCaretBlink",   "ALScriptStudioHoverCards",  "ALScriptStudioHoverDelay",
+        "ALScriptStudioVimClipboard",
         "ALScriptFormatBlankLines",  "ALScriptFormatSpacing",      "ALScriptFormatOnSave",      "ALScriptTrimOnSave",
         "ALScriptTemplateLSL",       "ALScriptTemplateSLua",       "ALScriptPreprocDefines",    "ExternalEditor",
     };

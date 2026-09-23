@@ -1443,7 +1443,9 @@ private:
     LLButton*                          mExpandedButton = nullptr;
     boost::signals2::scoped_connection mCompiledConnection;
     boost::signals2::scoped_connection mDefinitionsConnection;
-    std::vector<boost::signals2::scoped_connection> mLintConnections;
+    // The settings the window follows as they change: the lints and the
+    // Luau mode, vim's clipboard.
+    std::vector<boost::signals2::scoped_connection> mSettingConnections;
     boost::signals2::scoped_connection mRuntimeConnection;
     boost::signals2::scoped_connection mRunningConnection;
 };

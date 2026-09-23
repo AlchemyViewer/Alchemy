@@ -589,6 +589,28 @@ end</floater.string>
              tool_tip="How long the mouse rests on a name before its card shows"
              top_delta="-2"
              width="60" />
+            <text
+             follows="left|top"
+             font="SansSerifBold"
+             height="16"
+             layout="topleft"
+             left="412"
+             name="vim_heading"
+             top_pad="16"
+             width="370">
+                Vim
+            </text>
+            <check_box
+             control_name="ALScriptStudioVimClipboard"
+             follows="left|top"
+             height="20"
+             label="Yank, delete and put use the system clipboard"
+             layout="topleft"
+             left="412"
+             name="vim_clipboard"
+             tool_tip="As vim's clipboard=unnamed: y, d, x and p with no register named go by the clipboard other programs share; off, they stay in the editor, and only &quot;+ and &quot;* reach the clipboard. A named register, &quot;a, never does."
+             top_pad="6"
+             width="370" />
         </panel>
         <panel
          follows="all"

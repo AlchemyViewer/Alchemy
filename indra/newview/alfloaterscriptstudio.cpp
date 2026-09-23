@@ -898,7 +898,7 @@ bool ALFloaterScriptStudio::postBuild()
     {
         if (LLControlVariable* control = gSavedSettings.getControl(setting))
         {
-            mLintConnections.emplace_back(control->getSignal()->connect([this](LLControlVariable*, const LLSD&, const LLSD&) {
+            mSettingConnections.emplace_back(control->getSignal()->connect([this](LLControlVariable*, const LLSD&, const LLSD&) {
                 for (std::unique_ptr<Doc>& doc : mDocs)
                 {
                     if (doc->loaded)
@@ -908,6 +908,16 @@ bool ALFloaterScriptStudio::postBuild()
                 }
             }));
         }
+    }
+
+    // Whether vim's unnamed register is the system clipboard, as the
+    // setting says, for every editor of this window; :set clipboard
+    // changes it for the session, and the setting changed again says so.
+    mVimShared->unnamedClipboard = gSavedSettings.getBOOL("ALScriptStudioVimClipboard");
+    if (LLControlVariable* control = gSavedSettings.getControl("ALScriptStudioVimClipboard"))
+    {
+        mSettingConnections.emplace_back(control->getSignal()->connect(
+            [this](LLControlVariable*, const LLSD& value, const LLSD&) { mVimShared->unnamedClipboard = value.asBoolean(); }));
     }
 
     loadState();
