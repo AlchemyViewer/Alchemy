@@ -346,9 +346,10 @@ void ALCodeEditor::onEdit(const ALTextDocument::Edit& edit)
 
 void ALCodeEditor::setMark(S32 line, Mark mark)
 {
-    if (line >= 0 && line < static_cast<S32>(mMarks.size()))
+    if (line >= 0 && line < static_cast<S32>(mMarks.size()) && mMarks[line] != mark)
     {
         mMarks[line] = mark;
+        ++mMarksRevision;
     }
 }
 
@@ -436,6 +437,7 @@ LLColor4 ALCodeEditor::selectionDrawColor() const
 void ALCodeEditor::clearMarks()
 {
     std::fill(mMarks.begin(), mMarks.end(), Mark::None);
+    ++mMarksRevision;
 }
 
 void ALCodeEditor::setDecorations(std::vector<Decoration> decorations)

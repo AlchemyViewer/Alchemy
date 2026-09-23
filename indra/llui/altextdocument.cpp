@@ -26,7 +26,6 @@
 
 #include "altextdocument.h"
 
-#include "altextchars.h"
 #include "llstring.h"
 
 #include <algorithm>
@@ -85,12 +84,6 @@ namespace
         }
         return out;
     }
-
-    // Whether the byte at `at` begins something a word is made of.
-    bool wordByteAt(std::string_view text, size_t at)
-    {
-        return at < text.size() && alWordByte(text[at]);
-    }
 }
 
 // --- Edit --------------------------------------------------------------------
@@ -124,6 +117,24 @@ ALTextPos ALTextDocument::Edit::slidPast(const ALTextPos& pos) const
         return ALTextPos(end_after.line, end_after.column + (pos.column - removed.end.column));
     }
     return ALTextPos(pos.line + (end_after.line - removed.end.line), pos.column);
+}
+
+ALTextRange ALTextDocument::Edit::stretched(const ALTextRange& range_in) const
+{
+    const ALTextRange removed = range.normalised();
+    const ALTextRange r       = range_in.normalised();
+    const auto        moved   = [&](const ALTextPos& pos, bool is_end) {
+        if (pos <= removed.begin)
+        {
+            return pos;
+        }
+        if (pos >= removed.end)
+        {
+            return slidPast(pos);
+        }
+        return is_end ? endAfter() : removed.begin;
+    };
+    return ALTextRange(moved(r.begin, false), moved(r.end, true));
 }
 
 bool ALTextDocument::Edit::slide(ALTextRange& range_in) const
@@ -259,9 +270,12 @@ ALTextDocument::Edit ALTextDocument::replace(ALTextRange range, std::string_view
     {
         edit.inserted = joinLines(pieces);
     }
-    if (edit.nothing())
+    if (edit.nothing() || edit.removed == edit.inserted)
     {
-        return edit;
+        // Nothing changes: answered as nothing, where it was asked for.
+        Edit none;
+        none.range = ALTextRange(range.begin, range.begin);
+        return none;
     }
 
     // The line the range starts in keeps what came before it, the line it
@@ -448,98 +462,4 @@ ALTextPos ALTextDocument::posAtDisplayColumn(S32 line, S32 display_column, S32 t
         at  = utf8str_step_grapheme_forward(l, at);
     }
     return ALTextPos(line, static_cast<S32>(at));
-}
-
-// --- search ------------------------------------------------------------------
-
-std::optional<ALTextRange> ALTextDocument::findInLine(S32 line, size_t from, size_t to, std::string_view needle, const FindOptions& options) const
-{
-    const std::string&         hay = mLines[line];
-    std::optional<ALTextRange> found;
-    to = llmin(to, hay.size());
-    size_t at = from;
-    while (at < to)
-    {
-        size_t begin = at;
-        if (!options.caseInsensitive)
-        {
-            begin = hay.find(needle, at);
-            if (begin == std::string::npos || begin >= to)
-            {
-                break;
-            }
-        }
-        const size_t match_end = alMatchAt(hay, begin, needle, options.caseInsensitive);
-        const bool   whole     = !options.wholeWord ||
-                             ((begin == 0 || !wordByteAt(hay, utf8str_step_grapheme_backward(hay, begin))) && !wordByteAt(hay, match_end));
-        if (match_end != std::string_view::npos && whole)
-        {
-            found = ALTextRange(ALTextPos(line, static_cast<S32>(begin)), ALTextPos(line, static_cast<S32>(match_end)));
-            if (!options.backwards)
-            {
-                return found;
-            }
-        }
-        at = utf8str_decode_at(hay, begin).next;
-    }
-    return found;
-}
-
-std::optional<ALTextRange> ALTextDocument::find(std::string_view needle, ALTextPos from) const
-{
-    return find(needle, from, FindOptions());
-}
-
-std::optional<ALTextRange> ALTextDocument::find(std::string_view needle, ALTextPos from, const FindOptions& options) const
-{
-    if (needle.empty() || needle.find('\n') != std::string_view::npos)
-    {
-        return std::nullopt;
-    }
-    from            = clampBytes(from);
-    const S32    count = lineCount();
-    const size_t none  = std::string::npos;
-
-    if (!options.backwards)
-    {
-        // From here to the end, then from the start back to here.
-        for (S32 l = from.line; l < count; ++l)
-        {
-            if (auto found = findInLine(l, l == from.line ? from.column : 0, none, needle, options))
-            {
-                return found;
-            }
-        }
-        if (options.wrap)
-        {
-            for (S32 l = 0; l <= from.line; ++l)
-            {
-                if (auto found = findInLine(l, 0, l == from.line ? from.column : none, needle, options))
-                {
-                    return found;
-                }
-            }
-        }
-        return std::nullopt;
-    }
-
-    // The last match beginning before here, then round from the end.
-    for (S32 l = from.line; l >= 0; --l)
-    {
-        if (auto found = findInLine(l, 0, l == from.line ? from.column : none, needle, options))
-        {
-            return found;
-        }
-    }
-    if (options.wrap)
-    {
-        for (S32 l = count - 1; l >= from.line; --l)
-        {
-            if (auto found = findInLine(l, l == from.line ? from.column : 0, none, needle, options))
-            {
-                return found;
-            }
-        }
-    }
-    return std::nullopt;
 }

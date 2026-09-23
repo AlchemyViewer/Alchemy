@@ -371,4 +371,35 @@ namespace tut
         ensure("unwrapped, the line still starts at its indent", near(layout.xOf(1, 0), four * 2.f));
         ensure_equals("and has one row", layout.rowCount(0), 1);
     }
+
+    template<> template<>
+    void altextlayout_object::test<9>()
+    {
+        set_test_name("a scale the fonts do not have yet is taken as one once, not as a change at every asking; and the hidden lines' revision moves only when they may have");
+        ready("abc\ndef");
+        const F32 was_x     = LLFontGL::sScaleX;
+        const F32 was_y     = LLFontGL::sScaleY;
+        LLFontGL::sScaleX   = 0.f;
+        LLFontGL::sScaleY   = 0.f;
+        layout.line(0);
+        layout.line(1);
+        const U32 laid = layout.linesLaidOut();
+        layout.line(0);
+        layout.columnWidth();
+        layout.line(1);
+        layout.totalHeight();
+        const U32 again = layout.linesLaidOut();
+        LLFontGL::sScaleX = was_x;
+        LLFontGL::sScaleY = was_y;
+        ensure_equals("nothing laid out again", again, laid);
+
+        const U32 before = layout.hiddenRevision();
+        layout.setHidden(1, 1, false);
+        ensure_equals("shown already: nothing moved", layout.hiddenRevision(), before);
+        layout.setHidden(1, 1, true);
+        ensure("hidden: moved", layout.hiddenRevision() != before);
+        const U32 hidden = layout.hiddenRevision();
+        doc.insert(ALTextPos(0, 0), "x\n");
+        ensure("lines made: moved", layout.hiddenRevision() != hidden);
+    }
 }

@@ -167,4 +167,108 @@ namespace tut
         options.wholeWord     = true;
         ensure_equals("whole words", said(ALTextSearch::matches(doc, "cafe", options)), std::string("0:12-16"));
     }
+
+    template<> template<>
+    void altextsearch_object::test<7>()
+    {
+        set_test_name("the nearest match from a place: forward, back, round either end; by case, past ASCII, and whole words");
+        ALTextDocument doc;
+        doc.setText("Foo foobar\n\xC3\x89ric foo\nfoo");
+        ALTextSearchOptions options;
+        options.caseSensitive = true;
+        const std::vector<ALTextRange> exact = ALTextSearch::matches(doc, "foo", options);
+        ensure_equals("by case", said(exact), std::string("0:4-7 1:6-9 2:0-3"));
+        ensure_equals("forward from the start", ALTextSearch::nearest(exact, ALTextPos(0, 0), true), 0);
+        ensure_equals("forward from inside the first", ALTextSearch::nearest(exact, ALTextPos(0, 5), true), 1);
+        ensure_equals("round the end to the first", ALTextSearch::nearest(exact, ALTextPos(2, 1), true), 0);
+        ensure_equals("back: the one before", ALTextSearch::nearest(exact, ALTextPos(2, 0), false), 1);
+        ensure_equals("back from the first round to the last", ALTextSearch::nearest(exact, ALTextPos(0, 4), false), 2);
+        ensure_equals("nothing in nothing", ALTextSearch::nearest({}, ALTextPos(0, 0), true), -1);
+
+        options.caseSensitive = false;
+        ensure_equals("without case: the capital one first", said(ALTextSearch::matches(doc, "foo", options)), std::string("0:0-3 0:4-7 1:6-9 2:0-3"));
+        ensure_equals("past ASCII", said(ALTextSearch::matches(doc, "\xC3\xA9ric", options)), std::string("1:0-5"));
+        options.wholeWord = true;
+        ensure_equals("whole words, not the start of foobar", said(ALTextSearch::matches(doc, "foo", options)), std::string("0:0-3 1:6-9 2:0-3"));
+        options.wholeWord = false;
+        ensure("no line break in a plain query crosses where lines are not", ALTextSearch::matches(doc, "bar\n", options).empty());
+    }
+
+    template<> template<>
+    void altextsearch_object::test<8>()
+    {
+        set_test_name("a pattern that takes longer than the engine will wait is said, not thrown, and replaces nothing");
+        ALTextDocument doc;
+        doc.setText(std::string(4000, 'a') + "\nabc");
+        ALTextSearchOptions options;
+        options.regex = true;
+        std::string error;
+        const std::vector<ALTextRange> found = ALTextSearch::matches(doc, "(a*)*b", options, nullptr, &error);
+        ensure("nothing found", found.empty());
+        ensure("and why", !error.empty());
+        // A search that goes through after one that did not.
+        ensure_equals("the next search is its own", said(ALTextSearch::matches(doc, "abc", options, nullptr, &error)), std::string("1:0-3"));
+        ensure("with nothing to say", error.empty());
+        // A replacement over a match the engine gives up on again is the
+        // words as written.
+        const std::string with = ALTextSearch::replacement(doc, ALTextRange(ALTextPos(0, 0), ALTextPos(0, 4000)), "(a*)*b|a+", options, "x");
+        ensure_equals("as written", with, std::string("x"));
+    }
+
+    template<> template<>
+    void altextsearch_object::test<9>()
+    {
+        set_test_name("a replacement's groups are filled from the match where it stands: a look ahead, a look behind and a line's start see what is around it");
+        ALTextDocument doc;
+        doc.setText("foobar foobaz\nxy zy\n  indented");
+        ALTextSearchOptions options;
+        options.regex = true;
+
+        std::vector<ALTextRange> found = ALTextSearch::matches(doc, "(foo)(?=bar)", options);
+        ensure_equals("the one before bar", said(found), std::string("0:0-3"));
+        ensure_equals("its group, though what it looks at is not in it", ALTextSearch::replacement(doc, found[0], "(foo)(?=bar)", options, "[$1]"),
+                      std::string("[foo]"));
+
+        found = ALTextSearch::matches(doc, "(?<=x)(y)", options);
+        ensure_equals("the y after an x", said(found), std::string("1:1-2"));
+        ensure_equals("looked back past its start", ALTextSearch::replacement(doc, found[0], "(?<=x)(y)", options, "<$1>"), std::string("<y>"));
+
+        found = ALTextSearch::matches(doc, "\\Bba", options);
+        ensure_equals("inside a word", said(found), std::string("0:3-5 0:10-12"));
+        ensure_equals("still inside one", ALTextSearch::replacement(doc, found[0], "\\Bba", options, "[$&]"), std::string("[ba]"));
+
+        found = ALTextSearch::matches(doc, "^( +)(\\w)", options);
+        ensure_equals("at a line's start", said(found), std::string("2:0-3"));
+        ensure_equals("in its place", ALTextSearch::replacement(doc, found[0], "^( +)(\\w)", options, "$2"), std::string("i"));
+
+        // The match's case kept, past ASCII.
+        doc.setText("\xC3\x89lan");
+        options.regex        = false;
+        options.preserveCase = true;
+        ensure_equals("capitalised as what it replaces is, by its first letter past ASCII",
+                      ALTextSearch::replacement(doc, ALTextRange(ALTextPos(0, 0), ALTextPos(0, 5)), "\xC3\xA9lan", options, "verve"), std::string("Verve"));
+    }
+
+    template<> template<>
+    void altextsearch_object::test<10>()
+    {
+        set_test_name("an empty match steps on a whole character; a stretch that ends inside a line is no line's end, and what is past it is seen");
+        ALTextDocument doc;
+        doc.setText("\xC3\xA9" "a");
+        ALTextSearchOptions options;
+        options.regex = true;
+        const std::vector<ALTextRange> empties = ALTextSearch::matches(doc, "x*", options);
+        for (const ALTextRange& m : empties)
+        {
+            ensure("never inside a character: " + said({ m }), m.begin.column != 1);
+        }
+        ensure_equals("at each character and the end", said(empties), std::string("0:0-0 0:2-2 0:3-3"));
+
+        doc.setText("foo bar foo");
+        const ALTextRange stretch(ALTextPos(0, 0), ALTextPos(0, 7));
+        ensure("bar is not at the line's end", ALTextSearch::matches(doc, "bar$", options, &stretch).empty());
+        const ALTextRange first(ALTextPos(0, 0), ALTextPos(0, 3));
+        ensure_equals("a look past the stretch's end sees what is there", said(ALTextSearch::matches(doc, "foo(?= bar)", options, &first)), std::string("0:0-3"));
+        ensure("and a match past it is not in it", ALTextSearch::matches(doc, "foo bar", options, &first).empty());
+    }
 }

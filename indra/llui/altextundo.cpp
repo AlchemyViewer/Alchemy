@@ -218,15 +218,34 @@ void ALTextUndo::join(Step& last, Step&& next)
     {
         last.edits.push_back(std::move(edit));
     }
-    last.caretAfter = next.caretAfter;
+    last.caretAfter  = next.caretAfter;
+    last.anchorAfter = next.anchorAfter;
 }
 
 void ALTextUndo::record(const ALTextDocument::Edit& edit, const ALTextPos& before, const ALTextPos& after, F64 now)
+{
+    record(edit, ALTextRange(before, before), after, now);
+}
+
+void ALTextUndo::settle(const ALTextRange& selection)
+{
+    if (!mSettling || mSteps.undone().empty())
+    {
+        return;
+    }
+    Step& newest       = mSteps.newest();
+    newest.anchorAfter = selection.begin;
+    newest.caretAfter  = selection.end;
+}
+
+void ALTextUndo::record(const ALTextDocument::Edit& edit, const ALTextRange& before_in, const ALTextPos& after, F64 now)
 {
     if (edit.nothing())
     {
         return;
     }
+    mSettling               = true;
+    const ALTextPos& before = before_in.end;
     // A change after an undo throws the redo steps away; the saved text,
     // if it was among them, can no longer be reached by stepping.
     if (mSavedInForce != NOWHERE && mSavedInForce > mSteps.inForce())
@@ -236,9 +255,11 @@ void ALTextUndo::record(const ALTextDocument::Edit& edit, const ALTextPos& befor
 
     Step step;
     step.edits.push_back(edit);
-    step.caretBefore = before;
-    step.caretAfter  = after;
-    step.serial      = ++mNextSerial;
+    step.caretBefore  = before;
+    step.anchorBefore = before_in.begin;
+    step.caretAfter   = after;
+    step.anchorAfter  = after;
+    step.serial       = ++mNextSerial;
 
     // The key a run is joined by: the open group, or the kind of change
     // where it carries on the last step; anything else ends the run first.
@@ -282,37 +303,39 @@ void ALTextUndo::endGroup()
     }
 }
 
-std::optional<ALTextPos> ALTextUndo::undo()
+std::optional<ALTextRange> ALTextUndo::undo()
 {
     std::optional<Step> step = mSteps.takeUndo();
     if (!step)
     {
         return std::nullopt;
     }
+    mSettling = false;
     for (auto it = step->edits.rbegin(); it != step->edits.rend(); ++it)
     {
         const ALTextDocument::Edit back = it->inverse();
         mDocument.replace(back.range, back.inserted);
     }
-    const ALTextPos caret = step->caretBefore;
+    const ALTextRange selection(step->anchorBefore, step->caretBefore);
     mSteps.pushRedo(std::move(*step));
-    return caret;
+    return selection;
 }
 
-std::optional<ALTextPos> ALTextUndo::redo()
+std::optional<ALTextRange> ALTextUndo::redo()
 {
     std::optional<Step> step = mSteps.takeRedo();
     if (!step)
     {
         return std::nullopt;
     }
+    mSettling = false;
     for (const ALTextDocument::Edit& edit : step->edits)
     {
         mDocument.replace(edit.range, edit.inserted);
     }
-    const ALTextPos caret = step->caretAfter;
+    const ALTextRange selection(step->anchorAfter, step->caretAfter);
     mSteps.pushUndo(std::move(*step));
-    return caret;
+    return selection;
 }
 
 void ALTextUndo::clear()
@@ -320,6 +343,7 @@ void ALTextUndo::clear()
     mSteps.clear();
     mGroupDepth   = 0;
     mSavedInForce = 0;
+    mSettling     = false;
     ++mEra;
 }
 
@@ -336,6 +360,15 @@ LLSD ALTextUndo::asLLSD(size_t budget) const
         out["label"]  = step.mLabel;
         out["before"] = posAsLLSD(step.caretBefore);
         out["after"]  = posAsLLSD(step.caretAfter);
+        // The anchors only where something was selected.
+        if (step.anchorBefore != step.caretBefore)
+        {
+            out["anchor_before"] = posAsLLSD(step.anchorBefore);
+        }
+        if (step.anchorAfter != step.caretAfter)
+        {
+            out["anchor_after"] = posAsLLSD(step.anchorAfter);
+        }
         bytes += STEP_WRITTEN + step.mLabel.size();
         LLSD       edits = LLSD::emptyArray();
         const auto write = [&edits, &bytes](const ALTextDocument::Edit& edit) {
@@ -430,8 +463,10 @@ bool ALTextUndo::fromLLSD(const LLSD& sd)
         Step step;
         step.serial      = ++serial;
         step.mLabel      = one["label"].asString();
-        step.caretBefore = posFrom(one["before"]);
-        step.caretAfter  = posFrom(one["after"]);
+        step.caretBefore  = posFrom(one["before"]);
+        step.caretAfter   = posFrom(one["after"]);
+        step.anchorBefore = one.has("anchor_before") ? posFrom(one["anchor_before"]) : step.caretBefore;
+        step.anchorAfter  = one.has("anchor_after") ? posFrom(one["anchor_after"]) : step.caretAfter;
         for (LLSD::array_const_iterator it = one["edits"].beginArray(); it != one["edits"].endArray(); ++it)
         {
             ALTextDocument::Edit edit;
@@ -487,6 +522,7 @@ bool ALTextUndo::fromLLSD(const LLSD& sd)
     mNextSerial          = serial;
     ++mEra;
     mGroupDepth   = 0;
+    mSettling     = false;
     mSavedInForce = saved >= 0 && static_cast<size_t>(saved) <= steps && static_cast<size_t>(saved) >= dropped ? static_cast<size_t>(saved) - dropped : NOWHERE;
     return true;
 }

@@ -83,6 +83,82 @@ inline size_t alMatchAt(std::string_view hay, size_t at, std::string_view needle
     return h;
 }
 
+// A stretch of text with its tabs as spaces to the next stop, starting at
+// a display column -- one per character, a tab reaching the next stop --
+// which is moved on past it: what a text drawn somewhere a tab is not
+// honoured shows, where the view's own stops are wanted.
+inline std::string alExpandTabs(std::string_view text, S32& column, S32 tab_width)
+{
+    tab_width = tab_width > 0 ? tab_width : 1;
+    std::string out;
+    out.reserve(text.size());
+    for (const char c : text)
+    {
+        if (c == '\t')
+        {
+            const S32 spaces = tab_width - column % tab_width;
+            out.append(static_cast<size_t>(spaces), ' ');
+            column += spaces;
+            continue;
+        }
+        out.push_back(c);
+        // A column a character: counted at its first byte.
+        if ((static_cast<unsigned char>(c) & 0xC0) != 0x80)
+        {
+            ++column;
+        }
+    }
+    return out;
+}
+
+// The replacement put in the case the match had, letter by letter past
+// ASCII as well: all capitals where the match is, capitalised where it is,
+// all small where it is; as it is where the match is none of those, or has
+// no letters.
+inline std::string alInCaseOf(std::string_view match, std::string_view text)
+{
+    bool letters = false, all_upper = true, all_lower = true, rest_lower = true, first_upper = false;
+    for (size_t at = 0; at < match.size();)
+    {
+        const LLCodepointAt c = utf8str_decode_at(match, at);
+        if (LLStringOps::isAlpha(c.cp))
+        {
+            const bool upper = LLStringOps::isUpper(c.cp);
+            if (!letters)
+            {
+                first_upper = upper;
+            }
+            else if (upper)
+            {
+                rest_lower = false;
+            }
+            letters   = true;
+            all_upper = all_upper && upper;
+            all_lower = all_lower && !upper;
+        }
+        at = c.next;
+    }
+    if (!letters || (!all_upper && !all_lower && !(first_upper && rest_lower)))
+    {
+        return std::string(text);
+    }
+    std::string out;
+    out.reserve(text.size());
+    bool first = true;
+    for (size_t at = 0; at < text.size();)
+    {
+        const LLCodepointAt c = utf8str_decode_at(text, at);
+        const bool          up = all_upper || (!all_lower && first && LLStringOps::isAlpha(c.cp));
+        utf8str_append_cp(out, up ? LLStringOps::toUpper(c.cp) : LLStringOps::toLower(c.cp));
+        if (LLStringOps::isAlpha(c.cp))
+        {
+            first = false;
+        }
+        at = c.next;
+    }
+    return out;
+}
+
 // The text with its case changed, codepoint by codepoint: swapped for
 // '~', lowered for 'u', raised for 'U' -- vim's three.
 inline std::string alRecased(std::string_view text, char how)

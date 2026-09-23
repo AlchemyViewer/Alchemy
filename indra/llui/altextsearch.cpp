@@ -32,6 +32,7 @@
 
 #include <algorithm>
 #include <functional>
+#include <stdexcept>
 
 namespace
 {
@@ -40,58 +41,16 @@ namespace
         return !(begin > 0 && alWordByte(line[begin - 1])) && !(end < static_cast<S32>(line.size()) && alWordByte(line[end]));
     }
 
-    // The replacement in the case the match had: all upper, capitalised
-    // or all lower; as it is where the match is none of those.
-    std::string inCaseOf(const std::string& match, std::string text)
+    // Past the character at a place, a whole one: what an empty match is
+    // stepped over by, so that the next match never begins inside one.
+    const char* pastCharacter(const char* at, const char* end)
     {
-        bool letters = false, all_upper = true, all_lower = true, rest_lower = true;
-        for (size_t i = 0; i < match.size(); ++i)
+        const char* next = at + 1;
+        while (next < end && (static_cast<unsigned char>(*next) & 0xC0) == 0x80)
         {
-            const char c = match[i];
-            if (!LLStringOps::isAlpha(c))
-            {
-                continue;
-            }
-            letters = true;
-            if (LLStringOps::isUpper(c))
-            {
-                all_lower = false;
-                if (i > 0)
-                {
-                    rest_lower = false;
-                }
-            }
-            else
-            {
-                all_upper = false;
-            }
+            ++next;
         }
-        if (!letters)
-        {
-            return text;
-        }
-        if (all_upper)
-        {
-            for (char& c : text)
-            {
-                c = LLStringOps::toUpper(c);
-            }
-        }
-        else if (all_lower)
-        {
-            for (char& c : text)
-            {
-                c = LLStringOps::toLower(c);
-            }
-        }
-        else if (LLStringOps::isUpper(match[0]) && rest_lower)
-        {
-            for (size_t i = 0; i < text.size(); ++i)
-            {
-                text[i] = i == 0 ? LLStringOps::toUpper(text[i]) : LLStringOps::toLower(text[i]);
-            }
-        }
-        return text;
+        return next;
     }
 
     bool compile(std::string_view query, const ALTextSearchOptions& options, boost::regex& re, std::string* error)
@@ -162,11 +121,16 @@ std::vector<ALTextRange> ALTextSearch::matches(const ALTextDocument& doc, std::s
     auto searchIn = [&](const std::string& text, S32 from, S32 to, const std::function<ALTextPos(S32)>& posOf) {
         if (options.regex)
         {
+            // Searched to the text's own end, a match kept only where it
+            // lies within [from, to]: what stands past a stretch that ends
+            // inside a line is there for a look ahead, and the stretch's end
+            // is no line's end to a $.
             const char*  base  = text.data();
             const char*  start = base + from;
-            const char*  end   = base + to;
+            const char*  limit = base + to;
+            const char*  end   = base + text.size();
             boost::cmatch found;
-            while (start <= end)
+            while (start <= limit)
             {
                 // The dot stays within a line, as it does when the lines
                 // are searched one by one.
@@ -175,9 +139,31 @@ std::vector<ALTextRange> ALTextSearch::matches(const ALTextDocument& doc, std::s
                 {
                     flags |= boost::match_prev_avail;
                 }
-                if (!boost::regex_search(start, end, found, re, flags))
+                // A pattern can take longer than anyone would wait -- nested
+                // repeats over a long line -- and the engine gives up with an
+                // exception: said as a pattern that does not compile is said,
+                // rather than taking the viewer down.
+                try
                 {
-                    break;
+                    // From the text's start as the base, so that a look
+                    // behind sees past where this search began.
+                    if (!boost::regex_search(start, end, found, re, flags, base) || found[0].first > limit)
+                    {
+                        break;
+                    }
+                }
+                catch (const std::runtime_error& fault)
+                {
+                    if (error)
+                    {
+                        *error = fault.what();
+                    }
+                    out.clear();
+                    if (whole_begins)
+                    {
+                        whole_begins->clear();
+                    }
+                    return false;
                 }
                 // The group asked for where it took part, else the whole.
                 const bool grouped = options.matchGroup > 0 && options.matchGroup < static_cast<S32>(found.size()) &&
@@ -185,7 +171,7 @@ std::vector<ALTextRange> ALTextSearch::matches(const ALTextDocument& doc, std::s
                 const auto& part   = grouped ? found[static_cast<size_t>(options.matchGroup)] : found[0];
                 const S32   begin  = static_cast<S32>(part.first - base);
                 const S32   finish = static_cast<S32>(part.second - base);
-                if (!options.wholeWord || wholeWord(text, begin, finish))
+                if (found[0].second <= limit && (!options.wholeWord || wholeWord(text, begin, finish)))
                 {
                     out.emplace_back(posOf(begin), posOf(finish));
                     if (whole_begins)
@@ -195,12 +181,13 @@ std::vector<ALTextRange> ALTextSearch::matches(const ALTextDocument& doc, std::s
                 }
                 if (found[0].length() == 0)
                 {
-                    // An empty match: on, or the text is done.
-                    if (found[0].second >= end)
+                    // An empty match: on by a whole character, or the text
+                    // is done.
+                    if (found[0].second >= limit)
                     {
                         break;
                     }
-                    start = found[0].second + 1;
+                    start = pastCharacter(found[0].second, end);
                 }
                 else
                 {
@@ -237,6 +224,7 @@ std::vector<ALTextRange> ALTextSearch::matches(const ALTextDocument& doc, std::s
                 at = options.caseSensitive ? begin + 1 : utf8str_decode_at(text, begin).next;
             }
         }
+        return true;
     };
 
     const S32 first = llmax(0, within.begin.line);
@@ -264,7 +252,10 @@ std::vector<ALTextRange> ALTextSearch::matches(const ALTextDocument& doc, std::s
         const S32          size = static_cast<S32>(text.size());
         const S32          from = line == within.begin.line ? llclamp(within.begin.column, 0, size) : 0;
         const S32          to   = line == within.end.line ? llclamp(within.end.column, 0, size) : size;
-        searchIn(text, from, to, [line](S32 offset) { return ALTextPos(line, offset); });
+        if (!searchIn(text, from, to, [line](S32 offset) { return ALTextPos(line, offset); }))
+        {
+            break;
+        }
     }
     return out;
 }
@@ -301,17 +292,57 @@ S32 ALTextSearch::nearest(const std::vector<ALTextRange>& matches, const ALTextP
 std::string ALTextSearch::replacement(const ALTextDocument& doc, const ALTextRange& match, std::string_view query,
                                       const ALTextSearchOptions& options, std::string_view with)
 {
-    const std::string text = doc.text(match.normalised());
+    const ALTextRange range = match.normalised();
+    const std::string text  = doc.text(range);
     std::string       out(with);
     if (options.regex)
     {
         // The pattern as compiled for the matches, once for the lot.
         const boost::regex* re = compiledOnce(query, options, nullptr);
-        if (re && boost::regex_search(text, *re, boost::match_default | boost::match_not_dot_newline))
+        if (re)
         {
-            out = boost::regex_replace(text, *re, std::string(with),
-                                       boost::match_default | boost::match_not_dot_newline | boost::format_perl | boost::format_first_only | boost::format_no_copy);
+            // Matched again where it stands, with what is around it there
+            // to be seen -- a look behind or ahead, a line's ends, a word's
+            // edge -- as it was when it was found: its line, or the whole
+            // text for a match over a line's end. To the text's end first,
+            // then, where that runs on past where the match ended, to the
+            // match's end, as a search held to a stretch found it; and on
+            // the match's own text alone where neither finds it there.
+            const bool         across = range.begin.line != range.end.line || options.acrossLines;
+            const std::string& hay    = across ? doc.wholeText() : doc.line(range.begin.line);
+            const size_t       from   = across ? doc.offsetOf(range.begin) : static_cast<size_t>(range.begin.column);
+            const size_t       to     = across ? doc.offsetOf(range.end) : static_cast<size_t>(range.end.column);
+            const char*        base   = hay.data();
+            boost::match_flag_type flags = boost::match_default | boost::match_not_dot_newline | boost::match_continuous;
+            if (from > 0)
+            {
+                flags |= boost::match_prev_avail;
+            }
+            try
+            {
+                boost::cmatch found;
+                bool matched = boost::regex_search(base + from, base + hay.size(), found, *re, flags, base) && found[0].second == base + to;
+                if (!matched)
+                {
+                    matched = boost::regex_search(base + from, base + to, found, *re, flags, base) && found[0].second == base + to;
+                }
+                if (matched)
+                {
+                    out = found.format(std::string(with), boost::format_perl);
+                }
+                else if (boost::regex_search(text, *re, boost::match_default | boost::match_not_dot_newline))
+                {
+                    out = boost::regex_replace(text, *re, std::string(with),
+                                               boost::match_default | boost::match_not_dot_newline | boost::format_perl | boost::format_first_only |
+                                                   boost::format_no_copy);
+                }
+            }
+            catch (const std::runtime_error&)
+            {
+                // Given up on as the search would have been: the words as
+                // they were written.
+            }
         }
     }
-    return options.preserveCase ? inCaseOf(text, std::move(out)) : out;
+    return options.preserveCase ? alInCaseOf(text, out) : out;
 }

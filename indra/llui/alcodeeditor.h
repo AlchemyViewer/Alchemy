@@ -536,6 +536,7 @@ protected:
     bool canSymbol(ALEditorCommand command) const override;
     bool offersSymbols() const override { return static_cast<bool>(mSymbolRequest); }
     bool mapMark(S32 line, LLColor4& color) const override;
+    U32  marksRevision() const override { return mMarksRevision; }
     bool closerOpenedAt(const ALTextPos& closer, ALTextPos& opener) override;
 
 private:
@@ -656,6 +657,8 @@ private:
     boost::signals2::scoped_connection mEditConnection;
     boost::signals2::scoped_connection mChangedConnection;
     std::vector<Mark>                  mMarks;
+    // Moves on as marks are set or cleared, for the ruler's list of them.
+    U32                                mMarksRevision = 0;
     // One per line: changed since the last save.
     std::vector<U8>                    mChanged;
     // The mouse over the gutter, and the line it is on there: the fold

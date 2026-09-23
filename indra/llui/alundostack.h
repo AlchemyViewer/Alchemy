@@ -135,6 +135,9 @@ public:
     // likewise the last the next to be taken -- the reverse of the order
     // they would be taken in.
     const std::vector<Step>& undone() const { return mUndo; }
+    // The newest step back, for its caller to say more about it; there
+    // must be one.
+    Step&                    newest() { return mUndo.back(); }
     const std::vector<Step>& redone() const { return mRedo; }
     size_t inForce() const { return mUndo.size(); }
     // The label of the next step back and of the next step forward, or

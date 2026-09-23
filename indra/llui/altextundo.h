@@ -34,7 +34,8 @@
 #include <vector>
 
 // A document's edits as steps a person can take back: each one the edits
-// it was made of, in order, with the caret where it stood before and after.
+// it was made of, in order, with the selection -- its anchor and its caret
+// -- as it stood before and after.
 // A run of typing is one step -- characters typed one after the other, each
 // where the last ended, within a moment of each other -- and so is a run of
 // backspaces or deletes; anything recorded while a group is open is one
@@ -55,6 +56,10 @@ public:
         std::vector<ALTextDocument::Edit> edits;
         ALTextPos                         caretBefore;
         ALTextPos                         caretAfter;
+        // Where the selection's other end stood: the caret's own place
+        // where nothing was selected.
+        ALTextPos                         anchorBefore;
+        ALTextPos                         anchorAfter;
         std::string                       mLabel;
         // Which step this is, for a save point to find it by; a run
         // joined to it keeps the number it began with.
@@ -73,9 +78,16 @@ public:
     explicit ALTextUndo(ALTextDocument& document);
 
     // A change made through the document, with where the caret was and
-    // is. `now` is in seconds from any clock, and the window is how close
-    // two changes have to be to join a run.
+    // is -- or the selection it was made over, anchor to caret. `now` is in
+    // seconds from any clock, and the window is how close two changes have
+    // to be to join a run.
     void record(const ALTextDocument::Edit& edit, const ALTextPos& before, const ALTextPos& after, F64 now);
+    void record(const ALTextDocument::Edit& edit, const ALTextRange& before, const ALTextPos& after, F64 now);
+    // Where the selection ends up once the change that was just recorded is
+    // done -- a replace-all putting the caret back where it was, a line
+    // moved with its selection -- for a redo to put it there. Nothing once
+    // a step has been taken back or forward since.
+    void settle(const ALTextRange& selection);
     void setRunWindow(F64 seconds) { mWindow = seconds; }
 
     // Everything recorded until endGroup() is one step.
@@ -84,10 +96,10 @@ public:
     // A run of typing is over: the next change is a step of its own.
     void breakRun() { mSteps.breakRun(); }
 
-    // The step back and the step forward, applied. Where the caret goes,
-    // or nothing where there was nothing to do.
-    std::optional<ALTextPos> undo();
-    std::optional<ALTextPos> redo();
+    // The step back and the step forward, applied. The selection it puts
+    // back, anchor to caret, or nothing where there was nothing to do.
+    std::optional<ALTextRange> undo();
+    std::optional<ALTextRange> redo();
     bool                     canUndo() const { return mSteps.canUndo(); }
     bool                     canRedo() const { return mSteps.canRedo(); }
     // Nothing to step back or forward to, and the text as it stands taken
@@ -160,4 +172,7 @@ private:
     size_t            mSavedInForce = 0;
     U64               mNextSerial   = 0;
     U32               mEra          = 0;
+    // Whether the newest step is the change last recorded, which settle()
+    // may still say where it left the selection.
+    bool              mSettling     = false;
 };

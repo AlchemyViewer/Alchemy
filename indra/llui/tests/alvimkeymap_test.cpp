@@ -1091,4 +1091,14 @@ namespace tut
         keys("<C-c>");
         ensure("control-c leaves insert and the list", !vim->inserting() && !e.completionOpen());
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<28>()
+    {
+        set_test_name(":s fills its groups from the match where it stands, where \\ze looks past the match's end");
+        ALCodeEditor& e = make("foobar foobaz\n");
+        keys(":s/\\(foo\\)\\zebar/[\\1]/<CR>");
+        ensure_equals("the group, found where what follows is bar", flat(e.text()), std::string("[foo]bar foobaz|"));
+        ensure("and nothing said against it", !vim->messageIsError());
+    }
 }

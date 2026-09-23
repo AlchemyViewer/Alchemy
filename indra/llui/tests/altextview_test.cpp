@@ -33,6 +33,8 @@
 #include "../lluictrlfactory.h"
 #include "../llurlaction.h"
 
+#include "llpreeditor.h"
+
 #include "alheadlessui_fixture.h"
 
 #include "../test/lltut.h"
@@ -901,5 +903,156 @@ namespace tut
         key('K', MASK_MAC_CONTROL);
         ensure_equals("control-k to the line's end", v.document().line(0), std::string(""));
 #endif
+    }
+
+    template<> template<>
+    void altextview_object::test<25>()
+    {
+        set_test_name("a composition is taken out before an undo or an edit, which are of the text without it, measured as though it were not there");
+        ALTextView& v = make("");
+        type("hello");
+        v.setCaret(ALTextPos(0, 0));
+        v.preeditor().updatePreedit("xy", LLPreeditor::segment_lengths_t{ 2 }, LLPreeditor::standouts_t{ false }, 2);
+        ensure_equals("composing before the typing", v.text(), std::string("xyhello"));
+        v.undo();
+        ensure_equals("the composition out, and the typing undone whole", v.text(), std::string());
+        ensure("nothing composing", !v.hasPreedit());
+
+        v.setText("abc def");
+        v.setCaret(ALTextPos(0, 3));
+        v.preeditor().updatePreedit("XY", LLPreeditor::segment_lengths_t{ 2 }, LLPreeditor::standouts_t{ false }, 2);
+        ensure_equals("composing", v.text(), std::string("abcXY def"));
+        // def measured where it stands with the composition in.
+        ensure("replaced", v.replaceAll({ { ALTextRange(ALTextPos(0, 6), ALTextPos(0, 9)), "DEF" } }));
+        ensure_equals("the word it was measured on, the composition gone", v.text(), std::string("abc DEF"));
+        v.undo();
+        ensure_equals("and undone where it was", v.text(), std::string("abc def"));
+    }
+
+    template<> template<>
+    void altextview_object::test<26>()
+    {
+        set_test_name("the stretch a search is held to grows and shrinks with what is replaced inside it");
+        ALTextView& v = make("aa aa aa");
+        v.setSelection(ALTextRange(ALTextPos(0, 0), ALTextPos(0, 5)));
+        v.showFind(true);
+        LLUICtrl* in_selection = v.findBar()->getChild<LLUICtrl>("in_selection");
+        in_selection->handleMouseDown(1, 1, MASK_NONE);
+        v.findBar()->setQuery("aa");
+        ensure_equals("two in the selection", v.findMatches().size(), size_t(2));
+        v.findBar()->setReplacement("a");
+        ensure_equals("both replaced", v.replaceAllMatches(), 2);
+        ensure_equals("the text", v.text(), std::string("a a aa"));
+        v.findBar()->setQuery("a");
+        ensure_equals("the stretch shrank with them: the third pair is still outside it", v.findMatches().size(), size_t(2));
+    }
+
+    template<> template<>
+    void altextview_object::test<27>()
+    {
+        set_test_name("a line's spelling is checked again where a change above made it a comment");
+        ALTextView& v = make("teh x;\nteh y;");
+        v.setSpellChecker([](const std::string& word) { return word != "teh"; });
+        v.setSpellCheck(true);
+        v.setSyntax("lsl");
+        ensure("code is left alone", v.misspellings(1).empty());
+        v.setCaret(ALTextPos(0, 0));
+        type("/*");
+        ensure_equals("the line below, a comment now, checked", v.misspellings(1).size(), size_t(1));
+    }
+
+    template<> template<>
+    void altextview_object::test<28>()
+    {
+        set_test_name("an atom's box finds its atom by where it stands, whatever was made before it since the line was laid out");
+        const std::string& p    = ALTextView::atomPlaceholder();
+        const std::string  text = "a" + p + "\nb" + p + "\nc" + p;
+        ALTextView&        v    = make(text.c_str());
+        const auto         atom = [](S32 line, S32 value) {
+            ALTextView::Atom one;
+            one.at    = ALTextPos(line, 1);
+            one.width = 20;
+            one.value = value;
+            return one;
+        };
+        v.addAtom(atom(1, 1));
+        v.addAtom(atom(2, 2));
+        v.layout().line(1);
+        v.layout().line(2);
+        // One made before them: the lines laid out already keep the numbers
+        // they were laid out with.
+        v.addAtom(atom(0, 0));
+        const ALTextLayout::Line& laid = v.layout().line(2);
+        bool                      seen = false;
+        for (const ALTextLayout::Glyph& glyph : laid.glyphs)
+        {
+            if (glyph.substitution < (1 << 30))
+            {
+                continue;
+            }
+            seen                         = true;
+            const ALTextView::Atom* found = v.atomAt(ALTextPos(2, glyph.cluster));
+            ensure("its own atom, by where it stands", found && found->value.asInteger() == 2 && found->at.column == glyph.cluster);
+            ensure("where the number it was laid out with is another's now", v.atoms()[static_cast<size_t>(glyph.substitution - (1 << 30))].value.asInteger() != 2);
+        }
+        ensure("a box on the line", seen);
+    }
+
+    template<> template<>
+    void altextview_object::test<29>()
+    {
+        set_test_name("what is selected typed over with the same text changes nothing, and the caret goes past it");
+        ALTextView& v = make("abc");
+        v.setSelection(ALTextRange(ALTextPos(0, 1), ALTextPos(0, 2)));
+        type("b");
+        ensure_equals("the text", v.text(), std::string("abc"));
+        ensure("the caret past it, nothing selected", v.caret() == ALTextPos(0, 2) && !v.hasSelection());
+        ensure("nothing to undo, nothing unsaved", !v.canUndo() && !v.isDirty());
+    }
+
+    template<> template<>
+    void altextview_object::test<30>()
+    {
+        set_test_name("select all, deselect and a comment toggled over a selection tell whoever follows the caret");
+        ALTextView& v = make("one\ntwo");
+        v.setCaret(ALTextPos(1, 3));
+        S32 moved = 0;
+        boost::signals2::scoped_connection heard = v.onCaretMoved([&moved]() { ++moved; });
+        v.selectAll();
+        ensure_equals("select all, the caret where it was", moved, 1);
+        ensure("all selected", v.selection() == ALTextRange(ALTextPos(0, 0), ALTextPos(1, 3)));
+        v.deselect();
+        ensure_equals("deselected", moved, 2);
+        ensure("nothing selected", !v.hasSelection());
+        v.setSyntax("lsl");
+        v.setSelection(ALTextRange(ALTextPos(0, 1), ALTextPos(1, 1)));
+        ensure("commented", v.toggleComment());
+        ensure_equals("the text", v.text(), std::string("// one\n// two"));
+        ensure("the lines selected", v.selection() == ALTextRange(ALTextPos(0, 0), ALTextPos(1, 6)));
+    }
+
+    template<> template<>
+    void altextview_object::test<31>()
+    {
+        set_test_name("undo puts back the selection a change was made over, and redo the caret where the change left it");
+        ALTextView& v = make("one two three");
+        v.setSelection(ALTextRange(ALTextPos(0, 7), ALTextPos(0, 4)));
+        type("2");
+        ensure_equals("typed over", v.text(), std::string("one 2 three"));
+        v.undo();
+        ensure_equals("back", v.text(), std::string("one two three"));
+        ensure("the selection as it was, from its end to its start", v.selection() == ALTextRange(ALTextPos(0, 7), ALTextPos(0, 4)));
+        v.redo();
+        ensure("the caret after what was typed", v.caret() == ALTextPos(0, 5) && !v.hasSelection());
+
+        v.setText("aa bb aa");
+        v.setCaret(ALTextPos(0, 4));
+        ensure("replaced", v.replaceAll({ { ALTextRange(ALTextPos(0, 0), ALTextPos(0, 2)), "xxxx" }, { ALTextRange(ALTextPos(0, 6), ALTextPos(0, 8)), "y" } }));
+        ensure_equals("the text", v.text(), std::string("xxxx bb y"));
+        ensure("the caret kept its place in bb", v.caret() == ALTextPos(0, 6));
+        v.undo();
+        ensure("back where it was", v.caret() == ALTextPos(0, 4));
+        v.redo();
+        ensure("and redone to where the replace left it", v.caret() == ALTextPos(0, 6));
     }
 }

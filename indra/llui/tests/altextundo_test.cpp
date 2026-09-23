@@ -71,14 +71,14 @@ namespace tut
         at           = type(at, "c");
         ensure_equals("typed", doc.text(), std::string("abc"));
         ensure("can undo", undo.canUndo());
-        std::optional<ALTextPos> caret = undo.undo();
+        std::optional<ALTextRange> caret = undo.undo();
         ensure("undone", caret.has_value());
         ensure_equals("all of it", doc.text(), std::string());
-        ensure("caret back at the start", *caret == ALTextPos(0, 0));
+        ensure("caret back at the start, nothing selected", caret->end == ALTextPos(0, 0) && caret->empty());
         ensure("nothing more to undo", !undo.canUndo());
         caret = undo.redo();
         ensure_equals("redone", doc.text(), std::string("abc"));
-        ensure("caret after the run", *caret == ALTextPos(0, 3));
+        ensure("caret after the run", caret->end == ALTextPos(0, 3) && caret->empty());
         ensure("nothing to redo", !undo.redo().has_value());
     }
 
@@ -486,5 +486,39 @@ namespace tut
         ensure("put back", restored.fromLLSD(run));
         restored.undo();
         ensure_equals("stepped back whole", erased.text(), std::string("abcdefg"));
+    }
+
+    template<> template<>
+    void altextundo_object::test<16>()
+    {
+        set_test_name("a step keeps the selection it was made over and the one it left, which settle says, until a step is taken");
+        doc.setText("one two three");
+        now += 5.0;
+        // "two" selected from its end back to its start, and typed over.
+        ALTextDocument::Edit over = doc.replace(ALTextRange(ALTextPos(0, 4), ALTextPos(0, 7)), "2");
+        undo.record(over, ALTextRange(ALTextPos(0, 7), ALTextPos(0, 4)), over.endAfter(), now);
+        // Where the change put the selection once it was done: the new text
+        // selected.
+        undo.settle(ALTextRange(ALTextPos(0, 4), ALTextPos(0, 5)));
+
+        std::optional<ALTextRange> back = undo.undo();
+        ensure_equals("undone", doc.text(), std::string("one two three"));
+        ensure("the selection it was made over, anchor and caret as they were", back && *back == ALTextRange(ALTextPos(0, 7), ALTextPos(0, 4)));
+        // Settled after a step back: nothing, since the step settled is not
+        // the one last recorded.
+        undo.settle(ALTextRange(ALTextPos(0, 0), ALTextPos(0, 0)));
+        std::optional<ALTextRange> ahead = undo.redo();
+        ensure_equals("redone", doc.text(), std::string("one 2 three"));
+        ensure("the selection it was left with", ahead && *ahead == ALTextRange(ALTextPos(0, 4), ALTextPos(0, 5)));
+
+        // Through the history written out and read back.
+        const LLSD written = undo.asLLSD();
+        ALTextDocument later(doc.text());
+        ALTextUndo     again(later);
+        ensure("put back", again.fromLLSD(written));
+        back = again.undo();
+        ensure("the selection before, from the history", back && *back == ALTextRange(ALTextPos(0, 7), ALTextPos(0, 4)));
+        ahead = again.redo();
+        ensure("and after", ahead && *ahead == ALTextRange(ALTextPos(0, 4), ALTextPos(0, 5)));
     }
 }

@@ -28,7 +28,6 @@
 
 #include <boost/signals2.hpp>
 
-#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -115,6 +114,13 @@ public:
         // after it is not it.
         ALTextPos slidPast(const ALTextPos& pos) const;
         bool      slide(ALTextRange& range) const;
+        // A range the edit may land inside -- a stretch a search is held
+        // to -- which grows and shrinks with what is done within it rather
+        // than going: a position before the edit stays, one after it moves
+        // along, and one inside what was replaced goes to its start, for the
+        // range's start, or past what went in, for its end. Text put right
+        // at the range's start is within it; right at its end, not.
+        ALTextRange stretched(const ALTextRange& range) const;
     };
 
     typedef boost::signals2::signal<void(const Edit&)> changed_signal_t;
@@ -146,8 +152,9 @@ public:
     // --- edits ---------------------------------------------------------------
 
     // The range is clamped to the text but not to grapheme boundaries: an
-    // edit may cut wherever it was asked to. An edit that changes nothing
-    // is answered without moving the version or telling anyone.
+    // edit may cut wherever it was asked to. An edit that changes nothing --
+    // nothing for nothing, or a stretch for the same text -- is answered as
+    // nothing, without moving the version or telling anyone.
     Edit replace(ALTextRange range, std::string_view text);
     Edit insert(const ALTextPos& at, std::string_view text) { return replace(ALTextRange(at, at), text); }
     Edit remove(const ALTextRange& range) { return replace(range, std::string_view()); }
@@ -191,32 +198,12 @@ public:
     S32       displayColumn(ALTextPos pos, S32 tab_width) const;
     ALTextPos posAtDisplayColumn(S32 line, S32 display_column, S32 tab_width) const;
 
-    // --- search --------------------------------------------------------------
-
-    struct FindOptions
-    {
-        bool caseInsensitive = false;
-        // Only where nothing of a word is on either side of the match.
-        bool wholeWord = false;
-        // The last match beginning before `from`, rather than the first
-        // beginning at or after it.
-        bool backwards = false;
-        // Round past the end of the text back to the start.
-        bool wrap = true;
-    };
-
-    // The needle is one line's worth: a needle with a line break in it finds
-    // nothing.
-    std::optional<ALTextRange> find(std::string_view needle, ALTextPos from, const FindOptions& options) const;
-    std::optional<ALTextRange> find(std::string_view needle, ALTextPos from) const;
+    // Finding is ALTextSearch's, which every find in the studio goes through.
 
 private:
     // Into the text, byte for byte, with no regard for graphemes.
     ALTextPos   clampBytes(ALTextPos pos) const;
     ALTextRange clampBytes(const ALTextRange& range) const;
-    // The first match beginning in [from, to) on a line, or the last one
-    // when asked backwards.
-    std::optional<ALTextRange> findInLine(S32 line, size_t from, size_t to, std::string_view needle, const FindOptions& options) const;
 
     std::vector<std::string> mLines;
     U32                      mVersion = 0;

@@ -92,6 +92,9 @@ namespace
     };
     static_assert(sizeof(KIND_COLOR_SUFFIXES) / sizeof(KIND_COLOR_SUFFIXES[0]) == static_cast<size_t>(ALSyntaxKind::COUNT), "every kind has a colour");
 
+    // Whether a command changes the text, which a read-only view refuses.
+    // Every command is named, with no default, so that one added to the
+    // list is a build that fails here until someone says which it is.
     bool editsText(ALEditorCommand command)
     {
         switch (command)
@@ -118,9 +121,48 @@ namespace
             case ALEditorCommand::Complete:
             case ALEditorCommand::Rename:
                 return true;
-            default:
+            case ALEditorCommand::None:
+            case ALEditorCommand::MoveLeft:
+            case ALEditorCommand::MoveRight:
+            case ALEditorCommand::MoveUp:
+            case ALEditorCommand::MoveDown:
+            case ALEditorCommand::MoveWordLeft:
+            case ALEditorCommand::MoveWordRight:
+            case ALEditorCommand::MoveLineStart:
+            case ALEditorCommand::MoveLineEnd:
+            case ALEditorCommand::MoveDocStart:
+            case ALEditorCommand::MoveDocEnd:
+            case ALEditorCommand::MovePageUp:
+            case ALEditorCommand::MovePageDown:
+            case ALEditorCommand::SelectLeft:
+            case ALEditorCommand::SelectRight:
+            case ALEditorCommand::SelectUp:
+            case ALEditorCommand::SelectDown:
+            case ALEditorCommand::SelectWordLeft:
+            case ALEditorCommand::SelectWordRight:
+            case ALEditorCommand::SelectLineStart:
+            case ALEditorCommand::SelectLineEnd:
+            case ALEditorCommand::SelectDocStart:
+            case ALEditorCommand::SelectDocEnd:
+            case ALEditorCommand::SelectPageUp:
+            case ALEditorCommand::SelectPageDown:
+            case ALEditorCommand::SelectAll:
+            case ALEditorCommand::Copy:
+            case ALEditorCommand::Fold:
+            case ALEditorCommand::Unfold:
+            case ALEditorCommand::FoldAll:
+            case ALEditorCommand::UnfoldAll:
+            case ALEditorCommand::SignatureHelp:
+            case ALEditorCommand::GoToDefinition:
+            case ALEditorCommand::FindReferences:
+            case ALEditorCommand::Find:
+            case ALEditorCommand::Replace:
+            case ALEditorCommand::FindNext:
+            case ALEditorCommand::FindPrevious:
+            case ALEditorCommand::COUNT:
                 return false;
         }
+        return false;
     }
 
     // The layout knows a substitution and an atom by one id each; atoms
@@ -586,18 +628,21 @@ void ALTextView::setModalKeymap(std::unique_ptr<ALModalKeymap> keymap)
 
 void ALTextView::placeCaret(const ALTextPos& pos, bool extend)
 {
-    const ALTextPos was = mCaret;
-    mCaret              = snapped(mDocument.clamp(pos), was);
-    if (!extend)
-    {
-        mAnchor = mCaret;
-    }
+    const ALTextPos caret = snapped(mDocument.clamp(pos), mCaret);
+    placeSelection(extend ? mAnchor : caret, caret);
+}
+
+void ALTextView::placeSelection(const ALTextPos& anchor, const ALTextPos& caret)
+{
+    const ALTextRange was = selection();
+    mAnchor               = mDocument.clamp(anchor);
+    mCaret                = snapped(mDocument.clamp(caret), was.end);
     if (mLayout.hidden(mCaret.line))
     {
         revealLine(mCaret.line);
     }
     mBlink.reset();
-    if (mCaret != was)
+    if (selection() != was)
     {
         mCaretMoved();
     }
@@ -612,8 +657,7 @@ void ALTextView::setCaret(ALTextPos pos, bool extend)
 
 void ALTextView::setSelection(const ALTextRange& range)
 {
-    mAnchor = mDocument.clamp(range.begin);
-    placeCaret(range.end, true);
+    placeSelection(range.begin, range.end);
     mDesiredX = -1.f;
     scrollToCaret();
 }
@@ -1228,6 +1272,7 @@ void ALTextView::checkLine(S32 line)
     }
     SpellLine& checked = mSpellLines[static_cast<size_t>(line)];
     checked.valid      = true;
+    checked.revision   = mHighlighter.revision(line);
     checked.words.clear();
     if (!getSpellCheck())
     {
@@ -1282,7 +1327,11 @@ const std::vector<std::pair<S32, S32>>& ALTextView::misspellings(S32 line)
     {
         return none;
     }
-    if (static_cast<size_t>(line) >= mSpellLines.size() || !mSpellLines[static_cast<size_t>(line)].valid)
+    // Checked again where the line's tokens changed since -- a comment
+    // opened or closed on a line above makes it prose or code -- as well
+    // as where the line itself did.
+    if (static_cast<size_t>(line) >= mSpellLines.size() || !mSpellLines[static_cast<size_t>(line)].valid ||
+        mSpellLines[static_cast<size_t>(line)].revision != mHighlighter.revision(line))
     {
         checkLine(line);
     }
@@ -1398,6 +1447,12 @@ void ALTextView::onDocumentEdit(const ALTextDocument::Edit& edit)
     }
     mSuggestions.clear();
     mSuggestedFor = ALTextRange();
+    // The stretch a search is held to grows and shrinks with what is done
+    // within it.
+    if (mFindInSelection)
+    {
+        mFindScope = edit.stretched(mFindScope);
+    }
 
     // The layers: what is after the edit slides with the text, what it
     // cut through goes.
@@ -1495,9 +1550,38 @@ void ALTextView::moveVertically(S32 rows, bool extend)
 
 // --- editing -------------------------------------------------------------------
 
-ALTextDocument::Edit ALTextView::edit(const ALTextRange& range, std::string_view text)
+ALTextRange ALTextView::withoutComposition(const ALTextRange& range) const
 {
-    const ALTextPos      before = mCaret;
+    // A place measured with the composition standing in the text, measured
+    // as though it were not: after it on its line, back by what it added --
+    // what it wrote over put back -- and inside it, at its start.
+    const auto without = [this](const ALTextPos& pos) {
+        if (!hasPreedit() || pos.line != mPreeditBegin.line || pos <= mPreeditBegin)
+        {
+            return pos;
+        }
+        if (pos.column < mPreeditBegin.column + mPreeditLength)
+        {
+            return mPreeditBegin;
+        }
+        return ALTextPos(pos.line, pos.column - mPreeditLength + static_cast<S32>(mPreeditOverwritten.size()));
+    };
+    return ALTextRange(without(range.begin), without(range.end));
+}
+
+ALTextDocument::Edit ALTextView::edit(const ALTextRange& range_in, std::string_view text)
+{
+    // A composition is not text yet, and the journal knows nothing of it:
+    // taken out before anything the journal keeps is done, so that every
+    // step is of the text without it, and the range, measured with it in,
+    // measured without it. The input method composes on at the caret.
+    ALTextRange range = range_in;
+    if (hasPreedit())
+    {
+        range = withoutComposition(range_in);
+        resetPreedit();
+    }
+    const ALTextRange    before = selection();
     ALTextDocument::Edit done   = mDocument.replace(range, text);
     if (done.nothing())
     {
@@ -1511,6 +1595,9 @@ ALTextDocument::Edit ALTextView::edit(const ALTextRange& range, std::string_view
 
 void ALTextView::afterEdit()
 {
+    // Where the change left the selection, for a redo to put it back
+    // there; nothing once a step has been taken back or forward.
+    mUndo.settle(selection());
     mDesiredX          = -1.f;
     mChangedSinceFocus = true;
     mBlink.reset();
@@ -1525,9 +1612,18 @@ void ALTextView::insertText(std::string_view text)
     {
         return;
     }
-    if (!edit(selection(), text).nothing())
+    const ALTextRange over = selection().normalised();
+    if (!edit(over, text).nothing())
     {
         afterEdit();
+    }
+    else if (!over.empty() && !text.empty())
+    {
+        // What was selected typed or pasted over with the same text: the
+        // text is as it was, and the caret goes past it, as it would have.
+        placeCaret(over.end, false);
+        mDesiredX = -1.f;
+        scrollToCaret();
     }
 }
 
@@ -1539,7 +1635,12 @@ bool ALTextView::replaceAll(std::vector<std::pair<ALTextRange, std::string>> edi
     }
     for (auto& one : edits)
     {
-        one.first = one.first.normalised();
+        one.first = withoutComposition(one.first.normalised());
+    }
+    if (hasPreedit())
+    {
+        // Measured without it above; taken out now, before the caret is.
+        resetPreedit();
     }
     std::sort(edits.begin(), edits.end(), [](const auto& a, const auto& b) { return a.first.begin < b.first.begin; });
 
@@ -1846,6 +1947,7 @@ void ALTextView::newLine()
     if (caret.line >= 0)
     {
         setCaret(caret);
+        mUndo.settle(selection());
     }
     mUndo.endGroup();
 }
@@ -1912,8 +2014,7 @@ void ALTextView::indentLines(bool in)
         }
         return mDocument.clamp(pos);
     };
-    mAnchor = moved(anchor_was);
-    mCaret  = moved(caret_was);
+    placeSelection(moved(anchor_was), moved(caret_was));
     afterEdit();
 }
 
@@ -1928,8 +2029,7 @@ void ALTextView::duplicateLines()
     edit(ALTextRange(mDocument.lineEnd(last), mDocument.lineEnd(last)), "\n" + block);
     mUndo.endGroup();
     // The caret and the selection go with the copy.
-    mAnchor = ALTextPos(anchor.line + count, anchor.column);
-    placeCaret(ALTextPos(caret.line + count, caret.column), true);
+    placeSelection(ALTextPos(anchor.line + count, anchor.column), ALTextPos(caret.line + count, caret.column));
     afterEdit();
 }
 
@@ -1955,8 +2055,7 @@ void ALTextView::moveLines(S32 direction)
         edit(ALTextRange(mDocument.lineStart(first), mDocument.lineEnd(last + 1)), below + "\n" + block);
     }
     mUndo.endGroup();
-    mAnchor = ALTextPos(anchor.line + direction, anchor.column);
-    placeCaret(ALTextPos(caret.line + direction, caret.column), true);
+    placeSelection(ALTextPos(anchor.line + direction, anchor.column), ALTextPos(caret.line + direction, caret.column));
     afterEdit();
 }
 
@@ -2304,8 +2403,7 @@ bool ALTextView::toggleComment()
     mUndo.endGroup();
     if (had_selection)
     {
-        mAnchor = ALTextPos(first, 0);
-        mCaret  = last + 1 < mDocument.lineCount() ? ALTextPos(last + 1, 0) : mDocument.lineEnd(last);
+        placeSelection(ALTextPos(first, 0), last + 1 < mDocument.lineCount() ? ALTextPos(last + 1, 0) : mDocument.lineEnd(last));
     }
     else
     {
@@ -2365,9 +2463,14 @@ void ALTextView::undo()
     {
         return;
     }
-    if (std::optional<ALTextPos> caret = mUndo.undo())
+    // The steps are of the text without a composition in it.
+    if (hasPreedit())
     {
-        placeCaret(*caret, false);
+        resetPreedit();
+    }
+    if (std::optional<ALTextRange> selected = mUndo.undo())
+    {
+        placeSelection(selected->begin, selected->end);
         afterEdit();
     }
 }
@@ -2378,9 +2481,13 @@ void ALTextView::redo()
     {
         return;
     }
-    if (std::optional<ALTextPos> caret = mUndo.redo())
+    if (hasPreedit())
     {
-        placeCaret(*caret, false);
+        resetPreedit();
+    }
+    if (std::optional<ALTextRange> selected = mUndo.redo())
+    {
+        placeSelection(selected->begin, selected->end);
         afterEdit();
     }
 }
@@ -2436,15 +2543,13 @@ void ALTextView::doDelete()
 
 void ALTextView::selectAll()
 {
-    mAnchor   = mDocument.start();
-    mCaret    = mDocument.end();
+    placeSelection(mDocument.start(), mDocument.end());
     mDesiredX = -1.f;
-    mBlink.reset();
 }
 
 void ALTextView::deselect()
 {
-    mAnchor = mCaret;
+    placeSelection(mCaret, mCaret);
 }
 
 // --- the input method ----------------------------------------------------------
@@ -3076,9 +3181,27 @@ void ALTextView::drawBars(F32 alpha)
         const S32 track_h = llmax(1, ruler.getHeight());
         const auto yOf    = [&](S32 line) { return ruler.mTop - static_cast<S32>(static_cast<F32>(mLayout.lineTop(line)) / static_cast<F32>(total) * static_cast<F32>(track_h)); };
         const S32 middle  = ruler.mLeft + RULER_W / 2;
-        const S32 count   = mDocument.lineCount();
-        LLColor4  mark;
-        for (S32 line = 0; line < count; ++line)
+        // The lines with a mark, found again only where the text or the
+        // marks have changed; their colours asked every frame, which a
+        // change of theme may change.
+        if (mRulerMarksVersion != mDocument.version() || mRulerMarksRevision != marksRevision() || !mRulerMarksValid)
+        {
+            mRulerMarkLines.clear();
+            LLColor4  unused;
+            const S32 count = mDocument.lineCount();
+            for (S32 line = 0; line < count; ++line)
+            {
+                if (mapMark(line, unused))
+                {
+                    mRulerMarkLines.push_back(line);
+                }
+            }
+            mRulerMarksVersion  = mDocument.version();
+            mRulerMarksRevision = marksRevision();
+            mRulerMarksValid    = true;
+        }
+        LLColor4 mark;
+        for (const S32 line : mRulerMarkLines)
         {
             if (mapMark(line, mark))
             {
@@ -3148,15 +3271,22 @@ S32 ALTextView::leftEdge() const
 S32 ALTextView::mapScroll(const LLRect& map)
 {
     // The lines the map shows, and how far its window is down them: as
-    // far, in proportion, as the text is scrolled.
-    mMapLines.clear();
+    // far, in proportion, as the text is scrolled. The lines found again
+    // only where which are hidden may have changed.
     const S32 count = mDocument.lineCount();
-    for (S32 line = 0; line < count; ++line)
+    if (!mMapLinesValid || mMapLinesRevision != mLayout.hiddenRevision() || mMapLinesCount != count)
     {
-        if (!mLayout.hidden(line))
+        mMapLines.clear();
+        for (S32 line = 0; line < count; ++line)
         {
-            mMapLines.push_back(line);
+            if (!mLayout.hidden(line))
+            {
+                mMapLines.push_back(line);
+            }
         }
+        mMapLinesRevision = mLayout.hiddenRevision();
+        mMapLinesCount    = count;
+        mMapLinesValid    = true;
     }
     const S32 doc_h = static_cast<S32>(mMapLines.size()) * MAP_LINE_H;
     const S32 map_h = map.getHeight() - 2 * MAP_PAD;
@@ -3231,16 +3361,14 @@ void ALTextView::drawMapPreview(F32 alpha)
         const std::vector<ALSyntaxToken>& tokens = mHighlighter.tokens(l);
         F32                               x      = static_cast<F32>(box.mLeft + PAD + numbers);
         const F32                         limit  = static_cast<F32>(box.mRight - PAD);
+        // The tabs to the view's own stops, counted along the whole line.
+        S32                               column = 0;
         auto                              run    = [&](S32 begin, S32 end, const LLColor4& color) {
             if (begin >= end || x >= limit)
             {
                 return;
             }
-            std::string piece = text.substr(static_cast<size_t>(begin), static_cast<size_t>(end - begin));
-            for (size_t at = piece.find('\t'); at != std::string::npos; at = piece.find('\t', at + 4))
-            {
-                piece.replace(at, 1, "    ");
-            }
+            const std::string piece = alExpandTabs(std::string_view(text).substr(static_cast<size_t>(begin), static_cast<size_t>(end - begin)), column, mTabWidth);
             F32 right_x = x;
             mFont->renderUTF8(piece, 0, x, static_cast<F32>(baseline), color % alpha, LLFontGL::LEFT, LLFontGL::BOTTOM, LLFontGL::NORMAL,
                               LLFontGL::NO_SHADOW, S32_MAX, static_cast<S32>(limit - x), &right_x, false);
@@ -3608,12 +3736,15 @@ void ALTextView::drawLayers(S32 line, const ALTextLayout::Line& laid, S32 r, con
             {
                 continue;
             }
-            const size_t index = static_cast<size_t>(glyph.substitution - ATOM_ID_BASE);
-            if (index >= mAtoms.size())
+            // By where the glyph stands rather than by the index it was
+            // laid out with, which atoms made or taken away before it on
+            // another line have moved on since.
+            const Atom* found = atomAt(ALTextPos(line, glyph.cluster));
+            if (!found || found->at.column != glyph.cluster)
             {
                 continue;
             }
-            const Atom& atom = mAtoms[index];
+            const Atom& atom = *found;
             if (atom.view || !atom.image)
             {
                 // A view was put in its box before the rows were drawn.
@@ -4060,8 +4191,7 @@ bool ALTextView::handleMouseDown(S32 x, S32 y, MASK mask)
         // The third click takes the line; through placeCaret, so that
         // whoever follows the caret hears of it.
         const S32 line = mCaret.line;
-        mAnchor        = mDocument.lineStart(line);
-        placeCaret(line + 1 < mDocument.lineCount() ? mDocument.lineStart(line + 1) : mDocument.lineEnd(line), true);
+        placeSelection(mDocument.lineStart(line), line + 1 < mDocument.lineCount() ? mDocument.lineStart(line + 1) : mDocument.lineEnd(line));
         mDesiredX  = -1.f;
         mSelecting = false;
         if (mModal)
@@ -4264,8 +4394,7 @@ bool ALTextView::handleDoubleClick(S32 x, S32 y, MASK mask)
     }
     setFocus(true);
     const ALTextRange word = mDocument.wordAt(posAtLocal(x, y, false));
-    mAnchor                = word.begin;
-    placeCaret(word.end, true);
+    placeSelection(word.begin, word.end);
     mDesiredX  = -1.f;
     mSelecting = false;
     armTripleClick();

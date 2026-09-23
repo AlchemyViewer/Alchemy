@@ -26,6 +26,8 @@
 
 #include "../altextdocument.h"
 
+#include "../altextchars.h"
+
 #include "../test/lltut.h"
 
 #include <string>
@@ -217,44 +219,16 @@ namespace tut
     template<> template<>
     void altextdocument_object::test<11>()
     {
-        set_test_name("find: forward, wrapping, backwards, whole words, and without regard to case");
-        ALTextDocument doc("Foo foobar\n\xC3\x89ric foo\nfoo");
-        ALTextDocument::FindOptions options;
-
-        auto found = doc.find("foo", ALTextPos(0, 0), options);
-        ensure("found", found.has_value());
-        ensure("the first exact one", *found == ALTextRange(ALTextPos(0, 4), ALTextPos(0, 7)));
-
-        found = doc.find("foo", ALTextPos(0, 5), options);
-        ensure("the next, on the next line", found && *found == ALTextRange(ALTextPos(1, 6), ALTextPos(1, 9)));
-
-        found = doc.find("foo", ALTextPos(2, 1), options);
-        ensure("wraps round to the first", found && *found == ALTextRange(ALTextPos(0, 4), ALTextPos(0, 7)));
-
-        options.wrap = false;
-        ensure("or not", !doc.find("foo", ALTextPos(2, 1), options));
-        options.wrap = true;
-
-        options.caseInsensitive = true;
-        found = doc.find("foo", ALTextPos(0, 0), options);
-        ensure("case: the capital one", found && *found == ALTextRange(ALTextPos(0, 0), ALTextPos(0, 3)));
-        found = doc.find("\xC3\xA9ric", ALTextPos(0, 0), options);
-        ensure("case above ASCII", found && *found == ALTextRange(ALTextPos(1, 0), ALTextPos(1, 5)));
-        options.caseInsensitive = false;
-
-        options.wholeWord = true;
-        found = doc.find("foo", ALTextPos(0, 0), options);
-        ensure("a whole word, not the start of foobar", found && *found == ALTextRange(ALTextPos(1, 6), ALTextPos(1, 9)));
-        options.wholeWord = false;
-
-        options.backwards = true;
-        found = doc.find("foo", ALTextPos(2, 0), options);
-        ensure("back: the one before", found && *found == ALTextRange(ALTextPos(1, 6), ALTextPos(1, 9)));
-        found = doc.find("foo", ALTextPos(0, 4), options);
-        ensure("back from the first wraps to the last", found && *found == ALTextRange(ALTextPos(2, 0), ALTextPos(2, 3)));
-
-        ensure("nothing for nothing", !doc.find("", ALTextPos(0, 0)));
-        ensure("nothing across lines", !doc.find("bar\n", ALTextPos(0, 0)));
+        set_test_name("a stretch replaced by the same text changes nothing: nothing heard, the version still, answered as nothing");
+        ALTextDocument doc("one two");
+        listen(doc);
+        const U32            before = doc.version();
+        ALTextDocument::Edit same   = doc.replace(ALTextRange(ALTextPos(0, 4), ALTextPos(0, 7)), "two");
+        ensure("nothing", same.nothing());
+        ensure_equals("the version still", doc.version(), before);
+        ensure("nobody told", heard.empty());
+        ensure_equals("the text as it was", doc.text(), std::string("one two"));
+        ensure("and a different text is an edit", !doc.replace(ALTextRange(ALTextPos(0, 4), ALTextPos(0, 7)), "Two").nothing() && heard.size() == 1);
     }
 
     template<> template<>
@@ -270,5 +244,55 @@ namespace tut
         ensure_equals("what went", gone.removed, std::string("one\ntwo\n"));
         ensure("everything can go", doc.removeFirstLines(5).removed == "three" && doc.empty());
         ensure("nothing to go", doc.removeFirstLines(0).nothing());
+    }
+
+    template<> template<>
+    void altextdocument_object::test<13>()
+    {
+        set_test_name("a stretch an edit lands in grows and shrinks with it, rather than going as a link would");
+        const ALTextRange scope(ALTextPos(0, 4), ALTextPos(1, 3));
+        ALTextDocument    doc("one two three\nfour five");
+        // Inside it, longer: the end moves on by what grew.
+        ALTextDocument::Edit grew = doc.replace(ALTextRange(ALTextPos(0, 4), ALTextPos(0, 7)), "TWO!!");
+        ensure("grown", grew.stretched(scope) == ALTextRange(ALTextPos(0, 4), ALTextPos(1, 3)));
+        ensure("its end on the next line as it was", grew.stretched(ALTextRange(ALTextPos(0, 4), ALTextPos(0, 13))) == ALTextRange(ALTextPos(0, 4), ALTextPos(0, 15)));
+        // Before it: both ends move along.
+        doc.setText("one two three");
+        ALTextDocument::Edit before = doc.insert(ALTextPos(0, 0), "zero ");
+        ensure("moved along", before.stretched(ALTextRange(ALTextPos(0, 4), ALTextPos(0, 7))) == ALTextRange(ALTextPos(0, 9), ALTextPos(0, 12)));
+        // At its start: within it; at its end: not.
+        doc.setText("one two three");
+        ALTextDocument::Edit at_start = doc.insert(ALTextPos(0, 4), "x");
+        ensure("put at its start, within it", at_start.stretched(ALTextRange(ALTextPos(0, 4), ALTextPos(0, 7))) == ALTextRange(ALTextPos(0, 4), ALTextPos(0, 8)));
+        doc.setText("one two three");
+        ALTextDocument::Edit at_end = doc.insert(ALTextPos(0, 7), "x");
+        ensure("put at its end, not", at_end.stretched(ALTextRange(ALTextPos(0, 4), ALTextPos(0, 7))) == ALTextRange(ALTextPos(0, 4), ALTextPos(0, 7)));
+        // Over its end: its end past what went in.
+        doc.setText("one two three");
+        ALTextDocument::Edit over = doc.replace(ALTextRange(ALTextPos(0, 6), ALTextPos(0, 9)), "O\nTH");
+        ensure("its end past what went in", over.stretched(ALTextRange(ALTextPos(0, 4), ALTextPos(0, 7))) == ALTextRange(ALTextPos(0, 4), ALTextPos(1, 2)));
+        // Over its start: its start where what was replaced began.
+        doc.setText("one two three");
+        ALTextDocument::Edit cut = doc.remove(ALTextRange(ALTextPos(0, 2), ALTextPos(0, 5)));
+        ensure("its start where the cut began", cut.stretched(ALTextRange(ALTextPos(0, 4), ALTextPos(0, 7))) == ALTextRange(ALTextPos(0, 2), ALTextPos(0, 4)));
+    }
+
+    template<> template<>
+    void altextdocument_object::test<14>()
+    {
+        set_test_name("tabs to the stops from a column, one column a character; and a replacement in the case of what it replaces, past ASCII");
+        S32 column = 0;
+        ensure_equals("to the first stop", alExpandTabs("\tx", column, 4), std::string("    x"));
+        ensure_equals("counted on", column, 5);
+        ensure_equals("from where it had reached", alExpandTabs("\ty", column, 4), std::string("   y"));
+        column = 1;
+        ensure_equals("a character of two bytes is one column", alExpandTabs("\xC3\xA9\t|", column, 4), std::string("\xC3\xA9  |"));
+
+        ensure_equals("all capitals", alInCaseOf("\xC3\x89LAN", "hello"), std::string("HELLO"));
+        ensure_equals("capitalised", alInCaseOf("\xC3\x89lan", "hello"), std::string("Hello"));
+        ensure_equals("all small, and what goes in lowered past ASCII too", alInCaseOf("world", "\xC3\x89LAN"), std::string("\xC3\xA9lan"));
+        ensure_equals("raised past ASCII", alInCaseOf("WORLD", "\xC3\xA9lan"), std::string("\xC3\x89LAN"));
+        ensure_equals("mixed stays as written", alInCaseOf("wOrLd", "Hello"), std::string("Hello"));
+        ensure_equals("no letters stays as written", alInCaseOf("123", "Hello"), std::string("Hello"));
     }
 }

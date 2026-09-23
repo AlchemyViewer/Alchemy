@@ -97,13 +97,17 @@ F32 ALTextLayout::columnWidth()
 
 void ALTextLayout::refreshIfFontsChanged()
 {
-    if (mFontGeneration == LLFontGL::sResolutionGeneration && mScaleX == LLFontGL::sScaleX && mScaleY == LLFontGL::sScaleY)
+    // Against the scale as the fonts have it, not as it is used: a scale of
+    // nothing, used as one, would otherwise differ at every asking.
+    if (mFontGeneration == LLFontGL::sResolutionGeneration && mRawScaleX == LLFontGL::sScaleX && mRawScaleY == LLFontGL::sScaleY)
     {
         return;
     }
     mFontGeneration = LLFontGL::sResolutionGeneration;
-    mScaleX         = LLFontGL::sScaleX > 0.f ? LLFontGL::sScaleX : 1.f;
-    mScaleY         = LLFontGL::sScaleY > 0.f ? LLFontGL::sScaleY : 1.f;
+    mRawScaleX      = LLFontGL::sScaleX;
+    mRawScaleY      = LLFontGL::sScaleY;
+    mScaleX         = mRawScaleX > 0.f ? mRawScaleX : 1.f;
+    mScaleY         = mRawScaleY > 0.f ? mRawScaleY : 1.f;
     mSpaceAdvance   = -1.f;
     invalidateAll();
 }
@@ -117,6 +121,7 @@ void ALTextLayout::invalidateAll()
     {
         mHidden.assign(mLines.size(), 0);
         mHiddenCount = 0;
+        ++mHiddenRevision;
     }
     mTopsDirty    = true;
     mContentWidth = -1.f;
@@ -144,6 +149,7 @@ void ALTextLayout::onEdit(const ALTextDocument::Edit& edit)
         mLines.resize(mDocument->lineCount());
         mHidden.resize(mDocument->lineCount(), 0);
     }
+    ++mHiddenRevision;
     mTopsDirty    = true;
     mContentWidth = -1.f;
 }
@@ -179,6 +185,7 @@ void ALTextLayout::setHidden(S32 first, S32 last, bool hidden)
             mHidden[l] = hidden ? 1 : 0;
             mHiddenCount += hidden ? 1 : -1;
             mTopsDirty = true;
+            ++mHiddenRevision;
         }
     }
 }
@@ -255,6 +262,7 @@ void ALTextLayout::invalidateLine(S32 index)
 
 void ALTextLayout::layoutLine(S32 index, Line& out)
 {
+    ++mLinesLaidOut;
     out.placed.clear();
     out.glyphs.clear();
     out.rows.clear();

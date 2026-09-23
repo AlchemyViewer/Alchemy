@@ -640,8 +640,10 @@ protected:
     // What the call at the caret takes, asked for again.
     virtual bool signatureHelp() { return false; }
     // What the map shows beside a line: a mark's colour, where the
-    // subclass has one for it.
+    // subclass has one for it; and a count that moves on whenever the
+    // marks do, so that the lines with one are not looked for every frame.
     virtual bool mapMark(S32 line, LLColor4& color) const { return false; }
+    virtual U32  marksRevision() const { return 0; }
     // The bracket a closing one at a place closes, where the subclass
     // knows how to match them past strings and comments.
     virtual bool closerOpenedAt(const ALTextPos& closer, ALTextPos& opener) { return false; }
@@ -670,6 +672,12 @@ protected:
     ALTextDocument::Edit edit(const ALTextRange& range, std::string_view text);
     void                 afterEdit();
     void                 placeCaret(const ALTextPos& pos, bool extend);
+    // The selection put somewhere, anchor and caret at once, told to
+    // whoever follows the caret where either moved.
+    void                 placeSelection(const ALTextPos& anchor, const ALTextPos& caret);
+    // A range measured with a composition standing in the text, measured
+    // as though it were not.
+    ALTextRange          withoutComposition(const ALTextRange& range) const;
 
     // --- LLPreeditor ---------------------------------------------------------
 
@@ -861,7 +869,17 @@ private:
     bool             mScrollMapPreview = true;
     bool             mScrollMapLeft    = false;
     bool             mDraggingMap      = false;
+    // The lines the map shows, as of the layout's hidden revision and the
+    // line count; and the ruler's lines with a mark, as of the text's
+    // version and the marks' revision.
     std::vector<S32> mMapLines;
+    bool             mMapLinesValid    = false;
+    U32              mMapLinesRevision = 0;
+    S32              mMapLinesCount    = 0;
+    std::vector<S32> mRulerMarkLines;
+    bool             mRulerMarksValid    = false;
+    U32              mRulerMarksVersion  = 0;
+    U32              mRulerMarksRevision = 0;
 
     std::vector<LLColor4U> mColorScratch;
     changed_signal_t       mChanged;
@@ -894,6 +912,8 @@ private:
     struct SpellLine
     {
         bool                             valid = false;
+        // The line's tokens as they were checked by.
+        U32                              revision = 0;
         std::vector<std::pair<S32, S32>> words;
     };
     std::vector<SpellLine>                  mSpellLines;

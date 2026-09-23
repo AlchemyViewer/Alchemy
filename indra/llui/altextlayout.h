@@ -219,6 +219,10 @@ public:
     // The nearest line not hidden, starting at this one and looking in
     // this direction (1 or -1); -1 where there is none.
     S32 visibleFrom(S32 index, S32 direction) const;
+    // Moves on whenever which lines are hidden may have changed -- a line
+    // hidden or shown, lines made or taken away -- for whoever keeps a list
+    // of the lines in sight.
+    U32 hiddenRevision() const { return mHiddenRevision; }
 
     // --- a line ------------------------------------------------------------
 
@@ -251,6 +255,10 @@ public:
     // `round`, else the one at or before.
     S32 columnAt(S32 index, S32 row, F32 x, bool round);
 
+    // How many lines have been laid out, for a test that says a layout is
+    // not thrown away for nothing.
+    U32 linesLaidOut() const { return mLinesLaidOut; }
+
 private:
     void onEdit(const ALTextDocument::Edit& edit);
     void invalidateAll();
@@ -276,10 +284,16 @@ private:
     F32                                mSpaceAdvance = -1.f;
     // Negative until asked for.
     F32                                mContentWidth = -1.f;
-    // What the lines were laid out under.
+    // What the lines were laid out under: the fonts' generation and the UI
+    // scale as the fonts had it, and the scale as used, which is one where
+    // the fonts have none yet.
     S32                                mFontGeneration = -1;
+    F32                                mRawScaleX      = -1.f;
+    F32                                mRawScaleY      = -1.f;
     F32                                mScaleX         = 1.f;
     F32                                mScaleY         = 1.f;
+    U32                                mHiddenRevision = 0;
+    U32                                mLinesLaidOut   = 0;
     // Scratch a wrapping loop keeps rather than allocates per line.
     std::vector<size_t>                mBreaks;
     std::vector<ALShapedGlyph>         mShaped;
