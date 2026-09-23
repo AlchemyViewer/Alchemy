@@ -610,6 +610,8 @@ private:
     void   onTabAction(const std::string& action);
     // The tab after or before the active one, round the ends.
     void   cycleTab(S32 direction);
+    // The tab shown, one place along the strip.
+    void   moveTab(S32 direction);
     // The documents in the order the tabs were dragged into.
     void   onTabsReordered(const std::vector<std::string>& order);
     // How many errors and warnings a script shows.

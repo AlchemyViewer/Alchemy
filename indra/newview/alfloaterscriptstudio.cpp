@@ -2518,17 +2518,17 @@ void ALFloaterScriptStudio::preprocessedAnswer(const std::string& id, U32 versio
         return;
     }
     scheduleAnalysis(doc, true);
+    // The includes that never came, by the names the script gave them.
+    std::string pending;
+    for (const std::string& name : result.pending)
+    {
+        pending += (pending.empty() ? "" : ", ") + name;
+    }
+    args["[FILES]"] = pending;
     if (!then_save)
     {
         if (!result.pending.empty())
         {
-            // Which, by the names the script gave them.
-            std::string names;
-            for (const std::string& name : result.pending)
-            {
-                names += (names.empty() ? "" : ", ") + name;
-            }
-            args["[FILES]"] = names;
             report(counted("PreprocessedPending", static_cast<S32>(result.pending.size()), args), true, &doc);
         }
         else
@@ -2548,6 +2548,16 @@ void ALFloaterScriptStudio::preprocessedAnswer(const std::string& id, U32 versio
         doc.saveAnywayVersion = version;
         saveStopped(doc);
         showBottom("problems_tab");
+        return;
+    }
+    // An include still on its way is one the upload would go without,
+    // its line dropped from the text: the script as written is not what
+    // would compile. Stopped, as an error stops it, unless asked again.
+    if (!result.pending.empty() && doc.saveAnywayVersion != static_cast<S64>(version))
+    {
+        report(counted("PreprocessPendingSave", static_cast<S32>(result.pending.size()), args), true, &doc, { "save_anyway" });
+        doc.saveAnywayVersion = version;
+        saveStopped(doc);
         return;
     }
     if (result.disabled)
@@ -4090,6 +4100,27 @@ void ALFloaterScriptStudio::onTabsReordered(const std::vector<std::string>& orde
     reindexDocs();
     mActive = active_id.empty() ? NONE : indexOf(active_id);
     fillTabs();
+}
+
+void ALFloaterScriptStudio::moveTab(S32 direction)
+{
+    if (mActive == NONE)
+    {
+        return;
+    }
+    const S64 to = static_cast<S64>(mActive) + (direction > 0 ? 1 : -1);
+    if (to < 0 || to >= static_cast<S64>(mDocs.size()))
+    {
+        return;
+    }
+    // As a drag along the strip would have left them.
+    std::vector<std::string> order;
+    for (const std::unique_ptr<Doc>& doc : mDocs)
+    {
+        order.push_back(doc->id);
+    }
+    std::swap(order[mActive], order[static_cast<size_t>(to)]);
+    onTabsReordered(order);
 }
 
 void ALFloaterScriptStudio::cycleTab(S32 direction)
@@ -12729,6 +12760,14 @@ void ALFloaterScriptStudio::onMenuAction(const LLSD& param)
     else if (action == "all_tabs")
     {
         showAllTabs();
+    }
+    else if (action == "move_tab_left" || action == "move_tab_right")
+    {
+        moveTab(action == "move_tab_right" ? 1 : -1);
+    }
+    else if (action == "focus_tabs")
+    {
+        mTabs->setFocus(true);
     }
     else if (action == "command_palette")
     {

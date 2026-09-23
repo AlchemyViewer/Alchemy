@@ -1501,6 +1501,7 @@ void LLPanelObjectInventory::clearContents()
 {
     mHaveInventory = false;
     mIsInventoryEmpty = true;
+    mInventoryFailed = false;
     if (LLToolDragAndDrop::getInstance() && LLToolDragAndDrop::getInstance()->getSource() == LLToolDragAndDrop::SOURCE_WORLD)
     {
         LLToolDragAndDrop::getInstance()->endDrag();
@@ -1621,6 +1622,10 @@ void LLPanelObjectInventory::updateInventory()
         }
 
         mHaveInventory = !mIsInventoryEmpty || !objectp->isInventoryDirty();
+        // No inventory because the request for it failed, which is not an
+        // object with nothing in it. Asked again when the object is chosen
+        // again, not on every refresh: a request that failed is apt to.
+        mInventoryFailed = !inventory_root && objectp->isInventoryRequestFailed();
         if (objectp->isInventoryDirty())
         {
             // Inventory is dirty, yet we received inventoryChanged() callback.
@@ -1867,7 +1872,11 @@ void LLPanelObjectInventory::draw()
     if (mIsInventoryEmpty)
     {
         std::string text;
-        if (!mHaveInventory && mTaskUUID.notNull())
+        if (mInventoryFailed)
+        {
+            text = LLTrans::getString("ContentsUnavailable");
+        }
+        else if (!mHaveInventory && mTaskUUID.notNull())
         {
             text = LLTrans::getString("LoadingContents");
         }

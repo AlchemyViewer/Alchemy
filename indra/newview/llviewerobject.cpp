@@ -3248,6 +3248,7 @@ void LLViewerObject::fetchInventoryFromServer()
 
         // This will get reset by doInventoryCallback or processTaskInv
         mInvRequestState = INVENTORY_REQUEST_PENDING;
+        mInvRequestFailed = false;
 
         if (mRegionp && !mRegionp->getCapability("RequestTaskInventory").empty())
         {
@@ -3354,18 +3355,26 @@ void LLViewerObject::fetchInventoryFromCapCoro(const LLUUID task_inv)
         else if (status.getType() == 304)
         {
             LL_INFOS() << "Inventory wasn't changed on server!" << LL_ENDL;
-            obj->mInvRequestState = INVENTORY_REQUEST_STOPPED;
             // Even though it wasn't necessary to send a response, we still may have mutated
             // the inventory since we kicked off the request, check for that case.
             potentially_stale = obj->mInventorySerialNum < obj->mExpectedInventorySerialNum;
             // Set this to what we already have so that we don't re-request a second time.
             obj->mExpectedInventorySerialNum = obj->mInventorySerialNum;
+            // What we already have is the answer, and whoever asked is
+            // waiting for one. Also stops the request.
+            obj->doInventoryCallback();
         }
         else
         {
             // Not sure that there's anything sensible we can do to recover here, retrying in a loop would be bad.
             LL_WARNS() << "Error status while requesting task inventory: " << status.toString() << LL_ENDL;
-            obj->mInvRequestState = INVENTORY_REQUEST_STOPPED;
+            // But whoever asked is told that nothing came, rather than
+            // nothing at all: a listener waiting on the answer -- the
+            // build floater's contents, a script's includes looked up in
+            // its object -- would otherwise wait for the rest of the
+            // session. Also stops the request.
+            obj->mInvRequestFailed = true;
+            obj->doInventoryCallback();
         }
 
         if (potentially_stale)

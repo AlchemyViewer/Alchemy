@@ -28,6 +28,8 @@
 
 #include "../lluictrlfactory.h"
 
+#include "llkeyboard.h"
+
 #include "alheadlessui_fixture.h"
 
 #include "../test/lltut.h"
@@ -93,6 +95,43 @@ namespace tut
         next->handleKeyHere(KEY_RETURN, MASK_NONE);
         ensure_equals("the next, from the keyboard", nexts, 1);
         ensure("anything else is not the button's", !next->handleKeyHere('Q', MASK_NONE));
+        bar->die();
+    }
+    // While the bar has the keyboard, a letter with Alt -- with Command
+    // and Option on a Mac -- turns a way of matching on and off, and the
+    // tip says which.
+    template<> template<>
+    void alfindbar_object::test<2>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+#if LL_DARWIN
+        constexpr MASK toggle = MASK_CONTROL | MASK_ALT;
+#else
+        constexpr MASK toggle = MASK_ALT;
+#endif
+        ALFindBar* bar     = make();
+        S32        changed = 0;
+        bar->onChanged([&]() { ++changed; });
+        ensure("C is taken", bar->handleKeyHere('C', toggle));
+        ensure("and matches case", bar->options().caseSensitive);
+        bar->handleKeyHere('W', toggle);
+        ensure("W, whole words", bar->options().wholeWord);
+        bar->handleKeyHere('R', toggle);
+        ensure("R, patterns", bar->options().regex);
+        bar->handleKeyHere('L', toggle);
+        ensure("L, the selection only", bar->inSelection());
+        ensure_equals("each said", changed, 4);
+        bar->handleKeyHere('C', toggle);
+        ensure("and again, off", !bar->options().caseSensitive);
+        ensure("another letter is not the bar's", !bar->handleKeyHere('Q', toggle));
+        ensure("nor the letter with another mask", !bar->handleKeyHere('C', MASK_SHIFT));
+        // The viewer gives the keys their names; here, as they are.
+        LLKeyboard::setStringTranslatorFunc([](std::string_view name) { return std::string(name); });
+        const std::string tip = bar->getChild<LLUICtrl>("match_case")->getToolTip();
+        ensure("the tip says the key: " + tip, tip.find(LLKeyboard::stringFromAccelerator(toggle, 'C')) != std::string::npos);
         bar->die();
     }
 }

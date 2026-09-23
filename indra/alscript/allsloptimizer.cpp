@@ -2804,20 +2804,40 @@ namespace
             return true;
         }
 
-        // Whether a label something jumps to is in a statement, however
-        // far down. A jump from inside the statement itself counts too,
-        // which keeps a statement that nothing outside reaches: dead code
-        // kept, never live code dropped.
-        static bool holdsLiveLabel(LSLASTNode* node)
+        // Whether a label a jump from outside a statement goes to is in
+        // it, however far down: the one way in to a statement nothing
+        // before it reaches. A jump from inside to a label inside -- a
+        // loop made of labels -- is no way in.
+        static bool holdsLiveLabel(LSLASTNode* statement)
         {
-            if (node->getNodeType() == NODE_STATEMENT && node->getNodeSubType() == NODE_LABEL)
+            // Each label's references are its own name and every jump to
+            // it; the jumps inside the statement are taken off.
+            boost::unordered_flat_map<LSLSymbol*, int> inside;
+            std::vector<LSLSymbol*>                    labels;
+            const std::function<void(LSLASTNode*)> gather = [&](LSLASTNode* node) {
+                if (node->getNodeType() == NODE_STATEMENT && node->getNodeSubType() == NODE_LABEL)
+                {
+                    if (LSLSymbol* sym = node->getSymbol())
+                    {
+                        labels.push_back(sym);
+                    }
+                }
+                else if (node->getNodeType() == NODE_STATEMENT && node->getNodeSubType() == NODE_JUMP_STATEMENT)
+                {
+                    if (LSLSymbol* sym = static_cast<LSLJumpStatement*>(node)->getIdentifier()->getSymbol())
+                    {
+                        ++inside[sym];
+                    }
+                }
+                for (LSLASTNode* child = node->getChild(0); child; child = child->getNext())
+                {
+                    gather(child);
+                }
+            };
+            gather(statement);
+            for (LSLSymbol* label : labels)
             {
-                LSLSymbol* sym = node->getSymbol();
-                return sym && sym->getReferences() > 1;
-            }
-            for (LSLASTNode* child = node->getChild(0); child; child = child->getNext())
-            {
-                if (holdsLiveLabel(child))
+                if (label->getReferences() - 1 > inside[label])
                 {
                     return true;
                 }

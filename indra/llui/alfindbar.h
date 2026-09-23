@@ -45,7 +45,10 @@ class LLTextBox;
 //
 // Its buttons are flat glyphs, lit when on, as an editor's are: the
 // glyphs stand in until the icons are drawn. Tab reaches each of them
-// in turn, and Space or Return presses the one it is on.
+// in turn, and Space or Return presses the one it is on; and while the
+// bar has the keyboard, Alt with C, W, R or L -- Command and Option with
+// them on a Mac -- turns case, whole words, patterns or the selection on
+// or off, as the modern editors have it.
 class ALFindBar : public LLPanel
 {
 public:

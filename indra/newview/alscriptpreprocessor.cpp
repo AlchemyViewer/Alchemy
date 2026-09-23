@@ -351,7 +351,9 @@ std::vector<ALScriptPreprocessor::Candidate> ALScriptPreprocessor::candidatesFor
             auto listed = mContents.find(request.ref.object);
             if (listed == mContents.end())
             {
-                unknown = true;
+                // Not said yet, the object may still hold the name; asked
+                // and not answered, nothing is looked for in it.
+                unknown = unknown || !mUnanswered.count(request.ref.object);
                 continue;
             }
             LLViewerObject* object = gObjectList.findObject(request.ref.object);
@@ -556,7 +558,7 @@ ALPreprocessor::Found ALScriptPreprocessor::configFor(const std::string& from, c
         auto listed = mContents.find(asking.object);
         if (listed == mContents.end())
         {
-            return ALPreprocessor::Found::Pending;
+            return mUnanswered.count(asking.object) ? ALPreprocessor::Found::No : ALPreprocessor::Found::Pending;
         }
         LLViewerObject* object = gObjectList.findObject(asking.object);
         for (const ALScriptWorkspace::Item& item : listed->second)
@@ -904,7 +906,7 @@ void ALScriptPreprocessor::start(const Request& request, callback_t callback, bo
     // keystroke, and asking a prim what it holds that often is a message
     // a keystroke for an answer that hardly ever changes.
     const LLUUID prim = request.ref.object;
-    if (!fresh && mContents.count(prim))
+    if (!fresh && (mContents.count(prim) || mUnanswered.count(prim)))
     {
         attemptJob(job);
         return;
@@ -913,6 +915,12 @@ void ALScriptPreprocessor::start(const Request& request, callback_t callback, bo
         if (contents.fetched)
         {
             mContents[prim] = contents.items;
+            mUnanswered.erase(prim);
+        }
+        else if (!mContents.count(prim))
+        {
+            // Nothing to go by, not even what it said before.
+            mUnanswered.insert(prim);
         }
         attemptJob(job);
     });
@@ -1019,11 +1027,30 @@ void ALScriptPreprocessor::cleanupSingleton()
 
 void ALScriptPreprocessor::finish(const std::shared_ptr<Job>& job, ALPreprocessor::Result result)
 {
-    if (job->callback)
+    if (!job->callback)
     {
-        alTranslateScriptProblems(result.problems);
-        job->callback(result);
+        return;
     }
+    // What could not be found may be in the object that never said what
+    // it holds: said, ahead of the names it would have answered, so that
+    // a save stopped for them says why.
+    if (!job->request.ref.inInventory() && mUnanswered.count(job->request.ref.object))
+    {
+        const bool missing = std::any_of(result.problems.begin(), result.problems.end(), [](const ALScriptProblem& p) {
+            return p.key == "PreprocIncludeNotFound" || p.key == "PreprocModuleNotFound";
+        });
+        if (missing)
+        {
+            ALScriptProblem unanswered;
+            unanswered.severity = ALScriptProblem::Severity::Error;
+            unanswered.key      = "PreprocObjectUnanswered";
+            unanswered.message  = "the object this script is in did not say what it holds -- it did not answer in time, or is out of view -- so "
+                                  "no include was looked for in it; save again once it answers";
+            result.problems.insert(result.problems.begin(), unanswered);
+        }
+    }
+    alTranslateScriptProblems(result.problems);
+    job->callback(result);
 }
 
 void ALScriptPreprocessor::optimizeAndFinish(const std::shared_ptr<Job>& job, ALPreprocessor::Result result)

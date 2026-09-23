@@ -32,6 +32,9 @@
     <panel.string name="menu_next_tab">Next tab</panel.string>
     <panel.string name="menu_previous_tab">Previous tab</panel.string>
     <panel.string name="menu_all_tabs">Every tab, to pick from</panel.string>
+    <panel.string name="menu_move_tab_left">Move the tab left</panel.string>
+    <panel.string name="menu_move_tab_right">Move the tab right</panel.string>
+    <panel.string name="menu_focus_tabs">The tabs, for the arrow keys</panel.string>
     <panel.string name="menu_command_palette">Command palette</panel.string>
     <panel.string name="menu_explorer">Show or hide the explorer</panel.string>
     <panel.string name="menu_problems">Show or hide the problems</panel.string>

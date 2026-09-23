@@ -48,6 +48,17 @@ namespace
     constexpr S32 EXPAND_W = 18;
     constexpr S32 SMALL_W  = 22;
     constexpr S32 COUNT_W  = 84;
+
+    // What turns a way of matching on and off from the keyboard, with a
+    // letter: Command and Option on a Mac, as its editors have it, since
+    // Option alone types a character there; Alt alone elsewhere, since
+    // Control and Alt together is AltGr on many a Windows keyboard, which
+    // types too.
+#if LL_DARWIN
+    constexpr MASK TOGGLE_MASK = MASK_CONTROL | MASK_ALT;
+#else
+    constexpr MASK TOGGLE_MASK = MASK_ALT;
+#endif
 }
 
 // --- a flat glyph button ---------------------------------------------------------------
@@ -72,6 +83,16 @@ public:
     }
 
     void setGlyph(const std::string& glyph) { mGlyph = glyph; }
+    // The letter that presses it with TOGGLE_MASK, said after its tip.
+    void setKey(KEY key) { mKey = key; }
+
+    // Put together as it is shown rather than when it is made: a key's
+    // name is the viewer's to give, in the viewer's language.
+    std::string getToolTip() const override
+    {
+        const std::string tip = LLUICtrl::getToolTip();
+        return mKey == KEY_NONE || tip.empty() ? tip : tip + " (" + LLKeyboard::stringFromAccelerator(TOGGLE_MASK, mKey) + ")";
+    }
     void setInk(const LLColor4& ink) { mInk = ink; }
     void setLit(const LLColor4& lit) { mLit = lit; }
     bool getToggleState() const { return mOn; }
@@ -158,6 +179,7 @@ public:
 
 private:
     std::string mGlyph;
+    KEY         mKey    = KEY_NONE;
     bool        mToggle = false;
     bool        mOn     = false;
     bool        mHover  = false;
@@ -203,6 +225,9 @@ ALFindBar::ALFindBar(const Params& p)
     {
         toggle->setCommitCallback([this](LLUICtrl*, const LLSD&) { mChanged(); });
     }
+    mCase->setKey('C');
+    mWord->setKey('W');
+    mRegex->setKey('R');
 
     LLTextBox::Params tp(LLUICtrlFactory::getDefaultParams<LLTextBox>());
     tp.name       = "count";
@@ -221,6 +246,7 @@ ALFindBar::ALFindBar(const Params& p)
     mPrev->setCommitCallback([this](LLUICtrl*, const LLSD&) { mPrevious(); });
     mNextButton->setCommitCallback([this](LLUICtrl*, const LLSD&) { mNext(); });
     mSelection->setCommitCallback([this](LLUICtrl*, const LLSD&) { mChanged(); });
+    mSelection->setKey('L');
     mCloseButton->setCommitCallback([this](LLUICtrl*, const LLSD&) { mClose(); });
 
     mReplaceField = field("replace", alSaid("FindBarReplace", "Replace"), SMALL_W + 6);
@@ -416,6 +442,15 @@ bool ALFindBar::handleKeyHere(KEY key, MASK mask)
     {
         mClose();
         return true;
+    }
+    if (mask == TOGGLE_MASK)
+    {
+        Flat* toggle = key == 'C' ? mCase : key == 'W' ? mWord : key == 'R' ? mRegex : key == 'L' ? mSelection : nullptr;
+        if (toggle)
+        {
+            toggle->press();
+            return true;
+        }
     }
     if (key == KEY_F3 && (mask == MASK_NONE || mask == MASK_SHIFT))
     {

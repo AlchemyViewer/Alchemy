@@ -120,6 +120,7 @@ private:
     LLUUID mAttachmentUUID;
     bool mHaveInventory; // 'Loading' label and used for initial request
     bool mIsInventoryEmpty; // 'Empty' label
+    bool mInventoryFailed = false; // the request for it failed: not empty, unknown
     bool mInventoryNeedsUpdate; // for idle, set on changed callback
     LLFolderViewModelInventory  mInventoryViewModel;
     bool mShowRootFolder;

@@ -830,9 +830,13 @@ namespace tut
         ensure("and the loop whose body one does: " + r.text, has("llOwnerSay(\"fifth\");"));
         ensure("nothing said to be unreachable: " + notes(r), notes(r).find("can never run") == std::string::npos);
 
-        // Where nothing jumps into it, it is still gone.
+        // Where nothing jumps into it, it is still gone; and a jump from
+        // inside it to its own label is no way in.
         r = ALLSLOptimizer::run(wrap("", "        return;\n        {\n            @x;\n            llOwnerSay(\"never\");\n        }\n"), options());
         ensure("a block after a return that nothing jumps into goes: " + r.text, r.text.find("never") == std::string::npos);
+        r = ALLSLOptimizer::run(wrap("", "        integer i;\n        return;\n        {\n            @again;\n            llOwnerSay(\"never\");\n            if (++i < 3) jump again;\n        }\n"),
+                                options());
+        ensure("nor one that only jumps to itself: " + r.text, r.text.find("never") == std::string::npos);
     }
 
     template<> template<>

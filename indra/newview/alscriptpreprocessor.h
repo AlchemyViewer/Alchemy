@@ -185,7 +185,8 @@ private:
         std::string file;
     };
     // `unknown` says the object's contents have not been listed yet, so
-    // a name not found may still be there.
+    // a name not found may still be there; an object asked that did not
+    // answer is not unknown, and holds nothing.
     std::vector<Candidate> candidatesFor(const ALPreprocessor::Ask& ask, const Request& request, const std::vector<std::string>& alias_folders,
                                          bool& unknown);
     // The folders on disk an include asked for may come from: the
@@ -262,6 +263,11 @@ private:
     wanted_t                                                                        mAdmitted;
     // What each prim was last said to hold.
     boost::unordered_flat_map<LLUUID, std::vector<ALScriptWorkspace::Item>>         mContents;
+    // The prims asked what they hold that did not answer -- not in time,
+    // or not in view -- and never had: nothing is looked for in one, and
+    // a run over a script in one says why, until a save asks again and
+    // it answers.
+    boost::unordered_flat_set<LLUUID>                                               mUnanswered;
     // Every script and notecard of a name, from the last walk of the
     // inventory for it. The walk is of the whole tree, and a check runs
     // a moment after every keystroke: a script naming three includes

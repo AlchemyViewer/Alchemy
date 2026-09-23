@@ -874,8 +874,13 @@ bool LLFloaterDeleteQueue::startQueue()
 void ObjectInventoryFetcher::inventoryChanged(LLViewerObject* object,
         LLInventoryObject::object_list_t* inventory, S32 serial_num, void* user_data)
 {
+    // Nothing, where the request for it failed: an object with no scripts
+    // to the queue, rather than one it waits on.
     mInventoryList.clear();
-    mInventoryList.assign(inventory->begin(), inventory->end());
+    if (inventory)
+    {
+        mInventoryList.assign(inventory->begin(), inventory->end());
+    }
 
     mPump.post(LLSDMap("changed", LLSD::Boolean(true)));
 
