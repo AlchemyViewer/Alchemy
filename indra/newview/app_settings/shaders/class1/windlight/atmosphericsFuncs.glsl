@@ -87,14 +87,10 @@ void calcAtmosphericVars(vec3 inPositionEye, vec3 light_dir, float ambFactor, ou
     atten = combined_haze.rgb;
 
     // compute haze glow
-    float haze_glow = dot(rel_pos_norm, lightnorm.xyz);
-
-    // dampen sun additive contrib when not facing it...
-    // SL-13539: This "if" clause causes an "additive" white artifact at roughly 77 degreees.
-    //    if (length(light_dir) > 0.01)
-    haze_glow *= max(0.0f, dot(light_dir, rel_pos_norm));
-
-    haze_glow = 1. - haze_glow;
+    // rel_pos is eye space, so the angle to the light is taken against light_dir, which callers pass in
+    // eye space. lightnorm is world space (its .y is the elevation used above): dotted against an eye
+    // space position it put the hotspot wherever the camera's heading happened to put it.
+    float haze_glow = 1. - dot(rel_pos_norm, light_dir);
     // haze_glow is 0 at the sun and increases away from sun
     haze_glow = max(haze_glow, .001);  // set a minimum "angle" (smaller glow.y allows tighter, brighter hotspot)
     haze_glow *= glow.x;
