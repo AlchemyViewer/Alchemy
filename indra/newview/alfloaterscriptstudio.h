@@ -407,6 +407,9 @@ private:
         // Whether the script runs in its object, as the region last
         // said: -1 until it has.
         S32                                        running = -1;
+        // A compile target picked here since the last save, which the
+        // region's word on what the script compiles for does not put back.
+        bool                                       targetChosen = false;
         // A save waiting on a check of the text as it stands; and the
         // version of the text a save goes ahead for over what the check or
         // the preprocessor found -- the one a save was refused over, so
@@ -676,6 +679,10 @@ private:
     // through where it was.
     void                          upload(Doc& doc, const std::string& text, const ALSourceMap* map = nullptr);
     static S32                    mapSpan(const ALSourceMap& map, ALScriptSpan& span);
+    // The map the text the region compiled and runs was expanded through:
+    // what the compiler's lines and a run-time error's are read back by.
+    // Null where the text went up as written.
+    static const ALSourceMap*     runningMap(const Doc& doc);
     std::string                   includeName(const Doc& doc, const std::string& path) const;
     void                          chooseIncludeFolder();
     // A file on disk opened in a tab of its own, or brought forward, at
@@ -1042,6 +1049,8 @@ private:
     // A script open here searched again as it stands now, a moment after
     // it was typed in, its rows replaced where they were.
     void researchOpen(Doc& doc);
+    // What a search's row says an open script is in.
+    std::string searchWhere(const Doc& doc) const;
     void pumpSearch();
     void onSearchResult(bool to_editor);
     // Where to go in a script once it is open, or now.
@@ -1095,6 +1104,10 @@ private:
     // compiled with errors: a close waiting on it waits no longer, and a
     // window closing stops, the tab left for the author to look at.
     void saveStopped(Doc& doc);
+    // A tab saved to be closed once its save comes back: where the save
+    // cannot begin, the tab is left as it was, and a close waiting on it
+    // stops -- rather than closing at whatever save comes next.
+    void saveToClose(const std::string& id);
     // The window's close, with several scripts unsaved, asked about all of
     // them at once: saved, let go of, or the window kept.
     void closeWindowAnswered(S32 option);
@@ -1438,6 +1451,10 @@ private:
         std::vector<S32>         at;
     };
     std::vector<Found>                 mSearchFound;
+    // The tab a script found is open in, or NONE; and whether Replace All
+    // would change it, which its question counts by.
+    size_t                             foundIndex(const Found& one) const;
+    bool                               replaceable(const Found& one) const;
     // When the scripts typed in since the search are searched again, or
     // zero; and which.
     F64                                mSearchDue = 0.0;
@@ -1456,6 +1473,9 @@ private:
     std::string                        mSearchQuery;
     LLScrollListCtrl*                  mExplorer      = nullptr;
     std::vector<ExplorerObject>        mExplorerModel;
+    // Answers have come that the list does not show yet: it is filled with
+    // the next frame.
+    bool                               mExplorerStale = false;
     // The objects and the prims of linksets folded shut in the explorer,
     // each by its id -- apart, since a linkset's root prim has its
     // object's.

@@ -301,6 +301,7 @@
     <floater.string name="SaveBlockedLocked">[NAME] may no longer be changed by you; save a copy, or export it.</floater.string>
     <floater.string name="SaveBlockedUnloaded">[NAME] could not be loaded, and is not saved over what it holds unseen; try again, or save a copy.</floater.string>
     <floater.string name="SaveWaitsForLoad">[NAME]'s script is being loaded under what is here first; save again once it is in.</floater.string>
+    <floater.string name="PopOutWhileSaving">[NAME] is being saved; pop it out once the save is done.</floater.string>
     <floater.string name="CopyingTo">Saving a copy of [NAME] to your inventory...</floater.string>
     <floater.string name="CopiedTo">A copy of [NAME] is saved in your inventory; the tab it came from closed.</floater.string>
     <floater.string name="CopiedToKeptOpen">A copy of [NAME] is saved in your inventory; the tab it came from stays open, since it changed while the copy was made.</floater.string>
