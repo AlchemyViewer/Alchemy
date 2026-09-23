@@ -92,7 +92,9 @@ void calcAtmosphericVars(vec3 inPositionEye, vec3 light_dir, float ambFactor, ou
     // space position it put the hotspot wherever the camera's heading happened to put it.
     float haze_glow = 1. - dot(rel_pos_norm, light_dir);
     // haze_glow is 0 at the sun and increases away from sun
-    haze_glow = max(haze_glow, .001);  // set a minimum "angle" (smaller glow.y allows tighter, brighter hotspot)
+    // set a minimum "angle" (smaller allows a tighter, brighter hotspot). WindLight's objects used .03;
+    // only its sky dome used .001, and skyF keeps that.
+    haze_glow = max(haze_glow, .03);
     haze_glow *= glow.x;
     // higher glow.x gives dimmer glow (because next step is 1 / "angle")
     haze_glow = clamp(pow(haze_glow, glow.z), -100000, 100000);
