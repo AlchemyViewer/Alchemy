@@ -321,7 +321,11 @@ void main()
             float gt = max(0,(min(gtdenom * nv / vh, gtdenom * nl / vh)));
 
             float scol = shadow*fres*blinnPhongLobe(nh, glossiness)*gt/(nh*nl);
-            color.rgb += lit*scol*sunlit_linear.rgb*spec.rgb;
+            vec3 spec_contrib = lit*scol*sunlit_linear.rgb*spec.rgb;
+            color.rgb += spec_contrib;
+
+            // the sun's glint raises the alpha of a blended surface, so it shows on clear glass, as in WindLight
+            glare = max(max(spec_contrib.r, spec_contrib.g), spec_contrib.b);
         }
 
         // add radiance map
@@ -335,8 +339,7 @@ void main()
         applyLegacyEnv(color, legacyenv, spec, pos.xyz, norm.xyz, env);
 
         float cur_glare = max(max(legacyenv.r, legacyenv.g), legacyenv.b);
-        cur_glare = clamp(cur_glare, 0, 1);
-        cur_glare *= env;
+        cur_glare = max(cur_glare, 0.0) * env * 4.0; // WindLight's weight; glare is clamped to 1 below
         glare += cur_glare;
     }
 
