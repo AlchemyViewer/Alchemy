@@ -17,6 +17,7 @@ endif()
 target_sources(
   llcommon
   PRIVATE
+    alfilewrite.cpp
     alparamtype.cpp
     apply.cpp
     commoncontrol.cpp
@@ -115,6 +116,7 @@ target_sources(
   PUBLIC
     FILE_SET HEADERS
       FILES
+        alfilewrite.h
         alparamtype.h
         alsimd.h
         always_return.h
@@ -287,6 +289,7 @@ if(AL_BUILD_TESTS)
   # files could not stand alone. Every test here links the library.
   foreach(
     test
+    alfilewrite
     apply
     bitpack
     classic_callback

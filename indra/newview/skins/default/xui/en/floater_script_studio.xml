@@ -26,6 +26,10 @@
     <floater.string name="Reverted">[NAME] was read again from disk.</floater.string>
     <floater.string name="FileChangedOutside">[NAME] changed on disk while it was being edited here; saving will overwrite it.</floater.string>
     <floater.string name="SaveToFileFailed">Could not write [PATH]</floater.string>
+    <floater.string name="LoadFromFileFailed">Could not read [FILE]</floater.string>
+    <floater.string name="FileTooLarge">[FILE] is too large to open here.</floater.string>
+    <floater.string name="RevertOutOfReach">[NAME] cannot be read again: what it came from is out of reach.</floater.string>
+    <floater.string name="RevertFailed">[NAME] could not be read again, and is as it was: [ERROR]</floater.string>
     <floater.string name="NoProblems">No problems.</floater.string>
     <floater.string name="NoScriptOpenHeadline">No script open</floater.string>
     <floater.string name="NoScriptOpenSentence">Choose a script or a notecard in the Explorer, or open a file from your computer.</floater.string>

@@ -26,6 +26,8 @@
 
 #include "../alscriptsnippets.h"
 
+#include "alfilewrite.h"
+
 #include "fsyspath.h"
 #include "llfile.h"
 #include "lluuid.h"
@@ -35,6 +37,10 @@
 #include <filesystem>
 #include <fstream>
 #include <sstream>
+
+#if !LL_WINDOWS
+#include <unistd.h>
+#endif
 
 namespace tut
 {
@@ -124,15 +130,24 @@ namespace tut
         const std::string first = read(file);
         ensure("written again, over it", ALScriptSnippets::writeTo(file, { snippet("say", "llSay(0, \"two\");") }));
         ensure("replaced", read(file) != first && read(file).find("two") != std::string::npos);
-        ensure("and nothing half-written beside it", !LLFile::isfile(file + ".tmp"));
+        ensure("and nothing half-written beside it", !LLFile::isfile(ALFileWrite::besideOf(file)));
 
-        // Where the text cannot be written beside it, the file is not
-        // touched: never opened for writing and left cut short.
+        // A file that cannot be written is not touched: never opened for
+        // writing and left cut short. Root writes what it likes.
+#if !LL_WINDOWS
+        if (geteuid() == 0)
+        {
+            return;
+        }
+#endif
         const std::string written = read(file);
         std::error_code   ec;
-        std::filesystem::create_directory(fsyspath(file + ".tmp"), ec);
-        ensure("a place nothing can be written", !ec);
-        ensure("not written", !ALScriptSnippets::writeTo(file, { snippet("say", "llSay(0, \"three\");") }));
+        std::filesystem::permissions(fsyspath(file), std::filesystem::perms::owner_read, std::filesystem::perm_options::replace, ec);
+        ensure("a file nothing can be written in", !ec);
+        const bool wrote = ALScriptSnippets::writeTo(file, { snippet("say", "llSay(0, \"three\");") });
+        std::filesystem::permissions(fsyspath(file), std::filesystem::perms::owner_read | std::filesystem::perms::owner_write,
+                                     std::filesystem::perm_options::replace, ec);
+        ensure("not written", !wrote);
         ensure("and the file as it was", read(file) == written);
     }
 }

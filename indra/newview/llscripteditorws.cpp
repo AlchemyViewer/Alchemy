@@ -116,10 +116,11 @@ namespace
     //   - failure: { "failed": true, "reason": <reason> }.
     auto make_asset_upload_callbacks(const std::string& pump_name)
     {
-        auto on_success = [pump_name](LLUUID item_id, LLUUID task_id, LLUUID /*new_asset_id*/, LLSD response)
+        auto on_success = [pump_name](LLUUID item_id, LLUUID task_id, LLUUID new_asset_id, LLSD response)
         {
-            response["item_id"] = item_id;
-            response["task_id"] = task_id;
+            response["item_id"]      = item_id;
+            response["task_id"]      = task_id;
+            response["new_asset_id"] = new_asset_id;
             LLEventPumps::instance().post(pump_name, response);
         };
         auto on_failure = [pump_name](LLUUID /*item_id*/, LLUUID /*task_id*/, LLSD /*response*/, std::string reason)
@@ -1881,7 +1882,7 @@ LLSD LLScriptEditorWSServer::saveScript(LLViewerObject* prim, LLInventoryItem* i
             sed->makeEditorPristine();
         }
     }
-    ALFloaterScriptStudio::savedElsewhere(ALScriptRef(prim_id, item_id), content);
+    ALFloaterScriptStudio::savedElsewhere(ALScriptRef(prim_id, item_id), content, cb_result["new_asset_id"].asUUID());
 
     return response;
 }

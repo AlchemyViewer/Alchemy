@@ -115,7 +115,8 @@ public:
     // over the bridge -- with this text: the tab that holds it, if one
     // does, shows the text as saved. A tab with unsaved changes takes
     // the text as one more step to undo, so that nothing typed is lost.
-    static void savedElsewhere(const ALScriptRef& ref, const std::string& text);
+    // The asset the save made, where the saver knows it.
+    static void savedElsewhere(const ALScriptRef& ref, const std::string& text, const LLUUID& asset_id = LLUUID::null);
     // A script or notecard gone from its object, so that a tab holding
     // it goes too.
     static void itemRemoved(const ALScriptRef& ref);
@@ -293,6 +294,9 @@ private:
         // what a kept text says it came from once they are not.
         std::string                                objectName;
         std::string                                regionName;
+        // A reload a revert asked for, with whether the tab could be
+        // changed before it: one that fails puts the tab back as it was.
+        std::optional<bool>                        reverting;
         // Where the caret and the view were before the text was loaded
         // again -- a revert, an external editor's save -- to be put back;
         // a line of -1 for none.
@@ -344,10 +348,11 @@ private:
         // the compiler's answer is read back through, whatever has been
         // expanded since.
         std::optional<ALSourceMap>                 sentMap;
-        // The version an expansion has been asked for, or zero: the
-        // preprocessor answers on the main thread a moment later, and
-        // one text is expanded once however many questions wait on it.
-        U32                                        expanding = 0;
+        // The version an expansion has been asked for, or none -- not a
+        // zero, which an empty text's version is: the preprocessor answers
+        // on the main thread a moment later, and one text is expanded once
+        // however many questions wait on it.
+        std::optional<U32>                         expanding;
         // The questions held until it comes. A question of a kind
         // replaces the one of that kind still waiting: a second hover
         // is a hover of somewhere else, and only the last is wanted.
@@ -875,7 +880,9 @@ private:
     // again, and what the compiler says goes in a log beside it, as the
     // old editor did. Closing the tab ends it.
     void               editExternally(Doc& doc);
-    void               externalChanged(const std::string& id, const std::string& file);
+    // `settled` where the file was seen empty and is asked about again, to
+    // take it as empty if it still is.
+    void               externalChanged(const std::string& id, const std::string& file, bool settled = false);
     void               syncExternal(Doc& doc);
     void               logExternal(Doc& doc, const ALScriptWorkspace::CompileResult& result);
     void               stopExternal(Doc& doc);
@@ -985,7 +992,10 @@ private:
         ALScriptRef ref() const { return ALScriptRef(prim, item); }
     };
     void pumpExplorer();
-    void refreshExplorer();
+    // The objects in hand listed again; what each prim holds asked where
+    // it is not known or has changed, and of every prim where `refetch` --
+    // a person asked, or something was made, renamed or deleted in one.
+    void refreshExplorer(bool refetch = false);
     void explorerContents(const ALScriptWorkspace::Contents& contents);
     void fillExplorer();
     // The rows chosen, in the list's order.
@@ -1005,7 +1015,7 @@ private:
     // A script or notecard made in a prim, named through a dialog and
     // opened once the region lists it.
     void explorerCreate(const LLUUID& prim, bool notecard, bool lua);
-    void explorerCreated(const ALScriptWorkspace::Created& made);
+    void explorerCreated(const ALScriptWorkspace::Created& made, const std::optional<std::string>& opening);
     void explorerRename(const ExplorerRow& row);
     void explorerDelete(const std::vector<ExplorerRow>& rows);
     void explorerRecompile(const std::vector<ExplorerRow>& rows);
@@ -1177,8 +1187,10 @@ private:
     // What a tab holds saved as a new item in the inventory -- a script or
     // a notecard, its items with it -- and the tab closed once it is.
     void saveCopyToInventory(Doc& doc);
-    // Revert to Saved, asked about where something would be lost.
+    // Revert to Saved, asked about where something would be lost; and
+    // whether there is anything to read again.
     void askRevert(Doc& doc);
+    bool revertible(const Doc& doc) const;
     // Replace All, asked about first.
     void askReplaceAll();
     // The places jumped from, to go back to and forward again: a place in
@@ -1207,6 +1219,8 @@ private:
     // it reaches more than one script.
     void runExplorerScripts(const std::string& action, const std::vector<ExplorerRow>& rows);
     S32  scriptsReached(const std::vector<ExplorerRow>& rows) const;
+    // Whether a queue over these prims walks the row's script already.
+    static bool walkedByQueue(const ExplorerRow& row, const std::vector<std::pair<LLUUID, std::string>>& prims);
     // The explorer's row for a script, unfolded to and chosen.
     void revealInExplorer(const Doc& doc);
     // A name that a rename may not take: one of the language's own.
@@ -1220,12 +1234,13 @@ private:
     void revert(Doc& doc);
     void loadFromFile();
     void saveToFile();
-    void fileChosenToLoad(const std::vector<std::string>& files);
-    void fileChosenToSave(const std::vector<std::string>& files);
+    // The pickers' answers, for the tab each was asked from, by its id.
+    void fileChosenToLoad(const std::string& id, const std::vector<std::string>& files);
+    void fileChosenToSave(const std::string& id, const std::vector<std::string>& files);
     // A disk tab saved under another name: the tab is that file from
     // then on, in the language its name says.
     void saveFileAs();
-    void fileChosenToSaveAs(const std::vector<std::string>& files);
+    void fileChosenToSaveAs(const std::string& id, const std::vector<std::string>& files);
     // What a file's name says it holds: an LSL or a Lua script, or, with
     // neither extension, what it was asked for as, else plain text.
     struct FileLanguage
@@ -1293,12 +1308,35 @@ private:
     };
     std::vector<Recent>                mRecentScripts;
     // The tabs open when the state was last written, opened again once the
-    // window is built.
+    // window is built; and those whose object or item was not in hand yet,
+    // opened once it is, until a while after.
     LLSD                               mRestoreTabs;
+    struct PendingRestore
+    {
+        ALScriptRef ref;
+        F64         until = 0.0;
+        bool        asked = false;
+    };
+    std::vector<PendingRestore>        mPendingRestores;
+    void                               pumpRestores();
+    void                               restoreListed(const ALScriptRef& ref, const ALScriptWorkspace::Contents& contents);
     // The viewer is quitting and this window was asked to close; and the
     // tabs as they were when it was, which the state keeps for next time.
     bool                               mAppQuitting = false;
     LLSD                               mTabsAtQuit;
+    // The main window's: the windows popped out of it as the viewer went,
+    // each what it had open and where it was, made again next time.
+    LLSD                               mWindowsAtQuit = LLSD::emptyArray();
+    LLSD                               mRestoreWindows;
+    void                               adoptWindowAtQuit(const LLSD& window);
+    // A popped-out window made again to restore what it had: closed if
+    // nothing of it comes.
+    bool                               mRestoring = false;
+    // The tabs of a window's state opened in it; the popped-out windows
+    // made again; and what was kept on purpose at the quit opened again.
+    void                               restoreTabs(const LLSD& open);
+    void                               restoreWindows(const LLSD& windows);
+    void                               reopenKept();
     // The places jumped from and back from, and whether a pane's list is
     // being walked, which is one jump however many rows it passes.
     std::vector<NavPlace>              mBack;
@@ -1459,8 +1497,11 @@ private:
     // zero; and which.
     F64                                mSearchDue = 0.0;
     std::vector<std::string>           mSearchStale;
-    // The object searched, for a search of one; null otherwise.
+    // The object searched, for a search of one; null otherwise. And every
+    // object the search was over, which what is typed later is searched
+    // again within.
     LLUUID                             mSearchRoot;
+    std::vector<LLUUID>                mSearchRoots;
     // Which search the answers arriving belong to; how many files are
     // still to answer; what was found so far, and in how many files; the
     // words last searched for, so that a changed dropdown asks again
@@ -1482,13 +1523,17 @@ private:
     boost::unordered_flat_set<LLUUID>  mExplorerFolded;
     boost::unordered_flat_set<LLUUID>  mExplorerFoldedPrims;
     std::vector<Pinned>                mPinned;
-    // A prim whose new item is to be opened once its contents list it,
-    // by name where the region gave no id.
-    LLUUID                             mOpenWhenListedPrim;
-    LLUUID                             mOpenWhenListedItem;
-    std::string                        mOpenWhenListedName;
-    // The scripter's template for it, put in place of the region's.
-    std::optional<std::string>         mOpenWhenListedText;
+    // The new items to be opened once their prims list them: each by its
+    // prim, and by its id, or its name where the region gave no id; with
+    // the scripter's template for it, put in place of the region's.
+    struct OpenWhenListed
+    {
+        LLUUID                     prim;
+        LLUUID                     item;
+        std::string                name;
+        std::optional<std::string> text;
+    };
+    std::vector<OpenWhenListed>        mOpenWhenListed;
     LLHandle<LLContextMenu>            mExplorerMenuHandle;
     LLHandle<LLContextMenu>            mProblemMenuHandle;
     LLHandle<LLContextMenu>            mTabMenuHandle;

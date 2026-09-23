@@ -26,6 +26,8 @@
 
 #include "alscriptsnippets.h"
 
+#include "alfilewrite.h"
+
 #include "lldir.h"
 #include "llfile.h"
 #include "llsdserialize.h"
@@ -54,31 +56,6 @@ namespace ALScriptSnippets
                 aside = file + ".unreadable." + std::to_string(n);
             }
             return aside;
-        }
-
-        // A text written whole in a file's place: beside it first, then
-        // put where it goes, so that a crash or a full disk midway leaves
-        // the file as it was rather than cut short.
-        bool writeWhole(const std::string& file, const std::string& text)
-        {
-            const std::string beside = file + ".tmp";
-            {
-                llofstream out(beside.c_str(), std::ios::binary);
-                out << text;
-                out.flush();
-                if (!out.good())
-                {
-                    out.close();
-                    LLFile::remove(beside, ENOENT);
-                    return false;
-                }
-            }
-            if (LLFile::rename(beside, file) != 0)
-            {
-                LLFile::remove(beside, ENOENT);
-                return false;
-            }
-            return true;
         }
     }
 
@@ -155,7 +132,8 @@ namespace ALScriptSnippets
                                  "     where ${1:text}, ${2} and $1 are the places Tab goes through in order\n"
                                  "     and $0 is where the caret ends. The preferences' Snippets tab edits these. -->";
         text.insert(declared == std::string::npos ? 0 : declared + 2, note);
-        return writeWhole(file, text);
+        // Whole or not at all: beside it, then in its place.
+        return ALFileWrite::whole(file, text);
     }
 
     std::string path(bool lua)
@@ -212,7 +190,7 @@ namespace ALScriptSnippets
         }
         else
         {
-            writeWhole(path(lua), text);
+            ALFileWrite::whole(path(lua), text);
         }
         forget(lua);
     }
