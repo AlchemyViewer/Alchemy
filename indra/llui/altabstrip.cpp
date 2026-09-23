@@ -454,9 +454,9 @@ void ALTabStrip::draw()
             x += IMAGE + IMAGE_GAP;
         }
 
-        // The name stops short of the way out, which every held tab has
-        // and a preview does not; one too long is cut in the middle, so
-        // that its end -- the extension, the number -- still shows.
+        // The name stops short of the way out; one too long is cut in the
+        // middle, so that its end -- the extension, the number -- still
+        // shows.
         const S32 room = r.mRight - PAD - CLOSE - PAD / 2 - x;
         if (room > 0)
         {
@@ -490,7 +490,6 @@ void ALTabStrip::draw()
                 }
             }
         }
-        if (!tab.preview)
         {
             // Brighter under the pointer, so that a press there is plainly
             // a press on it and not on the tab.
@@ -548,7 +547,7 @@ bool ALTabStrip::handleMouseDown(S32 x, S32 y, MASK mask)
         return LLUICtrl::handleMouseDown(x, y, mask);
     }
     const Tab& tab = mTabs[which];
-    if (!tab.preview && closeRectOf(which).pointInRect(x, y))
+    if (closeRectOf(which).pointInRect(x, y))
     {
         // Closed when let go of over the way out, so a press can still be
         // taken back by sliding off it.
@@ -650,7 +649,7 @@ bool ALTabStrip::handleRightMouseDown(S32 x, S32 y, MASK mask)
 bool ALTabStrip::handleMiddleMouseDown(S32 x, S32 y, MASK mask)
 {
     const S32 which = at(x, y);
-    if (which >= 0 && !mTabs[which].preview)
+    if (which >= 0)
     {
         mClosedSignal(mTabs[which].value);
         return true;

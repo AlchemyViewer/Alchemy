@@ -59,7 +59,9 @@ public:
     struct Params : public LLInitParam::Block<Params, LLPanel::Params>
     {
         Optional<std::string> placeholder;
-        Optional<S32>         rows;       // how many to offer at once
+        // How many to offer at once while something is typed; with nothing
+        // typed, every candidate, which is browsing.
+        Optional<S32>         rows;
         Params();
     };
 

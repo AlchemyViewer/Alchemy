@@ -26,6 +26,7 @@
 
 #include "alquickopen.h"
 
+#include "alsaid.h"
 #include "alsurface.h"
 
 #include "lllineeditor.h"
@@ -215,7 +216,7 @@ std::vector<size_t> ALQuickOpen::rank(const std::vector<Candidate>& candidates,
 
 ALQuickOpen::Params::Params()
 :   placeholder("placeholder"),
-    rows("rows", 12)
+    rows("rows", 100)
 {
 }
 
@@ -302,6 +303,7 @@ void ALQuickOpen::fill()
         // The one row, saying what return does; chosen, so return takes it.
         mRanked.clear();
         mList->deleteAllItems();
+        mList->setCommentText(LLStringUtil::null);
         LLSD row;
         row["value"]                = mQuery;
         row["columns"][0]["column"] = "label";
@@ -313,14 +315,17 @@ void ALQuickOpen::fill()
         return;
     }
     mRanked = rank(mCandidates, mQuery);
-    // As many as were asked for: the answer meant is at the top, and a
-    // list of seven hundred rows made again on every letter typed is
-    // what the ranking exists to spare.
-    if (mRows > 0 && mRanked.size() > (size_t)mRows)
+    // As many as were asked for while something is typed: the answer
+    // meant is at the top, and a list of seven hundred rows made again on
+    // every letter typed is what the ranking exists to spare. With nothing
+    // typed the list is being browsed, and all of it is there to scroll.
+    if (mRows > 0 && !mQuery.empty() && mRanked.size() > (size_t)mRows)
     {
         mRanked.resize((size_t)mRows);
     }
     mList->deleteAllItems();
+    // Nothing to choose says so, rather than being an empty box.
+    mList->setCommentText(mRanked.empty() && !mQuery.empty() ? alSaid("QuickOpenNone", "Nothing matches") : LLStringUtil::null);
     for (size_t at : mRanked)
     {
         LLSD row;

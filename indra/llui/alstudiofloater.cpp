@@ -32,6 +32,7 @@
 #include "llfocusmgr.h"
 #include "llmenugl.h"
 #include "lltextbox.h"
+#include "lltimer.h"
 #include "llui.h"
 #include "lluicolortable.h"
 #include "lluictrlfactory.h"
@@ -207,6 +208,9 @@ void ALStudioFloater::setStatus(const std::string& text, bool failure)
         mStatus->setColor(failure ? alarm : normal);
         mStatus->setText(text);
     }
+    mStatusSaidAt  = LLTimer::getTotalSeconds();
+    mStatusFailure = failure;
+    mStatusQuiet   = text.empty();
 }
 
 // Before anything else: a pane left in a window this one does not own
@@ -221,6 +225,16 @@ void ALStudioFloater::onClose(bool app_quitting)
 void ALStudioFloater::draw()
 {
     rememberShape();
+    // What the status line said, gone quiet once it is old: a quarter of a
+    // minute for news, a minute for a failure, which is read later.
+    constexpr F64 NEWS_SECONDS    = 15.0;
+    constexpr F64 FAILURE_SECONDS = 60.0;
+    if (mStatus && !mStatusQuiet && LLTimer::getTotalSeconds() - mStatusSaidAt > (mStatusFailure ? FAILURE_SECONDS : NEWS_SECONDS))
+    {
+        static const LLUIColor quiet = LLUIColorTable::instance().getColor("LabelDisabledColor", LLColor4::grey);
+        mStatus->setColor(quiet);
+        mStatusQuiet = true;
+    }
     LLFloater::draw();
 }
 

@@ -213,4 +213,33 @@ namespace tut
         ensure("and no button, since none was given", !part(state, "action")->getVisible());
         state->die();
     }
+
+    // Two ways out: side by side under the sentence, each telling its own.
+    template<> template<>
+    void alemptystate_object::test<7>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+
+        ALEmptyState* state = build();
+        S32 first = 0, second = 0;
+        state->onAction([&first]() { ++first; });
+        state->onSecondAction([&second]() { ++second; });
+        state->say("No script open", "Open one, or make one.", "Open File...", "New Script...");
+        const LLRect a = part(state, "action")->getRect();
+        const LLRect b = part(state, "second_action")->getRect();
+        ensure("both shown", part(state, "action")->getVisible() && part(state, "second_action")->getVisible());
+        ensure("on one row", a.mTop == b.mTop);
+        ensure("side by side", a.mRight <= b.mLeft);
+        ensure("inside the room", state->getLocalRect().contains(a) && state->getLocalRect().contains(b));
+        ensure("under the sentence", a.mTop <= part(state, "sentence")->getRect().mBottom);
+        state->getChild<LLButton>("second_action", true)->onCommit();
+        ensure("the second is its own", first == 0 && second == 1);
+
+        state->say("No script open", "Open one.", "Open File...");
+        ensure("gone when not given", !part(state, "second_action")->getVisible());
+        state->die();
+    }
 }

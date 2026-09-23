@@ -48,9 +48,11 @@ class LLFontGL;
 //
 // A tab may be a preview: what is being looked at without being held, which
 // the next look replaces. It is drawn in the other face so that a reader
-// can tell which tabs will still be there after the next click, and it
-// offers no way to close, since it is not being held. Whether a tab is one
-// is the caller's to say, and so is what a tab is called.
+// can tell which tabs will still be there after the next click; it closes
+// as any tab does, by its way out or the middle button, since a reader
+// done looking should not have to look at something else to be rid of
+// it. Whether a tab is one is the caller's to say, and so is what a tab
+// is called.
 class ALTabStrip : public LLUICtrl
 {
 public:

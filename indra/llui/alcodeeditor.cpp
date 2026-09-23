@@ -3390,6 +3390,19 @@ bool ALCodeEditor::handleMouseDown(S32 x, S32 y, MASK mask)
             return true;
         }
     }
+    // Control-click on a name -- Command-click on a Mac -- goes to where it
+    // is declared, as in every editor of code.
+    if (mask == MASK_CONTROL && mSymbolRequest && text.pointInRect(x, y))
+    {
+        const ALTextRange word = identifierAt(posAtLocal(x, y, false));
+        if (!word.empty())
+        {
+            setFocus(true);
+            placeCaret(word.begin, false);
+            performSymbol(ALEditorCommand::GoToDefinition);
+            return true;
+        }
+    }
     return ALTextView::handleMouseDown(x, y, mask);
 }
 

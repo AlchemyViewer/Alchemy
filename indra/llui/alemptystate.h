@@ -42,9 +42,10 @@ class LLTextBox;
 // would fix it, a button that does that thing.
 //
 // Four parts, all of them optional: an icon, a headline, a sentence, and an
-// action. What is given is laid out down the middle of whatever room there
-// is; what is not is not there at all, so a state with only a sentence is
-// one line of text and not a line of text under two empty rows.
+// action -- or two, side by side, where there are two ways out of the
+// emptiness. What is given is laid out down the middle of whatever room
+// there is; what is not is not there at all, so a state with only a
+// sentence is one line of text and not a line of text under two empty rows.
 //
 // The words are the caller's. This library has no file for a translator to
 // open, and a pane knows what it is empty of.
@@ -62,9 +63,10 @@ public:
         Params();
     };
 
-    // All four at once, which is how a pane changes what it is empty of.
+    // All of it at once, which is how a pane changes what it is empty of.
     void say(const std::string& headline, const std::string& sentence,
-             const std::string& action = LLStringUtil::null);
+             const std::string& action = LLStringUtil::null,
+             const std::string& second_action = LLStringUtil::null);
     void setIcon(const std::string& name);
 
     const std::string& headline() const { return mHeadline; }
@@ -75,6 +77,11 @@ public:
     boost::signals2::connection onAction(const action_signal_t::slot_type& cb)
     {
         return mAction.connect(cb);
+    }
+    // The second button, beside the first, pressed.
+    boost::signals2::connection onSecondAction(const action_signal_t::slot_type& cb)
+    {
+        return mSecondAction.connect(cb);
     }
 
     void reshape(S32 width, S32 height, bool called_from_parent = true) override;
@@ -93,8 +100,11 @@ private:
     LLTextBox*      mHeadlineText = nullptr;
     LLTextBox*      mSentenceText = nullptr;
     LLButton*       mButton = nullptr;
+    LLButton*       mSecondButton = nullptr;
     std::string     mHeadline;
     std::string     mSentence;
     std::string     mActionLabel;
+    std::string     mSecondLabel;
     action_signal_t mAction;
+    action_signal_t mSecondAction;
 };

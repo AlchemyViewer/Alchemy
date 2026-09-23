@@ -650,6 +650,9 @@ protected:
     // its references, a new name; whether it could be.
     virtual bool performSymbol(ALEditorCommand command) { return false; }
     virtual bool canSymbol(ALEditorCommand command) const { return false; }
+    // Whether anyone answers those questions of this view at all: the
+    // right-click menu leaves them out of a view nobody answers them for.
+    virtual bool offersSymbols() const { return false; }
     // The screen y of the top of a line's row -- the row's own top; a row
     // a box made taller than the font's line holds its text at its
     // bottom -- and every row on screen in turn, for a subclass drawing

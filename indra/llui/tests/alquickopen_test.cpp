@@ -290,4 +290,39 @@ namespace tut
         ensure("return sends what was typed", chosen.size() == 1 && chosen[0] == "12");
         quick->die();
     }
+
+    template<> template<>
+    void alquickopen_object::test<9>()
+    {
+        set_test_name("with nothing typed, every candidate to browse; typed, the best few; none, said so");
+        if (!ll_test::HeadlessUI::get().ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        ALQuickOpen::Params p(LLUICtrlFactory::getDefaultParams<ALQuickOpen>());
+        p.name = "quick";
+        p.rect = LLRect(0, 200, 300, 0);
+        p.rows = 3;
+        ALQuickOpen* quick = LLUICtrlFactory::create<ALQuickOpen>(p);
+        std::vector<ALQuickOpen::Candidate> many;
+        for (S32 i = 0; i < 20; ++i)
+        {
+            ALQuickOpen::Candidate one;
+            one.label = llformat("llFunction%02d", i);
+            one.value = one.label;
+            many.push_back(one);
+        }
+        quick->setCandidates(many);
+        LLScrollListCtrl* list = quick->findChild<LLScrollListCtrl>("matches");
+        ensure_equals("nothing typed: all of them", list->getItemCount(), 20);
+        quick->setQuery("func");
+        ensure_equals("typed: as many as were asked for", list->getItemCount(), 3);
+        quick->setQuery("zzz");
+        ensure_equals("nothing answers", list->getItemCount(), 0);
+        const LLTextBox* comment = list->findChild<LLTextBox>("comment_text");
+        ensure("and the list says so", comment && !comment->getText().empty());
+        quick->setQuery(std::string());
+        ensure("the saying goes with a list to show", comment->getText().empty());
+        quick->die();
+    }
 }

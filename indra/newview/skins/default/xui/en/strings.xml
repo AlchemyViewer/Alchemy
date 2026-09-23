@@ -394,6 +394,7 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<!-- The row of tabs over an editor (altabstrip.cpp): the button that
 	     lists them all once they run past it. -->
 	<string name="TabStripList">Every tab, to pick one from</string>
+	<string name="QuickOpenNone">Nothing matches</string>
 
 	<!-- The vim keymap's words, in the band under the editor's text
 	     (alvimkeymap.cpp): the modes, the questions, and what a command

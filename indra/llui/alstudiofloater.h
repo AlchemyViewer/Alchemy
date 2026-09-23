@@ -63,7 +63,9 @@ public:
     void draw() override;
     bool applyRectControl() override;
 
-    // The status line, in the plain ink or the alarm's.
+    // The status line, in the plain ink or the alarm's; either goes quiet
+    // after a while, so that what was said long ago does not read as news
+    // -- a failure after longer than the rest.
     virtual void setStatus(const std::string& text, bool failure = false);
 
     // Undo and redo, which every studio has: a step back and a step
@@ -143,6 +145,10 @@ private:
     LLMenuItemGL*       mUndoItem = nullptr;
     LLMenuItemGL*       mRedoItem = nullptr;
     LLTextBox*          mStatus = nullptr;
+    // When the status line was last said, and whether it has gone quiet.
+    F64                 mStatusSaidAt  = 0.0;
+    bool                mStatusFailure = false;
+    bool                mStatusQuiet   = true;
     // What the state said the window's rect was, applied when it opens;
     // and what was last written, so a frame can tell whether anything
     // moved.

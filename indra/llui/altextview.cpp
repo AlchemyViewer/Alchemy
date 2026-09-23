@@ -2726,6 +2726,11 @@ void ALTextView::showContextMenu(S32 x, S32 y)
     menu->setItemVisible("Add to Dictionary", misspelled);
     menu->setItemVisible("Add to Ignore", misspelled);
     menu->setItemVisible("Spellcheck Separator", misspelled);
+    // What the name the click landed on is about, where anyone would say.
+    for (const char* symbol : { "go_to_definition", "find_references", "rename", "Symbol Separator" })
+    {
+        menu->setItemVisible(symbol, offersSymbols());
+    }
     S32 screen_x, screen_y;
     localPointToScreen(x, y, &screen_x, &screen_y);
     menu->show(screen_x, screen_y, this);

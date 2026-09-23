@@ -527,6 +527,7 @@ protected:
     bool signatureHelp() override;
     bool performSymbol(ALEditorCommand command) override;
     bool canSymbol(ALEditorCommand command) const override;
+    bool offersSymbols() const override { return static_cast<bool>(mSymbolRequest); }
     bool mapMark(S32 line, LLColor4& color) const override;
     bool closerOpenedAt(const ALTextPos& closer, ALTextPos& opener) override;
 

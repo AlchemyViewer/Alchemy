@@ -265,8 +265,8 @@ namespace tut
         ensure_equals("no room for even the end: the whole, for the renderer to cut", ALTabStrip::shortened(font, name, 4), name);
     }
 
-    // A preview tab has no way out: it is not being held, so there is
-    // nothing to let go of.
+    // A preview tab closes as any tab does: by its way out, let go of over
+    // it, and by the middle button.
     template<> template<>
     void altabstrip_object::test<4>()
     {
@@ -279,15 +279,16 @@ namespace tut
         tabs[2].preview = true;
         strip->setTabs(tabs, "c");
 
-        S32 closed = 0;
-        strip->onClosed([&closed](const std::string&) { ++closed; });
+        std::vector<std::string> closed;
+        strip->onClosed([&closed](const std::string& value) { closed.push_back(value); });
         const LLRect out = strip->closeRectOf(2);
         strip->handleHover(out.getCenterX(), out.getCenterY(), MASK_NONE);
         strip->handleMouseDown(out.getCenterX(), out.getCenterY(), MASK_NONE);
+        ensure("not on the press", closed.empty());
         strip->handleMouseUp(out.getCenterX(), out.getCenterY(), MASK_NONE);
+        ensure("the way out asks the preview to go", closed.size() == 1 && closed.back() == "c");
         strip->handleMiddleMouseDown(out.getCenterX(), out.getCenterY(), MASK_NONE);
-        ensure_equals("nothing asks a preview to go", closed, 0);
-        ensure_equals("and it stays chosen", strip->chosen(), std::string("c"));
+        ensure("and so does the middle button", closed.size() == 2 && closed.back() == "c");
         strip->die();
     }
 

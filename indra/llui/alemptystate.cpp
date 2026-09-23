@@ -102,18 +102,26 @@ ALEmptyState::ALEmptyState(const Params& p)
     mButton->setCommitCallback([this](LLUICtrl*, const LLSD&) { mAction(); });
     addChild(mButton);
 
+    bp.name = "second_action";
+    bp.label = std::string();
+    mSecondButton = LLUICtrlFactory::create<LLButton>(bp);
+    mSecondButton->setCommitCallback([this](LLUICtrl*, const LLSD&) { mSecondAction(); });
+    addChild(mSecondButton);
+
     layout();
 }
 
 void ALEmptyState::say(const std::string& headline, const std::string& sentence,
-                       const std::string& action)
+                       const std::string& action, const std::string& second_action)
 {
     mHeadline = headline;
     mSentence = sentence;
     mActionLabel = action;
+    mSecondLabel = action.empty() ? std::string() : second_action;
     mHeadlineText->setText(mHeadline);
     mSentenceText->setText(mSentence);
     mButton->setLabel(mActionLabel);
+    mSecondButton->setLabel(mSecondLabel);
     layout();
 }
 
@@ -189,12 +197,30 @@ void ALEmptyState::layout()
     place(mHeadlineText, has_headline, HEADLINE_HEIGHT, width);
     place(mSentenceText, has_sentence, sentence_height, width);
 
-    // A button is as wide as its label needs, and never wider than the room.
-    S32 button_width = width;
-    if (has_action)
-    {
+    // A button is as wide as its label needs, and never wider than the room;
+    // two side by side, the pair centred as one and sharing the room where
+    // it is short.
+    const bool has_second = has_action && !mSecondLabel.empty();
+    mSecondButton->setVisible(has_second);
+    const auto wants = [this](const std::string& label) {
         const LLFontGL* font = mButton->getFont() ? mButton->getFont() : LLFontGL::getFontSansSerif();
-        button_width = llclamp((S32)font->getWidth(mActionLabel) + 2 * BUTTON_PAD, 60, width);
+        return llmax((S32)font->getWidth(label) + 2 * BUTTON_PAD, 60);
+    };
+    if (!has_second)
+    {
+        place(mButton, has_action, BUTTON_HEIGHT, has_action ? llmin(wants(mActionLabel), width) : width);
+        return;
     }
-    place(mButton, has_action, BUTTON_HEIGHT, button_width);
+    S32       first  = wants(mActionLabel);
+    S32       second = wants(mSecondLabel);
+    const S32 shared = width - GAP;
+    if (first + second > shared)
+    {
+        first  = llmax(1, shared / 2);
+        second = llmax(1, shared - first);
+    }
+    const S32 at = (getRect().getWidth() - (first + GAP + second)) / 2;
+    mButton->setVisible(true);
+    mButton->setShape(LLRect(at, top, at + first, top - BUTTON_HEIGHT));
+    mSecondButton->setShape(LLRect(at + first + GAP, top, at + first + GAP + second, top - BUTTON_HEIGHT));
 }
