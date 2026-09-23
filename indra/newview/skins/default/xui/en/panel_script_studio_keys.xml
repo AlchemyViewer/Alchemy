@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <!-- Script Studio's keyboard map, a tab of its preferences: every
-     command of the editor with the keys it answers to, to read, to
-     search, and to change. The menus keep the shortcuts they show; these
-     are the editor's own. -->
+     command of the editor, and of the studio's menus, with the keys it
+     answers to, to read, to search, and to change. A menu item answers to
+     one key; an editor's command to as many as it is given. -->
 <panel
  follows="all"
  height="440"
@@ -11,6 +11,37 @@
  width="480">
     <panel.string name="NoKeys">(none)</panel.string>
     <panel.string name="Changed">changed</panel.string>
+    <panel.string name="KeyTaken">[KEYS] was [WHOSE]'s; it is [WHAT]'s now.</panel.string>
+    <panel.string name="menu_new_script">New script</panel.string>
+    <panel.string name="menu_new_lua_script">New Lua script</panel.string>
+    <panel.string name="menu_save">Save</panel.string>
+    <panel.string name="menu_save_all">Save all</panel.string>
+    <panel.string name="menu_revert">Revert to saved</panel.string>
+    <panel.string name="menu_open_file">Open a file</panel.string>
+    <panel.string name="menu_close">Close the script</panel.string>
+    <panel.string name="menu_preferences">Preferences</panel.string>
+    <panel.string name="menu_format">Format the document</panel.string>
+    <panel.string name="menu_find_in_files">Find in files</panel.string>
+    <panel.string name="menu_insert_snippet">Insert a snippet</panel.string>
+    <panel.string name="menu_back">Go back</panel.string>
+    <panel.string name="menu_forward">Go forward</panel.string>
+    <panel.string name="menu_go_to_line">Go to a line</panel.string>
+    <panel.string name="menu_go_to_symbol">Go to a symbol</panel.string>
+    <panel.string name="menu_next_problem">Next problem</panel.string>
+    <panel.string name="menu_previous_problem">Previous problem</panel.string>
+    <panel.string name="menu_next_tab">Next tab</panel.string>
+    <panel.string name="menu_previous_tab">Previous tab</panel.string>
+    <panel.string name="menu_all_tabs">Every tab, to pick from</panel.string>
+    <panel.string name="menu_command_palette">Command palette</panel.string>
+    <panel.string name="menu_explorer">Show or hide the explorer</panel.string>
+    <panel.string name="menu_problems">Show or hide the problems</panel.string>
+    <panel.string name="menu_references">Show or hide the references</panel.string>
+    <panel.string name="menu_output">Show or hide the output</panel.string>
+    <panel.string name="menu_inspector">Show or hide the inspector</panel.string>
+    <panel.string name="menu_search">Show or hide the search</panel.string>
+    <panel.string name="menu_expanded">The preprocessed output</panel.string>
+    <panel.string name="menu_preprocess">Preprocess now</panel.string>
+    <panel.string name="menu_reference">Reference for the word at the caret</panel.string>
     <panel.string name="cmd_move_left">Move left</panel.string>
     <panel.string name="cmd_move_right">Move right</panel.string>
     <panel.string name="cmd_move_up">Move up</panel.string>
@@ -81,17 +112,26 @@
      width="464" />
     <scroll_list
      follows="all"
-     height="372"
+     height="350"
      layout="topleft"
      left="8"
      name="keys"
-     tool_tip="Every command and its keys; double-click one to press a new key for it"
+     tool_tip="Every command of the editor and of the studio's menus, and its keys; double-click one to press a new key for it"
      top_pad="4"
      width="464">
         <scroll_list.columns dynamic_width="true" label="Command" name="command" />
         <scroll_list.columns label="Keys" name="keys" width="170" />
         <scroll_list.columns label="" name="changed" width="60" />
     </scroll_list>
+    <text
+     follows="left|right|bottom"
+     height="16"
+     layout="topleft"
+     left="8"
+     name="said"
+     top_pad="4"
+     use_ellipses="true"
+     width="464" />
     <button
      follows="left|bottom"
      height="22"
@@ -99,8 +139,8 @@
      layout="topleft"
      left="8"
      name="change"
-     tool_tip="Press a key to answer for the chosen command, in place of its keys"
-     top_pad="6"
+     tool_tip="Press a key to answer for the chosen command, in place of its keys; whatever answered to it before lets it go"
+     top_pad="4"
      width="80" />
     <button
      follows="left|bottom"

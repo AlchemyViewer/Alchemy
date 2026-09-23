@@ -161,7 +161,9 @@ bool ALFloaterScriptPreferences::postBuild()
     mLintsLSL->setCommitCallback([this](LLUICtrl*, const LLSD&) { storeLints(false); });
     mLintsLuau->setCommitCallback([this](LLUICtrl*, const LLSD&) { storeLints(true); });
     getChild<LLButton>("lints_defaults")->setCommitCallback([this](LLUICtrl*, const LLSD&) {
+        mStoringLints = true;
         ALScriptLints::reset();
+        mStoringLints = false;
         fillLints();
     });
     getChild<LLButton>("ok")->setCommitCallback([this](LLUICtrl*, const LLSD&) { onOK(); });
@@ -180,6 +182,20 @@ bool ALFloaterScriptPreferences::postBuild()
         }
     }
     refreshEnabled();
+    // A lint turned off or made an error from a problem's menu while this
+    // window is open is the menu's doing, not this window's: the list shows
+    // it, and Cancel does not take it back.
+    if (LLControlVariable* control = gSavedSettings.getControl("ALScriptLintLevels"))
+    {
+        mEnableWatches.emplace_back(control->getSignal()->connect([this](LLControlVariable*, const LLSD& value, const LLSD&) {
+            if (!mShowing || mStoringLints)
+            {
+                return;
+            }
+            mWasSettings["ALScriptLintLevels"] = value;
+            fillLints();
+        }));
+    }
 
     buildSwatches();
     fillThemes();
@@ -270,7 +286,9 @@ void ALFloaterScriptPreferences::storeLints(bool lua)
         }
         levels.emplace_back(id, !is_on ? ALScriptLints::Level::Off : is_error ? ALScriptLints::Level::Error : ALScriptLints::Level::Warning);
     }
+    mStoringLints = true;
     ALScriptLints::setLevels(lua, levels);
+    mStoringLints = false;
     fillLints(lua);
 }
 
@@ -318,7 +336,7 @@ void ALFloaterScriptPreferences::onOpen(const LLSD& key)
     }
     mShowing = true;
     remember();
-    mKept = false;
+    mCancelled = false;
     fillThemes();
     refreshSwatches();
     refreshFont();
@@ -341,11 +359,13 @@ void ALFloaterScriptPreferences::onClose(bool app_quitting)
         // The viewer writes the colours itself on the way out.
         return;
     }
-    // Closed without OK: as it was.
-    if (!mKept)
+    // Cancelled: as it was. Closed any other way, what was changed stays,
+    // as the window showed it changing.
+    if (mCancelled)
     {
         revert();
     }
+    mCancelled = false;
     LLUIColorTable::instance().saveUserSettings();
 }
 
@@ -412,13 +432,13 @@ void ALFloaterScriptPreferences::revert()
 
 void ALFloaterScriptPreferences::onOK()
 {
-    mKept = true;
+    mCancelled = false;
     closeFloater();
 }
 
 void ALFloaterScriptPreferences::onCancel()
 {
-    mKept = false;
+    mCancelled = true;
     closeFloater();
 }
 

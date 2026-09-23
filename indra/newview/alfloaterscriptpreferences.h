@@ -164,7 +164,13 @@ private:
     };
     std::map<std::string, WasColor>                        mWasColors;
     LLSD                                                   mWasSettings;
-    bool                                                   mKept = false;
+    // Cancel pressed: what was changed goes back as the window closes. The
+    // window's own close keeps it, as every change here is live already
+    // and a window closed is not a change taken back.
+    bool                                                   mCancelled = false;
+    // The lints being stored from here, so that a change of them made
+    // elsewhere -- a problem's menu -- is told from one of this window's.
+    bool                                                   mStoringLints = false;
     // Open, with what Cancel goes back to remembered.
     bool                                                   mShowing = false;
     LLScrollListCtrl*                                      mLintsLSL  = nullptr;

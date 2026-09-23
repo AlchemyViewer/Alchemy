@@ -123,6 +123,9 @@ public:
     // A popped-out window closes once every script in it has been closed,
     // each asked about if it has unsaved changes; the main window hides.
     bool canClose() override;
+    // The viewer quitting: the main window, hidden or not, asks about what
+    // is unsaved in it first, and the quit waits on the answer.
+    void closeFloater(bool app_quitting = false) override;
     void onClose(bool app_quitting) override;
     void draw() override;
     bool handleKeyHere(KEY key, MASK mask) override;
@@ -211,6 +214,14 @@ private:
         // without being held, and replaced by the next one looked at, until
         // it is typed in, saved, gone to or double-clicked.
         bool                                       preview = false;
+        // A file changed on disk while this tab had unsaved changes, and
+        // the author asked what to do: once, however often it changes.
+        bool                                       askingReload = false;
+        // Where the caret and the view were before the text was loaded
+        // again -- a revert, an external editor's save -- to be put back;
+        // a line of -1 for none.
+        ALTextPos                                  keepCaret{ -1, -1 };
+        S32                                        keepScroll = 0;
         // The outline's symbols folded shut, each by the names from the
         // outermost down to it.
         boost::unordered_flat_set<std::string, ll::string_hash, std::equal_to<>> outlineFolded;
@@ -402,6 +413,9 @@ private:
             ALScriptSpan span;
             std::string  was;
             std::string  now;
+            // A replace across scripts rather than a rename, which is said
+            // so where a place has moved.
+            bool         replace = false;
         };
         std::vector<PendingEdit>                   pendingEdits;
         // The script held open in an external editor: the file under
@@ -679,8 +693,10 @@ private:
     void layoutProblemFilters();
     // What the studio did, said in the status line and kept in the
     // Output tab, where it can be read again: saving, compiling,
-    // preprocessing, renaming. The script's name in it is a link to it.
-    void report(const std::string& text, bool failure = false, const Doc* doc = nullptr);
+    // preprocessing, renaming. The script's name in it is a link to it;
+    // and, for a save held over what was found, a link after it that saves
+    // anyway.
+    void report(const std::string& text, bool failure = false, const Doc* doc = nullptr, bool save_anyway = false);
 
     // The analyzers: a check is due a moment after the last keystroke,
     // sent from draw, answered whenever the worker gets to it, and kept
@@ -888,8 +904,10 @@ private:
     // text has moved on since the search is left alone and searched
     // again.
     void replaceAllFound();
+    // A script not open is searched as the region has it: its text kept,
+    // for a replace to work over, and whether it is a notecard.
     void searchDocument(const ALScriptRef& ref, const std::string& name, const std::string& where, const ALTextDocument& text, U32 version = 0,
-                        const std::string& doc_id = std::string());
+                        const std::string& doc_id = std::string(), bool keep_text = false, bool notecard = false);
     // A script's places as rows, after the rest, up to what a list holds;
     // and its rows told what it holds now, in place, where it holds as
     // many places as its rows are -- false where it does not.
@@ -936,6 +954,14 @@ private:
 
     void closeDocument(std::string_view id);
     void closeDocumentAnswered(const std::string& id, S32 option);
+    // Several tabs closed at once -- the others, all of them, `:qa` -- the
+    // unsaved among them asked about in one question, not one each.
+    void closeMany(const std::vector<std::string>& ids);
+    // A close of the window, or of several tabs, that is waited on no
+    // longer; and a quit waiting on it called off.
+    void stopClosing();
+    // Whether the viewer is quitting on this window's answer.
+    bool quittingOnUs() const;
     void letGoOf(size_t index);
     // A save that did not go through -- refused over errors, failed, or
     // compiled with errors: a close waiting on it waits no longer, and a
@@ -946,6 +972,40 @@ private:
     void closeWindowAnswered(S32 option);
 
     void onTabChosen(const std::string& value);
+    // A script made in the inventory, named first and opened here once the
+    // inventory has it, with the scripter's template in it.
+    void newInventoryScript(bool lua);
+    // Revert to Saved, asked about where something would be lost.
+    void askRevert(Doc& doc);
+    // Replace All, asked about first.
+    void askReplaceAll();
+    // The places jumped from, to go back to and forward again: a place in
+    // a tab by its id. Walking a pane's list is one jump, from where the
+    // caret was before the walk began.
+    struct NavPlace
+    {
+        std::string doc;
+        ALTextPos   at;
+    };
+    void noteJump(bool walking = false);
+    void goBack(bool forward);
+    // The editor commands' keys as the keymap has them, and the menus'
+    // own as a person rebound them, on the menus and the tips that say
+    // them.
+    void applyMenuKeys();
+    void refreshKeyTips();
+    // Edit > Undo and Redo named for the step they take, where it has one.
+    void refreshUndoLabels();
+    // The explorer's buttons, as what is chosen allows.
+    void refreshExplorerButtons();
+    // Start, stop, reset or restart over the rows, asked about first where
+    // it reaches more than one script.
+    void runExplorerScripts(const std::string& action, const std::vector<ExplorerRow>& rows);
+    S32  scriptsReached(const std::vector<ExplorerRow>& rows) const;
+    // The explorer's row for a script, unfolded to and chosen.
+    void revealInExplorer(const Doc& doc);
+    // A name that a rename may not take: one of the language's own.
+    bool reservedName(const Doc& doc, const std::string& name) const;
     void onMenuAction(const LLSD& param);
     bool onMenuEnable(const LLSD& param);
     bool onMenuCheck(const LLSD& param);
@@ -974,14 +1034,19 @@ private:
     // The document's language set by it, the editor taught or untaught.
     void                speakFileLanguage(Doc& doc, const FileLanguage& language);
     // The files opened from disk lately, newest first, under File ▸
-    // Open Recent; kept with the state.
+    // Open Recent; kept with the state. The scripts and notecards opened
+    // from the world and the inventory lately, beside them.
     void noteRecentFile(const std::string& path);
+    void noteRecentScript(const Doc& doc);
     void fillRecentMenu();
     // The marks: what a document is, on its tab; what a symbol's kind
     // is, in the outline -- by texture name, as a scroll list wants it.
     static const char* imageNameOf(const Doc& doc);
     static const char* imageNameOf(ALScriptSymbolKind kind);
 
+    // The tabs open, as the state keeps them: an item by its object and
+    // id, a file by its path, and which is in front.
+    LLSD openTabs() const;
     void writeState(LLSD& state) const override;
     void readState(const LLSD& state) override;
 
@@ -995,13 +1060,14 @@ private:
         std::string name;
         bool        dirty  = false;
         bool        preview = false;
+        bool        readOnly = false;
         S32         errors = 0;
         S32         warnings = 0;
         const char* image  = nullptr;
         friend bool operator==(const TabFacts& a, const TabFacts& b)
         {
-            return a.id == b.id && a.name == b.name && a.dirty == b.dirty && a.preview == b.preview && a.errors == b.errors && a.warnings == b.warnings &&
-                   a.image == b.image;
+            return a.id == b.id && a.name == b.name && a.dirty == b.dirty && a.preview == b.preview && a.readOnly == b.readOnly && a.errors == b.errors &&
+                   a.warnings == b.warnings && a.image == b.image;
         }
         friend bool operator!=(const TabFacts& a, const TabFacts& b) { return !(a == b); }
     };
@@ -1011,6 +1077,34 @@ private:
     boost::unordered_flat_map<std::string, size_t, ll::string_hash, std::equal_to<>> mByDocId;
     void                               reindexDocs();
     std::vector<std::string>           mRecentFiles;
+    struct Recent
+    {
+        ALScriptRef ref;
+        std::string name;
+    };
+    std::vector<Recent>                mRecentScripts;
+    // The tabs open when the state was last written, opened again once the
+    // window is built.
+    LLSD                               mRestoreTabs;
+    // The viewer is quitting and this window was asked to close; and the
+    // tabs as they were when it was, which the state keeps for next time.
+    bool                               mAppQuitting = false;
+    LLSD                               mTabsAtQuit;
+    // The places jumped from and back from, and whether a pane's list is
+    // being walked, which is one jump however many rows it passes.
+    std::vector<NavPlace>              mBack;
+    std::vector<NavPlace>              mForward;
+    bool                               mWalking = false;
+    // The tips that say a menu item's keys, as the skin wrote them, to be
+    // said again when a key is rebound.
+    std::vector<std::pair<std::string, std::vector<std::string>>> mKeyTips;
+    std::map<std::string, std::string> mKeyTipTexts;
+    // What Edit > Undo and Redo were last named for.
+    std::string                        mUndoSaid;
+    std::string                        mRedoSaid;
+    // Whether the last search's pattern did not parse.
+    bool                               mSearchBadPattern = false;
+    LLFilterEditor*                    mExplorerFilter = nullptr;
     // What the editors' vim keymaps share: the : and / lines entered in
     // any of them, and the settings a :set changes.
     std::shared_ptr<ALVimKeymap::Shared> mVimShared = std::make_shared<ALVimKeymap::Shared>();
@@ -1127,6 +1221,11 @@ private:
         std::string              where;
         U32                      version = 0;
         std::vector<ALTextRange> places;
+        // A script that was not open: the text it was searched in, which a
+        // replace works out its replacements over, and whether it is a
+        // notecard, which a replace leaves alone.
+        std::string              text;
+        bool                     notecard = false;
         // Each place's line as listed, trimmed, and where the words start
         // in it.
         std::vector<std::string> lines;

@@ -18,25 +18,30 @@
     <floater.string name="LoadedReadOnly">[NAME] loaded; it may be read and not changed.</floater.string>
     <floater.string name="Saving">Saving [NAME]...</floater.string>
     <floater.string name="Compiled">[NAME] compiled.</floater.string>
-    <floater.string name="CompileFailed">[NAME] did not compile: [COUNT] problem(s).</floater.string>
+    <floater.string name="CompileFailedA">[NAME] did not compile: 1 problem.</floater.string>
+    <floater.string name="CompileFailedB">[NAME] did not compile: [COUNT] problems.</floater.string>
     <floater.string name="SaveFailed">[NAME] was not saved: [ERROR]</floater.string>
     <floater.string name="SavedToFile">Written to [PATH]</floater.string>
     <floater.string name="FileReloaded">[NAME] changed on disk and was read again.</floater.string>
+    <floater.string name="Reverted">[NAME] was read again from disk.</floater.string>
     <floater.string name="FileChangedOutside">[NAME] changed on disk while it was being edited here; saving will overwrite it.</floater.string>
     <floater.string name="SaveToFileFailed">Could not write [PATH]</floater.string>
     <floater.string name="NoProblems">No problems.</floater.string>
     <floater.string name="NoScriptOpenHeadline">No script open</floater.string>
     <floater.string name="NoScriptOpenSentence">Choose a script or a notecard in the Explorer, or open a file from your computer.</floater.string>
     <floater.string name="NoScriptOpenAction">Open File...</floater.string>
+    <floater.string name="NoScriptOpenNew">New Script...</floater.string>
     <floater.string name="NoReferences">Nothing looked up yet. Put the caret on a name and press Find References.</floater.string>
     <floater.string name="NoOutline">Nothing in this script to outline yet.</floater.string>
     <floater.string name="NoOutlineYet">Still loading.</floater.string>
     <floater.string name="NoExplorerSelection">Nothing selected. Select an object in the world to see what it holds.</floater.string>
     <floater.string name="NoExplorerContents">Nothing selected is holding a script or a notecard.</floater.string>
+    <floater.string name="ExplorerNoMatch">Nothing listed has those letters in its name.</floater.string>
     <floater.string name="NoOutput">Nothing yet. Compiling, running and the preprocessor say what they are doing here.</floater.string>
     <floater.string name="PaneExplorer">Explorer</floater.string>
     <floater.string name="PaneBottom">Problems, references, output and search</floater.string>
     <floater.string name="NoReference">Nothing at the caret to look up.</floater.string>
+    <floater.string name="NoWikiPage">[NAME] is the script's own; the wiki has no page for it.</floater.string>
     <floater.string name="ReferenceTitle">Reference</floater.string>
     <floater.string name="ReferencePlaceholder">A function, event or constant by name</floater.string>
     <floater.string name="SnippetDetail">snippet</floater.string>
@@ -49,6 +54,7 @@
     <floater.string name="Formatted">[NAME] formatted.</floater.string>
     <floater.string name="FormattedSelection">The selection in [NAME] formatted.</floater.string>
     <floater.string name="FormattedAlready">[NAME] was formatted already.</floater.string>
+    <floater.string name="FormatFailed">[NAME] was left as it was: the formatter could not keep its lines.</floater.string>
     <floater.string name="SearchFind">Find</floater.string>
     <floater.string name="SearchPlaceholder">words</floater.string>
     <floater.string name="SearchQueryTip">What to look for; return runs the search</floater.string>
@@ -67,16 +73,26 @@
     <floater.string name="SearchListed">every object listed</floater.string>
     <floater.string name="SearchCountTip">How many places were found, in how many scripts</floater.string>
     <floater.string name="SearchCounting">[HITS] in [FILES], fetching...</floater.string>
-    <floater.string name="SearchCountA">[HITS] in 1 file</floater.string>
-    <floater.string name="SearchCountB">[HITS] in [COUNT] files</floater.string>
-    <floater.string name="SearchCountCappedA">[HITS] in 1 file, the first [SHOWN] listed</floater.string>
-    <floater.string name="SearchCountCappedB">[HITS] in [COUNT] files, the first [SHOWN] listed</floater.string>
-    <floater.string name="SearchReplacedA">1 place replaced in [FILES] scripts.</floater.string>
-    <floater.string name="SearchReplacedB">[COUNT] places replaced in [FILES] scripts.</floater.string>
+    <floater.string name="SearchCount">[HITS] in [FILES]</floater.string>
+    <floater.string name="SearchCountCapped">[HITS] in [FILES], the first [SHOWN] listed</floater.string>
+    <floater.string name="MatchesA">1 match</floater.string>
+    <floater.string name="MatchesB">[COUNT] matches</floater.string>
+    <floater.string name="FilesA">1 file</floater.string>
+    <floater.string name="FilesB">[COUNT] files</floater.string>
+    <floater.string name="PlacesA">1 place</floater.string>
+    <floater.string name="PlacesB">[COUNT] places</floater.string>
+    <floater.string name="ScriptsA">1 script</floater.string>
+    <floater.string name="ScriptsB">[COUNT] scripts</floater.string>
+    <floater.string name="SearchReplaced">[PLACES] replaced in [SCRIPTS]</floater.string>
+    <floater.string name="SearchReplacedOpened">[SCRIPTS] opened with the change unsaved</floater.string>
+    <floater.string name="SearchReplacedLeft">[SCRIPTS] left alone, changed since the search</floater.string>
     <floater.string name="SearchReplaceNothing">Nothing to replace.</floater.string>
-    <floater.string name="SearchReplaceMoved">[NAME] has changed since the search; searched again.</floater.string>
+    <floater.string name="SearchNoObject">no object chosen</floater.string>
+    <floater.string name="SearchNoObjectTip">Open a script of an object, or choose an object in the explorer, to search what it holds</floater.string>
+    <floater.string name="SearchObjectTip">[OBJECT]: [HITS] in [FILES]</floater.string>
     <floater.string name="OutputCopiedA">1 line copied.</floater.string>
     <floater.string name="OutputCopiedB">[COUNT] lines copied.</floater.string>
+    <floater.string name="OutputNothingToCopy">Nothing shown to copy.</floater.string>
     <floater.string name="SearchNone">nothing found</floater.string>
     <floater.string name="SearchBadPattern">the pattern does not parse</floater.string>
     <floater.string name="PaneInspector">Inspector</floater.string>
@@ -90,7 +106,8 @@
     <floater.string name="RunningYes">running</floater.string>
     <floater.string name="RunningNo">stopped</floater.string>
     <floater.string name="ObjectUnnamed">(unnamed)</floater.string>
-    <floater.string name="RowObjectTip">[NAME]: an object in world, of [COUNT] prim(s). What it holds is listed under it -- its arrow, a double-click or the left and right keys fold it; double-click a script or a notecard to open it, right-click for everything else.</floater.string>
+    <floater.string name="RowObjectTipA">[NAME]: an object in world, of 1 prim. What it holds is listed under it -- its arrow, a double-click, return or the left and right keys fold it; double-click a script or a notecard to open it, right-click for everything else.</floater.string>
+    <floater.string name="RowObjectTipB">[NAME]: an object in world, of [COUNT] prims. What it holds is listed under it -- its arrow, a double-click, return or the left and right keys fold it; double-click a script or a notecard to open it, right-click for everything else.</floater.string>
     <floater.string name="RowAwayTip">[NAME]: pinned, and not in sight now; listed as it was last seen. Unpin it from the right-click menu.</floater.string>
     <floater.string name="RowPrimTip">[NAME]: a prim of [OBJECT], with what it holds listed under it.</floater.string>
     <floater.string name="RowScriptTip">[NAME]: [KIND] in [OBJECT], [STATE]. Double-click to open it; right-click to start, stop, reset, recompile, rename or delete it.</floater.string>
@@ -108,7 +125,8 @@
     <floater.string name="Recompiling">Recompiling [NAME]...</floater.string>
     <floater.string name="SavedNotecard">[NAME] saved.</floater.string>
     <floater.string name="Preflight">Checking [NAME] before saving...</floater.string>
-    <floater.string name="PreflightErrors">[COUNT] error(s) the analyzers found in [NAME]; save again to compile anyway.</floater.string>
+    <floater.string name="PreflightErrorsA">The analyzers found 1 error in [NAME]; save again to compile anyway.</floater.string>
+    <floater.string name="PreflightErrorsB">The analyzers found [COUNT] errors in [NAME]; save again to compile anyway.</floater.string>
     <floater.string name="VimNormal">vim</floater.string>
     <floater.string name="HoverExpected">Expected here: [TYPE]</floater.string>
     <floater.string name="InspectDeclared">Declared on line [LINE].</floater.string>
@@ -131,11 +149,16 @@
     <floater.string name="NotRenamable">[NAME] is not this script's to rename.</floater.string>
     <floater.string name="RenameBadName">&quot;[NAME]&quot; is not a name.</floater.string>
     <floater.string name="RenameStale">The script changed before the rename; ask again.</floater.string>
-    <floater.string name="Renamed">[COUNT] place(s) renamed to [NAME].</floater.string>
-    <floater.string name="RenamedStale">[COUNT] place(s) renamed to [NAME]; [STALE] script(s) changed since they were read, or are on disk, and were left alone.</floater.string>
-    <floater.string name="RenamedAcross">[COUNT] place(s) renamed to [NAME] in [FILES] scripts; [OPENED] opened with the change unsaved.</floater.string>
-    <floater.string name="RenamedAcrossStale">[COUNT] place(s) renamed to [NAME] in [FILES] scripts; [OPENED] opened with the change unsaved; [STALE] left alone, changed since they were read or on disk.</floater.string>
-    <floater.string name="RenameMissed">[COUNT] place(s) in [NAME] no longer read as they did, and were not renamed.</floater.string>
+    <floater.string name="RenamedHere">[PLACES] renamed to [NAME]</floater.string>
+    <floater.string name="RenamedIn">[PLACES] renamed to [NAME] in [SCRIPTS]</floater.string>
+    <floater.string name="RenamedOpened">[SCRIPTS] opened with the change unsaved</floater.string>
+    <floater.string name="RenamedLeft">[SCRIPTS] left alone, changed since read or on disk</floater.string>
+    <floater.string name="RenameMissedA">In [NAME], 1 place no longer read as it did, and was not renamed.</floater.string>
+    <floater.string name="RenameMissedB">In [NAME], [COUNT] places no longer read as they did, and were not renamed.</floater.string>
+    <floater.string name="ReplaceMissedA">In [NAME], 1 place no longer read as it did when searched, and was not replaced.</floater.string>
+    <floater.string name="ReplaceMissedB">In [NAME], [COUNT] places no longer read as they did when searched, and were not replaced.</floater.string>
+    <floater.string name="RenameReserved">[NAME] is a word of the language's own, and cannot be a name of the script's.</floater.string>
+    <floater.string name="RenameClash">Rename to [NEW]; [NEW] is declared in this script already, so the two may clash.</floater.string>
     <floater.string name="CaretPosition">Ln [LINE], Col [COL]</floater.string>
     <floater.string name="SelectedLinesA">1 line selected</floater.string>
     <floater.string name="SelectedLinesB">[COUNT] lines selected</floater.string>
@@ -166,8 +189,9 @@
     <floater.string name="RenamePlaceholder">The new name</floater.string>
     <floater.string name="RenameHint">Type the new name for [NAME].</floater.string>
     <floater.string name="RenameSame">[NAME] is its name already.</floater.string>
-    <floater.string name="RenameTo">Rename [COUNT] place(s) of [NAME] to [NEW].</floater.string>
-    <floater.string name="RenameToAcross">Rename [COUNT] place(s) of [NAME] to [NEW] across [FILES] scripts; any not open opens with the change unsaved.</floater.string>
+    <floater.string name="RenameToA">Rename 1 place of [NAME] to [NEW].</floater.string>
+    <floater.string name="RenameToB">Rename [COUNT] places of [NAME] to [NEW].</floater.string>
+    <floater.string name="RenameToAcross">Rename [COUNT] places of [NAME] to [NEW] across [FILES] scripts; any not open opens with the change unsaved.</floater.string>
     <floater.string name="KindKeyword">keyword</floater.string>
     <floater.string name="KindVariable">variable</floater.string>
     <floater.string name="KindParameter">parameter</floater.string>
@@ -183,7 +207,8 @@
     <floater.string name="KindError">error</floater.string>
     <floater.string name="OriginRuntime">Runtime</floater.string>
     <floater.string name="OriginAny">Every source</floater.string>
-    <floater.string name="ProblemsShown">[SHOWN] of [TOTAL] problems shown; the filters hide the rest.</floater.string>
+    <floater.string name="ProblemsAllHiddenA">The filters hide the 1 problem there is.</floater.string>
+    <floater.string name="ProblemsAllHiddenB">The filters hide all [COUNT] problems.</floater.string>
     <floater.string name="ProblemsHiddenA">1 more hidden by the filters</floater.string>
     <floater.string name="ProblemsHiddenB">[COUNT] more hidden by the filters</floater.string>
     <floater.string name="ProblemsCopiedA">1 problem copied.</floater.string>
@@ -225,12 +250,19 @@
     <floater.string name="TabInventoryTip">A script in your inventory</floater.string>
     <floater.string name="TabObjectTip">A script in an object's contents</floater.string>
     <floater.string name="TabNotecardTip">A notecard, as plain text</floater.string>
+    <floater.string name="TabReadOnlyTip">Read-only: you may read it and not change it</floater.string>
+    <floater.string name="TrailerReadOnly">Read-only</floater.string>
+    <floater.string name="TrailerReadOnlyTip">You may read this script and not change it</floater.string>
     <floater.string name="OriginPreprocessor">Preprocessor</floater.string>
     <floater.string name="OriginOptimizer">Optimizer</floater.string>
     <floater.string name="Preprocessing">Preprocessing [NAME]...</floater.string>
     <floater.string name="Preprocessed">Preprocessed [NAME].</floater.string>
-    <floater.string name="PreprocessedPending">Preprocessed [NAME]; [COUNT] include(s) could not be fetched: [FILES].</floater.string>
-    <floater.string name="PreprocessErrors">The preprocessor found [COUNT] error(s) in [NAME]; save again to upload anyway.</floater.string>
+    <floater.string name="PreprocessedPendingA">Preprocessed [NAME]; 1 include could not be fetched: [FILES].</floater.string>
+    <floater.string name="PreprocessedPendingB">Preprocessed [NAME]; [COUNT] includes could not be fetched: [FILES].</floater.string>
+    <floater.string name="PreprocessErrorsA">The preprocessor found 1 error in [NAME]; save again to upload anyway.</floater.string>
+    <floater.string name="PreprocessErrorsB">The preprocessor found [COUNT] errors in [NAME]; save again to upload anyway.</floater.string>
+    <floater.string name="SaveAnyway">Save anyway</floater.string>
+    <floater.string name="SaveAnywayTip">Save [NAME] as it stands, over what was found</floater.string>
     <floater.string name="ExternalWriteFailed">[FILE] could not be written.</floater.string>
     <floater.string name="ExternalOpened">[NAME] is open in the external editor; its saves are saved from here.</floater.string>
     <floater.string name="ExternalOpenedVSCode">[NAME] is open in VS Code; its saves are saved from here.</floater.string>
@@ -258,6 +290,15 @@
     <floater.string name="MenuUndoWhat">Undo [WHAT]</floater.string>
     <floater.string name="MenuRedo">Redo</floater.string>
     <floater.string name="MenuRedoWhat">Redo [WHAT]</floater.string>
+    <floater.string name="PaletteOn">on</floater.string>
+    <floater.string name="PaletteOff">off</floater.string>
+    <floater.string name="UndoWhatRename">Rename</floater.string>
+    <floater.string name="UndoWhatFormat">Format</floater.string>
+    <floater.string name="UndoWhatReplace">Replace All</floater.string>
+    <floater.string name="RecentScripts">Scripts</floater.string>
+    <floater.string name="RecentFiles">Files</floater.string>
+    <floater.string name="NewScriptLSL">LSL script</floater.string>
+    <floater.string name="NewScriptLua">Lua script</floater.string>
 
     <menu_bar
      bg_visible="false"
@@ -276,6 +317,14 @@
          name="file"
          tear_off="false"
          width="200">
+            <menu_item_call label="New Script..." layout="topleft" name="new_script" shortcut="control|N">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="new_script" />
+            </menu_item_call>
+            <menu_item_call label="New Lua Script..." layout="topleft" name="new_lua_script">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="new_lua_script" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="new_lua_script" />
+            </menu_item_call>
+            <menu_item_separator layout="topleft" />
             <menu_item_call label="Save" layout="topleft" name="save" shortcut="control|S">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="save" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="save" />
@@ -314,6 +363,10 @@
             <menu_item_call label="Edit in External Editor" layout="topleft" name="external_editor">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="external_editor" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="external_editor" />
+            </menu_item_call>
+            <menu_item_separator layout="topleft" />
+            <menu_item_call label="Preferences..." layout="topleft" name="preferences">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="preferences" />
             </menu_item_call>
             <menu_item_separator layout="topleft" />
             <menu_item_call label="Move to New Window" layout="topleft" name="pop_out">
@@ -451,6 +504,15 @@
          name="go"
          tear_off="false"
          width="200">
+            <menu_item_call label="Back" layout="topleft" name="back" shortcut="control|-" use_mac_ctrl="true">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="back" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="back" />
+            </menu_item_call>
+            <menu_item_call label="Forward" layout="topleft" name="forward" shortcut="control|shift|-" use_mac_ctrl="true">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="forward" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="forward" />
+            </menu_item_call>
+            <menu_item_separator layout="topleft" />
             <menu_item_call label="Go to Line..." layout="topleft" name="go_to_line" shortcut="control|G">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="go_to_line" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="go_to_line" />
@@ -569,9 +631,6 @@
                 <menu_item_check.on_check function="ScriptStudio.Check" parameter="spell_check" />
                 <menu_item_check.on_click function="ScriptStudio.Menu" parameter="spell_check" />
             </menu_item_check>
-            <menu_item_call label="Preferences..." layout="topleft" name="preferences">
-                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="preferences" />
-            </menu_item_call>
             <menu_item_separator layout="topleft" />
             <menu
              label="Scrollbar"
@@ -645,19 +704,19 @@
                 <menu_item_check.on_check function="ScriptStudio.Check" parameter="output" />
                 <menu_item_check.on_click function="ScriptStudio.Menu" parameter="output" />
             </menu_item_check>
-            <menu_item_check label="Search" layout="topleft" name="search">
+            <menu_item_check label="Search" layout="topleft" name="search" shortcut="control|alt|5">
                 <menu_item_check.on_check function="ScriptStudio.Check" parameter="search" />
                 <menu_item_check.on_click function="ScriptStudio.Menu" parameter="search" />
+            </menu_item_check>
+            <menu_item_check label="Inspector" layout="topleft" name="inspector" shortcut="control|alt|4">
+                <menu_item_check.on_check function="ScriptStudio.Check" parameter="inspector" />
+                <menu_item_check.on_click function="ScriptStudio.Menu" parameter="inspector" />
             </menu_item_check>
             <menu_item_separator layout="topleft" />
             <menu_item_check label="Preprocessed Output" layout="topleft" name="expanded" shortcut="control|alt|P">
                 <menu_item_check.on_check function="ScriptStudio.Check" parameter="expanded" />
                 <menu_item_check.on_click function="ScriptStudio.Menu" parameter="expanded" />
                 <menu_item_check.on_enable function="ScriptStudio.Enable" parameter="expanded" />
-            </menu_item_check>
-            <menu_item_check label="Inspector" layout="topleft" name="inspector" shortcut="control|alt|4">
-                <menu_item_check.on_check function="ScriptStudio.Check" parameter="inspector" />
-                <menu_item_check.on_click function="ScriptStudio.Menu" parameter="inspector" />
             </menu_item_check>
         </menu>
         <menu
@@ -914,15 +973,25 @@
          background_opaque="true"
          bg_opaque_color="DkGray2"
          border="true">
+            <filter_editor
+             follows="left|top|right"
+             height="20"
+             label="Filter"
+             layout="topleft"
+             left="2"
+             name="explorer_filter"
+             tool_tip="Only the objects, prims, scripts and notecards with these letters in their names"
+             top="2"
+             width="236" />
             <scroll_list
              follows="all"
-             height="438"
+             height="414"
              layout="topleft"
              left="0"
              multi_select="true"
              name="explorer"
-             tool_tip="The objects in hand -- pinned, selected in world, or holding a script that is open -- and their scripts and notecards; double-click to open one, right-click for everything else"
-             top="0"
+             tool_tip="The objects in hand -- pinned, selected in world, or holding a script that is open -- and their scripts and notecards; double-click or return opens one, delete deletes it, F2 renames it, right-click for everything else"
+             top="24"
              width="240">
                 <scroll_list.columns label="" name="icon" width="20" />
                 <scroll_list.columns dynamic_width="true" label="Name" name="name" tool_tip="The objects in hand, each prim of a linkset, and what each prim holds" />
@@ -1008,7 +1077,7 @@
                      handle between them and the band below. -->
                 <layout_panel
                  auto_resize="true"
-                 height="324"
+                 height="264"
                  layout="topleft"
                  min_dim="168"
                  name="editor_column"
@@ -1017,7 +1086,7 @@
                 <layout_stack
                  animate="false"
                  follows="all"
-                 height="324"
+                 height="264"
                  layout="topleft"
                  left="0"
                  name="editor_stack"
@@ -1049,14 +1118,14 @@
                 </layout_panel>
                 <layout_panel
                  auto_resize="true"
-                 height="276"
+                 height="216"
                  layout="topleft"
                  min_dim="120"
                  name="editor_host"
                  width="574">
                     <panel
                      follows="all"
-                     height="276"
+                     height="216"
                      layout="topleft"
                      left="0"
                      name="editor_panel"
@@ -1124,7 +1193,7 @@
                 <layout_panel
                  auto_resize="false"
                  expanded_min_dim="80"
-                 height="130"
+                 height="190"
                  layout="topleft"
                  min_dim="0"
                  name="bottom_panel"
@@ -1136,7 +1205,7 @@
                  border="true">
                     <tab_container
                      follows="all"
-                     height="130"
+                     height="190"
                      layout="topleft"
                      left="0"
                      name="bottom_tabs"
@@ -1146,7 +1215,7 @@
                      width="574">
                         <panel
                          follows="all"
-                         height="108"
+                         height="168"
                          label="Problems"
                          layout="topleft"
                          name="problems_tab"
@@ -1154,7 +1223,7 @@
                             <layout_stack
                              animate="false"
                              follows="all"
-                             height="108"
+                             height="168"
                              layout="topleft"
                              left="0"
                              name="problems_stack"
@@ -1235,7 +1304,7 @@
                                 </layout_panel>
                                 <layout_panel
                                  auto_resize="true"
-                                 height="84"
+                                 height="144"
                                  layout="topleft"
                                  min_dim="20"
                                  name="problems_list_panel"
@@ -1244,7 +1313,7 @@
                                      draw_heading="true"
                                      heading_height="18"
                                      follows="all"
-                                     height="84"
+                                     height="144"
                                      layout="topleft"
                                      left="0"
                                      name="problems"
@@ -1261,7 +1330,7 @@
                         </panel>
                         <panel
                          follows="all"
-                         height="108"
+                         height="168"
                          label="References"
                          layout="topleft"
                          name="references_tab"
@@ -1279,7 +1348,7 @@
                              draw_heading="true"
                              heading_height="18"
                              follows="all"
-                             height="84"
+                             height="144"
                              layout="topleft"
                              left="0"
                              name="references"
@@ -1294,7 +1363,7 @@
                         </panel>
                         <panel
                          follows="all"
-                         height="108"
+                         height="168"
                          label="Output"
                          layout="topleft"
                          name="output_tab"
@@ -1355,7 +1424,7 @@
                              width="70" />
                             <output_view
                              follows="all"
-                             height="82"
+                             height="142"
                              layout="topleft"
                              left="0"
                              name="output"
@@ -1365,7 +1434,7 @@
                         </panel>
                         <panel
                          follows="all"
-                         height="108"
+                         height="168"
                          label="Search"
                          layout="topleft"
                          name="search_tab"
@@ -1386,23 +1455,25 @@
                              layout="topleft"
                              name="search_replace"
                              right="-2"
-                             tool_tip="Every place found replaced by the words in the box, script by script, each script's own one step to undo. A script that is not open is opened with the change unsaved."
+                             tool_tip="Every place found replaced by the words in the box, script by script, each script's own one step to undo, once you say so. A script that is not open is opened with the change unsaved."
                              top="28"
                              width="90" />
                             <line_editor
+                             commit_on_focus_lost="false"
                              follows="top|left|right"
                              height="22"
+                             label="Replace with"
                              layout="topleft"
                              left="0"
                              name="search_replacement"
-                             tool_tip="What to put in place of the words found"
+                             tool_tip="What to put in place of the words found; return or Replace All asks before replacing"
                              top_delta="0"
                              width="478" />
                             <pane_list
                              draw_heading="true"
                              heading_height="18"
                              follows="all"
-                             height="56"
+                             height="116"
                              layout="topleft"
                              left="0"
                              name="search_results"
