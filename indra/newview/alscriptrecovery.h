@@ -88,6 +88,19 @@ struct ALScriptRecoveryEntry
     static bool fromLLSD(const LLSD& sd, ALScriptRecoveryEntry& out);
 };
 
+// When a kept text's script is loaded again after loads that failed: a
+// moment after the first failure, three times as long after each one
+// since, and a few times only before it waits for a person to ask.
+struct ALScriptRecoveryRetry
+{
+    static constexpr F64 FIRST = 5.0;
+    static constexpr S32 TRIES = 5;
+    // How long after the failure that made this many failures in a row.
+    static F64 delayAfter(S32 failures);
+    // Whether another may be tried on its own after this many.
+    static bool mayTry(S32 failures) { return failures < TRIES; }
+};
+
 // The entries, one file each in a folder of the account's, written whole
 // and then put in place, so that what is there is always one whole text or
 // another and never half of each. Each session writes files of its own, so
@@ -114,13 +127,38 @@ public:
     // This session's entry for the key gone: the text was saved, or is not
     // this session's to keep any more.
     void forget(const std::string& key);
-    // This session's entry for the key, or another's, moved among the
-    // discarded, marked when.
-    bool discard(const std::string& key);
+    // A text written straight among the discarded, marked when -- what a
+    // tab throws away, set aside a while all the same -- leaving whatever
+    // entry it came from where it is. By this session where it says none.
+    bool setAside(ALScriptRecoveryEntry entry);
+    // An entry, this session's or another's, moved among the discarded:
+    // set aside, and its file gone once that is written.
     bool discard(const ALScriptRecoveryEntry& entry);
     // An entry taken up -- put back in a tab, which keeps it from here --
     // or thrown away for good.
     void remove(const ALScriptRecoveryEntry& entry);
+
+    // A tab let go of -- closed, thrown away, its window gone -- as it
+    // stood: what it holds unsaved of its own; the entry it took up or
+    // carried in from another window; whether what it carried was still
+    // waiting on a load to be put in; and whether its text stands where a
+    // save could reach it -- loaded, and changeable.
+    struct Parting
+    {
+        std::string                          key;
+        std::optional<ALScriptRecoveryEntry> unsaved;
+        std::optional<ALScriptRecoveryEntry> tookUp;
+        bool                                 carrying = false;
+        bool                                 settled  = false;
+    };
+    // What it holds unsaved set aside among the discarded -- or what it
+    // carried and never put in, where that came with no file of its own --
+    // and this session's entry for the key forgotten once that is written.
+    // The entry it took up goes only once what the tab held is safe: set
+    // aside, or the same as saved; one it never put in, or held where no
+    // save could reach, is left to be offered again. False where something
+    // could not be set aside, and nothing was let go of.
+    bool letGo(const Parting& parting);
 
     // Every entry that can be read, newest first: this session's, other
     // sessions', and the discarded. A file that cannot be read is left
@@ -135,7 +173,9 @@ public:
     // discarded one. By the files' names, without reading them.
     bool hasOffers() const;
 
-    // The discarded older than this let go of for good.
+    // The discarded older than this let go of for good, by when their
+    // names say they were discarded; and whatever a write cut short left
+    // half written beside an entry.
     void prune(F64 max_age_seconds, const LLDate& now = LLDate::now());
 
 private:

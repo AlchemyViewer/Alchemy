@@ -120,8 +120,20 @@ public:
         // stripped, and the items it carries, which go back with it.
         bool                                     notecard = false;
         std::vector<LLPointer<LLInventoryItem>> embedded;
-        // Why there is no text, where there is none.
+        // Why there is no text, where there is none: in words, and in kind
+        // -- the item or its object gone, the agent not permitted to see
+        // it, the asset not there or not readable, or the fetch failing,
+        // which may go through if it is tried again.
+        enum class Failure : U8
+        {
+            None,
+            Missing,
+            NotPermitted,
+            Unreadable,
+            Fetch
+        };
         std::string error;
+        Failure     failure = Failure::None;
     };
     typedef std::function<void(const Loaded&)> load_callback_t;
 

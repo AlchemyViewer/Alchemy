@@ -202,6 +202,10 @@ private:
         ALScriptWorkspace::Language                language;
         LLUUID                                     assetId;
         bool                                       loaded     = false;
+        // Why the last load came back with no text, and what it said: nothing
+        // is coming to put a kept text over until it is loaded again.
+        ALScriptWorkspace::Loaded::Failure         loadFailure = ALScriptWorkspace::Loaded::Failure::None;
+        std::string                                loadError;
         bool                                       modifiable = false;
         bool                                       saving     = false;
         bool                                       closeAfterSave = false;
@@ -239,18 +243,22 @@ private:
         std::optional<std::vector<LLPointer<LLInventoryItem>>> carriedEmbedded;
         // A copy saved into the inventory from another tab: wrapped as that
         // one was, saved as soon as it is in, and that tab closed once the
-        // copy is saved -- by its id.
+        // copy is saved -- by its id, and the version its text was at when
+        // the copy was made, since what is typed there meanwhile is not in
+        // the copy.
         bool                                       wrapOnLoad = false;
         bool                                       saveOnLoad = false;
         std::string                                copyOf;
+        U32                                        copyOfVersion = 0;
         // What it is to compile for once it has loaded, which the load
         // would otherwise say: a copy compiles for what its original did.
         std::string                                targetOnLoad;
         // Where it stands with what holds it: its object out of sight --
         // deleted, returned, far away -- the item gone from the object or
         // the inventory, the connection lost, the item in the Trash, the
-        // file gone from disk. Said in the notice over the editor, which a
-        // person may hide until it changes.
+        // file gone from disk; or a kept text over a script that may no
+        // longer be changed, or that could not be loaded. Said in the
+        // notice over the editor, which a person may hide until it changes.
         enum class Orphan : U8
         {
             None,
@@ -258,10 +266,21 @@ private:
             Removed,
             Offline,
             Trashed,
-            FileGone
+            FileGone,
+            Locked,
+            Unloaded
         };
         Orphan                                     orphan          = Orphan::None;
         bool                                       noticeDismissed = false;
+        // A kept text with nothing loaded under it -- its item out of reach
+        // as it was opened -- whose script is known only as the entry said:
+        // loaded under it once the item is in reach, before it is saved.
+        // How many loads have failed on the way since the last that went
+        // through, and when the next may be tried: further apart each time,
+        // and a few times only unless a person asks.
+        bool                                       detached        = false;
+        S32                                        reattachTries   = 0;
+        F64                                        nextReattach    = 0.0;
         // Since when its object has been out of sight, or zero: an object
         // at the edge of what is in view comes and goes, and is taken for
         // gone only once it has been gone a moment.
@@ -634,6 +653,9 @@ private:
     // a place in it where one is given; read as the language its
     // extension says, or the one it was included from.
     void                          openFile(const std::string& path, bool lua, S32 line = -1, S32 column = -1, S32 length = 0);
+    // Opened in this window whatever another has open: where a tab is
+    // being moved here from it.
+    void                          openFileHere(const std::string& path, bool lua, S32 line = -1, S32 column = -1, S32 length = 0);
     // A file's text written back where it came from; the scripts that
     // include it are expanded again.
     void                          saveFile(Doc& doc);
@@ -1042,16 +1064,31 @@ private:
     // A tab's text as an entry of the store.
     ALScriptRecoveryEntry recoveryEntryOf(const Doc& doc) const;
     // The tab's unsaved text written now, in the state given; a clean tab's
-    // entry forgotten, and an entry it took up let go of.
-    void keepForRecovery(Doc& doc, ALScriptRecoveryEntry::State state = ALScriptRecoveryEntry::State::Unsaved);
+    // entry forgotten, and an entry it took up let go of. False where what
+    // is unsaved could not be written.
+    bool keepForRecovery(Doc& doc, ALScriptRecoveryEntry::State state = ALScriptRecoveryEntry::State::Unsaved);
+    // What the tab holds unsaved put straight among the discarded, and
+    // this session's entry for it gone once it is. False where it could
+    // not be written, and nothing changed.
+    bool setAside(Doc& doc);
     // Written a moment after the first change since the last writing,
     // whatever is typed meanwhile; a tab gone clean forgotten at once.
     void scheduleRecovery(Doc& doc);
     // Due writings, a lost connection, and what holds each tab, looked at
-    // as the window draws.
+    // a few times a second, whether the window is shown or not.
     void pumpRecovery();
     void checkOrphans();
     Doc::Orphan orphanOf(const Doc& doc) const;
+    // What a tab holding a kept text is where its script could not be
+    // loaded, by why: one that may not be changed, one that could not be
+    // loaded, or one whose item or object is gone or out of sight.
+    Doc::Orphan failedAs(const Doc& doc, ALScriptWorkspace::Loaded::Failure failure) const;
+    // A detached tab's item loaded under it now that it is in reach, what
+    // it holds carried over with its history; or loaded again after a load
+    // that failed, where a person asks or the next try is due.
+    void reattach(Doc& doc);
+    // The window, of all of them, that has a script or a file open.
+    static ALFloaterScriptStudio* holderOf(const ALScriptRef& ref, const std::string& file);
     // An entry put back: into the tab that has its script or file, opened
     // where it is not, or into a tab of its own where what it came from
     // is gone.

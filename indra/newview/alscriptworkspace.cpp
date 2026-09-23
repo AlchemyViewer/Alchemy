@@ -282,7 +282,8 @@ void ALScriptWorkspace::load(const ALScriptRef& ref, load_callback_t callback)
         LLViewerInventoryItem* item = gInventory.getItem(ref.item);
         if (!item)
         {
-            answer.error = LLTrans::getString("WorkspaceNoSuchItem");
+            answer.error   = LLTrans::getString("WorkspaceNoSuchItem");
+            answer.failure = Loaded::Failure::Missing;
             callback(answer);
             return;
         }
@@ -296,7 +297,8 @@ void ALScriptWorkspace::load(const ALScriptRef& ref, load_callback_t callback)
         answer.assetId       = item->getAssetUUID();
         if (!answer.viewable)
         {
-            answer.error = LLTrans::getString("WorkspaceNotPermitted");
+            answer.error   = LLTrans::getString("WorkspaceNotPermitted");
+            answer.failure = Loaded::Failure::NotPermitted;
             callback(answer);
             return;
         }
@@ -311,7 +313,8 @@ void ALScriptWorkspace::load(const ALScriptRef& ref, load_callback_t callback)
     LLInventoryItem* item   = object ? object->getInventoryItem(ref.item) : nullptr;
     if (!object || !item || !object->getRegion())
     {
-        answer.error = LLTrans::getString(object ? "WorkspaceNoSuchItemInObject" : "WorkspaceNoSuchObject");
+        answer.error   = LLTrans::getString(object ? "WorkspaceNoSuchItemInObject" : "WorkspaceNoSuchObject");
+        answer.failure = Loaded::Failure::Missing;
         callback(answer);
         return;
     }
@@ -322,7 +325,8 @@ void ALScriptWorkspace::load(const ALScriptRef& ref, load_callback_t callback)
     answer.assetId      = item->getAssetUUID();
     if (!answer.viewable)
     {
-        answer.error = LLTrans::getString("WorkspaceNotPermitted");
+        answer.error   = LLTrans::getString("WorkspaceNotPermitted");
+        answer.failure = Loaded::Failure::NotPermitted;
         callback(answer);
         return;
     }
@@ -339,11 +343,18 @@ void ALScriptWorkspace::onAssetLoaded(const LLUUID& asset_id, LLAssetType::EType
     Loaded&                      answer = request->answer;
     if (status != 0)
     {
-        answer.error = LLAssetStorage::getErrorString(status);
+        // Refused, or not there to be had, the same next time; anything
+        // else -- a timeout, a lost capability -- may go through again.
+        answer.error   = LLAssetStorage::getErrorString(status);
+        answer.failure = status == LL_ERR_INSUFFICIENT_PERMISSIONS ? Loaded::Failure::NotPermitted
+                         : status == LL_ERR_ASSET_REQUEST_NOT_IN_DATABASE || status == LL_ERR_ASSET_REQUEST_NONEXISTENT_FILE
+                             ? Loaded::Failure::Unreadable
+                             : Loaded::Failure::Fetch;
     }
     else if (!readAsset(asset_id, type, answer.text))
     {
-        answer.error = LLTrans::getString("WorkspaceAssetUnreadable");
+        answer.error   = LLTrans::getString("WorkspaceAssetUnreadable");
+        answer.failure = Loaded::Failure::Unreadable;
     }
     else if (type == LLAssetType::AT_NOTECARD)
     {
@@ -362,7 +373,8 @@ void ALScriptWorkspace::onAssetLoaded(const LLUUID& asset_id, LLAssetType::EType
             }
             else
             {
-                answer.error = LLTrans::getString("WorkspaceNotecardUnreadable");
+                answer.error   = LLTrans::getString("WorkspaceNotecardUnreadable");
+                answer.failure = Loaded::Failure::Unreadable;
             }
         }
     }

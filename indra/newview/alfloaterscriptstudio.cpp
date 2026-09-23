@@ -49,6 +49,7 @@
 #include "llsyntaxid.h"
 #include "llversioninfo.h"
 #include "llbutton.h"
+#include "llcallbacklist.h"
 #include "llcheckboxctrl.h"
 #include "alsaid.h"
 #include "llclipboard.h"
@@ -327,26 +328,19 @@ ALFloaterScriptStudio* ALFloaterScriptStudio::open(const ALScriptRef& ref, const
     // Open somewhere already: that window, brought forward -- if a
     // window may be shown at all, which a restriction on viewing
     // scripts decides the same way for every window.
-    if (!ref.isNull())
+    if (ALFloaterScriptStudio* window = ref.isNull() ? nullptr : holderOf(ref, std::string()))
     {
-        for (LLFloater* floater : LLFloaterReg::getFloaterList("script_studio"))
+        if (!LLFloaterReg::canShowInstance("script_studio", window->getKey()))
         {
-            ALFloaterScriptStudio* window = ALViewType::as<ALFloaterScriptStudio>(floater);
-            if (window && window->indexOf(ref) != NONE)
-            {
-                if (!LLFloaterReg::canShowInstance("script_studio", window->getKey()))
-                {
-                    return nullptr;
-                }
-                window->openFloater(window->getKey());
-                if (take_focus)
-                {
-                    window->setFocus(true);
-                }
-                window->openScript(ref, name);
-                return window;
-            }
+            return nullptr;
         }
+        window->openFloater(window->getKey());
+        if (take_focus)
+        {
+            window->setFocus(true);
+        }
+        window->openScript(ref, name);
+        return window;
     }
     ALFloaterScriptStudio* studio = LLFloaterReg::showTypedInstance<ALFloaterScriptStudio>("script_studio", LLSD(), take_focus ? TAKE_FOCUS_YES : TAKE_FOCUS_NO);
     if (studio && !ref.isNull())
@@ -917,6 +911,24 @@ bool ALFloaterScriptStudio::postBuild()
     }
 
     loadState();
+    // Unsaved text kept against a crash, a lost connection noticed, and what
+    // holds each tab looked at, whether the window is shown or not: a
+    // window closed or hidden a moment after typing still writes what was
+    // typed.
+    {
+        const LLHandle<LLFloater> handle = getHandle();
+        doPeriodically(
+            [handle]() {
+                ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get());
+                if (!studio)
+                {
+                    return true;
+                }
+                studio->pumpRecovery();
+                return false;
+            },
+            0.25f);
+    }
     // With the pins read, the objects in hand.
     refreshExplorer();
     refreshToolbar();
@@ -1015,17 +1027,23 @@ void ALFloaterScriptStudio::closeFloater(bool app_quitting)
     // offer back.
     if (app_quitting && gDisconnected && unsaved > 0)
     {
-        mTabsAtQuit = openTabs();
+        bool kept = true;
         for (std::unique_ptr<Doc>& doc : mDocs)
         {
-            keepForRecovery(*doc);
+            kept = keepForRecovery(*doc) && kept;
         }
-        while (!mDocs.empty())
+        if (kept)
         {
-            letGoOf(mDocs.size() - 1, true);
+            mTabsAtQuit = openTabs();
+            while (!mDocs.empty())
+            {
+                letGoOf(mDocs.size() - 1, true);
+            }
+            ALStudioFloater::closeFloater(app_quitting);
+            return;
         }
-        ALStudioFloater::closeFloater(app_quitting);
-        return;
+        // Not all of it could be written: asked, as it is when connected,
+        // rather than let go of unasked.
     }
     // The viewer quitting, this window shown or hidden: what it holds
     // unsaved is asked about, in sight, the quit waiting on the answer --
@@ -1042,8 +1060,14 @@ void ALFloaterScriptStudio::closeFloater(bool app_quitting)
         LLSD args;
         args["COUNT"] = unsaved;
         args["NAME"]  = one;
+        const LLHandle<LLFloater> handle = getHandle();
         LLNotificationsUtil::add(unsaved > 1 ? "ScriptStudioQuitUnsavedMany" : "ScriptStudioQuitUnsaved", args, LLSD(),
-                                 [this](const LLSD& notification, const LLSD& response) { quitAnswered(LLNotificationsUtil::getSelectedOption(notification, response)); });
+                                 [handle](const LLSD& notification, const LLSD& response) {
+                                     if (ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get()))
+                                     {
+                                         studio->quitAnswered(LLNotificationsUtil::getSelectedOption(notification, response));
+                                     }
+                                 });
         return;
     }
     // A popped-out window closed: what is unsaved in it asked about, one
@@ -1055,9 +1079,13 @@ void ALFloaterScriptStudio::closeFloater(bool app_quitting)
         {
             LLSD args;
             args["COUNT"] = unsaved;
+            const LLHandle<LLFloater> handle = getHandle();
             LLNotificationsUtil::add("ScriptStudioSaveChangesMany", args, LLSD(),
-                                     [this](const LLSD& notification, const LLSD& response) {
-                                         closeWindowAnswered(LLNotificationsUtil::getSelectedOption(notification, response));
+                                     [handle](const LLSD& notification, const LLSD& response) {
+                                         if (ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get()))
+                                         {
+                                             studio->closeWindowAnswered(LLNotificationsUtil::getSelectedOption(notification, response));
+                                         }
                                      });
         }
         else
@@ -1107,7 +1135,6 @@ void ALFloaterScriptStudio::draw()
     pumpVim();
     pumpSearch();
     pumpSettle();
-    pumpRecovery();
     refreshUndoLabels();
     if (mPlacesStale)
     {
@@ -1438,6 +1465,19 @@ void ALFloaterScriptStudio::applyEditorOptions()
 void ALFloaterScriptStudio::openScript(const ALScriptRef& ref, const std::string& name, std::optional<std::string> carried, S32 line)
 {
     const size_t already = indexOf(ref);
+    if (already == NONE && !carried)
+    {
+        // Open in another window: that one, brought forward, since two tabs
+        // of one script would each save over the other, and keep one file
+        // against a crash between them.
+        if (ALFloaterScriptStudio* holder = holderOf(ref, std::string()); holder && holder != this)
+        {
+            holder->openFloater(holder->getKey());
+            holder->setFocus(true);
+            holder->openScript(ref, name, std::nullopt, line);
+            return;
+        }
+    }
     if (already != NONE)
     {
         // Asked for outright, a preview is held.
@@ -1549,10 +1589,17 @@ bool ALFloaterScriptStudio::restoreHistory(Doc& doc, const ALScriptRecoveryEntry
         doc.editor->setText(was);
         return false;
     }
-    const std::optional<std::string> saved = doc.editor->undoJournal().savedText();
-    if (!standing || !saved || *saved != *standing)
+    const std::optional<std::string> saved   = doc.editor->undoJournal().savedText();
+    const bool                       trusted = standing && saved && *saved == *standing;
+    if (!trusted)
     {
         doc.editor->markUnsaved();
+    }
+    // The gutter's bars on the lines that differ from what the item holds,
+    // where that is known; every line, where it is not.
+    if (standing)
+    {
+        doc.editor->barChangesSince(*standing);
     }
     if (entry.caretLine >= 0)
     {
@@ -1575,6 +1622,15 @@ void ALFloaterScriptStudio::takeCarriedText(Doc& doc)
     {
         return;
     }
+    // A kept text changed from an older version than the one loaded: the
+    // script was saved since -- in another viewer, by someone else -- and
+    // saving this replaces what was saved then.
+    if (doc.recovering && doc.recovering->baseAsset.notNull() && doc.assetId.notNull() && doc.recovering->baseAsset != doc.assetId)
+    {
+        LLStringUtil::format_map_t args;
+        args["[NAME]"] = doc.name;
+        report(getString("RecoveryStale", args), true, &doc);
+    }
     // Kept text with its history: put back as it was, steps and all.
     if (doc.recovering && *doc.carriedText == doc.recovering->text && restoreHistory(doc, *doc.recovering))
     {
@@ -1586,6 +1642,12 @@ void ALFloaterScriptStudio::takeCarriedText(Doc& doc)
         doc.editor->setReadOnly(false);
         doc.editor->setSelection(ALTextRange(doc.editor->document().start(), doc.editor->document().end()));
         doc.editor->insertText(*doc.carriedText);
+        // Barred where it differs from the saved text, not over the whole
+        // of it, as the one edit that put it in would have it.
+        if (const std::optional<std::string> saved = doc.editor->undoJournal().savedText())
+        {
+            doc.editor->barChangesSince(*saved);
+        }
     }
     doc.carriedText.reset();
 }
@@ -2036,16 +2098,37 @@ void ALFloaterScriptStudio::loaded(const ALScriptWorkspace::Loaded& answer)
     doc.language   = answer.language;
     doc.modifiable = answer.modifiable;
     doc.notecard   = answer.notecard;
-    if (!answer.error.empty() && doc.recovering)
+    if (doc.recovering && (!answer.error.empty() || !answer.modifiable))
     {
         // Opened to take up a kept text, and what it came from cannot be
-        // had: the tab holds the text on its own, unsaved, and says why.
-        LLViewerObject* object = doc.ref.inInventory() ? nullptr : gObjectList.findObject(doc.ref.object);
+        // had, or may no longer be changed: the tab holds the text on its
+        // own, unsaved, and says why -- and is loaded again later, further
+        // apart each time, where that may go differently.
+        using Failure                     = ALScriptWorkspace::Loaded::Failure;
         const ALScriptRecoveryEntry entry = *doc.recovering;
         doc.carriedText.reset();
         doc.carriedEmbedded.reset();
-        becomeOrphan(doc, entry, doc.ref.inInventory() || object ? Doc::Orphan::Removed : Doc::Orphan::Away);
+        doc.loadFailure  = answer.error.empty() ? Failure::NotPermitted : answer.failure;
+        doc.loadError    = answer.error;
+        doc.nextReattach = LLTimer::getTotalSeconds() + ALScriptRecoveryRetry::delayAfter(++doc.reattachTries);
+        becomeOrphan(doc, entry, failedAs(doc, doc.loadFailure));
+        if (doc.loadFailure == Failure::NotPermitted)
+        {
+            LLStringUtil::format_map_t args;
+            args["[NAME]"] = doc.name;
+            report(getString("OrphanLockedKept", args), true, &doc, { "copy", "export" });
+        }
+        else
+        {
+            report(answer.error, true, &doc, { "copy", "export" });
+        }
         return;
+    }
+    doc.loadFailure = answer.failure;
+    doc.loadError   = answer.error;
+    if (answer.error.empty())
+    {
+        doc.reattachTries = 0;
     }
     if (!answer.error.empty())
     {
@@ -2220,6 +2303,8 @@ void ALFloaterScriptStudio::loaded(const ALScriptWorkspace::Loaded& answer)
     if (index == mActive)
     {
         refreshToolbar();
+        // What a kept text offered here says of it may turn on what loaded.
+        refreshNotice();
     }
 }
 
@@ -2513,6 +2598,22 @@ std::string ALFloaterScriptStudio::includeName(const Doc& doc, const std::string
 }
 
 void ALFloaterScriptStudio::openFile(const std::string& path, bool lua, S32 line, S32 column, S32 length)
+{
+    // Open in another window: that one, as a script is.
+    if (indexOf("disk:" + path) == NONE)
+    {
+        if (ALFloaterScriptStudio* holder = holderOf(ALScriptRef(), path); holder && holder != this)
+        {
+            holder->openFloater(holder->getKey());
+            holder->setFocus(true);
+            holder->openFileHere(path, lua, line, column, length);
+            return;
+        }
+    }
+    openFileHere(path, lua, line, column, length);
+}
+
+void ALFloaterScriptStudio::openFileHere(const std::string& path, bool lua, S32 line, S32 column, S32 length)
 {
     const std::string id      = "disk:" + path;
     size_t            already = indexOf(id);
@@ -4065,13 +4166,16 @@ void ALFloaterScriptStudio::save(Doc& doc)
     // Where it cannot go -- its object out of sight, the item gone, the
     // connection lost -- said, with the notice back in sight to offer a
     // copy or a file; nothing is tried that would only fail.
-    if (doc.orphan == Doc::Orphan::Away || doc.orphan == Doc::Orphan::Removed || doc.orphan == Doc::Orphan::Offline)
+    if (doc.orphan == Doc::Orphan::Away || doc.orphan == Doc::Orphan::Removed || doc.orphan == Doc::Orphan::Offline ||
+        doc.orphan == Doc::Orphan::Locked || doc.orphan == Doc::Orphan::Unloaded)
     {
         LLStringUtil::format_map_t args;
         args["[NAME]"] = doc.name;
-        setStatus(getString(doc.orphan == Doc::Orphan::Away      ? "SaveBlockedAway"
-                            : doc.orphan == Doc::Orphan::Removed ? "SaveBlockedRemoved"
-                                                                 : "SaveBlockedOffline",
+        setStatus(getString(doc.orphan == Doc::Orphan::Away       ? "SaveBlockedAway"
+                            : doc.orphan == Doc::Orphan::Removed  ? "SaveBlockedRemoved"
+                            : doc.orphan == Doc::Orphan::Locked   ? "SaveBlockedLocked"
+                            : doc.orphan == Doc::Orphan::Unloaded ? "SaveBlockedUnloaded"
+                                                                  : "SaveBlockedOffline",
                             args),
                   true);
         doc.noticeDismissed = false;
@@ -4080,6 +4184,19 @@ void ALFloaterScriptStudio::save(Doc& doc)
         {
             refreshNotice();
         }
+        return;
+    }
+    if (doc.detached)
+    {
+        // Its item in reach, and not loaded under it yet -- a try that
+        // failed waits its turn: loaded now, what it holds carried over,
+        // so that it is saved as what the item is once asked again.
+        LLStringUtil::format_map_t args;
+        args["[NAME]"] = doc.name;
+        setStatus(getString("SaveWaitsForLoad", args), true);
+        doc.reattachTries = 0;
+        reattach(doc);
+        saveStopped(doc);
         return;
     }
     // Saved, a preview is held.
@@ -4198,17 +4315,27 @@ void ALFloaterScriptStudio::compiled(const ALScriptWorkspace::CompileResult& res
     // tab it copied is safe in the inventory, and closes, once everything
     // below is done with the tabs as they stand.
     std::string copy_of;
+    U32         copied_at = 0;
     if (const size_t index = indexOf(result.ref); index != NONE && result.error.empty())
     {
         copy_of.swap(mDocs[index]->copyOf);
+        copied_at = mDocs[index]->copyOfVersion;
     }
     compiledHere(result);
     if (const size_t original = copy_of.empty() ? NONE : indexOf(copy_of); original != NONE)
     {
+        Doc&                       from = *mDocs[original];
         LLStringUtil::format_map_t copied;
-        copied["[NAME]"] = mDocs[original]->name;
+        copied["[NAME]"] = from.name;
+        if (from.editor->document().version() != copied_at)
+        {
+            // Typed in since the copy was made: what was typed is not in the
+            // copy, and the tab stays with it.
+            report(getString("CopiedToKeptOpen", copied), false, &from);
+            return;
+        }
         report(getString("CopiedTo", copied));
-        mDocs[original]->editor->resetDirty();
+        from.editor->resetDirty();
         letGoOf(original);
     }
 }
@@ -9031,13 +9158,22 @@ void ALFloaterScriptStudio::quitAnswered(S32 option)
             break;
         case 1:
         {
-            // Kept, to be opened again with the studio next time.
+            // Kept, to be opened again with the studio next time; the quit
+            // called off where any of it could not be written, since it
+            // would go with the viewer.
+            bool kept = true;
             for (std::unique_ptr<Doc>& doc : mDocs)
             {
                 if (doc->loaded && doc->modifiable && doc->editor->isDirty())
                 {
-                    keepForRecovery(*doc, ALScriptRecoveryEntry::State::Kept);
+                    kept = keepForRecovery(*doc, ALScriptRecoveryEntry::State::Kept) && kept;
                 }
+            }
+            if (!kept)
+            {
+                report(getString("KeepFailed"), true);
+                stopClosing();
+                break;
             }
             while (!mDocs.empty())
             {
@@ -9164,7 +9300,7 @@ void ALFloaterScriptStudio::popOut()
     {
         // A file on disk has no item to be fetched by: it is read there
         // from where it is, and what was typed here goes over it, unsaved.
-        window->openFile(doc->file, doc->language.lua);
+        window->openFileHere(doc->file, doc->language.lua);
         const size_t moved = window->indexOf("disk:" + doc->file);
         if (moved == NONE)
         {
@@ -9286,15 +9422,21 @@ ALScriptRecoveryEntry ALFloaterScriptStudio::recoveryEntryOf(const Doc& doc) con
     return entry;
 }
 
-void ALFloaterScriptStudio::keepForRecovery(Doc& doc, ALScriptRecoveryEntry::State state)
+bool ALFloaterScriptStudio::keepForRecovery(Doc& doc, ALScriptRecoveryEntry::State state)
 {
     doc.recoveryDue              = 0.0;
     ALScriptRecoveryStore* store = recoveryStore();
+    if (!store)
+    {
+        // Nowhere to keep it, which matters only where there is something
+        // unsaved to keep.
+        return !(doc.loaded && doc.modifiable && doc.editor->isDirty());
+    }
     // Nothing to keep of a tab still loading, one that may not be changed,
     // or one whose kept text has not been put in yet.
-    if (!store || doc.recoveryKey.empty() || !doc.loaded || !doc.modifiable || doc.carriedText)
+    if (doc.recoveryKey.empty() || !doc.loaded || !doc.modifiable || doc.carriedText)
     {
-        return;
+        return true;
     }
     if (!doc.editor->isDirty())
     {
@@ -9316,7 +9458,7 @@ void ALFloaterScriptStudio::keepForRecovery(Doc& doc, ALScriptRecoveryEntry::Sta
                 args["[NAME]"] = doc.name;
                 report(getString("RecoveryWriteFailed", args), true, &doc);
             }
-            return;
+            return false;
         }
         doc.recoveryFailed = false;
     }
@@ -9326,6 +9468,18 @@ void ALFloaterScriptStudio::keepForRecovery(Doc& doc, ALScriptRecoveryEntry::Sta
         store->remove(*doc.recovering);
         doc.recovering.reset();
     }
+    return true;
+}
+
+bool ALFloaterScriptStudio::setAside(Doc& doc)
+{
+    ALScriptRecoveryStore* store = recoveryStore();
+    if (!store || doc.recoveryKey.empty() || !store->setAside(recoveryEntryOf(doc)))
+    {
+        return false;
+    }
+    store->forget(doc.recoveryKey);
+    return true;
 }
 
 void ALFloaterScriptStudio::scheduleRecovery(Doc& doc)
@@ -9402,6 +9556,13 @@ ALFloaterScriptStudio::Doc::Orphan ALFloaterScriptStudio::orphanOf(const Doc& do
     {
         return Doc::Orphan::Offline;
     }
+    // A kept text over a script that may no longer be changed, or that
+    // could not be loaded, stays that while there is an item: nothing here
+    // says it has changed, and loading it again is tried on its own terms.
+    const auto held = [&doc](Doc::Orphan seen) {
+        const bool stays = doc.orphan == Doc::Orphan::Locked || doc.orphan == Doc::Orphan::Unloaded;
+        return stays && (seen == Doc::Orphan::None || seen == Doc::Orphan::Trashed) ? doc.orphan : seen;
+    };
     if (doc.ref.inInventory())
     {
         if (!gInventory.getItem(doc.ref.item))
@@ -9409,7 +9570,7 @@ ALFloaterScriptStudio::Doc::Orphan ALFloaterScriptStudio::orphanOf(const Doc& do
             return Doc::Orphan::Removed;
         }
         const LLUUID trash = gInventory.findCategoryUUIDForType(LLFolderType::FT_TRASH);
-        return trash.notNull() && gInventory.isObjectDescendentOf(doc.ref.item, trash) ? Doc::Orphan::Trashed : Doc::Orphan::None;
+        return held(trash.notNull() && gInventory.isObjectDescendentOf(doc.ref.item, trash) ? Doc::Orphan::Trashed : Doc::Orphan::None);
     }
     LLViewerObject* object = gObjectList.findObject(doc.ref.object);
     if (!object || object->isDead())
@@ -9428,13 +9589,77 @@ ALFloaterScriptStudio::Doc::Orphan ALFloaterScriptStudio::orphanOf(const Doc& do
             }
             if (!prim.fetched)
             {
-                return doc.orphan == Doc::Orphan::Removed ? Doc::Orphan::Removed : Doc::Orphan::None;
+                return held(doc.orphan == Doc::Orphan::Removed ? Doc::Orphan::Removed : Doc::Orphan::None);
             }
             const bool there = std::any_of(prim.items.begin(), prim.items.end(), [&doc](const ALScriptWorkspace::Item& item) { return item.id == doc.ref.item; });
-            return there ? Doc::Orphan::None : Doc::Orphan::Removed;
+            return held(there ? Doc::Orphan::None : Doc::Orphan::Removed);
         }
     }
-    return doc.orphan == Doc::Orphan::Removed ? Doc::Orphan::Removed : Doc::Orphan::None;
+    return held(doc.orphan == Doc::Orphan::Removed ? Doc::Orphan::Removed : Doc::Orphan::None);
+}
+
+ALFloaterScriptStudio::Doc::Orphan ALFloaterScriptStudio::failedAs(const Doc& doc, ALScriptWorkspace::Loaded::Failure failure) const
+{
+    using Failure = ALScriptWorkspace::Loaded::Failure;
+    switch (failure)
+    {
+        case Failure::NotPermitted:
+            return Doc::Orphan::Locked;
+        case Failure::Unreadable:
+        case Failure::Fetch:
+            return Doc::Orphan::Unloaded;
+        default:
+            break;
+    }
+    // Gone: from the inventory or its object, or its object out of sight.
+    if (doc.ref.inInventory())
+    {
+        return Doc::Orphan::Removed;
+    }
+    LLViewerObject* object = gObjectList.findObject(doc.ref.object);
+    return object && !object->isDead() ? Doc::Orphan::Removed : Doc::Orphan::Away;
+}
+
+void ALFloaterScriptStudio::reattach(Doc& doc)
+{
+    // What the tab holds carried over what the item has, with its history,
+    // as a kept text is taken up: the item loaded under it at last, so that
+    // what it is saved as is what the item is -- its language and target,
+    // whether it runs, whether it may be changed, the items a notecard's
+    // asset carries. Written first, so that nothing typed is only in the
+    // tab while it loads.
+    keepForRecovery(doc);
+    ALScriptRecoveryEntry holding = recoveryEntryOf(doc);
+    doc.detached                  = false;
+    doc.recovering                = holding;
+    doc.carriedText               = holding.text;
+    if (doc.notecard)
+    {
+        doc.carriedEmbedded = doc.embedded;
+    }
+    doc.loaded = false;
+    doc.editor->setReadOnly(true);
+    const LLHandle<LLFloater> handle = getHandle();
+    ALScriptWorkspace::instance().load(doc.ref, [handle](const ALScriptWorkspace::Loaded& answer) {
+        if (ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get()))
+        {
+            studio->loaded(answer);
+        }
+    });
+}
+
+// static
+ALFloaterScriptStudio* ALFloaterScriptStudio::holderOf(const ALScriptRef& ref, const std::string& file)
+{
+    for (LLFloater* floater : LLFloaterReg::getFloaterList("script_studio"))
+    {
+        ALFloaterScriptStudio* window = ALViewType::as<ALFloaterScriptStudio>(floater);
+        if (window && (file.empty() ? window->indexOf(ref) : window->indexOf("disk:" + file)) != NONE)
+        {
+            return window;
+        }
+    }
+    return nullptr;
 }
 
 void ALFloaterScriptStudio::checkOrphans()
@@ -9493,9 +9718,36 @@ void ALFloaterScriptStudio::checkOrphans()
             report(getString(doc.orphan == Doc::Orphan::Away ? "OrphanAwayKept" : "OrphanRemovedKept", args), true, &doc,
                    doc.file.empty() ? std::vector<std::string>{ "copy", "export" } : std::vector<std::string>{ "export" });
         }
-        else if ((was == Doc::Orphan::Away || was == Doc::Orphan::Removed || was == Doc::Orphan::Offline) && doc.orphan == Doc::Orphan::None)
+        else if ((was == Doc::Orphan::Away || was == Doc::Orphan::Removed || was == Doc::Orphan::Offline) && doc.orphan == Doc::Orphan::None &&
+                 !doc.detached)
         {
+            // A detached tab is loaded now, and what the load says is said.
             report(getString("OrphanBack", args), false, &doc);
+        }
+    }
+    // Detached tabs whose item is in reach loaded under what they hold, and
+    // a fetch that failed on the way tried again -- each only once its next
+    // try is due, so that a load that fails however often it is tried is
+    // tried a few times, further apart each time, and then waits for a
+    // person to ask. Loaded once the walk is done, since an answer can come
+    // at once.
+    const F64                now = LLTimer::getTotalSeconds();
+    std::vector<std::string> reattaching;
+    for (const std::unique_ptr<Doc>& each : mDocs)
+    {
+        const Doc& doc   = *each;
+        const bool ready = doc.orphan == Doc::Orphan::None ||
+                           (doc.orphan == Doc::Orphan::Unloaded && doc.loadFailure == ALScriptWorkspace::Loaded::Failure::Fetch);
+        if (doc.detached && doc.loaded && ready && ALScriptRecoveryRetry::mayTry(doc.reattachTries) && now >= doc.nextReattach)
+        {
+            reattaching.push_back(doc.id);
+        }
+    }
+    for (const std::string& id : reattaching)
+    {
+        if (const size_t index = indexOf(id); index != NONE)
+        {
+            reattach(*mDocs[index]);
         }
     }
     if (changed)
@@ -9519,11 +9771,13 @@ void ALFloaterScriptStudio::refreshNotice()
     std::pair<std::string, std::string> buttons[2];
     if (doc && doc->recoverable)
     {
+        // Said so where the script was saved since the text was kept.
         LLStringUtil::format_map_t args;
-        args["[WHEN]"] = timeOf(doc->recoverable->when);
-        text           = getString("NoticeRecoverable", args);
-        buttons[0]     = { "restore", "NoticeRestore" };
-        buttons[1]     = { "discard_left", "NoticeDiscard" };
+        args["[WHEN]"]   = timeOf(doc->recoverable->when);
+        const bool stale = doc->recoverable->baseAsset.notNull() && doc->assetId.notNull() && doc->recoverable->baseAsset != doc->assetId;
+        text             = getString(stale ? "NoticeRecoverableStale" : "NoticeRecoverable", args);
+        buttons[0]       = { "restore", "NoticeRestore" };
+        buttons[1]       = { "discard_left", "NoticeDiscard" };
     }
     else if (doc && !doc->noticeDismissed)
     {
@@ -9548,6 +9802,20 @@ void ALFloaterScriptStudio::refreshNotice()
             case Doc::Orphan::Trashed:
                 text = getString("NoticeTrashed");
                 break;
+            case Doc::Orphan::Locked:
+                text       = getString("NoticeLocked");
+                buttons[0] = { "copy", "NoticeCopy" };
+                buttons[1] = { "export", "NoticeExport" };
+                break;
+            case Doc::Orphan::Unloaded:
+            {
+                LLStringUtil::format_map_t why;
+                why["[ERROR]"] = doc->loadError;
+                text           = getString("NoticeUnloaded", why);
+                buttons[0]     = { "retry_load", "NoticeTryAgain" };
+                buttons[1]     = { "copy", "NoticeCopy" };
+                break;
+            }
             case Doc::Orphan::FileGone:
                 text       = getString("NoticeFileGone", args);
                 buttons[0] = { "save", "NoticeSaveAgain" };
@@ -9612,7 +9880,11 @@ void ALFloaterScriptStudio::onNoticeAction(const std::string& action)
         const ALScriptRecoveryEntry entry = *doc->recoverable;
         doc->recoverable.reset();
         takeUpEntry(*doc, entry);
-        report(getString("RecoveryRestored", args), false, doc);
+        // A tab left holding it on its own has said why instead.
+        if (doc->orphan == Doc::Orphan::None)
+        {
+            report(getString("RecoveryRestored", args), false, doc);
+        }
     }
     else if (action == "discard_left" && doc->recoverable)
     {
@@ -9622,6 +9894,12 @@ void ALFloaterScriptStudio::onNoticeAction(const std::string& action)
         }
         doc->recoverable.reset();
         report(getString("RecoveryDiscarded", args), false, doc);
+    }
+    else if (action == "retry_load" && doc->detached && doc->loaded)
+    {
+        // Asked for: tried now, and a few more times after if it fails.
+        doc->reattachTries = 0;
+        reattach(*doc);
     }
     else if (action == "copy")
     {
@@ -9647,6 +9925,29 @@ void ALFloaterScriptStudio::takeUpEntry(Doc& doc, const ALScriptRecoveryEntry& e
     {
         doc.recoverable.reset();
     }
+    using Failure = ALScriptWorkspace::Loaded::Failure;
+    if (doc.loadFailure != Failure::None || (doc.loaded && !doc.modifiable))
+    {
+        // Nothing it could be saved over: the script could not be loaded,
+        // or may no longer be changed. The tab holds the text on its own,
+        // to copy or export, rather than waiting on a load that is not
+        // coming or holding it where nothing can be done with it.
+        if (doc.loadFailure == Failure::None)
+        {
+            doc.loadFailure = Failure::NotPermitted;
+        }
+        const bool locked = doc.loadFailure == Failure::NotPermitted;
+        doc.carriedText.reset();
+        doc.carriedEmbedded.reset();
+        becomeOrphan(doc, entry, failedAs(doc, doc.loadFailure));
+        if (locked)
+        {
+            LLStringUtil::format_map_t args;
+            args["[NAME]"] = doc.name;
+            report(getString("OrphanLockedKept", args), true, &doc, { "copy", "export" });
+        }
+        return;
+    }
     doc.recovering  = entry;
     doc.carriedText = entry.text;
     if (entry.notecard && doc.file.empty())
@@ -9663,8 +9964,9 @@ void ALFloaterScriptStudio::takeUpEntry(Doc& doc, const ALScriptRecoveryEntry& e
         doc.embedded = std::move(*doc.carriedEmbedded);
     }
     doc.carriedEmbedded.reset();
-    doc.editor->setReadOnly(!doc.modifiable);
     takeCarriedText(doc);
+    // After, since putting the text in opens the editor to take it.
+    doc.editor->setReadOnly(!doc.modifiable);
     if (doc.notecard && doc.file.empty())
     {
         placeEmbeddedItems(doc);
@@ -9680,6 +9982,7 @@ void ALFloaterScriptStudio::becomeOrphan(Doc& doc, const ALScriptRecoveryEntry& 
     // a notecard's items.
     doc.loaded                 = true;
     doc.modifiable             = true;
+    doc.detached               = doc.file.empty();
     doc.notecard               = entry.notecard;
     doc.language.lua           = entry.lua;
     doc.language.compileTarget = !entry.compileTarget.empty() ? entry.compileTarget : entry.lua ? "luau" : "mono";
@@ -9690,7 +9993,14 @@ void ALFloaterScriptStudio::becomeOrphan(Doc& doc, const ALScriptRecoveryEntry& 
     doc.noticeDismissed        = false;
     if (entry.wrapped && !entry.notecard)
     {
-        doc.envelope = ALScriptEnvelope();
+        if (!doc.envelope)
+        {
+            doc.envelope = ALScriptEnvelope();
+        }
+    }
+    else
+    {
+        doc.envelope.reset();
     }
     doc.editor->setPlaceholder(LLStringUtil::null);
     doc.editor->setSyntax(entry.notecard ? (doc.file.empty() ? std::string("text") : textSyntaxOf(doc.file)) : entry.lua ? "slua" : "lsl");
@@ -9751,6 +10061,15 @@ void ALFloaterScriptStudio::openOrphan(const ALScriptRecoveryEntry& entry, Doc::
 
 void ALFloaterScriptStudio::recoverEntry(const ALScriptRecoveryEntry& entry)
 {
+    // Open in another window: put in there, since two tabs of one script
+    // would each save over the other.
+    if (ALFloaterScriptStudio* holder = holderOf(ALScriptRef(entry.object, entry.item), entry.file); holder && holder != this)
+    {
+        holder->openFloater(holder->getKey());
+        holder->setFocus(true);
+        holder->recoverEntry(entry);
+        return;
+    }
     // A file: opened where it is and the kept text put over it; where it is
     // gone, a tab of its own that writes it again when saved.
     if (!entry.file.empty())
@@ -9973,12 +10292,13 @@ void ALFloaterScriptStudio::saveCopyToInventory(Doc& doc)
         text = doc.editor->text();
     }
     const std::string         id      = doc.id;
+    const U32                 version = doc.editor->document().version();
     const std::string         name    = doc.name;
     const std::string         target  = doc.language.compileTarget;
     const bool                wrapped = doc.envelope.has_value();
     const LLHandle<LLFloater> handle  = getHandle();
     LLPointer<LLBoostFuncInventoryCallback> made = notecard ? new LLBoostFuncInventoryCallback() : new LLBoostFuncInventoryCallback(create_script_cb);
-    made->addOnFireFunc([handle, id, text, items, target, wrapped, notecard](const LLUUID& item_id) {
+    made->addOnFireFunc([handle, id, version, text, items, target, wrapped, notecard](const LLUUID& item_id) {
         ALFloaterScriptStudio*       studio = ALViewType::as<ALFloaterScriptStudio>(handle.get());
         const LLViewerInventoryItem* item   = item_id.notNull() ? gInventory.getItem(item_id) : nullptr;
         if (!studio || !item)
@@ -9996,6 +10316,7 @@ void ALFloaterScriptStudio::saveCopyToInventory(Doc& doc)
         copy.saveOnLoad            = true;
         copy.wrapOnLoad            = wrapped;
         copy.copyOf                = id;
+        copy.copyOfVersion         = version;
         copy.targetOnLoad          = target;
         if (notecard)
         {
@@ -11996,30 +12317,32 @@ void ALFloaterScriptStudio::closeMany(const std::vector<std::string>& ids)
     }
     LLSD args;
     args["COUNT"] = static_cast<S32>(unsaved.size());
-    LLNotificationsUtil::add("ScriptStudioSaveChangesMany", args, LLSD(), [this, unsaved](const LLSD& notification, const LLSD& response) {
-        const S32 option = LLNotificationsUtil::getSelectedOption(notification, response);
-        if (option != 0 && option != 1)
+    const LLHandle<LLFloater> handle = getHandle();
+    LLNotificationsUtil::add("ScriptStudioSaveChangesMany", args, LLSD(), [handle, unsaved](const LLSD& notification, const LLSD& response) {
+        ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get());
+        const S32              option = LLNotificationsUtil::getSelectedOption(notification, response);
+        if (!studio || (option != 0 && option != 1))
         {
             return;
         }
         for (const std::string& id : unsaved)
         {
-            const size_t index = indexOf(id);
+            const size_t index = studio->indexOf(id);
             if (index == NONE)
             {
                 continue;
             }
             if (option == 1)
             {
-                letGoOf(index);
+                studio->letGoOf(index);
                 continue;
             }
-            Doc& doc           = *mDocs[index];
+            Doc& doc           = *studio->mDocs[index];
             doc.closeAfterSave = true;
-            save(doc);
+            studio->save(doc);
             // A save that could not begin -- still loading, say -- leaves
             // the tab for the author.
-            if (indexOf(id) != NONE && doc.closeAfterSave && !doc.saving && !doc.preprocessing && !doc.saveAfterCheck)
+            if (studio->indexOf(id) != NONE && doc.closeAfterSave && !doc.saving && !doc.preprocessing && !doc.saveAfterCheck)
             {
                 doc.closeAfterSave = false;
             }
@@ -12038,27 +12361,23 @@ void ALFloaterScriptStudio::letGoOf(size_t index, bool keep)
         // Unsaved text thrown away -- Don't Save, a deletion, :q! -- is set
         // aside among the discarded, where File > Recover Unsaved Changes
         // has it for a week; a saved tab's entry forgotten. A kept one is
-        // left as it is: another window has it, or the next session.
+        // left as it is: another window has it, or the next session. An
+        // entry the tab took up goes with it only once what the tab holds
+        // is safe -- set aside, saved, or the same as saved -- so that a
+        // failed write, or a text nobody could save, loses nothing.
         ALScriptRecoveryStore* store = recoveryStore();
         if (!keep && store && !doc.recoveryKey.empty())
         {
-            if (doc.loaded && doc.modifiable && !doc.carriedText && doc.editor->isDirty())
+            ALScriptRecoveryStore::Parting parting;
+            parting.key      = doc.recoveryKey;
+            parting.tookUp   = doc.recovering;
+            parting.carrying = doc.carriedText.has_value();
+            parting.settled  = doc.loaded && doc.modifiable;
+            if (!parting.carrying && parting.settled && doc.editor->isDirty())
             {
-                if (store->write(recoveryEntryOf(doc)))
-                {
-                    store->discard(doc.recoveryKey);
-                }
+                parting.unsaved = recoveryEntryOf(doc);
             }
-            else
-            {
-                store->forget(doc.recoveryKey);
-            }
-            // An entry it had taken up goes with it; one not yet put in is
-            // still what it was, to be offered again.
-            if (doc.recovering && !doc.carriedText)
-            {
-                store->remove(*doc.recovering);
-            }
+            store->letGo(parting);
         }
         stopExternal(doc);
         mProblemStore.forget(doc.id);
@@ -12890,12 +13209,9 @@ void ALFloaterScriptStudio::revert(Doc& doc)
     args["[NAME]"] = doc.name;
     // What the revert throws away is set aside first, among the discarded,
     // for File > Recover Unsaved Changes to have for a week.
-    if (ALScriptRecoveryStore* store = recoveryStore(); store && doc.loaded && doc.modifiable && doc.editor->isDirty() && !doc.recoveryKey.empty())
+    if (doc.loaded && doc.modifiable && doc.editor->isDirty())
     {
-        if (store->write(recoveryEntryOf(doc)))
-        {
-            store->discard(doc.recoveryKey);
-        }
+        setAside(doc);
     }
     if (!doc.file.empty())
     {

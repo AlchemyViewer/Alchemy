@@ -28,10 +28,14 @@
 
 #include "fsyspath.h"
 #include "llfile.h"
+#include "llsdserialize.h"
+#include "lltimer.h"
 
 #include "../test/lltut.h"
 
+#include <algorithm>
 #include <filesystem>
+#include <sstream>
 
 namespace tut
 {
@@ -157,7 +161,7 @@ namespace tut
                all.front().embedded[0]["name"].asString() == "Sunset" && all.front().embedded[1]["name"].asString() == "Home");
         ensure("each whole", all.front().embedded[1]["item_id"].asUUID() == second["item_id"].asUUID());
         // Discarded, it keeps them too.
-        ensure("discarded", store.discard("item:card"));
+        ensure("discarded", store.discard(all.front()));
         const std::vector<ALScriptRecoveryEntry> thrown = store.list();
         ensure("the items go with it", thrown.size() == 1 && thrown.front().embedded.size() == 2);
         // A script has none, and says so as an empty list.
@@ -218,7 +222,11 @@ namespace tut
         ALScriptRecoveryStore other(folder, "theirs");
         ensure("written", store.write(entry("item:gone", "thrown away")));
         ensure("and another session's", other.write(entry("item:kept", "never thrown away")));
-        ensure("discarded", store.discard("item:gone"));
+        {
+            const std::vector<ALScriptRecoveryEntry> written = store.list();
+            const auto mine = std::find_if(written.begin(), written.end(), [](const ALScriptRecoveryEntry& one) { return one.key == "item:gone"; });
+            ensure("discarded", mine != written.end() && store.discard(*mine));
+        }
         std::vector<ALScriptRecoveryEntry> all = store.list();
         ensure_equals("both still listed", all.size(), size_t(2));
         const auto discarded = std::find_if(all.begin(), all.end(), [](const ALScriptRecoveryEntry& one) { return one.key == "item:gone"; });
@@ -255,5 +263,263 @@ namespace tut
         ensure_equals("the one that reads", all.size(), size_t(1));
         ensure_equals("is the good one", all.front().key, std::string("item:ok"));
         ensure("the other is still there", LLFile::isfile(folder + "/0000.someone.llsd"));
+    }
+
+    template<> template<>
+    void alscriptrecovery_object::test<8>()
+    {
+        set_test_name("a text set aside leaves what it came from; half-written files and old discards go at a prune; an XML entry still reads");
+        ALScriptRecoveryStore store(folder, "mine");
+        ALScriptRecoveryStore other(folder, "theirs");
+        ensure("another session's", other.write(entry("item:a", "left")));
+        ensure("set aside", store.setAside(entry("item:a", "thrown")));
+        ensure_equals("among the discarded", files("/discarded").size(), size_t(1));
+        const std::optional<ALScriptRecoveryEntry> left = store.leftFor("item:a");
+        ensure("what it came from still left", left.has_value() && left->text == "left");
+        ensure_equals("and only that is left", store.left().size(), size_t(1));
+        const std::vector<ALScriptRecoveryEntry> all = store.list();
+        const auto thrown = std::find_if(all.begin(), all.end(), [](const ALScriptRecoveryEntry& one) { return one.text == "thrown"; });
+        ensure("set aside by this session", thrown != all.end() && thrown->session == "mine" && thrown->state == ALScriptRecoveryEntry::State::Discarded);
+
+        // Written half by a session that went, and by this one.
+        for (const char* name : { "/0001.theirs.llsd.tmp", "/0002.mine.llsd.tmp" })
+        {
+            LLFILE* half = LLFile::fopen(folder + name, LLFILE_MODE("wb"));
+            ensure("made", half != nullptr);
+            fputs("<? llsd/notation ?>\n{'key':'ite", half);
+            fclose(half);
+        }
+        store.prune(60.0);
+        ensure("the gone session's half gone", !LLFile::isfile(folder + "/0001.theirs.llsd.tmp"));
+        ensure("this session's own left", LLFile::isfile(folder + "/0002.mine.llsd.tmp"));
+        ensure_equals("the young discard stays", files("/discarded").size(), size_t(1));
+
+        // An entry as the XML it was once written as.
+        {
+            ALScriptRecoveryEntry was = entry("item:old", "from before");
+            was.session               = "older";
+            LLFILE* xml = LLFile::fopen(folder + "/0003.older.llsd", LLFILE_MODE("wb"));
+            ensure("made", xml != nullptr);
+            std::ostringstream text;
+            LLSDSerialize::toPrettyXML(was.asLLSD(), text);
+            fputs(text.str().c_str(), xml);
+            fclose(xml);
+        }
+        const std::vector<ALScriptRecoveryEntry> now = store.left();
+        ensure("read", std::any_of(now.begin(), now.end(), [](const ALScriptRecoveryEntry& one) { return one.text == "from before"; }));
+    }
+
+    template<> template<>
+    void alscriptrecovery_object::test<9>()
+    {
+        set_test_name("a changed tab let go of has its text set aside, its own entry forgotten, and the entry it took up let go of");
+        ALScriptRecoveryStore store(folder, "mine");
+        ALScriptRecoveryStore other(folder, "theirs");
+        ensure("left by another session", other.write(entry("item:x", "left before")));
+        const std::optional<ALScriptRecoveryEntry> took = store.leftFor("item:x");
+        ensure("found", took.has_value());
+        ensure("kept by this one", store.write(entry("item:x", "typed since")));
+
+        ALScriptRecoveryStore::Parting parting;
+        parting.key     = "item:x";
+        parting.unsaved = entry("item:x", "typed since, then closed");
+        parting.tookUp  = took;
+        parting.settled = true;
+        ensure("let go of", store.letGo(parting));
+
+        const std::vector<ALScriptRecoveryEntry> all = store.list();
+        ensure_equals("one entry", all.size(), size_t(1));
+        ensure("set aside, as it stood", all.front().state == ALScriptRecoveryEntry::State::Discarded && all.front().text == "typed since, then closed");
+        ensure("by this session", all.front().session == "mine");
+        ensure("what it took up gone", !store.leftFor("item:x").has_value() && store.left().empty());
+    }
+
+    template<> template<>
+    void alscriptrecovery_object::test<10>()
+    {
+        set_test_name("where the text cannot be set aside, nothing is let go of: its own entry and the one it took up both stay");
+        ALScriptRecoveryStore store(folder, "mine");
+        ALScriptRecoveryStore other(folder, "theirs");
+        ensure("left by another session", other.write(entry("item:x", "left before")));
+        const std::optional<ALScriptRecoveryEntry> took = store.leftFor("item:x");
+        ensure("kept by this one", store.write(entry("item:x", "typed since")));
+        // A file where the folder of the discarded would be: nothing can be
+        // written there.
+        {
+            LLFILE* blocking = LLFile::fopen(folder + "/discarded", LLFILE_MODE("wb"));
+            ensure("made", blocking != nullptr);
+            fclose(blocking);
+        }
+
+        ALScriptRecoveryStore::Parting parting;
+        parting.key     = "item:x";
+        parting.unsaved = entry("item:x", "typed since, then closed");
+        parting.tookUp  = took;
+        parting.settled = true;
+        ensure("said to have failed", !store.letGo(parting));
+
+        const std::vector<ALScriptRecoveryEntry> all = store.list();
+        const auto own = std::find_if(all.begin(), all.end(), [](const ALScriptRecoveryEntry& one) { return one.session == "mine"; });
+        ensure("its own entry still there", own != all.end() && own->text == "typed since");
+        ensure("and the one it took up", store.leftFor("item:x").has_value());
+        ensure("a set-aside that fails is said", !store.setAside(entry("item:y", "anything")));
+    }
+
+    template<> template<>
+    void alscriptrecovery_object::test<11>()
+    {
+        set_test_name("a clean tab forgets its own entry, and lets go of what it took up only where a save could reach its text");
+        ALScriptRecoveryStore store(folder, "mine");
+        ALScriptRecoveryStore other(folder, "theirs");
+        ensure("left by another session", other.write(entry("item:x", "left before")));
+
+        // Holding the kept text where nothing can save it -- the script may
+        // no longer be changed, or never loaded: left to be offered again.
+        ensure("kept by this one", store.write(entry("item:x", "typed since")));
+        ALScriptRecoveryStore::Parting stuck;
+        stuck.key     = "item:x";
+        stuck.tookUp  = store.leftFor("item:x");
+        stuck.settled = false;
+        ensure("let go of", store.letGo(stuck));
+        const std::vector<ALScriptRecoveryEntry> after = store.list();
+        ensure("its own forgotten", std::none_of(after.begin(), after.end(), [](const ALScriptRecoveryEntry& one) { return one.session == "mine"; }));
+        ensure("what it took up still offered", store.leftFor("item:x").has_value());
+        ensure("nothing set aside", files("/discarded").empty());
+
+        // Loaded and clean: the text it took up is what was saved.
+        ALScriptRecoveryStore::Parting clean;
+        clean.key     = "item:x";
+        clean.tookUp  = store.leftFor("item:x");
+        clean.settled = true;
+        ensure("let go of", store.letGo(clean));
+        ensure("what it took up gone", !store.leftFor("item:x").has_value());
+        ensure("and nothing set aside", files("/discarded").empty());
+    }
+
+    template<> template<>
+    void alscriptrecovery_object::test<12>()
+    {
+        set_test_name("a tab let go of before what it carried was put in: a text with no file of its own set aside, an entry on disk left as it was");
+        ALScriptRecoveryStore store(folder, "mine");
+        ALScriptRecoveryStore other(folder, "theirs");
+
+        // Moved from another window, or loading its item under what it held:
+        // the text it carried is the only copy of what was typed, and this
+        // session's entry for it was written by the tab it came from.
+        ensure("kept by the tab it came from", store.write(entry("item:moved", "typed in the other window")));
+        ALScriptRecoveryStore::Parting moved;
+        moved.key      = "item:moved";
+        moved.tookUp   = entry("item:moved", "typed in the other window");
+        moved.carrying = true;
+        ensure("let go of", store.letGo(moved));
+        const std::vector<ALScriptRecoveryEntry> all = store.list();
+        ensure_equals("one entry", all.size(), size_t(1));
+        ensure("the carried text set aside", all.front().state == ALScriptRecoveryEntry::State::Discarded && all.front().text == "typed in the other window");
+
+        // Opened to take up another session's entry, and closed before it
+        // loaded: that entry is still what it was, to be offered again.
+        ensure("left by another session", other.write(entry("item:left", "left before")));
+        ALScriptRecoveryStore::Parting waiting;
+        waiting.key      = "item:left";
+        waiting.tookUp   = store.leftFor("item:left");
+        waiting.carrying = true;
+        ensure("let go of", store.letGo(waiting));
+        ensure("the entry left", store.leftFor("item:left").has_value());
+        ensure_equals("and nothing more set aside", files("/discarded").size(), size_t(1));
+
+        // A new item opened with a text of its own: nothing to keep.
+        ensure("kept", store.write(entry("item:new", "template")));
+        ALScriptRecoveryStore::Parting fresh;
+        fresh.key      = "item:new";
+        fresh.carrying = true;
+        ensure("let go of", store.letGo(fresh));
+        const std::vector<ALScriptRecoveryEntry> after = store.list();
+        ensure("forgotten", std::none_of(after.begin(), after.end(), [](const ALScriptRecoveryEntry& one) { return one.key == "item:new"; }));
+    }
+
+    template<> template<>
+    void alscriptrecovery_object::test<13>()
+    {
+        set_test_name("a failed load is tried again a moment later, three times as long after each failure since, and a few times only");
+        ensure_equals("after the first", ALScriptRecoveryRetry::delayAfter(1), ALScriptRecoveryRetry::FIRST);
+        ensure_equals("after the second", ALScriptRecoveryRetry::delayAfter(2), ALScriptRecoveryRetry::FIRST * 3.0);
+        ensure_equals("after the third", ALScriptRecoveryRetry::delayAfter(3), ALScriptRecoveryRetry::FIRST * 9.0);
+        ensure_equals("none yet is as the first", ALScriptRecoveryRetry::delayAfter(0), ALScriptRecoveryRetry::FIRST);
+        ensure("tried while there have been fewer failures than the tries", ALScriptRecoveryRetry::mayTry(0) && ALScriptRecoveryRetry::mayTry(ALScriptRecoveryRetry::TRIES - 1));
+        ensure("and then waits to be asked", !ALScriptRecoveryRetry::mayTry(ALScriptRecoveryRetry::TRIES));
+    }
+
+    template<> template<>
+    void alscriptrecovery_object::test<14>()
+    {
+        set_test_name("written as notation, whatever the text and history hold; set aside by the session named, a moment apart kept apart; the newest left first");
+        ALScriptRecoveryStore store(folder, "mine");
+        ALScriptRecoveryEntry awkward = entry("item:a", "tab\there, 'quoted' \"twice\", back\\slash,\r\nlines, \xC3\xA9, \xF4\x80\x80\x80");
+        LLSD                  history;
+        history["version"] = 2;
+        history["undo"]    = LLSD::emptyArray().with(0, LLSD().with("label", "it's").with("edits", LLSD::emptyArray().with(0, LLSD::emptyArray().with(0, 0).with(1, 0).with(2, 0).with(3, 0).with(4, "").with(5, awkward.text))));
+        history["redo"]    = LLSD::emptyArray();
+        history["saved"]   = -1;
+        awkward.history    = history;
+        ensure("written", store.write(awkward));
+        {
+            const std::vector<std::string> names = files();
+            ensure_equals("one file", names.size(), size_t(1));
+            std::error_code   ec;
+            const std::string written = LLFile::getContents(fsyspath(folder + "/" + names.front()), ec);
+            ensure("as notation", written.rfind("<? llsd/notation ?>", 0) == 0);
+        }
+        const std::vector<ALScriptRecoveryEntry> back = store.list();
+        ensure("the text as it was", back.size() == 1 && back.front().text == awkward.text);
+        ensure("the history as it was", back.front().history["undo"][0]["edits"][0][5].asString() == awkward.text &&
+                                             back.front().history["undo"][0]["label"].asString() == "it's");
+
+        // Set aside for another session, and two a moment apart.
+        ALScriptRecoveryEntry theirs = entry("item:b", "theirs");
+        theirs.session               = "theirs";
+        ensure("set aside", store.setAside(theirs));
+        // Apart by more than the centisecond a date is written to.
+        ms_sleep(20);
+        ensure("and another", store.setAside(entry("item:b", "mine, later")));
+        ensure_equals("both kept", files("/discarded").size(), size_t(2));
+        const std::vector<ALScriptRecoveryEntry> all = store.list();
+        ensure("the session it was set aside for", std::any_of(all.begin(), all.end(), [](const ALScriptRecoveryEntry& one) { return one.text == "theirs" && one.session == "theirs"; }));
+        ensure("this one where none was named", std::any_of(all.begin(), all.end(), [](const ALScriptRecoveryEntry& one) { return one.text == "mine, later" && one.session == "mine"; }));
+
+        // Left by other sessions: the newest first.
+        ALScriptRecoveryStore older(folder, "older");
+        ALScriptRecoveryStore newer(folder, "newer");
+        ensure("older", older.write(entry("item:c", "older")));
+        // Apart by more than the centisecond a date is written to.
+        ms_sleep(20);
+        ensure("newer", newer.write(entry("item:d", "newer")));
+        const std::vector<ALScriptRecoveryEntry> left = store.left();
+        ensure("newest first", left.size() == 2 && left.front().text == "newer" && left.back().text == "older");
+    }
+
+    template<> template<>
+    void alscriptrecovery_object::test<15>()
+    {
+        set_test_name("a discarded file whose name does not say when is pruned by what it says inside");
+        ALScriptRecoveryStore store(folder, "mine");
+        ensure("set aside", store.setAside(entry("item:a", "old")));
+        // Renamed to say nothing of when, and then to say it badly.
+        const std::vector<std::string> names = files("/discarded");
+        ensure_equals("one", names.size(), size_t(1));
+        const std::string stamped = folder + "/discarded/" + names.front();
+        const std::string bare    = folder + "/discarded/0000.mine.llsd";
+        ensure("renamed", LLFile::rename(stamped, bare) == 0);
+        store.prune(60.0, LLDate(LLDate::now().secondsSinceEpoch() + 30.0));
+        ensure("young by what it says, it stays", LLFile::isfile(bare));
+        store.prune(60.0, LLDate(LLDate::now().secondsSinceEpoch() + 120.0));
+        ensure("old by what it says, it goes", !LLFile::isfile(bare));
+
+        ensure("set aside", store.setAside(entry("item:b", "old")));
+        const std::string garbled = folder + "/discarded/0001.mine.soon.llsd";
+        ensure("renamed", LLFile::rename(folder + "/discarded/" + files("/discarded").front(), garbled) == 0);
+        store.prune(60.0, LLDate(LLDate::now().secondsSinceEpoch() + 30.0));
+        ensure("a stamp that is no number read past", LLFile::isfile(garbled));
+        store.prune(60.0, LLDate(LLDate::now().secondsSinceEpoch() + 120.0));
+        ensure("and pruned by what it says", !LLFile::isfile(garbled));
     }
 }

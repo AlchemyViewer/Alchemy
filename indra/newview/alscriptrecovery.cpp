@@ -31,6 +31,8 @@
 #include "llsdserialize.h"
 
 #include <algorithm>
+#include <cmath>
+#include <cstdlib>
 #include <filesystem>
 #include <sstream>
 
@@ -43,6 +45,8 @@
 namespace
 {
     const char* const EXTENSION = ".llsd";
+    // What a file is written as first, beside where it goes.
+    const char* const HALF_WRITTEN = ".tmp";
 
     const char* stateName(ALScriptRecoveryEntry::State state)
     {
@@ -177,6 +181,12 @@ bool ALScriptRecoveryEntry::fromLLSD(const LLSD& sd, ALScriptRecoveryEntry& out)
     return !out.key.empty();
 }
 
+// static
+F64 ALScriptRecoveryRetry::delayAfter(S32 failures)
+{
+    return FIRST * std::pow(3.0, static_cast<F64>(llmax(failures, 1) - 1));
+}
+
 ALScriptRecoveryStore::ALScriptRecoveryStore(std::string directory, std::string session)
 :   mDirectory(withSeparator(std::move(directory))),
     mDiscarded(mDirectory + "discarded/"),
@@ -209,12 +219,14 @@ std::string ALScriptRecoveryStore::pathOf(const std::string& key, const std::str
 // static
 bool ALScriptRecoveryStore::writeWhole(const std::string& path, const LLSD& sd)
 {
+    // As notation: a person can still read it, and it is a fraction of
+    // what XML makes of a history's many small edits.
     std::ostringstream text;
-    LLSDSerialize::toPrettyXML(sd, text);
+    LLSDSerialize::serialize(sd, text, LLSDSerialize::LLSD_NOTATION, LLSDFormatter::OPTIONS_NONE);
     const std::string written = text.str();
     // Beside it first, forced out to the disk, then put in its place: a
     // crash, or the power going, leaves the last whole text or this one.
-    const std::string beside = path + ".tmp";
+    const std::string beside = path + HALF_WRITTEN;
     LLFILE*           file   = LLFile::fopen(beside, LLFILE_MODE("wb"));
     if (!file)
     {
@@ -246,7 +258,7 @@ bool ALScriptRecoveryStore::readEntry(const std::string& path, ALScriptRecoveryE
     }
     std::istringstream in(text);
     LLSD               sd;
-    if (LLSDSerialize::fromXML(sd, in) <= 0 || !ALScriptRecoveryEntry::fromLLSD(sd, out))
+    if (!LLSDSerialize::deserialize(sd, in, static_cast<llssize>(text.size())) || !ALScriptRecoveryEntry::fromLLSD(sd, out))
     {
         return false;
     }
@@ -271,10 +283,25 @@ void ALScriptRecoveryStore::forget(const std::string& key)
     LLFile::remove(pathOf(key, mSession), ENOENT);
 }
 
-bool ALScriptRecoveryStore::discard(const std::string& key)
+bool ALScriptRecoveryStore::setAside(ALScriptRecoveryEntry entry)
 {
-    ALScriptRecoveryEntry entry;
-    return readEntry(pathOf(key, mSession), entry) && discard(entry);
+    if (entry.key.empty())
+    {
+        return false;
+    }
+    if (entry.session.empty())
+    {
+        entry.session = mSession;
+    }
+    entry.state = ALScriptRecoveryEntry::State::Discarded;
+    entry.when  = LLDate::now();
+    LLFile::mkdir(mDirectory);
+    LLFile::mkdir(mDiscarded);
+    // Named by when to the millisecond, which prune reads without opening
+    // it, and which two set aside in a moment do not share.
+    const std::string target = mDiscarded + fileOf(entry.key) + "." + entry.session + "." +
+                               std::to_string(static_cast<S64>(entry.when.secondsSinceEpoch() * 1000.0)) + EXTENSION;
+    return writeWhole(target, entry.asLLSD());
 }
 
 bool ALScriptRecoveryStore::discard(const ALScriptRecoveryEntry& entry)
@@ -283,21 +310,11 @@ bool ALScriptRecoveryStore::discard(const ALScriptRecoveryEntry& entry)
     {
         return true;
     }
-    ALScriptRecoveryEntry discarded = entry;
-    discarded.state                 = ALScriptRecoveryEntry::State::Discarded;
-    discarded.when                  = LLDate::now();
-    LLFile::mkdir(mDirectory);
-    LLFile::mkdir(mDiscarded);
-    const std::string target = mDiscarded + fileOf(entry.key) + "." + entry.session + "." +
-                               std::to_string(static_cast<S64>(discarded.when.secondsSinceEpoch())) + EXTENSION;
-    if (!writeWhole(target, discarded.asLLSD()))
+    if (!setAside(entry))
     {
         return false;
     }
-    if (!entry.path.empty())
-    {
-        LLFile::remove(entry.path, ENOENT);
-    }
+    remove(entry);
     return true;
 }
 
@@ -307,6 +324,44 @@ void ALScriptRecoveryStore::remove(const ALScriptRecoveryEntry& entry)
     {
         LLFile::remove(entry.path, ENOENT);
     }
+}
+
+bool ALScriptRecoveryStore::letGo(const Parting& parting)
+{
+    bool let_go = false;
+    bool safe   = true;
+    if (parting.carrying)
+    {
+        // Never put in. A text carried with no file of its own is set aside
+        // as it came; an entry on disk is still what it was.
+        if (parting.tookUp && parting.tookUp->path.empty())
+        {
+            let_go = safe = setAside(*parting.tookUp);
+        }
+        if (!parting.tookUp || let_go)
+        {
+            forget(parting.key);
+        }
+    }
+    else if (parting.unsaved)
+    {
+        let_go = safe = setAside(*parting.unsaved);
+        if (safe)
+        {
+            forget(parting.key);
+        }
+    }
+    else
+    {
+        // Saved, never changed, or never loaded: nothing of its own to keep.
+        forget(parting.key);
+        let_go = parting.settled;
+    }
+    if (let_go && parting.tookUp)
+    {
+        remove(*parting.tookUp);
+    }
+    return safe;
 }
 
 void ALScriptRecoveryStore::listIn(const std::string& folder, std::vector<ALScriptRecoveryEntry>& out) const
@@ -337,14 +392,19 @@ std::vector<ALScriptRecoveryEntry> ALScriptRecoveryStore::list() const
 
 std::vector<ALScriptRecoveryEntry> ALScriptRecoveryStore::left() const
 {
+    // The discarded are not read: they are in a folder of their own.
+    std::vector<ALScriptRecoveryEntry> all;
+    listIn(mDirectory, all);
     std::vector<ALScriptRecoveryEntry> entries;
-    for (ALScriptRecoveryEntry& entry : list())
+    for (ALScriptRecoveryEntry& entry : all)
     {
         if (entry.state != ALScriptRecoveryEntry::State::Discarded && entry.session != mSession)
         {
             entries.push_back(std::move(entry));
         }
     }
+    std::stable_sort(entries.begin(), entries.end(),
+                     [](const ALScriptRecoveryEntry& a, const ALScriptRecoveryEntry& b) { return a.when.secondsSinceEpoch() > b.when.secondsSinceEpoch(); });
     return entries;
 }
 
@@ -392,13 +452,51 @@ bool ALScriptRecoveryStore::hasOffers() const
 
 void ALScriptRecoveryStore::prune(F64 max_age_seconds, const LLDate& now)
 {
-    std::vector<ALScriptRecoveryEntry> discarded;
-    listIn(mDiscarded, discarded);
-    for (const ALScriptRecoveryEntry& entry : discarded)
+    for (const std::string& name : namesIn(mDiscarded))
     {
-        if (now.secondsSinceEpoch() - entry.when.secondsSinceEpoch() > max_age_seconds)
+        // When, from the name; read from the file only where the name does
+        // not say it.
+        const std::vector<std::string> parts = partsOf(name);
+        if (parts.size() < 2)
         {
-            remove(entry);
+            continue;
+        }
+        F64  when  = 0.0;
+        bool known = false;
+        if (parts.size() == 3)
+        {
+            char*       end    = nullptr;
+            const S64   millis = std::strtoll(parts[2].c_str(), &end, 10);
+            known              = end && *end == '\0' && !parts[2].empty();
+            when               = static_cast<F64>(millis) / 1000.0;
+        }
+        if (!known)
+        {
+            ALScriptRecoveryEntry entry;
+            if (!readEntry(mDiscarded + name, entry))
+            {
+                continue;
+            }
+            when = entry.when.secondsSinceEpoch();
+        }
+        if (now.secondsSinceEpoch() - when > max_age_seconds)
+        {
+            LLFile::remove(mDiscarded + name, ENOENT);
+        }
+    }
+    // A write cut short -- a crash between writing and putting in place --
+    // leaves its half beside the entry, which nothing reads. This session
+    // has written nothing yet where it prunes as it starts, and writes
+    // whole in one call where it does not.
+    for (const std::string& folder : { mDirectory, mDiscarded })
+    {
+        for (const std::string& name : namesIn(folder))
+        {
+            const size_t tail = strlen(HALF_WRITTEN);
+            if (name.size() > tail && name.compare(name.size() - tail, tail, HALF_WRITTEN) == 0 && name.find(mSession) == std::string::npos)
+            {
+                LLFile::remove(folder + name, ENOENT);
+            }
         }
     }
 }
