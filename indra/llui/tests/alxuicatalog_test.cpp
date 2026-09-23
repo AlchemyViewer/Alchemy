@@ -303,4 +303,24 @@ namespace tut
                ALXUICatalog::resolve(root, ALXUISelection::fromString("unnamed#1"), true) == y);
         ensure("and so does the file's", ALXUICatalog::resolve(root, ALXUISelection::fromString("y"), true) == y);
     }
+
+    template<> template<>
+    void alxuicatalog_object::test<5>()
+    {
+        set_test_name("the UI library's own tags are told from the viewer's, and the kinds built from the rest");
+        ensure("a button is the library's", ALXUICatalog::isCoreWidgetTag("button"));
+        ensure("so is a layout stack", ALXUICatalog::isCoreWidgetTag("layout_stack"));
+        ensure("a chat history is the viewer's", !ALXUICatalog::isCoreWidgetTag("chat_history"));
+        ensure("no tag is nobody's", !ALXUICatalog::isCoreWidgetTag(""));
+
+        using Kind = ALXUICatalog::Kind;
+        for (Kind kind : { Kind::Floater, Kind::Panel, Kind::Menu, Kind::Widget, Kind::Template })
+        {
+            ensure(std::string("built: ") + ALXUICatalog::kindName(kind), ALXUICatalog::isBuilt(kind));
+        }
+        for (Kind kind : { Kind::Notifications, Kind::Strings, Kind::Other })
+        {
+            ensure(std::string("not built: ") + ALXUICatalog::kindName(kind), !ALXUICatalog::isBuilt(kind));
+        }
+    }
 }

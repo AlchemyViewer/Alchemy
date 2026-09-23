@@ -42,6 +42,7 @@
 #include <filesystem>
 
 #include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/unordered/unordered_flat_set.hpp>
 
 namespace
 {
@@ -381,6 +382,41 @@ std::vector<const ALXUICatalog::Layer*> ALXUICatalog::layersFor(const Entry& ent
 // Remembered per tag: the registries are filled by static registrars
 // before anything asks, and a path asks this of every sibling of every
 // step.
+// static
+bool ALXUICatalog::isCoreWidgetTag(std::string_view tag)
+{
+    static const boost::unordered_flat_set<std::string, ll::string_hash, std::equal_to<> > core = {
+        "accordion", "accordion_tab", "badge", "button", "chat_editor", "check_box", "combo_box",
+        "console", "container_view", "context_menu", "filter_editor", "flat_list_view", "floater_view",
+        "flyout_button", "folder_view_item", "fs_virtual_trackpad", "icon", "icons_combo_box",
+        "layout_panel", "layout_stack", "line_editor", "loading_indicator", "locate", "menu",
+        "menu_bar", "menu_button", "menu_item", "menu_item_call", "menu_item_check",
+        "menu_item_separator", "menu_item_tear_off", "multi_slider", "multi_slider_bar", "panel",
+        "progress_bar", "radio_group", "scroll_bar", "scroll_container", "scroll_list",
+        "scrolling_panel_list", "search_editor", "simple_text_editor", "slider", "slider_bar",
+        "spinner", "stat_bar", "stat_view", "sun_moon_trackball", "tab_container", "text", "time",
+        "toggleable_menu", "tool_tip", "toolbar", "tooltip_view", "ui_ctrl", "view", "view_border",
+        "window_shade", "xy_vector"
+    };
+    return core.find(tag) != core.end();
+}
+
+// static
+bool ALXUICatalog::isBuilt(Kind kind)
+{
+    switch (kind)
+    {
+    case Kind::Floater:
+    case Kind::Panel:
+    case Kind::Menu:
+    case Kind::Widget:
+    case Kind::Template:
+        return true;
+    default:
+        return false;
+    }
+}
+
 bool ALXUICatalog::isWidgetTag(std::string_view tag)
 {
     static boost::unordered_flat_map<std::string, bool, ll::string_hash, std::equal_to<> > known;

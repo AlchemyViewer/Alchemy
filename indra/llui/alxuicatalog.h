@@ -115,6 +115,17 @@ public:
     // Whether any child registry builds a widget from the tag.
     static bool isWidgetTag(std::string_view tag);
 
+    // Whether the UI library registers the tag, rather than the viewer. A
+    // tag the viewer registers is built by a viewer class, whose
+    // constructor is viewer code with the expectations of viewer code: a
+    // notification to attach to, an agent, a plugin. Something building
+    // the UI without a viewer -- a shell build -- cannot meet them.
+    static bool isCoreWidgetTag(std::string_view tag);
+
+    // Whether a file of this kind is built into views: a floater, a panel,
+    // a menu, a widget at the root, a widget's defaults.
+    static bool isBuilt(Kind kind);
+
     enum class Field : U8
     {
         Tag,

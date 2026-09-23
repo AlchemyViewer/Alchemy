@@ -27,6 +27,7 @@
 #include "lluictrl.h"
 
 #include <string>
+#include <string_view>
 #include <vector>
 
 // `follows` is four bits that decide where an element goes when the thing
@@ -95,6 +96,11 @@ public:
     // arithmetic written where it can be drawn and tested.
     static LLRect follow(const LLRect& child, S32 grow_width, S32 grow_height,
                          bool left, bool bottom, bool right, bool top);
+
+    // A view's follows flags as a file writes them -- "left|top", "all",
+    // "none" -- and back, in the words this control speaks.
+    static std::string followsText(U32 follows);
+    static U32         followsFlags(std::string_view text);
 
 protected:
     friend class LLUICtrlFactory;

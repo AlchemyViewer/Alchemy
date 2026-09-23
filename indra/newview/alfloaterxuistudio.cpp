@@ -29,7 +29,7 @@
 #include "alxmldocument.h"
 #include "alxmllayermerge.h"
 #include "alcolorfield.h"
-#include "alflagsfield.h"
+#include "alfollowscontrol.h"
 #include "alpopover.h"
 #include "alquickopen.h"
 #include "aljumpbar.h"
@@ -38,6 +38,7 @@
 #include "alstringmatch.h"
 #include "altabstrip.h"
 #include "alpropertygrid.h"
+#include "alxuifields.h"
 #include "alxuinotes.h"
 #include "alxuischema.h"
 #include "alxuishellbuild.h"
@@ -230,157 +231,6 @@ namespace
     constexpr S32 ZOOM_LEAST = (S32)(ALCanvasView::MIN_ZOOM * 100.f);
     constexpr S32 ZOOM_MOST = (S32)(ALCanvasView::MAX_ZOOM * 100.f);
 
-
-    // The sections the attribute grid is divided into, in the order an
-    // author reads them: what the thing is, where it is, what it looks
-    // like, what it does, and then everything a tag will take that none of
-    // those cover.
-    enum EAttributeGroup
-    {
-        GROUP_IDENTITY,
-        GROUP_GEOMETRY,
-        GROUP_APPEARANCE,
-        GROUP_BEHAVIOUR,
-        GROUP_OTHER,
-        // Two sections that are not subjects but verdicts: what a file may
-        // write and the viewer throws away, and what a file writes that
-        // nothing declares. Both are worth an author's eye and neither is
-        // worth being mixed in with the fields that work.
-        GROUP_IGNORED,
-        GROUP_UNKNOWN
-    };
-
-    // The vocabulary of the few fields whose values are a list the viewer
-    // holds rather than an enumeration the schema can read. A font is
-    // named in fonts.xml, its size is named there too, and its style is a
-    // set of flags written with bars between them -- none of which an
-    // author should have to remember, and none of which the type system
-    // knows, since all three are strings as far as the block is concerned.
-    void vocabularyFor(ALPropertyGrid::Field& field)
-    {
-        if (!field.values.empty())
-        {
-            return;
-        }
-        if (field.name == "font")
-        {
-            field.values = LLFontGL::getDeclaredFontNames();
-        }
-        else if (field.name == "font.size")
-        {
-            field.values = LLFontGL::getDeclaredSizeNames();
-        }
-        else if (field.name == "font.style")
-        {
-            field.values = { "BOLD", "ITALIC", "UNDERLINE" };
-            field.flags = true;
-            field.noneWord = "NORMAL";
-        }
-        else if (field.name == "layout")
-        {
-            // Which corner an element's numbers are measured from. Two
-            // answers, and the file writes one of them as a word.
-            field.values = { "topleft", "bottomleft" };
-        }
-        else if (field.name == "follows")
-        {
-            // Which edges of its parent the element is tied to: four
-            // answers, written as one word, and drawn as what they do to
-            // it rather than spelled. The order is the one the picture is
-            // drawn in and not the one a file writes them in.
-            field.values = { "left", "top", "right", "bottom" };
-            field.edges = { "left", "bottom", "right", "top" };
-            field.allWord = "all";
-            field.noneWord = "none";
-        }
-    }
-
-    bool oneOf(std::string_view name, std::initializer_list<std::string_view> names)
-    {
-        return std::find(names.begin(), names.end(), name) != names.end();
-    }
-
-    bool builtFrom(std::string_view name, std::initializer_list<std::string_view> words)
-    {
-        return std::any_of(words.begin(), words.end(), [name](std::string_view word)
-        {
-            return name.find(word) != std::string_view::npos;
-        });
-    }
-
-    // Which section a field belongs in. XUI's vocabulary is wide but its
-    // shape is narrow: a fixed handful of names position a widget and a
-    // fixed handful name it, and what is left divides fairly well by the
-    // words the name is built from. A name none of these rules recognise
-    // is left in the last section rather than guessed at, which is what
-    // that section is for.
-    // The heading a name written in the notes belongs under, or nothing
-    // where no one has written one.
-    S32 sectionFromNotes(std::string_view tag, std::string_view name)
-    {
-        const ALXUINotes::Attribute* said = ALXUINotes::get().attribute(tag, name);
-        if (!said || said->section.empty())
-        {
-            return -1;
-        }
-        if (said->section == "identity")   { return GROUP_IDENTITY; }
-        if (said->section == "geometry")   { return GROUP_GEOMETRY; }
-        if (said->section == "appearance") { return GROUP_APPEARANCE; }
-        if (said->section == "behaviour")  { return GROUP_BEHAVIOUR; }
-        if (said->section == "other")      { return GROUP_OTHER; }
-        return -1;
-    }
-
-    // Which heading a name belongs under, guessed from the name. A guess over
-    // a vocabulary is wrong somewhere, and where it is, the notes say so and
-    // are asked first: a short list of corrections beats a longer heuristic.
-    S32 attributeGroupOf(std::string_view name, std::string_view tag = std::string_view())
-    {
-        if (const S32 said = sectionFromNotes(tag, name); said >= 0)
-        {
-            return said;
-        }
-        // A nested leaf belongs where its block belongs: bg_alpha_color
-        // .alpha is a colour and rect.left is a position.
-        const std::string_view head = name.substr(0, name.find('.'));
-
-        if (oneOf(head, { "name", "label", "label_selected", "value", "initial_value", "title",
-                          "short_title", "tool_tip", "help_topic", "filename", "menu_filename",
-                          "class", "type" }))
-        {
-            return GROUP_IDENTITY;
-        }
-        if (oneOf(head, { "left", "right", "top", "bottom", "width", "height", "rect",
-                          "left_pad", "top_pad", "left_delta", "top_delta", "bottom_delta",
-                          "follows", "layout", "orientation", "min_width", "max_width",
-                          "min_height", "max_height", "min_dim", "max_dim", "expanded_min_dim",
-                          "auto_resize", "user_resize", "border_size" }))
-        {
-            return GROUP_GEOMETRY;
-        }
-        if (oneOf(head, { "enabled", "visible", "mouse_opaque", "tab_stop", "tab_group",
-                          "default_tab_group", "read_only", "allow_text_entry", "chrome",
-                          "single_instance", "reuse_instance", "can_close", "can_drag",
-                          "can_minimize", "can_resize", "can_tear_off", "save_rect",
-                          "save_visibility", "focus_root" }))
-        {
-            return GROUP_BEHAVIOUR;
-        }
-        if (builtFrom(head, { "color", "image", "font", "texture", "bg_", "border", "highlight",
-                              "shadow", "style", "halign", "valign" }))
-        {
-            return GROUP_APPEARANCE;
-        }
-        if (builtFrom(head, { "width", "height", "_pad", "pad_", "margin", "spacing", "delta", "dim" }))
-        {
-            return GROUP_GEOMETRY;
-        }
-        if (builtFrom(head, { "callback", "control", "enabled", "visible", "hover", "focus", "commit" }))
-        {
-            return GROUP_BEHAVIOUR;
-        }
-        return GROUP_OTHER;
-    }
 
     // A layout stack gives its children three of their four numbers and
     // reads the fourth from the file: the width of a panel in a stack
@@ -1381,52 +1231,6 @@ namespace
 {
     constexpr S32 MAX_FIND_ROWS = 500;
 
-    // The follows flags as a file writes them and back, through the one
-    // reader and writer of a set of named bits. The names sit at bits nought
-    // to three here and the flags do not, so the two are mapped.
-    const std::vector<std::string>& followsNames()
-    {
-        static const std::vector<std::string> names = { "left", "right", "top", "bottom" };
-        return names;
-    }
-    constexpr U32 FOLLOWS_BY_BIT[] = { FOLLOWS_LEFT, FOLLOWS_RIGHT, FOLLOWS_TOP, FOLLOWS_BOTTOM };
-
-    std::string followsText(U32 follows)
-    {
-        U32 bits = 0;
-        for (size_t i = 0; i < std::size(FOLLOWS_BY_BIT); ++i)
-        {
-            bits |= (follows & FOLLOWS_BY_BIT[i]) ? (1u << i) : 0u;
-        }
-        return ALFlagsField::write(bits, followsNames(), "all", "none");
-    }
-
-    U32 followsFlags(std::string_view text)
-    {
-        const U32 bits = ALFlagsField::read(text, followsNames(), "all");
-        U32 follows = FOLLOWS_NONE;
-        for (size_t i = 0; i < std::size(FOLLOWS_BY_BIT); ++i)
-        {
-            follows |= (bits & (1u << i)) ? FOLLOWS_BY_BIT[i] : 0u;
-        }
-        return follows;
-    }
-
-    bool isBuilt(ALXUICatalog::Kind kind)
-    {
-        switch (kind)
-        {
-        case ALXUICatalog::Kind::Floater:
-        case ALXUICatalog::Kind::Panel:
-        case ALXUICatalog::Kind::Menu:
-        case ALXUICatalog::Kind::Widget:
-        case ALXUICatalog::Kind::Template:
-            return true;
-        default:
-            return false;
-        }
-    }
-
     S32 countViews(const LLView* view)
     {
         S32 n = 1;
@@ -1449,29 +1253,6 @@ namespace
         return ALXUICatalog::Field::Any;
     }
 
-    // The tags the UI library registers. A tag the viewer registers is
-    // built by a viewer class, whose constructor is viewer code with the
-    // expectations of viewer code: a notification to attach to, an agent,
-    // a plugin. A shell build cannot meet them, so those tags are shown
-    // from their files and searched, and built only by the viewer.
-    bool isCoreWidgetTag(const std::string& tag)
-    {
-        static const std::set<std::string> core = {
-            "accordion", "accordion_tab", "badge", "button", "chat_editor", "check_box", "combo_box",
-            "console", "container_view", "context_menu", "filter_editor", "flat_list_view", "floater_view",
-            "flyout_button", "folder_view_item", "fs_virtual_trackpad", "icon", "icons_combo_box",
-            "layout_panel", "layout_stack", "line_editor", "loading_indicator", "locate", "menu",
-            "menu_bar", "menu_button", "menu_item", "menu_item_call", "menu_item_check",
-            "menu_item_separator", "menu_item_tear_off", "multi_slider", "multi_slider_bar", "panel",
-            "progress_bar", "radio_group", "scroll_bar", "scroll_container", "scroll_list",
-            "scrolling_panel_list", "search_editor", "simple_text_editor", "slider", "slider_bar",
-            "spinner", "stat_bar", "stat_view", "sun_moon_trackball", "tab_container", "text", "time",
-            "toggleable_menu", "tool_tip", "toolbar", "tooltip_view", "ui_ctrl", "view", "view_border",
-            "window_shade", "xy_vector"
-        };
-        return core.count(tag) != 0;
-    }
-
     // Where the specimen sits in its row, past the label.
     constexpr S32 SPECIMEN_LEFT = 130;
     constexpr S32 SPECIMEN_WIDTH = 150;
@@ -1488,7 +1269,7 @@ namespace
     // with defaults.
     bool galleryTag(const std::string& tag)
     {
-        return isCoreWidgetTag(tag) && ALXUISchema::buildsAlone(tag);
+        return ALXUICatalog::isCoreWidgetTag(tag) && ALXUISchema::buildsAlone(tag);
     }
 }
 
@@ -4355,7 +4136,7 @@ bool ALFloaterXUIStudio::applyLive(const ALXUISelection::path_t& path,
     }
     else if (name == "follows")
     {
-        view->setFollows(followsFlags(value));
+        view->setFollows(ALFollowsControl::followsFlags(value));
         done = true;
     }
     else if (ALXUIEdit::isGeometryAttribute(name))
@@ -5150,7 +4931,7 @@ void ALFloaterXUIStudio::showPreview(S32 which)
         widget_tag = mFile.substr(mFile.rfind('/') + 1);
         widget_tag = widget_tag.substr(0, widget_tag.size() - 4);
     }
-    const bool viewer_widget = !widget_tag.empty() && !isCoreWidgetTag(widget_tag);
+    const bool viewer_widget = !widget_tag.empty() && !ALXUICatalog::isCoreWidgetTag(widget_tag);
     // A template is built from nothing but its tag, and a tag that wants a
     // model, a parent or children it is not given asserts in its own
     // building rather than showing anything.
@@ -5160,7 +4941,7 @@ void ALFloaterXUIStudio::showPreview(S32 which)
     // notifications.xml is a file of templates rather than a view tree; it
     // is built once one of them has been chosen on the Notifications tab.
     const bool notification = entry->kind == ALXUICatalog::Kind::Notifications && !mNotification.empty();
-    if ((!isBuilt(entry->kind) && !notification) || viewer_widget || template_alone)
+    if ((!ALXUICatalog::isBuilt(entry->kind) && !notification) || viewer_widget || template_alone)
     {
         if (which == PRIMARY)
         {
@@ -5865,7 +5646,7 @@ void ALFloaterXUIStudio::toggleFollows(S32 edge)
         return;
     }
 
-    const std::string text = followsText(view->getFollows() ^ flags[edge]);
+    const std::string text = ALFollowsControl::followsText(view->getFollows() ^ flags[edge]);
     if (!held->setAttribute(mSelection.selection(), "follows", text))
     {
         setStatus(held->error());
@@ -6298,17 +6079,17 @@ S32 ALFloaterXUIStudio::lintOneFile(const ALXUICatalog::Entry& entry)
     // alone survives: a folder view item made with no model to show
     // asserts in its own postBuild.
     std::string widget_tag;
-    bool buildable = isBuilt(entry.kind);
+    bool buildable = ALXUICatalog::isBuilt(entry.kind);
     if (entry.kind == ALXUICatalog::Kind::Widget)
     {
         widget_tag = entry.rootTag;
-        buildable = buildable && isCoreWidgetTag(widget_tag);
+        buildable = buildable && ALXUICatalog::isCoreWidgetTag(widget_tag);
     }
     else if (entry.kind == ALXUICatalog::Kind::Template)
     {
         widget_tag = entry.name.substr(entry.name.rfind('/') + 1);
         widget_tag = widget_tag.substr(0, widget_tag.size() - 4);
-        buildable = buildable && isCoreWidgetTag(widget_tag) && ALXUISchema::buildsAlone(widget_tag);
+        buildable = buildable && ALXUICatalog::isCoreWidgetTag(widget_tag) && ALXUISchema::buildsAlone(widget_tag);
     }
     if (!buildable)
     {
@@ -8890,10 +8671,10 @@ void ALFloaterXUIStudio::refreshAttributes(LLView* view)
         }
         // What a field does outranks what its name suggests: an attribute
         // that is thrown away is not a position however it is spelled.
-        field.group = field.ignored ? GROUP_IGNORED
-                    : field.unknown ? GROUP_UNKNOWN
-                                    : attributeGroupOf(name, declared ? declared->name : std::string_view());
-        vocabularyFor(field);
+        field.group = field.ignored ? ALXUIFields::IGNORED
+                    : field.unknown ? ALXUIFields::UNKNOWN
+                                    : ALXUIFields::sectionOf(name, declared ? declared->name : std::string_view());
+        ALXUIFields::vocabularyFor(field);
         // A field drawn as a picture is drawn in the proportions of the
         // element it is about: a rect and the rect it sits in, which are
         // the same coordinates.
@@ -8936,7 +8717,7 @@ void ALFloaterXUIStudio::refreshAttributes(LLView* view)
         field.source = layerLabel(PRIMARY, from ? from->layer : 0);
         field.authored = true;
         field.kind = ALParamType::STRING;
-        field.group = attributeGroupOf(field.name, declared ? declared->name : std::string_view());
+        field.group = ALXUIFields::sectionOf(field.name, declared ? declared->name : std::string_view());
         written.insert(field.name);
         fields.push_back(std::move(field));
     }
@@ -8961,9 +8742,9 @@ void ALFloaterXUIStudio::refreshAttributes(LLView* view)
             field.values = attribute.values;
             field.type = attribute.type;
             field.ignored = attribute.ignored;
-            field.group = field.ignored ? GROUP_IGNORED
-                                        : attributeGroupOf(field.name, declared->name);
-            vocabularyFor(field);
+            field.group = field.ignored ? ALXUIFields::IGNORED
+                                        : ALXUIFields::sectionOf(field.name, declared->name);
+            ALXUIFields::vocabularyFor(field);
             fields.push_back(std::move(field));
         }
     }
@@ -9645,7 +9426,7 @@ void ALFloaterXUIStudio::refreshLayout(LLView* view)
     {
         add("LayoutBoundingRect", rect_of(view->getBoundingRect()));
     }
-    add("LayoutFollows", followsText(view->getFollows()));
+    add("LayoutFollows", ALFollowsControl::followsText(view->getFollows()));
 
     const ALXUICatalog::Layer* layer = nullptr;
     pugi::xml_node element = authoredElement(layer);

@@ -275,4 +275,29 @@ namespace tut
                       narrow->getValue().asString(), std::string("right"));
         delete narrow;
     }
+
+    template<> template<>
+    void alfollowscontrol_object::test<12>()
+    {
+        set_test_name("a view's follows flags are written as a file writes them, and read back in any order");
+        ensure_equals("two edges", ALFollowsControl::followsText(FOLLOWS_LEFT | FOLLOWS_TOP), std::string("left|top"));
+        ensure_equals("every edge is all", ALFollowsControl::followsText(FOLLOWS_ALL), std::string("all"));
+        ensure_equals("no edge is none", ALFollowsControl::followsText(FOLLOWS_NONE), std::string("none"));
+        ensure_equals("read back", ALFollowsControl::followsFlags("left|top"), (U32)(FOLLOWS_LEFT | FOLLOWS_TOP));
+        ensure_equals("in any order", ALFollowsControl::followsFlags("top|left"), (U32)(FOLLOWS_LEFT | FOLLOWS_TOP));
+        ensure_equals("all is every edge", ALFollowsControl::followsFlags("all"), (U32)FOLLOWS_ALL);
+        // The four flags are not four bits in a row, so the sets of them
+        // are made from the flags rather than counted.
+        const U32 edges[] = { FOLLOWS_LEFT, FOLLOWS_RIGHT, FOLLOWS_TOP, FOLLOWS_BOTTOM };
+        for (U32 set = 0; set < 16; ++set)
+        {
+            U32 follows = FOLLOWS_NONE;
+            for (U32 i = 0; i < 4; ++i)
+            {
+                follows |= (set & (1u << i)) ? edges[i] : 0u;
+            }
+            ensure_equals("every set of edges round trips: " + ALFollowsControl::followsText(follows),
+                          ALFollowsControl::followsFlags(ALFollowsControl::followsText(follows)), follows);
+        }
+    }
 }

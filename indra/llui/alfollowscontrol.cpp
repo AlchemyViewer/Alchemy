@@ -111,6 +111,41 @@ LLSD ALFollowsControl::getValue() const
     return ALFlagsField::write(bits, mNames, mAll, mNone);
 }
 
+namespace
+{
+    // The names sit at bits nought to three here and the flags do not, so
+    // the two are mapped.
+    const std::vector<std::string>& followsNames()
+    {
+        static const std::vector<std::string> names = { "left", "right", "top", "bottom" };
+        return names;
+    }
+    constexpr U32 FOLLOWS_BY_BIT[] = { FOLLOWS_LEFT, FOLLOWS_RIGHT, FOLLOWS_TOP, FOLLOWS_BOTTOM };
+}
+
+// static
+std::string ALFollowsControl::followsText(U32 follows)
+{
+    U32 bits = 0;
+    for (size_t i = 0; i < std::size(FOLLOWS_BY_BIT); ++i)
+    {
+        bits |= (follows & FOLLOWS_BY_BIT[i]) ? (1u << i) : 0u;
+    }
+    return ALFlagsField::write(bits, followsNames(), "all", "none");
+}
+
+// static
+U32 ALFollowsControl::followsFlags(std::string_view text)
+{
+    const U32 bits    = ALFlagsField::read(text, followsNames(), "all");
+    U32       follows = FOLLOWS_NONE;
+    for (size_t i = 0; i < std::size(FOLLOWS_BY_BIT); ++i)
+    {
+        follows |= (bits & (1u << i)) ? FOLLOWS_BY_BIT[i] : 0u;
+    }
+    return follows;
+}
+
 // static
 // A view keeps its distance from the edges it follows. Following both edges
 // of a dimension is following two distances that cannot both be kept at one

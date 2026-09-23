@@ -157,6 +157,7 @@ target_sources(
     alxuicatalog.cpp
     alxuidiagnostics.cpp
     alxuiedit.cpp
+    alxuifields.cpp
     alxuidocuments.cpp
     alxuilint.cpp
     alxuinotes.cpp
@@ -344,6 +345,7 @@ target_sources(
         alxuicatalog.h
         alxuidiagnostics.h
         alxuiedit.h
+        alxuifields.h
         alxuidocuments.h
         alxuifindings.h
         alxuilint.h
@@ -501,6 +503,7 @@ if(AL_BUILD_TESTS)
     altabstrip
     alquickopen
     alstudiofloater
+    alxuifields
     alxuischema
     alxuiselection
     alxuisourcemap
