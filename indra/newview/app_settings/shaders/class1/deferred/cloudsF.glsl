@@ -87,7 +87,12 @@ void main()
     // Get relative position
     vec3 rel_pos = pos.xyz - camPosLocal.xyz + vec3(0, 50, 0);
 
-    float altitude_blend_factor = clamp((rel_pos.y + 512.0) / max_y, 0.0, 1.0);
+    // WindLight drew clouds at full opacity above the horizon. SL-10751's (rel_pos.y + 512) / max_y fade was
+    // meant for the dome's underside, but rel_pos.y tops out near 650, so with max_y above ~1160 it capped
+    // every cloud (0.72 at the zenith for the default 1605). Below the horizon SL-11589 zeroes them (WindLight
+    // drew them hanging under it); this only softens that cut over the last two degrees above the horizon,
+    // where the haze has already taken the clouds most of the way to the horizon's colour.
+    float altitude_blend_factor = smoothstep(0.0, 0.035, rel_pos.y / length(rel_pos));
 
     // Set altitude
     if (rel_pos.y > 0)
