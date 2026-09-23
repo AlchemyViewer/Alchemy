@@ -175,7 +175,6 @@ if(AL_BUILD_VIEWER)
     alscriptpreprocessor.cpp
     alscriptrecovery.cpp
     alscriptsnippets.cpp
-    alscriptmessages.cpp
     alscripttheme.cpp
     alscriptworkspace.cpp
     alterrainsurfacemaps.cpp
@@ -973,7 +972,6 @@ if(AL_BUILD_VIEWER)
     alscriptpreprocessor.h
     alscriptrecovery.h
     alscriptsnippets.h
-    alscriptmessages.h
     alscripttheme.h
     alscriptworkspace.h
     alterrainsurfacemaps.h
@@ -2359,7 +2357,6 @@ if(AL_BUILD_TESTS)
     almotionpredictor
     alnotecarditems
     alsceneexplorerpredicate
-    alscriptmessages
     alscriptrecovery
     alscriptsnippets
     alwhitebalancesolver
