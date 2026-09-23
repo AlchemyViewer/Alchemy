@@ -472,6 +472,7 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="PreprocTooMuch">the macros expand to more than this preprocessor will make; nothing was preprocessed</string>
 	<string name="PreprocExpressionTooDeep">the expression nests too deeply for this preprocessor</string>
 	<string name="PreprocMacrosTooDeep">macros are invoked inside each other's arguments more deeply than this preprocessor follows; nothing was preprocessed</string>
+	<string name="PreprocNestsTooDeep">blocks nest more deeply than this preprocessor follows; nothing was preprocessed</string>
 	<string name="PreprocIncludeNeedsClose">missing '&gt;' in #include</string>
 	<string name="PreprocIncludeNotFound">could not find include file '[1]'</string>
 	<string name="PreprocIncludeTooDeep">#include nested too deeply at '[1]'</string>

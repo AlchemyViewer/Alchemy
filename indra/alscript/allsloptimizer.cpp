@@ -2633,8 +2633,16 @@ namespace
                 }
                 if (dead)
                 {
-                    go(stmt, "OptimizerRemovedUnreachable", ", which can never run");
-                    continue;
+                    // A label in it that a jump goes to makes it reachable,
+                    // and what follows it: a jump in SL goes to the last
+                    // label of its name in the function, whatever block
+                    // that is in.
+                    if (!holdsLiveLabel(stmt))
+                    {
+                        go(stmt, "OptimizerRemovedUnreachable", ", which can never run");
+                        continue;
+                    }
+                    dead = false;
                 }
                 switch (stmt->getNodeSubType())
                 {
@@ -2689,6 +2697,12 @@ namespace
             }
             const bool    taken  = static_cast<LSLIntegerConstant*>(cv)->getValue() != 0;
             LSLStatement* branch = taken ? stmt->getTrueBranch() : stmt->getFalseBranch();
+            // A branch never taken is reached all the same by a jump to a
+            // label in it.
+            if (LSLStatement* other = taken ? stmt->getFalseBranch() : stmt->getTrueBranch(); other && holdsLiveLabel(other))
+            {
+                return false;
+            }
             report.note(stmt->getLoc(), taken ? "OptimizerIfAlwaysTrue" : "OptimizerIfAlwaysFalse",
                         taken ? "the condition of this if is always true; kept only what runs" : "the condition of this if is always false; kept only what runs");
             replaceStatement(stmt, branch ? static_cast<LSLStatement*>(stmt->takeChild(taken ? 1 : 2)) : nullptr);
@@ -2698,7 +2712,7 @@ namespace
         bool visit(LSLWhileStatement* stmt) override
         {
             visitChildren(stmt);
-            if (isInteger(stmt->getCheckExpr(), 0))
+            if (isInteger(stmt->getCheckExpr(), 0) && !holdsLiveLabel(stmt))
             {
                 report.note(stmt->getLoc(), "OptimizerRemovedWhile", "removed a while loop whose condition is always false");
                 replaceStatement(stmt, nullptr);
@@ -2720,7 +2734,7 @@ namespace
         bool visit(LSLForStatement* stmt) override
         {
             visitChildren(stmt);
-            if (isInteger(stmt->getCheckExpr(), 0))
+            if (isInteger(stmt->getCheckExpr(), 0) && !holdsLiveLabel(stmt))
             {
                 // The initialisers still run, once.
                 auto* block = ctx.allocator->newTracked<LSLCompoundStatement>(nullptr);
@@ -2788,6 +2802,27 @@ namespace
                 }
             }
             return true;
+        }
+
+        // Whether a label something jumps to is in a statement, however
+        // far down. A jump from inside the statement itself counts too,
+        // which keeps a statement that nothing outside reaches: dead code
+        // kept, never live code dropped.
+        static bool holdsLiveLabel(LSLASTNode* node)
+        {
+            if (node->getNodeType() == NODE_STATEMENT && node->getNodeSubType() == NODE_LABEL)
+            {
+                LSLSymbol* sym = node->getSymbol();
+                return sym && sym->getReferences() > 1;
+            }
+            for (LSLASTNode* child = node->getChild(0); child; child = child->getNext())
+            {
+                if (holdsLiveLabel(child))
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         bool unusedLabel(LSLASTNode* label)

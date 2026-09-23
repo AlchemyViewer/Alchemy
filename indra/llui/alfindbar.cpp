@@ -29,6 +29,7 @@
 #include "alsaid.h"
 #include "alsurface.h"
 
+#include "llfocusmgr.h"
 #include "llfontgl.h"
 #include "llkeyboard.h"
 #include "lllineeditor.h"
@@ -65,6 +66,9 @@ public:
         mInk(ink),
         mLit(lit)
     {
+        // Made here rather than by the factory, which is what would have
+        // read the parameter: a stop for Tab, as a button is.
+        setTabStop(true);
     }
 
     void setGlyph(const std::string& glyph) { mGlyph = glyph; }
@@ -92,6 +96,11 @@ public:
         }
         const LLFontGL* font = LLFontGL::getFontSansSerifSmall();
         font->renderUTF8(mGlyph, 0, local.getCenterX(), local.getCenterY() - font->getLineHeight() / 2 + 1, ink, LLFontGL::HCENTER, LLFontGL::BOTTOM);
+        if (hasFocus())
+        {
+            // Where the keyboard is, once Tab has brought it here.
+            gl_rect_2d(local, gFocusMgr.getFocusColor() % alpha, false);
+        }
         mHover = false;
     }
 
@@ -103,19 +112,49 @@ public:
 
     bool handleMouseDown(S32 x, S32 y, MASK mask) override
     {
+        press();
+        return true;
+    }
+
+    bool handleMouseUp(S32 x, S32 y, MASK mask) override { return true; }
+
+    // Pressed from the keyboard as a button is: Space, which comes as the
+    // character, once however long it is held; and Return.
+    bool handleUnicodeCharHere(llwchar uni_char) override
+    {
+        if (uni_char == ' ')
+        {
+            if (!gKeyboard || !gKeyboard->getKeyRepeated(' '))
+            {
+                press();
+            }
+            return true;
+        }
+        return LLUICtrl::handleUnicodeCharHere(uni_char);
+    }
+
+    bool handleKeyHere(KEY key, MASK mask) override
+    {
+        if (key == KEY_RETURN && mask == MASK_NONE)
+        {
+            press();
+            return true;
+        }
+        return LLUICtrl::handleKeyHere(key, mask);
+    }
+
+    void press()
+    {
         if (!getEnabled())
         {
-            return true;
+            return;
         }
         if (mToggle)
         {
             mOn = !mOn;
         }
         onCommit();
-        return true;
     }
-
-    bool handleMouseUp(S32 x, S32 y, MASK mask) override { return true; }
 
 private:
     std::string mGlyph;

@@ -189,9 +189,10 @@ private:
     // after another.
     std::unique_ptr<Worker>                             mWorker;
     U32                                                 mDefinitionsGeneration = 1;
-    // The newest check asked for of each script, by the serial they were
-    // asked in: a check the worker reaches with a newer one already
-    // asked for is passed over. Written on the main thread, read on the
+    // The newest check asked for of each script with one waiting, by the
+    // serial they were asked in: a check the worker reaches with a newer
+    // one already asked for is passed over, and the newest, reached,
+    // takes its script off. Written on the main thread, read on the
     // worker; both under the lock, since a check may take a moment and
     // the main thread goes on asking meanwhile.
     std::mutex                                          mLatestMutex;

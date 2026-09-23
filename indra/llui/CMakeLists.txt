@@ -483,6 +483,7 @@ if(AL_BUILD_TESTS)
     alxuicatalog
     alxuilint
     alxuiedit
+    alfindbar
     alhistorylist
     alpopover
     alscopebar

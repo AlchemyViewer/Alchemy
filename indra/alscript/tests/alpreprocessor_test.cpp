@@ -35,6 +35,7 @@
 #include <fstream>
 #include <map>
 #include <sstream>
+#include <thread>
 
 namespace tut
 {
@@ -881,5 +882,105 @@ namespace tut
         // And the macro after it is expanded.
         ALPreprocessor::Result r = ALPreprocessor::run("#define X 42\nlocal s = `{\"{\"}` .. X\n", options(true));
         ensure("the macro after the string expanded: " + r.text, r.text.find(".. 42") != std::string::npos);
+    }
+
+    template<> template<>
+    void alpreprocessor_object::test<24>()
+    {
+        set_test_name("the switch and loop transforms are bounded however the script nests, and a long run of else-ifs is no deeper for its length");
+        ALPreprocessor::Options opts = options();
+        opts.switches                = true;
+        opts.extensions              = true;
+
+        // Blocks in blocks past the bound: said, and nothing made of it.
+        std::string blocks = "default { state_entry() {\n";
+        for (int i = 0; i < 2000; ++i)
+        {
+            blocks += "{";
+        }
+        blocks += "llOwnerSay(\"deep\");";
+        for (int i = 0; i < 2000; ++i)
+        {
+            blocks += "}";
+        }
+        blocks += "\n} }\n";
+        ALPreprocessor::Result r = ALPreprocessor::run(blocks, opts);
+        ensure("overran", r.overran);
+        ensure("and said why: " + messages(r).substr(0, 200), messages(r).find("blocks nest more deeply") != std::string::npos);
+        ensure_equals("the text is the source as it was", r.text, blocks);
+
+        // Switches in switches, likewise.
+        std::string switches = "default { state_entry() { integer x;\n";
+        for (int i = 0; i < 2000; ++i)
+        {
+            switches += "switch (x) { case 1: ";
+        }
+        for (int i = 0; i < 2000; ++i)
+        {
+            switches += "}";
+        }
+        switches += "\n} }\n";
+        r = ALPreprocessor::run(switches, opts);
+        ensure("switches overran", r.overran);
+        ensure("and said why: " + messages(r).substr(0, 200), messages(r).find("blocks nest more deeply") != std::string::npos);
+
+        // As deep as anybody writes, done.
+        std::string loops = "default { state_entry() { integer i;\n";
+        for (int i = 0; i < 30; ++i)
+        {
+            loops += "while (i) { switch (i) { case 1: break; } ";
+        }
+        loops += "break;";
+        for (int i = 0; i < 30; ++i)
+        {
+            loops += "}";
+        }
+        loops += "\n} }\n";
+        r = ALPreprocessor::run(loops, opts);
+        ensure("thirty deep is nothing: " + messages(r).substr(0, 200), !r.overran && !r.hasErrors());
+        ensure("and the loops were lowered: " + r.text.substr(0, 200), r.text.find("jump _brk") != std::string::npos);
+
+        // A loop governing a long chain of else-ifs, on a thread with what
+        // the platform gives one -- half a megabyte on a Mac: the chain is
+        // walked along, not descended, however long it is.
+        std::string chain = "default { state_entry() { integer i;\nwhile (i < 3)\n";
+        for (int k = 0; k < 20000; ++k)
+        {
+            chain += std::string(k ? "else " : "") + "if (i == " + std::to_string(k) + ") i += 1;\n";
+        }
+        chain += "} }\n";
+        std::thread worker([&]() { r = ALPreprocessor::run(chain, opts); });
+        worker.join();
+        ensure("the chain is no deeper for its length: " + messages(r).substr(0, 200), !r.overran && !r.hasErrors());
+        ensure("and all of it is there", r.text.find("else if (i == 19999) i += 1;") != std::string::npos);
+    }
+
+    template<> template<>
+    void alpreprocessor_object::test<25>()
+    {
+        set_test_name("every line of a token over several lines maps back to its own: a block comment, a long string");
+        const std::string source = "#define X 1\n/* one\n   two\n   three */ integer x = X;\n";
+        ALPreprocessor::Result r = ALPreprocessor::run(source, options());
+        ensure_equals("nothing wrong", messages(r), std::string());
+        ensure("the comment on the lines it was on: " + r.text, r.text.find("\n/* one\n   two\n   three */ integer x = 1;") != std::string::npos);
+        ALSourceMap::Loc loc = r.map.toSource(2, 4);
+        ensure("the comment's middle line maps", loc.found());
+        ensure_equals("to its own line", loc.line, 2);
+        ensure_equals("and column", loc.column, 4);
+        loc = r.map.toSource(3, 4);
+        ensure_equals("its last line, before what follows it on the line", loc.line, 3);
+        ensure_equals("at its own column", loc.column, 4);
+        loc = r.map.toSource(3, 12);
+        ensure_equals("and what follows it where it is", loc.column, 12);
+        loc = r.map.toExpanded(0, 2, 4);
+        ensure("and back", loc.found() && loc.line == 2 && loc.column == 4);
+
+        const std::string lua = "#define X 2\nlocal s = [[one\ntwo\nthree]] .. X\n";
+        r = ALPreprocessor::run(lua, options(true));
+        ensure_equals("nothing wrong in SLua", messages(r), std::string());
+        loc = r.map.toSource(2, 1);
+        ensure("a long string's middle line maps to its own", loc.found() && loc.line == 2 && loc.column == 1);
+        loc = r.map.toSource(3, 11);
+        ensure("and the macro after it to where it was invoked", loc.found() && loc.line == 3 && loc.column == 11);
     }
 } // namespace tut

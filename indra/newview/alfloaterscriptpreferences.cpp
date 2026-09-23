@@ -32,6 +32,7 @@
 #include "alfontfield.h"
 #include "alscriptkeymap.h"
 #include "llbutton.h"
+#include "llcallbacklist.h"
 #include "llcolorswatch.h"
 #include "llcombobox.h"
 #include "lldirpicker.h"
@@ -77,6 +78,9 @@ namespace
     // The places an include is looked for, as the setting spells them.
     const char* const PLACES[] = { "inventory", "object", "disk" };
 
+    // How long after the last keystroke an edited snippet is written.
+    const F32 SNIPPET_SETTLE = 0.5f;
+
     const S32 SWATCH_ROW    = 24;
     const S32 SWATCH_WIDTH  = 48;
     const S32 SWATCH_HEIGHT = 20;
@@ -116,7 +120,10 @@ bool ALFloaterScriptPreferences::postBuild()
     getChild<LLButton>("remove_folder")->setCommitCallback([this](LLUICtrl*, const LLSD&) { onRemoveIncludeFolder(); });
     getChild<LLButton>("external_browse")->setCommitCallback([this](LLUICtrl*, const LLSD&) { onBrowseExternalEditor(); });
     getChild<LLButton>("scripting_settings")->setCommitCallback([](LLUICtrl*, const LLSD&) { LLFloaterReg::showInstance("scripting_settings"); });
-    getChild<LLButton>("snippet_xml")->setCommitCallback([this](LLUICtrl*, const LLSD&) { ALFloaterScriptStudio::editSnippets(snippetLua()); });
+    getChild<LLButton>("snippet_xml")->setCommitCallback([this](LLUICtrl*, const LLSD&) {
+        flushSnippets();
+        ALFloaterScriptStudio::editSnippets(snippetLua());
+    });
     getChild<LLButton>("snippet_new")->setCommitCallback([this](LLUICtrl*, const LLSD&) { onSnippetNew(); });
     getChild<LLButton>("snippet_copy")->setCommitCallback([this](LLUICtrl*, const LLSD&) { onSnippetCopy(); });
     getChild<LLButton>("snippet_delete")->setCommitCallback([this](LLUICtrl*, const LLSD&) { onSnippetDelete(); });
@@ -355,6 +362,16 @@ void ALFloaterScriptPreferences::onOpen(const LLSD& key)
 void ALFloaterScriptPreferences::onClose(bool app_quitting)
 {
     mShowing = false;
+    // A snippet typed and not yet written goes with a Cancel, and is
+    // written by any other way out.
+    if (mCancelled)
+    {
+        mSnippetsUnsaved = false;
+    }
+    else
+    {
+        flushSnippets();
+    }
     if (app_quitting)
     {
         // The viewer writes the colours itself on the way out.
@@ -484,8 +501,12 @@ void ALFloaterScriptPreferences::onTheme()
 void ALFloaterScriptPreferences::onSaveTheme()
 {
     const LLHandle<LLFloater> handle = getHandle();
-    LLSD                      args;
-    args["NAME"] = ALScriptTheme::chosen().empty() ? getString("ThemeNewName") : ALScriptTheme::chosen();
+    // The chosen theme's name where it is the person's own, to save over;
+    // a shipped one's is not theirs to take.
+    const std::string chosen = ALScriptTheme::chosen();
+    const bool        own    = std::any_of(mAvailable.begin(), mAvailable.end(), [&](const ALScriptTheme& theme) { return theme.own && theme.name == chosen; });
+    LLSD              args;
+    args["NAME"] = own ? chosen : getString("ThemeNewName");
     LLNotificationsUtil::add("ScriptStudioSaveTheme", args, LLSD(), [handle](const LLSD& notification, const LLSD& response) {
         ALFloaterScriptPreferences* self = ALViewType::as<ALFloaterScriptPreferences>(handle.get());
         if (!self || LLNotificationsUtil::getSelectedOption(notification, response) != 0)
@@ -497,6 +518,18 @@ void ALFloaterScriptPreferences::onSaveTheme()
         if (name.empty())
         {
             return;
+        }
+        // A theme is chosen by its name, and a shipped one already has it:
+        // two of one name would be one that could never be chosen.
+        for (const ALScriptTheme& theme : self->mAvailable)
+        {
+            if (!theme.own && theme.name == name)
+            {
+                LLSD taken;
+                taken["NAME"] = name;
+                LLNotificationsUtil::add("ScriptStudioThemeNameShipped", taken);
+                return;
+            }
         }
         ALScriptTheme theme = ALScriptTheme::capture(name);
         std::string   path;
@@ -870,8 +903,22 @@ S32 ALFloaterScriptPreferences::chosenOwnSnippet() const
     return index >= 0 && index < static_cast<S32>(mOwnSnippets.size()) ? index : -1;
 }
 
+void ALFloaterScriptPreferences::flushSnippets()
+{
+    if (!mSnippetsUnsaved)
+    {
+        return;
+    }
+    mSnippetsUnsaved = false;
+    // The language they were read for, which the chooser may have moved
+    // off by now.
+    ALScriptSnippets::saveOwn(mSnippetsLua, mOwnSnippets);
+}
+
 void ALFloaterScriptPreferences::fillSnippets(bool reread)
 {
+    // What is waiting written before the file is read again.
+    flushSnippets();
     const bool lua = snippetLua();
     if (reread || lua != mSnippetsLua)
     {
@@ -974,8 +1021,9 @@ void ALFloaterScriptPreferences::onSnippetEdited()
     one.prefix = mSnippetPrefix->getText();
     one.detail = mSnippetDetail->getText();
     one.body   = mSnippetBody->text();
-    // The row says what the fields do, and the file holds it -- whatever
-    // has a name and a body -- for the studio to offer at once.
+    // The row says what the fields do at once, and the file holds it --
+    // whatever has a name and a body -- for the studio to offer once the
+    // typing stops.
     if (LLScrollListItem* item = mSnippetList->getFirstSelected())
     {
         if (LLScrollListCell* name = item->getColumn(0))
@@ -987,7 +1035,16 @@ void ALFloaterScriptPreferences::onSnippetEdited()
             prefix->setValue(one.prefix);
         }
     }
-    ALScriptSnippets::saveOwn(snippetLua(), mOwnSnippets);
+    mSnippetsUnsaved = true;
+    const U32                 edit   = ++mSnippetEdits;
+    const LLHandle<LLFloater> handle = getHandle();
+    doAfterInterval([handle, edit]() {
+        ALFloaterScriptPreferences* self = ALViewType::as<ALFloaterScriptPreferences>(handle.get());
+        if (self && self->mSnippetEdits == edit)
+        {
+            self->flushSnippets();
+        }
+    }, SNIPPET_SETTLE);
 }
 
 void ALFloaterScriptPreferences::onSnippetNew()
@@ -1019,7 +1076,8 @@ void ALFloaterScriptPreferences::onSnippetCopy()
     one.detail = mSnippetDetail->getText();
     one.body   = body;
     mOwnSnippets.push_back(one);
-    ALScriptSnippets::saveOwn(snippetLua(), mOwnSnippets);
+    mSnippetsUnsaved = true;
+    flushSnippets();
     mSnippetList->deselectAllItems();
     fillSnippets(false);
     mSnippetList->selectByValue(LLSD("own:" + std::to_string(mOwnSnippets.size() - 1)));
@@ -1035,7 +1093,8 @@ void ALFloaterScriptPreferences::onSnippetDelete()
         return;
     }
     mOwnSnippets.erase(mOwnSnippets.begin() + own);
-    ALScriptSnippets::saveOwn(snippetLua(), mOwnSnippets);
+    mSnippetsUnsaved = true;
+    flushSnippets();
     mSnippetList->deselectAllItems();
     fillSnippets(false);
 }

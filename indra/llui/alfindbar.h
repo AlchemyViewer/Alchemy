@@ -44,7 +44,8 @@ class LLTextBox;
 // the bar the count.
 //
 // Its buttons are flat glyphs, lit when on, as an editor's are: the
-// glyphs stand in until the icons are drawn.
+// glyphs stand in until the icons are drawn. Tab reaches each of them
+// in turn, and Space or Return presses the one it is on.
 class ALFindBar : public LLPanel
 {
 public:

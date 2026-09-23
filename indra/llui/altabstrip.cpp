@@ -186,6 +186,95 @@ void ALTabStrip::choose(const std::string& value)
     showChosen();
 }
 
+// Each tab's cut name goes with it, since it is kept by place.
+void ALTabStrip::trade(size_t a, size_t b)
+{
+    std::swap(mTabs[a], mTabs[b]);
+    if (a < mShown.size() && b < mShown.size())
+    {
+        std::swap(mShown[a], mShown[b]);
+    }
+    layout();
+}
+
+// What a mouse does to the chosen tab, with the keyboard. Each signal gets
+// a copy of the value, as the mouse's do: whoever hears fills the strip
+// afresh.
+bool ALTabStrip::handleKeyHere(KEY key, MASK mask)
+{
+    const S32 at = indexOf(mChosen);
+    if (at < 0)
+    {
+        // Nothing chosen: the first tab is where a walk starts.
+        if (!mTabs.empty() && mask == MASK_NONE && (key == KEY_RIGHT || key == KEY_LEFT || key == KEY_HOME || key == KEY_END))
+        {
+            chooseKeyed(key == KEY_END || key == KEY_LEFT ? mTabs.size() - 1 : 0);
+            return true;
+        }
+        return LLUICtrl::handleKeyHere(key, mask);
+    }
+    const size_t here = static_cast<size_t>(at);
+    const size_t last = mTabs.size() - 1;
+    if (mask == MASK_NONE)
+    {
+        switch (key)
+        {
+            case KEY_LEFT: chooseKeyed(here > 0 ? here - 1 : here); return true;
+            case KEY_RIGHT: chooseKeyed(here < last ? here + 1 : here); return true;
+            case KEY_HOME: chooseKeyed(0); return true;
+            case KEY_END: chooseKeyed(last); return true;
+            case KEY_DELETE:
+            {
+                const std::string value = mChosen;
+                mClosedSignal(value);
+                return true;
+            }
+            case KEY_RETURN:
+            case ' ':
+            {
+                const std::string value = mChosen;
+                mHeldSignal(value);
+                return true;
+            }
+            case KEY_DOWN: mListSignal(); return true;
+            default: break;
+        }
+    }
+    if (mask == MASK_SHIFT && (key == KEY_LEFT || key == KEY_RIGHT))
+    {
+        const bool left = key == KEY_LEFT;
+        if (left ? here > 0 : here < last)
+        {
+            trade(here, left ? here - 1 : here + 1);
+            showChosen();
+            sayOrder();
+        }
+        return true;
+    }
+    if (mask == MASK_SHIFT && key == KEY_F10)
+    {
+        const LLRect      r     = rectOf(here);
+        const std::string value = mChosen;
+        mMenuSignal(value, r.getCenterX(), r.mBottom);
+        return true;
+    }
+    return LLUICtrl::handleKeyHere(key, mask);
+}
+
+void ALTabStrip::chooseKeyed(size_t index)
+{
+    const std::string value = mTabs[index].value;
+    if (value != mChosen)
+    {
+        mChosen = value;
+        showChosen();
+        mChosenSignal(value);
+    }
+    // Kept while the tabs are being walked: a host that answers a choice
+    // by putting the keyboard in what it shows would end the walk at one.
+    setFocus(true);
+}
+
 S32 ALTabStrip::contentWidth() const
 {
     S32 width = 0;
@@ -480,6 +569,11 @@ void ALTabStrip::draw()
         // The shown tab is the face of what is under it; the rest sit back.
         gl_rect_2d(r, (current ? shown : rest).get() % alpha, true);
         gl_rect_2d(r, edge.get() % alpha, false);
+        if (current && hasFocus())
+        {
+            // Where the keyboard is, while the strip has it.
+            gl_rect_2d(r.mLeft + 1, r.mTop - 1, r.mRight - 1, r.mBottom + 1, gFocusMgr.getFocusColor() % alpha, false);
+        }
 
         S32 x = r.mLeft + PAD;
         const bool badged = tab.badge.mV[VALPHA] > 0.f;
@@ -754,16 +848,6 @@ bool ALTabStrip::handleHover(S32 x, S32 y, MASK mask)
         if (mDragging)
         {
             bool moved = true;
-            // Each tab's cut name goes with it, since it is kept by place.
-            const auto trade = [this](size_t a, size_t b)
-            {
-                std::swap(mTabs[a], mTabs[b]);
-                if (a < mShown.size() && b < mShown.size())
-                {
-                    std::swap(mShown[a], mShown[b]);
-                }
-                layout();
-            };
             while (moved && mPressed < (S32)mTabs.size())
             {
                 moved = false;

@@ -257,7 +257,8 @@ public:
     };
     typedef std::function<void(const Contents&)> contents_callback_t;
     // The scripts and notecards a prim holds, fetched from the region if
-    // need be, answered once on the main thread.
+    // need be, answered once on the main thread: as not fetched where the
+    // region has not answered within a while.
     void listContents(const LLUUID& prim, contents_callback_t callback);
 
     // --- changing what an object holds ---------------------------------------------
@@ -356,7 +357,9 @@ private:
 
     compiled_signal_t             mCompiled;
     running_signal_t              mRunningState;
-    std::vector<std::unique_ptr<ContentsListener>> mListeners;
+    // Shared, so that the timer answering one the object never did can
+    // tell whether it is still here.
+    std::vector<std::shared_ptr<ContentsListener>> mListeners;
     std::unique_ptr<Burst>        mBurst;
     std::unique_ptr<LLEventTimer> mBurstTimer;
     std::deque<RuntimeEvent>      mRecent;

@@ -138,6 +138,35 @@ namespace
             }
         }
     }
+
+    // The file a theme called `name` is written to among a person's own:
+    // the one a theme of that name is already in, else the first under
+    // the name's slug that no other file is at. Two names can come to one
+    // slug -- "My theme" and "my-theme" -- and neither is written over by
+    // the other; nor is a file that does not read as a theme at all.
+    // Nothing where every such name is taken.
+    std::string fileFor(const std::string& folder, const std::string& name)
+    {
+        std::vector<ALScriptTheme> own;
+        themesIn(folder, true, own);
+        for (const ALScriptTheme& theme : own)
+        {
+            if (theme.name == name)
+            {
+                return theme.path;
+            }
+        }
+        const std::string slug = slugOf(name);
+        for (S32 n = 1; n <= 1000; ++n)
+        {
+            const std::string path = gDirUtilp->add(folder, n == 1 ? slug + ".xml" : slug + "_" + std::to_string(n) + ".xml");
+            if (!LLFile::isfile(path))
+            {
+                return path;
+            }
+        }
+        return std::string();
+    }
 }
 
 // static
@@ -263,7 +292,12 @@ bool ALScriptTheme::save(std::string& path_out) const
 {
     const std::string folder = gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, FOLDER);
     LLFile::mkdir(folder);
-    path_out = gDirUtilp->add(folder, slugOf(name) + ".xml");
+    path_out = fileFor(folder, name);
+    if (path_out.empty())
+    {
+        path_out = folder;
+        return false;
+    }
     LLSD data;
     data["name"]   = name;
     data["source"] = source;

@@ -1148,6 +1148,9 @@ void ALFloaterLightBox::openHistory()
     hp.rect = LLRect(0, HEIGHT, WIDTH, 0);
     hp.empty_headline = getString("history_empty_headline");
     hp.empty_sentence = getString("history_empty_sentence");
+    // The row under every step: undoing everything is the one trip back a
+    // person is most likely to want, and no step's row can ask for it.
+    hp.start_label    = getString("history_start");
     ALHistoryList* list = LLUICtrlFactory::create<ALHistoryList>(hp);
 
     // The floater's own keys work while the list is up -- Ctrl+Z steps it
@@ -1165,12 +1168,10 @@ void ALFloaterLightBox::openHistory()
     mHistoryList = list->getHandle();
     list->onGoTo([self](size_t in_force)
     {
-        // The list counts its first row, which is the start of the history
-        // rather than a step, so the cursor is one less than it asks for.
-        ALFloaterLightBox* floater = self.get();
-        if (floater && in_force > 0)
+        // How many steps in force is where the cursor goes.
+        if (ALFloaterLightBox* floater = self.get())
         {
-            floater->goToHistory(in_force - 1);
+            floater->goToHistory(in_force);
         }
     });
     fillHistoryList();
@@ -1185,18 +1186,8 @@ void ALFloaterLightBox::fillHistoryList()
     }
     mHistoryListRevision = mHistory.revision();
 
-    // Nothing done yet: an empty list, which is what makes it say so.
+    // Nothing done yet is an empty list, which is what makes it say so.
     std::vector<ALHistoryList::Step> steps;
-    if (mHistory.depth() == 0)
-    {
-        showHistory(list, std::move(steps), 0);
-        return;
-    }
-
-    // A first row that is no step at all: where the history starts. Without
-    // it no row could ask for nothing to be in force, and undoing everything
-    // is the one trip back a person is most likely to want.
-    steps.push_back({ getString("history_start"), std::string() });
     for (size_t index = 0; index < mHistory.depth(); ++index)
     {
         const ALGradeHistory::Transaction& changes = mHistory.at(index);
@@ -1237,7 +1228,7 @@ void ALFloaterLightBox::fillHistoryList()
         }
         steps.push_back(std::move(step));
     }
-    showHistory(list, std::move(steps), mHistory.cursor() + 1);
+    showHistory(list, std::move(steps), mHistory.cursor());
 }
 
 void ALFloaterLightBox::goToHistory(size_t cursor)

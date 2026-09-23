@@ -293,4 +293,47 @@ namespace tut
         other->closeFloater();
         over->die();
     }
+    // A popover is its window's dependent: the window closing takes it,
+    // however the window went, and one that has already gone is not
+    // touched when the window goes after it.
+    template<> template<>
+    void alpopover_object::test<8>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        const auto home = []() {
+            LLFloater::Params fp(LLFloater::getDefaultParams());
+            fp.name            = "home";
+            fp.rect            = LLRect(100, 500, 500, 100);
+            fp.save_rect       = false;
+            fp.save_visibility = false;
+            LLFloater* made    = new LLFloater(LLSD(), fp);
+            made->openFloater();
+            return made;
+        };
+
+        LLFloater* window = home();
+        LLPanel*   over   = anchor();
+        window->addChild(over);
+        ALPopover*        popover = ALPopover::show(over, content());
+        std::vector<bool> said;
+        popover->onClosed([&said](bool escaped) { said.push_back(escaped); });
+        ensure("its window's dependent", popover->getDependee() == window);
+        window->closeFloater();
+        ensure("gone with its window", popover->isDead());
+        ensure_equals("said so once", said.size(), 1u);
+        ensure("and not as escaped: nobody pressed escape", !said.front());
+
+        // Gone first: the window closing after it finds nothing of it.
+        LLFloater* again = home();
+        LLPanel*   under = anchor();
+        again->addChild(under);
+        ALPopover* first = ALPopover::show(under, content());
+        first->escape();
+        ensure("gone", first->isDead());
+        again->closeFloater();
+        ensure("and the window closed after it", again->isDead());
+    }
 }

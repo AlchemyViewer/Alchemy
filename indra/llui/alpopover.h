@@ -57,7 +57,8 @@
 // menu bar instead. Keys the popover and its content do not take go home
 // to the floater the anchor was in, the way a pane out in a window of its
 // own sends them (ALPanelFloater), so a window's own shortcuts still answer
-// while one of its popovers has the keyboard.
+// while one of its popovers has the keyboard. And it is that window's
+// dependent: it closes when the window does, however the window went.
 class ALPopover : public LLFloater
 {
 public:

@@ -521,4 +521,78 @@ namespace tut
         ensure("and asks for a menu about it", menus.size() == 1 && menus.back() == "c");
         strip->die();
     }
+    // With the keyboard: the arrows walk the tabs and the strip keeps the
+    // keyboard while they do, Shift with an arrow moves the chosen one,
+    // and what else the mouse does has a key.
+    template<> template<>
+    void altabstrip_object::test<11>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        ALTabStrip* strip = make();
+        // A host that keeps its own order, fills the strip on every choice,
+        // and puts the keyboard in what it shows.
+        std::vector<ALTabStrip::Tab>          kept = three();
+        std::vector<std::string>              chosen, closed, held, menus;
+        std::vector<std::vector<std::string>> orders;
+        S32                                   lists = 0;
+        strip->setTabs(kept, "a");
+        strip->onReordered([&](const std::vector<std::string>& order) {
+            orders.push_back(order);
+            std::vector<ALTabStrip::Tab> now;
+            for (const std::string& value : order)
+            {
+                for (const ALTabStrip::Tab& one : kept)
+                {
+                    if (one.value == value)
+                    {
+                        now.push_back(one);
+                    }
+                }
+            }
+            kept = now;
+        });
+        strip->onChosen([&](const std::string& value) {
+            chosen.push_back(value);
+            gFocusMgr.setKeyboardFocus(nullptr);
+            strip->setTabs(kept, value);
+        });
+        strip->onClosed([&](const std::string& value) { closed.push_back(value); });
+        strip->onHeld([&](const std::string& value) { held.push_back(value); });
+        strip->onMenu([&](const std::string& value, S32, S32) { menus.push_back(value); });
+        strip->onListAsked([&]() { ++lists; });
+
+        ensure("reached by Tab", strip->hasTabStop());
+        ensure("the right arrow is taken", strip->handleKeyHere(KEY_RIGHT, MASK_NONE));
+        ensure("and chooses the next", chosen.size() == 1 && chosen.back() == "b" && strip->chosen() == "b");
+        ensure("and the strip keeps the keyboard", strip->hasFocus());
+        strip->handleKeyHere(KEY_END, MASK_NONE);
+        ensure_equals("End, the last", strip->chosen(), std::string("c"));
+        strip->handleKeyHere(KEY_RIGHT, MASK_NONE);
+        ensure("past the last, nothing more", chosen.size() == 2 && strip->chosen() == "c");
+        strip->handleKeyHere(KEY_HOME, MASK_NONE);
+        ensure_equals("Home, the first", strip->chosen(), std::string("a"));
+
+        ensure("Shift and right is taken", strip->handleKeyHere(KEY_RIGHT, MASK_SHIFT));
+        ensure("and moves the chosen tab along, told", orders.size() == 1 && orders.back() == std::vector<std::string>({ "b", "a", "c" }));
+        ensure("which is still chosen, where it went", strip->chosen() == "a" && strip->tabs()[1].value == "a");
+        strip->handleKeyHere(KEY_LEFT, MASK_SHIFT);
+        strip->handleKeyHere(KEY_LEFT, MASK_SHIFT);
+        ensure("back, and no further than the first", orders.size() == 2 && strip->tabs()[0].value == "a");
+
+        strip->handleKeyHere(KEY_DELETE, MASK_NONE);
+        ensure("Delete closes the chosen", closed == std::vector<std::string>({ "a" }));
+        strip->handleKeyHere(KEY_RETURN, MASK_NONE);
+        strip->handleKeyHere(' ', MASK_NONE);
+        ensure("Return and Space hold it", held == std::vector<std::string>({ "a", "a" }));
+        strip->handleKeyHere(KEY_F10, MASK_SHIFT);
+        ensure("Shift-F10 asks for its menu", menus == std::vector<std::string>({ "a" }));
+        strip->handleKeyHere(KEY_DOWN, MASK_NONE);
+        ensure_equals("the down arrow for the list", lists, 1);
+        ensure("anything else is not the strip's", !strip->handleKeyHere('Q', MASK_NONE));
+        gFocusMgr.setKeyboardFocus(nullptr);
+        strip->die();
+    }
 }

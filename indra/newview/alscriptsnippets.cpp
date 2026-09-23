@@ -55,6 +55,31 @@ namespace ALScriptSnippets
             }
             return aside;
         }
+
+        // A text written whole in a file's place: beside it first, then
+        // put where it goes, so that a crash or a full disk midway leaves
+        // the file as it was rather than cut short.
+        bool writeWhole(const std::string& file, const std::string& text)
+        {
+            const std::string beside = file + ".tmp";
+            {
+                llofstream out(beside.c_str(), std::ios::binary);
+                out << text;
+                out.flush();
+                if (!out.good())
+                {
+                    out.close();
+                    LLFile::remove(beside, ENOENT);
+                    return false;
+                }
+            }
+            if (LLFile::rename(beside, file) != 0)
+            {
+                LLFile::remove(beside, ENOENT);
+                return false;
+            }
+            return true;
+        }
     }
 
     bool readFrom(const std::string& file, bool builtin, std::vector<Snippet>& out)
@@ -130,11 +155,7 @@ namespace ALScriptSnippets
                                  "     where ${1:text}, ${2} and $1 are the places Tab goes through in order\n"
                                  "     and $0 is where the caret ends. The preferences' Snippets tab edits these. -->";
         text.insert(declared == std::string::npos ? 0 : declared + 2, note);
-        llofstream out(file.c_str(), std::ios::binary);
-        out << text;
-        const bool written = out.good();
-        out.close();
-        return written;
+        return writeWhole(file, text);
     }
 
     std::string path(bool lua)
@@ -191,8 +212,7 @@ namespace ALScriptSnippets
         }
         else
         {
-            llofstream out(path(lua).c_str(), std::ios::binary);
-            out << text;
+            writeWhole(path(lua), text);
         }
         forget(lua);
     }

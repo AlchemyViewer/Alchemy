@@ -99,6 +99,8 @@ private:
     // fields edit and each change writes back, then the viewer's, which
     // are copied to be changed.
     void fillSnippets(bool reread);
+    // The scripter's own written back, where an edit is waiting to be.
+    void flushSnippets();
     void showSnippet();
     void onSnippetEdited();
     void onSnippetNew();
@@ -141,6 +143,11 @@ private:
     std::vector<ALScriptSnippets::Snippet>                 mOwnSnippets;
     bool                                                   mSnippetsLua     = false;
     bool                                                   mSettingSnippet  = false;
+    // Edits not yet written: a keystroke marks them, and they are written
+    // a moment after the typing stops -- or before anything reads the file
+    // again, or as the window goes -- rather than the file once a key.
+    bool                                                   mSnippetsUnsaved = false;
+    U32                                                    mSnippetEdits    = 0;
     boost::signals2::scoped_connection                     mSnippetBodyChanged;
     // Each language's file as it was when the window opened, for Cancel.
     std::string                                            mWasSnippets[2];

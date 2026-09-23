@@ -832,6 +832,16 @@ namespace
         void predefine(const std::string& definition);
         void predefine(const std::string& name, Macro::Dynamic dynamic);
 
+        // The run stopped where a bound stops it: said once, with what
+        // was said of the source, and nothing of the run compiled or
+        // analysed.
+        void overrun(const char* key, std::string_view text, const Token& at);
+        // Whether a transform that descends into what the script nests --
+        // a block, a loop's body, a switch in a switch, each a frame of
+        // the machine's stack -- may go `depth` levels down; past the
+        // bound, the run is stopped.
+        bool nest(S32 depth, const Token& at);
+
     private:
         // -- files --
         void pushFile(std::string_view text, const std::string& path, const std::string& name, const std::string& assetId);
@@ -1080,9 +1090,28 @@ namespace
         {
             return true;
         }
-        mOverran         = true;
-        mResult.overran  = true;
-        problem(ALScriptProblem::Severity::Error, "PreprocTooMuch", "the macros expand to more than this preprocessor will make; nothing was preprocessed", {}, at);
+        overrun("PreprocTooMuch", "the macros expand to more than this preprocessor will make; nothing was preprocessed", at);
+        return false;
+    }
+
+    void Engine::overrun(const char* key, std::string_view text, const Token& at)
+    {
+        if (mOverran)
+        {
+            return;
+        }
+        mOverran        = true;
+        mResult.overran = true;
+        problem(ALScriptProblem::Severity::Error, key, text, {}, at);
+    }
+
+    bool Engine::nest(S32 depth, const Token& at)
+    {
+        if (depth <= mOptions.nestingDepth)
+        {
+            return true;
+        }
+        overrun("PreprocNestsTooDeep", "blocks nest more deeply than this preprocessor follows; nothing was preprocessed", at);
         return false;
     }
 
@@ -1486,14 +1515,8 @@ namespace
         } level(mExpandDepth);
         if (mExpandDepth > mOptions.macroDepth)
         {
-            if (!mOverran)
-            {
-                mOverran        = true;
-                mResult.overran = true;
-                problem(ALScriptProblem::Severity::Error, "PreprocMacrosTooDeep",
-                        "macros are invoked inside each other's arguments more deeply than this preprocessor follows; nothing was preprocessed", {},
-                        in.empty() ? Token() : in.front());
-            }
+            overrun("PreprocMacrosTooDeep", "macros are invoked inside each other's arguments more deeply than this preprocessor follows; nothing was preprocessed",
+                    in.empty() ? Token() : in.front());
             return in;
         }
         std::deque<Token> pending;
@@ -2284,6 +2307,15 @@ namespace
         out.insert(out.end(), more.begin(), more.end());
     }
 
+    // A level of a transform's descent into what the script nests,
+    // counted while it stands.
+    struct Nesting
+    {
+        S32& depth;
+        explicit Nesting(S32& d) : depth(++d) {}
+        ~Nesting() { --depth; }
+    };
+
     // The language extensions LSL-PyOptimizer's users know, lowered to
     // LSL: `break` and `continue` in a loop -- `break 2` for the loop
     // outside -- as jumps to labels put after the loop and at the end
@@ -2510,48 +2542,65 @@ namespace
 
         // Where a statement starting at `i` ends: the index past its last
         // token. A block to its brace; if, while, for, do to the end of
-        // what they govern; anything else to its semicolon.
-        size_t statementEnd(const Tokens& t, size_t i) const
+        // what they govern; anything else to its semicolon. An `else if`
+        // is a chain rather than a nesting, walked along, so that a long
+        // run of them costs no depth; what a statement governs is a level
+        // down.
+        size_t statementEnd(const Tokens& t, size_t i)
         {
-            i = skipBlank(t, i);
-            if (i >= t.size())
+            while (true)
             {
-                return t.size();
-            }
-            if (t[i].is(Kind::Punct, "{"))
-            {
-                const size_t m = matching(t, i, "{", "}");
-                return m == std::string::npos ? t.size() : m + 1;
-            }
-            if (t[i].is(Kind::Ident, "if") || t[i].is(Kind::Ident, "while") || t[i].is(Kind::Ident, "for"))
-            {
-                const size_t open = skipBlank(t, i + 1);
-                if (open >= t.size() || !t[open].is(Kind::Punct, "("))
-                {
-                    return semicolonAfter(t, i);
-                }
-                const size_t close = matching(t, open, "(", ")");
-                if (close == std::string::npos)
+                i = skipBlank(t, i);
+                if (i >= t.size())
                 {
                     return t.size();
                 }
-                size_t end = statementEnd(t, close + 1);
-                if (t[i].is(Kind::Ident, "if"))
+                if (t[i].is(Kind::Punct, "{"))
                 {
-                    const size_t e = skipBlank(t, end);
-                    if (e < t.size() && t[e].is(Kind::Ident, "else"))
-                    {
-                        end = statementEnd(t, e + 1);
-                    }
+                    const size_t m = matching(t, i, "{", "}");
+                    return m == std::string::npos ? t.size() : m + 1;
                 }
-                return end;
+                if (t[i].is(Kind::Ident, "if") || t[i].is(Kind::Ident, "while") || t[i].is(Kind::Ident, "for"))
+                {
+                    const size_t open = skipBlank(t, i + 1);
+                    if (open >= t.size() || !t[open].is(Kind::Punct, "("))
+                    {
+                        return semicolonAfter(t, i);
+                    }
+                    const size_t close = matching(t, open, "(", ")");
+                    if (close == std::string::npos)
+                    {
+                        return t.size();
+                    }
+                    const size_t end = governedEnd(t, close + 1);
+                    if (t[i].is(Kind::Ident, "if"))
+                    {
+                        const size_t e = skipBlank(t, end);
+                        if (e < t.size() && t[e].is(Kind::Ident, "else"))
+                        {
+                            i = e + 1;
+                            continue;
+                        }
+                    }
+                    return end;
+                }
+                if (t[i].is(Kind::Ident, "do"))
+                {
+                    return semicolonAfter(t, governedEnd(t, i + 1));
+                }
+                return semicolonAfter(t, i);
             }
-            if (t[i].is(Kind::Ident, "do"))
+        }
+
+        // Where a statement another governs ends, a level down.
+        size_t governedEnd(const Tokens& t, size_t i)
+        {
+            const Nesting level(mNested);
+            if (!mEngine.nest(mNested, i < t.size() ? t[i] : Token()))
             {
-                const size_t body_end = statementEnd(t, i + 1);
-                return semicolonAfter(t, body_end);
+                return t.size();
             }
-            return semicolonAfter(t, i);
+            return statementEnd(t, i);
         }
 
         size_t semicolonAfter(const Tokens& t, size_t i) const
@@ -2576,9 +2625,14 @@ namespace
         }
 
         // The tokens from `from` to `to` with every loop in them lowered,
-        // each statement in turn.
+        // each statement in turn; a block or a body in them a level down.
         Tokens statements(const Tokens& in, size_t from, size_t to)
         {
+            const Nesting level(mNested);
+            if (!mEngine.nest(mNested, from < in.size() ? in[from] : Token()))
+            {
+                return slice(in, from, to);
+            }
             Tokens out;
             size_t i = from;
             while (i < to)
@@ -2823,6 +2877,8 @@ namespace
         S32                      mCounter     = 0;
         S32                      mAssignments = 0;
         std::vector<std::string> mInlined;
+        // How far down the descent is.
+        S32                      mNested      = 0;
     };
 
     // The shape Firestorm emits: a block whose first statements test the
@@ -2835,8 +2891,14 @@ namespace
     public:
         explicit Switches(Engine& engine) : mEngine(engine) {}
 
+        // A switch's body is run over first, a level down.
         Tokens run(const Tokens& in)
         {
+            const Nesting level(mNested);
+            if (!mEngine.nest(mNested, in.empty() ? Token() : in.front()))
+            {
+                return in;
+            }
             Tokens out;
             size_t i = 0;
             while (i < in.size())
@@ -2984,6 +3046,7 @@ namespace
 
         Engine& mEngine;
         S32     mCounter = 0;
+        S32     mNested  = 0;
     };
 
     const char* const LAZY_LIST_SET =
@@ -3442,15 +3505,33 @@ namespace
         {
             if (t.kind != Kind::Newline)
             {
-                ALSourceMap::Segment s;
-                s.outLine   = line;
-                s.outColumn = column;
-                s.length    = S32(t.text.size());
-                s.file      = t.file;
-                s.line      = t.line;
-                s.column    = t.column;
-                s.verbatim  = t.verbatim;
-                result.map.add(s);
+                // A token over several lines -- a block comment, a long
+                // string -- is a segment on each of them, so that every
+                // line of it maps back: its own lines in turn where it is
+                // the file's text, the invocation where a macro made it.
+                size_t start = 0;
+                for (S32 piece = 0;; ++piece)
+                {
+                    const size_t newline = t.text.find('\n', start);
+                    const size_t end     = newline == std::string::npos ? t.text.size() : newline;
+                    if (piece == 0 || end > start)
+                    {
+                        ALSourceMap::Segment s;
+                        s.outLine   = line + piece;
+                        s.outColumn = piece == 0 ? column : 0;
+                        s.length    = S32(end - start);
+                        s.file      = t.file;
+                        s.line      = t.verbatim ? t.line + piece : t.line;
+                        s.column    = t.verbatim && piece > 0 ? 0 : t.column;
+                        s.verbatim  = t.verbatim;
+                        result.map.add(s);
+                    }
+                    if (newline == std::string::npos)
+                    {
+                        break;
+                    }
+                    start = newline + 1;
+                }
             }
             for (char c : t.text)
             {

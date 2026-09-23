@@ -791,4 +791,76 @@ namespace tut
         ensure("so both functions stay, for the calls that kept them: " + put.text,
                put.text.find("bump()\n{") != std::string::npos && put.text.find("integer plus(integer x)") != std::string::npos);
     }
+
+    template<> template<>
+    void allsloptimizer_object::test<22>()
+    {
+        set_test_name("what follows a jump stays where it holds the label the jump goes to, and so does a branch never taken that holds one");
+        // A jump in SL goes to the last label of its name in the function,
+        // whatever block it is in: here, the one in the block after it.
+        const std::string source = wrap("",
+                                        "        @a;\n"
+                                        "        llOwnerSay(\"first\");\n"
+                                        "        jump a;\n"
+                                        "        {\n"
+                                        "            @a;\n"
+                                        "            llOwnerSay(\"second\");\n"
+                                        "        }\n"
+                                        "        llOwnerSay(\"third\");\n"
+                                        "        @b;\n"
+                                        "        if (0)\n"
+                                        "        {\n"
+                                        "            @b;\n"
+                                        "            llOwnerSay(\"fourth\");\n"
+                                        "        }\n"
+                                        "        @c;\n"
+                                        "        while (0)\n"
+                                        "        {\n"
+                                        "            @c;\n"
+                                        "            llOwnerSay(\"fifth\");\n"
+                                        "        }\n"
+                                        "        if (llGetUnixTime() > 0) jump b;\n"
+                                        "        jump c;\n");
+        ALLSLOptimizer::Result r = ALLSLOptimizer::run(source, options());
+        ensure("optimized: " + notes(r), r.optimized);
+        auto has = [&r](const char* text) { return r.text.find(text) != std::string::npos; };
+        ensure("the block the jump lands in stays: " + r.text, has("llOwnerSay(\"second\");"));
+        ensure("and what follows it: " + r.text, has("llOwnerSay(\"third\");"));
+        ensure("the if whose branch a jump lands in stays: " + r.text, has("llOwnerSay(\"fourth\");"));
+        ensure("and the loop whose body one does: " + r.text, has("llOwnerSay(\"fifth\");"));
+        ensure("nothing said to be unreachable: " + notes(r), notes(r).find("can never run") == std::string::npos);
+
+        // Where nothing jumps into it, it is still gone.
+        r = ALLSLOptimizer::run(wrap("", "        return;\n        {\n            @x;\n            llOwnerSay(\"never\");\n        }\n"), options());
+        ensure("a block after a return that nothing jumps into goes: " + r.text, r.text.find("never") == std::string::npos);
+    }
+
+    template<> template<>
+    void allsloptimizer_object::test<23>()
+    {
+        set_test_name("a function put in place as a block takes its arguments in the order a call does: left to right, as LSO and Mono both push them");
+        const std::string source =
+            "integer n;\n"
+            "integer next()\n"
+            "{\n"
+            "    n = n + 1;\n"
+            "    return n;\n"
+            "}\n"
+            "show(integer a, integer b)\n"
+            "{\n"
+            "    llOwnerSay((string)a + \",\" + (string)b);\n"
+            "}\n"
+            "default\n"
+            "{\n"
+            "    state_entry()\n"
+            "    {\n"
+            "        show(next(), next() * 10);\n"
+            "    }\n"
+            "}\n";
+        const ALLSLInliner::Result put = ALLSLInliner::run(source);
+        const size_t               a   = put.text.find("integer a = next();");
+        const size_t               b   = put.text.find("integer b = next() * 10;");
+        ensure("both arguments set to locals: " + put.text, a != std::string::npos && b != std::string::npos);
+        ensure("the first first: " + put.text, a < b);
+    }
 } // namespace tut

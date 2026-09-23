@@ -143,6 +143,14 @@ void ALPopover::adopt(const LLView* anchor)
 
 void ALPopover::openAt(LLRect where)
 {
+    // One of its home's dependents, and so gone when its home goes: a
+    // popover left over a window that has closed is about nothing. Its
+    // home put away or minimised hides it, and it goes as the keyboard
+    // leaves it. Before it is placed, since the placing is its own.
+    if (LLFloater* home = mHome.get())
+    {
+        home->addDependentFloater(this, /*reposition*/ false);
+    }
     setRect(where);
     if (gFloaterView && getParent() == gFloaterView)
     {

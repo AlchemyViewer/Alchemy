@@ -128,6 +128,10 @@ public:
         // How deep macros may be invoked inside the arguments of others,
         // each level of which is a level of the machine's own stack.
         S32    macroDepth      = 200;
+        // How deep blocks, loops' bodies and switches may nest for the
+        // transforms that rewrite them, which descend a level for each;
+        // a chain of `else if` is no deeper for being long.
+        S32    nestingDepth    = 500;
         // The predefined macros' values. An empty agent id leaves the
         // agent macros undefined; an empty asset id says NOT_IN_WORLD.
         std::string agentId;

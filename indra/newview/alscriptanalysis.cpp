@@ -180,6 +180,14 @@ void ALScriptAnalysis::ask(Request request, callback_t callback)
                 // one's answer would be thrown away on arrival.
                 return;
             }
+            // The newest, run: nothing is waiting behind it, and the
+            // script is forgotten until it is asked about again, so that
+            // what is kept is what is waiting rather than one entry for
+            // every script ever checked.
+            if (latest != mLatestCheck.end())
+            {
+                mLatestCheck.erase(latest);
+            }
         }
         // The engines recurse on how the script nests; the pool's thread
         // has what the platform gives a thread, which on a Mac is half a

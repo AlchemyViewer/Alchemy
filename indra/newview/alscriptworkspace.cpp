@@ -31,6 +31,7 @@
 #include "llagent.h"
 #include "llappviewer.h"
 #include "llassetstorage.h"
+#include "llcallbacklist.h"
 #include "llchat.h"
 #include "llcompilequeue.h"
 #include "lldate.h"
@@ -75,6 +76,9 @@ namespace
     const F32    BURST_TIMEOUT      = 1.0f;
     const F32    BURST_FLUSH_PERIOD = 0.25f;
     const size_t RECENT_RUNTIME     = 500;
+    // How long a prim's contents are waited for before they are answered
+    // as not fetched.
+    const F32    CONTENTS_TIMEOUT   = 20.f;
 
     // The script a message names, in a prim's contents.
     LLInventoryItem* scriptNamed(LLViewerObject* prim, const std::string& name)
@@ -94,7 +98,11 @@ namespace
 }
 
 // One prim's contents asked for: answered once the object has them, then
-// let go of.
+// let go of. The object's own asking can fail without a word -- the
+// capability answering with an error, the object killed or out of sight
+// before the answer -- and whatever waits on this one, a save among them,
+// would wait for ever; so a while without an answer is answered as
+// nothing fetched.
 struct ALScriptWorkspace::ContentsListener final : public LLVOInventoryListener
 {
     LLUUID              prim;
@@ -103,25 +111,59 @@ struct ALScriptWorkspace::ContentsListener final : public LLVOInventoryListener
 
     ContentsListener(LLViewerObject* object, const LLUUID& prim_in, contents_callback_t callback_in)
     :   prim(prim_in),
-        callback(std::move(callback_in))
+        callback(std::move(callback_in)),
+        mAsked(object)
     {
         registerVOInventoryListener(object, nullptr);
         requestVOInventory();
     }
 
-    void inventoryChanged(LLViewerObject* object, LLInventoryObject::object_list_t* inventory, S32, void*) override
+    ~ContentsListener() override { letGo(); }
+
+    void inventoryChanged(LLViewerObject* from, LLInventoryObject::object_list_t* inventory, S32, void*) override
     {
-        if (done)
+        if (!done)
         {
-            return;
+            answer(from, inventory);
         }
+    }
+
+    // No answer in time.
+    void expire()
+    {
+        if (!done)
+        {
+            answer(gObjectList.findObject(prim), nullptr);
+        }
+    }
+
+private:
+    // Off the object's list of listeners, where the object is still the
+    // one asked. It forgets its listeners only as it is destroyed, and one
+    // killed since -- gone from the list, whether or not something still
+    // holds it -- is not to be followed to: this is only forgotten.
+    void letGo()
+    {
+        if (mAsked && gObjectList.findObject(prim) == mAsked)
+        {
+            removeVOInventoryListener();
+        }
+        else
+        {
+            clearVOInventoryListener();
+        }
+        mAsked = nullptr;
+    }
+
+    void answer(LLViewerObject* from, LLInventoryObject::object_list_t* inventory)
+    {
         done = true;
         Contents contents;
         contents.prim    = prim;
         contents.fetched = inventory != nullptr;
-        if (object)
+        if (from)
         {
-            if (LLNameValue* name = object->getNVPair("Name"))
+            if (LLNameValue* name = from->getNVPair("Name"))
             {
                 contents.name = name->getString() ? name->getString() : "";
             }
@@ -154,14 +196,17 @@ struct ALScriptWorkspace::ContentsListener final : public LLVOInventoryListener
                 contents.items.push_back(std::move(one));
             }
         }
-        // The object is walking its listeners: this one leaves the walk
-        // now, and answers once it is over.
-        removeVOInventoryListener();
-        LLAppViewer::instance()->postToMainCoro([answer = std::move(callback), contents]() {
-            answer(contents);
+        // The object may be walking its listeners: this one leaves the
+        // walk now, and answers once it is over.
+        letGo();
+        LLAppViewer::instance()->postToMainCoro([told = std::move(callback), contents]() {
+            told(contents);
             ALScriptWorkspace::instance().sweepListeners();
         });
     }
+
+    // Never followed but where the object list says it is still there.
+    LLViewerObject* mAsked = nullptr;
 };
 
 // The lines one script has said within a moment of each other, not yet
@@ -817,12 +862,19 @@ void ALScriptWorkspace::listContents(const LLUUID& prim, contents_callback_t cal
         callback(none);
         return;
     }
-    mListeners.push_back(std::make_unique<ContentsListener>(object, prim, std::move(callback)));
+    auto listener = std::make_shared<ContentsListener>(object, prim, std::move(callback));
+    mListeners.push_back(listener);
+    doAfterInterval([waiting = std::weak_ptr<ContentsListener>(listener)]() {
+        if (const std::shared_ptr<ContentsListener> still = waiting.lock())
+        {
+            still->expire();
+        }
+    }, CONTENTS_TIMEOUT);
 }
 
 void ALScriptWorkspace::sweepListeners()
 {
-    mListeners.erase(std::remove_if(mListeners.begin(), mListeners.end(), [](const std::unique_ptr<ContentsListener>& l) { return l->done; }),
+    mListeners.erase(std::remove_if(mListeners.begin(), mListeners.end(), [](const std::shared_ptr<ContentsListener>& l) { return l->done; }),
                      mListeners.end());
 }
 

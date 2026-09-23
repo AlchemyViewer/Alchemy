@@ -1828,6 +1828,14 @@ The theme could not be written to [PATH].
 
   <notification
    icon="alertmodal.tga"
+   name="ScriptStudioThemeNameShipped"
+   type="alertmodal">
+A theme that comes with the viewer is called &quot;[NAME]&quot;. Save yours under another name.
+    <tag>fail</tag>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
    name="ScriptStudioDeleteItem"
    type="alertmodal">
 Delete &quot;[NAME]&quot; from the object? An item taken out of an object is gone for good.

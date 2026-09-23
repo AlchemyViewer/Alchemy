@@ -114,4 +114,25 @@ namespace tut
         ensure("the first kept still", read(file + ".unreadable") == broken);
         ensure("the second beside it", read(file + ".unreadable.1") == "again");
     }
+
+    template<> template<>
+    void alscriptsnippets_object::test<3>()
+    {
+        set_test_name("written whole in the file's place: nothing is left beside it, and a write that fails leaves the file as it was");
+        const std::string file = folder + "/lsl.xml";
+        ensure("written", ALScriptSnippets::writeTo(file, { snippet("say", "llSay(0, \"one\");") }));
+        const std::string first = read(file);
+        ensure("written again, over it", ALScriptSnippets::writeTo(file, { snippet("say", "llSay(0, \"two\");") }));
+        ensure("replaced", read(file) != first && read(file).find("two") != std::string::npos);
+        ensure("and nothing half-written beside it", !LLFile::isfile(file + ".tmp"));
+
+        // Where the text cannot be written beside it, the file is not
+        // touched: never opened for writing and left cut short.
+        const std::string written = read(file);
+        std::error_code   ec;
+        std::filesystem::create_directory(fsyspath(file + ".tmp"), ec);
+        ensure("a place nothing can be written", !ec);
+        ensure("not written", !ALScriptSnippets::writeTo(file, { snippet("say", "llSay(0, \"three\");") }));
+        ensure("and the file as it was", read(file) == written);
+    }
 }

@@ -476,7 +476,11 @@ namespace
                 return false;
             }
             // A block in place of the statement: each parameter a local
-            // set to its argument, then the body. A return in the body is
+            // set to its argument, in order, then the body. The order is a
+            // call's own: LSL takes an operator's operands right to left,
+            // but a call's arguments left to right, in LSO and Mono alike,
+            // so an argument that changes something changes it when the
+            // call would have. A return in the body is
             // a jump to a label after the block; the body's own labels
             // get fresh names, since a label is one to a function; a
             // state change cannot go.

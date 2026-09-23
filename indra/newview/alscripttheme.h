@@ -61,8 +61,9 @@ public:
     static bool                       load(const std::string& path, ALScriptTheme& theme);
     // The colours as they stand, under a name.
     static ALScriptTheme capture(const std::string& name);
-    // Written as a person's own, under the settings folder; the path it
-    // landed at.
+    // Written as a person's own, under the settings folder -- over the own
+    // theme of the same name where there is one, beside every other -- and
+    // the path it landed at.
     bool save(std::string& path_out) const;
 
     // Into the table, every colour the theme has and the skin's own for

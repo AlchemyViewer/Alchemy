@@ -53,6 +53,11 @@ class LLFontGL;
 // done looking should not have to look at something else to be rid of
 // it. Whether a tab is one is the caller's to say, and so is what a tab
 // is called.
+//
+// With the keyboard, once the strip has it: the arrows choose the tab
+// beside, Home and End the first and the last; Shift with an arrow moves
+// the chosen tab along; Delete closes it, Return or Space holds it, Shift
+// and F10 ask for its menu, and the down arrow for the list of them all.
 class ALTabStrip : public LLUICtrl
 {
 public:
@@ -149,8 +154,8 @@ public:
     {
         return mMenuSignal.connect(cb);
     }
-    // The list button pressed, while the tabs run past the strip: for
-    // the caller to offer every tab to choose from.
+    // The list button pressed, while the tabs run past the strip, or the
+    // down arrow: for the caller to offer every tab to choose from.
     typedef boost::signals2::signal<void()> list_signal_t;
     boost::signals2::connection onListAsked(const list_signal_t::slot_type& cb)
     {
@@ -168,6 +173,7 @@ public:
     bool handleScrollWheel(S32 x, S32 y, LLScrollDelta delta) override;
     bool handleScrollHWheel(S32 x, S32 y, LLScrollDelta delta) override;
     bool handleToolTip(S32 x, S32 y, MASK mask) override;
+    bool handleKeyHere(KEY key, MASK mask) override;
     void onMouseLeave(S32 x, S32 y, MASK mask) override;
     void reshape(S32 width, S32 height, bool called_from_parent = true) override;
 
@@ -194,6 +200,10 @@ private:
     S32  indexOf(const std::string& value) const;
     // The order the tabs were dragged into, told.
     void sayOrder();
+    // Two tabs change places, each with what it last drew.
+    void trade(size_t a, size_t b);
+    // A tab chosen from the keyboard, which the strip keeps.
+    void chooseKeyed(size_t index);
     std::string textOf(const Tab& tab) const;
     // A preview is set in italic. The face that draws it is the one the
     // font hands the style to, which is what the words are measured in.
