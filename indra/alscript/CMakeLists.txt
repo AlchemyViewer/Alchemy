@@ -21,6 +21,7 @@ target_sources(
     alscriptenvelope.cpp
     alscriptformatter.cpp
     alscriptmessages.cpp
+    alscriptrecovery.cpp
     alscriptstack.cpp
     alsourcemap.cpp
 )
@@ -44,6 +45,7 @@ target_sources(
         alscriptenvelope.h
         alscriptformatter.h
         alscriptmessages.h
+        alscriptrecovery.h
         alscriptproblem.h
         alscriptstack.h
         alscriptsymbol.h
@@ -78,6 +80,7 @@ if(AL_BUILD_TESTS)
   al_add_test(alluauconfig PROJECT alscript LIBRARIES alscript llcommon)
   al_add_test(alscriptformatter PROJECT alscript LIBRARIES alscript llcommon)
   al_add_test(alscriptmessages PROJECT alscript LIBRARIES alscript llcommon)
+  al_add_test(alscriptrecovery PROJECT alscript LIBRARIES alscript llcommon)
   # The optimizer's golden files under tests/optimizer/, checked with the
   # grid's builtins loaded.
   al_add_test(
