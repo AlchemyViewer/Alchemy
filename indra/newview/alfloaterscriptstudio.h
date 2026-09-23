@@ -342,8 +342,11 @@ private:
             ALTextPos              at;
         };
         std::vector<Waiting>                       waiting;
-        // A save waiting on the preprocessor.
-        bool                                       preprocessing = false;
+        // A run of the preprocessor on its way, for a save or not; and a
+        // save asked for while one that was not for a save was, taken up
+        // when it answers as though it had been.
+        bool                                       preprocessing       = false;
+        bool                                       saveAfterPreprocess = false;
         // Whether the script's `.luaurc` was asked for once, so that a
         // script with none is not asked for it at every check.
         bool                                       configAsked = false;
@@ -603,8 +606,6 @@ private:
     void vimComplete(ALTextView& view, const std::string& command, std::vector<std::string>& out);
     void pumpVim();
     Doc* docOf(const ALTextView& view);
-    // Whether a doc a callback held on to is still one of the tabs.
-    bool hasDoc(const Doc* doc) const;
     // The tab pressed with the right button: a menu about it.
     void   showTabMenu(const std::string& value, S32 x, S32 y);
     void   onTabAction(const std::string& action);
@@ -623,6 +624,9 @@ private:
     // The expanded text put in the document's other editor, and the pane
     // swapped between the two.
     void                      showExpanded(Doc& doc, const std::string& text);
+    // The other editor gone, where what it holds is of no text the
+    // script is now, and the source shown in its place.
+    void                      dropExpanded(Doc& doc);
     void                      toggleExpanded();
     // Which editor the pane shows for the active document, and every
     // other editor hidden.
@@ -699,6 +703,9 @@ private:
     static void                   placeText(Doc::Place& place, const std::string& line);
 
     void loaded(const ALScriptWorkspace::Loaded& answer);
+    // The caret to the line, or the stretch, asked for before the text had
+    // loaded, once it has.
+    void goToPending(Doc& doc);
     void takeCarriedText(Doc& doc);
     // What a notecard carries, each item a button in the text where its
     // placeholder is -- the character that stands for it in the format

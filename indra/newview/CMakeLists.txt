@@ -188,6 +188,7 @@ if(AL_BUILD_VIEWER)
     allegacynotificationwellwindow.cpp
     allightboxdirectory.cpp
     almotionpredictor.cpp
+    alnotecarditems.cpp
     alobjectproperties.cpp
     alagentlocationformat.cpp
     alcrashreporter.cpp
@@ -986,6 +987,7 @@ if(AL_BUILD_VIEWER)
     allegacynotificationwellwindow.h
     allightboxdirectory.h
     almotionpredictor.h
+    alnotecarditems.h
     alobjectproperties.h
     alagentlocationformat.h
     alcrashreporter.h
@@ -2355,6 +2357,7 @@ if(AL_BUILD_TESTS)
     aldaycyclelandmarks
     algradehistory
     almotionpredictor
+    alnotecarditems
     alsceneexplorerpredicate
     alscriptmessages
     alscriptrecovery

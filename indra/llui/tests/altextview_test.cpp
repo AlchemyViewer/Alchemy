@@ -1055,4 +1055,34 @@ namespace tut
         v.redo();
         ensure("and redone to where the replace left it", v.caret() == ALTextPos(0, 6));
     }
+
+    template<> template<>
+    void altextview_object::test<32>()
+    {
+        set_test_name("a text put in with its history steps back through it, and a history of another text changes nothing");
+        ALTextView& v = make("one");
+        type("x");
+        const std::string first   = v.text();
+        const LLSD        history = v.undoJournal().asLLSD();
+
+        // Another text, typed in: its own step back and its unsaved state.
+        v.setText("other");
+        type("y");
+        const std::string second = v.text();
+        ensure("typed in", v.isDirty() && v.canUndo());
+
+        ensure("a history of another text is refused", !v.setTextWithHistory("unrelated", history));
+        ensure_equals("the text as it was", v.text(), second);
+        ensure("still unsaved", v.isDirty());
+        ensure("its own step back still there", v.canUndo());
+        v.undo();
+        ensure_equals("and it takes back what was typed", v.text(), std::string("other"));
+
+        ensure("the history of its own text is taken", v.setTextWithHistory(first, history));
+        ensure_equals("the text put in", v.text(), first);
+        ensure("unsaved, as it was when kept", v.isDirty());
+        v.undo();
+        ensure_equals("stepped back through the kept history", v.text(), std::string("one"));
+        ensure("to the text that was saved", !v.isDirty());
+    }
 }

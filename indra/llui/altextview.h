@@ -177,6 +177,10 @@ public:
     // --- the text ------------------------------------------------------------
 
     void        setText(std::string_view text);
+    // The text put in with the steps that led to it (ALTextUndo::asLLSD),
+    // to take back and forward again: false, and nothing changed -- the
+    // text, its steps, its saved mark -- where the history is not of it.
+    bool        setTextWithHistory(std::string_view text, const LLSD& history);
     std::string text() const { return mDocument.text(); }
     void        setValue(const LLSD& value) override;
     LLSD        getValue() const override;

@@ -374,6 +374,24 @@ void ALTextView::setText(std::string_view text)
     mChanged();
 }
 
+bool ALTextView::setTextWithHistory(std::string_view text, const LLSD& history)
+{
+    // Tried against a copy of the text first: the journal can only be
+    // given a history over the text it is of, and putting the text in
+    // clears what this one had, which a history that does not fit would
+    // then have taken for nothing.
+    {
+        ALTextDocument trial(text);
+        ALTextUndo     journal(trial);
+        if (!journal.fromLLSD(history))
+        {
+            return false;
+        }
+    }
+    setText(text);
+    return mUndo.fromLLSD(history);
+}
+
 void ALTextView::setValue(const LLSD& value)
 {
     setText(value.asString());

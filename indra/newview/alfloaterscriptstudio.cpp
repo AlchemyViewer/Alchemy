@@ -27,6 +27,7 @@
 #include "alfloaterscriptstudio.h"
 
 #include "alcodeeditor.h"
+#include "alnotecarditems.h"
 #include "alscriptpreprocessor.h"
 #include "alemptystate.h"
 #include "aljumpbar.h"
@@ -122,6 +123,12 @@ namespace
     // long discarded text is kept before it goes for good.
     const F64 RECOVERY_DELAY = 1.5;
     const F64 DISCARDED_KEPT = 7.0 * 24.0 * 60.0 * 60.0;
+
+    // The notecard's item characters are read by ALNotecardItems and made
+    // by the text editor the legacy notecard uses: the two must agree.
+    static_assert(ALNotecardItems::FIRST_CHAR == LLTextEditor::FIRST_EMBEDDED_CHAR &&
+                      ALNotecardItems::MOST == static_cast<size_t>(LLTextEditor::MAX_EMBEDDED_ITEMS),
+                  "a notecard's item characters are numbered one way");
 }
 
 namespace
@@ -148,10 +155,23 @@ namespace
         return false;
     }
 
-    std::string readWholeFile(const std::string& path)
+    // A file's bytes, whole; false where it could not be opened.
+    bool readWholeFile(const std::string& path, std::string& text)
     {
         std::ifstream in(path, std::ios::binary);
-        std::string   text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+        if (!in)
+        {
+            return false;
+        }
+        text.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+        return true;
+    }
+
+    // The same, with a file that could not be opened read as empty.
+    std::string readWholeFile(const std::string& path)
+    {
+        std::string text;
+        readWholeFile(path, text);
         return text;
     }
 
@@ -1266,18 +1286,6 @@ ALQuickOpen* ALFloaterScriptStudio::quickOpen(std::vector<ALQuickOpen::Candidate
     return quick;
 }
 
-bool ALFloaterScriptStudio::hasDoc(const Doc* doc) const
-{
-    for (const std::unique_ptr<Doc>& each : mDocs)
-    {
-        if (each.get() == doc)
-        {
-            return true;
-        }
-    }
-    return false;
-}
-
 std::string ALFloaterScriptStudio::counted(const char* name, S32 count, LLStringUtil::format_map_t args) const
 {
     args["[COUNT]"] = std::to_string(count);
@@ -1582,8 +1590,6 @@ void ALFloaterScriptStudio::wireNotecard(Doc& doc)
     });
 }
 
-// Text brought from another window in place of the server's, as one
-// step to undo: the server's text is what undo goes back to.
 bool ALFloaterScriptStudio::restoreHistory(Doc& doc, const ALScriptRecoveryEntry& entry)
 {
     // The kept tab as it was: its text, the steps that led to it to take
@@ -1591,17 +1597,17 @@ bool ALFloaterScriptStudio::restoreHistory(Doc& doc, const ALScriptRecoveryEntry
     // its window. Its saved mark holds where the text it stands at is the
     // one the item holds now, as far as this tab knows; otherwise nothing
     // the history reaches was saved.
-    if (!entry.history.isMap())
+    //
+    // Only over a tab that holds nothing of its own: the history takes the
+    // place of the tab's, and what was typed there would go with it.
+    if (!entry.history.isMap() || doc.editor->isDirty())
     {
         return false;
     }
-    const std::string                was      = doc.editor->text();
     const std::optional<std::string> standing = doc.orphan == Doc::Orphan::None ? doc.editor->undoJournal().savedText() : std::nullopt;
-    doc.editor->setText(entry.text);
-    if (!doc.editor->undoJournal().fromLLSD(entry.history))
+    if (!doc.editor->setTextWithHistory(entry.text, entry.history))
     {
-        // Not the history of this text: the text went back as it was.
-        doc.editor->setText(was);
+        // Not the history of this text: the tab is as it was.
         return false;
     }
     const std::optional<std::string> saved   = doc.editor->undoJournal().savedText();
@@ -1631,6 +1637,8 @@ bool ALFloaterScriptStudio::restoreHistory(Doc& doc, const ALScriptRecoveryEntry
     return true;
 }
 
+// Text brought from another window in place of the server's, as one
+// step to undo: the server's text is what undo goes back to.
 void ALFloaterScriptStudio::takeCarriedText(Doc& doc)
 {
     if (!doc.carriedText)
@@ -1646,7 +1654,9 @@ void ALFloaterScriptStudio::takeCarriedText(Doc& doc)
         args["[NAME]"] = doc.name;
         report(getString("RecoveryStale", args), true, &doc);
     }
-    // Kept text with its history: put back as it was, steps and all.
+    // Kept text with its history: put back as it was, steps and all, into
+    // a tab that holds nothing of its own. One typed in since it opened
+    // takes it as one more step, so that what was typed is a step back.
     if (doc.recovering && *doc.carriedText == doc.recovering->text && restoreHistory(doc, *doc.recovering))
     {
         doc.carriedText.reset();
@@ -1672,58 +1682,30 @@ void ALFloaterScriptStudio::placeEmbeddedItems(Doc& doc, S32 first_line, S32 las
     const ALTextDocument& text = doc.editor->document();
     for (S32 line = llmax(0, first_line); line <= last_line && line < text.lineCount() && !doc.embedded.empty(); ++line)
     {
-        const std::string& bytes = text.line(line);
-        for (size_t i = 0; i + 3 < bytes.size(); ++i)
-        {
-            const unsigned char b0 = static_cast<unsigned char>(bytes[i]);
-            const unsigned char b1 = static_cast<unsigned char>(bytes[i + 1]);
-            const unsigned char b2 = static_cast<unsigned char>(bytes[i + 2]);
-            const unsigned char b3 = static_cast<unsigned char>(bytes[i + 3]);
-            if (b0 != 0xF4 || (b1 & 0xF0) != 0x80 || (b2 & 0xC0) != 0x80 || (b3 & 0xC0) != 0x80)
-            {
-                continue;
-            }
-            const U32       code  = ((b0 & 7u) << 18) | ((b1 & 0x3Fu) << 12) | ((b2 & 0x3Fu) << 6) | (b3 & 0x3Fu);
-            const U32       index = code - static_cast<U32>(LLTextEditor::FIRST_EMBEDDED_CHAR);
-            const ALTextPos at(line, static_cast<S32>(i));
+        ALNotecardItems::forEach(text.line(line), [&](size_t column, size_t index) {
+            const ALTextPos at(line, static_cast<S32>(column));
             if (index < doc.embedded.size() && doc.embedded[index].notNull() && !doc.editor->atomAt(at))
             {
                 doc.editor->addAtom(embeddedAtom(doc, at, index));
             }
-            i += 3;
-        }
+        });
     }
 }
 
 void ALFloaterScriptStudio::placeEmbeddedItems(Doc& doc)
 {
-    // The format stands each item in the text as a character past the
-    // last the standard assigns -- the first item's the first of them --
-    // which is four bytes starting F4 in UTF-8; each becomes an atom
-    // over its four bytes, so the text keeps it and a save carries it.
+    // Each item's character (ALNotecardItems) becomes an atom over its
+    // four bytes, so the text keeps it and a save carries it.
     std::vector<ALTextView::Atom> atoms;
     const ALTextDocument&         text = doc.editor->document();
     for (S32 line = 0; line < text.lineCount() && !doc.embedded.empty(); ++line)
     {
-        const std::string& bytes = text.line(line);
-        for (size_t i = 0; i + 3 < bytes.size(); ++i)
-        {
-            const unsigned char b0 = static_cast<unsigned char>(bytes[i]);
-            const unsigned char b1 = static_cast<unsigned char>(bytes[i + 1]);
-            const unsigned char b2 = static_cast<unsigned char>(bytes[i + 2]);
-            const unsigned char b3 = static_cast<unsigned char>(bytes[i + 3]);
-            if (b0 != 0xF4 || (b1 & 0xF0) != 0x80 || (b2 & 0xC0) != 0x80 || (b3 & 0xC0) != 0x80)
-            {
-                continue;
-            }
-            const U32 code  = ((b0 & 7u) << 18) | ((b1 & 0x3Fu) << 12) | ((b2 & 0x3Fu) << 6) | (b3 & 0x3Fu);
-            const U32 index = code - static_cast<U32>(LLTextEditor::FIRST_EMBEDDED_CHAR);
+        ALNotecardItems::forEach(text.line(line), [&](size_t column, size_t index) {
             if (index < doc.embedded.size() && doc.embedded[index].notNull())
             {
-                atoms.push_back(embeddedAtom(doc, ALTextPos(line, static_cast<S32>(i)), index));
+                atoms.push_back(embeddedAtom(doc, ALTextPos(line, static_cast<S32>(column)), index));
             }
-            i += 3;
-        }
+        });
     }
     doc.editor->setAtoms(std::move(atoms));
 }
@@ -1736,41 +1718,14 @@ void ALFloaterScriptStudio::carriedForSave(Doc& doc, std::string& text, std::vec
     {
         return;
     }
-    // Each item's new number, given in the order the text first stands
-    // them; an item the text no longer stands anywhere is left behind.
-    std::map<U32, U32> renumbered;
-    for (size_t i = 0; i + 3 < text.size(); ++i)
+    // Each item numbered afresh in the order the text first stands them;
+    // an item the text no longer stands anywhere is left behind.
+    const std::vector<size_t> order = ALNotecardItems::renumber(text, [&doc](size_t index) {
+        return index < doc.embedded.size() && doc.embedded[index].notNull();
+    });
+    for (const size_t index : order)
     {
-        const unsigned char b0 = static_cast<unsigned char>(text[i]);
-        const unsigned char b1 = static_cast<unsigned char>(text[i + 1]);
-        const unsigned char b2 = static_cast<unsigned char>(text[i + 2]);
-        const unsigned char b3 = static_cast<unsigned char>(text[i + 3]);
-        if (b0 != 0xF4 || (b1 & 0xF0) != 0x80 || (b2 & 0xC0) != 0x80 || (b3 & 0xC0) != 0x80)
-        {
-            continue;
-        }
-        const U32 code  = ((b0 & 7u) << 18) | ((b1 & 0x3Fu) << 12) | ((b2 & 0x3Fu) << 6) | (b3 & 0x3Fu);
-        const U32 index = code - static_cast<U32>(LLTextEditor::FIRST_EMBEDDED_CHAR);
-        if (index < doc.embedded.size() && doc.embedded[index].notNull())
-        {
-            const auto found = renumbered.find(index);
-            U32        fresh;
-            if (found == renumbered.end())
-            {
-                fresh = static_cast<U32>(items.size());
-                items.push_back(doc.embedded[index]);
-                renumbered[index] = fresh;
-            }
-            else
-            {
-                fresh = found->second;
-            }
-            const U32 c = static_cast<U32>(LLTextEditor::FIRST_EMBEDDED_CHAR) + fresh;
-            text[i + 1]  = static_cast<char>(0x80 | ((c >> 12) & 0x3F));
-            text[i + 2]  = static_cast<char>(0x80 | ((c >> 6) & 0x3F));
-            text[i + 3]  = static_cast<char>(0x80 | (c & 0x3F));
-        }
-        i += 3;
+        items.push_back(doc.embedded[index]);
     }
 }
 
@@ -1868,7 +1823,7 @@ bool ALFloaterScriptStudio::dropOnNotecard(Doc& doc, S32 x, S32 y, bool drop, ED
         {
             at = doc.dropEnd;
         }
-        const std::string placeholder = utf8str_from_cp(static_cast<llwchar>(LLTextEditor::FIRST_EMBEDDED_CHAR + index));
+        const std::string placeholder = ALNotecardItems::charOf(index);
         doc.editor->replaceAll({ { ALTextRange(at, at), placeholder } });
         doc.dropEnd   = ALTextPos(at.line, at.column + static_cast<S32>(placeholder.size()));
         doc.dropFrame = gFrameCount;
@@ -2029,8 +1984,11 @@ void ALFloaterScriptStudio::openEmbeddedItem(Doc& doc, LLPointer<LLInventoryItem
                 key["id"]   = landmark_id;
                 LLFloaterSidePanelContainer::showPanel("places", key);
             };
-            Doc* raw    = &doc;
-            auto placed = [this, raw, item, show](LLLandmark* landmark) {
+            // The asset may come long after, the window or the tab gone by
+            // then: both found again by what they are.
+            const LLHandle<LLFloater> handle = getHandle();
+            const std::string         id     = doc.id;
+            auto placed = [handle, id, item, show](LLLandmark* landmark) {
                 LLVector3d where;
                 if (!landmark || !landmark->getGlobalPos(where))
                 {
@@ -2041,9 +1999,12 @@ void ALFloaterScriptStudio::openEmbeddedItem(Doc& doc, LLPointer<LLInventoryItem
                     show(mine->getUUID());
                     return;
                 }
-                if (hasDoc(raw))
+                ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get());
+                const size_t           index  = studio ? studio->indexOf(id) : NONE;
+                if (index != NONE)
                 {
-                    copyEmbeddedItem(*raw, item, get_folder_by_itemtype(item), gInventoryCallbacks.registerCB(new LLBoostFuncInventoryCallback(show)));
+                    studio->copyEmbeddedItem(*studio->mDocs[index], item, get_folder_by_itemtype(item),
+                                             gInventoryCallbacks.registerCB(new LLBoostFuncInventoryCallback(show)));
                 }
             };
             if (LLLandmark* landmark = gLandmarkList.getAsset(item->getAssetUUID(), placed))
@@ -2087,14 +2048,36 @@ void ALFloaterScriptStudio::openEmbeddedItem(Doc& doc, LLPointer<LLInventoryItem
         setStatus(getString("NotecardCopyUnsaved", args), true);
         return;
     }
-    Doc* raw = &doc;
-    LLNotificationsUtil::add("ConfirmItemCopy", LLSD(), LLSD(), [this, raw, item](const LLSD& notification, const LLSD& response) {
-        if (LLNotificationsUtil::getSelectedOption(notification, response) == 0 && item.notNull() && hasDoc(raw))
+    const LLHandle<LLFloater> handle = getHandle();
+    const std::string         id     = doc.id;
+    LLNotificationsUtil::add("ConfirmItemCopy", LLSD(), LLSD(), [handle, id, item](const LLSD& notification, const LLSD& response) {
+        ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get());
+        const size_t           index  = studio ? studio->indexOf(id) : NONE;
+        if (LLNotificationsUtil::getSelectedOption(notification, response) == 0 && item.notNull() && index != NONE)
         {
             // The server finds the folder for it.
-            copyEmbeddedItem(*raw, item, LLUUID::null);
+            studio->copyEmbeddedItem(*studio->mDocs[index], item, LLUUID::null);
         }
     });
+}
+
+void ALFloaterScriptStudio::goToPending(Doc& doc)
+{
+    if (doc.pendingLine < 0)
+    {
+        return;
+    }
+    if (doc.pendingColumn >= 0)
+    {
+        doc.editor->goTo(ALTextRange(ALTextPos(doc.pendingLine, doc.pendingColumn), ALTextPos(doc.pendingLine, doc.pendingColumn + doc.pendingLength)));
+    }
+    else
+    {
+        doc.editor->goToLine(doc.pendingLine);
+    }
+    doc.pendingLine   = -1;
+    doc.pendingColumn = -1;
+    doc.pendingLength = 0;
 }
 
 void ALFloaterScriptStudio::loaded(const ALScriptWorkspace::Loaded& answer)
@@ -2188,20 +2171,7 @@ void ALFloaterScriptStudio::loaded(const ALScriptWorkspace::Loaded& answer)
         {
             refreshExplorer();
         }
-        if (doc.pendingLine >= 0)
-        {
-            if (doc.pendingColumn >= 0)
-            {
-                doc.editor->goTo(ALTextRange(ALTextPos(doc.pendingLine, doc.pendingColumn), ALTextPos(doc.pendingLine, doc.pendingColumn + doc.pendingLength)));
-            }
-            else
-            {
-                doc.editor->goToLine(doc.pendingLine);
-            }
-            doc.pendingLine   = -1;
-            doc.pendingColumn = -1;
-            doc.pendingLength = 0;
-        }
+        goToPending(doc);
     }
     else
     {
@@ -2246,6 +2216,13 @@ void ALFloaterScriptStudio::loaded(const ALScriptWorkspace::Loaded& answer)
                 doc.envelope = ALScriptEnvelope();
             }
         }
+        // Loaded again with nothing wrapped round it, and nothing to
+        // expand it afresh: what the other editor holds was compiled from
+        // a text the script no longer is.
+        if (!preprocessed(doc))
+        {
+            dropExpanded(doc);
+        }
         doc.editor->setReadOnly(!answer.modifiable);
         applyPendingEdits(doc);
         doc.expanded.valid = false;
@@ -2267,20 +2244,7 @@ void ALFloaterScriptStudio::loaded(const ALScriptWorkspace::Loaded& answer)
             ALScriptWorkspace::instance().askRunning(doc.ref);
             refreshExplorer();
         }
-        if (doc.pendingLine >= 0)
-        {
-            if (doc.pendingColumn >= 0)
-            {
-                doc.editor->goTo(ALTextRange(ALTextPos(doc.pendingLine, doc.pendingColumn), ALTextPos(doc.pendingLine, doc.pendingColumn + doc.pendingLength)));
-            }
-            else
-            {
-                doc.editor->goToLine(doc.pendingLine);
-            }
-            doc.pendingLine   = -1;
-            doc.pendingColumn = -1;
-            doc.pendingLength = 0;
-        }
+        goToPending(doc);
     }
     // Loaded again -- reverted, or saved by an editor outside -- the caret
     // and the view where they were, rather than at the top.
@@ -2335,6 +2299,29 @@ void ALFloaterScriptStudio::showExpanded(Doc& doc, const std::string& text)
     doc.expandedEditor->setText(text);
     if (&doc == active())
     {
+        refreshToolbar();
+    }
+}
+
+void ALFloaterScriptStudio::dropExpanded(Doc& doc)
+{
+    if (!doc.expandedEditor)
+    {
+        return;
+    }
+    const bool focused = doc.expandedEditor->hasFocus();
+    mEditorHost->removeChild(doc.expandedEditor);
+    doc.expandedEditor->die();
+    doc.expandedEditor  = nullptr;
+    doc.showingExpanded = false;
+    if (&doc == active())
+    {
+        // The source in its place, with the keyboard where it was.
+        showEditors();
+        if (focused)
+        {
+            doc.editor->setFocus(true);
+        }
         refreshToolbar();
     }
 }
@@ -2466,6 +2453,11 @@ void ALFloaterScriptStudio::preprocess(Doc& doc, bool then_save)
 {
     if (doc.preprocessing)
     {
+        // One on its way already -- the one a load starts, which fetches
+        // an object's includes and can take a while: the save waits on it
+        // rather than going nowhere, which a close waiting on the save
+        // would wait on for ever.
+        doc.saveAfterPreprocess = doc.saveAfterPreprocess || then_save;
         return;
     }
     doc.preprocessing = true;
@@ -2492,6 +2484,7 @@ void ALFloaterScriptStudio::preprocessedAnswer(const std::string& id, U32 versio
     }
     Doc& doc          = *mDocs[index];
     doc.preprocessing = false;
+    then_save         = std::exchange(doc.saveAfterPreprocess, false) || then_save;
     // What a save would upload, shown; the analyzers' own expansion is
     // made again now that every include is in, without the optimizer.
     doc.uploaded.valid    = true;
@@ -2648,16 +2641,14 @@ void ALFloaterScriptStudio::openFileHere(const std::string& path, bool lua, S32 
     }
     if (already == NONE)
     {
-        std::ifstream in(path, std::ios::binary);
-        if (!in)
+        std::string text;
+        if (!readWholeFile(path, text))
         {
             LLStringUtil::format_map_t args;
             args["[FILE]"] = path;
             setStatus(getString("IncludeGone", args), true);
             return;
         }
-        std::stringstream buffer;
-        buffer << in.rdbuf();
 
         const bool preview = mOpenPreview > 0;
         if (preview)
@@ -2677,7 +2668,7 @@ void ALFloaterScriptStudio::openFileHere(const std::string& path, bool lua, S32 
         doc->notecard                = !language.script;
         doc->editor                  = makeEditor(doc->id, false);
         doc->editor->setSyntax(!language.script ? textSyntaxOf(path) : language.lua ? "slua" : "lsl");
-        doc->editor->setText(buffer.str());
+        doc->editor->setText(text);
         doc->loaded     = true;
         doc->modifiable = true;
         wireDoc(*doc);
@@ -13284,18 +13275,16 @@ void ALFloaterScriptStudio::revert(Doc& doc)
     {
         // A file: what is on disk now, as one step to undo, and clean --
         // the caret and the view where they were.
-        std::ifstream in(doc.file, std::ios::binary);
-        if (!in)
+        std::string text;
+        if (!readWholeFile(doc.file, text))
         {
             args["[FILE]"] = doc.file;
             setStatus(getString("IncludeGone", args), true);
             return;
         }
-        std::stringstream text;
-        text << in.rdbuf();
         const ALTextPos caret  = doc.editor->caret();
         const S32       scroll = doc.editor->scrollY();
-        doc.carriedText        = text.str();
+        doc.carriedText        = std::move(text);
         takeCarriedText(doc);
         doc.editor->setSelection(ALTextRange(doc.editor->document().clamp(caret), doc.editor->document().clamp(caret)));
         doc.editor->setScrollY(scroll);
