@@ -1587,14 +1587,19 @@ LLVector4 LLEnvironment::getMoonDirectionCFR() const
     return light_direction_cfr;
 }
 
-LLVector4 LLEnvironment::getClampedLightNorm() const
+LLVector3 LLEnvironment::getClampedLightDirection() const
 {
     LLVector3 light_direction = getLightDirection();
     if (light_direction.mV[2] < -0.1f)
     {
         light_direction.mV[2] = -0.1f;
     }
-    return toLightNorm(light_direction);
+    return light_direction;
+}
+
+LLVector4 LLEnvironment::getClampedLightNorm() const
+{
+    return toLightNorm(getClampedLightDirection());
 }
 
 LLVector4 LLEnvironment::getClampedSunNorm() const

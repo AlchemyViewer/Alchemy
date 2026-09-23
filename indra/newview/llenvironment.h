@@ -201,6 +201,9 @@ public:
     LLVector3                   getSunDirection() const;
     LLVector3                   getMoonDirection() const;
 
+    // getLightDirection() with z clamped above -0.1f; getClampedLightNorm() is this in OGL order
+    LLVector3                   getClampedLightDirection() const;
+
     // Returns light direction converted to CFR coord system
     LLVector4                   getLightDirectionCFR() const; // returns sun or moon depending on which is up
     LLVector4                   getSunDirectionCFR() const;

@@ -1108,7 +1108,8 @@ void LLSettingsVOWater::applySpecial(void *ptarget, bool force)
         shader->uniform4fv(LLShaderMgr::CLIP_PLANE, mirrorPlane.mV);
         LLVector4 light_direction = env.getClampedLightNorm();
 
-        F32 waterFogKS = 1.f / llmax(light_direction.mV[2], WATER_FOG_LIGHT_CLAMP);
+        // lightnorm is OGL order (y, z, x): the light's elevation is [1], not [2]
+        F32 waterFogKS = 1.f / llmax(light_direction.mV[1], WATER_FOG_LIGHT_CLAMP);
 
         shader->uniform1f(LLShaderMgr::WATER_FOGKS, waterFogKS);
 
