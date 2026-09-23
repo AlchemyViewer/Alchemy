@@ -2020,6 +2020,7 @@
                      tool_tip="Everything done to the files this tool has open, with a mark where the present is"
                      width="742">
                         <history_list
+                         start_label="The files as they were opened"
                          empty_headline="Nothing done yet."
                          empty_sentence="Edits show up here as you make them, newest first. Double-click one to put the files back the way they were just after it."
                          follows="all"

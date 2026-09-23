@@ -568,7 +568,8 @@ private:
     // over the text reads as the text's.
     ALQuickOpen* quickOpen(std::vector<ALQuickOpen::Candidate> candidates, const std::string& placeholder, const std::string& title,
                            std::function<void(const std::string&)> chose, LLView* anchor = nullptr, S32 width = 0, S32 height = 0,
-                           std::function<void()> escaped = {}, std::function<void(const std::string&)> hold = {});
+                           std::function<void()> escaped = {}, std::function<void(const std::string&)> hold = {},
+                           std::function<void()> left = {});
 
     // A floater string in the form its count takes in the viewer's
     // language: the name with LLTrans's suffix -- A for one, B for many

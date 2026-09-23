@@ -1126,6 +1126,9 @@ void ALFloaterScriptStudio::stopClosing()
     if (quittingOnUs())
     {
         LLAppViewer::instance()->abortQuit();
+        // The panes out in windows of their own were put back as the quit
+        // closed those windows: out again, as the author had them.
+        mFolds.putBackOut();
     }
     mClosingWindow = false;
     mAppQuitting   = false;
@@ -1250,9 +1253,11 @@ bool ALFloaterScriptStudio::redo()
 
 ALQuickOpen* ALFloaterScriptStudio::quickOpen(std::vector<ALQuickOpen::Candidate> candidates, const std::string& placeholder, const std::string& title,
                                               std::function<void(const std::string&)> chose, LLView* anchor, S32 width, S32 height,
-                                              std::function<void()> escaped, std::function<void(const std::string&)> hold)
+                                              std::function<void()> escaped, std::function<void(const std::string&)> hold,
+                                              std::function<void()> left)
 {
-    ALQuickOpen* quick = ALStudioFloater::quickOpen(std::move(candidates), placeholder, title, std::move(chose), anchor, width, height, std::move(escaped), std::move(hold));
+    ALQuickOpen* quick = ALStudioFloater::quickOpen(std::move(candidates), placeholder, title, std::move(chose), anchor, width, height,
+                                                    std::move(escaped), std::move(hold), std::move(left));
     if (quick)
     {
         const LLUIColorTable& colors = LLUIColorTable::instance();
@@ -7350,7 +7355,7 @@ void ALFloaterScriptStudio::goToLine()
     const ALTextPos           was    = doc->editor->caret();
     const LLHandle<LLFloater> handle = getHandle();
     // The editor at the place typed, while it is typed; return leaves it
-    // there, escape puts it back.
+    // there, and so does looking away, escape puts it back.
     auto docOf = [handle, id]() -> Doc* {
         ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get());
         const size_t           index  = studio ? studio->indexOf(id) : NONE;
@@ -7392,6 +7397,19 @@ void ALFloaterScriptStudio::goToLine()
             if (Doc* doc = docOf())
             {
                 doc->editor->goTo(was);
+            }
+        },
+        {},
+        // Looked away from: the line it went to stands, since that is
+        // what was looked at, and the way back from it is kept, as a
+        // line gone to by Return keeps it.
+        [handle, docOf, was]() {
+            ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get());
+            Doc*                   doc    = docOf();
+            if (studio && doc && doc->editor->caret() != was)
+            {
+                studio->mForward.clear();
+                studio->mBack.push_back(NavPlace{ doc->id, was });
             }
         });
     if (!quick)
