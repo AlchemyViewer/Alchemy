@@ -93,6 +93,9 @@ public:
     // Everything recorded until endGroup() is one step.
     void beginGroup();
     void endGroup();
+    // Every group still open closed at once: what is left of whoever opened
+    // them -- a modal keymap in its insert mode -- is gone.
+    void closeGroups();
     // A run of typing is over: the next change is a step of its own.
     void breakRun() { mSteps.breakRun(); }
 

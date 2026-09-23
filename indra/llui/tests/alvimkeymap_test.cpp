@@ -29,6 +29,8 @@
 #include "../llclipboard.h"
 #include "../llfocusmgr.h"
 #include "../lluictrlfactory.h"
+
+#include "llsd.h"
 #include "alheadlessui_fixture.h"
 
 #include "../test/lltut.h"
@@ -342,7 +344,7 @@ namespace tut
         ALCodeEditor& e = make("alpha beta\ngamma alpha\ndelta\n");
         keys("\"ayyj\"ap");
         ensure_equals("a named register keeps its line", flat(e.text()), std::string("alpha beta|gamma alpha|alpha beta|delta|"));
-        ensure_equals("and the clipboard has it too", vim->registerText('"'), std::string("alpha beta"));
+        ensure_equals("and \"\" names it", vim->registerText('"'), std::string("alpha beta"));
         keys("ggmaG`a");
         ensure_equals("a mark goes back to the place", caretText(), std::string("0:0"));
         keys("jl'a");
@@ -1100,5 +1102,80 @@ namespace tut
         keys(":s/\\(foo\\)\\zebar/[\\1]/<CR>");
         ensure_equals("the group, found where what follows is bar", flat(e.text()), std::string("[foo]bar foobaz|"));
         ensure("and nothing said against it", !vim->messageIsError());
+    }
+
+    template<> template<>
+    void alvimkeymap_object::test<29>()
+    {
+        set_test_name("vim turned off in insert mode leaves no step open: what is typed after is a step of its own");
+        ALCodeEditor& e = make("\n");
+        keys("iab");
+        ensure("inserting", vim->inserting());
+        e.setModalKeymap(nullptr);
+        vim = nullptr;
+        for (const char c : { 'c', 'd' })
+        {
+            e.handleUnicodeCharHere(static_cast<llwchar>(c));
+        }
+        ensure_equals("typed", e.document().line(0), std::string("abcd"));
+        e.undo();
+        ensure_equals("the typing after undone alone", e.document().line(0), std::string("ab"));
+    }
+
+    template<> template<>
+    void alvimkeymap_object::test<30>()
+    {
+        set_test_name("an operator's count times its motion's is held to the most a count is, rather than wrapping round");
+        ALCodeEditor& e = make("a\nb\nc\nd\ne\n");
+        keys("50000d50000d");
+        ensure_equals("every line from the caret", flat(e.text()), std::string(""));
+        ALCodeEditor& f = make("a\nb\nc\nd\ne\n");
+        keys("50000d50000j");
+        ensure_equals("and a motion likewise", flat(f.text()), std::string(""));
+    }
+
+    template<> template<>
+    void alvimkeymap_object::test<31>()
+    {
+        set_test_name(":g inside :g is refused, as vim refuses it");
+        ALCodeEditor& e = make("a1\nb2\na3\n");
+        keys(":g/a/g/1/d<CR>");
+        ensure("refused", vim->messageIsError() && vim->message().find("E147") != std::string::npos);
+        ensure_equals("nothing done", flat(e.text()), std::string("a1|b2|a3|"));
+    }
+
+    template<> template<>
+    void alvimkeymap_object::test<32>()
+    {
+        set_test_name("a named register never touches the clipboard; the unnamed one does where the setting says; \"+ always; :set clipboard");
+        make("one\ntwo\n");
+        const auto clipboard = []() {
+            std::string text;
+            LLClipboard::instance().pasteFromClipboard(text);
+            return text;
+        };
+        const std::string outside("outside");
+        LLClipboard::instance().copyToClipboard(outside, 0, static_cast<S32>(outside.size()));
+        keys("\"ayy");
+        ensure_equals("a named register leaves the clipboard alone", clipboard(), outside);
+        ensure_equals("and \"\" names it", vim->registerText('"'), std::string("one"));
+
+        vim->sharedState()->unnamedClipboard = false;
+        keys("x");
+        ensure_equals("off: a delete leaves the clipboard alone", clipboard(), outside);
+        ensure_equals("and keeps what it took", vim->registerText('"'), std::string("o"));
+        keys("p");
+        ensure_equals("which is what p puts", flat(editor->text()), std::string("noe|two|"));
+        keys("\"+yy");
+        ensure_equals("\"+ is the clipboard whatever", clipboard(), std::string("noe"));
+
+        keys(":set clipboard=unnamed<CR>");
+        ensure("on again", vim->shared().unnamedClipboard);
+        keys("jyy");
+        ensure_equals("a yank goes by the clipboard", clipboard(), std::string("two"));
+        keys(":set clipboard=<CR>");
+        ensure("and off", !vim->shared().unnamedClipboard);
+        keys(":set clipboard=bogus<CR>");
+        ensure("a value vim has not is said", vim->messageIsError() && vim->message().find("E474") != std::string::npos);
     }
 }

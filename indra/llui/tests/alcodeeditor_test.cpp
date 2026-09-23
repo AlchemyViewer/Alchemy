@@ -1116,4 +1116,105 @@ namespace tut
         e.resetDirty();
         ensure("a save clears the bars", !e.lineChanged(0));
     }
+
+    template<> template<>
+    void alcodeeditor_object::test<29>()
+    {
+        set_test_name("a snippet's stops on several lines stay while the caret is among them; one inside another; $0's text chosen; a number again a mirror");
+        ALCodeEditor& e = make("", "lsl");
+        e.insertSnippet("for (${1:i} = 0; ${1} < ${2:n}; ++${1})\n{\n    ${3:body}\n}${0:done}");
+        ensure_equals("the mirrors show what the first holds", e.document().line(0), std::string("for (i = 0; i < n; ++i)"));
+        ensure_equals("three stops, not the mirrors", e.placeholders().size(), size_t(3));
+        type("k");
+        ensure_equals("typed over the first alone", e.document().line(0), std::string("for (k = 0; i < n; ++i)"));
+        key(KEY_TAB);
+        ensure_equals("its mirrors made it as it was left", e.document().line(0), std::string("for (k = 0; k < n; ++k)"));
+        ensure_equals("the next chosen", e.selectedText(), std::string("n"));
+        key(KEY_TAB);
+        ensure("on to a stop on another line, the stops still there", e.selectedText() == "body" && e.caret().line == 2 && e.placeholders().size() == 3);
+        key(KEY_TAB);
+        ensure_equals("then $0, its text chosen", e.selectedText(), std::string("done"));
+        ensure("and done", e.placeholders().empty());
+        e.undo();
+
+        // One inside another, and let go of when the caret leaves them.
+        ALCodeEditor& f = make("x\n", "lsl");
+        f.insertSnippet("f(${1:a, ${2:b}})");
+        ensure_equals("the text", f.document().line(0), std::string("f(a, b)x"));
+        ensure_equals("the outer chosen whole", f.selectedText(), std::string("a, b"));
+        key(KEY_TAB);
+        ensure_equals("then the inner", f.selectedText(), std::string("b"));
+        f.setCaret(ALTextPos(1, 0));
+        ensure("the caret gone from their lines lets them go", f.placeholders().empty());
+        ALCodeEditor& g = make("", "lsl");
+        g.insertSnippet("a\\$b\\}c ${1:x}");
+        ensure_equals("escaped dollar and brace as themselves", g.text(), std::string("a$b}c x"));
+    }
+
+    template<> template<>
+    void alcodeeditor_object::test<30>()
+    {
+        set_test_name("a word of many parts alike is matched by its parts at once, however near the miss, and still matched right");
+        std::string word;
+        for (S32 i = 0; i < 60; ++i)
+        {
+            word += "a_";
+        }
+        word += "b";
+        // Every way there is through sixty parts, tried one by one, would
+        // not end in anyone's lifetime.
+        ensure_equals("a near miss is no match", ALCodeEditor::matchTier(word, std::string(30, 'a') + "c"), -1);
+        ensure_equals("and the letters of its parts a match", ALCodeEditor::matchTier(word, std::string(30, 'a') + "b"), 3);
+        ensure_equals("by parts as ever", ALCodeEditor::matchTier("llSetPos", "setpos"), 2);
+        ensure_equals("by the letters of its parts", ALCodeEditor::matchTier("llSetPrimitiveParams", "sprp"), 3);
+    }
+
+    template<> template<>
+    void alcodeeditor_object::test<31>()
+    {
+        set_test_name("the bars go where the text is stepped back to the one saved");
+        ALCodeEditor& e = make("one\ntwo");
+        e.resetDirty();
+        e.setCaret(ALTextPos(1, 3));
+        type("x");
+        ensure("changed and barred", e.isDirty() && e.lineChanged(1));
+        e.undo();
+        ensure("back to the saved text: clean", !e.isDirty());
+        ensure("and no bar", !e.lineChanged(1));
+        e.redo();
+        ensure("forward again: barred", e.lineChanged(1));
+    }
+
+    template<> template<>
+    void alcodeeditor_object::test<32>()
+    {
+        set_test_name("whole lines taken from right above a folded block leave it folded, moved up with them");
+        ALCodeEditor& e = make("x\ny\ndefault\n{\n    state_entry()\n    {\n    }\n}\nz");
+        ensure("folds", e.foldAt(2));
+        e.setSelection(ALTextRange(ALTextPos(0, 0), ALTextPos(2, 0)));
+        key(KEY_DELETE);
+        ensure_equals("the lines gone", e.document().line(0), std::string("default"));
+        ensure("the block still folded, where it is now", e.isFolded(0) && e.layout().hidden(1));
+        // An edit into its line is typing on it, and it stays folded; one
+        // that takes the line with others unfolds it.
+        e.setSelection(ALTextRange(ALTextPos(0, 0), ALTextPos(0, 0)));
+        type("q");
+        ensure("typing on the header keeps it", e.isFolded(0));
+    }
+
+    template<> template<>
+    void alcodeeditor_object::test<33>()
+    {
+        set_test_name("with nobody to ask, the grammar's words are found by their parts as the document's are");
+        ALCodeEditor& e = make("", "lsl");
+        e.highlighter().words().set("function", { "llSetPos", "llSay" });
+        type("setp");
+        key(' ', MASK_CONTROL);
+        bool found = false;
+        for (const ALCodeEditor::Completion& c : e.completions())
+        {
+            found = found || c.text == "llSetPos";
+        }
+        ensure("llSetPos for setp", e.completionOpen() && found);
+    }
 }

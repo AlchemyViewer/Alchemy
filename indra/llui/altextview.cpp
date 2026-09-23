@@ -621,6 +621,14 @@ S32 ALTextView::lastVisibleLine()
 
 void ALTextView::setModalKeymap(std::unique_ptr<ALModalKeymap> keymap)
 {
+    // A keymap let go of in the middle of something -- vim in its insert
+    // mode, asking about substitutions -- leaves the group it opened open,
+    // and every edit after would be one step with what came before. None is
+    // the view's own between calls, so every one open is closed.
+    if (mModal)
+    {
+        mUndo.closeGroups();
+    }
     mModal = std::move(keymap);
 }
 

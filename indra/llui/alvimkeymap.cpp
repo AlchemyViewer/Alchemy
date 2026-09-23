@@ -186,8 +186,14 @@ namespace
 
     bool isDigit(llwchar ch) { return ch >= '0' && ch <= '9'; }
 
-    // A count typed before a command: the digits as a number, at least one.
+    // A count typed before a command: the digits as a number, at least one;
+    // no more than this.
+    constexpr S32 MAX_COUNT = 100000;
     S32 countOr(S32 count, S32 fallback = 1) { return count > 0 ? count : fallback; }
+    // An operator's count and its motion's together -- 3d2w is six words --
+    // held to the same most, which their product would otherwise pass far
+    // enough to wrap round.
+    S32 countTimes(S32 a, S32 b) { return static_cast<S32>(llmin<S64>(static_cast<S64>(a) * static_cast<S64>(b), MAX_COUNT)); }
 }
 
 ALVimKeymap::ALVimKeymap() = default;
@@ -838,7 +844,8 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
         switch (pending)
         {
             case '"':
-                if ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || ch == '"' || (ch >= '0' && ch <= '9') || ch == '-' || ch == '_')
+                if ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || ch == '"' || (ch >= '0' && ch <= '9') || ch == '-' || ch == '_' || ch == '+' ||
+                    ch == '*')
                 {
                     mRegister = static_cast<char>(ch);
                     mCount    = 0;
@@ -1166,7 +1173,7 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
     // A count.
     if (isDigit(ch) && !(ch == '0' && mCount == 0))
     {
-        mCount = llmin(mCount * 10 + static_cast<S32>(ch - '0'), 100000);
+        mCount = llmin(mCount * 10 + static_cast<S32>(ch - '0'), MAX_COUNT);
         return true;
     }
     if (ch == '"' && !mOperator)
@@ -1184,7 +1191,7 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
         // the count more.
         if (ch == op || (op == '~' && ch == '~') || (op == 'u' && ch == 'u') || (op == 'U' && ch == 'U'))
         {
-            const S32 lines = countOr(mOperatorCount) * count;
+            const S32 lines = countTimes(countOr(mOperatorCount), count);
             Span      span;
             span.linewise    = true;
             const S32 first  = cursor(view).line;
@@ -1210,7 +1217,7 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
         {
             m_ch = ch == 'w' ? 'e' : 'E';
         }
-        Motion m = motion(view, m_ch, countOr(mOperatorCount) * count, 0);
+        Motion m = motion(view, m_ch, countTimes(countOr(mOperatorCount), count), 0);
         if (!m.ok || !m.moved)
         {
             clearPending();
@@ -2782,6 +2789,8 @@ void ALVimKeymap::store(char name, std::string text, bool linewise, bool block, 
     {
         return;
     }
+    // A register named keeps it, and "" says it; the clipboard is not
+    // touched, as vim's clipboard=unnamed leaves a named one alone.
     if (name >= 'A' && name <= 'Z')
     {
         // Added to the named register, a line or straight on.
@@ -2796,14 +2805,22 @@ void ALVimKeymap::store(char name, std::string text, bool linewise, bool block, 
             into.text += reg.text;
         }
         mUnnamed = into;
-        LLClipboard::instance().copyToClipboard(into.text, 0, static_cast<S32>(into.text.size()));
         return;
     }
     if (name >= 'a' && name <= 'z')
     {
         mRegisters[name] = reg;
+        mUnnamed         = reg;
+        return;
     }
-    else if (yanked)
+    // "+ and "* are the clipboard, whatever the setting says.
+    if (name == '+' || name == '*')
+    {
+        mUnnamed = reg;
+        LLClipboard::instance().copyToClipboard(reg.text, 0, static_cast<S32>(reg.text.size()));
+        return;
+    }
+    if (yanked)
     {
         mRegisters['0'] = reg;
     }
@@ -2825,9 +2842,13 @@ void ALVimKeymap::store(char name, std::string text, bool linewise, bool block, 
         // A smaller delete.
         mRegisters['-'] = reg;
     }
-    // The unnamed register is the clipboard, which the world shares.
+    // The unnamed register: the clipboard, which the world shares, where
+    // the setting says so; the editor's own otherwise.
     mUnnamed = reg;
-    LLClipboard::instance().copyToClipboard(reg.text, 0, static_cast<S32>(reg.text.size()));
+    if (mShared->unnamedClipboard)
+    {
+        LLClipboard::instance().copyToClipboard(reg.text, 0, static_cast<S32>(reg.text.size()));
+    }
 }
 
 ALVimKeymap::Register ALVimKeymap::fetch(char name) const
@@ -2840,6 +2861,13 @@ ALVimKeymap::Register ALVimKeymap::fetch(char name) const
     {
         const auto it = mRegisters.find(name);
         return it == mRegisters.end() ? Register() : it->second;
+    }
+    // "" by name: what was last put in a register, whichever it was. With
+    // no register named, the same where the clipboard is not the unnamed
+    // register's.
+    if (name == '"' || (name == 0 && !mShared->unnamedClipboard))
+    {
+        return mUnnamed;
     }
     // What the clipboard holds now: ours, with how it was taken, or
     // somebody else's, taken as characters.
@@ -3554,7 +3582,7 @@ void ALVimKeymap::complete(ALTextView& view, bool forward)
             }
             if (command == "set" || command == "se")
             {
-                static const char* OPTIONS[] = { "expandtab", "ignorecase", "noexpandtab", "noignorecase", "nosmartcase", "nowrap", "shiftwidth=", "smartcase", "tabstop=", "wrap" };
+                static const char* OPTIONS[] = { "clipboard=", "clipboard=unnamed", "expandtab", "ignorecase", "noexpandtab", "noignorecase", "nosmartcase", "nowrap", "shiftwidth=", "smartcase", "tabstop=", "wrap" };
                 found.assign(std::begin(OPTIONS), std::end(OPTIONS));
             }
         }
@@ -4233,6 +4261,18 @@ void ALVimKeymap::runCommand(ALTextView& view, const std::string& line_in)
             mShared->smartCase = !off;
             return;
         }
+        if (option == "cb" || option == "clipboard")
+        {
+            // unnamed or unnamedplus, which are one clipboard here; empty
+            // for the editor's own.
+            if (value.empty() || value == "unnamed" || value == "unnamedplus")
+            {
+                mShared->unnamedClipboard = !value.empty();
+                return;
+            }
+            say(said("VimBadOptionValue", "E474: Invalid argument: [OPTION]", { { "[OPTION]", args } }), true);
+            return;
+        }
         if (mHooks.command && mHooks.command(view, "set", args))
         {
             return;
@@ -4394,6 +4434,11 @@ bool ALVimKeymap::global(ALTextView& view, S32 first, S32 last, bool ranged, con
         say(said("VimNoPreviousPattern", "E35: No previous regular expression"), true);
         return false;
     }
+    if (mInGlobal)
+    {
+        say(said("VimGlobalRecursive", "E147: Cannot do :global recursive"), true);
+        return false;
+    }
     const ALTextDocument& d   = view.document();
     const char            sep = spec[0];
     size_t                p1  = 1;
@@ -4478,6 +4523,7 @@ bool ALVimKeymap::global(ALTextView& view, S32 first, S32 last, bool ranged, con
     view.undoJournal().beginGroup();
     mConfirming           = Confirming();
     mConfirming.gathering = true;
+    mInGlobal             = true;
     for (auto it = lines.rbegin(); it != lines.rend(); ++it)
     {
         const S32 line = *it;
@@ -4491,6 +4537,7 @@ bool ALVimKeymap::global(ALTextView& view, S32 first, S32 last, bool ranged, con
             break;
         }
     }
+    mInGlobal             = false;
     mConfirming.gathering = false;
     if (mMessageError && !mConfirming.edits.empty())
     {

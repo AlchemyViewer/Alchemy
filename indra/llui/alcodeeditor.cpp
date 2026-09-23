@@ -44,6 +44,8 @@
 #include <boost/unordered/unordered_flat_map.hpp>
 #include <boost/unordered/unordered_flat_set.hpp>
 
+#include <functional>
+
 #include <algorithm>
 #include <cmath>
 #include <optional>
@@ -186,7 +188,13 @@ ALCodeEditor::ALCodeEditor(const Params& p)
         {
             refreshCompletion();
         }
+        // Stepped back to the saved text: nothing is changed since.
+        if (!isDirty())
+        {
+            std::fill(mChanged.begin(), mChanged.end(), 0);
+        }
     });
+    mCaretConnection = onCaretMoved([this]() { dropPlaceholdersLeft(); });
 
     // The list of completions, made once and shown when there is
     // something to choose; a child, so it draws over the text and goes
@@ -273,9 +281,31 @@ void ALCodeEditor::onEdit(const ALTextDocument::Edit& edit)
                                  }),
                   mInlays.end());
     // The placeholder being typed over becomes what was typed; the others
-    // move with the text, and one the edit cut into goes.
+    // move with the text, and one the edit cut into goes, with its mirrors.
+    // A mirror being brought up is what the edit put in.
     if (!mPlaceholders.empty())
     {
+        for (S32 k = 0; k < static_cast<S32>(mMirrors.size());)
+        {
+            Mirror& mirror = mMirrors[static_cast<size_t>(k)];
+            if (k == mSyncingMirror)
+            {
+                mirror.range = edit.rangeAfter();
+                ++k;
+            }
+            else if (edit.slide(mirror.range))
+            {
+                ++k;
+            }
+            else
+            {
+                mMirrors.erase(mMirrors.begin() + k);
+                if (mSyncingMirror > k)
+                {
+                    --mSyncingMirror;
+                }
+            }
+        }
         for (S32 i = 0; i < static_cast<S32>(mPlaceholders.size());)
         {
             ALTextRange& r = mPlaceholders[i];
@@ -291,6 +321,14 @@ void ALCodeEditor::onEdit(const ALTextDocument::Edit& edit)
             else
             {
                 mPlaceholders.erase(mPlaceholders.begin() + i);
+                mMirrors.erase(std::remove_if(mMirrors.begin(), mMirrors.end(), [i](const Mirror& m) { return m.of == i; }), mMirrors.end());
+                for (Mirror& m : mMirrors)
+                {
+                    if (m.of > i)
+                    {
+                        --m.of;
+                    }
+                }
                 if (mPlaceholderAt > i)
                 {
                     --mPlaceholderAt;
@@ -328,11 +366,18 @@ void ALCodeEditor::onEdit(const ALTextDocument::Edit& edit)
                       mAutoClosed.end());
 
     // Folds slide the same way. One that starts on the edit's first line
-    // stays: typing on a block's first line is not opening the block.
-    mFolded.erase(std::remove_if(mFolded.begin(), mFolded.end(), [&](S32 start) { return start > first && start <= last; }), mFolded.end());
+    // stays: typing on a block's first line is not opening the block. One
+    // on its last line stays too where the edit ended at that line's start
+    // and left it a line of its own -- whole lines taken from above a
+    // folded block -- and moves up with it.
+    const bool last_kept = last > first && removed.end.column == 0 &&
+                           (edit.inserted.empty() ? removed.begin.column == 0 : edit.inserted.back() == '\n');
+    mFolded.erase(std::remove_if(mFolded.begin(), mFolded.end(),
+                                 [&](S32 start) { return start > first && (start < last || (start == last && !last_kept)); }),
+                  mFolded.end());
     for (S32& start : mFolded)
     {
-        if (start > last)
+        if (start > last || (start == last && last_kept))
         {
             start += delta;
         }
@@ -1829,14 +1874,20 @@ S32 ALCodeEditor::chosenCompletion() const
 
 void ALCodeEditor::vocabularyCompletions(std::string_view prefix, std::vector<Completion>& out)
 {
+    // Every word, matched as the document's own are -- a part of it, the
+    // letters of its parts -- rather than by its start alone.
     std::vector<std::pair<std::string, std::string>> words;
     if (highlighter().grammar())
     {
-        highlighter().grammar()->collectWords(prefix, words);
+        highlighter().grammar()->collectWords(std::string_view(), words);
     }
-    highlighter().words().collect(prefix, words);
+    highlighter().words().collect(std::string_view(), words);
     for (auto& [word, table] : words)
     {
+        if (matchTier(word, prefix) < 0)
+        {
+            continue;
+        }
         Completion c;
         c.text   = word;
         c.kind   = kindOfTable(table);
@@ -2080,26 +2131,34 @@ namespace
         return LLStringOps::toLower(a) == LLStringOps::toLower(b);
     }
 
-    // The rest of what was typed, from `i`, in the word from `j`: each
-    // letter the next of the word, or the first of a part further on.
-    bool byParts(std::string_view word, size_t j, std::string_view typed, size_t i, bool running)
+    // What was typed, in the word: each letter the next of the word, or
+    // the first of a part further on. Every place in the word and in what
+    // was typed is answered once and remembered, since a word of many
+    // parts starting alike would otherwise be tried every way there is --
+    // `a_a_a_a...` against a near miss, over and again at every keystroke.
+    bool byParts(std::string_view word, std::string_view typed)
     {
-        if (i == typed.size())
-        {
-            return true;
-        }
-        if (running && j < word.size() && sameLetter(word[j], typed[i]) && byParts(word, j + 1, typed, i + 1, true))
-        {
-            return true;
-        }
-        for (size_t k = j; k < word.size(); ++k)
-        {
-            if (partAt(word, k) && sameLetter(word[k], typed[i]) && byParts(word, k + 1, typed, i + 1, true))
+        const size_t        across = word.size() + 1;
+        std::vector<U8>     known((typed.size() + 1) * across * 2, 0);
+        std::function<bool(size_t, size_t, bool)> fits = [&](size_t j, size_t i, bool running) -> bool {
+            if (i == typed.size())
             {
                 return true;
             }
-        }
-        return false;
+            U8& seen = known[(i * across + j) * 2 + (running ? 1 : 0)];
+            if (seen)
+            {
+                return seen == 2;
+            }
+            bool ok = running && j < word.size() && sameLetter(word[j], typed[i]) && fits(j + 1, i + 1, true);
+            for (size_t k = j; !ok && k < word.size(); ++k)
+            {
+                ok = partAt(word, k) && sameLetter(word[k], typed[i]) && fits(k + 1, i + 1, true);
+            }
+            seen = ok ? 2 : 1;
+            return ok;
+        };
+        return fits(0, 0, false);
     }
 }
 
@@ -2139,8 +2198,9 @@ S32 ALCodeEditor::matchTier(std::string_view word, std::string_view typed)
             return 2;
         }
     }
-    // Past a length where no name is typed by the letters of its parts.
-    if (typed.size() <= 32 && byParts(word, 0, typed, 0, false))
+    // Past a length where no name is typed by the letters of its parts,
+    // or is one.
+    if (typed.size() <= 32 && word.size() <= 256 && byParts(word, typed))
     {
         return 3;
     }
@@ -2836,22 +2896,23 @@ void ALCodeEditor::insertSnippet(std::string_view body)
     }
     // Where it goes, and how far in that line is, which every line of
     // the body after the first follows.
-    const ALTextRange selection = this->selection();
-    const ALTextPos   at        = std::min(selection.begin, selection.end);
-    const std::string& line     = document().line(at.line);
-    const std::string  indent   = line.substr(0, std::min(line.size(), line.find_first_not_of(" \t")));
+    const ALTextRange  selection = this->selection();
+    const ALTextPos    at        = std::min(selection.begin, selection.end);
+    const std::string& line      = document().line(at.line);
+    const std::string  indent    = line.substr(0, std::min(line.size(), line.find_first_not_of(" \t")));
     // The body read: the text as it will stand, and each placeholder's
-    // place in it, by number.
+    // place in it, by number, with what it held as written.
     struct Place
     {
         S32         number;
         ALTextRange range;
     };
-    std::vector<Place>       places;
-    std::optional<ALTextPos> end;
-    std::string              text;
-    ALTextPos                pos = at;
-    auto                     put = [&](char ch) {
+    std::vector<Place>                          places;
+    boost::unordered_flat_map<S32, std::string> held;
+    std::optional<ALTextRange>                  end;
+    std::string                                 text;
+    ALTextPos                                   pos = at;
+    auto                                        put = [&](char ch) {
         text += ch;
         if (ch == '\n')
         {
@@ -2865,84 +2926,189 @@ void ALCodeEditor::insertSnippet(std::string_view body)
             ++pos.column;
         }
     };
-    for (size_t i = 0; i < body.size(); ++i)
-    {
-        const char ch = body[i];
-        if (ch != '$' || i + 1 >= body.size())
+    // Where the brace closing a placeholder opened at `open` is, minding
+    // the ones inside it and the escaped; npos where it is never closed.
+    auto closing = [&body](size_t open) {
+        S32 depth = 0;
+        for (size_t k = open; k < body.size(); ++k)
         {
-            put(ch);
-            continue;
-        }
-        if (body[i + 1] == '$')
-        {
-            put('$');
-            ++i;
-            continue;
-        }
-        // $n, ${n} or ${n:text}
-        size_t      j       = i + 1;
-        const bool  braced  = body[j] == '{';
-        if (braced)
-        {
-            ++j;
-        }
-        size_t      digits  = j;
-        while (digits < body.size() && isdigit(static_cast<unsigned char>(body[digits])))
-        {
-            ++digits;
-        }
-        if (digits == j)
-        {
-            put(ch);
-            continue;
-        }
-        const S32   number  = atoi(std::string(body.substr(j, digits - j)).c_str());
-        std::string content;
-        size_t      after   = digits;
-        if (braced)
-        {
-            const size_t close = body.find('}', digits);
-            if (close == std::string_view::npos)
+            if (body[k] == '\\' && k + 1 < body.size() && (body[k + 1] == '$' || body[k + 1] == '}'))
             {
-                put(ch);
+                ++k;
+            }
+            else if (body[k] == '$' && k + 1 < body.size() && body[k + 1] == '{')
+            {
+                ++depth;
+                ++k;
+            }
+            else if (body[k] == '}' && --depth == 0)
+            {
+                return k;
+            }
+        }
+        return std::string_view::npos;
+    };
+    // The body from `i` to `stop`, placeholders within placeholders read
+    // the same way.
+    std::function<void(size_t, size_t)> read = [&](size_t i, size_t stop) {
+        while (i < stop)
+        {
+            const char ch = body[i];
+            if (ch == '\\' && i + 1 < stop && (body[i + 1] == '$' || body[i + 1] == '}'))
+            {
+                put(body[i + 1]);
+                i += 2;
                 continue;
             }
-            if (body[digits] == ':')
+            if (ch != '$' || i + 1 >= stop)
             {
-                content = std::string(body.substr(digits + 1, close - digits - 1));
+                put(ch);
+                ++i;
+                continue;
             }
-            after = close + 1;
-        }
-        if (number == 0)
-        {
-            end = pos;
-        }
-        else
-        {
-            const ALTextPos from = pos;
-            for (char c : content)
+            if (body[i + 1] == '$')
             {
-                put(c);
+                put('$');
+                i += 2;
+                continue;
             }
-            places.push_back(Place{ number, ALTextRange(from, pos) });
+            // $n, ${n} or ${n:text}
+            const bool braced = body[i + 1] == '{';
+            size_t     digits = i + (braced ? 2 : 1);
+            size_t     past   = digits;
+            while (past < stop && isdigit(static_cast<unsigned char>(body[past])))
+            {
+                ++past;
+            }
+            const size_t close = braced ? closing(i) : past;
+            if (past == digits || (braced && (close == std::string_view::npos || close > stop || (body[past] != ':' && body[past] != '}'))))
+            {
+                put(ch);
+                ++i;
+                continue;
+            }
+            const S32       number = atoi(std::string(body.substr(digits, past - digits)).c_str());
+            const ALTextPos from   = pos;
+            const size_t    began  = text.size();
+            if (braced && body[past] == ':')
+            {
+                read(past + 1, close);
+            }
+            else if (const auto first = held.find(number); first != held.end() && number != 0)
+            {
+                // A mirror written bare shows what its first holds, as it
+                // stands: indented already.
+                for (const char c : first->second)
+                {
+                    text += c;
+                    if (c == '\n')
+                    {
+                        ++pos.line;
+                        pos.column = 0;
+                    }
+                    else
+                    {
+                        ++pos.column;
+                    }
+                }
+            }
+            if (number == 0)
+            {
+                end = ALTextRange(from, pos);
+            }
+            else
+            {
+                places.push_back(Place{ number, ALTextRange(from, pos) });
+                held.emplace(number, text.substr(began));
+            }
+            i = braced ? close + 1 : past;
         }
-        i = after - 1;
-    }
+    };
+    read(0, body.size());
     insertText(text);
+    // Each number's first place the stop, the rest its mirrors; the stops
+    // in the order of their numbers.
     std::stable_sort(places.begin(), places.end(), [](const Place& a, const Place& b) { return a.number < b.number; });
     std::vector<ALTextRange> ranges;
-    for (const Place& place : places)
+    std::vector<Mirror>      mirrors;
+    for (size_t k = 0; k < places.size(); ++k)
     {
-        ranges.push_back(place.range);
+        if (k > 0 && places[k].number == places[k - 1].number)
+        {
+            mirrors.push_back(Mirror{ static_cast<S32>(ranges.size()) - 1, places[k].range });
+            continue;
+        }
+        ranges.push_back(places[k].range);
     }
-    const ALTextPos landing = end.value_or(pos);
+    const ALTextRange landing = end.value_or(ALTextRange(pos, pos));
     if (!ranges.empty())
     {
-        setPlaceholders(std::move(ranges), landing);
+        setPlaceholders(std::move(ranges), landing.begin);
+        mMirrors = std::move(mirrors);
+        // $0's own text chosen as the caret lands there, where it is on
+        // one line.
+        mLandingLength = landing.begin.line == landing.end.line ? landing.end.column - landing.begin.column : 0;
     }
     else
     {
-        setCaret(landing);
+        setSelection(landing);
+    }
+}
+
+void ALCodeEditor::syncMirrors(S32 index)
+{
+    if (index < 0 || index >= static_cast<S32>(mPlaceholders.size()) || mMirrors.empty())
+    {
+        return;
+    }
+    // From the last to the first, so that none moves one still to do; one
+    // step to undo, and the selection as it was.
+    const std::string        wanted = document().text(mPlaceholders[static_cast<size_t>(index)]);
+    std::vector<S32>         order;
+    for (S32 k = 0; k < static_cast<S32>(mMirrors.size()); ++k)
+    {
+        if (mMirrors[static_cast<size_t>(k)].of == index && document().text(mMirrors[static_cast<size_t>(k)].range) != wanted)
+        {
+            order.push_back(k);
+        }
+    }
+    if (order.empty())
+    {
+        return;
+    }
+    std::sort(order.begin(), order.end(), [this](S32 a, S32 b) { return mMirrors[static_cast<size_t>(b)].range.begin < mMirrors[static_cast<size_t>(a)].range.begin; });
+    const ALTextRange was = selection();
+    undoJournal().beginGroup();
+    for (const S32 k : order)
+    {
+        mSyncingMirror = k;
+        edit(mMirrors[static_cast<size_t>(k)].range, wanted);
+    }
+    mSyncingMirror = -1;
+    undoJournal().endGroup();
+    placeSelection(document().clamp(was.begin), document().clamp(was.end));
+    afterEdit();
+}
+
+void ALCodeEditor::dropPlaceholdersLeft()
+{
+    if (mPlaceholders.empty() || mSyncingMirror >= 0)
+    {
+        return;
+    }
+    // Anywhere from the first stop's line to where the call or the
+    // snippet ends is still filling it in: a snippet's stops may be on
+    // several lines.
+    S32 first = mPlaceholdersAfter.line;
+    S32 last  = mPlaceholdersAfter.line;
+    for (const ALTextRange& r : mPlaceholders)
+    {
+        first = llmin(first, r.begin.line);
+        last  = llmax(last, r.end.line);
+    }
+    if (caret().line < first || caret().line > last)
+    {
+        clearPlaceholders();
     }
 }
 
@@ -3052,6 +3218,8 @@ std::vector<std::string> ALCodeEditor::parameterNames(std::string_view detail, s
 
 void ALCodeEditor::setPlaceholders(std::vector<ALTextRange> ranges, const ALTextPos& after)
 {
+    mMirrors.clear();
+    mLandingLength     = 0;
     mPlaceholders      = std::move(ranges);
     mPlaceholdersAfter = after;
     mPlaceholderAt     = mPlaceholders.empty() ? -1 : 0;
@@ -3072,12 +3240,15 @@ bool ALCodeEditor::nextPlaceholder(S32 direction)
     {
         return false;
     }
+    // What was typed over the one being left, in its mirrors.
+    syncMirrors(mPlaceholderAt);
     if (to >= static_cast<S32>(mPlaceholders.size()))
     {
-        // Past the last: after the call, done.
-        const ALTextPos after = mPlaceholdersAfter;
+        // Past the last: after the call, done -- $0's text chosen.
+        const ALTextPos after   = mPlaceholdersAfter;
+        const S32       landing = mLandingLength;
         clearPlaceholders();
-        setCaret(after);
+        setSelection(ALTextRange(after, ALTextPos(after.line, after.column + landing)));
         return true;
     }
     mPlaceholderAt = to;
@@ -3091,6 +3262,8 @@ bool ALCodeEditor::nextPlaceholder(S32 direction)
 
 void ALCodeEditor::clearPlaceholders()
 {
+    mMirrors.clear();
+    mLandingLength = 0;
     mPlaceholders.clear();
     mPlaceholderAt = -1;
 }
@@ -3134,6 +3307,7 @@ bool ALCodeEditor::handleKeyHere(KEY key, MASK mask)
         }
         else if (key == KEY_ESCAPE && mask == MASK_NONE)
         {
+            syncMirrors(mPlaceholderAt);
             clearPlaceholders();
             return true;
         }
@@ -4037,14 +4211,11 @@ void ALCodeEditor::drawSignature(const LLRect& text)
 void ALCodeEditor::draw()
 {
     // A signature is about a call on the caret's line; anywhere else it
-    // is stale, and so are the placeholders of a call the caret has left.
+    // is stale. (The placeholders are let go of as the caret leaves their
+    // lines, where it moves: dropPlaceholdersLeft.)
     if (mSignature && !signatureShown())
     {
         hideSignature();
-    }
-    if (!mPlaceholders.empty() && caret().line != mPlaceholders.front().begin.line)
-    {
-        clearPlaceholders();
     }
     // A closer put in is typed over only on its own line.
     mAutoClosed.erase(std::remove_if(mAutoClosed.begin(), mAutoClosed.end(), [this](const ALTextPos& at) { return at.line != caret().line; }),

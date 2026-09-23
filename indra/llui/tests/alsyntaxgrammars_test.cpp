@@ -214,4 +214,48 @@ namespace tut
         ensure_equals("compound assignment and concatenation", lexed("slua", "s ..= \"x\"", state, words),
                       std::string("text:s |punctuation:..|operator:=|text: |string:\"x\""));
     }
+
+    template<> template<>
+    void alsyntaxgrammars_object::test<8>()
+    {
+        set_test_name("a pattern that gives up on a line is no match there, once; states nest so deep and no deeper; span ends are not kept without end");
+        LLSD states;
+        states["main"] = LLSD::emptyArray()
+                             .with(0, LLSD().with("regex", "(a*)*b").with("kind", "keyword"))
+                             .with(1, LLSD().with("match", "(").with("kind", "punctuation").with("push", "main"))
+                             .with(2, LLSD().with("match", ")").with("kind", "punctuation").with("pop", true))
+                             .with(3, LLSD().with("span_regex", "<<(\\w+)").with("end_regex", "\\1").with("kind", "string"));
+        LLSD description;
+        description["name"]   = "tested";
+        description["states"] = states;
+        ALSyntaxGrammar grammar;
+        std::string     error;
+        ensure("loads: " + error, grammar.load(description, error));
+        ALSyntaxWords words;
+
+        // Nested repeats over a long line: the engine gives up, and the
+        // line lexes all the same, in its default kind.
+        const std::string          long_line(4000, 'a');
+        ALSyntaxState              state = grammar.initialState();
+        std::vector<ALSyntaxToken> tokens;
+        grammar.lexLine(long_line, state, tokens, words);
+        ensure("the line covered", !tokens.empty() && tokens.front().begin == 0 && tokens.back().end == static_cast<S32>(long_line.size()));
+        ensure("as text", tokens.size() == 1 && tokens.front().kind == ALSyntaxKind::Text);
+
+        // Brackets opened past reason: the states go so deep and no deeper.
+        state = grammar.initialState();
+        grammar.lexLine(std::string(500, '('), state, tokens, words);
+        ensure("no deeper than the depth", state.frames.size() <= ALSyntaxGrammar::MAX_DEPTH);
+        grammar.lexLine(std::string(10, ')'), state, tokens, words);
+        ensure("and out again", state.frames.size() < ALSyntaxGrammar::MAX_DEPTH);
+
+        // A span whose end is its opening's capture, over many captures.
+        for (S32 i = 0; i < 400; ++i)
+        {
+            state = grammar.initialState();
+            grammar.lexLine("<<w" + std::to_string(i) + " x w" + std::to_string(i), state, tokens, words);
+        }
+        ensure("the ends kept are held to a number", grammar.cachedEndPatterns() <= 256);
+        ensure("and they still close", state.frames.size() == 1);
+    }
 }

@@ -125,13 +125,18 @@ public:
     // of one studio's editors: the lines entered on the : line and on
     // the search line, oldest first, for Up and Down on the line, q: q/
     // @: and :history; and the settings a :set changes, ignorecase and
-    // smartcase. The keymap's own unless told to share another's.
+    // smartcase, and clipboard: whether what is yanked, deleted and put
+    // with no register named goes by the system clipboard, as vim's
+    // clipboard=unnamed has it, or stays the editor's own. A register
+    // named -- "a -- never touches the clipboard, and "+ and "* are it
+    // whatever this says. The keymap's own unless told to share another's.
     struct Shared
     {
         std::vector<std::string> command;
         std::vector<std::string> search;
-        bool                     ignoreCase = false;
-        bool                     smartCase  = false;
+        bool                     ignoreCase       = false;
+        bool                     smartCase        = false;
+        bool                     unnamedClipboard = true;
     };
     const Shared&           shared() const { return *mShared; }
     std::shared_ptr<Shared> sharedState() const { return mShared; }
@@ -313,6 +318,9 @@ private:
         bool                                             gathering = false;
     };
     Confirming mConfirming;
+    // Whether a :g is running its command over lines, which another :g
+    // may not do, as vim has it (E147).
+    bool       mInGlobal = false;
     bool       confirmKey(ALTextView& view, const Input& input);
     // One of the edits made, the ones after it moved by what it changed.
     void       applyConfirmed(ALTextView& view, size_t index);

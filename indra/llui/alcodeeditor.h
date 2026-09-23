@@ -364,8 +364,12 @@ public:
 
     // A body in place of the selection, or at the caret: its lines after
     // the first indented as the caret's line is; `${1:text}`, `${1}` and
-    // `$1` its placeholders, tabbed through in order of their numbers,
-    // and `$0` where the caret lands past the last; `$$` a dollar.
+    // `$1` its placeholders, tabbed through in order of their numbers --
+    // one inside another's text as well, `${1:a ${2:b}}` -- and `$0`, or
+    // `${0:text}` with its text chosen, where the caret lands past the
+    // last. A number that comes again is a mirror of the first: it shows
+    // what the first holds, and takes what was typed over the first as
+    // Tab or Escape leaves it. `$$` or `\$` a dollar, `\}` a brace.
     void insertSnippet(std::string_view body);
 
     // --- the name at the caret -----------------------------------------------------
@@ -700,6 +704,25 @@ private:
     std::vector<ALTextRange> mPlaceholders;
     S32                      mPlaceholderAt = -1;
     ALTextPos                mPlaceholdersAfter;
+    // A snippet's placeholders that repeat another's number, by the index
+    // of the one they repeat: brought up to what that one holds as it is
+    // left. The one being brought up while it is.
+    struct Mirror
+    {
+        S32         of = -1;
+        ALTextRange range;
+    };
+    std::vector<Mirror>      mMirrors;
+    S32                      mSyncingMirror = -1;
+    // How long the text `${0:text}` put where the caret lands is, to be
+    // chosen as it lands; nothing for a bare $0.
+    S32                      mLandingLength = 0;
+    // Each placeholder's mirrors made what it holds.
+    void                     syncMirrors(S32 index);
+    // The placeholders let go of where the caret has left the lines they
+    // and where the call or the snippet ends are on.
+    void                     dropPlaceholdersLeft();
+    boost::signals2::scoped_connection mCaretConnection;
     // Where the last request was made, so a late answer is known for
     // what it is about, and what was answered, kept through every
     // narrowing until the list closes.

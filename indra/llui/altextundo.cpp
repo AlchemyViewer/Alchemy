@@ -303,6 +303,12 @@ void ALTextUndo::endGroup()
     }
 }
 
+void ALTextUndo::closeGroups()
+{
+    mGroupDepth = 0;
+    mSteps.breakRun();
+}
+
 std::optional<ALTextRange> ALTextUndo::undo()
 {
     std::optional<Step> step = mSteps.takeUndo();

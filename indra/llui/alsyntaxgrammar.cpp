@@ -34,6 +34,7 @@
 
 #include <bitset>
 #include <cstring>
+#include <stdexcept>
 
 // --- kinds -------------------------------------------------------------------
 
@@ -275,8 +276,39 @@ struct ALSyntaxGrammar::Impl
     U16                      initial = 0;
     CharClass                wordStart;
     CharClass                wordContinue;
-    // The end regexes of spans, one per capture they were written with.
+    // The end regexes of spans, one per capture they were written with,
+    // up to a number, then made afresh: a grammar is every view's, for
+    // the whole session, and a capture may be any text at all.
     mutable std::map<std::string, std::shared_ptr<boost::regex>> endRegexes;
+    // Whether a match that gave up has been said, which is once; and
+    // whether the last one tried did, which the lexer asks after each
+    // rule, since one that gave up has spent all the engine allows and
+    // would spend it again at every place on the line after.
+    mutable bool gaveUpSaid = false;
+    mutable bool gaveUp     = false;
+
+    // A regex tried where it stands, and taken for no match where the
+    // engine gives up -- the text is anyone's, and a pattern may take
+    // longer over it than the engine will go -- rather than throwing out
+    // of the lexer, which runs every frame.
+    template <typename It, typename Results>
+    bool search(It begin, It end, Results& found, const boost::regex& regex, boost::match_flag_type flags) const
+    {
+        try
+        {
+            return boost::regex_search(begin, end, found, regex, flags);
+        }
+        catch (const std::runtime_error& fault)
+        {
+            gaveUp = true;
+            if (!gaveUpSaid)
+            {
+                gaveUpSaid = true;
+                LL_WARNS("Syntax") << name << ": a pattern gave up on a line, taken as no match: " << fault.what() << LL_ENDL;
+            }
+            return false;
+        }
+    }
 
     S32 stateIndex(std::string_view name) const
     {
@@ -522,6 +554,10 @@ const boost::regex* ALSyntaxGrammar::Impl::endRegexFor(const Rule& rule, const s
     auto it = endRegexes.find(pattern);
     if (it == endRegexes.end())
     {
+        if (endRegexes.size() >= 256)
+        {
+            endRegexes.clear();
+        }
         std::shared_ptr<boost::regex> compiled;
         std::string                   error;
         if (!compileRegex(pattern, compiled, error))
@@ -623,7 +659,7 @@ size_t ALSyntaxGrammar::Impl::tryRule(const Rule& rule, std::string_view line, s
             const char*   begin = line.data() + pos;
             const char*   end   = line.data() + len;
             const auto    flags = boost::match_continuous | (pos > 0 ? boost::match_prev_avail : boost::match_default);
-            if (!boost::regex_search(begin, end, found, *rule.regex, flags) || found.length(0) == 0)
+            if (!search(begin, end, found, *rule.regex, flags) || found.length(0) == 0)
             {
                 return npos;
             }
@@ -636,7 +672,7 @@ size_t ALSyntaxGrammar::Impl::tryRule(const Rule& rule, std::string_view line, s
             const char*   begin = line.data() + pos;
             const char*   end   = line.data() + len;
             const auto    flags = boost::match_continuous | (pos > 0 ? boost::match_prev_avail : boost::match_default);
-            if (!boost::regex_search(begin, end, found, *rule.regex, flags) || found.length(0) == 0)
+            if (!search(begin, end, found, *rule.regex, flags) || found.length(0) == 0)
             {
                 return npos;
             }
@@ -657,7 +693,7 @@ size_t ALSyntaxGrammar::Impl::tryRule(const Rule& rule, std::string_view line, s
             const char*   begin = line.data() + pos;
             const char*   end   = line.data() + len;
             const auto    flags = boost::match_continuous | (pos > 0 ? boost::match_prev_avail : boost::match_default);
-            if (!boost::regex_search(begin, end, found, *regex, flags) || found.length(0) == 0)
+            if (!search(begin, end, found, *regex, flags) || found.length(0) == 0)
             {
                 return npos;
             }
@@ -870,7 +906,8 @@ bool ALSyntaxGrammar::indents() const
 
 bool ALSyntaxGrammar::opensBlock(std::string_view before) const
 {
-    return mImpl->indentOpens && boost::regex_search(before.begin(), before.end(), *mImpl->indentOpens);
+    boost::match_results<std::string_view::const_iterator> found;
+    return mImpl->indentOpens && mImpl->search(before.begin(), before.end(), found, *mImpl->indentOpens, boost::match_default);
 }
 
 size_t ALSyntaxGrammar::closesBlock(std::string_view text) const
@@ -880,11 +917,16 @@ size_t ALSyntaxGrammar::closesBlock(std::string_view text) const
         return 0;
     }
     boost::match_results<std::string_view::const_iterator> found;
-    if (!boost::regex_search(text.begin(), text.end(), found, *mImpl->indentCloses, boost::match_continuous))
+    if (!mImpl->search(text.begin(), text.end(), found, *mImpl->indentCloses, boost::match_continuous))
     {
         return 0;
     }
     return static_cast<size_t>(found.length(0));
+}
+
+size_t ALSyntaxGrammar::cachedEndPatterns() const
+{
+    return mImpl->endRegexes.size();
 }
 
 ALSyntaxState ALSyntaxGrammar::initialState() const
@@ -922,7 +964,12 @@ void ALSyntaxGrammar::lexLine(std::string_view line, ALSyntaxState& state, std::
         switch (rule.then)
         {
             case Rule::Then::Push:
-                state.frames.push_back(ALSyntaxState::Frame{ rule.target, std::move(capture) });
+                // Past the depth, where it is: what nests past reason lexes
+                // as the state it is in.
+                if (state.frames.size() < MAX_DEPTH)
+                {
+                    state.frames.push_back(ALSyntaxState::Frame{ rule.target, std::move(capture) });
+                }
                 break;
             case Rule::Then::Pop:
                 if (state.frames.size() > 1)
@@ -938,7 +985,10 @@ void ALSyntaxGrammar::lexLine(std::string_view line, ALSyntaxState& state, std::
         }
     };
 
-    size_t pos = 0;
+    // The rules whose patterns gave up on this line, passed over for the
+    // rest of it.
+    std::vector<const Rule*> gave_up;
+    size_t                   pos = 0;
     while (pos < len)
     {
         const ALSyntaxState::Frame& frame = state.frames.back();
@@ -949,11 +999,16 @@ void ALSyntaxGrammar::lexLine(std::string_view line, ALSyntaxState& state, std::
         std::string                 capture;
         for (const Rule& rule : current.rules)
         {
-            if (rule.match == Rule::Match::Eol)
+            if (rule.match == Rule::Match::Eol || (!gave_up.empty() && std::find(gave_up.begin(), gave_up.end(), &rule) != gave_up.end()))
             {
                 continue;
             }
-            end = mImpl->tryRule(rule, line, pos, frame.payload, words, kind, capture);
+            mImpl->gaveUp = false;
+            end           = mImpl->tryRule(rule, line, pos, frame.payload, words, kind, capture);
+            if (mImpl->gaveUp)
+            {
+                gave_up.push_back(&rule);
+            }
             if (end != std::string_view::npos)
             {
                 hit = &rule;

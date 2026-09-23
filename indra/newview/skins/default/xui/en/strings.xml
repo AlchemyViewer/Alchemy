@@ -416,6 +416,8 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="VimBadPattern">E486: [ERROR]</string>
 	<string name="VimPatternNotFound">E486: Pattern not found: [PATTERN]</string>
 	<string name="VimUnknownOption">E518: Unknown option: [OPTION]</string>
+	<string name="VimBadOptionValue">E474: Invalid argument: [OPTION]</string>
+	<string name="VimGlobalRecursive">E147: Cannot do :global recursive</string>
 	<string name="VimNotACommand">E492: Not an editor command: [LINE]</string>
 	<string name="VimInvalidAddress">E14: Invalid address</string>
 	<string name="VimMoveIntoItself">E134: Cannot move a range of lines into itself</string>

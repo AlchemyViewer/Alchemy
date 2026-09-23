@@ -195,6 +195,14 @@ public:
     // and two neighbours of one kind are one token.
     void lexLine(std::string_view line, ALSyntaxState& state, std::vector<ALSyntaxToken>& tokens, const ALSyntaxWords& words) const;
 
+    // How deep the states may be entered, one inside another: past it a
+    // push stays where it is, so that text nested past reason costs no
+    // more than this at every line after it.
+    static constexpr size_t MAX_DEPTH = 64;
+    // How many span ends written with a capture are kept compiled, for a
+    // test that says they do not pile up.
+    size_t cachedEndPatterns() const;
+
 private:
     struct Impl;
     std::unique_ptr<Impl> mImpl;
