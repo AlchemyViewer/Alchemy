@@ -76,7 +76,7 @@ void main()
     vary_texcoord0.xy += 0.5;
 
     vary_texcoord1 = vary_texcoord0;
-    vary_texcoord1.x += lightnorm.x * 0.0125;
+    vary_texcoord1.x -= lightnorm.x * 0.0125; // u is mirrored above, so the offset toward the light is too
     vary_texcoord1.y += lightnorm.z * 0.0125;
 
     vary_texcoord2 = vary_texcoord0 * 16.;
