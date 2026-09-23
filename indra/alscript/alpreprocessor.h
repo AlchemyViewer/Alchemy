@@ -220,6 +220,24 @@ public:
     };
     static std::vector<Token> tokenize(std::string_view text, bool lua);
 
+    // The transform a line of LSL is written for, by the shape of its
+    // first statement: `switch (` and `case ...:` the switch's; `break;`,
+    // `break 2;`, `continue;`, `inline f(` and `inline type f(` the
+    // extensions'. A brace on a line of its own is the switch's where the
+    // line before it, past blank ones, opens one, since its brace may go
+    // on the next. Nothing where the word is a name of the script's own --
+    // `case = 1;`, `inline(` -- or the line is none of these. What a parse
+    // error there is, with that transform off, is the transform's to
+    // explain. `line` answers a line's text by its index, `count` of them;
+    // the word comes back in `word`.
+    enum class Transform : U8
+    {
+        None,
+        Switch,
+        Extensions
+    };
+    static Transform transformAt(const std::function<std::string_view(S32)>& line, S32 count, S32 at, std::string& word);
+
 private:
     // The optimizer alone, which is the first half of `finish`.
     static void optimize(Result& result, const Options& options);

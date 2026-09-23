@@ -983,4 +983,46 @@ namespace tut
         loc = r.map.toSource(3, 11);
         ensure("and the macro after it to where it was invoked", loc.found() && loc.line == 3 && loc.column == 11);
     }
+    template<> template<>
+    void alpreprocessor_object::test<26>()
+    {
+        set_test_name("a line is read as the transform it is written for, and a name that is one of the words is no transform");
+        using T = ALPreprocessor::Transform;
+        const auto of = [](std::vector<std::string> lines, S32 at, std::string* said = nullptr) {
+            std::string word;
+            const T     t = ALPreprocessor::transformAt([&lines](S32 i) { return std::string_view(lines[i]); }, static_cast<S32>(lines.size()), at, word);
+            if (said)
+            {
+                *said = word;
+            }
+            return t;
+        };
+        std::string word;
+        ensure("switch", of({ "    switch (x)" }, 0, &word) == T::Switch);
+        ensure_equals("its word", word, std::string("switch"));
+        ensure("switch not called", of({ "switch = 2;" }, 0) == T::None);
+        ensure("a case", of({ "  case 1:" }, 0, &word) == T::Switch);
+        ensure_equals("the case's word", word, std::string("case"));
+        ensure("case assigned", of({ "case = 1;" }, 0) == T::None);
+        ensure("case called", of({ "case(1);" }, 0) == T::None);
+        ensure("case with no colon", of({ "case 1" }, 0) == T::None);
+        ensure("break", of({ "break;" }, 0) == T::Extensions);
+        ensure("break out of two", of({ "break 2;" }, 0) == T::Extensions);
+        ensure("continue", of({ "\tcontinue;" }, 0) == T::Extensions);
+        ensure("break assigned", of({ "break = 3;" }, 0) == T::None);
+        ensure("an inline function", of({ "inline f(integer a)" }, 0, &word) == T::Extensions);
+        ensure_equals("inline's word", word, std::string("inline"));
+        ensure("an inline function with its type", of({ "inline integer f(integer a)" }, 0) == T::Extensions);
+        ensure("inline assigned", of({ "inline = 2;" }, 0) == T::None);
+        ensure("after a brace and a statement's end", of({ "} ; switch (x)" }, 0) == T::Switch);
+        ensure("a plain statement", of({ "integer x = 1;" }, 0) == T::None);
+        ensure("a blank line", of({ "   " }, 0) == T::None);
+
+        // A brace of its own is the switch's where the line before opens one.
+        ensure("the switch's brace", of({ "switch (x)", "", "  {" }, 2) == T::Switch);
+        ensure("a brace after anything else", of({ "if (x)", "{" }, 1) == T::None);
+        ensure("a brace after a break is not the switch's", of({ "break;", "{" }, 1) == T::None);
+        ensure("a brace with nothing before it", of({ "", "{" }, 1) == T::None);
+        ensure("a line past the end", of({ "switch (x)" }, 1) == T::None);
+    }
 } // namespace tut

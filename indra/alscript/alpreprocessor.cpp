@@ -3789,3 +3789,89 @@ std::vector<ALPreprocessor::Token> ALPreprocessor::tokenize(std::string_view tex
     }
     return out;
 }
+
+// static
+ALPreprocessor::Transform ALPreprocessor::transformAt(const std::function<std::string_view(S32)>& line, S32 count, S32 at, std::string& word)
+{
+    const auto isWord = [](char c) { return isalnum(static_cast<unsigned char>(c)) || c == '_'; };
+    const auto blank  = std::string_view(" \t");
+    // The line's first statement's shape, and its word.
+    const auto shapeOf = [&](S32 index) {
+        const std::string_view text = line(index);
+        size_t                 from = text.find_first_not_of(blank);
+        // Past a closing or opening brace and a statement's end, which the
+        // words may follow on the same line.
+        while (from != std::string_view::npos && (text[from] == '{' || text[from] == '}' || text[from] == ';'))
+        {
+            from = text.find_first_not_of(blank, from + 1);
+        }
+        if (from == std::string_view::npos || !isWord(text[from]))
+        {
+            return Transform::None;
+        }
+        size_t end = from;
+        while (end < text.size() && isWord(text[end]))
+        {
+            ++end;
+        }
+        word                   = std::string(text.substr(from, end - from));
+        const size_t rest      = text.find_first_not_of(blank, end);
+        const char   following = rest == std::string_view::npos ? '\0' : text[rest];
+        if (word == "switch")
+        {
+            return following == '(' ? Transform::Switch : Transform::None;
+        }
+        if (word == "case")
+        {
+            // `case <what>:` -- the colon somewhere after, and the word
+            // not used as a name would be: `case = 1;`, `case(`.
+            const bool named = following == '=' || following == '(' || following == '.' || following == ';';
+            return !named && text.find(':', end) != std::string_view::npos ? Transform::Switch : Transform::None;
+        }
+        if (word == "break" || word == "continue")
+        {
+            return following == ';' || isdigit(static_cast<unsigned char>(following)) ? Transform::Extensions : Transform::None;
+        }
+        if (word == "inline")
+        {
+            // `inline name(` or `inline type name(`.
+            size_t k = rest;
+            for (int words = 0; words < 2 && k != std::string_view::npos && k < text.size() && isWord(text[k]); ++words)
+            {
+                while (k < text.size() && isWord(text[k]))
+                {
+                    ++k;
+                }
+                k = text.find_first_not_of(blank, k);
+                if (k != std::string_view::npos && text[k] == '(')
+                {
+                    return Transform::Extensions;
+                }
+            }
+        }
+        return Transform::None;
+    };
+    if (at < 0 || at >= count)
+    {
+        return Transform::None;
+    }
+    const Transform here = shapeOf(at);
+    if (here != Transform::None)
+    {
+        return here;
+    }
+    // A brace on its own: the switch it opens is on the line before, past
+    // blank lines.
+    const std::string_view text  = line(at);
+    const size_t           first = text.find_first_not_of(blank);
+    if (first == std::string_view::npos || text[first] != '{')
+    {
+        return Transform::None;
+    }
+    S32 back = at - 1;
+    while (back >= 0 && line(back).find_first_not_of(blank) == std::string_view::npos)
+    {
+        --back;
+    }
+    return back >= 0 && shapeOf(back) == Transform::Switch ? Transform::Switch : Transform::None;
+}

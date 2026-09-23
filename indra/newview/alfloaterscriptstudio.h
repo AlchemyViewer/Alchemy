@@ -141,8 +141,10 @@ public:
 
     // A script opened here; with text carried from another window, put
     // in place of what the server has once that has loaded, as one step
-    // to undo, and the caret at a line.
-    void openScript(const ALScriptRef& ref, const std::string& name, std::optional<std::string> carried = std::nullopt, S32 line = -1);
+    // to undo, and the caret at a line; and the keyboard given to it, or
+    // left where it is.
+    void openScript(const ALScriptRef& ref, const std::string& name, std::optional<std::string> carried = std::nullopt, S32 line = -1,
+                    bool focus = true);
     // The active script moved to a window of its own, its unsaved text
     // going with it.
     void popOut();
@@ -323,12 +325,23 @@ private:
             bool             valid    = false;
             bool             disabled = false;
             U32              version  = 0;
+            // Which expansion of the text this is, counted from one: a
+            // question asked over it is answered in its places, and an
+            // answer asked over one since dropped or replaced -- the
+            // includes came in, a setting changed -- is of places no
+            // longer read that way.
+            U32              generation = 0;
             std::string      text;
             ALSourceMap      map;
             ALScriptProblems problems;
         };
         Expanded                                   expanded;
         Expanded                                   uploaded;
+        U32                                        expansions = 0;
+        // The map the last upload went with, where it was expanded: what
+        // the compiler's answer is read back through, whatever has been
+        // expanded since.
+        std::optional<ALSourceMap>                 sentMap;
         // The version an expansion has been asked for, or zero: the
         // preprocessor answers on the main thread a moment later, and
         // one text is expanded once however many questions wait on it.
@@ -585,7 +598,8 @@ private:
     Doc*   active();
     size_t indexOf(const ALScriptRef& ref) const;
     size_t indexOf(std::string_view id) const;
-    void   activate(size_t index);
+    // The tab in front, its editor given the keyboard where asked.
+    void   activate(size_t index, bool focus = true);
     // The strip filled from the docs, and the toolbar put right. Both
     // are asked for on every keystroke; each does its work only when
     // what it shows has actually changed since the last.
@@ -635,7 +649,9 @@ private:
     // behind completion, hover and signature help.
     void                      teachEditor(Doc& doc);
     void                      askAnalyzer(Doc& doc, ALScriptAnalysis::Kind kind, const ALTextPos& at);
-    void                      answered(const ALScriptAnalysis::Result& result);
+    // `expansion` is the expansion the question was asked over, or zero
+    // for the text as it stands.
+    void                      answered(const ALScriptAnalysis::Result& result, U32 expansion);
 
     // The preprocessor: whether it applies to a script; its run over the
     // text as it stands, for the analyzers, with the way back; and its
@@ -652,7 +668,9 @@ private:
     ALScriptPreprocessor::Request preprocessRequest(const Doc& doc, bool with_source = true) const;
     void                          preprocess(Doc& doc, bool then_save);
     void                          preprocessedAnswer(const std::string& id, U32 version, bool then_save, const ALPreprocessor::Result& result);
-    void                          upload(Doc& doc, const std::string& text);
+    // The text sent to be saved and compiled, with the map it was expanded
+    // through where it was.
+    void                          upload(Doc& doc, const std::string& text, const ALSourceMap* map = nullptr);
     static S32                    mapSpan(const ALSourceMap& map, ALScriptSpan& span);
     std::string                   includeName(const Doc& doc, const std::string& path) const;
     void                          chooseIncludeFolder();
@@ -793,8 +811,14 @@ private:
     // state is put after them, and whose declarations are for others.
     bool lslFragment(const Doc& doc) const;
     void pumpAnalysis();
+    // The preprocessor's settings changed, here or in the preferences:
+    // every script expanded and checked again, a moment after the last.
+    void pumpPreprocessor();
     void requestAnalysis(Doc& doc);
     void analysed(const ALScriptAnalysis::Result& result);
+    // A parse error on a preprocessor's word, with its transform off, told
+    // so: over the problems in the source's places.
+    void explainTransformWords(Doc& doc);
     // The marks, the squiggles and the pane, from the compiler's problems
     // and the analyzer's together.
     void refreshProblems(Doc& doc);
@@ -1454,8 +1478,13 @@ private:
     boost::signals2::scoped_connection mCompiledConnection;
     boost::signals2::scoped_connection mDefinitionsConnection;
     // The settings the window follows as they change: the lints and the
-    // Luau mode, vim's clipboard.
+    // Luau mode, the preprocessor's, vim's clipboard.
     std::vector<boost::signals2::scoped_connection> mSettingConnections;
+    // When every script is expanded and checked again after the
+    // preprocessor's settings changed, or zero; and whether the
+    // transforms' words are coloured again with it.
+    F64                                mPreprocessorDue   = 0.0;
+    bool                               mPreprocessorWords = false;
     boost::signals2::scoped_connection mRuntimeConnection;
     boost::signals2::scoped_connection mRunningConnection;
 };

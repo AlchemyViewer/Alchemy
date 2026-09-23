@@ -354,18 +354,36 @@ ALFloaterScriptStudio* ALFloaterScriptStudio::open(const ALScriptRef& ref, const
         {
             return nullptr;
         }
+        // A floater takes the keyboard as it opens unless told otherwise.
+        const bool auto_focus = window->getAutoFocus();
+        window->setAutoFocus(auto_focus && take_focus);
         window->openFloater(window->getKey());
+        window->setAutoFocus(auto_focus);
         if (take_focus)
         {
             window->setFocus(true);
         }
-        window->openScript(ref, name);
+        window->openScript(ref, name, std::nullopt, -1, take_focus);
         return window;
     }
+    // Made first where it is to open without the keyboard -- a script
+    // handed over while someone types elsewhere, which would otherwise
+    // take the rest of their line -- so that it can be told so before it
+    // opens; shown through the registry, which says whether it may be.
+    ALFloaterScriptStudio* quiet      = take_focus ? nullptr : LLFloaterReg::getTypedInstance<ALFloaterScriptStudio>("script_studio", LLSD());
+    const bool             auto_focus = quiet && quiet->getAutoFocus();
+    if (quiet)
+    {
+        quiet->setAutoFocus(false);
+    }
     ALFloaterScriptStudio* studio = LLFloaterReg::showTypedInstance<ALFloaterScriptStudio>("script_studio", LLSD(), take_focus ? TAKE_FOCUS_YES : TAKE_FOCUS_NO);
+    if (quiet)
+    {
+        quiet->setAutoFocus(auto_focus);
+    }
     if (studio && !ref.isNull())
     {
-        studio->openScript(ref, name);
+        studio->openScript(ref, name, std::nullopt, -1, take_focus);
     }
     return studio;
 }
@@ -497,6 +515,17 @@ ALFloaterScriptStudio::ALFloaterScriptStudio(const LLSD& key)
 
 ALFloaterScriptStudio::~ALFloaterScriptStudio()
 {
+    // A menu still open calls into this window, which is going: it goes
+    // first. The menus live in the viewer's menu holder, not here.
+    for (LLHandle<LLContextMenu>* menu : { &mTabMenuHandle, &mExplorerMenuHandle, &mProblemMenuHandle, &mListMenuHandle })
+    {
+        if (LLContextMenu* open = menu->get())
+        {
+            // Out of sight at once; gone once the frame is done with it.
+            open->hide();
+            open->die();
+        }
+    }
     // Going with unsaved text still in a tab -- the viewer made to go
     // without asking, as it does with no region to say goodbye to -- the
     // text is written as it stands, for the next login to offer back.
@@ -930,6 +959,25 @@ bool ALFloaterScriptStudio::postBuild()
         }
     }
 
+    // The preprocessor's settings, from the menu here or the preferences:
+    // every script expanded and checked again, and the transforms' words
+    // coloured as they now are -- a moment after the last change, since a
+    // field typed in changes its setting at every key.
+    for (const char* setting :
+         { "ALScriptPreprocEnabled", "ALScriptPreprocSwitch", "ALScriptPreprocLazyLists", "ALScriptPreprocCompress", "ALScriptPreprocOptimizer",
+           "ALScriptPreprocOptimizerShrinkNames", "ALScriptPreprocOptimizerAddStrings", "ALScriptPreprocOptimizerInlining", "ALScriptPreprocExtensions",
+           "ALScriptPreprocDiskIncludes", "ALScriptPreprocDiskIncludeFolder", "ALScriptPreprocIncludeOrder", "ALScriptPreprocDefines" })
+    {
+        if (LLControlVariable* control = gSavedSettings.getControl(setting))
+        {
+            const bool words = std::string_view(setting) == "ALScriptPreprocSwitch" || std::string_view(setting) == "ALScriptPreprocExtensions";
+            mSettingConnections.emplace_back(control->getSignal()->connect([this, words](LLControlVariable*, const LLSD&, const LLSD&) {
+                mPreprocessorDue   = LLTimer::getTotalSeconds() + ANALYSIS_DELAY;
+                mPreprocessorWords = mPreprocessorWords || words;
+            }));
+        }
+    }
+
     // Whether vim's unnamed register is the system clipboard, as the
     // setting says, for every editor of this window; :set clipboard
     // changes it for the session, and the setting changed again says so.
@@ -1162,6 +1210,7 @@ void ALFloaterScriptStudio::onClose(bool app_quitting)
 
 void ALFloaterScriptStudio::draw()
 {
+    pumpPreprocessor();
     pumpAnalysis();
     pumpCaret();
     pumpExplorer();
@@ -1485,7 +1534,7 @@ void ALFloaterScriptStudio::applyEditorOptions()
     saveState();
 }
 
-void ALFloaterScriptStudio::openScript(const ALScriptRef& ref, const std::string& name, std::optional<std::string> carried, S32 line)
+void ALFloaterScriptStudio::openScript(const ALScriptRef& ref, const std::string& name, std::optional<std::string> carried, S32 line, bool focus)
 {
     const size_t already = indexOf(ref);
     if (already == NONE && !carried)
@@ -1496,8 +1545,11 @@ void ALFloaterScriptStudio::openScript(const ALScriptRef& ref, const std::string
         if (ALFloaterScriptStudio* holder = holderOf(ref, std::string()); holder && holder != this)
         {
             holder->openFloater(holder->getKey());
-            holder->setFocus(true);
-            holder->openScript(ref, name, std::nullopt, line);
+            if (focus)
+            {
+                holder->setFocus(true);
+            }
+            holder->openScript(ref, name, std::nullopt, line, focus);
             return;
         }
     }
@@ -1508,7 +1560,7 @@ void ALFloaterScriptStudio::openScript(const ALScriptRef& ref, const std::string
         {
             holdPreview(*mDocs[already]);
         }
-        activate(already);
+        activate(already, focus);
         return;
     }
     const bool preview = mOpenPreview > 0;
@@ -1541,7 +1593,7 @@ void ALFloaterScriptStudio::openScript(const ALScriptRef& ref, const std::string
 
     mDocs.push_back(std::move(doc));
     reindexDocs();
-    activate(mDocs.size() - 1);
+    activate(mDocs.size() - 1, focus);
 
     const LLHandle<LLFloater> handle = getHandle();
     ALScriptWorkspace::instance().load(ref, [handle](const ALScriptWorkspace::Loaded& answer) {
@@ -2433,9 +2485,10 @@ void ALFloaterScriptStudio::expandedAnswer(const std::string& id, U32 version, c
         doc.waiting.clear();
         return;
     }
-    doc.expanded.valid    = true;
-    doc.expanded.disabled = result.disabled;
-    doc.expanded.version  = version;
+    doc.expanded.valid      = true;
+    doc.expanded.disabled   = result.disabled;
+    doc.expanded.version    = version;
+    doc.expanded.generation = ++doc.expansions;
     doc.expanded.text     = result.text;
     doc.expanded.map      = result.map;
     doc.expanded.problems = result.problems;
@@ -2574,7 +2627,7 @@ void ALFloaterScriptStudio::preprocessedAnswer(const std::string& id, U32 versio
     envelope.programVersion = LLVersionInfo::instance().getChannelAndVersion();
     envelope.lastCompiled   = LLDate::now().asString();
     doc.envelope            = envelope;
-    upload(doc, envelope.wrap());
+    upload(doc, envelope.wrap(), &result.map);
 }
 
 // static
@@ -2797,6 +2850,9 @@ namespace
     // kept until they change.
     std::vector<ALFloaterScriptStudio::Vocab> sVocabulary[2];
     bool                                      sVocabularyBuilt[2] = { false, false };
+    // How many times each has been built: what an index over one knows it
+    // by, since the list built again is the same list, and may be as long.
+    U32                                       sVocabularyBuilds[2] = { 0, 0 };
 }
 
 // static
@@ -2814,6 +2870,7 @@ const std::vector<ALFloaterScriptStudio::Vocab>& ALFloaterScriptStudio::vocabula
         return out;
     }
     sVocabularyBuilt[lua ? 1 : 0] = true;
+    ++sVocabularyBuilds[lua ? 1 : 0];
     out.clear();
     const LLSD keywords = lua ? LLSyntaxDefCache::instance().getLuaKeywords() : LLSyntaxDefCache::instance().getLSLKeywords();
     if (!keywords.isMap())
@@ -3189,7 +3246,10 @@ void ALFloaterScriptStudio::insertFromLibrary(const std::string& what)
             one.label  = list[i].name;
             one.detail = list[i].detail;
             one.also   = list[i].prefix;
-            one.value  = std::to_string(i);
+            // By what it is rather than where it stands in a list that
+            // may be made again while the picker is up -- the scripter's
+            // own saved meanwhile, new definitions from a region.
+            one.value  = list[i].name + '\n' + list[i].prefix;
             candidates.push_back(std::move(one));
         }
     }
@@ -3207,7 +3267,7 @@ void ALFloaterScriptStudio::insertFromLibrary(const std::string& what)
             one.label  = words[i].text;
             one.detail = words[i].deprecated ? getString("Deprecated") : firstLine(words[i].tooltip);
             one.also   = words[i].detail;
-            one.value  = std::to_string(i);
+            one.value  = words[i].text;
             candidates.push_back(std::move(one));
         }
     }
@@ -3224,26 +3284,27 @@ void ALFloaterScriptStudio::insertFromLibrary(const std::string& what)
         {
             return;
         }
-        const size_t             index = static_cast<size_t>(atoi(value.c_str()));
         ALCodeEditor::Completion chosen;
         if (what == "snippet")
         {
-            const std::vector<Snippet>& list = studio->snippets(lua);
-            if (index >= list.size())
+            const std::vector<Snippet>& list  = studio->snippets(lua);
+            const auto                  found = std::find_if(list.begin(), list.end(),
+                                                             [&value](const Snippet& one) { return one.name + '\n' + one.prefix == value; });
+            if (found == list.end())
             {
                 return;
             }
-            chosen.text    = list[index].prefix;
-            chosen.snippet = list[index].body;
+            chosen.text    = found->prefix;
+            chosen.snippet = found->body;
         }
         else
         {
-            const std::vector<Vocab>& words = studio->vocabulary(lua);
-            if (index >= words.size())
+            const Vocab* word = vocabWord(lua, value);
+            if (!word)
             {
                 return;
             }
-            chosen = studio->completionFor(words[index], lua);
+            chosen = studio->completionFor(*word, lua);
         }
         // In place of the selection, or at the caret.
         const ALTextRange selection = doc->editor->selection();
@@ -3297,6 +3358,7 @@ void ALFloaterScriptStudio::askAnalyzer(Doc& doc, ALScriptAnalysis::Kind kind, c
             });
         }
     }
+    U32 expansion = 0;
     if (preprocessed(doc))
     {
         if (!doc.expanded.valid || doc.expanded.version != request.version)
@@ -3307,6 +3369,7 @@ void ALFloaterScriptStudio::askAnalyzer(Doc& doc, ALScriptAnalysis::Kind kind, c
             return;
         }
         // A position inside a directive has nothing there to ask about.
+        expansion    = doc.expanded.generation;
         request.text = doc.expanded.text;
         if (kind != ALScriptAnalysis::Kind::Check)
         {
@@ -3324,10 +3387,10 @@ void ALFloaterScriptStudio::askAnalyzer(Doc& doc, ALScriptAnalysis::Kind kind, c
         request.text += FRAGMENT_STATE;
     }
     const LLHandle<LLFloater> handle = getHandle();
-    ALScriptAnalysis::instance().ask(std::move(request), [handle](const ALScriptAnalysis::Result& result) {
+    ALScriptAnalysis::instance().ask(std::move(request), [handle, expansion](const ALScriptAnalysis::Result& result) {
         if (ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get()))
         {
-            studio->answered(result);
+            studio->answered(result, expansion);
         }
     });
 }
@@ -3373,7 +3436,7 @@ namespace
     }
 }
 
-void ALFloaterScriptStudio::answered(const ALScriptAnalysis::Result& result)
+void ALFloaterScriptStudio::answered(const ALScriptAnalysis::Result& result, U32 expansion)
 {
     const size_t index = indexOf(result.id);
     if (index == NONE)
@@ -3382,14 +3445,26 @@ void ALFloaterScriptStudio::answered(const ALScriptAnalysis::Result& result)
     }
     Doc&      doc = *mDocs[index];
     ALTextPos at(result.line, result.column);
-    if (preprocessed(doc) && result.kind != ALScriptAnalysis::Kind::Check)
+    // Of the text as it is read now, or of nothing: an answer about an
+    // expansion since dropped or replaced -- the includes came in, a
+    // setting changed -- is in places no longer read that way, and one
+    // about the plain text of a script now expanded, or the other way
+    // round, likewise. Everything below reads the answer through what the
+    // script is now. A check is asked again; the rest were about a moment
+    // that has gone.
+    const bool read_expanded = preprocessed(doc);
+    if ((expansion != 0) != read_expanded || (expansion != 0 && (!doc.expanded.valid || doc.expanded.generation != expansion)))
+    {
+        if (result.kind == ALScriptAnalysis::Kind::Check && result.version == doc.editor->document().version())
+        {
+            scheduleAnalysis(doc, true);
+        }
+        return;
+    }
+    if (expansion != 0 && result.kind != ALScriptAnalysis::Kind::Check)
     {
         // Answered about the expanded text; the editor wants the source's
         // place, which is where it asked.
-        if (!doc.expanded.valid || doc.expanded.version != result.version)
-        {
-            return;
-        }
         const ALSourceMap::Loc loc = doc.expanded.map.toSource(result.line, result.column);
         if (!loc.found() || loc.file != 0)
         {
@@ -3479,7 +3554,7 @@ void ALFloaterScriptStudio::answered(const ALScriptAnalysis::Result& result)
     }
 }
 
-void ALFloaterScriptStudio::activate(size_t index)
+void ALFloaterScriptStudio::activate(size_t index, bool focus)
 {
     if (index >= mDocs.size())
     {
@@ -3487,7 +3562,12 @@ void ALFloaterScriptStudio::activate(size_t index)
     }
     mActive = index;
     showEditors();
-    (mDocs[index]->showingExpanded && mDocs[index]->expandedEditor ? mDocs[index]->expandedEditor : mDocs[index]->editor)->setFocus(true);
+    // Asked for, or the keyboard is in this window already -- in the
+    // editor just hidden, where it would type into a tab out of sight.
+    if (focus || gFocusMgr.childHasKeyboardFocus(this))
+    {
+        (mDocs[index]->showingExpanded && mDocs[index]->expandedEditor ? mDocs[index]->expandedEditor : mDocs[index]->editor)->setFocus(true);
+    }
     fillTabs();
     refreshToolbar();
     // The problems are the script's in front, but for a tab opened by
@@ -3691,6 +3771,15 @@ void ALFloaterScriptStudio::onTrailerChosen(const std::string& value)
 
 // --- vim ----------------------------------------------------------------------------------
 
+namespace
+{
+    // The studio's own commands a : line gives by the names its menu knows
+    // them by: what vimCommand runs and vimComplete offers, one list.
+    const char* const VIM_MENU_COMMANDS[] = { "format", "problems", "references", "output", "search", "preferences", "pop_out",
+                                              "reveal", "save_all", "revert", "external_editor", "save_file", "save_as", "load_file",
+                                              "open_file", "fold_all", "unfold_all", "go_to_line" };
+}
+
 ALFloaterScriptStudio::Doc* ALFloaterScriptStudio::docOf(const ALTextView& view)
 {
     // The editor carries its document's id in its name, which is what
@@ -3892,9 +3981,7 @@ bool ALFloaterScriptStudio::vimCommand(ALTextView& view, const std::string& name
         return false;
     }
     // The studio's own, by the names its menu knows.
-    static const std::set<std::string> ours{ "format", "problems", "references", "output", "search", "preferences", "pop_out", "reveal", "save_all",
-                                             "revert", "external_editor", "save_file", "save_as", "load_file", "open_file", "fold_all", "unfold_all", "go_to_line" };
-    if (ours.count(name))
+    if (std::any_of(std::begin(VIM_MENU_COMMANDS), std::end(VIM_MENU_COMMANDS), [&name](const char* command) { return name == command; }))
     {
         onMenuAction(LLSD(name));
         return true;
@@ -3906,14 +3993,13 @@ void ALFloaterScriptStudio::vimComplete(ALTextView& view, const std::string& com
 {
     // The names vimCommand answers to, in their long forms, and the
     // menu's actions; what :set and :history take after them.
-    static const char* NAMES[] = { "close", "history", "qall", "quit", "wall", "wq", "write", "xit",
-                                   "format", "problems", "references", "output", "search", "preferences", "pop_out", "reveal", "save_all",
-                                   "revert", "external_editor", "save_file", "save_as", "load_file", "open_file", "fold_all", "unfold_all", "go_to_line" };
+    static const char* NAMES[]   = { "close", "history", "qall", "quit", "wall", "wq", "write", "xit" };
     static const char* OPTIONS[] = { "number", "nonumber", "relativenumber", "norelativenumber" };
     static const char* KINDS[]   = { "all", "cmd", "search" };
     if (command.empty())
     {
         out.insert(out.end(), std::begin(NAMES), std::end(NAMES));
+        out.insert(out.end(), std::begin(VIM_MENU_COMMANDS), std::end(VIM_MENU_COMMANDS));
     }
     else if (command == "set" || command == "se")
     {
@@ -4304,7 +4390,7 @@ void ALFloaterScriptStudio::save(Doc& doc)
     upload(doc, doc.editor->text());
 }
 
-void ALFloaterScriptStudio::upload(Doc& doc, const std::string& text)
+void ALFloaterScriptStudio::upload(Doc& doc, const std::string& text, const ALSourceMap* map)
 {
     // The script's own target and whether it runs, which the strip under
     // the editor says for the one in front: Save All saves the others by
@@ -4327,6 +4413,9 @@ void ALFloaterScriptStudio::upload(Doc& doc, const std::string& text)
     }
     doc.saveAnywayVersion = -1;
     doc.saving            = true;
+    // What the compiler's lines are read back through, kept as it went:
+    // the next preprocess, for whatever reason, is of another text.
+    doc.sentMap = map ? std::optional<ALSourceMap>(*map) : std::nullopt;
     doc.problems.clear();
     refreshProblems(doc);
     LLStringUtil::format_map_t args;
@@ -4438,6 +4527,10 @@ void ALFloaterScriptStudio::compiledHere(const ALScriptWorkspace::CompileResult&
         return;
     }
     doc.problems.clear();
+    // The compiler read an expanded text: the one that went up from here,
+    // where it did, else -- a recompile of what was loaded -- the text as
+    // last expanded.
+    const ALSourceMap* read = doc.sentMap ? &*doc.sentMap : doc.uploaded.valid && !doc.uploaded.disabled ? &doc.uploaded.map : nullptr;
     for (const ALScriptWorkspace::Diagnostic& said : result.diagnostics)
     {
         Doc::Compiled one;
@@ -4446,17 +4539,16 @@ void ALFloaterScriptStudio::compiledHere(const ALScriptWorkspace::CompileResult&
         one.hasColumn = said.hasColumn;
         one.level     = said.level;
         one.message   = said.message;
-        if (doc.uploaded.valid && !doc.uploaded.disabled)
+        if (read)
         {
-            // The compiler read the expanded text.
-            const ALSourceMap::Loc loc = doc.uploaded.map.toSource(said.line, said.column);
+            const ALSourceMap::Loc loc = read->toSource(said.line, said.column);
             if (loc.found())
             {
                 one.line   = loc.line;
                 one.column = loc.column;
                 if (loc.file > 0)
                 {
-                    one.file = doc.uploaded.map.files()[loc.file].path;
+                    one.file = read->files()[loc.file].path;
                 }
             }
         }
@@ -4563,6 +4655,32 @@ void ALFloaterScriptStudio::scheduleAnalysis(Doc& doc, bool now)
     doc.analysisDue = now ? 1.0 : static_cast<F64>(LLTimer::getTotalSeconds()) + ANALYSIS_DELAY;
 }
 
+void ALFloaterScriptStudio::pumpPreprocessor()
+{
+    if (mPreprocessorDue <= 0.0 || LLTimer::getTotalSeconds() < mPreprocessorDue)
+    {
+        return;
+    }
+    const bool words   = mPreprocessorWords;
+    mPreprocessorDue   = 0.0;
+    mPreprocessorWords = false;
+    // What the analyzers see changes with the settings, and what the
+    // editors colour as the transforms' words.
+    for (std::unique_ptr<Doc>& doc : mDocs)
+    {
+        doc->expanded.valid = false;
+        if (words && !doc->notecard && !doc->language.lua)
+        {
+            teachWords(*doc->editor, false);
+        }
+        if (preprocessed(*doc))
+        {
+            preprocess(*doc, false);
+        }
+        scheduleAnalysis(*doc, true);
+    }
+}
+
 void ALFloaterScriptStudio::pumpAnalysis()
 {
     const F64 now = LLTimer::getTotalSeconds();
@@ -4641,122 +4759,6 @@ void ALFloaterScriptStudio::analysed(const ALScriptAnalysis::Result& result)
             doc.outline.erase(std::remove_if(doc.outline.begin(), doc.outline.end(),
                                              [own_lines](const ALScriptOutlineEntry& entry) { return entry.nameSpan.line >= own_lines; }),
                               doc.outline.end());
-        }
-    }
-    if (!doc.language.lua)
-    {
-        // A parse error on one of the preprocessor's words, with its
-        // transform off, is the transform's to explain.
-        static LLCachedControl<bool> switches(gSavedSettings, "ALScriptPreprocSwitch", false);
-        static LLCachedControl<bool> extensions(gSavedSettings, "ALScriptPreprocExtensions", false);
-        const bool                   preprocessing = ALScriptPreprocessor::enabled();
-        const ALTextDocument& text = doc.editor->document();
-        // The transform a line's first statement is written for, by its
-        // shape -- `switch (`, `case ...:`, `break;`, `break 2;`,
-        // `continue;`, `inline f(` or `inline integer f(` -- and nothing
-        // for a line where one of the words is a name of the script's
-        // own; the word itself comes back in `word`. (A `default:` is
-        // never the line the parser stops on: the switch's own line
-        // comes first.)
-        auto shapeOf = [&text](S32 index, std::string& word) -> const char* {
-            const std::string& line = text.line(index);
-            auto               isWord = [](char c) { return isalnum(static_cast<unsigned char>(c)) || c == '_'; };
-            size_t             at     = line.find_first_not_of(" \t");
-            // Past a closing or opening brace and a statement's end, which
-            // the words may follow on the same line.
-            while (at != std::string::npos && (line[at] == '{' || line[at] == '}' || line[at] == ';'))
-            {
-                at = line.find_first_not_of(" \t", at + 1);
-            }
-            if (at == std::string::npos || !isWord(line[at]))
-            {
-                return nullptr;
-            }
-            size_t end = at;
-            while (end < line.size() && isWord(line[end]))
-            {
-                ++end;
-            }
-            word                   = line.substr(at, end - at);
-            const size_t rest      = line.find_first_not_of(" \t", end);
-            const char   following = rest == std::string::npos ? '\0' : line[rest];
-            if (word == "switch")
-            {
-                return following == '(' ? "PreprocHintSwitch" : nullptr;
-            }
-            if (word == "case")
-            {
-                // `case <what>:` -- the colon somewhere after, and the
-                // word not used as a name would be: `case = 1;`, `case(`.
-                return following != '=' && following != '(' && following != '.' && following != ';' && line.find(':', end) != std::string::npos ? "PreprocHintSwitch" : nullptr;
-            }
-            if (word == "break" || word == "continue")
-            {
-                return following == ';' || isdigit(static_cast<unsigned char>(following)) ? "PreprocHintExtensions" : nullptr;
-            }
-            if (word == "inline")
-            {
-                // `inline name(` or `inline type name(`.
-                size_t k = rest;
-                for (int words = 0; words < 2 && k != std::string::npos && k < line.size() && isWord(line[k]); ++words)
-                {
-                    while (k < line.size() && isWord(line[k]))
-                    {
-                        ++k;
-                    }
-                    k = line.find_first_not_of(" \t", k);
-                    if (k != std::string::npos && line[k] == '(')
-                    {
-                        return "PreprocHintExtensions";
-                    }
-                }
-                return nullptr;
-            }
-            return nullptr;
-        };
-        for (ALScriptProblem& problem : doc.analysis)
-        {
-            if (problem.severity != ALScriptProblem::Severity::Error || problem.line < 0 || problem.line >= text.lineCount())
-            {
-                continue;
-            }
-            // The line the parser stopped on, written for a transform; or
-            // the one before it where the line is a brace on its own,
-            // since a switch's brace may open on the next line.
-            std::string word;
-            const char* item = shapeOf(problem.line, word);
-            if (!item)
-            {
-                const std::string& line = text.line(problem.line);
-                const size_t       at   = line.find_first_not_of(" \t");
-                S32                back = problem.line - 1;
-                while (at != std::string::npos && line[at] == '{' && back >= 0 && text.line(back).find_first_not_of(" \t") == std::string::npos)
-                {
-                    --back;
-                }
-                if (at != std::string::npos && line[at] == '{' && back >= 0)
-                {
-                    item = shapeOf(back, word);
-                    if (item && std::string(item) != "PreprocHintSwitch")
-                    {
-                        item = nullptr;
-                    }
-                }
-            }
-            if (item && std::string(item) == "PreprocHintSwitch" && preprocessing && switches)
-            {
-                item = nullptr;
-            }
-            if (item && std::string(item) == "PreprocHintExtensions" && preprocessing && extensions)
-            {
-                item = nullptr;
-            }
-            if (item)
-            {
-                LLStringUtil::format_map_t args;
-                args["[WORD]"] = word;
-                problem.message += " " + getString(item, args);
-            }
         }
     }
     // What every name is and what goes beside the text, in the source's
@@ -4872,12 +4874,46 @@ void ALFloaterScriptStudio::analysed(const ALScriptAnalysis::Result& result)
         }
         doc.outline = std::move(outline);
     }
+    // In the source's places now, where the words are.
+    if (!doc.language.lua)
+    {
+        explainTransformWords(doc);
+    }
     refreshProblems(doc);
     refreshOutline(doc);
     if (doc.saveAfterCheck)
     {
         doc.saveAfterCheck = false;
         save(doc);
+    }
+}
+
+void ALFloaterScriptStudio::explainTransformWords(Doc& doc)
+{
+    // A parse error on one of the preprocessor's words, with its transform
+    // off, is the transform's to explain (ALPreprocessor::transformAt).
+    static LLCachedControl<bool> switches(gSavedSettings, "ALScriptPreprocSwitch", false);
+    static LLCachedControl<bool> extensions(gSavedSettings, "ALScriptPreprocExtensions", false);
+    using Transform                     = ALPreprocessor::Transform;
+    const bool            preprocessing = ALScriptPreprocessor::enabled();
+    const ALTextDocument& text          = doc.editor->document();
+    const auto            line          = [&text](S32 index) { return std::string_view(text.line(index)); };
+    for (ALScriptProblem& problem : doc.analysis)
+    {
+        if (problem.severity != ALScriptProblem::Severity::Error || !problem.file.empty())
+        {
+            continue;
+        }
+        std::string     word;
+        const Transform transform = ALPreprocessor::transformAt(line, text.lineCount(), problem.line, word);
+        const bool      on        = preprocessing && (transform == Transform::Switch ? switches() : extensions());
+        if (transform == Transform::None || on)
+        {
+            continue;
+        }
+        LLStringUtil::format_map_t args;
+        args["[WORD]"] = word;
+        problem.message += " " + getString(transform == Transform::Switch ? "PreprocHintSwitch" : "PreprocHintExtensions", args);
     }
 }
 
@@ -7788,10 +7824,10 @@ const ALFloaterScriptStudio::Vocab* ALFloaterScriptStudio::vocabWord(bool lua, s
     // them: this is asked on every hover, every completion and every
     // settling of the caret, over some hundreds of words.
     static boost::unordered_flat_map<std::string, size_t, ll::string_hash, std::equal_to<>> index[2];
-    static const std::vector<Vocab>*                                                        indexed[2] = { nullptr, nullptr };
+    static U32                                                                              indexed[2] = { 0, 0 };
     const std::vector<Vocab>&                                                               words      = vocabulary(lua);
     const size_t                                                                            which      = lua ? 1 : 0;
-    if (indexed[which] != &words || index[which].size() != words.size())
+    if (indexed[which] != sVocabularyBuilds[which])
     {
         index[which].clear();
         index[which].reserve(words.size());
@@ -7799,7 +7835,7 @@ const ALFloaterScriptStudio::Vocab* ALFloaterScriptStudio::vocabWord(bool lua, s
         {
             index[which].emplace(words[i].text, i);
         }
-        indexed[which] = &words;
+        indexed[which] = sVocabularyBuilds[which];
     }
     const auto found = index[which].find(name);
     return found == index[which].end() ? nullptr : &words[found->second];
@@ -12877,23 +12913,8 @@ void ALFloaterScriptStudio::onMenuAction(const LLSD& param)
                               : action == "preproc_inline"     ? "ALScriptPreprocOptimizerInlining"
                               : action == "preproc_extensions" ? "ALScriptPreprocExtensions"
                                                                : "ALScriptPreprocDiskIncludes";
+        // Heard as the preferences' changes are (pumpPreprocessor).
         gSavedSettings.setBOOL(setting, !gSavedSettings.getBOOL(setting));
-        // What the analyzers see changes with the setting, and what the
-        // editors colour as the transforms' words.
-        const bool words = action == "preproc_switch" || action == "preproc_extensions";
-        for (std::unique_ptr<Doc>& doc : mDocs)
-        {
-            doc->expanded.valid = false;
-            if (words && !doc->notecard && !doc->language.lua)
-            {
-                teachWords(*doc->editor, false);
-            }
-            if (preprocessed(*doc))
-            {
-                preprocess(*doc, false);
-            }
-            scheduleAnalysis(*doc, true);
-        }
     }
     else if (action == "preproc_folder")
     {
