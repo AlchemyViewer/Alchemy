@@ -22,16 +22,17 @@
  * $/LicenseInfo$
  */
 
-#include "llviewerprecompiledheaders.h"
+#include "linden_common.h"
 
 #include "alscripttheme.h"
 
 #include "altextview.h"
+#include "llcontrol.h"
 #include "lldir.h"
 #include "lldiriterator.h"
 #include "llsdserialize.h"
+#include "llui.h"
 #include "lluicolortable.h"
-#include "llviewercontrol.h"
 
 #include <algorithm>
 #include <fstream>
@@ -361,11 +362,11 @@ void ALScriptTheme::restoreSkin()
 // static
 std::string ALScriptTheme::chosen()
 {
-    return gSavedSettings.getString(SETTING);
+    return LLUI::getInstance()->mSettingGroups["config"]->getString(SETTING);
 }
 
 // static
 void ALScriptTheme::setChosen(const std::string& name)
 {
-    gSavedSettings.setString(SETTING, name);
+    LLUI::getInstance()->mSettingGroups["config"]->setString(SETTING, name);
 }

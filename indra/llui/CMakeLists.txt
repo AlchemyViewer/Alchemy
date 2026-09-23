@@ -148,6 +148,7 @@ target_sources(
     altextview.cpp
     altextundo.cpp
     alnotecarditems.cpp
+    alscripttheme.cpp
     alfollowscontrol.cpp
     alfontfield.cpp
     alcolorpicker.cpp
@@ -333,6 +334,7 @@ target_sources(
         altextview.h
         altextundo.h
         alnotecarditems.h
+        alscripttheme.h
         alfollowscontrol.h
         alfontfield.h
         alcolorpicker.h
@@ -509,6 +511,7 @@ if(AL_BUILD_TESTS)
     altextsearch
     altextview
     alcodeeditor
+    alscripttheme
     alvimkeymap
     alxuiservice
     aloutputview

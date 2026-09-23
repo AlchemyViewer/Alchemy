@@ -174,7 +174,6 @@ if(AL_BUILD_VIEWER)
     alscriptkeymap.cpp
     alscriptpreprocessor.cpp
     alscriptsnippets.cpp
-    alscripttheme.cpp
     alscriptworkspace.cpp
     alterrainsurfacemaps.cpp
     alfloaterscriptstudio.cpp
@@ -969,7 +968,6 @@ if(AL_BUILD_VIEWER)
     alscriptkeymap.h
     alscriptpreprocessor.h
     alscriptsnippets.h
-    alscripttheme.h
     alscriptworkspace.h
     alterrainsurfacemaps.h
     altexturetable.h
