@@ -161,12 +161,16 @@ namespace tut
             x                 = text.mLeft + static_cast<S32>(xrel) + 1;
             y                 = text.mTop - (editor->layout().lineTop(line) + row * editor->layout().rowHeight()) - editor->layout().rowHeight() / 2;
         }
-        void click(S32 line, S32 column)
+        // As the viewer does: the mouse held still between the press and
+        // the release is hovered over all the same.
+        void click(S32 line, S32 column, S32 slide = 0)
         {
             S32 x, y;
             pointOf(line, column, x, y);
             editor->handleMouseDown(x, y, MASK_NONE);
-            editor->handleMouseUp(x, y, MASK_NONE);
+            editor->handleHover(x, y, MASK_NONE);
+            editor->handleHover(x + slide, y, MASK_NONE);
+            editor->handleMouseUp(x + slide, y, MASK_NONE);
         }
         void drag(S32 line, S32 column, S32 to_line, S32 to_column)
         {
@@ -1177,5 +1181,24 @@ namespace tut
         ensure("and off", !vim->shared().unnamedClipboard);
         keys(":set clipboard=bogus<CR>");
         ensure("a value vim has not is said", vim->messageIsError() && vim->message().find("E474") != std::string::npos);
+    }
+
+    template<> template<>
+    void alvimkeymap_object::test<33>()
+    {
+        set_test_name("a click past a line's end is a click, however the mouse rests or slides on past it, and a drag from there takes the last character");
+        ALCodeEditor& e = make("one two\nthree four\n");
+        click(0, 7);
+        ensure("past the end: normal, on the last character", vim->mode() == ALVimKeymap::Mode::Normal && caretText() == "0:6" && !e.hasSelection());
+        click(0, 7, 40);
+        ensure("slid on past the end: still a click", vim->mode() == ALVimKeymap::Mode::Normal && caretText() == "0:6" && !e.hasSelection());
+        drag(0, 7, 0, 4);
+        ensure("dragged back from past the end is visual", vim->mode() == ALVimKeymap::Mode::Visual);
+        keys("y");
+        ensure_equals("and takes the last character with it", vim->registerText('"'), std::string("two"));
+        drag(1, 2, 1, 10);
+        ensure("dragged on past the end is visual", vim->mode() == ALVimKeymap::Mode::Visual);
+        keys("y");
+        ensure_equals("to the last character", vim->registerText('"'), std::string("ree four"));
     }
 }

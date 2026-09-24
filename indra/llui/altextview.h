@@ -848,6 +848,12 @@ private:
     // What a wheel moved that did not make a whole pixel yet.
     F32          mWheelRemainder = 0.f;
     bool         mSelecting = false;
+    // A drag reaches from where the press put the anchor, not from where a
+    // modal keymap then moved the caret -- vim's normal mode takes a click
+    // past a line's end back onto its last character -- and only once the
+    // mouse is over another place than it was.
+    ALTextPos    mDragAnchor;
+    ALTextPos    mDragAt;
     LLFrameTimer mBlink;
     CaretStyle   mCaretStyle = CaretStyle::Line;
     bool         mCaretBlink = true;
