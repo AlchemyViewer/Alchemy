@@ -26,9 +26,8 @@
 
 #include "alscriptmessages.h"
 
+#include "alregex.h"
 #include "llstring.h"
-
-#include <boost/regex.hpp>
 
 #include <cstdlib>
 
@@ -37,19 +36,19 @@ namespace
     // What the compilers say about where a problem is. Luau's names the
     // chunk and a one-based line; LSL's gives a zero-based line and column
     // as the viewer scrolls to them.
-    const boost::regex LUAU_LOCATION(R"(^([^:]*):([0-9]+):\s*(.*)$)");
-    const boost::regex LSL_LOCATION(R"(\((\d+), (\d+)\) : ([^:]+) : (.+))");
-    const boost::regex DEFAULT_STATE(R"(\s*default\s*\{)");
+    const ALRegex LUAU_LOCATION(R"(^([^:]*):([0-9]+):\s*(.*)$)");
+    const ALRegex LSL_LOCATION(R"(\((\d+), (\d+)\) : ([^:]+) : (.+))");
+    const ALRegex DEFAULT_STATE(R"(\s*default\s*\{)");
     // A frame of a Luau traceback: the chunk, bare -- a script's name,
     // spaces and all -- or as Lua quotes one, and its one-based line, then
     // nothing, the function, or a colon and where -- but not the words of
     // an error, `chunk:12: attempt to`, which is the error's own line.
-    const boost::regex STACK_FRAME(R"re(^\s*(?:\[string "([^"]*)"\]|([^:\[\]"]*[^:\[\]"\s])):([0-9]+)(?:$|\s+\S.*$|:\s+in\s.*$))re");
+    const ALRegex STACK_FRAME(R"re(^\s*(?:\[string "([^"]*)"\]|([^:\[\]"]*[^:\[\]"\s])):([0-9]+)(?:$|\s+\S.*$|:\s+in\s.*$))re");
 
     // How a script's run-time error starts: the object, the script, and
     // the words.
-    const boost::regex RUNTIME_ERROR_HEADER(R"(^(.+?)\s+\[script:([^\]]+)\]\s+Script run-time error)");
-    const char* const  RUNTIME_ERROR_MARKER = "Script run-time error";
+    const ALRegex RUNTIME_ERROR_HEADER(R"(^(.+?)\s+\[script:([^\]]+)\]\s+Script run-time error)");
+    const char* const RUNTIME_ERROR_MARKER = "Script run-time error";
 }
 
 namespace ALScriptMessages
@@ -58,21 +57,21 @@ namespace ALScriptMessages
     {
         std::string line = line_in;
         LLStringUtil::stripNonprintable(line);
-        Place         place;
-        boost::smatch found;
-        if (lua && boost::regex_match(line, found, LUAU_LOCATION))
+        Place        place;
+        ALRegexMatch found;
+        if (lua && LUAU_LOCATION.match(line, &found))
         {
-            place.line    = llmax(0, std::atoi(found[2].str().c_str()) - 1);
+            place.line    = llmax(0, std::atoi(found.str(2).c_str()) - 1);
             place.level   = "ERROR";
-            place.message = found[3].str();
+            place.message = found.str(3);
         }
-        else if (!lua && boost::regex_search(line, found, LSL_LOCATION))
+        else if (!lua && LSL_LOCATION.search(line, &found))
         {
-            place.line      = std::atoi(found[1].str().c_str());
-            place.column    = std::atoi(found[2].str().c_str());
+            place.line      = std::atoi(found.str(1).c_str());
+            place.column    = std::atoi(found.str(2).c_str());
             place.hasColumn = true;
-            place.level     = found[3].str();
-            place.message   = found[4].str();
+            place.level     = found.str(3);
+            place.message   = found.str(4);
         }
         else
         {
@@ -94,18 +93,18 @@ namespace ALScriptMessages
 
     bool looksLikeLua(std::string_view content)
     {
-        return !boost::regex_search(content.begin(), content.end(), DEFAULT_STATE);
+        return !DEFAULT_STATE.search(content);
     }
 
     bool readRuntimeHeader(const std::string& line, Header& out)
     {
-        boost::smatch match;
-        if (!boost::regex_match(line, match, RUNTIME_ERROR_HEADER))
+        ALRegexMatch match;
+        if (!RUNTIME_ERROR_HEADER.match(line, &match))
         {
             return false;
         }
-        out.object = match[1].str();
-        out.script = match[2].str();
+        out.object = match.str(1);
+        out.script = match.str(2);
         return true;
     }
 
@@ -117,13 +116,13 @@ namespace ALScriptMessages
 
     bool readStackFrame(const std::string& line, Frame& out)
     {
-        boost::smatch match;
-        if (!boost::regex_match(line, match, STACK_FRAME))
+        ALRegexMatch match;
+        if (!STACK_FRAME.match(line, &match))
         {
             return false;
         }
-        out.chunk = match[1].matched ? match[1].str() : match[2].str();
-        out.line  = static_cast<S32>(std::strtol(match[3].str().c_str(), nullptr, 10)) - 1;
+        out.chunk = match.matched(1) ? match.str(1) : match.str(2);
+        out.line  = static_cast<S32>(std::strtol(match.str(3).c_str(), nullptr, 10)) - 1;
         return out.line >= 0;
     }
 
@@ -131,19 +130,19 @@ namespace ALScriptMessages
     {
         for (const std::string& line : lines)
         {
-            boost::smatch match;
-            if (lua && boost::regex_match(line, match, LUAU_LOCATION))
+            ALRegexMatch match;
+            if (lua && LUAU_LOCATION.match(line, &match))
             {
-                out.line    = static_cast<S32>(std::strtol(match[2].str().c_str(), nullptr, 10)) - 1;
+                out.line    = static_cast<S32>(std::strtol(match.str(2).c_str(), nullptr, 10)) - 1;
                 out.column  = -1;
-                out.message = match[3].str();
+                out.message = match.str(3);
                 return true;
             }
-            if (!lua && boost::regex_match(line, match, LSL_LOCATION))
+            if (!lua && LSL_LOCATION.match(line, &match))
             {
-                out.line    = static_cast<S32>(std::strtol(match[1].str().c_str(), nullptr, 10));
-                out.column  = static_cast<S32>(std::strtol(match[2].str().c_str(), nullptr, 10));
-                out.message = match[4].str();
+                out.line    = static_cast<S32>(std::strtol(match.str(1).c_str(), nullptr, 10));
+                out.column  = static_cast<S32>(std::strtol(match.str(2).c_str(), nullptr, 10));
+                out.message = match.str(4);
                 return true;
             }
         }

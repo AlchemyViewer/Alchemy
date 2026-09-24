@@ -26,7 +26,6 @@
  */
 
 #include "linden_common.h"
-#include "llregex.h"
 #include "llurlregistry.h"
 
 
@@ -112,21 +111,20 @@ void LLUrlRegistry::registerUrl(LLUrlEntryBase *url, bool force_front)
     }
 }
 
-static bool matchRegex(const char *text, boost::regex regex, U32 &start, U32 &end)
+static bool matchRegex(const std::string& text, const LLUrlEntryBase& entry, U32 &start, U32 &end)
 {
-    boost::cmatch result;
-    bool found;
-
-    found = ll_regex_search(text, result, regex);
-
-    if (! found)
+    // only the group that is the Url is asked for, which the search can
+    // answer without reading the pattern's other groups
+    const U32 group = entry.getUrlGroup();
+    ALRegexMatch result;
+    if (!entry.getPattern().search(text, &result, 0, false, static_cast<S32>(group)) || !result.matched(group))
     {
         return false;
     }
 
     // return the first/last character offset for the matched substring
-    start = static_cast<U32>(result[0].first - text);
-    end = static_cast<U32>(result[0].second - text) - 1;
+    start = static_cast<U32>(result.begin(group));
+    end = static_cast<U32>(result.end(group)) - 1;
 
     // we allow certain punctuation to terminate a Url but not match it,
     // e.g., "http://foo.com/." should just match "http://foo.com/"
@@ -136,12 +134,12 @@ static bool matchRegex(const char *text, boost::regex regex, U32 &start, U32 &en
     }
     // ignore a terminating ')' when Url contains no matching '('
     // see DEV-19842 for details
-    else if (text[end] == ')' && std::string(text+start, end-start).find('(') == std::string::npos)
+    else if (text[end] == ')' && std::string_view(text).substr(start, end-start).find('(') == std::string_view::npos)
     {
         end--;
     }
 
-    else if (text[end] == ']' && std::string(text+start, end-start).find('[') == std::string::npos)
+    else if (text[end] == ']' && std::string_view(text).substr(start, end-start).find('[') == std::string_view::npos)
     {
             end--;
     }
@@ -256,7 +254,7 @@ bool LLUrlRegistry::findUrl(const std::string &text, LLUrlMatch &match, const LL
         LLUrlEntryBase *url_entry = *it;
 
         U32 start = 0, end = 0;
-        if (matchRegex(text.c_str(), url_entry->getPattern(), start, end))
+        if (matchRegex(text, *url_entry, start, end))
         {
             // does this match occur in the string before any other match
             if (start < match_start || match_entry == NULL)
@@ -344,21 +342,10 @@ bool LLUrlRegistry::containsAgentMention(const std::string& text)
         return false;
     }
 
-    try
-    {
-        boost::sregex_iterator it(text.begin(), text.end(), mUrlEntryAgentMention->getPattern());
-        boost::sregex_iterator end;
-        for (; it != end; ++it)
-        {
-            if (mUrlEntryAgentMention->isAgentID(it->str()))
-            {
-               return true;
-            }
-        }
-    }
-    catch (boost::regex_error&)
-    {
-        LL_INFOS() << "Regex error for: " << text << LL_ENDL;
-    }
-    return false;
+    bool mentioned = false;
+    mUrlEntryAgentMention->getPattern().forEach(text, [&](const ALRegexMatch& match) {
+        mentioned = mUrlEntryAgentMention->isAgentID(match.str());
+        return !mentioned;
+    }, 0);
+    return mentioned;
 }

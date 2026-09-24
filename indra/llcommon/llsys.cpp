@@ -40,7 +40,7 @@
 #include "llevents.h"
 #include "llformat.h"
 #include "llmemory.h"
-#include "llregex.h"
+#include "alregex.h"
 #include "lltimer.h"
 #include "llsdserialize.h"
 #include "llsdutil.h"
@@ -341,19 +341,19 @@ LLOSInfo::LLOSInfo() :
     }
 
     const char OS_VERSION_MATCH_EXPRESSION[] = "([0-9]+)\\.([0-9]+)(\\.([0-9]+))?";
-    boost::regex os_version_parse(OS_VERSION_MATCH_EXPRESSION);
-    boost::smatch matched;
+    static const ALRegex os_version_parse(OS_VERSION_MATCH_EXPRESSION);
+    ALRegexMatch matched;
 
     std::string glibc_version(gnu_get_libc_version());
-    if ( ll_regex_match(glibc_version, matched, os_version_parse) )
+    if ( os_version_parse.match(glibc_version, &matched) )
     {
         LL_INFOS("AppInit") << "Using glibc version '" << glibc_version << "' as OS version" << LL_ENDL;
 
         std::string version_value;
 
-        if ( matched[1].matched ) // Major version
+        if ( matched.matched(1) ) // Major version
         {
-            version_value.assign(matched[1].first, matched[1].second);
+            version_value = matched.str(1);
             if (sscanf(version_value.c_str(), "%d", &mMajorVer) != 1)
             {
               LL_WARNS("AppInit") << "failed to parse major version '" << version_value << "' as a number" << LL_ENDL;
@@ -367,9 +367,9 @@ LLOSInfo::LLOSInfo() :
                 << LL_ENDL;
         }
 
-        if ( matched[2].matched ) // Minor version
+        if ( matched.matched(2) ) // Minor version
         {
-            version_value.assign(matched[2].first, matched[2].second);
+            version_value = matched.str(2);
             if (sscanf(version_value.c_str(), "%d", &mMinorVer) != 1)
             {
               LL_ERRS("AppInit") << "failed to parse minor version '" << version_value << "' as a number" << LL_ENDL;
@@ -383,9 +383,9 @@ LLOSInfo::LLOSInfo() :
                 << LL_ENDL;
         }
 
-        if ( matched[4].matched ) // Build version (optional) - note that [3] includes the '.'
+        if ( matched.matched(4) ) // Build version (optional) - note that [3] includes the '.'
         {
-            version_value.assign(matched[4].first, matched[4].second);
+            version_value = matched.str(4);
             if (sscanf(version_value.c_str(), "%d", &mBuild) != 1)
             {
               LL_ERRS("AppInit") << "failed to parse build version '" << version_value << "' as a number" << LL_ENDL;
@@ -1187,22 +1187,21 @@ LLSD LLMemoryInfo::loadStatsMap()
         // DirectMap4k:      434168 kB
         // DirectMap2M:      477184 kB
 
-        // Intentionally don't pass the boost::no_except flag. This
-        // boost::regex object is constructed with a string literal, so it
-        // should be valid every time. If it becomes invalid, we WANT an
-        // exception, hopefully even before the dev checks in.
-        boost::regex stat_rx("(.+): +([0-9]+)( kB)?");
-        boost::smatch matched;
+        // The pattern is a literal, so it compiles every time; if it ever
+        // does not, we want to hear of it before the dev checks in.
+        static const ALRegex stat_rx("(.+): +([0-9]+)( kB)?");
+        llassert(stat_rx.ok());
+        ALRegexMatch matched;
 
         std::string line;
         while (std::getline(meminfo, line))
         {
             LL_DEBUGS("LLMemoryInfo") << line << LL_ENDL;
-            if (ll_regex_match(line, matched, stat_rx))
+            if (stat_rx.match(line, &matched))
             {
                 // e.g. "MemTotal:      4108424 kB"
-                LLSD::String key(matched[1].first, matched[1].second);
-                LLSD::String value_str(matched[2].first, matched[2].second);
+                LLSD::String key = matched.str(1);
+                LLSD::String value_str = matched.str(2);
                 LLSD::Integer value(0);
                 S64 intval = 0;
                 try

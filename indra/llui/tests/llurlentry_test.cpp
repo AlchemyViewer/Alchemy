@@ -34,7 +34,6 @@
 #include "../llrender/lluiimage.h"
 #include "../llmessage/llexperiencecache.h"
 
-#include <boost/regex.hpp>
 
 // namespace LLExperienceCache
 // {
@@ -111,15 +110,13 @@ namespace tut
     void testRegex(const std::string &testname, LLUrlEntryBase &entry,
                    const char *text, const std::string &expected)
     {
-        boost::regex regex = entry.getPattern();
         std::string url = "";
-        boost::cmatch result;
-        bool found = boost::regex_search(text, result, regex);
+        ALRegexMatch result;
+        const U32 group = entry.getUrlGroup();
+        bool found = entry.getPattern().search(text, &result) && result.matched(group);
         if (found)
         {
-            S32 start = static_cast<U32>(result[0].first - text);
-            S32 end = static_cast<U32>(result[0].second - text);
-            url = entry.getUrl(std::string(text+start, end-start));
+            url = entry.getUrl(result.str(group));
         }
         ensure_equals(testname, url, expected);
     }
@@ -131,15 +128,13 @@ namespace tut
     void testLabel(const std::string &testname, LLUrlEntryBase &entry,
                    const char *text, const std::string &expected)
     {
-        boost::regex regex = entry.getPattern();
         std::string label = "";
-        boost::cmatch result;
-        bool found = boost::regex_search(text, result, regex);
+        ALRegexMatch result;
+        const U32 group = entry.getUrlGroup();
+        bool found = entry.getPattern().search(text, &result) && result.matched(group);
         if (found)
         {
-            S32 start = static_cast<U32>(result[0].first - text);
-            S32 end = static_cast<U32>(result[0].second - text);
-            std::string url = std::string(text+start, end-start);
+            std::string url = result.str(group);
             label = entry.getLabel(url, boost::bind(dummyCallback, _1, _2, _3));
         }
         ensure_equals(testname, label, expected);
@@ -148,15 +143,13 @@ namespace tut
     void testLocation(const std::string &testname, LLUrlEntryBase &entry,
                       const char *text, const std::string &expected)
     {
-        boost::regex regex = entry.getPattern();
         std::string location = "";
-        boost::cmatch result;
-        bool found = boost::regex_search(text, result, regex);
+        ALRegexMatch result;
+        const U32 group = entry.getUrlGroup();
+        bool found = entry.getPattern().search(text, &result) && result.matched(group);
         if (found)
         {
-            S32 start = static_cast<U32>(result[0].first - text);
-            S32 end = static_cast<U32>(result[0].second - text);
-            std::string url = std::string(text+start, end-start);
+            std::string url = result.str(group);
             location = entry.getLocation(url);
         }
         ensure_equals(testname, location, expected);

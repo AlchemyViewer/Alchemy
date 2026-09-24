@@ -36,7 +36,7 @@
 #include "_httprequestqueue.h"
 
 #include <curl/curl.h>
-#include <boost/regex.hpp>
+#include "alregex.h"
 #include <sstream>
 
 #include "llcorehttp_test.h"
@@ -68,7 +68,7 @@ void usleep(unsigned long usec);
 namespace tut
 {
 
-typedef std::vector<std::pair<boost::regex, boost::regex> > regex_container_t;
+typedef std::vector<std::pair<ALRegex, ALRegex> > regex_container_t;
 
 struct HttpRequestTestData
 {
@@ -125,10 +125,8 @@ public:
                             // std::cerr << "Header: " << (*iter).first
                             //        << ": " << (*iter).second << std::endl;
 
-                            if (boost::regex_match((*iter).first,
-                                                   mHeadersRequired[i].first) &&
-                                boost::regex_match((*iter).second,
-                                                   mHeadersRequired[i].second))
+                            if (mHeadersRequired[i].first.match((*iter).first) &&
+                                mHeadersRequired[i].second.match((*iter).second))
                             {
                                 found = true;
                                 break;
@@ -150,10 +148,8 @@ public:
                              header->end() != iter;
                              ++iter)
                         {
-                            if (boost::regex_match((*iter).first,
-                                                   mHeadersDisallowed[i].first) &&
-                                boost::regex_match((*iter).second,
-                                                   mHeadersDisallowed[i].second))
+                            if (mHeadersDisallowed[i].first.match((*iter).first) &&
+                                mHeadersDisallowed[i].second.match((*iter).second))
                             {
                                 std::ostringstream str;
                                 str << "Disallowed header #" << i << " "
@@ -1197,9 +1193,9 @@ void HttpRequestTestObjectType::test<13>()
 {
     ScopedCurlInit ready;
 
-    // Warmup boost::regex to pre-alloc memory for memory size tests
-    boost::regex warmup("askldjflasdj;f", boost::regex::icase);
-    boost::regex_match("akl;sjflajfk;ajsk", warmup);
+    // Warmup the regex engine to pre-alloc memory for memory size tests
+    ALRegex warmup("askldjflasdj;f", ALRegex::ICASE);
+    warmup.match("akl;sjflajfk;ajsk");
 
     std::string url_base(get_base_url());
     // std::cerr << "Base:  "  << url_base << std::endl;
@@ -1238,8 +1234,8 @@ void HttpRequestTestObjectType::test<13>()
         // Issue a GET that succeeds
         mStatus = HttpStatus(200);
         handler.mHeadersRequired.push_back(
-            regex_container_t::value_type(boost::regex("X-LL-Special", boost::regex::icase),
-                                          boost::regex(".*", boost::regex::icase)));
+            regex_container_t::value_type(ALRegex("X-LL-Special", ALRegex::ICASE),
+                                          ALRegex(".*", ALRegex::ICASE)));
         HttpHandle handle = req->requestGetByteRange(HttpRequest::DEFAULT_POLICY_ID,
                                                      url_base,
                                                      0,
@@ -1521,9 +1517,9 @@ void HttpRequestTestObjectType::test<16>()
 {
     ScopedCurlInit ready;
 
-    // Warmup boost::regex to pre-alloc memory for memory size tests
-    boost::regex warmup("askldjflasdj;f", boost::regex::icase);
-    boost::regex_match("akl;sjflajfk;ajsk", warmup);
+    // Warmup the regex engine to pre-alloc memory for memory size tests
+    ALRegex warmup("askldjflasdj;f", ALRegex::ICASE);
+    warmup.match("akl;sjflajfk;ajsk");
 
     std::string url_base(get_base_url());
 
@@ -1560,52 +1556,52 @@ void HttpRequestTestObjectType::test<16>()
         mStatus = HttpStatus(200);
         handler.mHeadersRequired.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-connection", boost::regex::icase),
-                boost::regex("keep-alive", boost::regex::icase)));
+                ALRegex("X-Reflect-connection", ALRegex::ICASE),
+                ALRegex("keep-alive", ALRegex::ICASE)));
         handler.mHeadersRequired.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-accept", boost::regex::icase),
-                boost::regex("\\*/\\*", boost::regex::icase)));
+                ALRegex("X-Reflect-accept", ALRegex::ICASE),
+                ALRegex("\\*/\\*", ALRegex::ICASE)));
         handler.mHeadersRequired.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-accept-encoding", boost::regex::icase),
-                boost::regex("((gzip|deflate),\\s*)+(gzip|deflate)", boost::regex::icase))); // close enough
+                ALRegex("X-Reflect-accept-encoding", ALRegex::ICASE),
+                ALRegex("((gzip|deflate),\\s*)+(gzip|deflate)", ALRegex::ICASE))); // close enough
         handler.mHeadersRequired.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-keep-alive", boost::regex::icase),
-                boost::regex("\\d+", boost::regex::icase)));
+                ALRegex("X-Reflect-keep-alive", ALRegex::ICASE),
+                ALRegex("\\d+", ALRegex::ICASE)));
         handler.mHeadersRequired.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-host", boost::regex::icase),
-                boost::regex(".*", boost::regex::icase)));
+                ALRegex("X-Reflect-host", ALRegex::ICASE),
+                ALRegex(".*", ALRegex::ICASE)));
         handler.mHeadersDisallowed.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-cache-control", boost::regex::icase),
-                boost::regex(".*", boost::regex::icase)));
+                ALRegex("X-Reflect-cache-control", ALRegex::ICASE),
+                ALRegex(".*", ALRegex::ICASE)));
         handler.mHeadersDisallowed.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-pragma", boost::regex::icase),
-                boost::regex(".*", boost::regex::icase)));
+                ALRegex("X-Reflect-pragma", ALRegex::ICASE),
+                ALRegex(".*", ALRegex::ICASE)));
         handler.mHeadersDisallowed.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-range", boost::regex::icase),
-                boost::regex(".*", boost::regex::icase)));
+                ALRegex("X-Reflect-range", ALRegex::ICASE),
+                ALRegex(".*", ALRegex::ICASE)));
         handler.mHeadersDisallowed.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-transfer-encoding", boost::regex::icase),
-                boost::regex(".*", boost::regex::icase)));
+                ALRegex("X-Reflect-transfer-encoding", ALRegex::ICASE),
+                ALRegex(".*", ALRegex::ICASE)));
         handler.mHeadersDisallowed.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-referer", boost::regex::icase),
-                boost::regex(".*", boost::regex::icase)));
+                ALRegex("X-Reflect-referer", ALRegex::ICASE),
+                ALRegex(".*", ALRegex::ICASE)));
         handler.mHeadersDisallowed.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-content-type", boost::regex::icase),
-                boost::regex(".*", boost::regex::icase)));
+                ALRegex("X-Reflect-content-type", ALRegex::ICASE),
+                ALRegex(".*", ALRegex::ICASE)));
         handler.mHeadersDisallowed.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-content-encoding", boost::regex::icase),
-                boost::regex(".*", boost::regex::icase)));
+                ALRegex("X-Reflect-content-encoding", ALRegex::ICASE),
+                ALRegex(".*", ALRegex::ICASE)));
         HttpHandle handle = req->requestGet(HttpRequest::DEFAULT_POLICY_ID,
                                             url_base + "reflect/",
                                             options,
@@ -1633,53 +1629,53 @@ void HttpRequestTestObjectType::test<16>()
         handler.mHeadersDisallowed.clear();
         handler.mHeadersRequired.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-connection", boost::regex::icase),
-                boost::regex("keep-alive", boost::regex::icase)));
+                ALRegex("X-Reflect-connection", ALRegex::ICASE),
+                ALRegex("keep-alive", ALRegex::ICASE)));
         handler.mHeadersRequired.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-accept", boost::regex::icase),
-                boost::regex("image/x-j2c", boost::regex::icase)));
+                ALRegex("X-Reflect-accept", ALRegex::ICASE),
+                ALRegex("image/x-j2c", ALRegex::ICASE)));
         handler.mHeadersRequired.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-accept-encoding", boost::regex::icase),
-                boost::regex("((gzip|deflate),\\s*)+(gzip|deflate)", boost::regex::icase))); // close enough
+                ALRegex("X-Reflect-accept-encoding", ALRegex::ICASE),
+                ALRegex("((gzip|deflate),\\s*)+(gzip|deflate)", ALRegex::ICASE))); // close enough
         handler.mHeadersRequired.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-keep-alive", boost::regex::icase),
-                boost::regex("\\d+", boost::regex::icase)));
+                ALRegex("X-Reflect-keep-alive", ALRegex::ICASE),
+                ALRegex("\\d+", ALRegex::ICASE)));
         handler.mHeadersRequired.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-host", boost::regex::icase),
-                boost::regex(".*", boost::regex::icase)));
+                ALRegex("X-Reflect-host", ALRegex::ICASE),
+                ALRegex(".*", ALRegex::ICASE)));
         handler.mHeadersRequired.push_back(
             regex_container_t::value_type(
-                boost::regex("\\W*X-Reflect-range", boost::regex::icase),
-                boost::regex(".*", boost::regex::icase)));
+                ALRegex("\\W*X-Reflect-range", ALRegex::ICASE),
+                ALRegex(".*", ALRegex::ICASE)));
 
         handler.mHeadersDisallowed.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-cache-control", boost::regex::icase),
-                boost::regex(".*", boost::regex::icase)));
+                ALRegex("X-Reflect-cache-control", ALRegex::ICASE),
+                ALRegex(".*", ALRegex::ICASE)));
         handler.mHeadersDisallowed.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-pragma", boost::regex::icase),
-                boost::regex(".*", boost::regex::icase)));
+                ALRegex("X-Reflect-pragma", ALRegex::ICASE),
+                ALRegex(".*", ALRegex::ICASE)));
         handler.mHeadersDisallowed.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-transfer-encoding", boost::regex::icase),
-                boost::regex(".*", boost::regex::icase)));
+                ALRegex("X-Reflect-transfer-encoding", ALRegex::ICASE),
+                ALRegex(".*", ALRegex::ICASE)));
         handler.mHeadersDisallowed.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-referer", boost::regex::icase),
-                boost::regex(".*", boost::regex::icase)));
+                ALRegex("X-Reflect-referer", ALRegex::ICASE),
+                ALRegex(".*", ALRegex::ICASE)));
         handler.mHeadersDisallowed.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-content-type", boost::regex::icase),
-                boost::regex(".*", boost::regex::icase)));
+                ALRegex("X-Reflect-content-type", ALRegex::ICASE),
+                ALRegex(".*", ALRegex::ICASE)));
         handler.mHeadersDisallowed.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-content-encoding", boost::regex::icase),
-                boost::regex(".*", boost::regex::icase)));
+                ALRegex("X-Reflect-content-encoding", ALRegex::ICASE),
+                ALRegex(".*", ALRegex::ICASE)));
         handle = req->requestGetByteRange(HttpRequest::DEFAULT_POLICY_ID,
                                           url_base + "reflect/",
                                           0,
@@ -1758,9 +1754,9 @@ void HttpRequestTestObjectType::test<17>()
 {
     ScopedCurlInit ready;
 
-    // Warmup boost::regex to pre-alloc memory for memory size tests
-    boost::regex warmup("askldjflasdj;f", boost::regex::icase);
-    boost::regex_match("akl;sjflajfk;ajsk", warmup);
+    // Warmup the regex engine to pre-alloc memory for memory size tests
+    ALRegex warmup("askldjflasdj;f", ALRegex::ICASE);
+    warmup.match("akl;sjflajfk;ajsk");
 
     std::string url_base(get_base_url());
 
@@ -1803,61 +1799,61 @@ void HttpRequestTestObjectType::test<17>()
         mStatus = HttpStatus(200);
         handler.mHeadersRequired.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-connection", boost::regex::icase),
-                boost::regex("keep-alive", boost::regex::icase)));
+                ALRegex("X-Reflect-connection", ALRegex::ICASE),
+                ALRegex("keep-alive", ALRegex::ICASE)));
         handler.mHeadersRequired.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-accept", boost::regex::icase),
-                boost::regex("\\*/\\*", boost::regex::icase)));
+                ALRegex("X-Reflect-accept", ALRegex::ICASE),
+                ALRegex("\\*/\\*", ALRegex::ICASE)));
         handler.mHeadersRequired.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-accept-encoding", boost::regex::icase),
-                boost::regex("((gzip|deflate),\\s*)+(gzip|deflate)", boost::regex::icase))); // close enough
+                ALRegex("X-Reflect-accept-encoding", ALRegex::ICASE),
+                ALRegex("((gzip|deflate),\\s*)+(gzip|deflate)", ALRegex::ICASE))); // close enough
         handler.mHeadersRequired.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-keep-alive", boost::regex::icase),
-                boost::regex("\\d+", boost::regex::icase)));
+                ALRegex("X-Reflect-keep-alive", ALRegex::ICASE),
+                ALRegex("\\d+", ALRegex::ICASE)));
         handler.mHeadersRequired.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-host", boost::regex::icase),
-                boost::regex(".*", boost::regex::icase)));
+                ALRegex("X-Reflect-host", ALRegex::ICASE),
+                ALRegex(".*", ALRegex::ICASE)));
         handler.mHeadersRequired.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-content-length", boost::regex::icase),
-                boost::regex("\\d+", boost::regex::icase)));
+                ALRegex("X-Reflect-content-length", ALRegex::ICASE),
+                ALRegex("\\d+", ALRegex::ICASE)));
         handler.mHeadersRequired.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-content-type", boost::regex::icase),
-                boost::regex("application/x-www-form-urlencoded", boost::regex::icase)));
+                ALRegex("X-Reflect-content-type", ALRegex::ICASE),
+                ALRegex("application/x-www-form-urlencoded", ALRegex::ICASE)));
 
         handler.mHeadersDisallowed.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-cache-control", boost::regex::icase),
-                boost::regex(".*", boost::regex::icase)));
+                ALRegex("X-Reflect-cache-control", ALRegex::ICASE),
+                ALRegex(".*", ALRegex::ICASE)));
         handler.mHeadersDisallowed.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-pragma", boost::regex::icase),
-                boost::regex(".*", boost::regex::icase)));
+                ALRegex("X-Reflect-pragma", ALRegex::ICASE),
+                ALRegex(".*", ALRegex::ICASE)));
         handler.mHeadersDisallowed.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-range", boost::regex::icase),
-                boost::regex(".*", boost::regex::icase)));
+                ALRegex("X-Reflect-range", ALRegex::ICASE),
+                ALRegex(".*", ALRegex::ICASE)));
         handler.mHeadersDisallowed.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-referer", boost::regex::icase),
-                boost::regex(".*", boost::regex::icase)));
+                ALRegex("X-Reflect-referer", ALRegex::ICASE),
+                ALRegex(".*", ALRegex::ICASE)));
         handler.mHeadersDisallowed.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-content-encoding", boost::regex::icase),
-                boost::regex(".*", boost::regex::icase)));
+                ALRegex("X-Reflect-content-encoding", ALRegex::ICASE),
+                ALRegex(".*", ALRegex::ICASE)));
         handler.mHeadersDisallowed.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-expect", boost::regex::icase),
-                boost::regex(".*", boost::regex::icase)));
+                ALRegex("X-Reflect-expect", ALRegex::ICASE),
+                ALRegex(".*", ALRegex::ICASE)));
         handler.mHeadersDisallowed.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-transfer_encoding", boost::regex::icase),
-                boost::regex(".*chunked.*", boost::regex::icase)));
+                ALRegex("X-Reflect-transfer_encoding", ALRegex::ICASE),
+                ALRegex(".*chunked.*", ALRegex::ICASE)));
         HttpHandle handle = req->requestPost(HttpRequest::DEFAULT_POLICY_ID,
                                              url_base + "reflect/",
                                              ba,
@@ -1942,9 +1938,9 @@ void HttpRequestTestObjectType::test<18>()
 {
     ScopedCurlInit ready;
 
-    // Warmup boost::regex to pre-alloc memory for memory size tests
-    boost::regex warmup("askldjflasdj;f", boost::regex::icase);
-    boost::regex_match("akl;sjflajfk;ajsk", warmup);
+    // Warmup the regex engine to pre-alloc memory for memory size tests
+    ALRegex warmup("askldjflasdj;f", ALRegex::ICASE);
+    warmup.match("akl;sjflajfk;ajsk");
 
     std::string url_base(get_base_url());
 
@@ -1987,61 +1983,61 @@ void HttpRequestTestObjectType::test<18>()
         mStatus = HttpStatus(200);
         handler.mHeadersRequired.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-connection", boost::regex::icase),
-                boost::regex("keep-alive", boost::regex::icase)));
+                ALRegex("X-Reflect-connection", ALRegex::ICASE),
+                ALRegex("keep-alive", ALRegex::ICASE)));
         handler.mHeadersRequired.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-accept", boost::regex::icase),
-                boost::regex("\\*/\\*", boost::regex::icase)));
+                ALRegex("X-Reflect-accept", ALRegex::ICASE),
+                ALRegex("\\*/\\*", ALRegex::ICASE)));
         handler.mHeadersRequired.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-accept-encoding", boost::regex::icase),
-                boost::regex("((gzip|deflate),\\s*)+(gzip|deflate)", boost::regex::icase))); // close enough
+                ALRegex("X-Reflect-accept-encoding", ALRegex::ICASE),
+                ALRegex("((gzip|deflate),\\s*)+(gzip|deflate)", ALRegex::ICASE))); // close enough
         handler.mHeadersRequired.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-keep-alive", boost::regex::icase),
-                boost::regex("\\d+", boost::regex::icase)));
+                ALRegex("X-Reflect-keep-alive", ALRegex::ICASE),
+                ALRegex("\\d+", ALRegex::ICASE)));
         handler.mHeadersRequired.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-host", boost::regex::icase),
-                boost::regex(".*", boost::regex::icase)));
+                ALRegex("X-Reflect-host", ALRegex::ICASE),
+                ALRegex(".*", ALRegex::ICASE)));
         handler.mHeadersRequired.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-content-length", boost::regex::icase),
-                boost::regex("\\d+", boost::regex::icase)));
+                ALRegex("X-Reflect-content-length", ALRegex::ICASE),
+                ALRegex("\\d+", ALRegex::ICASE)));
 
         handler.mHeadersDisallowed.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-cache-control", boost::regex::icase),
-                boost::regex(".*", boost::regex::icase)));
+                ALRegex("X-Reflect-cache-control", ALRegex::ICASE),
+                ALRegex(".*", ALRegex::ICASE)));
         handler.mHeadersDisallowed.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-pragma", boost::regex::icase),
-                boost::regex(".*", boost::regex::icase)));
+                ALRegex("X-Reflect-pragma", ALRegex::ICASE),
+                ALRegex(".*", ALRegex::ICASE)));
         handler.mHeadersDisallowed.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-range", boost::regex::icase),
-                boost::regex(".*", boost::regex::icase)));
+                ALRegex("X-Reflect-range", ALRegex::ICASE),
+                ALRegex(".*", ALRegex::ICASE)));
         handler.mHeadersDisallowed.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-referer", boost::regex::icase),
-                boost::regex(".*", boost::regex::icase)));
+                ALRegex("X-Reflect-referer", ALRegex::ICASE),
+                ALRegex(".*", ALRegex::ICASE)));
         handler.mHeadersDisallowed.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-content-encoding", boost::regex::icase),
-                boost::regex(".*", boost::regex::icase)));
+                ALRegex("X-Reflect-content-encoding", ALRegex::ICASE),
+                ALRegex(".*", ALRegex::ICASE)));
         handler.mHeadersDisallowed.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-expect", boost::regex::icase),
-                boost::regex(".*", boost::regex::icase)));
+                ALRegex("X-Reflect-expect", ALRegex::ICASE),
+                ALRegex(".*", ALRegex::ICASE)));
         handler.mHeadersDisallowed.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-transfer-encoding", boost::regex::icase),
-                boost::regex(".*chunked.*", boost::regex::icase)));
+                ALRegex("X-Reflect-transfer-encoding", ALRegex::ICASE),
+                ALRegex(".*chunked.*", ALRegex::ICASE)));
         handler.mHeadersDisallowed.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-content-type", boost::regex::icase),
-                boost::regex(".*", boost::regex::icase)));
+                ALRegex("X-Reflect-content-type", ALRegex::ICASE),
+                ALRegex(".*", ALRegex::ICASE)));
 
         HttpHandle handle = req->requestPut(HttpRequest::DEFAULT_POLICY_ID,
                                             url_base + "reflect/",
@@ -2138,9 +2134,9 @@ void HttpRequestTestObjectType::test<19>()
 
     ScopedCurlInit ready;
 
-    // Warmup boost::regex to pre-alloc memory for memory size tests
-    boost::regex warmup("askldjflasdj;f", boost::regex::icase);
-    boost::regex_match("akl;sjflajfk;ajsk", warmup);
+    // Warmup the regex engine to pre-alloc memory for memory size tests
+    ALRegex warmup("askldjflasdj;f", ALRegex::ICASE);
+    warmup.match("akl;sjflajfk;ajsk");
 
     std::string url_base(get_base_url());
 
@@ -2183,65 +2179,65 @@ void HttpRequestTestObjectType::test<19>()
         mStatus = HttpStatus(200);
         handler.mHeadersRequired.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-connection", boost::regex::icase),
-                boost::regex("keep-alive", boost::regex::icase)));
+                ALRegex("X-Reflect-connection", ALRegex::ICASE),
+                ALRegex("keep-alive", ALRegex::ICASE)));
         handler.mHeadersRequired.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-accept", boost::regex::icase),
-                boost::regex("text/plain", boost::regex::icase)));
+                ALRegex("X-Reflect-accept", ALRegex::ICASE),
+                ALRegex("text/plain", ALRegex::ICASE)));
         handler.mHeadersRequired.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-accept-encoding", boost::regex::icase),
-                boost::regex("deflate", boost::regex::icase))); // close enough
+                ALRegex("X-Reflect-accept-encoding", ALRegex::ICASE),
+                ALRegex("deflate", ALRegex::ICASE))); // close enough
         handler.mHeadersRequired.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-keep-alive", boost::regex::icase),
-                boost::regex("120", boost::regex::icase)));
+                ALRegex("X-Reflect-keep-alive", ALRegex::ICASE),
+                ALRegex("120", ALRegex::ICASE)));
         handler.mHeadersRequired.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-host", boost::regex::icase),
-                boost::regex(".*", boost::regex::icase)));
+                ALRegex("X-Reflect-host", ALRegex::ICASE),
+                ALRegex(".*", ALRegex::ICASE)));
 
         handler.mHeadersDisallowed.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-accept-encoding", boost::regex::icase),
-                boost::regex("((gzip|deflate),\\s*)+(gzip|deflate)", boost::regex::icase))); // close enough
+                ALRegex("X-Reflect-accept-encoding", ALRegex::ICASE),
+                ALRegex("((gzip|deflate),\\s*)+(gzip|deflate)", ALRegex::ICASE))); // close enough
         handler.mHeadersDisallowed.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-keep-alive", boost::regex::icase),
-                boost::regex("300", boost::regex::icase)));
+                ALRegex("X-Reflect-keep-alive", ALRegex::ICASE),
+                ALRegex("300", ALRegex::ICASE)));
         handler.mHeadersDisallowed.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-accept", boost::regex::icase),
-                boost::regex("\\*/\\*", boost::regex::icase)));
+                ALRegex("X-Reflect-accept", ALRegex::ICASE),
+                ALRegex("\\*/\\*", ALRegex::ICASE)));
         handler.mHeadersDisallowed.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-cache-control", boost::regex::icase),
-                boost::regex(".*", boost::regex::icase)));
+                ALRegex("X-Reflect-cache-control", ALRegex::ICASE),
+                ALRegex(".*", ALRegex::ICASE)));
         handler.mHeadersDisallowed.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-pragma", boost::regex::icase),
-                boost::regex(".*", boost::regex::icase)));
+                ALRegex("X-Reflect-pragma", ALRegex::ICASE),
+                ALRegex(".*", ALRegex::ICASE)));
         handler.mHeadersDisallowed.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-range", boost::regex::icase),
-                boost::regex(".*", boost::regex::icase)));
+                ALRegex("X-Reflect-range", ALRegex::ICASE),
+                ALRegex(".*", ALRegex::ICASE)));
         handler.mHeadersDisallowed.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-transfer-encoding", boost::regex::icase),
-                boost::regex(".*", boost::regex::icase)));
+                ALRegex("X-Reflect-transfer-encoding", ALRegex::ICASE),
+                ALRegex(".*", ALRegex::ICASE)));
         handler.mHeadersDisallowed.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-referer", boost::regex::icase),
-                boost::regex(".*", boost::regex::icase)));
+                ALRegex("X-Reflect-referer", ALRegex::ICASE),
+                ALRegex(".*", ALRegex::ICASE)));
         handler.mHeadersDisallowed.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-content-type", boost::regex::icase),
-                boost::regex(".*", boost::regex::icase)));
+                ALRegex("X-Reflect-content-type", ALRegex::ICASE),
+                ALRegex(".*", ALRegex::ICASE)));
         handler.mHeadersDisallowed.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-content-encoding", boost::regex::icase),
-                boost::regex(".*", boost::regex::icase)));
+                ALRegex("X-Reflect-content-encoding", ALRegex::ICASE),
+                ALRegex(".*", ALRegex::ICASE)));
         HttpHandle handle = req->requestGet(HttpRequest::DEFAULT_POLICY_ID,
                                             url_base + "reflect/",
                                             options,
@@ -2328,9 +2324,9 @@ void HttpRequestTestObjectType::test<20>()
 
     ScopedCurlInit ready;
 
-    // Warmup boost::regex to pre-alloc memory for memory size tests
-    boost::regex warmup("askldjflasdj;f", boost::regex::icase);
-    boost::regex_match("akl;sjflajfk;ajsk", warmup);
+    // Warmup the regex engine to pre-alloc memory for memory size tests
+    ALRegex warmup("askldjflasdj;f", ALRegex::ICASE);
+    warmup.match("akl;sjflajfk;ajsk");
 
     std::string url_base(get_base_url());
 
@@ -2381,73 +2377,73 @@ void HttpRequestTestObjectType::test<20>()
         mStatus = HttpStatus(200);
         handler.mHeadersRequired.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-connection", boost::regex::icase),
-                boost::regex("keep-alive", boost::regex::icase)));
+                ALRegex("X-Reflect-connection", ALRegex::ICASE),
+                ALRegex("keep-alive", ALRegex::ICASE)));
         handler.mHeadersRequired.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-accept", boost::regex::icase),
-                boost::regex("text/html", boost::regex::icase)));
+                ALRegex("X-Reflect-accept", ALRegex::ICASE),
+                ALRegex("text/html", ALRegex::ICASE)));
         handler.mHeadersRequired.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-accept-encoding", boost::regex::icase),
-                boost::regex("((gzip|deflate),\\s*)+(gzip|deflate)", boost::regex::icase))); // close enough
+                ALRegex("X-Reflect-accept-encoding", ALRegex::ICASE),
+                ALRegex("((gzip|deflate),\\s*)+(gzip|deflate)", ALRegex::ICASE))); // close enough
         handler.mHeadersRequired.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-keep-alive", boost::regex::icase),
-                boost::regex("120", boost::regex::icase)));
+                ALRegex("X-Reflect-keep-alive", ALRegex::ICASE),
+                ALRegex("120", ALRegex::ICASE)));
         handler.mHeadersRequired.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-host", boost::regex::icase),
-                boost::regex(".*", boost::regex::icase)));
+                ALRegex("X-Reflect-host", ALRegex::ICASE),
+                ALRegex(".*", ALRegex::ICASE)));
         handler.mHeadersRequired.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-content-length", boost::regex::icase),
-                boost::regex("\\d+", boost::regex::icase)));
+                ALRegex("X-Reflect-content-length", ALRegex::ICASE),
+                ALRegex("\\d+", ALRegex::ICASE)));
         handler.mHeadersRequired.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-content-type", boost::regex::icase),
-                boost::regex("application/llsd\\+xml", boost::regex::icase)));
+                ALRegex("X-Reflect-content-type", ALRegex::ICASE),
+                ALRegex("application/llsd\\+xml", ALRegex::ICASE)));
         handler.mHeadersRequired.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-cache-control", boost::regex::icase),
-                boost::regex("no-store", boost::regex::icase)));
+                ALRegex("X-Reflect-cache-control", ALRegex::ICASE),
+                ALRegex("no-store", ALRegex::ICASE)));
 
         handler.mHeadersDisallowed.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-content-type", boost::regex::icase),
-                boost::regex("application/x-www-form-urlencoded", boost::regex::icase)));
+                ALRegex("X-Reflect-content-type", ALRegex::ICASE),
+                ALRegex("application/x-www-form-urlencoded", ALRegex::ICASE)));
         handler.mHeadersDisallowed.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-accept", boost::regex::icase),
-                boost::regex("\\*/\\*", boost::regex::icase)));
+                ALRegex("X-Reflect-accept", ALRegex::ICASE),
+                ALRegex("\\*/\\*", ALRegex::ICASE)));
         handler.mHeadersDisallowed.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-keep-alive", boost::regex::icase),
-                boost::regex("300", boost::regex::icase)));
+                ALRegex("X-Reflect-keep-alive", ALRegex::ICASE),
+                ALRegex("300", ALRegex::ICASE)));
         handler.mHeadersDisallowed.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-pragma", boost::regex::icase),
-                boost::regex(".*", boost::regex::icase)));
+                ALRegex("X-Reflect-pragma", ALRegex::ICASE),
+                ALRegex(".*", ALRegex::ICASE)));
         handler.mHeadersDisallowed.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-range", boost::regex::icase),
-                boost::regex(".*", boost::regex::icase)));
+                ALRegex("X-Reflect-range", ALRegex::ICASE),
+                ALRegex(".*", ALRegex::ICASE)));
         handler.mHeadersDisallowed.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-referer", boost::regex::icase),
-                boost::regex(".*", boost::regex::icase)));
+                ALRegex("X-Reflect-referer", ALRegex::ICASE),
+                ALRegex(".*", ALRegex::ICASE)));
         handler.mHeadersDisallowed.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-content-encoding", boost::regex::icase),
-                boost::regex(".*", boost::regex::icase)));
+                ALRegex("X-Reflect-content-encoding", ALRegex::ICASE),
+                ALRegex(".*", ALRegex::ICASE)));
         handler.mHeadersDisallowed.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-expect", boost::regex::icase),
-                boost::regex(".*", boost::regex::icase)));
+                ALRegex("X-Reflect-expect", ALRegex::ICASE),
+                ALRegex(".*", ALRegex::ICASE)));
         handler.mHeadersDisallowed.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-transfer-encoding", boost::regex::icase),
-                boost::regex(".*", boost::regex::icase)));
+                ALRegex("X-Reflect-transfer-encoding", ALRegex::ICASE),
+                ALRegex(".*", ALRegex::ICASE)));
 
         HttpHandle handle = req->requestPost(HttpRequest::DEFAULT_POLICY_ID,
                                              url_base + "reflect/",
@@ -2543,9 +2539,9 @@ void HttpRequestTestObjectType::test<21>()
 
     ScopedCurlInit ready;
 
-    // Warmup boost::regex to pre-alloc memory for memory size tests
-    boost::regex warmup("askldjflasdj;f", boost::regex::icase);
-    boost::regex_match("akl;sjflajfk;ajsk", warmup);
+    // Warmup the regex engine to pre-alloc memory for memory size tests
+    ALRegex warmup("askldjflasdj;f", ALRegex::ICASE);
+    warmup.match("akl;sjflajfk;ajsk");
 
     std::string url_base(get_base_url());
 
@@ -2594,69 +2590,69 @@ void HttpRequestTestObjectType::test<21>()
         mStatus = HttpStatus(200);
         handler.mHeadersRequired.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-connection", boost::regex::icase),
-                boost::regex("keep-alive", boost::regex::icase)));
+                ALRegex("X-Reflect-connection", ALRegex::ICASE),
+                ALRegex("keep-alive", ALRegex::ICASE)));
         handler.mHeadersRequired.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-accept", boost::regex::icase),
-                boost::regex("\\*/\\*", boost::regex::icase)));
+                ALRegex("X-Reflect-accept", ALRegex::ICASE),
+                ALRegex("\\*/\\*", ALRegex::ICASE)));
         handler.mHeadersRequired.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-accept-encoding", boost::regex::icase),
-                boost::regex("((gzip|deflate),\\s*)+(gzip|deflate)", boost::regex::icase))); // close enough
+                ALRegex("X-Reflect-accept-encoding", ALRegex::ICASE),
+                ALRegex("((gzip|deflate),\\s*)+(gzip|deflate)", ALRegex::ICASE))); // close enough
         handler.mHeadersRequired.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-keep-alive", boost::regex::icase),
-                boost::regex("\\d+", boost::regex::icase)));
+                ALRegex("X-Reflect-keep-alive", ALRegex::ICASE),
+                ALRegex("\\d+", ALRegex::ICASE)));
         handler.mHeadersRequired.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-host", boost::regex::icase),
-                boost::regex(".*", boost::regex::icase)));
+                ALRegex("X-Reflect-host", ALRegex::ICASE),
+                ALRegex(".*", ALRegex::ICASE)));
         handler.mHeadersRequired.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-content-length", boost::regex::icase),
-                boost::regex("\\d+", boost::regex::icase)));
+                ALRegex("X-Reflect-content-length", ALRegex::ICASE),
+                ALRegex("\\d+", ALRegex::ICASE)));
         handler.mHeadersRequired.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-content-type", boost::regex::icase),
-                boost::regex("application/llsd\\+xml", boost::regex::icase)));
+                ALRegex("X-Reflect-content-type", ALRegex::ICASE),
+                ALRegex("application/llsd\\+xml", ALRegex::ICASE)));
 
         handler.mHeadersDisallowed.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-cache-control", boost::regex::icase),
-                boost::regex(".*", boost::regex::icase)));
+                ALRegex("X-Reflect-cache-control", ALRegex::ICASE),
+                ALRegex(".*", ALRegex::ICASE)));
         handler.mHeadersDisallowed.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-pragma", boost::regex::icase),
-                boost::regex(".*", boost::regex::icase)));
+                ALRegex("X-Reflect-pragma", ALRegex::ICASE),
+                ALRegex(".*", ALRegex::ICASE)));
         handler.mHeadersDisallowed.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-range", boost::regex::icase),
-                boost::regex(".*", boost::regex::icase)));
+                ALRegex("X-Reflect-range", ALRegex::ICASE),
+                ALRegex(".*", ALRegex::ICASE)));
         handler.mHeadersDisallowed.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-referer", boost::regex::icase),
-                boost::regex(".*", boost::regex::icase)));
+                ALRegex("X-Reflect-referer", ALRegex::ICASE),
+                ALRegex(".*", ALRegex::ICASE)));
         handler.mHeadersDisallowed.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-content-encoding", boost::regex::icase),
-                boost::regex(".*", boost::regex::icase)));
+                ALRegex("X-Reflect-content-encoding", ALRegex::ICASE),
+                ALRegex(".*", ALRegex::ICASE)));
         handler.mHeadersDisallowed.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-expect", boost::regex::icase),
-                boost::regex(".*", boost::regex::icase)));
+                ALRegex("X-Reflect-expect", ALRegex::ICASE),
+                ALRegex(".*", ALRegex::ICASE)));
         handler.mHeadersDisallowed.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-transfer-encoding", boost::regex::icase),
-                boost::regex(".*", boost::regex::icase)));
+                ALRegex("X-Reflect-transfer-encoding", ALRegex::ICASE),
+                ALRegex(".*", ALRegex::ICASE)));
         handler.mHeadersDisallowed.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-content-type", boost::regex::icase),
-                boost::regex("text/plain", boost::regex::icase)));
+                ALRegex("X-Reflect-content-type", ALRegex::ICASE),
+                ALRegex("text/plain", ALRegex::ICASE)));
         handler.mHeadersDisallowed.push_back(
             regex_container_t::value_type(
-                boost::regex("X-Reflect-content-type", boost::regex::icase),
-                boost::regex("text/html", boost::regex::icase)));
+                ALRegex("X-Reflect-content-type", ALRegex::ICASE),
+                ALRegex("text/html", ALRegex::ICASE)));
         HttpHandle handle = req->requestPut(HttpRequest::DEFAULT_POLICY_ID,
                                             url_base + "reflect/",
                                             ba,

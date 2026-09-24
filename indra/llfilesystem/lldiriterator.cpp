@@ -29,7 +29,7 @@
 #include "lldiriterator.h"
 
 #include "fsyspath.h"
-#include "llregex.h"
+#include "alregex.h"
 #include <filesystem>
 
 namespace fs = std::filesystem;
@@ -46,7 +46,7 @@ public:
     bool next(std::string &fname);
 
 private:
-    boost::regex            mFilterExp;
+    ALRegex                 mFilterExp;
     fs::directory_iterator  mIter;
     bool                    mIsValid;
 };
@@ -87,17 +87,12 @@ LLDirIterator::Impl::Impl(const std::filesystem::path& dir_path, const std::stri
     // Convert the glob mask to a regular expression
     std::string exp = glob_to_regex(mask);
 
-    // Initialize boost::regex with the expression converted from
-    // the glob mask.
-    // An exception is thrown if the expression is not valid.
-    try
-    {
-        mFilterExp.assign(exp);
-    }
-    catch (boost::regex_error& e)
+    // Compile the expression converted from the glob mask.
+    mFilterExp = ALRegex(exp);
+    if (!mFilterExp.ok())
     {
         LL_WARNS() << "\"" << exp << "\" is not a valid regular expression: "
-                << e.what() << LL_ENDL;
+                << mFilterExp.error() << LL_ENDL;
         return;
     }
 
@@ -128,9 +123,8 @@ bool LLDirIterator::Impl::next(std::string &fname)
         {
             try
             {
-                boost::smatch match;
                 std::string name = ll_convert<std::string>(mIter->path().filename().u8string());
-                found = ll_regex_match(name, match, mFilterExp);
+                found = mFilterExp.match(name);
                 if (found)
                 {
                     fname = name;

@@ -35,7 +35,6 @@
 #include "llavatarnamecache.h"
 #include "llcachename.h"
 #include "llkeyboard.h"
-#include "llregex.h"
 #include "llscrolllistctrl.h" // for LLUrlEntryKeybinding file parsing
 #include "lltrans.h"
 #include "lluicolortable.h"
@@ -298,8 +297,7 @@ static std::string getStringAfterToken(const std::string str, const std::string 
 LLUrlEntryHTTP::LLUrlEntryHTTP()
     : LLUrlEntryBase()
 {
-    mPattern = boost::regex("https?://([^\\s/?\\.#]+\\.?)+\\.\\w+(:\\d+)?(/\\S*)?",
-                            boost::regex::perl|boost::regex::icase);
+    mPattern = ALRegex("https?://([^\\s/?\\.#]+\\.?)+\\.\\w+(:\\d+)?(/\\S*)?", ALRegex::ICASE);
     mMenuName = "menu_url_http.xml";
     mTooltip = LLTrans::getString("TooltipHttpUrl");
 }
@@ -334,8 +332,7 @@ std::string LLUrlEntryHTTP::getTooltip(const std::string &url) const
 //
 LLUrlEntryHTTPLabel::LLUrlEntryHTTPLabel()
 {
-    mPattern = boost::regex("\\[https?://\\S+[ \t]+[^\\]]+\\]",
-                            boost::regex::perl|boost::regex::icase);
+    mPattern = ALRegex("\\[https?://\\S+[ \t]+[^\\]]+\\]", ALRegex::ICASE);
     mMenuName = "menu_url_http.xml";
     mTooltip = LLTrans::getString("TooltipHttpUrl");
 }
@@ -359,8 +356,7 @@ std::string LLUrlEntryHTTPLabel::getUrl(const std::string &string) const
 LLUrlEntryInvalidSLURL::LLUrlEntryInvalidSLURL()
     : LLUrlEntryBase()
 {
-    mPattern = boost::regex("(https?://(maps.secondlife.com|slurl.com)/secondlife/|secondlife://(/app/(worldmap|teleport)/)?)[^ /]+(/-?[0-9]+){1,3}(/?(\\?title|\\?img|\\?msg)=\\S*)?/?",
-                                    boost::regex::perl|boost::regex::icase);
+    mPattern = ALRegex("(https?://(maps.secondlife.com|slurl.com)/secondlife/|secondlife://(/app/(worldmap|teleport)/)?)[^ /]+(/-?[0-9]+){1,3}(/?(\\?title|\\?img|\\?msg)=\\S*)?/?", ALRegex::ICASE);
     mMenuName = "menu_url_http.xml";
     mTooltip = LLTrans::getString("TooltipHttpUrl");
 }
@@ -446,8 +442,7 @@ bool LLUrlEntryInvalidSLURL::isSLURLvalid(const std::string &url) const
 LLUrlEntrySLURL::LLUrlEntrySLURL()
 {
     // see http://slurl.com/about.php for details on the SLURL format
-    mPattern = boost::regex("https?://(maps.secondlife.com|slurl.com)/secondlife/[^ /]+(/\\d+){0,3}(/?(\\?title|\\?img|\\?msg)=\\S*)?/?",
-                            boost::regex::perl|boost::regex::icase);
+    mPattern = ALRegex("https?://(maps.secondlife.com|slurl.com)/secondlife/[^ /]+(/\\d+){0,3}(/?(\\?title|\\?img|\\?msg)=\\S*)?/?", ALRegex::ICASE);
     mIcon = "Hand";
     mMenuName = "menu_url_slurl.xml";
     mTooltip = LLTrans::getString("TooltipSLURL");
@@ -519,17 +514,17 @@ std::string LLUrlEntrySLURL::getLocation(const std::string &url) const
 //
 LLUrlEntrySecondlifeURL::LLUrlEntrySecondlifeURL()
 {
-    mPattern = boost::regex("((http://([-\\w\\.]*\\.)?(secondlife|lindenlab|tilia-inc)\\.com)"
-                            "|"
-                            "(http://([-\\w\\.]*\\.)?secondlifegrid\\.net)"
-                            "|"
-                            "(https://([-\\w\\.]*\\.)?(secondlife|lindenlab|tilia-inc)\\.com(:\\d{1,5})?)"
-                            "|"
-                            "(https://([-\\w\\.]*\\.)?secondlifegrid\\.net(:\\d{1,5})?)"
-                            "|"
-                            "(https?://([-\\w\\.]*\\.)?secondlife\\.io(:\\d{1,5})?))"
-                            "\\/\\S*",
-        boost::regex::perl|boost::regex::icase);
+    mPattern = ALRegex("((http://([-\\w\\.]*\\.)?(secondlife|lindenlab|tilia-inc)\\.com)"
+                       "|"
+                       "(http://([-\\w\\.]*\\.)?secondlifegrid\\.net)"
+                       "|"
+                       "(https://([-\\w\\.]*\\.)?(secondlife|lindenlab|tilia-inc)\\.com(:\\d{1,5})?)"
+                       "|"
+                       "(https://([-\\w\\.]*\\.)?secondlifegrid\\.net(:\\d{1,5})?)"
+                       "|"
+                       "(https?://([-\\w\\.]*\\.)?secondlife\\.io(:\\d{1,5})?))"
+                       "\\/\\S*",
+                       ALRegex::ICASE);
 
     mIcon = "Hand";
     mMenuName = "menu_url_http.xml";
@@ -566,10 +561,13 @@ std::string LLUrlEntrySecondlifeURL::getTooltip(const std::string &url) const
 //
 LLUrlEntrySimpleSecondlifeURL::LLUrlEntrySimpleSecondlifeURL()
   {
-    mPattern = boost::regex("https?://([-\\w\\.]*\\.)?(secondlife|lindenlab|tilia-inc)\\.com(?!\\S)"
-                            "|"
-                            "https?://([-\\w\\.]*\\.)?secondlifegrid\\.net(?!\\S)",
-                            boost::regex::perl|boost::regex::icase);
+    // Only a host that ends where the text or a blank does, which the
+    // pattern reads and leaves out of the Url, group 1.
+    mPattern = ALRegex("(https?://([-\\w\\.]*\\.)?(secondlife|lindenlab|tilia-inc)\\.com"
+                       "|"
+                       "https?://([-\\w\\.]*\\.)?secondlifegrid\\.net)(?:\\s|$)",
+                       ALRegex::ICASE);
+    mUrlGroup = 1;
 
     mIcon = "Hand";
     mMenuName = "menu_url_http.xml";
@@ -582,8 +580,7 @@ LLUrlEntrySimpleSecondlifeURL::LLUrlEntrySimpleSecondlifeURL()
 //
 LLUrlEntryAgent::LLUrlEntryAgent()
 {
-    mPattern = boost::regex(APP_HEADER_REGEX "/agent/[\\da-f-]+/\\w+",
-                            boost::regex::perl|boost::regex::icase);
+    mPattern = ALRegex(APP_HEADER_REGEX "/agent/[\\da-f-]+/\\w+", ALRegex::ICASE);
     mMenuName = "menu_url_agent.xml";
     mIcon = "Generic_Person";
 }
@@ -783,7 +780,7 @@ std::string LLUrlEntryAgent::getIcon(const std::string &url)
 ///
 LLUrlEntryAgentMention::LLUrlEntryAgentMention()
 {
-    mPattern  = boost::regex(APP_HEADER_REGEX "/agent/[\\da-f-]+/mention", boost::regex::perl | boost::regex::icase);
+    mPattern  = ALRegex(APP_HEADER_REGEX "/agent/[\\da-f-]+/mention", ALRegex::ICASE);
     mMenuName = "menu_url_agent.xml";
     mIcon = std::string();
 }
@@ -881,8 +878,7 @@ LLStyle::Params LLUrlEntryAgentName::getStyle(const std::string &url) const
 //
 LLUrlEntryAgentCompleteName::LLUrlEntryAgentCompleteName()
 {
-    mPattern = boost::regex(APP_HEADER_REGEX "/agent/[\\da-f-]+/completename",
-                            boost::regex::perl|boost::regex::icase);
+    mPattern = ALRegex(APP_HEADER_REGEX "/agent/[\\da-f-]+/completename", ALRegex::ICASE);
 }
 
 std::string LLUrlEntryAgentCompleteName::getName(const LLAvatarName& avatar_name)
@@ -897,8 +893,7 @@ std::string LLUrlEntryAgentCompleteName::getName(const LLAvatarName& avatar_name
 //
 LLUrlEntryAgentLegacyName::LLUrlEntryAgentLegacyName()
 {
-    mPattern = boost::regex(APP_HEADER_REGEX "/agent/[\\da-f-]+/legacyname",
-                            boost::regex::perl|boost::regex::icase);
+    mPattern = ALRegex(APP_HEADER_REGEX "/agent/[\\da-f-]+/legacyname", ALRegex::ICASE);
 }
 
 std::string LLUrlEntryAgentLegacyName::getName(const LLAvatarName& avatar_name)
@@ -913,8 +908,7 @@ std::string LLUrlEntryAgentLegacyName::getName(const LLAvatarName& avatar_name)
 //
 LLUrlEntryAgentDisplayName::LLUrlEntryAgentDisplayName()
 {
-    mPattern = boost::regex(APP_HEADER_REGEX "/agent/[\\da-f-]+/displayname",
-                            boost::regex::perl|boost::regex::icase);
+    mPattern = ALRegex(APP_HEADER_REGEX "/agent/[\\da-f-]+/displayname", ALRegex::ICASE);
 }
 
 std::string LLUrlEntryAgentDisplayName::getName(const LLAvatarName& avatar_name)
@@ -929,8 +923,7 @@ std::string LLUrlEntryAgentDisplayName::getName(const LLAvatarName& avatar_name)
 //
 LLUrlEntryAgentUserName::LLUrlEntryAgentUserName()
 {
-    mPattern = boost::regex(APP_HEADER_REGEX "/agent/[\\da-f-]+/username",
-                            boost::regex::perl|boost::regex::icase);
+    mPattern = ALRegex(APP_HEADER_REGEX "/agent/[\\da-f-]+/username", ALRegex::ICASE);
 }
 
 std::string LLUrlEntryAgentUserName::getName(const LLAvatarName& avatar_name)
@@ -950,7 +943,7 @@ extern const std::string& rlvGetAnonym(const LLAvatarName& avName);
 //
 LLUrlEntryAgentRLVAnonymizedName::LLUrlEntryAgentRLVAnonymizedName()
 {
-    mPattern = boost::regex(APP_HEADER_REGEX "/agent/[\\da-f-]+/rlvanonym", boost::regex::perl|boost::regex::icase);
+    mPattern = ALRegex(APP_HEADER_REGEX "/agent/[\\da-f-]+/rlvanonym", ALRegex::ICASE);
 }
 
 std::string LLUrlEntryAgentRLVAnonymizedName::getName(const LLAvatarName& avatar_name)
@@ -967,8 +960,7 @@ std::string LLUrlEntryAgentRLVAnonymizedName::getName(const LLAvatarName& avatar
 //
 LLUrlEntryGroup::LLUrlEntryGroup()
 {
-    mPattern = boost::regex(APP_HEADER_REGEX "/group/[\\da-f-]+/\\w+",
-                            boost::regex::perl|boost::regex::icase);
+    mPattern = ALRegex(APP_HEADER_REGEX "/group/[\\da-f-]+/\\w+", ALRegex::ICASE);
     mMenuName = "menu_url_group.xml";
     mIcon = "Generic_Group";
     mTooltip = LLTrans::getString("TooltipGroupUrl");
@@ -1044,8 +1036,7 @@ LLUrlEntryInventory::LLUrlEntryInventory()
     //this pattern cann't parse for example
     //secondlife:///app/inventory/0e346d8b-4433-4d66-a6b0-fd37083abc4c/select?name=name with spaces&param2=value
     //x-grid-location-info://lincoln.lindenlab.com/app/inventory/0e346d8b-4433-4d66-a6b0-fd37083abc4c/select?name=name with spaces&param2=value
-    mPattern = boost::regex(APP_HEADER_REGEX "/inventory/[\\da-f-]+/\\w+\\S*",
-                            boost::regex::perl|boost::regex::icase);
+    mPattern = ALRegex(APP_HEADER_REGEX "/inventory/[\\da-f-]+/\\w+\\S*", ALRegex::ICASE);
     mMenuName = "menu_url_inventory.xml";
 }
 
@@ -1061,8 +1052,7 @@ std::string LLUrlEntryInventory::getLabel(const std::string &url, const LLUrlLab
 //
 LLUrlEntryObjectIM::LLUrlEntryObjectIM()
 {
-    mPattern = boost::regex("secondlife:///app/objectim/[\\da-f-]+\?\\S*\\w",
-                            boost::regex::perl|boost::regex::icase);
+    mPattern = ALRegex("secondlife:///app/objectim/[\\da-f-]+\?\\S*\\w", ALRegex::ICASE);
     mMenuName = "menu_url_objectim.xml";
 }
 
@@ -1091,8 +1081,7 @@ std::string LLUrlEntryObjectIM::getLocation(const std::string &url) const
 
 LLUrlEntryChat::LLUrlEntryChat()
 {
-    mPattern = boost::regex("secondlife:///app/chat/\\d+/\\S+",
-        boost::regex::perl|boost::regex::icase);
+    mPattern = ALRegex("secondlife:///app/chat/\\d+/\\S+", ALRegex::ICASE);
     mMenuName = "menu_url_slapp.xml";
     mTooltip = LLTrans::getString("TooltipSLAPP");
 }
@@ -1116,8 +1105,7 @@ std::map<LLUUID, LLVector3d> LLUrlEntryParcel::sParcelPos;
 ///
 LLUrlEntryParcel::LLUrlEntryParcel()
 {
-    mPattern = boost::regex(APP_HEADER_REGEX "/parcel/[\\da-f-]+/about",
-                            boost::regex::perl|boost::regex::icase);
+    mPattern = ALRegex(APP_HEADER_REGEX "/parcel/[\\da-f-]+/about", ALRegex::ICASE);
     mMenuName = "menu_url_parcel.xml";
     mTooltip = LLTrans::getString("TooltipParcelUrl");
 
@@ -1221,8 +1209,7 @@ LLVector3d LLUrlEntryParcel::getParcelPos(const LLUUID& parcel_id)
 //
 LLUrlEntryPlace::LLUrlEntryPlace()
 {
-    mPattern = boost::regex("((x-grid-location-info://[-\\w\\.]+/region/)|(secondlife://))\\S+/?(\\d+/\\d+/\\d+|\\d+/\\d+)/?",
-                            boost::regex::perl|boost::regex::icase);
+    mPattern = ALRegex("((x-grid-location-info://[-\\w\\.]+/region/)|(secondlife://))\\S+/?(\\d+/\\d+/\\d+|\\d+/\\d+)/?", ALRegex::ICASE);
     mMenuName = "menu_url_slurl.xml";
     mTooltip = LLTrans::getString("TooltipSLURL");
 }
@@ -1269,8 +1256,7 @@ std::string LLUrlEntryPlace::getLocation(const std::string &url) const
 //
 LLUrlEntryRegion::LLUrlEntryRegion()
 {
-    mPattern = boost::regex("secondlife:///app/region/[A-Za-z0-9()_%]+(/\\d+)?(/\\d+)?(/\\d+)?/?",
-                            boost::regex::perl|boost::regex::icase);
+    mPattern = ALRegex("secondlife:///app/region/[A-Za-z0-9()_%]+(/\\d+)?(/\\d+)?(/\\d+)?/?", ALRegex::ICASE);
     mMenuName = "menu_url_slurl.xml";
     mTooltip = LLTrans::getString("TooltipSLURL");
 }
@@ -1333,8 +1319,7 @@ std::string LLUrlEntryRegion::getLocation(const std::string &url) const
 //
 LLUrlEntryTeleport::LLUrlEntryTeleport()
 {
-    mPattern = boost::regex(APP_HEADER_REGEX "/teleport/\\S+(/\\d+)?(/\\d+)?(/\\d+)?/?\\S*",
-                            boost::regex::perl|boost::regex::icase);
+    mPattern = ALRegex(APP_HEADER_REGEX "/teleport/\\S+(/\\d+)?(/\\d+)?(/\\d+)?/?\\S*", ALRegex::ICASE);
     mMenuName = "menu_url_teleport.xml";
     mTooltip = LLTrans::getString("TooltipTeleportUrl");
 }
@@ -1403,8 +1388,7 @@ std::string LLUrlEntryTeleport::getLocation(const std::string &url) const
 //
 LLUrlEntrySL::LLUrlEntrySL()
 {
-    mPattern = boost::regex("secondlife://(\\w+)?(:\\d+)?/\\S+",
-                            boost::regex::perl|boost::regex::icase);
+    mPattern = ALRegex("secondlife://(\\w+)?(:\\d+)?/\\S+", ALRegex::ICASE);
     mMenuName = "menu_url_slapp.xml";
     mTooltip = LLTrans::getString("TooltipSLAPP");
 }
@@ -1420,8 +1404,7 @@ std::string LLUrlEntrySL::getLabel(const std::string &url, const LLUrlLabelCallb
 //
 LLUrlEntrySLLabel::LLUrlEntrySLLabel()
 {
-    mPattern = boost::regex("\\[secondlife://\\S+[ \t]+[^\\]]+\\]",
-                            boost::regex::perl|boost::regex::icase);
+    mPattern = ALRegex("\\[secondlife://\\S+[ \t]+[^\\]]+\\]", ALRegex::ICASE);
     mMenuName = "menu_url_slapp.xml";
     mTooltip = LLTrans::getString("TooltipSLAPP");
 }
@@ -1469,8 +1452,7 @@ LLStyle::EUnderlineLink LLUrlEntrySLLabel::getUnderline(const std::string& strin
 //
 LLUrlEntryWorldMap::LLUrlEntryWorldMap()
 {
-    mPattern = boost::regex(APP_HEADER_REGEX "/worldmap/\\S+/?(\\d+)?/?(\\d+)?/?(\\d+)?/?\\S*",
-                            boost::regex::perl|boost::regex::icase);
+    mPattern = ALRegex(APP_HEADER_REGEX "/worldmap/\\S+/?(\\d+)?/?(\\d+)?/?(\\d+)?/?\\S*", ALRegex::ICASE);
     mMenuName = "menu_url_map.xml";
     mTooltip = LLTrans::getString("TooltipMapUrl");
 }
@@ -1510,8 +1492,7 @@ std::string LLUrlEntryWorldMap::getLocation(const std::string &url) const
 //
 LLUrlEntryNoLink::LLUrlEntryNoLink()
 {
-    mPattern = boost::regex("<nolink>.*?</nolink>",
-                            boost::regex::perl|boost::regex::icase);
+    mPattern = ALRegex("<nolink>.*?</nolink>", ALRegex::ICASE);
 }
 
 std::string LLUrlEntryNoLink::getUrl(const std::string &url) const
@@ -1537,8 +1518,7 @@ LLStyle::Params LLUrlEntryNoLink::getStyle(const std::string &url) const
 //
 LLUrlEntryIcon::LLUrlEntryIcon()
 {
-    mPattern = boost::regex("<icon\\s*>\\s*([^<]*)?\\s*</icon\\s*>",
-                            boost::regex::perl|boost::regex::icase);
+    mPattern = ALRegex("<icon\\s*>\\s*([^<]*)?\\s*</icon\\s*>", ALRegex::ICASE);
 }
 
 std::string LLUrlEntryIcon::getUrl(const std::string &url) const
@@ -1555,9 +1535,9 @@ std::string LLUrlEntryIcon::getIcon(const std::string &url)
 {
     // Grep icon info between <icon>...</icon> tags
     // matches[1] contains the icon name/path
-    boost::match_results<std::string::const_iterator> matches;
-    mIcon = (ll_regex_match(url, matches, mPattern) && matches[1].matched)
-        ? matches[1]
+    ALRegexMatch matches;
+    mIcon = (mPattern.match(url, &matches) && matches.matched(1))
+        ? matches.str(1)
         : LLStringUtil::null;
     LLStringUtil::trim(mIcon);
     return mIcon;
@@ -1569,8 +1549,7 @@ std::string LLUrlEntryIcon::getIcon(const std::string &url)
 LLUrlEntryEmail::LLUrlEntryEmail()
     : LLUrlEntryBase()
 {
-    mPattern = boost::regex("(mailto:)?[\\w\\.\\-]+@[\\w\\.\\-]+\\.[a-z]{2,63}",
-                            boost::regex::perl | boost::regex::icase);
+    mPattern = ALRegex("(mailto:)?[\\w\\.\\-]+@[\\w\\.\\-]+\\.[a-z]{2,63}", ALRegex::ICASE);
     mMenuName = "menu_url_email.xml";
     mTooltip = LLTrans::getString("TooltipEmail");
 }
@@ -1599,8 +1578,7 @@ std::string LLUrlEntryEmail::getUrl(const std::string &string) const
 
 LLUrlEntryExperienceProfile::LLUrlEntryExperienceProfile()
 {
-    mPattern = boost::regex(APP_HEADER_REGEX "/experience/[\\da-f-]+/profile",
-        boost::regex::perl|boost::regex::icase);
+    mPattern = ALRegex(APP_HEADER_REGEX "/experience/[\\da-f-]+/profile", ALRegex::ICASE);
     mIcon = "Generic_Experience";
     mMenuName = "menu_url_experience.xml";
 }
@@ -1656,20 +1634,19 @@ LLUrlEntryIPv6::LLUrlEntryIPv6()
     : LLUrlEntryBase()
 {
     mHostPath = "https?://\\[([a-f0-9:]+:+)+[a-f0-9]+]";
-    mPattern = boost::regex(mHostPath + "(:\\d{1,5})?(/\\S*)?",
-        boost::regex::perl | boost::regex::icase);
+    mHostRegex = ALRegex(mHostPath, ALRegex::ICASE);
+    mPattern = ALRegex(mHostPath + "(:\\d{1,5})?(/\\S*)?", ALRegex::ICASE);
     mMenuName = "menu_url_http.xml";
     mTooltip = LLTrans::getString("TooltipHttpUrl");
 }
 
 std::string LLUrlEntryIPv6::getLabel(const std::string &url, const LLUrlLabelCallback &cb)
 {
-    boost::regex regex = boost::regex(mHostPath, boost::regex::perl | boost::regex::icase);
-    boost::match_results<std::string::const_iterator> matches;
+    ALRegexMatch matches;
 
-    if (boost::regex_search(url, matches, regex))
+    if (mHostRegex.search(url, &matches, 0, false, 0))
     {
-        return  url.substr(0, matches[0].length());
+        return  url.substr(0, matches.length());
     }
     else
     {
@@ -1679,10 +1656,9 @@ std::string LLUrlEntryIPv6::getLabel(const std::string &url, const LLUrlLabelCal
 
 std::string LLUrlEntryIPv6::getQuery(const std::string &url) const
 {
-    boost::regex regex = boost::regex(mHostPath, boost::regex::perl | boost::regex::icase);
-    boost::match_results<std::string::const_iterator> matches;
-
-    return boost::regex_replace(url, regex, "");
+    std::string query = url;
+    mHostRegex.replaceAll(query, "");
+    return query;
 }
 
 std::string LLUrlEntryIPv6::getUrl(const std::string &string) const
@@ -1698,8 +1674,7 @@ LLUrlEntryKeybinding::LLUrlEntryKeybinding()
     : LLUrlEntryBase()
     , pHandler(NULL)
 {
-    mPattern = boost::regex(APP_HEADER_REGEX "/keybinding/\\w+(\\?mode=\\w+)?$",
-                            boost::regex::perl | boost::regex::icase);
+    mPattern = ALRegex(APP_HEADER_REGEX "/keybinding/\\w+(\\?mode=\\w+)?$", ALRegex::ICASE);
     mMenuName = "menu_url_experience.xml";
 
     initLocalization();
