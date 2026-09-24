@@ -1158,6 +1158,56 @@ namespace ALScriptFixes
         problem.fixes = std::move(kept);
     }
 
+    bool intoExpansion(const ALSourceMap& map, ALScriptFix& fix)
+    {
+        ALScriptFix into = fix;
+        for (ALScriptEdit& edit : into.edits)
+        {
+            const ALSourceMap::Loc from = map.toExpanded(0, edit.line, edit.column);
+            if (edit.line == edit.endLine && from.found())
+            {
+                // Over what the map copied as the text has it, or put in
+                // where the text it copied stands.
+                const ALSourceMap::Loc to = edit.endColumn == edit.column ? from : map.toExpanded(0, edit.endLine, edit.endColumn);
+                ALSourceMap::Loc       begin, end;
+                if (to.found() && to.line == from.line && map.verbatimSpan(from.line, from.column, to.column, begin, end) && begin.file == 0 &&
+                    begin.line == edit.line && begin.column == edit.column && end.line == edit.endLine && end.column == edit.endColumn)
+                {
+                    edit.line      = from.line;
+                    edit.endLine   = from.line;
+                    edit.column    = from.column;
+                    edit.endColumn = to.column;
+                    continue;
+                }
+                // Something put in at a line's start, at the start of the
+                // line of the output the source line began.
+                ALSourceMap::Loc at;
+                if (edit.column == 0 && edit.endColumn == 0 && map.lineStart(from.line, at) && at.file == 0 && at.line == edit.line)
+                {
+                    edit.line = edit.endLine = from.line;
+                    continue;
+                }
+            }
+            // Whole lines taken out: the output's lines they became, where
+            // they are the script's own, one after another.
+            if (edit.text.empty() && edit.column == 0 && edit.endColumn == 0 && edit.endLine > edit.line)
+            {
+                const ALSourceMap::Loc first = map.toExpanded(0, edit.line, 0);
+                const ALSourceMap::Loc last  = map.toExpanded(0, edit.endLine - 1, 0);
+                const ALSourceMap::Loc back  = first.found() ? map.toSource(first.line, 0) : ALSourceMap::Loc();
+                if (first.found() && last.found() && back.file == 0 && back.line == edit.line && last.line - first.line == edit.endLine - 1 - edit.line)
+                {
+                    edit.line    = first.line;
+                    edit.endLine = last.line + 1;
+                    continue;
+                }
+            }
+            return false;
+        }
+        fix = std::move(into);
+        return true;
+    }
+
     void attach(ALScriptProblems& problems, std::string_view text, bool lua)
     {
         const Lines lines(text);

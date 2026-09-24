@@ -817,6 +817,15 @@ private:
     // and each line's heat in the gutter. Only of a weight of the text as
     // it stands; what is there already slides with the edits until then.
     void                      showWeightsInEditor(Doc& doc);
+    // What each fix and refactor listed would make the script weigh, said
+    // after it in the list: its edits made to a copy of what the analyzers
+    // read, and the copies weighed beside that for the script's own target
+    // on the analyzer's thread, the words put in when they come. A copy is
+    // of the expansion where the preprocessor runs, a fix's edits taken
+    // into it (ALScriptFixes::intoExpansion); false for a fix whose edits
+    // cannot be, or overlap.
+    void                      weighFixes(Doc& doc, U32 shown, const std::vector<ALCodeEditor::Fix>& fixes);
+    bool                      editedCopy(const Doc& doc, const std::vector<std::pair<ALTextRange, std::string>>& edits, std::string& out) const;
 
     // The preprocessor: whether it applies to a script; its run over the
     // text as it stands, for the analyzers, with the way back; and its
@@ -1636,6 +1645,17 @@ private:
     ALPaneList*                        mSearchResults = nullptr;
     // The Weights tab, and whether it was looked at last frame and has
     // been told of everything since: it is filled while it is looked at.
+    // The fix list last shown, to be weighed a frame later -- once the
+    // refactors a quick fix asked for have joined it, where they are coming,
+    // so that the weighing does not keep them waiting on the analyzer's
+    // thread.
+    struct FixesToWeigh
+    {
+        std::string                    id;
+        U32                            shown = 0;
+        std::vector<ALCodeEditor::Fix> fixes;
+    };
+    std::optional<FixesToWeigh>        mFixesToWeigh;
     std::unique_ptr<ALScriptWeightsPane> mWeightsPane;
     ALPaneList*                        mWeightsParts      = nullptr;
     bool                               mWeightsWereShown  = false;

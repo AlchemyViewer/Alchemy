@@ -148,8 +148,12 @@ public:
         // or the same place for the caret alone.
         S32         endLine   = 0;
         S32         endColumn = 0;
-        // Weigh only: the targets to weigh it for.
+        // Weigh only: the targets to weigh it for. Or, where there are
+        // any, texts to weigh in its place -- the script with a fix's edits
+        // made, say -- each for the first target alone, and answered as
+        // each one's total in order (Result::variantTotals).
         std::vector<ALScriptWeight::Target> targets;
+        std::vector<std::string>            variants;
         // What a check says beyond the problems and the outline: what
         // every name is, and what the editor may show beside the text.
         bool        semantics      = false;
@@ -174,6 +178,9 @@ public:
         ALScriptReferences                references;
         std::vector<ALScriptFix>          actions;
         std::vector<ALScriptWeight>       weights;
+        // Each variant's total as its target counts it, nothing where it
+        // came to nothing.
+        std::vector<size_t>               variantTotals;
         // Why the analyzer ran without its definitions, or nothing.
         std::string                     definitionsError;
         // Whether the text parsed at all, and whether there was a tree to

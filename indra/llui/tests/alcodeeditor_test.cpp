@@ -1512,4 +1512,48 @@ namespace tut
         e.setLineNotes({});
         ensure("replaced whole", e.noteAt(1).empty());
     }
+
+    template<> template<>
+    void alcodeeditor_object::test<41>()
+    {
+        set_test_name("whoever asks is told each time the fix list is made, and notes go after their fixes for that making only");
+        ALCodeEditor& e = make("integer a = 1\nllOwnerSay((string)a);\n");
+        e.setFixProvider([](S32 line, std::vector<ALCodeEditor::Fix>& out) {
+            if (line != 0)
+            {
+                return;
+            }
+            ALCodeEditor::Fix semi;
+            semi.title     = "Insert ';'";
+            semi.preferred = true;
+            semi.value     = "semi";
+            semi.edits.emplace_back(ALTextRange(ALTextPos(0, 13), ALTextPos(0, 13)), ";");
+            ALCodeEditor::Fix other;
+            other.title = "Something else";
+            other.value = "other";
+            out         = { semi, other };
+        });
+        e.setFixHandler([](const LLSD&) {});
+        std::vector<std::pair<U32, size_t>> told;
+        e.setFixesShown([&told](U32 shown, const std::vector<ALCodeEditor::Fix>& fixes) { told.emplace_back(shown, fixes.size()); });
+        e.setFixable(0, true, true);
+        ensure("opened", e.openFixes(0));
+        ensure("told what it lists", told.size() == 1 && told.back().second == 2);
+        e.noteFixes(told.back().first, { "12 bytes lighter on LSO", "" });
+        ensure_equals("after its fix", e.fixes()[0].note, std::string("12 bytes lighter on LSO"));
+        ensure("the other has none", e.fixes()[1].note.empty());
+        ensure("still open", e.fixesOpen());
+
+        // Made again: told again, and the last making's notes go nowhere.
+        const U32 was = told.back().first;
+        ensure("opened again", e.openFixes(0));
+        ensure("told again", told.size() == 2 && told.back().first != was);
+        e.noteFixes(was, { "stale", "stale" });
+        ensure("an old making's dropped", e.fixes()[0].note.empty());
+        e.noteFixes(told.back().first, { "one" });
+        ensure("one note for two fixes dropped", e.fixes()[0].note.empty());
+        e.closeFixes();
+        e.noteFixes(told.back().first, { "late", "late" });
+        ensure("nothing to put them on once closed", e.fixes().empty());
+    }
 }

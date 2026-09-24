@@ -237,6 +237,14 @@ void ALScriptAnalysis::ask(Request request, callback_t callback)
                         result.actions = mWorker->luau.actions(request.text, request.line, request.column, request.endLine, request.endColumn);
                         break;
                     case Kind::Weigh:
+                        if (!request.variants.empty())
+                        {
+                            for (const std::string& variant : request.variants)
+                            {
+                                result.variantTotals.push_back(ALScriptWeigh::slua(variant).total);
+                            }
+                            break;
+                        }
                         for (const ALScriptWeight::Target target : request.targets)
                         {
                             if (target == ALScriptWeight::Target::SLua)
@@ -279,22 +287,30 @@ void ALScriptAnalysis::ask(Request request, callback_t callback)
                         result.actions = mWorker->lsl.actions(request.text, request.line, request.column, request.endLine, request.endColumn);
                         break;
                     case Kind::Weigh:
+                    {
+                        const auto weigh = [](ALScriptWeight::Target target, const std::string& text) {
+                            return target == ALScriptWeight::Target::LSO       ? ALScriptWeigh::lso(text)
+                                   : target == ALScriptWeight::Target::Mono    ? ALScriptWeigh::mono(text)
+                                   : target == ALScriptWeight::Target::LSLLuau ? ALScriptWeigh::lslLuau(text)
+                                                                               : ALScriptWeight();
+                        };
+                        if (!request.variants.empty() && !request.targets.empty())
+                        {
+                            for (const std::string& variant : request.variants)
+                            {
+                                result.variantTotals.push_back(weigh(request.targets.front(), variant).total);
+                            }
+                            break;
+                        }
                         for (const ALScriptWeight::Target target : request.targets)
                         {
-                            if (target == ALScriptWeight::Target::LSO)
+                            if (target != ALScriptWeight::Target::SLua)
                             {
-                                result.weights.push_back(ALScriptWeigh::lso(request.text));
-                            }
-                            else if (target == ALScriptWeight::Target::Mono)
-                            {
-                                result.weights.push_back(ALScriptWeigh::mono(request.text));
-                            }
-                            else if (target == ALScriptWeight::Target::LSLLuau)
-                            {
-                                result.weights.push_back(ALScriptWeigh::lslLuau(request.text));
+                                result.weights.push_back(weigh(target, request.text));
                             }
                         }
                         break;
+                    }
                 }
                 result.parsed     = mWorker->lsl.parsed();
                 result.understood = mWorker->lsl.understood();

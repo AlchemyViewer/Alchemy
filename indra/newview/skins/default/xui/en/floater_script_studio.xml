@@ -429,6 +429,10 @@
     <floater.string name="TrailerOptimizedEstimate">[TARGET] ~[BEFORE] → ~[AFTER] of [LIMIT] KB</floater.string>
     <floater.string name="TrailerOptimizedTip">What the script's code weighs on [TARGET] before the preprocessor's optimizer and after it, as this view shows it sent: [BYTESBEFORE] and then [BYTESAFTER] of the [MAX] bytes it runs a script in.</floater.string>
     <floater.string name="TrailerOptimizedEstimateTip">About what the script's code weighs on [TARGET] before the preprocessor's optimizer and after it, as this view shows it sent: [BYTESBEFORE] and then [BYTESAFTER] of the [MAX] bytes it runs a script in, estimated from the code its compiler makes.</floater.string>
+    <floater.string name="FixLighter">[BYTES] bytes lighter on [TARGET]</floater.string>
+    <floater.string name="FixLighterEstimate">about [BYTES] bytes lighter on [TARGET]</floater.string>
+    <floater.string name="FixHeavier">[BYTES] bytes heavier on [TARGET]</floater.string>
+    <floater.string name="FixHeavierEstimate">about [BYTES] bytes heavier on [TARGET]</floater.string>
     <floater.string name="SaveOverWeight">[NAME] was not saved: as it would be sent, its code is [SIZE] KB, more than the [LIMIT] KB [TARGET] runs a script in. Save again to upload anyway.</floater.string>
     <floater.string name="SaveTooLarge">[NAME] was not saved: it is [SIZE] bytes, [OVER] more than the [LIMIT] a script may be.</floater.string>
     <floater.string name="SaveTooLargePlain">Moving part of it into another script, or into a notecard it reads, would bring it under.</floater.string>

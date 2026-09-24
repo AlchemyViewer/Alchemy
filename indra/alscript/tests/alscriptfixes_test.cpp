@@ -769,4 +769,47 @@ namespace tut
             ensure(std::string("undeclared: ") + name + "\n" + said(problems), said_so);
         }
     }
+
+    template<> template<>
+    void object::test<27>()
+    {
+        set_test_name("a fix made over the source is taken into the expansion where it lands on what the expansion copied, and not where a macro stood");
+        ALPreprocessor::Options options;
+        options.fileName = "main.lsl";
+        options.resolve  = [](const ALPreprocessor::Ask&, ALPreprocessor::Include&) { return ALPreprocessor::Found::No; };
+        const std::string script = "#define N 2\ndefault\n{\n    state_entry()\n    {\n        llOwnerSay(\"hello\");\n        llOwnerSay((string)N);\n        "
+                                   "llOwnerSay(\"bye\");\n    }\n}\n";
+        const ALPreprocessor::Result result = ALPreprocessor::run(script, options);
+        const auto                   edited = [](S32 line, S32 column, S32 end_line, S32 end_column, const std::string& text) {
+            ALScriptFix fix;
+            fix.edits.push_back({ line, column, end_line, end_column, text });
+            return fix;
+        };
+        const auto into = [&result](ALScriptFix fix, std::string& out) {
+            if (!ALScriptFixes::intoExpansion(result.map, fix))
+            {
+                return false;
+            }
+            const std::optional<std::string> made = ALScriptFixes::apply(result.text, fix);
+            out                                   = made.value_or(std::string());
+            return made.has_value();
+        };
+        std::string out;
+        ensure("a word the expansion copied", into(edited(5, 20, 5, 25, "hi"), out));
+        std::string expected = result.text;
+        expected.replace(expected.find("\"hello\""), 7, "\"hi\"");
+        ensure_equals("replaced there alone", out, expected);
+
+        ALScriptFix over_macro = edited(6, 27, 6, 28, "3");
+        ensure("not where a macro stood", !ALScriptFixes::intoExpansion(result.map, over_macro));
+        ensure_equals("and the fix as it was", over_macro.edits.front().line, 6);
+        ensure("nor across lines unless whole", !into(edited(5, 8, 6, 8, ""), out));
+
+        ensure("a line put in at a line's start", into(edited(7, 0, 7, 0, "        integer x;\n"), out));
+        const size_t put = out.find("integer x;");
+        ensure("before the line it was put before", put != std::string::npos && put < out.find("\"bye\"") && put > out.find("(string)"));
+        ensure("whole lines taken out", into(edited(5, 0, 6, 0, ""), out));
+        ensure("that line gone, the rest kept", out.find("hello") == std::string::npos && out.find("\"bye\"") != std::string::npos &&
+                                                   out.find("(string)") != std::string::npos);
+    }
 }

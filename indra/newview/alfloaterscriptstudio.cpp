@@ -1368,6 +1368,23 @@ void ALFloaterScriptStudio::draw()
         mOutputUnread = false;
         refreshBottomTabs();
     }
+    // The fix list last shown, weighed once nothing more is coming to it;
+    // dropped once it has closed.
+    if (mFixesToWeigh)
+    {
+        const size_t index = indexOf(mFixesToWeigh->id);
+        Doc*         doc   = index != NONE ? mDocs[index].get() : nullptr;
+        if (!doc || !doc->editor->fixesOpen())
+        {
+            mFixesToWeigh.reset();
+        }
+        else if (!doc->editor->actionsAwaited())
+        {
+            const FixesToWeigh asked = std::move(*mFixesToWeigh);
+            mFixesToWeigh.reset();
+            weighFixes(*doc, asked.shown, asked.fixes);
+        }
+    }
     // The Weights tab, filled while it is looked at: with what came since,
     // or with the script now in front; and that script weighed for the
     // targets beside its own, which the tab alone asks for.
@@ -3384,6 +3401,7 @@ void ALFloaterScriptStudio::teachEditor(Doc& doc)
     // and the gutter offer them; the one taken made here, where it is known
     // whether the text is still the one the fixes were made for.
     editor.setFixProvider([this, raw](S32 line, std::vector<ALCodeEditor::Fix>& out) { fixesOn(*raw, line, out); });
+    editor.setFixesShown([this, raw](U32 shown, const std::vector<ALCodeEditor::Fix>& fixes) { mFixesToWeigh = FixesToWeigh{ raw->id, shown, fixes }; });
     editor.setActionRequest([this, raw](const ALTextRange& at) {
         raw->actionsAsked = at;
         askAnalyzer(*raw, ALScriptAnalysis::Kind::Actions, at.begin, at.end);
@@ -4241,6 +4259,98 @@ void ALFloaterScriptStudio::showWeightsInEditor(Doc& doc)
         }
         doc.editor->setLineHeat(heat);
     }
+}
+
+bool ALFloaterScriptStudio::editedCopy(const Doc& doc, const std::vector<std::pair<ALTextRange, std::string>>& edits, std::string& out) const
+{
+    ALScriptFix fix;
+    for (const auto& [range, text] : edits)
+    {
+        const ALTextRange at = range.normalised();
+        fix.edits.push_back({ at.begin.line, at.begin.column, at.end.line, at.end.column, text });
+    }
+    if (preprocessed(doc) && !ALScriptFixes::intoExpansion(doc.expanded.map, fix))
+    {
+        return false;
+    }
+    const std::optional<std::string> made = ALScriptFixes::apply(preprocessed(doc) ? doc.expanded.text : doc.editor->text(), fix);
+    if (!made)
+    {
+        return false;
+    }
+    out = *made;
+    return true;
+}
+
+void ALFloaterScriptStudio::weighFixes(Doc& doc, U32 shown, const std::vector<ALCodeEditor::Fix>& fixes)
+{
+    const std::optional<ALScriptWeight::Target> target = weightTarget(doc);
+    const U32                                   version = doc.editor->document().version();
+    if (!target || (preprocessed(doc) && (!doc.expanded.valid || doc.expanded.version != version)))
+    {
+        return;
+    }
+    ALScriptAnalysis::Request request;
+    request.kind    = ALScriptAnalysis::Kind::Weigh;
+    request.id      = doc.id;
+    request.version = version;
+    request.lua     = doc.language.lua;
+    request.targets = { *target };
+    // What the analyzers read as it stands first, weighed with the rest so
+    // that each is measured against the same weigher at the same moment.
+    request.variants.push_back(preprocessed(doc) ? doc.expanded.text : doc.editor->text());
+    std::vector<S32> variant_of(fixes.size(), -1);
+    for (size_t i = 0; i < fixes.size(); ++i)
+    {
+        std::string copy;
+        if (!fixes[i].suppress && !fixes[i].edits.empty() && editedCopy(doc, fixes[i].edits, copy))
+        {
+            variant_of[i] = static_cast<S32>(request.variants.size());
+            request.variants.push_back(std::move(copy));
+        }
+    }
+    if (request.variants.size() < 2)
+    {
+        return;
+    }
+    const LLHandle<LLFloater> handle = getHandle();
+    const ALScriptWeight::Target weighed_for = *target;
+    ALScriptAnalysis::instance().ask(std::move(request), [handle, shown, variant_of, weighed_for](const ALScriptAnalysis::Result& result) {
+        ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get());
+        const size_t           index  = studio ? studio->indexOf(result.id) : NONE;
+        if (index == NONE)
+        {
+            return;
+        }
+        Doc& doc = *studio->mDocs[index];
+        if (result.version != doc.editor->document().version() || result.variantTotals.empty() || result.variantTotals.front() == 0)
+        {
+            return;
+        }
+        // What each would come to less, or more; nothing where it is the
+        // same, or did not come to anything.
+        const S64                  base     = S64(result.variantTotals.front());
+        const bool                 estimate = weighed_for == ALScriptWeight::Target::Mono;
+        std::vector<std::string>   notes(variant_of.size());
+        LLStringUtil::format_map_t args;
+        args["[TARGET]"] = ALScriptWeight::nameOf(weighed_for);
+        for (size_t i = 0; i < variant_of.size(); ++i)
+        {
+            const S32 at = variant_of[i];
+            if (at <= 0 || static_cast<size_t>(at) >= result.variantTotals.size() || result.variantTotals[static_cast<size_t>(at)] == 0)
+            {
+                continue;
+            }
+            const S64 change = S64(result.variantTotals[static_cast<size_t>(at)]) - base;
+            if (change == 0)
+            {
+                continue;
+            }
+            args["[BYTES]"] = std::to_string(std::abs(change));
+            notes[i]        = studio->getString(change < 0 ? (estimate ? "FixLighterEstimate" : "FixLighter") : (estimate ? "FixHeavierEstimate" : "FixHeavier"), args);
+        }
+        doc.editor->noteFixes(shown, notes);
+    });
 }
 
 void ALFloaterScriptStudio::actionsAnswered(Doc& doc, const ALScriptAnalysis::Result& result, U32 expansion)

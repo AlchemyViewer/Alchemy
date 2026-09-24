@@ -87,6 +87,14 @@ namespace ALScriptFixes
     // in the script's own text as the map copied it -- not in an include,
     // nor in what a macro made.
     void mapThrough(const ALSourceMap& map, ALScriptProblem& problem);
+    // The other way: a fix made over the source taken into the text a map
+    // made of it -- to be weighed as the compiler would see it made, say.
+    // Where every edit lands as mapThrough would bring it back: on one
+    // line, on what the map copied from the script's own text; at the
+    // start of the line a source line began; or over whole lines, the
+    // script's own and one after another. False, and the fix as it was,
+    // where one does not.
+    bool intoExpansion(const ALSourceMap& map, ALScriptFix& fix);
 
     // The fix that gives a global a script does not know -- the problem's
     // one word -- what a module in reach gives: `local util =

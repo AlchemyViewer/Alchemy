@@ -488,6 +488,9 @@ public:
         // puts a problem right and before a suppression.
         bool                                             refactor  = false;
         LLSD                                             value;
+        // Said after its title, dim: what it would do beyond its words --
+        // what the script would weigh made, say -- where that is known.
+        std::string                                      note;
     };
     typedef std::function<void(S32 line, std::vector<Fix>& out)> fix_provider_t;
     void setFixProvider(fix_provider_t provider) { mFixProvider = std::move(provider); }
@@ -525,6 +528,17 @@ public:
     // nothing at all, a word that says so. Dropped where the list has
     // closed since, or the caret moved.
     void supplyActions(const ALTextRange& at, std::vector<Fix> actions);
+    // Told whenever the list is made or made again -- opened, or joined by
+    // the refactors -- with which showing of it this is and what it lists,
+    // for notes that take a while to say; noteFixes puts them after their
+    // fixes, in the order listed, and drops them where the list has been
+    // made again or closed since.
+    typedef std::function<void(U32 shown, const std::vector<Fix>& fixes)> fixes_shown_t;
+    void setFixesShown(fixes_shown_t told) { mFixesShown = std::move(told); }
+    void noteFixes(U32 shown, const std::vector<std::string>& notes);
+    // Whether the refactors asked for are still to come, and will make the
+    // list again when they do.
+    bool actionsAwaited() const { return mActionsWanted; }
 
     // --- hover -------------------------------------------------------------------
 
@@ -689,8 +703,10 @@ private:
     void        placeSideBox(const LLRect& list);
     void        showFixPreview();
     void        takeFix(S32 index);
-    // The list made of `fixes`, under `line`, with one chosen.
+    // The list made of `fixes`, under `line`, with one chosen; and the list
+    // filled and placed from what it holds, which a note put in fills again.
     void        showFixes(S32 line, std::vector<Fix> fixes, S32 chosen);
+    void        fillFixList(S32 chosen);
     // The list shown; the one chosen kept by its word where the list is
     // still about what was typed, else the best.
     void listCompletions(bool keep_choice);
@@ -829,6 +845,9 @@ private:
     ALChoiceList*           mFixList = nullptr;
     std::vector<Fix>        mFixes;
     S32                     mFixLine = -1;
+    // Which showing of the list this is, counted from one, and who is told.
+    U32                     mFixShowing = 0;
+    fixes_shown_t           mFixesShown;
     // Where refactors were asked for, and where the caret was, while the
     // quick fix that asked waits on them.
     action_request_t        mActionRequest;

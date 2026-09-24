@@ -2882,7 +2882,16 @@ void ALCodeEditor::showFixes(S32 line, std::vector<Fix> fixes, S32 chosen)
     hideCard();
     mFixes   = std::move(fixes);
     mFixLine = line;
+    fillFixList(chosen);
+    ++mFixShowing;
+    if (mFixesShown)
+    {
+        mFixesShown(mFixShowing, mFixes);
+    }
+}
 
+void ALCodeEditor::fillFixList(S32 chosen)
+{
     // In the editor's colours, as the completions are; a suppression, and
     // the word that there is nothing, quieter than what makes a change.
     mFixList->setBackgroundColor(paint(Paint::Widget));
@@ -2891,22 +2900,26 @@ void ALCodeEditor::showFixes(S32 line, std::vector<Fix> fixes, S32 chosen)
     mFixList->setBorderColor(paint(Paint::WidgetBorder));
     std::vector<ALChoiceList::Choice> choices;
     S32                               widest = 0;
+    S32                               noted  = 0;
     for (const Fix& fix : mFixes)
     {
         ALChoiceList::Choice choice;
         choice.text = fix.title;
+        choice.note = fix.note;
         if (fix.suppress || isNothing(fix))
         {
             choice.color = paint(Paint::InlayHint);
         }
         widest = llmax(widest, getFont()->getWidth(fix.title));
+        noted  = fix.note.empty() ? noted : llmax(noted, getFont()->getWidth(fix.note));
         choices.push_back(std::move(choice));
     }
     const LLRect local = getLocalRect();
-    const S32    width = llclamp(widest + 24, 120, llmax(120, local.getWidth() - 8));
+    const S32    width = llclamp(widest + (noted > 0 ? noted + 24 : 0) + 24, 120, llmax(120, local.getWidth() - 8));
     mFixList->setShape(LLRect(0, 40, width, 0));
     mFixList->setChoices(std::move(choices), llclamp(chosen, 0, llmax(0, static_cast<S32>(mFixes.size()) - 1)));
     // Under the caret where it is on the line, else under the line's text.
+    const S32          line  = mFixLine;
     const ALTextPos    caret = this->caret();
     const std::string& text  = document().line(llclamp(line, 0, document().lineCount() - 1));
     const size_t       lead  = text.find_first_not_of(" \t");
@@ -2914,6 +2927,19 @@ void ALCodeEditor::showFixes(S32 line, std::vector<Fix> fixes, S32 chosen)
     placeListAt(*mFixList, at, llmin(static_cast<S32>(mFixes.size()), COMPLETION_ROWS), width);
     mFixList->setVisible(true);
     showFixPreview();
+}
+
+void ALCodeEditor::noteFixes(U32 shown, const std::vector<std::string>& notes)
+{
+    if (shown != mFixShowing || !fixesOpen() || notes.size() != mFixes.size())
+    {
+        return;
+    }
+    for (size_t i = 0; i < notes.size(); ++i)
+    {
+        mFixes[i].note = notes[i];
+    }
+    fillFixList(mFixList->chosen());
 }
 
 void ALCodeEditor::supplyActions(const ALTextRange& at, std::vector<Fix> actions)
