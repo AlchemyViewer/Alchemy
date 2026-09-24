@@ -1676,6 +1676,8 @@ private:
     F64                                mSettleDue   = 0.0;
     std::string                        mTrailerLineTip;
     std::string                        mTrailerProblemsTip;
+    std::string                        mTrailerSourceTip;
+    std::string                        mTrailerExpandedTip;
     // Whether a run-time error has come since the Output tab was last
     // looked at, which its title says until it is.
     bool                               mOutputUnread   = false;

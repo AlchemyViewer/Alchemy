@@ -616,6 +616,7 @@ bool ALFloaterScriptStudio::postBuild()
                  { "redo_btn", { "redo" } },
                  { "find_btn", { "find", "find_in_files" } },
                  { "format_btn", { "format" } },
+                 { "expanded_btn", { "expanded" } },
                  { "fold_explorer", { "explorer" } },
                  { "fold_bottom", { "problems", "references", "output", "search" } },
                  { "fold_inspector", { "inspector" } } };
@@ -2677,7 +2678,14 @@ void ALFloaterScriptStudio::toggleExpanded()
     {
         return;
     }
-    showView(*doc, doc->shownView() == Doc::View::Expanded ? Doc::View::Source : Doc::View::Expanded, true);
+    const bool to_expanded = doc->shownView() != Doc::View::Expanded;
+    showView(*doc, to_expanded ? Doc::View::Expanded : Doc::View::Source, true);
+    // The expansion is made on loading and saving; the source changed
+    // since is expanded again, and shows as it comes.
+    if (to_expanded && doc->loaded && (!doc->uploaded.valid || doc->uploaded.version != doc->editor->document().version()))
+    {
+        preprocess(*doc, false);
+    }
 }
 
 void ALFloaterScriptStudio::showView(Doc& doc, Doc::View view, bool focus)
@@ -4703,6 +4711,13 @@ void ALFloaterScriptStudio::refreshTrailer(Doc& doc)
         }
         parts.push_back(std::move(part));
     }
+    // Which of the two it is, where the script has an expansion to show:
+    // pressed, the other.
+    if (doc.expandedEditor)
+    {
+        const bool expanded = doc.shownView() == Doc::View::Expanded;
+        parts.push_back({ getString(expanded ? "TrailerExpanded" : "TrailerSource"), "expanded", expanded ? mTrailerExpandedTip : mTrailerSourceTip });
+    }
     // Joined by a middle dot with air around it; in code, since a
     // string of the skin's is trimmed of its spaces.
     std::vector<ALJumpBar::TrailerPart> said;
@@ -4757,6 +4772,10 @@ void ALFloaterScriptStudio::onTrailerChosen(const std::string& value)
     else if (value == "problems")
     {
         showBottom("problems_tab", true);
+    }
+    else if (value == "expanded")
+    {
+        toggleExpanded();
     }
 }
 
@@ -7171,7 +7190,9 @@ void ALFloaterScriptStudio::refreshKeyTips()
     // What the words past the breadcrumb do when pressed, with the keys
     // that do the same; asked on every move of the caret, so said here.
     for (auto [item_name, tip, keyless, out] : { std::make_tuple("go_to_line", "TrailerLineTip", "TrailerLineTipNoKeys", &mTrailerLineTip),
-                                                std::make_tuple("problems", "TrailerProblemsTip", "TrailerProblemsTipNoKeys", &mTrailerProblemsTip) })
+                                                std::make_tuple("problems", "TrailerProblemsTip", "TrailerProblemsTipNoKeys", &mTrailerProblemsTip),
+                                                std::make_tuple("expanded", "TrailerSourceTip", "TrailerSourceTipNoKeys", &mTrailerSourceTip),
+                                                std::make_tuple("expanded", "TrailerExpandedTip", "TrailerExpandedTipNoKeys", &mTrailerExpandedTip) })
     {
         const LLMenuItemGL*        item = bar->findChild<LLMenuItemGL>(item_name, true);
         const std::string          keys = item ? item->getAcceleratorString() : std::string();

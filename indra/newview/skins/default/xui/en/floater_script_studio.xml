@@ -241,6 +241,12 @@
     <floater.string name="TrailerLineTipNoKeys">Go to a line</floater.string>
     <floater.string name="TrailerProblemsTip">Show the problems ([KEYS])</floater.string>
     <floater.string name="TrailerProblemsTipNoKeys">Show the problems</floater.string>
+    <floater.string name="TrailerSource">Source</floater.string>
+    <floater.string name="TrailerExpanded">Preprocessed</floater.string>
+    <floater.string name="TrailerSourceTip">The script as written. Press for what the preprocessor makes of it, as the server compiles it ([KEYS])</floater.string>
+    <floater.string name="TrailerSourceTipNoKeys">The script as written. Press for what the preprocessor makes of it, as the server compiles it</floater.string>
+    <floater.string name="TrailerExpandedTip">What the preprocessor made of the script, as the server compiles it; read-only. Press for the source ([KEYS])</floater.string>
+    <floater.string name="TrailerExpandedTipNoKeys">What the preprocessor made of the script, as the server compiles it; read-only. Press for the source</floater.string>
     <floater.string name="ReferenceDeclaration">declaration</floater.string>
     <floater.string name="ReferenceDeclarationTip">Where [NAME] is declared</floater.string>
     <floater.string name="OutlineNoMatch">No symbol has those letters in its name.</floater.string>
@@ -1078,7 +1084,7 @@
      layout="topleft"
      left_pad="8"
      name="expanded_btn"
-     tool_tip="Show what the preprocessor made of this script, as the server compiles it, in place of the source; press again for the source. Read-only."
+     tool_tip="Show what the preprocessor made of this script, as the server compiles it, in place of the source; press again for the source ([KEYS]). Read-only. Off while the preprocessor is, which the Script Studio preferences turn on."
      top_delta="0"
      width="26" />
     <button
