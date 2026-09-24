@@ -2701,7 +2701,7 @@ ALScriptPreprocessor::Request ALFloaterScriptStudio::preprocessRequest(const Doc
     return request;
 }
 
-void ALFloaterScriptStudio::expandFor(Doc& doc, ALScriptAnalysis::Kind kind, const ALTextPos& at)
+void ALFloaterScriptStudio::expandFor(Doc& doc, ALScriptAnalysis::Kind kind, const ALTextPos& at, const ALTextPos& to)
 {
     // The question waits for the text it is about: one of its kind that
     // was already waiting is somewhere the caret or the mouse has since
@@ -2710,10 +2710,11 @@ void ALFloaterScriptStudio::expandFor(Doc& doc, ALScriptAnalysis::Kind kind, con
     if (same != doc.waiting.end())
     {
         same->at = at;
+        same->to = to;
     }
     else
     {
-        doc.waiting.push_back(Doc::Waiting{ kind, at });
+        doc.waiting.push_back(Doc::Waiting{ kind, at, to });
     }
     const U32 version = doc.editor->document().version();
     if (doc.expanding && *doc.expanding == version)
@@ -2766,7 +2767,7 @@ void ALFloaterScriptStudio::expandedAnswer(const std::string& id, U32 version, c
     waiting.swap(doc.waiting);
     for (const Doc::Waiting& question : waiting)
     {
-        askAnalyzer(doc, question.kind, question.at);
+        askAnalyzer(doc, question.kind, question.at, question.to);
     }
 }
 
@@ -3328,7 +3329,21 @@ void ALFloaterScriptStudio::teachEditor(Doc& doc)
     // and the gutter offer them; the one taken made here, where it is known
     // whether the text is still the one the fixes were made for.
     editor.setFixProvider([this, raw](S32 line, std::vector<ALCodeEditor::Fix>& out) { fixesOn(*raw, line, out); });
+    editor.setActionRequest([this, raw](const ALTextRange& at) {
+        raw->actionsAsked = at;
+        askAnalyzer(*raw, ALScriptAnalysis::Kind::Actions, at.begin, at.end);
+    });
     editor.setFixHandler([this, raw](const LLSD& value) {
+        if (value.has("action"))
+        {
+            const size_t n = static_cast<size_t>(value["action"].asInteger());
+            if (n < raw->actions.size())
+            {
+                const ALScriptFix action = raw->actions[n];
+                applyFix(*raw, action, raw->actionsVersion);
+            }
+            return;
+        }
         const Doc::Shown* shown = shownOf(value);
         const size_t      n     = static_cast<size_t>(value["fix"].asInteger());
         if (shown && n < shown->fixes.size())
@@ -3595,7 +3610,7 @@ void ALFloaterScriptStudio::insertFromLibrary(const std::string& what)
     }, mEditorHost);
 }
 
-void ALFloaterScriptStudio::askAnalyzer(Doc& doc, ALScriptAnalysis::Kind kind, const ALTextPos& at)
+void ALFloaterScriptStudio::askAnalyzer(Doc& doc, ALScriptAnalysis::Kind kind, const ALTextPos& at, const ALTextPos& to)
 {
     if (!doc.loaded || doc.notecard)
     {
@@ -3610,6 +3625,8 @@ void ALFloaterScriptStudio::askAnalyzer(Doc& doc, ALScriptAnalysis::Kind kind, c
     request.text    = doc.editor->text();
     request.line    = at.line;
     request.column  = at.column;
+    request.endLine   = to.line;
+    request.endColumn = to.column;
     request.semantics      = mSemanticColors;
     request.hintParameters = mInlayParameters;
     request.hintTypes      = mInlayTypes;
@@ -3648,7 +3665,7 @@ void ALFloaterScriptStudio::askAnalyzer(Doc& doc, ALScriptAnalysis::Kind kind, c
         {
             // The analyzers see what the compiler would, and expanding a
             // script is a thread's work: the question waits for it.
-            expandFor(doc, kind, at);
+            expandFor(doc, kind, at, to);
             return;
         }
         // A position inside a directive has nothing there to ask about.
@@ -3663,6 +3680,15 @@ void ALFloaterScriptStudio::askAnalyzer(Doc& doc, ALScriptAnalysis::Kind kind, c
             }
             request.line   = loc.line;
             request.column = loc.column;
+            // A stretch the expansion does not carry as it stands is asked
+            // about as the caret alone.
+            ALSourceMap::Loc from, end;
+            const ALSourceMap::Loc last = doc.expanded.map.toExpanded(0, to.line, to.column);
+            const bool             kept = last.found() && last.line == loc.line && last.column > loc.column &&
+                                          doc.expanded.map.verbatimSpan(loc.line, loc.column, last.column, from, end) && from.file == 0 &&
+                                          from.line == at.line && from.column == at.column && end.line == to.line && end.column == to.column;
+            request.endLine   = kept ? last.line : loc.line;
+            request.endColumn = kept ? last.column : loc.column;
         }
     }
     if (lslFragment(doc))
@@ -3834,7 +3860,53 @@ void ALFloaterScriptStudio::answered(const ALScriptAnalysis::Result& result, U32
         case ALScriptAnalysis::Kind::Inspect:
             inspected(doc, result, at);
             break;
+        case ALScriptAnalysis::Kind::Actions:
+            actionsAnswered(doc, result, expansion);
+            break;
     }
+}
+
+void ALFloaterScriptStudio::actionsAnswered(Doc& doc, const ALScriptAnalysis::Result& result, U32 expansion)
+{
+    if (result.version != doc.editor->document().version())
+    {
+        return;
+    }
+    // In the source's places: through the expansion where there is one,
+    // each kept only where all of it lands in the script's own text.
+    ALScriptProblem held;
+    held.fixes = result.actions;
+    if (expansion != 0)
+    {
+        ALScriptFixes::mapThrough(doc.expanded.map, held);
+    }
+    // Nor what lands past the script's end: a fragment is asked about with
+    // a state of the studio's own after it.
+    const ALTextDocument& text = doc.editor->document();
+    std::erase_if(held.fixes, [&text](const ALScriptFix& fix) {
+        return std::any_of(fix.edits.begin(), fix.edits.end(), [&text](const ALScriptEdit& edit) {
+            const ALTextPos begin(edit.line, edit.column), end(edit.endLine, edit.endColumn);
+            return text.clamp(begin) != begin || text.clamp(end) != end;
+        });
+    });
+    doc.actions        = std::move(held.fixes);
+    doc.actionsVersion = result.version;
+    std::vector<ALCodeEditor::Fix> offered;
+    for (size_t i = 0; i < doc.actions.size(); ++i)
+    {
+        const ALScriptFix& action = doc.actions[i];
+        ALCodeEditor::Fix  one;
+        one.title    = action.title;
+        one.refactor = true;
+        for (const ALScriptEdit& edit : action.edits)
+        {
+            one.edits.emplace_back(ALTextRange(ALTextPos(edit.line, edit.column), ALTextPos(edit.endLine, edit.endColumn)), edit.text);
+        }
+        one.value["doc"]    = doc.id;
+        one.value["action"] = static_cast<S32>(i);
+        offered.push_back(std::move(one));
+    }
+    doc.editor->supplyActions(doc.actionsAsked, std::move(offered));
 }
 
 void ALFloaterScriptStudio::activate(size_t index, bool focus)
@@ -5968,7 +6040,7 @@ bool ALFloaterScriptStudio::applyFix(Doc& doc, const ALScriptFix& fix, U32 versi
     {
         return false;
     }
-    source.undoJournal().label("fix");
+    source.undoJournal().label(fix.kind == ALScriptFix::Kind::Refactor ? "refactor" : "fix");
     setStatus(fix.title);
     scheduleAnalysis(doc, true);
     return true;
@@ -6257,11 +6329,12 @@ void ALFloaterScriptStudio::refreshUndoLabels()
     mUndoSaid       = undo;
     mRedoSaid       = redo;
     const auto what = [this](const std::string& label) {
-        return label == "rename"    ? getString("UndoWhatRename")
-               : label == "format"  ? getString("UndoWhatFormat")
-               : label == "replace" ? getString("UndoWhatReplace")
-               : label == "fix"     ? getString("UndoWhatFix")
-                                    : std::string();
+        return label == "rename"     ? getString("UndoWhatRename")
+               : label == "format"   ? getString("UndoWhatFormat")
+               : label == "replace"  ? getString("UndoWhatReplace")
+               : label == "fix"      ? getString("UndoWhatFix")
+               : label == "refactor" ? getString("UndoWhatRefactor")
+                                     : std::string();
     };
     sayUndoRedo(what(undo), what(redo));
 }

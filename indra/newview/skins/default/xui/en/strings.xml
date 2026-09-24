@@ -366,6 +366,7 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	     only where the escapes make that longer. -->
 	<string name="CodeStringHead">string</string>
 	<string name="CodeFixLink">Fix: [TITLE]</string>
+	<string name="CodeFixNone">Nothing to fix or refactor here</string>
 	<string name="CodeDeprecated">(deprecated)</string>
 	<string name="CodeStringBytesA">[COUNT] byte</string>
 	<string name="CodeStringBytesB">[COUNT] bytes</string>
@@ -552,6 +553,11 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="ScriptFixOptimized">Write '[1]' here</string>
 	<string name="ScriptFixRemoveUnreachable">Remove what can never run</string>
 	<string name="ScriptFixRemoveNoEffect">Remove what does nothing</string>
+	<string name="ScriptActionAnnotate">Declare it as '[1]'</string>
+	<string name="ScriptActionExtract">Put it in a local, '[1]'</string>
+	<string name="ScriptActionInterpolate">Write it as an interpolated string</string>
+	<string name="ScriptActionInvertIf">Invert the if</string>
+	<string name="ScriptActionHandler">Add a handler for '[1]'</string>
 
 	<!-- What the engines say, taken apart by ALMessageMap and said again
 	     with the words put in: Tailslide's messages by their error code,

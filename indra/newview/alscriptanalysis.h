@@ -120,7 +120,10 @@ public:
         Inspect,
         Signature,
         // Where the name at a position is bound and used.
-        References
+        References,
+        // What could be done at the caret, or to the stretch chosen from
+        // it, that no problem asks for: the refactors.
+        Actions
     };
     struct Request
     {
@@ -137,6 +140,10 @@ public:
         // Where, for anything but a check.
         S32         line   = 0;
         S32         column = 0;
+        // Actions only: where a stretch chosen from (line, column) ends,
+        // or the same place for the caret alone.
+        S32         endLine   = 0;
+        S32         endColumn = 0;
         // What a check says beyond the problems and the outline: what
         // every name is, and what the editor may show beside the text.
         bool        semantics      = false;
@@ -159,6 +166,7 @@ public:
         ALScriptHover                     hover;
         ALScriptSignature                 signature;
         ALScriptReferences                references;
+        std::vector<ALScriptFix>          actions;
         // Why the analyzer ran without its definitions, or nothing.
         std::string                     definitionsError;
         // Whether the text parsed at all, and whether there was a tree to

@@ -233,6 +233,9 @@ void ALScriptAnalysis::ask(Request request, callback_t callback)
                     case Kind::References:
                         result.references = mWorker->luau.references(request.text, request.line, request.column);
                         break;
+                    case Kind::Actions:
+                        result.actions = mWorker->luau.actions(request.text, request.line, request.column, request.endLine, request.endColumn);
+                        break;
                 }
             }
             else
@@ -263,6 +266,9 @@ void ALScriptAnalysis::ask(Request request, callback_t callback)
                     case Kind::References:
                         result.references = mWorker->lsl.references(request.text, request.line, request.column);
                         break;
+                    case Kind::Actions:
+                        result.actions = mWorker->lsl.actions(request.text, request.line, request.column, request.endLine, request.endColumn);
+                        break;
                 }
                 result.parsed     = mWorker->lsl.parsed();
                 result.understood = mWorker->lsl.understood();
@@ -272,6 +278,10 @@ void ALScriptAnalysis::ask(Request request, callback_t callback)
         // the strings are.
         LLAppViewer::instance()->postToMainCoro([result = std::move(result), callback]() mutable {
             alTranslateScriptProblems(result.problems);
+            for (ALScriptFix& action : result.actions)
+            {
+                action.title = alScriptKeyedWords(action.key, action.args, action.title);
+            }
             // A definitions error of this code's own carries its key
             // between the marks, with what it is about after.
             if (!result.definitionsError.empty() && result.definitionsError[0] == '\x01')

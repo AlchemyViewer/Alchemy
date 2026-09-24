@@ -377,6 +377,8 @@ private:
         {
             ALScriptAnalysis::Kind kind = ALScriptAnalysis::Kind::Check;
             ALTextPos              at;
+            // Where a stretch chosen from `at` ends: the refactors'.
+            ALTextPos              to;
         };
         std::vector<Waiting>                       waiting;
         // A run of the preprocessor on its way, for a save or not; and a
@@ -489,6 +491,11 @@ private:
             U32                      fixesFor = 0;
         };
         std::vector<Shown>                         shown;
+        // The refactors last offered at the caret, in the source's places
+        // at actionsVersion, and the stretch they were asked about.
+        std::vector<ALScriptFix>                   actions;
+        U32                                        actionsVersion = 0;
+        ALTextRange                                actionsAsked;
         // What the analyzer said the script declares, at analysisVersion.
         std::vector<ALScriptOutlineEntry>          outline;
         // The name last asked about -- its definition, its references, a
@@ -733,10 +740,15 @@ private:
     // The region's words for colouring and completing, and the analyzer
     // behind completion, hover and signature help.
     void                      teachEditor(Doc& doc);
-    void                      askAnalyzer(Doc& doc, ALScriptAnalysis::Kind kind, const ALTextPos& at);
+    void                      askAnalyzer(Doc& doc, ALScriptAnalysis::Kind kind, const ALTextPos& at) { askAnalyzer(doc, kind, at, at); }
+    // The refactors are asked about a stretch, from `at` to `to`.
+    void                      askAnalyzer(Doc& doc, ALScriptAnalysis::Kind kind, const ALTextPos& at, const ALTextPos& to);
     // `expansion` is the expansion the question was asked over, or zero
     // for the text as it stands.
     void                      answered(const ALScriptAnalysis::Result& result, U32 expansion);
+    // The refactors at the caret, kept on the Doc and handed to the editor
+    // to join the fixes it lists.
+    void                      actionsAnswered(Doc& doc, const ALScriptAnalysis::Result& result, U32 expansion);
 
     // The preprocessor: whether it applies to a script; its run over the
     // text as it stands, for the analyzers, with the way back; and its
@@ -747,7 +759,7 @@ private:
     // The expansion of the text as it stands, asked for where it is not
     // in hand: it is a thread's work now, so a question that needs it
     // waits on the Doc and is asked again when it comes.
-    void                          expandFor(Doc& doc, ALScriptAnalysis::Kind kind, const ALTextPos& at);
+    void                          expandFor(Doc& doc, ALScriptAnalysis::Kind kind, const ALTextPos& at, const ALTextPos& to);
     void                          expandedAnswer(const std::string& id, U32 version, const ALPreprocessor::Result& result);
     // Without the source where only where the script is matters.
     ALScriptPreprocessor::Request preprocessRequest(const Doc& doc, bool with_source = true) const;

@@ -368,6 +368,7 @@
     <floater.string name="PaletteOff">off</floater.string>
     <floater.string name="UndoWhatRename">Rename</floater.string>
     <floater.string name="UndoWhatFix">Fix</floater.string>
+    <floater.string name="UndoWhatRefactor">Refactor</floater.string>
     <floater.string name="UndoWhatFormat">Format</floater.string>
     <floater.string name="UndoWhatReplace">Replace All</floater.string>
     <floater.string name="RecentScripts">Scripts</floater.string>
@@ -1399,7 +1400,7 @@
                                      name="problems_errors"
                                      tool_tip="Show what stops the script from compiling or running"
                                      top="3"
-                                     width="70" />
+                                     width="60" />
                                     <check_box
                                      follows="left|top"
                                      height="18"
@@ -1410,7 +1411,7 @@
                                      name="problems_warnings"
                                      tool_tip="Show what probably does not do what was written"
                                      top_delta="0"
-                                     width="82" />
+                                     width="74" />
                                     <check_box
                                      follows="left|top"
                                      height="18"
@@ -1421,7 +1422,7 @@
                                      name="problems_notes"
                                      tool_tip="Show what is worth a look: the optimizer's changes, the lint's advice"
                                      top_delta="0"
-                                     width="64" />
+                                     width="56" />
                                     <check_box
                                      follows="left|top"
                                      height="18"
@@ -1432,16 +1433,16 @@
                                      name="problems_fixable"
                                      tool_tip="Show only the problems that offer a fix, which the right-click menu, Control-. and the lightbulb make"
                                      top_delta="0"
-                                     width="72" />
+                                     width="62" />
                                     <combo_box
                                      follows="left|top"
                                      height="20"
                                      layout="topleft"
-                                     left_pad="10"
+                                     left_pad="8"
                                      name="problems_scope"
                                      tool_tip="Whose problems: the script in front, or every script open here, each under its name"
                                      top_delta="-1"
-                                     width="110">
+                                     width="104">
                                         <combo_box.item label="This script" name="problems_scope_this" value="this" />
                                         <combo_box.item label="All open scripts" name="problems_scope_all" value="all" />
                                     </combo_box>
@@ -1453,7 +1454,7 @@
                                      name="problems_origin"
                                      tool_tip="Only what one source said: the checkers, the compiler, the preprocessor, the optimizer, the script as it ran"
                                      top_delta="0"
-                                     width="100" />
+                                     width="92" />
                                     <filter_editor
                                      follows="left|top|right"
                                      height="20"
@@ -1463,7 +1464,7 @@
                                      name="problems_filter"
                                      tool_tip="Only problems with these words in them"
                                      top_delta="0"
-                                     width="100" />
+                                     width="80" />
                                 </layout_panel>
                                 <layout_panel
                                  auto_resize="true"
