@@ -26,6 +26,8 @@
 
 #include "../alpopover.h"
 
+#include "../llfocusmgr.h"
+#include "../lllineeditor.h"
 #include "../llpanel.h"
 #include "../lluictrlfactory.h"
 
@@ -357,6 +359,34 @@ namespace tut
         ensure("not the anchor's", where.mLeft != over->calcScreenRect().mLeft);
         popover->closeFloater();
         ensure("no anchor, no popover", ALPopover::showAt(screen, nullptr, content()) == nullptr);
+        over->die();
+    }
+
+    // Quiet as a menu is, and closed from the keyboard with nothing else
+    // taking it -- no window over which to hand it back -- it gives the
+    // keyboard back to what had it, not to the world.
+    template<> template<>
+    void alpopover_object::test<10>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        LLPanel*              over = anchor();
+        LLLineEditor::Params  lp(LLUICtrlFactory::getDefaultParams<LLLineEditor>());
+        lp.name               = "field";
+        lp.rect               = LLRect(0, 20, 120, 0);
+        LLLineEditor* field   = LLUICtrlFactory::create<LLLineEditor>(lp);
+        over->addChild(field);
+        field->setFocus(true);
+        ensure("the field has the keyboard", gFocusMgr.getKeyboardFocus() == field);
+        ALPopover* popover = ALPopover::showOver(over, content(), "Go to line");
+        ensure("shown", popover != nullptr);
+        ensure("silent", popover->getSoundFlags() == LLView::SILENT);
+        ensure("it has the keyboard", gFocusMgr.getKeyboardFocus() != field);
+        popover->escape();
+        ensure("the keyboard back in the field", gFocusMgr.getKeyboardFocus() == field);
+        gFocusMgr.setKeyboardFocus(nullptr);
         over->die();
     }
 }

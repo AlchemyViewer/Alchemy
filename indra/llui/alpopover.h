@@ -146,10 +146,15 @@ private:
     void adopt(const LLView* anchor);
     void openAt(LLRect where);
 
+    // Closed from the keyboard, the keyboard back where it was when it
+    // opened, where nothing else has taken it: not the world's.
+    void giveKeysBack();
+
     bool                mEscaped = false;
     bool                mSaidSo = false;    // the signal is sent once
     closed_signal_t     mClosed;
     LLHandle<LLFloater> mHome;
+    LLHandle<LLView>    mKeysBefore;
     // What paramsRemembered was asked for, and so what the size is kept as.
     std::string         mSizeKind;
 };

@@ -111,6 +111,9 @@ ALPopover* ALPopover::showOver(LLView* anchor, LLPanel* content, const std::stri
 LLFloater::Params ALPopover::paramsFor(S32 width, S32 height, const std::string& title, bool resizable)
 {
     LLFloater::Params p(LLFloater::getDefaultParams());
+    // A part of the window it is over, which comes and goes as a menu does:
+    // not a window of its own, to be heard opening and closing.
+    p.sound_flags = LLView::SILENT;
     p.can_close = false;
     p.can_minimize = false;
     p.can_resize = resizable;
@@ -174,6 +177,10 @@ void ALPopover::openAt(LLRect where)
     {
         gFloaterView->adjustToFitScreen(this, false);
     }
+    if (LLView* keys = dynamic_cast<LLView*>(gFocusMgr.getKeyboardFocus()); keys && keys != this && !keys->hasAncestor(this))
+    {
+        mKeysBefore = keys->getHandle();
+    }
     openFloater();
     setFocus(true);
 }
@@ -220,12 +227,32 @@ void ALPopover::settle()
 {
     mEscaped = false;
     closeFloater();
+    giveKeysBack();
 }
 
 void ALPopover::escape()
 {
     mEscaped = true;
     closeFloater();
+    giveKeysBack();
+}
+
+void ALPopover::giveKeysBack()
+{
+    if (gFocusMgr.getKeyboardFocus())
+    {
+        // Taken by what was chosen, or by the window it was over.
+        return;
+    }
+    LLView* before = mKeysBefore.get();
+    if (before && before->isInEnabledChain() && before->isInVisibleChain())
+    {
+        before->setFocus(true);
+    }
+    else if (LLFloater* home = mHome.get(); home && home->getVisible())
+    {
+        home->setFocus(true);
+    }
 }
 
 void ALPopover::onClose(bool app_quitting)
