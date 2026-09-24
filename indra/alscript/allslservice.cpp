@@ -1222,11 +1222,7 @@ ALScriptProblems ALLSLService::check(std::string_view source, bool mono)
         {
             if (problem.key == "LSLUndeclared" && problem.args.size() == 1)
             {
-                const std::string near = ALScriptFixes::nearest(problem.args[0], namesAt(script, parser.context.builtins, problem.line, problem.column));
-                if (!near.empty())
-                {
-                    ALScriptFixes::offerName(problem, source, problem.args[0], near);
-                }
+                ALScriptFixes::offerNames(problem, source, problem.args[0], namesAt(script, parser.context.builtins, problem.line, problem.column));
             }
         }
     }

@@ -55,17 +55,31 @@ namespace ALScriptFixes
     // of `text`, which is what the problems were said of.
     void attach(ALScriptProblems& problems, std::string_view text, bool lua);
 
-    // How far apart two names are, in edits, case aside.
+    // How far apart two names are, in edits, case aside: a character put
+    // in, taken out or changed, or two side by side swapped.
     size_t editDistance(std::string_view a, std::string_view b);
-    // The name among `names` nearest `word`: the same in another case,
-    // else one within a couple of edits, the shorter of two as near; empty
-    // where none is near enough to be what was meant.
+    // The names among `names` nearest `word`, each as near as the others:
+    // the same in another case, else within an edit for a name of up to
+    // five characters, two up to nine, and a third of a longer one's
+    // length; none for a one-character name but the same in another case,
+    // and none where nothing is near enough to be what was meant.
+    std::vector<std::string> nearestNames(std::string_view word, const std::vector<std::string>& names);
+    // The one name nearest `word`, where no other is as near; empty where
+    // none is near enough, or several are.
     std::string nearest(std::string_view word, const std::vector<std::string>& names);
+    // Whether `now` is sure enough to be what `word` meant for its change
+    // to be the one preferred: the same in another case, or a guess at a
+    // name longer than three characters. A guess at a shorter one is a
+    // guess among too many.
+    bool surelyMeant(std::string_view word, std::string_view now);
     // The fix that changes the name a problem is about, `was`, to `now`,
     // given to the problem where the name is found at its place in `text`:
     // what a service offers once it knows the names in scope there, which
-    // attach() does not.
-    void offerName(ALScriptProblem& problem, std::string_view text, const std::string& was, const std::string& now);
+    // attach() does not. Preferred only where asked.
+    void offerName(ALScriptProblem& problem, std::string_view text, const std::string& was, const std::string& now, bool preferred = true);
+    // A change for each of the names in scope nearest the one a problem
+    // is about, preferred where there is one and it is surely meant.
+    void offerNames(ALScriptProblem& problem, std::string_view text, const std::string& was, const std::vector<std::string>& names);
     // The fix that takes a declaration nothing uses out of `text`, given
     // where the service's tree says it stands: with the `;` after it and
     // the type word before its name, and the whole of its lines where

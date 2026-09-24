@@ -909,4 +909,54 @@ namespace tut
         ensure("said: " + said(lua), local != nullptr && !local->fixes.empty());
         ensure("a rename is safe, and removes nothing", local->fixes.front().safe && !local->fixes.front().removes);
     }
+
+    template<> template<>
+    void object::test<31>()
+    {
+        set_test_name("a short name gets a guess only one edit away, a swap is one edit, and names as near as each other are all offered and none preferred");
+        ensure("builtins: " + error, lslLoaded);
+        ensure("definitions: " + error, luauLoaded);
+        const std::string head = "default\n{\n    state_entry()\n    {\n";
+        const std::string tail = "    }\n}\n";
+        // One character: nothing but itself in another case; two edits
+        // made PI of it once.
+        ALScriptProblems       problems = check(head + "        llOwnerSay((string)n);\n" + tail, false);
+        const ALScriptProblem* problem  = keyed(problems, "LSLUndeclared");
+        ensure("said: " + said(problems), problem != nullptr);
+        ensure("no guess at n: " + titles(problem->fixes), problem->fixes.empty());
+        const auto unknown = [](const ALScriptProblems& all) -> const ALScriptProblem* {
+            for (const ALScriptProblem& each : all)
+            {
+                if (each.key.find("UnknownGlobal") != std::string::npos)
+                {
+                    return &each;
+                }
+            }
+            return nullptr;
+        };
+        problems = check("print(xy)\n", true);
+        problem  = unknown(problems);
+        ensure("said: " + said(problems), problem != nullptr);
+        ensure("no guess at xy two edits from ll: " + titles(problem->fixes), problem->fixes.empty());
+        // Two as near: both, neither preferred.
+        problems = check(head + "        integer cat = 1;\n        integer car = 2;\n        llOwnerSay((string)(cat + car + cax));\n" + tail, false);
+        problem  = keyed(problems, "LSLUndeclared");
+        ensure("said: " + said(problems), problem != nullptr);
+        ensure_equals("both: " + titles(problem->fixes), problem->fixes.size(), size_t(2));
+        ensure("neither preferred", !problem->fixes[0].preferred && !problem->fixes[1].preferred);
+        problems = check("local cat, car = 1, 2\nprint(cat, car, cax)\n", true);
+        problem  = unknown(problems);
+        ensure("said: " + said(problems), problem != nullptr);
+        ensure("both in SLua: " + titles(problem->fixes), problem->fixes.size() == 2 && !problem->fixes[0].preferred && !problem->fixes[1].preferred);
+        // One near a short name: offered, not preferred; one near a longer
+        // name, preferred, a swap being one edit.
+        problems = check(head + "        integer cat = 1;\n        llOwnerSay((string)(cat + cta));\n" + tail, false);
+        problem  = keyed(problems, "LSLUndeclared");
+        ensure("said: " + said(problems), problem != nullptr && problem->fixes.size() == 1);
+        ensure("a guess at three characters is not preferred", !problem->fixes.front().preferred);
+        problems = check(head + "        integer total = 1;\n        llOwnerSay((string)(total + totla));\n" + tail, false);
+        problem  = keyed(problems, "LSLUndeclared");
+        ensure("said: " + said(problems), problem != nullptr && problem->fixes.size() == 1 && problem->fixes.front().preferred);
+        ensure_equals("swapped back", ALScriptFixes::editDistance("totla", "total"), size_t(1));
+    }
 }

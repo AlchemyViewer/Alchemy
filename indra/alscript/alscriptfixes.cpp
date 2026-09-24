@@ -928,30 +928,37 @@ namespace ALScriptFixes
 
     size_t editDistance(std::string_view a, std::string_view b)
     {
-        std::vector<size_t> row(b.size() + 1);
+        // Three rows: a swap reaches back two.
+        std::vector<size_t> before(b.size() + 1), last(b.size() + 1), row(b.size() + 1);
         for (size_t j = 0; j <= b.size(); ++j)
         {
-            row[j] = j;
+            last[j] = j;
         }
+        const auto lower = [](char c) { return LLStringOps::toLower(c); };
         for (size_t i = 1; i <= a.size(); ++i)
         {
-            size_t previous = row[0];
-            row[0]          = i;
+            row[0] = i;
             for (size_t j = 1; j <= b.size(); ++j)
             {
-                const size_t was  = row[j];
-                const bool   same = LLStringOps::toLower(a[i - 1]) == LLStringOps::toLower(b[j - 1]);
-                row[j]            = std::min({ row[j] + 1, row[j - 1] + 1, previous + (same ? 0 : 1) });
-                previous          = was;
+                const bool same = lower(a[i - 1]) == lower(b[j - 1]);
+                row[j]          = std::min({ last[j] + 1, row[j - 1] + 1, last[j - 1] + (same ? 0 : 1) });
+                if (i > 1 && j > 1 && lower(a[i - 1]) == lower(b[j - 2]) && lower(a[i - 2]) == lower(b[j - 1]))
+                {
+                    row[j] = std::min(row[j], before[j - 2] + 1);
+                }
             }
+            std::swap(before, last);
+            std::swap(last, row);
         }
-        return row[b.size()];
+        return last[b.size()];
     }
 
-    std::string nearest(std::string_view word, const std::vector<std::string>& names)
+    std::vector<std::string> nearestNames(std::string_view word, const std::vector<std::string>& names)
     {
-        std::string best;
-        size_t      best_distance = std::max<size_t>(2, word.size() / 2) + 1;
+        const size_t n     = word.size();
+        const size_t limit = n <= 1 ? 0 : n <= 5 ? 1 : n <= 9 ? 2 : n / 3;
+        std::vector<std::string> best;
+        size_t                   best_distance = limit + 1;
         for (const std::string& name : names)
         {
             if (name == word)
@@ -959,24 +966,51 @@ namespace ALScriptFixes
                 continue;
             }
             const size_t distance = editDistance(name, word);
-            if (distance < best_distance || (distance == best_distance && !best.empty() && name.size() < best.size()))
+            if (distance < best_distance)
             {
-                best          = name;
+                best.clear();
                 best_distance = distance;
             }
+            if (distance == best_distance && std::find(best.begin(), best.end(), name) == best.end())
+            {
+                best.push_back(name);
+            }
         }
+        std::sort(best.begin(), best.end());
         return best;
     }
 
-    void offerName(ALScriptProblem& problem, std::string_view text, const std::string& was, const std::string& now)
+    std::string nearest(std::string_view word, const std::vector<std::string>& names)
+    {
+        const std::vector<std::string> near = nearestNames(word, names);
+        return near.size() == 1 ? near.front() : std::string();
+    }
+
+    bool surelyMeant(std::string_view word, std::string_view now) { return word.size() > 3 || editDistance(word, now) == 0; }
+
+    void offerName(ALScriptProblem& problem, std::string_view text, const std::string& was, const std::string& now, bool preferred)
     {
         if (!isIdentifier(was) || !isIdentifier(now))
         {
             return;
         }
         ALScriptFix fix = titled("ScriptFixChange", "Change '[1]' to '[2]'", { was, now });
-        fix.preferred   = true;
+        fix.preferred   = preferred;
         changeName(problem, Lines(text), was, now, std::move(fix), false);
+    }
+
+    void offerNames(ALScriptProblem& problem, std::string_view text, const std::string& was, const std::vector<std::string>& names)
+    {
+        // A few at most: past that the name was no near miss.
+        const std::vector<std::string> near = nearestNames(was, names);
+        if (near.size() > 3)
+        {
+            return;
+        }
+        for (const std::string& now : near)
+        {
+            offerName(problem, text, was, now, near.size() == 1 && surelyMeant(was, now));
+        }
     }
 
     void offerRemoval(ALScriptProblem& problem, std::string_view text, S32 line, S32 column, S32 endLine, S32 endColumn, const std::string& name)
@@ -1268,7 +1302,7 @@ namespace ALScriptFixes
                 // The key after its table: the last of its name where the
                 // problem is, `ll.Sya` being the stretch it marks.
                 ALScriptFix fix = titled("ScriptFixChange", "Change '[1]' to '[2]'", { args[0], args[2] });
-                fix.preferred   = true;
+                fix.preferred   = surelyMeant(args[0], args[2]);
                 changeName(problem, lines, args[0], args[2], std::move(fix), true);
             }
             else if (lua && (key == "LuauMissingPropertyDidYouMean" || key == "LuauMissingExternPropertyDidYouMean") && args.size() == 3 &&

@@ -169,8 +169,8 @@ namespace
         return nullptr;
     }
 
-    // The property of a table or a class nearest a name that is not one:
-    // the same name in another case, else within a couple of edits.
+    // The property of a table or a class nearest a name that is not one,
+    // as ALScriptFixes::nearest has it: none where several are as near.
     std::string nearestProperty(Luau::TypeId type, const std::string& key)
     {
         type = Luau::follow(type);
@@ -1251,11 +1251,7 @@ ALScriptProblems ALLuauService::check(std::string_view source)
                         names.emplace_back(symbol.c_str());
                     }
                 }
-                const std::string near = ALScriptFixes::nearest(problem.args[0], names);
-                if (!near.empty())
-                {
-                    ALScriptFixes::offerName(problem, source, problem.args[0], near);
-                }
+                ALScriptFixes::offerNames(problem, source, problem.args[0], names);
             }
         }
     }
