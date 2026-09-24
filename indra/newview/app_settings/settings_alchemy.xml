@@ -621,7 +621,7 @@
         <key>ALScriptFixOnSave</key>
         <map>
             <key>Comment</key>
-            <string>Script Studio makes the fixes that change nothing a script does before saving it, as one step to undo.</string>
+            <string>Script Studio makes the fixes that change nothing a script does before saving it, as one step to undo; none that takes code out.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>

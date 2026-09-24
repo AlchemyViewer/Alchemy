@@ -7012,7 +7012,7 @@ std::vector<const ALScriptFix*> ALFloaterScriptStudio::pickFixes(const Doc& doc,
         {
             if (fix.preferred && fix.kind == ALScriptFix::Kind::Fix)
             {
-                if (!pick.safeOnly || fix.safe)
+                if (!pick.forSave || (fix.safe && !fix.removes))
                 {
                     taken.push_back(&fix);
                 }

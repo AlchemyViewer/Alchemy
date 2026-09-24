@@ -72,6 +72,11 @@ struct ALScriptFix
     // Whether it may be made unlooked at -- among many, or on a save --
     // because it changes nothing the script does.
     bool safe = false;
+    // Whether it takes code out -- a declaration nothing uses, what can
+    // never run -- which is safe but never made on a save: what is unused
+    // or unreached while the author writes may be what they are about to
+    // use or reach, a return put in to try something say.
+    bool removes = false;
 };
 
 // What the LSL and SLua analyzers report: a range in the script, how bad it

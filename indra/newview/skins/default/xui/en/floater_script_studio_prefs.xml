@@ -651,7 +651,7 @@ end</floater.string>
              layout="topleft"
              left="12"
              name="fix_on_save"
-             tool_tip="The fixes that change nothing a script does -- an unused local marked unused -- are made before it is saved, as one step to undo"
+             tool_tip="The fixes that change nothing a script does -- an unused local marked unused, a misspelt directive -- are made before it is saved, as one step to undo. Nothing is taken out: a function nothing calls, or code that can never run, is left for Fix All"
              top_pad="4"
              width="370" />
             <check_box

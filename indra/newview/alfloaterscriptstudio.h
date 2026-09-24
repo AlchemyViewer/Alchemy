@@ -700,7 +700,8 @@ private:
     struct FixPick
     {
         std::string key;
-        bool        safeOnly = false;
+        // Only what may be made on a save: safe, and taking nothing out.
+        bool        forSave = false;
     };
     // The preferred fix of every problem picked, made as one step, once
     // asked; and made, the asking done. True where anything was made.

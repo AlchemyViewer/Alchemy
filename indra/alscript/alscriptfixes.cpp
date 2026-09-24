@@ -1026,6 +1026,7 @@ namespace ALScriptFixes
         const bool alone_before = first.substr(0, column).find_first_not_of(" \t") == std::string_view::npos;
         const bool alone_after  = last.substr(endColumn).find_first_not_of(" \t") == std::string_view::npos;
         fix.edits.clear();
+        fix.removes = true;
         if (alone_before && alone_after)
         {
             if (lines.offsetOf(endLine + 1, 0))

@@ -872,4 +872,20 @@ namespace tut
         ensure("bracketed under a cast: " + made, made.find("llOwnerSay((string)((list)1 + 2));") != std::string::npos);
         ensure("not a global's value, which must be written out", actedOn(script, false, "[1, 2];", false, "Write the list as a sum").rfind("offered", 0) == 0);
     }
+    template<> template<>
+    void object::test<30>()
+    {
+        set_test_name("a fix that takes code out says so, and one that only renames does not, so that a save makes the one and not the other");
+        ensure("builtins: " + error, lslLoaded);
+        ensure("definitions: " + error, luauLoaded);
+        const std::string state = "default\n{\n    state_entry()\n    {\n        llOwnerSay(\"x\");\n    }\n}\n";
+        const ALScriptProblems lsl = check("integer helper(integer x)\n{\n    return x;\n}\n" + state, false);
+        const ALScriptProblem* unused = keyed(lsl, "LSLDeclaredButNotUsed");
+        ensure("said", unused != nullptr && !unused->fixes.empty());
+        ensure("a removal is safe, and removes", unused->fixes.front().safe && unused->fixes.front().removes);
+        const ALScriptProblems lua = check("local function f()\n    local unused = 1\nend\nf()\n", true);
+        const ALScriptProblem* local = keyed(lua, "LuauLintLocalUnused");
+        ensure("said: " + said(lua), local != nullptr && !local->fixes.empty());
+        ensure("a rename is safe, and removes nothing", local->fixes.front().safe && !local->fixes.front().removes);
+    }
 }
