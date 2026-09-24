@@ -6,6 +6,7 @@ target_sources(
   llui
   PRIVATE
     alangledial.cpp
+    aldraggesture.cpp
     alcornerfield.cpp
     aloffsetpad.cpp
     alpanefolds.cpp
@@ -173,6 +174,7 @@ target_sources(
     FILE_SET HEADERS
       FILES
         alangledial.h
+        aldraggesture.h
         alcornerfield.h
         aloffsetpad.h
         alpanefolds.h
@@ -485,6 +487,7 @@ if(AL_BUILD_TESTS)
     aldockpanel
     alpanefolds
     alangledial
+    aldraggesture
     aloffsetpad
     alemptystate
     alxuifill
