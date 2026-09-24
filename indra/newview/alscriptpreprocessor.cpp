@@ -893,6 +893,9 @@ ALPreprocessor::Options ALScriptPreprocessor::optionsFor(const Request& request,
     // The analyzers see the expanded text before the optimizer has been
     // at it, so that their positions stay the author's.
     options.optimize              = optimize && request.optimize && optimizer && !request.lua && ALLSLService::builtinsLoaded();
+    // Weighed before and after where that is asked, so that its notes say
+    // what each change saved in code and not only in characters.
+    options.weigh                 = options.optimize && request.weigh;
     // Nobody reads the notes of a run whose text is only read: the
     // optimizer prints what a fold was and became to say it.
     options.optimizer.notes       = request.optimize;

@@ -358,6 +358,10 @@ private:
             std::string      text;
             ALSourceMap      map;
             ALScriptProblems problems;
+            // What the code came to on the script's target before the
+            // optimizer and after, where it ran and was weighed.
+            size_t           codeBefore = 0;
+            size_t           codeAfter  = 0;
         };
         Expanded                                   expanded;
         Expanded                                   uploaded;

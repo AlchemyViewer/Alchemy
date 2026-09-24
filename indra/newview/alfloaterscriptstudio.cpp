@@ -2735,6 +2735,8 @@ ALScriptPreprocessor::Request ALFloaterScriptStudio::preprocessRequest(const Doc
     }
     request.lua     = doc.language.lua;
     request.compileTarget = doc.language.compileTarget;
+    // The optimizer's notes are read here: each says what it saved in code.
+    request.weigh   = true;
     return request;
 }
 
@@ -2852,6 +2854,8 @@ void ALFloaterScriptStudio::preprocessedAnswer(const std::string& id, U32 versio
     doc.uploaded.text     = result.text;
     doc.uploaded.map      = result.map;
     doc.uploaded.problems = result.problems;
+    doc.uploaded.codeBefore = result.codeBefore;
+    doc.uploaded.codeAfter  = result.codeAfter;
     doc.expanded.valid    = false;
     showExpanded(doc, result.text);
     refreshProblems(doc);
@@ -4474,9 +4478,39 @@ void ALFloaterScriptStudio::refreshTrailer(Doc& doc)
     {
         parts.push_back({ counted("ProblemWarnings", warnings), "problems", mTrailerProblemsTip });
     }
+    // While the Preprocessed view is in front, where the optimizer ran over
+    // the text as it stands: what its code weighed before the optimizer and
+    // after, the whole of what that view shows it did.
+    const bool optimized = doc.shownView() == Doc::View::Expanded && doc.uploaded.valid && doc.uploaded.version == doc.editor->document().version() &&
+                           doc.uploaded.codeBefore > 0 && doc.uploaded.codeAfter > 0 && weightTarget(doc);
+    if (optimized)
+    {
+        const ALScriptWeight::Target target = *weightTarget(doc);
+        const size_t                 limit  = ALScriptWeight::limitOf(target);
+        LLStringUtil::format_map_t   args;
+        args["[TARGET]"]      = ALScriptWeight::nameOf(target);
+        args["[BEFORE]"]      = llformat("%.1f", (F64)doc.uploaded.codeBefore / 1024.0);
+        args["[AFTER]"]       = llformat("%.1f", (F64)doc.uploaded.codeAfter / 1024.0);
+        args["[LIMIT]"]       = std::to_string(limit / 1024);
+        args["[BYTESBEFORE]"] = std::to_string(doc.uploaded.codeBefore);
+        args["[BYTESAFTER]"]  = std::to_string(doc.uploaded.codeAfter);
+        args["[MAX]"]         = std::to_string(limit);
+        const bool estimate   = target == ALScriptWeight::Target::Mono;
+        ALJumpBar::TrailerPart part{ getString(estimate ? "TrailerOptimizedEstimate" : "TrailerOptimized", args), std::string(),
+                                     getString(estimate ? "TrailerOptimizedEstimateTip" : "TrailerOptimizedTip", args) };
+        if (doc.uploaded.codeAfter > limit)
+        {
+            part.color = doc.editor->markColor(ALCodeEditor::Mark::Error);
+        }
+        else if (doc.uploaded.codeAfter * 5 > limit * 4)
+        {
+            part.color = doc.editor->markColor(ALCodeEditor::Mark::Warning);
+        }
+        parts.push_back(std::move(part));
+    }
     // What its code weighs for its target, against what the target runs
     // it in: in the warning colour past four fifths, the error's past it.
-    if (doc.weight && doc.weight->total > 0)
+    if (!optimized && doc.weight && doc.weight->total > 0)
     {
         const ALScriptWeight&      weight = *doc.weight;
         LLStringUtil::format_map_t args;
@@ -6086,11 +6120,22 @@ void ALFloaterScriptStudio::refreshProblems(Doc& doc)
     // The optimizer's notes offer what it did as a change to the source,
     // over the text the run was made of.
     const U32  now             = doc.editor->document().version();
+    const std::optional<ALScriptWeight::Target> target = weightTarget(doc);
     const auto preprocessorRow = [&](const ALScriptProblem& problem, U32 version) {
         const Doc::Level level     = levelOf(problem.severity);
         const bool       optimizer = problem.source == ALScriptProblem::Source::Optimizer;
+        // What the lines a change is on came to less in code, beside what
+        // it did to them.
+        std::string message = problem.message;
+        if (problem.savedBytes && target)
+        {
+            LLStringUtil::format_map_t args;
+            args["[BYTES]"]  = std::to_string(std::abs(*problem.savedBytes));
+            args["[TARGET]"] = ALScriptWeight::nameOf(*target);
+            message += " " + getString(*problem.savedBytes > 0 ? "OptimizerNoteLighter" : *problem.savedBytes < 0 ? "OptimizerNoteHeavier" : "OptimizerNoteSame", args);
+        }
         add(problem.line, problem.column, true, problem.endLine, problem.endColumn, markOf(level), level,
-            getString(optimizer ? "OriginOptimizer" : "OriginPreprocessor"), problem.message, problem.file);
+            getString(optimizer ? "OriginOptimizer" : "OriginPreprocessor"), message, problem.file);
         doc.shown.back().key      = problem.key;
         doc.shown.back().fixes    = problem.fixes;
         doc.shown.back().fixesFor = version;

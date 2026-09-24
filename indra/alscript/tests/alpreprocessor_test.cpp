@@ -1061,4 +1061,61 @@ namespace tut
         ensure_equals("to the call's end", end.column, 17);
         ensure("what the macro made is not", !r.map.verbatimSpan(greet_line, greet_column, greet_column + 10, begin, end));
     }
+
+    template<> template<>
+    void alpreprocessor_object::test<28>()
+    {
+        set_test_name("the optimizer's run, weighed, says what it saved in code: the whole, and each note what its lines came to less");
+        {
+            ALLSLService service;
+            std::string  error;
+            ensure("builtins: " + error, service.loadBuiltins(std::string(AL_LSL_DEFINITIONS_DIR) + "/builtins.txt", error));
+        }
+        const std::string source = "integer unused(integer n)\n"
+                                   "{\n"
+                                   "    return n * 3;\n"
+                                   "}\n"
+                                   "default\n"
+                                   "{\n"
+                                   "    state_entry()\n"
+                                   "    {\n"
+                                   "        llSay(0, (string)(21 * 2));\n"
+                                   "    }\n"
+                                   "}\n";
+        ALPreprocessor::Options o = options();
+        o.optimize                = true;
+        o.optimizer.target        = ALLSLOptimizer::Target::LSO;
+        o.weigh                   = true;
+        const ALPreprocessor::Result r = ALPreprocessor::run(source, o);
+        ensure("optimized", r.optimized);
+        ensure("weighed, and lighter: " + std::to_string(r.codeBefore) + " to " + std::to_string(r.codeAfter), r.codeAfter > 0 && r.codeAfter < r.codeBefore);
+        const ALScriptProblem* removed = nullptr;
+        const ALScriptProblem* folded  = nullptr;
+        const ALScriptProblem* sizes   = nullptr;
+        for (const ALScriptProblem& p : r.problems)
+        {
+            removed = p.key == "OptimizerRemovedFunction" ? &p : removed;
+            folded  = p.line == 8 && p.source == ALScriptProblem::Source::Optimizer && p.key != "OptimizerRemovedFunction" ? &p : folded;
+            sizes   = p.key == "OptimizerSizesWeighed" ? &p : sizes;
+        }
+        ensure("the function's removal noted", removed && removed->savedBytes.has_value());
+        ensure("its lines' code all saved: " + std::to_string(removed->savedBytes.value_or(0)), *removed->savedBytes > 0);
+        ensure("the fold noted, with what its line saved", folded && folded->savedBytes && *folded->savedBytes > 0);
+        ensure("the whole said", sizes != nullptr);
+        ensure_equals("in code", sizes->args[2], std::to_string(r.codeBefore));
+        ensure_equals("on its target", sizes->args[4], std::string("LSO"));
+        const S64 lost = S64(r.codeBefore) - S64(r.codeAfter);
+        ensure("no note says more than the whole lost", *removed->savedBytes <= lost && *folded->savedBytes <= lost);
+
+        // Not weighed unless asked: no bytes, and the words as they were.
+        o.weigh                           = false;
+        const ALPreprocessor::Result bare = ALPreprocessor::run(source, o);
+        bool                         said = false;
+        for (const ALScriptProblem& p : bare.problems)
+        {
+            ensure("nothing weighed", !p.savedBytes);
+            said = said || p.key == "OptimizerSizes";
+        }
+        ensure("the size in source only", said && bare.codeBefore == 0);
+    }
 } // namespace tut

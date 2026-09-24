@@ -139,6 +139,11 @@ public:
         // optimizer may rename or remove the very name being looked
         // for, and its work is thrown away with the text.
         bool        optimize = true;
+        // Whether an optimizing run is weighed before and after, so that
+        // its notes say what each change saved in code: for a window that
+        // shows them, and not for a compile of many, which would pay two
+        // compiles more a script for words nobody reads.
+        bool        weigh    = false;
     };
     typedef std::function<void(const ALPreprocessor::Result&)> callback_t;
 

@@ -118,6 +118,11 @@ public:
         // rather do that elsewhere leaves this off and calls `optimize`.
         bool                    optimize = false;
         ALLSLOptimizer::Options optimizer;
+        // Whether the optimizer's run is weighed for the target it
+        // optimized for, before and after (ALScriptWeigh): the whole in
+        // the result, and each note with what its lines came to less. Two
+        // compiles more.
+        bool                    weigh = false;
         S32  includeDepth = 32;
         // What one run may make of a script -- every token of every file
         // it opens counts, as well as every token a macro makes -- and how
@@ -173,6 +178,11 @@ public:
         std::vector<std::string> inlined;
         // The optimizer ran and its text is what came out.
         bool optimized     = false;
+        // Where it was weighed: what the code came to for its target
+        // before it and after, as the target counts it; nothing where it
+        // was not, or the script did not compile.
+        size_t codeBefore  = 0;
+        size_t codeAfter   = 0;
         // The run reached its budget and stopped: the text is as far as
         // it got, and is nothing to compile or analyse.
         bool overran       = false;

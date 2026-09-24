@@ -28,6 +28,7 @@
 #include "alpreprocessor.h"
 
 #include "alscriptfixes.h"
+#include "alscriptweight.h"
 
 #include "llstl.h"
 
@@ -3747,6 +3748,7 @@ void ALPreprocessor::optimize(Result& result, const Options& options)
     optimizing.inlineNames             = result.inlined;
     optimizing.inlining                = optimizing.inlining || !result.inlined.empty();
     ALLSLOptimizer::Result optimized   = ALLSLOptimizer::run(result.text, optimizing);
+    const size_t           first_note  = result.problems.size();
     for (ALScriptProblem p : optimized.problems)
     {
         // What it did, as a change to the source where that can be said,
@@ -3760,19 +3762,79 @@ void ALPreprocessor::optimize(Result& result, const Options& options)
         }
         result.problems.push_back(std::move(p));
     }
-    if (optimized.optimized)
+    if (!optimized.optimized)
     {
-        ALScriptProblem sizes;
-        sizes.severity = ALScriptProblem::Severity::Note;
-        sizes.source   = ALScriptProblem::Source::Optimizer;
-        sizes.key      = "OptimizerSizes";
-        sizes.args     = { std::to_string(optimized.sizeBefore), std::to_string(optimized.sizeAfter) };
-        sizes.message  = ALScriptProblem::fill("optimized from [1] to [2] bytes of source; script memory is the simulator's to say", sizes.args);
-        result.problems.push_back(std::move(sizes));
-        result.map       = optimized.map.composed(result.map);
-        result.text      = std::move(optimized.text);
-        result.optimized = true;
+        return;
     }
+    const ALSourceMap after_map = optimized.map.composed(result.map);
+    // What it saved in code for its target, the whole and line by line in
+    // the source's places, where both texts compile: each note given what
+    // the lines it stands on came to less.
+    ALScriptWeight::Target target = optimizing.target == ALLSLOptimizer::Target::LSO    ? ALScriptWeight::Target::LSO
+                                    : optimizing.target == ALLSLOptimizer::Target::Luau ? ALScriptWeight::Target::LSLLuau
+                                                                                        : ALScriptWeight::Target::Mono;
+    const auto weigh = [target](std::string_view text) {
+        return target == ALScriptWeight::Target::LSO       ? ALScriptWeigh::lso(text)
+               : target == ALScriptWeight::Target::LSLLuau ? ALScriptWeigh::lslLuau(text)
+                                                           : ALScriptWeigh::mono(text);
+    };
+    bool weighed = false;
+    if (options.weigh)
+    {
+        const ALScriptWeight before = weigh(result.text);
+        const ALScriptWeight after  = weigh(optimized.text);
+        weighed                     = before.total > 0 && after.total > 0;
+        if (weighed)
+        {
+            result.codeBefore = before.total;
+            result.codeAfter  = after.total;
+            std::map<std::pair<std::string, S32>, S64> lost;
+            for (const ALScriptWeight::Line& line : before.inSource(result.map).lines)
+            {
+                lost[{ line.file, line.line }] += S64(line.bytes);
+            }
+            for (const ALScriptWeight::Line& line : after.inSource(after_map).lines)
+            {
+                lost[{ line.file, line.line }] -= S64(line.bytes);
+            }
+            for (size_t i = first_note; i < result.problems.size(); ++i)
+            {
+                ALScriptProblem& note = result.problems[i];
+                if (note.source != ALScriptProblem::Source::Optimizer || note.severity != ALScriptProblem::Severity::Note ||
+                    note.key == "OptimizerStoppedEarly" || note.endLine < note.line)
+                {
+                    continue;
+                }
+                S64 saved = 0;
+                for (auto it = lost.lower_bound({ note.file, note.line }); it != lost.end() && it->first.first == note.file && it->first.second <= note.endLine;
+                     ++it)
+                {
+                    saved += it->second;
+                }
+                note.savedBytes = saved;
+            }
+        }
+    }
+    ALScriptProblem sizes;
+    sizes.severity = ALScriptProblem::Severity::Note;
+    sizes.source   = ALScriptProblem::Source::Optimizer;
+    if (weighed)
+    {
+        sizes.key     = "OptimizerSizesWeighed";
+        sizes.args    = { std::to_string(optimized.sizeBefore), std::to_string(optimized.sizeAfter), std::to_string(result.codeBefore),
+                          std::to_string(result.codeAfter), ALScriptWeight::nameOf(target) };
+        sizes.message = ALScriptProblem::fill("optimized from [1] to [2] bytes of source, and from [3] to [4] bytes of code on [5]", sizes.args);
+    }
+    else
+    {
+        sizes.key     = "OptimizerSizes";
+        sizes.args    = { std::to_string(optimized.sizeBefore), std::to_string(optimized.sizeAfter) };
+        sizes.message = ALScriptProblem::fill("optimized from [1] to [2] bytes of source; script memory is the simulator's to say", sizes.args);
+    }
+    result.problems.push_back(std::move(sizes));
+    result.map       = after_map;
+    result.text      = std::move(optimized.text);
+    result.optimized = true;
 }
 
 std::vector<ALPreprocessor::Token> ALPreprocessor::tokenize(std::string_view text, bool lua)

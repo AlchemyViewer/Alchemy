@@ -26,6 +26,7 @@
 
 #include "stdtypes.h"
 
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -124,6 +125,11 @@ struct ALScriptProblem
     // What would put it right, where the words and the place make that
     // plain (ALScriptFixes::attach): the preferred first.
     std::vector<ALScriptFix> fixes;
+    // For an optimizer's note, where the run was weighed: how many bytes
+    // less code the lines it stands on make for the target after the run
+    // than before -- every change on those lines together, so that two
+    // notes on one line say the same -- below nothing where they make more.
+    std::optional<S64> savedBytes;
 
     // `text` with [1], [2] ... replaced by the args, in one pass: a word
     // that holds a mark of its own -- a file named `a[2].lsl` -- is put in
