@@ -255,6 +255,27 @@ public:
     void                       askOwnExperiences(experiences_callback_t told);
     const std::vector<LLUUID>& ownExperiences() const { return mOwnExperiences; }
 
+    // --- between objects ------------------------------------------------------------
+
+    // Items of one prim put into another. The region lets nothing go from
+    // one object into another but through the agent's inventory: each is
+    // taken into a folder made for it in the trash -- a copy where it may
+    // be copied, the item itself out of an object of one's own -- and put
+    // from there into the other prim, a script running or not as asked.
+    // A copy that went in stays in that folder, in the trash, where the
+    // agent can see what passed through; what the other prim would not
+    // take stays there too, for the agent to take back.
+    struct TransferResult
+    {
+        S32                      moved = 0;
+        // By name: what might not go, and what never came through.
+        std::vector<std::string> refused;
+        std::vector<std::string> lost;
+        std::string              error;
+    };
+    typedef std::function<void(const TransferResult&)> transfer_callback_t;
+    void transfer(const LLUUID& from, const std::vector<LLUUID>& items, const LLUUID& to, bool running, transfer_callback_t done);
+
     // --- what an object holds ----------------------------------------------------
 
     // A script or a notecard in a prim's contents.
@@ -364,6 +385,9 @@ public:
 private:
     struct Burst;
     struct ContentsListener;
+    struct Transfer;
+    void transferArrived(const std::shared_ptr<Transfer>& transfer);
+    void transferEnd(const std::shared_ptr<Transfer>& transfer);
     void flushExpiredBurst();
     void deliverRuntime(const Burst& burst);
     void sweepListeners();
@@ -382,6 +406,7 @@ private:
     std::unique_ptr<LLEventTimer> mBurstTimer;
     std::deque<RuntimeEvent>      mRecent;
     runtime_signal_t              mRuntime;
+    std::vector<std::shared_ptr<Transfer>> mTransfers;
     std::vector<LLUUID>                 mOwnExperiences;
     std::vector<experiences_callback_t> mOwnExperiencesWaiting;
     bool                                mOwnExperiencesAsked = false;

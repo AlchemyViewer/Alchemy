@@ -40,11 +40,14 @@
 #include "llfloaterperms.h"
 #include "llfloaterreg.h"
 #include "llinventory.h"
+#include "llinventorydefines.h"
 #include "llinventorymodel.h"
+#include "llinventoryobserver.h"
 #include "llnotecard.h"
 #include "llnotificationsutil.h"
 #include "llpreviewscript.h"
 #include "llscripteditorws.h"
+#include "lltooldraganddrop.h"
 #include "llsdutil.h"
 #include "lltrans.h"
 #include "llversioninfo.h"
@@ -61,6 +64,8 @@
 #include "alscriptmessages.h"
 #include "rlvlocks.h"
 // [/RLVa:KB]
+
+#include <boost/unordered/unordered_flat_set.hpp>
 
 #include <algorithm>
 #include <memory>
@@ -250,8 +255,6 @@ ALScriptRef ALScriptRef::fromKey(const LLSD& key)
 // --- language ------------------------------------------------------------------
 
 ALScriptWorkspace::ALScriptWorkspace() = default;
-
-ALScriptWorkspace::~ALScriptWorkspace() = default;
 
 bool ALScriptWorkspace::looksLikeLua(std::string_view content)
 {
@@ -795,6 +798,233 @@ void ALScriptWorkspace::recompile(const ALScriptRef& ref, const std::string& req
             }
         });
     });
+}
+
+// --- between objects ---------------------------------------------------------------
+
+namespace
+{
+    // How long the items taken are waited for in the agent's inventory.
+    constexpr F32 TRANSFER_TIMEOUT = 30.f;
+
+    // Whether an item may be taken out of an object, as the build floater's
+    // contents let one go: copied where it may be copied and given, the
+    // item itself out of an object of one's own; nothing out of a locked
+    // attachment, and only a copy out of any attachment, whose contents
+    // the region does not keep up with.
+    bool takeable(LLViewerObject* object, const LLInventoryItem& item)
+    {
+        const LLPermissions& perm     = item.getPermissions();
+        const bool           can_copy = gAgent.allowOperation(PERM_COPY, perm, GP_OBJECT_MANIPULATE);
+        if (rlv_handler_t::isEnabled() && gRlvAttachmentLocks.isLockedAttachment(object->getRootEdit()))
+        {
+            return false;
+        }
+        if (!can_copy && object->isAttachment())
+        {
+            return false;
+        }
+        return (can_copy && perm.allowTransferTo(gAgent.getID())) || object->permYouOwner();
+    }
+}
+
+// One transfer: the folder its items come into, and what is put in from it.
+struct ALScriptWorkspace::Transfer final : public LLInventoryObserver
+{
+    LLUUID                            from;
+    LLUUID                            to;
+    LLUUID                            folder;
+    bool                              running = true;
+    // The names of what was taken, until each has come.
+    std::vector<std::string>          awaited;
+    boost::unordered_flat_set<LLUUID> arrived;
+    TransferResult                    result;
+    transfer_callback_t               done;
+    bool                              finished = false;
+    std::weak_ptr<Transfer>           self;
+
+    void changed(U32) override
+    {
+        if (const std::shared_ptr<Transfer> held = self.lock(); held && !finished && folder.notNull())
+        {
+            ALScriptWorkspace::instance().transferArrived(held);
+        }
+    }
+};
+
+void ALScriptWorkspace::transfer(const LLUUID& from_id, const std::vector<LLUUID>& items, const LLUUID& to_id, bool running, transfer_callback_t done)
+{
+    LLViewerObject* from = gObjectList.findObject(from_id);
+    LLViewerObject* to   = gObjectList.findObject(to_id);
+    auto            one  = std::make_shared<Transfer>();
+    one->self            = one;
+    one->from            = from_id;
+    one->to              = to_id;
+    one->running         = running;
+    one->done            = std::move(done);
+    if (!from || !to)
+    {
+        one->result.error = LLTrans::getString("WorkspaceNoSuchObject");
+        one->done(one->result);
+        return;
+    }
+    std::vector<LLUUID> taking;
+    for (const LLUUID& id : items)
+    {
+        LLInventoryItem* item = dynamic_cast<LLInventoryItem*>(from->getInventoryObject(id));
+        if (!item)
+        {
+            continue;
+        }
+        if (!takeable(from, *item) || !LLToolDragAndDrop::isInventoryDropAcceptable(to, item))
+        {
+            one->result.refused.push_back(item->getName());
+            continue;
+        }
+        taking.push_back(id);
+        one->awaited.push_back(item->getName());
+    }
+    const LLUUID trash = gInventory.findCategoryUUIDForType(LLFolderType::FT_TRASH);
+    if (taking.empty() || trash.isNull())
+    {
+        one->done(one->result);
+        return;
+    }
+    mTransfers.push_back(one);
+    const auto begin = [this, one, taking](const LLUUID& folder) {
+        LLViewerObject* from = gObjectList.findObject(one->from);
+        if (folder.isNull() || !from)
+        {
+            one->result.error = LLTrans::getString(folder.isNull() ? "WorkspaceTransferNoFolder" : "WorkspaceNoSuchObject");
+            transferEnd(one);
+            return;
+        }
+        // What the folder holds already came before, and is not this
+        // transfer's.
+        one->folder                           = folder;
+        LLInventoryModel::cat_array_t*  cats  = nullptr;
+        LLInventoryModel::item_array_t* items = nullptr;
+        gInventory.getDirectDescendentsOf(folder, cats, items);
+        for (const LLPointer<LLViewerInventoryItem>& item : items ? *items : LLInventoryModel::item_array_t())
+        {
+            one->arrived.insert(item->getUUID());
+        }
+        gInventory.addObserver(one.get());
+        for (const LLUUID& id : taking)
+        {
+            from->moveInventory(folder, id);
+        }
+        doAfterInterval(
+            [this, one]() {
+                if (!one->finished)
+                {
+                    transferEnd(one);
+                }
+            },
+            TRANSFER_TIMEOUT);
+    };
+    // One folder in the trash for everything that passes between objects,
+    // made the first time.
+    const std::string               name     = LLTrans::getString("WorkspaceTransferFolder");
+    LLInventoryModel::cat_array_t*  in_trash = nullptr;
+    LLInventoryModel::item_array_t* loose    = nullptr;
+    gInventory.getDirectDescendentsOf(trash, in_trash, loose);
+    for (const LLPointer<LLViewerInventoryCategory>& cat : in_trash ? *in_trash : LLInventoryModel::cat_array_t())
+    {
+        if (cat && cat->getName() == name)
+        {
+            begin(cat->getUUID());
+            return;
+        }
+    }
+    gInventory.createNewCategory(trash, LLFolderType::FT_NONE, name, begin);
+}
+
+void ALScriptWorkspace::transferArrived(const std::shared_ptr<Transfer>& one)
+{
+    LLInventoryModel::cat_array_t*  cats  = nullptr;
+    LLInventoryModel::item_array_t* items = nullptr;
+    gInventory.getDirectDescendentsOf(one->folder, cats, items);
+    std::vector<LLPointer<LLViewerInventoryItem>> fresh;
+    for (const LLPointer<LLViewerInventoryItem>& item : items ? *items : LLInventoryModel::item_array_t())
+    {
+        if (item && one->arrived.insert(item->getUUID()).second)
+        {
+            fresh.push_back(item);
+        }
+    }
+    if (fresh.empty())
+    {
+        return;
+    }
+    // Put in once the inventory has done telling of them, which putting in
+    // what may not be copied changes again.
+    doOnIdleOneTime([this, one, fresh]() {
+        LLViewerObject* to = gObjectList.findObject(one->to);
+        for (const LLPointer<LLViewerInventoryItem>& item : fresh)
+        {
+            if (const auto awaited = std::find(one->awaited.begin(), one->awaited.end(), item->getName()); awaited != one->awaited.end())
+            {
+                one->awaited.erase(awaited);
+            }
+            if (!to || !LLToolDragAndDrop::isInventoryDropAcceptable(to, item))
+            {
+                one->result.refused.push_back(item->getName());
+                continue;
+            }
+            // As a drop from the inventory puts it in: what may not be
+            // copied leaves the inventory as it goes.
+            LLPointer<LLViewerInventoryItem> put = new LLViewerInventoryItem(item.get());
+            if (!item->getPermissions().allowCopyBy(gAgent.getID()))
+            {
+                gInventory.deleteObject(item->getUUID());
+                gInventory.notifyObservers();
+            }
+            if (item->getType() == LLAssetType::AT_LSL_TEXT)
+            {
+                to->saveScript(put, one->running, true, LLUUID::null);
+            }
+            else
+            {
+                put->setCreationDate(time_corrected());
+                to->updateInventory(put, TASK_INVENTORY_ITEM_KEY, true);
+            }
+            ++one->result.moved;
+        }
+        if (one->awaited.empty() && !one->finished)
+        {
+            transferEnd(one);
+        }
+    });
+}
+
+void ALScriptWorkspace::transferEnd(const std::shared_ptr<Transfer>& one)
+{
+    if (one->finished)
+    {
+        return;
+    }
+    one->finished = true;
+    if (one->folder.notNull())
+    {
+        gInventory.removeObserver(one.get());
+    }
+    // What never came, by the names it was taken by.
+    one->result.lost = std::move(one->awaited);
+    mTransfers.erase(std::remove(mTransfers.begin(), mTransfers.end(), one), mTransfers.end());
+    one->done(one->result);
+}
+
+ALScriptWorkspace::~ALScriptWorkspace()
+{
+    // A transfer still waiting on its items is heard of no more.
+    for (const std::shared_ptr<Transfer>& one : mTransfers)
+    {
+        if (one->folder.notNull() && !one->finished)
+        {
+            gInventory.removeObserver(one.get());
+        }
+    }
 }
 
 // --- a script in an object -------------------------------------------------------

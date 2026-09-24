@@ -1105,6 +1105,9 @@ private:
     // chosen in it, where all of that is of one; the object selected in
     // world where nothing is. Nowhere, where either is more than one.
     LLViewerObject* explorerDropTarget() const;
+    // Items of one prim put into another, through the agent's inventory,
+    // and said as it ends.
+    void transferBetween(const LLUUID& from, const std::vector<LLUUID>& items, const LLUUID& to, bool running);
     // Every command the menus hold, to give one by name.
     void showCommandPalette();
     // One field for going anywhere, as Visual Studio Code's: a script by
@@ -1813,6 +1816,8 @@ private:
     // When what the prims hold is asked again after a drop, for what the
     // drop sends on its own time: a folder's items, fetched first.
     F64                                mExplorerRefetchAt = 0.0;
+    // What a drag from another prim has dropped so far, sent with its last.
+    std::vector<LLUUID>                mTransferring;
     // What the region said runs, by prim and item.
     std::map<std::pair<LLUUID, LLUUID>, bool> mRunningKnown;
     bool                               mMain = true;

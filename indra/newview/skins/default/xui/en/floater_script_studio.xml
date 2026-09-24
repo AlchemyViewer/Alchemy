@@ -117,6 +117,13 @@
     <floater.string name="RunningNo">stopped</floater.string>
     <floater.string name="ObjectUnnamed">(unnamed)</floater.string>
     <floater.string name="StateUnknown">asking...</floater.string>
+    <floater.string name="TransferGoing">Putting into [NAME], by way of your inventory...</floater.string>
+    <floater.string name="TransferDoneA">1 item put into [NAME], by way of your inventory; what was copied on the way is in your trash, in Passed between objects.</floater.string>
+    <floater.string name="TransferDoneB">[COUNT] items put into [NAME], by way of your inventory; what was copied on the way is in your trash, in Passed between objects.</floater.string>
+    <floater.string name="TransferNone">Nothing was put into [NAME].</floater.string>
+    <floater.string name="TransferFailed">Nothing was put into [NAME]: [ERROR].</floater.string>
+    <floater.string name="TransferRefused">Not taken: [REFUSED].</floater.string>
+    <floater.string name="TransferLost">Never came through: [LOST]; look in your trash, in Passed between objects.</floater.string>
     <floater.string name="ExperienceNone">No experience</floater.string>
     <floater.string name="ExperienceProfile">Its profile...</floater.string>
     <floater.string name="ExperienceLoading">loading...</floater.string>

@@ -13992,6 +13992,50 @@ bool ALFloaterScriptStudio::startExplorerDrag(const LLSD& pressed)
     return true;
 }
 
+void ALFloaterScriptStudio::transferBetween(const LLUUID& from, const std::vector<LLUUID>& items, const LLUUID& to, bool running)
+{
+    LLViewerObject*            prim = gObjectList.findObject(to);
+    LLViewerObject*            root = prim && prim->getRootEdit() ? prim->getRootEdit() : prim;
+    LLStringUtil::format_map_t args;
+    args["[NAME]"] = objectNameOf(root, getString("ObjectUnnamed"));
+    setStatus(getString("TransferGoing", args));
+    const LLHandle<LLFloater> handle = getHandle();
+    ALScriptWorkspace::instance().transfer(from, items, to, running, [handle, args](const ALScriptWorkspace::TransferResult& result) {
+        ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get());
+        if (!studio)
+        {
+            return;
+        }
+        const auto listed = [](const std::vector<std::string>& names) {
+            std::string out;
+            for (const std::string& name : names)
+            {
+                out += (out.empty() ? "" : ", ") + name;
+            }
+            return out;
+        };
+        LLStringUtil::format_map_t said = args;
+        said["[ERROR]"]   = result.error;
+        said["[REFUSED]"] = listed(result.refused);
+        said["[LOST]"]    = listed(result.lost);
+        std::string words = !result.error.empty() ? studio->getString("TransferFailed", said)
+                            : result.moved > 0    ? studio->counted("TransferDone", result.moved, said)
+                                                  : studio->getString("TransferNone", said);
+        if (!result.refused.empty())
+        {
+            words += " " + studio->getString("TransferRefused", said);
+        }
+        if (!result.lost.empty())
+        {
+            words += " " + studio->getString("TransferLost", said);
+        }
+        studio->report(words, !result.error.empty() || !result.refused.empty() || !result.lost.empty());
+        // The prims listed again, as after a drop from the inventory.
+        studio->refreshExplorer(true);
+        studio->mExplorerRefetchAt = LLTimer::getTotalSeconds() + 2.0;
+    });
+}
+
 LLViewerObject* ALFloaterScriptStudio::explorerDropTarget() const
 {
     // What is chosen in the list, where all of it is of one prim.
@@ -14037,12 +14081,37 @@ void ALFloaterScriptStudio::dropOnExplorer(const LLSD& row, MASK mask, bool drop
     {
         return;
     }
-    // From the inventory only: what comes from an object or a notecard
-    // the drag tool will not put into another object, and is not offered.
+    // Nothing from a notecard, which the drag tool will not put into an
+    // object.
     LLToolDragAndDrop*               tool   = LLToolDragAndDrop::getInstance();
     const LLToolDragAndDrop::ESource source = tool->getSource();
-    if (source == LLToolDragAndDrop::SOURCE_WORLD || source == LLToolDragAndDrop::SOURCE_NOTECARD)
+    if (source == LLToolDragAndDrop::SOURCE_NOTECARD)
     {
+        return;
+    }
+    if (source == LLToolDragAndDrop::SOURCE_WORLD)
+    {
+        // From another prim -- this list's, or the build floater's contents
+        // -- by way of the agent's inventory, the only way between two
+        // objects: gathered as the drag tool drops each, and sent together
+        // with the last. A script goes in running unless Control is held.
+        LLViewerInventoryItem* item = static_cast<LLViewerInventoryItem*>(cargo);
+        const LLUUID           from = tool->getSourceID();
+        const bool ok = type != DAD_CATEGORY && item && gObjectList.findObject(from) && LLToolDragAndDrop::isInventoryDropAcceptable(prim, item);
+        *accept       = ok ? ACCEPT_YES_MULTI : ACCEPT_NO;
+        if (!ok || !drop)
+        {
+            return;
+        }
+        if (tool->getCargoIndex() == 0)
+        {
+            mTransferring.clear();
+        }
+        mTransferring.push_back(item->getUUID());
+        if (tool->getCargoIndex() + 1 >= static_cast<S32>(tool->getCargoCount()))
+        {
+            transferBetween(from, std::exchange(mTransferring, {}), prim->getID(), (mask & MASK_CONTROL) == 0);
+        }
         return;
     }
     // As the build floater's contents take it: a folder's items, each
