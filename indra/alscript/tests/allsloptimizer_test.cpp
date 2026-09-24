@@ -561,7 +561,7 @@ namespace tut
     template<> template<>
     void allsloptimizer_object::test<15>()
     {
-        set_test_name("a return in the body becomes a jump to a label after the block, and a round takes every call that does not cross another's edit");
+        set_test_name("a return in the body becomes a jump to a label that ends the block, and a round takes every call that does not cross another's edit");
         const std::string source =
             "check(integer n)\n"
             "{\n"
@@ -592,7 +592,7 @@ namespace tut
         ALLSLInliner::Result put = ALLSLInliner::run(source);
         auto has = [&put](const char* text) { return put.text.find(text) != std::string::npos; };
         ensure("the returns are jumps: " + put.text, has("if (n < 0) jump _ret_1;") && has("        jump _ret_1;"));
-        ensure("to a label after the block: " + put.text, has("}@_ret_1;"));
+        ensure("to a label that ends the block: " + put.text, has("@_ret_1;\n}") || has("@_ret_1;\n        }"));
         const ALLSLInliner::Result trailing = ALLSLInliner::run("f()\n{\n    llSay(0, \"x\");\n    return;\n}\ndefault\n{\n    state_entry()\n    {\n        f();\n    }\n}\n");
         ensure("a return that ends the body is just dropped: " + trailing.text, trailing.text.find("jump") == std::string::npos && trailing.text.find("@_ret") == std::string::npos &&
                trailing.text.find("llSay(0, \"x\");") != std::string::npos);
@@ -945,5 +945,33 @@ namespace tut
         // Where the inner if has an else of its own, nothing is added.
         r = ALLSLOptimizer::run(wrap("integer c;\ninteger d = 1;\n", "        if (!c) llOwnerSay(\"A\"); else if (d) llOwnerSay(\"B\"); else llOwnerSay(\"C\");\n        c = 1; d = 0;\n"), options());
         ensure("no braces an else chain does not need: " + r.text, r.text.find('{', r.text.find("if (c)")) > r.text.find("llOwnerSay(\"A\")"));
+    }
+    template<> template<>
+    void allsloptimizer_object::test<25>()
+    {
+        set_test_name("a call that is the whole of a loop's body or an if's branch, written without braces, keeps its return inside the loop or the branch");
+        const std::string fn =
+            "skip(integer n)\n"
+            "{\n"
+            "    if (n == 2) return;\n"
+            "    llOwnerSay((string)n);\n"
+            "}\n";
+        // A return is the end of this time round, not of the loop.
+        ALLSLInliner::Result put = ALLSLInliner::run(fn + wrap("", "        integer i;\n        for (i = 0; i < 5; ++i) skip(i);\n        llOwnerSay(\"done\");\n"));
+        const size_t label = put.text.find("@_ret_1;");
+        const size_t close = put.text.find('}', label);
+        ensure("went in: " + put.text, put.inlined == 1 && label != std::string::npos && put.text.find("jump _ret_1;") != std::string::npos);
+        ensure("the label ends the loop's body, before anything after the loop: " + put.text,
+               close != std::string::npos && close < put.text.find("llOwnerSay(\"done\");"));
+        ALLSLOptimizer::Options o = options();
+        o.inlining                = true;
+        ALLSLOptimizer::Result r  = ALLSLOptimizer::run(fn + wrap("", "        integer i;\n        for (i = 0; i < 5; ++i) skip(i);\n        llOwnerSay(\"done\");\n"), o);
+        ensure("the optimizer reads it: " + notes(r) + r.text, r.optimized);
+        // Between an if and its else, a label after the block was a
+        // syntax error the user never wrote.
+        put = ALLSLInliner::run(fn + wrap("integer g;\n", "        if (g) skip(g); else llOwnerSay(\"none\");\n"));
+        ensure("went in: " + put.text, put.inlined == 1);
+        r = ALLSLOptimizer::run(fn + wrap("integer g;\n", "        if (g) skip(g); else llOwnerSay(\"none\");\n        g = llGetUnixTime();\n"), o);
+        ensure("the else still follows its if: " + notes(r) + r.text, r.optimized && r.text.find("else") != std::string::npos);
     }
 } // namespace tut

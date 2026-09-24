@@ -481,7 +481,7 @@ namespace
             // but a call's arguments left to right, in LSO and Mono alike,
             // so an argument that changes something changes it when the
             // call would have. A return in the body is
-            // a jump to a label after the block; the body's own labels
+            // a jump to a label that ends the block; the body's own labels
             // get fresh names, since a label is one to a function; a
             // state change cannot go.
             std::vector<LSLASTNode*> returns;
@@ -558,7 +558,7 @@ namespace
                 }
             }
             // A return that is the body's last statement is the end of the
-            // block anyway; the rest are jumps to a label after it.
+            // block anyway; the rest are jumps to a label at its end.
             LSLASTNode* lastStatement = nullptr;
             for (LSLASTNode* child = body->getChild(0); child; child = child->getNext())
             {
@@ -570,7 +570,11 @@ namespace
             // The label a return jumps to: the one already after the
             // call's statement, where the next statement is a label --
             // a loop's continue label, say -- since two labels at one
-            // place are one too many; else a fresh one after the block.
+            // place are one too many; else a fresh one as the block's
+            // last statement. Inside the block, not after it: the call
+            // may be the whole body of a loop or an if written without
+            // braces, where a label after the block would stand after
+            // the loop, or between the if and its else.
             std::string after;
             bool        afterIsOwn = false;
             if (LSLASTNode* next = statement->getNext(); next && next->getNodeType() == NODE_STATEMENT && next->getNodeSubType() == NODE_LABEL &&
@@ -598,8 +602,8 @@ namespace
             std::sort(renames.begin(), renames.end(), [](const Rename& a, const Rename& b) { return a.begin < b.begin; });
 
             // The block: an opening brace at the call, the parameters as
-            // locals, the body's own lines between its braces, a closing
-            // brace, and the label a return jumps to.
+            // locals, the body's own lines between its braces, the label
+            // a return jumps to, and a closing brace.
             const Pos bbegin = beginOf(body);
             const Pos bend   = endOf(body);
             const Pos inner_begin{ bbegin.line, bbegin.column + 1 };
@@ -626,12 +630,11 @@ namespace
             {
                 block.push_back(std::move(line));
             }
-            PieceLine closing{ Piece{ "}", endOf(statement), false } };
             if (afterIsOwn)
             {
-                closing.push_back(Piece{ "@" + after + ";", endOf(statement), false });
+                block.push_back(PieceLine{ Piece{ "@" + after + ";", endOf(statement), false } });
             }
-            block.push_back(std::move(closing));
+            block.push_back(PieceLine{ Piece{ "}", endOf(statement), false } });
             out.edit     = Edit{ beginOf(statement), endOf(statement), std::move(block) };
             out.note     = noteAt(statement, last ? "InlinerPutFunctionOnce" : "InlinerPutFunction",
                                   last ? "put the function [1] in place of its one call" : "put the function [1] in place of a call", { sym->getName() });
