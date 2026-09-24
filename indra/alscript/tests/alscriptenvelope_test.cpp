@@ -32,6 +32,21 @@ namespace tut
 {
     struct alscriptenvelope_data
     {
+        // Lexes the long comment an SLua envelope opens with as Luau does:
+        // the level from the opener, then the body up to the first closer of
+        // that level, wherever that falls. Answers where that closer starts.
+        static size_t luaCommentEnd(const std::string& asset, size_t& level, size_t& body)
+        {
+            body  = std::string_view("--start_unprocessed_text\n--[").size();
+            level = 0;
+            while (body < asset.size() && asset[body] == '=')
+            {
+                ++level;
+                ++body;
+            }
+            ++body;
+            return asset.find("]" + std::string(level, '=') + "]", body);
+        }
     };
 
     typedef test_group<alscriptenvelope_data> alscriptenvelope_group;
@@ -139,5 +154,52 @@ namespace tut
         ensure_equals("not mid-line", ALScriptEnvelope::directiveOf("x //mono\n", false), std::string());
         ensure_equals("lua", ALScriptEnvelope::directiveOf("--luau\n", true), std::string("luau"));
         ensure_equals("not lua's in lsl", ALScriptEnvelope::directiveOf("--luau\n", false), std::string());
+    }
+
+    template<> template<>
+    void alscriptenvelope_object::test<6>()
+    {
+        set_test_name("SLua's long comment closes where the source ends, not at a closer the source's tail makes with it");
+        struct Case
+        {
+            std::string name;
+            std::string source;
+            size_t      level;
+        };
+        const Case cases[] = {
+            // At level zero, t[1]]] would close at the source's own ].
+            { "ending in ]", "return t[1]", 1 },
+            // ]=]] is safe at level zero; only ]=]=] at level one closes early.
+            { "ending in ]=", "-- t[1]=", 0 },
+            // Level zero is out for the ]] inside; ]]]=] is safe at level one.
+            { "ending in ]]", "local s = [[a]]", 1 },
+            // Level zero is out for the ]], level one for the ]=]=] at the join.
+            { "holding ]] and ending in ]=", "local s = [[a]]\n-- t[1]=", 2 },
+        };
+        for (const Case& c : cases)
+        {
+            ALScriptEnvelope envelope;
+            envelope.lua            = true;
+            envelope.source         = c.source;
+            envelope.expanded       = "print('x')\n";
+            envelope.compileTarget  = "luau";
+            envelope.programVersion = "Alchemy";
+            envelope.lastCompiled   = "now";
+            const std::string asset = envelope.wrap();
+
+            size_t       level = 0;
+            size_t       body  = 0;
+            const size_t end   = luaCommentEnd(asset, level, body);
+            ensure_equals(c.name + ": the level", level, c.level);
+            ensure_equals(c.name + ": the comment closes where the source ends", end, body + c.source.size());
+            ensure_equals(c.name + ": and the end line follows the closer",
+                          asset.substr(end + level + 2, 24),
+                          std::string("\n--end_unprocessed_text\n"));
+
+            std::optional<ALScriptEnvelope> back = ALScriptEnvelope::parse(asset);
+            ensure(c.name + ": reads back", back.has_value());
+            ensure_equals(c.name + ": the source", back->source, c.source);
+            ensure_equals(c.name + ": the expanded code", back->expanded, envelope.expanded);
+        }
     }
 }

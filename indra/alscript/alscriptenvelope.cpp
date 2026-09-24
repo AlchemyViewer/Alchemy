@@ -81,14 +81,19 @@ namespace
         return false;
     }
 
-    // The smallest long-bracket level whose closer the source does not
-    // contain.
+    // The smallest long-bracket level whose closer first turns up where
+    // wrap() puts it, after the source: not inside the source, and not
+    // across the join either, as a source ending in ] would make ]] with
+    // the level-zero closer's first ] and close the comment a byte early.
     S32 luaBracketLevel(std::string_view source)
     {
+        std::string joined(source);
         for (S32 level = 0;; ++level)
         {
-            std::string closer = "]" + std::string(static_cast<size_t>(level), '=') + "]";
-            if (source.find(closer) == std::string_view::npos)
+            const std::string closer = "]" + std::string(static_cast<size_t>(level), '=') + "]";
+            joined.resize(source.size());
+            joined += closer;
+            if (joined.find(closer) == source.size())
             {
                 return level;
             }
