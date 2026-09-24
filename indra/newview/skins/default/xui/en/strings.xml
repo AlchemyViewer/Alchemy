@@ -565,6 +565,8 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="ScriptActionInterpolate">Write it as an interpolated string</string>
 	<string name="ScriptActionInvertIf">Invert the if</string>
 	<string name="ScriptActionHandler">Add a handler for '[1]'</string>
+	<string name="ScriptActionStringGlobal">Put the string in a global, '[1]', for its [2] uses</string>
+	<string name="ScriptActionListSum">Write the list as a sum</string>
 
 	<!-- What the engines say, taken apart by ALMessageMap and said again
 	     with the words put in: Tailslide's messages by their error code,

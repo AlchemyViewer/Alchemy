@@ -1645,6 +1645,143 @@ namespace
         }
     }
 
+    // Whether a stretch of text is one string literal as written, quote to
+    // quote with nothing but what is escaped between.
+    bool stringLiteral(std::string_view text)
+    {
+        if (text.size() < 2 || text.front() != '"' || text.back() != '"')
+        {
+            return false;
+        }
+        for (size_t i = 1; i + 1 < text.size(); ++i)
+        {
+            if (text[i] == '\\')
+            {
+                ++i;
+            }
+            else if (text[i] == '"')
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    // Whether a node is in a function's or a handler's body, rather than a
+    // global's value.
+    bool inBody(Tailslide::LSLASTNode* node)
+    {
+        for (; node; node = node->getParent())
+        {
+            const Tailslide::LSLNodeType type = node->getNodeType();
+            if (type == Tailslide::NODE_GLOBAL_VARIABLE)
+            {
+                return false;
+            }
+            if (type == Tailslide::NODE_GLOBAL_FUNCTION || type == Tailslide::NODE_EVENT_HANDLER)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // Every node under one, in the order written.
+    template <typename Each> void eachNode(Tailslide::LSLASTNode* node, Each&& each)
+    {
+        for (; node; node = node->getNext())
+        {
+            each(node);
+            eachNode(node->getChild(0), each);
+        }
+    }
+
+    // A global's name for a string: `g` and the first few words of it,
+    // each begun in capitals -- "touched by" as gTouchedBy -- or gText where
+    // it has none.
+    std::string globalNameFor(std::string_view literal)
+    {
+        std::string name  = "g";
+        S32         words = 0;
+        bool        start = true;
+        for (size_t i = 1; i + 1 < literal.size(); ++i)
+        {
+            const unsigned char c = static_cast<unsigned char>(literal[i]);
+            if (c == '\\')
+            {
+                // An escape, `\n` and the like, is no letter of a word.
+                ++i;
+                start = true;
+                continue;
+            }
+            if (c >= 0x80 || !isalnum(c))
+            {
+                start = true;
+                continue;
+            }
+            if (start)
+            {
+                if (words == 3)
+                {
+                    break;
+                }
+                ++words;
+                start = false;
+                name += static_cast<char>(toupper(c));
+            }
+            else if (name.size() < 24)
+            {
+                name += static_cast<char>(c);
+            }
+        }
+        return name.size() > 1 ? name : std::string("gText");
+    }
+
+    // Whether an expression may stand as it is on either side of a `+`, or
+    // after a cast, and mean what it meant alone: a name, a call, a
+    // literal not begun by a sign, what is in brackets already.
+    bool bareOperand(std::string_view source, Tailslide::LSLASTNode* node)
+    {
+        if (isExpression(node, Tailslide::NODE_LVALUE_EXPRESSION) || isExpression(node, Tailslide::NODE_FUNCTION_EXPRESSION) ||
+            isExpression(node, Tailslide::NODE_PARENTHESIS_EXPRESSION) || isExpression(node, Tailslide::NODE_VECTOR_EXPRESSION) ||
+            isExpression(node, Tailslide::NODE_QUATERNION_EXPRESSION))
+        {
+            return true;
+        }
+        // A constant written as one word or number, or one string: not what
+        // the tree may have folded from more, `2 + 3`, nor a sign before it.
+        const std::string_view text = textOf(source, node);
+        if (!isExpression(node, Tailslide::NODE_CONSTANT_EXPRESSION) || text.empty())
+        {
+            return false;
+        }
+        return stringLiteral(text) ||
+               std::all_of(text.begin(), text.end(), [](char c) { return isalnum(static_cast<unsigned char>(c)) || c == '_' || c == '.'; });
+    }
+
+    // Whether an expression is the whole of what it is given to -- a
+    // declaration's value, what is assigned or returned, an argument -- so
+    // that what is written in its place needs no brackets of its own.
+    bool standsWhole(Tailslide::LSLASTNode* node)
+    {
+        Tailslide::LSLASTNode* parent = node->getParent();
+        if (!parent)
+        {
+            return false;
+        }
+        if (isStatement(parent, Tailslide::NODE_DECLARATION) || isStatement(parent, Tailslide::NODE_RETURN_STATEMENT) ||
+            isStatement(parent, Tailslide::NODE_EXPRESSION_STATEMENT))
+        {
+            return true;
+        }
+        if (isExpression(parent, Tailslide::NODE_BINARY_EXPRESSION) && static_cast<Tailslide::LSLExpression*>(parent)->getOperation() == Tailslide::OP_ASSIGN &&
+            parent->getChild(1) == node)
+        {
+            return true;
+        }
+        return parent->getNodeType() == Tailslide::NODE_AST_NODE_LIST && isExpression(parent->getParent(), Tailslide::NODE_FUNCTION_EXPRESSION);
+    }
+
     // The leading blanks of the line a zero-based place is on.
     std::string indentOf(std::string_view source, S32 line)
     {
@@ -1845,6 +1982,98 @@ std::vector<ALScriptFix> ALLSLService::actions(std::string_view source, S32 line
             {
                 replace(fix, { whole.endLine, close, whole.endLine, close }, "\n" + handler);
             }
+            out.push_back(std::move(fix));
+        }
+    }
+
+    // A string written the same several times over, put in a global of its
+    // own and each place it stands given the global's name: one copy of it
+    // in the script where a target keeps one at each use. Only the places
+    // in a function or a handler -- a global's value may not be another
+    // global -- and only where there are two of them or more. The global
+    // after the globals the script opens with, else ahead of what it opens
+    // with.
+    Tailslide::LSLASTNode* literal = nullptr;
+    for (auto it = path.rbegin(); it != path.rend() && !literal; ++it)
+    {
+        if (isExpression(*it, Tailslide::NODE_CONSTANT_EXPRESSION) && stringLiteral(textOf(source, *it)))
+        {
+            literal = *it;
+        }
+    }
+    Tailslide::LSLASTNode* globals = script->getGlobals();
+    if (literal && inBody(literal) && globals)
+    {
+        const std::string         written(textOf(source, literal));
+        std::vector<ALScriptSpan> uses;
+        eachNode(script->getChild(0), [&](Tailslide::LSLASTNode* node) {
+            if (isExpression(node, Tailslide::NODE_CONSTANT_EXPRESSION) && inBody(node) && textOf(source, node) == written)
+            {
+                uses.push_back(spanOf(*node->getLoc()));
+            }
+        });
+        Tailslide::LSLASTNode* last_global = nullptr;
+        Tailslide::LSLASTNode* first_other = nullptr;
+        for (Tailslide::LSLASTNode* global = globals->getChild(0); global && !first_other; global = global->getNext())
+        {
+            (global->getNodeType() == Tailslide::NODE_GLOBAL_VARIABLE ? last_global : first_other) = global;
+        }
+        if (!first_other && script->getStates())
+        {
+            first_other = script->getStates()->getChild(0);
+        }
+        if (uses.size() >= 2 && (last_global || first_other))
+        {
+            const std::string name = ALScriptFixes::freshName(source, globalNameFor(written));
+            ALScriptFix       fix  = refactor(ALScriptFixes::titled("ScriptActionStringGlobal", "Put the string in a global, '[1]', for its [2] uses",
+                                                                    { name, std::to_string(uses.size()) }));
+            const std::string declaration = "string " + name + " = " + written + ";\n";
+            if (last_global)
+            {
+                const S32 after = zeroBased(last_global->getLoc()->last_line) + 1;
+                replace(fix, { after, 0, after, 0 }, declaration);
+            }
+            else
+            {
+                const S32 before = zeroBased(first_other->getLoc()->first_line);
+                replace(fix, { before, 0, before, 0 }, declaration + "\n");
+            }
+            for (const ALScriptSpan& use : uses)
+            {
+                replace(fix, use, name);
+            }
+            out.push_back(std::move(fix));
+        }
+    }
+
+    // A list written out, written as a sum: the first element cast, the
+    // rest added to it, which Mono makes without boxing each. Each element
+    // in brackets where it would not mean alone what it meant, and the sum
+    // where it is part of something more. Not in a global's value, which
+    // must be written out.
+    Tailslide::LSLASTNode* list = nullptr;
+    for (auto it = path.rbegin(); it != path.rend() && !list; ++it)
+    {
+        if (isExpression(*it, Tailslide::NODE_LIST_EXPRESSION))
+        {
+            list = *it;
+        }
+    }
+    if (list && inBody(list) && present(list->getChild(0)))
+    {
+        std::string sum;
+        bool        whole = true;
+        for (Tailslide::LSLASTNode* element = list->getChild(0); element && whole; element = element->getNext())
+        {
+            const std::string text(textOf(source, element));
+            whole = present(element) && !text.empty();
+            const std::string operand = bareOperand(source, element) ? text : "(" + text + ")";
+            sum += sum.empty() ? "(list)" + operand : " + " + operand;
+        }
+        if (whole)
+        {
+            ALScriptFix fix = refactor(ALScriptFixes::titled("ScriptActionListSum", "Write the list as a sum", {}));
+            replace(fix, spanOf(*list->getLoc()), standsWhole(list) ? sum : "(" + sum + ")");
             out.push_back(std::move(fix));
         }
     }

@@ -25,6 +25,7 @@
 #include "linden_common.h"
 
 #include "../alscriptfixes.h"
+#include "../alscriptweight.h"
 
 #include "../allslexports.h"
 #include "../alluauexports.h"
@@ -811,5 +812,64 @@ namespace tut
         ensure("whole lines taken out", into(edited(5, 0, 6, 0, ""), out));
         ensure("that line gone, the rest kept", out.find("hello") == std::string::npos && out.find("\"bye\"") != std::string::npos &&
                                                    out.find("(string)") != std::string::npos);
+    }
+
+    template<> template<>
+    void object::test<28>()
+    {
+        set_test_name("a string written the same several times over goes into a global after the ones the script opens with, each use named");
+        ensure("builtins: " + error, lslLoaded);
+        const std::string script = "string gGreeting = \"hello there\";\n"
+                                   "default\n{\n    state_entry()\n    {\n        llOwnerSay(\"hello there\");\n"
+                                   "        llSetText(\"hello there\", <1.0, 1.0, 1.0>, 1.0);\n    }\n"
+                                   "    touch_start(integer n)\n    {\n        llOwnerSay(\"hello there\");\n        llOwnerSay(\"other\");\n    }\n}\n";
+        const std::string made = actedOn(script, false, "\"hello there\");", false, "Put the string in a global, 'gHelloThere', for its 3 uses");
+        ensure_equals("declared after the globals, each use named, the global's own value kept", made,
+                      "string gGreeting = \"hello there\";\nstring gHelloThere = \"hello there\";\n"
+                      "default\n{\n    state_entry()\n    {\n        llOwnerSay(gHelloThere);\n"
+                      "        llSetText(gHelloThere, <1.0, 1.0, 1.0>, 1.0);\n    }\n"
+                      "    touch_start(integer n)\n    {\n        llOwnerSay(gHelloThere);\n        llOwnerSay(\"other\");\n    }\n}\n");
+        // A short one costs more as a global than it saves: the list says
+        // so, weighing it. A long one, used as often, is lighter.
+        ensure("heavier on LSO: " + std::to_string(ALScriptWeigh::lso(made).total) + " from " + std::to_string(ALScriptWeigh::lso(script).total),
+               ALScriptWeigh::lso(made).total >= ALScriptWeigh::lso(script).total);
+        std::string long_script = script;
+        std::string long_made   = made;
+        for (std::string* text : { &long_script, &long_made })
+        {
+            for (size_t at = text->find("hello there"); at != std::string::npos; at = text->find("hello there", at + 1))
+            {
+                text->replace(at, 11, "hello there, and a sentence of some length said to the owner");
+            }
+        }
+        ensure("a long one lighter on LSO: " + std::to_string(ALScriptWeigh::lso(long_made).total) + " from " +
+                   std::to_string(ALScriptWeigh::lso(long_script).total),
+               ALScriptWeigh::lso(long_made).total < ALScriptWeigh::lso(long_script).total);
+        ensure("not for a string used once", actedOn(script, false, "\"other\"", false, "Put the string in a global, 'gOther', for its 1 uses").rfind("offered", 0) == 0);
+
+        // No globals to follow: ahead of what the script opens with.
+        const std::string bare = "default\n{\n    state_entry()\n    {\n        llOwnerSay(\"hi\\n\");\n        llOwnerSay(\"hi\\n\");\n    }\n}\n";
+        const std::string placed = actedOn(bare, false, "\"hi", false, "Put the string in a global, 'gHi', for its 2 uses");
+        ensure("ahead of the state, a blank line after: " + placed, placed.rfind("string gHi = \"hi\\n\";\n\ndefault\n", 0) == 0);
+    }
+
+    template<> template<>
+    void object::test<29>()
+    {
+        set_test_name("a list written out is written as a sum, each element meaning what it meant, and the sum bracketed where it is part of more");
+        ensure("builtins: " + error, lslLoaded);
+        const std::string script = "list gFixed = [1, 2];\n"
+                                   "default\n{\n    state_entry()\n    {\n        integer n = 5;\n"
+                                   "        list l = [n, \"two\", <3.0, 3.0, 3.0>, -4, n + 3, llGetListLength(gFixed)];\n"
+                                   "        llOwnerSay((string)[1, 2]);\n    }\n}\n";
+        std::string made = actedOn(script, false, "[n,", false, "Write the list as a sum");
+        ensure_equals("each where it would mean what it meant", made,
+                      "list gFixed = [1, 2];\n"
+                      "default\n{\n    state_entry()\n    {\n        integer n = 5;\n"
+                      "        list l = (list)n + \"two\" + <3.0, 3.0, 3.0> + (-4) + (n + 3) + llGetListLength(gFixed);\n"
+                      "        llOwnerSay((string)[1, 2]);\n    }\n}\n");
+        made = actedOn(script, false, "[1, 2]);", false, "Write the list as a sum");
+        ensure("bracketed under a cast: " + made, made.find("llOwnerSay((string)((list)1 + 2));") != std::string::npos);
+        ensure("not a global's value, which must be written out", actedOn(script, false, "[1, 2];", false, "Write the list as a sum").rfind("offered", 0) == 0);
     }
 }
