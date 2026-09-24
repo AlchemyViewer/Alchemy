@@ -16,6 +16,7 @@ target_sources(
     alluauconfig.cpp
     alluauexports.cpp
     alluauservice.cpp
+    allslexports.cpp
     allslservice.cpp
     allsltraits.cpp
     alpreprocessor.cpp
@@ -41,6 +42,7 @@ target_sources(
         alluauconfig.h
         alluauexports.h
         alluauservice.h
+        allslexports.h
         allslservice.h
         allsltraits.h
         alpreprocessor.h

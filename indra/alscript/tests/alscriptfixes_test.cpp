@@ -26,6 +26,7 @@
 
 #include "../alscriptfixes.h"
 
+#include "../allslexports.h"
 #include "../alluauexports.h"
 
 #include "../allslservice.h"
@@ -706,5 +707,66 @@ namespace tut
         ALScriptFixes::offerRequire(problem, "print(util)\n", "util", false);
         ensure_equals("offered once", problem.fixes.size(), static_cast<size_t>(1));
         ensure("neither preferred nor safe", !problem.fixes.front().preferred && !problem.fixes.front().safe);
+    }
+
+    template<> template<>
+    void object::test<25>()
+    {
+        set_test_name("an LSL include declares its macros and the functions and globals at its top, a fragment and all");
+        const auto listed = [](const std::string& source) {
+            std::string out;
+            for (const std::string& name : ALLSLExports::of(source))
+            {
+                out += (out.empty() ? "" : " ") + name;
+            }
+            return out;
+        };
+        ensure_equals("everything at the top",
+                      listed("// helpers\n#define CHANNEL -42\n#define say(x) \\\n    llOwnerSay(x)\n#ifdef DEBUG\n#include \"more.lsl\"\n#endif\n"
+                             "integer gCount = 0;\nlist gSeen;\nvector gAt = <1, 2, 3>;\n"
+                             "string greet(string name)\n{\n    integer inner = 1;\n    return \"hi \" + name;\n}\n"
+                             "reset() { gCount = 0; }\ninline integer twice(integer n) { return n * 2; }\n"),
+                      std::string("CHANNEL say gCount gSeen gAt greet reset twice"));
+        ensure_equals("a state holds no declarations",
+                      listed("integer shared;\ndefault\n{\n    state_entry()\n    {\n        integer local = 1;\n    }\n}\nstate other { touch_start(integer n) {} }\n"),
+                      std::string("shared"));
+        ensure_equals("each once", listed("#define A 1\n#undef A\n#define A 2\n"), std::string("A"));
+        ensure_equals("SLua is no LSL", listed("local function greet() end\nprint(greet())\nreturn { greet = greet }\n"), std::string());
+    }
+
+    template<> template<>
+    void object::test<26>()
+    {
+        set_test_name("an include goes after the directives an LSL script opens with, else after its comments, apart from the code");
+        ALScriptProblem problem;
+        problem.key  = "LSLUndeclared";
+        problem.args = { "greet" };
+        const auto made = [&problem](const std::string& text, const std::string& include) {
+            problem.fixes.clear();
+            ALScriptFixes::offerInclude(problem, text, include);
+            return problem.fixes.empty() ? std::string("none") : ALScriptFixes::apply(text, problem.fixes.front()).value_or("refused");
+        };
+        ensure_equals("after the last directive",
+                      made("// Hello\n#include \"a.lsl\"\n#define LONG \\\n    1\n\ndefault {}\n", "helpers.lsl"),
+                      std::string("// Hello\n#include \"a.lsl\"\n#define LONG \\\n    1\n#include \"helpers.lsl\"\n\ndefault {}\n"));
+        ensure_equals("its words", problem.fixes.front().title, std::string("Include 'helpers.lsl'"));
+        ensure_equals("after the comments, the blank line kept", made("/* A header\n   over lines */\n\ndefault {}\n", "helpers"),
+                      std::string("/* A header\n   over lines */\n#include \"helpers\"\n\ndefault {}\n"));
+        ensure_equals("apart from code that follows at once", made("default {}\n", "helpers"), std::string("#include \"helpers\"\n\ndefault {}\n"));
+        ensure_equals("no name with a quote in it", made("default {}\n", "a\"b"), std::string("none"));
+        // What the studio offers them on: a function, a global and a macro
+        // alike, each undeclared by its name.
+        ensure("builtins: " + error, lslLoaded);
+        const ALScriptProblems problems =
+            check("default\n{\n    state_entry()\n    {\n        greet(\"x\");\n        llOwnerSay((string)gCount);\n        llSay(CHANNEL, \"\");\n    }\n}\n", false);
+        for (const char* name : { "greet", "gCount", "CHANNEL" })
+        {
+            bool said_so = false;
+            for (const ALScriptProblem& each : problems)
+            {
+                said_so = said_so || (each.key == "LSLUndeclared" && each.args.size() == 1 && each.args[0] == name);
+            }
+            ensure(std::string("undeclared: ") + name + "\n" + said(problems), said_so);
+        }
     }
 }

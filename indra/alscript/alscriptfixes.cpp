@@ -809,6 +809,60 @@ namespace
         return after_comments;
     }
 
+    // Where an include goes at the top of an LSL script: after the last of
+    // the directives it opens with -- its includes, and the defines that
+    // may say how an include is read -- else after the comments it opens
+    // with, apart from code that would stand against it.
+    S32 includeLine(const Lines& lines, bool& apart)
+    {
+        S32  after_comments = 0;
+        S32  last_directive = -1;
+        bool in_block       = false;
+        for (S32 i = 0; i < lines.count(); ++i)
+        {
+            std::string_view line = lines.line(i);
+            const size_t     lead = line.find_first_not_of(" \t");
+            line                  = lead == std::string_view::npos ? std::string_view() : line.substr(lead);
+            if (in_block)
+            {
+                in_block = line.find("*/") == std::string_view::npos;
+                if (last_directive < 0)
+                {
+                    after_comments = i + 1;
+                }
+                continue;
+            }
+            if (line.empty())
+            {
+                continue;
+            }
+            if (line.compare(0, 2, "//") == 0 || line.compare(0, 2, "/*") == 0)
+            {
+                in_block = line.compare(0, 2, "/*") == 0 && line.find("*/", 2) == std::string_view::npos;
+                if (last_directive < 0)
+                {
+                    after_comments = i + 1;
+                }
+                continue;
+            }
+            if (line.front() == '#')
+            {
+                // With the lines a backslash carries it on to.
+                last_directive = i;
+                while (!lines.line(last_directive).empty() && lines.line(last_directive).back() == '\\' && last_directive + 1 < lines.count())
+                {
+                    ++last_directive;
+                }
+                i = last_directive;
+                continue;
+            }
+            break;
+        }
+        const S32 at = last_directive >= 0 ? last_directive + 1 : after_comments;
+        apart        = last_directive < 0 && at < lines.count() && lines.line(at).find_first_not_of(" \t") != std::string_view::npos;
+        return at;
+    }
+
     // A module's name as a string in the script's source.
     std::string luaString(std::string_view name)
     {
@@ -1237,6 +1291,39 @@ namespace ALScriptFixes
         }
         ALScriptFix fix = field ? titled("ScriptFixRequireField", "Take '[1]' from '[2]'", { name, module })
                                 : titled("ScriptFixRequire", "Require '[1]'", { module });
+        fix.edits.push_back({ line, column, line, column, said });
+        problem.fixes.push_back(std::move(fix));
+    }
+
+    void offerInclude(ALScriptProblem& problem, std::string_view text, const std::string& include)
+    {
+        if (problem.args.size() != 1 || !isIdentifier(problem.args[0]) || include.empty() || include.find_first_of("\"\n\r") != std::string::npos)
+        {
+            return;
+        }
+        const Lines lines(text);
+        bool        apart  = false;
+        S32         line   = includeLine(lines, apart);
+        S32         column = 0;
+        std::string said   = "#include \"" + include + "\"";
+        if (line >= lines.count())
+        {
+            line   = lines.count() - 1;
+            column = static_cast<S32>(lines.line(line).size());
+            said   = "\n" + said;
+        }
+        else
+        {
+            said += apart ? "\n\n" : "\n";
+        }
+        for (const ALScriptFix& had : problem.fixes)
+        {
+            if (!had.edits.empty() && had.edits.front().text == said)
+            {
+                return;
+            }
+        }
+        ALScriptFix fix = titled("ScriptFixInclude", "Include '[1]'", { include });
         fix.edits.push_back({ line, column, line, column, said });
         problem.fixes.push_back(std::move(fix));
     }

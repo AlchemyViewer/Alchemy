@@ -97,6 +97,10 @@ namespace ALScriptFixes
     // preferred nor safe here: which module is meant, and whether running
     // it is wanted, is the caller's to know.
     void offerRequire(ALScriptProblem& problem, std::string_view text, const std::string& module, bool field);
+    // The same for LSL: `#include "include"` for a name an include
+    // declares -- a function, a global, a macro -- after the directives
+    // `text` opens with, else after its comments.
+    void offerInclude(ALScriptProblem& problem, std::string_view text, const std::string& include);
 
     // A name for something a refactor makes in `text`: `base`, else
     // `base2`, `base3` and on -- one that stands nowhere in it as a word,
