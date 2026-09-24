@@ -299,6 +299,17 @@
             <key>Value</key>
             <integer>0</integer>
         </map>
+        <key>ALScriptPreprocWorldIncludes</key>
+        <map>
+            <key>Comment</key>
+            <string>The preprocessor resolves #include and require from the object holding the script and from the agent's inventory. Off, only folders on disk are looked in.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
         <key>ALScriptPreprocEnabled</key>
         <map>
             <key>Comment</key>

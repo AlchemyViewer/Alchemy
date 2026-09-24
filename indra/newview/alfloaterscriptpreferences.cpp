@@ -65,7 +65,7 @@ namespace
         "ALScriptPreprocLazyLists",  "ALScriptPreprocCompress",    "ALScriptPreprocOptimizer",
         "ALScriptPreprocOptimizerShrinkNames", "ALScriptPreprocOptimizerAddStrings",
         "ALScriptPreprocOptimizerInlining",     "ALScriptPreprocExtensions",
-        "ALScriptPreprocDiskIncludes", "ALScriptPreprocDiskIncludeFolder", "ALScriptPreprocIncludeOrder",
+        "ALScriptPreprocDiskIncludes", "ALScriptPreprocDiskIncludeFolder", "ALScriptPreprocIncludeOrder", "ALScriptPreprocWorldIncludes",
         "ALScriptStudioTabWidth",    "ALScriptStudioInsertSpaces",
         "ALScriptLintLevels",        "ALScriptLuauMode",
         "ALScriptStudioAutoComplete", "ALScriptStudioCompleteAfter", "ALScriptStudioAcceptOnEnter", "ALScriptStudioAutoClose",

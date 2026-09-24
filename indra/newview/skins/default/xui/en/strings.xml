@@ -475,6 +475,8 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="PreprocTooMuch">the macros expand to more than this preprocessor will make; nothing was preprocessed</string>
 	<string name="PreprocExpressionTooDeep">the expression nests too deeply for this preprocessor</string>
 	<string name="PreprocMacrosTooDeep">macros are invoked inside each other's arguments more deeply than this preprocessor follows; nothing was preprocessed</string>
+	<string name="PreprocIncludeInWorld">could not find include file '[1]': one so named is in the object or the inventory, which includes are not taken from unless Script Studio's preferences say so</string>
+	<string name="PreprocModuleInWorld">could not find module '[1]': one so named is in the object or the inventory, which modules are not taken from unless Script Studio's preferences say so</string>
 	<string name="PreprocObjectUnanswered">the object this script is in did not say what it holds -- it did not answer in time, or is out of view -- so no include was looked for in it; save again once it answers</string>
 	<string name="PreprocNestsTooDeep">blocks nest more deeply than this preprocessor follows; nothing was preprocessed</string>
 	<string name="PreprocIncludeNeedsClose">missing '&gt;' in #include</string>

@@ -238,6 +238,13 @@ bool ALScriptPreprocessor::enabled()
 }
 
 // static
+bool ALScriptPreprocessor::worldIncludes()
+{
+    static LLCachedControl<bool> on(gSavedSettings, "ALScriptPreprocWorldIncludes", false);
+    return on;
+}
+
+// static
 bool ALScriptPreprocessor::refOf(const std::string& path, ALScriptRef& ref)
 {
     if (path.compare(0, OBJECT_PREFIX.size(), OBJECT_PREFIX) == 0)
@@ -417,8 +424,14 @@ std::vector<ALScriptPreprocessor::Candidate> ALScriptPreprocessor::candidatesFor
     static LLCachedControl<std::string> order(gSavedSettings, "ALScriptPreprocIncludeOrder", "inventory object disk");
     std::istringstream                  sources(order());
     std::string                         source;
+    const bool                          world = worldIncludes();
     while (sources >> source)
     {
+        // The world only where the scripter let it in.
+        if (!world && (source == "object" || source == "inventory"))
+        {
+            continue;
+        }
         if (source == "object")
         {
             if (request.ref.inInventory())
@@ -971,7 +984,8 @@ void ALScriptPreprocessor::start(const Request& request, callback_t callback, bo
             job->askKeys.insert(ALScriptSnapshot::keyOf(ask));
         }
     }
-    if (request.ref.inInventory())
+    // Nothing to ask an object where includes are not taken from it.
+    if (request.ref.inInventory() || !worldIncludes())
     {
         attemptJob(job);
         return;
@@ -1125,8 +1139,41 @@ void ALScriptPreprocessor::finish(const std::shared_ptr<Job>& job, ALPreprocesso
             result.problems.insert(result.problems.begin(), unanswered);
         }
     }
+    // What could not be found where includes are not taken from the world,
+    // with one so named in the object or the inventory: said so, and where
+    // it is let in, since that is what a script saved by somebody who
+    // took its includes from their inventory runs into.
+    if (!worldIncludes())
+    {
+        for (ALScriptProblem& problem : result.problems)
+        {
+            const bool include = problem.key == "PreprocIncludeNotFound";
+            if ((!include && problem.key != "PreprocModuleNotFound") || problem.args.size() != 1 || !inWorld(job->request, problem.args[0]))
+            {
+                continue;
+            }
+            problem.key     = include ? "PreprocIncludeInWorld" : "PreprocModuleInWorld";
+            problem.message = ALScriptProblem::fill(include ? "could not find include file '[1]': one so named is in the object or the inventory, "
+                                                              "which includes are not taken from unless Script Studio's preferences say so"
+                                                            : "could not find module '[1]': one so named is in the object or the inventory, which "
+                                                              "modules are not taken from unless Script Studio's preferences say so",
+                                                    problem.args);
+        }
+    }
     alTranslateScriptProblems(result.problems);
     job->callback(result);
+}
+
+bool ALScriptPreprocessor::inWorld(const Request& request, const std::string& name)
+{
+    const std::string item_name = itemNameOf(name);
+    if (!namedItems(item_name).empty())
+    {
+        return true;
+    }
+    const auto listed = request.ref.inInventory() ? mContents.end() : mContents.find(request.ref.object);
+    return listed != mContents.end() &&
+           std::any_of(listed->second.begin(), listed->second.end(), [&item_name](const ALScriptWorkspace::Item& item) { return item.name == item_name; });
 }
 
 void ALScriptPreprocessor::optimizeAndFinish(const std::shared_ptr<Job>& job, ALPreprocessor::Result result)

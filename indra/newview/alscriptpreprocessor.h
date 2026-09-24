@@ -111,6 +111,13 @@ public:
     // in the envelope is preprocessed on saving whatever this says, so
     // that its source stays its source.
     static bool enabled();
+    // Whether an include or a require may come from the world: the object
+    // holding the script, the agent's inventory. Off unless the scripter
+    // turns it on -- a script is expanded the moment it is on screen,
+    // somebody else's too, and a name it asks for from the inventory is
+    // the agent's own text going into it -- and then only folders on disk
+    // the scripter blessed are looked in.
+    static bool worldIncludes();
 
     struct Request
     {
@@ -215,6 +222,9 @@ private:
     ALDiskIncludes         blessedFor(const ALPreprocessor::Ask& ask, const Request& request, const std::vector<std::string>& alias_folders);
     // Every item of a name, from the walk or from the last one.
     const LLInventoryModel::item_array_t& namedItems(const std::string& name);
+    // Whether an include or a module so named is in the world a script is
+    // in -- its object, the inventory -- whether or not it may be taken.
+    bool                                  inWorld(const Request& request, const std::string& name);
     // `retry` asks again for what failed before rather than taking the
     // failure for an answer: what a run's first round does, since an
     // include that was not there may be there now.
