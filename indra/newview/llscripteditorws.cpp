@@ -2014,6 +2014,12 @@ LLSD LLScriptEditorWSServer::saveScript(LLViewerObject* prim, LLInventoryItem* i
 LLSD LLScriptEditorWSServer::saveNotecard(LLViewerObject* prim, LLInventoryItem* item,
                                            const std::string& content)
 {
+    // More text than a notecard is read back with makes one nobody can open.
+    if (content.size() > static_cast<size_t>(LLNotecard::MAX_SIZE))
+    {
+        throw LLJSONRPCConnection::InvalidParams("The notecard's text is " + std::to_string(content.size()) + " bytes; a notecard may hold at most " +
+                                                 std::to_string(static_cast<S32>(LLNotecard::MAX_SIZE)));
+    }
     // The task inventory can be refreshed while the upload is in flight,
     // invalidating the raw item pointer returned by validatePublishedItem().
     // Keep stable identifiers for use after await_async_result().

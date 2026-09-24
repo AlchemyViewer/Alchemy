@@ -774,6 +774,7 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="WorkspaceAssetUnreadable">the asset could not be read</string>
 	<string name="WorkspaceNotecardUnreadable">the notecard could not be read</string>
 	<string name="WorkspaceNotecardUnwritable">the notecard could not be written</string>
+	<string name="WorkspaceNotecardTooLarge">the notecard's text is [SIZE] bytes, and a notecard may hold at most [LIMIT]: past that, no viewer could open it again</string>
 	<string name="WorkspaceUploadFailed">the upload failed</string>
 	<string name="WorkspaceScriptTooLarge">the script is [SIZE] bytes, and a script may be at most [LIMIT]</string>
 	<string name="WorkspaceNoRegion">no region</string>

@@ -604,6 +604,16 @@ bool ALScriptWorkspace::save(const ALScriptRef& ref, const std::string& text, co
 bool ALScriptWorkspace::saveNotecard(const ALScriptRef& ref, const std::string& text, const std::vector<LLPointer<LLInventoryItem>>& embedded,
                                      compile_callback_t callback, std::string& error)
 {
+    // Nothing a notecard is read back with takes more text than this -- the
+    // reader refuses the whole notecard -- so nothing more is written.
+    if (text.size() > static_cast<size_t>(LLNotecard::MAX_SIZE))
+    {
+        LLStringUtil::format_map_t args;
+        args["[SIZE]"]  = std::to_string(text.size());
+        args["[LIMIT]"] = std::to_string(static_cast<S32>(LLNotecard::MAX_SIZE));
+        error           = LLTrans::getString("WorkspaceNotecardTooLarge", args);
+        return false;
+    }
     LLNotecard notecard(LLNotecard::MAX_SIZE);
     notecard.setItems(embedded);
     notecard.setText(text);

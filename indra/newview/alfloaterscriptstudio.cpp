@@ -80,6 +80,7 @@
 #include "llpreviewtexture.h"
 #include "lllineeditor.h"
 #include "llmenugl.h"
+#include "llnotecard.h"
 #include "llnotificationsutil.h"
 #include "llscrolllistctrl.h"
 #include "llsdserialize.h"
@@ -4730,10 +4731,10 @@ void ALFloaterScriptStudio::refreshTrailer(Doc& doc)
         }
         parts.push_back(std::move(part));
     }
-    // What a save would send, once it is past half of what a script may
-    // be: in the warning colour past nine tenths, the error's past the
-    // whole, where a save is refused.
-    constexpr size_t LIMIT = ALScriptEnvelope::MAX_ASSET_BYTES;
+    // What a save would send, once it is past half of what a script -- or
+    // a notecard's text -- may be: in the warning colour past nine tenths,
+    // the error's past the whole, where a save is refused.
+    const size_t LIMIT = doc.notecard ? static_cast<size_t>(LLNotecard::MAX_SIZE) : ALScriptEnvelope::MAX_ASSET_BYTES;
     if (doc.assetBytes * 2 > LIMIT)
     {
         LLStringUtil::format_map_t size;
@@ -4742,7 +4743,9 @@ void ALFloaterScriptStudio::refreshTrailer(Doc& doc)
         size["[BYTES]"] = std::to_string(doc.assetBytes);
         size["[MAX]"]   = std::to_string(LIMIT);
         size["[OVER]"]  = std::to_string(doc.assetBytes > LIMIT ? doc.assetBytes - LIMIT : 0);
-        ALJumpBar::TrailerPart part{ getString("TrailerSize", size), std::string(), getString(doc.assetBytes > LIMIT ? "TrailerSizeOverTip" : "TrailerSizeTip", size) };
+        const char*            tip = doc.notecard ? (doc.assetBytes > LIMIT ? "TrailerNotecardSizeOverTip" : "TrailerNotecardSizeTip")
+                                                      : (doc.assetBytes > LIMIT ? "TrailerSizeOverTip" : "TrailerSizeTip");
+        ALJumpBar::TrailerPart part{ getString("TrailerSize", size), std::string(), getString(tip, size) };
         if (doc.assetBytes > LIMIT)
         {
             part.color = doc.editor->markColor(ALCodeEditor::Mark::Error);
@@ -4784,10 +4787,15 @@ void ALFloaterScriptStudio::measureAsset(Doc& doc)
     }
     doc.assetMeasured = std::make_pair(version, expansion);
     doc.assetBytes    = 0;
-    // A notecard is not a script, and has its own limit; a file on disk is
-    // saved to the disk, which has none.
-    if (!doc.loaded || doc.notecard || !doc.file.empty())
+    // A file on disk is saved to the disk, which has no limit.
+    if (!doc.loaded || !doc.file.empty())
     {
+        return;
+    }
+    // A notecard's text against the notecard's own limit.
+    if (doc.notecard)
+    {
+        doc.assetBytes = doc.editor->document().byteCount();
         return;
     }
     const std::string text = doc.editor->text();

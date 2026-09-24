@@ -393,6 +393,8 @@
     <floater.string name="TrailerSize">[SIZE] KB of [LIMIT] KB</floater.string>
     <floater.string name="TrailerSizeTip">What saving this script sends: [BYTES] of the [MAX] bytes a script may be. A preprocessed script is sent as written and as expanded, measured here before the optimizer and compression a save adds.</floater.string>
     <floater.string name="TrailerSizeOverTip">What saving this script sends: [BYTES] bytes, [OVER] more than the [MAX] a script may be. A save is refused until it is shorter.</floater.string>
+    <floater.string name="TrailerNotecardSizeTip">The notecard's text: [BYTES] of the [MAX] bytes a notecard may hold.</floater.string>
+    <floater.string name="TrailerNotecardSizeOverTip">The notecard's text: [BYTES] bytes, [OVER] more than the [MAX] a notecard may hold. A save is refused until it is shorter, since no viewer could open it past that.</floater.string>
     <floater.string name="WeightsNoScript">Nothing open to weigh.</floater.string>
     <floater.string name="WeightsNoTarget">[NAME] has no code of its own to weigh: a notecard, or a script that is only ever included.</floater.string>
     <floater.string name="WeightsNotYet">[NAME] is weighed once it has been checked.</floater.string>
