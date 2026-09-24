@@ -147,4 +147,42 @@ namespace tut
         l.sortByColumnIndex(0, true);
         ensure_equals("the owner's comparison", order(), std::string("Zed b2 b1 Alpha a2 a1"));
     }
+
+    template<> template<>
+    void alpanelist_object::test<3>()
+    {
+        set_test_name("a row pressed and moved past the dead zone is offered as a drag, once; within it, refused, or with no starter, the list chooses as it would");
+        ALPaneList& l = make();
+        add("one", 0);
+        add("two", 0);
+        add("three", 0);
+        const LLRect first = l.getCellRect(0, 0);
+        const LLRect third = l.getCellRect(2, 0);
+        S32          asked = 0;
+        bool         agree = true;
+        l.setDragStarter([&]() {
+            ++asked;
+            return agree;
+        });
+        l.handleMouseDown(first.getCenterX(), first.getCenterY(), MASK_NONE);
+        ensure_equals("the row pressed is chosen", l.getFirstSelectedIndex(), 0);
+        l.handleHover(first.getCenterX() + 1, first.getCenterY(), MASK_NONE);
+        ensure_equals("a tremble is no drag", asked, 0);
+        l.handleHover(third.getCenterX(), third.getCenterY(), MASK_NONE);
+        ensure_equals("moved on, a drag offered", asked, 1);
+        ensure("of what was chosen, nothing else chosen on the way", l.getFirstSelectedIndex() == 0 && l.getAllSelected().size() == 1);
+        l.handleMouseUp(third.getCenterX(), third.getCenterY(), MASK_NONE);
+
+        agree = false;
+        l.handleMouseDown(first.getCenterX(), first.getCenterY(), MASK_NONE);
+        l.handleHover(third.getCenterX(), third.getCenterY(), MASK_NONE);
+        ensure("refused, the list chooses where the pointer went", asked == 2 && l.getFirstSelectedIndex() == 2);
+        l.handleMouseUp(third.getCenterX(), third.getCenterY(), MASK_NONE);
+
+        l.setDragStarter(nullptr);
+        l.handleMouseDown(first.getCenterX(), first.getCenterY(), MASK_NONE);
+        l.handleHover(third.getCenterX(), third.getCenterY(), MASK_NONE);
+        ensure("with no starter, as any list", asked == 2 && l.getFirstSelectedIndex() == 2);
+        l.handleMouseUp(third.getCenterX(), third.getCenterY(), MASK_NONE);
+    }
 }

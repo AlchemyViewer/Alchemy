@@ -27,6 +27,7 @@
 
 #include "llscrolllistcell.h"
 #include "llscrolllistitem.h"
+#include "llui.h"
 
 static LLDefaultChildRegistry::Register<ALPaneList> r("pane_list");
 
@@ -35,7 +36,8 @@ ALPaneList::Params::Params()
 }
 
 ALPaneList::ALPaneList(const Params& p)
-:   LLScrollListCtrl(p)
+:   LLScrollListCtrl(p),
+    mPress(DRAG_N_DROP_DISTANCE_THRESHOLD)
 {
 }
 
@@ -46,6 +48,50 @@ bool ALPaneList::handleKeyHere(KEY key, MASK mask)
         return true;
     }
     return LLScrollListCtrl::handleKeyHere(key, mask);
+}
+
+bool ALPaneList::handleMouseDown(S32 x, S32 y, MASK mask)
+{
+    const bool handled = LLScrollListCtrl::handleMouseDown(x, y, mask);
+    // A row pressed, which the list has chosen and holds the pointer for:
+    // one that goes on to move may be a drag.
+    if (mDragStarter && hasMouseCapture() && hitItem(x, y))
+    {
+        mPress.press(x, y);
+    }
+    return handled;
+}
+
+bool ALPaneList::handleMouseUp(S32 x, S32 y, MASK mask)
+{
+    mPress.release();
+    return LLScrollListCtrl::handleMouseUp(x, y, mask);
+}
+
+bool ALPaneList::handleHover(S32 x, S32 y, MASK mask)
+{
+    if (mPress.pressed() && hasMouseCapture())
+    {
+        // Still, or within the dead zone: nothing yet, and no row chosen
+        // by a hand that only trembled.
+        if (!mPress.moved(x, y))
+        {
+            return true;
+        }
+        mPress.release();
+        // Begun, the drag tool has the pointer from here.
+        if (mDragStarter())
+        {
+            return true;
+        }
+    }
+    return LLScrollListCtrl::handleHover(x, y, mask);
+}
+
+void ALPaneList::onMouseCaptureLost()
+{
+    mPress.cancel();
+    LLScrollListCtrl::onMouseCaptureLost();
 }
 
 void ALPaneList::setGrouping(group_t grouping)

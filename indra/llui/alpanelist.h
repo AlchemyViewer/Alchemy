@@ -23,6 +23,7 @@
 
 #pragma once
 
+#include "aldraggesture.h"
 #include "llscrolllistctrl.h"
 
 #include <functional>
@@ -64,7 +65,19 @@ public:
     typedef std::function<S32(S32 column, const LLScrollListItem*, const LLScrollListItem*)> compare_t;
     void setComparison(compare_t comparison);
 
+    // A press on a row that moves on with the button held, past the
+    // viewer's dead zone for a drag: offered as a drag of what is chosen,
+    // which the starter begins with the viewer's drag tool and says it
+    // did. Not begun, or with no starter, the list chooses the rows the
+    // pointer passes, as any list does.
+    typedef std::function<bool()> drag_t;
+    void setDragStarter(drag_t starter) { mDragStarter = std::move(starter); }
+
     bool handleKeyHere(KEY key, MASK mask) override;
+    bool handleMouseDown(S32 x, S32 y, MASK mask) override;
+    bool handleMouseUp(S32 x, S32 y, MASK mask) override;
+    bool handleHover(S32 x, S32 y, MASK mask) override;
+    void onMouseCaptureLost() override;
 
 protected:
     friend class LLUICtrlFactory;
@@ -78,4 +91,6 @@ private:
     group_t                     mGrouping;
     compare_t                   mComparison;
     boost::signals2::connection mSortConnection;
+    drag_t                      mDragStarter;
+    ALDragGesture               mPress;
 };

@@ -1090,6 +1090,10 @@ private:
     // where the point is on its arrow.
     void explorerFold(const LLUUID& id, bool prim, std::optional<bool> folded = std::nullopt);
     bool explorerArrowAt(S32 x, S32 y, LLUUID& id, bool& prim);
+    // What is chosen of what a prim holds, dragged out with the viewer's
+    // drag tool -- to the inventory, as the build floater's contents are;
+    // false where none of it may go.
+    bool startExplorerDrag();
     // Every command the menus hold, to give one by name.
     void showCommandPalette();
     // One field for going anywhere, as Visual Studio Code's: a script by
@@ -1765,7 +1769,7 @@ private:
     S32                                mSearchHits       = 0;
     S32                                mSearchFiles      = 0;
     std::string                        mSearchQuery;
-    LLScrollListCtrl*                  mExplorer      = nullptr;
+    ALPaneList*                        mExplorer      = nullptr;
     std::vector<ExplorerObject>        mExplorerModel;
     // Answers have come that the list does not show yet: it is filled with
     // the next frame.

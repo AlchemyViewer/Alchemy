@@ -1174,7 +1174,7 @@
              tool_tip="Only the objects, prims, scripts and notecards with these letters in their names"
              top="2"
              width="236" />
-            <scroll_list
+            <pane_list
              follows="all"
              height="414"
              layout="topleft"
@@ -1184,10 +1184,10 @@
              tool_tip="The objects in hand -- pinned, selected in world, or holding a script that is open -- and their scripts and notecards; double-click or return opens one, delete deletes it, F2 renames it, right-click for everything else"
              top="24"
              width="240">
-                <scroll_list.columns label="" name="icon" width="20" />
-                <scroll_list.columns dynamic_width="true" label="Name" name="name" tool_tip="The objects in hand, each prim of a linkset, and what each prim holds" />
-                <scroll_list.columns label="State" name="run" tool_tip="Whether a script runs in its object, and an object pinned while not in sight" width="70" />
-            </scroll_list>
+                <pane_list.columns label="" name="icon" width="20" />
+                <pane_list.columns dynamic_width="true" label="Name" name="name" tool_tip="The objects in hand, each prim of a linkset, and what each prim holds" />
+                <pane_list.columns label="State" name="run" tool_tip="Whether a script runs in its object, and an object pinned while not in sight" width="70" />
+            </pane_list>
             <button
              follows="left|bottom"
              height="22"

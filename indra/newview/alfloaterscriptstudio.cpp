@@ -104,6 +104,10 @@
 #include "llviewerobjectlist.h"
 #include "llviewerregion.h"
 #include "llviewerwindow.h"
+// [RLVa:KB]
+#include "rlvhandler.h"
+#include "rlvlocks.h"
+// [/RLVa:KB]
 
 #include <algorithm>
 #include <ctime>
@@ -685,7 +689,7 @@ bool ALFloaterScriptStudio::postBuild()
     mOutputFilter  = getChild<LLComboBox>("output_filter");
     mOutputKind    = getChild<LLComboBox>("output_kind");
     mOutputFind    = getChild<LLFilterEditor>("output_find");
-    mExplorer      = getChild<LLScrollListCtrl>("explorer");
+    mExplorer      = getChild<ALPaneList>("explorer");
     mSearchBar     = getChild<ALScopeBar>("search_bar");
     mSearchResults = getChild<ALPaneList>("search_results");
     mCompileTarget = getChild<LLComboBox>("compile_target");
@@ -945,6 +949,7 @@ bool ALFloaterScriptStudio::postBuild()
     mExplorer->setDoubleClickCallback(boost::bind(&ALFloaterScriptStudio::onExplorerChosen, this));
     // The buttons follow what is chosen, which the list says as it changes.
     mExplorer->setCommitOnSelectionChange(true);
+    mExplorer->setDragStarter([this]() { return startExplorerDrag(); });
     mExplorer->setCommitCallback([this](LLUICtrl*, const LLSD&) { refreshExplorerButtons(); });
     mExplorerFilter = getChild<LLFilterEditor>("explorer_filter");
     mExplorerFilter->setCommitCallback([this](LLUICtrl*, const LLSD&) { fillExplorer(); });
@@ -13855,6 +13860,55 @@ bool ALFloaterScriptStudio::explorerArrowAt(S32 x, S32 y, LLUUID& id, bool& prim
     }
     id       = prim ? value["prim"].asUUID() : value["root"].asUUID();
     prim_row = prim;
+    return true;
+}
+
+bool ALFloaterScriptStudio::startExplorerDrag()
+{
+    // One drag comes out of one prim: the chosen items of the first chosen
+    // item's prim. Each goes as the build floater's contents let it go --
+    // a copy where it may be copied and given, the item itself out of an
+    // object of one's own where it may not -- and nothing comes out of a
+    // locked attachment, nor anything but a copy out of any attachment,
+    // whose contents the region does not keep up with.
+    std::vector<EDragAndDropType> types;
+    uuid_vec_t                    ids;
+    LLUUID                        from;
+    for (const ExplorerRow& row : explorerChoice())
+    {
+        if (!row.isItem() || (from.notNull() && row.prim != from))
+        {
+            continue;
+        }
+        LLViewerObject*        object = gObjectList.findObject(row.prim);
+        const LLInventoryItem* item   = object ? dynamic_cast<const LLInventoryItem*>(object->getInventoryObject(row.item)) : nullptr;
+        if (!item)
+        {
+            continue;
+        }
+        const LLPermissions& perm     = item->getPermissions();
+        const bool           can_copy = gAgent.allowOperation(PERM_COPY, perm, GP_OBJECT_MANIPULATE);
+        if (rlv_handler_t::isEnabled() && gRlvAttachmentLocks.isLockedAttachment(object->getRootEdit()))
+        {
+            continue;
+        }
+        if (!can_copy && object->isAttachment())
+        {
+            continue;
+        }
+        if (!(can_copy && perm.allowTransferTo(gAgent.getID())) && !object->permYouOwner())
+        {
+            continue;
+        }
+        from = row.prim;
+        types.push_back(LLViewerAssetType::lookupDragAndDropType(item->getType()));
+        ids.push_back(item->getUUID());
+    }
+    if (ids.empty())
+    {
+        return false;
+    }
+    LLToolDragAndDrop::getInstance()->beginMultiDrag(types, ids, LLToolDragAndDrop::SOURCE_WORLD, from);
     return true;
 }
 
