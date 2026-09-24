@@ -54,6 +54,57 @@ namespace tut
             return nullptr;
         }
 
+        static size_t at(const ALScriptWeight& weight, S32 line)
+        {
+            return within(weight, line, line);
+        }
+
+        static size_t within(const ALScriptWeight& weight, S32 from, S32 to)
+        {
+            size_t bytes = 0;
+            for (const ALScriptWeight::Line& line : weight.lines)
+            {
+                bytes += line.line >= from && line.line <= to ? line.bytes : 0;
+            }
+            return bytes;
+        }
+
+        static std::string lined(const ALScriptWeight& weight)
+        {
+            std::string out;
+            for (const ALScriptWeight::Line& line : weight.lines)
+            {
+                out += " " + std::to_string(line.line) + "=" + std::to_string(line.bytes);
+            }
+            return out;
+        }
+
+        // A global string, a function, and a handler with a loop, a long
+        // string and a short one, and no return of its own.
+        static const std::string& byLine()
+        {
+            static const std::string script = "integer gCount = 0;\n"
+                                              "string gName = \"a name a little longer than a word\";\n"
+                                              "integer twice(integer n)\n"
+                                              "{\n"
+                                              "    return n * 2;\n"
+                                              "}\n"
+                                              "default\n"
+                                              "{\n"
+                                              "    state_entry()\n"
+                                              "    {\n"
+                                              "        integer i;\n"
+                                              "        for (i = 0; i < 3; ++i)\n"
+                                              "        {\n"
+                                              "            gCount = twice(gCount);\n"
+                                              "        }\n"
+                                              "        llOwnerSay(\"a sentence of some length, said to the owner on every start\");\n"
+                                              "        llOwnerSay(\"x\");\n"
+                                              "    }\n"
+                                              "}\n";
+            return script;
+        }
+
         static std::string listed(const ALScriptWeight& weight)
         {
             std::string out;
@@ -165,6 +216,11 @@ namespace tut
         ensure_equals("a function where it is", twice->line, 2);
         ensure_equals("a handler in its state", touch->within, std::string("default"));
         ensure("the state holds its handlers", state->bytes > touch->bytes);
+        // Where its handlers begin, a jump table entry for each, and each
+        // handler from where it begins to where it ends -- the first as
+        // well, which begins where the table ends.
+        ensure_equals("a state is its table and its handlers:" + listed(weight), state->bytes,
+                      5 + 8 * 2 + named(weight, "state_entry")->bytes + touch->bytes);
         const ALScriptWeight::Part* count = named(weight, "gCount");
         const ALScriptWeight::Part* name  = named(weight, "gName");
         ensure("the globals too", count && name);
@@ -265,5 +321,62 @@ namespace tut
         ensure_equals("where it is", touch->line, 11);
         const ALScriptWeight broken = ALScriptWeigh::lslLuau("default { state_entry() { integer x = ; } }\n");
         ensure("a script that does not compile", !broken.compiled && !broken.error.empty());
+    }
+
+    // LSO by line: what the compiler wrote while it stood at each
+    // statement and expression, a function's missing return at its closing
+    // brace, and a global's value on its line. A function's lines are its
+    // code, which is the function less its header.
+    template<> template<>
+    void alscriptweight_object::test<7>()
+    {
+        ensure("builtins: " + error, lslLoaded);
+        const ALScriptWeight weight = ALScriptWeigh::lso(byLine());
+        ensure("compiled: " + weight.error, weight.compiled);
+        ensure("by line:" + lined(weight), !weight.lines.empty());
+        ensure("the loop's body" + lined(weight), at(weight, 13) > 0);
+        ensure("the loop itself: its test, its step and its jump back" + lined(weight), at(weight, 11) > 0);
+        ensure("a long string weighs more than a short one" + lined(weight), at(weight, 15) > at(weight, 16) + 40);
+        ensure("the return it does not write, at its closing brace" + lined(weight), at(weight, 17) > 0);
+        ensure("a function's return" + lined(weight), at(weight, 4) > 0);
+        ensure("a global string's value" + lined(weight), at(weight, 1) >= 34);
+        ensure("a brace that makes nothing" + lined(weight), at(weight, 7) == 0 && at(weight, 3) == 0);
+        const ALScriptWeight::Part* entry = named(weight, "state_entry");
+        const ALScriptWeight::Part* twice = named(weight, "twice");
+        ensure("both parts:" + listed(weight), entry && twice);
+        ensure_equals("a handler's lines are all of it but its header, where its code begins", entry->bytes - within(weight, entry->line, entry->endLine),
+                      size_t(5));
+        ensure_equals("a function's lines are all of it but its header: where its code begins, its type and its parameter's",
+                      twice->bytes - within(weight, twice->line, twice->endLine), size_t(9));
+    }
+
+    // Mono by line, the same way: each instruction, with its string, is
+    // the line it was written for; a global's initialiser is its line's.
+    template<> template<>
+    void alscriptweight_object::test<8>()
+    {
+        ensure("builtins: " + error, lslLoaded);
+        const ALScriptWeight weight = ALScriptWeigh::mono(byLine());
+        ensure("compiled: " + weight.error, weight.compiled);
+        ensure("by line:" + lined(weight), !weight.lines.empty());
+        ensure("the loop's body" + lined(weight), at(weight, 13) > 0);
+        ensure("the loop itself" + lined(weight), at(weight, 11) > 0);
+        ensure("a long string weighs more than a short one" + lined(weight), at(weight, 15) > at(weight, 16) + 40);
+        ensure("the return it does not write, at its closing brace" + lined(weight), at(weight, 17) > 0);
+        ensure("a global string's initialiser" + lined(weight), at(weight, 1) >= 34);
+        ensure("a brace that makes nothing" + lined(weight), at(weight, 7) == 0 && at(weight, 3) == 0);
+        for (const ALScriptWeight::Part& part : weight.parts)
+        {
+            if (part.line >= 0)
+            {
+                ensure(part.name + "'s lines are no more than it" + lined(weight), within(weight, part.line, part.endLine) <= part.bytes);
+            }
+        }
+        size_t all = 0;
+        for (const ALScriptWeight::Line& line : weight.lines)
+        {
+            all += line.bytes;
+        }
+        ensure("the lines are less than the whole", all > 0 && all < weight.total);
     }
 }

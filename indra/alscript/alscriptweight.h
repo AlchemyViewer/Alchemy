@@ -90,8 +90,14 @@ struct ALScriptWeight
     // state's as well, so the parts do not add up to the total.
     std::vector<Part> parts;
 
-    // The bytes of code each line made, where the compiler says which
-    // instruction came of which line: exact for the Luau targets.
+    // The bytes of code each line made, by line: for the Luau targets as
+    // the compiler says which instruction came of which line; for LSO and
+    // Mono what the compiler wrote while it stood at the line's statement
+    // or expression, walking the tree -- a loop's jump back is the loop's
+    // line, the return a function does not write is its closing brace's --
+    // and for LSO a global's value as well, which the image holds. What the
+    // target spends on a function as such, and the strings SLua keeps once
+    // for the script, are nobody's line. Only lines that made something.
     struct Line
     {
         S32    line  = 0;

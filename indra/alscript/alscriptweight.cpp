@@ -36,10 +36,12 @@
 #include "Luau/ParseResult.h"
 
 #include <tailslide/tailslide.hh>
+#include <tailslide/passes/lso/bytecode_compiler.hh>
 #include <tailslide/passes/lso/script_compiler.hh>
 #include <tailslide/passes/mono/script_compiler.hh>
 
 #include <algorithm>
+#include <limits>
 #include <map>
 #include <set>
 #include <sstream>
@@ -510,14 +512,126 @@ namespace
         return std::max(0, one_based - 1);
     }
 
+    // Which line of the text a compiler is writing for as it walks the
+    // tree: the line each node begins on, or the one around it where it has
+    // no place of its own; for a function or a handler, its closing line,
+    // since what it writes of its own comes after its body -- the return
+    // its last path does not make. Nothing for the script as a whole. A
+    // node Tailslide makes after the parse -- `++i` made `i = i + 1` --
+    // may carry the whole script's place rather than its statement's, so a
+    // place is believed only inside the one around it. Kept as where the
+    // output stood at each change of line, so that what was written from
+    // one mark to the next is the first mark's line. The compiler's
+    // visitor calls it around every node it visits, which Tailslide lets a
+    // subclass do by `visitSpecific`.
+    class LineMarks
+    {
+    public:
+        void enter(Tailslide::LSLASTNode* node, size_t at)
+        {
+            Open                         open = mOpen.empty() ? Open() : mOpen.back();
+            const Tailslide::YYLTYPE*    loc  = node->getLoc();
+            const Tailslide::LSLNodeType type = node->getNodeType();
+            if (type == Tailslide::NODE_SCRIPT)
+            {
+                open.line = -1;
+            }
+            if (loc && loc->first_line > 0 && loc->first_line >= open.first && loc->last_line <= open.last)
+            {
+                const bool closes = type == Tailslide::NODE_GLOBAL_FUNCTION || type == Tailslide::NODE_EVENT_HANDLER;
+                if (type != Tailslide::NODE_SCRIPT)
+                {
+                    open.line = zeroBased(closes ? loc->last_line : loc->first_line);
+                }
+                open.first = loc->first_line;
+                open.last  = loc->last_line;
+            }
+            mOpen.push_back(open);
+            mark(at);
+        }
+        void leave(size_t at)
+        {
+            if (!mOpen.empty())
+            {
+                mOpen.pop_back();
+            }
+            mark(at);
+        }
+
+        // Each mark's line and where it stood, in the order written.
+        const std::vector<std::pair<size_t, S32>>& marks() const { return mFrom; }
+        // The bytes each line came to, of output `total` long.
+        void spread(size_t total, std::map<S32, size_t>& lines) const
+        {
+            for (size_t i = 0; i < mFrom.size(); ++i)
+            {
+                const size_t end = i + 1 < mFrom.size() ? mFrom[i + 1].first : total;
+                if (mFrom[i].second >= 0 && end > mFrom[i].first)
+                {
+                    lines[mFrom[i].second] += end - mFrom[i].first;
+                }
+            }
+        }
+
+    private:
+        void mark(size_t at)
+        {
+            const S32 line = mOpen.empty() ? -1 : mOpen.back().line;
+            // Nothing written since the last mark: it was never that line's.
+            if (!mFrom.empty() && mFrom.back().first == at)
+            {
+                mFrom.pop_back();
+            }
+            if (mFrom.empty() || mFrom.back().second != line)
+            {
+                mFrom.emplace_back(at, line);
+            }
+        }
+
+        struct Open
+        {
+            S32 line  = -1;
+            // The one-based lines of the place around, which a place within
+            // it must be inside.
+            int first = 0;
+            int last  = std::numeric_limits<int>::max();
+        };
+        std::vector<Open>                   mOpen;
+        std::vector<std::pair<size_t, S32>> mFrom;
+    };
+
+    // Tailslide's LSO code for one function or handler written a second
+    // time, with the line each byte came of. The bytecode compiler writes
+    // only what it reads from the tree and the symbols' data, and changes
+    // neither, so the second writing is the first's.
+    class LinedLSO : public Tailslide::LSOBytecodeCompiler
+    {
+    public:
+        explicit LinedLSO(Tailslide::LSOSymbolDataMap& symbols) : LSOBytecodeCompiler(symbols) {}
+
+        LineMarks marks;
+
+        bool visitSpecific(Tailslide::LSLASTNode* node) override
+        {
+            marks.enter(node, mCodeBS.size());
+            const bool descend = LSOBytecodeCompiler::visitSpecific(node);
+            marks.leave(mCodeBS.size());
+            return descend;
+        }
+    };
+
     // Tailslide's LSO compiler, told of each function, state, handler and
-    // global as it writes them, and measuring what each came to.
+    // global as it writes them, and measuring what each came to: from where
+    // its writing begins to where it ends. Not by a stream's size, which a
+    // move past the end leaves a byte beyond where it moved to, for what is
+    // written next to write over.
     class MeasuringLSO : public Tailslide::LSOScriptCompiler
     {
     public:
         explicit MeasuringLSO(Tailslide::ScriptAllocator* allocator) : LSOScriptCompiler(allocator) {}
 
         std::vector<ALScriptWeight::Part> parts;
+        std::map<S32, size_t>             lines;
         size_t registers = 0, globals = 0, functions = 0, states = 0, heap = 0;
 
     protected:
@@ -533,38 +647,56 @@ namespace
         }
         bool visit(Tailslide::LSLGlobalVariable* global) override
         {
-            const size_t before = _mGlobalVarManager.mGlobalsBS.size() + _mHeapManager.mHeapBS.size();
+            const size_t before = _mGlobalVarManager.mGlobalsBS.pos() + _mHeapManager.mHeapBS.pos();
             LSOScriptCompiler::visit(global);
-            add(ALScriptWeight::Part::Kind::Global, global, nameOf(global->getChild(0)), std::string(),
-                _mGlobalVarManager.mGlobalsBS.size() + _mHeapManager.mHeapBS.size() - before);
+            const size_t bytes = _mGlobalVarManager.mGlobalsBS.pos() + _mHeapManager.mHeapBS.pos() - before;
+            add(ALScriptWeight::Part::Kind::Global, global, nameOf(global->getChild(0)), std::string(), bytes);
+            // Its value is in the image, and is its line's.
+            if (const Tailslide::YYLTYPE* at = global->getLoc(); at && at->first_line > 0 && bytes > 0)
+            {
+                lines[zeroBased(at->first_line)] += bytes;
+            }
             return false;
         }
         bool visit(Tailslide::LSLGlobalFunction* function) override
         {
-            const size_t before = _mFunctionsBS.size();
+            const size_t before = _mFunctionsBS.pos();
             LSOScriptCompiler::visit(function);
-            add(ALScriptWeight::Part::Kind::Function, function, nameOf(function->getChild(0)), std::string(), _mFunctionsBS.size() - before);
+            add(ALScriptWeight::Part::Kind::Function, function, nameOf(function->getChild(0)), std::string(), _mFunctionsBS.pos() - before);
+            if (_mFunctionsBS.pos() > before)
+            {
+                lineCode(function);
+            }
             return false;
         }
         bool visit(Tailslide::LSLState* state) override
         {
             const std::string was = mState;
             mState                = nameOf(state->getChild(0));
-            const size_t before   = _mStateBS.size();
+            const size_t before   = _mStateBS.pos();
             LSOScriptCompiler::visit(state);
-            add(ALScriptWeight::Part::Kind::State, state, mState, std::string(), _mStateBS.size() - before);
+            add(ALScriptWeight::Part::Kind::State, state, mState, std::string(), _mStateBS.pos() - before);
             mState = was;
             return false;
         }
         bool visit(Tailslide::LSLEventHandler* handler) override
         {
-            const size_t before = _mStateBS.size();
+            const size_t before = _mStateBS.pos();
             LSOScriptCompiler::visit(handler);
-            add(ALScriptWeight::Part::Kind::Handler, handler, nameOf(handler->getChild(0)), mState, _mStateBS.size() - before);
+            add(ALScriptWeight::Part::Kind::Handler, handler, nameOf(handler->getChild(0)), mState, _mStateBS.pos() - before);
+            lineCode(handler);
             return false;
         }
 
     private:
+        // The code of a function or handler, by the line each byte came of.
+        void lineCode(Tailslide::LSLASTNode* node)
+        {
+            LinedLSO lined(_mSymData);
+            node->visit(&lined);
+            lined.marks.spread(lined.mCodeBS.size(), lines);
+        }
+
         static std::string nameOf(Tailslide::LSLASTNode* node)
         {
             return node && node->getNodeType() == Tailslide::NODE_IDENTIFIER ? static_cast<Tailslide::LSLIdentifier*>(node)->getName() : std::string();
@@ -631,6 +763,10 @@ namespace ALScriptWeigh
         weight.total = compiler.registers + compiler.globals + compiler.functions + compiler.states + compiler.heap;
         weight.parts = std::move(compiler.parts);
         weight.parts.insert(weight.parts.begin(), part(ALScriptWeight::Part::Kind::Frame, "registers", compiler.registers));
+        for (const auto& [line, bytes] : compiler.lines)
+        {
+            weight.lines.push_back({ line, bytes });
+        }
         if (parser.logger.getErrors())
         {
             // Where the stack meets the heap before the image is made.
@@ -743,6 +879,32 @@ namespace
             return false;
         }
     };
+
+    // Tailslide's Mono compiler, marking where its CIL stands as it enters
+    // and leaves each node, so that each instruction is the line it was
+    // written for. It only appends to the text.
+    class LinedMono : public Tailslide::MonoScriptCompiler
+    {
+    public:
+        explicit LinedMono(Tailslide::ScriptAllocator* allocator) : MonoScriptCompiler(allocator) {}
+
+        LineMarks marks;
+
+        bool visitSpecific(Tailslide::LSLASTNode* node) override
+        {
+            marks.enter(node, at());
+            const bool descend = MonoScriptCompiler::visitSpecific(node);
+            marks.leave(at());
+            return descend;
+        }
+
+    private:
+        size_t at()
+        {
+            const std::streamoff pos = mCIL.tellp();
+            return pos < 0 ? 0 : static_cast<size_t>(pos);
+        }
+    };
 }
 
 namespace ALScriptWeigh
@@ -781,12 +943,13 @@ namespace ALScriptWeigh
         }
         Places places;
         script->visit(&places);
-        Tailslide::MonoScriptCompiler compiler(&parser.allocator);
+        LinedMono compiler(&parser.allocator);
         script->visit(&compiler);
 
         // A method at a time: its header, its code, its locals, and what
         // declaring it takes; with the fields, the strings and what it calls
-        // over the whole.
+        // over the whole. Each instruction, with its string, is the line it
+        // was written for as well.
         std::istringstream    cil(compiler.mCIL.str());
         std::set<std::string> referenced;
         size_t                shared = MONO_BASE_BYTES;
@@ -794,9 +957,20 @@ namespace ALScriptWeigh
         ALScriptWeight::Part  globals;
         globals.kind = ALScriptWeight::Part::Kind::Frame;
         globals.name = "globals";
+        const std::vector<std::pair<size_t, S32>>& marks = compiler.marks.marks();
+        size_t                                     mark  = 0;
+        size_t                                     next  = 0;
+        std::map<S32, size_t>                      by_line;
         for (std::string line; std::getline(cil, line);)
         {
-            const size_t lead = line.find_first_not_of(" \t");
+            const size_t begins = next;
+            next += line.size() + 1;
+            while (mark < marks.size() && marks[mark].first <= begins)
+            {
+                ++mark;
+            }
+            const S32    source = mark > 0 ? marks[mark - 1].second : -1;
+            const size_t lead   = line.find_first_not_of(" \t");
             if (lead == std::string::npos)
             {
                 continue;
@@ -858,13 +1032,14 @@ namespace ALScriptWeigh
             const size_t      cut  = line.find(' ');
             const std::string op   = line.substr(0, cut);
             const std::string rest = cut == std::string::npos ? std::string() : line.substr(cut + 1);
-            method->bytes += ilBytes(op, rest);
-            if (op == "ldstr")
+            const size_t      bytes = ilBytes(op, rest) + (op == "ldstr" ? userStringBytes(rest) : 0);
+            method->bytes += bytes;
+            if (source >= 0)
             {
-                method->bytes += userStringBytes(rest);
+                by_line[source] += bytes;
             }
-            else if ((op == "call" || op == "callvirt" || op == "newobj" || op == "ldfld" || op == "stfld" || op == "ldflda") &&
-                     referenced.insert(rest).second)
+            if ((op == "call" || op == "callvirt" || op == "newobj" || op == "ldfld" || op == "stfld" || op == "ldflda") &&
+                referenced.insert(rest).second)
             {
                 // What it names outside itself, once however often: a row
                 // with a name and a signature.
@@ -878,6 +1053,10 @@ namespace ALScriptWeigh
         for (const ALScriptWeight::Part& one : weight.parts)
         {
             weight.total += one.bytes;
+        }
+        for (const auto& [line, bytes] : by_line)
+        {
+            weight.lines.push_back({ line, bytes });
         }
         weight.compiled = true;
         return weight;
