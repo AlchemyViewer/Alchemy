@@ -301,9 +301,36 @@ namespace tut
                       std::string("control:local|text: util |operator:=|text: |function:require|punctuation:(|path:\"./util\"|punctuation:)"));
         ensure_equals("in single quotes, spaced", lexed("slua", "require( 'lib' ).greet()", state, words),
                       std::string("function:require|punctuation:(|text: |path:'lib'|text: |punctuation:).|text:greet|punctuation:()"));
-        ensure_equals("another call's string is a string", lexed("slua", "print(\"./util\")", state, words),
-                      std::string("function:print|punctuation:(|string:\"./util\"|punctuation:)"));
+        ensure_equals("another call's string is a string", lexed("slua", "print(\"see ./util\")", state, words),
+                      std::string("function:print|punctuation:(|string:\"see ./util\"|punctuation:)"));
         ensure_equals("and after a require, the line goes on as before", lexed("slua", "print(\"hi\")", state, words),
                       std::string("function:print|punctuation:(|string:\"hi\"|punctuation:)"));
+    }
+
+    template<> template<>
+    void alsyntaxgrammars_object::test<11>()
+    {
+        set_test_name("a string one word long with a dot or a slash in it is a path, in LSL, in its directives and in SLua; a sentence or an escape is a string");
+        ALSyntaxWords words;
+        words.set("function", { "llHTTPRequest", "llOwnerSay", "print" });
+        ALSyntaxState state;
+        ensure_equals("an address", lexed("lsl", "llHTTPRequest(\"https://example.com/api\", [], \"\");", state, words),
+                      std::string("function:llHTTPRequest|punctuation:(|path:\"https://example.com/api\"|punctuation:,|text: |punctuation:[],|text: "
+                                  "|string:\"\"|punctuation:);"));
+        ensure_equals("a file's name", lexed("lsl", "llOwnerSay(\"texture.png\");", state, words),
+                      std::string("function:llOwnerSay|punctuation:(|path:\"texture.png\"|punctuation:);"));
+        ensure_equals("a sentence", lexed("lsl", "llOwnerSay(\"Loaded the texture.png file.\");", state, words),
+                      std::string("function:llOwnerSay|punctuation:(|string:\"Loaded the texture.png file.\"|punctuation:);"));
+        ensure_equals("an escape is no slash", lexed("lsl", "llOwnerSay(\"a\\nb\");", state, words),
+                      std::string("function:llOwnerSay|punctuation:(|string:\"a|escape:\\n|string:b\"|punctuation:);"));
+        ensure_equals("in a directive", lexed("lsl", "#define URL \"http://example.com\"", state, words),
+                      std::string("preprocessor:#define URL |path:\"http://example.com\""));
+        ALSyntaxState json;
+        ensure_equals("JSON, a value but not a key", lexed("json", "{\"lib\": \"./lib\", \"mode\": \"strict\"}", json, words),
+                      std::string("punctuation:{|property:\"lib\"|punctuation::|text: |path:\"./lib\"|punctuation:,|text: |property:\"mode\"|punctuation::|text: "
+                                  "|string:\"strict\"|punctuation:}"));
+        ALSyntaxState slua;
+        ensure_equals("SLua, either quote", lexed("slua", "print('lib.lua', \"a/b\")", slua, words),
+                      std::string("function:print|punctuation:(|path:'lib.lua'|punctuation:,|text: |path:\"a/b\"|punctuation:)"));
     }
 }

@@ -115,6 +115,15 @@
           <key>kind</key>
           <string>comment</string>
         </map>
+        <!-- A string one word long with a dot or a slash in it names a
+             file or an address rather than saying anything: a path, as
+             what an #include takes in is, and no prose. -->
+        <map>
+          <key>regex</key>
+          <string>"[^"\s\\]*[./][^"\s\\]*"</string>
+          <key>kind</key>
+          <string>path</string>
+        </map>
         <map>
           <key>span</key>
           <string>"</string>
@@ -222,6 +231,12 @@
             <string>*/</string>
             <key>kind</key>
             <string>comment</string>
+          </map>
+          <map>
+            <key>regex</key>
+            <string>"[^"\s\\]*[./][^"\s\\]*"</string>
+            <key>kind</key>
+            <string>path</string>
           </map>
           <map>
             <key>span</key>

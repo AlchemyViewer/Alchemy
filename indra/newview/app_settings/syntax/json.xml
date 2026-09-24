@@ -71,6 +71,14 @@
           <key>kind</key>
           <string>property</string>
         </map>
+        <!-- A value one word long with a dot or a slash in it names a
+             file, a module or an address: a path, and no prose. -->
+        <map>
+          <key>regex</key>
+          <string>"[^"\s\\]*[./][^"\s\\]*"</string>
+          <key>kind</key>
+          <string>path</string>
+        </map>
         <map>
           <key>span</key>
           <string>"</string>

@@ -1364,26 +1364,11 @@ void ALTextView::checkLine(S32 line)
         check_stretch(0, static_cast<S32>(text.size()));
         return;
     }
-    // A string that names a file rather than saying anything is no prose:
-    // anything one word long with a dot or a slash in it -- a file's path,
-    // an address. What a directive or a call takes in by name is the
-    // grammar's to say, as a path, which is never checked.
-    const auto names_a_file = [&text](const ALSyntaxToken& token) {
-        std::string_view inner(text.data() + token.begin, static_cast<size_t>(token.end - token.begin));
-        if (!inner.empty() && (inner.front() == '"' || inner.front() == '\''))
-        {
-            inner.remove_prefix(1);
-        }
-        if (!inner.empty() && (inner.back() == '"' || inner.back() == '\''))
-        {
-            inner.remove_suffix(1);
-        }
-        return !inner.empty() && inner.find_first_of(" \t") == std::string_view::npos && inner.find_first_of("./\\") != std::string_view::npos;
-    };
+    // What names a file, a module or an address rather than saying
+    // anything is the grammar's to say, as a path, which is never checked.
     for (const ALSyntaxToken& token : mHighlighter.tokens(line))
     {
-        const bool prose = token.kind == ALSyntaxKind::Comment || token.kind == ALSyntaxKind::DocComment ||
-                           (token.kind == ALSyntaxKind::String && !names_a_file(token));
+        const bool prose = token.kind == ALSyntaxKind::Comment || token.kind == ALSyntaxKind::DocComment || token.kind == ALSyntaxKind::String;
         if (prose)
         {
             check_stretch(token.begin, token.end);
