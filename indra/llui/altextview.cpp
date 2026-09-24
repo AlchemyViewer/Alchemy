@@ -593,15 +593,7 @@ void ALTextView::scrollToCaret()
     const S32 height = mLayout.rowHeightOf(mCaret.line, row);
     const LLRect text = textRect();
     const S32 page = llmax(height, text.getHeight());
-    if (top < mScrollY)
-    {
-        mScrollY = top;
-    }
-    else if (top + height > mScrollY + page)
-    {
-        mScrollY = top + height - page;
-    }
-    mScrollY = llmax(0, mScrollY);
+    // Across first: where the caret is across says what covers it above.
     if (mWordWrap)
     {
         mScrollX = 0.f;
@@ -618,7 +610,40 @@ void ALTextView::scrollToCaret()
             mScrollX = x + CARET_MARGIN - width;
         }
     }
+    if (top + height > mScrollY + page)
+    {
+        mScrollY = top + height - page;
+    }
+    // Up, below what is drawn over the top where the caret is -- the find
+    // bar, the lines pinned there -- which is asked again at each place
+    // tried, since what is pinned is what the top of the view is inside.
+    const S32 caret_x = text.mLeft + static_cast<S32>(x - mScrollX);
+    for (S32 tries = 0; tries < 4 && mScrollY > 0; ++tries)
+    {
+        const S32 covered = llmin(llmax(0, coveredAbove(caret_x)), llmax(0, page - height));
+        if (top >= mScrollY + covered)
+        {
+            break;
+        }
+        mScrollY = llmax(0, top - covered);
+    }
+    if (top < mScrollY)
+    {
+        mScrollY = top;
+    }
+    mScrollY = llmax(0, mScrollY);
     syncScrollbar();
+}
+
+S32 ALTextView::coveredAbove(S32 local_x)
+{
+    if (!findShown())
+    {
+        return 0;
+    }
+    const LLRect bar  = mFindBar->getRect();
+    const LLRect text = textRect();
+    return local_x >= bar.mLeft && local_x <= bar.mRight ? llmax(0, text.mTop - bar.mBottom) : 0;
 }
 
 void ALTextView::scrollToLine(S32 line)
@@ -4261,6 +4286,10 @@ bool ALTextView::handleMouseDown(S32 x, S32 y, MASK mask)
 
 bool ALTextView::handleRightMouseDown(S32 x, S32 y, MASK mask)
 {
+    if (overlayAt(x, y))
+    {
+        return LLUICtrl::handleRightMouseDown(x, y, mask);
+    }
     // A link that is a URL has the registry's menu for it.
     if (const Substitution* link = linkAtLocal(x, y); link && !link->url.empty())
     {
@@ -4299,8 +4328,18 @@ bool ALTextView::handleHover(S32 x, S32 y, MASK mask)
 {
     // The mouse is here: the bars stay in sight.
     mBarShown.reset();
+    // A bar or the map held, or under the mouse: the arrow, as over any
+    // scroll bar, not the text's cursor.
+    const auto arrow = []() {
+        if (LLWindow* window = getWindow())
+        {
+            window->setCursor(UI_CURSOR_ARROW);
+        }
+        return true;
+    };
     if (mBarDrag != BarDrag::None && hasMouseCapture())
     {
+        arrow();
         if (mBarDrag == BarDrag::Vertical)
         {
             scrollToRulerY(y, mBarDragOffset);
@@ -4314,7 +4353,7 @@ bool ALTextView::handleHover(S32 x, S32 y, MASK mask)
     if (mDraggingMap && hasMouseCapture())
     {
         scrollToMapY(y);
-        return true;
+        return arrow();
     }
     if (mSelecting && hasMouseCapture())
     {
@@ -4336,9 +4375,27 @@ bool ALTextView::handleHover(S32 x, S32 y, MASK mask)
         }
         return true;
     }
+    // On something over the text, it has the mouse: its buttons light and
+    // its cursor shows, not the text's.
+    if (overlayAt(x, y))
+    {
+        mMapHoverY = -1;
+        mHoverLink = -1;
+        mHoverAtom = -1;
+        return LLUICtrl::handleHover(x, y, mask);
+    }
     // Resting on the map previews the lines there, as long as it rests.
     const LLRect map = mapRect();
     mMapHoverY       = mScrollMap && mScrollMapPreview && map.notEmpty() && map.pointInRect(x, y) ? y : -1;
+    const LLRect ruler = rulerRect();
+    const LLRect bar   = hBarRect();
+    if ((mScrollMap && map.notEmpty() && map.pointInRect(x, y)) || (ruler.notEmpty() && ruler.pointInRect(x, y)) ||
+        (bar.notEmpty() && bar.pointInRect(x, y) && barAlpha() > 0.f))
+    {
+        mHoverLink = -1;
+        mHoverAtom = -1;
+        return arrow();
+    }
     if (textRect().pointInRect(x, y))
     {
         const Substitution* link = linkAtLocal(x, y);
@@ -4486,6 +4543,10 @@ void ALTextView::onMouseCaptureLost()
 
 bool ALTextView::handleToolTip(S32 x, S32 y, MASK mask)
 {
+    if (overlayAt(x, y))
+    {
+        return LLUICtrl::handleToolTip(x, y, mask);
+    }
     // The map has its preview drawn as the mouse moves; no tip there.
     const LLRect map = mapRect();
     if (mScrollMap && mScrollMapPreview && map.notEmpty() && map.pointInRect(x, y))

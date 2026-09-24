@@ -37,6 +37,7 @@
 #include "lltextbox.h"
 #include "lluicolortable.h"
 #include "lluictrlfactory.h"
+#include "llwindow.h"
 
 static LLDefaultChildRegistry::Register<ALFindBar> r("find_bar");
 
@@ -128,6 +129,11 @@ public:
     bool handleHover(S32 x, S32 y, MASK mask) override
     {
         mHover = true;
+        // A button: the arrow, not the text's cursor under the bar.
+        if (LLWindow* window = getWindow())
+        {
+            window->setCursor(UI_CURSOR_ARROW);
+        }
         return true;
     }
 

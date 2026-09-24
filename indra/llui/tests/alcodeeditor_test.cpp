@@ -27,6 +27,7 @@
 #include "../alcodeeditor.h"
 
 #include "../alchoicelist.h"
+#include "../alfindbar.h"
 #include "../alsurface.h"
 
 #include "../llfocusmgr.h"
@@ -1555,5 +1556,43 @@ namespace tut
         e.closeFixes();
         e.noteFixes(told.back().first, { "late", "late" });
         ensure("nothing to put them on once closed", e.fixes().empty());
+    }
+
+    template<> template<>
+    void alcodeeditor_object::test<42>()
+    {
+        set_test_name("a press on the find bar is the bar's though pinned headers are under it, and a line scrolled up to comes out from under them");
+        std::string text = "default\n{\n    state_entry()\n    {\n";
+        for (int i = 0; i < 80; ++i)
+        {
+            text += "        llOwnerSay(\"line " + std::to_string(i) + "\");\n";
+        }
+        text += "    }\n}\n";
+        ALCodeEditor& e = make(text.c_str());
+        e.setStickyHeaders(true);
+        const S32 row_h = e.layout().rowHeight();
+        // Well into the handler, so that its state and it are pinned over
+        // the top; then up to a line above the view.
+        e.setCaret(ALTextPos(70, 8));
+        e.setCaret(ALTextPos(40, 8));
+        const S32 below = e.layout().lineTop(40) - e.scrollY();
+        ensure("below the two pinned headers: " + std::to_string(below) + " of " + std::to_string(row_h), below >= 2 * row_h);
+
+        e.showFind(false);
+        e.findBar()->setQuery("line 6");
+        e.setCaret(ALTextPos(64, 8));
+        LLView*      next = e.findBar()->findChild<LLView>("next");
+        const LLRect bar  = e.findBar()->getRect();
+        ensure("the arrow", next != nullptr);
+        const S32 x = bar.mLeft + next->getRect().getCenterX();
+        const S32 y = bar.mBottom + next->getRect().getCenterY();
+        ensure("over the pinned headers", y > e.textRect().mTop - 2 * row_h);
+        ensure("pressed", e.handleMouseDown(x, y, MASK_NONE));
+        e.handleMouseUp(x, y, MASK_NONE);
+        // The next after the caret is further along its own line.
+        ensure("the next match after the caret, not a header's line: " + std::to_string(e.caret().line), e.caret().line == 64 && e.findCurrent() >= 0);
+        e.handleMouseDown(x, y, MASK_NONE);
+        e.handleMouseUp(x, y, MASK_NONE);
+        ensure("and the one after that on the next press: " + std::to_string(e.caret().line), e.caret().line == 65);
     }
 }

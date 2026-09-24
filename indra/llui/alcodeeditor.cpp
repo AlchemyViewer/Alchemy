@@ -1410,6 +1410,11 @@ S32 ALCodeEditor::stickyRows()
     return static_cast<S32>(stickyLines().size());
 }
 
+S32 ALCodeEditor::coveredAbove(S32 local_x)
+{
+    return llmax(ALTextView::coveredAbove(local_x), stickyRows() * layout().rowHeight());
+}
+
 void ALCodeEditor::drawAfterRows(const LLRect& text)
 {
     const std::vector<S32> lines = stickyLines();
@@ -4204,19 +4209,10 @@ bool ALCodeEditor::deletePair()
 
 bool ALCodeEditor::handleMouseDown(S32 x, S32 y, MASK mask)
 {
-    if (mCompletionList && mCompletionList->getVisible() && mCompletionList->getRect().pointInRect(x, y))
-    {
-        return LLUICtrl::handleMouseDown(x, y, mask);
-    }
-    if (fixesOpen() && mFixList->getRect().pointInRect(x, y))
-    {
-        return LLUICtrl::handleMouseDown(x, y, mask);
-    }
-    if (cardShown() && mCard->getRect().pointInRect(x, y))
-    {
-        return LLUICtrl::handleMouseDown(x, y, mask);
-    }
-    if (mCompletionDoc && mCompletionDoc->getVisible() && mCompletionDoc->getRect().pointInRect(x, y))
+    // Something drawn over the text that is a view of its own -- the find
+    // bar, a list, the card -- has the press before the text, the gutter
+    // and the pinned headers: the find bar's arrows are over the headers.
+    if (overlayAt(x, y))
     {
         return LLUICtrl::handleMouseDown(x, y, mask);
     }
@@ -4313,6 +4309,11 @@ bool ALCodeEditor::handleMouseDown(S32 x, S32 y, MASK mask)
 
 bool ALCodeEditor::handleToolTip(S32 x, S32 y, MASK mask)
 {
+    // Over the find bar or a list, theirs; the card says nothing more.
+    if (overlayAt(x, y) && !(cardShown() && mCard->getRect().pointInRect(x, y)))
+    {
+        return ALTextView::handleToolTip(x, y, mask);
+    }
     const LLRect text = textRect();
     // A mark in the gutter says what is on its line: every problem there;
     // the strip of heat at its edge, what the line came to.
@@ -4791,6 +4792,10 @@ void ALCodeEditor::supplyHover(const ALTextPos& at, const std::string& text, std
 
 bool ALCodeEditor::handleDoubleClick(S32 x, S32 y, MASK mask)
 {
+    if (overlayAt(x, y))
+    {
+        return ALTextView::handleDoubleClick(x, y, mask);
+    }
     // A hint the text can say, written in where it stands: a type after a
     // name declared without one, as Visual Studio Code writes its hints.
     const S32 inlay = isReadOnly() ? -1 : inlayAtLocal(x, y);
@@ -4839,6 +4844,16 @@ bool ALCodeEditor::handleHover(S32 x, S32 y, MASK mask)
         {
             hideCard();
         }
+    }
+    // Over the find bar or a list, the mouse is not resting on the text
+    // under it: no card comes for what is hidden there.
+    if (overlayAt(x, y))
+    {
+        mMouseX          = -1;
+        mMouseY          = -1;
+        mGutterHover     = false;
+        mGutterHoverLine = -1;
+        return ALTextView::handleHover(x, y, mask);
     }
     const S32 gutter_right = leftEdge() + gutterWidth();
     mGutterHover           = gutterWidth() > 0 && x >= leftEdge() && x < gutter_right && textRect().mBottom <= y && y <= textRect().mTop;

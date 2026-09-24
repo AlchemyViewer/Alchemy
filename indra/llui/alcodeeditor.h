@@ -671,6 +671,8 @@ private:
     // inner; and the number of rows they take.
     std::vector<S32> stickyLines();
     S32              stickyRows();
+    // What is drawn over the top of the text: the pinned headers too.
+    S32              coveredAbove(S32 local_x) override;
 
     void              ensureRegions();
     void              applyFolds();

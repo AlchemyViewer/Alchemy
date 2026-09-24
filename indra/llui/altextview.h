@@ -617,6 +617,15 @@ protected:
     // are drawn, and whatever it draws over each row after its glyphs --
     // given the top of the row's text band, which is a font line tall.
     virtual S32  leftInset() const { return 0; }
+    // How much of the top of the text is drawn over at a point across the
+    // view, which a line scrolled up to is brought below: the find bar,
+    // where the point is under it, and in a subclass what it pins there.
+    // Asked again as the view scrolls, since what is pinned may change.
+    virtual S32  coveredAbove(S32 local_x);
+    // A view of its own under a point, drawn over the text -- the find bar,
+    // a list, a card, a view the text holds -- which has the mouse before
+    // the text does; or nothing.
+    LLView*      overlayAt(S32 x, S32 y) { return childFromPoint(x, y); }
     virtual void drawBeforeRows(const LLRect& text) {}
     virtual void drawRowExtras(S32 line, S32 row, const LLRect& text, S32 screen_top, F32 left, F32 alpha) {}
     // Over every row, still clipped to the text: what floats above the
