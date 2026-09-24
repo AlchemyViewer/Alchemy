@@ -357,6 +357,19 @@ namespace
     }
 }
 
+namespace
+{
+    // The studio window the keyboard was last in.
+    LLHandle<LLFloater> sLastWorkedIn;
+}
+
+// static
+ALFloaterScriptStudio* ALFloaterScriptStudio::lastWorkedIn()
+{
+    ALFloaterScriptStudio* window = ALViewType::as<ALFloaterScriptStudio>(sLastWorkedIn.get());
+    return window && window->getVisible() ? window : nullptr;
+}
+
 // static
 bool ALFloaterScriptStudio::wantsScripts()
 {
@@ -369,8 +382,14 @@ ALFloaterScriptStudio* ALFloaterScriptStudio::open(const ALScriptRef& ref, const
 {
     // Open somewhere already: that window, brought forward -- if a
     // window may be shown at all, which a restriction on viewing
-    // scripts decides the same way for every window.
-    if (ALFloaterScriptStudio* window = ref.isNull() ? nullptr : holderOf(ref, std::string()))
+    // scripts decides the same way for every window. Else the window last
+    // worked in, as a script window used to open over the last one.
+    ALFloaterScriptStudio* window = ref.isNull() ? nullptr : holderOf(ref, std::string());
+    if (!window && !ref.isNull())
+    {
+        window = lastWorkedIn();
+    }
+    if (window)
     {
         if (!LLFloaterReg::canShowInstance("script_studio", window->getKey()))
         {
@@ -1349,6 +1368,10 @@ void ALFloaterScriptStudio::adoptWindowAtQuit(const LLSD& window)
 
 void ALFloaterScriptStudio::draw()
 {
+    if (hasFocus())
+    {
+        sLastWorkedIn = getHandle();
+    }
     pumpPreprocessor();
     pumpAnalysis();
     pumpCaret();
@@ -1786,12 +1809,14 @@ void ALFloaterScriptStudio::openScript(const ALScriptRef& ref, const std::string
     }
     if (already != NONE)
     {
-        // Asked for outright, a preview is held.
+        // Asked for outright, a preview is held; and called what it is
+        // called now, renamed since it was opened.
         if (mOpenPreview == 0)
         {
             holdPreview(*mDocs[already]);
         }
         activate(already, focus);
+        renameDoc(*mDocs[already], name);
         return;
     }
     const bool preview = mOpenPreview > 0;
@@ -4421,10 +4446,13 @@ void ALFloaterScriptStudio::activate(size_t index, bool focus)
     }
     refreshOutline(*mDocs[index]);
     // The inspector is about this script now: told again once the caret
-    // is seen.
+    // is seen. The bar at the bottom says so now -- a notecard's too, whose
+    // caret is not watched -- rather than keep the last tab's path until
+    // the caret moves.
     mDocs[index]->caretSeen = ALTextPos(-1, -1);
     mDocs[index]->inspectAt = ALTextPos(-1, -1);
     mSymbol->setText(LLStringUtil::null);
+    refreshBreadcrumb(*mDocs[index]);
     refreshNotice();
 }
 
@@ -4492,11 +4520,9 @@ void ALFloaterScriptStudio::fillTabs()
         }
     }
     mTabs->setTabs(std::move(tabs), chosen);
-    if (!mMain)
-    {
-        const Doc* doc = active();
-        setTitle(doc ? getString("WindowTitle") + " - " + doc->name : getString("WindowTitle"));
-    }
+    // Every window says which script is in front, as a window of one did.
+    const Doc* doc = active();
+    setTitle(doc ? getString("WindowTitle") + " - " + doc->name : getString("WindowTitle"));
 }
 
 // static
@@ -5040,6 +5066,35 @@ void ALFloaterScriptStudio::showTabMenu(const std::string& value, S32 x, S32 y)
     if (!menu)
     {
         return;
+    }
+    // Each other studio window open, to move the tab into, after moving it
+    // to a window of its own.
+    S32 at = 0;
+    for (U32 i = 0; i < menu->getItemCount(); ++i)
+    {
+        if (menu->getItem(static_cast<S32>(i)) && menu->getItem(static_cast<S32>(i))->getName() == "pop_out")
+        {
+            at = static_cast<S32>(i) + 1;
+        }
+    }
+    for (LLFloater* floater : LLFloaterReg::getFloaterList("script_studio"))
+    {
+        ALFloaterScriptStudio* other = ALViewType::as<ALFloaterScriptStudio>(floater);
+        if (!other || other == this || !other->getVisible())
+        {
+            continue;
+        }
+        LLStringUtil::format_map_t args;
+        args["[WINDOW]"] = other->getTitle();
+        LLMenuItemCallGL::Params p;
+        p.name                   = "move_to_" + other->getKey().asString();
+        p.label                  = getString("MoveToWindow", args);
+        LLMenuItemCallGL*         item   = LLUICtrlFactory::create<LLMenuItemCallGL>(p);
+        const LLHandle<LLFloater> target = other->getHandle();
+        item->setClickCallback([this, target](LLUICtrl*, const LLSD&) {
+            moveActiveTo(ALViewType::as<ALFloaterScriptStudio>(target.get()));
+        });
+        menu->insert(at++, item);
     }
     mTabMenuHandle = menu->getHandle();
     menu->show(x, y);
@@ -9973,7 +10028,7 @@ void ALFloaterScriptStudio::refreshBreadcrumb(Doc& doc)
             parent = found;
         }
     }
-    if (doc.crumbsOf == doc.analysisVersion && doc.crumbPath == path && doc.crumbName == doc.name)
+    if (mCrumbsShownFor == doc.id && doc.crumbsOf == doc.analysisVersion && doc.crumbPath == path && doc.crumbName == doc.name)
     {
         // The same steps over the same outline: only the trailer, which
         // says where the caret is.
@@ -10030,7 +10085,19 @@ void ALFloaterScriptStudio::refreshBreadcrumb(Doc& doc)
         parent = found;
     }
     mBreadcrumb->setPath(std::move(crumbs));
+    mCrumbsShownFor = doc.id;
     refreshTrailer(doc);
+}
+
+void ALFloaterScriptStudio::renameDoc(Doc& doc, const std::string& name)
+{
+    if (name.empty() || name == doc.name)
+    {
+        return;
+    }
+    doc.name = name;
+    fillTabs();
+    refreshBreadcrumb(doc);
 }
 
 void ALFloaterScriptStudio::onCrumbChosen(size_t, const std::string& value)
@@ -11221,18 +11288,8 @@ void ALFloaterScriptStudio::continueClosing()
 void ALFloaterScriptStudio::popOut()
 {
     Doc* doc = active();
-    if (!doc || !doc->loaded)
+    if (!doc || !doc->loaded || !movable(*doc))
     {
-        return;
-    }
-    // Not while a save of it is on its way: the answer comes to whichever
-    // window holds the tab then, where the save is not its own, and a close
-    // waiting on it here would wait on a tab gone from here.
-    if (doc->saving || doc->preprocessing || doc->saveAfterCheck || doc->saveAfterWeigh || doc->uploadAfterWeigh)
-    {
-        LLStringUtil::format_map_t args;
-        args["[NAME]"] = doc->name;
-        setStatus(getString("PopOutWhileSaving", args), true);
         return;
     }
     // A window of its own, placed beside this one; the script opens
@@ -11255,6 +11312,36 @@ void ALFloaterScriptStudio::popOut()
     rect.translate(40, -40);
     window->setShape(rect);
     gFloaterView->adjustToFitScreen(window, false);
+    if (!moveActiveTo(window))
+    {
+        // It could not go -- a file that could not be read there: the tab
+        // stays here, and the empty window goes.
+        window->closeFloater();
+    }
+}
+
+bool ALFloaterScriptStudio::movable(const Doc& doc)
+{
+    // Not while a save of it is on its way: the answer comes to whichever
+    // window holds the tab then, where the save is not its own, and a close
+    // waiting on it here would wait on a tab gone from here.
+    if (doc.saving || doc.preprocessing || doc.saveAfterCheck || doc.saveAfterWeigh || doc.uploadAfterWeigh)
+    {
+        LLStringUtil::format_map_t args;
+        args["[NAME]"] = doc.name;
+        setStatus(getString("PopOutWhileSaving", args), true);
+        return false;
+    }
+    return true;
+}
+
+bool ALFloaterScriptStudio::moveActiveTo(ALFloaterScriptStudio* window)
+{
+    Doc* doc = active();
+    if (!doc || !doc->loaded || !window || window == this || !movable(*doc))
+    {
+        return false;
+    }
     // What it holds goes with it whole -- the text, the steps that led to
     // it to take back, the caret -- as a kept tab comes back next session.
     ALScriptRecoveryEntry moving = recoveryEntryOf(*doc);
@@ -11267,10 +11354,7 @@ void ALFloaterScriptStudio::popOut()
         const size_t moved = window->indexOf("disk:" + doc->file);
         if (moved == NONE)
         {
-            // The file could not be read there: the tab stays here, and
-            // the empty window goes.
-            window->closeFloater();
-            return;
+            return false;
         }
         Doc& there        = *window->mDocs[moved];
         there.recovering  = moving;
@@ -11294,8 +11378,10 @@ void ALFloaterScriptStudio::popOut()
             window->showView(there, doc->view);
         }
     }
+    window->openFloater(window->getKey());
     window->setFocus(true);
     letGoOf(mActive, true);
+    return true;
 }
 
 // --- recovery ------------------------------------------------------------------------
@@ -11748,6 +11834,19 @@ void ALFloaterScriptStudio::checkOrphans()
             if (object->getRegion())
             {
                 doc.regionName = object->getRegion()->getName();
+            }
+        }
+        // Renamed where it lives since it was opened -- in the inventory, in
+        // its object: called so here too.
+        if (doc.loaded && doc.file.empty() && !doc.ref.isNull())
+        {
+            LLViewerObject*        holder = doc.ref.inInventory() ? nullptr : gObjectList.findObject(doc.ref.object);
+            const LLInventoryItem* item   = doc.ref.inInventory() ? gInventory.getItem(doc.ref.item)
+                                            : holder              ? holder->getInventoryItem(doc.ref.item)
+                                                                  : nullptr;
+            if (item && !item->getName().empty())
+            {
+                renameDoc(doc, item->getName());
             }
         }
         const Doc::Orphan was       = doc.orphan;
@@ -14195,8 +14294,7 @@ void ALFloaterScriptStudio::explorerRename(const ExplorerRow& row)
         // The tab, if it is open, and the list.
         if (const size_t index = studio->indexOf(ref); index != NONE)
         {
-            studio->mDocs[index]->name = name;
-            studio->fillTabs();
+            studio->renameDoc(*studio->mDocs[index], name);
         }
         studio->refreshExplorer(true);
     });
@@ -14636,6 +14734,7 @@ void ALFloaterScriptStudio::letGoOf(size_t index, bool keep)
         mOutline->deleteAllItems();
         mBreadcrumb->setPath({});
         mBreadcrumb->setTrailer(LLStringUtil::null);
+        mCrumbsShownFor.clear();
         mSymbol->setText(LLStringUtil::null);
     }
     else

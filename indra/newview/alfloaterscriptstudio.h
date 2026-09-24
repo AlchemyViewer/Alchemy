@@ -149,8 +149,10 @@ public:
     void openScript(const ALScriptRef& ref, const std::string& name, std::optional<std::string> carried = std::nullopt, S32 line = -1,
                     bool focus = true);
     // The active script moved to a window of its own, its unsaved text
-    // going with it.
+    // going with it; or to another studio window already open. False where
+    // it could not go.
     void popOut();
+    bool moveActiveTo(ALFloaterScriptStudio* window);
     // The next script closed on the way to closing the window, or the
     // window closed once none is left.
     void continueClosing();
@@ -1095,6 +1097,12 @@ private:
     bool        outlineArrowAt(S32 x, S32 y, size_t& index);
     void        foldOutline(size_t index, std::optional<bool> folded = std::nullopt);
     void        refreshBreadcrumb(Doc& doc);
+    // A script's tab, its window's title and the bar called what it is now
+    // called: renamed here, in the inventory, or found so when opened again.
+    void        renameDoc(Doc& doc, const std::string& name);
+    // Whether a script may move between windows now: not while a save of it
+    // is on its way, which is said.
+    bool        movable(const Doc& doc);
     // The words past the breadcrumb: where the caret is, what is
     // selected, how many problems; the caret's place opens Go to Line and
     // the counts the problems.
@@ -1328,6 +1336,10 @@ private:
     void reattach(Doc& doc);
     // The window, of all of them, that has a script or a file open.
     static ALFloaterScriptStudio* holderOf(const ALScriptRef& ref, const std::string& file);
+    // The studio window the keyboard was last in, while it is open: where a
+    // script opened from outside -- the inventory, an object -- goes, as a
+    // script window used to open over the last one.
+    static ALFloaterScriptStudio* lastWorkedIn();
     // An entry put back: into the tab that has its script or file, opened
     // where it is not, or into a tab of its own where what it came from
     // is gone.
@@ -1740,6 +1752,9 @@ private:
     // What the region said runs, by prim and item.
     std::map<std::pair<LLUUID, LLUUID>, bool> mRunningKnown;
     bool                               mMain = true;
+    // Whose path the bar at the bottom shows, so that a tab come to the
+    // front is shown there whatever its own path was when last shown.
+    std::string                        mCrumbsShownFor;
     bool                               mClosingWindow = false;
     LLHandle<LLContextMenu>            mListMenuHandle;
     LLScrollListCtrl*                  mListMenuFor   = nullptr;
