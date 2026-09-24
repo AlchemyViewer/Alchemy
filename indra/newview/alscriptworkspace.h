@@ -264,7 +264,10 @@ public:
     // from there into the other prim, a script running or not as asked.
     // A copy that went in stays in that folder, in the trash, where the
     // agent can see what passed through; what the other prim would not
-    // take stays there too, for the agent to take back.
+    // take stays there too, for the agent to take back. One transfer runs
+    // at a time, the rest waiting their turn, and each takes from the
+    // folder only what it is waiting for: a transfer knows its items there
+    // by their names alone.
     struct TransferResult
     {
         S32                      moved = 0;
@@ -386,6 +389,7 @@ private:
     struct Burst;
     struct ContentsListener;
     struct Transfer;
+    void startTransfer(const std::shared_ptr<Transfer>& transfer);
     void transferArrived(const std::shared_ptr<Transfer>& transfer);
     void transferEnd(const std::shared_ptr<Transfer>& transfer);
     void flushExpiredBurst();
@@ -406,6 +410,7 @@ private:
     std::unique_ptr<LLEventTimer> mBurstTimer;
     std::deque<RuntimeEvent>      mRecent;
     runtime_signal_t              mRuntime;
+    // The one in front is under way; the rest wait for it to end.
     std::vector<std::shared_ptr<Transfer>> mTransfers;
     std::vector<LLUUID>                 mOwnExperiences;
     std::vector<experiences_callback_t> mOwnExperiencesWaiting;

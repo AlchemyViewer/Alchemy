@@ -835,6 +835,8 @@ struct ALScriptWorkspace::Transfer final : public LLInventoryObserver
     LLUUID                            to;
     LLUUID                            folder;
     bool                              running = true;
+    // What is to be taken out of `from`, once its turn comes.
+    std::vector<LLUUID>               taking;
     // The names of what was taken, until each has come.
     std::vector<std::string>          awaited;
     boost::unordered_flat_set<LLUUID> arrived;
@@ -890,8 +892,20 @@ void ALScriptWorkspace::transfer(const LLUUID& from_id, const std::vector<LLUUID
         one->done(one->result);
         return;
     }
+    // After any under way: two at once would each see the other's items
+    // come into the folder they share.
+    one->taking = std::move(taking);
     mTransfers.push_back(one);
-    const auto begin = [this, one, taking](const LLUUID& folder) {
+    if (mTransfers.size() == 1)
+    {
+        startTransfer(one);
+    }
+}
+
+void ALScriptWorkspace::startTransfer(const std::shared_ptr<Transfer>& one)
+{
+    const LLUUID trash = gInventory.findCategoryUUIDForType(LLFolderType::FT_TRASH);
+    const auto   begin = [this, one](const LLUUID& folder) {
         LLViewerObject* from = gObjectList.findObject(one->from);
         if (folder.isNull() || !from)
         {
@@ -910,7 +924,7 @@ void ALScriptWorkspace::transfer(const LLUUID& from_id, const std::vector<LLUUID
             one->arrived.insert(item->getUUID());
         }
         gInventory.addObserver(one.get());
-        for (const LLUUID& id : taking)
+        for (const LLUUID& id : one->taking)
         {
             from->moveInventory(folder, id);
         }
@@ -923,6 +937,11 @@ void ALScriptWorkspace::transfer(const LLUUID& from_id, const std::vector<LLUUID
             },
             TRANSFER_TIMEOUT);
     };
+    if (trash.isNull())
+    {
+        begin(LLUUID::null);
+        return;
+    }
     // One folder in the trash for everything that passes between objects,
     // made the first time.
     const std::string               name     = LLTrans::getString("WorkspaceTransferFolder");
@@ -948,10 +967,21 @@ void ALScriptWorkspace::transferArrived(const std::shared_ptr<Transfer>& one)
     std::vector<LLPointer<LLViewerInventoryItem>> fresh;
     for (const LLPointer<LLViewerInventoryItem>& item : items ? *items : LLInventoryModel::item_array_t())
     {
-        if (item && one->arrived.insert(item->getUUID()).second)
+        if (!item || one->arrived.count(item->getUUID()))
         {
-            fresh.push_back(item);
+            continue;
         }
+        // Only what this one is waiting for: one before it that gave up on
+        // an item may see it come late, and something put in by hand is
+        // nobody's to take.
+        const auto awaited = std::find(one->awaited.begin(), one->awaited.end(), item->getName());
+        if (awaited == one->awaited.end())
+        {
+            continue;
+        }
+        one->awaited.erase(awaited);
+        one->arrived.insert(item->getUUID());
+        fresh.push_back(item);
     }
     if (fresh.empty())
     {
@@ -963,10 +993,6 @@ void ALScriptWorkspace::transferArrived(const std::shared_ptr<Transfer>& one)
         LLViewerObject* to = gObjectList.findObject(one->to);
         for (const LLPointer<LLViewerInventoryItem>& item : fresh)
         {
-            if (const auto awaited = std::find(one->awaited.begin(), one->awaited.end(), item->getName()); awaited != one->awaited.end())
-            {
-                one->awaited.erase(awaited);
-            }
             if (!to || !LLToolDragAndDrop::isInventoryDropAcceptable(to, item))
             {
                 one->result.refused.push_back(item->getName());
@@ -1013,6 +1039,11 @@ void ALScriptWorkspace::transferEnd(const std::shared_ptr<Transfer>& one)
     one->result.lost = std::move(one->awaited);
     mTransfers.erase(std::remove(mTransfers.begin(), mTransfers.end(), one), mTransfers.end());
     one->done(one->result);
+    // The next one's turn.
+    if (!mTransfers.empty() && mTransfers.front()->folder.isNull() && !mTransfers.front()->finished)
+    {
+        startTransfer(mTransfers.front());
+    }
 }
 
 ALScriptWorkspace::~ALScriptWorkspace()
