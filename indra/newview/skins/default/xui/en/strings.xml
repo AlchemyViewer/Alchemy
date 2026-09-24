@@ -537,6 +537,17 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="ScriptFixUseInstead">Use '[2]' instead of '[1]'</string>
 	<string name="ScriptFixUnused">Rename to '_[1]'</string>
 	<string name="ScriptFixSuppress">Suppress '[1]' on this line</string>
+	<string name="ScriptFixCast">Cast to [1]</string>
+	<string name="ScriptFixCompare">Compare with '=='</string>
+	<string name="ScriptFixBrackets">Wrap the assignment in brackets</string>
+	<string name="ScriptFixAssign">Assign with '='</string>
+	<string name="ScriptFixIntFloat">Multiply as a float, then cast to integer</string>
+	<string name="ScriptFixReturn">Write 'return' instead</string>
+	<string name="ScriptFixToString">Wrap in tostring()</string>
+	<string name="ScriptFixColon">Call with ':'</string>
+	<string name="ScriptFixDot">Call with '.'</string>
+	<string name="ScriptFixLocal">Make '[1]' local</string>
+	<string name="ScriptFixInitNil">Initialize '[1]' with nil</string>
 
 	<!-- What the engines say, taken apart by ALMessageMap and said again
 	     with the words put in: Tailslide's messages by their error code,

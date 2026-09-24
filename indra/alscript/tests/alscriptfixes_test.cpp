@@ -312,4 +312,75 @@ namespace tut
         lint.key  = "LSLDeclaredButNotUsed";
         ensure_equals("LSL", made("    integer x;", false), std::string("    integer x;  // NOLINT(DeclaredButNotUsed)"));
     }
+
+    template<> template<>
+    void object::test<11>()
+    {
+        set_test_name("an LSL value of the wrong type is cast to the right one, where LSL casts it");
+        ensure("builtins: " + error, lslLoaded);
+        std::string made = fixed("default\n{\n    state_entry()\n    {\n        llOwnerSay(5 + 1);\n    }\n}\n", false, "LSLArgumentWrongType",
+                                 "Cast to string");
+        ensure("the argument: " + made, made.find("llOwnerSay((string)(5 + 1));") != std::string::npos);
+        made = fixed("default\n{\n    state_entry()\n    {\n        llSetText(\"a\", <1, 1, 1>, \"1\");\n    }\n}\n", false, "LSLArgumentWrongType",
+                     "Cast to float");
+        ensure("the third, past a vector's commas: " + made, made.find("<1, 1, 1>, (float)\"1\")") != std::string::npos);
+        made = fixed("default\n{\n    state_entry()\n    {\n        string s = 5;\n        llOwnerSay(s);\n    }\n}\n", false,
+                     "LSLWrongTypeInAssignment", "Cast to string");
+        ensure("the declaration: " + made, made.find("string s = (string)5;") != std::string::npos);
+        made = fixed("default\n{\n    state_entry()\n    {\n        string s;\n        s = 6;\n        llOwnerSay(s);\n    }\n}\n", false,
+                     "LSLInvalidOperator", "Cast to string");
+        ensure("the assignment: " + made, made.find("s = (string)6;") != std::string::npos);
+        made = fixed("string f()\n{\n    return 5;\n}\ndefault\n{\n    state_entry()\n    {\n        llOwnerSay(f());\n    }\n}\n", false,
+                     "LSLBadReturnType", "Cast to string");
+        ensure("the return: " + made, made.find("return (string)5;") != std::string::npos);
+        // No cast LSL has: a list is no vector.
+        const ALScriptProblems problems = check("default\n{\n    state_entry()\n    {\n        llSetPos([1]);\n    }\n}\n", false);
+        const ALScriptProblem* none     = keyed(problems, "LSLArgumentWrongType");
+        ensure("said: " + said(problems), none != nullptr && none->fixes.empty());
+    }
+
+    template<> template<>
+    void object::test<12>()
+    {
+        set_test_name("the LSL warnings that say what to write are written so");
+        ensure("builtins: " + error, lslLoaded);
+        const std::string head = "default\n{\n    state_entry()\n    {\n        integer a = 2;\n";
+        const std::string tail = "        llOwnerSay((string)a);\n    }\n}\n";
+        std::string made = fixed(head + "        a == 3;\n" + tail, false, "LSLEqAsStatement", "Assign with '='");
+        ensure("assigned: " + made, made.find("        a = 3;\n") != std::string::npos);
+        made = fixed(head + "        a *= 1.5;\n" + tail, false, "LSLIntFloatMulAssign", "Multiply as a float, then cast to integer");
+        ensure("rewritten: " + made, made.find("a = (integer)(a * 1.5);") != std::string::npos);
+        made = fixed(head + "        state default;\n" + tail, false, "LSLChangeToCurrentState", "Write 'return' instead");
+        ensure("returned: " + made, made.find("        return;\n") != std::string::npos);
+
+        // An assignment used as a condition: either was meant, so neither
+        // is preferred, and the brackets change nothing.
+        const std::string      script   = head + "        if (a = 1) llOwnerSay(\"one\");\n" + tail;
+        const ALScriptProblems problems = check(script, false);
+        const ALScriptProblem* problem  = keyed(problems, "LSLAssignmentInComparison");
+        ensure("said: " + said(problems), problem != nullptr && problem->fixes.size() >= 2);
+        ensure("neither preferred", !problem->fixes[0].preferred && !problem->fixes[1].preferred);
+        ensure_equals("compared", ALScriptFixes::apply(script, problem->fixes[0]).value_or("").find("if (a == 1)") != std::string::npos, true);
+        ensure("bracketed, safely", problem->fixes[1].safe && ALScriptFixes::apply(script, problem->fixes[1]).value_or("").find("if ((a = 1))") != std::string::npos);
+        const std::optional<std::string> quiet = ALScriptFixes::apply(script, problem->fixes[1]);
+        ensure("and quiet after", quiet && keyed(check(*quiet, false), "LSLAssignmentInComparison") == nullptr);
+    }
+
+    template<> template<>
+    void object::test<13>()
+    {
+        set_test_name("the SLua fixes read off what the checker marks");
+        ensure("definitions: " + error, luauLoaded);
+        std::string made = fixed("--!strict\nlocal n = 5\nlocal s: string = n\nprint(s)\n", true, "LuauTypeMismatch", "Wrap in tostring()");
+        ensure("the value a declaration is given: " + made, made.find("local s: string = tostring(n)") != std::string::npos);
+        made = fixed("--!strict\nlocal t = {}\nfunction t:m() return self end\nprint(t.m())\n", true, "LuauRequiresSelf", "Call with ':'");
+        ensure("with a colon: " + made, made.find("print(t:m())") != std::string::npos);
+        made = fixed("local function f()\n    counter = 1\n    return counter\nend\nprint(f())\n", true, "LuauLintGlobalUsedAsLocalFunction",
+                     "Make 'counter' local");
+        ensure("local: " + made, made.find("    local counter = 1\n") != std::string::npos);
+        made = fixed("--!strict\nlocal x\nprint(x)\n", true, "LuauLintUninitializedLocal", "Initialize 'x' with nil");
+        ensure("given nil: " + made, made.find("local x = nil\n") != std::string::npos);
+        made = fixed("--!nonstrickt\nprint(1)\n", true, "LuauLintDirectiveUnknownDidYouMean", "Change 'nonstrickt' to 'nonstrict'");
+        ensure("spelt: " + made, made.compare(0, 12, "--!nonstrict") == 0);
+    }
 }

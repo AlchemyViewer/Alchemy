@@ -30,6 +30,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstring>
 
 namespace
 {
@@ -169,6 +170,392 @@ namespace
         }
         fix.edits.push_back({ problem.line, at, problem.line, at + static_cast<S32>(was.size()), now });
         problem.fixes.push_back(std::move(fix));
+    }
+
+    // `'string'` as a type error words it, and the type it names.
+    std::string typeNamed(const std::string& said)
+    {
+        return said.size() >= 2 && said.front() == '\'' && said.back() == '\'' ? said.substr(1, said.size() - 2) : said;
+    }
+
+    // Whether LSL casts one type to another: to a string or a list from
+    // anything, from a string to anything but a list, between integer and
+    // float. What it does not, no fix offers.
+    bool castable(const std::string& from, const std::string& to)
+    {
+        static const char* const TYPES[] = { "integer", "float", "string", "key", "vector", "rotation", "list" };
+        const auto known = [](const std::string& type) { return std::find(std::begin(TYPES), std::end(TYPES), type) != std::end(TYPES); };
+        if (from == to || !known(from) || !known(to))
+        {
+            return false;
+        }
+        if (to == "string" || to == "list")
+        {
+            return true;
+        }
+        if (from == "string")
+        {
+            return true;
+        }
+        return (from == "integer" && to == "float") || (from == "float" && to == "integer");
+    }
+
+    // An expression with something wrapped round it: bare where it is one
+    // name, number or string, which binds tighter than anything, and in
+    // brackets otherwise.
+    std::string wrapped(const std::string& before, std::string_view expression, const std::string& after, bool bare_ok)
+    {
+        const bool simple = !expression.empty() &&
+                            (std::all_of(expression.begin(), expression.end(), [](char c) { return identifierByte(c) || c == '.'; }) ||
+                             (expression.size() >= 2 && expression.front() == '"' && expression.back() == '"' &&
+                              expression.substr(1, expression.size() - 2).find('"') == std::string_view::npos));
+        return simple && bare_ok ? before + std::string(expression) + after : before + "(" + std::string(expression) + ")" + after;
+    }
+
+    // Blanks off both ends of a stretch of a line, as columns.
+    void trimmed(std::string_view line, S32& from, S32& to)
+    {
+        while (from < to && isspace(static_cast<unsigned char>(line[from])))
+        {
+            ++from;
+        }
+        while (to > from && (isspace(static_cast<unsigned char>(line[to - 1])) || line[to - 1] == ';'))
+        {
+            --to;
+        }
+    }
+
+    // Where a lone `=` stands in a stretch of a line -- not `==`, `<=`,
+    // `>=` or `!=`, nor one in a string -- or -1.
+    S32 loneEquals(std::string_view line, S32 from, S32 to)
+    {
+        char quote = 0;
+        for (S32 i = llmax(0, from); i < llmin(to, static_cast<S32>(line.size())); ++i)
+        {
+            const char c = line[i];
+            if (quote)
+            {
+                if (c == '\\')
+                {
+                    ++i;
+                }
+                else if (c == quote)
+                {
+                    quote = 0;
+                }
+                continue;
+            }
+            if (c == '"' || c == '\'')
+            {
+                quote = c;
+                continue;
+            }
+            if (c == '=' && (i + 1 >= static_cast<S32>(line.size()) || line[i + 1] != '=') && (i == 0 || !strchr("=<>!~+-*/%&|^", line[i - 1])))
+            {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    // The arguments of the call a stretch of a line holds, each as its
+    // columns, blanks off: split at the commas outside brackets, strings,
+    // and LSL's vector and rotation literals -- a `<` where an argument
+    // or an element begins.
+    std::vector<std::pair<S32, S32>> callArguments(std::string_view line, S32 from, S32 to)
+    {
+        std::vector<std::pair<S32, S32>> out;
+        const size_t                     open = line.find('(', static_cast<size_t>(llmax(0, from)));
+        if (open == std::string_view::npos || static_cast<S32>(open) >= to)
+        {
+            return out;
+        }
+        std::vector<char> closers;
+        char              quote       = 0;
+        S32               begin       = static_cast<S32>(open) + 1;
+        bool              at_start    = true;
+        const S32         end         = llmin(to, static_cast<S32>(line.size()));
+        for (S32 i = begin; i < end; ++i)
+        {
+            const char c = line[i];
+            if (quote)
+            {
+                if (c == '\\')
+                {
+                    ++i;
+                }
+                else if (c == quote)
+                {
+                    quote = 0;
+                }
+                continue;
+            }
+            if (isspace(static_cast<unsigned char>(c)))
+            {
+                continue;
+            }
+            const bool starting = at_start;
+            at_start            = false;
+            if (c == '"')
+            {
+                quote = c;
+            }
+            else if (c == '(' || c == '[')
+            {
+                closers.push_back(c == '(' ? ')' : ']');
+                at_start = true;
+            }
+            else if (c == '<' && starting)
+            {
+                closers.push_back('>');
+                at_start = true;
+            }
+            else if (!closers.empty() && c == closers.back())
+            {
+                closers.pop_back();
+            }
+            else if (closers.empty() && (c == ',' || c == ')'))
+            {
+                S32 a = begin, b = i;
+                trimmed(line, a, b);
+                if (b > a)
+                {
+                    out.emplace_back(a, b);
+                }
+                if (c == ')')
+                {
+                    return out;
+                }
+                begin    = i + 1;
+                at_start = true;
+            }
+            else if (c == ',')
+            {
+                at_start = true;
+            }
+        }
+        return out;
+    }
+
+    // A cast of the expression in [from, to) of a line to `to`, where LSL
+    // has one from `from`.
+    bool offerCast(ALScriptProblem& problem, std::string_view line, S32 from, S32 to, const std::string& from_type, const std::string& to_type)
+    {
+        trimmed(line, from, to);
+        if (to <= from || !castable(from_type, to_type))
+        {
+            return false;
+        }
+        const std::string_view expression = line.substr(from, to - from);
+        ALScriptFix            fix        = titled("ScriptFixCast", "Cast to [1]", { to_type });
+        fix.preferred                     = true;
+        fix.edits.push_back({ problem.line, from, problem.line, to, wrapped("(" + to_type + ")", expression, std::string(), true) });
+        problem.fixes.push_back(std::move(fix));
+        return true;
+    }
+
+    // The fixes read off the stretch of one line a problem marks.
+    void attachOnLine(ALScriptProblem& problem, std::string_view line, const Lines& lines, bool lua)
+    {
+        const std::string&              key  = problem.key;
+        const std::vector<std::string>& args = problem.args;
+        const S32                       from = llmax(0, problem.column);
+        const S32                       to   = llmin(problem.endColumn, static_cast<S32>(line.size()));
+        if (to < from)
+        {
+            return;
+        }
+        const std::string_view marked = line.substr(from, to - from);
+        if (!lua && key == "LSLArgumentWrongType" && args.size() >= 4)
+        {
+            // The argument the call was given, cast to what it takes.
+            const std::vector<std::pair<S32, S32>> call  = callArguments(line, from, to);
+            const size_t                           which = static_cast<size_t>(atoi(args[1].c_str()));
+            if (which >= 1 && which <= call.size())
+            {
+                offerCast(problem, line, call[which - 1].first, call[which - 1].second, args[0], args[3]);
+            }
+        }
+        else if (!lua && key == "LSLWrongTypeInAssignment" && args.size() == 3)
+        {
+            // What a declaration is given, cast to what it declares.
+            if (const S32 equals = loneEquals(line, from, to); equals >= 0)
+            {
+                offerCast(problem, line, equals + 1, to, args[2], args[0]);
+            }
+        }
+        else if (!lua && key == "LSLInvalidOperator" && args.size() == 3 && args[1] == "=")
+        {
+            // An assignment of the wrong type, which Tailslide words as an
+            // operator it has no rule for.
+            if (const S32 equals = loneEquals(line, from, to); equals >= 0)
+            {
+                offerCast(problem, line, equals + 1, to, args[2], args[0]);
+            }
+        }
+        else if (!lua && key == "LSLBadReturnType" && args.size() == 2)
+        {
+            if (const size_t at = marked.find("return"); at != std::string_view::npos)
+            {
+                offerCast(problem, line, from + static_cast<S32>(at) + 6, to, args[0], args[1]);
+            }
+        }
+        else if (!lua && key == "LSLAssignmentInComparison")
+        {
+            // Either a comparison was meant, or the assignment is wanted and
+            // says so in brackets. Neither is preferred: which was meant is
+            // the scripter's to say.
+            if (const S32 equals = loneEquals(line, from, to); equals >= 0)
+            {
+                ALScriptFix compare = titled("ScriptFixCompare", "Compare with '=='", {});
+                compare.edits.push_back({ problem.line, equals, problem.line, equals + 1, "==" });
+                problem.fixes.push_back(std::move(compare));
+                ALScriptFix brackets = titled("ScriptFixBrackets", "Wrap the assignment in brackets", {});
+                brackets.safe        = true;
+                brackets.edits.push_back({ problem.line, from, problem.line, from, "(" });
+                brackets.edits.push_back({ problem.line, to, problem.line, to, ")" });
+                problem.fixes.push_back(std::move(brackets));
+            }
+        }
+        else if (!lua && key == "LSLEqAsStatement")
+        {
+            // A comparison thrown away is an assignment typed with one `=`
+            // too many.
+            if (const size_t at = marked.find("=="); at != std::string_view::npos)
+            {
+                ALScriptFix fix = titled("ScriptFixAssign", "Assign with '='", {});
+                fix.preferred   = true;
+                fix.edits.push_back({ problem.line, from + static_cast<S32>(at), problem.line, from + static_cast<S32>(at) + 2, "=" });
+                problem.fixes.push_back(std::move(fix));
+            }
+        }
+        else if (!lua && key == "LSLIntFloatMulAssign")
+        {
+            // What the warning itself says to write: the product as a float,
+            // cast back to the integer once.
+            const size_t at = marked.find("*=");
+            if (at != std::string_view::npos)
+            {
+                S32 name_from = from, name_to = from + static_cast<S32>(at);
+                trimmed(line, name_from, name_to);
+                S32 value_from = from + static_cast<S32>(at) + 2, value_to = to;
+                trimmed(line, value_from, value_to);
+                const std::string_view name = line.substr(name_from, name_to - name_from);
+                if (isIdentifier(name) && value_to > value_from)
+                {
+                    ALScriptFix fix = titled("ScriptFixIntFloat", "Multiply as a float, then cast to integer", {});
+                    fix.preferred   = true;
+                    fix.edits.push_back({ problem.line, name_from, problem.line, value_to,
+                                          std::string(name) + " = (integer)(" + std::string(name) + " * " +
+                                              wrapped("", line.substr(value_from, value_to - value_from), "", true) + ")" });
+                    problem.fixes.push_back(std::move(fix));
+                }
+            }
+        }
+        else if (!lua && key == "LSLChangeToCurrentState")
+        {
+            // It does what `return` does, as the warning says; so write that.
+            if (marked.compare(0, 5, "state") == 0)
+            {
+                S32 end = to;
+                while (end > from && line[end - 1] != ';')
+                {
+                    --end;
+                }
+                ALScriptFix fix = titled("ScriptFixReturn", "Write 'return' instead", {});
+                fix.preferred   = true;
+                fix.safe        = true;
+                fix.edits.push_back({ problem.line, from, problem.line, end > from ? end : to, end > from ? "return;" : "return" });
+                problem.fixes.push_back(std::move(fix));
+            }
+        }
+        else if (lua && (key == "LuauTypeMismatch" || key == "LuauTypeMismatchReason") && args.size() >= 2 && typeNamed(args[0]) == "string" &&
+                 typeNamed(args[1]) != "string")
+        {
+            // A value where a string is wanted, said as one. A declaration
+            // marks the whole of itself: what it is given is after its `=`.
+            S32 value_from = from, value_to = to;
+            if (marked.compare(0, 6, "local ") == 0)
+            {
+                const S32 equals = loneEquals(line, from, to);
+                value_from       = equals < 0 ? to : equals + 1;
+            }
+            trimmed(line, value_from, value_to);
+            const std::string_view value = line.substr(value_from, llmax(0, value_to - value_from));
+            if (value_to > value_from && value.find(',') == std::string_view::npos)
+            {
+                ALScriptFix fix = titled("ScriptFixToString", "Wrap in tostring()", {});
+                fix.preferred   = true;
+                fix.edits.push_back({ problem.line, value_from, problem.line, value_from, "tostring(" });
+                fix.edits.push_back({ problem.line, value_to, problem.line, value_to, ")" });
+                problem.fixes.push_back(std::move(fix));
+            }
+        }
+        else if (lua && (key == "LuauRequiresSelf" || key == "LuauNotTakeSelf"))
+        {
+            // The last `.` or `:` before the call's bracket, the other way.
+            const bool   colon = key == "LuauRequiresSelf";
+            const size_t open  = marked.find('(');
+            const size_t at    = marked.substr(0, open).find_last_of(colon ? '.' : ':');
+            if (open != std::string_view::npos && at != std::string_view::npos)
+            {
+                ALScriptFix fix = colon ? titled("ScriptFixColon", "Call with ':'", {}) : titled("ScriptFixDot", "Call with '.'", {});
+                fix.preferred   = true;
+                const S32 col   = from + static_cast<S32>(at);
+                fix.edits.push_back({ problem.line, col, problem.line, col + 1, colon ? ":" : "." });
+                problem.fixes.push_back(std::move(fix));
+            }
+        }
+        else if (lua && (key.compare(0, 23, "LuauLintGlobalUsedAsLoc") == 0 || key == "LuauLintGlobalNeverRead") && !args.empty() && isIdentifier(args[0]))
+        {
+            // Local where it is first given a value, which is the place the
+            // lint marks: `local` put before the assignment, where that is
+            // what stands there.
+            const S32 equals = loneEquals(line, from, static_cast<S32>(line.size()));
+            if (marked == args[0] && equals >= to && line.substr(to, equals - to).find_first_not_of(" \t") == std::string_view::npos)
+            {
+                ALScriptFix fix = titled("ScriptFixLocal", "Make '[1]' local", { args[0] });
+                fix.preferred   = true;
+                fix.edits.push_back({ problem.line, from, problem.line, from, "local " });
+                problem.fixes.push_back(std::move(fix));
+            }
+        }
+        else if (lua && key == "LuauLintUninitializedLocal" && args.size() == 2 && isIdentifier(args[0]))
+        {
+            // Given nil where it is declared, which is what it holds anyway:
+            // the declaration's line is the lint's second word.
+            const S32              at_line = atoi(args[1].c_str()) - 1;
+            const std::string_view decl    = lines.line(at_line);
+            const S32              name_at = findWord(decl, args[0], 0, static_cast<S32>(decl.size()), false);
+            const size_t           local   = decl.find("local");
+            if (name_at >= 0 && local != std::string_view::npos && static_cast<S32>(local) < name_at && loneEquals(decl, 0, static_cast<S32>(decl.size())) < 0 &&
+                decl.find(',') == std::string_view::npos)
+            {
+                // After the name and any type it was given, before a
+                // comment.
+                size_t end = decl.find("--");
+                end        = end == std::string_view::npos ? decl.size() : end;
+                while (end > static_cast<size_t>(name_at) && isspace(static_cast<unsigned char>(decl[end - 1])))
+                {
+                    --end;
+                }
+                ALScriptFix fix = titled("ScriptFixInitNil", "Initialize '[1]' with nil", { args[0] });
+                fix.preferred   = true;
+                fix.safe        = true;
+                fix.edits.push_back({ at_line, static_cast<S32>(end), at_line, static_cast<S32>(end), " = nil" });
+                problem.fixes.push_back(std::move(fix));
+            }
+        }
+        else if (lua && (key == "LuauLintDirectiveUnknownDidYouMean" || key == "LuauLintDirectiveNolintUnknownDidYouMean") && args.size() == 2 &&
+                 isIdentifier(args[0]) && isIdentifier(args[1]))
+        {
+            // A directive or a lint's name spelt as Luau suggests; a comment
+            // only, so nothing the script does changes.
+            ALScriptFix fix = titled("ScriptFixChange", "Change '[1]' to '[2]'", { args[0], args[1] });
+            fix.preferred   = true;
+            fix.safe        = true;
+            changeName(problem, lines, args[0], args[1], std::move(fix), false);
+        }
     }
 
     // A comment on a line: where its words begin and end, and whether it
@@ -486,6 +873,12 @@ namespace ALScriptFixes
                         problem.fixes.push_back(std::move(fix));
                     }
                 }
+            }
+            else if (problem.endLine == problem.line)
+            {
+                // What the rest need is the stretch the problem marks, on
+                // one line.
+                attachOnLine(problem, lines.line(problem.line), lines, lua);
             }
         }
     }
