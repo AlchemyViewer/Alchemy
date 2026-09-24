@@ -48,7 +48,7 @@ CODE = [
 ]
 # The keys that are the studio's: what strings.xml groups under these
 # prefixes is compared; the rest of the file is the viewer's.
-PREFIXES = ("Vim", "Preproc", "Optimizer", "Inliner", "LuauLint", "Luau", "LSL", "Workspace", "Analysis", "XUIEdit", "FindBar", "TabStrip")
+PREFIXES = ("Vim", "Preproc", "Optimizer", "Inliner", "LuauLint", "Luau", "LSL", "Workspace", "Analysis", "XUIEdit", "FindBar", "TabStrip", "ScriptFix")
 # The viewer's own under those prefixes: the legacy editor's tooltips.
 NOT_OURS = ("LSLTip",)
 # The calls that pass a key with its English, and which arguments those
@@ -61,6 +61,7 @@ CALLS = {
     "problem": [(1, 2, "")],
     "note": [(1, 2, "")],
     "noteAt": [(1, 2, "")],
+    "titled": [(0, 1, "")],
     "alSaidCount": [(0, 2, "A"), (0, 3, "B")],
 }
 

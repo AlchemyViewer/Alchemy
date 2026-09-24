@@ -26,6 +26,8 @@
 
 #include "allslservice.h"
 
+#include "alscriptfixes.h"
+
 #include "alscriptengine.h"
 
 #include "almessagemap.h"
@@ -835,6 +837,42 @@ namespace
         problem.message = ALScriptProblem::fill(wanted.empty() ? "Unexpected [1]." : "Unexpected [1]; expected [2].", problem.args);
         problem.args.resize(wanted.empty() ? 1 : 2);
     }
+    // The names in scope at a place, as a name there could be spelt: the
+    // script's own -- a local only from where it is declared -- and, with
+    // `builtins`, the language's functions and constants.
+    std::vector<std::string> namesAt(Tailslide::LSLScript* script, Tailslide::LSLSymbolTable* builtins, S32 line, S32 column)
+    {
+        std::vector<std::string>            out;
+        std::vector<Tailslide::LSLASTNode*> path;
+        holding(script, line + 1, column + 1, path);
+        for (Tailslide::LSLASTNode* node : path)
+        {
+            Tailslide::LSLSymbolTable* table = node->getSymbolTable();
+            if (!table)
+            {
+                continue;
+            }
+            const bool lexical = table->getTableType() == Tailslide::SYMTAB_LEXICAL;
+            for (auto& [name, symbol] : table->getMap())
+            {
+                if (!lexical || startsBefore(*symbol->getLoc(), line + 1, column + 1))
+                {
+                    out.emplace_back(symbol->getName());
+                }
+            }
+        }
+        if (builtins)
+        {
+            for (auto& [name, symbol] : builtins->getMap())
+            {
+                if (symbol->getSymbolType() == Tailslide::SYM_FUNCTION || symbol->getSymbolType() == Tailslide::SYM_VARIABLE)
+                {
+                    out.emplace_back(symbol->getName());
+                }
+            }
+        }
+        return out;
+    }
 }
 
 struct ALLSLService::Impl
@@ -1079,6 +1117,24 @@ ALScriptProblems ALLSLService::check(std::string_view source, bool mono)
         }
         problems.push_back(std::move(problem));
     }
+    // A name it does not know changed to the nearest it does, where one is
+    // near: Tailslide suggested one itself once, and no longer does.
+    if (script)
+    {
+        for (ALScriptProblem& problem : problems)
+        {
+            if (problem.key == "LSLUndeclared" && problem.args.size() == 1)
+            {
+                const std::string near = ALScriptFixes::nearest(problem.args[0], namesAt(script, parser.context.builtins, problem.line, problem.column));
+                if (!near.empty())
+                {
+                    ALScriptFixes::offerName(problem, source, problem.args[0], near);
+                }
+            }
+        }
+    }
+    // What would put each right, where its words and its place say.
+    ALScriptFixes::attach(problems, source, false);
     return problems;
 }
 

@@ -19,6 +19,7 @@ target_sources(
     allsltraits.cpp
     alpreprocessor.cpp
     alscriptenvelope.cpp
+    alscriptfixes.cpp
     alscriptformatter.cpp
     alscriptmessages.cpp
     alscriptrecovery.cpp
@@ -43,6 +44,7 @@ target_sources(
         alpreprocessor.h
         alscriptengine.h
         alscriptenvelope.h
+        alscriptfixes.h
         alscriptformatter.h
         alscriptmessages.h
         alscriptrecovery.h
@@ -69,6 +71,13 @@ if(AL_BUILD_TESTS)
   )
   al_add_test(
     allslservice
+    PROJECT alscript
+    LIBRARIES alscript llcommon
+    DEFINES ${definitions_defines}
+  )
+  # Each fix made over a real check, applied, and the text checked again.
+  al_add_test(
+    alscriptfixes
     PROJECT alscript
     LIBRARIES alscript llcommon
     DEFINES ${definitions_defines}

@@ -26,6 +26,8 @@
 
 #include "alluauservice.h"
 
+#include "alscriptfixes.h"
+
 #include "almessagemap.h"
 
 #include "llsdjson.h"
@@ -167,29 +169,6 @@ namespace
         return nullptr;
     }
 
-    // How far apart two names are, in edits.
-    size_t editDistance(std::string_view a, std::string_view b)
-    {
-        std::vector<size_t> row(b.size() + 1);
-        for (size_t j = 0; j <= b.size(); ++j)
-        {
-            row[j] = j;
-        }
-        for (size_t i = 1; i <= a.size(); ++i)
-        {
-            size_t previous = row[0];
-            row[0]          = i;
-            for (size_t j = 1; j <= b.size(); ++j)
-            {
-                const size_t was = row[j];
-                const bool   same = LLStringOps::toLower(a[i - 1]) == LLStringOps::toLower(b[j - 1]);
-                row[j]            = std::min({ row[j] + 1, row[j - 1] + 1, previous + (same ? 0 : 1) });
-                previous          = was;
-            }
-        }
-        return row[b.size()];
-    }
-
     // The property of a table or a class nearest a name that is not one:
     // the same name in another case, else within a couple of edits.
     std::string nearestProperty(Luau::TypeId type, const std::string& key)
@@ -210,18 +189,7 @@ namespace
                 names.push_back(name);
             }
         }
-        std::string best;
-        size_t      best_distance = std::max<size_t>(2, key.size() / 2) + 1;
-        for (const std::string& name : names)
-        {
-            const size_t distance = editDistance(name, key);
-            if (distance < best_distance || (distance == best_distance && !best.empty() && name.size() < best.size()))
-            {
-                best          = name;
-                best_distance = distance;
-            }
-        }
-        return best;
+        return ALScriptFixes::nearest(key, names);
     }
 
     std::string withoutBreaks(std::string text)
@@ -1256,6 +1224,36 @@ ALScriptProblems ALLuauService::check(std::string_view source)
     {
         lint(warning, ALScriptProblem::Severity::Warning);
     }
+    // A global it does not know changed to the nearest name that is in
+    // scope there, where one is near: the script's own locals, its globals
+    // and the definitions', up the scopes from the place.
+    if (const Luau::ModulePtr module = impl.frontend->moduleResolver.getModule(SCRIPT_MODULE))
+    {
+        for (ALScriptProblem& problem : problems)
+        {
+            const std::string& key = problem.key;
+            if ((key == "LuauUnknownGlobal" || key == "LuauUnknownGlobalAssign" || key == "LuauLintUnknownGlobal" || key == "LuauLintUnknownGlobalAssign") &&
+                problem.args.size() == 1)
+            {
+                std::vector<std::string> names;
+                const Luau::Position     at(static_cast<unsigned>(problem.line), static_cast<unsigned>(problem.column));
+                for (Luau::ScopePtr scope = Luau::findScopeAtPosition(*module, at); scope; scope = scope->parent)
+                {
+                    for (const auto& [symbol, binding] : scope->bindings)
+                    {
+                        names.emplace_back(symbol.c_str());
+                    }
+                }
+                const std::string near = ALScriptFixes::nearest(problem.args[0], names);
+                if (!near.empty())
+                {
+                    ALScriptFixes::offerName(problem, source, problem.args[0], near);
+                }
+            }
+        }
+    }
+    // What would put each right, where its words and its place say.
+    ALScriptFixes::attach(problems, source, true);
     return problems;
 }
 

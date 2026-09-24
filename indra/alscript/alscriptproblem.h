@@ -30,6 +30,46 @@
 #include <string_view>
 #include <vector>
 
+// A change to a script's text: the stretch from (line, column) to (endLine,
+// endColumn) with `text` in its place -- an empty stretch an insertion, an
+// empty text a deletion -- in the places of the text the problem it fixes
+// is about.
+struct ALScriptEdit
+{
+    S32         line      = 0;
+    S32         column    = 0;
+    S32         endLine   = 0;
+    S32         endColumn = 0;
+    std::string text;
+};
+
+// What would put a problem right, as the edits that would do it: offered
+// where the problem is, and made as one step to undo.
+struct ALScriptFix
+{
+    enum class Kind : U8
+    {
+        // A change to what the script says.
+        Fix,
+        // A comment that says the problem is known and wanted.
+        Suppress
+    };
+    Kind kind = Kind::Fix;
+    // What it does, in words: the English, and a key and the words it was
+    // built with, so that the studio may say it in another language as it
+    // says a problem (ALScriptProblem::key).
+    std::string               title;
+    std::string               key;
+    std::vector<std::string>  args;
+    std::vector<ALScriptEdit> edits;
+    // The one to take where one is taken without asking which: the fix a
+    // key gives when it is the problem's only one, and what Fix All takes.
+    bool preferred = false;
+    // Whether it may be made unlooked at -- among many, or on a save --
+    // because it changes nothing the script does.
+    bool safe = false;
+};
+
 // What the LSL and SLua analyzers report: a range in the script, how bad it
 // is, which pass said it, and the words. Lines and columns are zero-based
 // and a column counts bytes of UTF-8 -- the one convention every boundary
@@ -78,6 +118,9 @@ struct ALScriptProblem
     // -- the parser, Luau -- which speaks for itself.
     std::string              key;
     std::vector<std::string> args;
+    // What would put it right, where the words and the place make that
+    // plain (ALScriptFixes::attach): the preferred first.
+    std::vector<ALScriptFix> fixes;
 
     // `text` with [1], [2] ... replaced by the args, in one pass: a word
     // that holds a mark of its own -- a file named `a[2].lsl` -- is put in

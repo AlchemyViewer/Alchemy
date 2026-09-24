@@ -530,6 +530,13 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="LuauKeyNotFound">Key '[1]' not found in [2]</string>
 	<string name="LuauKeyNotFoundDidYouMean">Key '[1]' not found in [2]; did you mean '[3]'?</string>
 
+	<!-- What a fix offered for a problem does (alscriptfixes.cpp) -->
+	<string name="ScriptFixInsert">Insert '[1]'</string>
+	<string name="ScriptFixChange">Change '[1]' to '[2]'</string>
+	<string name="ScriptFixUseInstead">Use '[2]' instead of '[1]'</string>
+	<string name="ScriptFixUnused">Rename to '_[1]'</string>
+	<string name="ScriptFixSuppress">Suppress '[1]' on this line</string>
+
 	<!-- What the engines say, taken apart by ALMessageMap and said again
 	     with the words put in: Tailslide's messages by their error code,
 	     Luau's lints by their name, Luau's commonest type errors by their
