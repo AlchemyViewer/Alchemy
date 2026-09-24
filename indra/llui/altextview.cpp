@@ -1363,9 +1363,33 @@ void ALTextView::checkLine(S32 line)
         check_stretch(0, static_cast<S32>(text.size()));
         return;
     }
+    // A string that names a file rather than saying anything is no prose:
+    // what an `#include` names, and anything one word long with a dot or a
+    // slash in it -- a module's path, a file's, an address.
+    const auto names_a_file = [&text](const ALSyntaxToken& token) {
+        std::string_view inner(text.data() + token.begin, static_cast<size_t>(token.end - token.begin));
+        if (!inner.empty() && (inner.front() == '"' || inner.front() == '\''))
+        {
+            inner.remove_prefix(1);
+        }
+        if (!inner.empty() && (inner.back() == '"' || inner.back() == '\''))
+        {
+            inner.remove_suffix(1);
+        }
+        return !inner.empty() && inner.find_first_of(" \t") == std::string_view::npos && inner.find_first_of("./\\") != std::string_view::npos;
+    };
+    bool included = false;
     for (const ALSyntaxToken& token : mHighlighter.tokens(line))
     {
-        if (token.kind == ALSyntaxKind::Comment || token.kind == ALSyntaxKind::DocComment || token.kind == ALSyntaxKind::String)
+        if (token.kind == ALSyntaxKind::Preprocessor)
+        {
+            std::string_view directive(text.data() + token.begin, static_cast<size_t>(token.end - token.begin));
+            directive.remove_prefix(std::min(directive.size(), directive.find_first_not_of("# \t")));
+            included = included || directive.compare(0, 7, "include") == 0;
+        }
+        const bool prose = token.kind == ALSyntaxKind::Comment || token.kind == ALSyntaxKind::DocComment ||
+                           (token.kind == ALSyntaxKind::String && !included && !names_a_file(token));
+        if (prose)
         {
             check_stretch(token.begin, token.end);
         }

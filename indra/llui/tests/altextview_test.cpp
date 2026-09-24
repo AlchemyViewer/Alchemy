@@ -39,6 +39,7 @@
 
 #include "../test/lltut.h"
 
+#include <set>
 #include <string>
 
 // llui reaches the viewer for this one, and linking any of the library pulls
@@ -1084,5 +1085,31 @@ namespace tut
         v.undo();
         ensure_equals("stepped back through the kept history", v.text(), std::string("one"));
         ensure("to the text that was saved", !v.isDirty());
+    }
+
+    template<> template<>
+    void altextview_object::test<33>()
+    {
+        set_test_name("what an #include names, and a string that is a file's name or an address, is no prose to check");
+        ALTextView& v = make("");
+        v.setSpellChecker([](const std::string& word) {
+            static const std::set<std::string> unknown = { "utils", "lsl", "helo", "teh", "mylib" };
+            return unknown.count(word) == 0;
+        });
+        v.setSpellCheck(true);
+        v.setSyntax("lsl");
+        v.setText("#include \"utils.lsl\"\n"
+                  "#include \"utils\"\n"
+                  "#define GREETING \"helo there\"\n"
+                  "string url = \"https://example.com/utils.lsl\";\n"
+                  "string s = \"teh utils\";\n"
+                  "#  include \"mylib.lsl\" // teh\n");
+        ensure("an include's file", v.misspellings(0).empty());
+        ensure("however it is named", v.misspellings(1).empty());
+        ensure_equals("a macro's words are words", v.misspellings(2).size(), size_t(1));
+        ensure("an address", v.misspellings(3).empty());
+        ensure_equals("a sentence is checked, file-like words and all", v.misspellings(4).size(), size_t(2));
+        ensure("an include spaced out, and the comment after it checked",
+               v.misspellings(5).size() == 1 && v.document().line(5).substr(v.misspellings(5).front().first, 3) == "teh");
     }
 }
