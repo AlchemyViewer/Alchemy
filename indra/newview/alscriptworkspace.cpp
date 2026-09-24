@@ -62,8 +62,6 @@
 #include "rlvlocks.h"
 // [/RLVa:KB]
 
-#include <boost/regex.hpp>
-
 #include <algorithm>
 #include <memory>
 #include <optional>

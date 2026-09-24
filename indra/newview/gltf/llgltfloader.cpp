@@ -57,7 +57,6 @@
 
 #include "llmatrix4a.h"
 
-#include <boost/regex.hpp>
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/exception/diagnostic_information.hpp>
 #include <fstream>

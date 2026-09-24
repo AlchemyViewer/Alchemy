@@ -147,7 +147,6 @@
 #include "llpathfindingmanager.h"
 #include "llstartup.h"
 #include <unordered_map>
-#include <boost/regex.hpp>
 #include <boost/algorithm/string.hpp>
 #include "llcleanup.h"
 #include "llviewershadermgr.h"

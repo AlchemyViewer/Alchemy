@@ -58,7 +58,6 @@
 #include "lldraghandle.h"
 #include "llwindow.h"
 #include "llclipboard.h"
-#include "llregex.h"
 #include "llstring.h"
 
 // System includes

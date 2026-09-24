@@ -31,7 +31,6 @@
 
 #include "llchat.h"
 #include "llinventorydefines.h"
-#include "llregex.h"
 #include "llselectmgr.h"
 #include "llviewerinventory.h"
 #include "llviewerobject.h"

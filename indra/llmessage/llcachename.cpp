@@ -37,7 +37,6 @@
 #include "lluuid.h"
 #include "message.h"
 
-#include <boost/regex.hpp>
 #include <boost/unordered_map.hpp>
 
 // llsd serialization constants
