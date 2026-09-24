@@ -193,6 +193,10 @@ private:
                 }
                 contents.items.push_back(std::move(one));
             }
+            // By name, as the build floater's Contents lists them, not in
+            // the order the simulator sends them in.
+            std::stable_sort(contents.items.begin(), contents.items.end(),
+                             [](const Item& a, const Item& b) { return LLStringUtil::compareDict(a.name, b.name) < 0; });
         }
         // The object may be walking its listeners: this one leaves the
         // walk now, and answers once it is over.
