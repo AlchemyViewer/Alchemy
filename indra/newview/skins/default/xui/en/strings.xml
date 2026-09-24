@@ -770,6 +770,7 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="WorkspaceNotecardUnreadable">the notecard could not be read</string>
 	<string name="WorkspaceNotecardUnwritable">the notecard could not be written</string>
 	<string name="WorkspaceUploadFailed">the upload failed</string>
+	<string name="WorkspaceScriptTooLarge">the script is [SIZE] bytes, and a script may be at most [LIMIT]</string>
 	<string name="WorkspaceNoRegion">no region</string>
 	<string name="WorkspaceRegionCannotUpdateScripts">the region cannot update scripts</string>
 	<string name="WorkspaceRegionCannotUpdateNotecards">the region cannot update notecards</string>

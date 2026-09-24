@@ -24,6 +24,7 @@
 
 #pragma once
 
+#include <cstddef>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -52,6 +53,11 @@
 // script goes back and forth between the two viewers.
 struct ALScriptEnvelope
 {
+    // The most a script's text may be as it is sent, in bytes: the whole
+    // asset, the envelope and both its halves where there is one. The
+    // simulator refuses what is longer.
+    static constexpr size_t MAX_ASSET_BYTES = 262144;
+
     std::string source;
     std::string expanded;
     // "mono", "lsl2" or "luau", or nothing where the envelope said none.

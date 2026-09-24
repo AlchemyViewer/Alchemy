@@ -27,6 +27,7 @@
 #include "alscriptmodules.h"
 
 #include "aldiskincludes.h"
+#include "alscriptenvelope.h"
 #include "allslexports.h"
 #include "alluauexports.h"
 #include "llinventorymodel.h"
@@ -44,7 +45,7 @@ namespace
     // may be, which is how long a script may be.
     constexpr F64    HOLD_SECONDS  = 5.0;
     constexpr size_t SCRIPTS_KEPT  = 32;
-    constexpr size_t MODULE_BYTES  = 262144;
+    constexpr size_t MODULE_BYTES  = ALScriptEnvelope::MAX_ASSET_BYTES;
     // How far a folder is looked through: how many folders down a module
     // may be, how many of its entries are looked at, and how many modules
     // taken from it. Enough

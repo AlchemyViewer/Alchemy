@@ -472,6 +472,17 @@ bool ALScriptWorkspace::save(const ALScriptRef& ref, const std::string& text, co
     // The upload finishes on a coroutine; the answer is handed to the main
     // loop before anything that draws hears of it, as the legacy floaters
     // did, since a text editor's reflow takes a mutex a fiber may not.
+    // Nothing the simulator would refuse for its length is sent, whoever
+    // sends it: the studio says so first, with more to say; the compile
+    // queue and the rest are stopped here.
+    if (text.size() > ALScriptEnvelope::MAX_ASSET_BYTES)
+    {
+        LLStringUtil::format_map_t args;
+        args["[SIZE]"]  = std::to_string(text.size());
+        args["[LIMIT]"] = std::to_string(ALScriptEnvelope::MAX_ASSET_BYTES);
+        error           = LLTrans::getString("WorkspaceScriptTooLarge", args);
+        return false;
+    }
     const bool lua = options.compileTarget == "luau";
     auto answered  = [this, ref, lua, callback, running = options.running](const LLSD& response, const LLUUID& new_asset_id) {
         CompileResult result;

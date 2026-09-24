@@ -4102,6 +4102,29 @@ void ALFloaterScriptStudio::refreshTrailer(Doc& doc)
     {
         parts.push_back({ counted("ProblemWarnings", warnings), "problems", mTrailerProblemsTip });
     }
+    // What a save would send, once it is past half of what a script may
+    // be: in the warning colour past nine tenths, the error's past the
+    // whole, where a save is refused.
+    constexpr size_t LIMIT = ALScriptEnvelope::MAX_ASSET_BYTES;
+    if (doc.assetBytes * 2 > LIMIT)
+    {
+        LLStringUtil::format_map_t size;
+        size["[SIZE]"]  = std::to_string((doc.assetBytes + 1023) / 1024);
+        size["[LIMIT]"] = std::to_string(LIMIT / 1024);
+        size["[BYTES]"] = std::to_string(doc.assetBytes);
+        size["[MAX]"]   = std::to_string(LIMIT);
+        size["[OVER]"]  = std::to_string(doc.assetBytes > LIMIT ? doc.assetBytes - LIMIT : 0);
+        ALJumpBar::TrailerPart part{ getString("TrailerSize", size), std::string(), getString(doc.assetBytes > LIMIT ? "TrailerSizeOverTip" : "TrailerSizeTip", size) };
+        if (doc.assetBytes > LIMIT)
+        {
+            part.color = doc.editor->markColor(ALCodeEditor::Mark::Error);
+        }
+        else if (doc.assetBytes * 10 > LIMIT * 9)
+        {
+            part.color = doc.editor->markColor(ALCodeEditor::Mark::Warning);
+        }
+        parts.push_back(std::move(part));
+    }
     // Joined by a middle dot with air around it; in code, since a
     // string of the skin's is trimmed of its spaces.
     std::vector<ALJumpBar::TrailerPart> said;
@@ -4114,6 +4137,37 @@ void ALFloaterScriptStudio::refreshTrailer(Doc& doc)
         said.push_back(std::move(part));
     }
     mBreadcrumb->setTrailer(std::move(said));
+}
+
+void ALFloaterScriptStudio::measureAsset(Doc& doc)
+{
+    const U32 version   = doc.editor->document().version();
+    const U32 expansion = doc.expanded.valid ? doc.expanded.generation : 0;
+    if (doc.assetMeasured == std::make_pair(version, expansion))
+    {
+        return;
+    }
+    doc.assetMeasured = std::make_pair(version, expansion);
+    doc.assetBytes    = 0;
+    // A notecard is not a script, and has its own limit; a file on disk is
+    // saved to the disk, which has none.
+    if (!doc.loaded || doc.notecard || !doc.file.empty())
+    {
+        return;
+    }
+    const std::string text = doc.editor->text();
+    doc.assetBytes         = text.size();
+    if (preprocessed(doc) && doc.expanded.valid && doc.expanded.version == version && !doc.expanded.disabled)
+    {
+        ALScriptEnvelope envelope = doc.envelope ? *doc.envelope : ALScriptEnvelope();
+        envelope.lua              = doc.language.lua;
+        envelope.source           = text;
+        envelope.expanded         = doc.expanded.text;
+        envelope.compileTarget    = doc.language.compileTarget;
+        envelope.programVersion   = LLVersionInfo::instance().getChannelAndVersion();
+        envelope.lastCompiled     = LLDate::now().asString();
+        doc.assetBytes            = envelope.wrap().size();
+    }
 }
 
 void ALFloaterScriptStudio::onTrailerChosen(const std::string& value)
@@ -4742,6 +4796,29 @@ void ALFloaterScriptStudio::upload(Doc& doc, const std::string& text, const ALSo
 {
     // Past the checks: the next save may fix again.
     doc.fixedForSave = false;
+    // Longer than a script may be: refused here, saying by how much and
+    // what would shrink it, rather than sent for the simulator to refuse.
+    if (text.size() > ALScriptEnvelope::MAX_ASSET_BYTES)
+    {
+        LLStringUtil::format_map_t args;
+        args["[NAME]"]  = doc.name;
+        args["[SIZE]"]  = std::to_string(text.size());
+        args["[LIMIT]"] = std::to_string(ALScriptEnvelope::MAX_ASSET_BYTES);
+        args["[OVER]"]  = std::to_string(text.size() - ALScriptEnvelope::MAX_ASSET_BYTES);
+        // A preprocessed script goes as written and as expanded; LSL's
+        // expansion may be compressed.
+        const char* shrink = !map                                                                   ? "SaveTooLargePlain"
+                             : !doc.language.lua && !gSavedSettings.getBOOL("ALScriptPreprocCompress") ? "SaveTooLargeCompress"
+                                                                                                       : "SaveTooLargeWrapped";
+        report(getString("SaveTooLarge", args) + " " + getString(shrink), true, &doc);
+        doc.assetBytes = text.size();
+        saveStopped(doc);
+        if (&doc == active())
+        {
+            refreshTrailer(doc);
+        }
+        return;
+    }
     // The script's own target and whether it runs, which the strip under
     // the editor says for the one in front: Save All saves the others by
     // theirs, not by the front one's.
@@ -5690,6 +5767,7 @@ void ALFloaterScriptStudio::refreshProblems(Doc& doc)
     {
         fillProblems(listed);
     }
+    measureAsset(doc);
     if (&doc == active())
     {
         refreshTrailer(doc);

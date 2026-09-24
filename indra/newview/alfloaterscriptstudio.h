@@ -449,6 +449,11 @@ private:
         // next check is due, or zero; the version last asked about.
         ALScriptProblems                           analysis;
         U32                                        analysisVersion  = 0;
+        // What a save would send, in bytes, as the last check measured it,
+        // and the text and the expansion it was measured of: what the
+        // trailer says once it is past half of what a script may be.
+        size_t                                     assetBytes       = 0;
+        std::optional<std::pair<U32, U32>>         assetMeasured;
         U32                                        requestedVersion = 0;
         F64                                        analysisDue      = 0.0;
         std::string                                definitionsError;
@@ -694,6 +699,12 @@ private:
     // The strip under the editor's right-hand words: the caret's place,
     // what is selected, and how many problems the script has.
     void   refreshTrailer(Doc& doc);
+    // What a save of a script would send, measured again where the text or
+    // its expansion has changed since: the text as it stands, or wrapped
+    // with the analyzers' expansion where the preprocessor runs -- before
+    // the optimizer and the compression a save adds, near enough to say
+    // how near the limit it is. The save measures what it sends exactly.
+    void   measureAsset(Doc& doc);
     // The vim mode's : commands the mode does not answer itself, and
     // its = over lines; and its mode and its words shown as they change.
     bool vimCommand(ALTextView& view, const std::string& name, const std::string& args);
