@@ -57,7 +57,8 @@
 #include "llsdserialize.h"
 #include "lltrans.h"
 
-#include <boost/regex.hpp>
+#include "alregex.h"
+
 #include <sstream>
 
 const S32 LOGIN_MAX_RETRIES = 0; // Viewer should not autmatically retry login
@@ -531,7 +532,8 @@ bool LLLoginInstance::handleMFAChallenge(LLSD const & notif, LLSD const & respon
     LL_DEBUGS("LLLogin") << "PromptMFAToken: response: " << response << " continue_clicked" << continue_clicked << LL_ENDL;
 
     // strip out whitespace - SL-17034/BUG-231938
-    token = boost::regex_replace(token, boost::regex("\\s"), "");
+    static const ALRegex blank("\\s");
+    blank.replaceAll(token, "");
 
     if (continue_clicked && !token.empty())
     {

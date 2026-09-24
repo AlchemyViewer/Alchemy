@@ -16,6 +16,7 @@
  */
 
 #include "llviewerprecompiledheaders.h"
+#include "alregex.h"
 #include "llagent.h"
 #include "llagentui.h"
 #include "llavatarnamecache.h"
@@ -23,10 +24,10 @@
 #include "llimview.h"
 #include "llinstantmessage.h"
 #include "llnotificationsutil.h"
-#include "llregex.h"
 #include "llregionhandle.h"
 #include "llscriptruntimeperms.h"
 #include "llsdserialize.h"
+#include "llstl.h"
 #include "lluri.h"
 #include "lltrans.h"
 #include "llurlentry.h"
@@ -46,8 +47,7 @@
 #include "rlvlocks.h"
 
 #include <boost/algorithm/string.hpp>
-#include <boost/algorithm/string/regex.hpp>
-#include <boost/regex.hpp>
+#include <boost/unordered/unordered_flat_map.hpp>
 
 // ============================================================================
 // Forward declarations
@@ -95,7 +95,7 @@ bool RlvSettings::s_fNoSetEnv = false;
 bool RlvSettings::s_fTempAttach = true;
 std::list<std::string> RlvSettings::s_BlockedExperiences;
 std::list<LLUUID> RlvSettings::s_CompatItemCreators;
-std::list<std::string> RlvSettings::s_CompatItemNames;
+std::list<ALRegex> RlvSettings::s_CompatItemNames;
 
 // Checked: 2010-02-27 (RLVa-1.2.0a) | Modified: RLVa-1.1.0i
 void RlvSettings::initClass()
@@ -201,7 +201,15 @@ void RlvSettings::initCompatibilityMode(std::string strCompatList)
         else if (boost::starts_with(strCompatEntry, "name:"))
         {
             if (strCompatEntry.size() > 5)
-                s_CompatItemNames.push_back(strCompatEntry.substr(5));
+            {
+                // Compiled once here rather than at every check; the list is the resident's own, so a pattern of theirs that
+                // does not compile is said and passed over
+                ALRegex regexCompatName(strCompatEntry.substr(5), ALRegex::ICASE);
+                if (regexCompatName.ok())
+                    s_CompatItemNames.push_back(std::move(regexCompatName));
+                else
+                    LL_WARNS("RLV") << "Ignoring compatibility entry '" << strCompatEntry << "': " << regexCompatName.error() << LL_ENDL;
+            }
         }
     }
 }
@@ -221,10 +229,9 @@ bool RlvSettings::isCompatibilityModeObject(const LLUUID& idRlvObject)
                 if (!fCompatMode)
                 {
                     const std::string& strAttachName = pItem->getName();
-                    for (const std::string& strCompatName : s_CompatItemNames)
+                    for (const ALRegex& regexCompatName : s_CompatItemNames)
                     {
-                        boost::regex regexp(strCompatName, boost::regex::perl | boost::regex::icase);
-                        if (ll_regex_match(strAttachName, regexp))
+                        if (regexCompatName.match(strAttachName))
                         {
                             fCompatMode = true;
                             break;
@@ -496,30 +503,77 @@ void RlvStrings::setCustomString(const std::string& strStringName, const std::st
 
 bool RlvUtil::m_fForceTp = false;
 
-std::string escape_for_regex(const std::string& str)
+namespace
 {
-    using namespace boost;
-    return regex_replace(str, regex("[.^$|()\\[\\]{}*+?\\\\]"), "\\\\&", match_default|format_sed);
+    std::string asciiLowered(std::string_view text)
+    {
+        std::string lowered(text);
+        for (char& ch : lowered)
+        {
+            if (ch >= 'A' && ch <= 'Z')
+                ch = static_cast<char>(ch - 'A' + 'a');
+        }
+        return lowered;
+    }
+
+    // A name as a whole word in any case, compiled once for as long as it is about, and the name ASCII lowered: a line
+    // has to hold that for the regex to find anything in it, and a plain find passes over the names it does not hold far
+    // sooner than the regex, whose leading \b keeps RE2 from looking ahead for the name's first letters.
+    struct RlvWordFilter
+    {
+        ALRegex     regex;
+        std::string lowered;
+    };
+
+    const RlvWordFilter& wordFilterFor(const std::string& strName)
+    {
+        llassert(on_main_thread());
+        static boost::unordered_flat_map<std::string, RlvWordFilter, ll::string_hash, std::equal_to<>> s_Filters;
+        auto itFilter = s_Filters.find(strName);
+        if (s_Filters.end() == itFilter)
+        {
+            // Nearby names come and go; the ones kept are held to a number
+            if (s_Filters.size() >= 256)
+                s_Filters.clear();
+            itFilter = s_Filters.emplace(strName, RlvWordFilter{ ALRegex("\\b" + ALRegex::escape(strName) + "\\b", ALRegex::ICASE), asciiLowered(strName) }).first;
+        }
+        return itFilter->second;
+    }
+
+    // Every mention of the name in the text, as a whole word in any case, replaced; strLowered is the text ASCII lowered,
+    // and is kept so
+    void hideWord(std::string& strUTF8Text, std::string& strLowered, const std::string& strName, const std::string& strReplacement)
+    {
+        if (strName.empty())
+            return;
+        const RlvWordFilter& filter = wordFilterFor(strName);
+        if ( (std::string::npos != strLowered.find(filter.lowered)) && (filter.regex.replaceAll(strUTF8Text, strReplacement) > 0) )
+            strLowered = asciiLowered(strUTF8Text);
+    }
 }
 
 // Checked: 2009-07-04 (RLVa-1.0.0a) | Modified: RLVa-1.0.0a
 void RlvUtil::filterLocation(std::string& strUTF8Text)
 {
+    std::string strLowered = asciiLowered(strUTF8Text);
+
     // Filter any mention of the surrounding region names
     LLWorld::region_list_t regions = LLWorld::getInstance()->getRegionList();
     const std::string& strHiddenRegion = RlvStrings::getString(RlvStringKeys::Hidden::Region);
     for (LLWorld::region_list_t::const_iterator itRegion = regions.begin(); itRegion != regions.end(); ++itRegion)
-        boost::replace_all_regex(strUTF8Text, boost::regex("\\b" + escape_for_regex((*itRegion)->getName()) + "\\b", boost::regex::icase), strHiddenRegion);
+        hideWord(strUTF8Text, strLowered, (*itRegion)->getName(), strHiddenRegion);
 
     // Filter any mention of the parcel name
     LLViewerParcelMgr* pParcelMgr = LLViewerParcelMgr::getInstance();
     if (pParcelMgr)
-        boost::replace_all_regex(strUTF8Text, boost::regex("\\b" + escape_for_regex(pParcelMgr->getAgentParcelName()) + "\\b", boost::regex::icase), RlvStrings::getString(RlvStringKeys::Hidden::Parcel));
+        hideWord(strUTF8Text, strLowered, pParcelMgr->getAgentParcelName(), RlvStrings::getString(RlvStringKeys::Hidden::Parcel));
 }
 
 // Checked: 2010-12-08 (RLVa-1.2.2c) | Modified: RLVa-1.2.2c
 void RlvUtil::filterNames(std::string& strUTF8Text, bool fFilterLegacy, bool fClearMatches)
 {
+    std::string strLowered = asciiLowered(strUTF8Text);
+
     uuid_vec_t idAgents;
     LLWorld::getInstance()->getAvatars(&idAgents, NULL);
     for (size_t idxAgent = 0, cntAgent = idAgents.size(); idxAgent < cntAgent; idxAgent++)
@@ -528,7 +582,7 @@ void RlvUtil::filterNames(std::string& strUTF8Text, bool fFilterLegacy, bool fCl
         // NOTE: if we're agressively culling nearby names then ignore exceptions
         if ( (LLAvatarNameCache::get(idAgents[idxAgent], &avName)) && ((fClearMatches) || (!RlvActions::canShowName(RlvActions::SNC_DEFAULT, idAgents[idxAgent]))) )
         {
-            const std::string& strDisplayName = escape_for_regex(avName.getDisplayName());
+            const std::string& strDisplayName = avName.getDisplayName();
             bool fFilterDisplay = (strDisplayName.length() > 2);
             const std::string& strLegacyName = avName.getLegacyName();
             fFilterLegacy &= (strLegacyName.length() > 2);
@@ -538,16 +592,16 @@ void RlvUtil::filterNames(std::string& strUTF8Text, bool fFilterLegacy, bool fCl
             if (boost::icontains(strLegacyName, strDisplayName))
             {
                 if (fFilterLegacy)
-                    boost::replace_all_regex(strUTF8Text, boost::regex("\\b" + strLegacyName + "\\b", boost::regex::icase), strAnonym);
+                    hideWord(strUTF8Text, strLowered, strLegacyName, strAnonym);
                 if (fFilterDisplay)
-                    boost::replace_all_regex(strUTF8Text, boost::regex("\\b" + strDisplayName + "\\b", boost::regex::icase), strAnonym);
+                    hideWord(strUTF8Text, strLowered, strDisplayName, strAnonym);
             }
             else
             {
                 if (fFilterDisplay)
-                    boost::replace_all_regex(strUTF8Text, boost::regex("\\b" + strDisplayName + "\\b", boost::regex::icase), strAnonym);
+                    hideWord(strUTF8Text, strLowered, strDisplayName, strAnonym);
                 if (fFilterLegacy)
-                    boost::replace_all_regex(strUTF8Text, boost::regex("\\b" + strLegacyName + "\\b", boost::regex::icase), strAnonym);
+                    hideWord(strUTF8Text, strLowered, strLegacyName, strAnonym);
             }
         }
     }
@@ -563,29 +617,25 @@ void RlvUtil::filterMentions(std::string& strUTF8Text)
     if (RlvActions::canShowName(RlvActions::SNC_DEFAULT))
         return;
 
-    static const boost::regex mention_regex(APP_HEADER_REGEX
-                                            "/agent/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"
-                                            "/mention(?=/|\\?|$)",
-                                            boost::regex::perl);
-    boost::sregex_iterator it(strUTF8Text.begin(), strUTF8Text.end(), mention_regex);
-    boost::sregex_iterator end;
-
-    if (it == end)
-        return;
+    // The mention's URL is group 1; what follows it is only read, as ending it
+    static const ALRegex mention_regex("(" APP_HEADER_REGEX
+                                       "/agent/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"
+                                       "/mention)(?:/|\\?|$)");
 
     std::string result;
-    result.reserve(strUTF8Text.size());
     size_t last_pos = 0;
 
-    for (; it != end; ++it)
+    const size_t mentions = mention_regex.forEach(strUTF8Text, [&](const ALRegexMatch& match)
     {
-        const boost::smatch& match = *it;
-        const size_t start = match.position();
-        const size_t length = match.length();
+        if (result.empty())
+            result.reserve(strUTF8Text.size());
+
+        const size_t start = match.begin(1);
+        const size_t length = match.length(1);
 
         result.append(strUTF8Text, last_pos, start - last_pos);
 
-        const std::string match_url = match.str();
+        const std::string match_url = match.str(1);
         std::string agent_id_str;
         {
             LLURI uri(match_url);
@@ -616,7 +666,11 @@ void RlvUtil::filterMentions(std::string& strUTF8Text)
         }
 
         last_pos = start + length;
-    }
+        return true;
+    }, 1);
+
+    if (0 == mentions)
+        return;
 
     result.append(strUTF8Text, last_pos, std::string::npos);
     strUTF8Text.swap(result);

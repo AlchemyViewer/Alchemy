@@ -141,7 +141,7 @@
 #include "lllocationhistory.h"
 #include "llgltfmateriallist.h"
 #include "llimageworker.h"
-#include "llregex.h"
+#include "alregex.h"
 
 #include "llloginflags.h"
 #include "llmd5.h"
@@ -2950,10 +2950,10 @@ void uninstall_nsis_if_required()
 void validate_release_notes_coro(const std::string url)
 {
     LLVersionInfo& versionInfo(LLVersionInfo::instance());
-    const boost::regex version_regex(R"(\b\d+\.\d+\.\d+\.\d+\b)");
+    static const ALRegex version_regex(R"(\b\d+\.\d+\.\d+\.\d+\b)");
 
     if (url.find(versionInfo.getVersion()) == std::string::npos // has no our build version
-        && ll_regex_search(url, version_regex)) // has any version
+        && version_regex.search(url)) // has any version
     {
         LL_INFOS() << "Received release notes url \"" << url << "\" wwith mismatching build, falling back to locally generated url" << LL_ENDL;
         // Updater only provides notes for a most recent version, if it is not

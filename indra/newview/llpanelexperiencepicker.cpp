@@ -41,7 +41,7 @@
 #include "llcombobox.h"
 #include "llviewercontrol.h"
 #include "llfloater.h"
-#include "llregex.h"
+#include "alregex.h"
 #include "lltrans.h"
 
 #define BTN_FIND        "find"
@@ -113,10 +113,9 @@ void LLPanelExperiencePicker::editKeystroke( class LLLineEditor* caller, void* u
 void LLPanelExperiencePicker::onBtnFind()
 {
     mCurrentPage=1;
-    boost::cmatch what;
     std::string text = getChild<LLUICtrl>(TEXT_EDIT)->getValue().asString();
-    const boost::regex expression("secondlife:///app/experience/[\\da-f-]+/profile");
-    if (ll_regex_match(text.c_str(), what, expression))
+    static const ALRegex expression("secondlife:///app/experience/[\\da-f-]+/profile");
+    if (expression.match(text))
     {
         LLURI uri(text);
         LLSD path_array = uri.pathArray();

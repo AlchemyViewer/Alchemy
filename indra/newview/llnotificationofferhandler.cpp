@@ -40,8 +40,7 @@
 // [RLVa:KB] - Checked: 2013-05-09 (RLVa-1.4.9)
 #include "rlvactions.h"
 // [/RLVa:KB]
-
-#include <boost/regex.hpp>
+#include "alregex.h"
 
 using namespace LLNotificationsUI;
 
@@ -169,9 +168,9 @@ bool LLOfferHandler::processNotification(const LLNotificationPtr& notification, 
                 || notification->getName() == "TeleportOffered_MaturityExceeded"
                 || notification->getName() == "TeleportOffered_MaturityBlocked"))
             {
-                boost::regex r("<icon\\s*>\\s*([^<]*)?\\s*</icon\\s*>( - )?",
-                    boost::regex::perl|boost::regex::icase);
-                std::string stripped_msg = boost::regex_replace(notification->getMessage(), r, "");
+                static const ALRegex icon("<icon\\s*>\\s*([^<]*)?\\s*</icon\\s*>( - )?", ALRegex::ICASE);
+                std::string stripped_msg = notification->getMessage();
+                icon.replaceAll(stripped_msg, "");
                 LLHandlerUtil::logToIMP2P(notification->getPayload()["from_id"], stripped_msg,file_only);
             }
             else

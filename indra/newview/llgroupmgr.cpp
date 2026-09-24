@@ -51,7 +51,7 @@
 #include "lluictrlfactory.h"
 #include "lltrans.h"
 #include "llviewerregion.h"
-#include <boost/regex.hpp>
+#include "alregex.h"
 #include "llcorehttputil.h"
 
 #include <boost/lexical_cast.hpp>
@@ -913,15 +913,14 @@ LLGroupMgrGroupData* LLGroupMgr::getGroupData(const LLUUID& id)
 // so that the sorter can sort by year before month before day.
 static void formatDateString(std::string &date_string)
 {
-    using namespace boost;
-    cmatch result;
-    const regex expression("([0-9]{1,2})/([0-9]{1,2})/([0-9]{4})");
-    if (regex_match(date_string.c_str(), result, expression))
+    ALRegexMatch result;
+    static const ALRegex expression("([0-9]{1,2})/([0-9]{1,2})/([0-9]{4})");
+    if (expression.match(date_string, &result))
     {
         // convert matches to integers so that we can pad them with zeroes on Linux
-        S32 year    = boost::lexical_cast<S32>(result[3]);
-        S32 month   = boost::lexical_cast<S32>(result[1]);
-        S32 day     = boost::lexical_cast<S32>(result[2]);
+        S32 year    = boost::lexical_cast<S32>(result.str(3));
+        S32 month   = boost::lexical_cast<S32>(result.str(1));
+        S32 day     = boost::lexical_cast<S32>(result.str(2));
 
         // ISO 8601 date format
         date_string = llformat("%04d/%02d/%02d", year, month, day);

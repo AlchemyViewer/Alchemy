@@ -52,7 +52,7 @@
 #include "llpreviewnotecard.h"
 #include "llpreviewscript.h"
 #include "llprocess.h"
-#include "llregex.h"
+#include "alregex.h"
 #include "llmd5.h"
 #include "llsdjson.h"
 #include "llselectmgr.h"
@@ -94,10 +94,10 @@ namespace
     // it is sent a challenge, and nothing is written for it.
     constexpr size_t MAX_UNAUTHENTICATED = 4;
 
-    static const boost::regex LUAU_LOCATION_PATTERN(
+    static const ALRegex LUAU_LOCATION_PATTERN(
         R"(^([^:]*):([0-9]+):\s*(.*)$)");
 
-    static const boost::regex LSL_LOCATION_PATTERN(
+    static const ALRegex LSL_LOCATION_PATTERN(
         R"(\((\d+), (\d+)\) : ([^:]+) : (.+))");
 
     // Creates a uniquely-named LLEventMailDrop under "<prefix>.<uuid>", passes
@@ -1921,44 +1921,40 @@ LLSD LLScriptEditorWSServer::saveScript(LLViewerObject* prim, LLInventoryItem* i
 
         for (const auto& error : llsd::inArray(cb_result["errors"]))
         {
-            boost::smatch match;
+            // The match views the text, so the text is kept for as long.
+            const std::string text = error.asString();
+            ALRegexMatch match;
             LLSD diagnostic;
             diagnostic["level"] = "ERROR";
             S32 line_number = 0;
             S32 col_number = 0;
 
             if (is_lua &&
-                boost::regex_match(
-                    error.asString(),
-                    match,
-                    LUAU_LOCATION_PATTERN) &&
-                LLStringUtil::convertToS32(match[2].str(), line_number))
+                LUAU_LOCATION_PATTERN.match(text, &match) &&
+                LLStringUtil::convertToS32(match.str(2), line_number))
             {
                 diagnostic["row"] = line_number;
                 diagnostic["column"] = 0;
-                diagnostic["message"] = match[3].str();
+                diagnostic["message"] = match.str(3);
             }
             else if (!is_lua &&
-                     boost::regex_match(
-                         error.asString(),
-                         match,
-                         LSL_LOCATION_PATTERN) &&
-                     LLStringUtil::convertToS32(match[1].str(), line_number) &&
-                     LLStringUtil::convertToS32(match[2].str(), col_number) &&
+                     LSL_LOCATION_PATTERN.match(text, &match) &&
+                     LLStringUtil::convertToS32(match.str(1), line_number) &&
+                     LLStringUtil::convertToS32(match.str(2), col_number) &&
                      line_number < S32_MAX &&
                      col_number < S32_MAX)
             {
                 diagnostic["row"] = line_number + 1;
                 diagnostic["column"] = col_number + 1;
-                diagnostic["level"] = match[3].str();
-                diagnostic["message"] = match[4].str();
+                diagnostic["level"] = match.str(3);
+                diagnostic["message"] = match.str(4);
                 diagnostic["format"] = "lsl";
             }
             else
             {
                 diagnostic["row"] = 0;
                 diagnostic["column"] = 0;
-                diagnostic["message"] = error.asString();
+                diagnostic["message"] = text;
             }
 
             response["diagnostics"].append(diagnostic);

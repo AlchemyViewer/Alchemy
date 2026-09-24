@@ -28,6 +28,7 @@
 
 #include "llpreviewscript.h"
 
+#include "alscriptmessages.h"
 #include "llassetstorage.h"
 #include "llbutton.h"
 #include "llcheckboxctrl.h"
@@ -85,7 +86,6 @@
 #include "llinventoryfunctions.h"
 #include "llwebsocketmgr.h"
 #include "llscripteditorws.h"
-#include <regex>
 // [RLVa:KB] - Checked: 2011-05-22 (RLVa-1.3.1a)
 #include "rlvhandler.h"
 #include "rlvlocks.h"
@@ -164,13 +164,8 @@ static bool have_lua_enabled(const LLUUID& object_id)
 // since we don't have another way to determine the language yet
 bool is_lua_script(const std::string& code)
 {
-    // Check for LSL's signature "default" state pattern
-    std::regex lsl_pattern("\\s*default\\s*\\{");
-    if (std::regex_search(code, lsl_pattern))
-        return false;
-
-    // "default" state not found, assuming it's Lua
-    return true;
+    // No "default" state, LSL's signature: taken for Lua
+    return ALScriptMessages::looksLikeLua(code);
 }
 
 /// ---------------------------------------------------------------------------

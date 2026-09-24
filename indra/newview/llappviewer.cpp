@@ -135,6 +135,7 @@
 
 // Linden library includes
 #include "llavatarnamecache.h"
+#include "alregex.h"
 #include "alxmlmergelog.h"
 #include "lldiriterator.h"
 #include "llexperiencecache.h"
@@ -170,7 +171,6 @@
 // Third party library includes
 #include <boost/bind.hpp>
 #include <boost/algorithm/string.hpp>
-#include <boost/regex.hpp>
 #include <boost/throw_exception.hpp>
 #include <chrono>
 
@@ -3793,8 +3793,10 @@ LLSD LLAppViewer::getViewerInfo() const
         info["POSITION_LOCAL"] = ll_sd_from_vector3(gAgent.getPosAgentFromGlobal(pos));
         info["REGION"] = region->getName();
 
-        boost::regex regex("\\.(secondlife|lindenlab)\\..*");
-        info["HOSTNAME"] = boost::regex_replace(region->getSimHostName(), regex, "");
+        static const ALRegex grid_domain("\\.(secondlife|lindenlab)\\..*");
+        std::string host_name = region->getSimHostName();
+        grid_domain.replaceAll(host_name, "");
+        info["HOSTNAME"] = host_name;
         info["SERVER_VERSION"] = gLastVersionChannel;
         LLSLURL slurl;
         LLAgentUI::buildSLURL(slurl);

@@ -29,6 +29,7 @@
 #include "llviewerregion.h"
 
 // linden libraries
+#include "alregex.h"
 #include "indra_constants.h"
 #include "llaisapi.h"
 #include "llavatarnamecache.h"      // name lookup cap url
@@ -84,7 +85,6 @@
 #include "llsettingsdaycycle.h"
 #include "llslurl.h"
 
-#include <boost/regex.hpp>
 
 #ifdef LL_WINDOWS
     #pragma warning(disable:4355)
@@ -150,15 +150,15 @@ public:
         {
             url += grid + "/secondlife/";
         }
-        boost::regex name_rx("[A-Za-z0-9()_%]+");
-        boost::regex coord_rx("[0-9]+");
+        static const ALRegex name_rx("[A-Za-z0-9()_%]+");
+        static const ALRegex coord_rx("[0-9]+");
         for (size_t i = 0; i < num_params; i++)
         {
             if (i > 0)
             {
                 url += "/";
             }
-            if (!boost::regex_match(params[i].asString(), i > 0 ? coord_rx : name_rx))
+            if (!(i > 0 ? coord_rx : name_rx).match(params[i].asString()))
             {
                 return false;
             }

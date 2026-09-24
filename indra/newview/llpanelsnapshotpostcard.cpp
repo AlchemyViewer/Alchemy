@@ -38,13 +38,12 @@
 #include "llfloatersnapshot.h" // FIXME: replace with a snapshot storage model
 #include "llpanelsnapshot.h"
 #include "llpostcard.h"
-#include "llregex.h"
+#include "alregex.h"
 #include "llsnapshotlivepreview.h"
 #include "llviewercontrol.h" // gSavedSettings
 #include "llviewerwindow.h"
 #include "llviewerregion.h"
 
-#include <boost/regex.hpp>
 
 /**
  * Sends postcard via email.
@@ -229,9 +228,9 @@ void LLPanelSnapshotPostcard::onSend()
     // Validate input.
     std::string to(getChild<LLUICtrl>("to_form")->getValue().asString());
 
-    boost::regex email_format("[A-Za-z0-9.%+-_]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}(,[ \t]*[A-Za-z0-9.%+-_]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,})*");
+    static const ALRegex email_format("[A-Za-z0-9.%+-_]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}(,[ \t]*[A-Za-z0-9.%+-_]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,})*");
 
-    if (to.empty() || !ll_regex_match(to, email_format))
+    if (to.empty() || !email_format.match(to))
     {
         LLNotificationsUtil::add("PromptRecipientEmail");
         return;

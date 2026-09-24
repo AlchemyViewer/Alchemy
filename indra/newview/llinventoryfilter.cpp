@@ -36,7 +36,7 @@
 #include "llinventorymodelbackgroundfetch.h"
 #include "llinventoryfunctions.h"
 #include "llmarketplacefunctions.h"
-#include "llregex.h"
+#include "alregex.h"
 #include "llviewercontrol.h"
 #include "llfolderview.h"
 #include "llinventorybridge.h"
@@ -1081,11 +1081,10 @@ void LLInventoryFilter::setFilterSubString(const std::string& string)
         bool exact_token_changed = false;
         if (mFilterTokens.empty() && filter_sub_string_new.size() > 2)
         {
-            boost::regex mPattern = boost::regex("\"\\s*([^<]*)?\\s*\"",
-                boost::regex::perl | boost::regex::icase);
-            boost::match_results<std::string::const_iterator> matches;
-            mExactToken = (ll_regex_match(filter_sub_string_new, matches, mPattern) && matches[1].matched)
-                ? matches[1]
+            static const ALRegex exact_token("\"\\s*([^<]*)?\\s*\"", ALRegex::ICASE);
+            ALRegexMatch matches;
+            mExactToken = (exact_token.match(filter_sub_string_new, &matches) && matches.matched(1))
+                ? matches.str(1)
                 : LLStringUtil::null;
             if ((old_token.empty() && !mExactToken.empty())
                 || (!old_token.empty() && mExactToken.empty()))
