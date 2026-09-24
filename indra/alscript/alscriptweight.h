@@ -119,6 +119,12 @@ namespace ALScriptWeigh
     // and holds the engine lock while it works.
     ALScriptWeight lso(std::string_view source);
 
+    // LSL compiled for Luau's VM by the SLua fork's own compiler for it, as
+    // the server compiles such an asset, and its bytecode read back as
+    // SLua's is. As lso() for the builtins and the lock: the compiler parses
+    // with Tailslide's table, numbered as the runtime numbers its events.
+    ALScriptWeight lslLuau(std::string_view source);
+
     // What a Mono assembly is taken to cost before a line of the script is
     // in it -- the class, its references, the headers -- which the
     // region's own numbers for an empty script are to calibrate.

@@ -3889,9 +3889,9 @@ std::optional<ALScriptWeight::Target> ALFloaterScriptStudio::weightTarget(const 
     {
         return ALScriptWeight::Target::SLua;
     }
-    // LSL on Luau waits on the fork's own compiler for it.
     const std::string& target = doc.language.compileTarget;
-    return target == "lsl2" ? std::optional(ALScriptWeight::Target::LSO)
+    return target == "lsl2"                     ? std::optional(ALScriptWeight::Target::LSO)
+           : target == "lsl-luau"               ? std::optional(ALScriptWeight::Target::LSLLuau)
            : target == "mono" || target.empty() ? std::optional(ALScriptWeight::Target::Mono)
                                                 : std::nullopt;
 }

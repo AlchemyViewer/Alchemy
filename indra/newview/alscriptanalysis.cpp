@@ -289,6 +289,10 @@ void ALScriptAnalysis::ask(Request request, callback_t callback)
                             {
                                 result.weights.push_back(ALScriptWeigh::mono(request.text));
                             }
+                            else if (target == ALScriptWeight::Target::LSLLuau)
+                            {
+                                result.weights.push_back(ALScriptWeigh::lslLuau(request.text));
+                            }
                         }
                         break;
                 }

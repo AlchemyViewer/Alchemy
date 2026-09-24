@@ -229,4 +229,41 @@ namespace tut
                                              [](size_t sum, const ALScriptWeight::Part& p) { return sum + p.bytes; });
         ensure_equals("the parts are the whole", parts, weight.total);
     }
+
+    // LSL on Luau: the fork's own compiler, the asset as the server makes
+    // it, the bytecode read back as SLua's is.
+    template<> template<>
+    void alscriptweight_object::test<6>()
+    {
+        ensure("builtins: " + error, lslLoaded);
+        const std::string script = "integer gCount = 0;\n"
+                                   "integer twice(integer n)\n"
+                                   "{\n"
+                                   "    return n * 2;\n"
+                                   "}\n"
+                                   "default\n"
+                                   "{\n"
+                                   "    state_entry()\n"
+                                   "    {\n"
+                                   "        gCount = twice(gCount);\n"
+                                   "    }\n"
+                                   "    touch_start(integer n)\n"
+                                   "    {\n"
+                                   "        llOwnerSay((string)gCount + \" \" + (string)n);\n"
+                                   "    }\n"
+                                   "}\n";
+        const ALScriptWeight weight = ALScriptWeigh::lslLuau(script);
+        ensure("compiled: " + weight.error + listed(weight), weight.compiled);
+        ensure_equals("against Luau's limit", weight.limit, size_t(131072));
+        ensure("not an estimate", !weight.estimate);
+        ensure("something, and not much: " + std::to_string(weight.total) + listed(weight), weight.total > 50 && weight.total < 4096);
+        const ALScriptWeight::Part* twice = named(weight, "twice");
+        ensure("a function a part:" + listed(weight), twice != nullptr);
+        ensure("where it is: " + std::to_string(twice->line), twice->line == 1);
+        const ALScriptWeight::Part* touch = named(weight, "touch_start");
+        ensure("a handler in its state:" + listed(weight), touch && touch->within == "default" && touch->kind == ALScriptWeight::Part::Kind::Handler);
+        ensure_equals("where it is", touch->line, 11);
+        const ALScriptWeight broken = ALScriptWeigh::lslLuau("default { state_entry() { integer x = ; } }\n");
+        ensure("a script that does not compile", !broken.compiled && !broken.error.empty());
+    }
 }

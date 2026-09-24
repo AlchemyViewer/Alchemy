@@ -35,6 +35,8 @@
 
 #include "llfile.h"
 
+#include "Luau/LSLBuiltins.h"
+
 #include <tailslide/tailslide.hh>
 
 #include <atomic>
@@ -1052,6 +1054,39 @@ bool ALLSLService::loadBuiltins(const std::string& path, std::string& error)
     }
     fclose(file);
     Tailslide::tailslide_init_builtins(path.c_str());
+    // Every event numbered as the runtime numbers it (Luau::lslEventIndex):
+    // the grid's definitions list them in an order of their own, and what an
+    // event's number goes into -- LSO's handled-events bits, the dispatch of
+    // LSL on Luau, whose compiler refuses a script whose numbers disagree
+    // with the runtime's -- is the runtime's. One the runtime does not know
+    // goes after all it does, in the file's order.
+    Tailslide::ScopedScriptParser probe(nullptr);
+    if (Tailslide::LSLSymbolTable* table = probe.context.builtins)
+    {
+        std::vector<Tailslide::LSLSymbol*> unknown;
+        int                                last = 0;
+        for (auto& [name, symbol] : table->getMap())
+        {
+            if (symbol->getSymbolType() != Tailslide::SYM_EVENT)
+            {
+                continue;
+            }
+            if (const int index = Luau::lslEventIndex(symbol->getName()); index > 0)
+            {
+                symbol->setEventIndex(index);
+                last = std::max(last, index);
+            }
+            else
+            {
+                unknown.push_back(symbol);
+            }
+        }
+        std::stable_sort(unknown.begin(), unknown.end(), [](Tailslide::LSLSymbol* a, Tailslide::LSLSymbol* b) { return a->getEventIndex() < b->getEventIndex(); });
+        for (Tailslide::LSLSymbol* symbol : unknown)
+        {
+            symbol->setEventIndex(++last);
+        }
+    }
     mImpl->builtins = true;
     sBuiltinsLoaded = true;
     error.clear();

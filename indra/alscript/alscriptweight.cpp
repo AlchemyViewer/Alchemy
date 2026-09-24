@@ -32,6 +32,8 @@
 #include "Luau/Bytecode.h"
 #include "Luau/BytecodeHeader.h"
 #include "Luau/Compiler.h"
+#include "Luau/LSLCompiler.h"
+#include "Luau/ParseResult.h"
 
 #include <tailslide/tailslide.hh>
 #include <tailslide/passes/lso/script_compiler.hh>
@@ -365,6 +367,17 @@ namespace
     }
 }
 
+namespace
+{
+    // What an asset of Luau bytecode weighs, and its parts and lines: what
+    // the server charges, read off the header, and the bytecode read back.
+    void weighAsset(ALScriptWeight& weight, const std::string& asset);
+    // The LSL compiler's prototypes by the script's own names -- `_f<name>`
+    // a function, `_e<state>/<event>` a handler of the state so numbered --
+    // and where each is in the script.
+    void nameLSLParts(ALScriptWeight& weight, std::string_view source);
+}
+
 namespace ALScriptWeigh
 {
     ALScriptWeight slua(std::string_view source)
@@ -385,12 +398,52 @@ namespace ALScriptWeigh
             weight.error = e.what();
             return weight;
         }
+        weighAsset(weight, asset);
+        return weight;
+    }
+
+    ALScriptWeight lslLuau(std::string_view source)
+    {
+        ALScriptWeight weight;
+        weight.target = ALScriptWeight::Target::LSLLuau;
+        weight.limit  = ALScriptWeight::limitOf(weight.target);
+        if (!ALLSLService::builtinsLoaded())
+        {
+            weight.error = "the LSL builtins are not loaded";
+            return weight;
+        }
+        AL_SCRIPT_ENGINE_HELD;
+        std::string asset;
+        try
+        {
+            asset = compileLSLAssetOrThrow(std::string(source), 0);
+        }
+        catch (const Luau::ParseErrors& e)
+        {
+            weight.error = e.getErrors().empty() ? std::string("it does not compile") : e.getErrors().front().getMessage();
+            return weight;
+        }
+        catch (const std::exception& e)
+        {
+            weight.error = e.what();
+            return weight;
+        }
+        weighAsset(weight, asset);
+        nameLSLParts(weight, source);
+        return weight;
+    }
+}
+
+namespace
+{
+    void weighAsset(ALScriptWeight& weight, const std::string& asset)
+    {
         Luau::BytecodeHeader header;
         size_t               start = 0;
         if (!Luau::readBytecodeHeader(asset.data(), asset.size(), header, start) || start > asset.size())
         {
             weight.error = "the compiled asset has no header it can be read by";
-            return weight;
+            return;
         }
         const std::string_view code(asset.data() + start, asset.size() - start);
         // What the server charges: the bytecode's length, unless the header
@@ -400,7 +453,7 @@ namespace ALScriptWeigh
         if (!readBytecode(code, read))
         {
             weight.error = "the bytecode could not be read back";
-            return weight;
+            return;
         }
         weight.compiled = true;
         weight.parts.push_back(part(ALScriptWeight::Part::Kind::Constant, "strings", read.stringsEnd - read.stringsBegin));
@@ -445,7 +498,6 @@ namespace ALScriptWeigh
         {
             weight.lines.push_back({ line, bytes });
         }
-        return weight;
     }
 }
 
@@ -829,5 +881,80 @@ namespace ALScriptWeigh
         }
         weight.compiled = true;
         return weight;
+    }
+}
+
+namespace
+{
+    void nameLSLParts(ALScriptWeight& weight, std::string_view source)
+    {
+        Tailslide::ScopedScriptParser parser(nullptr);
+        const std::string            text(source);
+        Tailslide::LSLScript*        script = parser.parseLSLBytes(text.data(), static_cast<int>(text.size()));
+        if (!script)
+        {
+            return;
+        }
+        // The states in the order written, which is the order numbered; and
+        // each function and handler where it is.
+        std::vector<std::string>                              states;
+        std::map<std::string, Tailslide::LSLASTNode*>         functions;
+        std::map<std::pair<size_t, std::string>, Tailslide::LSLASTNode*> handlers;
+        const auto nameOf = [](Tailslide::LSLASTNode* node) {
+            return node && node->getNodeType() == Tailslide::NODE_IDENTIFIER ? std::string(static_cast<Tailslide::LSLIdentifier*>(node)->getName())
+                                                                             : std::string();
+        };
+        for (Tailslide::LSLASTNode* global = script->getGlobals() ? script->getGlobals()->getChild(0) : nullptr; global; global = global->getNext())
+        {
+            if (global->getNodeType() == Tailslide::NODE_GLOBAL_FUNCTION)
+            {
+                functions[nameOf(global->getChild(0))] = global;
+            }
+        }
+        for (Tailslide::LSLASTNode* state = script->getStates() ? script->getStates()->getChild(0) : nullptr; state; state = state->getNext())
+        {
+            if (state->getNodeType() != Tailslide::NODE_STATE)
+            {
+                continue;
+            }
+            states.push_back(nameOf(state->getChild(0)));
+            Tailslide::LSLASTNode* list = state->getChild(1);
+            for (Tailslide::LSLASTNode* handler = list ? list->getChild(0) : nullptr; handler; handler = handler->getNext())
+            {
+                handlers[{ states.size() - 1, nameOf(handler->getChild(0)) }] = handler;
+            }
+        }
+        const auto place = [](ALScriptWeight::Part& part, Tailslide::LSLASTNode* node) {
+            if (const Tailslide::YYLTYPE* at = node ? node->getLoc() : nullptr; at && at->first_line > 0)
+            {
+                part.line      = zeroBased(at->first_line);
+                part.column    = zeroBased(at->first_column);
+                part.endLine   = zeroBased(at->last_line);
+                part.endColumn = zeroBased(at->last_column);
+            }
+        };
+        for (ALScriptWeight::Part& part : weight.parts)
+        {
+            if (part.name.compare(0, 2, "_f") == 0)
+            {
+                part.name = part.name.substr(2);
+                const auto found = functions.find(part.name);
+                place(part, found == functions.end() ? nullptr : found->second);
+            }
+            else if (part.name.compare(0, 2, "_e") == 0)
+            {
+                const size_t slash = part.name.find('/');
+                if (slash == std::string::npos)
+                {
+                    continue;
+                }
+                const size_t state = static_cast<size_t>(std::atoi(part.name.c_str() + 2));
+                part.kind          = ALScriptWeight::Part::Kind::Handler;
+                part.within        = state < states.size() ? states[state] : std::string();
+                part.name          = part.name.substr(slash + 1);
+                const auto found   = handlers.find({ state, part.name });
+                place(part, found == handlers.end() ? nullptr : found->second);
+            }
+        }
     }
 }
