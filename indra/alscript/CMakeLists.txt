@@ -25,6 +25,7 @@ target_sources(
     alscriptformatter.cpp
     alscriptmessages.cpp
     alscriptrecovery.cpp
+    alscriptweight.cpp
     alscriptstack.cpp
     alsourcemap.cpp
 )
@@ -55,6 +56,7 @@ target_sources(
         alscriptproblem.h
         alscriptstack.h
         alscriptsymbol.h
+        alscriptweight.h
         alsourcemap.h
 )
 
@@ -82,6 +84,14 @@ if(AL_BUILD_TESTS)
   # Each fix made over a real check, applied, and the text checked again.
   al_add_test(
     alscriptfixes
+    PROJECT alscript
+    LIBRARIES alscript llcommon
+    DEFINES ${definitions_defines}
+  )
+  # What a script weighs: SLua by its bytecode, LSO by Tailslide's image,
+  # with the grid's builtins loaded.
+  al_add_test(
+    alscriptweight
     PROJECT alscript
     LIBRARIES alscript llcommon
     DEFINES ${definitions_defines}
