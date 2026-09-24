@@ -1236,4 +1236,45 @@ namespace tut
         editor->handleMouseUp(next_x - 3, y, MASK_NONE);
         ensure("even on its right half", vim->mode() == ALVimKeymap::Mode::Normal && caretText() == "0:4" && !editor->hasSelection());
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<35>()
+    {
+        set_test_name("insert mode's Control keys are vim's, not the editor's -- none of them moves the caret off the text being typed");
+        ALCodeEditor& e = make("abc\ndef\n");
+        // Control-N and Control-P ask for completions, and the caret stays
+        // where it was: on a Mac they were the text system's down and up.
+        keys("A<C-n>x<C-p>y<Esc>");
+        ensure_equals("typed where the caret was", flat(e.text()), std::string("abcxy|def|"));
+        // Control-A the last insert again, where it was the line's start
+        // on a Mac and select-all elsewhere.
+        keys("jA<C-a><Esc>");
+        ensure_equals("the last insert again", flat(e.text()), std::string("abcxy|defxy|"));
+        // Control-H a backspace, where it was Replace elsewhere.
+        keys("A<C-h>z<Esc>");
+        ensure_equals("backspace", flat(e.text()), std::string("abcxy|defxz|"));
+        // Control-Y and Control-E: the character above and below.
+        make("abc\n\nxyz\n");
+        keys("ji<C-y><C-y><C-e><Esc>");
+        ensure_equals("above, above, below", flat(editor->text()), std::string("abc|abz|xyz|"));
+        // Control-T and Control-D: a step in and back, the caret on its
+        // character.
+        ALCodeEditor& t = make("x = 1;\n");
+        t.setSoftTabs(true);
+        keys("A<C-t>2<Esc>");
+        ensure_equals("a step in, typing on where it was", flat(t.text()), std::string("    x = 1;2|"));
+        keys("A<C-d>3<Esc>");
+        ensure_equals("and back", flat(t.text()), std::string("x = 1;23|"));
+        keys("I<C-d>4<Esc>");
+        ensure_equals("nothing to take back", flat(t.text()), std::string("4x = 1;23|"));
+        // Control-R and a register: its text typed in, and `.` does it again.
+        ALCodeEditor& r = make("foo bar\n");
+        keys("\"ayiwo<C-r>a!<Esc>");
+        ensure_equals("the register put in", flat(r.text()), std::string("foo bar|foo!|"));
+        keys(".");
+        ensure_equals("and again", flat(r.text()), std::string("foo bar|foo!|foo!|"));
+        // Control-J and Control-M are Return.
+        keys("A<C-j>q<Esc>");
+        ensure_equals("a line broken", flat(r.text()), std::string("foo bar|foo!|foo!|q|"));
+    }
 }

@@ -3021,6 +3021,7 @@ void ALVimKeymap::enterInsert(ALTextView& view, S32 count)
     mInsertCount = llmax(1, count);
     mWantColumn  = -1;
     mTyped.clear();
+    mInsertRegister = false;
     mInsertStart = view.caret();
     mCount       = 0;
     mRegister    = 0;
@@ -3062,7 +3063,9 @@ void ALVimKeymap::leaveInsert(ALTextView& view)
             view.setCaret(d.clamp(keep));
         }
     }
-    mBlockInsert = false;
+    mBlockInsert    = false;
+    mInsertRegister = false;
+    mLastTyped      = mTyped;
     view.undoJournal().endGroup();
     mMode = Mode::Normal;
     // The caret steps back onto the last character typed.
@@ -3072,9 +3075,150 @@ void ALVimKeymap::leaveInsert(ALTextView& view)
     bump();
 }
 
+void ALVimKeymap::typeIn(ALTextView& view, const std::string& text)
+{
+    if (!text.empty())
+    {
+        view.insertText(text);
+        mTyped += text;
+    }
+}
+
+bool ALVimKeymap::insertControl(ALTextView& view, const Input& input)
+{
+    const ALTextDocument& d = view.document();
+    // A key vim gives its own meaning, as the key it stands for: Control-H
+    // is Backspace, Control-J and Control-M Return, Control-I Tab.
+    const auto as = [&](KEY key) {
+        Input plain;
+        plain.key = key;
+        if (!insert(view, plain))
+        {
+            const ALEditorCommand command = view.keymap().lookup(key, MASK_NONE);
+            if (command != ALEditorCommand::None)
+            {
+                view.perform(command);
+            }
+        }
+        return true;
+    };
+    switch (input.key)
+    {
+        case 'W':
+            view.perform(ALEditorCommand::DeleteWordLeft);
+            return true;
+        case 'U':
+            view.deleteRange(ALTextRange(d.lineStart(view.caret().line), view.caret()));
+            return true;
+        case 'H': return as(KEY_BACKSPACE);
+        case 'J':
+        case 'M': return as(KEY_RETURN);
+        case 'I': return as(KEY_TAB);
+        case 'T':
+        case 'D':
+        {
+            // The line a step further in, or a step back, as > and < step
+            // it, the caret staying on the character it was on.
+            const ALTextPos    caret = view.caret();
+            const S32          width = llmax(1, view.getTabWidth());
+            const std::string& text  = d.line(caret.line);
+            ALTextRange        range(d.lineStart(caret.line), d.lineStart(caret.line));
+            std::string        with;
+            if (input.key == 'T')
+            {
+                with = view.getSoftTabs() ? std::string(width, ' ') : std::string("\t");
+            }
+            else
+            {
+                S32 cut = 0;
+                if (!text.empty() && text[0] == '\t')
+                {
+                    cut = 1;
+                }
+                while (cut < width && cut < static_cast<S32>(text.size()) && text[cut] == ' ' && text[0] == ' ')
+                {
+                    ++cut;
+                }
+                if (cut == 0)
+                {
+                    return true;
+                }
+                range.end = ALTextPos(caret.line, cut);
+            }
+            const S32 moved = static_cast<S32>(with.size()) - (range.end.column - range.begin.column);
+            view.replaceAll({ { range, with } });
+            view.setCaret(d.clamp(ALTextPos(caret.line, llmax(0, caret.column + moved))));
+            return true;
+        }
+        case 'N':
+        case 'P':
+            // The completions of the word being typed, which these walk
+            // once they are up. Not when played back: the list is for
+            // somebody to choose from.
+            if (!mReplaying && mPlaying == 0)
+            {
+                view.perform(ALEditorCommand::Complete);
+            }
+            return true;
+        case 'A':
+            typeIn(view, mLastTyped);
+            return true;
+        case 'R':
+            mInsertRegister = true;
+            return true;
+        case 'E':
+        case 'Y':
+        {
+            // The character below the caret, or above it, where it is drawn.
+            const ALTextPos caret = view.caret();
+            const S32       line  = caret.line + (input.key == 'E' ? 1 : -1);
+            if (line < 0 || line >= d.lineCount())
+            {
+                return true;
+            }
+            const S32       column = d.displayColumn(caret, view.getTabWidth());
+            const ALTextPos from   = d.posAtDisplayColumn(line, column, view.getTabWidth());
+            if (!atLineEnd(d, from) && d.displayColumn(from, view.getTabWidth()) == column)
+            {
+                typeIn(view, d.text(ALTextRange(from, d.nextCluster(from))));
+            }
+            return true;
+        }
+        default:
+            return false;
+    }
+}
+
 bool ALVimKeymap::insert(ALTextView& view, const Input& input)
 {
     const ALTextDocument& d = view.document();
+    if (mInsertRegister)
+    {
+        // The register after a Control-R: its text typed in. The key a
+        // character comes with, and one that only holds a modifier, wait
+        // for it; anything else lets the Control-R go.
+        if (!input.isChar)
+        {
+            const bool plain = !(input.mask & (CONTROL | MASK_CONTROL | MASK_ALT)) && input.key >= 0x20 && input.key < KEY_SPECIAL;
+            if (plain || input.key == KEY_SHIFT || input.key == KEY_CONTROL || input.key == KEY_ALT)
+            {
+                return false;
+            }
+            mInsertRegister = false;
+            return true;
+        }
+        mInsertRegister = false;
+        const char name = input.ch < 0x80 ? static_cast<char>(input.ch) : 0;
+        if (name == '.')
+        {
+            typeIn(view, mLastTyped);
+        }
+        else if (isalnum(static_cast<unsigned char>(name)) || name == '"' || name == '-' || name == '+' || name == '*')
+        {
+            typeIn(view, fetch(name).text);
+        }
+        return true;
+    }
     if (!input.isChar)
     {
         const bool ctrl = (input.mask & CONTROL) != 0;
@@ -3083,14 +3227,8 @@ bool ALVimKeymap::insert(ALTextView& view, const Input& input)
             leaveInsert(view);
             return true;
         }
-        if (ctrl && input.key == 'W')
+        if (ctrl && !(input.mask & (MASK_ALT | MASK_SHIFT)) && insertControl(view, input))
         {
-            view.perform(ALEditorCommand::DeleteWordLeft);
-            return true;
-        }
-        if (ctrl && input.key == 'U')
-        {
-            view.deleteRange(ALTextRange(d.lineStart(view.caret().line), view.caret()));
             return true;
         }
         if (input.key == KEY_RETURN)

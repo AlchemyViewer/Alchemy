@@ -40,7 +40,9 @@
 // gg G { } % f F t T ; , H M L n N * # ` ' | and with the text objects iw
 // aw iW aW i" a" i' a' i` a` i( a( i[ a[ i{ a{ i< a< it at ip ap; x X s S
 // C D Y p P J gJ r ~ o O i a I A u Ctrl-R and . to do the last change
-// again; registers, the unnamed one being the system clipboard, with 0
+// again; in insert mode Ctrl-W Ctrl-U Ctrl-H Ctrl-T Ctrl-D Ctrl-N Ctrl-P
+// Ctrl-A Ctrl-R Ctrl-E Ctrl-Y, and Ctrl-J Ctrl-M Ctrl-I for Return and
+// Tab; registers, the unnamed one being the system clipboard, with 0
 // for the last yank and a-z by name (A-Z to add); marks a-z, ` and '; a
 // search line for / and ?; and a : line for a line number, s/// with
 // vim's flags and & g& :& :&& to do the last one again, set, g and v
@@ -202,6 +204,11 @@ private:
     // the line has none there.
     bool lineAddress(ALTextView& view, const std::string& line, size_t& at, S32& out) const;
     bool insert(ALTextView& view, const Input& input);
+    // Insert mode's own Control keys; false where vim gives the key no
+    // meaning there, and it is the view's.
+    bool insertControl(ALTextView& view, const Input& input);
+    // Text put in as though it were typed, for `.` and a count.
+    void typeIn(ALTextView& view, const std::string& text);
     bool commandLine(ALTextView& view, const Input& input);
     // Tab on the : line: the word at the cursor completed from what the
     // keymap and the host know -- a command's name, or what follows
@@ -418,9 +425,13 @@ private:
     ALTextPos mVisualLastCaret;
 
     // Insert mode: how many times what is typed goes in, the characters
-    // typed so far, and a block's lines to put them on as well.
+    // typed so far, and a block's lines to put them on as well; what the
+    // last insert typed, for Control-A; and whether a Control-R waits
+    // for the register to put in.
     S32         mInsertCount = 1;
     std::string mTyped;
+    std::string mLastTyped;
+    bool        mInsertRegister = false;
     bool        mBlockInsert       = false;
     S32         mBlockFirst        = 0;
     S32         mBlockLast         = 0;

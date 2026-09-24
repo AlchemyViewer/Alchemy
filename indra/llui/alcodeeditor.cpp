@@ -3989,6 +3989,19 @@ bool ALCodeEditor::handleKeyHere(KEY key, MASK mask)
             return true;
         }
     }
+    // Under a modal keymap Control-N and Control-P walk the list, as they
+    // walk vim's own popup menu -- the Control key itself on a Mac, not
+    // Command.
+#if LL_DARWIN
+    constexpr MASK REAL_CONTROL = MASK_MAC_CONTROL;
+#else
+    constexpr MASK REAL_CONTROL = MASK_CONTROL;
+#endif
+    if (completionOpen() && modalKeymap() && mask == REAL_CONTROL && (key == 'N' || key == 'P'))
+    {
+        mCompletionList->moveChoice(key == 'N' ? 1 : -1, true);
+        return true;
+    }
     if (completionOpen() && mask == MASK_NONE)
     {
         switch (key)
