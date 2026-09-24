@@ -6604,13 +6604,7 @@ U32 LLVolumeGeometryManager::genDrawInfo(LLSpatialGroup* group, U32 mask, LLFace
                 //sort faces by things that break batches, including avatar and mesh id
                 std::sort(faces, faces + face_count, CompareBatchBreakerRigged());
             }
-            else
-            {
-                // rigged alpha still needs back-to-front ordering for correct blending;
-                // the GPU depth buffer handles hard occlusion but cannot fix blend order
-                // between semi-transparent surfaces (hair cards, layered clothing, etc.)
-                std::sort(faces, faces + face_count, LLFace::CompareDistanceGreater());
-            }
+            // rigged faces rely on depth buffer for occlusion, no distance sort needed
         }
         else if (!distance_sort)
         {
