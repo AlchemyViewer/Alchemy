@@ -101,6 +101,7 @@
       ]
     },
     "pugixml",
+    "re2",
     {
       "name": "sdl3",
       "features": [
