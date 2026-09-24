@@ -33,6 +33,7 @@
 #include "lltrace.h"
 #include "llfasttimer.h"
 #include "v3colorutil.h"
+#include "llsdutil.h"
 #include <boost/bind.hpp>
 
 
@@ -183,78 +184,49 @@ LLSettingsSky::validation_list_t legacyHazeValidationList()
     return legacyHazeValidation;
 }
 
-LLSettingsSky::validation_list_t rayleighValidationList()
+// Ranges hold every Bruneton profile, including the ozone layers' negative linear and constant
+// terms. Widths, scales and linear terms are in metres.
+LLSettingsSky::validation_list_t buildDensityLayerValidationList(bool with_anisotropy)
 {
-    static LLSettingsBase::validation_list_t rayleighValidation;
-    if (rayleighValidation.empty())
+    LLSettingsSky::validation_list_t validation;
+
+    validation.push_back(LLSettingsBase::Validator(LLSettingsSky::SETTING_DENSITY_PROFILE_WIDTH,      false,  LLSD::TypeReal,
+        boost::bind(&LLSettingsBase::Validator::verifyFloatRange, _1, _2, llsd::array(0.0f, 32768.0f))));
+
+    validation.push_back(LLSettingsBase::Validator(LLSettingsSky::SETTING_DENSITY_PROFILE_EXP_TERM,   false,  LLSD::TypeReal,
+        boost::bind(&LLSettingsBase::Validator::verifyFloatRange, _1, _2, llsd::array(0.0f, 2.0f))));
+
+    validation.push_back(LLSettingsBase::Validator(LLSettingsSky::SETTING_DENSITY_PROFILE_EXP_SCALE_FACTOR, false,  LLSD::TypeReal,
+        boost::bind(&LLSettingsBase::Validator::verifyFloatRange, _1, _2, llsd::array(-1.0f, 1.0f))));
+
+    validation.push_back(LLSettingsBase::Validator(LLSettingsSky::SETTING_DENSITY_PROFILE_LINEAR_TERM, false,  LLSD::TypeReal,
+        boost::bind(&LLSettingsBase::Validator::verifyFloatRange, _1, _2, llsd::array(-1.0f, 1.0f))));
+
+    validation.push_back(LLSettingsBase::Validator(LLSettingsSky::SETTING_DENSITY_PROFILE_CONSTANT_TERM, false,  LLSD::TypeReal,
+        boost::bind(&LLSettingsBase::Validator::verifyFloatRange, _1, _2, llsd::array(-10.0f, 10.0f))));
+
+    if (with_anisotropy)
     {
-        rayleighValidation.push_back(LLSettingsBase::Validator(LLSettingsSky::SETTING_DENSITY_PROFILE_WIDTH,      false,  LLSD::TypeReal,
-            boost::bind(&LLSettingsBase::Validator::verifyFloatRange, _1, _2, llsd::array(0.0f, 32768.0f))));
-
-        rayleighValidation.push_back(LLSettingsBase::Validator(LLSettingsSky::SETTING_DENSITY_PROFILE_EXP_TERM,   false,  LLSD::TypeReal,
-            boost::bind(&LLSettingsBase::Validator::verifyFloatRange, _1, _2, llsd::array(0.0f, 2.0f))));
-
-        rayleighValidation.push_back(LLSettingsBase::Validator(LLSettingsSky::SETTING_DENSITY_PROFILE_EXP_SCALE_FACTOR, false,  LLSD::TypeReal,
-            boost::bind(&LLSettingsBase::Validator::verifyFloatRange, _1, _2, llsd::array(-1.0f, 1.0f))));
-
-        rayleighValidation.push_back(LLSettingsBase::Validator(LLSettingsSky::SETTING_DENSITY_PROFILE_LINEAR_TERM, false,  LLSD::TypeReal,
-            boost::bind(&LLSettingsBase::Validator::verifyFloatRange, _1, _2, llsd::array(0.0f, 2.0f))));
-
-        rayleighValidation.push_back(LLSettingsBase::Validator(LLSettingsSky::SETTING_DENSITY_PROFILE_CONSTANT_TERM, false,  LLSD::TypeReal,
+        validation.push_back(LLSettingsBase::Validator(LLSettingsSky::SETTING_MIE_ANISOTROPY_FACTOR, false,  LLSD::TypeReal,
             boost::bind(&LLSettingsBase::Validator::verifyFloatRange, _1, _2, llsd::array(0.0f, 1.0f))));
     }
-    return rayleighValidation;
+
+    return validation;
 }
 
-LLSettingsSky::validation_list_t absorptionValidationList()
+LLSettingsSky::validation_list_t& densityLayerValidationList()
 {
-    static LLSettingsBase::validation_list_t absorptionValidation;
-    if (absorptionValidation.empty())
-    {
-        absorptionValidation.push_back(LLSettingsBase::Validator(LLSettingsSky::SETTING_DENSITY_PROFILE_WIDTH,      false,  LLSD::TypeReal,
-            boost::bind(&LLSettingsBase::Validator::verifyFloatRange, _1, _2, llsd::array(0.0f, 32768.0f))));
-
-        absorptionValidation.push_back(LLSettingsBase::Validator(LLSettingsSky::SETTING_DENSITY_PROFILE_EXP_TERM,   false,  LLSD::TypeReal,
-            boost::bind(&LLSettingsBase::Validator::verifyFloatRange, _1, _2, llsd::array(0.0f, 2.0f))));
-
-        absorptionValidation.push_back(LLSettingsBase::Validator(LLSettingsSky::SETTING_DENSITY_PROFILE_EXP_SCALE_FACTOR, false,  LLSD::TypeReal,
-            boost::bind(&LLSettingsBase::Validator::verifyFloatRange, _1, _2, llsd::array(-1.0f, 1.0f))));
-
-        absorptionValidation.push_back(LLSettingsBase::Validator(LLSettingsSky::SETTING_DENSITY_PROFILE_LINEAR_TERM, false,  LLSD::TypeReal,
-            boost::bind(&LLSettingsBase::Validator::verifyFloatRange, _1, _2, llsd::array(0.0f, 2.0f))));
-
-        absorptionValidation.push_back(LLSettingsBase::Validator(LLSettingsSky::SETTING_DENSITY_PROFILE_CONSTANT_TERM, false,  LLSD::TypeReal,
-            boost::bind(&LLSettingsBase::Validator::verifyFloatRange, _1, _2, llsd::array(0.0f, 1.0f))));
-    }
-    return absorptionValidation;
+    static LLSettingsSky::validation_list_t validation = buildDensityLayerValidationList(false);
+    return validation;
 }
 
-LLSettingsSky::validation_list_t mieValidationList()
+LLSettingsSky::validation_list_t& mieLayerValidationList()
 {
-    static LLSettingsBase::validation_list_t mieValidation;
-    if (mieValidation.empty())
-    {
-        mieValidation.push_back(LLSettingsBase::Validator(LLSettingsSky::SETTING_DENSITY_PROFILE_WIDTH,      false,  LLSD::TypeReal,
-            boost::bind(&LLSettingsBase::Validator::verifyFloatRange, _1, _2, llsd::array(0.0f, 32768.0f))));
-
-        mieValidation.push_back(LLSettingsBase::Validator(LLSettingsSky::SETTING_DENSITY_PROFILE_EXP_TERM,   false,  LLSD::TypeReal,
-            boost::bind(&LLSettingsBase::Validator::verifyFloatRange, _1, _2, llsd::array(0.0f, 2.0f))));
-
-        mieValidation.push_back(LLSettingsBase::Validator(LLSettingsSky::SETTING_DENSITY_PROFILE_EXP_SCALE_FACTOR, false,  LLSD::TypeReal,
-            boost::bind(&LLSettingsBase::Validator::verifyFloatRange, _1, _2, llsd::array(-1.0f, 1.0f))));
-
-        mieValidation.push_back(LLSettingsBase::Validator(LLSettingsSky::SETTING_DENSITY_PROFILE_LINEAR_TERM, false,  LLSD::TypeReal,
-            boost::bind(&LLSettingsBase::Validator::verifyFloatRange, _1, _2, llsd::array(0.0f, 2.0f))));
-
-        mieValidation.push_back(LLSettingsBase::Validator(LLSettingsSky::SETTING_DENSITY_PROFILE_CONSTANT_TERM, false,  LLSD::TypeReal,
-            boost::bind(&LLSettingsBase::Validator::verifyFloatRange, _1, _2, llsd::array(0.0f, 1.0f))));
-
-        mieValidation.push_back(LLSettingsBase::Validator(LLSettingsSky::SETTING_MIE_ANISOTROPY_FACTOR, false,  LLSD::TypeReal,
-            boost::bind(&LLSettingsBase::Validator::verifyFloatRange, _1, _2, llsd::array(0.0f, 1.0f))));
-    }
-    return mieValidation;
+    static LLSettingsSky::validation_list_t validation = buildDensityLayerValidationList(true);
+    return validation;
 }
 
+// Warnings name keys the validation stripped; what remains is valid, so they do not fail the sky.
 bool validateLegacyHaze(LLSD &value, U32 flags)
 {
     LLSettingsSky::validation_list_t legacyHazeValidations = legacyHazeValidationList();
@@ -267,135 +239,138 @@ bool validateLegacyHaze(LLSD &value, U32 flags)
     }
     if (result["warnings"].size() > 0)
     {
-        LL_WARNS("SETTINGS") << "Legacy Haze Config Validation warnings: " << result["warnings"] << LL_ENDL;
+        LL_DEBUGS("SETTINGS") << "Legacy Haze Config Validation warnings: " << result["warnings"] << LL_ENDL;
+    }
+    return true;
+}
+
+// Validates every layer of a profile, descending into a nested array rather than stopping at it.
+bool validateDensityLayers(LLSD &value, U32 flags, LLSettingsSky::validation_list_t& validations, const char* profile)
+{
+    if (value.isArray())
+    {
+        bool all_good = true;
+        for (LLSD::array_iterator itf = value.beginArray(); itf != value.endArray(); ++itf)
+        {
+            all_good = validateDensityLayers(*itf, flags, validations, profile) && all_good;
+        }
+        return all_good;
+    }
+
+    if (!value.isMap())
+    {
+        LL_WARNS("SETTINGS") << profile << " Config layer is neither a map nor an array: " << value << LL_ENDL;
         return false;
+    }
+
+    LLSD result = LLSettingsBase::settingValidation(value, validations, flags);
+    if (result["errors"].size() > 0)
+    {
+        LL_WARNS("SETTINGS") << profile << " Config Validation errors: " << result["errors"] << LL_ENDL;
+        return false;
+    }
+    if (result["warnings"].size() > 0)
+    {
+        LL_DEBUGS("SETTINGS") << profile << " Config Validation warnings: " << result["warnings"] << LL_ENDL;
     }
     return true;
 }
 
 bool validateRayleighLayers(LLSD &value, U32 flags)
 {
-    LLSettingsSky::validation_list_t rayleighValidations = rayleighValidationList();
-    if (value.isArray())
-    {
-        bool allGood = true;
-        for (LLSD::array_iterator itf = value.beginArray(); itf != value.endArray(); ++itf)
-        {
-            LLSD& layerConfig = (*itf);
-            if (layerConfig.type() == LLSD::TypeMap)
-            {
-                if (!validateRayleighLayers(layerConfig, flags))
-                {
-                    allGood = false;
-                }
-            }
-            else if (layerConfig.type() == LLSD::TypeArray)
-            {
-                return validateRayleighLayers(layerConfig, flags);
-            }
-            else
-            {
-                return LLSettingsBase::settingValidation(value, rayleighValidations, flags);
-            }
-        }
-        return allGood;
-    }
-    llassert(value.type() == LLSD::TypeMap);
-    LLSD result = LLSettingsBase::settingValidation(value, rayleighValidations, flags);
-    if (result["errors"].size() > 0)
-    {
-        LL_WARNS("SETTINGS") << "Rayleigh Config Validation errors: " << result["errors"] << LL_ENDL;
-        return false;
-    }
-    if (result["warnings"].size() > 0)
-    {
-        LL_WARNS("SETTINGS") << "Rayleigh Config Validation warnings: " << result["errors"] << LL_ENDL;
-        return false;
-    }
-    return true;
+    return validateDensityLayers(value, flags, densityLayerValidationList(), "Rayleigh");
 }
 
 bool validateAbsorptionLayers(LLSD &value, U32 flags)
 {
-    LLSettingsBase::validation_list_t absorptionValidations = absorptionValidationList();
-    if (value.isArray())
-    {
-        bool allGood = true;
-        for (LLSD::array_iterator itf = value.beginArray(); itf != value.endArray(); ++itf)
-        {
-            LLSD& layerConfig = (*itf);
-            if (layerConfig.type() == LLSD::TypeMap)
-            {
-                if (!validateAbsorptionLayers(layerConfig, flags))
-                {
-                    allGood = false;
-                }
-            }
-            else if (layerConfig.type() == LLSD::TypeArray)
-            {
-                return validateAbsorptionLayers(layerConfig, flags);
-            }
-            else
-            {
-                return LLSettingsBase::settingValidation(value, absorptionValidations, flags);
-            }
-        }
-        return allGood;
-    }
-    llassert(value.type() == LLSD::TypeMap);
-    LLSD result = LLSettingsBase::settingValidation(value, absorptionValidations, flags);
-    if (result["errors"].size() > 0)
-    {
-        LL_WARNS("SETTINGS") << "Absorption Config Validation errors: " << result["errors"] << LL_ENDL;
-        return false;
-    }
-    if (result["warnings"].size() > 0)
-    {
-        LL_WARNS("SETTINGS") << "Absorption Config Validation warnings: " << result["errors"] << LL_ENDL;
-        return false;
-    }
-    return true;
+    return validateDensityLayers(value, flags, densityLayerValidationList(), "Absorption");
 }
 
 bool validateMieLayers(LLSD &value, U32 flags)
 {
-    LLSettingsBase::validation_list_t mieValidations = mieValidationList();
-    if (value.isArray())
+    return validateDensityLayers(value, flags, mieLayerValidationList(), "Mie");
+}
+
+F32 density_layer_value(const LLSD& layer, const std::string& key)
+{
+    return layer.has(key) ? (F32)layer[key].asReal() : 0.0f;
+}
+
+// Blends two profiles term by term. The shorter one is padded to the longer's length by repeating
+// its last layer, and every layer from its last onward takes the longer profile's width, so both
+// describe the same density at every altitude before they are mixed.
+LLSD lerp_density_profile(const LLSD& from, const LLSD& to, F32 mix)
+{
+    static const std::string* const TERMS[] = {
+        &LLSettingsSky::SETTING_DENSITY_PROFILE_EXP_TERM,
+        &LLSettingsSky::SETTING_DENSITY_PROFILE_EXP_SCALE_FACTOR,
+        &LLSettingsSky::SETTING_DENSITY_PROFILE_LINEAR_TERM,
+        &LLSettingsSky::SETTING_DENSITY_PROFILE_CONSTANT_TERM,
+        &LLSettingsSky::SETTING_MIE_ANISOTROPY_FACTOR,
+    };
+
+    const LLSD a = LLSettingsSky::flattenDensityProfile(from);
+    const LLSD b = LLSettingsSky::flattenDensityProfile(to);
+    const size_t count_a = a.size();
+    const size_t count_b = b.size();
+    if (count_a == 0 || count_b == 0)
     {
-        bool allGood = true;
-        for (LLSD::array_iterator itf = value.beginArray(); itf != value.endArray(); ++itf)
+        return from;
+    }
+
+    const size_t count = llmax(count_a, count_b);
+    LLSD result = LLSD::emptyArray();
+    for (size_t i = 0; i < count; ++i)
+    {
+        const LLSD& layer_a = a[llmin(i, count_a - 1)];
+        const LLSD& layer_b = b[llmin(i, count_b - 1)];
+
+        const std::string& width = LLSettingsSky::SETTING_DENSITY_PROFILE_WIDTH;
+        F32 width_a = density_layer_value(layer_a, width);
+        F32 width_b = density_layer_value(layer_b, width);
+        if (count_a < count && i + 1 >= count_a)
         {
-            LLSD& layerConfig = (*itf);
-            if (layerConfig.type() == LLSD::TypeMap)
+            width_a = width_b;
+        }
+        else if (count_b < count && i + 1 >= count_b)
+        {
+            width_b = width_a;
+        }
+
+        LLSD layer;
+        layer[width] = lerp(width_a, width_b, mix);
+        for (const std::string* term : TERMS)
+        {
+            if (layer_a.has(*term) || layer_b.has(*term))
             {
-                if (!validateMieLayers(layerConfig, flags))
-                {
-                    allGood = false;
-                }
-            }
-            else if (layerConfig.type() == LLSD::TypeArray)
-            {
-                return validateMieLayers(layerConfig, flags);
-            }
-            else
-            {
-                return LLSettingsBase::settingValidation(value, mieValidations, flags);
+                layer[*term] = lerp(density_layer_value(layer_a, *term), density_layer_value(layer_b, *term), mix);
             }
         }
-        return allGood;
+        result.append(layer);
     }
-    LLSD result = LLSettingsBase::settingValidation(value, mieValidations, flags);
-    if (result["errors"].size() > 0)
+    return result;
+}
+
+// The first layer of a profile, looking through a nested array; undefined when there is none.
+const LLSD& first_density_layer(const LLSD& profile)
+{
+    for (LLSD::array_const_iterator itf = profile.beginArray(); itf != profile.endArray(); ++itf)
     {
-        LL_WARNS("SETTINGS") << "Mie Config Validation errors: " << result["errors"] << LL_ENDL;
-        return false;
+        if (itf->isMap())
+        {
+            return *itf;
+        }
+        if (itf->isArray())
+        {
+            const LLSD& nested = first_density_layer(*itf);
+            if (nested.isMap())
+            {
+                return nested;
+            }
+        }
     }
-    if (result["warnings"].size() > 0)
-    {
-        LL_WARNS("SETTINGS") << "Mie Config Validation warnings: " << result["warnings"] << LL_ENDL;
-        return false;
-    }
-    return true;
+    static const LLSD none;
+    return none;
 }
 
 }
@@ -632,6 +607,20 @@ void LLSettingsSky::blend(LLSettingsBase::ptr_t &end, F64 blendf)
         mSkyIceLevel = lerp(mSkyIceLevel, other->mSkyIceLevel, (F32)blendf);
         mPlanetRadius = lerp(mPlanetRadius, other->mPlanetRadius, (F32)blendf);
 
+        // Equal profiles, the usual case, stay shared rather than rebuilt every frame.
+        if (!llsd_equals(mRayleighConfigs, other->mRayleighConfigs))
+        {
+            mRayleighConfigs = lerp_density_profile(mRayleighConfigs, other->mRayleighConfigs, (F32)blendf);
+        }
+        if (!llsd_equals(mMieConfigs, other->mMieConfigs))
+        {
+            mMieConfigs = lerp_density_profile(mMieConfigs, other->mMieConfigs, (F32)blendf);
+        }
+        if (!llsd_equals(mAbsorptionConfigs, other->mAbsorptionConfigs))
+        {
+            mAbsorptionConfigs = lerp_density_profile(mAbsorptionConfigs, other->mAbsorptionConfigs, (F32)blendf);
+        }
+
         // Legacy settings
 
         if (other->mHasLegacyHaze)
@@ -857,8 +846,8 @@ LLSD LLSettingsSky::rayleighConfigDefault()
 
 LLSD LLSettingsSky::absorptionConfigDefault()
 {
-// absorption (ozone) has two linear ramping zones
-    LLSD dflt_absorption_layer_a = createDensityProfileLayer(25000.0f, 0.0f, 0.0f, -1.0f / 25000.0f, -2.0f / 3.0f);
+    // ozone rises linearly from 0 at 10 km to 1 at 25 km, then falls to 0 at 40 km
+    LLSD dflt_absorption_layer_a = createDensityProfileLayer(25000.0f, 0.0f, 0.0f, 1.0f / 15000.0f, -2.0f / 3.0f);
     LLSD dflt_absorption_layer_b = createDensityProfileLayer(0.0f, 0.0f, 0.0f, -1.0f / 15000.0f, 8.0f / 3.0f);
     LLSD dflt_absorption;
     dflt_absorption.append(dflt_absorption_layer_a);
@@ -944,8 +933,6 @@ LLSD LLSettingsSky::translateLegacyHazeSettings(const LLSD& legacy)
 {
     LLSD legacyhazesettings;
 
-// AdvancedAtmospherics TODO
-// These need to be translated into density profile info in the new settings format...
 // LEGACY_ATMOSPHERICS
     if (legacy.has(SETTING_AMBIENT))
     {
@@ -1478,8 +1465,15 @@ void LLSettingsSky::setSunArcRadians(F32 radians)
 
 void LLSettingsSky::setMieAnisotropy(F32 aniso_factor)
 {
-    getMieConfig()[SETTING_MIE_ANISOTROPY_FACTOR] = aniso_factor;
+    mMieConfigs = flattenDensityProfile(mMieConfigs);
+    if (mMieConfigs.size() == 0)
+    {
+        LL_WARNS("SETTINGS") << "Sky has no Mie layer to carry the anisotropy." << LL_ENDL;
+        return;
+    }
+    mMieConfigs[0][SETTING_MIE_ANISOTROPY_FACTOR] = aniso_factor;
     setDirtyFlag(true);
+    setLLSDDirty();
 }
 
 void LLSettingsSky::setSkyMoistureLevel(F32 moisture_level)
@@ -1841,20 +1835,40 @@ F32 LLSettingsSky::getMieAnisotropy() const
 
 LLSD LLSettingsSky::getRayleighConfig() const
 {
-    LLSD copy = *(mRayleighConfigs.beginArray());
-    return copy;
+    return first_density_layer(mRayleighConfigs);
 }
 
 LLSD LLSettingsSky::getMieConfig() const
 {
-    LLSD copy = *(mMieConfigs.beginArray());
-    return copy;
+    return first_density_layer(mMieConfigs);
 }
 
 LLSD LLSettingsSky::getAbsorptionConfig() const
 {
-    LLSD copy = *(mAbsorptionConfigs.beginArray());
-    return copy;
+    return first_density_layer(mAbsorptionConfigs);
+}
+
+LLSD LLSettingsSky::flattenDensityProfile(const LLSD& profile)
+{
+    LLSD flat = LLSD::emptyArray();
+    for (LLSD::array_const_iterator itf = profile.beginArray(); itf != profile.endArray(); ++itf)
+    {
+        if (itf->isMap())
+        {
+            flat.append(*itf);
+        }
+        else if (itf->isArray())
+        {
+            for (LLSD::array_const_iterator itn = itf->beginArray(); itn != itf->endArray(); ++itn)
+            {
+                if (itn->isMap())
+                {
+                    flat.append(*itn);
+                }
+            }
+        }
+    }
+    return flat;
 }
 
 LLSD LLSettingsSky::getRayleighConfigs() const
@@ -1875,18 +1889,21 @@ LLSD LLSettingsSky::getAbsorptionConfigs() const
 void LLSettingsSky::setRayleighConfigs(const LLSD& rayleighConfig)
 {
     mRayleighConfigs = rayleighConfig;
+    setDirtyFlag(true);
     setLLSDDirty();
 }
 
 void LLSettingsSky::setMieConfigs(const LLSD& mieConfig)
 {
     mMieConfigs = mieConfig;
+    setDirtyFlag(true);
     setLLSDDirty();
 }
 
 void LLSettingsSky::setAbsorptionConfigs(const LLSD& absorptionConfig)
 {
     mAbsorptionConfigs = absorptionConfig;
+    setDirtyFlag(true);
     setLLSDDirty();
 }
 

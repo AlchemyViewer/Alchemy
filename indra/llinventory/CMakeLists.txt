@@ -63,6 +63,7 @@ if(AL_BUILD_TESTS)
     llparcel
     llpermissions
     llsaleinfo
+    llsettingssky
     lluserrelations
   )
     al_add_test(${test} PROJECT llinventory LIBRARIES llinventory llmath llcorehttp llfilesystem)
