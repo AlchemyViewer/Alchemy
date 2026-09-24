@@ -5333,11 +5333,12 @@ void ALFloaterScriptStudio::offerRequires(Doc& doc)
         }
         const std::string& name    = problem.args[0];
         const size_t       before  = problem.fixes.size();
-        // A module by the name itself, wherever a require of it finds one;
-        // then what the index knows: a module so named under another
-        // name, and each that exports the name.
-        ALPreprocessor::Include found;
-        if (preprocessor.requireOf(request, name, found) == ALPreprocessor::Found::Yes && ALScriptModules::identity(found.path) != self)
+        // A module by the name itself, wherever a require of it finds one,
+        // its text in hand or not yet; then what the index knows: a module
+        // so named under another name, and each that exports the name.
+        ALPreprocessor::Include     found;
+        const ALPreprocessor::Found named = preprocessor.requireOf(request, name, found);
+        if (named != ALPreprocessor::Found::No && !found.path.empty() && ALScriptModules::identity(found.path) != self)
         {
             ALScriptFixes::offerRequire(problem, text, name, false);
         }

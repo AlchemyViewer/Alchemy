@@ -743,11 +743,10 @@ ALPreprocessor::Found ALScriptPreprocessor::resolve(const ALPreprocessor::Ask& a
         {
             continue;
         }
-        if (found == ALPreprocessor::Found::Yes)
-        {
-            out.name = c.name;
-            out.path = c.path;
-        }
+        // Named where it is found, whether its text is in hand or not: a
+        // run takes the text, a question the name alone.
+        out.name = c.name;
+        out.path = c.path;
         return found;
     }
     // Not found anywhere listed; the object may still hold it.

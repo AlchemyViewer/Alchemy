@@ -175,10 +175,11 @@ public:
     std::vector<std::string> heldPaths() const;
 
     // What a SLua `require` of a name from a script finds now, as a run
-    // would: Yes with its identity and text; Pending where it is in the
-    // world and not in hand, or the object has not said what it holds;
-    // No where nothing is so named. Nothing is fetched, so that the fixes
-    // may ask about every name a script does not know.
+    // would: Yes with its identity and text; Pending with its identity
+    // where it is in the world and not in hand, and with none where the
+    // object has not said what it holds; No where nothing is so named.
+    // Nothing is fetched, so that the fixes may ask about every name a
+    // script does not know.
     ALPreprocessor::Found requireOf(const Request& request, const std::string& name, ALPreprocessor::Include& out);
     // The folders on disk a require from a script reads, each with what a
     // name under it starts with: the scripter's include folders while disk
