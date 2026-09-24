@@ -179,7 +179,7 @@ bool ALOffsetPad::handleMouseDown(S32 x, S32 y, MASK mask)
         return LLUICtrl::handleMouseDown(x, y, mask);
     }
 
-    mDragging = true;
+    mDrag.press(x, y);
     gFocusMgr.setMouseCapture(this);
     place(x, y);
 
@@ -188,9 +188,14 @@ bool ALOffsetPad::handleMouseDown(S32 x, S32 y, MASK mask)
 
 bool ALOffsetPad::handleHover(S32 x, S32 y, MASK mask)
 {
-    if (mDragging)
+    if (mDrag.pressed())
     {
-        place(x, y);
+        // Followed only where the pointer went somewhere: the captor is
+        // hovered on every frame, moved or not.
+        if (mDrag.moved(x, y))
+        {
+            place(x, y);
+        }
 
         return true;
     }
@@ -200,18 +205,17 @@ bool ALOffsetPad::handleHover(S32 x, S32 y, MASK mask)
 
 void ALOffsetPad::onMouseCaptureLost()
 {
-    mDragging = false;
+    mDrag.cancel();
     LLUICtrl::onMouseCaptureLost();
 }
 
 bool ALOffsetPad::handleMouseUp(S32 x, S32 y, MASK mask)
 {
-    if (!mDragging)
+    if (!mDrag.release())
     {
         return LLUICtrl::handleMouseUp(x, y, mask);
     }
 
-    mDragging = false;
     gFocusMgr.setMouseCapture(nullptr);
     place(x, y);
     onCommit();

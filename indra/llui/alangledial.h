@@ -24,6 +24,7 @@
 
 #pragma once
 
+#include "aldraggesture.h"
 #include "lluictrl.h"
 
 class LLSpinCtrl;
@@ -68,5 +69,6 @@ private:
     LLRect mDial;
     // Degrees anticlockwise from the right, as the value's x and y say.
     F32 mAngle = 135.f;
-    bool mDragging = false;
+    // Moved at once, taken on release.
+    ALDragGesture mDrag;
 };

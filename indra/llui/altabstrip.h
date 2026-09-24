@@ -24,6 +24,7 @@
 
 #pragma once
 
+#include "aldraggesture.h"
 #include "lluictrl.h"
 #include "lluiimage.h"
 
@@ -248,10 +249,9 @@ private:
     // save come back -- and may while a press is held, and a press whose
     // tab has gone is let go of.
     S32                 mPressedClose = -1;
-    // A tab pressed and perhaps being dragged along the strip: which,
-    // where it was pressed, and whether it has moved far enough to be a
-    // drag rather than a press.
+    // A tab pressed and perhaps being dragged along the strip: which, and
+    // the press, which is a drag once it has gone more than four pixels
+    // along the strip.
     S32                 mPressed  = -1;
-    S32                 mPressX   = 0;
-    bool                mDragging = false;
+    ALDragGesture       mDrag{ 4, ALDragGesture::Zone::Across };
 };

@@ -26,6 +26,8 @@
 
 #include "alspecimenlist.h"
 
+#include "aldraggesture.h"
+
 #include "alemptystate.h"
 #include "alstringmatch.h"
 #include "llfocusmgr.h"
@@ -53,12 +55,11 @@ namespace
     constexpr S32 CELL_PAD = 4;
     constexpr S32 CAPTION_HEIGHT = 14;
 
-    // Whether a press has moved far enough to be a drag.
-    bool dragged(S32 x, S32 y, S32 from_x, S32 from_y)
+    // A press is a drag once it has gone as far as a drag and drop
+    // needs, however it went.
+    ALDragGesture pressGesture()
     {
-        const S32 dx = x - from_x;
-        const S32 dy = y - from_y;
-        return dx * dx + dy * dy > DRAG_N_DROP_DISTANCE_THRESHOLD * DRAG_N_DROP_DISTANCE_THRESHOLD;
+        return ALDragGesture(DRAG_N_DROP_DISTANCE_THRESHOLD);
     }
 }
 
@@ -86,8 +87,7 @@ public:
         mList.choose(mValue);
         // Held from here, so that a press that goes on to move is seen
         // moving by this row and not by whatever it moved over.
-        mPressX = x;
-        mPressY = y;
+        mPress.press(x, y);
         gFocusMgr.setMouseCapture(this);
         return true;
     }
@@ -96,6 +96,7 @@ public:
     {
         if (hasMouseCapture())
         {
+            mPress.release();
             gFocusMgr.setMouseCapture(nullptr);
             return true;
         }
@@ -110,12 +111,19 @@ public:
         {
             return LLPanel::handleHover(x, y, mask);
         }
-        if (dragged(x, y, mPressX, mPressY))
+        if (mPress.moved(x, y))
         {
+            mPress.release();
             gFocusMgr.setMouseCapture(nullptr);
             mList.startDrag(mValue);
         }
         return true;
+    }
+
+    void onMouseCaptureLost() override
+    {
+        mPress.cancel();
+        LLPanel::onMouseCaptureLost();
     }
 
     void draw() override
@@ -136,8 +144,7 @@ private:
     std::string         mValue;
     ALSpecimenList&     mList;
     bool                mMarked = false;
-    S32                 mPressX = 0;
-    S32                 mPressY = 0;
+    ALDragGesture       mPress  = pressGesture();
 };
 
 // The pane the cells are drawn on: it draws them and takes the clicks, and
@@ -173,8 +180,7 @@ public:
         mList.setFocus(true);
         mList.cellPressed(index, mask);
         mPressed = mList.mSpecimens[index].value;
-        mPressX = x;
-        mPressY = y;
+        mPress.press(x, y);
         gFocusMgr.setMouseCapture(this);
         return true;
     }
@@ -183,6 +189,7 @@ public:
     {
         if (hasMouseCapture())
         {
+            mPress.release();
             gFocusMgr.setMouseCapture(nullptr);
             return true;
         }
@@ -193,8 +200,9 @@ public:
     {
         if (hasMouseCapture())
         {
-            if (dragged(x, y, mPressX, mPressY))
+            if (mPress.moved(x, y))
             {
+                mPress.release();
                 gFocusMgr.setMouseCapture(nullptr);
                 mList.startDrag(mPressed);
             }
@@ -208,6 +216,12 @@ public:
     {
         mHovered = -1;
         LLPanel::onMouseLeave(x, y, mask);
+    }
+
+    void onMouseCaptureLost() override
+    {
+        mPress.cancel();
+        LLPanel::onMouseCaptureLost();
     }
 
     bool handleToolTip(S32 x, S32 y, MASK mask) override
@@ -229,8 +243,7 @@ private:
     ALSpecimenList& mList;
     S32             mHovered = -1;
     std::string     mPressed;
-    S32             mPressX = 0;
-    S32             mPressY = 0;
+    ALDragGesture   mPress = pressGesture();
 };
 
 ALSpecimenList::Params::Params()

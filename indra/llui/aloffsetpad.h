@@ -24,6 +24,7 @@
 
 #pragma once
 
+#include "aldraggesture.h"
 #include "lluictrl.h"
 
 class LLSpinCtrl;
@@ -71,5 +72,6 @@ private:
     LLRect mPad;
     F32 mOffset[2] = { 0.f, 0.f };
     F32 mReach = 32.f;
-    bool mDragging = false;
+    // Moved at once, taken on release.
+    ALDragGesture mDrag;
 };

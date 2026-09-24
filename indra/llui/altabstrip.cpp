@@ -152,7 +152,7 @@ void ALTabStrip::setTabs(std::vector<Tab> tabs, const std::string& chosen)
     if (pressing && mPressed < 0 && mPressedClose < 0 && hasMouseCapture())
     {
         // The tab held is gone: so is the press.
-        mDragging = false;
+        mDrag.cancel();
         gFocusMgr.setMouseCapture(nullptr);
     }
 }
@@ -711,8 +711,7 @@ bool ALTabStrip::handleMouseDown(S32 x, S32 y, MASK mask)
     {
         return true;
     }
-    mPressX   = x;
-    mDragging = false;
+    mDrag.press(x, y);
     gFocusMgr.setMouseCapture(this);
     return true;
 }
@@ -736,9 +735,9 @@ bool ALTabStrip::handleMouseUp(S32 x, S32 y, MASK mask)
     {
         // Likewise: letting go forgets the drag, and a drag forgotten
         // before it was told left the host's tabs in the old order.
-        const bool dragged = mDragging;
+        const bool dragged = mDrag.dragging();
         mPressed           = -1;
-        mDragging          = false;
+        mDrag.release();
         gFocusMgr.setMouseCapture(nullptr);
         if (dragged)
         {
@@ -754,9 +753,9 @@ bool ALTabStrip::handleMouseUp(S32 x, S32 y, MASK mask)
 // orders until the next fill.
 void ALTabStrip::onMouseCaptureLost()
 {
-    const bool dragged = mDragging;
+    const bool dragged = mDrag.dragging();
     mPressed      = -1;
-    mDragging     = false;
+    mDrag.cancel();
     mPressedClose = -1;
     if (dragged)
     {
@@ -839,13 +838,10 @@ bool ALTabStrip::handleHover(S32 x, S32 y, MASK mask)
     }
     if (mPressed >= 0 && hasMouseCapture())
     {
-        // A press that has travelled is a drag: the tab moves past a
-        // neighbour once the mouse is past that neighbour's middle.
-        if (!mDragging && std::abs(x - mPressX) > 4)
-        {
-            mDragging = true;
-        }
-        if (mDragging)
+        // A press that has travelled along the strip is a drag: the tab
+        // moves past a neighbour once the mouse is past that neighbour's
+        // middle.
+        if (mDrag.moved(x, y))
         {
             bool moved = true;
             while (moved && mPressed < (S32)mTabs.size())

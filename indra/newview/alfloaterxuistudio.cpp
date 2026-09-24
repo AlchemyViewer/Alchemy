@@ -551,8 +551,13 @@ public:
         toContent(x, y);
         if (grabbed())
         {
-            track(x, y);
-            trackDrop(x, y);
+            // Followed only where the pointer went somewhere: the captor is
+            // hovered every frame, and a hit test a frame is for nothing.
+            if (mDrag.moved(x, y))
+            {
+                track(x, y);
+                trackDrop(x, y);
+            }
             setGripCursor(mGrip);
             return true;
         }
@@ -605,6 +610,7 @@ public:
         toContent(x, y);
         if (grabbed())
         {
+            mDrag.moved(x, y);
             track(x, y);
             trackDrop(x, y);
             const S32 grip = mGrip;
@@ -652,7 +658,7 @@ public:
     void onMouseCaptureLost() override
     {
         dropDrag();
-        LLPanel::onMouseCaptureLost();
+        ALCanvasView::onMouseCaptureLost();
     }
 
     void onMouseLeave(S32 x, S32 y, MASK mask) override
@@ -674,7 +680,8 @@ private:
     static constexpr S32 GRIP_SIZE = 7;
     static constexpr S32 ANCHOR_SIZE = 7;
     static constexpr S32 MOVE_GRIP_SIZE = 13;
-    static constexpr S32 DEAD_ZONE = 3;      // a click is not a drag
+    // A click is not a drag: the hand moves a little on the way down.
+    static constexpr S32 DEAD_ZONE = 2;      // pixels either way, past which it is
 
     // The root of a floater preview is the preview window: its corners
     // are the window's own, and dragging its bar is how the window is
@@ -685,9 +692,12 @@ private:
         return view && view != this && mWhich == ALFloaterXUIStudio::PRIMARY;
     }
 
+    // Past the dead zone since the press, however near it the hand has
+    // come back: a drag out and back is a drag that came to nothing, not a
+    // click.
     bool dragging() const
     {
-        return mDelta[EDGE_L] || mDelta[EDGE_B] || mDelta[EDGE_R] || mDelta[EDGE_T];
+        return mDrag.dragging();
     }
 
     // A handle is held: the button went down on one and has not come up.
@@ -702,6 +712,7 @@ private:
     void dropDrag()
     {
         mLetGo = false;
+        mDrag.cancel();
         mGrip = GRIP_NONE;
         mDrop.markDead();
         for (S32& d : mDelta)
@@ -721,8 +732,7 @@ private:
     bool beginDrag(S32 grip, S32 x, S32 y)
     {
         mGrip = grip;
-        mDragX = x;
-        mDragY = y;
+        mDrag.press(x, y);
         for (S32& d : mDelta)
         {
             d = 0;
@@ -900,9 +910,9 @@ private:
 
     void track(S32 x, S32 y)
     {
-        S32 dx = x - mDragX;
-        S32 dy = y - mDragY;
-        if (!dragging() && llabs(dx) < DEAD_ZONE && llabs(dy) < DEAD_ZONE)
+        S32 dx = x - mDrag.pressX();
+        S32 dy = y - mDrag.pressY();
+        if (!dragging())
         {
             // The hand moves a little on the way down; a click that
             // selects an element is not a move of it.
@@ -1138,8 +1148,7 @@ private:
 
     bool                mLetGo = false;         // a control press on what was selected
     S32                 mGrip = GRIP_NONE;      // the handle the button went down on
-    S32                 mDragX = 0;
-    S32                 mDragY = 0;
+    ALDragGesture       mDrag{ DEAD_ZONE, ALDragGesture::Zone::EitherAxis };
     S32                 mDelta[EDGE_COUNT] = { 0, 0, 0, 0 };
     LLHandle<LLView>    mDrop;                  // the container a held element would land in
     U32                 mDropFrame = 0;         // the frame a drag tool hover last said so

@@ -182,7 +182,7 @@ bool ALAngleDial::handleMouseDown(S32 x, S32 y, MASK mask)
         return LLUICtrl::handleMouseDown(x, y, mask);
     }
 
-    mDragging = true;
+    mDrag.press(x, y);
     gFocusMgr.setMouseCapture(this);
     turn(x, y);
 
@@ -191,9 +191,14 @@ bool ALAngleDial::handleMouseDown(S32 x, S32 y, MASK mask)
 
 bool ALAngleDial::handleHover(S32 x, S32 y, MASK mask)
 {
-    if (mDragging)
+    if (mDrag.pressed())
     {
-        turn(x, y);
+        // Followed only where the pointer went somewhere: the captor is
+        // hovered on every frame, moved or not.
+        if (mDrag.moved(x, y))
+        {
+            turn(x, y);
+        }
 
         return true;
     }
@@ -203,18 +208,17 @@ bool ALAngleDial::handleHover(S32 x, S32 y, MASK mask)
 
 void ALAngleDial::onMouseCaptureLost()
 {
-    mDragging = false;
+    mDrag.cancel();
     LLUICtrl::onMouseCaptureLost();
 }
 
 bool ALAngleDial::handleMouseUp(S32 x, S32 y, MASK mask)
 {
-    if (!mDragging)
+    if (!mDrag.release())
     {
         return LLUICtrl::handleMouseUp(x, y, mask);
     }
 
-    mDragging = false;
     gFocusMgr.setMouseCapture(nullptr);
     turn(x, y);
     onCommit();
