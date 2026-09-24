@@ -4292,7 +4292,9 @@ bool ALTextView::handleMouseDown(S32 x, S32 y, MASK mask)
     {
         mPressedAtom = static_cast<S32>(atom - mAtoms.data());
     }
-    mDragAt = posAtLocal(x, y, true);
+    mDragAt       = posAtLocal(x, y, true);
+    mDragToChar   = posAtLocal(x, y, false);
+    mDragFromChar = (mask & MASK_SHIFT) != 0 ? mAnchor : mDragToChar;
     placeCaret(mDragAt, (mask & MASK_SHIFT) != 0);
     mDragAnchor = mAnchor;
     mDesiredX   = -1.f;
@@ -4388,12 +4390,14 @@ bool ALTextView::handleHover(S32 x, S32 y, MASK mask)
         {
             setScrollY(mScrollY + row_h);
         }
-        const ALTextPos at = posAtLocal(x, y, true);
-        if (at == mDragAt)
+        const ALTextPos at        = posAtLocal(x, y, true);
+        const ALTextPos character = posAtLocal(x, y, false);
+        if (at == mDragAt && character == mDragToChar)
         {
             return true;
         }
-        mDragAt = at;
+        mDragAt     = at;
+        mDragToChar = character;
         placeSelection(mDragAnchor, at);
         mDesiredX = -1.f;
         if (mModal)

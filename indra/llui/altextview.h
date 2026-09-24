@@ -604,6 +604,15 @@ public:
     S32    bandHeight() const;
     // The position under a point of the view, on a cluster boundary.
     ALTextPos posAtLocal(S32 x, S32 y, bool round);
+    // A drag of the mouse under way -- from its press, or a shift-press
+    // from the anchor -- and the characters under its two ends: what a
+    // keymap whose caret stands on a character, not between two, takes a
+    // drag to reach, both ends included. The view's own selection runs
+    // between boundaries, and which half of a character the press fell on
+    // it rounds away.
+    bool      mouseDragging() const { return mSelecting; }
+    ALTextPos dragFromCharacter() const { return mDragFromChar; }
+    ALTextPos dragToCharacter() const { return mDragToChar; }
     // Comments the selected lines out with the grammar's line comment, or
     // back in where they all are. False without a grammar that has one.
     bool toggleComment();
@@ -854,6 +863,10 @@ private:
     // mouse is over another place than it was.
     ALTextPos    mDragAnchor;
     ALTextPos    mDragAt;
+    // The characters under the press and under the pointer, whichever half
+    // of each it is on.
+    ALTextPos    mDragFromChar;
+    ALTextPos    mDragToChar;
     LLFrameTimer mBlink;
     CaretStyle   mCaretStyle = CaretStyle::Line;
     bool         mCaretBlink = true;

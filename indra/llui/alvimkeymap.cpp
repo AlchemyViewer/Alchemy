@@ -442,10 +442,35 @@ void ALVimKeymap::mouseChanged(ALTextView& view)
         return;
     }
     const ALTextDocument& d = view.document();
-    if (view.hasSelection())
+    // A drag: from the character pressed to the character under the
+    // pointer, both included, as vim's own mouse has it -- a line's end
+    // its last character -- and drawn so; the same character at both
+    // ends is still a click.
+    const auto on_character = [&d](const ALTextPos& at) {
+        const ALTextPos last = lastCharOf(d, at.line);
+        return at.column > last.column ? last : at;
+    };
+    const ALTextPos from = on_character(d.clamp(view.dragFromCharacter()));
+    const ALTextPos to   = on_character(d.clamp(view.dragToCharacter()));
+    if (view.mouseDragging() && from != to)
     {
-        // A drag is a visual selection, charwise, the character under
-        // either end included as the view's selection reaches past it.
+        mVisualAnchor = from;
+        mVisualCaret  = to;
+        if (mMode == Mode::Normal || mMode == Mode::VisualBlock)
+        {
+            mMode = Mode::Visual;
+        }
+        showVisual(view);
+        mWantColumn = -1;
+        clearPending();
+        bump();
+        return;
+    }
+    if (view.hasSelection() && !view.mouseDragging())
+    {
+        // A word or a line taken by a double or a triple click, or a key
+        // the plain keymap took: charwise, the character under either end
+        // included as the view's selection reaches past it.
         const ALTextRange sel = view.selection();
         if (sel.end > sel.begin)
         {
@@ -484,8 +509,16 @@ void ALVimKeymap::mouseChanged(ALTextView& view)
                 editor->clearHighlights();
             }
         }
-        const ALTextPos last = lastCharOf(d, view.caret().line);
-        if (view.caret().column > last.column)
+        // The character pressed, whichever half of it, rather than the
+        // boundary nearest the press; past a line's end, its last.
+        if (view.mouseDragging())
+        {
+            if (view.caret() != from || view.hasSelection())
+            {
+                view.setCaret(from);
+            }
+        }
+        else if (const ALTextPos last = lastCharOf(d, view.caret().line); view.caret().column > last.column)
         {
             view.setCaret(last);
         }

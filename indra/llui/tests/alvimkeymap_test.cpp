@@ -172,11 +172,21 @@ namespace tut
             editor->handleHover(x + slide, y, MASK_NONE);
             editor->handleMouseUp(x + slide, y, MASK_NONE);
         }
-        void drag(S32 line, S32 column, S32 to_line, S32 to_column)
+        // From a character to a character, each at the left of its glyph,
+        // or at its right with `right_half`.
+        void drag(S32 line, S32 column, S32 to_line, S32 to_column, bool right_half = false)
         {
             S32 x, y, x2, y2;
             pointOf(line, column, x, y);
             pointOf(to_line, to_column, x2, y2);
+            if (right_half)
+            {
+                S32 next_x, next_y;
+                pointOf(line, column + 1, next_x, next_y);
+                x = next_x - 3;
+                pointOf(to_line, to_column + 1, next_x, next_y);
+                x2 = next_x - 3;
+            }
             editor->handleMouseDown(x, y, MASK_NONE);
             editor->handleHover(x2, y2, MASK_NONE);
             editor->handleMouseUp(x2, y2, MASK_NONE);
@@ -414,12 +424,12 @@ namespace tut
         click(0, 7);
         ensure_equals("past the end of a line lands on its last character", caretText(), std::string("0:6"));
         ensure("still normal", vim->mode() == ALVimKeymap::Mode::Normal);
-        drag(1, 0, 1, 5);
+        drag(1, 0, 1, 4);
         ensure("a drag is visual", vim->mode() == ALVimKeymap::Mode::Visual);
         keys("d");
         ensure_equals("and the operator takes what was dragged, up to where the drag stopped", flat(e.text()), std::string("one two| four|five six|"));
         ensure("back to normal", vim->mode() == ALVimKeymap::Mode::Normal);
-        drag(2, 4, 2, 0);
+        drag(2, 3, 2, 0);
         ensure("dragged backwards is visual too", vim->mode() == ALVimKeymap::Mode::Visual);
         keys("y");
         ensure_equals("yanked, as far as the drag reached", vim->registerText('"'), std::string("five"));
@@ -456,7 +466,7 @@ namespace tut
         // A selection the mouse made repeats the same way.
         e.setText("one two\nthree four\n");
         vim->handleKey(e, KEY_ESCAPE, MASK_NONE);
-        drag(0, 0, 0, 3);
+        drag(0, 0, 0, 2);
         keys("d");
         ensure_equals("the dragged three gone", flat(e.text()), std::string(" two|three four|"));
         keys("j0.");
@@ -1200,5 +1210,30 @@ namespace tut
         ensure("dragged on past the end is visual", vim->mode() == ALVimKeymap::Mode::Visual);
         keys("y");
         ensure_equals("to the last character", vim->registerText('"'), std::string("ree four"));
+    }
+
+    template<> template<>
+    void alvimkeymap_object::test<34>()
+    {
+        set_test_name("a drag reaches from the character pressed to the character under the pointer, both taken, whichever half of either the pointer is on");
+        make("hello world\n");
+        drag(0, 4, 0, 1);
+        keys("y");
+        ensure_equals("back from the left of the o: the o taken", vim->registerText('"'), std::string("ello"));
+        drag(0, 1, 0, 4, true);
+        keys("y");
+        ensure_equals("on from the right of the e: the e taken", vim->registerText('"'), std::string("ello"));
+        drag(0, 4, 0, 1, true);
+        keys("y");
+        ensure_equals("back from the right of the o, to the right of the e", vim->registerText('"'), std::string("ello"));
+        click(0, 4);
+        ensure("a click is on its character", vim->mode() == ALVimKeymap::Mode::Normal && caretText() == "0:4");
+        S32 x, y, next_x, next_y;
+        pointOf(0, 4, x, y);
+        pointOf(0, 5, next_x, next_y);
+        editor->handleMouseDown(next_x - 3, y, MASK_NONE);
+        editor->handleHover(next_x - 3, y, MASK_NONE);
+        editor->handleMouseUp(next_x - 3, y, MASK_NONE);
+        ensure("even on its right half", vim->mode() == ALVimKeymap::Mode::Normal && caretText() == "0:4" && !editor->hasSelection());
     }
 }
