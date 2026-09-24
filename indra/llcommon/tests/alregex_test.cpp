@@ -29,7 +29,9 @@
 
 #include "../test/lltut.h"
 
+#include <algorithm>
 #include <sstream>
+#include <vector>
 
 namespace tut
 {
@@ -229,9 +231,38 @@ namespace tut
     template<> template<>
     void alregex_object::test<9>()
     {
-        set_test_name("a regex written out is its pattern");
+        set_test_name("a regex written out is its pattern, and keeps its flags");
         std::ostringstream out;
         out << ALRegex("a|b", ALRegex::ICASE);
         ensure_equals("the pattern", out.str(), std::string("a|b"));
+        ensure_equals("the flags", ALRegex("a", ALRegex::ICASE | ALRegex::NO_DOT_NL).flags(), U32(ALRegex::ICASE | ALRegex::NO_DOT_NL));
+    }
+
+    template<> template<>
+    void alregex_object::test<10>()
+    {
+        set_test_name("a set says which of its patterns match anywhere in a text, in one pass, read as a regex reads them");
+        ALRegexSet set(ALRegex::ICASE);
+        ensure("an empty set is not made", !set.ok() && !set.compile());
+        ensure_equals("the first", set.add("https?://\\S+"), 0);
+        ensure_equals("the second", set.add("[0-9]+"), 1);
+        ensure_equals("the third", set.add("^b$"), 2);
+        std::string   error;
+        ensure_equals("one that does not compile is not added", set.add("x(?=y)", &error), -1);
+        ensure("and says why", !error.empty());
+        ensure_equals("three", set.size(), size_t(3));
+        std::vector<S32> hits;
+        ensure("not made, it cannot say", !set.match("123", hits) && hits.empty());
+
+        ensure("made", set.compile() && set.ok());
+        ensure("nothing is added after", set.add("z") == -1);
+        ensure("a pass", set.match("see HTTP://x.com at 10", hits));
+        std::sort(hits.begin(), hits.end());
+        ensure("the Url in any case, and the number", hits == std::vector<S32>{ 0, 1 });
+        ensure("^ and $ are a line's, as a regex's are", set.match("a\nb\nc", hits) && hits == std::vector<S32>{ 2 });
+        ensure("none, said", set.match("nothing", hits) && hits.empty());
+
+        ALRegexSet moved = std::move(set);
+        ensure("moved, it goes on", moved.ok() && moved.match("7", hits) && hits == std::vector<S32>{ 1 });
     }
 }

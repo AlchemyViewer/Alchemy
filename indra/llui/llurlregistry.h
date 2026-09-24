@@ -89,7 +89,16 @@ public:
     bool containsAgentMention(const std::string& text);
 
 private:
+    // The entries' patterns as one set, asked first which of them can
+    // match anywhere in a text at all
+    void buildUrlSet();
+
     std::vector<LLUrlEntryBase *> mUrlEntry;
+    ALRegexSet mUrlSet;
+    // Each entry's index in the set, in the order of mUrlEntry; -1 for one
+    // the set does not speak for, which is always tried
+    std::vector<S32> mUrlSetIndex;
+    bool mUrlSetBuilt = false;
     LLUrlEntryBase* mUrlEntryIcon;
     LLUrlEntryBase* mLLUrlEntryInvalidSLURL;
     LLUrlEntryBase* mUrlEntryHTTPLabel;

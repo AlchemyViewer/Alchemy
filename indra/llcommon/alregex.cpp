@@ -27,6 +27,7 @@
 #include "alregex.h"
 
 #include <re2/re2.h>
+#include <re2/set.h>
 
 #include <algorithm>
 #include <ostream>
@@ -34,13 +35,15 @@
 
 struct ALRegex::Impl
 {
-    Impl(std::string_view source, const std::string& program, const re2::RE2::Options& options)
+    Impl(std::string_view source, U32 flags, const std::string& program, const re2::RE2::Options& options)
     :   source(source),
+        flags(flags),
         re(program, options)
     {
     }
 
     std::string source;
+    U32         flags;
     re2::RE2    re;
 };
 
@@ -119,7 +122,7 @@ namespace
 }
 
 ALRegex::ALRegex(std::string_view pattern, U32 flags)
-:   mImpl(std::make_shared<const Impl>(pattern, programOf(pattern, flags), optionsOf(flags)))
+:   mImpl(std::make_shared<const Impl>(pattern, flags, programOf(pattern, flags), optionsOf(flags)))
 {
 }
 
@@ -136,6 +139,11 @@ const std::string& ALRegex::error() const
 const std::string& ALRegex::pattern() const
 {
     return mImpl ? mImpl->source : NO_PATTERN;
+}
+
+U32 ALRegex::flags() const
+{
+    return mImpl ? mImpl->flags : NONE;
 }
 
 S32 ALRegex::groups() const
@@ -274,4 +282,96 @@ std::string ALRegex::escape(std::string_view text)
 std::ostream& operator<<(std::ostream& out, const ALRegex& regex)
 {
     return out << regex.pattern();
+}
+
+// --- ALRegexSet --------------------------------------------------------------
+
+struct ALRegexSet::Impl
+{
+    explicit Impl(U32 flags)
+    :   flags(flags),
+        set(optionsOf(flags), re2::RE2::UNANCHORED)
+    {
+    }
+
+    U32           flags;
+    re2::RE2::Set set;
+    size_t        count    = 0;
+    bool          compiled = false;
+};
+
+ALRegexSet::ALRegexSet(U32 flags)
+:   mImpl(std::make_unique<Impl>(flags))
+{
+}
+
+ALRegexSet::~ALRegexSet() = default;
+ALRegexSet::ALRegexSet(ALRegexSet&& other) noexcept = default;
+ALRegexSet& ALRegexSet::operator=(ALRegexSet&& other) noexcept = default;
+
+S32 ALRegexSet::add(std::string_view pattern, std::string* error)
+{
+    if (!mImpl || mImpl->compiled)
+    {
+        if (error)
+        {
+            *error = "the set is compiled";
+        }
+        return -1;
+    }
+    std::string why;
+    const int   index = mImpl->set.Add(programOf(pattern, mImpl->flags), &why);
+    if (index < 0)
+    {
+        if (error)
+        {
+            *error = why;
+        }
+        return -1;
+    }
+    ++mImpl->count;
+    return index;
+}
+
+bool ALRegexSet::compile()
+{
+    if (!mImpl || mImpl->compiled || mImpl->count == 0)
+    {
+        return false;
+    }
+    mImpl->compiled = mImpl->set.Compile();
+    return mImpl->compiled;
+}
+
+bool ALRegexSet::ok() const
+{
+    return mImpl && mImpl->compiled;
+}
+
+U32 ALRegexSet::flags() const
+{
+    return mImpl ? mImpl->flags : ALRegex::NONE;
+}
+
+size_t ALRegexSet::size() const
+{
+    return mImpl ? mImpl->count : 0;
+}
+
+bool ALRegexSet::match(std::string_view text, std::vector<S32>& hits) const
+{
+    static_assert(std::is_same_v<S32, int>, "RE2 gives the set's hits as ints");
+    hits.clear();
+    if (!ok())
+    {
+        return false;
+    }
+    // A miss says why: none matched, or the pass could not be made.
+    re2::RE2::Set::ErrorInfo info{ re2::RE2::Set::kNoError };
+    if (!mImpl->set.Match(text.data() ? text : std::string_view("", 0), &hits, &info) && info.kind != re2::RE2::Set::kNoError)
+    {
+        hits.clear();
+        return false;
+    }
+    return true;
 }

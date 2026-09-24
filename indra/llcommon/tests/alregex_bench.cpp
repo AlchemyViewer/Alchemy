@@ -223,7 +223,56 @@ namespace
                 }
             }
         });
+        // The same, with the patterns first looked for all at once: only
+        // those the set says match somewhere in the rest are searched.
+        ALRegexSet set(ALRegex::ICASE);
+        for (const ALRegex& pattern : re2_patterns)
+        {
+            set.add(pattern.pattern());
+        }
+        set.compile();
+        const double re2_set_ns = time_per_item(lines, [&] {
+            std::vector<S32>  hits;
+            std::vector<bool> hit(re2_patterns.size());
+            for (const char* line : CHAT_WITH_URLS)
+            {
+                const std::string text(line);
+                size_t            at = 0;
+                while (at < text.size())
+                {
+                    const std::string_view rest(text.data() + at, text.size() - at);
+                    const bool             known = set.match(rest, hits);
+                    if (known && hits.empty())
+                    {
+                        break;
+                    }
+                    std::fill(hit.begin(), hit.end(), !known);
+                    for (const S32 i : hits)
+                    {
+                        hit[static_cast<size_t>(i)] = true;
+                    }
+                    size_t       first = std::string::npos, last = 0;
+                    ALRegexMatch found;
+                    for (size_t i = 0; i < re2_patterns.size(); ++i)
+                    {
+                        if (hit[i] && re2_patterns[i].search(rest, &found, 0, false, static_cast<S32>(groups[i])) && found.matched(groups[i]) &&
+                            found.begin(groups[i]) < first)
+                        {
+                            first = found.begin(groups[i]);
+                            last  = found.end(groups[i]);
+                        }
+                    }
+                    if (first == std::string::npos)
+                    {
+                        break;
+                    }
+                    g_sink = g_sink + first;
+                    at += std::max<size_t>(last, 1);
+                }
+            }
+        });
         row("31 patterns, earliest match, repeated", boost_ns, re2_ns);
+        row("the same, the set asked first (re2)", boost_ns, re2_set_ns);
     }
 
     // --- RLVa's hidden names ----------------------------------------------

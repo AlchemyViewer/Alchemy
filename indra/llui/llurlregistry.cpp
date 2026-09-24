@@ -28,6 +28,8 @@
 #include "linden_common.h"
 #include "llurlregistry.h"
 
+#include <algorithm>
+
 
 // default dummy callback that ignores any label updates from the server
 void LLUrlRegistryNullCallback(const std::string &url, const std::string &label, const std::string& icon)
@@ -88,6 +90,8 @@ LLUrlRegistry::LLUrlRegistry()
     registerUrl(mUrlEntrySLLabel);
     registerUrl(new LLUrlEntryEmail());
     registerUrl(new LLUrlEntryIPv6());
+
+    buildUrlSet();
 }
 
 LLUrlRegistry::~LLUrlRegistry()
@@ -108,6 +112,34 @@ void LLUrlRegistry::registerUrl(LLUrlEntryBase *url, bool force_front)
             mUrlEntry.insert(mUrlEntry.begin(), url);
         else
         mUrlEntry.push_back(url);
+
+        // one registered once the registry is made makes the set again
+        if (mUrlSetBuilt)
+        {
+            buildUrlSet();
+        }
+    }
+}
+
+void LLUrlRegistry::buildUrlSet()
+{
+    // Every entry's pattern that reads as the set's do; any other entry is
+    // tried whatever the set says. A set that cannot be made says nothing,
+    // and every entry is tried, as each was before there was one.
+    mUrlSetBuilt = true;
+    mUrlSet      = ALRegexSet(ALRegex::ICASE);
+    mUrlSetIndex.assign(mUrlEntry.size(), -1);
+    for (size_t i = 0; i < mUrlEntry.size(); ++i)
+    {
+        const ALRegex& pattern = mUrlEntry[i]->getPattern();
+        if (pattern.ok() && pattern.flags() == mUrlSet.flags())
+        {
+            mUrlSetIndex[i] = mUrlSet.add(pattern.pattern());
+        }
+    }
+    if (!mUrlSet.compile())
+    {
+        LL_WARNS() << "The Url patterns could not be made one set; each is tried in turn" << LL_ENDL;
     }
 }
 
@@ -233,6 +265,15 @@ bool LLUrlRegistry::findUrl(const std::string &text, LLUrlMatch &match, const LL
         return false;
     }
 
+    // which entries' patterns match anywhere in the text, in one pass,
+    // where the set can say: the others cannot match, and are passed over
+    std::vector<S32> could_match;
+    const bool       set_says = !skip_non_mentions && mUrlSet.match(text, could_match);
+    if (set_says)
+    {
+        std::sort(could_match.begin(), could_match.end());
+    }
+
     // find the first matching regex from all url entries in the registry
     U32 match_start = 0, match_end = 0;
     LLUrlEntryBase *match_entry = NULL;
@@ -240,6 +281,12 @@ bool LLUrlRegistry::findUrl(const std::string &text, LLUrlMatch &match, const LL
     std::vector<LLUrlEntryBase *>::iterator it;
     for (it = mUrlEntry.begin(); it != mUrlEntry.end(); ++it)
     {
+        const S32 set_index = mUrlSetIndex[it - mUrlEntry.begin()];
+        if (set_says && set_index >= 0 && !std::binary_search(could_match.begin(), could_match.end(), set_index))
+        {
+            continue;
+        }
+
         //Skip for url entry icon if content is not trusted
         if((mUrlEntryIcon == *it) && ((text.find("Hand") != std::string::npos) || !is_content_trusted))
         {

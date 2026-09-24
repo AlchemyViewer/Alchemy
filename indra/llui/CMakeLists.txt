@@ -522,6 +522,7 @@ if(AL_BUILD_TESTS)
     alxuiservice
     aloutputview
     alchoicelist
+    llurlregistry
   )
     al_add_test(
       ${test}

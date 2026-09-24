@@ -107,8 +107,9 @@ public:
     // Whether the pattern compiled, and if not, why.
     bool               ok() const;
     const std::string& error() const;
-    // The pattern as it was given.
+    // The pattern as it was given, and the flags it was given with.
     const std::string& pattern() const;
+    U32                flags() const;
     // How many capturing groups it has.
     S32                groups() const;
 
@@ -148,6 +149,39 @@ private:
 };
 
 LL_COMMON_API std::ostream& operator<<(std::ostream& out, const ALRegex& regex);
+
+// Many patterns looked for at once: which of them match somewhere in a
+// text, found in one pass over it rather than one for each. The patterns
+// share their flags, which are ALRegex's and read as they do there. Where
+// a pass would take more memory than RE2 allows it the set cannot say,
+// and then any of them may match.
+class LL_COMMON_API ALRegexSet
+{
+public:
+    explicit ALRegexSet(U32 flags = ALRegex::NONE);
+    ~ALRegexSet();
+    ALRegexSet(ALRegexSet&& other) noexcept;
+    ALRegexSet& operator=(ALRegexSet&& other) noexcept;
+
+    // The pattern's index, counting from 0 in the order they are added,
+    // or -1 where it does not compile, and error says why. Nothing is
+    // added once the set is compiled.
+    S32  add(std::string_view pattern, std::string* error = nullptr);
+    // Makes the patterns added one set; false where RE2 could not.
+    bool compile();
+    bool ok() const;
+    U32  flags() const;
+    size_t size() const;
+
+    // The indices of the patterns that match somewhere in the text, in no
+    // order. False where the set cannot say, not compiled or out of the
+    // memory it may use, and then hits is empty and any may match.
+    bool match(std::string_view text, std::vector<S32>& hits) const;
+
+private:
+    struct Impl;
+    std::unique_ptr<Impl> mImpl;
+};
 
 template <typename F>
 size_t ALRegex::forEach(std::string_view text, F&& fn, S32 wanted) const
