@@ -34,19 +34,25 @@
 #include "llviewerobject.h"
 #include "llviewerobjectlist.h"
 
-#include <filesystem>
+#include <algorithm>
 #include <functional>
 
 namespace
 {
     // How long what is in reach of a script is kept before it is looked
-    // for again; how many files of one folder are read; and how long a
-    // module may be, which is how long a script may be.
-    constexpr F64    HOLD_SECONDS     = 5.0;
-    constexpr size_t FOLDER_FILES     = 128;
-    constexpr size_t MODULE_BYTES     = 262144;
-    // How many scripts' reach are kept at once.
-    constexpr size_t SCRIPTS_KEPT     = 32;
+    // for again, and how many scripts' reach at once; how long a module
+    // may be, which is how long a script may be.
+    constexpr F64    HOLD_SECONDS  = 5.0;
+    constexpr size_t SCRIPTS_KEPT  = 32;
+    constexpr size_t MODULE_BYTES  = 262144;
+    // How far a folder is looked through: how many folders down a module
+    // may be, how many of its entries are looked at, and how many modules
+    // taken from it. Enough
+    // for a library laid out in folders, and not a walk of whatever a
+    // scripter's include folder happens to hold -- a home folder, say.
+    constexpr S32    FOLDER_DEPTH   = 3;
+    constexpr size_t FOLDER_ENTRIES = 4096;
+    constexpr size_t FOLDER_FILES   = 256;
 
     const char* const DISK_PREFIX = "disk:";
 
@@ -108,6 +114,11 @@ namespace
         const std::filesystem::path real = std::filesystem::canonical(fsyspath(path.substr(strlen(DISK_PREFIX))), ec);
         return ec ? path : DISK_PREFIX + fsyspath(real).string();
     }
+
+    bool contains(const std::vector<std::string>& list, const std::string& word)
+    {
+        return std::find(list.begin(), list.end(), word) != list.end();
+    }
 }
 
 // static
@@ -128,7 +139,61 @@ const std::vector<std::string>& ALScriptModules::exportsOf(const std::string& pa
     return read.exports;
 }
 
-const std::vector<ALScriptModules::Module>& ALScriptModules::inReach(const ALScriptPreprocessor::Request& request, const open_t& open)
+const std::vector<std::string>* ALScriptModules::fileExports(const std::string& file, bool lua)
+{
+    std::error_code             ec;
+    const std::filesystem::path path = fsyspath(file);
+    const auto                  time = std::filesystem::last_write_time(path, ec);
+    const std::uintmax_t        size = ec ? 0 : std::filesystem::file_size(path, ec);
+    if (ec || size > MODULE_BYTES)
+    {
+        return nullptr;
+    }
+    OnDisk& on = mOnDisk[(lua ? "lua:" : "lsl:") + file];
+    if (on.time != time || on.size != size)
+    {
+        std::string text;
+        on.time     = time;
+        on.size     = size;
+        on.readable = ALDiskIncludes::readOrdinary(file, text) && text.size() <= MODULE_BYTES;
+        on.exports  = on.readable ? (lua ? ALLuauExports::of(text) : ALLSLExports::of(text)) : std::vector<std::string>();
+    }
+    return on.readable ? &on.exports : nullptr;
+}
+
+void ALScriptModules::listFolder(const std::string& prefix, const std::string& folder, const ALDiskIncludes& blessed, bool lua,
+                                 std::vector<Candidate>& found, boost::unordered_flat_map<std::string, size_t, ll::string_hash, std::equal_to<>>& at)
+{
+    const std::vector<const char*>& wanted = extensionsOf(lua);
+    const std::vector<std::string>  extensions(wanted.begin(), wanted.end());
+    for (const ALDiskIncludes::Listed& listed : blessed.filesUnder(folder, extensions, FOLDER_DEPTH, FOLDER_ENTRIES, FOLDER_FILES))
+    {
+        // By its path from the folder: a require without its extension, an
+        // include as it is named.
+        const std::string under = prefix + (lua ? stemOf(listed.relative, true) : listed.relative);
+        const std::string path  = DISK_PREFIX + listed.file;
+        // Found already -- open, or under another folder -- another name
+        // for it; the script itself, none.
+        if (const auto had = at.find(path); had != at.end())
+        {
+            if (had->second < found.size() && !contains(found[had->second].names, under))
+            {
+                found[had->second].names.push_back(under);
+            }
+            continue;
+        }
+        const std::vector<std::string>* exports = fileExports(listed.file, lua);
+        if (!exports)
+        {
+            continue;
+        }
+        const size_t slash = listed.relative.find_last_of('/');
+        at[path]           = found.size();
+        found.push_back({ path, slash == std::string::npos ? listed.relative : listed.relative.substr(slash + 1), { under }, *exports });
+    }
+}
+
+ALScriptModules::Reach& ALScriptModules::reachOf(const ALScriptPreprocessor::Request& request, const open_t& open)
 {
     const bool        lua  = request.lua;
     const std::string self = sameFile(request.path.empty() ? ALScriptPreprocessor::pathOf(request.ref) : request.path);
@@ -141,29 +206,23 @@ const std::vector<ALScriptModules::Module>& ALScriptModules::inReach(const ALScr
     Reach& reach = mReach[kept];
     if (reach.at > 0.0 && now - reach.at < HOLD_SECONDS)
     {
-        return reach.modules;
+        return reach;
     }
     reach.at = now;
-    reach.modules.clear();
+    reach.candidates.clear();
+    reach.named.clear();
 
     // Everything that could be a module, each once: what is open first,
     // since it is what the module is becoming; then what the cache holds;
-    // then the files of the folders a require reads, each with the names
-    // those folders give it.
-    struct Found
-    {
-        std::string              path;
-        std::string              name;
-        std::string              text;
-        std::vector<std::string> names;
-    };
-    std::vector<Found>                                                               found;
+    // then the files of the folders a require or an include reads.
+    std::vector<Candidate>&                                                           found = reach.candidates;
     boost::unordered_flat_map<std::string, size_t, ll::string_hash, std::equal_to<>> at;
     at[self] = std::string::npos;
-    const auto add = [&found, &at](std::string path, std::string name, std::string text) {
+    const auto add = [this, &found, &at, lua](std::string path, std::string name, const std::string& text) {
         if (at.emplace(path, found.size()).second)
         {
-            found.push_back({ std::move(path), std::move(name), std::move(text), {} });
+            std::vector<std::string> exports = exportsOf(path, text, lua);
+            found.push_back({ std::move(path), std::move(name), {}, std::move(exports) });
         }
     };
     for (const Open& one : open())
@@ -181,7 +240,7 @@ const std::vector<ALScriptModules::Module>& ALScriptModules::inReach(const ALScr
         std::string       text;
         if (!name.empty() && preprocessor.heldText(path, text) && text.size() <= MODULE_BYTES)
         {
-            add(path, name, std::move(text));
+            add(path, name, text);
         }
     }
     const std::vector<std::pair<std::string, std::string>> folders = preprocessor.moduleFolders(request);
@@ -192,81 +251,81 @@ const std::vector<ALScriptModules::Module>& ALScriptModules::inReach(const ALScr
     }
     for (const auto& [prefix, folder] : folders)
     {
-        size_t taken = 0;
-        for (const std::string& file : gDirUtilp->getFilesInDir(folder))
-        {
-            const std::vector<const char*>& extensions = extensionsOf(lua);
-            if (taken >= FOLDER_FILES ||
-                std::none_of(extensions.begin(), extensions.end(), [&file](const char* extension) { return endsWith(file, extension); }))
-            {
-                continue;
-            }
-            const std::optional<std::string> real = blessed.admits(gDirUtilp->add(folder, file));
-            if (!real)
-            {
-                continue;
-            }
-            ++taken;
-            // A require without its extension; an include as it is named.
-            const std::string path  = DISK_PREFIX + *real;
-            const std::string under = prefix + (lua ? stemOf(file, true) : file);
-            // Found already -- open, or under another folder -- another
-            // name for it; the script itself, none.
-            if (const auto seen = at.find(path); seen != at.end())
-            {
-                if (seen->second < found.size())
-                {
-                    found[seen->second].names.push_back(under);
-                }
-                continue;
-            }
-            std::string text;
-            if (!ALDiskIncludes::readOrdinary(*real, text) || text.size() > MODULE_BYTES)
-            {
-                continue;
-            }
-            add(path, file, std::move(text));
-            found.back().names.push_back(under);
-        }
+        listFolder(prefix, folder, blessed, lua, found, at);
     }
 
-    // Each by the first of its names a require or an include from the
-    // script resolves to it: those its folders give it, its own, its own
-    // without its extension, and its own under each alias a SLua
-    // configuration names.
+    // The names each might be found by, after those its folders give it:
+    // its own, its own without its extension, and its own under each alias
+    // a SLua configuration names.
     ALLuauConfig config;
     if (lua)
     {
         preprocessor.configOf(request, config);
     }
-    for (Found& one : found)
+    for (Candidate& one : found)
     {
-        const std::string        stem  = stemOf(one.name, lua);
-        std::vector<std::string> names = one.names;
-        names.push_back(one.name);
-        names.push_back(stem);
+        const std::string stem = stemOf(one.name, lua);
+        for (const std::string& name : { one.name, stem })
+        {
+            if (!name.empty() && !contains(one.names, name))
+            {
+                one.names.push_back(name);
+            }
+        }
         for (const auto& [alias, folder] : config.aliases)
         {
-            names.push_back("@" + alias + "/" + stem);
-        }
-        for (const std::string& name : names)
-        {
-            ALPreprocessor::Ask ask;
-            ask.name    = name;
-            ask.require = lua;
-            ALPreprocessor::Include include;
-            if (name.empty() || preprocessor.lookUp(request, ask, include) != ALPreprocessor::Found::Yes || sameFile(include.path) != one.path)
+            const std::string under = "@" + alias + "/" + stem;
+            if (!contains(one.names, under))
             {
-                continue;
+                one.names.push_back(under);
             }
-            Module module;
-            module.path    = one.path;
-            module.name    = stem;
-            module.require = name;
-            module.exports = exportsOf(one.path, one.text, lua);
-            reach.modules.push_back(std::move(module));
-            break;
+        }
+        one.name = stem;
+    }
+    return reach;
+}
+
+std::string ALScriptModules::nameOf(const ALScriptPreprocessor::Request& request, const Candidate& candidate)
+{
+    // The first a require or an include from the script resolves to this
+    // very module.
+    ALScriptPreprocessor& preprocessor = ALScriptPreprocessor::instance();
+    for (const std::string& name : candidate.names)
+    {
+        ALPreprocessor::Ask ask;
+        ask.name    = name;
+        ask.require = request.lua;
+        ALPreprocessor::Include include;
+        if (preprocessor.lookUp(request, ask, include) == ALPreprocessor::Found::Yes && sameFile(include.path) == candidate.path)
+        {
+            return name;
         }
     }
-    return reach.modules;
+    return std::string();
+}
+
+std::vector<ALScriptModules::Module> ALScriptModules::giving(const ALScriptPreprocessor::Request& request, const open_t& open,
+                                                             const std::vector<std::string>& names)
+{
+    Reach&              reach = reachOf(request, open);
+    std::vector<Module> out;
+    for (const Candidate& candidate : reach.candidates)
+    {
+        const bool named = request.lua && contains(names, candidate.name);
+        const bool gives = std::any_of(names.begin(), names.end(), [&candidate](const std::string& name) { return contains(candidate.exports, name); });
+        if (!named && !gives)
+        {
+            continue;
+        }
+        auto known = reach.named.find(candidate.path);
+        if (known == reach.named.end())
+        {
+            known = reach.named.emplace(candidate.path, nameOf(request, candidate)).first;
+        }
+        if (!known->second.empty())
+        {
+            out.push_back({ candidate.path, candidate.name, known->second, candidate.exports });
+        }
+    }
+    return out;
 }

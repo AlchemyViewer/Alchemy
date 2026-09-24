@@ -5341,7 +5341,17 @@ void ALFloaterScriptStudio::offerImports(Doc& doc)
             ALScriptFixes::offerInclude(problem, text, module);
         }
     };
-    const std::vector<ALScriptModules::Module>* modules = nullptr;
+    // What the index knows of the names asked for: each module so named,
+    // or that exports or declares one of them.
+    std::vector<std::string> names;
+    for (const ALScriptProblem& problem : doc.analysis)
+    {
+        if (unknown(problem) && std::find(names.begin(), names.end(), problem.args[0]) == names.end())
+        {
+            names.push_back(problem.args[0]);
+        }
+    }
+    const std::vector<ALScriptModules::Module> modules = ALScriptModules::instance().giving(request, open, names);
     for (ALScriptProblem& problem : doc.analysis)
     {
         if (!unknown(problem))
@@ -5367,11 +5377,7 @@ void ALFloaterScriptStudio::offerImports(Doc& doc)
         }
         // Then what the index knows: a module so named under another name,
         // and each that exports or declares the name.
-        if (!modules)
-        {
-            modules = &ALScriptModules::instance().inReach(request, open);
-        }
-        for (const ALScriptModules::Module& module : *modules)
+        for (const ALScriptModules::Module& module : modules)
         {
             if (problem.fixes.size() - before >= 4)
             {
