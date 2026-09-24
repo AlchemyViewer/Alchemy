@@ -1101,6 +1101,10 @@ private:
     // dropped on it: into the prim the row is of, as into the build
     // floater's contents.
     void dropOnExplorer(const LLSD& row, MASK mask, bool drop, EDragAndDropType type, void* cargo, EAcceptance* accept);
+    // Where a drop on the explorer's empty space goes: the prim of what is
+    // chosen in it, where all of that is of one; the object selected in
+    // world where nothing is. Nowhere, where either is more than one.
+    LLViewerObject* explorerDropTarget() const;
     // Every command the menus hold, to give one by name.
     void showCommandPalette();
     // One field for going anywhere, as Visual Studio Code's: a script by

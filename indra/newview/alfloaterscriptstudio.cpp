@@ -13992,16 +13992,47 @@ bool ALFloaterScriptStudio::startExplorerDrag(const LLSD& pressed)
     return true;
 }
 
+LLViewerObject* ALFloaterScriptStudio::explorerDropTarget() const
+{
+    // What is chosen in the list, where all of it is of one prim.
+    LLUUID chosen;
+    for (const ExplorerRow& row : explorerChoice())
+    {
+        if (chosen.notNull() && row.prim != chosen)
+        {
+            return nullptr;
+        }
+        chosen = row.prim;
+    }
+    if (chosen.notNull())
+    {
+        return gObjectList.findObject(chosen);
+    }
+    // Nothing chosen: the object selected in world, as the build floater's
+    // contents are of it -- one object, or one prim of one.
+    LLObjectSelectionHandle selection = LLSelectMgr::getInstance()->getSelection();
+    LLSelectNode*           node      = selection->getFirstRootNode(nullptr, true);
+    if (!node || !node->mValid || (selection->getRootObjectCount() != 1 && selection->getObjectCount() != 1))
+    {
+        return nullptr;
+    }
+    return node->getObject();
+}
+
 void ALFloaterScriptStudio::dropOnExplorer(const LLSD& row, MASK mask, bool drop, EDragAndDropType type, void* cargo, EAcceptance* accept)
 {
     // Into the prim the row is of: an item's, a prim's own, an object's
     // root, which is where a drop on the object in world goes too.
     *accept = ACCEPT_NO;
-    if (!row.isMap())
+    LLViewerObject* prim = nullptr;
+    if (row.isMap())
     {
-        return;
+        prim = gObjectList.findObject(row.has("prim") ? row["prim"].asUUID() : row["root"].asUUID());
     }
-    LLViewerObject* prim = gObjectList.findObject(row.has("prim") ? row["prim"].asUUID() : row["root"].asUUID());
+    else
+    {
+        prim = explorerDropTarget();
+    }
     if (!prim)
     {
         return;
