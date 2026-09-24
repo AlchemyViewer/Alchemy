@@ -125,7 +125,6 @@
     <floater.string name="TransferRefused">Not taken: [REFUSED].</floater.string>
     <floater.string name="TransferLost">Never came through: [LOST]; look in your trash, in Passed between objects.</floater.string>
     <floater.string name="ExperienceNone">No experience</floater.string>
-    <floater.string name="ExperienceProfile">Its profile...</floater.string>
     <floater.string name="ExperienceLoading">loading...</floater.string>
     <floater.string name="ExperienceAsking">Experience: asking...</floater.string>
     <floater.string name="ExperienceUnknown">Experience: not known</floater.string>
@@ -1409,11 +1408,22 @@
                      height="20"
                      layout="topleft"
                      name="experience"
-                     right="-290"
-                     tool_tip="The experience the script runs under, which its experience functions need: none, one of your own, or the one it has. Picked here, it is set when the script is saved; its profile is at the end of the list."
+                     right="-314"
+                     tool_tip="The experience the script runs under, which its experience functions need: none, one you contribute to, or the one it has. Picked here, it is set when the script is saved."
                      top="2"
                      visible="false"
                      width="150" />
+                    <button
+                     follows="right|top"
+                     height="20"
+                     image_overlay="Info_Small"
+                     layout="topleft"
+                     name="experience_profile"
+                     right="-290"
+                     tool_tip="The profile of the experience the script runs under"
+                     top="2"
+                     visible="false"
+                     width="20" />
                     <button
                      follows="right|top"
                      height="20"

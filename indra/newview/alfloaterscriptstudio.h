@@ -1847,6 +1847,7 @@ private:
     LLComboBox*                        mCompileTarget = nullptr;
     LLCheckBoxCtrl*                    mRunning       = nullptr;
     LLComboBox*                        mExperience    = nullptr;
+    LLButton*                          mExperienceProfile = nullptr;
     // What the experience list was last made of, so that it is made again
     // only when that changes; and the experiences whose names are asked.
     std::string                        mExperienceMadeOf;

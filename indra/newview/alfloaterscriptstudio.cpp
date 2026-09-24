@@ -705,6 +705,7 @@ bool ALFloaterScriptStudio::postBuild()
     mCompileTarget = getChild<LLComboBox>("compile_target");
     mRunning       = getChild<LLCheckBoxCtrl>("running");
     mExperience    = getChild<LLComboBox>("experience");
+    mExperienceProfile = getChild<LLButton>("experience_profile");
     mResetButton   = getChild<LLButton>("reset_btn");
     mSaveButton    = getChild<LLButton>("save_btn");
     mSaveAllButton = getChild<LLButton>("save_all_btn");
@@ -990,6 +991,12 @@ bool ALFloaterScriptStudio::postBuild()
     mCompileTarget->setCommitCallback(boost::bind(&ALFloaterScriptStudio::onCompileTarget, this));
     mRunning->setCommitCallback(boost::bind(&ALFloaterScriptStudio::onRunning, this));
     mExperience->setCommitCallback(boost::bind(&ALFloaterScriptStudio::onExperience, this));
+    mExperienceProfile->setCommitCallback([this](LLUICtrl*, const LLSD&) {
+        if (const Doc* doc = active(); doc && doc->experience.notNull())
+        {
+            LLFloaterReg::showInstance("experience_profile", doc->experience, true);
+        }
+    });
     mResetButton->setCommitCallback(boost::bind(&ALFloaterScriptStudio::onReset, this));
     mSaveButton->setCommitCallback([this](LLUICtrl*, const LLSD&) {
         if (Doc* doc = active())
@@ -16212,6 +16219,8 @@ void ALFloaterScriptStudio::refreshExperience()
     const std::vector<LLUUID>& own   = ALScriptWorkspace::instance().ownExperiences();
     const bool                 shown = task && (doc->experience.notNull() || !own.empty());
     mExperience->setVisible(shown);
+    // Its profile beside it, where it has one.
+    mExperienceProfile->setVisible(shown && doc->experience.notNull());
     if (!shown)
     {
         mExperienceMadeOf.clear();
@@ -16280,11 +16289,6 @@ void ALFloaterScriptStudio::refreshExperience()
     {
         mExperience->add(label, LLSD(id.asString()), ADD_BOTTOM, doc->modifiable || id == doc->experience);
     }
-    if (doc->experience.notNull())
-    {
-        mExperience->addSeparator();
-        mExperience->add(getString("ExperienceProfile"), LLSD("profile"));
-    }
     mExperience->setValue(LLSD(current));
     mExperience->setEnabled(true);
 }
@@ -16298,16 +16302,6 @@ void ALFloaterScriptStudio::onExperience()
     }
     const std::string value   = mExperience->getValue().asString();
     const std::string current = doc->experience.isNull() ? std::string("none") : doc->experience.asString();
-    if (value == "profile")
-    {
-        // Not a choice: the profile shown, and the choice as it was.
-        mExperience->setValue(LLSD(current));
-        if (doc->experience.notNull())
-        {
-            LLFloaterReg::showInstance("experience_profile", doc->experience, true);
-        }
-        return;
-    }
     const LLUUID picked = value == "none" ? LLUUID::null : LLUUID(value);
     if (value == "unknown" || picked == doc->experience || !doc->modifiable)
     {
