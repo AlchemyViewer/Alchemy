@@ -156,14 +156,76 @@ LLTextParser::LLTextParser()
 :   mLoaded(false)
 {}
 
+void LLTextParser::buildSets() const
+{
+    llassert(on_main_thread());
+    mSetsDirty = false;
+    // A condition is an anchor: the keyword at the text's start, at its end,
+    // or both, which ^ and $ are with the text read as one line
+    mCaseSet    = ALRegexSet(ALRegex::NO_MULTILINE);
+    mAnyCaseSet = ALRegexSet(ALRegex::NO_MULTILINE | ALRegex::ICASE);
+    mCaseEntries.clear();
+    mAnyCaseEntries.clear();
+    mAlwaysTried.assign(mHighlightEntries.size(), false);
+    for (size_t i = 0; i < mHighlightEntries.size(); ++i)
+    {
+        const LLHighlightEntry& entry = mHighlightEntries[i];
+        // An entry with no keyword holds nowhere
+        if (entry.mPattern.empty())
+            continue;
+
+        std::string pattern = ALRegex::escape(entry.mPattern);
+        if ((entry.mCondition == LLHighlightEntry::STARTS_WITH) || (entry.mCondition == LLHighlightEntry::MATCHES))
+            pattern.insert(0, "^");
+        if ((entry.mCondition == LLHighlightEntry::ENDS_WITH) || (entry.mCondition == LLHighlightEntry::MATCHES))
+            pattern += "$";
+
+        ALRegexSet& set = (entry.mCaseSensitive) ? mCaseSet : mAnyCaseSet;
+        if (set.add(pattern) >= 0)
+            ((entry.mCaseSensitive) ? mCaseEntries : mAnyCaseEntries).push_back(i);
+        else
+            mAlwaysTried[i] = true;
+    }
+    if ( ((!mCaseEntries.empty()) && (!mCaseSet.compile())) || ((!mAnyCaseEntries.empty()) && (!mAnyCaseSet.compile())) )
+        LL_WARNS() << "The highlight keywords could not be made one set; each is looked for in turn" << LL_ENDL;
+}
+
+bool LLTextParser::mayHold(const std::string& text, std::vector<bool>& may) const
+{
+    if (mSetsDirty)
+        buildSets();
+
+    // A set with no keywords holds none; one that cannot say leaves any entry
+    // able to
+    std::vector<S32> case_hits, any_case_hits;
+    if ( ((!mCaseEntries.empty()) && (!mCaseSet.match(text, case_hits))) ||
+         ((!mAnyCaseEntries.empty()) && (!mAnyCaseSet.match(text, any_case_hits))) )
+    {
+        return false;
+    }
+
+    may = mAlwaysTried;
+    for (const S32 hit : case_hits)
+        may[mCaseEntries[hit]] = true;
+    for (const S32 hit : any_case_hits)
+        may[mAnyCaseEntries[hit]] = true;
+    return true;
+}
+
 LLTextParser::parser_out_vec_t LLTextParser::parsePartialLineHighlights(const std::string& text, S32 cat_mask, EHighlightPosition part, S32 index)
 {
     parser_out_vec_t result;
+
+    // Only the entries the text can hold are looked for in it
+    std::vector<bool> may;
+    const bool        sets_say = mayHold(text, may);
 
     for (S32 i = index, size = static_cast<S32>(mHighlightEntries.size()); i < size; i++)
     {
         const LLHighlightEntry& entry = mHighlightEntries[i];
         if ((entry.mHighlightType != LLHighlightEntry::PART) || (entry.mCondition == LLHighlightEntry::MATCHES))
+            continue;
+        if ((sets_say) && (!may[i]))
             continue;
 
         if (!((entry.mCondition == LLHighlightEntry::STARTS_WITH && part == START) ||
@@ -225,8 +287,15 @@ LLTextParser::parser_out_vec_t LLTextParser::parsePartialLineHighlights(const st
 
 bool LLTextParser::parseFullLineHighlights(const std::string& text, S32 cat_mask, const LLHighlightEntry** ppEntry) const
 {
-    for (const LLHighlightEntry& entry : mHighlightEntries)
+    // Only the entries the text can hold are looked for in it
+    std::vector<bool> may;
+    const bool        sets_say = mayHold(text, may);
+
+    for (size_t i = 0; i < mHighlightEntries.size(); ++i)
     {
+        const LLHighlightEntry& entry = mHighlightEntries[i];
+        if ((sets_say) && (!may[i]))
+            continue;
         if ((entry.mHighlightType == LLHighlightEntry::ALL) || (entry.mCondition == LLHighlightEntry::MATCHES))
         {
             if (entry.findPattern(text, cat_mask) >= 0)
@@ -265,6 +334,7 @@ bool LLTextParser::loadKeywords()
     }
 
     mHighlightEntries.clear();
+    mSetsDirty = true;
 
     LLSD sdIn;
     if (LLSDSerialize::fromXML(sdIn, fileHighlights) == LLSDParser::PARSE_FAILURE)
@@ -281,6 +351,7 @@ bool LLTextParser::loadKeywords()
         }
     }
 
+    mSetsDirty = true;
     mLoaded = true;
     return true;
 }
@@ -314,10 +385,13 @@ void LLTextParser::addHighlight(const LLHighlightEntry& entry)
     if (getHighlightById(entry.getId()) != nullptr)
         return;
     mHighlightEntries.push_back(entry);
+    mSetsDirty = true;
 }
 
 LLHighlightEntry* LLTextParser::getHighlightById(const LLUUID& idEntry)
 {
+    // What is handed out may be changed where it is
+    mSetsDirty = true;
     auto it = std::find_if(mHighlightEntries.begin(), mHighlightEntries.end(),
         [&idEntry](const LLHighlightEntry& e) { return e.getId() == idEntry; });
     return (it != mHighlightEntries.end()) ? &(*it) : nullptr;
@@ -340,5 +414,8 @@ void LLTextParser::removeHighlight(const LLUUID& idEntry)
     auto it = std::find_if(mHighlightEntries.begin(), mHighlightEntries.end(),
         [&idEntry](const LLHighlightEntry& e) { return e.getId() == idEntry; });
     if (it != mHighlightEntries.end())
+    {
         mHighlightEntries.erase(it);
+        mSetsDirty = true;
+    }
 }

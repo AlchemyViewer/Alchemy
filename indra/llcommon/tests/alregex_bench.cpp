@@ -41,6 +41,7 @@
 
 #include "alregex.h"
 
+#include <boost/algorithm/string/find.hpp>
 #include <boost/algorithm/string/regex.hpp>
 #include <boost/regex.hpp>
 
@@ -614,6 +615,101 @@ namespace
         row("seven rules, anchored, first byte filtered", boost_ns, re2_filtered_ns);
     }
 
+    // --- chat highlights -----------------------------------------------------
+
+    // Keywords a resident highlights: their names, friends', words they
+    // want to see.
+    const char* const KEYWORDS[] = {
+        "rye",      "alchemy", "linden",  "sandbox", "party",    "sale",     "free",    "hunt",    "gacha",   "event",
+        "dj",       "live",    "contest", "prize",   "raffle",   "meeting",  "urgent",  "help",    "question", "update",
+        "bug",      "crash",   "release", "beta",    "viewer",   "mesh",     "texture", "script",  "lsl",     "luau",
+        "alice",    "bob",     "carol",   "dave",    "eve",      "frank",    "gina",    "hank",    "ivy",     "jack",
+        "kara",     "liam",    "mia",     "nate",    "olga",     "paul",     "quinn",   "rosa",    "sam",     "tara",
+    };
+
+    const char* const CHAT_LINES[] = {
+        "hey everyone, how is the sim tonight?",
+        "brb",
+        "I'll be right back, the cat is on the keyboard again and will not get off it",
+        "lol",
+        "has anyone seen the new hair at the fair? it is really nice, the blonde one especially",
+        "Alchemy has a new Beta out, the release notes are long",
+        "ty!",
+        "that build is gorgeous, how many prims is it? the windows are amazing",
+        "there is a party at the club, DJ starts at 9",
+        "meet me @ the club at 9",
+    };
+
+    // LLTextParser::parsePartialLineHighlights over CONTAINS entries, as it
+    // is and with the set asked first which keywords a piece holds: each
+    // piece is split at the first entry it holds, and the parts before and
+    // after are parsed on with the entries after it and from it.
+    size_t highlightPieces(const std::string& text, size_t first, size_t count, const ALRegexSet* set)
+    {
+        std::vector<S32> hits;
+        const bool       set_says = set && set->match(text, hits);
+        if (set_says && hits.empty())
+        {
+            return 1;
+        }
+        std::sort(hits.begin(), hits.end());
+        for (size_t i = first; i < count; ++i)
+        {
+            if (set_says && !std::binary_search(hits.begin(), hits.end(), static_cast<S32>(i)))
+            {
+                continue;
+            }
+            const boost::iterator_range<std::string::const_iterator> found = boost::ifind_first(text, KEYWORDS[i]);
+            if (found.empty())
+            {
+                continue;
+            }
+            const size_t start = found.begin() - text.begin();
+            const size_t end   = start + found.size();
+            size_t       pieces = 1;
+            if (start > 0)
+            {
+                pieces += highlightPieces(text.substr(0, start), i + 1, count, set);
+            }
+            if (end < text.size())
+            {
+                pieces += highlightPieces(text.substr(end), i, count, set);
+            }
+            return pieces;
+        }
+        return 1;
+    }
+
+    void bench_highlights()
+    {
+        heading("Chat highlights: a line split at the keywords it holds, as LLTextBase appends it", "line");
+        const size_t lines = std::size(CHAT_LINES);
+        for (const size_t count : { size_t(5), size_t(20), size_t(50) })
+        {
+            ALRegexSet set(ALRegex::ICASE);
+            for (size_t i = 0; i < count; ++i)
+            {
+                set.add(ALRegex::escape(KEYWORDS[i]));
+            }
+            set.compile();
+            const double boost_ns = time_per_item(lines, [&] {
+                for (const char* line : CHAT_LINES)
+                {
+                    g_sink = g_sink + highlightPieces(line, 0, count, nullptr);
+                }
+            });
+            const double set_ns = time_per_item(lines, [&] {
+                for (const char* line : CHAT_LINES)
+                {
+                    g_sink = g_sink + highlightPieces(line, 0, count, &set);
+                }
+            });
+            char name[64];
+            std::snprintf(name, sizeof(name), "%zu keywords, each found (boost) vs the set", count);
+            row(name, boost_ns, set_ns);
+        }
+    }
+
     // --- a chat log read back ---------------------------------------------
 
     void bench_chat_log()
@@ -751,6 +847,7 @@ int main(int, char**)
     bench_url_gate();
     bench_rlva();
     bench_lexing();
+    bench_highlights();
     bench_chat_log();
     bench_dates();
     std::printf("\n(checksum %zu)\n", static_cast<size_t>(g_sink));
