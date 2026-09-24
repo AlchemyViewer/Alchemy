@@ -443,6 +443,13 @@ private:
         // A compile target picked here since the last save, which the
         // region's word on what the script compiles for does not put back.
         bool                                       targetChosen = false;
+        // The experience a script in an object runs under -- the null one
+        // for none -- as its region said, or as picked here for the next
+        // save to set; a save that knows neither keeps whatever it is.
+        LLUUID                                     experience;
+        bool                                       experienceKnown  = false;
+        bool                                       experienceChosen = false;
+        bool                                       experienceAsking = false;
         // A save waiting on a check of the text as it stands; and the
         // version of the text a save goes ahead for over what the check or
         // the preprocessor found -- the one a save was refused over, so
@@ -1445,6 +1452,11 @@ private:
     bool onMenuCheck(const LLSD& param);
     void onCompileTarget();
     void onRunning();
+    // The strip's experience, for the script in front: shown where it has
+    // one or the agent has any to give it.
+    void askExperienceOf(Doc& doc);
+    void refreshExperience();
+    void onExperience();
     void onReset();
     void revert(Doc& doc);
     void loadFromFile();
@@ -1795,6 +1807,11 @@ private:
     std::vector<std::pair<LLUUID, std::string>> mOutputObjects;
     LLComboBox*                        mCompileTarget = nullptr;
     LLCheckBoxCtrl*                    mRunning       = nullptr;
+    LLComboBox*                        mExperience    = nullptr;
+    // What the experience list was last made of, so that it is made again
+    // only when that changes; and the experiences whose names are asked.
+    std::string                        mExperienceMadeOf;
+    boost::unordered_flat_set<LLUUID>  mExperienceNamesAsked;
     LLButton*                          mResetButton   = nullptr;
     LLButton*                          mSaveButton    = nullptr;
     LLButton*                          mSaveAllButton = nullptr;

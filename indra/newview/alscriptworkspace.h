@@ -36,6 +36,7 @@
 #include <deque>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -175,9 +176,12 @@ public:
     {
         std::string compileTarget;
         // Task scripts only: whether it runs after the compile, and the
-        // experience it runs under.
-        bool   running = true;
-        LLUUID experience;
+        // experience it runs under -- the null one for none. Not given,
+        // the one it runs under now, asked of the region first: an
+        // upload says an experience whatever, and one that said none
+        // would take it away.
+        bool                  running = true;
+        std::optional<LLUUID> experience;
     };
 
     // Uploads and compiles. False, with why and nothing sent, where there
@@ -236,6 +240,20 @@ public:
     // The region's answer, registered for the message; the legacy live
     // editor hears it through here.
     static void processScriptRunningReply(LLMessageSystem* msg, void** data);
+
+    // The experience a script in an object runs under, asked of its
+    // region: the null one for none -- and for a script in the inventory,
+    // or a region that keeps no experiences -- and nothing where the
+    // region could not be asked, or did not answer.
+    typedef std::function<void(const std::optional<LLUUID>&)> experience_callback_t;
+    void askExperience(const ALScriptRef& ref, experience_callback_t told);
+
+    // The experiences the agent may put a script under, as the region
+    // lists them: asked of it once, and each asker told once they are in.
+    // Empty until then, and where the agent has none.
+    typedef std::function<void(const std::vector<LLUUID>&)> experiences_callback_t;
+    void                       askOwnExperiences(experiences_callback_t told);
+    const std::vector<LLUUID>& ownExperiences() const { return mOwnExperiences; }
 
     // --- what an object holds ----------------------------------------------------
 
@@ -364,4 +382,8 @@ private:
     std::unique_ptr<LLEventTimer> mBurstTimer;
     std::deque<RuntimeEvent>      mRecent;
     runtime_signal_t              mRuntime;
+    std::vector<LLUUID>                 mOwnExperiences;
+    std::vector<experiences_callback_t> mOwnExperiencesWaiting;
+    bool                                mOwnExperiencesAsked = false;
+    bool                                mOwnExperiencesKnown = false;
 };

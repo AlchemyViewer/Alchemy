@@ -36,7 +36,6 @@
 #include "llcompilequeue.h"
 #include "lldate.h"
 #include "lleventtimer.h"
-#include "llexperiencecache.h"
 #include "llfilesystem.h"
 #include "llfloaterperms.h"
 #include "llfloaterreg.h"
@@ -46,6 +45,7 @@
 #include "llnotificationsutil.h"
 #include "llpreviewscript.h"
 #include "llscripteditorws.h"
+#include "llsdutil.h"
 #include "lltrans.h"
 #include "llversioninfo.h"
 #include "llviewerassettype.h"
@@ -473,6 +473,43 @@ void ALScriptWorkspace::deliver(const CompileResult& result, const compile_callb
 
 bool ALScriptWorkspace::save(const ALScriptRef& ref, const std::string& text, const SaveOptions& options, compile_callback_t callback, std::string& error)
 {
+    if (!ref.inInventory() && !options.experience)
+    {
+        // What stops it here stops it before the region is asked, as it
+        // stops one that knows its experience.
+        LLViewerObject* object = gObjectList.findObject(ref.object);
+        if (!object || !object->getRegion())
+        {
+            error = LLTrans::getString("WorkspaceNoSuchObject");
+            return false;
+        }
+        if (object->getRegion()->getCapability("UpdateScriptTask").empty())
+        {
+            error = LLTrans::getString("WorkspaceRegionCannotUpdateScripts");
+            return false;
+        }
+        askExperience(ref, [this, ref, text, options, callback](const std::optional<LLUUID>& experience) {
+            std::string why;
+            if (experience)
+            {
+                SaveOptions known = options;
+                known.experience  = *experience;
+                if (save(ref, text, known, callback, why))
+                {
+                    return;
+                }
+            }
+            else
+            {
+                why = LLTrans::getString("WorkspaceExperienceUnknown");
+            }
+            CompileResult result;
+            result.ref   = ref;
+            result.error = why;
+            deliver(result, callback);
+        });
+        return true;
+    }
     // The upload finishes on a coroutine; the answer is handed to the main
     // loop before anything that draws hears of it, as the legacy floaters
     // did, since a text editor's reflow takes a mutex a fiber may not.
@@ -551,7 +588,7 @@ bool ALScriptWorkspace::save(const ALScriptRef& ref, const std::string& text, co
     LLInventoryItem* item      = object->getInventoryItem(ref.item);
     const LLUUID     old_asset = item ? item->getAssetUUID() : LLUUID::null;
     LLResourceUploadInfo::ptr_t info(std::make_shared<LLScriptAssetUpload>(
-        ref.object, ref.item, options.compileTarget, options.running, options.experience, text,
+        ref.object, ref.item, options.compileTarget, options.running, options.experience.value_or(LLUUID::null), text,
         [answered, old_asset](LLUUID, LLUUID, LLUUID new_asset_id, LLSD response) {
             LLFileSystem::removeFile(old_asset, LLAssetType::AT_LSL_TEXT);
             answered(response, new_asset_id);
@@ -727,58 +764,132 @@ void ALScriptWorkspace::recompile(const ALScriptRef& ref, const std::string& req
         return;
     }
     const std::string name = item->getName();
-    // Its experience, then its text, then the upload.
-    auto go = [this, ref, target, lua, name, callback, fail](const LLUUID& experience) {
-        load(ref, [this, target, lua, name, callback, fail, experience](const Loaded& loaded) {
-            if (!loaded.error.empty())
+    // Its text, then the upload, which keeps the experience it runs under.
+    load(ref, [this, target, lua, name, callback, fail](const Loaded& loaded) {
+        if (!loaded.error.empty())
+        {
+            fail(loaded.error);
+            return;
+        }
+        const ALScriptRef ref = loaded.ref;
+        prepare(ref, name, loaded.assetId, loaded.text, lua, target, [this, ref, target, callback, fail](const Prepared& prepared) {
+            if (!prepared.errors.empty())
             {
-                fail(loaded.error);
+                CompileResult result;
+                result.ref         = ref;
+                result.diagnostics = prepared.errors;
+                for (const Diagnostic& diagnostic : prepared.errors)
+                {
+                    result.messages.push_back(diagnostic.message);
+                }
+                deliver(result, callback);
                 return;
             }
-            const ALScriptRef ref = loaded.ref;
-            prepare(ref, name, loaded.assetId, loaded.text, lua, target, [this, ref, target, callback, experience, fail](const Prepared& prepared) {
-                if (!prepared.errors.empty())
-                {
-                    CompileResult result;
-                    result.ref         = ref;
-                    result.diagnostics = prepared.errors;
-                    for (const Diagnostic& diagnostic : prepared.errors)
-                    {
-                        result.messages.push_back(diagnostic.message);
-                    }
-                    deliver(result, callback);
-                    return;
-                }
-                SaveOptions options;
-                options.compileTarget = target;
-                options.running       = true;
-                options.experience    = experience;
-                std::string error;
-                if (!save(ref, prepared.text, options, callback, error))
-                {
-                    fail(error);
-                }
-            });
-        });
-    };
-    if (object && object->getRegion() && object->getRegion()->isCapabilityAvailable("GetMetadata"))
-    {
-        LLExperienceCache::instance().fetchAssociatedExperience(ref.object, ref.item, [go](const LLSD& result) {
-            LLUUID experience;
-            if (result.has(LLExperienceCache::EXPERIENCE_ID))
+            SaveOptions options;
+            options.compileTarget = target;
+            options.running       = true;
+            std::string error;
+            if (!save(ref, prepared.text, options, callback, error))
             {
-                experience = result[LLExperienceCache::EXPERIENCE_ID].asUUID();
+                fail(error);
             }
-            LLAppViewer::instance()->postToMainCoro([go, experience]() { go(experience); });
         });
-    }
-    else
-    {
-        go(LLUUID::null);
-    }
+    });
 }
 
 // --- a script in an object -------------------------------------------------------
+
+void ALScriptWorkspace::askExperience(const ALScriptRef& ref, experience_callback_t told)
+{
+    if (ref.inInventory())
+    {
+        told(LLUUID::null);
+        return;
+    }
+    LLViewerObject* object = gObjectList.findObject(ref.object);
+    LLViewerRegion* region = object ? object->getRegion() : nullptr;
+    if (!region)
+    {
+        told(std::nullopt);
+        return;
+    }
+    // A region with no way to say keeps none: a grid without experiences.
+    if (!region->isCapabilityAvailable("GetMetadata"))
+    {
+        told(LLUUID::null);
+        return;
+    }
+    // Asked here rather than through the experience cache, which never
+    // answers where the script runs under none.
+    LLSD body;
+    body["object-id"] = ref.object;
+    body["item-id"]   = ref.item;
+    body["fields"].append("experience");
+    const bool asked = region->requestPostCapability(
+        "GetMetadata", body, [told](const LLSD& result) { told(result.has("experience") ? result["experience"].asUUID() : LLUUID::null); },
+        [told](const LLSD&) { told(std::nullopt); });
+    if (!asked)
+    {
+        told(std::nullopt);
+    }
+}
+
+void ALScriptWorkspace::askOwnExperiences(experiences_callback_t told)
+{
+    if (mOwnExperiencesKnown)
+    {
+        told(mOwnExperiences);
+        return;
+    }
+    mOwnExperiencesWaiting.push_back(std::move(told));
+    if (mOwnExperiencesAsked)
+    {
+        return;
+    }
+    // Everyone waiting told what is known; the list kept only where the
+    // region gave it, so that one not asked yet is asked again.
+    const auto tell = [this](bool known) {
+        mOwnExperiencesAsked = false;
+        mOwnExperiencesKnown = known;
+        std::vector<experiences_callback_t> waiting;
+        waiting.swap(mOwnExperiencesWaiting);
+        for (const experiences_callback_t& each : waiting)
+        {
+            each(mOwnExperiences);
+        }
+    };
+    LLViewerRegion* region = gAgent.getRegion();
+    if (!region || !region->capabilitiesReceived())
+    {
+        tell(false);
+        return;
+    }
+    if (!region->isCapabilityAvailable("GetCreatorExperiences"))
+    {
+        mOwnExperiences.clear();
+        tell(true);
+        return;
+    }
+    mOwnExperiencesAsked = true;
+    const bool asked     = region->requestGetCapability(
+        "GetCreatorExperiences",
+        [this, tell](const LLSD& result) {
+            mOwnExperiences.clear();
+            for (const LLSD& id : llsd::inArray(result["experience_ids"]))
+            {
+                if (id.asUUID().notNull())
+                {
+                    mOwnExperiences.push_back(id.asUUID());
+                }
+            }
+            tell(true);
+        },
+        [tell](const LLSD&) { tell(false); });
+    if (!asked)
+    {
+        tell(false);
+    }
+}
 
 bool ALScriptWorkspace::scriptMessage(const ALScriptRef& ref, const char* message, bool running, bool with_running)
 {

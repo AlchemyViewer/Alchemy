@@ -778,6 +778,7 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="WorkspaceScriptTooLarge">the script is [SIZE] bytes, and a script may be at most [LIMIT]</string>
 	<string name="WorkspaceNoRegion">no region</string>
 	<string name="WorkspaceRegionCannotUpdateScripts">the region cannot update scripts</string>
+	<string name="WorkspaceExperienceUnknown">the region did not say what experience the script runs under, and a save that did not say it would take it away</string>
 	<string name="WorkspaceRegionCannotUpdateNotecards">the region cannot update notecards</string>
 	<string name="WorkspaceRegionCannotMakeNotecard">the region cannot make a notecard in an object</string>
 	<string name="WorkspaceNameNeeded">a name is needed</string>

@@ -66,6 +66,7 @@
 #include "llfilepicker.h"
 #include "llfiltereditor.h"
 #include "llfloaterperms.h"
+#include "llexperiencecache.h"
 #include "llfloaterreg.h"
 #include "llfloatersidepanelcontainer.h"
 #include "lllandmarkactions.h"
@@ -689,6 +690,7 @@ bool ALFloaterScriptStudio::postBuild()
     mSearchResults = getChild<ALPaneList>("search_results");
     mCompileTarget = getChild<LLComboBox>("compile_target");
     mRunning       = getChild<LLCheckBoxCtrl>("running");
+    mExperience    = getChild<LLComboBox>("experience");
     mResetButton   = getChild<LLButton>("reset_btn");
     mSaveButton    = getChild<LLButton>("save_btn");
     mSaveAllButton = getChild<LLButton>("save_all_btn");
@@ -961,6 +963,7 @@ bool ALFloaterScriptStudio::postBuild()
     }
     mCompileTarget->setCommitCallback(boost::bind(&ALFloaterScriptStudio::onCompileTarget, this));
     mRunning->setCommitCallback(boost::bind(&ALFloaterScriptStudio::onRunning, this));
+    mExperience->setCommitCallback(boost::bind(&ALFloaterScriptStudio::onExperience, this));
     mResetButton->setCommitCallback(boost::bind(&ALFloaterScriptStudio::onReset, this));
     mSaveButton->setCommitCallback([this](LLUICtrl*, const LLSD&) {
         if (Doc* doc = active())
@@ -2430,11 +2433,12 @@ void ALFloaterScriptStudio::loaded(const ALScriptWorkspace::Loaded& answer)
     {
         doc.name = answer.name;
     }
-    doc.assetId      = answer.assetId;
-    doc.language     = answer.language;
-    doc.targetChosen = false;
-    doc.modifiable   = answer.modifiable;
-    doc.notecard     = answer.notecard;
+    doc.assetId          = answer.assetId;
+    doc.language         = answer.language;
+    doc.targetChosen     = false;
+    doc.experienceChosen = false;
+    doc.modifiable       = answer.modifiable;
+    doc.notecard         = answer.notecard;
     if (doc.recovering && (!answer.error.empty() || !answer.modifiable))
     {
         // Opened to take up a kept text, and what it came from cannot be
@@ -2578,9 +2582,14 @@ void ALFloaterScriptStudio::loaded(const ALScriptWorkspace::Loaded& answer)
         scheduleAnalysis(doc, true);
         if (!doc.ref.inInventory())
         {
-            // Whether it runs, and what it compiles for, which the region
-            // knows better than the text does; and its object in the explorer.
+            // Whether it runs, what it compiles for and what experience it
+            // runs under, which the region knows better than the text
+            // does; and its object in the explorer.
             ALScriptWorkspace::instance().askRunning(doc.ref);
+            if (!doc.notecard)
+            {
+                askExperienceOf(doc);
+            }
             refreshExplorer();
         }
         goToPending(doc);
@@ -5250,6 +5259,7 @@ void ALFloaterScriptStudio::refreshToolbar()
     mExpandedButton->setToggleState(doc && doc->shownView() == Doc::View::Expanded);
     mRunning->setVisible(task);
     mResetButton->setVisible(task);
+    refreshExperience();
     if (task)
     {
         mRunning->set(doc->running == 1);
@@ -5275,7 +5285,10 @@ void ALFloaterScriptStudio::refreshToolbar()
     // the strip.
     if (mBreadcrumb)
     {
-        const LLView* first = task ? static_cast<const LLView*>(mResetButton) : script ? static_cast<const LLView*>(mCompileTarget) : nullptr;
+        const LLView* first = task && mExperience->getVisible() ? static_cast<const LLView*>(mExperience)
+                              : task                            ? static_cast<const LLView*>(mResetButton)
+                              : script                          ? static_cast<const LLView*>(mCompileTarget)
+                                                                : nullptr;
         const S32     right = first ? first->getRect().mLeft - 6 : mBreadcrumb->getParent()->getRect().getWidth();
         const LLRect  crumbs = mBreadcrumb->getRect();
         if (crumbs.mRight != right && right > crumbs.mLeft)
@@ -5457,6 +5470,12 @@ void ALFloaterScriptStudio::upload(Doc& doc, const std::string& text, const ALSo
     ALScriptWorkspace::SaveOptions options;
     options.compileTarget = doc.language.compileTarget;
     options.running       = doc.ref.inInventory() || doc.running != 0;
+    // The experience picked here, or the one it runs under; not known yet,
+    // the save asks the region first rather than send none.
+    if (doc.experienceChosen || doc.experienceKnown)
+    {
+        options.experience = doc.experience;
+    }
     std::string error;
     // Where the journal stands as the text goes, taken before anything
     // can be typed after it.
@@ -5559,6 +5578,12 @@ void ALFloaterScriptStudio::compiledHere(const ALScriptWorkspace::CompileResult&
     {
         doc.editor->markSavedAt(doc.sentAt);
         doc.targetChosen = false;
+        // The experience it was sent with is the one it runs under now.
+        if (doc.experienceChosen)
+        {
+            doc.experienceChosen = false;
+            doc.experienceKnown  = true;
+        }
         keepSavedWeights(doc);
     }
     if (result.newAssetId.notNull())
@@ -15783,6 +15808,161 @@ void ALFloaterScriptStudio::onCompileTarget()
         // its grammar, its words -- stays what the item says.
         doc->targetChosen = true;
     }
+}
+
+void ALFloaterScriptStudio::askExperienceOf(Doc& doc)
+{
+    const LLHandle<LLFloater> handle = getHandle();
+    const std::string         id     = doc.id;
+    doc.experienceAsking             = true;
+    ALScriptWorkspace::instance().askExperience(doc.ref, [handle, id](const std::optional<LLUUID>& experience) {
+        ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get());
+        const size_t           index  = studio ? studio->indexOf(id) : NONE;
+        if (index == NONE)
+        {
+            return;
+        }
+        Doc& doc             = *studio->mDocs[index];
+        doc.experienceAsking = false;
+        // One picked meanwhile stands, as a picked target does.
+        if (experience && !doc.experienceChosen)
+        {
+            doc.experience      = *experience;
+            doc.experienceKnown = true;
+        }
+        if (&doc == studio->active())
+        {
+            studio->refreshToolbar();
+        }
+    });
+    ALScriptWorkspace::instance().askOwnExperiences([handle](const std::vector<LLUUID>&) {
+        if (ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get()))
+        {
+            studio->refreshToolbar();
+        }
+    });
+}
+
+void ALFloaterScriptStudio::refreshExperience()
+{
+    // Shown for a script in an object that runs under one, or whose
+    // agent has one to give it: most have none, and the strip is narrow.
+    Doc*                       doc   = active();
+    const bool                 task  = doc && doc->loaded && !doc->ref.inInventory() && !doc->notecard;
+    const std::vector<LLUUID>& own   = ALScriptWorkspace::instance().ownExperiences();
+    const bool                 shown = task && (doc->experience.notNull() || !own.empty());
+    mExperience->setVisible(shown);
+    if (!shown)
+    {
+        mExperienceMadeOf.clear();
+        return;
+    }
+    // An experience by its name, once the cache has it; asked for once,
+    // and the list made again as it comes.
+    const auto name_of = [this](const LLUUID& id) {
+        const LLSD& experience = LLExperienceCache::instance().get(id);
+        if (!experience.has(LLExperienceCache::NAME))
+        {
+            if (mExperienceNamesAsked.insert(id).second)
+            {
+                const LLHandle<LLFloater> handle = getHandle();
+                LLExperienceCache::instance().get(id, [handle](const LLSD&) {
+                    if (ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get()))
+                    {
+                        studio->refreshExperience();
+                    }
+                });
+            }
+            return getString("ExperienceLoading");
+        }
+        const std::string name = experience[LLExperienceCache::NAME].asString();
+        return name.empty() ? LLTrans::getString("ExperienceNameUntitled") : name;
+    };
+    // What can be picked: none, the agent's own by name, and the one it
+    // runs under where that is not the agent's; and its profile, where
+    // it has one. Only what it has, and the profile, where it may not be
+    // changed.
+    const bool known = doc->experienceKnown || doc->experienceChosen;
+    std::vector<std::pair<std::string, LLUUID>> offered;
+    for (const LLUUID& id : own)
+    {
+        offered.emplace_back(name_of(id), id);
+    }
+    if (doc->experience.notNull() && std::find(own.begin(), own.end(), doc->experience) == own.end())
+    {
+        offered.emplace_back(name_of(doc->experience), doc->experience);
+    }
+    std::stable_sort(offered.begin(), offered.end(), [](const auto& a, const auto& b) { return LLStringUtil::compareDict(a.first, b.first) < 0; });
+    std::string made = doc->id + (known ? "|known" : doc->experienceAsking ? "|asking" : "|unknown") + (doc->modifiable ? "|mod" : "") + "|" +
+                       doc->experience.asString();
+    for (const auto& [label, id] : offered)
+    {
+        made += "|" + id.asString() + "=" + label;
+    }
+    if (made == mExperienceMadeOf)
+    {
+        return;
+    }
+    mExperienceMadeOf = made;
+    mExperience->removeall();
+    if (!known)
+    {
+        // Until the region says, nothing to pick from: a save meanwhile
+        // asks it again rather than say none.
+        mExperience->add(getString(doc->experienceAsking ? "ExperienceAsking" : "ExperienceUnknown"), LLSD("unknown"));
+        mExperience->setValue(LLSD("unknown"));
+        mExperience->setEnabled(false);
+        return;
+    }
+    const std::string current = doc->experience.isNull() ? std::string("none") : doc->experience.asString();
+    mExperience->add(getString("ExperienceNone"), LLSD("none"), ADD_BOTTOM, doc->modifiable || current == "none");
+    for (const auto& [label, id] : offered)
+    {
+        mExperience->add(label, LLSD(id.asString()), ADD_BOTTOM, doc->modifiable || id == doc->experience);
+    }
+    if (doc->experience.notNull())
+    {
+        mExperience->addSeparator();
+        mExperience->add(getString("ExperienceProfile"), LLSD("profile"));
+    }
+    mExperience->setValue(LLSD(current));
+    mExperience->setEnabled(true);
+}
+
+void ALFloaterScriptStudio::onExperience()
+{
+    Doc* doc = active();
+    if (!doc)
+    {
+        return;
+    }
+    const std::string value   = mExperience->getValue().asString();
+    const std::string current = doc->experience.isNull() ? std::string("none") : doc->experience.asString();
+    if (value == "profile")
+    {
+        // Not a choice: the profile shown, and the choice as it was.
+        mExperience->setValue(LLSD(current));
+        if (doc->experience.notNull())
+        {
+            LLFloaterReg::showInstance("experience_profile", doc->experience, true);
+        }
+        return;
+    }
+    const LLUUID picked = value == "none" ? LLUUID::null : LLUUID(value);
+    if (value == "unknown" || picked == doc->experience || !doc->modifiable)
+    {
+        mExperience->setValue(LLSD(current));
+        return;
+    }
+    // Picked, and to stand until it is saved, as a compile target does:
+    // the experience is set by the upload, and nothing else sets it.
+    doc->experience       = picked;
+    doc->experienceChosen = true;
+    LLStringUtil::format_map_t args;
+    args["[NAME]"] = doc->name;
+    args["[EXPERIENCE]"] = mExperience->getSelectedItemLabel();
+    setStatus(getString(picked.isNull() ? "ExperienceClearedOnSave" : "ExperienceSetOnSave", args));
+    refreshToolbar();
 }
 
 void ALFloaterScriptStudio::onRunning()

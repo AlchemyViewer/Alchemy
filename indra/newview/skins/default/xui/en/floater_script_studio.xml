@@ -117,6 +117,13 @@
     <floater.string name="RunningNo">stopped</floater.string>
     <floater.string name="ObjectUnnamed">(unnamed)</floater.string>
     <floater.string name="StateUnknown">asking...</floater.string>
+    <floater.string name="ExperienceNone">No experience</floater.string>
+    <floater.string name="ExperienceProfile">Its profile...</floater.string>
+    <floater.string name="ExperienceLoading">loading...</floater.string>
+    <floater.string name="ExperienceAsking">Experience: asking...</floater.string>
+    <floater.string name="ExperienceUnknown">Experience: not known</floater.string>
+    <floater.string name="ExperienceSetOnSave">[NAME] runs under [EXPERIENCE] once it is saved.</floater.string>
+    <floater.string name="ExperienceClearedOnSave">[NAME] runs under no experience once it is saved.</floater.string>
     <floater.string name="PinnedMark">* </floater.string>
     <floater.string name="ArrowOpen">&#9662; </floater.string>
     <floater.string name="ArrowFolded">&#9656; </floater.string>
@@ -1390,6 +1397,16 @@
                      top="1" />
                     <!-- The script's own state, at the right end of its strip:
                          what it compiles for, whether it runs, and reset. -->
+                    <combo_box
+                     follows="right|top"
+                     height="20"
+                     layout="topleft"
+                     name="experience"
+                     right="-290"
+                     tool_tip="The experience the script runs under, which its experience functions need: none, one of your own, or the one it has. Picked here, it is set when the script is saved; its profile is at the end of the list."
+                     top="2"
+                     visible="false"
+                     width="150" />
                     <button
                      follows="right|top"
                      height="20"
