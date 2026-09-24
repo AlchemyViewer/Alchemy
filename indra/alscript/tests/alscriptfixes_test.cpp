@@ -26,6 +26,8 @@
 
 #include "../alscriptfixes.h"
 
+#include "../alluauexports.h"
+
 #include "../allslservice.h"
 #include "../alluauservice.h"
 #include "../alpreprocessor.h"
@@ -647,5 +649,62 @@ namespace tut
         ensure_equals("kept", held.fixes.size(), static_cast<size_t>(1));
         ensure_equals("the source's line", held.fixes.front().edits.front().line, 5);
         ensure_equals("its start", held.fixes.front().edits.front().column, 0);
+    }
+
+    template<> template<>
+    void object::test<23>()
+    {
+        set_test_name("a module's exports are the names of the table it returns, however it builds it");
+        const auto listed = [](const std::string& source) {
+            std::string out;
+            for (const std::string& name : ALLuauExports::of(source))
+            {
+                out += (out.empty() ? "" : " ") + name;
+            }
+            return out;
+        };
+        ensure_equals("a table returned", listed("local function greet() end\nreturn { greet = greet, count = 3, [\"spaced out\"] = 1, 4 }\n"),
+                      std::string("greet count"));
+        ensure_equals("a local table filled in",
+                      listed("local M = { count = 3 }\nfunction M.greet() end\nfunction M:reset() end\nM.name = \"util\"\nM[\"size\"] = 2\n"
+                             "local other = {}\nother.hidden = 1\nreturn M\n"),
+                      std::string("count greet reset name size"));
+        ensure_equals("through setmetatable", listed("local M = {}\nM.x = 1\nreturn setmetatable(M, { __index = M })\n"), std::string("x"));
+        ensure_equals("each once", listed("local M = {}\nM.x = 1\nM.x = 2\nreturn M\n"), std::string("x"));
+        ensure_equals("a function: no names", listed("return function() end\n"), std::string());
+        ensure_equals("nothing returned", listed("local M = {}\nM.x = 1\n"), std::string());
+        ensure_equals("a module that does not parse", listed("local M = {\nreturn M\n"), std::string());
+        ensure_equals("not a keyword", listed("return { [\"end\"] = 1, ok = 2 }\n"), std::string("ok"));
+    }
+
+    template<> template<>
+    void object::test<24>()
+    {
+        set_test_name("a require goes after the requires a script opens with, else after its comments, apart from the code");
+        ALScriptProblem problem;
+        problem.key  = "LuauUnknownGlobal";
+        problem.args = { "util" };
+        const auto made = [&problem](const std::string& text, const std::string& module, bool field) {
+            problem.fixes.clear();
+            ALScriptFixes::offerRequire(problem, text, module, field);
+            return problem.fixes.empty() ? std::string("none") : ALScriptFixes::apply(text, problem.fixes.front()).value_or("refused");
+        };
+        ensure_equals("after the last require", made("--!strict\nlocal a = require(\"a\")\nlocal b = require(\"b\").b\n\nprint(util.x)\n", "util", false),
+                      std::string("--!strict\nlocal a = require(\"a\")\nlocal b = require(\"b\").b\nlocal util = require(\"util\")\n\nprint(util.x)\n"));
+        ensure_equals("its words", problem.fixes.front().title, std::string("Require 'util'"));
+        ensure_equals("after the comments, the blank line kept",
+                      made("--!strict\n--[[ A header\n  over lines ]]\n\nprint(util.x)\n", "@lib/util", false),
+                      std::string("--!strict\n--[[ A header\n  over lines ]]\nlocal util = require(\"@lib/util\")\n\nprint(util.x)\n"));
+        ensure_equals("apart from code that follows at once", made("print(util)\n", "helpers", true),
+                      std::string("local util = require(\"helpers\").util\n\nprint(util)\n"));
+        ensure_equals("a field's words", problem.fixes.front().title, std::string("Take 'util' from 'helpers'"));
+        ensure_equals("past a last line with no break", made("-- only a comment", "util", false),
+                      std::string("-- only a comment\nlocal util = require(\"util\")"));
+        ensure_equals("a name quoted", made("print(util)\n", "a\"b", false), std::string("local util = require(\"a\\\"b\")\n\nprint(util)\n"));
+        problem.fixes.clear();
+        ALScriptFixes::offerRequire(problem, "print(util)\n", "util", false);
+        ALScriptFixes::offerRequire(problem, "print(util)\n", "util", false);
+        ensure_equals("offered once", problem.fixes.size(), static_cast<size_t>(1));
+        ensure("neither preferred nor safe", !problem.fixes.front().preferred && !problem.fixes.front().safe);
     }
 }

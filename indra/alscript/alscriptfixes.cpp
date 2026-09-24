@@ -52,6 +52,8 @@ namespace
             }
         }
 
+        S32 count() const { return static_cast<S32>(mStarts.size()); }
+
         std::string_view line(S32 n) const
         {
             if (n < 0 || static_cast<size_t>(n) >= mStarts.size())
@@ -718,6 +720,111 @@ namespace
     }
 }
 
+namespace
+{
+    // Whether a line gives a local what a require returns: `local util =
+    // require("util")`, `local greet = require("util").greet`.
+    bool givesRequire(std::string_view line)
+    {
+        const size_t lead = line.find_first_not_of(" \t");
+        if (lead == std::string_view::npos || line.compare(lead, 6, "local ") != 0)
+        {
+            return false;
+        }
+        const size_t equals = line.find('=', lead);
+        if (equals == std::string_view::npos)
+        {
+            return false;
+        }
+        const size_t call = line.find_first_not_of(" \t", equals + 1);
+        return call != std::string_view::npos && line.compare(call, 8, "require(") == 0;
+    }
+
+    // Where a require goes at the top of a script: after the last of those
+    // it opens with, else after the comments it opens with -- its hot
+    // comments, a header -- and whether a blank line should follow it,
+    // where code would stand against it otherwise.
+    S32 requireLine(const Lines& lines, bool& apart)
+    {
+        S32         after_comments = 0;
+        S32         last_require   = -1;
+        bool        in_block       = false;
+        std::string closing;
+        S32         i = 0;
+        for (; i < lines.count(); ++i)
+        {
+            std::string_view line = lines.line(i);
+            const size_t     lead = line.find_first_not_of(" \t");
+            line                  = lead == std::string_view::npos ? std::string_view() : line.substr(lead);
+            if (in_block)
+            {
+                in_block = line.find(closing) == std::string_view::npos;
+                if (last_require < 0)
+                {
+                    after_comments = i + 1;
+                }
+                continue;
+            }
+            if (line.empty())
+            {
+                continue;
+            }
+            if (line.compare(0, 2, "--") == 0)
+            {
+                // A block comment runs to its closing brackets, with as
+                // many equals signs between them as it opened with.
+                if (line.size() > 2 && line[2] == '[')
+                {
+                    size_t equals = 3;
+                    while (equals < line.size() && line[equals] == '=')
+                    {
+                        ++equals;
+                    }
+                    if (equals < line.size() && line[equals] == '[')
+                    {
+                        closing  = "]" + std::string(equals - 3, '=') + "]";
+                        in_block = line.find(closing, equals + 1) == std::string_view::npos;
+                    }
+                }
+                if (last_require < 0)
+                {
+                    after_comments = i + 1;
+                }
+                continue;
+            }
+            if (givesRequire(line))
+            {
+                last_require = i;
+                continue;
+            }
+            break;
+        }
+        if (last_require >= 0)
+        {
+            apart = false;
+            return last_require + 1;
+        }
+        const std::string_view next = lines.line(after_comments);
+        apart                       = after_comments < lines.count() && next.find_first_not_of(" \t") != std::string_view::npos;
+        return after_comments;
+    }
+
+    // A module's name as a string in the script's source.
+    std::string luaString(std::string_view name)
+    {
+        std::string out = "\"";
+        for (char c : name)
+        {
+            if (c == '"' || c == '\\')
+            {
+                out += '\\';
+            }
+            out += c;
+        }
+        return out + "\"";
+    }
+}
+
 namespace ALScriptFixes
 {
     ALScriptFix titled(const char* key, const char* english, std::vector<std::string> args)
@@ -1096,6 +1203,42 @@ namespace ALScriptFixes
                 attachOnLine(problem, lines.line(problem.line), lines, lua);
             }
         }
+    }
+
+    void offerRequire(ALScriptProblem& problem, std::string_view text, const std::string& module, bool field)
+    {
+        if (problem.args.size() != 1 || !isIdentifier(problem.args[0]) || module.empty())
+        {
+            return;
+        }
+        const std::string& name  = problem.args[0];
+        const Lines        lines(text);
+        bool               apart = false;
+        S32                line  = requireLine(lines, apart);
+        std::string        said  = "local " + name + " = require(" + luaString(module) + ")" + (field ? "." + name : std::string());
+        S32                column = 0;
+        if (line >= lines.count())
+        {
+            // Past a last line with no break after it: on a line of its own.
+            line   = lines.count() - 1;
+            column = static_cast<S32>(lines.line(line).size());
+            said   = "\n" + said;
+        }
+        else
+        {
+            said += apart ? "\n\n" : "\n";
+        }
+        for (const ALScriptFix& had : problem.fixes)
+        {
+            if (!had.edits.empty() && had.edits.front().text == said)
+            {
+                return;
+            }
+        }
+        ALScriptFix fix = field ? titled("ScriptFixRequireField", "Take '[1]' from '[2]'", { name, module })
+                                : titled("ScriptFixRequire", "Require '[1]'", { module });
+        fix.edits.push_back({ line, column, line, column, said });
+        problem.fixes.push_back(std::move(fix));
     }
 
     std::string freshName(std::string_view text, std::string_view base)

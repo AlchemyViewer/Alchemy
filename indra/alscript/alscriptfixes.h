@@ -88,6 +88,16 @@ namespace ALScriptFixes
     // nor in what a macro made.
     void mapThrough(const ALSourceMap& map, ALScriptProblem& problem);
 
+    // The fix that gives a global a script does not know -- the problem's
+    // one word -- what a module in reach gives: `local util =
+    // require("util")` for the module itself, or `local greet =
+    // require("util").greet` for a `field` of it, `module` being the name
+    // a require finds it by. After the requires `text` opens with, else
+    // after the comments it opens with, apart from the code after. Never
+    // preferred nor safe here: which module is meant, and whether running
+    // it is wanted, is the caller's to know.
+    void offerRequire(ALScriptProblem& problem, std::string_view text, const std::string& module, bool field);
+
     // A name for something a refactor makes in `text`: `base`, else
     // `base2`, `base3` and on -- one that stands nowhere in it as a word,
     // so that it can neither be taken already nor hide what is.

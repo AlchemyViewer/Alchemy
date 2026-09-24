@@ -14,6 +14,7 @@ target_sources(
     almessagemap.cpp
     allsloptimizer.cpp
     alluauconfig.cpp
+    alluauexports.cpp
     alluauservice.cpp
     allslservice.cpp
     allsltraits.cpp
@@ -38,6 +39,7 @@ target_sources(
         allsloptimizer.h
         allsltraits.inc
         alluauconfig.h
+        alluauexports.h
         alluauservice.h
         allslservice.h
         allsltraits.h
