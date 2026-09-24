@@ -85,6 +85,12 @@
     <floater.string name="FilesB">[COUNT] files</floater.string>
     <floater.string name="PlacesA">1 place</floater.string>
     <floater.string name="PlacesB">[COUNT] places</floater.string>
+    <floater.string name="FixesA">1 fix</floater.string>
+    <floater.string name="FixesB">[COUNT] fixes</floater.string>
+    <floater.string name="FixesMadeA">Made 1 fix.</floater.string>
+    <floater.string name="FixesMadeB">Made [COUNT] fixes.</floater.string>
+    <floater.string name="FixStale">The script changed since it was checked; the fixes are offered again once it has been checked.</floater.string>
+    <floater.string name="ProblemFixTip">Fix: [TITLE]</floater.string>
     <floater.string name="ScriptsA">1 script</floater.string>
     <floater.string name="ScriptsB">[COUNT] scripts</floater.string>
     <floater.string name="SearchReplaced">[PLACES] replaced in [SCRIPTS]</floater.string>
@@ -358,6 +364,7 @@
     <floater.string name="PaletteOn">on</floater.string>
     <floater.string name="PaletteOff">off</floater.string>
     <floater.string name="UndoWhatRename">Rename</floater.string>
+    <floater.string name="UndoWhatFix">Fix</floater.string>
     <floater.string name="UndoWhatFormat">Format</floater.string>
     <floater.string name="UndoWhatReplace">Replace All</floater.string>
     <floater.string name="RecentScripts">Scripts</floater.string>

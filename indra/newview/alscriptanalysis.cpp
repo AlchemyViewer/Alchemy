@@ -289,18 +289,23 @@ void ALScriptAnalysis::ask(Request request, callback_t callback)
     });
 }
 
-std::string alScriptProblemWords(const ALScriptProblem& problem)
+std::string alScriptKeyedWords(const std::string& key, const std::vector<std::string>& args, const std::string& english)
 {
-    if (problem.key.empty())
+    if (key.empty())
     {
-        return problem.message;
+        return english;
     }
     // The skin's text for the key, found once and kept; the words go in
     // by their marks, with no map made. A key the skin lacks is marked
-    // so, and the message stays the code's own English.
+    // so, and the words stay the code's own English.
     static const std::string MISSING("\x01");
-    const std::string&       text = alSaidTemplate(problem.key, MISSING);
-    return text == MISSING ? problem.message : ALScriptProblem::fill(text, problem.args);
+    const std::string&       text = alSaidTemplate(key, MISSING);
+    return text == MISSING ? english : ALScriptProblem::fill(text, args);
+}
+
+std::string alScriptProblemWords(const ALScriptProblem& problem)
+{
+    return alScriptKeyedWords(problem.key, problem.args, problem.message);
 }
 
 void alTranslateScriptProblems(ALScriptProblems& problems)
@@ -310,6 +315,11 @@ void alTranslateScriptProblems(ALScriptProblems& problems)
         if (!problem.key.empty())
         {
             problem.message = alScriptProblemWords(problem);
+        }
+        // What each fix does, as the problem's own words are said.
+        for (ALScriptFix& fix : problem.fixes)
+        {
+            fix.title = alScriptKeyedWords(fix.key, fix.args, fix.title);
         }
     }
 }

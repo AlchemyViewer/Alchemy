@@ -44,6 +44,7 @@
 #include <boost/unordered/unordered_flat_map.hpp>
 #include <boost/unordered/unordered_flat_set.hpp>
 
+#include <algorithm>
 #include <map>
 #include <memory>
 #include <optional>
@@ -474,6 +475,11 @@ private:
             // A lint's name or an LSL warning's number, where the problem
             // is one a scripter may turn off or make an error.
             std::string lint;
+            // The analyzer's key for its kind, and what would put it
+            // right, in the source's places at analysisVersion: the
+            // preferred first, a suppression last.
+            std::string              key;
+            std::vector<ALScriptFix> fixes;
         };
         std::vector<Shown>                         shown;
         // What the analyzer said the script declares, at analysisVersion.
@@ -570,6 +576,28 @@ private:
     // The caret to the next problem of the script after it, or the one
     // before, round past the ends, with what it says in a card.
     void                goToProblem(Doc& doc, S32 direction);
+    // Each fix the analyzers made put in the source's places through the
+    // map the check was made over, and kept only where every edit lands
+    // in the script's own text as it was copied -- not in an include, nor
+    // in what a macro made.
+    static void         mapFixes(const ALSourceMap& map, ALScriptProblem& problem);
+    // What a comment says is wanted dropped from the script's problems,
+    // and a comment that would say so offered for every lint left.
+    void                noLint(Doc& doc);
+    // A fix made, as one step to undo, and the script checked again at
+    // once; refused where the text has moved on since the check it was
+    // made in, whose places it is in.
+    bool                applyFix(Doc& doc, const ALScriptFix& fix);
+    // The preferred fix of every problem of one kind, made as one step,
+    // once asked; and made, the asking done.
+    void                askFixAllOfKind(Doc& doc, const std::string& key);
+    void                fixAllOfKind(Doc& doc, const std::string& key);
+    // The preferred fixes of one kind, none of whose edits overlap another
+    // taken before it.
+    static std::vector<const ALScriptFix*> fixesOfKind(const Doc& doc, const std::string& key);
+    // The problem a row of the pane is, in its script's list, where its
+    // fixes are.
+    const Doc::Shown*   shownOf(const LLSD& value) const;
     // The keymap's keys beside the menu's editor commands that have none.
     void                showEditorKeys();
     static Doc::Level   levelOf(const std::string& said);
@@ -583,7 +611,11 @@ private:
             return p.level == Doc::Level::Error ? ALFindingLevel::Error : p.level == Doc::Level::Warning ? ALFindingLevel::Warning : ALFindingLevel::Note;
         }
         static std::string    rule(const Doc::Shown& p) { return p.origin; }
-        static bool           fixable(const Doc::Shown&) { return false; }
+        // One with a fix that changes the script, not only a suppression.
+        static bool           fixable(const Doc::Shown& p)
+        {
+            return std::any_of(p.fixes.begin(), p.fixes.end(), [](const ALScriptFix& fix) { return fix.kind == ALScriptFix::Kind::Fix; });
+        }
         static bool           mentions(const Doc::Shown& p, std::string_view text)
         {
             return ALStringMatch::containsNoCase(p.message, text) || ALStringMatch::containsNoCase(p.fileName, text) ||

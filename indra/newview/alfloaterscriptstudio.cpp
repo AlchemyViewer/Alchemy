@@ -36,6 +36,7 @@
 #include "alpanelist.h"
 #include "llsdutil.h"
 #include "alscopebar.h"
+#include "alscriptfixes.h"
 #include "alscriptformatter.h"
 #include "alscriptkeymap.h"
 #include "alscriptmessages.h"
@@ -5137,6 +5138,7 @@ void ALFloaterScriptStudio::analysed(const ALScriptAnalysis::Result& result)
             const S32 file = mapSpan(map, span);
             if (file < 0)
             {
+                problem.fixes.clear();
                 continue;
             }
             problem.line      = span.line;
@@ -5145,7 +5147,13 @@ void ALFloaterScriptStudio::analysed(const ALScriptAnalysis::Result& result)
             problem.endColumn = span.endColumn;
             if (file > 0)
             {
+                // An include's text is not this tab's to change.
                 problem.file = map.files()[file].path;
+                problem.fixes.clear();
+            }
+            else
+            {
+                mapFixes(map, problem);
             }
         }
         std::vector<ALScriptOutlineEntry> outline;
@@ -5158,7 +5166,9 @@ void ALFloaterScriptStudio::analysed(const ALScriptAnalysis::Result& result)
         }
         doc.outline = std::move(outline);
     }
-    // In the source's places now, where the words are.
+    // In the source's places now, where the words are, and where a comment
+    // may say a lint is wanted.
+    noLint(doc);
     if (!doc.language.lua)
     {
         explainTransformWords(doc);
@@ -5370,6 +5380,8 @@ void ALFloaterScriptStudio::refreshProblems(Doc& doc)
         const std::string message = named ? problem.message + " [" + problem.code + "]" : problem.message;
         add(problem.line, problem.column, true, problem.endLine, problem.endColumn, markOf(level), level, origin, message, problem.file,
             problem.source == ALScriptProblem::Source::Lint ? problem.code : std::string());
+        doc.shown.back().key   = problem.key;
+        doc.shown.back().fixes = problem.fixes;
     }
     for (const Doc::RuntimeProblem& problem : doc.runtime)
     {
@@ -5621,8 +5633,18 @@ void ALFloaterScriptStudio::fillProblems(const Doc* doc)
                                                                                          : "LevelNote");
             // Every column carries the whole of it: a diagnostic longer
             // than the column is cut at the column's edge.
-            const std::string tip = level + "   \xC2\xB7   " + (problem->file.empty() ? group.doc->name : problem->fileName) + ":" + where + "\n" +
-                                    problem->message;
+            std::string tip = level + "   \xC2\xB7   " + (problem->file.empty() ? group.doc->name : problem->fileName) + ":" + where + "\n" +
+                              problem->message;
+            // What would put it right, which its right-click menu offers.
+            for (const ALScriptFix& fix : problem->fixes)
+            {
+                if (fix.kind == ALScriptFix::Kind::Fix)
+                {
+                    LLStringUtil::format_map_t fix_args;
+                    fix_args["[TITLE]"] = fix.title;
+                    tip += "\n" + getString("ProblemFixTip", fix_args);
+                }
+            }
             const ALCodeEditor::Mark mark = problem->origin == getString("OriginRuntime") ? ALCodeEditor::Mark::Runtime : markOf(problem->level);
             LLSD row;
             row["value"]                = value;
@@ -5833,6 +5855,230 @@ void ALFloaterScriptStudio::showProblemCard(Doc& doc, const ALTextPos& at)
     }
 }
 
+// static
+void ALFloaterScriptStudio::mapFixes(const ALSourceMap& map, ALScriptProblem& problem)
+{
+    std::vector<ALScriptFix> kept;
+    for (ALScriptFix& fix : problem.fixes)
+    {
+        bool whole = !fix.edits.empty();
+        for (ALScriptEdit& edit : fix.edits)
+        {
+            ALSourceMap::Loc begin, end;
+            if (edit.line != edit.endLine || !map.verbatimSpan(edit.line, edit.column, edit.endColumn, begin, end) || begin.file != 0)
+            {
+                whole = false;
+                break;
+            }
+            edit.line      = begin.line;
+            edit.column    = begin.column;
+            edit.endLine   = end.line;
+            edit.endColumn = end.column;
+        }
+        if (whole)
+        {
+            kept.push_back(std::move(fix));
+        }
+    }
+    problem.fixes = std::move(kept);
+}
+
+void ALFloaterScriptStudio::noLint(Doc& doc)
+{
+    // The script's own lines, as they stand at the check: a problem in an
+    // include is said of text this tab does not hold.
+    const ALTextDocument& text     = doc.editor->document();
+    const bool            lua      = doc.language.lua;
+    const auto            ours     = [&text](const ALScriptProblem& problem) {
+        return problem.file.empty() && problem.line >= 0 && problem.line < text.lineCount();
+    };
+    doc.analysis.erase(std::remove_if(doc.analysis.begin(), doc.analysis.end(),
+                                      [&](const ALScriptProblem& problem) {
+                                          return ours(problem) && ALScriptFixes::suppressed(problem, text.line(problem.line),
+                                                                                            problem.line > 0 ? std::string_view(text.line(problem.line - 1)) : std::string_view(),
+                                                                                            lua);
+                                      }),
+                       doc.analysis.end());
+    for (ALScriptProblem& problem : doc.analysis)
+    {
+        if (!ours(problem))
+        {
+            continue;
+        }
+        if (std::optional<ALScriptFix> fix = ALScriptFixes::suppression(problem, text.line(problem.line), lua))
+        {
+            fix->title = alScriptKeyedWords(fix->key, fix->args, fix->title);
+            problem.fixes.push_back(std::move(*fix));
+        }
+    }
+}
+
+bool ALFloaterScriptStudio::applyFix(Doc& doc, const ALScriptFix& fix)
+{
+    if (!doc.loaded || !doc.modifiable || fix.edits.empty())
+    {
+        return false;
+    }
+    // In the places of the check it was made in: a text typed in since is
+    // checked again, and its fixes offered afresh.
+    ALCodeEditor&         source = sourceInFront(doc);
+    const ALTextDocument& text   = source.document();
+    if (doc.analysisVersion != text.version())
+    {
+        setStatus(getString("FixStale"), true);
+        scheduleAnalysis(doc, true);
+        return false;
+    }
+    std::vector<std::pair<ALTextRange, std::string>> edits;
+    for (const ALScriptEdit& edit : fix.edits)
+    {
+        const ALTextRange range(ALTextPos(edit.line, edit.column), ALTextPos(edit.endLine, edit.endColumn));
+        if (text.clamp(range.begin) != range.begin || text.clamp(range.end) != range.end)
+        {
+            setStatus(getString("FixStale"), true);
+            scheduleAnalysis(doc, true);
+            return false;
+        }
+        edits.emplace_back(range, edit.text);
+    }
+    if (!source.replaceAll(std::move(edits)))
+    {
+        return false;
+    }
+    source.undoJournal().label("fix");
+    setStatus(fix.title);
+    scheduleAnalysis(doc, true);
+    return true;
+}
+
+// static
+std::vector<const ALScriptFix*> ALFloaterScriptStudio::fixesOfKind(const Doc& doc, const std::string& key)
+{
+    std::vector<const ALScriptFix*> taken;
+    if (key.empty())
+    {
+        return taken;
+    }
+    for (const Doc::Shown& shown : doc.shown)
+    {
+        if (shown.key != key || !shown.file.empty())
+        {
+            continue;
+        }
+        for (const ALScriptFix& fix : shown.fixes)
+        {
+            if (fix.preferred && fix.kind == ALScriptFix::Kind::Fix)
+            {
+                taken.push_back(&fix);
+                break;
+            }
+        }
+    }
+    // One step of edits that never meet: of two that would, the first.
+    const auto begin_of = [](const ALScriptEdit& edit) { return ALTextPos(edit.line, edit.column); };
+    const auto end_of   = [](const ALScriptEdit& edit) { return ALTextPos(edit.endLine, edit.endColumn); };
+    std::vector<const ALScriptFix*> kept;
+    std::vector<ALTextRange>        claimed;
+    for (const ALScriptFix* fix : taken)
+    {
+        const bool meets = std::any_of(fix->edits.begin(), fix->edits.end(), [&](const ALScriptEdit& edit) {
+            return std::any_of(claimed.begin(), claimed.end(), [&](const ALTextRange& range) {
+                return (begin_of(edit) < range.end && range.begin < end_of(edit)) ||
+                       (begin_of(edit) == end_of(edit) && range.begin == range.end && begin_of(edit) == range.begin);
+            });
+        });
+        if (meets)
+        {
+            continue;
+        }
+        for (const ALScriptEdit& edit : fix->edits)
+        {
+            claimed.emplace_back(begin_of(edit), end_of(edit));
+        }
+        kept.push_back(fix);
+    }
+    return kept;
+}
+
+void ALFloaterScriptStudio::askFixAllOfKind(Doc& doc, const std::string& key)
+{
+    const std::vector<const ALScriptFix*> fixes = fixesOfKind(doc, key);
+    if (fixes.size() < 2)
+    {
+        if (!fixes.empty())
+        {
+            applyFix(doc, *fixes.front());
+        }
+        return;
+    }
+    // Asked first, as Replace All asks: many changes at once, said as many.
+    LLSD args;
+    args["FIXES"]                    = counted("Fixes", static_cast<S32>(fixes.size()));
+    args["NAME"]                     = doc.name;
+    args["EXAMPLE"]                  = fixes.front()->title;
+    const LLHandle<LLFloater> handle = getHandle();
+    const std::string         id     = doc.id;
+    LLNotificationsUtil::add("ScriptStudioFixAll", args, LLSD(), [handle, id, key](const LLSD& notification, const LLSD& response) {
+        ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get());
+        const size_t           index  = studio ? studio->indexOf(id) : NONE;
+        if (index != NONE && LLNotificationsUtil::getSelectedOption(notification, response) == 0)
+        {
+            studio->fixAllOfKind(*studio->mDocs[index], key);
+        }
+    });
+}
+
+void ALFloaterScriptStudio::fixAllOfKind(Doc& doc, const std::string& key)
+{
+    if (!doc.loaded || !doc.modifiable)
+    {
+        return;
+    }
+    ALCodeEditor&         source = sourceInFront(doc);
+    const ALTextDocument& text   = source.document();
+    if (doc.analysisVersion != text.version())
+    {
+        setStatus(getString("FixStale"), true);
+        scheduleAnalysis(doc, true);
+        return;
+    }
+    const std::vector<const ALScriptFix*>            fixes = fixesOfKind(doc, key);
+    std::vector<std::pair<ALTextRange, std::string>> edits;
+    for (const ALScriptFix* fix : fixes)
+    {
+        for (const ALScriptEdit& edit : fix->edits)
+        {
+            edits.emplace_back(ALTextRange(ALTextPos(edit.line, edit.column), ALTextPos(edit.endLine, edit.endColumn)), edit.text);
+        }
+    }
+    // Every one of them one step to undo: they were made over one check,
+    // and none meets another.
+    if (!edits.empty() && source.replaceAll(std::move(edits)))
+    {
+        source.undoJournal().label("fix");
+        setStatus(counted("FixesMade", static_cast<S32>(fixes.size())));
+        scheduleAnalysis(doc, true);
+    }
+}
+
+const ALFloaterScriptStudio::Doc::Shown* ALFloaterScriptStudio::shownOf(const LLSD& value) const
+{
+    const size_t index = indexOf(value["doc"].asString());
+    if (index == NONE)
+    {
+        return nullptr;
+    }
+    for (const Doc::Shown& shown : mDocs[index]->shown)
+    {
+        if (shown.line == value["line"].asInteger() && shown.column == value["column"].asInteger() && shown.file == value["file"].asString() &&
+            shown.message == value["message"].asString())
+        {
+            return &shown;
+        }
+    }
+    return nullptr;
+}
+
 void ALFloaterScriptStudio::showEditorKeys()
 {
     applyMenuKeys();
@@ -5953,7 +6199,11 @@ void ALFloaterScriptStudio::refreshUndoLabels()
     mUndoSaid       = undo;
     mRedoSaid       = redo;
     const auto what = [this](const std::string& label) {
-        return label == "rename" ? getString("UndoWhatRename") : label == "format" ? getString("UndoWhatFormat") : label == "replace" ? getString("UndoWhatReplace") : std::string();
+        return label == "rename"    ? getString("UndoWhatRename")
+               : label == "format"  ? getString("UndoWhatFormat")
+               : label == "replace" ? getString("UndoWhatReplace")
+               : label == "fix"     ? getString("UndoWhatFix")
+                                    : std::string();
     };
     sayUndoRedo(what(undo), what(redo));
 }
@@ -12626,6 +12876,34 @@ void ALFloaterScriptStudio::showProblemMenu(S32 x, S32 y)
         const std::string lint = lint_of(lua);
         return !lint.empty() && ALScriptLints::level(lua, lint) == ALScriptLints::Level::Error;
     });
+    // Each fix the problem offers, by what it does; and every problem of its
+    // kind at once, where there is more than one to put right.
+    const auto shown_of = [this]() -> const Doc::Shown* {
+        LLScrollListItem* item = mProblems->getFirstSelected();
+        return item ? shownOf(item->getValue()) : nullptr;
+    };
+    enable.add("Problem.FixVisible", [shown_of, doc_of](LLUICtrl* ctrl, const LLSD& param) {
+        const Doc::Shown* shown = shown_of();
+        const Doc*        doc   = doc_of();
+        if (!shown || !doc || !doc->modifiable)
+        {
+            return false;
+        }
+        if (param.asString() == "kind")
+        {
+            return fixesOfKind(*doc, shown->key).size() > 1;
+        }
+        const size_t n = static_cast<size_t>(param.asInteger());
+        if (n >= shown->fixes.size())
+        {
+            return false;
+        }
+        if (LLMenuItemGL* item = ALViewType::as<LLMenuItemGL>(ctrl))
+        {
+            item->setLabel(shown->fixes[n].title);
+        }
+        return true;
+    });
     LLContextMenu* menu = LLUICtrlFactory::createFromFile<LLContextMenu>("menu_script_studio_problem.xml", LLMenuGL::sMenuContainer,
                                                                           LLMenuHolderGL::child_registry_t::instance());
     if (!menu)
@@ -12633,6 +12911,9 @@ void ALFloaterScriptStudio::showProblemMenu(S32 x, S32 y)
         return;
     }
     mProblemMenuHandle = menu->getHandle();
+    const Doc::Shown* shown = shown_of();
+    const Doc*        doc   = doc_of();
+    menu->setItemVisible("fix_separator", shown && doc && doc->modifiable && !shown->fixes.empty());
     menu->show(x, y);
     LLMenuGL::showPopup(mProblems, menu, x, y);
 }
@@ -12703,6 +12984,25 @@ void ALFloaterScriptStudio::onProblemMenu(const std::string& action)
     else if (action == "settings")
     {
         LLFloaterReg::showInstance("script_studio_prefs", LLSD().with("tab", "lints"));
+    }
+    else if (action.compare(0, 4, "fix:") == 0)
+    {
+        // A copy: making it checks the script again and fills the list anew.
+        const Doc::Shown* shown = shownOf(value);
+        const size_t      n     = static_cast<size_t>(atoi(action.c_str() + 4));
+        if (shown && n < shown->fixes.size())
+        {
+            const ALScriptFix fix = shown->fixes[n];
+            applyFix(doc, fix);
+        }
+    }
+    else if (action == "fix_kind")
+    {
+        if (const Doc::Shown* shown = shownOf(value))
+        {
+            const std::string key = shown->key;
+            askFixAllOfKind(doc, key);
+        }
     }
 }
 

@@ -1,10 +1,34 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
-<!-- The right-click menu of Script Studio's problems: the message, with
-     or without where it is, and every problem listed; the run-time errors
-     let go of; and the lint the problem is, which a scripter may turn off
-     or make an error, as the Lints tab of the preferences does. -->
+<!-- The right-click menu of Script Studio's problems: what would put the
+     problem right, each by what it does, and the same for every problem of
+     its kind; the message, with or without where it is, and every problem
+     listed; the run-time errors let go of; and the lint the problem is,
+     which a scripter may turn off or make an error, as the Lints tab of the
+     preferences does. -->
 <context_menu
  name="Script studio problem menu">
+  <!-- Named and shown as the problem offers them (Problem.FixVisible). -->
+  <menu_item_call label="(fix)" layout="topleft" name="fix_0">
+    <menu_item_call.on_click function="Problem.Action" parameter="fix:0" />
+    <menu_item_call.on_visible function="Problem.FixVisible" parameter="0" />
+  </menu_item_call>
+  <menu_item_call label="(fix)" layout="topleft" name="fix_1">
+    <menu_item_call.on_click function="Problem.Action" parameter="fix:1" />
+    <menu_item_call.on_visible function="Problem.FixVisible" parameter="1" />
+  </menu_item_call>
+  <menu_item_call label="(fix)" layout="topleft" name="fix_2">
+    <menu_item_call.on_click function="Problem.Action" parameter="fix:2" />
+    <menu_item_call.on_visible function="Problem.FixVisible" parameter="2" />
+  </menu_item_call>
+  <menu_item_call label="(fix)" layout="topleft" name="fix_3">
+    <menu_item_call.on_click function="Problem.Action" parameter="fix:3" />
+    <menu_item_call.on_visible function="Problem.FixVisible" parameter="3" />
+  </menu_item_call>
+  <menu_item_call label="Fix All of This Kind" layout="topleft" name="fix_kind">
+    <menu_item_call.on_click function="Problem.Action" parameter="fix_kind" />
+    <menu_item_call.on_visible function="Problem.FixVisible" parameter="kind" />
+  </menu_item_call>
+  <menu_item_separator layout="topleft" name="fix_separator" />
   <menu_item_call label="Copy Message" layout="topleft" name="copy">
     <menu_item_call.on_click function="Problem.Action" parameter="copy" />
     <menu_item_call.on_enable function="Problem.Enable" parameter="copy" />

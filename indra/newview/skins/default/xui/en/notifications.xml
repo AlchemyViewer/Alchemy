@@ -1992,6 +1992,18 @@ Replace [PLACES] in [SCRIPTS] with &quot;[WITH]&quot;? Each script's change is o
 
   <notification
    icon="alertmodal.tga"
+   name="ScriptStudioFixAll"
+   type="alertmodal">
+Make [FIXES] in &quot;[NAME]&quot;, one for each problem of this kind, such as &quot;[EXAMPLE]&quot;? They are one step to undo.
+    <tag>confirm</tag>
+    <usetemplate
+     name="okcancelbuttons"
+     notext="Cancel"
+     yestext="Fix"/>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
    name="ScriptStudioRevert"
    type="alertmodal">
 Revert &quot;[NAME]&quot; to its saved text? What was changed since it was last saved is set aside; File &gt; Recover Unsaved Changes has it for a week.

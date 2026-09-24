@@ -146,6 +146,27 @@ ALSourceMap::Loc ALSourceMap::toSource(S32 line, S32 column) const
     return loc;
 }
 
+bool ALSourceMap::verbatimSpan(S32 line, S32 column, S32 endColumn, Loc& begin, Loc& end) const
+{
+    if (line < 0 || line >= S32(mLineStart.size()) || endColumn < column)
+    {
+        return false;
+    }
+    for (size_t i = mLineStart[line]; i < mSegments.size() && mSegments[i].outLine == line; ++i)
+    {
+        const Segment& segment = mSegments[i];
+        // Its end is still its own: an insertion just after a token goes
+        // with the token.
+        if (segment.verbatim && segment.outColumn <= column && endColumn <= segment.outColumn + segment.length)
+        {
+            begin = Loc{ segment.file, segment.line, segment.column + (column - segment.outColumn) };
+            end   = Loc{ segment.file, segment.line, segment.column + (endColumn - segment.outColumn) };
+            return true;
+        }
+    }
+    return false;
+}
+
 ALSourceMap::Loc ALSourceMap::toExpanded(S32 file, S32 line, S32 column) const
 {
     Loc loc;

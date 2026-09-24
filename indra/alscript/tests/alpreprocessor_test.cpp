@@ -1025,4 +1025,38 @@ namespace tut
         ensure("a brace with nothing before it", of({ "", "{" }, 1) == T::None);
         ensure("a line past the end", of({ "switch (x)" }, 1) == T::None);
     }
+
+    template<> template<>
+    void alpreprocessor_object::test<27>()
+    {
+        set_test_name("a stretch of the output copied from the source maps back whole, and one a macro made does not");
+        const ALPreprocessor::Result r = ALPreprocessor::run("#define GREET llOwnerSay(\"hi\")\nGREET;\n    llSay(0, \"x\");\n", options());
+        ensure("no problems: " + messages(r), r.problems.empty());
+        // Where each call landed in the output.
+        S32 greet_line = -1, greet_column = -1, say_line = -1, say_column = -1;
+        std::istringstream in(r.text);
+        std::string        line;
+        for (S32 n = 0; std::getline(in, line); ++n)
+        {
+            if (const size_t at = line.find("llOwnerSay"); at != std::string::npos)
+            {
+                greet_line   = n;
+                greet_column = static_cast<S32>(at);
+            }
+            if (const size_t at = line.find("llSay"); at != std::string::npos)
+            {
+                say_line   = n;
+                say_column = static_cast<S32>(at);
+            }
+        }
+        ensure("both in the output: " + r.text, greet_line >= 0 && say_line >= 0);
+        ALSourceMap::Loc begin, end;
+        ensure("llSay is the source's own", r.map.verbatimSpan(say_line, say_column, say_column + 5, begin, end));
+        ensure_equals("from its line", begin.line, 2);
+        ensure_equals("its column", begin.column, 4);
+        ensure_equals("to its end", end.column, 9);
+        ensure_equals("in the script", begin.file, 0);
+        ensure("an insertion after it too", r.map.verbatimSpan(say_line, say_column + 5, say_column + 5, begin, end) && begin.column == 9);
+        ensure("what the macro made is not", !r.map.verbatimSpan(greet_line, greet_column, greet_column + 10, begin, end));
+    }
 } // namespace tut
