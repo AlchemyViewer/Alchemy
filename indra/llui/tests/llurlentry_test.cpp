@@ -897,6 +897,36 @@ namespace tut
         testRegex("don't match urls w/o protocol", url,
                   "and even no www something lindenlab.com",
                   "");
+
+        // Only a host that ends where the text or a space does: anything
+        // longer is LLUrlEntrySecondlifeURL's or LLUrlEntryHTTP's.
+        testRegex("a host at the end of the text", url,
+                  "go to http://secondlife.com",
+                  "http://secondlife.com");
+
+        testRegex("a host at the end of a line", url,
+                  "go to https://www.secondlife.com\nand look",
+                  "https://www.secondlife.com");
+
+        testRegex("a host with a tab after it", url,
+                  "go to http://secondlifegrid.net\tnow",
+                  "http://secondlifegrid.net");
+
+        testRegex("not a host with a path", url,
+                  "see http://secondlife.com/foo here",
+                  "");
+
+        testRegex("not a host with a port", url,
+                  "at https://secondlife.com:888 now",
+                  "");
+
+        testRegex("not a host that goes on", url,
+                  "at https://secondlife.com.example.net x",
+                  "");
+
+        testRegex("not a host with a full stop after it", url,
+                  "visit http://secondlife.com.",
+                  "");
     }
 
     template<> template<>

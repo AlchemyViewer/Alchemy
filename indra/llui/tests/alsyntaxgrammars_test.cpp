@@ -258,4 +258,31 @@ namespace tut
         ensure("the ends kept are held to a number", grammar.cachedEndPatterns() <= 256);
         ensure("and they still close", state.frames.size() == 1);
     }
+
+    template<> template<>
+    void alsyntaxgrammars_object::test<9>()
+    {
+        set_test_name("what opens a block: in SLua a function the line leaves open, in XML a tag that does not close itself");
+        std::shared_ptr<const ALSyntaxGrammar> slua = library.find("slua");
+        ensure("slua indents", slua && slua->indents());
+        ensure("then", slua->opensBlock("if x then"));
+        ensure("a brace", slua->opensBlock("local t = {"));
+        ensure("a function left open", slua->opensBlock("foo(function(x)"));
+        ensure("one with its return type", slua->opensBlock("local function f(a: number): string"));
+        ensure("not one that ends on the line", !slua->opensBlock("foo(function() return 1 end)"));
+        ensure("the last of two, open", slua->opensBlock("f(function() end, function(x)"));
+        ensure("do after a function closed on the line", slua->opensBlock("x = function() end; for i = 1, 3 do"));
+        ensure("not one with end in a comment after it", !slua->opensBlock("function f() -- the end"));
+        ensure("nor a name that holds end", slua->opensBlock("function f(endpoint)"));
+
+        std::shared_ptr<const ALSyntaxGrammar> xml = library.find("xml");
+        ensure("xml indents", xml && xml->indents());
+        ensure("a tag", xml->opensBlock("<a>"));
+        ensure("one with attributes", xml->opensBlock("<panel name=\"x\" follows=\"all\">"));
+        ensure("a blank inside", xml->opensBlock("<a >"));
+        ensure("not one that closes itself", !xml->opensBlock("<a/>"));
+        ensure("nor with attributes", !xml->opensBlock("<a b=\"c\"/>"));
+        ensure("the last tag, open", xml->opensBlock("<a/> <b>"));
+        ensure("not a closing tag's line", !xml->opensBlock("</a>"));
+    }
 }
