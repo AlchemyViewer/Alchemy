@@ -928,4 +928,22 @@ namespace tut
         ensure("both arguments set to locals: " + put.text, a != std::string::npos && b != std::string::npos);
         ensure("the first first: " + put.text, a < b);
     }
+    template<> template<>
+    void allsloptimizer_object::test<24>()
+    {
+        set_test_name("a true branch that ends in an if of its own is printed in braces where an else follows, so that the else stays the outer if's");
+        // if (!c) A; else if (d) B; swapped round: the inner if has no else.
+        ALLSLOptimizer::Result r =
+            ALLSLOptimizer::run(wrap("integer c;\ninteger d = 1;\n", "        if (!c) llOwnerSay(\"A\"); else if (d) llOwnerSay(\"B\");\n        c = 1; d = 0;\n"), options());
+        ensure("swapped: " + notes(r), has(r, "swapped the branches"));
+        ensure("the inner if in braces: " + r.text, r.text.find("        if (c)\n        {\n            if (d)\n                llOwnerSay(\"B\");\n        }\n") != std::string::npos);
+        ensure("the else the outer if's: " + r.text, r.text.find("        }\n        else\n            llOwnerSay(\"A\");\n") != std::string::npos);
+        // And one whose inner if stands in a loop.
+        r = ALLSLOptimizer::run(wrap("integer c;\ninteger d = 1;\n", "        if (!c) llOwnerSay(\"A\"); else while (d--) if (d == 3) llOwnerSay(\"B\");\n        c = 1;\n"), options());
+        ensure("the loop in braces: " + r.text, r.text.find("        if (c)\n        {\n            while (d--)\n") != std::string::npos &&
+                                                    r.text.find("        }\n        else\n            llOwnerSay(\"A\");\n") != std::string::npos);
+        // Where the inner if has an else of its own, nothing is added.
+        r = ALLSLOptimizer::run(wrap("integer c;\ninteger d = 1;\n", "        if (!c) llOwnerSay(\"A\"); else if (d) llOwnerSay(\"B\"); else llOwnerSay(\"C\");\n        c = 1; d = 0;\n"), options());
+        ensure("no braces an else chain does not need: " + r.text, r.text.find('{', r.text.find("if (c)")) > r.text.find("llOwnerSay(\"A\")"));
+    }
 } // namespace tut

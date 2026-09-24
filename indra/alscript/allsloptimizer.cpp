@@ -3339,6 +3339,66 @@ namespace
             problems.push_back(std::move(p));
         }
     }
+
+    // Whether a statement standing as an if's true branch, with an else
+    // after it, would take that else for its own once printed: an if with
+    // no else, or a loop or an else that ends in one.
+    bool endsInBareIf(LSLASTNode* statement)
+    {
+        LSLASTNode* s = statement;
+        while (s && s->getNodeType() == NODE_STATEMENT)
+        {
+            switch (s->getNodeSubType())
+            {
+                case NODE_IF_STATEMENT:
+                {
+                    LSLASTNode* otherwise = s->getChild(2);
+                    if (!otherwise || otherwise->getNodeType() == NODE_NULL)
+                    {
+                        return true;
+                    }
+                    s = otherwise;
+                    break;
+                }
+                case NODE_WHILE_STATEMENT:
+                    s = s->getChild(1);
+                    break;
+                case NODE_FOR_STATEMENT:
+                    s = s->getChild(3);
+                    break;
+                default:
+                    return false;
+            }
+        }
+        return false;
+    }
+
+    // Braces round each true branch that would otherwise take the else
+    // after it. The passes move branches about -- `if (!c) A else B` swapped
+    // round, an empty branch turned into a negated condition -- and the
+    // printer, as the grammar reads it back, gives an else to the nearest
+    // if before it.
+    void braceDanglingElses(LSLASTNode* node, ScriptAllocator* allocator)
+    {
+        for (LSLASTNode* child = node->getChild(0); child; child = child->getNext())
+        {
+            braceDanglingElses(child, allocator);
+        }
+        if (node->getNodeType() != NODE_STATEMENT || node->getNodeSubType() != NODE_IF_STATEMENT)
+        {
+            return;
+        }
+        LSLASTNode* otherwise = node->getChild(2);
+        if (!otherwise || otherwise->getNodeType() == NODE_NULL || !endsInBareIf(node->getChild(1)))
+        {
+            return;
+        }
+        LSLASTNode* yes   = node->takeChild(1);
+        auto*       block = allocator->newTracked<LSLCompoundStatement>(nullptr);
+        block->setLoc(yes->getLoc());
+        block->pushChild(yes);
+        node->setChild(1, block);
+    }
 } // namespace
 
 ALLSLOptimizer::Result ALLSLOptimizer::run(std::string_view source, const Options& options)
@@ -3502,6 +3562,7 @@ ALLSLOptimizer::Result ALLSLOptimizer::run(std::string_view source, const Option
     {
         shrink(script, parser.context, parser.allocator, report, result);
     }
+    braceDanglingElses(script, &parser.allocator);
 
     PrettyPrintOpts opts{};
     opts.mangle_local_names  = options.shrinknames;
