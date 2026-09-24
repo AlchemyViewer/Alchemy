@@ -61,15 +61,19 @@ namespace
             fs::remove_all(root, ec);
         }
 
+        // In the system's own separators, as a path that has been followed
+        // is put.
+        fs::path under(const std::string& relative) const { return (root / relative).make_preferred(); }
+
         std::string write(const std::string& relative, const std::string& text) const
         {
-            const fs::path path = root / relative;
+            const fs::path path = under(relative);
             fs::create_directories(path.parent_path());
             std::ofstream out(path, std::ios::binary);
             out << text;
             return fsyspath(path).string();
         }
-        std::string at(const std::string& relative) const { return fsyspath(root / relative).string(); }
+        std::string at(const std::string& relative) const { return fsyspath(under(relative)).string(); }
     };
 }
 

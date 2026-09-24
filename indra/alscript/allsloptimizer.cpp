@@ -2989,7 +2989,21 @@ namespace
                 symbols.push_back(sym);
             }
         }
-        std::stable_sort(symbols.begin(), symbols.end(), [](LSLSymbol* a, LSLSymbol* b) { return a->getReferences() > b->getReferences(); });
+        // Equally used, the first declared first, then by name: the tables
+        // are hash maps, whose order is the standard library's own.
+        std::stable_sort(symbols.begin(), symbols.end(), [](LSLSymbol* a, LSLSymbol* b) {
+            if (a->getReferences() != b->getReferences())
+            {
+                return a->getReferences() > b->getReferences();
+            }
+            const Tailslide::YYLTYPE& at = *a->getLoc();
+            const Tailslide::YYLTYPE& bt = *b->getLoc();
+            if (at < bt || bt < at)
+            {
+                return at < bt;
+            }
+            return strcmp(a->getName(), b->getName()) < 0;
+        });
         const std::string first = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_";
         const std::string rest  = first + "0123456789";
         std::vector<int>  digits;

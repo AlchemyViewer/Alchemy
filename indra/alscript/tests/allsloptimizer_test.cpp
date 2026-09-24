@@ -31,10 +31,13 @@
 
 #include "../test/lltut.h"
 
+#include <cmath>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <initializer_list>
 #include <sstream>
+#include <vector>
 
 namespace tut
 {
@@ -73,6 +76,64 @@ namespace tut
         }
 
         static bool has(const ALLSLOptimizer::Result& r, const std::string& text) { return notes(r).find(text) != std::string::npos; }
+
+        // The numbers a declaration was folded to, `<x, y, z>` or one
+        // alone; none where it was left a call.
+        static std::vector<F32> numbers(const std::string& text, const std::string& declaration)
+        {
+            std::vector<F32> out;
+            const size_t     at = text.find(declaration + " = ");
+            if (at == std::string::npos)
+            {
+                return out;
+            }
+            const char* p = text.c_str() + at + declaration.size() + 3;
+            if (*p == '<')
+            {
+                ++p;
+            }
+            while (true)
+            {
+                char*     end = nullptr;
+                const F32 v   = std::strtof(p, &end);
+                if (end == p)
+                {
+                    break;
+                }
+                out.push_back(v);
+                p = end;
+                if (*p != ',')
+                {
+                    break;
+                }
+                ++p;
+                while (*p == ' ')
+                {
+                    ++p;
+                }
+            }
+            return out;
+        }
+
+        // Within a few units in the last place of each: the viewer's float
+        // arithmetic is as near as the simulator's own comes, and how near
+        // is the compiler's to say.
+        static bool about(const std::vector<F32>& got, std::initializer_list<F32> want)
+        {
+            if (got.size() != want.size())
+            {
+                return false;
+            }
+            size_t i = 0;
+            for (const F32 w : want)
+            {
+                if (std::fabs(got[i++] - w) > 1e-6f)
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
 
         // A script around a state_entry body, and the body printed back.
         static std::string wrap(const std::string& globals, const std::string& body)
@@ -307,11 +368,11 @@ namespace tut
         ensure("optimized", r.optimized);
         auto has = [&r](const char* text) { return r.text.find(text) != std::string::npos; };
         // A quarter turn about z: x and y zero, z and s a half root two.
-        ensure("euler to rot: " + r.text, has("rotation a = <0, 0, 0.70710677, 0.70710677>;") || has("rotation a = <0, 0, 0.7071068, 0.7071068>;"));
-        ensure("rot to euler: " + r.text, has("vector b = <0, 0, 1.5707964>;") || has("vector b = <0, 0, 1.5707963>;"));
-        ensure("axis and angle, the axis normalised: " + r.text, has("rotation c = <0, 0, 1, ") && !has("llAxisAngle2Rot"));
-        ensure("the axis back, a bit under one as the division leaves it: " + r.text, has("vector d = <0, 0, 0.99999994>;") || has("vector d = <0, 0, 1>;"));
-        ensure("the angle back: " + r.text, has("float e = 1.5707964;") || has("float e = 1.5707963;"));
+        ensure("euler to rot: " + r.text, about(numbers(r.text, "rotation a"), { 0.f, 0.f, 0.70710677f, 0.70710677f }));
+        ensure("rot to euler: " + r.text, about(numbers(r.text, "vector b"), { 0.f, 0.f, 1.5707964f }));
+        ensure("axis and angle, the axis normalised: " + r.text, about(numbers(r.text, "rotation c"), { 0.f, 0.f, 1.f, 0.f }) && !has("llAxisAngle2Rot"));
+        ensure("the axis back: " + r.text, about(numbers(r.text, "vector d"), { 0.f, 0.f, 1.f }));
+        ensure("the angle back: " + r.text, about(numbers(r.text, "float e"), { 1.5707964f }));
         ensure("fwd of a quarter turn is left: " + r.text, !has("llRot2Fwd(<0, 0, 0.7071068, 0.7071068>)") && has("vector f = <"));
         ensure("up of a roll: " + r.text, !has("llRot2Up(") && has("vector h = <0, -"));
         ensure("no rotation has no axis: left", has("llRot2Axis(<0, 0, 0, 1>)"));

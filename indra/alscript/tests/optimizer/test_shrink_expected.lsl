@@ -1,7 +1,7 @@
 integer a;
-c(string e)
+c(string d)
 {
-    llSay(0, "Hello, world: " + e);
+    llSay(0, "Hello, world: " + d);
 }
 
 default
@@ -11,23 +11,23 @@ default
         c("started");
     }
 
-    touch_start(integer f)
+    touch_start(integer e)
     {
         integer b;
-        for (b = 0; b < f; b = b + 1)
+        for (b = 0; b < e; b = b + 1)
         {
             a = a + 1;
             c((string)a);
         }
-        @g;
+        @f;
         if (a > 100)
-            jump h;
-        jump g;
-        @h;
-        state d;
+            jump g;
+        jump f;
+        @g;
+        state h;
     }
 }
-state d
+state h
 {
     state_entry()
     {
