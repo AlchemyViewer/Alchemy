@@ -56,7 +56,6 @@ public:
     void refresh() override;
     // callback for when client modifies a render option
     void onRenderOptionEnable();
-    void onAdvancedAtmosphericsEnable();
     LOG_CLASS(LLFloaterPreferenceGraphicsAdvanced);
 
 protected:

@@ -2203,8 +2203,6 @@
   <string>Exibir a interface do usuário na captura.</string>
   <key>RenderUnloadedAvatar</key>
   <string>Mostrar avatares que ainda não terminaram de carregar.</string>
-  <key>RenderUseAdvancedAtmospherics</key>
-  <string>Usar atmosféricos pré-computados sofisticados e afins.</string>
   <key>RenderUseFarClip</key>
   <string>Se falso, o culling de frustum ignorará o plano de far clip.</string>
   <key>RenderUseStreamVBO</key>

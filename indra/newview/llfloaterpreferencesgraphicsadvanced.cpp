@@ -138,17 +138,6 @@ void LLFloaterPreferenceGraphicsAdvanced::onRenderOptionEnable()
     refreshEnabledGraphics();
 }
 
-void LLFloaterPreferenceGraphicsAdvanced::onAdvancedAtmosphericsEnable()
-{
-    LLFloaterPreference* instance = LLFloaterReg::findTypedInstance<LLFloaterPreference>("preferences");
-    if (instance)
-    {
-        instance->refresh();
-    }
-
-    refreshEnabledGraphics();
-}
-
 void LLFloaterPreferenceGraphicsAdvanced::refresh()
 {
     // sliders and their text boxes
