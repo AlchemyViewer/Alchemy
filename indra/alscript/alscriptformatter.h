@@ -28,6 +28,7 @@
 
 #include <string>
 #include <string_view>
+#include <vector>
 
 // A formatter over the tokens of a script rather than its tree, so that
 // every comment, string and line break the author wrote is still there
@@ -64,4 +65,12 @@ public:
     // Only the lines from `first` to `last`, zero-based and inclusive,
     // changed; the rest as it was, and every line where it was.
     static std::string formatLines(std::string_view text, const Options& options, S32 first, S32 last);
+
+    // Which line breaks stand inside a string, one for each line of `text`:
+    // true where the break that ends the line is part of a string that runs
+    // on to the next -- a Luau long string, a string continued by a
+    // backslash, an LSL string with a break written into it. The blanks
+    // before such a break, and a blank line after it, are the string's and
+    // not the layout's: nothing that tidies a script's lines may touch them.
+    static std::vector<bool> breaksInStrings(std::string_view text, bool lua);
 };

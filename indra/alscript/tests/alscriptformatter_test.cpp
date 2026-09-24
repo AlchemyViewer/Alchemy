@@ -231,4 +231,27 @@ namespace tut
                                   "    }\n"
                                   "}\n"));
     }
+    template<> template<>
+    void alscriptformatter_object::test<8>()
+    {
+        set_test_name("the line breaks that stand inside a string are known, so that tidying lines leaves them and the blanks before them alone");
+        const auto marked = [](const std::vector<bool>& breaks) {
+            std::string out;
+            for (const bool in : breaks)
+            {
+                out += in ? '1' : '0';
+            }
+            return out;
+        };
+        // A Luau long string over five lines, with blank lines in it; a long
+        // comment is not a string.
+        ensure_equals("a long string", marked(ALScriptFormatter::breaksInStrings("local s = [[\n  a  \n\n\n\nb]]\nprint(s)\n", true)), std::string("11111000"));
+        ensure_equals("a long comment", marked(ALScriptFormatter::breaksInStrings("--[[\n\n]]\nprint(1)\n", true)), std::string("00000"));
+        ensure_equals("a string continued by a backslash", marked(ALScriptFormatter::breaksInStrings("print(\"a \\\nb\")\n", true)), std::string("100"));
+        // LSL: a break written into a string, an escaped quote that does not
+        // end it, and quotes in comments that begin nothing.
+        ensure_equals("an LSL string", marked(ALScriptFormatter::breaksInStrings("string s = \"a  \n\n\nb\";\n// \"not\n/* \" */ integer i;\n", false)),
+                      std::string("1110000"));
+        ensure_equals("an escaped quote", marked(ALScriptFormatter::breaksInStrings("string s = \"a\\\"\nb\";\n", false)), std::string("100"));
+    }
 }

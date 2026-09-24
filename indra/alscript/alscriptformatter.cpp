@@ -773,3 +773,95 @@ std::string ALScriptFormatter::formatLines(std::string_view text, const Options&
     decide(lines, options.lua);
     return emit(lines, options, endsWithNewline, first, last);
 }
+
+// static
+std::vector<bool> ALScriptFormatter::breaksInStrings(std::string_view text, bool lua)
+{
+    std::vector<bool> out(static_cast<size_t>(std::count(text.begin(), text.end(), '\n')) + 1, false);
+    const auto        mark = [&out](S32 line) {
+        if (line >= 0 && static_cast<size_t>(line) < out.size())
+        {
+            out[static_cast<size_t>(line)] = true;
+        }
+    };
+    if (lua)
+    {
+        // Luau's strings are the tokens' own: a quoted one ends at its line
+        // but for a backslash before the break, a long one runs on.
+        for (const Token& t : ALPreprocessor::tokenize(text, true))
+        {
+            if (t.kind != Kind::String)
+            {
+                continue;
+            }
+            S32 line = t.line;
+            for (const char c : t.text)
+            {
+                if (c == '\n')
+                {
+                    mark(line++);
+                }
+            }
+        }
+        return out;
+    }
+    // An LSL string may hold a break as written, which the tokens -- read
+    // as a preprocessor reads C -- end at; so the text is read here, past
+    // comments, a quote to its closing quote.
+    bool in_string = false;
+    bool in_block  = false;
+    S32  line      = 0;
+    for (size_t i = 0; i < text.size(); ++i)
+    {
+        const char c    = text[i];
+        const char next = i + 1 < text.size() ? text[i + 1] : '\0';
+        if (c == '\n')
+        {
+            if (in_string)
+            {
+                mark(line);
+            }
+            ++line;
+        }
+        else if (in_block)
+        {
+            if (c == '*' && next == '/')
+            {
+                in_block = false;
+                ++i;
+            }
+        }
+        else if (in_string)
+        {
+            if (c == '\\' && next != '\0')
+            {
+                if (next == '\n')
+                {
+                    mark(line++);
+                }
+                ++i;
+            }
+            else if (c == '"')
+            {
+                in_string = false;
+            }
+        }
+        else if (c == '"')
+        {
+            in_string = true;
+        }
+        else if (c == '/' && next == '/')
+        {
+            while (i + 1 < text.size() && text[i + 1] != '\n')
+            {
+                ++i;
+            }
+        }
+        else if (c == '/' && next == '*')
+        {
+            in_block = true;
+            ++i;
+        }
+    }
+    return out;
+}

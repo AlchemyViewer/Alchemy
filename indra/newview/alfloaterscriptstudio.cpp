@@ -12873,6 +12873,12 @@ void ALFloaterScriptStudio::format(Doc& doc, bool selection_only)
     }
     std::vector<std::pair<ALTextRange, std::string>> edits;
     std::vector<bool>                                 gone(static_cast<size_t>(count), false);
+    // A line that begins inside a string -- a long string, an LSL string
+    // with a break written into it -- is the string's to the letter, and
+    // so are the blanks before a break inside one.
+    const std::vector<bool> in_string      = ALScriptFormatter::breaksInStrings(text, options.lua);
+    const auto              starts_in_text = [&in_string](S32 i) { return i > 0 && static_cast<size_t>(i - 1) < in_string.size() && in_string[static_cast<size_t>(i - 1)]; };
+    const auto              ends_in_text   = [&in_string](S32 i) { return static_cast<size_t>(i) < in_string.size() && in_string[static_cast<size_t>(i)]; };
     if (!selection_only)
     {
         // Runs of blank lines beyond a few, and every blank line at the
@@ -12881,13 +12887,13 @@ void ALFloaterScriptStudio::format(Doc& doc, bool selection_only)
         S32  run   = 0;
         for (S32 i = 0; i < count; ++i)
         {
-            run = blank(i) ? run + 1 : 0;
+            run = blank(i) && !starts_in_text(i) ? run + 1 : 0;
             if (run > options.maxBlankLines && i + 1 < count)
             {
                 gone[static_cast<size_t>(i)] = true;
             }
         }
-        for (S32 i = count - 1; i > 0 && blank(i); --i)
+        for (S32 i = count - 1; i > 0 && blank(i) && !starts_in_text(i); --i)
         {
             // The last line is what follows the final newline; blank
             // lines before it go, and it stays as the file's end.
@@ -12900,13 +12906,26 @@ void ALFloaterScriptStudio::format(Doc& doc, bool selection_only)
     for (S32 i = first; i <= last; ++i)
     {
         const std::string& was = document.line(i);
+        if (starts_in_text(i))
+        {
+            continue;
+        }
         if (gone[static_cast<size_t>(i)])
         {
             edits.emplace_back(ALTextRange(ALTextPos(i, 0), ALTextPos(i + 1, 0)), std::string());
+            continue;
         }
-        else if (was != lines[static_cast<size_t>(i)])
+        std::string now = lines[static_cast<size_t>(i)];
+        if (ends_in_text(i))
         {
-            edits.emplace_back(ALTextRange(ALTextPos(i, 0), ALTextPos(i, static_cast<S32>(was.size()))), lines[static_cast<size_t>(i)]);
+            // Its indentation may change; the blanks it ends in may not.
+            const size_t kept_now = now.find_last_not_of(" \t");
+            const size_t kept_was = was.find_last_not_of(" \t");
+            now = now.substr(0, kept_now == std::string::npos ? 0 : kept_now + 1) + was.substr(kept_was == std::string::npos ? 0 : kept_was + 1);
+        }
+        if (was != now)
+        {
+            edits.emplace_back(ALTextRange(ALTextPos(i, 0), ALTextPos(i, static_cast<S32>(was.size()))), now);
         }
     }
     LLStringUtil::format_map_t args;
@@ -12927,11 +12946,17 @@ void ALFloaterScriptStudio::trimTrailing(Doc& doc)
         return;
     }
     // Every line's blanks at its end, the one the caret is on too, as
-    // one step to undo.
-    const ALTextDocument&                            document = doc.editor->document();
+    // one step to undo; but for those before a break inside a string,
+    // which are the string's.
+    const ALTextDocument&                            document  = doc.editor->document();
+    const std::vector<bool>                          in_string = ALScriptFormatter::breaksInStrings(document.text(), doc.language.lua);
     std::vector<std::pair<ALTextRange, std::string>> edits;
     for (S32 line = 0; line < document.lineCount(); ++line)
     {
+        if (static_cast<size_t>(line) < in_string.size() && in_string[static_cast<size_t>(line)])
+        {
+            continue;
+        }
         const std::string& text = document.line(line);
         const size_t       kept = text.find_last_not_of(" \t");
         const size_t       end  = kept == std::string::npos ? 0 : kept + 1;
