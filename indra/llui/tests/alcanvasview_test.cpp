@@ -37,6 +37,7 @@
 #include "../test/lltut.h"
 
 #include <string>
+#include <vector>
 
 // llui reaches the viewer for this one, and linking any of the library pulls
 // the object that calls it. Nothing under test goes near it.
@@ -45,6 +46,43 @@ const std::string gCanvasTestAnonName("Anon");
 const std::string& rlvGetAnonym(const LLAvatarName& av_name)
 {
     return gCanvasTestAnonName;
+}
+
+namespace
+{
+    // Something on a surface that says where the pointer and a drop reached
+    // it, in its own coordinates.
+    struct Target : public LLView
+    {
+        std::vector<std::pair<S32, S32>> clicks;
+        std::vector<std::pair<S32, S32>> drops;
+
+        explicit Target(const LLView::Params& p) : LLView(p) {}
+
+        bool handleMouseDown(S32 x, S32 y, MASK) override
+        {
+            clicks.emplace_back(x, y);
+            return true;
+        }
+        bool handleDragAndDrop(S32 x, S32 y, MASK, bool, EDragAndDropType, void*, EAcceptance* accept, std::string&) override
+        {
+            drops.emplace_back(x, y);
+            *accept = ACCEPT_YES_SINGLE;
+            return true;
+        }
+    };
+
+    Target* target(LLView* on, const LLRect& rect)
+    {
+        LLView::Params p;
+        p.name         = "target";
+        p.rect         = rect;
+        p.mouse_opaque = true;
+        p.visible      = true;
+        Target* made   = new Target(p);
+        on->addChild(made);
+        return made;
+    }
 }
 
 namespace tut
@@ -1070,5 +1108,156 @@ namespace tut
         canvas->setDragPans(true);
         ensure("until it says so", canvas->panGesture());
         area->die();
+    }
+
+    // A viewport keeps the size it is given, whatever is on it, and what is
+    // on it may be left of and below nought: the pointer reaches it through
+    // the origin and the zoom, and the way back out lands where it went in.
+    template<> template<>
+    void alcanvasview_object::test<30>()
+    {
+        ALCanvasView* canvas = surface();
+        canvas->setViewport(true);
+        canvas->fitContent(3000, 2000);
+        ensure_equals("its place's width, not its content's", canvas->getRect().getWidth(), ROOM_W);
+        ensure_equals("and height", canvas->getRect().getHeight(), ROOM_H);
+
+        canvas->setContentOrigin(300.f, 200.f);
+        Target* node = target(canvas, LLRect(-100, -40, -60, -60));
+        S32     x = -80, y = -50;
+        canvas->toDrawn(x, y);
+        ensure_equals("drawn across from the origin", x, 220);
+        ensure_equals("and down", y, 150);
+        canvas->toContent(x, y);
+        ensure("and back where it was", x == -80 && y == -50);
+        ensure("clicked where it is drawn", canvas->handleMouseDown(220, 150, MASK_NONE));
+        ensure("reached, in its own coordinates", node->clicks.size() == 1 && node->clicks[0] == std::make_pair(20, 10));
+
+        canvas->setZoom(2.f);
+        x = -80;
+        y = -50;
+        canvas->toDrawn(x, y);
+        canvas->handleMouseDown(x, y, MASK_NONE);
+        ensure("reached at twice the size too", node->clicks.size() == 2 && node->clicks[1] == std::make_pair(20, 10));
+        const LLRect seen = canvas->contentInView();
+        ensure("what is seen, in the surface's own terms, holds it", seen.mLeft <= -100 && seen.mRight >= -60 && seen.mBottom <= -60 && seen.mTop >= -40);
+        canvas->die();
+    }
+
+    // A viewport pans by its origin, with no container to scroll; zooms
+    // about the pointer or the middle keeping that point where it was; and
+    // keeps its top left where it was as its place changes height.
+    template<> template<>
+    void alcanvasview_object::test<31>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        ALCanvasView* canvas = surface(false);
+        gFloaterView->addChild(canvas);
+        canvas->setViewport(true);
+        canvas->beginPan(100, 100);
+        canvas->panTo(160, 70);
+        ensure("the origin follows the hand", canvas->contentOriginX() == 60.f && canvas->contentOriginY() == -30.f);
+        canvas->endPan();
+        canvas->panBy(-10, 5);
+        ensure("and moves by an amount", canvas->contentOriginX() == 50.f && canvas->contentOriginY() == -25.f);
+
+        const auto contentAt = [canvas](S32 x, S32 y) {
+            canvas->toContent(x, y);
+            return std::make_pair(x, y);
+        };
+        const std::pair<S32, S32> under = contentAt(300, 200);
+        canvas->zoomAbout(2.f, 300, 200);
+        ensure_equals("zoomed", canvas->zoom(), 2.f);
+        ensure("what was under the pointer is under it still", contentAt(300, 200) == under);
+        const std::pair<S32, S32> middle = contentAt(ROOM_W / 2, ROOM_H / 2);
+        canvas->setZoom(4.f);
+        ensure("a zoom asked for keeps the middle", contentAt(ROOM_W / 2, ROOM_H / 2) == middle);
+
+        const std::pair<S32, S32> corner = contentAt(0, ROOM_H);
+        canvas->reshape(ROOM_W, ROOM_H + 100);
+        ensure("the top left stays put as the place grows", contentAt(0, ROOM_H + 100) == corner);
+        canvas->die();
+    }
+
+    // A drop reaches what is on a surface where it is drawn, zoomed or
+    // panned, bounded or not.
+    template<> template<>
+    void alcanvasview_object::test<32>()
+    {
+        std::string tip;
+        EAcceptance accept = ACCEPT_NO;
+        {
+            ALCanvasView* canvas = surface();
+            Target* node = target(canvas, LLRect(40, 80, 100, 20));
+            canvas->setZoom(2.f);
+            ensure("taken", canvas->handleDragAndDrop(100, 60, MASK_NONE, true, DAD_NOTECARD, nullptr, &accept, tip));
+            ensure("on a zoomed surface, in its own coordinates", node->drops.size() == 1 && node->drops[0] == std::make_pair(10, 10));
+            canvas->die();
+        }
+        {
+            ALCanvasView* canvas = surface();
+            canvas->setViewport(true);
+            canvas->setContentOrigin(200.f, 100.f);
+            Target* node = target(canvas, LLRect(-50, 0, 0, -50));
+            accept = ACCEPT_NO;
+            canvas->handleDragAndDrop(160, 70, MASK_NONE, false, DAD_NOTECARD, nullptr, &accept, tip);
+            ensure("in a viewport, left of and below nought", node->drops.size() == 1 && node->drops[0] == std::make_pair(10, 20));
+            ensure("and what it says of it answered", accept == ACCEPT_YES_SINGLE);
+            canvas->die();
+        }
+    }
+
+    // What is on a zoomed or panned canvas is on the screen where it is
+    // drawn, which is what a popover beside it is placed by -- not where
+    // its own screen rect, at a hundred per cent from the corner, says.
+    template<> template<>
+    void alcanvasview_object::test<33>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        ALCanvasView* canvas = surface(false);
+        gFloaterView->addChild(canvas);
+        canvas->setViewport(true);
+        canvas->setContentOrigin(250.f, 150.f);
+        canvas->setZoom(2.f);
+        Target* node = target(canvas, LLRect(-20, 30, 20, 10));
+        S32 sx = 0, sy = 0;
+        canvas->localPointToScreen(0, 0, &sx, &sy);
+        const F32    ox     = canvas->contentOriginX();
+        const F32    oy     = canvas->contentOriginY();
+        const LLRect screen = canvas->screenRectOf(node);
+        ensure_equals("its left, where it is drawn", screen.mLeft, sx + ll_round(ox - 40.f));
+        ensure_equals("its right", screen.mRight, sx + ll_round(ox + 40.f));
+        ensure_equals("its top", screen.mTop, sy + ll_round(oy + 60.f));
+        ensure_equals("its bottom", screen.mBottom, sy + ll_round(oy + 20.f));
+        ensure("not where its own rect says", node->calcScreenRect() != screen);
+        S32 x = -20, y = 10;
+        canvas->toScreen(x, y);
+        ensure("a point out the same way", x == screen.mLeft && y == screen.mBottom);
+        canvas->die();
+    }
+
+    // A bounded surface's origin is its corner: moved by nothing, and
+    // back at the corner when a viewport stops being one.
+    template<> template<>
+    void alcanvasview_object::test<34>()
+    {
+        ALCanvasView* canvas = surface();
+        canvas->setContentOrigin(40.f, 40.f);
+        ensure("not a viewport's to move", canvas->contentOriginX() == 0.f && canvas->contentOriginY() == 0.f);
+        canvas->setViewport(true);
+        canvas->setContentOrigin(40.f, 40.f);
+        canvas->setViewport(false);
+        ensure("a corner again", canvas->contentOriginX() == 0.f && canvas->contentOriginY() == 0.f);
+        S32 x = 30, y = 30;
+        canvas->setZoom(2.f);
+        canvas->toContent(x, y);
+        ensure("and the zoom alone taken out", x == 15 && y == 15);
+        canvas->die();
     }
 }

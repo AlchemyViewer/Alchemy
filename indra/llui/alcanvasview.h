@@ -24,6 +24,7 @@
 
 #pragma once
 
+#include "aldraggesture.h"
 #include "llfontgl.h"
 #include "llpanel.h"
 
@@ -62,6 +63,18 @@
 // carries its children through a reshape by their follows flags, which would
 // stretch a previewed window to the size of the thing previewing it, so this
 // reshapes without them and writes the root back where it was put.
+//
+// **A canvas may be a viewport instead** (setViewport): it fills the place
+// it is given and owns its transform, an origin and a zoom, so what is on
+// it may be anywhere -- left of and below nought as readily as right of and
+// above it -- and a pan is the origin moving, with no container to scroll.
+// What a graph is drawn on. A bounded surface's origin is its corner, and
+// what is said above of a surface's sizes is a bounded one's.
+//
+// Every way in goes through the transform: the pointer and a drop come in
+// through toContent, and whoever places something beside what is on the
+// canvas -- a popover, a card -- asks it where that is on the screen
+// (screenRectOf), since what is on it knows nothing of the zoom.
 class ALCanvasView : public LLPanel
 {
 public:
@@ -169,7 +182,7 @@ public:
     // by however far the pointer went in drawn pixels.
     void setDragPans(bool pans) { mDragPans = pans; }
     bool dragPans() const { return mDragPans; }
-    bool panning() const { return mPanning; }
+    bool panning() const { return mPan.pressed(); }
     // Whether a press now is the start of a pan: the space bar is held,
     // or the surface drags by itself.
     bool panGesture() const;
@@ -242,10 +255,34 @@ public:
     void setPixelGrid(bool shown) { mPixelGrid = shown; }
     bool pixelGrid() const { return mPixelGrid; }
 
+    // A viewport, or a bounded surface as it was; a canvas made a viewport
+    // keeps the size it is given, and its origin where nought was drawn.
+    void setViewport(bool viewport);
+    bool viewport() const { return mViewport; }
+    // Where the surface's nought is drawn, in the canvas's own pixels: moved
+    // by a pan, and by a zoom about a point other than it. Always the corner
+    // of a bounded surface.
+    F32  contentOriginX() const { return mOriginX; }
+    F32  contentOriginY() const { return mOriginY; }
+    void setContentOrigin(F32 x, F32 y);
+
     // The pointer in the coordinates what is on the surface is laid out in.
     // Everything that finds, measures or moves anything works in those, so
     // this is the one door the zoom is taken out at.
     void toContent(S32& x, S32& y) const;
+    // And the doors out: a point of the surface where it is drawn, in the
+    // canvas's own pixels, and where that is on the screen.
+    void toDrawn(S32& x, S32& y) const;
+    void toScreen(S32& x, S32& y) const;
+    // A rect of the surface, or a view on it, where it is drawn on the
+    // screen: what a popover or a card beside something on the canvas is
+    // placed by. A view's own calcScreenRect is where it would be drawn at
+    // a hundred per cent with nought at the corner, which is not where it
+    // is on a zoomed or panned canvas.
+    LLRect screenRectOf(const LLRect& content) const;
+    LLRect screenRectOf(const LLView* view) const;
+    // What of the surface can be seen, in the surface's own coordinates.
+    LLRect contentInView() const;
 
     // What of the surface can be seen, in the surface's own drawn
     // coordinates. A surface is as big as what is on it and the container
@@ -284,6 +321,10 @@ public:
     bool handleDoubleClick(S32 x, S32 y, MASK mask) override;
     bool handleHover(S32 x, S32 y, MASK mask) override;
     bool handleToolTip(S32 x, S32 y, MASK mask) override;
+    // A drop comes in through the transform as the pointer does, so that
+    // what is on the surface is dropped on where it is drawn.
+    bool handleDragAndDrop(S32 x, S32 y, MASK mask, bool drop, EDragAndDropType cargo_type, void* cargo_data, EAcceptance* accept,
+                           std::string& tooltip_msg) override;
     void onMouseCaptureLost() override;
 
 protected:
@@ -312,8 +353,15 @@ protected:
     virtual bool rulerHighlight(LLRect& content) const { return false; }
 
     F32     mZoom = 1.f;
+    // Where the surface's nought is drawn: the corner, unless a viewport.
+    F32     mOriginX = 0.f;
+    F32     mOriginY = 0.f;
 
 private:
+    bool    mViewport = false;
+    // Where the origin was as a pan began, a viewport's.
+    F32     mPanOriginX = 0.f;
+    F32     mPanOriginY = 0.f;
     LLView* mRoot = nullptr;
     bool    mSizable = false;
     S32     mContentWidth = 0;
@@ -331,12 +379,10 @@ private:
     bool mRulers = false;
     S32 mRulerStep = 4;
     zoom_signal_t mZoomChange;
-    // A pan under way: where the pointer was on the screen when it began,
-    // and where the container was scrolled to.
+    // A pan under way: the press, on the screen, which follows the hand
+    // from the start; and where the container was scrolled to.
     bool mDragPans = false;
-    bool mPanning = false;
-    S32 mPanScreenX = 0;
-    S32 mPanScreenY = 0;
+    ALDragGesture mPan{ 0, ALDragGesture::Zone::Distance, ALDragGesture::Commit::AsItGoes };
     S32 mPanDocX = 0;
     S32 mPanDocY = 0;
 };

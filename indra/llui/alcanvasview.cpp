@@ -89,6 +89,12 @@ void ALCanvasView::clear()
 
 void ALCanvasView::rememberRoot()
 {
+    // A viewport has no corner for a root to be kept against: it stays
+    // where it was put.
+    if (mViewport)
+    {
+        return;
+    }
     if (!mRoot)
     {
         mNeedWidth = 0;
@@ -149,6 +155,10 @@ bool ALCanvasView::keptPlace(S32& left, S32& down) const
 // something other than this surface moved it.
 void ALCanvasView::refresh()
 {
+    if (mViewport)
+    {
+        return;
+    }
     if (mSizable && getParent() && getParent()->as<LLScrollContainer>())
     {
         const LLRect room = roomRect();
@@ -176,7 +186,7 @@ void ALCanvasView::refresh()
 
 void ALCanvasView::anchorRoot()
 {
-    if (!mRoot)
+    if (!mRoot || mViewport)
     {
         return;
     }
@@ -234,7 +244,8 @@ S32 ALCanvasView::surfaceHeight() const
 
 void ALCanvasView::resurface()
 {
-    if (mSizable)
+    // A viewport is the size its place gives it, whatever is on it.
+    if (mSizable && !mViewport)
     {
         // The surface takes up what it is drawn as, so a zoomed one scrolls
         // by what it covers rather than by what it measures.
@@ -242,9 +253,49 @@ void ALCanvasView::resurface()
     }
 }
 
+void ALCanvasView::setViewport(bool viewport)
+{
+    if (mViewport == viewport)
+    {
+        return;
+    }
+    mViewport = viewport;
+    mOriginX  = 0.f;
+    mOriginY  = 0.f;
+    if (!mViewport)
+    {
+        resurface();
+        anchorRoot();
+    }
+}
+
+void ALCanvasView::setContentOrigin(F32 x, F32 y)
+{
+    if (mViewport)
+    {
+        mOriginX = x;
+        mOriginY = y;
+    }
+}
+
 void ALCanvasView::setZoom(F32 zoom)
 {
     zoom = llclamp(zoom, MIN_ZOOM, MAX_ZOOM);
+    // A viewport zooms about the middle of what is seen, which is where a
+    // zoom asked for by a menu or a key is about.
+    if (mViewport)
+    {
+        if (mZoom != zoom)
+        {
+            const LLRect seen = getLocalRect();
+            const F32    cx   = ((F32)seen.getCenterX() - mOriginX) / mZoom;
+            const F32    cy   = ((F32)seen.getCenterY() - mOriginY) / mZoom;
+            mZoom             = zoom;
+            mOriginX          = (F32)seen.getCenterX() - cx * zoom;
+            mOriginY          = (F32)seen.getCenterY() - cy * zoom;
+        }
+        return;
+    }
     if (mZoom != zoom)
     {
         mZoom = zoom;
@@ -341,6 +392,18 @@ void ALCanvasView::zoomAbout(F32 zoom, S32 x, S32 y)
     {
         return;
     }
+    if (mViewport)
+    {
+        // The point of the surface under (x, y) stays there: the origin
+        // moves by however much the zoom would have moved it.
+        const F32 cx = ((F32)x - mOriginX) / mZoom;
+        const F32 cy = ((F32)y - mOriginY) / mZoom;
+        mZoom        = zoom;
+        mOriginX     = (F32)x - cx * zoom;
+        mOriginY     = (F32)y - cy * zoom;
+        mZoomChange(mZoom);
+        return;
+    }
     LLScrollContainer* scroller = getParentByType<LLScrollContainer>();
     const F32 cx = (F32)x / mZoom;
     const F32 cy = (F32)y / mZoom;
@@ -394,23 +457,38 @@ bool ALCanvasView::panGesture() const
 // what moves: a point of it is somewhere else once it has been scrolled.
 void ALCanvasView::beginPan(S32 x, S32 y)
 {
-    localPointToScreen(x, y, &mPanScreenX, &mPanScreenY);
+    S32 sx = 0;
+    S32 sy = 0;
+    localPointToScreen(x, y, &sx, &sy);
+    mPan.press(sx, sy);
+    mPanOriginX = mOriginX;
+    mPanOriginY = mOriginY;
     const LLScrollContainer* scroller = getParentByType<LLScrollContainer>();
     mPanDocX = scroller ? scroller->getDocPosHorizontal() : 0;
     mPanDocY = scroller ? scroller->getDocPosVertical() : 0;
-    mPanning = true;
     gFocusMgr.setMouseCapture(this);
 }
 
 void ALCanvasView::panTo(S32 x, S32 y)
 {
-    if (!mPanning)
-    {
-        return;
-    }
+    // Only where the pointer went somewhere on the screen: the captor is
+    // hovered every frame, moved or not.
     S32 sx = 0;
     S32 sy = 0;
     localPointToScreen(x, y, &sx, &sy);
+    if (!mPan.moved(sx, sy))
+    {
+        return;
+    }
+    const S32 across = sx - mPan.pressX();
+    const S32 up     = sy - mPan.pressY();
+    // A viewport's origin follows the hand.
+    if (mViewport)
+    {
+        mOriginX = mPanOriginX + (F32)across;
+        mOriginY = mPanOriginY + (F32)up;
+        return;
+    }
     LLScrollContainer* scroller = getParentByType<LLScrollContainer>();
     if (!scroller)
     {
@@ -418,13 +496,13 @@ void ALCanvasView::panTo(S32 x, S32 y)
     }
     // The surface follows the hand: dragged right, what is seen moves
     // right, which is the container scrolled left.
-    scroller->setDocPosHorizontal(mPanDocX - (sx - mPanScreenX));
-    scroller->setDocPosVertical(mPanDocY + (sy - mPanScreenY));
+    scroller->setDocPosHorizontal(mPanDocX - across);
+    scroller->setDocPosVertical(mPanDocY + up);
 }
 
 void ALCanvasView::endPan()
 {
-    mPanning = false;
+    mPan.release();
     if (gFocusMgr.getMouseCapture() == this)
     {
         gFocusMgr.setMouseCapture(nullptr);
@@ -433,6 +511,12 @@ void ALCanvasView::endPan()
 
 void ALCanvasView::panBy(S32 dx, S32 dy)
 {
+    if (mViewport)
+    {
+        mOriginX += (F32)dx;
+        mOriginY += (F32)dy;
+        return;
+    }
     if (LLScrollContainer* scroller = getParentByType<LLScrollContainer>())
     {
         scroller->setDocPosHorizontal(scroller->getDocPosHorizontal() - dx);
@@ -457,7 +541,7 @@ bool ALCanvasView::handleMouseDown(S32 x, S32 y, MASK mask)
 
 bool ALCanvasView::handleMouseUp(S32 x, S32 y, MASK mask)
 {
-    if (mPanning)
+    if (mPan.pressed())
     {
         endPan();
         return true;
@@ -474,7 +558,7 @@ bool ALCanvasView::handleMiddleMouseDown(S32 x, S32 y, MASK mask)
 
 bool ALCanvasView::handleMiddleMouseUp(S32 x, S32 y, MASK mask)
 {
-    if (mPanning)
+    if (mPan.pressed())
     {
         endPan();
         return true;
@@ -509,7 +593,7 @@ bool ALCanvasView::handleToolTip(S32 x, S32 y, MASK mask)
 
 bool ALCanvasView::handleHover(S32 x, S32 y, MASK mask)
 {
-    if (mPanning)
+    if (mPan.pressed())
     {
         panTo(x, y);
         getWindow()->setCursor(UI_CURSOR_HAND);
@@ -524,9 +608,16 @@ bool ALCanvasView::handleHover(S32 x, S32 y, MASK mask)
     return LLPanel::handleHover(x, y, mask);
 }
 
+bool ALCanvasView::handleDragAndDrop(S32 x, S32 y, MASK mask, bool drop, EDragAndDropType cargo_type, void* cargo_data, EAcceptance* accept,
+                                     std::string& tooltip_msg)
+{
+    toContent(x, y);
+    return LLPanel::handleDragAndDrop(x, y, mask, drop, cargo_type, cargo_data, accept, tooltip_msg);
+}
+
 void ALCanvasView::onMouseCaptureLost()
 {
-    mPanning = false;
+    mPan.cancel();
     LLPanel::onMouseCaptureLost();
 }
 
@@ -636,12 +727,16 @@ void ALCanvasView::drawRulers() const
         every += step;
     }
     const LLFontGL* font = LLFontGL::getFontSansSerifSmall();
-    const auto onCanvas = [this](S32 content) { return ll_round((F32)content * mZoom); };
+    // Across and down, through the origin as well as the zoom.
+    const auto acrossOnCanvas = [this](S32 content) { return ll_round((F32)content * mZoom + mOriginX); };
+    const auto downOnCanvas   = [this](S32 content) { return ll_round((F32)content * mZoom + mOriginY); };
+    const S32  first_across   = ll_round(((F32)rule_right - mOriginX) / mZoom);
+    const S32  first_down     = ll_round(((F32)rule_bottom - mOriginY) / mZoom);
 
-    for (S32 fx = from(ll_round((F32)rule_right / mZoom) - origin.mLeft, every);
-         onCanvas(origin.mLeft + fx) <= view.mRight; fx += every)
+    for (S32 fx = from(first_across - origin.mLeft, every);
+         acrossOnCanvas(origin.mLeft + fx) <= view.mRight; fx += every)
     {
-        const S32 x = onCanvas(origin.mLeft + fx);
+        const S32 x = acrossOnCanvas(origin.mLeft + fx);
         const bool named = fx % LABEL_EVERY == 0;
         gl_line_2d(x, rule_bottom, x, rule_bottom + (named ? 5 : 3), marks);
         if (named)
@@ -649,10 +744,10 @@ void ALCanvasView::drawRulers() const
             font->renderUTF8(std::to_string(fx), 0, x + 2, rule_bottom + 3, marks, LLFontGL::LEFT, LLFontGL::BOTTOM);
         }
     }
-    for (S32 fy = from(origin.mTop - ll_round((F32)rule_bottom / mZoom), every);
-         onCanvas(origin.mTop - fy) >= view.mBottom; fy += every)
+    for (S32 fy = from(origin.mTop - first_down, every);
+         downOnCanvas(origin.mTop - fy) >= view.mBottom; fy += every)
     {
-        const S32 y = onCanvas(origin.mTop - fy);
+        const S32 y = downOnCanvas(origin.mTop - fy);
         const bool named = fy % LABEL_EVERY == 0;
         gl_line_2d(view.mLeft, y, view.mLeft + (named ? 5 : 3), y, marks);
         if (named)
@@ -665,7 +760,7 @@ void ALCanvasView::drawRulers() const
     LLRect content;
     if (rulerHighlight(content))
     {
-        const LLRect box(onCanvas(content.mLeft), onCanvas(content.mTop), onCanvas(content.mRight), onCanvas(content.mBottom));
+        const LLRect box(acrossOnCanvas(content.mLeft), downOnCanvas(content.mTop), acrossOnCanvas(content.mRight), downOnCanvas(content.mBottom));
         gl_rect_2d(LLRect(llmax(box.mLeft, rule_right), view.mTop, llmin(box.mRight, view.mRight), rule_bottom),
                    highlight.get(), false);
         gl_rect_2d(LLRect(view.mLeft, llmin(box.mTop, rule_bottom), rule_right, llmax(box.mBottom, view.mBottom)),
@@ -724,11 +819,43 @@ void ALCanvasView::drawBackdrop(const LLRect& area) const
 
 void ALCanvasView::toContent(S32& x, S32& y) const
 {
-    if (mZoom != 1.f)
+    if (mZoom != 1.f || mOriginX != 0.f || mOriginY != 0.f)
     {
-        x = ll_round((F32)x / mZoom);
-        y = ll_round((F32)y / mZoom);
+        x = ll_round(((F32)x - mOriginX) / mZoom);
+        y = ll_round(((F32)y - mOriginY) / mZoom);
     }
+}
+
+void ALCanvasView::toDrawn(S32& x, S32& y) const
+{
+    x = ll_round((F32)x * mZoom + mOriginX);
+    y = ll_round((F32)y * mZoom + mOriginY);
+}
+
+void ALCanvasView::toScreen(S32& x, S32& y) const
+{
+    toDrawn(x, y);
+    localPointToScreen(x, y, &x, &y);
+}
+
+LLRect ALCanvasView::screenRectOf(const LLRect& content) const
+{
+    S32 left = content.mLeft, bottom = content.mBottom, right = content.mRight, top = content.mTop;
+    toScreen(left, bottom);
+    toScreen(right, top);
+    return LLRect(left, top, right, bottom);
+}
+
+LLRect ALCanvasView::screenRectOf(const LLView* view) const
+{
+    return screenRectOf(localRectOf(view));
+}
+
+LLRect ALCanvasView::contentInView() const
+{
+    const LLRect seen = viewportRect();
+    return LLRect((S32)std::floor(((F32)seen.mLeft - mOriginX) / mZoom), (S32)std::ceil(((F32)seen.mTop - mOriginY) / mZoom),
+                  (S32)std::ceil(((F32)seen.mRight - mOriginX) / mZoom), (S32)std::floor(((F32)seen.mBottom - mOriginY) / mZoom));
 }
 
 LLRect ALCanvasView::getSnapRect() const
@@ -752,6 +879,12 @@ void ALCanvasView::reshape(S32 width, S32 height, bool called_from_parent)
     {
         return;
     }
+    // A viewport keeps what is at its top left where it was: a view's
+    // nought is its bottom, which moves as its height does.
+    if (mViewport)
+    {
+        mOriginY += (F32)(height - getRect().getHeight());
+    }
     LLRect r(getRect());
     r.mRight = r.mLeft + width;
     r.mTop = r.mBottom + height;
@@ -772,14 +905,24 @@ void ALCanvasView::draw()
     // The backdrop is drawn before the zoom is pushed: it is what is
     // behind the window, not part of the window.
     drawBackdrop(getLocalRect());
+    // Nought moved to where it is drawn, then the zoom about it: what is
+    // on the surface at c is drawn at the origin plus c times the zoom.
+    const bool moved  = mOriginX != 0.f || mOriginY != 0.f;
     const bool zoomed = mZoom != 1.f;
-    if (zoomed)
+    if (moved || zoomed)
     {
         LLRender2D::pushMatrix();
-        LLRender2D::scale(mZoom, mZoom);
+        if (moved)
+        {
+            LLRender2D::translate(mOriginX, mOriginY);
+        }
+        if (zoomed)
+        {
+            LLRender2D::scale(mZoom, mZoom);
+        }
     }
     drawContent();
-    if (zoomed)
+    if (moved || zoomed)
     {
         LLRender2D::popMatrix();
     }
@@ -795,23 +938,24 @@ void ALCanvasView::draw()
 void ALCanvasView::drawPixelGrid() const
 {
     const LLRect seen = viewportRect();
-    const S32 first_x = (S32)std::floor((F32)seen.mLeft / mZoom);
-    const S32 last_x = (S32)std::ceil((F32)seen.mRight / mZoom);
-    const S32 first_y = (S32)std::floor((F32)seen.mBottom / mZoom);
-    const S32 last_y = (S32)std::ceil((F32)seen.mTop / mZoom);
+    const LLRect content = contentInView();
+    const S32 first_x = content.mLeft;
+    const S32 last_x = content.mRight;
+    const S32 first_y = content.mBottom;
+    const S32 last_y = content.mTop;
 
     gGL.getTextureSlot(0)->unbind();
     gGL.color4f(0.5f, 0.5f, 0.5f, 0.35f);
     gGL.begin(LLRender::LINES);
     for (S32 x = first_x; x <= last_x; ++x)
     {
-        const S32 at = ll_round((F32)x * mZoom);
+        const S32 at = ll_round((F32)x * mZoom + mOriginX);
         gGL.vertex2i(at, seen.mBottom);
         gGL.vertex2i(at, seen.mTop);
     }
     for (S32 y = first_y; y <= last_y; ++y)
     {
-        const S32 at = ll_round((F32)y * mZoom);
+        const S32 at = ll_round((F32)y * mZoom + mOriginY);
         gGL.vertex2i(seen.mLeft, at);
         gGL.vertex2i(seen.mRight, at);
     }
@@ -820,7 +964,8 @@ void ALCanvasView::drawPixelGrid() const
 
 LLRect ALCanvasView::viewportRect() const
 {
-    if (LLScrollContainer* scroller = getParentByType<LLScrollContainer>())
+    LLScrollContainer* scroller = mViewport ? nullptr : getParentByType<LLScrollContainer>();
+    if (scroller)
     {
         LLRect screen;
         scroller->localRectToScreen(scroller->getContentWindowRect(), &screen);
