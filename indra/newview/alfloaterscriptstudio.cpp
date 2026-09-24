@@ -1002,7 +1002,7 @@ bool ALFloaterScriptStudio::postBuild()
     mSaveButton->setCommitCallback([this](LLUICtrl*, const LLSD&) {
         if (Doc* doc = active())
         {
-            save(*doc);
+            saveAsked(*doc);
         }
     });
     mSaveAllButton->setCommitCallback([this](LLUICtrl*, const LLSD&) { saveAll(); });
@@ -2655,8 +2655,8 @@ void ALFloaterScriptStudio::loaded(const ALScriptWorkspace::Loaded& answer)
         // over whatever a check would find, since keeping it is the point.
         if (doc.saveOnLoad && doc.modifiable)
         {
-            doc.saveOnLoad        = false;
-            doc.saveAnywayVersion = doc.editor->document().version();
+            doc.saveOnLoad = false;
+            doc.letAllPast(doc.editor->document().version());
             save(doc);
         }
     }
@@ -2994,7 +2994,7 @@ void ALFloaterScriptStudio::preprocessedAnswer(const std::string& id, U32 versio
         }
         return;
     }
-    if (result.hasErrors() && doc.saveAnywayVersion != static_cast<S64>(version))
+    if (result.hasErrors() && !doc.letsPast(version, Doc::CheckPreprocessor))
     {
         S32 errors = 0;
         for (const ALScriptProblem& problem : result.problems)
@@ -3002,7 +3002,7 @@ void ALFloaterScriptStudio::preprocessedAnswer(const std::string& id, U32 versio
             errors += problem.severity == ALScriptProblem::Severity::Error ? 1 : 0;
         }
         report(counted("PreprocessErrors", errors, args), true, &doc, { "save_anyway" });
-        doc.saveAnywayVersion = version;
+        doc.stoppedBy(version, Doc::CheckPreprocessor);
         saveStopped(doc);
         showBottom("problems_tab");
         return;
@@ -3010,10 +3010,10 @@ void ALFloaterScriptStudio::preprocessedAnswer(const std::string& id, U32 versio
     // An include still on its way is one the upload would go without,
     // its line dropped from the text: the script as written is not what
     // would compile. Stopped, as an error stops it, unless asked again.
-    if (!result.pending.empty() && doc.saveAnywayVersion != static_cast<S64>(version))
+    if (!result.pending.empty() && !doc.letsPast(version, Doc::CheckPending))
     {
         report(counted("PreprocessPendingSave", static_cast<S32>(result.pending.size()), args), true, &doc, { "save_anyway" });
-        doc.saveAnywayVersion = version;
+        doc.stoppedBy(version, Doc::CheckPending);
         saveStopped(doc);
         return;
     }
@@ -4168,17 +4168,11 @@ void ALFloaterScriptStudio::weighedSent(Doc& doc, const ALScriptAnalysis::Result
     // Over an exact target's limit, what went up would not compile or would
     // not run: stopped, as the preprocessor's errors stop it, unless asked
     // again. Mono's is an estimate, and refuses nothing.
-    if (weight && !weight->estimate && weight->total > weight->limit && doc.saveAnywayVersion != static_cast<S64>(version))
+    if (weight && !weight->estimate && weight->total > weight->limit && !doc.letsPast(version, Doc::CheckWeight))
     {
-        LLStringUtil::format_map_t args;
-        args["[NAME]"]   = doc.name;
-        args["[SIZE]"]   = llformat("%.1f", (F64)weight->total / 1024.0);
-        args["[LIMIT]"]  = std::to_string(weight->limit / 1024);
-        args["[TARGET]"] = ALScriptWeight::nameOf(weight->target);
-        report(getString("SaveOverWeight", args), true, &doc, { "save_anyway" });
-        doc.saveAnywayVersion = version;
+        reportOverWeight(doc, *weight);
+        doc.stoppedBy(version, Doc::CheckWeight);
         saveStopped(doc);
-        showBottom("problems_tab");
         return;
     }
     sendPreprocessed(doc, sent);
@@ -4928,7 +4922,7 @@ bool ALFloaterScriptStudio::vimCommand(ALTextView& view, const std::string& name
     }
     if (name == "w" || name == "write" || name == "w!")
     {
-        save(*doc);
+        saveAsked(*doc);
         return true;
     }
     if (name == "q" || name == "quit" || name == "close")
@@ -5530,8 +5524,8 @@ void ALFloaterScriptStudio::upload(Doc& doc, const std::string& text, const ALSo
         saveStopped(doc);
         return;
     }
-    doc.saveAnywayVersion = -1;
-    doc.saving            = true;
+    doc.clearSaveChecks();
+    doc.saving = true;
     // What the compiler's lines are read back through, kept as it went:
     // the next preprocess, for whatever reason, is of another text.
     doc.sentMap = map ? std::optional<ALSourceMap>(*map) : std::nullopt;
@@ -8653,7 +8647,7 @@ void ALFloaterScriptStudio::externalChanged(const std::string& id, const std::st
         return;
     }
     doc.externalSave      = true;
-    doc.saveAnywayVersion = doc.editor->document().version();
+    doc.letAllPast(doc.editor->document().version());
     save(doc);
 }
 
@@ -12396,7 +12390,7 @@ void ALFloaterScriptStudio::onNoticeAction(const std::string& action)
     }
     else if (action == "save")
     {
-        save(*doc);
+        saveAsked(*doc);
     }
     refreshNotice();
 }
@@ -13252,7 +13246,11 @@ void ALFloaterScriptStudio::onOutputChosen(const ALOutputView::Entry& entry)
         }
         activate(index);
         Doc& doc = *mDocs[index];
-        if (action == "save_anyway" || action == "retry")
+        if (action == "save_anyway")
+        {
+            saveAsked(doc);
+        }
+        else if (action == "retry")
         {
             save(doc);
         }
@@ -13325,15 +13323,16 @@ bool ALFloaterScriptStudio::preflight(Doc& doc)
         return true;
     }
     const S64 version = doc.editor->document().version();
-    if (doc.saveAnywayVersion == version)
+    if (doc.letsPast(version, Doc::CheckAll))
     {
-        // Asked twice: over whatever was found, by the check here and by
-        // the preprocessor after it; the upload closes the window.
+        // Saved over whatever is found: a copy made to be kept, a save from
+        // an editor outside.
         return true;
     }
     LLStringUtil::format_map_t args;
     args["[NAME]"] = doc.name;
-    if (doc.analysisVersion != doc.editor->document().version())
+    const bool errors_wanted = !doc.letsPast(version, Doc::CheckAnalyzers);
+    if (errors_wanted && doc.analysisVersion != doc.editor->document().version())
     {
         // Checked first; the save follows the answer.
         doc.saveAfterCheck = true;
@@ -13342,20 +13341,23 @@ bool ALFloaterScriptStudio::preflight(Doc& doc)
         return false;
     }
     S32 errors = 0;
-    for (const ALScriptProblem& problem : doc.analysis)
+    if (errors_wanted)
     {
-        if (problem.severity == ALScriptProblem::Severity::Error)
-        {
-            ++errors;
-        }
-    }
-    if (doc.expanded.valid && doc.expanded.version == doc.analysisVersion)
-    {
-        for (const ALScriptProblem& problem : doc.expanded.problems)
+        for (const ALScriptProblem& problem : doc.analysis)
         {
             if (problem.severity == ALScriptProblem::Severity::Error)
             {
                 ++errors;
+            }
+        }
+        if (doc.expanded.valid && doc.expanded.version == doc.analysisVersion)
+        {
+            for (const ALScriptProblem& problem : doc.expanded.problems)
+            {
+                if (problem.severity == ALScriptProblem::Severity::Error)
+                {
+                    ++errors;
+                }
             }
         }
     }
@@ -13363,7 +13365,8 @@ bool ALFloaterScriptStudio::preflight(Doc& doc)
     // up would not compile or would not run. A script the preprocessor runs
     // over is weighed as the run makes it to be sent, after it
     // (weighSent): this text is not what goes.
-    if (weightTarget(doc) && !preprocessed(doc))
+    bool over = false;
+    if (weightTarget(doc) && !preprocessed(doc) && !doc.letsPast(version, Doc::CheckWeight))
     {
         if (!doc.weight || doc.weightVersion != version)
         {
@@ -13375,22 +13378,49 @@ bool ALFloaterScriptStudio::preflight(Doc& doc)
             setStatus(getString("Preflight", args));
             return false;
         }
-        if (doc.weightExact && !doc.weight->estimate && doc.weight->total > doc.weight->limit)
-        {
-            ++errors;
-        }
+        over = doc.weightExact && !doc.weight->estimate && doc.weight->total > doc.weight->limit;
     }
-    if (errors == 0)
+    if (errors == 0 && !over)
     {
         return true;
     }
-    report(counted("PreflightErrors", errors, args), true, &doc, { "save_anyway" });
-    doc.saveAnywayVersion = version;
+    // Said as what stopped it: the errors -- the weight among them, which
+    // the problems list as one -- or the weight alone; and only those let
+    // past by asking again.
+    if (errors > 0)
+    {
+        report(counted("PreflightErrors", errors + (over ? 1 : 0), args), true, &doc, { "save_anyway" });
+        doc.stoppedBy(version, over ? Doc::CheckAnalyzers | Doc::CheckWeight : Doc::CheckAnalyzers);
+    }
+    else
+    {
+        reportOverWeight(doc, *doc.weight);
+        doc.stoppedBy(version, Doc::CheckWeight);
+    }
     saveStopped(doc);
     // The first of the checkers' errors, in sight.
     showBottom("problems_tab");
     selectFirstError(true);
     return false;
+}
+
+void ALFloaterScriptStudio::reportOverWeight(const Doc& doc, const ALScriptWeight& weight)
+{
+    LLStringUtil::format_map_t args;
+    args["[NAME]"]   = doc.name;
+    args["[SIZE]"]   = llformat("%.1f", (F64)weight.total / 1024.0);
+    args["[LIMIT]"]  = std::to_string(weight.limit / 1024);
+    args["[TARGET]"] = ALScriptWeight::nameOf(weight.target);
+    report(getString("SaveOverWeight", args), true, &doc, { "save_anyway" });
+    showBottom("problems_tab");
+}
+
+void ALFloaterScriptStudio::saveAsked(Doc& doc)
+{
+    // Asked for by the author: over the text the last save was stopped at,
+    // past what stopped it.
+    doc.letPast(doc.editor->document().version());
+    save(doc);
 }
 
 // --- the explorer -----------------------------------------------------------------
@@ -15415,7 +15445,7 @@ void ALFloaterScriptStudio::onMenuAction(const LLSD& param)
     {
         if (doc)
         {
-            save(*doc);
+            saveAsked(*doc);
         }
     }
     else if (action == "save_all")

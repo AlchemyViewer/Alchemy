@@ -481,7 +481,57 @@ private:
         // left its problem standing would be made again at every check the
         // save waits on.
         bool                                       fixedForSave      = false;
+        // The checks a save passes, each of which may stop it: the
+        // analyzers' errors, the preprocessor's, an include still to come,
+        // and the code over its target's limit. One that stopped a save is
+        // let past -- it alone -- where the author asks again over the same
+        // text: Save Anyway, or Save a second time. A later check still
+        // stops it, and says why.
+        enum SaveCheck : U8
+        {
+            CheckAnalyzers   = 1,
+            CheckPreprocessor = 2,
+            CheckPending     = 4,
+            CheckWeight      = 8,
+            CheckAll         = 0xFF
+        };
+        // The text the checks let past are for, which checks those are, and
+        // which stopped the last save of it.
         S64                                        saveAnywayVersion = -1;
+        U8                                         saveAnyway        = 0;
+        U8                                         saveStoppedBy     = 0;
+        bool letsPast(S64 version, U8 check) const { return saveAnywayVersion == version && (saveAnyway & check) == check; }
+        void stoppedBy(S64 version, U8 check)
+        {
+            if (saveAnywayVersion != version)
+            {
+                saveAnywayVersion = version;
+                saveAnyway        = 0;
+            }
+            saveStoppedBy = check;
+        }
+        // Asked again over the text the last save was stopped at.
+        void letPast(S64 version)
+        {
+            if (saveAnywayVersion == version)
+            {
+                saveAnyway |= saveStoppedBy;
+            }
+        }
+        // Saved over whatever the checks would find: a copy made to be kept,
+        // a save from an editor outside.
+        void letAllPast(S64 version)
+        {
+            saveAnywayVersion = version;
+            saveAnyway        = CheckAll;
+            saveStoppedBy     = 0;
+        }
+        void clearSaveChecks()
+        {
+            saveAnywayVersion = -1;
+            saveAnyway        = 0;
+            saveStoppedBy     = 0;
+        }
         // What the analyzer said of the text at analysisVersion; when the
         // next check is due, or zero; the version last asked about.
         ALScriptProblems                           analysis;
@@ -943,6 +993,9 @@ private:
     // asset does not carry, which the server could not find.
     bool             copyEmbeddedItem(Doc& doc, LLPointer<LLInventoryItem> item, const LLUUID& folder, U32 callback_id = 0);
     void save(Doc& doc);
+    // A save the author asked for: past the one check that stopped the last
+    // save of the same text, and then a save.
+    void saveAsked(Doc& doc);
     // The save asked for while the last was on its way, made now where
     // anything is still unsaved; true where one is under way again.
     bool sendQueuedSave(Doc& doc);
@@ -1332,6 +1385,7 @@ private:
     // Whether a save may go ahead: the analyzers' check of the text as it
     // stands found no errors, or the person asked twice.
     bool preflight(Doc& doc);
+    void reportOverWeight(const Doc& doc, const ALScriptWeight& weight);
 
     // Copy, from whichever list or editor has the keyboard; and a
     // right-click menu on a list for the same.
