@@ -600,7 +600,6 @@ bool ALFloaterScriptStudio::postBuild()
             mKeyTipTexts[control] = view->getToolTip();
         }
     }
-    showEditorKeys();
     setStatusLine(getChild<LLTextBox>("status"));
     mFolds.bind(this, { { "explorer", "explorer_panel", "fold_explorer", getString("PaneExplorer") },
                         { "bottom", "bottom_panel", "fold_bottom", getString("PaneBottom") },
@@ -669,6 +668,9 @@ bool ALFloaterScriptStudio::postBuild()
     mFindButton    = getChild<LLButton>("find_btn");
     mFormatButton  = getChild<LLButton>("format_btn");
     mExpandedButton = getChild<LLButton>("expanded_btn");
+    // After the lookups: a menu item's key shown again asks its check,
+    // which reads the panes.
+    showEditorKeys();
 
     mTabs->onChosen(boost::bind(&ALFloaterScriptStudio::onTabChosen, this, _1));
     mTabs->onClosed(boost::bind(&ALFloaterScriptStudio::closeDocument, this, _1));
