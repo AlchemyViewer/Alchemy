@@ -1097,6 +1097,10 @@ private:
     // What to call an object that has never said its name here: what a pin
     // or an open script remembers it by, or unnamed.
     std::string nameGivenTo(const LLUUID& root) const;
+    // The names of what the list shows read again, now that the region has
+    // said some; and one asked of its region, once while it is shown.
+    void rereadExplorerNames();
+    void askExplorerName(const LLUUID& id);
     // What is dragged from the inventory over a row of the explorer, or
     // dropped on it: into the prim the row is of, as into the build
     // floater's contents.
@@ -1193,6 +1197,8 @@ private:
     {
         LLUUID                            id;
         std::string                       name;
+        // The name is the prim's own, not a stand-in until it is heard.
+        bool                              named   = false;
         bool                              fetched = false;
         std::vector<ALScriptWorkspace::Item> items;
     };
@@ -1200,6 +1206,7 @@ private:
     {
         LLUUID                    root;
         std::string               name;
+        bool                      named   = false;
         bool                      pinned  = false;
         bool                      present = true;
         std::vector<ExplorerPrim> prims;
@@ -1818,6 +1825,13 @@ private:
     F64                                mExplorerRefetchAt = 0.0;
     // What a drag from another prim has dropped so far, sent with its last.
     std::vector<LLUUID>                mTransferring;
+    // The prims the list shows, among which the object properties cache's
+    // word on a name is looked for; those whose names were asked of their
+    // regions while shown; whether any came in since the last frame.
+    boost::unordered_flat_set<LLUUID>  mListedPrims;
+    boost::unordered_flat_set<LLUUID>  mNamesAsked;
+    bool                               mExplorerNamesStale = false;
+    boost::signals2::scoped_connection mPropertiesConnection;
     // What the region said runs, by prim and item.
     std::map<std::pair<LLUUID, LLUUID>, bool> mRunningKnown;
     bool                               mMain = true;

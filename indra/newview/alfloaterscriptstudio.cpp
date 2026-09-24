@@ -35,6 +35,7 @@
 #include "alemptystate.h"
 #include "aljumpbar.h"
 #include "aloutputview.h"
+#include "alobjectproperties.h"
 #include "alpanelist.h"
 #include "llsdutil.h"
 #include "alscopebar.h"
@@ -266,37 +267,30 @@ namespace
 
     // What an object is called, where the viewer knows: its name value,
     // or the selection's name for it.
-    // An object in world says its name only while it is selected, and then
-    // only once its properties are in: each name heard is kept for the
-    // session, and said for the object when it is not.
-    boost::unordered_flat_map<LLUUID, std::string>& heardNames()
-    {
-        static boost::unordered_flat_map<LLUUID, std::string> names;
-        return names;
-    }
-
+    // What an object in world is called: an avatar's name; the selection's
+    // word for it, while it is selected, which a rename here changes at
+    // once; or the last the region said of it, which the object properties
+    // cache keeps -- bounded, and shared with the scene explorer -- whether
+    // it was selected or asked of by name.
     std::string objectNameOf(LLViewerObject* object, const std::string& fallback)
     {
         if (!object)
         {
             return fallback;
         }
-        std::string said;
         if (LLNameValue* nv = object->getNVPair("Name"); nv && nv->getString() && nv->getString()[0])
         {
-            said = nv->getString();
+            return nv->getString();
         }
-        else if (LLSelectNode* node = LLSelectMgr::getInstance()->getSelection()->findNode(object); node && !node->mName.empty())
+        if (LLSelectNode* node = LLSelectMgr::getInstance()->getSelection()->findNode(object); node && !node->mName.empty())
         {
-            said = node->mName;
+            return node->mName;
         }
-        if (!said.empty())
+        if (const ALObjectPropertiesCache::ServerProps* said = ALObjectPropertiesCache::instance().get(object->getID()); said && !said->mName.empty())
         {
-            heardNames()[object->getID()] = said;
-            return said;
+            return said->mName;
         }
-        const auto heard = heardNames().find(object->getID());
-        return heard != heardNames().end() ? heard->second : fallback;
+        return fallback;
     }
 
     // The roots selected in world, in their order.
@@ -966,6 +960,14 @@ bool ALFloaterScriptStudio::postBuild()
     // The buttons follow what is chosen, which the list says as it changes.
     mExplorer->setCommitOnSelectionChange(true);
     mExplorer->setDragStarter([this](const LLSD& pressed) { return startExplorerDrag(pressed); });
+    // A name the region said of anything the list shows, whether for a
+    // selection or asked here, is read on the next frame.
+    mPropertiesConnection = ALObjectPropertiesCache::instance().setChangeCallback([this](const LLUUID& id) {
+        if (mListedPrims.contains(id))
+        {
+            mExplorerNamesStale = true;
+        }
+    });
     mExplorer->setDropHandler([this](const LLSD& row, MASK mask, bool drop, EDragAndDropType type, void* cargo, EAcceptance* accept, std::string&) {
         dropOnExplorer(row, mask, drop, type, cargo, accept);
     });
@@ -13380,8 +13382,15 @@ bool ALFloaterScriptStudio::preflight(Doc& doc)
 
 void ALFloaterScriptStudio::pumpExplorer()
 {
-    // What came in since the last frame -- contents, whether scripts run --
-    // put in the list once, however many answers there were.
+    // The names the region said since the last frame, of what the list
+    // shows: read now, when the selection has taken them in too.
+    if (mExplorerNamesStale)
+    {
+        mExplorerNamesStale = false;
+        rereadExplorerNames();
+    }
+    // What came in since the last frame -- contents, whether scripts run,
+    // names -- put in the list once, however many answers there were.
     if (mExplorerStale)
     {
         fillExplorer();
@@ -13403,9 +13412,10 @@ void ALFloaterScriptStudio::pumpExplorer()
         mExplorerRoots = std::move(roots);
         refreshExplorer();
     }
-    // The names heard since: an object says its name once its properties
-    // are in, a moment after it is selected -- many selected at once, many
-    // moments.
+}
+
+void ALFloaterScriptStudio::rereadExplorerNames()
+{
     for (ExplorerObject& object : mExplorerModel)
     {
         if (!object.present)
@@ -13415,7 +13425,13 @@ void ALFloaterScriptStudio::pumpExplorer()
         for (ExplorerPrim& prim : object.prims)
         {
             const std::string heard = objectNameOf(gObjectList.findObject(prim.id), LLStringUtil::null);
-            if (heard.empty() || heard == prim.name)
+            if (heard.empty())
+            {
+                continue;
+            }
+            prim.named = true;
+            object.named = object.named || prim.id == object.root;
+            if (heard == prim.name)
             {
                 continue;
             }
@@ -13427,6 +13443,19 @@ void ALFloaterScriptStudio::pumpExplorer()
             mExplorerStale = true;
         }
     }
+}
+
+void ALFloaterScriptStudio::askExplorerName(const LLUUID& id)
+{
+    // Once while it is listed: the answer comes by the object properties
+    // cache, which says so, and the name is read from there. Not what is
+    // selected, whose properties are on their way already.
+    LLViewerObject* object = gObjectList.findObject(id);
+    if (!object || !object->getRegion() || LLSelectMgr::getInstance()->getSelection()->findNode(object) || !mNamesAsked.insert(id).second)
+    {
+        return;
+    }
+    LLSelectMgr::getInstance()->requestObjectPropertiesFamily(object);
 }
 
 std::string ALFloaterScriptStudio::nameGivenTo(const LLUUID& root) const
@@ -13516,11 +13545,17 @@ void ALFloaterScriptStudio::refreshExplorer(bool refetch)
             return already;
         }
         ExplorerObject one;
-        one.root = root->getID();
-        one.name = objectNameOf(root, nameGivenTo(root->getID()));
+        one.root  = root->getID();
+        one.name  = objectNameOf(root, LLStringUtil::null);
+        one.named = !one.name.empty();
+        if (!one.named)
+        {
+            one.name = nameGivenTo(one.root);
+        }
         ExplorerPrim first;
-        first.id   = root->getID();
-        first.name = one.name;
+        first.id    = root->getID();
+        first.name  = one.name;
+        first.named = one.named;
         carry(first);
         one.prims.push_back(std::move(first));
         for (const LLPointer<LLViewerObject>& child : root->getChildren())
@@ -13529,7 +13564,8 @@ void ALFloaterScriptStudio::refreshExplorer(bool refetch)
             {
                 ExplorerPrim prim;
                 prim.id   = child->getID();
-                prim.name = objectNameOf(child, LLStringUtil::null);
+                prim.name  = objectNameOf(child, LLStringUtil::null);
+                prim.named = !prim.name.empty();
                 carry(prim);
                 one.prims.push_back(std::move(prim));
             }
@@ -13567,6 +13603,18 @@ void ALFloaterScriptStudio::refreshExplorer(bool refetch)
             add(gObjectList.findObject(doc->ref.object));
         }
     }
+    // What the list shows, for the cache's word on a name to be looked for
+    // among; and a name asked of a prim no longer shown is asked again if
+    // it comes back.
+    mListedPrims.clear();
+    for (const ExplorerObject& object : mExplorerModel)
+    {
+        for (const ExplorerPrim& prim : object.prims)
+        {
+            mListedPrims.insert(prim.id);
+        }
+    }
+    boost::unordered::erase_if(mNamesAsked, [this](const LLUUID& id) { return !mListedPrims.contains(id); });
     fillExplorer();
     const LLHandle<LLFloater> handle = getHandle();
     for (const ExplorerObject& object : mExplorerModel)
@@ -13724,6 +13772,11 @@ void ALFloaterScriptStudio::fillExplorer()
         const bool        object_folded = filter.empty() && mExplorerFolded.contains(object.root);
         LLScrollListItem* line = row(at, many ? "Inv_Object_Multi" : "Inv_Object", (object_folded ? arrow_folded : arrow_open) + pin + object.name,
                                      object.present ? LLStringUtil::null : getString("KindAway"));
+        // Shown without its own name, not being selected: asked of its region.
+        if (object.present && !object.named)
+        {
+            askExplorerName(object.root);
+        }
         line->setSelected(wasChosen(at));
         if (object_folded)
         {
@@ -13746,6 +13799,10 @@ void ALFloaterScriptStudio::fillExplorer()
             {
                 at["prim"]             = prim.id;
                 const bool prim_folded = filter.empty() && mExplorerFoldedPrims.contains(prim.id);
+                if (object.present && !prim.named)
+                {
+                    askExplorerName(prim.id);
+                }
                 line = row(at, "Studio_Prim", "    " + (prim_folded ? arrow_folded : arrow_open) + (prim.name.empty() ? getString("ObjectUnnamed") : prim.name),
                            LLStringUtil::null);
                 line->setSelected(wasChosen(at));
