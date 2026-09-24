@@ -1885,6 +1885,7 @@ std::vector<ALScriptFix> ALLuauService::actions(std::string_view source, S32 lin
         }
         const std::vector<Luau::AstNode*> around = Luau::findAstAncestryOfPosition(*module_source, positionOf(line, from));
         Luau::AstExpr*                    chosen    = nullptr;
+        Luau::AstNode*                    holder    = nullptr;
         Luau::AstStat*                    statement = nullptr;
         bool                              certain   = true;
         for (size_t i = around.size(); i-- > 0;)
@@ -1896,6 +1897,7 @@ std::vector<ALScriptFix> ALLuauService::actions(std::string_view source, S32 lin
                 if (expr && expr->location.begin == positionOf(line, from) && expr->location.end == positionOf(line, to))
                 {
                     chosen = expr;
+                    holder = i > 0 ? around[i - 1] : nullptr;
                 }
                 continue;
             }
@@ -1941,6 +1943,71 @@ std::vector<ALScriptFix> ALLuauService::actions(std::string_view source, S32 lin
         if (Luau::AstStatFunction* function = statement ? statement->as<Luau::AstStatFunction>() : nullptr)
         {
             certain = certain && function->name != chosen;
+        }
+        // Nor a call that is the whole statement, which would leave the
+        // local's name standing alone as one, and that is no statement.
+        if (Luau::AstStatExpr* alone = statement ? statement->as<Luau::AstStatExpr>() : nullptr)
+        {
+            certain = certain && alone->expr != chosen;
+        }
+        // Nor a call where every value it gives is kept -- the last of a
+        // call's arguments, of what is returned, of a table's items, of
+        // what a for-in reads, or of the values of an assignment with more
+        // names than values -- since a local keeps only the first; unless
+        // the checker says it gives just the one.
+        const auto one_value = [&module](Luau::AstExpr* expr) {
+            // What the call gave, where the checker kept it; else what the
+            // function called returns -- the overload chosen, or the
+            // function as it was called.
+            std::optional<Luau::TypePackId> pack;
+            if (const Luau::TypePackId* given = module->astTypePacks.find(expr))
+            {
+                pack = *given;
+            }
+            else if (Luau::AstExprCall* call = expr->as<Luau::AstExprCall>())
+            {
+                const Luau::TypeId* callee = module->astOverloadResolvedTypes.find(call);
+                callee                     = callee ? callee : module->astTypes.find(call->func);
+                if (const Luau::FunctionType* function = callee ? Luau::get<Luau::FunctionType>(Luau::follow(*callee)) : nullptr)
+                {
+                    pack = function->retTypes;
+                }
+            }
+            if (!pack)
+            {
+                return false;
+            }
+            const auto [head, tail] = Luau::flatten(Luau::follow(*pack));
+            return head.size() == 1 && (!tail || Luau::isEmpty(*tail));
+        };
+        if (chosen && chosen->is<Luau::AstExprCall>() && holder && !one_value(chosen))
+        {
+            const auto last = [chosen](const Luau::AstArray<Luau::AstExpr*>& list) { return list.size > 0 && list.data[list.size - 1] == chosen; };
+            if (Luau::AstExprCall* call = holder->as<Luau::AstExprCall>())
+            {
+                certain = certain && !last(call->args);
+            }
+            else if (Luau::AstStatReturn* ret = holder->as<Luau::AstStatReturn>())
+            {
+                certain = certain && !last(ret->list);
+            }
+            else if (Luau::AstExprTable* table = holder->as<Luau::AstExprTable>())
+            {
+                certain = certain && !(table->items.size > 0 && table->items.data[table->items.size - 1].kind == Luau::AstExprTable::Item::Kind::List &&
+                                       table->items.data[table->items.size - 1].value == chosen);
+            }
+            else if (Luau::AstStatForIn* each = holder->as<Luau::AstStatForIn>())
+            {
+                certain = certain && !last(each->values);
+            }
+            else if (Luau::AstStatLocal* local = holder->as<Luau::AstStatLocal>())
+            {
+                certain = certain && !(last(local->values) && local->vars.size > local->values.size);
+            }
+            else if (Luau::AstStatAssign* assign = holder->as<Luau::AstStatAssign>())
+            {
+                certain = certain && !(last(assign->values) && assign->vars.size > assign->values.size);
+            }
         }
         if (chosen && statement && certain && !chosen->is<Luau::AstExprFunction>() && !chosen->is<Luau::AstExprVarargs>() &&
             !statement->is<Luau::AstStatWhile>() && !statement->is<Luau::AstStatRepeat>())

@@ -537,6 +537,9 @@ namespace tut
         S32 line = 0, column = 0, end = 0;
         place(none, "i = 4", line, column, end);
         ensure("assigned to", acted(none, false, line, column, line, column + 1, "Put it in a local, 'value'").rfind("offered", 0) == 0);
+        // Nor the whole of a statement, which would leave `value;`.
+        none = head + "        llOwnerSay((string)llGetUnixTime());\n" + tail;
+        ensure("the whole statement", actedOn(none, false, "llOwnerSay((string)llGetUnixTime())", true, "Put it in a local, 'value'").rfind("offered", 0) == 0);
     }
 
     template<> template<>
@@ -598,6 +601,24 @@ namespace tut
         ensure("not a loop's condition", actedOn(looped, true, "x < 10", true, "Put it in a local, 'value'").rfind("offered", 0) == 0);
         const std::string elseif = "local x = 1\nif x == 0 then\n    print(0)\nelseif x + 1 == 2 then\n    print(1)\nend\n";
         ensure("not an elseif's condition", actedOn(elseif, true, "x + 1", true, "Put it in a local, 'value'").rfind("offered", 0) == 0);
+        // Not a call that is the whole statement: `value` alone is no
+        // statement.
+        const std::string whole = "print(math.abs(-1))\n";
+        ensure("not the whole statement", actedOn(whole, true, "print(math.abs(-1))", true, "Put it in a local, 'value'").rfind("offered", 0) == 0);
+        ensure("its argument yes: " + actedOn(whole, true, "math.abs(-1)", true, "Put it in a local, 'value'"),
+               actedOn(whole, true, "math.abs(-1)", true, "Put it in a local, 'value'") == "local value = math.abs(-1)\nprint(value)\n");
+        // Not a call where all it gives is kept, since a local keeps one.
+        const std::string two = "local function g(n: number) return n, 2 end\n";
+        ensure("not a last argument", actedOn(two + "print(g(1))\n", true, "g(1)", true, "Put it in a local, 'value'").rfind("offered", 0) == 0);
+        ensure("not a last return", actedOn(two + "local function h() return 0, g(1) end\nh()\n", true, "g(1)", true, "Put it in a local, 'value'").rfind("offered", 0) == 0);
+        ensure("not a table's last item", actedOn(two + "local t = { g(1) }\n", true, "g(1)", true, "Put it in a local, 'value'").rfind("offered", 0) == 0);
+        ensure("not to two names", actedOn(two + "local a, b = g(1)\n", true, "g(1)", true, "Put it in a local, 'value'").rfind("offered", 0) == 0);
+        ensure("not a for-in's values", actedOn("for k, v in pairs({}) do end\n", true, "pairs({})", true, "Put it in a local, 'value'").rfind("offered", 0) == 0);
+        // Where only the first is kept anyway, yes.
+        ensure("an argument before the last: " + actedOn(two + "print(g(1), 3)\n", true, "g(1)", true, "Put it in a local, 'value'"),
+               actedOn(two + "print(g(1), 3)\n", true, "g(1)", true, "Put it in a local, 'value'") == two + "local value = g(1)\nprint(value, 3)\n");
+        ensure("to one name: " + actedOn(two + "local a = g(1)\n", true, "g(1)", true, "Put it in a local, 'value'"),
+               actedOn(two + "local a = g(1)\n", true, "g(1)", true, "Put it in a local, 'value'").rfind("offered", 0) != 0);
     }
 
     template<> template<>

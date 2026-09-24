@@ -1860,6 +1860,12 @@ std::vector<ALScriptFix> ALLSLService::actions(std::string_view source, S32 line
             // What is assigned to, which a local would take in its place.
             certain = false;
         }
+        if (chosen && isStatement(chosen->getParent(), Tailslide::NODE_EXPRESSION_STATEMENT))
+        {
+            // The whole statement, which would leave the local's name
+            // standing alone as one.
+            certain = false;
+        }
         while (statement && statement->getNodeType() != Tailslide::NODE_STATEMENT)
         {
             statement = statement->getParent();
