@@ -35,6 +35,9 @@
 #include "llviewerregion.h"
 #include "llcorehttputil.h"
 
+#include <boost/iostreams/device/array.hpp>
+#include <boost/iostreams/stream.hpp>
+
 
 //-----------------------------------------------------------------------------
 // LLSyntaxIdLSL
@@ -59,6 +62,25 @@ namespace
         FILENAME_INTERNAL_LSL,
         FILENAME_INTERNAL_LUA
     };
+
+    // A keyword file as the region sent it. Every file of the definitions
+    // comes as its bytes, the keyword files too; those are read as their
+    // cached copies are, or nothing where they do not read.
+    LLSD keywordsFrom(const LLSD& contents)
+    {
+        if (!contents.isBinary())
+        {
+            return contents;
+        }
+        const LLSD::Binary&                                      bytes = contents.asBinary();
+        boost::iostreams::stream<boost::iostreams::array_source> in(reinterpret_cast<const char*>(bytes.data()), bytes.size());
+        LLSD                                                     parsed;
+        if (!LLSDSerialize::deserialize(parsed, in, static_cast<llssize>(bytes.size())))
+        {
+            return LLSD();
+        }
+        return parsed;
+    }
 } // namespace
 
 //========================================================================
@@ -314,13 +336,19 @@ void LLSyntaxDefCache::fetchKeywordsDefsCoro(std::string url, LLUUID syntax_id)
         {
             std::string full_path = gDirUtilp->add(path, filename);
 
-            if (filename == FILENAME_INTERNAL_LSL)
+            // Kept only where it reads as definitions this viewer knows,
+            // as the cached copy would be on the next login.
+            if (filename == FILENAME_INTERNAL_LSL || filename == FILENAME_INTERNAL_LUA)
             {
-                lsl_keywords = contents;
-            }
-            else if (filename == FILENAME_INTERNAL_LUA)
-            {
-                lua_keywords = contents;
+                const LLSD keywords = keywordsFrom(contents);
+                if (isSupportedVersion(keywords))
+                {
+                    (filename == FILENAME_INTERNAL_LSL ? lsl_keywords : lua_keywords) = keywords;
+                }
+                else
+                {
+                    LL_WARNS("SyntaxLSL") << "Unknown or unsupported version of syntax file " << filename << "." << LL_ENDL;
+                }
             }
 
             if (writeCacheFile(full_path, contents))
