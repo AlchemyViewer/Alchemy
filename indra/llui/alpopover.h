@@ -76,6 +76,13 @@ public:
     // where a prompt over a window goes, as a quick open does.
     static ALPopover* showOver(LLView* anchor, LLPanel* content,
                                const std::string& title = LLStringUtil::null);
+    // Beside a rect of the screen rather than beside the anchor's own: what
+    // is on a zoomed or panned canvas, whose place only the canvas can say
+    // (ALCanvasView::screenRectOf), or the pointer. The anchor is still
+    // what it is about -- the window keys go home to, and that it closes
+    // with.
+    static ALPopover* showAt(const LLRect& screen, LLView* anchor, LLPanel* content,
+                             const std::string& title = LLStringUtil::null);
 
     // What a popover this size is built from: no close box, no minimise,
     // no tear-off, nothing saved, and a size a person may change only
@@ -97,6 +104,8 @@ public:
     // above it where under would run off the bottom, and shoved back on
     // screen where a side would run off, then shown and given the keyboard.
     void openBeside(const LLView* anchor);
+    // The same beside a rect of the screen, for the anchor.
+    void openBeside(const LLRect& screen, const LLView* anchor);
     // Opened over the anchor: centred on it, its top a little below the
     // anchor's, shoved back on screen where it would run off.
     void openOver(const LLView* anchor);

@@ -72,6 +72,24 @@ ALPopover* ALPopover::show(LLView* anchor, LLPanel* content, const std::string& 
 }
 
 // static
+ALPopover* ALPopover::showAt(const LLRect& screen, LLView* anchor, LLPanel* content, const std::string& title)
+{
+    if (!anchor || !content)
+    {
+        delete content;
+        return nullptr;
+    }
+
+    const LLRect wanted = content->getRect();
+    ALPopover* popover = new ALPopover(paramsFor(wanted.getWidth(), wanted.getHeight(), title));
+    content->setOrigin(0, 0);
+    content->setFollows(FOLLOWS_ALL);
+    popover->addChild(content);
+    popover->openBeside(screen, anchor);
+    return popover;
+}
+
+// static
 ALPopover* ALPopover::showOver(LLView* anchor, LLPanel* content, const std::string& title)
 {
     if (!anchor || !content)
@@ -162,16 +180,25 @@ void ALPopover::openAt(LLRect where)
 
 void ALPopover::openBeside(const LLView* anchor)
 {
+    if (!anchor)
+    {
+        openAt(getRect());
+        return;
+    }
+    openBeside(anchor->calcScreenRect(), anchor);
+}
+
+void ALPopover::openBeside(const LLRect& screen, const LLView* anchor)
+{
     LLRect where = getRect();
     if (anchor)
     {
         adopt(anchor);
-        const LLRect screen = anchor->calcScreenRect();
-        where.setLeftTopAndSize(screen.mLeft, screen.mBottom, where.getWidth(), where.getHeight());
-        if (where.mBottom < 0)
-        {
-            where.translate(0, screen.getHeight() + where.getHeight());
-        }
+    }
+    where.setLeftTopAndSize(screen.mLeft, screen.mBottom, where.getWidth(), where.getHeight());
+    if (where.mBottom < 0)
+    {
+        where.translate(0, screen.getHeight() + where.getHeight());
     }
     openAt(where);
 }

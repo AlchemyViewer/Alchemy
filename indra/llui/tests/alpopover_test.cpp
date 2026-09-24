@@ -336,4 +336,27 @@ namespace tut
         again->closeFloater();
         ensure("and the window closed after it", again->isDead());
     }
+
+    // Beside a rect of the screen given for it -- where something on a
+    // zoomed canvas is drawn -- rather than beside the anchor's own rect,
+    // and still the dependent of the anchor's window.
+    template<> template<>
+    void alpopover_object::test<9>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        LLPanel*     over   = anchor();
+        const LLRect screen(300, 260, 380, 240);
+        ALPopover*   popover = ALPopover::showAt(screen, over, content(160, 90));
+        ensure("opens", popover != nullptr && popover->getVisible());
+        const LLRect where = popover->getRect();
+        ensure_equals("its left with the rect's", where.mLeft, screen.mLeft);
+        ensure_equals("hung from the rect's bottom", where.mTop, screen.mBottom);
+        ensure("not the anchor's", where.mLeft != over->calcScreenRect().mLeft);
+        popover->closeFloater();
+        ensure("no anchor, no popover", ALPopover::showAt(screen, nullptr, content()) == nullptr);
+        over->die();
+    }
 }
