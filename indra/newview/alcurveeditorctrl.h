@@ -25,6 +25,7 @@
 #ifndef AL_CURVEEDITORCTRL_H
 #define AL_CURVEEDITORCTRL_H
 
+#include "aldraggesture.h"
 #include "lluictrl.h"
 #include "lluicolor.h"
 
@@ -117,6 +118,7 @@ public:
     bool handleHover(S32 x, S32 y, MASK mask) override;
     bool handleDoubleClick(S32 x, S32 y, MASK mask) override;
     void onMouseLeave(S32 x, S32 y, MASK mask) override;
+    void onMouseCaptureLost() override;
 
     /// The curve to plot. Passing an empty function draws handles only.
     void setCurve(curve_fn_t fn) { mCurve = std::move(fn); }
@@ -217,11 +219,11 @@ private:
     F32 mActionY = 0.f;
     /// Handle under the pointer between drags, or -1.
     S32 mHoverIndex = -1;
-    /// Pointer position at the last drag commit, so a press that does not
-    /// move never commits: the viewer calls a captured widget's handleHover
-    /// every frame, not only on motion.
-    S32 mLastPointerX = -1;
-    S32 mLastPointerY = -1;
+    /// The drag of a handle: no dead zone, committed as it goes, and told
+    /// of a move only where the pointer moved, so a press that does not
+    /// move never commits -- the viewer calls a captured widget's
+    /// handleHover every frame, not only on motion.
+    ALDragGesture mDrag{ 0, ALDragGesture::Zone::Distance, ALDragGesture::Commit::AsItGoes };
 };
 
 #endif // AL_CURVEEDITORCTRL_H
