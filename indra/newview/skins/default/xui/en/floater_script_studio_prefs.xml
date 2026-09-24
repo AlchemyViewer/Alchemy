@@ -26,6 +26,7 @@
     <floater.string name="PlaceInventory">Inventory</floater.string>
     <floater.string name="PlaceObject">The script's object</floater.string>
     <floater.string name="PlaceDisk">The folder on disk</floater.string>
+    <floater.string name="OrderWorldOff">The places an #include or require is looked for, the first that has it winning; a place unticked is not looked in. The object and inventory are greyed while includes are not taken from them: tick the box above to let them in</floater.string>
     <floater.string name="ThemeNewName">My Theme</floater.string>
     <floater.string name="HeadingEditor">Editor</floater.string>
     <floater.string name="HeadingSyntax">Syntax</floater.string>

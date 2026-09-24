@@ -127,6 +127,8 @@ private:
     LLComboBox*                                            mThemes      = nullptr;
     LLComboBox*                                            mPreviewLang = nullptr;
     LLScrollListCtrl*                                      mOrder       = nullptr;
+    // The list's own tip, which says more where the world's places are off.
+    std::string                                            mOrderTip;
     ALFontField*                                           mFont        = nullptr;
     LLPanel*                                               mSwatches    = nullptr;
     ALCodeEditor*                                          mPreview     = nullptr;

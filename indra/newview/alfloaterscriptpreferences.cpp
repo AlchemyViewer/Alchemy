@@ -102,6 +102,7 @@ bool ALFloaterScriptPreferences::postBuild()
     mPreview     = getChild<ALCodeEditor>("preview");
     mFolders      = getChild<LLScrollListCtrl>("include_folders");
     mOrder        = getChild<LLScrollListCtrl>("include_order");
+    mOrderTip     = mOrder->getToolTip();
     mTemplateLSL  = getChild<ALCodeEditor>("template_lsl");
     mTemplateSLua = getChild<ALCodeEditor>("template_slua");
     mDefines      = getChild<LLTextEditor>("preproc_defines");
@@ -181,6 +182,12 @@ bool ALFloaterScriptPreferences::postBuild()
     refreshFont();
     mFont->onPartCommit([this](const std::string& part, const std::string& value) { onFontPart(part, value); });
 
+    // The world's places greyed in the order while includes are not taken
+    // from it, and back as they were once they are.
+    if (LLControlVariable* control = gSavedSettings.getControl("ALScriptPreprocWorldIncludes"))
+    {
+        mEnableWatches.emplace_back(control->getSignal()->connect([this](LLControlVariable*, const LLSD&, const LLSD&) { refreshIncludeOrder(); }));
+    }
     for (const char* setting : { "ALScriptPreprocOptimizer", "ALScriptPreprocDiskIncludes", "ALScriptStudioAutoComplete", "ALScriptStudioHoverCards",
                                  "ALScriptPreprocDiskIncludeFolder", "ALScriptTemplateLSL", "ALScriptTemplateSLua", "ALScriptPreprocDefines" })
     {
@@ -799,7 +806,11 @@ void ALFloaterScriptPreferences::refreshIncludeOrder()
     }
     const S32 chosen = mOrder->getFirstSelectedIndex();
     mOrder->deleteAllItems();
-    const auto add = [this](const std::string& place, bool on) {
+    // The object and the inventory while includes are not taken from them:
+    // greyed, their tick and their place kept for when they are, and not
+    // to be changed until then.
+    const bool world = gSavedSettings.getBOOL("ALScriptPreprocWorldIncludes");
+    const auto add   = [this, world](const std::string& place, bool on) {
         LLSD row;
         row["value"]                = place;
         row["columns"][0]["column"] = "on";
@@ -807,8 +818,18 @@ void ALFloaterScriptPreferences::refreshIncludeOrder()
         row["columns"][0]["value"]  = on;
         row["columns"][1]["column"] = "place";
         row["columns"][1]["value"]  = getString(place == "inventory" ? "PlaceInventory" : place == "object" ? "PlaceObject" : "PlaceDisk");
-        mOrder->addElement(row);
+        LLScrollListItem* item      = mOrder->addElement(row);
+        const bool        live      = world || place == "disk";
+        if (item && !live)
+        {
+            item->setEnabled(false);
+            if (LLScrollListCell* tick = item->getColumn(0))
+            {
+                tick->setEnabled(false);
+            }
+        }
     };
+    mOrder->setToolTip(world ? mOrderTip : getString("OrderWorldOff"));
     for (const std::string& place : named)
     {
         add(place, true);
@@ -820,7 +841,7 @@ void ALFloaterScriptPreferences::refreshIncludeOrder()
             add(place, false);
         }
     }
-    if (chosen >= 0)
+    if (chosen >= 0 && chosen < mOrder->getItemCount() && mOrder->getAllData()[chosen]->getEnabled())
     {
         mOrder->selectNthItem(chosen);
     }
