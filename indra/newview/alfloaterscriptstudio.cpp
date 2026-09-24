@@ -945,7 +945,7 @@ bool ALFloaterScriptStudio::postBuild()
     mFindButton->setCommitCallback([this](LLUICtrl*, const LLSD&) {
         if (Doc* doc = active())
         {
-            doc->editor->perform(ALEditorCommand::Find);
+            doc->shownText()->perform(ALEditorCommand::Find);
         }
     });
     mFormatButton->setCommitCallback([this](LLUICtrl*, const LLSD&) {
@@ -1105,8 +1105,13 @@ void ALFloaterScriptStudio::restoreTabs(const LLSD& open)
                 // Not in hand yet -- its object not in view, or what it
                 // holds not asked, the inventory still coming: opened
                 // when it is, for a while (pumpRestores).
-                mPendingRestores.push_back(PendingRestore{ ref, LLTimer::getTotalSeconds() + RESTORE_WAIT });
+                mPendingRestores.push_back(PendingRestore{ ref, LLTimer::getTotalSeconds() + RESTORE_WAIT, false, viewNamed(one["view"].asString()) });
             }
+        }
+        // Showing what it showed, once there is that to show.
+        if (const size_t at = id.empty() ? NONE : indexOf(id); at != NONE)
+        {
+            showView(*mDocs[at], viewNamed(one["view"].asString()));
         }
         if (i == chosen)
         {
@@ -1422,23 +1427,27 @@ bool ALFloaterScriptStudio::handleKeyHere(KEY key, MASK mask)
 
 bool ALFloaterScriptStudio::undo()
 {
-    Doc* doc = active();
-    if (!doc || !doc->editor->canUndo())
+    // The view in front's own steps: the expansion, being read, has none,
+    // and the source's are not to be taken back out of sight.
+    Doc*          doc  = active();
+    ALCodeEditor* text = doc ? doc->shownText() : nullptr;
+    if (!text || !text->canUndo())
     {
         return false;
     }
-    doc->editor->undo();
+    text->undo();
     return true;
 }
 
 bool ALFloaterScriptStudio::redo()
 {
-    Doc* doc = active();
-    if (!doc || !doc->editor->canRedo())
+    Doc*          doc  = active();
+    ALCodeEditor* text = doc ? doc->shownText() : nullptr;
+    if (!text || !text->canRedo())
     {
         return false;
     }
-    doc->editor->redo();
+    text->redo();
     return true;
 }
 
@@ -2285,13 +2294,14 @@ void ALFloaterScriptStudio::goToPending(Doc& doc)
     {
         return;
     }
+    ALCodeEditor& source = sourceInFront(doc);
     if (doc.pendingColumn >= 0)
     {
-        doc.editor->goTo(ALTextRange(ALTextPos(doc.pendingLine, doc.pendingColumn), ALTextPos(doc.pendingLine, doc.pendingColumn + doc.pendingLength)));
+        source.goTo(ALTextRange(ALTextPos(doc.pendingLine, doc.pendingColumn), ALTextPos(doc.pendingLine, doc.pendingColumn + doc.pendingLength)));
     }
     else
     {
-        doc.editor->goToLine(doc.pendingLine);
+        source.goToLine(doc.pendingLine);
     }
     doc.pendingLine   = -1;
     doc.pendingColumn = -1;
@@ -2530,7 +2540,8 @@ void ALFloaterScriptStudio::loaded(const ALScriptWorkspace::Loaded& answer)
 
 void ALFloaterScriptStudio::showExpanded(Doc& doc, const std::string& text)
 {
-    if (!doc.expandedEditor)
+    const bool made = !doc.expandedEditor;
+    if (made)
     {
         doc.expandedEditor = makeEditor(doc.id + ":expanded", true);
         doc.expandedEditor->setVisible(false);
@@ -2538,7 +2549,18 @@ void ALFloaterScriptStudio::showExpanded(Doc& doc, const std::string& text)
     doc.expandedEditor->setSyntax(doc.language.lua ? "slua" : "lsl");
     teachWords(*doc.expandedEditor, doc.language.lua);
     doc.expandedEditor->setText(text);
-    if (&doc == active())
+    if (&doc != active())
+    {
+        return;
+    }
+    // A tab that asked for the expansion before there was one -- brought
+    // back from the last session, or moved into a window of its own --
+    // shows it now that there is.
+    if (made && doc.view == Doc::View::Expanded)
+    {
+        showView(doc, Doc::View::Expanded);
+    }
+    else
     {
         refreshToolbar();
     }
@@ -2550,19 +2572,13 @@ void ALFloaterScriptStudio::dropExpanded(Doc& doc)
     {
         return;
     }
-    const bool focused = doc.expandedEditor->hasFocus();
+    // The source in its place first, with the keyboard where it was.
+    showView(doc, Doc::View::Source);
     mEditorHost->removeChild(doc.expandedEditor);
     doc.expandedEditor->die();
-    doc.expandedEditor  = nullptr;
-    doc.showingExpanded = false;
+    doc.expandedEditor = nullptr;
     if (&doc == active())
     {
-        // The source in its place, with the keyboard where it was.
-        showEditors();
-        if (focused)
-        {
-            doc.editor->setFocus(true);
-        }
         refreshToolbar();
     }
 }
@@ -2574,10 +2590,70 @@ void ALFloaterScriptStudio::toggleExpanded()
     {
         return;
     }
-    doc->showingExpanded = !doc->showingExpanded;
+    showView(*doc, doc->shownView() == Doc::View::Expanded ? Doc::View::Source : Doc::View::Expanded, true);
+}
+
+void ALFloaterScriptStudio::showView(Doc& doc, Doc::View view, bool focus)
+{
+    // Asked of whichever editor is on screen, which is not always the view
+    // asked for until now: a tab brought back asking for its expansion
+    // shows its source until the expansion comes.
+    const bool      had_keys = (doc.editor && doc.editor->hasFocus()) || (doc.expandedEditor && doc.expandedEditor->hasFocus());
+    const Doc::View was      = doc.shownView();
+    doc.view                 = view;
+    if (&doc != active())
+    {
+        return;
+    }
+    // The pane already showing it: a tab brought back asking for the source
+    // it shows, a jump back into the view in front.
+    if (doc.shownView() == was && doc.shownText()->getVisible())
+    {
+        if (focus)
+        {
+            focusShown(doc);
+        }
+        return;
+    }
     showEditors();
-    (doc->showingExpanded ? doc->expandedEditor : doc->editor)->setFocus(true);
+    if (focus || had_keys)
+    {
+        focusShown(doc);
+    }
+    // The bars read the caret of the view in front, which is another caret
+    // now, wherever it stands: seen afresh on the next frame (pumpCaret).
+    doc.caretSeen = ALTextPos(-1, -1);
     refreshToolbar();
+}
+
+ALCodeEditor& ALFloaterScriptStudio::sourceInFront(Doc& doc)
+{
+    if (doc.shownView() != Doc::View::Source)
+    {
+        showView(doc, Doc::View::Source);
+    }
+    return *doc.editor;
+}
+
+// static
+void ALFloaterScriptStudio::focusShown(Doc& doc)
+{
+    if (ALCodeEditor* text = doc.shownText())
+    {
+        text->setFocus(true);
+    }
+}
+
+// static
+const char* ALFloaterScriptStudio::viewName(Doc::View view)
+{
+    return view == Doc::View::Expanded ? "expanded" : "source";
+}
+
+// static
+ALFloaterScriptStudio::Doc::View ALFloaterScriptStudio::viewNamed(const std::string& name)
+{
+    return name == "expanded" ? Doc::View::Expanded : Doc::View::Source;
 }
 
 void ALFloaterScriptStudio::showEditors()
@@ -2588,13 +2664,13 @@ void ALFloaterScriptStudio::showEditors()
     }
     for (size_t i = 0; i < mDocs.size(); ++i)
     {
-        Doc&       doc      = *mDocs[i];
-        const bool here     = i == mActive;
-        const bool expanded = here && doc.showingExpanded && doc.expandedEditor;
-        doc.editor->setVisible(here && !expanded);
+        Doc&            doc   = *mDocs[i];
+        const bool      here  = i == mActive;
+        const Doc::View shown = doc.shownView();
+        doc.editor->setVisible(here && shown == Doc::View::Source);
         if (doc.expandedEditor)
         {
-            doc.expandedEditor->setVisible(expanded);
+            doc.expandedEditor->setVisible(here && shown == Doc::View::Expanded);
         }
     }
 }
@@ -2937,16 +3013,17 @@ void ALFloaterScriptStudio::openFileHere(const std::string& path, bool lua, S32 
     Doc& doc = *mDocs[already];
     if (line >= 0)
     {
+        ALCodeEditor& source = sourceInFront(doc);
         if (column < 0)
         {
-            doc.editor->goToLine(line);
+            source.goToLine(line);
         }
         else
         {
-            doc.editor->goTo(ALTextRange(ALTextPos(line, column), ALTextPos(line, column + length)));
+            source.goTo(ALTextRange(ALTextPos(line, column), ALTextPos(line, column + length)));
         }
     }
-    doc.editor->setFocus(true);
+    focusShown(doc);
     fillTabs();
     refreshToolbar();
 }
@@ -3755,7 +3832,7 @@ void ALFloaterScriptStudio::activate(size_t index, bool focus)
     // editor just hidden, where it would type into a tab out of sight.
     if (focus || gFocusMgr.childHasKeyboardFocus(this))
     {
-        (mDocs[index]->showingExpanded && mDocs[index]->expandedEditor ? mDocs[index]->expandedEditor : mDocs[index]->editor)->setFocus(true);
+        focusShown(*mDocs[index]);
     }
     fillTabs();
     refreshToolbar();
@@ -3886,13 +3963,16 @@ void ALFloaterScriptStudio::problemCounts(const Doc& doc, S32& errors, S32& warn
 
 void ALFloaterScriptStudio::refreshTrailer(Doc& doc)
 {
-    const ALTextPos             caret = doc.editor->caret();
-    const ALTextDocument&       text  = doc.editor->document();
+    // The view in front's caret: the expansion's own line, while it is
+    // the one being read.
+    const ALCodeEditor&         shown = *doc.shownText();
+    const ALTextPos             caret = shown.caret();
+    const ALTextDocument&       text  = shown.document();
     LLStringUtil::format_map_t args;
     args["[LINE]"]  = std::to_string(caret.line + 1);
     // Where the caret is as it is seen -- a character a column, a tab to
     // its stop -- rather than its byte in the line.
-    args["[COL]"]   = std::to_string(text.displayColumn(caret, doc.editor->getTabWidth()) + 1);
+    args["[COL]"]   = std::to_string(text.displayColumn(caret, shown.getTabWidth()) + 1);
     std::vector<ALJumpBar::TrailerPart> parts;
     // A script that may be read and not changed says so for as long as it
     // is in front, not only in the status line as it arrives.
@@ -3906,7 +3986,7 @@ void ALFloaterScriptStudio::refreshTrailer(Doc& doc)
     }
     parts.push_back({ getString("CaretPosition", args), "line", mTrailerLineTip });
     // What is selected: lines across lines, characters within one.
-    const ALTextRange selection = doc.editor->selection().normalised();
+    const ALTextRange selection = shown.selection().normalised();
     if (!selection.empty())
     {
         if (selection.begin.line != selection.end.line)
@@ -4002,7 +4082,8 @@ void ALFloaterScriptStudio::pumpVim()
     // all in the band the editor draws under its text, where vim has
     // them; the bottom strip says only that vim is on, so that a reader
     // of the strip knows why the keys do what they do.
-    ALVimKeymap* vim    = doc->editor ? dynamic_cast<ALVimKeymap*>(doc->editor->modalKeymap()) : nullptr;
+    ALCodeEditor* shown = doc->shownText();
+    ALVimKeymap*  vim   = shown ? dynamic_cast<ALVimKeymap*>(shown->modalKeymap()) : nullptr;
     std::string  banner = vim ? getString("VimNormal") : std::string();
     if (banner != mVimBanner)
     {
@@ -4168,10 +4249,15 @@ bool ALFloaterScriptStudio::vimCommand(ALTextView& view, const std::string& name
         }
         return false;
     }
-    // The studio's own, by the names its menu knows.
+    // The studio's own, by the names its menu knows, where the menu would
+    // give them: `:format` typed in the expansion being read is not a
+    // format of the source out of sight.
     if (std::any_of(std::begin(VIM_MENU_COMMANDS), std::end(VIM_MENU_COMMANDS), [&name](const char* command) { return name == command; }))
     {
-        onMenuAction(LLSD(name));
+        if (onMenuEnable(LLSD(name)))
+        {
+            onMenuAction(LLSD(name));
+        }
         return true;
     }
     return false;
@@ -4201,8 +4287,10 @@ void ALFloaterScriptStudio::vimComplete(ALTextView& view, const std::string& com
 
 void ALFloaterScriptStudio::vimFormat(ALTextView& view, S32 first, S32 last)
 {
+    // The lines of the source, where `=` was given there: the expansion's
+    // lines are other lines, and it is not to be changed.
     Doc* doc = docOf(view);
-    if (!doc || !doc->loaded || !doc->modifiable || doc->notecard)
+    if (!doc || &view != doc->editor || !doc->loaded || !doc->modifiable || doc->notecard)
     {
         return;
     }
@@ -4382,12 +4470,12 @@ void ALFloaterScriptStudio::refreshToolbar()
         anyDirty = anyDirty || (each->editor->isDirty() && each->modifiable);
     }
     mSaveAllButton->setEnabled(anyDirty);
-    mUndoButton->setEnabled(doc && doc->editor->canUndo());
-    mRedoButton->setEnabled(doc && doc->editor->canRedo());
+    mUndoButton->setEnabled(doc && doc->shownText()->canUndo());
+    mRedoButton->setEnabled(doc && doc->shownText()->canRedo());
     mFindButton->setEnabled(doc != nullptr);
-    mFormatButton->setEnabled(have && doc->modifiable && !doc->notecard);
+    mFormatButton->setEnabled(have && doc->modifiable && !doc->notecard && doc->shownView() == Doc::View::Source);
     mExpandedButton->setEnabled(doc && doc->expandedEditor != nullptr);
-    mExpandedButton->setToggleState(doc && doc->showingExpanded && doc->expandedEditor);
+    mExpandedButton->setToggleState(doc && doc->shownView() == Doc::View::Expanded);
     mRunning->setVisible(task);
     mResetButton->setVisible(task);
     if (task)
@@ -5698,9 +5786,11 @@ void ALFloaterScriptStudio::goToProblem(Doc& doc, S32 direction)
         setStatus(getString("NoProblemsHere", args));
         return;
     }
-    // From the caret, round past the end to the other.
+    // From the caret, round past the end to the other: the source's, where
+    // the problems are.
     noteJump();
-    const ALTextRange selection = doc.editor->selection().normalised();
+    ALCodeEditor&     source    = sourceInFront(doc);
+    const ALTextRange selection = source.selection().normalised();
     ALTextPos         to        = direction > 0 ? places.front() : places.back();
     if (direction > 0)
     {
@@ -5718,8 +5808,8 @@ void ALFloaterScriptStudio::goToProblem(Doc& doc, S32 direction)
             to = *(next - 1);
         }
     }
-    doc.editor->goTo(ALTextRange(to, to));
-    doc.editor->setFocus(true);
+    source.goTo(ALTextRange(to, to));
+    source.setFocus(true);
     showProblemCard(doc, to);
 }
 
@@ -5854,8 +5944,8 @@ void ALFloaterScriptStudio::refreshUndoLabels()
     Doc*                     doc   = active();
     const LLEditMenuHandler* field = focusedEditHandler();
     const bool               ours  = !field || (doc && (field == doc->editor || field == doc->expandedEditor));
-    const std::string        undo  = doc && (ours || !field->canUndo()) ? doc->editor->undoJournal().undoLabel() : std::string();
-    const std::string        redo  = doc && (ours || !field->canRedo()) ? doc->editor->undoJournal().redoLabel() : std::string();
+    const std::string        undo  = doc && (ours || !field->canUndo()) ? doc->shownText()->undoJournal().undoLabel() : std::string();
+    const std::string        redo  = doc && (ours || !field->canRedo()) ? doc->shownText()->undoJournal().redoLabel() : std::string();
     if (undo == mUndoSaid && redo == mRedoSaid)
     {
         return;
@@ -5916,7 +6006,7 @@ void ALFloaterScriptStudio::onProblemSelected(bool to_editor)
         {
             end = begin;
         }
-        doc.editor->goTo(ALTextRange(begin, end));
+        sourceInFront(doc).goTo(ALTextRange(begin, end));
         showProblemCard(doc, begin);
     }
     --mHoldPanes;
@@ -6023,7 +6113,7 @@ void ALFloaterScriptStudio::revealed(LLUICtrl* list, bool to_editor)
         if (Doc* doc = active())
         {
             holdPreview(*doc);
-            (doc->showingExpanded && doc->expandedEditor ? doc->expandedEditor : doc->editor)->setFocus(true);
+            focusShown(*doc);
         }
         return;
     }
@@ -6180,8 +6270,9 @@ void ALFloaterScriptStudio::goToDeclared(const LLSD& value)
         openIncludeAt(value["path"].asString(), value["name"].asString(), line, column, 0);
         return;
     }
-    doc->editor->goTo(ALTextPos(line, llmax(0, column)));
-    doc->editor->setFocus(true);
+    ALCodeEditor& source = sourceInFront(*doc);
+    source.goTo(ALTextPos(line, llmax(0, column)));
+    source.setFocus(true);
 }
 
 bool ALFloaterScriptStudio::sourceLine(const std::string& path, S32 line, std::string& out) const
@@ -6302,8 +6393,9 @@ void ALFloaterScriptStudio::symbolAnswered(Doc& doc, const ALScriptAnalysis::Res
             }
             else if (homePath.empty())
             {
-                doc.editor->goTo(rangeOf(definition));
-                doc.editor->setFocus(true);
+                ALCodeEditor& source = sourceInFront(doc);
+                source.goTo(rangeOf(definition));
+                source.setFocus(true);
             }
             else
             {
@@ -7594,7 +7686,7 @@ void ALFloaterScriptStudio::onReferenceChosen(bool to_editor)
             {
                 activate(from);
             }
-            mDocs[from]->editor->goTo(rangeOf(place.span));
+            sourceInFront(*mDocs[from]).goTo(rangeOf(place.span));
         }
     }
     else
@@ -7645,14 +7737,14 @@ void ALFloaterScriptStudio::noteJump(bool walking)
     {
         return;
     }
-    rememberPlace(NavPlace{ doc->id, doc->editor->caret() });
+    rememberPlace(NavPlace{ doc->id, doc->shownText()->caret(), doc->shownView() });
 }
 
 void ALFloaterScriptStudio::rememberPlace(const NavPlace& place)
 {
     mForward.clear();
     // Another jump from the same line is not another place to go back to.
-    if (!mBack.empty() && mBack.back().doc == place.doc && mBack.back().at.line == place.at.line)
+    if (!mBack.empty() && mBack.back().doc == place.doc && mBack.back().view == place.view && mBack.back().at.line == place.at.line)
     {
         return;
     }
@@ -7680,16 +7772,19 @@ void ALFloaterScriptStudio::goBack(bool forward)
         }
         if (Doc* here = active(); here && here->loaded)
         {
-            to.push_back(NavPlace{ here->id, here->editor->caret() });
+            to.push_back(NavPlace{ here->id, here->shownText()->caret(), here->shownView() });
         }
         mWalking = false;
         if (index != mActive)
         {
             activate(index);
         }
+        // In the view it was in, where the tab still has it.
         Doc& doc = *mDocs[index];
-        doc.editor->goTo(doc.editor->document().clamp(place.at));
-        doc.editor->setFocus(true);
+        showView(doc, place.view);
+        ALCodeEditor& text = *doc.shownText();
+        text.goTo(text.document().clamp(place.at));
+        text.setFocus(true);
         return;
     }
 }
@@ -7701,8 +7796,11 @@ void ALFloaterScriptStudio::goToLine()
     {
         return;
     }
+    // A line of the view in front: of the expansion, while it is the one
+    // being read.
     const std::string         id     = doc->id;
-    const ALTextPos           was    = doc->editor->caret();
+    const Doc::View           view   = doc->shownView();
+    const ALTextPos           was    = doc->shownText()->caret();
     const LLHandle<LLFloater> handle = getHandle();
     // The editor at the place typed, while it is typed; return leaves it
     // there, and so does looking away, escape puts it back.
@@ -7713,51 +7811,52 @@ void ALFloaterScriptStudio::goToLine()
     };
     auto placeOf = [](const Doc& doc, const std::string& typed, S32& line, S32& column) {
         placeTyped(typed, line, column);
-        const S32 count = doc.editor->document().lineCount();
+        const S32 count = doc.shownText()->document().lineCount();
         return line >= 1 && line <= count;
     };
     ALQuickOpen* quick = quickOpen(
         {}, getString("GoToLinePlaceholder"), getString("GoToLineTitle"),
-        [handle, docOf, placeOf, was](const std::string& typed) {
+        [handle, docOf, placeOf, was, view](const std::string& typed) {
             Doc* doc = docOf();
             if (!doc)
             {
                 return;
             }
-            S32 line, column;
+            ALCodeEditor& text = *doc->shownText();
+            S32           line, column;
             if (placeOf(*doc, typed, line, column))
             {
                 // Gone from where the caret was before the line was typed,
                 // which the preview has moved it from since.
                 if (ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get()))
                 {
-                    studio->rememberPlace(NavPlace{ doc->id, was });
+                    studio->rememberPlace(NavPlace{ doc->id, was, view });
                 }
-                doc->editor->goTo(column > 0 ? doc->editor->document().posAtDisplayColumn(line - 1, column - 1, doc->editor->getTabWidth()) : ALTextPos(line - 1, 0));
+                text.goTo(column > 0 ? text.document().posAtDisplayColumn(line - 1, column - 1, text.getTabWidth()) : ALTextPos(line - 1, 0));
             }
             else
             {
-                doc->editor->goTo(was);
+                text.goTo(was);
             }
-            doc->editor->setFocus(true);
+            text.setFocus(true);
         },
         mEditorHost, 420, ALQuickOpen::heightForRows(1),
         [docOf, was]() {
             if (Doc* doc = docOf())
             {
-                doc->editor->goTo(was);
+                doc->shownText()->goTo(was);
             }
         },
         {},
         // Looked away from: the line it went to stands, since that is
         // what was looked at, and the way back from it is kept, as a
         // line gone to by Return keeps it.
-        [handle, docOf, was]() {
+        [handle, docOf, was, view]() {
             ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get());
             Doc*                   doc    = docOf();
-            if (studio && doc && doc->editor->caret() != was)
+            if (studio && doc && doc->shownText()->caret() != was)
             {
-                studio->rememberPlace(NavPlace{ doc->id, was });
+                studio->rememberPlace(NavPlace{ doc->id, was, view });
             }
         });
     if (!quick)
@@ -7771,10 +7870,11 @@ void ALFloaterScriptStudio::goToLine()
         {
             return;
         }
+        ALCodeEditor&              text = *doc->shownText();
         S32                        line, column;
         const bool                 there = placeOf(*doc, typed, line, column);
         LLStringUtil::format_map_t args;
-        args["[COUNT]"] = std::to_string(doc->editor->document().lineCount());
+        args["[COUNT]"] = std::to_string(text.document().lineCount());
         args["[LINE]"]  = std::to_string(line);
         args["[COL]"]   = std::to_string(column);
         std::string trimmed = typed;
@@ -7782,12 +7882,12 @@ void ALFloaterScriptStudio::goToLine()
         if (trimmed.empty())
         {
             quick->setHint(studio->getString("GoToLineHint", args));
-            doc->editor->goTo(was);
+            text.goTo(was);
         }
         else if (there)
         {
             quick->setHint(studio->getString(column > 0 ? "GoToLineGoColumn" : "GoToLineGo", args));
-            doc->editor->goTo(column > 0 ? doc->editor->document().posAtDisplayColumn(line - 1, column - 1, doc->editor->getTabWidth()) : ALTextPos(line - 1, 0));
+            text.goTo(column > 0 ? text.document().posAtDisplayColumn(line - 1, column - 1, text.getTabWidth()) : ALTextPos(line - 1, 0));
         }
         else
         {
@@ -7853,8 +7953,8 @@ void ALFloaterScriptStudio::showCommandPalette()
         {
             if (Doc* doc = studio->active())
             {
-                // The command is about the editor the palette came up over.
-                doc->editor->setFocus(true);
+                // The command is about the view the palette came up over.
+                focusShown(*doc);
             }
             item->onCommit();
         }
@@ -7886,7 +7986,7 @@ void ALFloaterScriptStudio::showAllTabs()
             studio->onTabChosen(value);
             if (Doc* doc = studio->active())
             {
-                doc->editor->setFocus(true);
+                focusShown(*doc);
             }
         }
     }, mEditorHost);
@@ -7926,8 +8026,9 @@ void ALFloaterScriptStudio::goToSymbol()
             {
                 studio->activate(at);
             }
-            doc->editor->goTo(rangeOf(doc->outline[index].nameSpan));
-            doc->editor->setFocus(true);
+            ALCodeEditor& source = studio->sourceInFront(*doc);
+            source.goTo(rangeOf(doc->outline[index].nameSpan));
+            source.setFocus(true);
         }
     }, mEditorHost);
 }
@@ -7941,24 +8042,29 @@ void ALFloaterScriptStudio::pumpCaret()
     {
         return;
     }
-    const ALTextPos caret = doc->editor->caret();
-    const F64       now   = LLTimer::getTotalSeconds();
-    if (mWalking && doc->editor->hasFocus())
+    // The caret of the view in front, which the trailer reads. What the
+    // breadcrumb, the lit references and the inspector say is of the
+    // source, and waits while the expansion is being read.
+    const ALCodeEditor& shown  = *doc->shownText();
+    const bool          source = doc->shownView() == Doc::View::Source;
+    const ALTextPos     caret  = shown.caret();
+    const F64           now    = LLTimer::getTotalSeconds();
+    if (mWalking && shown.hasFocus())
     {
         mWalking = false;
     }
     if (caret != doc->caretSeen)
     {
         doc->caretSeen  = caret;
-        doc->inspectDue = now + ANALYSIS_DELAY;
+        doc->inspectDue = source ? now + ANALYSIS_DELAY : 0.0;
         refreshBreadcrumb(*doc);
         // The lit places go once the caret has left them all.
-        if (!doc->editor->highlights().empty() && !doc->editor->highlighted(caret))
+        if (source && !doc->editor->highlights().empty() && !doc->editor->highlighted(caret))
         {
             doc->editor->clearHighlights();
         }
     }
-    if (doc->inspectDue > 0.0 && now >= doc->inspectDue)
+    if (source && doc->inspectDue > 0.0 && now >= doc->inspectDue)
     {
         doc->inspectDue = 0.0;
         const ALTextRange word    = doc->editor->identifierAtCaret();
@@ -8185,16 +8291,20 @@ void ALFloaterScriptStudio::showReference(const Vocab& word, bool lua)
 void ALFloaterScriptStudio::reference(Doc& doc)
 {
     mFolds.setCollapsed("inspector", false);
-    const ALTextRange word = doc.editor->identifierAtCaret();
-    const std::string name = doc.editor->document().text(word);
+    // The word at the caret of the view in front: a word of the language
+    // reads the same in the expansion as in the source.
+    const ALCodeEditor& shown = *doc.shownText();
+    const ALTextRange   word  = shown.identifierAtCaret();
+    const std::string   name  = shown.document().text(word);
     if (const Vocab* known = vocabWord(doc.language.lua, name))
     {
         showReference(*known, doc.language.lua);
         return;
     }
     // A word of the script's own: what the analyzer knows of it, asked
-    // for now rather than a moment after the caret settles.
-    if (!word.empty())
+    // for now rather than a moment after the caret settles -- of the
+    // source, whose places the analyzer answers in.
+    if (!word.empty() && doc.shownView() == Doc::View::Source)
     {
         doc.inspectAt      = word.begin;
         doc.inspectVersion = doc.editor->document().version();
@@ -8552,8 +8662,11 @@ void ALFloaterScriptStudio::refreshBreadcrumb(Doc& doc)
     // The path the caret is in: which outline entry at each depth holds
     // it. The crumbs are built from the outline, which a caret move
     // does not touch, so the bar is told only where the path itself has
-    // changed -- and it is asked on every key.
+    // changed -- and it is asked on every key. The outline is the
+    // source's, so while the expansion is in front, whose lines are other
+    // lines, the path is the script alone.
     std::vector<size_t> path;
+    if (doc.shownView() == Doc::View::Source)
     {
         size_t parent = NONE;
         for (S32 depth = 0;; ++depth)
@@ -8643,15 +8756,16 @@ void ALFloaterScriptStudio::onCrumbChosen(size_t, const std::string& value)
         return;
     }
     noteJump();
+    ALCodeEditor& source = sourceInFront(*doc);
     if (value == "top")
     {
-        doc->editor->goTo(ALTextPos(0, 0));
+        source.goTo(ALTextPos(0, 0));
     }
     else if (const size_t index = outlineEntryOf(*doc, value); index != NONE)
     {
-        doc->editor->goTo(rangeOf(doc->outline[index].nameSpan));
+        source.goTo(rangeOf(doc->outline[index].nameSpan));
     }
-    doc->editor->setFocus(true);
+    source.setFocus(true);
 }
 
 // static
@@ -8694,7 +8808,7 @@ void ALFloaterScriptStudio::onOutlineChosen(bool to_editor)
     if (index < doc->outline.size())
     {
         noteJump(!to_editor);
-        doc->editor->goTo(rangeOf(doc->outline[index].nameSpan));
+        sourceInFront(*doc).goTo(rangeOf(doc->outline[index].nameSpan));
         revealed(mOutline, to_editor);
     }
 }
@@ -8854,14 +8968,17 @@ void ALFloaterScriptStudio::findInFiles()
     showBottom("search_tab");
     if (LLLineEditor* field = mSearchBar->findChild<LLLineEditor>("query"))
     {
-        // What is selected in the editor is what is most likely meant.
+        // What is selected in the view in front is what is most likely
+        // meant: a word read in the expansion is sought as much as one in
+        // the source.
         if (Doc* doc = active())
         {
-            const ALTextRange selection = doc->editor->selection();
+            const ALCodeEditor& shown     = *doc->shownText();
+            const ALTextRange   selection = shown.selection();
             if (!selection.empty() && selection.begin.line == selection.end.line)
             {
                 const ALTextRange ordered(std::min(selection.begin, selection.end), std::max(selection.begin, selection.end));
-                mSearchBar->setValue("query", doc->editor->document().text(ordered));
+                mSearchBar->setValue("query", shown.document().text(ordered));
             }
         }
         field->setFocus(true);
@@ -9596,7 +9713,7 @@ void ALFloaterScriptStudio::onSearchResult(bool to_editor)
         {
             activate(open);
         }
-        mDocs[open]->editor->goTo(match);
+        sourceInFront(*mDocs[open]).goTo(match);
     }
     else
     {
@@ -9634,15 +9751,16 @@ void ALFloaterScriptStudio::goToPlace(const ALScriptRef& ref, const std::string&
     Doc& doc = *mDocs[index];
     if (doc.loaded)
     {
+        ALCodeEditor& source = sourceInFront(doc);
         if (column < 0)
         {
-            doc.editor->goToLine(line);
+            source.goToLine(line);
         }
         else
         {
-            doc.editor->goTo(ALTextRange(ALTextPos(line, column), ALTextPos(line, column + length)));
+            source.goTo(ALTextRange(ALTextPos(line, column), ALTextPos(line, column + length)));
         }
-        doc.editor->setFocus(true);
+        source.setFocus(true);
     }
     else
     {
@@ -9872,6 +9990,7 @@ void ALFloaterScriptStudio::popOut()
         there.carriedText = moving.text;
         window->takeCarriedText(there);
         there.recovering.reset();
+        window->showView(there, doc->view);
     }
     else
     {
@@ -9884,6 +10003,8 @@ void ALFloaterScriptStudio::popOut()
             {
                 there.carriedEmbedded = doc->embedded;
             }
+            // Showing what it showed here, once its expansion comes there.
+            window->showView(there, doc->view);
         }
     }
     window->setFocus(true);
@@ -10068,8 +10189,14 @@ void ALFloaterScriptStudio::pumpRestores()
     const F64 now = LLTimer::getTotalSeconds();
     // Decided first and done after: opening a tab or asking what a prim
     // holds can answer on the spot, and the answer changes the list.
-    std::vector<std::pair<ALScriptRef, std::string>> opening;
-    std::vector<ALScriptRef>                         asking;
+    struct Opening
+    {
+        ALScriptRef ref;
+        std::string name;
+        Doc::View   view;
+    };
+    std::vector<Opening>     opening;
+    std::vector<ALScriptRef> asking;
     for (auto it = mPendingRestores.begin(); it != mPendingRestores.end();)
     {
         PendingRestore& one = *it;
@@ -10083,7 +10210,7 @@ void ALFloaterScriptStudio::pumpRestores()
         const LLInventoryItem* item   = one.ref.inInventory() ? gInventory.getItem(one.ref.item) : object ? object->getInventoryItem(one.ref.item) : nullptr;
         if (item)
         {
-            opening.emplace_back(one.ref, item->getName());
+            opening.push_back(Opening{ one.ref, item->getName(), one.view });
             it = mPendingRestores.erase(it);
             continue;
         }
@@ -10094,11 +10221,15 @@ void ALFloaterScriptStudio::pumpRestores()
         }
         ++it;
     }
-    for (const auto& [ref, name] : opening)
+    for (const Opening& one : opening)
     {
         // Beside what is open, without the keyboard: the author may be
         // typing somewhere by now.
-        openScript(ref, name, std::nullopt, -1, false);
+        openScript(one.ref, one.name, std::nullopt, -1, false);
+        if (const size_t at = indexOf(one.ref); at != NONE)
+        {
+            showView(*mDocs[at], one.view);
+        }
     }
     // A window made to restore what it had, with nothing of it to be had
     // now nor coming: no window.
@@ -10134,8 +10265,13 @@ void ALFloaterScriptStudio::restoreListed(const ALScriptRef& ref, const ALScript
     if (item != contents.items.end())
     {
         const std::string name = item->name;
+        const Doc::View   view = waiting->view;
         mPendingRestores.erase(waiting);
         openScript(ref, name, std::nullopt, -1, false);
+        if (const size_t at = indexOf(ref); at != NONE)
+        {
+            showView(*mDocs[at], view);
+        }
     }
     else if (contents.fetched)
     {
@@ -11473,8 +11609,9 @@ void ALFloaterScriptStudio::onOutputChosen(const ALOutputView::Entry& entry)
     activate(index);
     if (line >= 0)
     {
-        mDocs[index]->editor->goTo(ALTextPos(line, llmax(0, column)));
-        mDocs[index]->editor->setFocus(true);
+        ALCodeEditor& source = sourceInFront(*mDocs[index]);
+        source.goTo(ALTextPos(line, llmax(0, column)));
+        source.setFocus(true);
     }
 }
 
@@ -13244,7 +13381,7 @@ void ALFloaterScriptStudio::onMenuAction(const LLSD& param)
         LLEditMenuHandler* handler = focusedEditHandler();
         if (!handler && doc)
         {
-            handler = doc->editor;
+            handler = doc->shownText();
         }
         if (handler)
         {
@@ -13268,23 +13405,26 @@ void ALFloaterScriptStudio::onMenuAction(const LLSD& param)
     }
     else if (doc && action == "toggle_comment")
     {
-        doc->editor->toggleComment();
+        // The view in front's, as every command of the text's own is: the
+        // expansion being read says it cannot, where the source out of
+        // sight would have done it unseen.
+        doc->shownText()->perform(ALEditorCommand::ToggleComment);
     }
     else if (doc && (action == "duplicate_line" || action == "delete_line" || action == "move_line_up" || action == "move_line_down"))
     {
         // The editor's own line commands, by the names the keymap has.
         if (const std::optional<ALEditorCommand> command = alEditorCommandFromName(action))
         {
-            doc->editor->perform(*command);
+            doc->shownText()->perform(*command);
         }
     }
     else if (doc && action == "complete")
     {
-        doc->editor->perform(ALEditorCommand::Complete);
+        doc->shownText()->perform(ALEditorCommand::Complete);
     }
     else if (doc && action == "signature_help")
     {
-        doc->editor->perform(ALEditorCommand::SignatureHelp);
+        doc->shownText()->perform(ALEditorCommand::SignatureHelp);
     }
     else if (doc && (action == "next_problem" || action == "previous_problem"))
     {
@@ -13292,31 +13432,31 @@ void ALFloaterScriptStudio::onMenuAction(const LLSD& param)
     }
     else if (doc && action == "fold")
     {
-        doc->editor->perform(ALEditorCommand::Fold);
+        doc->shownText()->perform(ALEditorCommand::Fold);
     }
     else if (doc && action == "unfold")
     {
-        doc->editor->perform(ALEditorCommand::Unfold);
+        doc->shownText()->perform(ALEditorCommand::Unfold);
     }
     else if (doc && action == "fold_all")
     {
-        doc->editor->perform(ALEditorCommand::FoldAll);
+        doc->shownText()->perform(ALEditorCommand::FoldAll);
     }
     else if (doc && action == "unfold_all")
     {
-        doc->editor->perform(ALEditorCommand::UnfoldAll);
+        doc->shownText()->perform(ALEditorCommand::UnfoldAll);
     }
     else if (doc && action == "go_to_definition")
     {
-        doc->editor->perform(ALEditorCommand::GoToDefinition);
+        doc->shownText()->perform(ALEditorCommand::GoToDefinition);
     }
     else if (doc && action == "find_references")
     {
-        doc->editor->perform(ALEditorCommand::FindReferences);
+        doc->shownText()->perform(ALEditorCommand::FindReferences);
     }
     else if (doc && action == "rename")
     {
-        doc->editor->perform(ALEditorCommand::Rename);
+        doc->shownText()->perform(ALEditorCommand::Rename);
     }
     else if (doc && action == "go_to_line")
     {
@@ -13328,19 +13468,19 @@ void ALFloaterScriptStudio::onMenuAction(const LLSD& param)
     }
     else if (doc && action == "find")
     {
-        doc->editor->perform(ALEditorCommand::Find);
+        doc->shownText()->perform(ALEditorCommand::Find);
     }
     else if (doc && action == "replace")
     {
-        doc->editor->perform(ALEditorCommand::Replace);
+        doc->shownText()->perform(ALEditorCommand::Replace);
     }
     else if (doc && action == "find_next")
     {
-        doc->editor->perform(ALEditorCommand::FindNext);
+        doc->shownText()->perform(ALEditorCommand::FindNext);
     }
     else if (doc && action == "find_previous")
     {
-        doc->editor->perform(ALEditorCommand::FindPrevious);
+        doc->shownText()->perform(ALEditorCommand::FindPrevious);
     }
     else if (action == "preferences")
     {
@@ -13359,7 +13499,8 @@ void ALFloaterScriptStudio::onMenuAction(const LLSD& param)
         // The wiki has pages for the language's words, not the script's:
         // one of the script's own names is said to have none, rather than
         // opening a page that is not there. No word at all is the portal.
-        const std::string word = doc->editor->document().text(doc->editor->identifierAtCaret());
+        const ALCodeEditor& shown = *doc->shownText();
+        const std::string   word  = shown.document().text(shown.identifierAtCaret());
         if (!word.empty() && !vocabWord(doc->language.lua, word))
         {
             LLStringUtil::format_map_t args;
@@ -13620,7 +13761,7 @@ bool ALFloaterScriptStudio::onMenuEnable(const LLSD& param)
         LLEditMenuHandler* handler = focusedEditHandler();
         if (!handler && doc)
         {
-            handler = doc->editor;
+            handler = doc->shownText();
         }
         if (!handler)
         {
@@ -13636,9 +13777,16 @@ bool ALFloaterScriptStudio::onMenuEnable(const LLSD& param)
     {
         return doc && doc->loaded && doc->modifiable;
     }
-    if (action == "toggle_comment" || action == "complete" || action == "signature_help")
+    // What changes the text, or asks the analyzers about a place in it, is
+    // the source's to do: while the expansion is in front, it is read.
+    const bool source = doc && doc->shownView() == Doc::View::Source;
+    if (action == "toggle_comment")
     {
-        return doc && doc->modifiable;
+        return doc && doc->modifiable && doc->shownText()->canPerform(ALEditorCommand::ToggleComment);
+    }
+    if (action == "complete" || action == "signature_help")
+    {
+        return source && doc->modifiable;
     }
     if (action == "next_problem" || action == "previous_problem")
     {
@@ -13658,44 +13806,44 @@ bool ALFloaterScriptStudio::onMenuEnable(const LLSD& param)
     }
     if (action == "format" || action == "insert_snippet" || action == "insert_function" || action == "insert_event" || action == "insert_constant")
     {
-        return doc && doc->loaded && doc->modifiable && !doc->notecard;
+        return source && doc->loaded && doc->modifiable && !doc->notecard;
     }
     if (action == "format_selection")
     {
-        return doc && doc->loaded && doc->modifiable && !doc->notecard && !doc->editor->selection().empty();
+        return source && doc->loaded && doc->modifiable && !doc->notecard && !doc->editor->selection().empty();
     }
     if (action == "duplicate_line" || action == "delete_line" || action == "move_line_up" || action == "move_line_down")
     {
         const std::optional<ALEditorCommand> command = alEditorCommandFromName(action);
-        return doc && doc->modifiable && command && doc->editor->canPerform(*command);
+        return doc && doc->modifiable && command && doc->shownText()->canPerform(*command);
     }
     if (action == "fold")
     {
-        return doc && doc->editor->canPerform(ALEditorCommand::Fold);
+        return doc && doc->shownText()->canPerform(ALEditorCommand::Fold);
     }
     if (action == "unfold")
     {
-        return doc && doc->editor->canPerform(ALEditorCommand::Unfold);
+        return doc && doc->shownText()->canPerform(ALEditorCommand::Unfold);
     }
     if (action == "fold_all")
     {
-        return doc && doc->editor->canPerform(ALEditorCommand::FoldAll);
+        return doc && doc->shownText()->canPerform(ALEditorCommand::FoldAll);
     }
     if (action == "unfold_all")
     {
-        return doc && doc->editor->canPerform(ALEditorCommand::UnfoldAll);
+        return doc && doc->shownText()->canPerform(ALEditorCommand::UnfoldAll);
     }
     if (action == "go_to_definition")
     {
-        return doc && doc->editor->canPerform(ALEditorCommand::GoToDefinition);
+        return doc && doc->shownText()->canPerform(ALEditorCommand::GoToDefinition);
     }
     if (action == "find_references")
     {
-        return doc && doc->editor->canPerform(ALEditorCommand::FindReferences);
+        return doc && doc->shownText()->canPerform(ALEditorCommand::FindReferences);
     }
     if (action == "rename")
     {
-        return doc && doc->editor->canPerform(ALEditorCommand::Rename);
+        return doc && doc->shownText()->canPerform(ALEditorCommand::Rename);
     }
     if (action == "go_to_line" || action == "find" || action == "replace" || action == "find_next" || action == "find_previous")
     {
@@ -13709,7 +13857,7 @@ bool ALFloaterScriptStudio::onMenuEnable(const LLSD& param)
     {
         const bool         forward = action == "redo";
         LLEditMenuHandler* field   = focusedEditHandler();
-        return (field && (forward ? field->canRedo() : field->canUndo())) || (doc && (forward ? doc->editor->canRedo() : doc->editor->canUndo()));
+        return (field && (forward ? field->canRedo() : field->canUndo())) || (doc && (forward ? doc->shownText()->canRedo() : doc->shownText()->canUndo()));
     }
     return true;
 }
@@ -13720,7 +13868,7 @@ bool ALFloaterScriptStudio::onMenuCheck(const LLSD& param)
     if (action == "expanded")
     {
         const Doc* doc = active();
-        return doc && doc->showingExpanded && doc->expandedEditor;
+        return doc && doc->shownView() == Doc::View::Expanded;
     }
     if (action == "word_wrap")
     {
@@ -14409,6 +14557,12 @@ LLSD ALFloaterScriptStudio::openTabs() const
         else
         {
             continue;
+        }
+        // The view it asked for, where that is not the source: a tab
+        // reading its expansion reads it again when it comes back.
+        if (doc.view != Doc::View::Source)
+        {
+            tab["view"] = viewName(doc.view);
         }
         if (i == mActive)
         {

@@ -185,8 +185,9 @@ private:
     ALFloaterScriptStudio(const LLSD& key);
     ~ALFloaterScriptStudio() override;
 
-    // One tab of the studio: a script, or the author's source of one that
-    // the preprocessor wrapped, read-only beside it.
+    // One tab of the studio: a script, a notecard or a file, and the views
+    // of it the pane can show -- its source, and what the preprocessor made
+    // of that where it made anything.
     struct Doc
     {
         ALScriptRef                                ref;
@@ -197,10 +198,12 @@ private:
         // nothing in the world hears of it. A Lua file is analysed as
         // the module it is; an LSL one is a fragment, and is not.
         std::string                                file;
-        // The script's id, or the script's id and ":source"; a file's
-        // is `disk:` and its path.
+        // The script's id; a file's is `disk:` and its path.
         std::string                                id;
         std::string                                name;
+        // The source: the text the author types, which is what is saved,
+        // checked, kept against a crash and gone to by every place a list,
+        // a card or a jump names, whichever view is in front.
         ALCodeEditor*                              editor = nullptr;
         ALScriptWorkspace::Language                language;
         LLUUID                                     assetId;
@@ -218,10 +221,23 @@ private:
         // answer marks saved, whatever was typed while it came.
         ALTextUndo::SavePoint                      sentAt;
         // What the preprocessor made of the source, in a read-only editor
-        // of its own that the pane can swap to and back; made once there
-        // is expanded text to show.
-        ALCodeEditor*                              expandedEditor  = nullptr;
-        bool                                       showingExpanded = false;
+        // of its own; made once there is expanded text to show.
+        ALCodeEditor*                              expandedEditor = nullptr;
+        // The views of a tab the pane can show, and the one asked for.
+        // What was asked for stands through a reload, into a window of its
+        // own and across sessions; while it has nothing to show, the
+        // source is shown in its place.
+        enum class View : U8
+        {
+            Source,
+            Expanded
+        };
+        View                                       view = View::Source;
+        // The view in front, and its text: what the view's own commands --
+        // find, go to a line, fold, copy, undo -- act on, and whose caret
+        // the trailer reads.
+        View          shownView() const { return view == View::Expanded && expandedEditor ? View::Expanded : View::Source; }
+        ALCodeEditor* shownText() const { return shownView() == View::Expanded ? expandedEditor : editor; }
         // A notecard rather than a script: plain text, saved as a
         // notecard with the items it came with, never analysed.
         bool                                       notecard = false;
@@ -647,15 +663,27 @@ private:
     ALCodeEditor*             makeEditor(const std::string& id, bool read_only);
     // The options every editor shares, put on one.
     void                      applyEditorOptions(ALCodeEditor& editor) const;
-    // The expanded text put in the document's other editor, and the pane
-    // swapped between the two.
+    // The expanded text put in the document's other editor, which is shown
+    // once there is one where the tab asked for it.
     void                      showExpanded(Doc& doc, const std::string& text);
     // The other editor gone, where what it holds is of no text the
     // script is now, and the source shown in its place.
     void                      dropExpanded(Doc& doc);
     void                      toggleExpanded();
-    // Which editor the pane shows for the active document, and every
-    // other editor hidden.
+    // A view of the tab put in front, and the pane, the bars and the
+    // toolbar shown as it now is; the keyboard with it where asked, or
+    // where the view it replaces had it.
+    void                      showView(Doc& doc, Doc::View view, bool focus = false);
+    // The source put in front, for going to a place in it: every place a
+    // list, a card or a jump names is the source's.
+    ALCodeEditor&             sourceInFront(Doc& doc);
+    // The keyboard to the view in front.
+    static void               focusShown(Doc& doc);
+    // A view as the studio's state writes it, and back.
+    static const char*        viewName(Doc::View view);
+    static Doc::View          viewNamed(const std::string& name);
+    // Which view the pane shows for the active document, and every other
+    // editor hidden.
     void                      showEditors();
     // The region's words for colouring and completing, and the analyzer
     // behind completion, hover and signature help.
@@ -1200,6 +1228,9 @@ private:
     {
         std::string doc;
         ALTextPos   at;
+        // Which of the tab's views the place is in: a line gone to in
+        // the expansion is gone back to there.
+        Doc::View   view = Doc::View::Source;
     };
     void noteJump(bool walking = false);
     // A place to go back to, the way forward from it gone: once for a line,
@@ -1316,6 +1347,7 @@ private:
         ALScriptRef ref;
         F64         until = 0.0;
         bool        asked = false;
+        Doc::View   view  = Doc::View::Source;
     };
     std::vector<PendingRestore>        mPendingRestores;
     void                               pumpRestores();
