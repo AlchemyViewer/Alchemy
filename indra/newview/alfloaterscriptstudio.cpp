@@ -5278,7 +5278,7 @@ void ALFloaterScriptStudio::analysed(const ALScriptAnalysis::Result& result)
     }
     // In the source's places now, where the words are, and where a comment
     // may say a lint is wanted.
-    offerRequires(doc);
+    offerImports(doc);
     noLint(doc);
     if (!doc.language.lua)
     {
@@ -5293,16 +5293,22 @@ void ALFloaterScriptStudio::analysed(const ALScriptAnalysis::Result& result)
     }
 }
 
-void ALFloaterScriptStudio::offerRequires(Doc& doc)
+void ALFloaterScriptStudio::offerImports(Doc& doc)
 {
-    // Only where a require is read: a script the preprocessor runs over,
-    // or a module, which is read into one.
-    if (!doc.language.lua || !(preprocessed(doc) || doc.notecard))
+    // Only where a require or an include is read: a script the
+    // preprocessor runs over, or a module or an include, which is read
+    // into one.
+    if (!(preprocessed(doc) || doc.notecard))
     {
         return;
     }
-    const auto unknown = [](const ALScriptProblem& problem) {
-        return problem.file.empty() && problem.args.size() == 1 && (problem.key == "LuauUnknownGlobal" || problem.key == "LuauLintUnknownGlobal");
+    const bool lua     = doc.language.lua;
+    const auto unknown = [lua](const ALScriptProblem& problem) {
+        if (!problem.file.empty() || problem.args.size() != 1)
+        {
+            return false;
+        }
+        return lua ? problem.key == "LuauUnknownGlobal" || problem.key == "LuauLintUnknownGlobal" : problem.key == "LSLUndeclared";
     };
     if (std::none_of(doc.analysis.begin(), doc.analysis.end(), unknown))
     {
@@ -5310,19 +5316,30 @@ void ALFloaterScriptStudio::offerRequires(Doc& doc)
     }
     const ALScriptPreprocessor::Request request = preprocessRequest(doc, /*with_source*/ false);
     const std::string self = ALScriptModules::identity(request.path.empty() ? ALScriptPreprocessor::pathOf(request.ref) : request.path);
-    const std::string                   text    = doc.editor->text();
+    const std::string                   text         = doc.editor->text();
     ALScriptPreprocessor&               preprocessor = ALScriptPreprocessor::instance();
-    // The SLua texts open here, as they are being written.
-    const auto open = [this, &doc]() {
+    // The texts of the script's language open here, as they are being
+    // written.
+    const auto open = [this, &doc, lua]() {
         std::vector<ALScriptModules::Open> out;
         for (const auto& other : mDocs)
         {
-            if (other.get() != &doc && other->loaded && other->language.lua)
+            if (other.get() != &doc && other->loaded && other->language.lua == lua)
             {
                 out.push_back({ other->file.empty() ? ALScriptPreprocessor::pathOf(other->ref) : "disk:" + other->file, other->name, other->editor->text() });
             }
         }
         return out;
+    };
+    const auto offer = [&text, lua](ALScriptProblem& problem, const std::string& module, bool field) {
+        if (lua)
+        {
+            ALScriptFixes::offerRequire(problem, text, module, field);
+        }
+        else
+        {
+            ALScriptFixes::offerInclude(problem, text, module);
+        }
     };
     const std::vector<ALScriptModules::Module>* modules = nullptr;
     for (ALScriptProblem& problem : doc.analysis)
@@ -5331,17 +5348,25 @@ void ALFloaterScriptStudio::offerRequires(Doc& doc)
         {
             continue;
         }
-        const std::string& name    = problem.args[0];
-        const size_t       before  = problem.fixes.size();
-        // A module by the name itself, wherever a require of it finds one,
-        // its text in hand or not yet; then what the index knows: a module
-        // so named under another name, and each that exports the name.
-        ALPreprocessor::Include     found;
-        const ALPreprocessor::Found named = preprocessor.requireOf(request, name, found);
-        if (named != ALPreprocessor::Found::No && !found.path.empty() && ALScriptModules::identity(found.path) != self)
+        const std::string& name   = problem.args[0];
+        const size_t       before = problem.fixes.size();
+        // A SLua module by the name itself, wherever a require of it finds
+        // one, its text in hand or not yet. An LSL include's name says
+        // nothing of what it declares.
+        if (lua)
         {
-            ALScriptFixes::offerRequire(problem, text, name, false);
+            ALPreprocessor::Ask ask;
+            ask.name    = name;
+            ask.require = true;
+            ALPreprocessor::Include     found;
+            const ALPreprocessor::Found named = preprocessor.lookUp(request, ask, found);
+            if (named != ALPreprocessor::Found::No && !found.path.empty() && ALScriptModules::identity(found.path) != self)
+            {
+                offer(problem, name, false);
+            }
         }
+        // Then what the index knows: a module so named under another name,
+        // and each that exports or declares the name.
         if (!modules)
         {
             modules = &ALScriptModules::instance().inReach(request, open);
@@ -5352,13 +5377,13 @@ void ALFloaterScriptStudio::offerRequires(Doc& doc)
             {
                 break;
             }
-            if (module.name == name)
+            if (lua && module.name == name)
             {
-                ALScriptFixes::offerRequire(problem, text, module.require, false);
+                offer(problem, module.require, false);
             }
             else if (std::find(module.exports.begin(), module.exports.end(), name) != module.exports.end())
             {
-                ALScriptFixes::offerRequire(problem, text, module.require, true);
+                offer(problem, module.require, true);
             }
         }
         // In the viewer's words, as the analyzer's own fixes were said.
@@ -5366,8 +5391,8 @@ void ALFloaterScriptStudio::offerRequires(Doc& doc)
         {
             problem.fixes[i].title = alScriptKeyedWords(problem.fixes[i].key, problem.fixes[i].args, problem.fixes[i].title);
         }
-        // One module meant, by its very name: that, before a guess at a
-        // spelling.
+        // One module meant, by its very name or what it gives: that, before
+        // a guess at a spelling.
         if (problem.fixes.size() == before + 1)
         {
             for (ALScriptFix& fix : problem.fixes)

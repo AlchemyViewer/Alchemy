@@ -27,6 +27,7 @@
 #include "alscriptmodules.h"
 
 #include "aldiskincludes.h"
+#include "allslexports.h"
 #include "alluauexports.h"
 #include "llinventorymodel.h"
 #include "llviewerinventory.h"
@@ -55,10 +56,20 @@ namespace
         return text.size() > n && text.compare(text.size() - n, n, tail) == 0;
     }
 
-    // A name without the extension a SLua file or item may carry.
-    std::string stemOf(const std::string& name)
+    // What a file of each language is called on disk: what a require
+    // finds without its extension, and what an include is written with.
+    const std::vector<const char*>& extensionsOf(bool lua)
     {
-        for (const char* extension : { ".luau", ".lua" })
+        static const std::vector<const char*> LUA{ ".luau", ".lua" };
+        static const std::vector<const char*> LSL{ ".lsl", ".lslh", ".lsli" };
+        return lua ? LUA : LSL;
+    }
+
+    // A name without the extension the preprocessor puts back on it when
+    // it looks for a file: a SLua module's, `.lsl`.
+    std::string stemOf(const std::string& name, bool lua)
+    {
+        for (const char* extension : lua ? extensionsOf(true) : std::vector<const char*>{ ".lsl" })
         {
             if (endsWith(name, extension))
             {
@@ -105,27 +116,29 @@ std::string ALScriptModules::identity(const std::string& path)
     return sameFile(path);
 }
 
-const std::vector<std::string>& ALScriptModules::exportsOf(const std::string& path, const std::string& text)
+const std::vector<std::string>& ALScriptModules::exportsOf(const std::string& path, const std::string& text, bool lua)
 {
     const size_t hash = std::hash<std::string>()(text);
-    Read&        read = mRead[path];
+    Read&        read = mRead[(lua ? "lua:" : "lsl:") + path];
     if (read.hash != hash || hash == 0)
     {
         read.hash    = hash;
-        read.exports = ALLuauExports::of(text);
+        read.exports = lua ? ALLuauExports::of(text) : ALLSLExports::of(text);
     }
     return read.exports;
 }
 
 const std::vector<ALScriptModules::Module>& ALScriptModules::inReach(const ALScriptPreprocessor::Request& request, const open_t& open)
 {
+    const bool        lua  = request.lua;
     const std::string self = sameFile(request.path.empty() ? ALScriptPreprocessor::pathOf(request.ref) : request.path);
+    const std::string kept = (lua ? "lua:" : "lsl:") + self;
     const F64         now  = LLTimer::getTotalSeconds();
-    if (mReach.size() > SCRIPTS_KEPT && !mReach.count(self))
+    if (mReach.size() > SCRIPTS_KEPT && !mReach.count(kept))
     {
         mReach.clear();
     }
-    Reach& reach = mReach[self];
+    Reach& reach = mReach[kept];
     if (reach.at > 0.0 && now - reach.at < HOLD_SECONDS)
     {
         return reach.modules;
@@ -182,7 +195,9 @@ const std::vector<ALScriptModules::Module>& ALScriptModules::inReach(const ALScr
         size_t taken = 0;
         for (const std::string& file : gDirUtilp->getFilesInDir(folder))
         {
-            if ((!endsWith(file, ".luau") && !endsWith(file, ".lua")) || taken >= FOLDER_FILES)
+            const std::vector<const char*>& extensions = extensionsOf(lua);
+            if (taken >= FOLDER_FILES ||
+                std::none_of(extensions.begin(), extensions.end(), [&file](const char* extension) { return endsWith(file, extension); }))
             {
                 continue;
             }
@@ -192,8 +207,9 @@ const std::vector<ALScriptModules::Module>& ALScriptModules::inReach(const ALScr
                 continue;
             }
             ++taken;
+            // A require without its extension; an include as it is named.
             const std::string path  = DISK_PREFIX + *real;
-            const std::string under = prefix + stemOf(file);
+            const std::string under = prefix + (lua ? stemOf(file, true) : file);
             // Found already -- open, or under another folder -- another
             // name for it; the script itself, none.
             if (const auto seen = at.find(path); seen != at.end())
@@ -214,14 +230,18 @@ const std::vector<ALScriptModules::Module>& ALScriptModules::inReach(const ALScr
         }
     }
 
-    // Each by the first of its names a require from the script resolves
-    // to it: those its folders give it, its own, its own without its
-    // extension, and its own under each alias the configuration names.
+    // Each by the first of its names a require or an include from the
+    // script resolves to it: those its folders give it, its own, its own
+    // without its extension, and its own under each alias a SLua
+    // configuration names.
     ALLuauConfig config;
-    preprocessor.configOf(request, config);
+    if (lua)
+    {
+        preprocessor.configOf(request, config);
+    }
     for (Found& one : found)
     {
-        const std::string        stem  = stemOf(one.name);
+        const std::string        stem  = stemOf(one.name, lua);
         std::vector<std::string> names = one.names;
         names.push_back(one.name);
         names.push_back(stem);
@@ -231,8 +251,11 @@ const std::vector<ALScriptModules::Module>& ALScriptModules::inReach(const ALScr
         }
         for (const std::string& name : names)
         {
+            ALPreprocessor::Ask ask;
+            ask.name    = name;
+            ask.require = lua;
             ALPreprocessor::Include include;
-            if (name.empty() || preprocessor.requireOf(request, name, include) != ALPreprocessor::Found::Yes || sameFile(include.path) != one.path)
+            if (name.empty() || preprocessor.lookUp(request, ask, include) != ALPreprocessor::Found::Yes || sameFile(include.path) != one.path)
             {
                 continue;
             }
@@ -240,7 +263,7 @@ const std::vector<ALScriptModules::Module>& ALScriptModules::inReach(const ALScr
             module.path    = one.path;
             module.name    = stem;
             module.require = name;
-            module.exports = exportsOf(one.path, one.text);
+            module.exports = exportsOf(one.path, one.text, lua);
             reach.modules.push_back(std::move(module));
             break;
         }

@@ -593,10 +593,12 @@ private:
     // What a comment says is wanted dropped from the script's problems,
     // and a comment that would say so offered for every lint left.
     void                noLint(Doc& doc);
-    // A SLua global the script does not know given what a module in reach
-    // gives, where one is so named or exports the name: a require put in
-    // at the top (ALScriptModules). Preferred where it is the one offered.
-    void                offerRequires(Doc& doc);
+    // A name the script does not know given what a module in reach gives:
+    // a SLua global a require, where a module is so named or exports it;
+    // an LSL name an `#include`, where an include declares it
+    // (ALScriptModules). Put in at the top; preferred where it is the one
+    // offered.
+    void                offerImports(Doc& doc);
     // A fix made, as one step to undo, and the script checked again at
     // once; refused where the text has moved on since `version`, the one
     // it was made over, whose places it is in.

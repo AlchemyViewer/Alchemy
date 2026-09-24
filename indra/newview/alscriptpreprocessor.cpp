@@ -306,11 +306,8 @@ std::vector<std::string> ALScriptPreprocessor::heldPaths() const
     return out;
 }
 
-ALPreprocessor::Found ALScriptPreprocessor::requireOf(const Request& request, const std::string& name, ALPreprocessor::Include& out)
+ALPreprocessor::Found ALScriptPreprocessor::lookUp(const Request& request, const ALPreprocessor::Ask& ask, ALPreprocessor::Include& out)
 {
-    ALPreprocessor::Ask ask;
-    ask.name    = name;
-    ask.require = true;
     // Where an alias of a `.luaurc` on disk points is blessed for the
     // asking, as it is for a run.
     std::vector<std::string> alias_folders;
@@ -326,16 +323,32 @@ std::vector<std::pair<std::string, std::string>> ALScriptPreprocessor::moduleFol
         for (const std::string& folder : includeFolders())
         {
             out.emplace_back(std::string(), folder);
+            if (!request.lua)
+            {
+                for (const std::string& listed : ALDiskIncludes::lslrcFolders(folder))
+                {
+                    out.emplace_back(std::string(), listed);
+                }
+            }
         }
     }
+    const std::string from = request.path.empty() ? pathOf(request.ref) : request.path;
+    std::string       file;
     if (!request.lua)
     {
+        // The nearest `.lslrc` up from a script that is itself on disk.
+        if (fileOf(from, file))
+        {
+            for (const std::string& listed : ALDiskIncludes::nearestLslrcFolders(gDirUtilp->getDirName(file)))
+            {
+                out.emplace_back(std::string(), listed);
+            }
+        }
         return out;
     }
     // Each alias of the `.luaurc` that governs the script, where that is a
     // file on disk: the path it stands for, from beside the file.
     std::string config_path, config_text, config_file;
-    const std::string from = request.path.empty() ? pathOf(request.ref) : request.path;
     if (configFor(from, request, nullptr, false, config_path, config_text) != ALPreprocessor::Found::Yes || !fileOf(config_path, config_file))
     {
         return out;

@@ -33,15 +33,17 @@
 #include <string>
 #include <vector>
 
-// The SLua modules in reach of a script -- what a `require` from it would
-// find -- each by the name a require finds it by, and what each exports
-// (ALLuauExports): what the fix that gives a global a script does not know
-// what a module gives is made from.
+// The modules in reach of a script -- what a SLua `require` or an LSL
+// `#include` from it would find -- each by the name it finds it by, and
+// what each gives: what a SLua module exports (ALLuauExports), what an LSL
+// include declares (ALLSLExports). What the fix that gives a name a script
+// does not know what a module gives is made from.
 //
-// In reach and in hand: nothing is fetched to offer a require. A module is
-// a text the studio has open, one the preprocessor already holds from an
-// earlier run, or a SLua file in a folder on disk a require may read --
-// the scripter's include folders, the aliases of a `.luaurc` on disk
+// In reach and in hand: nothing is fetched to offer one. A module is a
+// text the studio has open, one the preprocessor already holds from an
+// earlier run, or a file of the script's language in a folder on disk a
+// require or an include may read -- the scripter's include folders, the
+// aliases of a `.luaurc` on disk, what a `.lslrc` on disk lists
 // (ALScriptPreprocessor::moduleFolders). Each is named by the first of its
 // names -- its own, without its extension, under each alias -- that the
 // preprocessor, asked it from the script, resolves to that very module;
@@ -58,7 +60,7 @@ public:
         std::string              path;
         // Its own name without an extension: what a local for it is called.
         std::string              name;
-        // What a require from the script finds it by.
+        // What a require or an include from the script finds it by.
         std::string              require;
         std::vector<std::string> exports;
     };
@@ -82,8 +84,9 @@ public:
     static std::string         identity(const std::string& path);
 
 private:
-    // What a text exports, by its identity, while its text is the same.
-    const std::vector<std::string>& exportsOf(const std::string& path, const std::string& text);
+    // What a text gives, by its identity and language, while its text is
+    // the same.
+    const std::vector<std::string>& exportsOf(const std::string& path, const std::string& text, bool lua);
 
     struct Read
     {
