@@ -607,6 +607,17 @@
             <key>Value</key>
             <integer>1</integer>
         </map>
+        <key>ALScriptFixOnSave</key>
+        <map>
+            <key>Comment</key>
+            <string>Script Studio makes the fixes that change nothing a script does before saving it, as one step to undo.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
         <key>ALScriptFormatOnSave</key>
         <map>
             <key>Comment</key>

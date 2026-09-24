@@ -697,6 +697,7 @@ bool ALFloaterScriptStudio::postBuild()
     mProblemErrors   = getChild<LLCheckBoxCtrl>("problems_errors");
     mProblemWarnings = getChild<LLCheckBoxCtrl>("problems_warnings");
     mProblemNotes    = getChild<LLCheckBoxCtrl>("problems_notes");
+    mProblemFixable  = getChild<LLCheckBoxCtrl>("problems_fixable");
     mProblemScope    = getChild<LLComboBox>("problems_scope");
     mProblemOrigin   = getChild<LLComboBox>("problems_origin");
     mProblemFilter   = getChild<LLFilterEditor>("problems_filter");
@@ -708,7 +709,8 @@ bool ALFloaterScriptStudio::postBuild()
     mProblemOrigin->selectFirstItem();
     mProblemScope->selectFirstItem();
     for (LLUICtrl* filter : { static_cast<LLUICtrl*>(mProblemErrors), static_cast<LLUICtrl*>(mProblemWarnings), static_cast<LLUICtrl*>(mProblemNotes),
-                              static_cast<LLUICtrl*>(mProblemScope), static_cast<LLUICtrl*>(mProblemOrigin), static_cast<LLUICtrl*>(mProblemFilter) })
+                              static_cast<LLUICtrl*>(mProblemFixable), static_cast<LLUICtrl*>(mProblemScope), static_cast<LLUICtrl*>(mProblemOrigin),
+                              static_cast<LLUICtrl*>(mProblemFilter) })
     {
         filter->setCommitCallback([this](LLUICtrl*, const LLSD&) {
             fillProblems(problemsDoc());
@@ -4060,7 +4062,7 @@ namespace
     // them by: what vimCommand runs and vimComplete offers, one list.
     const char* const VIM_MENU_COMMANDS[] = { "format", "problems", "references", "output", "search", "preferences", "pop_out",
                                               "reveal", "save_all", "revert", "external_editor", "save_file", "save_as", "load_file",
-                                              "open_file", "fold_all", "unfold_all", "go_to_line" };
+                                              "open_file", "fold_all", "unfold_all", "go_to_line", "quick_fix", "fix_all" };
 }
 
 ALFloaterScriptStudio::Doc* ALFloaterScriptStudio::docOf(const ALTextView& view)
@@ -4265,12 +4267,14 @@ bool ALFloaterScriptStudio::vimCommand(ALTextView& view, const std::string& name
     }
     // The studio's own, by the names its menu knows, where the menu would
     // give them: `:format` typed in the expansion being read is not a
-    // format of the source out of sight.
-    if (std::any_of(std::begin(VIM_MENU_COMMANDS), std::end(VIM_MENU_COMMANDS), [&name](const char* command) { return name == command; }))
+    // format of the source out of sight. Vim has no fixes of its own:
+    // `:fix` lists the caret's, and `:fixall` makes every preferred one.
+    const std::string menu_name = name == "fix" ? "quick_fix" : name == "fixall" ? "fix_all" : name;
+    if (std::any_of(std::begin(VIM_MENU_COMMANDS), std::end(VIM_MENU_COMMANDS), [&menu_name](const char* command) { return menu_name == command; }))
     {
-        if (onMenuEnable(LLSD(name)))
+        if (onMenuEnable(LLSD(menu_name)))
         {
-            onMenuAction(LLSD(name));
+            onMenuAction(LLSD(menu_name));
         }
         return true;
     }
@@ -4281,7 +4285,7 @@ void ALFloaterScriptStudio::vimComplete(ALTextView& view, const std::string& com
 {
     // The names vimCommand answers to, in their long forms, and the
     // menu's actions; what :set and :history take after them.
-    static const char* NAMES[]   = { "close", "history", "qall", "quit", "wall", "wq", "write", "xit" };
+    static const char* NAMES[]   = { "close", "fix", "fixall", "history", "qall", "quit", "wall", "wq", "write", "xit" };
     static const char* OPTIONS[] = { "number", "nonumber", "relativenumber", "norelativenumber" };
     static const char* KINDS[]   = { "all", "cmd", "search" };
     if (command.empty())
@@ -4588,9 +4592,16 @@ void ALFloaterScriptStudio::save(Doc& doc)
     // Saved, a preview is held.
     holdPreview(doc);
     // Tidied as the scripter asked before anything is sent or checked: a
-    // step each to undo, and nothing where the text is tidy already.
+    // step each to undo, and nothing where the text is tidy already. The
+    // safe fixes first, while the text is still the one they were made
+    // for, and once a save, however many checks it waits on.
     if (!doc.notecard)
     {
+        if (gSavedSettings.getBOOL("ALScriptFixOnSave") && !doc.fixedForSave && doc.analysisVersion == doc.editor->document().version())
+        {
+            doc.fixedForSave = true;
+            fixAll(doc, FixPick{ std::string(), true });
+        }
         if (gSavedSettings.getBOOL("ALScriptFormatOnSave"))
         {
             format(doc, false);
@@ -4655,6 +4666,8 @@ void ALFloaterScriptStudio::save(Doc& doc)
 
 void ALFloaterScriptStudio::upload(Doc& doc, const std::string& text, const ALSourceMap* map)
 {
+    // Past the checks: the next save may fix again.
+    doc.fixedForSave = false;
     // The script's own target and whether it runs, which the strip under
     // the editor says for the one in front: Save All saves the others by
     // theirs, not by the front one's.
@@ -5458,6 +5471,7 @@ ALFindings<ALFloaterScriptStudio::Doc::Shown, ALFloaterScriptStudio::ProblemTrai
     query.errors   = !mProblemErrors || mProblemErrors->get();
     query.warnings = !mProblemWarnings || mProblemWarnings->get();
     query.notes    = !mProblemNotes || mProblemNotes->get();
+    query.fixable  = mProblemFixable && mProblemFixable->get();
     query.rule     = mProblemOrigin ? mProblemOrigin->getValue().asString() : std::string();
     query.text     = mProblemFilter ? mProblemFilter->getText() : std::string();
     LLStringUtil::trim(query.text);
@@ -5510,7 +5524,7 @@ void ALFloaterScriptStudio::fillProblems(const Doc* doc)
     // How many of each there are before the filters: what the level
     // boxes and the tab say.
     const std::vector<const Doc*> docs = problemDocs(doc);
-    S32                           errors = 0, warnings = 0, notes = 0;
+    S32                           errors = 0, warnings = 0, notes = 0, fixable = 0;
     for (const Doc* each : docs)
     {
         for (const Doc::Shown& shown : each->shown)
@@ -5518,6 +5532,7 @@ void ALFloaterScriptStudio::fillProblems(const Doc* doc)
             errors += shown.level == Doc::Level::Error ? 1 : 0;
             warnings += shown.level == Doc::Level::Warning ? 1 : 0;
             notes += shown.level == Doc::Level::Note ? 1 : 0;
+            fixable += ProblemTraits::fixable(shown) ? 1 : 0;
         }
     }
     const S32 held = errors + warnings + notes;
@@ -5533,6 +5548,7 @@ void ALFloaterScriptStudio::fillProblems(const Doc* doc)
     label(mProblemErrors, "FilterErrors", errors);
     label(mProblemWarnings, "FilterWarnings", warnings);
     label(mProblemNotes, "FilterNotes", notes);
+    label(mProblemFixable, "FilterFixable", fixable);
     layoutProblemFilters();
     mProblemsHeld = held;
     refreshBottomTabs();
@@ -5761,7 +5777,7 @@ void ALFloaterScriptStudio::layoutProblemFilters()
     // words' box taking what is left.
     const LLFontGL* font = LLFontGL::getFontSansSerifSmall();
     S32             left = 4;
-    for (LLCheckBoxCtrl* box : { mProblemErrors, mProblemWarnings, mProblemNotes })
+    for (LLCheckBoxCtrl* box : { mProblemErrors, mProblemWarnings, mProblemNotes, mProblemFixable })
     {
         const S32 width = 24 + font->getWidth(box->getLabel());
         box->reshape(width, box->getRect().getHeight());
@@ -5973,16 +5989,12 @@ bool ALFloaterScriptStudio::applyFix(Doc& doc, const ALScriptFix& fix)
 }
 
 // static
-std::vector<const ALScriptFix*> ALFloaterScriptStudio::fixesOfKind(const Doc& doc, const std::string& key)
+std::vector<const ALScriptFix*> ALFloaterScriptStudio::pickFixes(const Doc& doc, const FixPick& pick)
 {
     std::vector<const ALScriptFix*> taken;
-    if (key.empty())
-    {
-        return taken;
-    }
     for (const Doc::Shown& shown : doc.shown)
     {
-        if (shown.key != key || !shown.file.empty())
+        if (!shown.file.empty() || (!pick.key.empty() && shown.key != pick.key))
         {
             continue;
         }
@@ -5990,7 +6002,10 @@ std::vector<const ALScriptFix*> ALFloaterScriptStudio::fixesOfKind(const Doc& do
         {
             if (fix.preferred && fix.kind == ALScriptFix::Kind::Fix)
             {
-                taken.push_back(&fix);
+                if (!pick.safeOnly || fix.safe)
+                {
+                    taken.push_back(&fix);
+                }
                 break;
             }
         }
@@ -6021,14 +6036,18 @@ std::vector<const ALScriptFix*> ALFloaterScriptStudio::fixesOfKind(const Doc& do
     return kept;
 }
 
-void ALFloaterScriptStudio::askFixAllOfKind(Doc& doc, const std::string& key)
+void ALFloaterScriptStudio::askFixAll(Doc& doc, const FixPick& pick)
 {
-    const std::vector<const ALScriptFix*> fixes = fixesOfKind(doc, key);
+    const std::vector<const ALScriptFix*> fixes = pickFixes(doc, pick);
     if (fixes.size() < 2)
     {
         if (!fixes.empty())
         {
             applyFix(doc, *fixes.front());
+        }
+        else
+        {
+            setStatus(getString("FixNone"));
         }
         return;
     }
@@ -6039,21 +6058,21 @@ void ALFloaterScriptStudio::askFixAllOfKind(Doc& doc, const std::string& key)
     args["EXAMPLE"]                  = fixes.front()->title;
     const LLHandle<LLFloater> handle = getHandle();
     const std::string         id     = doc.id;
-    LLNotificationsUtil::add("ScriptStudioFixAll", args, LLSD(), [handle, id, key](const LLSD& notification, const LLSD& response) {
+    LLNotificationsUtil::add("ScriptStudioFixAll", args, LLSD(), [handle, id, pick](const LLSD& notification, const LLSD& response) {
         ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get());
         const size_t           index  = studio ? studio->indexOf(id) : NONE;
         if (index != NONE && LLNotificationsUtil::getSelectedOption(notification, response) == 0)
         {
-            studio->fixAllOfKind(*studio->mDocs[index], key);
+            studio->fixAll(*studio->mDocs[index], pick);
         }
     });
 }
 
-void ALFloaterScriptStudio::fixAllOfKind(Doc& doc, const std::string& key)
+bool ALFloaterScriptStudio::fixAll(Doc& doc, const FixPick& pick)
 {
     if (!doc.loaded || !doc.modifiable)
     {
-        return;
+        return false;
     }
     ALCodeEditor&         source = sourceInFront(doc);
     const ALTextDocument& text   = source.document();
@@ -6061,9 +6080,9 @@ void ALFloaterScriptStudio::fixAllOfKind(Doc& doc, const std::string& key)
     {
         setStatus(getString("FixStale"), true);
         scheduleAnalysis(doc, true);
-        return;
+        return false;
     }
-    const std::vector<const ALScriptFix*>            fixes = fixesOfKind(doc, key);
+    const std::vector<const ALScriptFix*>            fixes = pickFixes(doc, pick);
     std::vector<std::pair<ALTextRange, std::string>> edits;
     for (const ALScriptFix* fix : fixes)
     {
@@ -6074,12 +6093,14 @@ void ALFloaterScriptStudio::fixAllOfKind(Doc& doc, const std::string& key)
     }
     // Every one of them one step to undo: they were made over one check,
     // and none meets another.
-    if (!edits.empty() && source.replaceAll(std::move(edits)))
+    if (edits.empty() || !source.replaceAll(std::move(edits)))
     {
-        source.undoJournal().label("fix");
-        setStatus(counted("FixesMade", static_cast<S32>(fixes.size())));
-        scheduleAnalysis(doc, true);
+        return false;
     }
+    source.undoJournal().label("fix");
+    setStatus(counted("FixesMade", static_cast<S32>(fixes.size())));
+    scheduleAnalysis(doc, true);
+    return true;
 }
 
 void ALFloaterScriptStudio::fixesOn(const Doc& doc, S32 line, std::vector<ALCodeEditor::Fix>& out) const
@@ -7777,6 +7798,7 @@ void ALFloaterScriptStudio::fileChangedOutside(const std::string& id, const std:
 
 void ALFloaterScriptStudio::saveFile(Doc& doc)
 {
+    doc.fixedForSave = false;
     if (doc.liveFile)
     {
         // The watcher on the file: this write is not an outside change.
@@ -10188,6 +10210,7 @@ void ALFloaterScriptStudio::closeWindowAnswered(S32 option)
 void ALFloaterScriptStudio::saveStopped(Doc& doc)
 {
     doc.closeAfterSave = false;
+    doc.fixedForSave   = false;
     stopClosing();
 }
 
@@ -12950,7 +12973,11 @@ void ALFloaterScriptStudio::showProblemMenu(S32 x, S32 y)
         }
         if (param.asString() == "kind")
         {
-            return fixesOfKind(*doc, shown->key).size() > 1;
+            return pickFixes(*doc, FixPick{ shown->key }).size() > 1;
+        }
+        if (param.asString() == "all")
+        {
+            return pickFixes(*doc, FixPick{}).size() > 1;
         }
         const size_t n = static_cast<size_t>(param.asInteger());
         if (n >= shown->fixes.size())
@@ -13060,8 +13087,12 @@ void ALFloaterScriptStudio::onProblemMenu(const std::string& action)
         if (const Doc::Shown* shown = shownOf(value))
         {
             const std::string key = shown->key;
-            askFixAllOfKind(doc, key);
+            askFixAll(doc, FixPick{ key });
         }
+    }
+    else if (action == "fix_all")
+    {
+        askFixAll(doc, FixPick{});
     }
 }
 
@@ -13821,6 +13852,10 @@ void ALFloaterScriptStudio::onMenuAction(const LLSD& param)
     {
         doc->shownText()->perform(ALEditorCommand::QuickFix);
     }
+    else if (doc && action == "fix_all")
+    {
+        askFixAll(*doc, FixPick{});
+    }
     else if (doc && action == "go_to_line")
     {
         goToLine();
@@ -14211,6 +14246,10 @@ bool ALFloaterScriptStudio::onMenuEnable(const LLSD& param)
     if (action == "quick_fix")
     {
         return doc && doc->modifiable && doc->shownText()->canPerform(ALEditorCommand::QuickFix);
+    }
+    if (action == "fix_all")
+    {
+        return doc && doc->loaded && doc->modifiable && doc->analysisVersion == doc->editor->document().version() && !pickFixes(*doc, FixPick{}).empty();
     }
     if (action == "go_to_line" || action == "find" || action == "replace" || action == "find_next" || action == "find_previous")
     {
@@ -14869,7 +14908,8 @@ void ALFloaterScriptStudio::writeState(LLSD& state) const
     // and which of the bottom tabs was in front.
     if (mProblemErrors)
     {
-        state["problem_levels"] = LLSD::emptyArray().with(0, mProblemErrors->get()).with(1, mProblemWarnings->get()).with(2, mProblemNotes->get());
+        state["problem_levels"] =
+            LLSD::emptyArray().with(0, mProblemErrors->get()).with(1, mProblemWarnings->get()).with(2, mProblemNotes->get()).with(3, mProblemFixable->get());
         state["problem_scope"]  = mProblemScope->getValue().asString();
         state["problem_origin"] = mProblemOrigin->getValue().asString();
     }
@@ -15028,6 +15068,7 @@ void ALFloaterScriptStudio::readState(const LLSD& state)
         mProblemErrors->set(levels[0].asBoolean());
         mProblemWarnings->set(levels[1].asBoolean());
         mProblemNotes->set(levels[2].asBoolean());
+        mProblemFixable->set(levels.size() > 3 && levels[3].asBoolean());
     }
     if (state.has("problem_scope") && mProblemScope)
     {

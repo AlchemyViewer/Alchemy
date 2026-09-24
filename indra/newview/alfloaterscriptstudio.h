@@ -438,6 +438,10 @@ private:
         // that asking again saves it, however long after, and a change
         // asks the question afresh -- or -1 for none.
         bool                                       saveAfterCheck    = false;
+        // The safe fixes made ahead of the save under way, once: a fix that
+        // left its problem standing would be made again at every check the
+        // save waits on.
+        bool                                       fixedForSave      = false;
         S64                                        saveAnywayVersion = -1;
         // What the analyzer said of the text at analysisVersion; when the
         // next check is due, or zero; the version last asked about.
@@ -588,13 +592,20 @@ private:
     // once; refused where the text has moved on since the check it was
     // made in, whose places it is in.
     bool                applyFix(Doc& doc, const ALScriptFix& fix);
-    // The preferred fix of every problem of one kind, made as one step,
-    // once asked; and made, the asking done.
-    void                askFixAllOfKind(Doc& doc, const std::string& key);
-    void                fixAllOfKind(Doc& doc, const std::string& key);
-    // The preferred fixes of one kind, none of whose edits overlap another
-    // taken before it.
-    static std::vector<const ALScriptFix*> fixesOfKind(const Doc& doc, const std::string& key);
+    // Which fixes to make at once: every problem's preferred one, or one
+    // kind's, or only those that change nothing a script does.
+    struct FixPick
+    {
+        std::string key;
+        bool        safeOnly = false;
+    };
+    // The preferred fix of every problem picked, made as one step, once
+    // asked; and made, the asking done. True where anything was made.
+    void                askFixAll(Doc& doc, const FixPick& pick);
+    bool                fixAll(Doc& doc, const FixPick& pick);
+    // The preferred fixes picked, of the script's own problems, none of
+    // whose edits overlap another taken before it.
+    static std::vector<const ALScriptFix*> pickFixes(const Doc& doc, const FixPick& pick);
     // The problem a row of the pane is, in its script's list, where its
     // fixes are.
     const Doc::Shown*   shownOf(const LLSD& value) const;
@@ -1473,6 +1484,7 @@ private:
     ALFindings<Doc::Shown, ProblemTraits> mProblemStore;
     LLCheckBoxCtrl*                    mProblemErrors   = nullptr;
     LLCheckBoxCtrl*                    mProblemWarnings = nullptr;
+    LLCheckBoxCtrl*                    mProblemFixable = nullptr;
     LLCheckBoxCtrl*                    mProblemNotes    = nullptr;
     LLComboBox*                        mProblemOrigin   = nullptr;
     LLFilterEditor*                    mProblemFilter   = nullptr;

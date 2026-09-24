@@ -643,6 +643,17 @@ end</floater.string>
              top_pad="6"
              width="370" />
             <check_box
+             control_name="ALScriptFixOnSave"
+             follows="left|top"
+             height="20"
+             label="Make safe fixes when saving"
+             layout="topleft"
+             left="12"
+             name="fix_on_save"
+             tool_tip="The fixes that change nothing a script does -- an unused local marked unused -- are made before it is saved, as one step to undo"
+             top_pad="4"
+             width="370" />
+            <check_box
              control_name="ALScriptFormatOnSave"
              follows="left|top"
              height="20"

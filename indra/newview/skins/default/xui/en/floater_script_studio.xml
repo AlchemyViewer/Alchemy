@@ -89,6 +89,9 @@
     <floater.string name="FixesB">[COUNT] fixes</floater.string>
     <floater.string name="FixesMadeA">Made 1 fix.</floater.string>
     <floater.string name="FixesMadeB">Made [COUNT] fixes.</floater.string>
+    <floater.string name="FixNone">Nothing here has a fix to make.</floater.string>
+    <floater.string name="FilterFixable">Fixable</floater.string>
+    <floater.string name="FilterFixableCount">Fixable ([COUNT])</floater.string>
     <floater.string name="FixStale">The script changed since it was checked; the fixes are offered again once it has been checked.</floater.string>
     <floater.string name="ProblemFixTip">Fix: [TITLE]</floater.string>
     <floater.string name="ScriptsA">1 script</floater.string>
@@ -522,6 +525,10 @@
             <menu_item_call label="Quick Fix..." layout="topleft" name="quick_fix">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="quick_fix" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="quick_fix" />
+            </menu_item_call>
+            <menu_item_call label="Fix All Issues" layout="topleft" name="fix_all">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="fix_all" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="fix_all" />
             </menu_item_call>
             <menu_item_separator layout="topleft" />
             <menu_item_call label="Format Document" layout="topleft" name="format" shortcut="shift|alt|F">
@@ -1415,6 +1422,17 @@
                                      tool_tip="Show what is worth a look: the optimizer's changes, the lint's advice"
                                      top_delta="0"
                                      width="64" />
+                                    <check_box
+                                     follows="left|top"
+                                     height="18"
+                                     initial_value="false"
+                                     label="Fixable"
+                                     layout="topleft"
+                                     left_pad="6"
+                                     name="problems_fixable"
+                                     tool_tip="Show only the problems that offer a fix, which the right-click menu, Control-. and the lightbulb make"
+                                     top_delta="0"
+                                     width="72" />
                                     <combo_box
                                      follows="left|top"
                                      height="20"
