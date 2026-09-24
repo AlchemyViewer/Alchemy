@@ -266,21 +266,37 @@ namespace
 
     // What an object is called, where the viewer knows: its name value,
     // or the selection's name for it.
+    // An object in world says its name only while it is selected, and then
+    // only once its properties are in: each name heard is kept for the
+    // session, and said for the object when it is not.
+    boost::unordered_flat_map<LLUUID, std::string>& heardNames()
+    {
+        static boost::unordered_flat_map<LLUUID, std::string> names;
+        return names;
+    }
+
     std::string objectNameOf(LLViewerObject* object, const std::string& fallback)
     {
         if (!object)
         {
             return fallback;
         }
+        std::string said;
         if (LLNameValue* nv = object->getNVPair("Name"); nv && nv->getString() && nv->getString()[0])
         {
-            return nv->getString();
+            said = nv->getString();
         }
-        if (LLSelectNode* node = LLSelectMgr::getInstance()->getSelection()->findNode(object); node && !node->mName.empty())
+        else if (LLSelectNode* node = LLSelectMgr::getInstance()->getSelection()->findNode(object); node && !node->mName.empty())
         {
-            return node->mName;
+            said = node->mName;
         }
-        return fallback;
+        if (!said.empty())
+        {
+            heardNames()[object->getID()] = said;
+            return said;
+        }
+        const auto heard = heardNames().find(object->getID());
+        return heard != heardNames().end() ? heard->second : fallback;
     }
 
     // The roots selected in world, in their order.
@@ -13387,6 +13403,74 @@ void ALFloaterScriptStudio::pumpExplorer()
         mExplorerRoots = std::move(roots);
         refreshExplorer();
     }
+    // The names heard since: an object says its name once its properties
+    // are in, a moment after it is selected -- many selected at once, many
+    // moments.
+    for (ExplorerObject& object : mExplorerModel)
+    {
+        if (!object.present)
+        {
+            continue;
+        }
+        for (ExplorerPrim& prim : object.prims)
+        {
+            const std::string heard = objectNameOf(gObjectList.findObject(prim.id), LLStringUtil::null);
+            if (heard.empty() || heard == prim.name)
+            {
+                continue;
+            }
+            prim.name = heard;
+            if (prim.id == object.root)
+            {
+                renameExplorerObject(object, heard);
+            }
+            mExplorerStale = true;
+        }
+    }
+}
+
+std::string ALFloaterScriptStudio::nameGivenTo(const LLUUID& root) const
+{
+    // Never heard: what a pin remembers it by, or a script open from it.
+    for (const Pinned& pin : mPinned)
+    {
+        if (pin.root == root && !pin.name.empty())
+        {
+            return pin.name;
+        }
+    }
+    for (const std::unique_ptr<Doc>& doc : mDocs)
+    {
+        if (doc->ref.inInventory() || doc->objectName.empty())
+        {
+            continue;
+        }
+        const LLViewerObject* object = gObjectList.findObject(doc->ref.object);
+        const LLViewerObject* top    = object && object->getRootEdit() ? object->getRootEdit() : object;
+        if (top && top->getID() == root)
+        {
+            return doc->objectName;
+        }
+    }
+    return getString("ObjectUnnamed");
+}
+
+void ALFloaterScriptStudio::renameExplorerObject(ExplorerObject& object, const std::string& name)
+{
+    object.name = name;
+    if (!object.pinned)
+    {
+        return;
+    }
+    // The name a pin is remembered by is the object's latest.
+    for (Pinned& pin : mPinned)
+    {
+        if (pin.root == object.root && pin.name != name)
+        {
+            pin.name = name;
+            saveState();
+        }
+    }
 }
 
 void ALFloaterScriptStudio::refreshExplorer(bool refetch)
@@ -13433,7 +13517,7 @@ void ALFloaterScriptStudio::refreshExplorer(bool refetch)
         }
         ExplorerObject one;
         one.root = root->getID();
-        one.name = objectNameOf(root, getString("ObjectUnnamed"));
+        one.name = objectNameOf(root, nameGivenTo(root->getID()));
         ExplorerPrim first;
         first.id   = root->getID();
         first.name = one.name;
@@ -13529,20 +13613,7 @@ void ALFloaterScriptStudio::explorerContents(const ALScriptWorkspace::Contents& 
                 prim.name = contents.name;
                 if (prim.id == object.root)
                 {
-                    object.name = contents.name;
-                    if (object.pinned)
-                    {
-                        // The name a pin is remembered by is the object's
-                        // latest.
-                        for (Pinned& pin : mPinned)
-                        {
-                            if (pin.root == object.root && pin.name != object.name)
-                            {
-                                pin.name = object.name;
-                                saveState();
-                            }
-                        }
-                    }
+                    renameExplorerObject(object, contents.name);
                 }
             }
             for (const ALScriptWorkspace::Item& item : prim.items)

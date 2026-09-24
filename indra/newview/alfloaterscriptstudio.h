@@ -1094,6 +1094,9 @@ private:
     // drag tool -- to the inventory, as the build floater's contents are --
     // from the prim of the row pressed; false where none of it may go.
     bool startExplorerDrag(const LLSD& pressed);
+    // What to call an object that has never said its name here: what a pin
+    // or an open script remembers it by, or unnamed.
+    std::string nameGivenTo(const LLUUID& root) const;
     // What is dragged from the inventory over a row of the explorer, or
     // dropped on it: into the prim the row is of, as into the build
     // floater's contents.
@@ -1199,6 +1202,8 @@ private:
         LLUUID      root;
         std::string name;
     };
+    // An object's name, and its pin's with it.
+    void renameExplorerObject(ExplorerObject& object, const std::string& name);
     // What a row of the explorer stands for: an object, a prim of one, or
     // a script or notecard in a prim.
     struct ExplorerRow
