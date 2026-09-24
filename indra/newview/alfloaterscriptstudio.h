@@ -1094,6 +1094,10 @@ private:
     // drag tool -- to the inventory, as the build floater's contents are --
     // from the prim of the row pressed; false where none of it may go.
     bool startExplorerDrag(const LLSD& pressed);
+    // What is dragged from the inventory over a row of the explorer, or
+    // dropped on it: into the prim the row is of, as into the build
+    // floater's contents.
+    void dropOnExplorer(const LLSD& row, MASK mask, bool drop, EDragAndDropType type, void* cargo, EAcceptance* accept);
     // Every command the menus hold, to give one by name.
     void showCommandPalette();
     // One field for going anywhere, as Visual Studio Code's: a script by
@@ -1797,6 +1801,9 @@ private:
     // The roots selected in world when last looked, and when.
     std::vector<LLUUID>                mExplorerRoots;
     F64                                mExplorerPolled = 0.0;
+    // When what the prims hold is asked again after a drop, for what the
+    // drop sends on its own time: a folder's items, fetched first.
+    F64                                mExplorerRefetchAt = 0.0;
     // What the region said runs, by prim and item.
     std::map<std::pair<LLUUID, LLUUID>, bool> mRunningKnown;
     bool                               mMain = true;

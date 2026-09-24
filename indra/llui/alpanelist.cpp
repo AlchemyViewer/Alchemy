@@ -115,6 +115,30 @@ bool ALPaneList::handleHover(S32 x, S32 y, MASK mask)
     return LLScrollListCtrl::handleHover(x, y, mask);
 }
 
+bool ALPaneList::handleDragAndDrop(S32 x, S32 y, MASK mask, bool drop, EDragAndDropType type, void* cargo, EAcceptance* accept,
+                                   std::string& tooltip)
+{
+    if (!mDropHandler)
+    {
+        return LLScrollListCtrl::handleDragAndDrop(x, y, mask, drop, type, cargo, accept, tooltip);
+    }
+    // At the top or the bottom of the rows, the list moves on a row at a
+    // time, for one out of sight.
+    constexpr F32 SCROLL_STEP = 0.1f;
+    constexpr S32 EDGE        = 10;
+    const LLRect  rows        = getItemListRect();
+    if (!drop && rows.pointInRect(x, y) && (y > rows.mTop - EDGE || y < rows.mBottom + EDGE) && mDropScroll.getElapsedTimeF32() > SCROLL_STEP)
+    {
+        mDropScroll.reset();
+        setScrollPos(llmax(0, getScrollPos() + (y < rows.mBottom + EDGE ? 1 : -1)));
+    }
+    LLScrollListItem* row = hitItem(x, y);
+    mouseOverHighlightNthItem(row && !drop ? getItemIndex(row) : -1);
+    *accept = ACCEPT_NO;
+    mDropHandler(row ? row->getValue() : LLSD(), mask, drop, type, cargo, accept, tooltip);
+    return true;
+}
+
 void ALPaneList::onMouseCaptureLost()
 {
     mPress.cancel();

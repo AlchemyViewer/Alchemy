@@ -225,4 +225,32 @@ namespace tut
         ensure("a drag of both, told the row pressed", asked == 1 && chosen_then == 2 && pressed_group == 3);
         l.handleMouseUp(second.getCenterX(), second.getCenterY(), MASK_NONE);
     }
+
+    template<> template<>
+    void alpanelist_object::test<5>()
+    {
+        set_test_name("what is dragged over a row is offered to the drop handler with the row's value, over no row with none, and its answer is the list's");
+        ALPaneList& l = make();
+        add("one", 1);
+        add("two", 2);
+        S32  group   = -1;
+        bool dropped = false;
+        bool defined = false;
+        l.setDropHandler([&](const LLSD& row, MASK, bool drop, EDragAndDropType, void*, EAcceptance* accept, std::string&) {
+            defined = row.isDefined();
+            group   = defined ? row["group"].asInteger() : -1;
+            dropped = drop;
+            *accept = defined ? ACCEPT_YES_MULTI : ACCEPT_NO;
+        });
+        const LLRect second = l.getCellRect(1, 0);
+        EAcceptance  accept = ACCEPT_NO;
+        std::string  tip;
+        ensure("over a row, taken", l.handleDragAndDrop(second.getCenterX(), second.getCenterY(), MASK_NONE, false, DAD_NOTECARD, nullptr, &accept, tip));
+        ensure("with its value", defined && group == 2 && !dropped && accept == ACCEPT_YES_MULTI);
+        l.handleDragAndDrop(second.getCenterX(), second.getCenterY(), MASK_NONE, true, DAD_NOTECARD, nullptr, &accept, tip);
+        ensure("and dropped", dropped && group == 2);
+        const LLRect rows = l.getItemListRect();
+        l.handleDragAndDrop(rows.getCenterX(), rows.mBottom + 12, MASK_NONE, false, DAD_NOTECARD, nullptr, &accept, tip);
+        ensure("over no row, none", !defined && accept == ACCEPT_NO);
+    }
 }

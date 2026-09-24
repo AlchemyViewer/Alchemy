@@ -950,6 +950,9 @@ bool ALFloaterScriptStudio::postBuild()
     // The buttons follow what is chosen, which the list says as it changes.
     mExplorer->setCommitOnSelectionChange(true);
     mExplorer->setDragStarter([this](const LLSD& pressed) { return startExplorerDrag(pressed); });
+    mExplorer->setDropHandler([this](const LLSD& row, MASK mask, bool drop, EDragAndDropType type, void* cargo, EAcceptance* accept, std::string&) {
+        dropOnExplorer(row, mask, drop, type, cargo, accept);
+    });
     mExplorer->setCommitCallback([this](LLUICtrl*, const LLSD&) { refreshExplorerButtons(); });
     mExplorerFilter = getChild<LLFilterEditor>("explorer_filter");
     mExplorerFilter->setCommitCallback([this](LLUICtrl*, const LLSD&) { fillExplorer(); });
@@ -13368,6 +13371,11 @@ void ALFloaterScriptStudio::pumpExplorer()
         fillExplorer();
     }
     const F64 now = LLTimer::getTotalSeconds();
+    if (mExplorerRefetchAt > 0.0 && now >= mExplorerRefetchAt)
+    {
+        mExplorerRefetchAt = 0.0;
+        refreshExplorer(true);
+    }
     if (now < mExplorerPolled + EXPLORER_POLL)
     {
         return;
@@ -13911,6 +13919,75 @@ bool ALFloaterScriptStudio::startExplorerDrag(const LLSD& pressed)
     }
     LLToolDragAndDrop::getInstance()->beginMultiDrag(types, ids, LLToolDragAndDrop::SOURCE_WORLD, from);
     return true;
+}
+
+void ALFloaterScriptStudio::dropOnExplorer(const LLSD& row, MASK mask, bool drop, EDragAndDropType type, void* cargo, EAcceptance* accept)
+{
+    // Into the prim the row is of: an item's, a prim's own, an object's
+    // root, which is where a drop on the object in world goes too.
+    *accept = ACCEPT_NO;
+    if (!row.isMap())
+    {
+        return;
+    }
+    LLViewerObject* prim = gObjectList.findObject(row.has("prim") ? row["prim"].asUUID() : row["root"].asUUID());
+    if (!prim)
+    {
+        return;
+    }
+    // From the inventory only: what comes from an object or a notecard
+    // the drag tool will not put into another object, and is not offered.
+    LLToolDragAndDrop*               tool   = LLToolDragAndDrop::getInstance();
+    const LLToolDragAndDrop::ESource source = tool->getSource();
+    if (source == LLToolDragAndDrop::SOURCE_WORLD || source == LLToolDragAndDrop::SOURCE_NOTECARD)
+    {
+        return;
+    }
+    // As the build floater's contents take it: a folder's items, each
+    // thing that may go in, and a script running unless Control is held.
+    bool ok = false;
+    switch (type)
+    {
+        case DAD_CATEGORY:
+            ok = tool->dadUpdateInventoryCategory(prim, drop);
+            break;
+        case DAD_TEXTURE:
+        case DAD_SOUND:
+        case DAD_LANDMARK:
+        case DAD_OBJECT:
+        case DAD_NOTECARD:
+        case DAD_CLOTHING:
+        case DAD_BODYPART:
+        case DAD_ANIMATION:
+        case DAD_GESTURE:
+        case DAD_CALLINGCARD:
+        case DAD_MESH:
+        case DAD_SETTINGS:
+        case DAD_MATERIAL:
+            ok = LLToolDragAndDrop::isInventoryDropAcceptable(prim, static_cast<LLViewerInventoryItem*>(cargo));
+            if (ok && drop)
+            {
+                LLToolDragAndDrop::dropInventory(prim, static_cast<LLViewerInventoryItem*>(cargo), source, tool->getSourceID());
+            }
+            break;
+        case DAD_SCRIPT:
+            ok = LLToolDragAndDrop::isInventoryDropAcceptable(prim, static_cast<LLViewerInventoryItem*>(cargo));
+            if (ok && drop)
+            {
+                LLToolDragAndDrop::dropScript(prim, static_cast<LLViewerInventoryItem*>(cargo), (mask & MASK_CONTROL) == 0, source, tool->getSourceID());
+            }
+            break;
+        default:
+            break;
+    }
+    *accept = ok ? ACCEPT_YES_MULTI : ACCEPT_NO;
+    if (ok && drop)
+    {
+        // Listed again now, and again in a moment for what a folder sends
+        // once its items are in.
+        refreshExplorer(true);
+        mExplorerRefetchAt = LLTimer::getTotalSeconds() + 2.0;
+    }
 }
 
 bool ALFloaterScriptStudio::handleMouseDown(S32 x, S32 y, MASK mask)

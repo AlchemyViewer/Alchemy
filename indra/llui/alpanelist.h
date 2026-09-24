@@ -24,6 +24,7 @@
 #pragma once
 
 #include "aldraggesture.h"
+#include "llframetimer.h"
 #include "llscrolllistctrl.h"
 
 #include <functional>
@@ -77,11 +78,22 @@ public:
     typedef std::function<bool(const LLSD& pressed)> drag_t;
     void setDragStarter(drag_t starter) { mDragStarter = std::move(starter); }
 
+    // What the viewer's drag tool carries over a row, or drops on it: the
+    // handler is given the row's value -- undefined over no row -- says in
+    // `accept` what it would do, and does it on the drop. The row under
+    // the pointer is lit meanwhile, and near the list's top or bottom the
+    // list scrolls, for a row out of sight.
+    typedef std::function<void(const LLSD& row, MASK mask, bool drop, EDragAndDropType type, void* cargo, EAcceptance* accept, std::string& tooltip)>
+        drop_t;
+    void setDropHandler(drop_t handler) { mDropHandler = std::move(handler); }
+
     bool handleKeyHere(KEY key, MASK mask) override;
     bool handleMouseDown(S32 x, S32 y, MASK mask) override;
     bool handleMouseUp(S32 x, S32 y, MASK mask) override;
     bool handleHover(S32 x, S32 y, MASK mask) override;
     void onMouseCaptureLost() override;
+    bool handleDragAndDrop(S32 x, S32 y, MASK mask, bool drop, EDragAndDropType type, void* cargo, EAcceptance* accept,
+                           std::string& tooltip) override;
 
 protected:
     friend class LLUICtrlFactory;
@@ -98,4 +110,7 @@ private:
     drag_t                      mDragStarter;
     ALDragGesture               mPress;
     LLSD                        mPressed;
+    drop_t                      mDropHandler;
+    // A row a step, and no faster, while a drag rests at an edge.
+    LLFrameTimer                mDropScroll;
 };
