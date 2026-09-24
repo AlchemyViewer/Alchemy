@@ -61,7 +61,7 @@ namespace tut
             layout.setFont(LLFontGL::getFontMonospace());
         }
 
-        static bool near(F32 a, F32 b, F32 within = 0.75f) { return std::fabs(a - b) <= within; }
+        static bool close_to(F32 a, F32 b, F32 within = 0.75f) { return std::fabs(a - b) <= within; }
     };
 
     typedef test_group<altextlayout_data> altextlayout_group;
@@ -110,7 +110,7 @@ namespace tut
         const ALTextLayout::Line& line = layout.line(0);
         ensure("the tab draws nothing", line.placed.front().face == nullptr);
         // 'ab' then a tab to the next stop: twice the first tab's width.
-        ensure("the second tab reaches the second stop", near(layout.xOf(0, 4), space * 2.f, 1.f));
+        ensure("the second tab reaches the second stop", close_to(layout.xOf(0, 4), space * 2.f, 1.f));
         // The e and its accent are one cluster: no caret position between them.
         ensure_equals("inside the cluster is its start", layout.columnAt(0, 0, layout.xOf(0, 4) + 0.5f, false), 4);
         ensure_equals("the end", layout.columnAt(0, 0, line.width + 1.f, false), 7);
@@ -178,7 +178,7 @@ namespace tut
         set_test_name("a hidden line takes no height, and an edit above it keeps it hidden");
         ready("a\nbbbb\nc\nd");
         const S32 row = layout.rowHeight();
-        ensure("the widest line is the second", near(layout.contentWidth(), layout.line(1).width));
+        ensure("the widest line is the second", close_to(layout.contentWidth(), layout.line(1).width));
         layout.setHidden(1, 2, true);
         ensure("hidden", layout.hidden(1) && layout.hidden(2) && !layout.hidden(3));
         ensure("any", layout.anyHidden());
@@ -244,7 +244,7 @@ namespace tut
         ensure("the glyph after is on the stretch's end", line.glyphs[13].cluster == 32);
         const F32 x_begin = layout.xOf(0, 4);
         const F32 x_end   = layout.xOf(0, 32);
-        ensure("the caret inside the stretch sits at its end", near(layout.xOf(0, 10), x_end));
+        ensure("the caret inside the stretch sits at its end", close_to(layout.xOf(0, 10), x_end));
         ensure_equals("a click in the label's first half is the start", layout.columnAt(0, 0, x_begin + 2.f, true), 4);
         ensure_equals("a click in the label's second half is the end", layout.columnAt(0, 0, x_end - 2.f, true), 32);
         ensure_equals("without rounding, the start", layout.columnAt(0, 0, x_end - 2.f, false), 4);
@@ -252,9 +252,9 @@ namespace tut
         const ALTextLayout::Line& second = layout.line(1);
         ensure_equals("'ab', the box, 'cd', the tab, 'z'", second.glyphs.size(), size_t(2 + 1 + 2 + 1 + 1));
         ensure("the box draws nothing", second.placed[2].face == nullptr);
-        ensure("the box is as wide as asked", near(second.glyphs[2].advance, 40.f));
+        ensure("the box is as wide as asked", close_to(second.glyphs[2].advance, 40.f));
         ensure_equals("the box carries the atom's id", second.glyphs[2].substitution, 11);
-        ensure("the caret after the box is past the placeholder's bytes", near(layout.xOf(1, 5), layout.xOf(1, 2) + 40.f));
+        ensure("the caret after the box is past the placeholder's bytes", close_to(layout.xOf(1, 5), layout.xOf(1, 2) + 40.f));
         ensure("the tab after still reaches a stop", layout.xOf(1, 8) > layout.xOf(1, 7));
         ensure_equals("a box without a height leaves the row a font line tall", second.height, layout.rowHeight());
 
@@ -352,9 +352,9 @@ namespace tut
         // the indent.
         ensure_equals("first row from the edge", layout.xOf(0, 0), 0.f);
         ensure_equals("two rows", layout.rowCount(0), 2);
-        ensure("the second row starts at the indent", near(layout.xOf(0, layout.line(0).rows[1].begin), four));
+        ensure("the second row starts at the indent", close_to(layout.xOf(0, layout.line(0).rows[1].begin), four));
         ensure_equals("a point in the indent is the row's start", layout.columnAt(0, 1, four / 2.f, true), layout.line(0).rows[1].begin);
-        ensure("a column on the second row counts from the edge", near(layout.xOf(0, layout.line(0).rows[1].begin + 2), four + layout.xOf(0, 2)));
+        ensure("a column on the second row counts from the edge", close_to(layout.xOf(0, layout.line(0).rows[1].begin + 2), four + layout.xOf(0, 2)));
         // Hanging in by eight, the rows after the first keep a quarter of
         // the wrap at least -- two letters here -- so 'cccc', with
         // nowhere to break, goes two letters a row.
@@ -364,11 +364,11 @@ namespace tut
         rest = four;
         layout.invalidateLine(0);
         // The next line's first row is in by the other amount.
-        ensure("the second line's first row in by eight", near(layout.xOf(1, 0), four * 2.f));
+        ensure("the second line's first row in by eight", close_to(layout.xOf(1, 0), four * 2.f));
         ensure_equals("and the hit test agrees", layout.columnAt(1, 0, four * 2.f + layout.xOf(0, 1), false), 1);
         // No wrap: the first row's indent still stands.
         layout.setWrapWidth(0);
-        ensure("unwrapped, the line still starts at its indent", near(layout.xOf(1, 0), four * 2.f));
+        ensure("unwrapped, the line still starts at its indent", close_to(layout.xOf(1, 0), four * 2.f));
         ensure_equals("and has one row", layout.rowCount(0), 1);
     }
 

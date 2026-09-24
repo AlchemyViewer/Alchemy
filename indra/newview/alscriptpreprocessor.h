@@ -35,7 +35,7 @@
 
 namespace LL
 {
-    template <class QUEUE> class ThreadPoolUsing;
+    template <class QUEUE> struct ThreadPoolUsing;
     class WorkQueue;
 }
 

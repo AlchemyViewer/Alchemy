@@ -799,7 +799,7 @@ void ALCodeEditor::drawGutter(const LLRect& text, F32 alpha)
 
     const LLFontGL* font   = getFont();
     const S32       row_h  = layout().rowHeight();
-    const S32       ascent = llround(font->getAscenderHeight());
+    const S32       ascent = ll_round(font->getAscenderHeight());
     const S32       numbers_right = gutter.mRight - (mShowFoldMarkers ? FOLD_COLUMN : 0) - GUTTER_PAD;
     const LLColor4  ink     = lineNumberColor() % alpha;
     const LLColor4  lit     = paint(Paint::ActiveLineNumber) % alpha;
@@ -834,7 +834,7 @@ void ALCodeEditor::drawGutter(const LLRect& text, F32 alpha)
             // counted from the caret's line where that is asked for.
             const S32 shown = mRelativeLineNumbers && line != caret_line ? std::abs(line - caret_line) : line + 1;
             font->renderUTF8(std::to_string(shown), 0, static_cast<F32>(numbers_right), static_cast<F32>(screen_top - ascent),
-                             line == caret_line ? lit : ink, LLFontGL::RIGHT, LLFontGL::BASELINE);
+                             line == caret_line ? lit : ink, LLFontGL::RIGHT, LLFontGL::BASELINE, LLFontGL::NORMAL, LLFontGL::NO_SHADOW);
             const Mark mark = markAt(line);
             if (mark != Mark::None)
             {
@@ -879,7 +879,7 @@ void ALCodeEditor::drawGutter(const LLRect& text, F32 alpha)
             const S32 line  = pinned[static_cast<size_t>(i)];
             const S32 shown_number = mRelativeLineNumbers && line != caret_line ? std::abs(line - caret_line) : line + 1;
             font->renderUTF8(std::to_string(shown_number), 0, static_cast<F32>(numbers_right), static_cast<F32>(text.mTop - i * row_h - ascent), ink,
-                             LLFontGL::RIGHT, LLFontGL::BASELINE);
+                             LLFontGL::RIGHT, LLFontGL::BASELINE, LLFontGL::NORMAL, LLFontGL::NO_SHADOW);
         }
     }
 }
@@ -1542,7 +1542,8 @@ void ALCodeEditor::drawRowExtras(S32 line, S32 row, const LLRect& text, S32 scre
         {
             const LLColor4 ink = foldColor() % alpha;
             gl_rect_2d(box, ink, false);
-            getFont()->renderUTF8(foldBoxText(line), 0, static_cast<F32>(box.mLeft + 4), static_cast<F32>(screen_top - llround(getFont()->getAscenderHeight())), ink, LLFontGL::LEFT, LLFontGL::BASELINE);
+            getFont()->renderUTF8(foldBoxText(line), 0, static_cast<F32>(box.mLeft + 4), static_cast<F32>(screen_top - llround(getFont()->getAscenderHeight())), ink, LLFontGL::LEFT, LLFontGL::BASELINE,
+                                  LLFontGL::NORMAL, LLFontGL::NO_SHADOW);
         }
     }
 }
@@ -4183,7 +4184,7 @@ void ALCodeEditor::drawSignature(const LLRect& text)
             return;
         }
         const std::string part = sig.label.substr(from, to - from);
-        font->renderUTF8(part, 0, pen, baseline, color, LLFontGL::LEFT, LLFontGL::BASELINE);
+        font->renderUTF8(part, 0, pen, baseline, color, LLFontGL::LEFT, LLFontGL::BASELINE, LLFontGL::NORMAL, LLFontGL::NO_SHADOW);
         pen += static_cast<F32>(font->getWidth(part));
     };
     {

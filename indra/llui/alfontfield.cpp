@@ -542,7 +542,7 @@ void ALFontField::draw()
         // The choice, said in itself, where the name would be typed.
         const LLRect box(mSampleWidth + 3, getRect().getHeight() - 2, getRect().getWidth(), 2);
         gl_rect_2d(box, edge.get(), false);
-        font()->renderUTF8(describe(), 0, box.mLeft + 6, box.mBottom + 2, ink.get(), LLFontGL::LEFT, LLFontGL::BOTTOM,
+        font()->renderUTF8(describe(), 0, static_cast<F32>(box.mLeft + 6), static_cast<F32>(box.mBottom + 2), ink.get(), LLFontGL::LEFT, LLFontGL::BOTTOM,
                            LLFontGL::NORMAL, LLFontGL::NO_SHADOW, S32_MAX, box.getWidth() - 8, nullptr, true);
     }
     LLUICtrl::draw();

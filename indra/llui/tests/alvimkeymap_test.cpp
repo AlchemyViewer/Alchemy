@@ -289,7 +289,7 @@ namespace tut
         ensure_equals("3i types it three times", flat(e.text()), std::string("-xyabc!|hihihiabove|new|"));
         keys("j0.");
         ensure_equals(". repeats the insert on the next line", flat(e.text()), std::string("-xyabc!|hihihiabove|hihihinew|"));
-        ensure("an insert is one step to undo", [&] { keys("u"); return flat(e.text()) == "-xyabc!|hihihiabove|new|"; }());
+        ensure("an insert is one step to undo", [&] { keys("u"); return alvimkeymap_data::flat(e.text()) =="-xyabc!|hihihiabove|new|"; }());
     }
 
     template<> template<>

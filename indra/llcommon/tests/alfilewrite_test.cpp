@@ -27,6 +27,7 @@
 #include "../alfilewrite.h"
 
 #include "../fsyspath.h"
+#include "../llfile.h"
 #include "../lluuid.h"
 
 #include "../test/lltut.h"
@@ -70,7 +71,7 @@ namespace tut
 
         static std::string read(const std::string& file)
         {
-            std::ifstream     in(fsyspath(file), std::ios::binary);
+            llifstream        in(file, std::ios::binary);
             std::stringstream text;
             text << in.rdbuf();
             return text.str();
@@ -78,7 +79,7 @@ namespace tut
 
         static void put(const std::string& file, const std::string& text)
         {
-            std::ofstream out(fsyspath(file), std::ios::binary);
+            llofstream out(file, std::ios::binary);
             out << text;
         }
 

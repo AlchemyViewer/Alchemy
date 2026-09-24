@@ -62,7 +62,7 @@ namespace tut
 
         static std::string read(const std::string& file)
         {
-            std::ifstream     in(fsyspath(file), std::ios::binary);
+            llifstream        in(file, std::ios::binary);
             std::stringstream text;
             text << in.rdbuf();
             return text.str();
@@ -101,7 +101,7 @@ namespace tut
         const std::string file   = folder + "/lsl.xml";
         const std::string broken = "<llsd><array><map><key>name</key><string>mine</string></map>  <!-- a comma too far -->";
         {
-            std::ofstream out(fsyspath(file), std::ios::binary);
+            llofstream out(file, std::ios::binary);
             out << broken;
         }
         std::vector<ALScriptSnippets::Snippet> held;
@@ -113,7 +113,7 @@ namespace tut
 
         // Broken again: kept beside the first, which is not written over.
         {
-            std::ofstream out(fsyspath(file), std::ios::binary);
+            llofstream out(file, std::ios::binary);
             out << "again";
         }
         ensure("written", ALScriptSnippets::writeTo(file, { snippet("say", "x") }));

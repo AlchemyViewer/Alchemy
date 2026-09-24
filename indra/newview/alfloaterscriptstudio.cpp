@@ -14410,7 +14410,7 @@ LLSD ALFloaterScriptStudio::openTabs() const
         }
         if (i == mActive)
         {
-            chosen = tabs.size();
+            chosen = static_cast<S32>(tabs.size());
         }
         tabs.append(tab);
     }

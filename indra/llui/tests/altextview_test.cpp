@@ -776,7 +776,7 @@ namespace tut
         };
         LLButton* first = button("first");
         LLButton* second = button("second");
-        LLButton* far = button("far");
+        LLButton* distant = button("far");
         ALTextView::Atom a;
         a.at    = ALTextPos(0, 5);
         a.width = 40;
@@ -786,7 +786,7 @@ namespace tut
         b.view  = second;
         ALTextView::Atom c = a;
         c.at    = ALTextPos(25, 5);
-        c.view  = far;
+        c.view  = distant;
         v.setAtoms({ a, b, c });
         v.placeAtomViews();
         v.setCaret(ALTextPos(0, 0));
@@ -796,11 +796,11 @@ namespace tut
         key(KEY_TAB);
         ensure("and on to the next", second->hasFocus());
         key(KEY_TAB);
-        ensure("and to the far one, brought into sight", far->hasFocus() && far->getVisible() && v.scrollY() > 0);
+        ensure("and to the far one, brought into sight", distant->hasFocus() && distant->getVisible() && v.scrollY() > 0);
         key(KEY_TAB);
         ensure("past the last: the text again", gFocusMgr.getKeyboardFocus() == &v && !v.atomViewFocused());
         key(KEY_TAB, MASK_SHIFT);
-        ensure("Shift-Tab goes to the last view before the caret", far->hasFocus());
+        ensure("Shift-Tab goes to the last view before the caret", distant->hasFocus());
         key(KEY_TAB, MASK_SHIFT);
         ensure("and back to the one before", second->hasFocus());
         key(KEY_ESCAPE);

@@ -119,7 +119,7 @@ bool ALDiskIncludes::readOrdinary(const std::string& file, std::string& out)
 {
     out.clear();
     std::error_code ec;
-    const fsyspath  path(file);
+    const std::filesystem::path path = fsyspath(file);
     // What a stat says it is, links followed: a device or a pipe would be
     // read for ever, and a folder not at all.
     if (!fs::is_regular_file(path, ec) || fs::file_size(path, ec) > MAX_BYTES || ec)

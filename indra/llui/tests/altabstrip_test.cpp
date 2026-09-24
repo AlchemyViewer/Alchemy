@@ -504,7 +504,7 @@ namespace tut
         std::vector<std::string> heard;
         std::vector<std::string> menus;
         strip->onChosen([&](const std::string& value) {
-            strip->setTabs(three(), value);
+            strip->setTabs(altabstrip_data::three(), value);
             heard.push_back(value);
         });
         strip->onMenu([&](const std::string& value, S32, S32) { menus.push_back(value); });

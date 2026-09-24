@@ -489,7 +489,7 @@ void ALTextLayout::layoutLine(S32 index, Line& out)
     const size_t glyph_count = out.glyphs.size();
     const S32    length      = static_cast<S32>(text.size());
     const S32    row_height  = rowHeight();
-    const S32    row_ascent  = mFont ? llround(mFont->getAscenderHeight()) : 0;
+    const S32    row_ascent  = mFont ? ll_round(mFont->getAscenderHeight()) : 0;
     // How far in the rows start: the first, and the ones after it. A
     // row's x runs from the line's edge, so its start is that much
     // before its first glyph's pen and its width that much more.
@@ -518,7 +518,7 @@ void ALTextLayout::layoutLine(S32 index, Line& out)
         const LLFontGL* current = nullptr;
         auto            tall_as = [&](const LLFontGL* used) {
             row.textHeight = llmax(row.textHeight, used->getLineSpacing());
-            row.ascent     = llmax(row.ascent, llround(used->getAscenderHeight()));
+            row.ascent     = llmax(row.ascent, ll_round(used->getAscenderHeight()));
         };
         for (const auto& [glyph, font] : font_spans)
         {

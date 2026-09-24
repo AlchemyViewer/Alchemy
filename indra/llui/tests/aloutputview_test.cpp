@@ -261,7 +261,7 @@ namespace tut
         ensure_equals("a lane given a fill keeps it", v.capacity(1), 2);
         ensure_equals("one not given keeps the first lane's", v.capacity(2), 3);
         const auto in_lane = [](const char* text, U8 lane) {
-            ALOutputView::Entry one = entry("", text);
+            ALOutputView::Entry one = aloutputview_data::entry("", text);
             one.lane                = lane;
             return one;
         };

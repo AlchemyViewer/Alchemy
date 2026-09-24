@@ -69,7 +69,7 @@ std::string besideOf(const std::string& path)
 bool whole(const std::string& path, std::string_view text)
 {
     std::error_code ec;
-    fsyspath        target(path);
+    std::filesystem::path target = fsyspath(path);
     // Through a link, to what it names: a link replaced would be a file
     // where somebody keeps a link. One that names nothing has nowhere for
     // the text to go.

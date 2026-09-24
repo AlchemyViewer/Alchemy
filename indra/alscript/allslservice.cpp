@@ -965,7 +965,7 @@ bool ALLSLService::loadBuiltins(const std::string& path, std::string& error)
     // Tailslide exits the process over a file it cannot open, so the file
     // is opened here first. A line it cannot read it reports on stderr and
     // skips, which the process survives.
-    LLFILE* file = LLFile::fopen(path, "rb");
+    LLFILE* file = LLFile::fopen(path, LLFILE_MODE("rb"));
     if (!file)
     {
         error = "cannot open " + path;

@@ -4209,10 +4209,10 @@ bool ALTextView::handleMouseDown(S32 x, S32 y, MASK mask)
         scrollToBarX(x, mBarDragOffset);
         return true;
     }
-    const bool near = llabs(x - mClickX) <= CLICK_SLOP && llabs(y - mClickY) <= CLICK_SLOP;
-    mClickX         = x;
-    mClickY         = y;
-    if (!mTripleClick.hasExpired() && near)
+    const bool same_spot = llabs(x - mClickX) <= CLICK_SLOP && llabs(y - mClickY) <= CLICK_SLOP;
+    mClickX              = x;
+    mClickY              = y;
+    if (!mTripleClick.hasExpired() && same_spot)
     {
         // The third click takes the line; through placeCaret, so that
         // whoever follows the caret hears of it.
