@@ -103,6 +103,14 @@ public:
     // script's own, where the argument is not that name already. LSL
     // says every type, so there are no type hints.
     std::vector<ALScriptInlayHint> inlayHints(std::string_view source, bool parameters);
+    // What could be done at a place -- the caret, or the stretch from it to
+    // (endLine, endColumn) where one is chosen -- that no problem asks for,
+    // each as the edits that make it: the stretch into a local of its own;
+    // an `if` with an `else` the other way round; a handler, in the state
+    // the caret is in, for an event that state asks for and does not hear.
+    // Only of a text that parses: a mended copy's places are not all the
+    // text's.
+    std::vector<ALScriptFix> actions(std::string_view source, S32 line, S32 column, S32 endLine, S32 endColumn);
 
 private:
     struct Impl;

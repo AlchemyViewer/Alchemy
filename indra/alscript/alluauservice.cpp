@@ -1693,3 +1693,418 @@ std::vector<ALScriptInlayHint> ALLuauService::inlayHints(std::string_view source
     std::stable_sort(hints.out.begin(), hints.out.end());
     return std::move(hints.out);
 }
+
+// --- what could be done here ----------------------------------------------------------
+
+namespace
+{
+    // Where a place of Luau's is in the text, or npos past it.
+    size_t offsetAt(std::string_view source, const Luau::Position& at)
+    {
+        size_t offset = 0;
+        for (unsigned line = 0; line < at.line; ++line)
+        {
+            offset = source.find('\n', offset);
+            if (offset == std::string_view::npos)
+            {
+                return offset;
+            }
+            ++offset;
+        }
+        const size_t end = source.find('\n', offset);
+        const size_t length = (end == std::string_view::npos ? source.size() : end) - offset;
+        return at.column <= length ? offset + at.column : std::string_view::npos;
+    }
+
+    std::string_view sliceOf(std::string_view source, const Luau::Position& begin, const Luau::Position& end)
+    {
+        const size_t from = offsetAt(source, begin);
+        const size_t to   = offsetAt(source, end);
+        return from == std::string_view::npos || to == std::string_view::npos || to < from ? std::string_view() : source.substr(from, to - from);
+    }
+
+    ALScriptFix refactor(ALScriptFix fix)
+    {
+        fix.kind = ALScriptFix::Kind::Refactor;
+        return fix;
+    }
+
+    void replace(ALScriptFix& fix, const Luau::Position& begin, const Luau::Position& end, std::string text)
+    {
+        fix.edits.push_back({ static_cast<S32>(begin.line), static_cast<S32>(begin.column), static_cast<S32>(end.line), static_cast<S32>(end.column),
+                              std::move(text) });
+    }
+
+    // A condition the other way round: `not x` as `x`, `a == b` as
+    // `a ~= b`, anything else under a `not`. An order is not turned round,
+    // `a < b` as `a >= b`: NaN is neither.
+    std::string negated(std::string_view source, Luau::AstExpr* condition)
+    {
+        const std::string text(sliceOf(source, condition->location.begin, condition->location.end));
+        if (Luau::AstExprUnary* unary = condition->as<Luau::AstExprUnary>(); unary && unary->op == Luau::AstExprUnary::Op::Not)
+        {
+            Luau::AstExpr* inner = unary->expr;
+            if (Luau::AstExprGroup* group = inner->as<Luau::AstExprGroup>())
+            {
+                inner = group->expr;
+            }
+            return std::string(sliceOf(source, inner->location.begin, inner->location.end));
+        }
+        if (Luau::AstExprBinary* binary = condition->as<Luau::AstExprBinary>();
+            binary && (binary->op == Luau::AstExprBinary::CompareEq || binary->op == Luau::AstExprBinary::CompareNe))
+        {
+            std::string between(sliceOf(source, binary->left->location.end, binary->right->location.begin));
+            const size_t at = between.find(binary->op == Luau::AstExprBinary::CompareEq ? "==" : "~=");
+            if (at != std::string::npos)
+            {
+                between.replace(at, 2, binary->op == Luau::AstExprBinary::CompareEq ? "~=" : "==");
+                return std::string(sliceOf(source, binary->left->location.begin, binary->left->location.end)) + between +
+                       std::string(sliceOf(source, binary->right->location.begin, binary->right->location.end));
+            }
+        }
+        const bool simple = condition->is<Luau::AstExprLocal>() || condition->is<Luau::AstExprGlobal>() || condition->is<Luau::AstExprCall>() ||
+                            condition->is<Luau::AstExprIndexName>() || condition->is<Luau::AstExprIndexExpr>() || condition->is<Luau::AstExprGroup>();
+        return simple ? "not " + text : "not (" + text + ")";
+    }
+
+    // Every operand of a chain of `..`, in order.
+    void concatenated(Luau::AstExpr* expr, std::vector<Luau::AstExpr*>& out)
+    {
+        if (Luau::AstExprBinary* binary = expr->as<Luau::AstExprBinary>(); binary && binary->op == Luau::AstExprBinary::Concat)
+        {
+            concatenated(binary->left, out);
+            concatenated(binary->right, out);
+            return;
+        }
+        out.push_back(expr);
+    }
+
+    // What the script calls in `ll`, and which events it hears.
+    struct Asking : Luau::AstVisitor
+    {
+        std::set<std::string> calls;
+        std::set<std::string> heard;
+
+        bool visit(Luau::AstExprCall* call) override
+        {
+            Luau::AstExprIndexName* index = call->func->as<Luau::AstExprIndexName>();
+            Luau::AstExprGlobal*    table = index ? index->expr->as<Luau::AstExprGlobal>() : nullptr;
+            if (!table)
+            {
+                return true;
+            }
+            if (strcmp(table->name.value, "ll") == 0)
+            {
+                calls.insert(index->index.value);
+            }
+            else if (strcmp(table->name.value, "LLEvents") == 0 && call->args.size >= 1)
+            {
+                if (Luau::AstExprConstantString* name = call->args.data[0]->as<Luau::AstExprConstantString>())
+                {
+                    heard.insert(std::string(name->value.data, name->value.size));
+                }
+            }
+            return true;
+        }
+
+        bool visit(Luau::AstStatAssign* assign) override
+        {
+            for (Luau::AstExpr* target : assign->vars)
+            {
+                Luau::AstExprIndexName* index = target->as<Luau::AstExprIndexName>();
+                Luau::AstExprGlobal*    table = index ? index->expr->as<Luau::AstExprGlobal>() : nullptr;
+                if (table && strcmp(table->name.value, "LLEvents") == 0)
+                {
+                    heard.insert(index->index.value);
+                }
+            }
+            return true;
+        }
+    };
+}
+
+std::vector<ALScriptFix> ALLuauService::actions(std::string_view source, S32 line, S32 column, S32 endLine, S32 endColumn)
+{
+    std::vector<ALScriptFix> out;
+    // The type a local was given without saying, where the caret is on its
+    // name: the hint the editor shows beside it, written in.
+    for (const ALScriptInlayHint& hint : inlayHints(source, false, true))
+    {
+        if (hint.kind != ALScriptInlayHint::Kind::Type || hint.line != line || column > hint.column)
+        {
+            continue;
+        }
+        const std::string_view text = sliceOf(source, Luau::Position(hint.line, 0), Luau::Position(hint.line, hint.column));
+        S32                    from = hint.column;
+        while (from > 0 && (isalnum(static_cast<unsigned char>(text[from - 1])) || text[from - 1] == '_'))
+        {
+            --from;
+        }
+        if (column >= from && hint.text.size() > 2 && hint.text.size() < 64)
+        {
+            ALScriptFix fix = refactor(ALScriptFixes::titled("ScriptActionAnnotate", "Declare it as '[1]'", { hint.text.substr(2) }));
+            fix.edits.push_back({ hint.line, hint.column, hint.line, hint.column, hint.text });
+            out.push_back(std::move(fix));
+        }
+    }
+
+    Impl& impl = *mImpl;
+    impl.checked(source, /*for_autocomplete*/ false);
+    const Luau::SourceModule* module_source = impl.frontend->getSourceModule(SCRIPT_MODULE);
+    const Luau::ModulePtr     module        = impl.frontend->moduleResolver.getModule(SCRIPT_MODULE);
+    if (!module_source || !module || !module_source->root || !module_source->parseErrors.empty())
+    {
+        return out;
+    }
+    const Luau::Position              at       = positionOf(line, column);
+    const std::vector<Luau::AstNode*> ancestry = Luau::findAstAncestryOfPosition(*module_source, at);
+
+    // A stretch chosen that is one expression, into a local declared just
+    // before the statement it is in, named as nothing in the script is.
+    // Only where that runs it as often, and as surely, as it ran: not out
+    // of a loop's condition, an `elseif`'s, nor what `and`, `or` or an `if`
+    // expression may skip.
+    if (endLine == line && endColumn > column)
+    {
+        S32                    from = column, to = endColumn;
+        const std::string_view text = sliceOf(source, Luau::Position(line, 0), Luau::Position(line, endColumn));
+        while (from < to && isspace(static_cast<unsigned char>(text[from])))
+        {
+            ++from;
+        }
+        while (to > from && isspace(static_cast<unsigned char>(text[to - 1])))
+        {
+            --to;
+        }
+        const std::vector<Luau::AstNode*> around = Luau::findAstAncestryOfPosition(*module_source, positionOf(line, from));
+        Luau::AstExpr*                    chosen    = nullptr;
+        Luau::AstStat*                    statement = nullptr;
+        bool                              certain   = true;
+        for (size_t i = around.size(); i-- > 0;)
+        {
+            Luau::AstNode* node = around[i];
+            if (!chosen)
+            {
+                Luau::AstExpr* expr = node->asExpr();
+                if (expr && expr->location.begin == positionOf(line, from) && expr->location.end == positionOf(line, to))
+                {
+                    chosen = expr;
+                }
+                continue;
+            }
+            const Luau::AstNode* below = around[i + 1];
+            if (Luau::AstExprBinary* binary = node->as<Luau::AstExprBinary>();
+                binary && (binary->op == Luau::AstExprBinary::And || binary->op == Luau::AstExprBinary::Or) && below == binary->right)
+            {
+                certain = false;
+            }
+            if (Luau::AstExprIfElse* either = node->as<Luau::AstExprIfElse>(); either && below != either->condition)
+            {
+                certain = false;
+            }
+            Luau::AstStat* stat = node->asStat();
+            if (!stat)
+            {
+                continue;
+            }
+            // The statement it is in, where that stands in a block: one that
+            // stands in another statement -- an `elseif` in its `if` -- runs
+            // only when that one gets to it.
+            if (i == 0 || !around[i - 1]->is<Luau::AstStatBlock>())
+            {
+                certain = false;
+                continue;
+            }
+            statement = stat;
+            break;
+        }
+        // Nor what is assigned to, which a local of its own would take in
+        // its place.
+        if (Luau::AstStatAssign* assign = statement ? statement->as<Luau::AstStatAssign>() : nullptr)
+        {
+            for (Luau::AstExpr* target : assign->vars)
+            {
+                certain = certain && target != chosen;
+            }
+        }
+        if (Luau::AstStatCompoundAssign* assign = statement ? statement->as<Luau::AstStatCompoundAssign>() : nullptr)
+        {
+            certain = certain && assign->var != chosen;
+        }
+        if (Luau::AstStatFunction* function = statement ? statement->as<Luau::AstStatFunction>() : nullptr)
+        {
+            certain = certain && function->name != chosen;
+        }
+        if (chosen && statement && certain && !chosen->is<Luau::AstExprFunction>() && !chosen->is<Luau::AstExprVarargs>() &&
+            !statement->is<Luau::AstStatWhile>() && !statement->is<Luau::AstStatRepeat>())
+        {
+            const std::string      name   = ALScriptFixes::freshName(source, "value");
+            const Luau::Position   start(statement->location.begin.line, 0);
+            const std::string_view first  = sliceOf(source, start, statement->location.begin);
+            const bool             alone  = first.find_first_not_of(" \t") == std::string_view::npos;
+            const std::string      value(sliceOf(source, chosen->location.begin, chosen->location.end));
+            ALScriptFix            fix = refactor(ALScriptFixes::titled("ScriptActionExtract", "Put it in a local, '[1]'", { name }));
+            // On a line of its own, where the statement starts its line;
+            // else just before it, where another stands ahead of it.
+            if (alone)
+            {
+                replace(fix, start, start, std::string(first) + "local " + name + " = " + value + "\n");
+            }
+            else
+            {
+                replace(fix, statement->location.begin, statement->location.begin, "local " + name + " = " + value + "; ");
+            }
+            replace(fix, chosen->location.begin, chosen->location.end, name);
+            out.push_back(std::move(fix));
+        }
+    }
+
+    for (Luau::AstNode* node : ancestry)
+    {
+        // A concatenation the caret is in, with a string in it: one
+        // interpolated string, each operand not a string in braces.
+        Luau::AstExprBinary* binary = node->as<Luau::AstExprBinary>();
+        if (binary && binary->op == Luau::AstExprBinary::Concat)
+        {
+            std::vector<Luau::AstExpr*> parts;
+            concatenated(binary, parts);
+            std::string written = "`";
+            bool        strings = false;
+            bool        fits    = true;
+            for (Luau::AstExpr* part : parts)
+            {
+                if (Luau::AstExprConstantString* string = part->as<Luau::AstExprConstantString>())
+                {
+                    using Quote = Luau::AstExprConstantString::QuoteStyle;
+                    if (string->quoteStyle != Quote::QuotedSimple && string->quoteStyle != Quote::QuotedSingle)
+                    {
+                        fits = false;
+                        break;
+                    }
+                    const std::string_view quoted = sliceOf(source, string->location.begin, string->location.end);
+                    if (quoted.size() < 2 || quoted.front() == '`')
+                    {
+                        fits = false;
+                        break;
+                    }
+                    for (char c : quoted.substr(1, quoted.size() - 2))
+                    {
+                        if (c == '`' || c == '{')
+                        {
+                            written += '\\';
+                        }
+                        written += c;
+                    }
+                    strings = true;
+                }
+                else if (part->is<Luau::AstExprInterpString>())
+                {
+                    fits = false;
+                    break;
+                }
+                else
+                {
+                    written += "{" + std::string(sliceOf(source, part->location.begin, part->location.end)) + "}";
+                }
+            }
+            if (fits && strings && parts.size() > 1)
+            {
+                ALScriptFix fix = refactor(ALScriptFixes::titled("ScriptActionInterpolate", "Write it as an interpolated string", {}));
+                replace(fix, binary->location.begin, binary->location.end, written + "`");
+                out.push_back(std::move(fix));
+            }
+            break;
+        }
+    }
+
+    // An `if` with an `else`, the caret on its first line: the condition
+    // turned round, the branches swapped.
+    for (size_t i = ancestry.size(); i-- > 0;)
+    {
+        Luau::AstStatIf* branch = ancestry[i]->as<Luau::AstStatIf>();
+        if (!branch || branch->location.begin.line != static_cast<unsigned>(line))
+        {
+            continue;
+        }
+        if (branch->thenLocation && branch->elseLocation && branch->elsebody && branch->elsebody->is<Luau::AstStatBlock>() &&
+            branch->location.end.column >= 3)
+        {
+            const Luau::Position ending(branch->location.end.line, branch->location.end.column - 3);
+            if (sliceOf(source, ending, branch->location.end) == "end")
+            {
+                const std::string then_text(sliceOf(source, branch->thenLocation->end, branch->elseLocation->begin));
+                const std::string else_text(sliceOf(source, branch->elseLocation->end, ending));
+                ALScriptFix       fix = refactor(ALScriptFixes::titled("ScriptActionInvertIf", "Invert the if", {}));
+                replace(fix, branch->condition->location.begin, branch->condition->location.end, negated(source, branch->condition));
+                replace(fix, branch->thenLocation->end, branch->elseLocation->begin, else_text);
+                replace(fix, branch->elseLocation->end, ending, then_text);
+                out.push_back(std::move(fix));
+            }
+        }
+        break;
+    }
+
+    // A handler for each event the script asks for and does not hear, at
+    // its end, with the parameters the definitions give the event.
+    Asking asking;
+    module_source->root->visit(&asking);
+    std::set<std::string> offered;
+    for (const std::string& call : asking.calls)
+    {
+        const char* event = ALScriptFixes::eventAnswering("ll" + call);
+        if (!event || asking.heard.count(event) || !offered.insert(event).second)
+        {
+            continue;
+        }
+        std::string parameters;
+        for (const auto& [symbol, binding] : impl.frontend->globals.globalScope->bindings)
+        {
+            if (strcmp(symbol.c_str(), "LLEvents") != 0)
+            {
+                continue;
+            }
+            const Luau::ExternType* events = Luau::get<Luau::ExternType>(Luau::follow(binding.typeId));
+            if (!events)
+            {
+                break;
+            }
+            const auto prop = events->props.find(event);
+            if (prop == events->props.end() || !prop->second.readTy)
+            {
+                break;
+            }
+            Luau::TypeId handler = Luau::follow(*prop->second.readTy);
+            if (const Luau::UnionType* either = Luau::get<Luau::UnionType>(handler))
+            {
+                for (Luau::TypeId option : either->options)
+                {
+                    if (Luau::get<Luau::FunctionType>(Luau::follow(option)))
+                    {
+                        handler = Luau::follow(option);
+                    }
+                }
+            }
+            if (const Luau::FunctionType* function = Luau::get<Luau::FunctionType>(handler))
+            {
+                const auto [types, tail] = Luau::flatten(function->argTypes);
+                for (size_t n = 0; n < types.size(); ++n)
+                {
+                    const std::string name = n < function->argNames.size() && function->argNames[n] ? function->argNames[n]->name : "arg" + std::to_string(n + 1);
+                    parameters += (n ? ", " : "") + name + ": " + Luau::toString(types[n]);
+                }
+            }
+            break;
+        }
+        // At the end, after a blank line: on the empty line a final break
+        // leaves, or after the last line's text.
+        const S32    last   = static_cast<S32>(std::count(source.begin(), source.end(), '\n'));
+        const bool   broken = !source.empty() && source.back() == '\n';
+        const size_t start  = source.rfind('\n');
+        const S32    end    = broken ? 0 : static_cast<S32>(source.size() - (start == std::string_view::npos ? 0 : start + 1));
+        ALScriptFix  fix    = refactor(ALScriptFixes::titled("ScriptActionHandler", "Add a handler for '[1]'", { event }));
+        fix.edits.push_back({ last, end, last, end,
+                              std::string(broken ? "\n" : "\n\n") + "LLEvents:on(\"" + event + "\", function(" + parameters + ")\nend)\n" });
+        out.push_back(std::move(fix));
+    }
+    return out;
+}

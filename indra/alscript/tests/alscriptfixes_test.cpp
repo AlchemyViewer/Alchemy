@@ -33,6 +33,7 @@
 
 #include "../test/lltut.h"
 
+#include <algorithm>
 #include <fstream>
 #include <sstream>
 
@@ -111,6 +112,64 @@ namespace tut
             ensure("gone from:\n" + *made + "\n" + said(after), keyed(after, key) == nullptr);
             ensure("no error in its place:\n" + *made + "\n" + said(after), errors(after) <= errors(problems) - (problem->severity == ALScriptProblem::Severity::Error ? 1 : 0));
             return *made;
+        }
+
+        // Where a piece of the script is, zero-based: its first line and
+        // column, and where it ends on that line.
+        static void place(const std::string& script, const std::string& piece, S32& line, S32& column, S32& end)
+        {
+            const size_t at = script.find(piece);
+            ensure("in the script: " + piece, at != std::string::npos);
+            const size_t start = script.rfind('\n', at);
+            line               = static_cast<S32>(std::count(script.begin(), script.begin() + at, '\n'));
+            column             = static_cast<S32>(at - (start == std::string::npos ? 0 : start + 1));
+            end                = column + static_cast<S32>(piece.size());
+        }
+
+        std::vector<ALScriptFix> actions(const std::string& script, bool lua, S32 line, S32 column, S32 endLine, S32 endColumn)
+        {
+            return lua ? luau.actions(script, line, column, endLine, endColumn) : lsl.actions(script, line, column, endLine, endColumn);
+        }
+
+        static std::string titles(const std::vector<ALScriptFix>& offered)
+        {
+            std::string out;
+            for (const ALScriptFix& action : offered)
+            {
+                out += "'" + action.title + "' ";
+            }
+            return out;
+        }
+
+        // The text with the refactor titled so made, among those offered at
+        // a place, and that text checked again: no error in it. Where none
+        // is titled so, what was offered.
+        std::string acted(const std::string& script, bool lua, S32 line, S32 column, S32 endLine, S32 endColumn, const std::string& title)
+        {
+            const std::vector<ALScriptFix> offered = actions(script, lua, line, column, endLine, endColumn);
+            for (const ALScriptFix& action : offered)
+            {
+                if (action.title != title)
+                {
+                    continue;
+                }
+                ensure("a refactor", action.kind == ALScriptFix::Kind::Refactor);
+                const std::optional<std::string> made = ALScriptFixes::apply(script, action);
+                ensure("applies", made.has_value());
+                const ALScriptProblems after = check(*made, lua);
+                ensure("no error in:\n" + *made + "\n" + said(after), errors(after) == 0);
+                return *made;
+            }
+            return "offered: " + titles(offered);
+        }
+
+        // The same with the caret, or the stretch chosen, on a piece of the
+        // script.
+        std::string actedOn(const std::string& script, bool lua, const std::string& piece, bool chosen, const std::string& title)
+        {
+            S32 line = 0, column = 0, end = 0;
+            place(script, piece, line, column, end);
+            return acted(script, lua, line, column, line, chosen ? end : column, title);
         }
     };
     typedef test_group<alscriptfixes_data> alscriptfixes_group;
@@ -443,5 +502,150 @@ namespace tut
         ensure("what can never run offered: " + notes, unreachable != nullptr && unreachable->fixes.front().preferred && unreachable->fixes.front().safe);
         made = ALScriptFixes::apply(script, unreachable->fixes.front()).value_or("refused");
         ensure("gone: " + made, made.find("never") == std::string::npos && made.find("        return;\n    }\n") != std::string::npos);
+    }
+
+    template<> template<>
+    void object::test<16>()
+    {
+        set_test_name("an LSL expression chosen goes into a local just before its statement, where that runs it as it ran");
+        ensure("builtins: " + error, lslLoaded);
+        const std::string head = "default\n{\n    state_entry()\n    {\n";
+        const std::string tail = "    }\n}\n";
+        std::string       made = actedOn(head + "        llOwnerSay((string)(llGetUnixTime() + 5));\n" + tail, false, "llGetUnixTime() + 5", true,
+                                         "Put it in a local, 'value'");
+        ensure_equals("on its own line", made,
+                      head + "        integer value = llGetUnixTime() + 5;\n        llOwnerSay((string)(value));\n" + tail);
+        // After another statement on the line, just before its own; and
+        // named as nothing in the script is.
+        made = actedOn(head + "        integer value = 1; llOwnerSay((string)(value * 2.5));\n" + tail, false, "value * 2.5", true,
+                       "Put it in a local, 'value2'");
+        ensure_equals("beside", made, head + "        integer value = 1; float value2 = value * 2.5; llOwnerSay((string)(value2));\n" + tail);
+        made = actedOn(head + "        llSetRot(llEuler2Rot(<0, 0, 1>));\n" + tail, false, "llEuler2Rot(<0, 0, 1>)", true, "Put it in a local, 'value'");
+        ensure("a rotation as LSL says it: " + made, made.find("rotation value = llEuler2Rot(<0, 0, 1>);") != std::string::npos);
+        // Not out of a loop's condition, nor from under an if with no
+        // braces, nor what is assigned to.
+        std::string none = head + "        integer i;\n        while (i < 10) ++i;\n" + tail;
+        ensure("a condition: " + actedOn(none, false, "i < 10", true, "Put it in a local, 'value'"),
+               actedOn(none, false, "i < 10", true, "Put it in a local, 'value'").rfind("offered", 0) == 0);
+        none = head + "        integer i;\n        if (i) llOwnerSay((string)(i + 1));\n" + tail;
+        ensure("under an if", actedOn(none, false, "i + 1", true, "Put it in a local, 'value'").rfind("offered", 0) == 0);
+        none = head + "        integer i;\n        i = 4;\n        llOwnerSay((string)i);\n" + tail;
+        S32 line = 0, column = 0, end = 0;
+        place(none, "i = 4", line, column, end);
+        ensure("assigned to", acted(none, false, line, column, line, column + 1, "Put it in a local, 'value'").rfind("offered", 0) == 0);
+    }
+
+    template<> template<>
+    void object::test<17>()
+    {
+        set_test_name("an LSL if with an else is inverted: the condition turned round, the branches swapped");
+        ensure("builtins: " + error, lslLoaded);
+        const std::string head = "default\n{\n    touch_start(integer n)\n    {\n";
+        const std::string tail = "    }\n}\n";
+        std::string       made = actedOn(head + "        if (n == 1)\n        {\n            llOwnerSay(\"one\");\n        }\n        else\n        {\n"
+                                                "            llOwnerSay(\"many\");\n        }\n" + tail,
+                                         false, "if", false, "Invert the if");
+        ensure_equals("braces", made,
+                      head + "        if (n != 1)\n        {\n            llOwnerSay(\"many\");\n        }\n        else\n        {\n"
+                             "            llOwnerSay(\"one\");\n        }\n" + tail);
+        made = actedOn(head + "        if (!n) llOwnerSay(\"none\"); else llOwnerSay(\"some\");\n" + tail, false, "if", false, "Invert the if");
+        ensure_equals("a not taken off", made, head + "        if (n) llOwnerSay(\"some\"); else llOwnerSay(\"none\");\n" + tail);
+        made = actedOn(head + "        if (n > 2) llOwnerSay(\"many\"); else llOwnerSay(\"few\");\n" + tail, false, "if", false, "Invert the if");
+        ensure_equals("an order under a not", made, head + "        if (!(n > 2)) llOwnerSay(\"few\"); else llOwnerSay(\"many\");\n" + tail);
+        const std::string chain = head + "        if (n == 1) llOwnerSay(\"one\"); else if (n == 2) llOwnerSay(\"two\");\n" + tail;
+        ensure("not with an else if", actedOn(chain, false, "if", false, "Invert the if").rfind("offered", 0) == 0);
+        const std::string lone = head + "        if (n == 1) llOwnerSay(\"one\");\n" + tail;
+        ensure("not without an else", actedOn(lone, false, "if", false, "Invert the if").rfind("offered", 0) == 0);
+    }
+
+    template<> template<>
+    void object::test<18>()
+    {
+        set_test_name("a handler is offered for an event the LSL state asks for and does not hear, laid out as its others are");
+        ensure("builtins: " + error, lslLoaded);
+        const std::string script = "default\n{\n    state_entry()\n    {\n        llListen(0, \"\", NULL_KEY, \"\");\n        llSetTimerEvent(1.0);\n"
+                                   "    }\n}\n";
+        std::string made = actedOn(script, false, "llListen", false, "Add a handler for 'listen'");
+        ensure_equals("before the brace, after a blank line", made,
+                      "default\n{\n    state_entry()\n    {\n        llListen(0, \"\", NULL_KEY, \"\");\n        llSetTimerEvent(1.0);\n    }\n\n"
+                      "    listen(integer Channel, string Name, key ID, string Text)\n    {\n    }\n}\n");
+        ensure("the timer too", actions(script, false, 4, 8, 4, 8).size() == 2);
+        // Heard already: nothing.
+        const std::string heard = "default\n{\n    state_entry() {\n        llSetTimerEvent(1.0);\n    }\n\n    timer() {\n    }\n}\n";
+        ensure("heard: " + titles(actions(heard, false, 3, 8, 3, 8)), actions(heard, false, 3, 8, 3, 8).empty());
+        // The brace where the state's first handler has it.
+        const std::string same = "default\n{\n    state_entry() {\n        llSensorRepeat(\"\", NULL_KEY, AGENT, 10.0, PI, 5.0);\n    }\n}\n";
+        made = actedOn(same, false, "llSensorRepeat", false, "Add a handler for 'sensor'");
+        ensure("on its line: " + made, made.find("\n\n    sensor(integer NumberDetected) {\n    }\n}\n") != std::string::npos);
+    }
+
+    template<> template<>
+    void object::test<19>()
+    {
+        set_test_name("a SLua expression chosen goes into a local, where that runs it as surely as it ran");
+        ensure("definitions: " + error, luauLoaded);
+        std::string made = actedOn("local function f(n: number)\n    print(n * 2 + 1)\nend\nf(1)\n", true, "n * 2", true, "Put it in a local, 'value'");
+        ensure_equals("before the statement", made, "local function f(n: number)\n    local value = n * 2\n    print(value + 1)\nend\nf(1)\n");
+        made = actedOn("local x = 1; print(x + 1)\n", true, "x + 1", true, "Put it in a local, 'value'");
+        ensure_equals("beside", made, "local x = 1; local value = x + 1; print(value)\n");
+        const std::string skipped = "local x = 1\nprint(x > 0 and tostring(x))\n";
+        ensure("not what and may skip", actedOn(skipped, true, "tostring(x)", true, "Put it in a local, 'value'").rfind("offered", 0) == 0);
+        const std::string looped = "local x = 1\nwhile x < 10 do\n    x += 1\nend\n";
+        ensure("not a loop's condition", actedOn(looped, true, "x < 10", true, "Put it in a local, 'value'").rfind("offered", 0) == 0);
+        const std::string elseif = "local x = 1\nif x == 0 then\n    print(0)\nelseif x + 1 == 2 then\n    print(1)\nend\n";
+        ensure("not an elseif's condition", actedOn(elseif, true, "x + 1", true, "Put it in a local, 'value'").rfind("offered", 0) == 0);
+    }
+
+    template<> template<>
+    void object::test<20>()
+    {
+        set_test_name("a SLua if is inverted, a concatenation interpolated, a local given the type it has");
+        ensure("definitions: " + error, luauLoaded);
+        std::string made = actedOn("local x = 1\nif x == 1 then\n    print(\"one\")\nelse\n    print(\"other\")\nend\n", true, "if", false, "Invert the if");
+        ensure_equals("inverted", made, "local x = 1\nif x ~= 1 then\n    print(\"other\")\nelse\n    print(\"one\")\nend\n");
+        made = actedOn("local x = 1\nif not (x > 1) then\n    print(\"few\")\nelse\n    print(\"many\")\nend\n", true, "if", false, "Invert the if");
+        ensure_equals("a not taken off", made, "local x = 1\nif x > 1 then\n    print(\"many\")\nelse\n    print(\"few\")\nend\n");
+        made = actedOn("local x = 1\nprint(\"n = \" .. x .. \"!\")\n", true, "..", false, "Write it as an interpolated string");
+        ensure_equals("interpolated", made, "local x = 1\nprint(`n = {x}!`)\n");
+        made = actedOn("local count = 5\nprint(count)\n", true, "count", false, "Declare it as 'number'");
+        ensure_equals("annotated", made, "local count: number = 5\nprint(count)\n");
+    }
+
+    template<> template<>
+    void object::test<21>()
+    {
+        set_test_name("a handler is offered for an event a SLua script asks for and does not hear, with the parameters the definitions give");
+        ensure("definitions: " + error, luauLoaded);
+        const std::string script = "ll.Listen(0, \"\", ll.GetOwner(), \"\")\n";
+        std::string       made   = actedOn(script, true, "Listen", false, "Add a handler for 'listen'");
+        ensure_equals("at the end", made,
+                      script + "\nLLEvents:on(\"listen\", function(Channel: number, Name: string, ID: uuid, Text: string)\nend)\n");
+        const std::string heard = script + "LLEvents:on(\"listen\", function(channel, name, id, text) end)\n";
+        ensure("heard: " + titles(actions(heard, true, 0, 3, 0, 3)), actedOn(heard, true, "Listen", false, "Add a handler for 'listen'").rfind("offered", 0) == 0);
+    }
+
+    template<> template<>
+    void object::test<22>()
+    {
+        set_test_name("a refactor's name is one the text has nowhere, and one put in at a line's start is mapped to the source line it began as");
+        ensure_equals("free", ALScriptFixes::freshName("local x = 1", "value"), std::string("value"));
+        ensure_equals("taken", ALScriptFixes::freshName("local value = 1 -- value2", "value"), std::string("value3"));
+        ensure_equals("a part is not a word", ALScriptFixes::freshName("local values = 1", "value"), std::string("value"));
+        // A line the preprocessor carries as it stands, a line down for the
+        // directive it drops.
+        ALPreprocessor::Options options;
+        options.fileName = "main.lsl";
+        options.resolve  = [](const ALPreprocessor::Ask&, ALPreprocessor::Include&) { return ALPreprocessor::Found::No; };
+        const std::string                  script = "#define N 2\ndefault\n{\n    state_entry()\n    {\n        llOwnerSay((string)N);\n    }\n}\n";
+        const ALPreprocessor::Result       result = ALPreprocessor::run(script, options);
+        ALScriptProblem                    held;
+        const ALSourceMap::Loc             carried = result.map.toExpanded(0, 5, 8);
+        ensure("carried", carried.found());
+        held.fixes.push_back(ALScriptFixes::titled("ScriptActionExtract", "Put it in a local, '[1]'", { "value" }));
+        held.fixes.back().edits.push_back({ carried.line, 0, carried.line, 0, "        integer value = 1;\n" });
+        ALScriptFixes::mapThrough(result.map, held);
+        ensure_equals("kept", held.fixes.size(), static_cast<size_t>(1));
+        ensure_equals("the source's line", held.fixes.front().edits.front().line, 5);
+        ensure_equals("its start", held.fixes.front().edits.front().column, 0);
     }
 }

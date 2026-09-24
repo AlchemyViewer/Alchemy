@@ -41,6 +41,7 @@
 #include <tailslide/visitor.hh>
 
 #include <algorithm>
+#include <set>
 #include <cstring>
 
 namespace
@@ -219,16 +220,17 @@ namespace
         return span;
     }
 
-    // Everything a node spans. Tailslide's last column is the last
-    // character's, counted from one, which is the column after it
-    // counted from zero.
+    // Everything a node spans. Tailslide's last column is the one after
+    // the last character, counted from one -- the lexer moves it on by
+    // each token's length -- which is the column after it counted from
+    // zero less one.
     ALScriptSpan spanOf(const Tailslide::YYLTYPE& where)
     {
         ALScriptSpan span;
         span.line      = zeroBased(where.first_line);
         span.column    = zeroBased(where.first_column);
         span.endLine   = zeroBased(where.last_line);
-        span.endColumn = std::max(0, where.last_column);
+        span.endColumn = zeroBased(where.last_column);
         return span;
     }
 
@@ -1482,4 +1484,334 @@ std::vector<ALScriptInlayHint> ALLSLService::inlayHints(std::string_view source,
     script->visit(&hints);
     std::stable_sort(hints.out.begin(), hints.out.end());
     return std::move(hints.out);
+}
+
+// --- what could be done here ----------------------------------------------------------
+
+namespace
+{
+    // What a node spans in the text, or nothing where its place is not the
+    // text's.
+    std::string_view textOf(std::string_view source, Tailslide::LSLASTNode* node)
+    {
+        if (!node || node->getLoc()->first_line == 0)
+        {
+            return {};
+        }
+        const ALScriptSpan span = spanOf(*node->getLoc());
+        const size_t       from = offsetOf(source, span.line, span.column);
+        const size_t       to   = offsetOf(source, span.endLine, span.endColumn);
+        return to > from ? source.substr(from, to - from) : std::string_view();
+    }
+
+    bool isStatement(Tailslide::LSLASTNode* node, Tailslide::LSLNodeSubType sub)
+    {
+        return node && node->getNodeType() == Tailslide::NODE_STATEMENT && node->getNodeSubType() == sub;
+    }
+
+    bool isExpression(Tailslide::LSLASTNode* node, Tailslide::LSLNodeSubType sub)
+    {
+        return node && node->getNodeType() == Tailslide::NODE_EXPRESSION && node->getNodeSubType() == sub;
+    }
+
+    bool present(Tailslide::LSLASTNode* node)
+    {
+        return node && node->getNodeType() != Tailslide::NODE_NULL;
+    }
+
+    ALScriptFix refactor(ALScriptFix fix)
+    {
+        fix.kind = ALScriptFix::Kind::Refactor;
+        return fix;
+    }
+
+    void replace(ALScriptFix& fix, const ALScriptSpan& span, std::string text)
+    {
+        fix.edits.push_back({ span.line, span.column, span.endLine, span.endColumn, std::move(text) });
+    }
+
+    // A type as a declaration writes it: `rotation`, where Tailslide says
+    // `quaternion`, which LSL takes but nobody writes.
+    std::string declared(Tailslide::LSLType* type)
+    {
+        return type && type->getIType() == Tailslide::LST_QUATERNION ? std::string("rotation") : typeName(type);
+    }
+
+    // Whether an operation writes to its operand.
+    bool assigns(Tailslide::LSLOperator op)
+    {
+        switch (op)
+        {
+            case Tailslide::OP_ASSIGN:
+            case Tailslide::OP_ADD_ASSIGN:
+            case Tailslide::OP_SUB_ASSIGN:
+            case Tailslide::OP_MUL_ASSIGN:
+            case Tailslide::OP_DIV_ASSIGN:
+            case Tailslide::OP_MOD_ASSIGN:
+            case Tailslide::OP_PRE_INCR:
+            case Tailslide::OP_PRE_DECR:
+            case Tailslide::OP_POST_INCR:
+            case Tailslide::OP_POST_DECR:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    // A condition the other way round: `!x` as `x`, `a == b` as `a != b`,
+    // anything else under a `!`. An order is not turned round, `a < b` as
+    // `a >= b`: a float may be NaN, which is neither.
+    std::string negated(std::string_view source, Tailslide::LSLASTNode* condition)
+    {
+        const std::string text(textOf(source, condition));
+        if (isExpression(condition, Tailslide::NODE_UNARY_EXPRESSION) &&
+            static_cast<Tailslide::LSLExpression*>(condition)->getOperation() == Tailslide::OP_BOOLEAN_NOT)
+        {
+            Tailslide::LSLASTNode* inner = condition->getChild(0);
+            if (isExpression(inner, Tailslide::NODE_PARENTHESIS_EXPRESSION))
+            {
+                inner = inner->getChild(0);
+            }
+            return std::string(textOf(source, inner));
+        }
+        if (isExpression(condition, Tailslide::NODE_BINARY_EXPRESSION))
+        {
+            const Tailslide::LSLOperator op = static_cast<Tailslide::LSLExpression*>(condition)->getOperation();
+            if (op == Tailslide::OP_EQ || op == Tailslide::OP_NEQ)
+            {
+                const ALScriptSpan lhs = spanOf(*condition->getChild(0)->getLoc());
+                const ALScriptSpan rhs = spanOf(*condition->getChild(1)->getLoc());
+                const size_t       from = offsetOf(source, lhs.endLine, lhs.endColumn);
+                const size_t       to   = offsetOf(source, rhs.line, rhs.column);
+                std::string        between(to > from ? source.substr(from, to - from) : std::string_view());
+                const size_t       at = between.find(op == Tailslide::OP_EQ ? "==" : "!=");
+                if (at != std::string::npos)
+                {
+                    between.replace(at, 2, op == Tailslide::OP_EQ ? "!=" : "==");
+                    return std::string(textOf(source, condition->getChild(0))) + between + std::string(textOf(source, condition->getChild(1)));
+                }
+            }
+        }
+        const bool simple = isExpression(condition, Tailslide::NODE_LVALUE_EXPRESSION) || isExpression(condition, Tailslide::NODE_FUNCTION_EXPRESSION) ||
+                            isExpression(condition, Tailslide::NODE_PARENTHESIS_EXPRESSION);
+        return simple ? "!" + text : "!(" + text + ")";
+    }
+
+    // The functions called in a stretch of the tree, by name.
+    void callsIn(Tailslide::LSLASTNode* node, std::set<std::string>& calls)
+    {
+        for (; node; node = node->getNext())
+        {
+            if (isExpression(node, Tailslide::NODE_FUNCTION_EXPRESSION) && node->getChild(0) && node->getChild(0)->getNodeType() == Tailslide::NODE_IDENTIFIER)
+            {
+                calls.insert(static_cast<Tailslide::LSLIdentifier*>(node->getChild(0))->getName());
+            }
+            callsIn(node->getChild(0), calls);
+        }
+    }
+
+    // The leading blanks of the line a zero-based place is on.
+    std::string indentOf(std::string_view source, S32 line)
+    {
+        const size_t     start = offsetOf(source, line, 0);
+        const size_t     end   = std::min(source.find('\n', start), source.size());
+        std::string_view text  = source.substr(start, end - start);
+        return std::string(text.substr(0, std::min(text.find_first_not_of(" \t"), text.size())));
+    }
+}
+
+std::vector<ALScriptFix> ALLSLService::actions(std::string_view source, S32 line, S32 column, S32 endLine, S32 endColumn)
+{
+    AL_SCRIPT_ENGINE_HELD;
+    std::vector<ALScriptFix> out;
+    Tailslide::LSLScript*    script = mImpl->resolve(source);
+    if (!script || !mImpl->parsed)
+    {
+        return out;
+    }
+
+    // A stretch chosen that is one expression, into a local declared just
+    // before the statement it is in, named as nothing in the script is.
+    // Only where that runs it as often as it ran: not out of a loop's
+    // condition, nor a statement an `if` or a loop holds without braces.
+    if (endLine == line && endColumn > column)
+    {
+        S32 from = column, to = endColumn;
+        const size_t           start = offsetOf(source, line, 0);
+        const std::string_view text  = source.substr(start, std::min(offsetOf(source, line, endColumn), source.size()) - start);
+        to                           = std::min<S32>(to, static_cast<S32>(text.size()));
+        while (from < to && isspace(static_cast<unsigned char>(text[from])))
+        {
+            ++from;
+        }
+        while (to > from && isspace(static_cast<unsigned char>(text[to - 1])))
+        {
+            --to;
+        }
+        std::vector<Tailslide::LSLASTNode*> path;
+        holding(script, line + 1, from + 1, path);
+        Tailslide::LSLASTNode* chosen = nullptr;
+        for (auto it = path.rbegin(); it != path.rend() && !chosen; ++it)
+        {
+            const ALScriptSpan span = spanOf(*(*it)->getLoc());
+            if ((*it)->getNodeType() == Tailslide::NODE_EXPRESSION && span.line == line && span.column == from && span.endLine == line && span.endColumn == to)
+            {
+                chosen = *it;
+            }
+        }
+        Tailslide::LSLASTNode* statement = chosen ? chosen->getParent() : nullptr;
+        bool                   certain   = chosen != nullptr;
+        if (chosen && chosen->getParent() && chosen->getParent()->getNodeType() == Tailslide::NODE_EXPRESSION &&
+            assigns(static_cast<Tailslide::LSLExpression*>(chosen->getParent())->getOperation()) && chosen->getParent()->getChild(0) == chosen)
+        {
+            // What is assigned to, which a local would take in its place.
+            certain = false;
+        }
+        while (statement && statement->getNodeType() != Tailslide::NODE_STATEMENT)
+        {
+            statement = statement->getParent();
+        }
+        Tailslide::LSLType* type = chosen ? chosen->getType() : nullptr;
+        if (certain && statement && isStatement(statement->getParent(), Tailslide::NODE_COMPOUND_STATEMENT) && type &&
+            type->getIType() != Tailslide::LST_NULL && type->getIType() != Tailslide::LST_ERROR && !isStatement(statement, Tailslide::NODE_WHILE_STATEMENT) &&
+            !isStatement(statement, Tailslide::NODE_DO_STATEMENT) && !isStatement(statement, Tailslide::NODE_FOR_STATEMENT))
+        {
+            const std::string  name  = ALScriptFixes::freshName(source, "value");
+            const std::string  value(textOf(source, chosen));
+            const ALScriptSpan where = spanOf(*statement->getLoc());
+            const std::string  indent = indentOf(source, where.line);
+            const bool         alone  = static_cast<S32>(indent.size()) == where.column;
+            ALScriptFix        fix = refactor(ALScriptFixes::titled("ScriptActionExtract", "Put it in a local, '[1]'", { name }));
+            // On a line of its own, where the statement starts its line;
+            // else just before it, where another stands ahead of it.
+            if (alone)
+            {
+                replace(fix, { where.line, 0, where.line, 0 }, indent + declared(type) + " " + name + " = " + value + ";\n");
+            }
+            else
+            {
+                replace(fix, { where.line, where.column, where.line, where.column }, declared(type) + " " + name + " = " + value + "; ");
+            }
+            replace(fix, { line, from, line, to }, name);
+            out.push_back(std::move(fix));
+        }
+    }
+
+    std::vector<Tailslide::LSLASTNode*> path;
+    holding(script, line + 1, column + 1, path);
+
+    // An `if` with an `else`, the caret on its first line: the condition
+    // turned round, the branches swapped. Not where the `else` is another
+    // `if`, which would come to stand as the first branch and take the
+    // `else` for its own.
+    for (auto it = path.rbegin(); it != path.rend(); ++it)
+    {
+        Tailslide::LSLASTNode* branch = *it;
+        if (!isStatement(branch, Tailslide::NODE_IF_STATEMENT) || zeroBased(branch->getLoc()->first_line) != line)
+        {
+            continue;
+        }
+        Tailslide::LSLASTNode* condition = branch->getChild(0);
+        Tailslide::LSLASTNode* then      = branch->getChild(1);
+        Tailslide::LSLASTNode* otherwise = branch->getChild(2);
+        while (isExpression(condition, Tailslide::NODE_BOOL_CONVERSION_EXPRESSION))
+        {
+            condition = condition->getChild(0);
+        }
+        if (present(condition) && present(then) && present(otherwise) && !isStatement(otherwise, Tailslide::NODE_IF_STATEMENT) &&
+            !textOf(source, condition).empty() && !textOf(source, then).empty() && !textOf(source, otherwise).empty())
+        {
+            ALScriptFix fix = refactor(ALScriptFixes::titled("ScriptActionInvertIf", "Invert the if", {}));
+            replace(fix, spanOf(*condition->getLoc()), negated(source, condition));
+            replace(fix, spanOf(*then->getLoc()), std::string(textOf(source, otherwise)));
+            replace(fix, spanOf(*otherwise->getLoc()), std::string(textOf(source, then)));
+            out.push_back(std::move(fix));
+        }
+        break;
+    }
+
+    // A handler for each event the state the caret is in asks for and does
+    // not hear, before the state's closing brace, with the parameters the
+    // builtins give the event, laid out as the state's first handler is.
+    Tailslide::LSLASTNode* state = nullptr;
+    for (Tailslide::LSLASTNode* node : path)
+    {
+        if (node->getNodeType() == Tailslide::NODE_STATE)
+        {
+            state = node;
+        }
+    }
+    Tailslide::LSLSymbolTable* builtins = mImpl->parser->context.builtins;
+    if (state && builtins)
+    {
+        Tailslide::LSLASTNode* handlers = static_cast<Tailslide::LSLState*>(state)->getEventHandlers();
+        std::set<std::string>  heard;
+        std::set<std::string>  calls;
+        Tailslide::LSLASTNode* first = nullptr;
+        for (Tailslide::LSLASTNode* handler = handlers ? handlers->getChild(0) : nullptr; handler; handler = handler->getNext())
+        {
+            if (handler->getNodeType() != Tailslide::NODE_EVENT_HANDLER || !handler->getChild(0))
+            {
+                continue;
+            }
+            first = first ? first : handler;
+            heard.insert(static_cast<Tailslide::LSLIdentifier*>(handler->getChild(0))->getName());
+            callsIn(handler->getChild(2), calls);
+        }
+        const ALScriptSpan whole  = spanOf(*state->getLoc());
+        const S32          close  = whole.endColumn - 1;
+        const size_t       brace  = offsetOf(source, whole.endLine, close);
+        std::string        indent = first ? indentOf(source, zeroBased(first->getLoc()->first_line)) : std::string();
+        if (indent.empty())
+        {
+            indent = "    ";
+        }
+        // `name() {` where the first handler opens its body on its own line.
+        bool same_line = false;
+        if (first)
+        {
+            const std::string_view opened = textOf(source, first);
+            same_line                     = opened.substr(0, opened.find('\n')).find('{') != std::string_view::npos;
+        }
+        std::set<std::string> offered;
+        for (const std::string& call : calls)
+        {
+            const char* event = ALScriptFixes::eventAnswering(call);
+            if (!event || heard.count(event) || !offered.insert(event).second || brace >= source.size() || source[brace] != '}')
+            {
+                continue;
+            }
+            Tailslide::LSLSymbol* symbol = builtins->lookup(event, Tailslide::SYM_EVENT);
+            if (!symbol)
+            {
+                continue;
+            }
+            std::string parameters;
+            if (Tailslide::LSLParamList* params = symbol->getFunctionDecl())
+            {
+                for (Tailslide::LSLASTNode* node = params->getChild(0); node; node = node->getNext())
+                {
+                    if (node->getNodeType() == Tailslide::NODE_IDENTIFIER)
+                    {
+                        auto* identifier = static_cast<Tailslide::LSLIdentifier*>(node);
+                        parameters += (parameters.empty() ? "" : ", ") + declared(identifier->getType()) + " " + identifier->getName();
+                    }
+                }
+            }
+            const std::string handler = indent + event + "(" + parameters + ")" + (same_line ? " {\n" : "\n" + indent + "{\n") + indent + "}\n";
+            ALScriptFix       fix     = refactor(ALScriptFixes::titled("ScriptActionHandler", "Add a handler for '[1]'", { event }));
+            // After a blank line, where the brace stands on a line of its
+            // own; else on lines of their own ahead of it.
+            if (static_cast<S32>(indentOf(source, whole.endLine).size()) == close)
+            {
+                replace(fix, { whole.endLine, 0, whole.endLine, 0 }, (first ? "\n" : "") + handler);
+            }
+            else
+            {
+                replace(fix, { whole.endLine, close, whole.endLine, close }, "\n" + handler);
+            }
+            out.push_back(std::move(fix));
+        }
+    }
+    return out;
 }

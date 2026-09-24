@@ -38,6 +38,16 @@
 // a test may apply a fix and check the text again.
 namespace ALScriptFixes
 {
+    // A fix's words, keyed as a problem's are: the English is what a skin
+    // without the key shows, and what the tests read. What the services
+    // title their own with.
+    ALScriptFix titled(const char* key, const char* english, std::vector<std::string> args);
+
+    // The event whose handler hears the answer to what a call asks for --
+    // llListen's listen, llRequestPermissions' run_time_permissions -- by
+    // the function's LSL name, or nothing.
+    const char* eventAnswering(std::string_view function);
+
     // Each problem given the fixes its words and its place make plain --
     // a missing `;` put in, the name the analyzer suggests put in place of
     // the one it could not find, a deprecated call's replacement where the
@@ -77,6 +87,11 @@ namespace ALScriptFixes
     // in the script's own text as the map copied it -- not in an include,
     // nor in what a macro made.
     void mapThrough(const ALSourceMap& map, ALScriptProblem& problem);
+
+    // A name for something a refactor makes in `text`: `base`, else
+    // `base2`, `base3` and on -- one that stands nowhere in it as a word,
+    // so that it can neither be taken already nor hide what is.
+    std::string freshName(std::string_view text, std::string_view base);
 
     // `text` with a fix's edits made, or nothing where two of them overlap
     // or one lies outside the text.

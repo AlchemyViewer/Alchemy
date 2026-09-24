@@ -52,7 +52,10 @@ struct ALScriptFix
         // A change to what the script says.
         Fix,
         // A comment that says the problem is known and wanted.
-        Suppress
+        Suppress,
+        // A change no problem asks for, offered at the caret: a stretch
+        // into a local, an `if` inverted.
+        Refactor
     };
     Kind kind = Kind::Fix;
     // What it does, in words: the English, and a key and the words it was

@@ -109,6 +109,21 @@ ALSourceMap ALSourceMap::composed(const ALSourceMap& inner) const
     return out;
 }
 
+bool ALSourceMap::lineStart(S32 line, Loc& at) const
+{
+    if (line < 0 || line >= S32(mLineStart.size()) || mLineStart[line] >= mSegments.size())
+    {
+        return false;
+    }
+    const Segment& first = mSegments[mLineStart[line]];
+    if (first.outLine != line || !first.verbatim || first.column != first.outColumn)
+    {
+        return false;
+    }
+    at = Loc{ first.file, first.line, 0 };
+    return true;
+}
+
 ALSourceMap::Loc ALSourceMap::toSource(S32 line, S32 column) const
 {
     Loc loc;

@@ -34,16 +34,7 @@
 
 namespace
 {
-    // A fix's words, keyed as a problem's are: the English is what a skin
-    // without the key shows, and what the tests read.
-    ALScriptFix titled(const char* key, const char* english, std::vector<std::string> args)
-    {
-        ALScriptFix fix;
-        fix.key   = key;
-        fix.title = ALScriptProblem::fill(english, args);
-        fix.args  = std::move(args);
-        return fix;
-    }
+    using ALScriptFixes::titled;
 
     // The text's lines, each without its break, and where each begins.
     class Lines
@@ -729,6 +720,51 @@ namespace
 
 namespace ALScriptFixes
 {
+    ALScriptFix titled(const char* key, const char* english, std::vector<std::string> args)
+    {
+        ALScriptFix fix;
+        fix.key   = key;
+        fix.title = ALScriptProblem::fill(english, args);
+        fix.args  = std::move(args);
+        return fix;
+    }
+
+    const char* eventAnswering(std::string_view function)
+    {
+        static const std::pair<const char*, const char*> ANSWERS[] = {
+            { "llListen", "listen" },
+            { "llSetTimerEvent", "timer" },
+            { "llSensor", "sensor" },
+            { "llSensorRepeat", "sensor" },
+            { "llRequestPermissions", "run_time_permissions" },
+            { "llRequestExperiencePermissions", "experience_permissions" },
+            { "llHTTPRequest", "http_response" },
+            { "llRequestURL", "http_request" },
+            { "llRequestSecureURL", "http_request" },
+            { "llRequestAgentData", "dataserver" },
+            { "llRequestInventoryData", "dataserver" },
+            { "llGetNotecardLine", "dataserver" },
+            { "llGetNumberOfNotecardLines", "dataserver" },
+            { "llRequestDisplayName", "dataserver" },
+            { "llRequestUsername", "dataserver" },
+            { "llRequestSimulatorData", "dataserver" },
+            { "llTakeControls", "control" },
+            { "llTarget", "at_target" },
+            { "llRotTarget", "at_rot_target" },
+            { "llGetNextEmail", "email" },
+            { "llTransferLindenDollars", "transaction_result" },
+            { "llCreateLink", "changed" },
+        };
+        for (const auto& [call, event] : ANSWERS)
+        {
+            if (function == call)
+            {
+                return event;
+            }
+        }
+        return nullptr;
+    }
+
     size_t editDistance(std::string_view a, std::string_view b)
     {
         std::vector<size_t> row(b.size() + 1);
@@ -924,6 +960,18 @@ namespace ALScriptFixes
                     edit.endColumn = end.column;
                     continue;
                 }
+                // Something put in at a line's start -- a local ahead of
+                // the statement it comes out of -- at the start of the
+                // source line the line began as.
+                if (edit.line == edit.endLine && edit.column == 0 && edit.endColumn == 0)
+                {
+                    ALSourceMap::Loc at;
+                    if (map.lineStart(edit.line, at) && at.file == 0)
+                    {
+                        edit.line = edit.endLine = at.line;
+                        continue;
+                    }
+                }
                 // A whole line or lines taken out: the lines of the source
                 // they came from, where the first and the last are the
                 // script's own, copied.
@@ -1048,6 +1096,16 @@ namespace ALScriptFixes
                 attachOnLine(problem, lines.line(problem.line), lines, lua);
             }
         }
+    }
+
+    std::string freshName(std::string_view text, std::string_view base)
+    {
+        std::string name(base);
+        for (int n = 2; findWord(text, name, 0, static_cast<S32>(text.size()), false) >= 0; ++n)
+        {
+            name = std::string(base) + std::to_string(n);
+        }
+        return name;
     }
 
     std::optional<std::string> apply(std::string_view text, const ALScriptFix& fix)

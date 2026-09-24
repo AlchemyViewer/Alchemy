@@ -98,6 +98,13 @@ public:
     // parameter name, where the argument is not that name already, and
     // the type a `local` was given without saying.
     std::vector<ALScriptInlayHint> inlayHints(std::string_view source, bool parameters, bool types);
+    // What could be done at a place -- the caret, or the stretch from it to
+    // (endLine, endColumn) where one is chosen -- that no problem asks for,
+    // each as the edits that make it: the type a local was given written
+    // in; the stretch into a local of its own; a concatenation as an
+    // interpolated string; an `if` with an `else` the other way round; a
+    // handler for an event the script asks for and does not hear.
+    std::vector<ALScriptFix> actions(std::string_view source, S32 line, S32 column, S32 endLine, S32 endColumn);
 
     // How many times a script has been type checked: a question asked
     // again of the same text, with the same configuration, is answered

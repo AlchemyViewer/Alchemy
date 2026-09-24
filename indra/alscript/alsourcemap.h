@@ -97,10 +97,16 @@ public:
     // its line, and a line that made no output goes nowhere.
     Loc toExpanded(S32 file, S32 line, S32 column) const;
     // The source stretch an output stretch on one line was copied from,
-    // where a single segment copied all of it from its file as it stands:
-    // what an edit to the output may be made to the source as. False
-    // where any of it is a macro's making, or it runs over segments.
+    // where the segments it runs over copied all of it from one line of
+    // one file as it stands: what an edit to the output may be made to the
+    // source as. False where any of it is a macro's making, or its pieces
+    // came from different places.
     bool verbatimSpan(S32 line, S32 column, S32 endColumn, Loc& begin, Loc& end) const;
+    // Where an output line begins in the source, where it begins as the
+    // source's line does -- its first segment copied from the same column
+    // it stands at, so that the blanks before it are the source's own: what
+    // an insertion at the line's start may be made to the source as.
+    bool lineStart(S32 line, Loc& at) const;
 
     // This map over another: this one's origins are positions in the text
     // the other maps, so the result maps this one's output straight to
