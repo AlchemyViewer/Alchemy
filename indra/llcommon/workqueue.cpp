@@ -319,6 +319,20 @@ bool LL::WorkQueue::tryPost(const Work& callable)
     }
 }
 
+bool LL::WorkQueue::tryPostFor(const std::chrono::milliseconds& timeout, const Work& callable)
+{
+    try
+    {
+        return mQueue.tryPushFor(timeout, Work(callable));
+    }
+    catch (std::bad_alloc&)
+    {
+        LLError::LLUserWarningMsg::showOutOfMemory();
+        LL_ERRS("LLCoros") << "Bad memory allocation in WorkQueue::tryPostFor" << LL_ENDL;
+        return false;
+    }
+}
+
 LL::WorkQueue::Work LL::WorkQueue::pop_()
 {
     return mQueue.pop();

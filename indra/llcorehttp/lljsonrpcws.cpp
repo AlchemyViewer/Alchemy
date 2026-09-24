@@ -31,44 +31,87 @@
 #include "llsdjson.h"
 #include "lldate.h"
 #include "llcoros.h"
-#include "llmainthreadtask.h"
 #include "lleventtimer.h"
 #include "lltimer.h"
+#include "workqueue.h"
+
+// static
+bool LLJSONRPCConnection::postToMainThread(const std::function<void()>& work)
+{
+    auto main_queue = LL::WorkQueue::getInstance("mainloop");
+    return main_queue && main_queue->tryPostFor(std::chrono::milliseconds(100), work);
+}
 
 //========================================================================
 // LLJSONRPCConnection Implementation
 //========================================================================
 
+// Sweeps a connection's call deadlines for as long as it is open, and ends
+// itself once it is not. It is made, ticked and ended on the main thread,
+// as every timer is ticked: one deleted from the server's thread could be
+// deleted as it ticks.
+struct LLJSONRPCConnection::SweepTimer : public LLEventTimer
+{
+    explicit SweepTimer(const std::weak_ptr<LLJSONRPCConnection>& connection) :
+        LLEventTimer(TIMEOUT_SWEEP_INTERVAL),
+        mConnection(connection)
+    {
+    }
+
+    bool tick() override
+    {
+        auto connection = mConnection.lock();
+        if (!connection || connection->isClosed())
+        {
+            return true;
+        }
+        connection->sweepTimeouts();
+        return false;
+    }
+
+    std::weak_ptr<LLJSONRPCConnection> mConnection;
+};
+
 void LLJSONRPCConnection::onOpen()
 {
     LL_INFOS("JSONRPC") << "JSON-RPC connection opened" << LL_ENDL;
 
-    // Start the recurring timeout sweep timer on the main thread. The timer
-    // is canceled in onClose() before the connection can be destroyed, so
-    // capturing `this` is safe. Keep a weak_ptr so we can safely test
-    // whether the timer instance still exists at cancellation time.
-    LLEventTimer* timer = LLEventTimer::run_every(TIMEOUT_SWEEP_INTERVAL,
-        [this]() { sweepTimeouts(); });
-    mTimeoutTimer = timer->getWeak();
+    std::weak_ptr<LLJSONRPCConnection> weak = std::static_pointer_cast<LLJSONRPCConnection>(getSelfPtr());
+    const bool posted = postToMainThread(
+        [weak]()
+        {
+            auto self = weak.lock();
+            if (self && !self->isClosed())
+            {
+                // The timer's own: it deletes itself when it is done.
+                new SweepTimer(weak);
+            }
+        });
+    if (!posted)
+    {
+        // With nothing to time its calls out, nothing it is asked would
+        // ever be given up on.
+        LL_WARNS("JSONRPC") << "Main loop not taking work; closing the new connection" << LL_ENDL;
+        closeConnection(1013, "Try again later");
+    }
+}
+
+void LLJSONRPCConnection::setAuthenticated(bool authenticated)
+{
+    mAuthenticated = authenticated;
+    setMessageLimit(authenticated ? 0 : UNAUTHENTICATED_MESSAGE_BYTES);
 }
 
 void LLJSONRPCConnection::onClose()
 {
-    // Cancel the sweep timer if it is still alive. LLEventTimer's instance
-    // tracker keeps a shared_ptr with a no-op deleter, so raw `delete` is
-    // the documented cancellation idiom (see lleventtimer.h).
-    if (auto timer = mTimeoutTimer.lock())
-    {
-        delete timer.get();
-    }
-    mTimeoutTimer.reset();
-
     // Move the pending-request map out under the lock so we can invoke the
     // callbacks without holding it (callbacks may themselves call into this
-    // connection).
+    // connection). Closed under the same lock call() takes, so that no call
+    // made from here on is left waiting for an answer nobody will give.
     std::unordered_map<std::string, ResponseCallback> pending;
     {
         LLMutexLock lock(&mMutex);
+        mClosed = true;
         pending.swap(mPendingRequests);
         // Deadlines correspond to entries in mPendingRequests; drop them.
         std::priority_queue<PendingDeadline> empty;
@@ -93,7 +136,9 @@ void LLJSONRPCConnection::onClose()
 void LLJSONRPCConnection::onMessage(const std::string& message)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_WEBSOCKET;
-    LL_DEBUGS("JSONRPC") << "Received JSON-RPC message: " << message << LL_ENDL;
+    // Its size, not what it says: a handshake's answer is a secret, and a
+    // save is the user's script.
+    LL_DEBUGS("JSONRPC") << "Received JSON-RPC message of " << message.size() << " bytes" << LL_ENDL;
 
     try
     {
@@ -135,26 +180,31 @@ void LLJSONRPCConnection::processMessage(const LLSD& message_obj)
     LL_PROFILE_ZONE_SCOPED_CATEGORY_WEBSOCKET;
     try
     {
-        // Determine if this is a request, notification, or response
+        // Determine if this is a request, notification, or response. One
+        // that is none of them is answered as an invalid request, with its
+        // id where it has one: nobody can tell it was meant as a
+        // notification.
+        std::string reason;
         if (message_obj.has("method"))
         {
-            // This is a request or notification
-            if (validateMessage(message_obj, true))
+            if (!validateMessage(message_obj, true, &reason))
             {
-                processRequest(message_obj);
+                throw InvalidRequest(reason);
             }
+            processRequest(message_obj);
         }
         else if (message_obj.has("result") || message_obj.has("error"))
         {
-            // This is a response
-            if (validateMessage(message_obj, false))
+            // A response that is not one is dropped: answering an answer
+            // would start an exchange nobody asked for.
+            if (validateMessage(message_obj, false, &reason))
             {
                 processResponse(message_obj);
             }
         }
         else
         {
-            LL_WARNS("JSONRPC") << "Message must contain 'method' or 'result'/'error'" << LL_ENDL;
+            throw InvalidRequest("A message must have a method, a result or an error");
         }
     }
     catch (const RPCError& e)
@@ -174,6 +224,18 @@ void LLJSONRPCConnection::processRequest(const LLSD& request)
 
     LL_DEBUGS("JSONRPC") << "Processing " << (is_notification ? "notification" : "request")
                          << " for method: " << method << LL_ENDL;
+
+    // Nothing for a peer that has not proven itself, and nothing said of
+    // which methods there are.
+    if (!mAuthenticated)
+    {
+        LL_DEBUGS("JSONRPC") << "Refused " << method << " from a peer not authenticated" << LL_ENDL;
+        if (!is_notification)
+        {
+            sendError(id, UnauthorizedError());
+        }
+        return;
+    }
 
     // Resolve the handler under the mutex, then invoke it unlocked.
     MethodHandler handler;
@@ -201,9 +263,10 @@ void LLJSONRPCConnection::processRequest(const LLSD& request)
         // Async handler — launched as a coroutine, response sent by the lambda.
         if (is_notification)
         {
+            // Not run, and -- a notification -- not answered either.
             LL_WARNS("JSONRPC") << "Method " << method
-                                << " called as notification; rejecting request" << LL_ENDL;
-            throw InvalidRequest("Method " + method + " cannot be called as a notification");
+                                << " called as a notification; it needs an id" << LL_ENDL;
+            return;
         }
         ptr_t conn = std::static_pointer_cast<LLJSONRPCConnection>(getSelfPtr());
         if (!conn)
@@ -213,9 +276,20 @@ void LLJSONRPCConnection::processRequest(const LLSD& request)
             throw InternalError("Connection expired before method " + method
                                 + " could be launched");
         }
-        LLMainThreadTask::dispatch(
-            [handler, method, id, params, conn]()
+        // The request goes to the main thread as its text, and is read
+        // there: an LLSD's parts are shared between copies and counted
+        // without a lock, so no part of one read here may be used there.
+        const bool posted = postToMainThread(
+            [handler, conn, text = LlsdToJson(request)]()
             {
+                LLSD request;
+                if (!LlsdFromJsonString(text, request))
+                {
+                    return;
+                }
+                const std::string method = request["method"].asString();
+                const LLSD        id     = request["id"];
+                const LLSD        params = request.has("params") ? request["params"] : LLSD();
                 LLCoros::instance().launch(
                     "JSONRPC::" + method,
                     [handler, method, id, params, conn]()
@@ -259,6 +333,10 @@ void LLJSONRPCConnection::processRequest(const LLSD& request)
                         }
                     });
             });
+        if (!posted)
+        {
+            throw ServiceUnavailableError("Not taking requests");
+        }
         return;
     }
 
@@ -338,13 +416,22 @@ void LLJSONRPCConnection::processResponse(const LLSD& response)
     }
 }
 
-bool LLJSONRPCConnection::validateMessage(const LLSD& message, bool is_request)
+bool LLJSONRPCConnection::validateMessage(const LLSD& message, bool is_request, std::string* reason) const
 {
+    auto invalid = [reason](const char* why)
+    {
+        LL_WARNS("JSONRPC") << why << LL_ENDL;
+        if (reason)
+        {
+            *reason = why;
+        }
+        return false;
+    };
+
     // Check JSON-RPC version
     if (!message.has("jsonrpc") || message["jsonrpc"].asString() != "2.0")
     {
-        LL_WARNS("JSONRPC") << "Missing or invalid jsonrpc version" << LL_ENDL;
-        return false;
+        return invalid("Missing or invalid jsonrpc version");
     }
 
     if (is_request)
@@ -352,14 +439,12 @@ bool LLJSONRPCConnection::validateMessage(const LLSD& message, bool is_request)
         // Request/notification validation
         if (!message.has("method"))
         {
-            LL_WARNS("JSONRPC") << "Missing method field" << LL_ENDL;
-            return false;
+            return invalid("Missing method field");
         }
 
         if (!message["method"].isString())
         {
-            LL_WARNS("JSONRPC") << "Method must be a string" << LL_ENDL;
-            return false;
+            return invalid("Method must be a string");
         }
 
         // Params are optional but must be array or object if present
@@ -367,8 +452,7 @@ bool LLJSONRPCConnection::validateMessage(const LLSD& message, bool is_request)
         {
             if (!message["params"].isArray() && !message["params"].isMap())
             {
-                LL_WARNS("JSONRPC") << "Params must be array or object" << LL_ENDL;
-                return false;
+                return invalid("Params must be array or object");
             }
         }
     }
@@ -377,8 +461,7 @@ bool LLJSONRPCConnection::validateMessage(const LLSD& message, bool is_request)
         // Response validation
         if (!message.has("id"))
         {
-            LL_WARNS("JSONRPC") << "Response missing id field" << LL_ENDL;
-            return false;
+            return invalid("Response missing id field");
         }
 
         // Must have either result or error, but not both
@@ -387,14 +470,12 @@ bool LLJSONRPCConnection::validateMessage(const LLSD& message, bool is_request)
 
         if (!has_result && !has_error)
         {
-            LL_WARNS("JSONRPC") << "Response must have result or error" << LL_ENDL;
-            return false;
+            return invalid("Response must have result or error");
         }
 
         if (has_result && has_error)
         {
-            LL_WARNS("JSONRPC") << "Response cannot have both result and error" << LL_ENDL;
-            return false;
+            return invalid("Response cannot have both result and error");
         }
 
         // Error must be an object with code and message
@@ -403,13 +484,11 @@ bool LLJSONRPCConnection::validateMessage(const LLSD& message, bool is_request)
             LLSD error = message["error"];
             if (!error.isMap())
             {
-                LL_WARNS("JSONRPC") << "Error must be an object" << LL_ENDL;
-                return false;
+                return invalid("Error must be an object");
             }
             if (!error.has("code") || !error.has("message"))
             {
-                LL_WARNS("JSONRPC") << "Error must have code and message" << LL_ENDL;
-                return false;
+                return invalid("Error must have code and message");
             }
         }
     }
@@ -440,8 +519,7 @@ void LLJSONRPCConnection::sweepTimeouts()
 
     for (auto& [id, callback] : expired)
     {
-        LL_WARNS("JSONRPC") << "Request " << id << " timed out after "
-                            << REQUEST_TIMEOUT_SECONDS << " seconds" << LL_ENDL;
+        LL_WARNS("JSONRPC") << "Request " << id << " timed out" << LL_ENDL;
         if (callback)
         {
             LLSD error;
@@ -560,7 +638,7 @@ LLSD LLJSONRPCConnection::makeEnvelope(const LLSD& id,
     return env;
 }
 
-LLSD LLJSONRPCConnection::call(const std::string& method, const LLSD& params, ResponseCallback callback)
+LLSD LLJSONRPCConnection::call(const std::string& method, const LLSD& params, ResponseCallback callback, F64 timeout)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_WEBSOCKET;
     LLSD id = generateId();
@@ -572,8 +650,14 @@ LLSD LLJSONRPCConnection::call(const std::string& method, const LLSD& params, Re
     if (callback)
     {
         LLMutexLock lock(&mMutex);
+        // Everything waiting on a closed connection has been told it
+        // closed; a call made now would wait for good.
+        if (mClosed)
+        {
+            return LLSD();
+        }
         mPendingRequests[id_str] = std::move(callback);
-        mPendingDeadlines.push({ LLTimer::getTotalSeconds() + REQUEST_TIMEOUT_SECONDS, id_str });
+        mPendingDeadlines.push({ LLTimer::getTotalSeconds() + timeout, id_str });
     }
 
     // Send the request

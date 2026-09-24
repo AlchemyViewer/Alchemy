@@ -93,7 +93,6 @@ al_import(ll::slua         PACKAGE unofficial-slua CONFIG TARGETS unofficial::sl
 al_import(ll::tailslide    PACKAGE unofficial-tailslide CONFIG TARGETS unofficial::tailslide::libtailslide)
 al_import(ll::tinyexr      PACKAGE tinyexr         CONFIG TARGETS unofficial::tinyexr::tinyexr)
 al_import(ll::vorbis       PACKAGE Vorbis          CONFIG TARGETS Vorbis::vorbisfile Vorbis::vorbisenc Vorbis::vorbis)
-al_import(ll::websocketpp  PACKAGE websocketpp     CONFIG TARGETS websocketpp::websocketpp)
 al_import(ll::xxhash       PACKAGE xxHash          CONFIG TARGETS xxHash::xxhash)
 
 # Header-only ports, and the two libraries kept in the tree.

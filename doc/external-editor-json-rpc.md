@@ -65,9 +65,26 @@ This document describes all the message interfaces defined for WebSocket communi
 
 1. **Connection Establishment:**
 
+   - The viewer listens on 127.0.0.1 only: a client on another machine could never read the
+     challenge's file
+   - The viewer refuses a WebSocket upgrade request that carries an `Origin` header (HTTP 403):
+     browsers send one with every socket a page opens, and a program connecting need not
+   - The viewer pings a connection that has been quiet for 150 seconds, and closes one from which
+     nothing, not even the ping's answer, has come for 300. WebSocket libraries answer pings
+     themselves; the extension's `system.ping` every 30 seconds keeps the connection from going quiet
+   - A message may be at most 16 MB once the connection has authenticated, and 64 KB before; a
+     larger one closes the connection (1009, Message too big)
+   - A client that stops reading is dropped once 32 MB of messages wait unsent to it, and a close
+     the viewer starts drops the connection if it has not completed within 5 seconds
+   - A few connections at a time may be waiting to authenticate; one more is closed (1013, Try
+     Again Later) before it is sent a handshake. The viewer takes 32 connections at most, and
+     closes any more unanswered
    - Viewer sends `session.handshake` call with `SessionHandshake` data
-   - Extension responds with `SessionHandshakeResponse`
-   - Viewer confirms with `session.ok` notification
+   - Extension responds with `SessionHandshakeResponse`, answering the challenge
+   - Viewer confirms with `session.ok` notification, which says who is logged in
+   - Until `session.ok`, every request the extension makes is refused with `-32002`
+     (Authentication required) and the viewer sends it no notifications. A wrong challenge
+     response, an error in place of one, or no response within 30 seconds closes the connection.
 
 2. **Language Information Exchange:**
 
@@ -265,6 +282,12 @@ transport defines the following; `-32001` and `-32003` are the ones handlers com
 | `-32006` | Message exceeds maximum size |
 | `-32007` | Session expired or invalid |
 
+**Malformed messages.** A message that is not a valid request -- no `jsonrpc: "2.0"`, a `method`
+that is not a string, `params` that are neither an array nor an object, or neither a `method`
+nor a `result` or `error` -- is answered `-32600` with its `id`, or `null` where it has none. A
+response that is not valid is dropped unanswered. A method that must be called with an `id`,
+called as a notification, is neither run nor answered.
+
 **Message format.** Standard errors prefix the handler's detail text with a fixed label, so
 `error.message` reads `"Invalid params: <detail>"`, `"Internal error: <detail>"`,
 `"Method not found: <method>"`, and so on. Server-specific errors carry the detail text alone
@@ -289,9 +312,7 @@ interface SessionHandshake {
   protocol_version: "1.0";
   viewer_name: string;
   viewer_version: string;
-  agent_id: string;
-  agent_name: string;
-  challenge?: string;
+  challenge: string;
   languages: string[];
   syntax_id: string;
   features: { [feature: string]: boolean };
@@ -304,9 +325,7 @@ interface SessionHandshake {
 - `protocol_version`: Fixed version "1.0" for the communication protocol
 - `viewer_name`: Name of the Second Life viewer application
 - `viewer_version`: Version string of the viewer
-- `agent_id`: Unique identifier for the user/agent
-- `agent_name`: Human-readable name of the agent
-- `challenge` (optional): Path to a temporary file on the local filesystem containing a UUID. The client must read this file and return the UUID as `challenge_response` to authenticate the connection.
+- `challenge`: Path to a temporary file on the local filesystem containing a UUID, and nothing else. The client must read this file and return its contents as `challenge_response` to authenticate the connection. The file is named at random, readable only by the user running the viewer, and deleted once the handshake is answered or abandoned, so only a client running as that user can answer.
 - `languages`: Array of supported scripting languages (e.g., `["lsl", "luau"]`)
 - `syntax_id`: Current active syntax identifier as a UUID string
 - `features`: Dictionary of feature flags indicating viewer capabilities. Known flags:
@@ -327,7 +346,7 @@ interface SessionHandshakeResponse {
   client_name: string;
   client_version: "1.0";
   protocol_version: string;
-  challenge_response?: string;
+  challenge_response: string;
   languages: string[];
   features: { [feature: string]: boolean };
   script_name?: string;
@@ -340,7 +359,7 @@ interface SessionHandshakeResponse {
 - `client_name`: Name of the client (VS Code extension)
 - `client_version`: Fixed version "1.0" of the client
 - `protocol_version`: Protocol version the client supports
-- `challenge_response` (optional): The UUID read from the temporary file identified by the `challenge` field in the handshake. Must be provided if `challenge` was present, otherwise the connection will be closed.
+- `challenge_response`: The UUID read from the temporary file identified by the `challenge` field in the handshake. Without it, or with any other value, the connection is closed.
 - `languages`: Array of languages supported by the client
 - `features`: Dictionary of features supported by the client. Known flags:
   - `live_sync`: Client supports live script synchronisation
@@ -357,7 +376,21 @@ interface SessionHandshakeResponse {
 
 **JSON-RPC Method:** `session.ok` (notification from viewer)
 
-Confirmation notification sent by the viewer after successful handshake completion. No parameters are sent with this notification.
+Confirmation notification sent by the viewer after successful handshake completion. It says who
+is logged in, which the handshake does not: anything that connects is sent the handshake, and
+only a client that has answered its challenge is sent this.
+
+```typescript
+interface SessionOk {
+  agent_id: string;
+  agent_name: string;
+}
+```
+
+**Fields:**
+
+- `agent_id`: Unique identifier for the user/agent
+- `agent_name`: Human-readable name of the agent
 
 ### SessionDisconnect
 
@@ -1130,9 +1163,10 @@ before doing any work, in this order:
 1. Both `prim_id` and `item_id` are present.
 2. The prim exists.
 3. The object containing the prim is currently published.
-4. The item exists in that prim's inventory.
-5. The item is a script or a notecard.
-6. The caller holds the permissions that method requires.
+4. The prim's region is connected.
+5. The item exists in that prim's inventory.
+6. The item is a script or a notecard.
+7. The caller holds the permissions that method requires.
 
 An object must be published before any of its items can be addressed. Learning an object's id from
 `object.list` is not sufficient on its own — the object must be published, which `object.list`
@@ -1145,6 +1179,7 @@ reports and `object.request` initiates.
 | `prim_id` or `item_id` missing | `-32602` | `Invalid params: prim_id and item_id are required` |
 | Prim not found | `-32602` | `Invalid params: Prim not found` |
 | Object is not published | `-32003` | `Object is not published` |
+| The prim's region is not connected (a disconnect, or mid-crossing) | `-32005` | `The object's region is not connected` |
 | Item not in the prim's inventory | `-32602` | `Invalid params: Item not found in prim inventory` |
 | Item is not a script or notecard | `-32602` | `Invalid params: Item is not a script or notecard` |
 | Required item permission denied | `-32003` | `Insufficient permissions` |
@@ -1315,6 +1350,7 @@ interface ObjectContentGetResponse {
   prim_id: string;
   item_id: string;
   content: string;  // Raw text content (UTF-8). Notecard envelope is unwrapped automatically.
+  embedded_items?: number;  // Notecards only: items embedded in it, which the text cannot carry
 }
 ```
 
@@ -1324,6 +1360,7 @@ interface ObjectContentGetResponse {
 - `item_id`: Inventory item UUID.
 - `success`: `true` on success.
 - `content`: The raw text content of the item. For notecards, the `Linden text version 2` envelope is stripped — only the body text is returned.
+- `embedded_items` (notecards only): How many inventory items -- landmarks, textures, anything dropped into it in the viewer -- the notecard holds beside its text. The text marks where each sits, and cannot carry them: a notecard holding any cannot be saved with `object.content.save`, and a client can say so before its user edits it.
 
 **Permissions.** Scripts require both `PERM_COPY` and `PERM_MODIFY` on the item: the source of a
 no-copy or no-modify script is never exposed. Notecards require no permission at all, so that
@@ -1363,8 +1400,8 @@ interface ObjectContentSaveResponse {
 
 - `prim_id`: UUID of the prim that owns the saved item.
 - `item_id`: UUID of the saved inventory item.
-- `content`: Raw script/notecard source text to store.
-- `vm` (optional): Scripts only compile target. Accepted values are `"mono"`, `"lsl2"`, `"luau"`. When `"luau"` is specified for an LSL script (as opposed to a native Luau script), the viewer automatically selects the correct LSL-on-Luau compile path. If omitted, inferred from item metadata or content analysis.
+- `content`: Raw script/notecard source text to store. Required, and may be empty.
+- `vm` (optional): Scripts only compile target. Accepted values are `"mono"`, `"lsl2"`, `"luau"`; any other is refused with `-32602` before anything is uploaded. When `"luau"` is specified for an LSL script (as opposed to a native Luau script), the viewer automatically selects the correct LSL-on-Luau compile path. If omitted, inferred from item metadata or content analysis.
 - `running` (optional): Scripts only. When provided, the viewer applies that run state after upload and compilation. When omitted, the viewer preserves the script's current run state and does not force it off.
 - `success`: Whether the upload/save operation succeeded.
 - `compiled` (optional): Scripts only. `true` when compilation succeeded, `false` when source saved but compile failed.
@@ -1374,6 +1411,11 @@ interface ObjectContentSaveResponse {
 
 **Permissions.** Requires `PERM_MODIFY` on the item and modify permission on the containing prim.
 See [Common preconditions](#common-preconditions) for the shared checks and errors.
+
+**Notecards with embedded items.** A notecard that holds embedded items is refused with `-32003`
+(`The notecard holds embedded items, which saving its text would lose; edit it in the viewer`):
+its text alone would be saved without them. The viewer fetches the notecard as it stands to
+tell, which adds the fetch's time to the save.
 
 **Timeouts.** Scripts allow 60 seconds for upload and compilation; notecards allow 30 seconds. A
 client's own timeout must exceed the longer of the two. Exceeding either fails the call with
@@ -1417,6 +1459,8 @@ interface ObjectItemCreateResponse extends ObjectInventoryItem {
   `object.publish` and `object.update` notifications).
 - The `name` in the response may differ from the request if the simulator renamed it.
 - An `object.update` notification will also fire for the prim (since inventory changed).
+- The wait ends when the simulator's answer names the item, or the prim's inventory holds a new
+  item of the type asked for. Another change to the prim's inventory meanwhile is waited past.
 
 **Errors:**
 
@@ -1428,7 +1472,10 @@ interface ObjectItemCreateResponse extends ObjectInventoryItem {
 | `name` missing | `-32602` | `Invalid params: name is required` |
 | `vm` missing or invalid for a script | `-32602` | `Invalid params: vm must be 'luau', 'mono', or 'lsl2'` |
 | Object is not published | `-32003` | `Object is not published` |
+| Modify denied on the prim | `-32003` | `No modify permission on prim` |
+| The prim's region is not connected | `-32005` | `The object's region is not connected` |
 | Another `object.item.create` is already in flight for this prim | `-32600` | `Invalid Request: An item.create is already in flight for this prim` |
+| The simulator refused the item | `-32603` | `Internal error: Item creation failed: <reason>` |
 | Simulator did not respond within 30 seconds | `-32001` | `Timed out waiting for item creation` |
 
 ---
@@ -1494,6 +1541,7 @@ shared item validator and accepts scripts only.
 | Script not in the prim's inventory | `-32602` | `Invalid params: Script not found in prim inventory` |
 | Item is not a script | `-32602` | `Invalid params: Item is not a script` |
 | No modify permission on the script | `-32003` | `No modify permission on script` |
+| The prim's region is not connected | `-32005` | `The object's region is not connected` |
 
 ---
 
@@ -1864,8 +1912,8 @@ interface CommandParamInfo {
 
 | Command | Required params | Description |
 |---------|----------------|-------------|
-| `viewer.teleport` | `object_id: string` | Teleport agent to an in-world object. |
-| `viewer.camera.focus` | `object_id: string` | Zoom camera to an in-world object (same behavior as context menu Zoom In). |
+| `viewer.teleport` | `object_id: string` | Teleport agent to an in-world object in a published linkset. Any other object is refused with `-32003`. |
+| `viewer.camera.focus` | `object_id: string` | Zoom camera to an in-world object in a published linkset (same behavior as context menu Zoom In). Any other object is refused with `-32003`. |
 | `viewer.object.save_back_to_contents` | `object_id: string` | Save an in-world object back to source object contents. |
 | `viewer.script.reset_all` | `object_id: string` | Open the viewer's reset queue and reset all scripts in an in-world object. |
 | `viewer.script.recompile_all` | `object_id: string`, `target: "luau" \| "lsl2" \| "mono" \| "auto"` | Open the viewer's compile queue and recompile scripts in an in-world object using the selected target. `luau` automatically selects Luau for native Luau scripts and LSL-Luau for LSL scripts. `auto` uses each script's previously registered VM. |

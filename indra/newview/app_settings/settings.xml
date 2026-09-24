@@ -14574,17 +14574,6 @@
         <key>Value</key>
         <integer>9020</integer>
     </map>
-    <key>ExternalWebsocketSyncLocal</key>
-    <map>
-        <key>Comment</key>
-        <string>Should the JSONRPC server listen only for local connections.</string>
-        <key>Persist</key>
-        <integer>1</integer>
-        <key>Type</key>
-        <string>Boolean</string>
-        <key>Value</key>
-        <integer>1</integer>
-    </map>
     <key>ExternalEditorTightIntegration</key>
     <map>
         <key>Comment</key>

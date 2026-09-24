@@ -190,8 +190,10 @@ public:
     bool cleanupObjectStateForUnpublish(const LLUUID& object_id);
     void clearAllStateWithListenerCleanup();
 
+    // An item.create waiting on a prim, told of every change to its
+    // inventory until the wait clears it: a change may be another item's.
     bool reservePendingItemCreate(const LLUUID& prim_id, std::string&& pump_name);
-    bool consumePendingItemCreate(const LLUUID& prim_id, std::string& pump_name);
+    bool findPendingItemCreate(const LLUUID& prim_id, std::string& pump_name) const;
     void clearPendingItemCreate(const LLUUID& prim_id);
 
     bool consumePendingNewChild(const LLUUID& root_id, const LLUUID& child_id, bool& root_empty_after_remove);
@@ -220,20 +222,25 @@ private:
     using linkset_flush_timer_map_t = std::map<LLUUID, std::weak_ptr<LLEventTimer>>;
     using inventory_request_start_map_t = std::map<LLUUID, F64>;
 
-    // Each item's revision: a count that goes up whenever the item's asset
-    // is another, so that a client holding the item's content knows to
-    // fetch it again without being told the asset itself. Kept as the
+    // Each item's revision: a number that goes up whenever the item's
+    // asset is another, so that a client holding the item's content knows
+    // to fetch it again without being told the asset itself. Kept as the
     // inventory is listed, which is why a const listing may change it.
+    // Drawn from one count for every item, so that an item listed again
+    // after its entry went -- its object unpublished and published again --
+    // has a higher revision than it had before, never a lower one.
     struct Revision
     {
         LLUUID asset;
         U32    number{ 0 };
+        LLUUID root; ///< The object it was last listed in, whose unpublishing lets it go
     };
     using revision_map_t = std::map<LLUUID, Revision>;
 
     published_map_t mPublishedObjects;
     pending_publish_map_t mPendingPublishes;
     mutable revision_map_t mRevisions;
+    mutable U32 mLastRevision{ 0 };
     pending_item_create_map_t mPendingItemCreates;
     new_child_prims_map_t mNewChildPrims;
     linkset_flush_timer_map_t mLinksetFlushTimers;

@@ -67,11 +67,7 @@ target_sources(
         _thread.h
 )
 
-target_link_libraries(
-  llcorehttp
-  PRIVATE al::flags
-  PUBLIC llmath llcommon ll::libcurl ll::openssl ll::websocketpp
-)
+target_link_libraries(llcorehttp PRIVATE al::flags PUBLIC llmath llcommon ll::libcurl ll::openssl)
 # llmessage depends on llcorehttp, yet llcorehttp also depends on llmessage (at least for includes).
 # Cannot/Should not use target_link_libraries here to add llmessage to the dependencies, as that would
 # lead to circular dependencies (or in case of cmake, the first project declaring it's dependencies wins)
@@ -96,6 +92,7 @@ if(AL_BUILD_TESTS)
       tests/test_bufferarray.hpp
       tests/test_bufferstream.hpp
       tests/test_jsonrpcws.hpp
+      tests/test_websocketmgr.hpp
     LIBRARIES llcorehttp llmessage llcommon
     PYTHON
     COMMAND ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_llcorehttp_peer.py"

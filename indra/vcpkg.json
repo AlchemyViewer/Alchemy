@@ -6,6 +6,7 @@
     "alchemy-fonts",
     "apr",
     "boost-asio",
+    "boost-beast",
     "boost-circular-buffer",
     "boost-dll",
     "boost-fiber",
@@ -148,7 +149,6 @@
       "name": "vlc-bin",
       "platform": "windows | osx"
     },
-    "websocketpp",
     "xxhash",
     "zlib"
   ],

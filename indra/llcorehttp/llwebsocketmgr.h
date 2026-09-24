@@ -39,8 +39,6 @@
 #include <thread>
 #include <atomic>
 
-#include <websocketpp/common/connection_hdl.hpp>
-
 struct Server_impl;
 
 /**
@@ -48,7 +46,7 @@ struct Server_impl;
  * @brief Singleton manager for WebSocket connections and servers
  *
  * This class provides a high-level interface for managing WebSocket connections
- * and servers using websocketpp library. It handles both client and server
+ * and servers using Boost.Beast. It handles both client and server
  * connections, provides thread-safe operations, and integrates with the
  * existing Linden Lab infrastructure.
  */
@@ -59,11 +57,13 @@ class LLWebsocketMgr: public LLSingleton<LLWebsocketMgr>
     LOG_CLASS(LLWebsocketMgr);
 
 public:
-    using connection_h = websocketpp::connection_hdl;
+    /// A connection's handle: its session, weakly. Compared by owner, so
+    /// that one whose session has gone still finds its place in a map.
+    using connection_h = std::weak_ptr<void>;
     class WSServer;
 
     enum connection_state_t
-    { // must map to websocketpp::session::state
+    {
         connection_connecting = 0,
         connection_open       = 1,
         connection_closing    = 2,
@@ -80,7 +80,7 @@ public:
         /**
          * @brief Constructor for WSConnection
          * @param server Shared pointer to the parent WSServer
-         * @param handle WebSocket connection handle from websocketpp
+         * @param handle The connection's handle
          */
         WSConnection(const std::shared_ptr<WSServer> &server, const connection_h& handle):
             mConnectionHandle(handle),
@@ -146,6 +146,16 @@ public:
          */
         void closeConnection(U16 code = 1000, const std::string& reason = std::string());
 
+        /**
+         * @brief The largest message taken from the client from here on
+         * @param bytes The limit, or zero for the transport's own (16 MB)
+         *
+         * A larger message closes the connection (1009, Message too big).
+         * Set as the connection opens -- from its constructor or onOpen() --
+         * it holds from the first message.
+         */
+        void setMessageLimit(size_t bytes) const;
+
         bool isConnected() const;
 
     protected:
@@ -161,7 +171,7 @@ public:
      * @class WSServer
      * @brief Base class for WebSocket servers with customizable connection handling
      *
-     * WSServer provides a high-level abstraction over websocketpp servers, handling
+     * WSServer provides a high-level abstraction over Boost.Beast servers, handling
      * threading, connection management, and event dispatching. Derive from this class
      * to create custom WebSocket servers with application-specific logic.
      *
@@ -240,15 +250,34 @@ public:
         void            broadcastMessage(const std::string& message);
         virtual bool    update() { return true; }
 
+        /**
+         * @brief Whether an upgrade request from this origin is let in
+         * @param origin The request's Origin header, empty where it had none
+         *
+         * A browser sends the page's origin with every WebSocket it opens,
+         * and nothing stops a page -- or media on a prim, in the viewer's
+         * own browser -- from opening one to 127.0.0.1. A program, such as
+         * an editor's extension, sends none. By default only those are let
+         * in; a request refused is answered 403 and never opens. Called on
+         * the server's thread.
+         */
+        virtual bool    acceptOrigin(const std::string& origin) const { return origin.empty(); }
+
         connection_state_t  getConnectionState(const connection_h& handle) const;
 
     protected:
         virtual WSConnection::ptr_t connectionFactory(WSServer::ptr_t server, connection_h handle);
 
+        /// Listens, then runs the server's thread. False where the server
+        /// is running already or the port could not be had.
         bool            start();
+        /// Closes every connection as going away, waiting a second at
+        /// most for the closes to finish. Every connection that opened has
+        /// been told it closed by the time this returns.
         void            stop();
 
         bool            sendMessageTo(const connection_h& handle, const std::string& message);
+        void            setMessageLimit(const connection_h& handle, size_t bytes);
 
         /**
          * @brief Close a specific connection gracefully

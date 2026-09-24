@@ -291,7 +291,7 @@ bool LLPublishedObjectMgr::reservePendingItemCreate(const LLUUID& prim_id, std::
     return true;
 }
 
-bool LLPublishedObjectMgr::consumePendingItemCreate(const LLUUID& prim_id, std::string& pump_name)
+bool LLPublishedObjectMgr::findPendingItemCreate(const LLUUID& prim_id, std::string& pump_name) const
 {
     auto it = mPendingItemCreates.find(prim_id);
     if (it == mPendingItemCreates.end())
@@ -300,7 +300,6 @@ bool LLPublishedObjectMgr::consumePendingItemCreate(const LLUUID& prim_id, std::
     }
 
     pump_name = it->second;
-    mPendingItemCreates.erase(it);
     return true;
 }
 
@@ -320,6 +319,7 @@ LLSD LLPublishedObjectMgr::buildPrimInventoryLLSD(LLViewerObject* object) const
 
     LLInventoryObject::object_list_t contents;
     object->getInventoryContents(contents);
+    const LLUUID root_id = object->getRootEdit()->getID();
 
     for (const auto& obj : contents)
     {
@@ -345,9 +345,10 @@ LLSD LLPublishedObjectMgr::buildPrimInventoryLLSD(LLViewerObject* object) const
         Revision& revision = mRevisions[item->getUUID()];
         if (revision.number == 0 || revision.asset != item->getAssetUUID())
         {
-            revision.asset = item->getAssetUUID();
-            ++revision.number;
+            revision.asset  = item->getAssetUUID();
+            revision.number = ++mLastRevision;
         }
+        revision.root = root_id;
         entry["revision"] = static_cast<S32>(revision.number);
 
         if (type == LLAssetType::AT_LSL_TEXT)
@@ -643,7 +644,7 @@ LLPublishedObjectMgr::handlePrimInventoryChangedEvent(
         result.mKind == InventoryChangeKind::CHILD_INVENTORY_UPDATE)
     {
         std::string pending_item_create_pump;
-        if (consumePendingItemCreate(prim_id, pending_item_create_pump))
+        if (findPendingItemCreate(prim_id, pending_item_create_pump))
         {
             result.mHasPendingItemCreate = true;
             result.mPendingItemCreatePump = pending_item_create_pump;
@@ -946,6 +947,10 @@ bool LLPublishedObjectMgr::cleanupObjectStateForUnpublish(const LLUUID& object_i
     cancelLinksetFlushTimer(object_id);
     clearPendingNewChildren(object_id);
 
+    // Its items' revisions go with it; the count they were drawn from
+    // stays, so that they come back higher.
+    std::erase_if(mRevisions, [&object_id](const auto& entry) { return entry.second.root == object_id; });
+
     return was_published;
 }
 
@@ -973,6 +978,7 @@ void LLPublishedObjectMgr::clearAllStateWithListenerCleanup()
         info.mListeners.clear();
     }
     mPublishedObjects.clear();
+    mRevisions.clear();
 }
 
 // --- what the world tells the server, and the publishing it comes to ---

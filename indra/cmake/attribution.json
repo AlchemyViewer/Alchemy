@@ -54,7 +54,6 @@
     "tinygltf": { "license": "MIT" },
     "v-hacd": { "license": "BSD-3-Clause" },
     "vlc-bin": { "holder": "Copyright (C) 1996-2023 VLC authors and VideoLAN" },
-    "websocketpp": { "license": "BSD-3-Clause" },
     "zstd": { "holder": "Copyright (c) Meta Platforms, Inc. and affiliates" }
   },
 

@@ -36,8 +36,6 @@
 #include <queue>
 #include <set>
 
-class LLEventTimer;
-
 /**
  * @class LLJSONRPCConnection
  * @brief JSON-RPC 2.0 WebSocket connection implementation
@@ -50,7 +48,8 @@ class LLEventTimer;
  *
  * - **Requests**: Method calls that expect a response
  * - **Notifications**: Method calls that do not expect a response
- * - **Batch Operations**: Multiple requests/notifications in a single message
+ * - **Batches**: sent with sendBatch(); a batch received is refused, since
+ *   no client sends one
  * - **Error Handling**: Standardized error codes and messages
  * - **ID Correlation**: Request/response correlation using unique identifiers
  *
@@ -259,9 +258,11 @@ public:
     /**
      * @brief Register an async method handler, executed in a coroutine
      *
-     * Unlike registerMethod(), the handler runs inside an LLCoros coroutine
-     * and may use llcoro::suspendUntilEventOn* to wait for async results.
-     * The handler returns its result normally; the framework sends the
+     * Unlike registerMethod(), the handler runs on the main thread, inside
+     * an LLCoros coroutine, and may use llcoro::suspendUntilEventOn* to
+     * wait for async results. The request is handed to the main thread, not
+     * waited on: the server's thread goes on to the next message. The
+     * handler returns its result normally; the framework sends the
      * JSON-RPC response automatically when the coroutine returns.
      *
      * @param method  The method name to register
@@ -286,10 +287,39 @@ public:
      * @param method The method name to call
      * @param params The parameters to pass
      * @param callback Callback for the response (optional)
-     * @return The request ID for correlation
+     * @param timeout Seconds before the callback is told the call timed out
+     * @return The request ID for correlation, undefined where it could not
+     *         be sent (the callback is then never called)
      */
     LLSD call(const std::string& method, const LLSD& params = LLSD(),
-             ResponseCallback callback = nullptr);
+             ResponseCallback callback = nullptr, F64 timeout = REQUEST_TIMEOUT_SECONDS);
+
+    /**
+     * @brief Whether the peer's requests are dispatched
+     *
+     * A connection whose peer must prove itself first -- answer a
+     * challenge -- starts out unauthenticated and refuses every request as
+     * unauthorized, whether or not the method exists, until it is told the
+     * peer has. Answers to its own calls go through either way: that is
+     * how the peer proves itself.
+     */
+    bool isAuthenticated() const { return mAuthenticated.load(); }
+
+    /// Whether the connection has closed: nothing waits on it after that.
+    bool isClosed() const { return mClosed.load(); }
+
+    /**
+     * @brief Hand work to the main thread from the server's
+     * @return false where it could not be: no main loop, the viewer
+     *         shutting down, or its queue full for as long as this waits
+     *
+     * The server's thread must never wait on the main one for long: the
+     * main thread stopping the server waits on the server's thread, and
+     * the two would wait on each other for good. This waits a tenth of a
+     * second at most -- for the queue's lock, which the main thread holds
+     * only a moment, and for room in it -- and the work is not waited on.
+     */
+    static bool postToMainThread(const std::function<void()>& work);
 
     /**
      * @brief Send a JSON-RPC notification (no response expected)
@@ -342,8 +372,9 @@ protected:
      * @brief Validate a JSON-RPC message structure
      * @param message The message to validate
      * @param is_request True if validating a request, false for response
+     * @param reason Where given, what is wrong with it
      */
-    bool validateMessage(const LLSD& message, bool is_request = true);
+    bool validateMessage(const LLSD& message, bool is_request = true, std::string* reason = nullptr) const;
 
     /**
      * @brief Generate the next unique request ID
@@ -361,6 +392,12 @@ protected:
      * - Thread-safe generation across multiple connections
      */
     LLSD generateId();
+
+    /// Until the peer has proven itself, it may send no more than a
+    /// handshake needs: nothing it says is read until then anyway.
+    void setAuthenticated(bool authenticated);
+
+    static constexpr size_t UNAUTHENTICATED_MESSAGE_BYTES = 64 * 1024;
 
 public:
     /**
@@ -400,13 +437,17 @@ private:
         bool operator<(const PendingDeadline& rhs) const { return mDeadline > rhs.mDeadline; }
     };
     std::priority_queue<PendingDeadline> mPendingDeadlines;
-    std::weak_ptr<LLEventTimer>          mTimeoutTimer;
+    struct SweepTimer;
+
+    std::atomic<bool> mAuthenticated{ true };
+    // Set under mMutex, so that call() and onClose() agree on it.
+    std::atomic<bool> mClosed{ false };
 
     static constexpr F64 REQUEST_TIMEOUT_SECONDS = 120.0;
     static constexpr F32 TIMEOUT_SWEEP_INTERVAL  = 1.0f;
 
-    /// Invoked by the sweep timer; fires the timeout callback for any
-    /// request whose deadline has passed. Safe to call from the main thread.
+    /// Invoked by the sweep timer on the main thread; fires the timeout
+    /// callback for any request whose deadline has passed.
     void sweepTimeouts();
 
 public:
@@ -426,7 +467,7 @@ public:
  * ## Server-Wide Method Registration
  *
  * Methods can be registered at the server level and will be available
- * on all connections:
+ * on every connection opened from then on (not those already open):
  *
  * @code
  * auto server = std::make_shared<LLJSONRPCServer>("rpc_server", 8080);
@@ -489,6 +530,9 @@ public:
      * @brief Broadcast a notification to all connected clients
      * @param method The method name
      * @param params The parameters to pass
+     *
+     * Every connection hears it, authenticated or not: a server whose
+     * clients must prove themselves sends to those that have, itself.
      */
     void broadcastNotification(const std::string& method, const LLSD& params = LLSD());
 

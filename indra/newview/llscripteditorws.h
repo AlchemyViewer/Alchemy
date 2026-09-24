@@ -47,7 +47,6 @@
 
 // Forward declarations
 class LLLiveLSLEditor;
-class LLScriptEdContainer;
 class LLScriptEditorWSServer;
 class LLPanel;
 class LLViewerObject;
@@ -71,6 +70,10 @@ public:
     LLScriptEditorWSConnection(const LLWebsocketMgr::WSServer::ptr_t server, const LLWebsocketMgr::connection_h& handle) :
         LLJSONRPCConnection(server, handle)
     {
+        // Anything that can reach the port can connect: nothing it asks
+        // is answered until it has proven it can read the user's files.
+        setAuthenticated(false);
+
         // Reserve id 0 as the "unassigned" sentinel used by EditorSubscription;
         // on wrap, skip past it.
         U32 id;
@@ -95,19 +98,39 @@ public:
 
 private:
     using string_set_t = std::set<std::string>;
+
+    // What the client proves itself with: a secret written to a file only
+    // the user can read, under a name that says nothing of it. The client
+    // is told where the file is and answers with what it says.
+    struct Challenge
+    {
+        LLUUID      mSecret;
+        std::string mFile;
+    };
+    // Empty where no secret could be made or written.
+    static Challenge writeChallenge();
+    // Who the viewer is and what the client must answer, on the main
+    // thread.
+    void sendHandshake();
+
     /**
      * @brief Handle the handshake response from the client
      * @param result The response data from the client containing client information
+     * @param secret What the challenge file said, which the client must answer with
+     * @param agent_id Who is logged in, told with session.ok
+     * @param agent_name Their username, told with it
      */
-    void handleHandshakeResponse(const LLSD& result);
-    std::string generateChallenge();
+    void handleHandshakeResponse(const LLSD& result, const LLUUID& secret, const LLUUID& agent_id, const std::string& agent_name);
+    // The handshake refused, unanswered in time, or never sent.
+    void handleHandshakeError(const LLSD& error);
 
-    LLScriptEdContainer*                    getEditor() const;
     std::shared_ptr<LLScriptEditorWSServer> getServer() const;
 
     U32 mConnectionID{ 0 }; ///< Unique identifier for this connection
 
-    // Client handshake response data
+    // Client handshake response data, written as the client answers, on
+    // the server's thread, and read on the main one: under the lock.
+    mutable LLMutex mHandshakeMutex;
     std::string  mClientName;      ///< Name of the external editor client
     std::string  mClientVersion;   ///< Version of the external editor client
     std::string  mProtocolVersion; ///< JSON-RPC protocol version supported by client
@@ -115,8 +138,6 @@ private:
     std::string  mScriptLanguage;  ///< Programming language of the script (lsl, luau, etc.)
     string_set_t mLanguages;       ///< Set of supported scripting languages
     string_set_t mFeatures;        ///< Active client features (live_sync, compilation, etc.)
-    LLUUID       mChallenge;
-    std::string  mChallengeFile;   ///< Temporary file used for challenge-response verification
 
     static std::atomic<U32> sNextConnectionID;
 };
@@ -141,21 +162,32 @@ private:
  * ## Usage
  *
  * @code
- * // Create and start the JSON-RPC server
- * auto server = std::make_shared<LLScriptEditorWSServer>("script_editor_server", 9020);
- * LLWebsocketMgr::getInstance()->addServer(server);
- * LLWebsocketMgr::getInstance()->startServer("script_editor_server");
+ * // Start the server, or find it running; null where it is disabled or
+ * // could not start
+ * LLScriptEditorWSServer::ptr_t server = LLScriptEditorWSServer::ensureServerRunning();
  *
- * // Associate with an LSL editor
- * server->associateEditor(editor_handle, script_id);
+ * // Hold a script open in a viewer editor for live sync with a client
+ * const std::string script_id = LLScriptEditorWSServer::buildScriptSubscriptionId(object_id, item_id);
+ * server->subscribeScriptEditor(object_id, item_id, script_name, editor_handle, script_id);
  * @endcode
  *
  * ## Security Considerations
  *
- * - Server binds to localhost only by default for security
+ * - Server binds to localhost only: a client anywhere else could never read
+ *   the challenge's file
+ * - A connection from a browser -- any upgrade request with an Origin -- is
+ *   refused, so no web page, the viewer's own included, can reach it
+ * - Nothing a client asks is answered, and nothing is sent it but the
+ *   handshake, until it has answered the handshake's challenge with what a
+ *   file only the user can read says; a wrong answer, or none within 30
+ *   seconds, closes it. Who is logged in is told with session.ok, once
+ *   it has
+ * - A few connections at a time may be proving themselves; one more is
+ *   closed (1013) before it is sent a challenge
  * - JSON-RPC 2.0 structured protocol with validation
- * - Rate limiting handled by base JSON-RPC server
  * - Error handling with standardized JSON-RPC error codes
+ * - Nothing limits how often a client asks: an authenticated client is
+ *   the user's own
  */
 class LLScriptEditorWSServer : public LLJSONRPCServer
 {
@@ -236,6 +268,9 @@ public:
 
     static bool isEnabled();
     static bool isTightIntegration();
+
+    // Connections open and not yet authenticated. Any thread's.
+    size_t unauthenticatedConnectionCount() const;
 
 protected:
     LLWebsocketMgr::WSConnection::ptr_t connectionFactory(LLWebsocketMgr::WSServer::ptr_t server,
@@ -354,8 +389,8 @@ private:
     // The manager sends through the server and names prims as it does.
     friend class LLPublishedObjectMgr;
     mutable LLPublishedObjectMgr mPublishedObjectManager;
-    // When the last client went, in the timer's seconds; zero while one
-    // is connected.
+    // Since when nobody has been connected -- the server's start, or the
+    // last client's going -- in the timer's seconds; zero while one is.
     std::atomic<F64>             mIdleSince{ 0.0 };
     boost::signals2::scoped_connection mRuntimeConnection;
     boost::signals2::scoped_connection mCompiledConnection;

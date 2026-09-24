@@ -4239,7 +4239,7 @@
         <key>ExternalWebsocketSyncIdleTimeout</key>
         <map>
             <key>Comment</key>
-            <string>Seconds the script editor server stays up with no editor connected, after the last one went, before it stops; zero keeps it up for the session.</string>
+            <string>Seconds the script editor server stays up with no editor connected, from its start or the last one's going, before it stops; zero keeps it up for the session.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>

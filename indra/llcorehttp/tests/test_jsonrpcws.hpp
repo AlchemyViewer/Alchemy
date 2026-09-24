@@ -24,6 +24,7 @@ public:
     using LLJSONRPCConnection::testInjectPendingRequest;
     using LLJSONRPCConnection::testPendingRequestCount;
     using LLJSONRPCConnection::testSweepTimeouts;
+    using LLJSONRPCConnection::setAuthenticated;
 };
 }
 
@@ -140,6 +141,84 @@ namespace tut
         conn.testSweepTimeouts();
         ensure("timeout callback should be called", callback_called);
         ensure_equals("pending request should be removed", conn.testPendingRequestCount(), (size_t)0);
+    }
+
+    template<> template<>
+    void JSONRPCWSTestObjectType::test<6>()
+    {
+        set_test_name("a connection not yet authenticated dispatches nothing, and everything once it is");
+
+        TestJSONRPCConnection conn;
+        ensure("authenticated unless it says otherwise", conn.isAuthenticated());
+
+        int calls = 0;
+        conn.registerMethod("object.list",
+            [&](const std::string&, const LLSD&, const LLSD&) -> LLSD
+            {
+                ++calls;
+                return LLSD();
+            });
+
+        conn.setAuthenticated(false);
+        ensure("not authenticated", !conn.isAuthenticated());
+        const LLSD request = LLJSONRPCConnection::makeEnvelope(LLSD("req_1"), "object.list", LLSD::emptyMap(), LLSD(), LLSD());
+        conn.processMessage(request);
+        const LLSD notification = LLJSONRPCConnection::makeEnvelope(LLSD(), "object.list", LLSD::emptyMap(), LLSD(), LLSD());
+        conn.processMessage(notification);
+        ensure_equals("neither a request nor a notification reaches the handler", calls, 0);
+
+        conn.setAuthenticated(true);
+        conn.processMessage(request);
+        ensure_equals("dispatched once authenticated", calls, 1);
+    }
+
+    template<> template<>
+    void JSONRPCWSTestObjectType::test<7>()
+    {
+        set_test_name("a connection not yet authenticated still takes the answers to its own calls");
+
+        TestJSONRPCConnection conn;
+        conn.setAuthenticated(false);
+
+        LLSD answer;
+        conn.testInjectPendingRequest(
+            "rpc_1",
+            LLTimer::getTotalSeconds() + 60.0,
+            [&](const LLSD& result, const LLSD& error)
+            {
+                ensure("no error", error.isUndefined());
+                answer = result;
+            });
+
+        LLSD result;
+        result["challenge_response"] = "secret";
+        conn.processMessage(LLJSONRPCConnection::makeEnvelope(LLSD("rpc_1"), std::string(), LLSD(), result, LLSD()));
+        ensure_equals("the answer reached the caller", answer["challenge_response"].asString(), std::string("secret"));
+        ensure("and it is answered", conn.testPendingRequestCount() == 0);
+    }
+
+    template<> template<>
+    void JSONRPCWSTestObjectType::test<8>()
+    {
+        set_test_name("a closed connection tells whatever waits on it, and takes no call that would wait for good");
+
+        TestJSONRPCConnection conn;
+        LLSD told;
+        conn.testInjectPendingRequest(
+            "rpc_1",
+            LLTimer::getTotalSeconds() + 60.0,
+            [&](const LLSD&, const LLSD& error) { told = error; });
+
+        conn.onClose();
+        ensure("closed", conn.isClosed());
+        ensure_equals("the waiting call told it closed", told["code"].asInteger(), LLJSONRPCConnection::RPCError::CONNECTION_CLOSED);
+
+        bool called = false;
+        const LLSD id = conn.call("session.handshake", LLSD(), [&](const LLSD&, const LLSD&) { called = true; }, 30.0);
+        ensure("not sent", id.isUndefined());
+        ensure_equals("and nothing waiting", conn.testPendingRequestCount(), (size_t)0);
+        conn.testSweepTimeouts();
+        ensure("so nothing is ever told", !called);
     }
 }
 
