@@ -5352,6 +5352,7 @@ void ALFloaterScriptStudio::offerImports(Doc& doc)
         }
     }
     const std::vector<ALScriptModules::Module> modules = ALScriptModules::instance().giving(request, open, names);
+    bool                                       given_all = true;
     for (ALScriptProblem& problem : doc.analysis)
     {
         if (!unknown(problem))
@@ -5392,6 +5393,7 @@ void ALFloaterScriptStudio::offerImports(Doc& doc)
                 offer(problem, module.require, true);
             }
         }
+        given_all = given_all && problem.fixes.size() > before;
         // In the viewer's words, as the analyzer's own fixes were said.
         for (size_t i = before; i < problem.fixes.size(); ++i)
         {
@@ -5407,6 +5409,22 @@ void ALFloaterScriptStudio::offerImports(Doc& doc)
             }
             problem.fixes.back().preferred = true;
         }
+    }
+    // A name nothing in hand gives may be given by what is near the script
+    // in the world and not fetched yet: fetched, and the script checked
+    // again once it is in.
+    if (!given_all)
+    {
+        const LLHandle<LLFloater> handle = getHandle();
+        const std::string         id     = doc.id;
+        ALScriptModules::instance().fetchNearby(request, [handle, id]() {
+            ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get());
+            const size_t           index  = studio ? studio->indexOf(id) : NONE;
+            if (index != NONE)
+            {
+                studio->scheduleAnalysis(*studio->mDocs[index], true);
+            }
+        });
     }
 }
 

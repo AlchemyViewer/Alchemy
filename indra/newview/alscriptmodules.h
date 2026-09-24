@@ -28,6 +28,7 @@
 #include "llsingleton.h"
 
 #include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/unordered/unordered_flat_set.hpp>
 
 #include <filesystem>
 #include <functional>
@@ -86,6 +87,13 @@ public:
     // looked for again -- and a module is named, which asks the
     // preprocessor, only once it gives a name asked for.
     std::vector<Module> giving(const ALScriptPreprocessor::Request& request, const open_t& open, const std::vector<std::string>& names);
+    // The scripts and notecards near a script in the world, fetched so that
+    // what they give is known (ALScriptPreprocessor::nearby): where a name
+    // the script does not know is given by nothing in hand. Each once a
+    // session, a handful at a time and no more than so many for a script;
+    // `fetched` is called once a handful is in, and what is in reach is
+    // looked for again then. False where there was nothing to fetch.
+    bool                fetchNearby(const ALScriptPreprocessor::Request& request, std::function<void()> fetched);
     // One identity for a module however it was reached: a file's with its
     // links followed, as the preprocessor names what it admits.
     static std::string  identity(const std::string& path);
@@ -138,4 +146,8 @@ private:
     };
     boost::unordered_flat_map<std::string, OnDisk, ll::string_hash, std::equal_to<>> mOnDisk;
     boost::unordered_flat_map<std::string, Reach, ll::string_hash, std::equal_to<>>  mReach;
+    // What has been fetched for being near a script, each once a session,
+    // and how many for each script.
+    boost::unordered_flat_set<std::string, ll::string_hash, std::equal_to<>>         mFetched;
+    boost::unordered_flat_map<std::string, size_t, ll::string_hash, std::equal_to<>> mFetchedFor;
 };

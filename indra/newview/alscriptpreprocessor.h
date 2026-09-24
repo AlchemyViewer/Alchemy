@@ -188,6 +188,17 @@ public:
     // Nothing is fetched, so that the fixes may ask about every name a
     // script does not know.
     ALPreprocessor::Found lookUp(const Request& request, const ALPreprocessor::Ask& ask, ALPreprocessor::Include& out);
+    // The scripts and notecards near a script that may be what it
+    // includes or requires and are not in hand, at most `most`: those in
+    // its object, those in its inventory folder, then those in the
+    // folders of the inventory's includes already in hand -- a scripter
+    // keeps a library together. Scripts of its language, notecards of
+    // either. Only from the places a name is looked in, and nothing while
+    // includes are not taken from the world.
+    std::vector<std::string> nearby(const Request& request, size_t most);
+    // Each fetched into the cache as a run would fetch it, and `done`
+    // called once, when every one has come or failed.
+    void                     prefetch(const std::vector<std::string>& paths, std::function<void()> done);
     // The folders on disk an include or a require from a script reads,
     // each with what a name under it starts with: the scripter's include
     // folders while disk includes are on, bare; for LSL, what a `.lslrc` in

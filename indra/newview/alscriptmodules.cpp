@@ -53,6 +53,10 @@ namespace
     constexpr S32    FOLDER_DEPTH   = 3;
     constexpr size_t FOLDER_ENTRIES = 4096;
     constexpr size_t FOLDER_FILES   = 256;
+    // How many of what is near a script in the world are fetched at once,
+    // and at most for one script in a session.
+    constexpr size_t NEARBY_AT_ONCE    = 16;
+    constexpr size_t NEARBY_FOR_SCRIPT = 64;
 
     const char* const DISK_PREFIX = "disk:";
 
@@ -302,6 +306,39 @@ std::string ALScriptModules::nameOf(const ALScriptPreprocessor::Request& request
         }
     }
     return std::string();
+}
+
+bool ALScriptModules::fetchNearby(const ALScriptPreprocessor::Request& request, std::function<void()> fetched)
+{
+    const std::string self = sameFile(request.path.empty() ? ALScriptPreprocessor::pathOf(request.ref) : request.path);
+    const std::string kept = (request.lua ? "lua:" : "lsl:") + self;
+    size_t&           had  = mFetchedFor[kept];
+    if (had >= NEARBY_FOR_SCRIPT)
+    {
+        return false;
+    }
+    // Not what is on its way already, for this script or another.
+    std::vector<std::string> paths;
+    for (const std::string& path : ALScriptPreprocessor::instance().nearby(request, NEARBY_AT_ONCE * 4))
+    {
+        if (paths.size() < std::min(NEARBY_AT_ONCE, NEARBY_FOR_SCRIPT - had) && mFetched.insert(path).second)
+        {
+            paths.push_back(path);
+        }
+    }
+    if (paths.empty())
+    {
+        return false;
+    }
+    had += paths.size();
+    ALScriptPreprocessor::instance().prefetch(paths, [this, kept, fetched = std::move(fetched)]() {
+        mReach.erase(kept);
+        if (fetched)
+        {
+            fetched();
+        }
+    });
+    return true;
 }
 
 std::vector<ALScriptModules::Module> ALScriptModules::giving(const ALScriptPreprocessor::Request& request, const open_t& open,

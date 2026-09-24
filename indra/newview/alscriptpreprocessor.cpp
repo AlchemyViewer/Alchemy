@@ -321,6 +321,101 @@ ALPreprocessor::Found ALScriptPreprocessor::lookUp(const Request& request, const
     return resolve(ask, out, request, nullptr, false, &alias_folders);
 }
 
+std::vector<std::string> ALScriptPreprocessor::nearby(const Request& request, size_t most)
+{
+    std::vector<std::string> out;
+    if (!worldIncludes())
+    {
+        return out;
+    }
+    static LLCachedControl<std::string> order(gSavedSettings, "ALScriptPreprocIncludeOrder", "inventory object disk");
+    std::istringstream                  words(order());
+    bool                                object = false, inventory = false;
+    for (std::string word; words >> word;)
+    {
+        object    = object || word == "object";
+        inventory = inventory || word == "inventory";
+    }
+    const auto take = [this, &out, most](const std::string& path) {
+        if (out.size() < most && !mTexts.count(path) && !mFailed.count(path) && std::find(out.begin(), out.end(), path) == out.end())
+        {
+            out.push_back(path);
+        }
+    };
+    if (object && !request.ref.inInventory())
+    {
+        if (const auto listed = mContents.find(request.ref.object); listed != mContents.end())
+        {
+            for (const ALScriptWorkspace::Item& item : listed->second)
+            {
+                if (item.id != request.ref.item && (!item.script || item.lua == request.lua))
+                {
+                    take(std::string(OBJECT_PREFIX) + request.ref.object.asString() + ":" + item.id.asString());
+                }
+            }
+        }
+    }
+    if (!inventory)
+    {
+        return out;
+    }
+    std::vector<LLUUID> folders;
+    if (const LLViewerInventoryItem* own = request.ref.inInventory() ? gInventory.getItem(request.ref.item) : nullptr)
+    {
+        folders.push_back(own->getParentUUID());
+    }
+    for (const auto& [path, cached] : mTexts)
+    {
+        ALScriptRef ref;
+        if (refOf(path, ref) && ref.inInventory())
+        {
+            const LLViewerInventoryItem* item = gInventory.getItem(ref.item);
+            if (item && std::find(folders.begin(), folders.end(), item->getParentUUID()) == folders.end())
+            {
+                folders.push_back(item->getParentUUID());
+            }
+        }
+    }
+    for (const LLUUID& folder : folders)
+    {
+        LLInventoryModel::cat_array_t*  cats  = nullptr;
+        LLInventoryModel::item_array_t* items = nullptr;
+        gInventory.getDirectDescendentsOf(folder, cats, items);
+        for (size_t i = 0; items && i < items->size() && out.size() < most; ++i)
+        {
+            const LLViewerInventoryItem* item = (*items)[i];
+            if (!item || item->getUUID() == request.ref.item)
+            {
+                continue;
+            }
+            const bool script = item->getType() == LLAssetType::AT_LSL_TEXT;
+            if ((script && (item->getInventorySubType() == SST_LUA) == request.lua) || item->getType() == LLAssetType::AT_NOTECARD)
+            {
+                take(std::string(INVENTORY_PREFIX) + item->getUUID().asString());
+            }
+        }
+    }
+    return out;
+}
+
+void ALScriptPreprocessor::prefetch(const std::vector<std::string>& paths, std::function<void()> done)
+{
+    if (paths.empty())
+    {
+        return;
+    }
+    auto left = std::make_shared<size_t>(paths.size());
+    for (const std::string& path : paths)
+    {
+        fetch(path, [left, done]() {
+            if (--*left == 0 && done)
+            {
+                done();
+            }
+        });
+    }
+}
+
 std::vector<std::pair<std::string, std::string>> ALScriptPreprocessor::moduleFolders(const Request& request)
 {
     static LLCachedControl<bool>                     disk(gSavedSettings, "ALScriptPreprocDiskIncludes", false);
