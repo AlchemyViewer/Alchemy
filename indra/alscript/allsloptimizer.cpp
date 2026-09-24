@@ -3411,6 +3411,7 @@ ALLSLOptimizer::Result ALLSLOptimizer::run(std::string_view source, const Option
     {
         collectMessages(parser.logger, result.problems);
         bringBack();
+        result.uncompiled = inlinedMap.empty();
         return result;
     }
     script->collectSymbols();
@@ -3427,6 +3428,7 @@ ALLSLOptimizer::Result ALLSLOptimizer::run(std::string_view source, const Option
     {
         collectMessages(parser.logger, result.problems);
         bringBack();
+        result.uncompiled = inlinedMap.empty();
         return result;
     }
 

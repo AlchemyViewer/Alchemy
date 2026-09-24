@@ -113,6 +113,11 @@ public:
         // The run reached its budget and stopped early; what it did
         // stands, and there may have been more to do.
         bool   stoppedEarly = false;
+        // The script as given does not parse, or its types do not agree:
+        // the errors are the script's own, the compiler's to say, and not
+        // something the optimizer did. Not set where the optimizer's own
+        // inlining made the text it could not read.
+        bool   uncompiled = false;
     };
 
     // Needs the builtins loaded through ALLSLService first; without them

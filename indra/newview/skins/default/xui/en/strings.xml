@@ -511,6 +511,7 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="OptimizerIfAlwaysTrue">the condition of this if is always true; kept only what runs</string>
 	<string name="OptimizerInlinedConstant">inlined [1] to [2]</string>
 	<string name="OptimizerNoDefinitions">the LSL definitions are not loaded, so nothing was optimized</string>
+	<string name="OptimizerUncompiled">not optimized: the script does not compile as it stands, and compiling it says why</string>
 	<string name="OptimizerRemovedFor">removed a for loop whose condition is always false; its initialisers stay</string>
 	<string name="OptimizerRemovedFunction">removed the unused function [1]</string>
 	<string name="OptimizerRemovedGlobal">removed the unused global [1]</string>
@@ -627,8 +628,9 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="LSLDeprecated">'[1]' is deprecated.</string>
 	<string name="LSLDeprecatedWithReplacement">'[1]' is deprecated; use '[2]' instead.</string>
 	<string name="LSLSyntaxMissing">Missing [1].</string>
-	<string name="LSLSyntaxUnexpected">Unexpected [1].</string>
-	<string name="LSLSyntaxUnexpectedWanted">Unexpected [1]; expected [2].</string>
+	<string name="LSLSyntaxUnexpected">Did not expect [1] here.</string>
+	<string name="LSLSyntaxUnexpectedWanted">Did not expect [1] here; expected [2].</string>
+	<string name="LSLParameterUntyped">The parameter '[1]' needs its type before it: integer, float, string, key, vector, rotation or list.</string>
 	<string name="LuauLintUnknownGlobalAssign">Unknown global '[1]'; consider assigning to it first</string>
 	<string name="LuauLintDeprecatedGlobal">Global '[1]' is deprecated, use '[2]' instead</string>
 	<string name="LuauLintDeprecatedGlobalPlain">Global '[1]' is deprecated</string>

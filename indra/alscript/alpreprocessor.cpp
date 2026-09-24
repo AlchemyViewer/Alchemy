@@ -3749,6 +3749,28 @@ void ALPreprocessor::optimize(Result& result, const Options& options)
     optimizing.inlining                = optimizing.inlining || !result.inlined.empty();
     ALLSLOptimizer::Result optimized   = ALLSLOptimizer::run(result.text, optimizing);
     const size_t           first_note  = result.problems.size();
+    if (optimized.uncompiled)
+    {
+        // A script that does not compile is not the preprocessor's to
+        // fail: the text goes on as it was expanded, and compiling it says
+        // what is wrong, as it would with the optimizer off. The optimizer
+        // says only that it stood aside, where the first error is.
+        ALScriptProblem p;
+        p.severity = ALScriptProblem::Severity::Note;
+        p.source   = ALScriptProblem::Source::Optimizer;
+        p.key      = "OptimizerUncompiled";
+        p.message  = "not optimized: the script does not compile as it stands, and compiling it says why";
+        if (!optimized.problems.empty())
+        {
+            p.line      = optimized.problems.front().line;
+            p.column    = optimized.problems.front().column;
+            p.endLine   = p.line;
+            p.endColumn = p.column;
+            mapProblem(p, result.map);
+        }
+        result.problems.push_back(std::move(p));
+        return;
+    }
     for (ALScriptProblem p : optimized.problems)
     {
         // What it did, as a change to the source where that can be said,

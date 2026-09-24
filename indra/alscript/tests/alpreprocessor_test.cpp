@@ -1118,4 +1118,33 @@ namespace tut
         }
         ensure("the size in source only", said && bare.codeBefore == 0);
     }
+
+    template<> template<>
+    void alpreprocessor_object::test<29>()
+    {
+        set_test_name("a script that does not compile is not the preprocessor's error: the optimizer stands aside with a note where the first error is");
+        {
+            ALLSLService service;
+            std::string  error;
+            ensure("builtins: " + error, service.loadBuiltins(std::string(AL_LSL_DEFINITIONS_DIR) + "/builtins.txt", error));
+        }
+        // Nexii's library, whose ObjectLinksetSittingAvatars has a parameter
+        // without its type, included as a save would include it.
+        std::ifstream     in(std::string(AL_ALSCRIPT_TEST_DIR) + "/preprocessor/include/linkset.lsl", std::ios::binary);
+        std::stringstream library;
+        library << in.rdbuf();
+        add("linkset.lsl", library.str());
+        const std::string source = "#include \"linkset.lsl\"\ndefault\n{\n    state_entry()\n    {\n        llSay(0, (string)LinkByName(\"Foot\"));\n    }\n}\n";
+        ALPreprocessor::Options o = options();
+        o.optimize                = true;
+        o.weigh                   = true;
+        ALPreprocessor::Result r  = ALPreprocessor::run(source, o);
+        ensure("no error of the preprocessor's: " + messages(r), !r.hasErrors());
+        ensure_equals("one note, on the library's line", messages(r),
+                      std::string("N linkset.lsl:110: not optimized: the script does not compile as it stands, and compiling it says why\n"));
+        ensure("keyed", r.problems.size() == 1 && r.problems[0].key == "OptimizerUncompiled" && r.problems[0].column == 33);
+        ensure("not optimized", !r.optimized);
+        ALPreprocessor::Options plain = options();
+        ensure_equals("the text as expanded, for the compiler to read", r.text, ALPreprocessor::run(source, plain).text);
+    }
 } // namespace tut

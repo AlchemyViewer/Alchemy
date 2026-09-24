@@ -806,6 +806,25 @@ namespace
         // A value ends there: a name, a number, a closing bracket, a string.
         const char   last        = before > 0 ? source[before - 1] : '\0';
         const bool   value_ended = before > 0 && (identifierByte(last) || last == ')' || last == ']' || lexed.code[before - 1] == STRING_BYTE);
+        // A name straight after a bracket or a comma, where any expression
+        // could have a name, is one where only a declaration's parameters
+        // go: a function's or an event's, written without its type.
+        if (found == "IDENTIFIER" && before > 0 && (last == '(' || last == ',') && lexed.code[before - 1] == CODE_BYTE && stopped < source.size() &&
+            identifierByte(source[stopped]))
+        {
+            size_t end = stopped;
+            while (end < source.size() && identifierByte(source[end]))
+            {
+                ++end;
+            }
+            problem.key       = "LSLParameterUntyped";
+            problem.args      = { std::string(source.substr(stopped, end - stopped)) };
+            problem.message   = ALScriptProblem::fill("The parameter '[1]' needs its type before it: integer, float, string, key, vector, rotation or list.",
+                                                      problem.args);
+            problem.endLine   = problem.line;
+            problem.endColumn = problem.column + static_cast<S32>(end - stopped);
+            return;
+        }
         static const char* const CLOSERS[] = { "';'", "')'", "']'", "'}'", "','", "'('" };
         std::string              missing;
         if (wanted.size() == 1 && std::find(std::begin(CLOSERS), std::end(CLOSERS), wanted.front()) != std::end(CLOSERS))
@@ -839,7 +858,7 @@ namespace
         }
         problem.key     = wanted.empty() ? "LSLSyntaxUnexpected" : "LSLSyntaxUnexpectedWanted";
         problem.args    = { tokenWords(found), list };
-        problem.message = ALScriptProblem::fill(wanted.empty() ? "Unexpected [1]." : "Unexpected [1]; expected [2].", problem.args);
+        problem.message = ALScriptProblem::fill(wanted.empty() ? "Did not expect [1] here." : "Did not expect [1] here; expected [2].", problem.args);
         problem.args.resize(wanted.empty() ? 1 : 2);
     }
     // Whether a node declares something a warning could say goes unused: a

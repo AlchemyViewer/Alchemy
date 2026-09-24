@@ -560,4 +560,35 @@ namespace tut
         ensure_equals("and after the other target, nothing of it left", said(back), said(first));
         ensure_equals("the other target, asked twice, the same", said(service.check(script, false)), said(lso));
     }
+    template<> template<>
+    void allslservice_object::test<16>()
+    {
+        set_test_name("a parameter written without its type says so by name, a function's or an event's, and what was not expected is said plainly");
+        ensure("builtins loaded: " + error, loaded);
+        auto first_error = [&](const std::string& script) {
+            for (const ALScriptProblem& problem : service.check(script))
+            {
+                if (problem.severity == ALScriptProblem::Severity::Error)
+                {
+                    return problem;
+                }
+            }
+            return ALScriptProblem();
+        };
+        const std::string tail = "default\n{\n    state_entry() { }\n}\n";
+        // As Nexii's linkset library has it.
+        ALScriptProblem p = first_error("list ObjectLinksetSittingAvatars(object) {\n    return [];\n}\n" + tail);
+        ensure_equals("the first: " + p.message, p.message,
+                      std::string("The parameter 'object' needs its type before it: integer, float, string, key, vector, rotation or list."));
+        ensure("keyed", p.key == "LSLParameterUntyped" && p.args.size() == 1 && p.args[0] == "object");
+        ensure("on the name, whole", p.line == 0 && p.column == 33 && p.endLine == 0 && p.endColumn == 39);
+        p = first_error("f(integer a, b) { }\n" + tail);
+        ensure("after a comma: " + p.message, p.key == "LSLParameterUntyped" && p.args[0] == "b" && p.column == 13);
+        p = first_error("default\n{\n    touch_start(total)\n    {\n    }\n}\n");
+        ensure("an event's: " + p.message, p.key == "LSLParameterUntyped" && p.args[0] == "total" && p.line == 2);
+        // A name where none can go, not after a bracket.
+        p = first_error("default\n{\n    state_entry()\n    {\n        llSay(0, \"x\") y;\n    }\n}\n");
+        ensure("not a parameter: " + p.message, p.key != "LSLParameterUntyped");
+        ensure("said plainly: " + p.message, p.message.find("Unexpected a") == std::string::npos && p.message.find("syntax error") == std::string::npos);
+    }
 }
