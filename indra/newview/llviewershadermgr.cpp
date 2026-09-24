@@ -229,6 +229,7 @@ LLGLSLShader            gDeferredDoFCombineProgram;
 LLGLSLShader            gDeferredDoFCombineProgramNoNear;
 LLGLSLShader            gExposureProgram;
 LLGLSLShader            gExposureProgramNoFade;
+LLGLSLShader            gExposureHistogramProgram;
 LLGLSLShader            gLuminanceProgram;
 LLGLSLShader            gLensFlareStateProgram;
 LLGLSLShader            gFXAAProgram[4];
@@ -1328,6 +1329,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
         gDeferredDoFCombineProgramNoNear.unload();
         gExposureProgram.unload();
         gExposureProgramNoFade.unload();
+        gExposureHistogramProgram.unload();
         gLuminanceProgram.unload();
         gLensFlareStateProgram.unload();
 
@@ -2843,6 +2845,20 @@ bool LLViewerShaderMgr::loadShadersDeferred()
 
     if (success)
     {
+        // The exposure meter's histogram: one point per part of a meter grid texel,
+        // summed into 64 bins by additive blending.
+        gExposureHistogramProgram.mName = "Exposure Histogram";
+        gExposureHistogramProgram.mShaderFiles.clear();
+        gExposureHistogramProgram.clearPermutations();
+        gExposureHistogramProgram.mShaderFiles.push_back(make_pair("deferred/exposureHistogramV.glsl", GL_VERTEX_SHADER));
+        gExposureHistogramProgram.mShaderFiles.push_back(make_pair("deferred/exposureHistogramF.glsl", GL_FRAGMENT_SHADER));
+        gExposureHistogramProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+        success = gExposureHistogramProgram.createShader();
+        llassert(success);
+    }
+
+    if (success)
+    {
         // Sun coverage, colour and the filtered flare drive, 2x1, read by the
         // colour-correct programs through uLensFlareStateMap.
         gLensFlareStateProgram.mName = "Lens Flare State";
@@ -2857,7 +2873,7 @@ bool LLViewerShaderMgr::loadShadersDeferred()
 
     if (success)
     {
-        gLuminanceProgram.mName = "Luminance";
+        gLuminanceProgram.mName = "Exposure Meter Grid";
         gLuminanceProgram.mShaderFiles.clear();
         gLuminanceProgram.clearPermutations();
         gLuminanceProgram.mShaderFiles.push_back(make_pair("deferred/postDeferredNoTCV.glsl", GL_VERTEX_SHADER));

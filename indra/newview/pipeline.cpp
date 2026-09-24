@@ -260,6 +260,17 @@ const F32 ALPHA_BLEND_CUTOFF = 0.598f;
 const F32 DEFERRED_LIGHT_FALLOFF = 0.5f;
 const U32 DEFERRED_VB_MASK = LLVertexBuffer::MAP_VERTEX | LLVertexBuffer::MAP_TEXCOORD0 | LLVertexBuffer::MAP_TEXCOORD1;
 
+// The exposure meter. The grid's size is fixed so its cost does not grow with the window;
+// luminanceF.glsl box-filters each texel's patch of the scene whatever the patch's size. The
+// histogram's 64 bins span log2 luminance -16 to +12 (BINS in exposureHistogramV.glsl and
+// exposureF.glsl), and the exposure puts the metered mean at middle grey.
+constexpr U32 EXPOSURE_METER_WIDTH = 128;
+constexpr U32 EXPOSURE_METER_HEIGHT = 72;
+constexpr U32 EXPOSURE_HISTOGRAM_BINS = 64;
+constexpr F32 EXPOSURE_HISTOGRAM_MIN_EV = -16.f;
+constexpr F32 EXPOSURE_HISTOGRAM_MAX_EV = 12.f;
+constexpr F32 EXPOSURE_KEY = 0.18f;
+
 extern S32 gBoxFrame;
 extern bool gDisplaySwapBuffers;
 extern bool gDebugGL;
@@ -542,6 +553,24 @@ void LLPipeline::init()
         mScreenTriangleVB->unmapBuffer();
     }
 
+    {
+        // xy: the meter texel, z: 0 for its non-sky part, 1 for its sky
+        mExposureHistogramVB = new LLVertexBuffer(LLVertexBuffer::MAP_VERTEX);
+        mExposureHistogramVB->allocateBuffer(EXPOSURE_METER_WIDTH * EXPOSURE_METER_HEIGHT * 2, 0);
+        LLStrider<LLVector3> vert;
+        mExposureHistogramVB->getVertexStrider(vert);
+        U32 i = 0;
+        for (U32 y = 0; y < EXPOSURE_METER_HEIGHT; ++y)
+        {
+            for (U32 x = 0; x < EXPOSURE_METER_WIDTH; ++x)
+            {
+                vert[i++].set((F32)x, (F32)y, 0.f);
+                vert[i++].set((F32)x, (F32)y, 1.f);
+            }
+        }
+        mExposureHistogramVB->unmapBuffer();
+    }
+
     //
     // Update all settings to trigger a cached settings refresh
     //
@@ -748,6 +777,7 @@ void LLPipeline::cleanup()
 
     mDeferredVB = NULL;
     mScreenTriangleVB = nullptr;
+    mExposureHistogramVB = nullptr;
 
     mCubeVB = NULL;
 
@@ -1366,6 +1396,7 @@ void LLPipeline::releaseLUTBuffers()
 
     mExposureMap.release();
     mLuminanceMap.release();
+    mExposureHistogram.release();
     mLastExposure.release();
 
     mLensFlareState[0].release();
@@ -1637,16 +1668,20 @@ void LLPipeline::createLUTBuffers()
     gDeferredGenBrdfLutProgram.unbind();
     mPbrBrdfLut.flush();
 
-    mExposureMap.allocate(1, 1, GL_R16F);
+    // Scale 1 at EV 0: the first frame adapts from no exposure at all.
+    mExposureMap.allocate(1, 1, GL_RGBA16F);
     mExposureMap.bindTarget();
-    glClearColor(1, 1, 1, 0);
+    glClearColor(1, 0, 0, 1);
     mExposureMap.clear();
     glClearColor(0, 0, 0, 0);
     mExposureMap.flush();
 
-    mLuminanceMap.allocate(256, 256, GL_R16F, false, false, ALTextureSlot::TT_TEXTURE, LLRenderTarget::MIPS_AUTO);
+    mLuminanceMap.allocate(EXPOSURE_METER_WIDTH, EXPOSURE_METER_HEIGHT, GL_RGBA16F);
 
-    mLastExposure.allocate(1, 1, GL_R16F);
+    // RGBA32F: a bin's weight sums thousands of points, past what a half float counts exactly.
+    mExposureHistogram.allocate(EXPOSURE_HISTOGRAM_BINS, 1, GL_RGBA32F);
+
+    mLastExposure.allocate(1, 1, GL_RGBA16F);
 
     // Lens flare sun state, 2x1, two of them swapped each frame. Zero is the
     // correct history: no drive, no instability, no reference luminance.
@@ -7854,150 +7889,138 @@ void LLPipeline::captureScopeSample(LLRenderTarget* src)
 
 void LLPipeline::generateLuminance(LLRenderTarget* src, LLRenderTarget* dst)
 {
-    // luminance sample and mipmap generation
+    // The exposure meter's grid (luminanceF.glsl), from the scene before bloom: metering a
+    // buffer the exposure already shaped would feed the exposure back into itself.
+    LL_PROFILE_GPU_ZONE("exposure meter grid");
+
+    dst->bindTarget();
+
+    LLGLDepthTest depth(GL_FALSE, GL_FALSE);
+
+    gLuminanceProgram.bind();
+
+    S32 channel = gLuminanceProgram.enableTexture(LLShaderMgr::DEFERRED_DIFFUSE);
+    if (channel > -1)
     {
-        LL_PROFILE_GPU_ZONE("luminance sample");
-
-        dst->bindTarget();
-
-        LLGLDepthTest depth(GL_FALSE, GL_FALSE);
-
-        gLuminanceProgram.bind();
-
-        static LLCachedControl<F32> diffuse_luminance_scale(gSavedSettings, "RenderDiffuseLuminanceScale", 1.0f);
-
-        S32 channel = 0;
-        channel = gLuminanceProgram.enableTexture(LLShaderMgr::DEFERRED_DIFFUSE);
-        if (channel > -1)
-        {
-            src->bindTexture(0, channel, ALSamplers::PointMirror);
-        }
-
-        channel = gLuminanceProgram.enableTexture(LLShaderMgr::DEFERRED_EMISSIVE);
-        if (channel > -1)
-        {
-            mRT->bloomMip[0].bindTexture(0, channel);
-        }
-
-        channel = gLuminanceProgram.enableTexture(LLShaderMgr::NORMAL_MAP);
-        if (channel > -1)
-        {
-            // bind the normal map to get the environment mask
-            mRT->deferredScreen.bindTexture(2, channel, ALSamplers::PointMirror);
-        }
-
-        gLuminanceProgram.uniform1f(LLShaderMgr::DIFFUSE_LUMINANCE_SCALE, diffuse_luminance_scale);
-
-        mScreenTriangleVB->setBuffer();
-        mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
-        dst->flush();
-
-        // note -- unbind AFTER the glGenerateMipMap so time in generatemipmap can be profiled under "Luminance"
-        // also note -- keep an eye on the performance of glGenerateMipmap, might need to replace it with a mip generation shader
-        gLuminanceProgram.unbind();
+        src->bindTexture(0, channel, ALSamplers::BilinearClamp);
     }
+
+    channel = gLuminanceProgram.enableTexture(LLShaderMgr::NORMAL_MAP);
+    if (channel > -1)
+    {
+        // the G-buffer normals carry the flags that mark the sky
+        mRT->deferredScreen.bindTexture(2, channel, ALSamplers::PointClamp);
+    }
+
+    // A bilinear tap averages a 2x2 block, so taps two texels apart cover a patch.
+    const F32 patch_w = (F32)src->getWidth() / (F32)dst->getWidth();
+    const F32 patch_h = (F32)src->getHeight() / (F32)dst->getHeight();
+    gLuminanceProgram.uniform4f(LLShaderMgr::METER_PARAMS, patch_w, patch_h,
+                                (F32)llmax(1, llceil(patch_w * 0.5f)), (F32)llmax(1, llceil(patch_h * 0.5f)));
+
+    mScreenTriangleVB->setBuffer();
+    mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
+
+    gLuminanceProgram.unbind();
+    dst->flush();
 }
 
-void LLPipeline::generateExposure(LLRenderTarget* src, LLRenderTarget* dst, bool use_history) {
-    // exposure sample
+void LLPipeline::generateExposure(LLRenderTarget* src, LLRenderTarget* dst, bool use_history)
+{
+    LL_PROFILE_GPU_ZONE("exposure");
+
+    static LLCachedControl<bool> dynamic_exposure_enabled(gSavedSettings, "RenderDynamicExposureEnabled", true);
+    static LLCachedControl<F32> compensation(gSavedSettings, "AlchemyExposureCompensation", 0.f);
+    static LLCachedControl<F32> min_ev(gSavedSettings, "AlchemyExposureMinEV", -3.f);
+    static LLCachedControl<F32> max_ev(gSavedSettings, "AlchemyExposureMaxEV", 4.f);
+    static LLCachedControl<F32> low_percent(gSavedSettings, "AlchemyExposureLowPercent", 10.f);
+    static LLCachedControl<F32> high_percent(gSavedSettings, "AlchemyExposureHighPercent", 95.f);
+    static LLCachedControl<F32> speed_up(gSavedSettings, "AlchemyExposureSpeedUp", 3.f);
+    static LLCachedControl<F32> speed_down(gSavedSettings, "AlchemyExposureSpeedDown", 1.f);
+    static LLCachedControl<U32> metering_mode(gSavedSettings, "AlchemyExposureMeteringMode", 1);
+    static LLCachedControl<F32> sky_weight(gSavedSettings, "AlchemyExposureSkyWeight", 1.f);
+
+    // A classic sky reproduces pre-PBR lighting, which assumed a fixed exposure.
+    const bool meter = dynamic_exposure_enabled && !LLRender::sClassicMode;
+
+    if (meter)
     {
-        LL_PROFILE_GPU_ZONE("exposure sample");
+        // The histogram (exposureHistogramV.glsl): the meter grid's points, summed per bin.
+        LL_PROFILE_GPU_ZONE("exposure histogram");
 
-        if (use_history)
-        {
-            // copy last frame's exposure into mLastExposure
-            mLastExposure.copyContents(*dst, 0, 0, dst->getWidth(), dst->getHeight(), 0, 0, mLastExposure.getWidth(), mLastExposure.getHeight(),
-                             GL_COLOR_BUFFER_BIT, GL_NEAREST);
-        }
-
-        dst->bindTarget();
+        mExposureHistogram.bindTarget();
+        mExposureHistogram.clear();
 
         LLGLDepthTest depth(GL_FALSE, GL_FALSE);
+        LLGLEnable blend(GL_BLEND);
+        gGL.setSceneBlendType(LLRender::BT_ADD);
 
-        LLGLSLShader* shader;
-        if (use_history)
-        {
-            shader = &gExposureProgram;
-        }
-        else
-        {
-            shader = &gExposureProgramNoFade;
-        }
-
-        shader->bind();
-
-        S32 channel = shader->enableTexture(LLShaderMgr::DEFERRED_EMISSIVE);
+        gExposureHistogramProgram.bind();
+        S32 channel = gExposureHistogramProgram.enableTexture(LLShaderMgr::METER_MAP);
         if (channel > -1)
         {
-            src->bindTexture(0, channel, ALSamplers::TrilinearMirror);
+            src->bindTexture(0, channel, ALSamplers::PointClamp);
         }
 
-        if (use_history)
-        {
-            channel = shader->enableTexture(LLShaderMgr::EXPOSURE_MAP);
-            if (channel > -1)
-            {
-                mLastExposure.bindTexture(0, channel);
-            }
-        }
+        const F32 bins_per_ev = (F32)EXPOSURE_HISTOGRAM_BINS / (EXPOSURE_HISTOGRAM_MAX_EV - EXPOSURE_HISTOGRAM_MIN_EV);
+        gExposureHistogramProgram.uniform4f(LLShaderMgr::METER_PARAMS, (F32)metering_mode(), llmax(sky_weight(), 0.f),
+                                            EXPOSURE_HISTOGRAM_MIN_EV, bins_per_ev);
 
-        static LLCachedControl<bool> should_auto_adjust(gSavedSettings, "RenderSkyAutoAdjustLegacy", false);
-        static LLCachedControl<bool> dynamic_exposure_enabled(gSavedSettings, "RenderDynamicExposureEnabled", true);
-        static LLCachedControl<F32> dynamic_exposure_coefficient(gSavedSettings, "RenderDynamicExposureCoefficient", 0.175f);
-        static LLCachedControl<F32> dynamic_exposure_speed_error(gSavedSettings, "RenderDynamicExposureSpeedError", 0.1f);
-        static LLCachedControl<F32> dynamic_exposure_speed_target(gSavedSettings, "RenderDynamicExposureSpeedTarget", 2.f);
+        mExposureHistogramVB->setBuffer();
+        mExposureHistogramVB->drawArrays(LLRender::POINTS, 0, mExposureHistogramVB->getNumVerts());
 
-        LLSettingsSky::ptr_t sky = LLEnvironment::instance().getCurrentSky();
-
-        F32 probe_ambiance = LLEnvironment::instance().getCurrentSky()->getReflectionProbeAmbiance(should_auto_adjust());
-
-        F32 exp_min = 1.f;
-        F32 exp_max = 1.f;
-
-        static LLCachedControl<bool> use_exposure_sky_settings(gSavedSettings, "RenderUseExposureSkySettings", false);
-
-        if (use_exposure_sky_settings)
-        {
-            if (dynamic_exposure_enabled)
-            {
-                exp_min = sky->getHDROffset(should_auto_adjust()) - sky->getHDRMin(should_auto_adjust());
-                exp_max = sky->getHDROffset(should_auto_adjust()) + sky->getHDRMax(should_auto_adjust());
-            }
-            else
-            {
-                exp_min = sky->getHDROffset(should_auto_adjust());
-                exp_max = sky->getHDROffset(should_auto_adjust());
-            }
-        }
-        else if (dynamic_exposure_enabled)
-        {
-            if (probe_ambiance > 0.f)
-            {
-                F32 hdr_scale = sqrtf(LLEnvironment::instance().getCurrentSky()->getGamma()) * 2.f;
-
-                if (hdr_scale > 1.f)
-                {
-                    exp_min = 1.f / hdr_scale;
-                    exp_max = hdr_scale;
-                }
-            }
-        }
-
-        shader->uniform1f(LLShaderMgr::DT, gFrameIntervalSeconds);
-        shader->uniform2f(LLShaderMgr::NOISE_VEC, ll_frand() * 2.0f - 1.0f, ll_frand() * 2.0f - 1.0f);
-        shader->uniform4f(LLShaderMgr::DYNAMIC_EXPOSURE_PARAMS, dynamic_exposure_coefficient, exp_min, exp_max, dynamic_exposure_speed_error);
-        shader->uniform4f(LLShaderMgr::DYNAMIC_EXPOSURE_PARAMS2, sky->getHDROffset(should_auto_adjust()), exp_min, exp_max, dynamic_exposure_speed_target);
-
-        mScreenTriangleVB->setBuffer();
-        mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
-
-        if (use_history)
-        {
-            gGL.getTextureSlot(channel)->unbind();
-        }
-        shader->unbind();
-        dst->flush();
+        gExposureHistogramProgram.unbind();
+        gGL.setSceneBlendType(LLRender::BT_ALPHA);
+        mExposureHistogram.flush();
     }
+
+    if (use_history)
+    {
+        // last frame's exposure, which this one adapts from
+        mLastExposure.copyContents(*dst, 0, 0, dst->getWidth(), dst->getHeight(), 0, 0, mLastExposure.getWidth(), mLastExposure.getHeight(),
+                                   GL_COLOR_BUFFER_BIT, GL_NEAREST);
+    }
+
+    dst->bindTarget();
+
+    LLGLDepthTest depth(GL_FALSE, GL_FALSE);
+
+    LLGLSLShader* shader = use_history ? &gExposureProgram : &gExposureProgramNoFade;
+    shader->bind();
+
+    S32 channel = shader->enableTexture(LLShaderMgr::EXPOSURE_HISTOGRAM);
+    if (channel > -1)
+    {
+        mExposureHistogram.bindTexture(0, channel, ALSamplers::PointClamp);
+    }
+
+    S32 history_channel = -1;
+    if (use_history)
+    {
+        history_channel = shader->enableTexture(LLShaderMgr::EXPOSURE_MAP);
+        if (history_channel > -1)
+        {
+            mLastExposure.bindTexture(0, history_channel);
+        }
+    }
+
+    // At least a percent of the weight between the trims, or nothing would be kept.
+    const F32 low = llclamp(low_percent() * 0.01f, 0.f, 0.99f);
+    const F32 high = llclamp(high_percent() * 0.01f, low + 0.01f, 1.f);
+    shader->uniform1f(LLShaderMgr::DT, gFrameIntervalSeconds);
+    shader->uniform4f(LLShaderMgr::DYNAMIC_EXPOSURE_PARAMS, log2f(EXPOSURE_KEY) + compensation(), llmin(min_ev(), max_ev()),
+                      llmax(min_ev(), max_ev()), meter ? 1.f : 0.f);
+    shader->uniform4f(LLShaderMgr::DYNAMIC_EXPOSURE_PARAMS2, low, high, llmax(speed_up(), 0.f), llmax(speed_down(), 0.f));
+
+    mScreenTriangleVB->setBuffer();
+    mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
+
+    if (history_channel > -1)
+    {
+        gGL.getTextureSlot(history_channel)->unbind();
+    }
+    shader->unbind();
+    dst->flush();
 }
 
 void LLPipeline::clearLensFlareState()

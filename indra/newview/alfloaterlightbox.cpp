@@ -2367,8 +2367,11 @@ void ALFloaterLightBox::refreshBloomSections()
     // glow runs whenever it does not. Keep the two in step. The cross filter
     // is on the HDR side with the bloom it is seeded from: it streaks what
     // the bloom pyramid's top holds, and without the pyramid it draws nothing.
+    // So is the auto exposure, which renderFinalize meters only under HDR.
     const bool hdr = gGLManager.mGLVersion > 4.05f && gSavedSettings.getBOOL("RenderHDREnabled");
     static const std::pair<const char*, bool> bloom_sections[] = {
+        { "sec_autoexp", true },
+        { "sec_autoexp_adv", true },
         { "sec_bloom", true },
         { "sec_bloom_adv", true },
         { "sec_crossfilter", true },

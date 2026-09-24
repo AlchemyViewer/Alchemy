@@ -221,6 +221,7 @@ extern LLGLSLShader         gCASProgram;
 extern LLGLSLShader         gDeferredPostNoDoFProgram;
 extern LLGLSLShader         gExposureProgram;
 extern LLGLSLShader         gExposureProgramNoFade;
+extern LLGLSLShader         gExposureHistogramProgram;
 extern LLGLSLShader         gLuminanceProgram;
 extern LLGLSLShader         gLensFlareStateProgram;
 extern LLGLSLShader         gDeferredAvatarShadowProgram;

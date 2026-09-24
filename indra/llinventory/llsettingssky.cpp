@@ -1175,9 +1175,6 @@ void LLSettingsSky::loadValuesFromLLSD()
         mReflectionProbeAmbiance = (F32)settings[SETTING_REFLECTION_PROBE_AMBIANCE].asReal();
     }
 
-    mHDRMax = 2.0f;
-    mHDRMin = 0.5f;
-    mHDROffset = 1.0f;
     mTonemapMix = 1.0f;
 
     mSunTextureId = settings[SETTING_SUN_TEXTUREID].asUUID();
@@ -2030,30 +2027,6 @@ F32 LLSettingsSky::getDomeRadius() const
 F32 LLSettingsSky::getGamma() const
 {
     return mGamma;
-}
-
-F32 LLSettingsSky::getHDRMin(bool auto_adjust) const
-{
-    if (mCanAutoAdjust && !auto_adjust)
-        return 0.f;
-
-    return mHDRMin;
-}
-
-F32 LLSettingsSky::getHDRMax(bool auto_adjust) const
-{
-    if (mCanAutoAdjust && !auto_adjust)
-        return 0.f;
-
-    return mHDRMax;
-}
-
-F32 LLSettingsSky::getHDROffset(bool auto_adjust) const
-{
-    if (mCanAutoAdjust && !auto_adjust)
-        return 1.0f;
-
-    return mHDROffset;
 }
 
 F32 LLSettingsSky::getTonemapMix(bool auto_adjust) const

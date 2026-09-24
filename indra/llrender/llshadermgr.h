@@ -414,7 +414,9 @@ public:
         TONEMAP_MIX,                        //  "tonemap_mix"
         TONEMAP_PARAMS,                     //  "tonemap_params"
         HDRI_SPLIT_SCREEN,                  //  "hdri_split_screen"
-        DIFFUSE_LUMINANCE_SCALE,            //  "diffuse_luminance_scale"
+        METER_PARAMS,                       //  "meter_params"          the exposure meter's per-pass parameters
+        METER_MAP,                          //  "meterMap"              the exposure meter's grid
+        EXPOSURE_HISTOGRAM,                 //  "exposureHistogram"     64x1, per bin (weight, weight * log2 luminance)
 
         // Alchemy-specific uniforms for Sky
         CUSTOM_ALPHA,                       //  "custom_alpha"

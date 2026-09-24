@@ -163,14 +163,14 @@ Row conventions:
 		<accordion_tab
 		 expanded="false"
 		 layout="topleft"
-		 height="327"
+		 height="194"
 		 name="atab_sec_tone_adv"
 		 title="Exposure &amp; Tone - Advanced"
 		 fit_panel="true">
 			<panel
 			 follows="all"
 			 layout="topleft"
-			 height="298"
+			 height="165"
 			 left="0"
 			 top="0"
 			 right="-1"
@@ -250,84 +250,13 @@ Row conventions:
 				 name="tone_agx_white"
 				 tool_tip="White point for the AgX operator (no effect on other operators)"
 				 control_name="RenderTonemapAgxWhite" />
-				<check_box
-				 follows="left|top"
-				 layout="topleft"
-				 height="16"
-				 left="8"
-				 top_pad="10"
-				 width="300"
-				 label="Automatic exposure (HDR)"
-				 tool_tip="Dynamically adapt exposure to scene brightness. Requires HDR rendering."
-				 name="tone_autoexposure"
-				 enabled_control="RenderHDREnabled"
-				 control_name="RenderDynamicExposureEnabled" />
-				<setting_row
-				 follows="left|top|right"
-				 layout="topleft"
-				 left="8"
-				 top_pad="9"
-				 right="-8"
-				 height="18"
-				 label="Auto-exposure strength"
-				 decimal_digits="2"
-				 increment="0.01"
-				 min_val="0.05"
-				 max_val="1"
-				 name="tone_autoexp_coeff"
-				 tool_tip="How strongly automatic exposure reacts to scene luminance"
-				 enabled_control="RenderDynamicExposureEnabled"
-				 control_name="RenderDynamicExposureCoefficient" />
-				<setting_row
-				 follows="left|top|right"
-				 layout="topleft"
-				 left="8"
-				 top_pad="8"
-				 right="-8"
-				 height="18"
-				 label="Adapt speed (far)"
-				 decimal_digits="2"
-				 increment="0.01"
-				 min_val="0.01"
-				 max_val="1"
-				 name="tone_autoexp_speed_error"
-				 tool_tip="How quickly exposure adapts while far from its target"
-				 enabled_control="RenderDynamicExposureEnabled"
-				 control_name="RenderDynamicExposureSpeedError" />
-				<setting_row
-				 follows="left|top|right"
-				 layout="topleft"
-				 left="8"
-				 top_pad="8"
-				 right="-8"
-				 height="18"
-				 label="Adapt speed (near)"
-				 decimal_digits="1"
-				 increment="0.1"
-				 min_val="0.1"
-				 max_val="10"
-				 name="tone_autoexp_speed_target"
-				 tool_tip="How quickly exposure settles once near its target"
-				 enabled_control="RenderDynamicExposureEnabled"
-				 control_name="RenderDynamicExposureSpeedTarget" />
-				<check_box
-				 follows="left|top"
-				 layout="topleft"
-				 height="16"
-				 left="8"
-				 top_pad="10"
-				 width="300"
-				 label="Use sky exposure range"
-				 tool_tip="Let the active sky's HDR settings define the automatic exposure range"
-				 name="tone_autoexp_sky"
-				 control_name="RenderUseExposureSkySettings" />
 				<button
 				 follows="top|right"
 				 layout="topleft"
 				 height="18"
 				 width="100"
 				 right="-8"
-				 top_pad="12"
+				 top_pad="10"
 				 label="Reset All"
 				 halign="left"
 				 scale_image="true"
@@ -338,6 +267,260 @@ Row conventions:
 					<button.commit_callback
 					 function="LightBox.ResetSection"
 					 parameter="sec_tone_adv" />
+				</button>
+			</panel>
+		</accordion_tab>
+		<accordion_tab
+		 expanded="false"
+		 layout="topleft"
+		 height="168"
+		 name="atab_sec_autoexp"
+		 title="Auto Exposure"
+		 fit_panel="true">
+			<!-- A real setting on the header, like the grading master: it can be read
+			     and thrown with the section shut, and it is saved with the Look. -->
+			<accordion_tab.header_check_box
+			 name="autoexp_enable"
+			 control_name="RenderDynamicExposureEnabled"
+			 tool_tip="Automatic exposure: meters the frame and sets the exposure so its middle tones sit at middle grey. Classic skies keep a fixed exposure. This one is a setting and is saved with the Look." />
+			<panel
+			 follows="all"
+			 layout="topleft"
+			 height="139"
+			 left="0"
+			 top="0"
+			 right="-1"
+			 name="sec_autoexp">
+				<setting_row
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top="7"
+				 right="-8"
+				 height="18"
+				 label="Compensation"
+				 decimal_digits="1"
+				 increment="0.1"
+				 min_val="-4"
+				 max_val="4"
+				 name="autoexp_compensation"
+				 tool_tip="Brightens (+) or darkens (-) the metered exposure, in stops: +1 doubles the image's brightness"
+				 enabled_control="RenderDynamicExposureEnabled"
+				 control_name="AlchemyExposureCompensation" />
+				<text
+				 follows="left|top"
+				 layout="topleft"
+				 left="8"
+				 top_pad="9"
+				 width="140"
+				 height="15"
+				 name="autoexp_metering_label"
+				 value="Metering" />
+				<combo_box
+				 follows="left|top|right"
+				 layout="topleft"
+				 left_delta="140"
+				 top_pad="-16"
+				 right="-32"
+				 height="18"
+				 name="autoexp_metering_combo"
+				 tool_tip="Which part of the frame the exposure is metered on"
+				 enabled_control="RenderDynamicExposureEnabled"
+				 control_name="AlchemyExposureMeteringMode">
+					<combo_box.item
+					 label="Average"
+					 name="0"
+					 value="0" />
+					<combo_box.item
+					 label="Center-weighted"
+					 name="1"
+					 value="1" />
+					<combo_box.item
+					 label="Spot"
+					 name="2"
+					 value="2" />
+				</combo_box>
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="18"
+				 right="-8"
+				 top_pad="-18"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="center"
+				 name="autoexp_metering_rst"
+				 tool_tip="Reset to default"
+				 enabled_control="RenderDynamicExposureEnabled">
+					<button.commit_callback
+					 function="LightBox.ResetControlDefault"
+					 parameter="AlchemyExposureMeteringMode" />
+				</button>
+				<setting_row
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
+				 label="Darkest scene (EV)"
+				 decimal_digits="1"
+				 increment="0.1"
+				 min_val="-8"
+				 max_val="0"
+				 name="autoexp_min_ev"
+				 tool_tip="How far a dark scene is opened up, in stops: -3 brightens it by at most 8x"
+				 enabled_control="RenderDynamicExposureEnabled"
+				 control_name="AlchemyExposureMinEV" />
+				<setting_row
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
+				 label="Brightest scene (EV)"
+				 decimal_digits="1"
+				 increment="0.1"
+				 min_val="0"
+				 max_val="8"
+				 name="autoexp_max_ev"
+				 tool_tip="How far a bright scene is stopped down, in stops: 4 darkens it by at most 16x"
+				 enabled_control="RenderDynamicExposureEnabled"
+				 control_name="AlchemyExposureMaxEV" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="100"
+				 right="-8"
+				 top_pad="10"
+				 label="Reset All"
+				 halign="left"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="right"
+				 name="sec_autoexp_reset"
+				 tool_tip="Reset this section (including Advanced) to defaults">
+					<button.commit_callback
+					 function="LightBox.ResetSection"
+					 parameter="sec_autoexp" />
+				</button>
+			</panel>
+		</accordion_tab>
+		<accordion_tab
+		 expanded="false"
+		 layout="topleft"
+		 height="194"
+		 name="atab_sec_autoexp_adv"
+		 title="Auto Exposure - Advanced"
+		 fit_panel="true">
+			<panel
+			 follows="all"
+			 layout="topleft"
+			 height="165"
+			 left="0"
+			 top="0"
+			 right="-1"
+			 name="sec_autoexp_adv">
+				<setting_row
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top="7"
+				 right="-8"
+				 height="18"
+				 label="Adapt to brighter"
+				 decimal_digits="1"
+				 increment="0.1"
+				 min_val="0.1"
+				 max_val="10"
+				 name="autoexp_speed_up"
+				 tool_tip="How fast the exposure follows a scene that gets brighter, per second: 3 covers 95% of the change in one second"
+				 enabled_control="RenderDynamicExposureEnabled"
+				 control_name="AlchemyExposureSpeedUp" />
+				<setting_row
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
+				 label="Adapt to darker"
+				 decimal_digits="1"
+				 increment="0.1"
+				 min_val="0.1"
+				 max_val="10"
+				 name="autoexp_speed_down"
+				 tool_tip="How fast the exposure follows a scene that gets darker, per second: 1 covers 63% of the change in one second"
+				 enabled_control="RenderDynamicExposureEnabled"
+				 control_name="AlchemyExposureSpeedDown" />
+				<setting_row
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
+				 label="Shadow cutoff %"
+				 decimal_digits="0"
+				 increment="1"
+				 min_val="0"
+				 max_val="50"
+				 name="autoexp_low_percent"
+				 tool_tip="The darkest part of the frame the meter ignores, as a percentage, so deep shadow does not move the exposure"
+				 enabled_control="RenderDynamicExposureEnabled"
+				 control_name="AlchemyExposureLowPercent" />
+				<setting_row
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
+				 label="Highlight cutoff %"
+				 decimal_digits="0"
+				 increment="1"
+				 min_val="50"
+				 max_val="100"
+				 name="autoexp_high_percent"
+				 tool_tip="The meter ignores the frame above this percentage of it, so the sun and glints do not move the exposure"
+				 enabled_control="RenderDynamicExposureEnabled"
+				 control_name="AlchemyExposureHighPercent" />
+				<setting_row
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
+				 label="Sky weight"
+				 decimal_digits="2"
+				 increment="0.05"
+				 min_val="0"
+				 max_val="1"
+				 name="autoexp_sky_weight"
+				 tool_tip="How much the sky counts toward the exposure: 0 ignores it, 1 counts it like the rest of the frame"
+				 enabled_control="RenderDynamicExposureEnabled"
+				 control_name="AlchemyExposureSkyWeight" />
+				<button
+				 follows="top|right"
+				 layout="topleft"
+				 height="18"
+				 width="100"
+				 right="-8"
+				 top_pad="10"
+				 label="Reset All"
+				 halign="left"
+				 scale_image="true"
+				 image_overlay="Refresh_Off"
+				 image_overlay_alignment="right"
+				 name="sec_autoexp_adv_reset"
+				 tool_tip="Reset the advanced auto exposure settings to defaults">
+					<button.commit_callback
+					 function="LightBox.ResetSection"
+					 parameter="sec_autoexp_adv" />
 				</button>
 			</panel>
 		</accordion_tab>

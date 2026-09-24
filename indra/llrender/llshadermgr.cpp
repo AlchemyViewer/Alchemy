@@ -1934,7 +1934,9 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("tonemap_mix");
     mReservedUniforms.push_back("tonemap_params");
     mReservedUniforms.push_back("hdri_split_screen");
-    mReservedUniforms.push_back("diffuse_luminance_scale");
+    mReservedUniforms.push_back("meter_params");
+    mReservedUniforms.push_back("meterMap");
+    mReservedUniforms.push_back("exposureHistogram");
 
     // Stars/Aurora/Meteors
     mReservedUniforms.push_back("custom_alpha");

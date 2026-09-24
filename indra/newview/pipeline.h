@@ -885,8 +885,11 @@ public:
     // for use by SSR
     LLRenderTarget          mSceneMap;
 
-    // exposure map for getting average color in scene
+    // The auto-exposure: the meter grid (luminanceF.glsl), its 64-bin histogram
+    // (exposureHistogramV.glsl), and the exposure, 1x1: x the scale, y the EV the next
+    // frame adapts from (exposureF.glsl). mLastExposure is last frame's.
     LLRenderTarget          mLuminanceMap;
+    LLRenderTarget          mExposureHistogram;
     LLRenderTarget          mExposureMap;
     LLRenderTarget          mLastExposure;
 
@@ -942,6 +945,9 @@ public:
 
     // a single triangle that covers the whole screen
     LLPointer<LLVertexBuffer> mScreenTriangleVB;
+
+    // the exposure meter's points: two per meter grid texel, its non-sky and sky parts
+    LLPointer<LLVertexBuffer> mExposureHistogramVB;
 
     //utility buffer for rendering cubes, 8 vertices are corners of a cube [-1, 1]
     LLPointer<LLVertexBuffer> mCubeVB;

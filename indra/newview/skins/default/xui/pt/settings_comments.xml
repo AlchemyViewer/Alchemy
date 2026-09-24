@@ -1865,16 +1865,12 @@
   <string>EXPERIMENTAL: preparar o buffer de profundidade com geometria de prim simples antes de renderizar com texturas.</string>
   <key>RenderDesaturateIrradiance</key>
   <string>Dessaturar a irradiância para remover o tom azulado.</string>
-  <key>RenderDiffuseLuminanceScale</key>
-  <string>Ajuste de luminância para superfícies difusas para auxiliar o comportamento de autoexposição.</string>
   <key>RenderDisablePostProcessing</key>
   <string>Desativar mapeamento de tons e correção de exposição quando o floater de construção está aberto (para artistas desenvolvendo materiais).</string>
   <key>RenderDisableVintageMode</key>
   <string>Ativa recursos adicionais do pipeline de renderização em máquinas mais novas, como HDR e texturas emissivas em conteúdo PBR.</string>
   <key>RenderDownScaleMethod</key>
   <string>Método a usar para reduzir imagens. 0 - FBO, 1 - PBO.</string>
-  <key>RenderDynamicExposureCoefficient</key>
-  <string>Coeficiente de luminância para exposição dinâmica.</string>
   <key>RenderDynamicLOD</key>
   <string>Ajustar dinamicamente o nível de detalhe.</string>
   <key>RenderEdgeDepthCutoff</key>
@@ -2211,8 +2207,6 @@
   <string>Mostrar avatares que ainda não terminaram de carregar.</string>
   <key>RenderUseAdvancedAtmospherics</key>
   <string>Usar atmosféricos pré-computados sofisticados e afins.</string>
-  <key>RenderUseExposureSkySettings</key>
-  <string>Usar as configurações de exposição do céu em vez de derivar da escala HDR.</string>
   <key>RenderUseFarClip</key>
   <string>Se falso, o culling de frustum ignorará o plano de far clip.</string>
   <key>RenderUseStreamVBO</key>

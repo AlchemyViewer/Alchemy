@@ -1855,6 +1855,105 @@
             <key>Value</key>
             <integer>1</integer>
         </map>
+        <key>AlchemyExposureCompensation</key>
+        <map>
+            <key>Comment</key>
+            <string>Automatic exposure's bias, in stops: +1 doubles the image's brightness, -1 halves it. -4 to 4.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.0</real>
+        </map>
+        <key>AlchemyExposureMinEV</key>
+        <map>
+            <key>Comment</key>
+            <string>The darkest scene automatic exposure opens up for, in stops below middle grey: -3 brightens a dark scene by at most 8x. -8 to 0.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>-3.0</real>
+        </map>
+        <key>AlchemyExposureMaxEV</key>
+        <map>
+            <key>Comment</key>
+            <string>The brightest scene automatic exposure stops down for, in stops above middle grey: 4 darkens a bright scene by at most 16x. 0 to 8.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>4.0</real>
+        </map>
+        <key>AlchemyExposureLowPercent</key>
+        <map>
+            <key>Comment</key>
+            <string>Automatic exposure ignores the darkest part of the frame, this percentage of it by weight, so deep shadow does not move it. 0 to 50.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>10.0</real>
+        </map>
+        <key>AlchemyExposureHighPercent</key>
+        <map>
+            <key>Comment</key>
+            <string>Automatic exposure ignores the brightest part of the frame, everything above this percentage of it by weight, so the sun and glints do not move it. 50 to 100.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>95.0</real>
+        </map>
+        <key>AlchemyExposureSpeedUp</key>
+        <map>
+            <key>Comment</key>
+            <string>How fast automatic exposure adapts to a brighter scene, as a rate per second: 3 covers 95% of the change in one second. 0.1 to 10.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>3.0</real>
+        </map>
+        <key>AlchemyExposureSpeedDown</key>
+        <map>
+            <key>Comment</key>
+            <string>How fast automatic exposure adapts to a darker scene, as a rate per second: 1 covers 63% of the change in one second. 0.1 to 10.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>1.0</real>
+        </map>
+        <key>AlchemyExposureMeteringMode</key>
+        <map>
+            <key>Comment</key>
+            <string>Which part of the frame automatic exposure meters: 0 = the whole frame evenly, 1 = center-weighted, 2 = a spot in the middle.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>U32</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>AlchemyExposureSkyWeight</key>
+        <map>
+            <key>Comment</key>
+            <string>How much the sky counts toward automatic exposure: 0 ignores it, 1 counts it like any other part of the frame. 0 to 1.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>1.0</real>
+        </map>
         <key>AlchemyScopeLayout</key>
         <map>
             <key>Comment</key>
