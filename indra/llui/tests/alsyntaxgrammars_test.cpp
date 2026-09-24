@@ -110,8 +110,12 @@ namespace tut
         ensure_equals("a directive and a float", lexed("lsl", "#define X 1.5e3", state, words), std::string("preprocessor:#define X 1.5e3"));
         ensure_equals("a comment after a directive is a comment", lexed("lsl", "#define X 1 // the x", state, words),
                       std::string("preprocessor:#define X 1 |comment:// the x"));
-        ensure_equals("an include's name is a string", lexed("lsl", "#include \"lib.lsl\"", state, words),
-                      std::string("preprocessor:#include |string:\"lib.lsl\""));
+        ensure_equals("an include's name is a path", lexed("lsl", "#include \"lib.lsl\"", state, words),
+                      std::string("preprocessor:#include |path:\"lib.lsl\""));
+        ensure_equals("in brackets too, and a comment after it", lexed("lsl", "#  include <lib.lsl> // the lib", state, words),
+                      std::string("preprocessor:#  include |path:<lib.lsl>|preprocessor: |comment:// the lib"));
+        ensure_equals("a macro's string is a string", lexed("lsl", "#define GREETING \"hello\"", state, words),
+                      std::string("preprocessor:#define GREETING |string:\"hello\""));
         ensure_equals("a directive continued", lexed("lsl", "#define TWICE(a) \\", state, words), std::string("preprocessor:#define TWICE(a) \\"));
         ensure_equals("goes on onto the next line", lexed("lsl", "    ((a) * 2)", state, words), std::string("preprocessor:    ((a) * 2)"));
         ensure_equals("and ends with it", lexed("lsl", "integer y;", state, words), std::string("type:integer|text: y|punctuation:;"));
@@ -284,5 +288,22 @@ namespace tut
         ensure("nor with attributes", !xml->opensBlock("<a b=\"c\"/>"));
         ensure("the last tag, open", xml->opensBlock("<a/> <b>"));
         ensure("not a closing tag's line", !xml->opensBlock("</a>"));
+    }
+
+    template<> template<>
+    void alsyntaxgrammars_object::test<10>()
+    {
+        set_test_name("SLua: what a require takes in by name is a path; any other string is a string");
+        ALSyntaxWords words;
+        words.set("function", { "require", "print" });
+        ALSyntaxState state;
+        ensure_equals("a module's path", lexed("slua", "local util = require(\"./util\")", state, words),
+                      std::string("control:local|text: util |operator:=|text: |function:require|punctuation:(|path:\"./util\"|punctuation:)"));
+        ensure_equals("in single quotes, spaced", lexed("slua", "require( 'lib' ).greet()", state, words),
+                      std::string("function:require|punctuation:(|text: |path:'lib'|text: |punctuation:).|text:greet|punctuation:()"));
+        ensure_equals("another call's string is a string", lexed("slua", "print(\"./util\")", state, words),
+                      std::string("function:print|punctuation:(|string:\"./util\"|punctuation:)"));
+        ensure_equals("and after a require, the line goes on as before", lexed("slua", "print(\"hi\")", state, words),
+                      std::string("function:print|punctuation:(|string:\"hi\"|punctuation:)"));
     }
 }

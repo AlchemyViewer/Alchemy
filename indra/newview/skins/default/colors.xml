@@ -1234,6 +1234,9 @@
   <color
     name="SyntaxGlobalVariable"
     reference="SyntaxVariable" />
+  <color
+    name="SyntaxPath"
+    reference="SyntaxString" />
 
   <!-- Script Studio's editors: the legacy script colours for the text,
        and every token kind under the Script prefix, which a theme sets as
@@ -1356,6 +1359,9 @@
   <color
     name="ScriptGlobalVariable"
     value="0.016 0.318 0.647 1" />
+  <color
+    name="ScriptPath"
+    reference="ScriptString" />
 
   <!-- the code editor's gutter and marks -->
   <color

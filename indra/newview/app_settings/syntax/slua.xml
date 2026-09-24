@@ -182,6 +182,18 @@
         </map>
         <map>
           <key>regex</key>
+          <string>(require)\s*\(\s*["']</string>
+          <key>consume</key>
+          <integer>1</integer>
+          <key>not_after_chars</key>
+          <string>A-Za-z0-9_.:</string>
+          <key>kind</key>
+          <string>function</string>
+          <key>push</key>
+          <string>require</string>
+        </map>
+        <map>
+          <key>regex</key>
           <string>(export)\s+(?:local|const|function|type)\b</string>
           <key>consume</key>
           <integer>1</integer>
@@ -270,6 +282,58 @@
           <string>punctuation</string>
         </map>
       </array>
+      <key>require</key>
+      <map>
+        <key>default</key>
+        <string>text</string>
+        <key>rules</key>
+        <array>
+          <map>
+            <key>match</key>
+            <string>(</string>
+            <key>kind</key>
+            <string>punctuation</string>
+          </map>
+          <map>
+            <key>span</key>
+            <string>"</string>
+            <key>end</key>
+            <string>"</string>
+            <key>escape</key>
+            <string>\</string>
+            <key>kind</key>
+            <string>path</string>
+            <key>multiline</key>
+            <boolean>0</boolean>
+          </map>
+          <map>
+            <key>span</key>
+            <string>'</string>
+            <key>end</key>
+            <string>'</string>
+            <key>escape</key>
+            <string>\</string>
+            <key>kind</key>
+            <string>path</string>
+            <key>multiline</key>
+            <boolean>0</boolean>
+          </map>
+          <map>
+            <key>match</key>
+            <string>)</string>
+            <key>kind</key>
+            <string>punctuation</string>
+            <key>pop</key>
+            <boolean>1</boolean>
+          </map>
+          <map>
+            <key>eol</key>
+            <boolean>1</boolean>
+            <key>pop</key>
+            <boolean>1</boolean>
+          </map>
+        </array>
+      </map>
       <key>line_comment</key>
       <map>
         <key>default</key>

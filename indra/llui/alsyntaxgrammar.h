@@ -72,6 +72,10 @@ enum class ALSyntaxKind : U8
     Namespace,
     State,
     GlobalVariable,
+    // What a directive or a call names to be taken in -- an `#include`'s
+    // file, a `require`'s module: not words to be read, and drawn as a
+    // string wherever a theme says nothing of it.
+    Path,
     COUNT
 };
 

@@ -1090,7 +1090,7 @@ namespace tut
     template<> template<>
     void altextview_object::test<33>()
     {
-        set_test_name("what an #include names, and a string that is a file's name or an address, is no prose to check");
+        set_test_name("what an #include or a require names, and a string that is a file's name or an address, is no prose to check");
         ALTextView& v = make("");
         v.setSpellChecker([](const std::string& word) {
             static const std::set<std::string> unknown = { "utils", "lsl", "helo", "teh", "mylib" };
@@ -1111,5 +1111,11 @@ namespace tut
         ensure_equals("a sentence is checked, file-like words and all", v.misspellings(4).size(), size_t(2));
         ensure("an include spaced out, and the comment after it checked",
                v.misspellings(5).size() == 1 && v.document().line(5).substr(v.misspellings(5).front().first, 3) == "teh");
+        // What a require takes in by name, a bare word as it may be, is the
+        // grammar's path; a string said is still words.
+        v.setSyntax("slua");
+        v.setText("local u = require(\"utils\")\nprint(\"teh utils\")\n");
+        ensure("a module's name", v.misspellings(0).empty());
+        ensure_equals("a sentence", v.misspellings(1).size(), size_t(2));
     }
 }

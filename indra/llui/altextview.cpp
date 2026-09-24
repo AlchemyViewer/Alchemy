@@ -89,6 +89,7 @@ namespace
         "Control",    "Type",        "Constant",     "Function",  "Event",          "Label",     "Operator",
         "Punctuation", "Preprocessor", "Tag",        "Attribute", "AttributeValue", "Entity",    "Variable",
         "Parameter",  "Property",    "Deprecated",   "Invalid",     "Namespace",      "State",     "GlobalVariable",
+        "Path",
     };
     static_assert(sizeof(KIND_COLOR_SUFFIXES) / sizeof(KIND_COLOR_SUFFIXES[0]) == static_cast<size_t>(ALSyntaxKind::COUNT), "every kind has a colour");
 
@@ -1364,8 +1365,9 @@ void ALTextView::checkLine(S32 line)
         return;
     }
     // A string that names a file rather than saying anything is no prose:
-    // what an `#include` names, and anything one word long with a dot or a
-    // slash in it -- a module's path, a file's, an address.
+    // anything one word long with a dot or a slash in it -- a file's path,
+    // an address. What a directive or a call takes in by name is the
+    // grammar's to say, as a path, which is never checked.
     const auto names_a_file = [&text](const ALSyntaxToken& token) {
         std::string_view inner(text.data() + token.begin, static_cast<size_t>(token.end - token.begin));
         if (!inner.empty() && (inner.front() == '"' || inner.front() == '\''))
@@ -1378,17 +1380,10 @@ void ALTextView::checkLine(S32 line)
         }
         return !inner.empty() && inner.find_first_of(" \t") == std::string_view::npos && inner.find_first_of("./\\") != std::string_view::npos;
     };
-    bool included = false;
     for (const ALSyntaxToken& token : mHighlighter.tokens(line))
     {
-        if (token.kind == ALSyntaxKind::Preprocessor)
-        {
-            std::string_view directive(text.data() + token.begin, static_cast<size_t>(token.end - token.begin));
-            directive.remove_prefix(std::min(directive.size(), directive.find_first_not_of("# \t")));
-            included = included || directive.compare(0, 7, "include") == 0;
-        }
         const bool prose = token.kind == ALSyntaxKind::Comment || token.kind == ALSyntaxKind::DocComment ||
-                           (token.kind == ALSyntaxKind::String && !included && !names_a_file(token));
+                           (token.kind == ALSyntaxKind::String && !names_a_file(token));
         if (prose)
         {
             check_stretch(token.begin, token.end);

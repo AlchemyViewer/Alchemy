@@ -41,7 +41,7 @@ namespace
         "text",     "comment",  "doc_comment", "string",       "escape",       "number",   "keyword",   "control",
         "type",     "constant", "function",    "event",        "label",        "operator", "punctuation", "preprocessor",
         "tag",      "attribute", "attribute_value", "entity",   "variable",     "parameter", "property", "deprecated", "invalid",
-        "namespace", "state",   "global_variable",
+        "namespace", "state",   "global_variable", "path",
     };
     static_assert(sizeof(KIND_NAMES) / sizeof(KIND_NAMES[0]) == static_cast<size_t>(ALSyntaxKind::COUNT), "every kind has a name");
 

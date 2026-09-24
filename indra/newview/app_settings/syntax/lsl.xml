@@ -85,6 +85,14 @@
       <array>
         <map>
           <key>regex</key>
+          <string>#[ \t]*include\b</string>
+          <key>kind</key>
+          <string>preprocessor</string>
+          <key>push</key>
+          <string>include</string>
+        </map>
+        <map>
+          <key>regex</key>
           <string>#[ \t]*[A-Za-z_]+</string>
           <key>kind</key>
           <string>preprocessor</string>
@@ -230,6 +238,52 @@
             <boolean>1</boolean>
             <key>unless_after</key>
             <string>\</string>
+            <key>pop</key>
+            <boolean>1</boolean>
+          </map>
+        </array>
+      </map>
+      <key>include</key>
+      <map>
+        <key>default</key>
+        <string>preprocessor</string>
+        <key>rules</key>
+        <array>
+          <map>
+            <key>match</key>
+            <string>//</string>
+            <key>kind</key>
+            <string>comment</string>
+            <key>push</key>
+            <string>line_comment</string>
+          </map>
+          <map>
+            <key>span</key>
+            <string>/*</string>
+            <key>end</key>
+            <string>*/</string>
+            <key>kind</key>
+            <string>comment</string>
+          </map>
+          <map>
+            <key>span</key>
+            <string>"</string>
+            <key>end</key>
+            <string>"</string>
+            <key>kind</key>
+            <string>path</string>
+          </map>
+          <map>
+            <key>span</key>
+            <string>&lt;</string>
+            <key>end</key>
+            <string>&gt;</string>
+            <key>kind</key>
+            <string>path</string>
+          </map>
+          <map>
+            <key>eol</key>
+            <boolean>1</boolean>
             <key>pop</key>
             <boolean>1</boolean>
           </map>

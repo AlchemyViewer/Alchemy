@@ -83,6 +83,7 @@ namespace
         { "ScriptNamespace", "ScriptType" },
         { "ScriptState", "ScriptLabel" },
         { "ScriptGlobalVariable", "ScriptVariable" },
+        { "ScriptPath", "ScriptString" },
     };
 
     // A kind's name split for reading: "DocComment" as "Doc comment".
