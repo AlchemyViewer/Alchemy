@@ -31,6 +31,7 @@
 #include "llscripteditorws.h"
 
 #include "alfloaterscriptstudio.h"
+#include "alscriptworkspace.h"
 
 #include "llagent.h"
 #include "llagentcamera.h"
@@ -1879,8 +1880,45 @@ LLSD LLScriptEditorWSServer::saveScript(LLViewerObject* prim, LLInventoryItem* i
     // Keep stable identifiers for use after await_async_result().
     const LLUUID prim_id = prim->getID();
     const LLUUID item_id = item->getUUID();
+    const LLViewerInventoryItem* viewer_item = dynamic_cast<const LLViewerInventoryItem*>(item);
+    bool is_running = viewer_item ? viewer_item->getIsRunning() : false;
+    if (params.has("running"))
+    {
+        is_running = params["running"].asBoolean();
+    }
+    if (region_of(prim)->getCapability("UpdateScriptTask").empty())
+        throw LLJSONRPCConnection::InternalError("UpdateScriptTask capability not available");
 
-    std::string url = region_of(prim)->getCapability("UpdateScriptTask");
+    // The experience it runs under: the upload sets whatever it is sent, and
+    // none takes it away, so it is asked of the region first, as the
+    // studio's own save asks. A save that cannot learn it is refused rather
+    // than strip it.
+    const LLSD asked = await_async_result(
+        "objectContentSaveExperience", ASSET_FETCH_TIMEOUT, "The script's experience was not answered",
+        [prim_id, item_id](const std::string& pump_name)
+        {
+            ALScriptWorkspace::instance().askExperience(ALScriptRef(prim_id, item_id), [pump_name](const std::optional<LLUUID>& experience) {
+                LLSD said;
+                if (experience)
+                {
+                    said["experience"] = *experience;
+                }
+                else
+                {
+                    said["unknown"] = true;
+                }
+                LLEventPumps::instance().post(pump_name, said);
+            });
+        });
+    if (asked.has("unknown"))
+        throw LLJSONRPCConnection::InternalError(LLTrans::getString("WorkspaceExperienceUnknown"));
+    const LLUUID experience = asked["experience"].asUUID();
+
+    // The object again, after the wait: it may have gone out of view.
+    LLViewerObject* holder = gObjectList.findObject(prim_id);
+    if (!holder)
+        throw LLJSONRPCConnection::InvalidParams("Prim not found");
+    std::string url = region_of(holder)->getCapability("UpdateScriptTask");
     if (url.empty())
         throw LLJSONRPCConnection::InternalError("UpdateScriptTask capability not available");
 
@@ -1889,16 +1927,9 @@ LLSD LLScriptEditorWSServer::saveScript(LLViewerObject* prim, LLInventoryItem* i
         [&, prim_id, item_id](const std::string& pump_name)
         {
             auto [on_success, on_failure] = make_asset_upload_callbacks(pump_name);
-            const LLViewerInventoryItem* viewer_item =
-                dynamic_cast<const LLViewerInventoryItem*>(item);
-            bool is_running = viewer_item ? viewer_item->getIsRunning() : false;
-            if (params.has("running"))
-            {
-                is_running = params["running"].asBoolean();
-            }
             LLResourceUploadInfo::ptr_t uploadInfo(std::make_shared<LLScriptAssetUpload>(
                 prim_id, item_id,
-                compile_target, is_running, LLUUID::null, content,
+                compile_target, is_running, experience, content,
                 std::move(on_success), std::move(on_failure)));
             LLViewerAssetUpload::EnqueueInventoryUpload(url, uploadInfo);
         });
