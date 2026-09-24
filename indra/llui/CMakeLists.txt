@@ -445,6 +445,7 @@ if(AL_BUILD_TESTS)
   foreach(
     test
     llstatbar
+    lltextparser
     llview
     lluistring
     llxuiparser
