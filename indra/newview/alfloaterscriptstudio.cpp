@@ -31,6 +31,7 @@
 #include "alnotecarditems.h"
 #include "alscriptmodules.h"
 #include "alscriptpreprocessor.h"
+#include "alscriptweightspane.h"
 #include "alemptystate.h"
 #include "aljumpbar.h"
 #include "aloutputview.h"
@@ -640,6 +641,8 @@ bool ALFloaterScriptStudio::postBuild()
     mProblems      = getChild<ALPaneList>("problems");
     mReferences    = getChild<ALPaneList>("references");
     mOutline       = getChild<ALPaneList>("outline");
+    mWeightsPane   = std::make_unique<ALScriptWeightsPane>(*getChild<LLPanel>("weights_tab"), *this);
+    mWeightsParts  = mWeightsPane->partsList();
     mSymbol        = getChild<ALTextView>("symbol");
     // The declaration, in the script the inspector is about or in the
     // include it was declared in.
@@ -720,6 +723,8 @@ bool ALFloaterScriptStudio::postBuild()
     }
     mReferences->setCommitCallback([this](LLUICtrl*, const LLSD&) { onReferenceChosen(false); });
     mReferences->setDoubleClickCallback([this]() { onReferenceChosen(true); });
+    mWeightsParts->setCommitCallback([this](LLUICtrl*, const LLSD&) { onWeightChosen(false); });
+    mWeightsParts->setDoubleClickCallback([this]() { onWeightChosen(true); });
     mOutline->setCommitCallback([this](LLUICtrl*, const LLSD&) { onOutlineChosen(false); });
     mOutline->setDoubleClickCallback([this]() { onOutlineChosen(true); });
     offerOutputObject(LLUUID::null, std::string());
@@ -792,7 +797,8 @@ bool ALFloaterScriptStudio::postBuild()
     const std::pair<ALPaneList*, std::function<void()>> lists[] = { { mProblems, [this]() { onProblemSelected(true); } },
                                                                           { mReferences, [this]() { onReferenceChosen(true); } },
                                                                           { mOutline, [this]() { onOutlineChosen(true); } },
-                                                                          { mSearchResults, [this]() { onSearchResult(true); } } };
+                                                                          { mSearchResults, [this]() { onSearchResult(true); } },
+                                                                          { mWeightsParts, [this]() { onWeightChosen(true); } } };
     for (const auto& [list, go] : lists)
     {
         list->setKeyHandler([this, list, go](KEY key, MASK mask) {
@@ -1362,6 +1368,33 @@ void ALFloaterScriptStudio::draw()
         mOutputUnread = false;
         refreshBottomTabs();
     }
+    // The Weights tab, filled while it is looked at: with what came since,
+    // or with the script now in front; and that script weighed for the
+    // targets beside its own, which the tab alone asks for.
+    const bool weights_shown = weightsShown();
+    if (weights_shown)
+    {
+        Doc* doc = active();
+        if (mWeightsStale || !mWeightsWereShown || (doc ? doc->id : std::string()) != mWeightsPane->shownId())
+        {
+            mWeightsStale = false;
+            refreshWeights();
+        }
+        if (doc && !doc->weighing && doc->analysisVersion == doc->editor->document().version())
+        {
+            for (const ALScriptWeight::Target target : weighedTargets(*doc))
+            {
+                const bool held = doc->weightsVersion == doc->editor->document().version() &&
+                                  std::any_of(doc->weights.begin(), doc->weights.end(), [target](const ALScriptWeight& w) { return w.target == target; });
+                if (!held)
+                {
+                    weigh(*doc);
+                    break;
+                }
+            }
+        }
+    }
+    mWeightsWereShown = weights_shown;
     ALStudioFloater::draw();
 }
 
@@ -3708,12 +3741,11 @@ void ALFloaterScriptStudio::askAnalyzer(Doc& doc, ALScriptAnalysis::Kind kind, c
     }
     if (kind == ALScriptAnalysis::Kind::Weigh)
     {
-        const std::optional<ALScriptWeight::Target> target = weightTarget(doc);
-        if (!target)
+        request.targets = weighedTargets(doc);
+        if (request.targets.empty())
         {
             return;
         }
-        request.targets = { *target };
     }
     else if (lslFragment(doc))
     {
@@ -3928,11 +3960,24 @@ void ALFloaterScriptStudio::weighed(Doc& doc, const ALScriptAnalysis::Result& re
     {
         return;
     }
+    // In the source's places, through the expansion the question was
+    // asked over -- which answered() has made sure is the one there is.
+    doc.weights.clear();
+    for (const ALScriptWeight& weight : result.weights)
+    {
+        doc.weights.push_back(preprocessed(doc) && doc.expanded.valid ? weight.inSource(doc.expanded.map) : weight);
+    }
+    doc.weightsVersion = result.version;
+    keepSavedWeights(doc);
+    if (&doc == active())
+    {
+        mWeightsStale = true;
+    }
     // What a preprocessor's run made to be sent, weighed, says more of the
     // same text than its check does: it stands until the text changes.
     if (!doc.weightSent || doc.weightVersion != result.version)
     {
-        doc.weight        = result.weights.front();
+        doc.weight        = doc.weights.front();
         doc.weightVersion = result.version;
         doc.weightSent    = false;
         // What was weighed is what a save compiles where the preprocessor
@@ -3962,29 +4007,24 @@ void ALFloaterScriptStudio::weighSent(Doc& doc, bool then_upload)
     request.lua     = doc.language.lua;
     request.text    = doc.uploaded.disabled ? doc.editor->text() : doc.uploaded.text;
     request.targets = { *target };
-    // What a save weighs is what it sends, kept with the question: a run
-    // since -- a setting changed while it was weighed -- is of another
-    // text, and weighs its own.
-    std::optional<Doc::Expanded> sent;
-    if (then_upload)
-    {
-        sent                 = doc.uploaded;
-        doc.uploadAfterWeigh = true;
-    }
+    // What was weighed kept with the question, its map for the places and,
+    // for a save, its text as what goes: a run since -- a setting changed
+    // while it was weighed -- is of another text, and weighs its own.
+    doc.uploadAfterWeigh = doc.uploadAfterWeigh || then_upload;
     const LLHandle<LLFloater> handle = getHandle();
-    ALScriptAnalysis::instance().ask(std::move(request), [handle, sent = std::move(sent)](const ALScriptAnalysis::Result& result) {
+    ALScriptAnalysis::instance().ask(std::move(request), [handle, sent = doc.uploaded, then_upload](const ALScriptAnalysis::Result& result) {
         ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get());
         const size_t           index  = studio ? studio->indexOf(result.id) : NONE;
         if (index != NONE)
         {
-            studio->weighedSent(*studio->mDocs[index], result, sent ? &*sent : nullptr);
+            studio->weighedSent(*studio->mDocs[index], result, sent, then_upload);
         }
     });
 }
 
-void ALFloaterScriptStudio::weighedSent(Doc& doc, const ALScriptAnalysis::Result& result, const Doc::Expanded* sent)
+void ALFloaterScriptStudio::weighedSent(Doc& doc, const ALScriptAnalysis::Result& result, const Doc::Expanded& sent, bool then_upload)
 {
-    if (sent)
+    if (then_upload)
     {
         doc.uploadAfterWeigh = false;
     }
@@ -3994,7 +4034,7 @@ void ALFloaterScriptStudio::weighedSent(Doc& doc, const ALScriptAnalysis::Result
         // The text moved on while it was weighed: a save goes again from
         // the start, as it does where the text moves on while the
         // includes come.
-        if (sent)
+        if (then_upload)
         {
             save(doc);
         }
@@ -4003,13 +4043,17 @@ void ALFloaterScriptStudio::weighedSent(Doc& doc, const ALScriptAnalysis::Result
     const ALScriptWeight* weight = result.weights.empty() ? nullptr : &result.weights.front();
     if (weight)
     {
-        doc.weight        = *weight;
+        doc.weight        = weight->inSource(sent.map);
         doc.weightVersion = result.version;
         doc.weightExact   = true;
         doc.weightSent    = true;
         refreshProblems(doc);
+        if (&doc == active())
+        {
+            mWeightsStale = true;
+        }
     }
-    if (!sent)
+    if (!then_upload)
     {
         return;
     }
@@ -4029,7 +4073,59 @@ void ALFloaterScriptStudio::weighedSent(Doc& doc, const ALScriptAnalysis::Result
         showBottom("problems_tab");
         return;
     }
-    sendPreprocessed(doc, *sent);
+    sendPreprocessed(doc, sent);
+}
+
+std::vector<ALScriptWeight::Target> ALFloaterScriptStudio::weighedTargets(const Doc& doc) const
+{
+    const std::optional<ALScriptWeight::Target> own = weightTarget(doc);
+    if (!own)
+    {
+        return {};
+    }
+    std::vector<ALScriptWeight::Target> targets = { *own };
+    // Three compiles where one would do are the analyzer's time that a
+    // completion waits behind: the other two only while they are looked
+    // at.
+    const bool in_front = mActive < mDocs.size() && mDocs[mActive].get() == &doc;
+    if (!doc.language.lua && in_front && weightsShown())
+    {
+        for (const ALScriptWeight::Target other : { ALScriptWeight::Target::LSO, ALScriptWeight::Target::Mono, ALScriptWeight::Target::LSLLuau })
+        {
+            if (other != *own)
+            {
+                targets.push_back(other);
+            }
+        }
+    }
+    return targets;
+}
+
+void ALFloaterScriptStudio::keepSavedWeights(Doc& doc)
+{
+    if (doc.editor->isDirty() || doc.weightsVersion != doc.editor->document().version())
+    {
+        return;
+    }
+    // Each target's in place of what it weighed before, the others kept: a
+    // target weighed only while the tab was looked at is counted from what
+    // it was then.
+    for (const ALScriptWeight& weight : doc.weights)
+    {
+        auto held = std::find_if(doc.weightsSaved.begin(), doc.weightsSaved.end(), [&weight](const ALScriptWeight& w) { return w.target == weight.target; });
+        if (held != doc.weightsSaved.end())
+        {
+            *held = weight;
+        }
+        else
+        {
+            doc.weightsSaved.push_back(weight);
+        }
+    }
+    if (&doc == active())
+    {
+        mWeightsStale = true;
+    }
 }
 
 void ALFloaterScriptStudio::actionsAnswered(Doc& doc, const ALScriptAnalysis::Result& result, U32 expansion)
@@ -4386,7 +4482,7 @@ namespace
     // them by: what vimCommand runs and vimComplete offers, one list.
     const char* const VIM_MENU_COMMANDS[] = { "format", "problems", "references", "output", "search", "preferences", "pop_out",
                                               "reveal", "save_all", "revert", "external_editor", "save_file", "save_as", "load_file",
-                                              "open_file", "fold_all", "unfold_all", "go_to_line", "quick_fix", "fix_all" };
+                                              "open_file", "fold_all", "unfold_all", "go_to_line", "quick_fix", "fix_all", "weights" };
 }
 
 ALFloaterScriptStudio::Doc* ALFloaterScriptStudio::docOf(const ALTextView& view)
@@ -5129,6 +5225,7 @@ void ALFloaterScriptStudio::compiledHere(const ALScriptWorkspace::CompileResult&
     {
         doc.editor->markSavedAt(doc.sentAt);
         doc.targetChosen = false;
+        keepSavedWeights(doc);
     }
     if (result.newAssetId.notNull())
     {
@@ -6898,6 +6995,10 @@ void ALFloaterScriptStudio::pumpSettle()
     {
         onSearchResult(false);
     }
+    else if (list == mWeightsParts)
+    {
+        onWeightChosen(false);
+    }
     --mOpenPreview;
     mSettled = false;
 }
@@ -8327,6 +8428,7 @@ void ALFloaterScriptStudio::saveFile(Doc& doc)
 void ALFloaterScriptStudio::fileSettled(Doc& doc)
 {
     doc.editor->resetDirty();
+    keepSavedWeights(doc);
     keepForRecovery(doc);
     // The scripts that include it see the file as it is now.
     for (std::unique_ptr<Doc>& each : mDocs)
@@ -8526,6 +8628,92 @@ void ALFloaterScriptStudio::onReferenceChosen(bool to_editor)
     }
     --mHoldPanes;
     revealed(mReferences, to_editor);
+}
+
+bool ALFloaterScriptStudio::weightsShown() const
+{
+    const LLPanel* current = mBottomTabs ? mBottomTabs->getCurrentPanel() : nullptr;
+    return mWeightsPane && !mFolds.collapsed("bottom") && current && current->getName() == "weights_tab" && getVisible() && !isMinimized();
+}
+
+void ALFloaterScriptStudio::refreshWeights()
+{
+    Doc* doc = active();
+    LLStringUtil::format_map_t args;
+    args["[NAME]"] = doc ? doc->name : std::string();
+    if (!doc)
+    {
+        mWeightsPane->showNothing(getString("WeightsNoScript"));
+        return;
+    }
+    if (doc->loaded && !weightTarget(*doc))
+    {
+        mWeightsPane->showNothing(getString("WeightsNoTarget", args));
+        return;
+    }
+    if (!doc->loaded || doc->weights.empty())
+    {
+        mWeightsPane->showNothing(getString("WeightsNotYet", args));
+        return;
+    }
+    ALScriptWeightsPane::Shown shown;
+    shown.id      = doc->id;
+    shown.name    = doc->name;
+    shown.weights = doc->weights;
+    shown.saved   = doc->weightsSaved;
+    // Weighed as the check has the text, which is before the optimizer
+    // where one runs; what a save sends beside it, where it has been
+    // weighed of the text as it stands.
+    shown.beforeOptimizer = preprocessed(*doc) && !doc->language.lua && gSavedSettings.getBOOL("ALScriptPreprocOptimizer");
+    if (doc->weight && doc->weightSent && doc->weightVersion == doc->weightsVersion)
+    {
+        shown.sent = doc->weight->total;
+    }
+    for (const ALScriptWeight& weight : doc->weights)
+    {
+        for (const ALScriptWeight::Part& part : weight.parts)
+        {
+            if (!part.file.empty() && !shown.fileNames.contains(part.file))
+            {
+                shown.fileNames[part.file] = includeName(*doc, part.file);
+            }
+        }
+    }
+    mWeightsPane->show(std::move(shown));
+}
+
+void ALFloaterScriptStudio::onWeightChosen(bool to_editor)
+{
+    const std::optional<ALScriptWeightsPane::Place> place = mWeightsPane->chosenPlace();
+    if (!place)
+    {
+        return;
+    }
+    if (!to_editor && deferOpen(mWeightsParts, place->file))
+    {
+        return;
+    }
+    noteJump(!to_editor);
+    ++mHoldPanes;
+    if (place->file.empty())
+    {
+        // The script the tab is about, whichever is in front by now.
+        const size_t index = indexOf(mWeightsPane->shownId());
+        if (index != NONE)
+        {
+            if (index != mActive)
+            {
+                activate(index);
+            }
+            sourceInFront(*mDocs[index]).goTo(ALTextPos(place->line, place->column));
+        }
+    }
+    else
+    {
+        openIncludeAt(place->file, place->fileName, place->line, place->column, 0);
+    }
+    --mHoldPanes;
+    revealed(mWeightsParts, to_editor);
 }
 
 void ALFloaterScriptStudio::openIncludeAt(const std::string& path, const std::string& name, S32 line, S32 column, S32 length)
@@ -9657,6 +9845,7 @@ void ALFloaterScriptStudio::showBottom(const char* tab, bool focus)
     LLUICtrl* list = name == "problems_tab" ? static_cast<LLUICtrl*>(mProblems)
                      : name == "references_tab" ? static_cast<LLUICtrl*>(mReferences)
                      : name == "output_tab"     ? static_cast<LLUICtrl*>(mOutput)
+                     : name == "weights_tab"    ? static_cast<LLUICtrl*>(mWeightsParts)
                                                 : nullptr;
     if (list)
     {
@@ -14565,10 +14754,14 @@ void ALFloaterScriptStudio::onMenuAction(const LLSD& param)
     {
         insertFromLibrary(action.substr(7));
     }
-    else if (action == "problems" || action == "references" || action == "output" || action == "search")
+    else if (action == "problems" || action == "references" || action == "output" || action == "search" || action == "weights")
     {
         // The tab, shown; or the pane folded when it is the tab showing.
-        const char* tab = action == "problems" ? "problems_tab" : action == "references" ? "references_tab" : action == "output" ? "output_tab" : "search_tab";
+        const char* tab = action == "problems"     ? "problems_tab"
+                          : action == "references" ? "references_tab"
+                          : action == "output"     ? "output_tab"
+                          : action == "weights"    ? "weights_tab"
+                                                   : "search_tab";
         if (onMenuCheck(param))
         {
             mFolds.setCollapsed("bottom", true);
@@ -14886,10 +15079,14 @@ bool ALFloaterScriptStudio::onMenuCheck(const LLSD& param)
     {
         return mScrollMapLeft;
     }
-    if (action == "problems" || action == "references" || action == "output" || action == "search")
+    if (action == "problems" || action == "references" || action == "output" || action == "search" || action == "weights")
     {
         const LLPanel* current = mBottomTabs->getCurrentPanel();
-        const char*    tab     = action == "problems" ? "problems_tab" : action == "references" ? "references_tab" : action == "output" ? "output_tab" : "search_tab";
+        const char*    tab     = action == "problems"     ? "problems_tab"
+                                 : action == "references" ? "references_tab"
+                                 : action == "output"     ? "output_tab"
+                                 : action == "weights"    ? "weights_tab"
+                                                          : "search_tab";
         return !mFolds.collapsed("bottom") && current && current->getName() == tab;
     }
     if (action == "inspector")

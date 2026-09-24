@@ -28,6 +28,7 @@
 
 #include "alscriptengine.h"
 #include "allslservice.h"
+#include "alsourcemap.h"
 
 #include "Luau/Bytecode.h"
 #include "Luau/BytecodeHeader.h"
@@ -77,6 +78,47 @@ const char* ALScriptWeight::nameOf(Target target)
         default:
             return "SLua";
     }
+}
+
+ALScriptWeight ALScriptWeight::inSource(const ALSourceMap& map) const
+{
+    ALScriptWeight out = *this;
+    const auto     fileOf = [&map](S32 file) { return file > 0 && file < S32(map.files().size()) ? map.files()[file].path : std::string(); };
+    for (Part& part : out.parts)
+    {
+        if (part.line < 0)
+        {
+            continue;
+        }
+        const ALSourceMap::Loc begin = map.toSource(part.line, std::max(0, part.column));
+        if (!begin.found())
+        {
+            part.line = part.column = part.endLine = part.endColumn = -1;
+            continue;
+        }
+        const ALSourceMap::Loc end = part.endLine >= 0 ? map.toSource(part.endLine, std::max(0, part.endColumn)) : ALSourceMap::Loc();
+        part.file                  = fileOf(begin.file);
+        part.line                  = begin.line;
+        part.column                = begin.column;
+        const bool ends_after      = end.found() && end.file == begin.file && (end.line > begin.line || (end.line == begin.line && end.column >= begin.column));
+        part.endLine               = ends_after ? end.line : begin.line;
+        part.endColumn             = ends_after ? end.column : begin.column;
+    }
+    std::map<std::pair<std::string, S32>, size_t> by_line;
+    for (const Line& line : lines)
+    {
+        const ALSourceMap::Loc at = map.toSource(line.line, 0);
+        if (at.found())
+        {
+            by_line[{ fileOf(at.file), at.line }] += line.bytes;
+        }
+    }
+    out.lines.clear();
+    for (const auto& [at, bytes] : by_line)
+    {
+        out.lines.push_back({ at.second, bytes, at.first });
+    }
+    return out;
 }
 
 // --- SLua: the bytecode read back ----------------------------------------------------------
@@ -467,15 +509,11 @@ namespace
             std::string  name;
             if (top)
             {
-                name = "(the script)";
+                name = "script";
             }
             else if (p.name > 0 && p.name <= read.strings.size())
             {
                 name = read.strings[static_cast<size_t>(p.name - 1)];
-            }
-            else
-            {
-                name = "function";
             }
             ALScriptWeight::Part one = part(top ? ALScriptWeight::Part::Kind::Frame : ALScriptWeight::Part::Kind::Function, name, p.end - p.begin);
             S32 first = p.lineDefined > 0 ? static_cast<S32>(p.lineDefined) : 0;

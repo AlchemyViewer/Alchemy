@@ -27,6 +27,7 @@
 #include "../alscriptweight.h"
 
 #include "../allslservice.h"
+#include "../alsourcemap.h"
 
 #include "../test/lltut.h"
 
@@ -153,7 +154,7 @@ namespace tut
         const ALScriptWeight::Part* nothing = named(weight, "nothing");
         ensure("a function that does nothing weighs least:" + listed(weight),
                nothing && nothing->bytes < greet->bytes && nothing->bytes < count->bytes);
-        ensure("the script itself, and its strings", named(weight, "(the script)") && named(weight, "strings"));
+        ensure("the script itself, and its strings", named(weight, "script") && named(weight, "strings"));
         const size_t parts = std::accumulate(weight.parts.begin(), weight.parts.end(), size_t(0),
                                              [](size_t sum, const ALScriptWeight::Part& p) { return sum + p.bytes; });
         ensure("the parts are nearly the whole: " + std::to_string(parts) + " of " + std::to_string(weight.total),
@@ -378,5 +379,80 @@ namespace tut
             all += line.bytes;
         }
         ensure("the lines are less than the whole", all > 0 && all < weight.total);
+    }
+
+    // In the source's places: a part in an include is in the include, at
+    // its line there, and a line's bytes are the source line's; what the
+    // map has no origin for keeps its part without a place.
+    template<> template<>
+    void alscriptweight_object::test<9>()
+    {
+        ensure("builtins: " + error, lslLoaded);
+        const std::vector<std::string> lines = { "integer twice(integer n)",
+                                                 "{",
+                                                 "    return n * 2;",
+                                                 "}",
+                                                 "default",
+                                                 "{",
+                                                 "    state_entry()",
+                                                 "    {",
+                                                 "        llOwnerSay((string)twice(2));",
+                                                 "    }",
+                                                 "}" };
+        std::string expanded;
+        for (const std::string& line : lines)
+        {
+            expanded += line + "\n";
+        }
+        // The first four lines are the include's, the rest the script's from
+        // its second line on: its first is the #include.
+        const auto mapped = [&lines](bool with_include) {
+            ALSourceMap map;
+            map.addFile("script", "script");
+            map.addFile("lib.lsl", "disk:/scripts/lib.lsl");
+            for (S32 out = with_include ? 0 : 4; out < S32(lines.size()); ++out)
+            {
+                ALSourceMap::Segment segment;
+                segment.outLine = out;
+                segment.length  = S32(lines[out].size());
+                segment.file    = out < 4 ? 1 : 0;
+                segment.line    = out < 4 ? out : out - 3;
+                map.add(segment);
+            }
+            map.finish();
+            return map;
+        };
+        const ALScriptWeight weight = ALScriptWeigh::lso(expanded);
+        ensure("compiled: " + weight.error, weight.compiled);
+        const ALScriptWeight placed = weight.inSource(mapped(true));
+        ensure_equals("the same weight", placed.total, weight.total);
+        const ALScriptWeight::Part* twice = named(placed, "twice");
+        const ALScriptWeight::Part* entry = named(placed, "state_entry");
+        ensure("both:" + listed(placed), twice && entry);
+        ensure_equals("a function in the include", twice->file, std::string("disk:/scripts/lib.lsl"));
+        ensure_equals("at its line there", twice->line, 0);
+        ensure_equals("to its end there", twice->endLine, 3);
+        ensure("a handler in the script", entry->file.empty());
+        ensure_equals("at the script's line", entry->line, 3);
+        size_t in_include = 0, in_script = 0;
+        for (const ALScriptWeight::Line& line : placed.lines)
+        {
+            ensure("a line of one of the two" + lined(placed), line.file.empty() || line.file == "disk:/scripts/lib.lsl");
+            ensure("not the #include's" + lined(placed), !(line.file.empty() && line.line == 0));
+            (line.file.empty() ? in_script : in_include) += line.bytes;
+        }
+        ensure("the include's return is its line's", in_include > 0);
+        ensure("the call is the script's", in_script > 0);
+        size_t all = 0;
+        for (const ALScriptWeight::Line& line : weight.lines)
+        {
+            all += line.bytes;
+        }
+        ensure_equals("every line's bytes somewhere", in_include + in_script, all);
+
+        const ALScriptWeight lost = weight.inSource(mapped(false));
+        ensure("a part the map has no origin for is kept" + listed(lost), named(lost, "twice") != nullptr);
+        ensure_equals("without a place", named(lost, "twice")->line, -1);
+        ensure_equals("the handler still placed", named(lost, "state_entry")->line, 3);
     }
 }

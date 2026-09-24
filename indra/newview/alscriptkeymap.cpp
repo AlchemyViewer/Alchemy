@@ -189,6 +189,7 @@ namespace ALScriptKeymap
             { "output", '3', MASK_CONTROL | MASK_ALT },
             { "inspector", '4', MASK_CONTROL | MASK_ALT },
             { "search", '5', MASK_CONTROL | MASK_ALT },
+            { "weights", '6', MASK_CONTROL | MASK_ALT },
             { "expanded", 'P', MASK_CONTROL | MASK_ALT },
             { "preprocess", KEY_NONE, MASK_NONE },
             { "reference", KEY_F1, MASK_NONE },

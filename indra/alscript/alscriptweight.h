@@ -30,6 +30,8 @@
 #include <string_view>
 #include <vector>
 
+class ALSourceMap;
+
 // What a script weighs for a target: the code the target's compiler makes of
 // it, in bytes, against the memory the target runs it in -- 16 KB under LSO,
 // 64 KB under Mono, 128 KB for SLua and for LSL on Luau -- and which parts
@@ -76,6 +78,10 @@ struct ALScriptWeight
             Frame
         };
         Kind        kind = Kind::Function;
+        // What the script calls it; for what the target spends on the
+        // script as a whole, which the script has no name for, a word to
+        // say it by -- "registers", "assembly", "globals", "script",
+        // "strings" -- and nothing for a function with no name.
         std::string name;
         // What holds it: a handler's state.
         std::string within;
@@ -85,6 +91,10 @@ struct ALScriptWeight
         S32         column    = -1;
         S32         endLine   = -1;
         S32         endColumn = -1;
+        // Once in the source's places (inSource), the included file it is
+        // in, by the identity the map's files carry; empty for the script
+        // itself.
+        std::string file;
     };
     // In the order the compiler made them. A handler's bytes are in its
     // state's as well, so the parts do not add up to the total.
@@ -100,10 +110,19 @@ struct ALScriptWeight
     // for the script, are nobody's line. Only lines that made something.
     struct Line
     {
-        S32    line  = 0;
-        size_t bytes = 0;
+        S32         line  = 0;
+        size_t      bytes = 0;
+        // As a part's.
+        std::string file;
     };
     std::vector<Line> lines;
+
+    // The same weight in the places of the source a map came from: each
+    // part where its place maps, in the file it maps to, and each line the
+    // bytes of the source line it came of, lines that came of one added up.
+    // What maps nowhere -- a macro's making with no line of its own -- keeps
+    // its part without a place, and its line's bytes are nobody's.
+    ALScriptWeight inSource(const ALSourceMap& map) const;
 
     static size_t      limitOf(Target target);
     static const char* nameOf(Target target);

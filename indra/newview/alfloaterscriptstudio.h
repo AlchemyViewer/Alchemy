@@ -56,6 +56,7 @@
 class ALEmptyState;
 class ALJumpBar;
 class ALPaneList;
+class ALScriptWeightsPane;
 class ALTabStrip;
 class LLButton;
 class LLCheckBoxCtrl;
@@ -454,6 +455,13 @@ private:
         bool                                       weighing          = false;
         bool                                       saveAfterWeigh    = false;
         bool                                       uploadAfterWeigh  = false;
+        // What the Weights tab lists: each target the last check's text was
+        // weighed for, its own first, in the source's places; and each
+        // target's as the text was last saved, where it was weighed while
+        // it was that text -- what "since the save" counts from.
+        std::vector<ALScriptWeight>                weights;
+        U32                                        weightsVersion    = 0;
+        std::vector<ALScriptWeight>                weightsSaved;
         // The safe fixes made ahead of the save under way, once: a fix that
         // left its problem standing would be made again at every check the
         // save waits on.
@@ -793,7 +801,13 @@ private:
     // says it fits: `sent` is what was weighed, which is what goes, however
     // many runs have come since.
     void                      weighSent(Doc& doc, bool then_upload);
-    void                      weighedSent(Doc& doc, const ALScriptAnalysis::Result& result, const Doc::Expanded* sent);
+    void                      weighedSent(Doc& doc, const ALScriptAnalysis::Result& result, const Doc::Expanded& sent, bool then_upload);
+    // The targets a script is weighed for: its own; and for an LSL script
+    // in front while the Weights tab is looked at, the other two beside it.
+    std::vector<ALScriptWeight::Target> weighedTargets(const Doc& doc) const;
+    // What the text weighs while it is the text saved, kept for the Weights
+    // tab to count from.
+    void                      keepSavedWeights(Doc& doc);
 
     // The preprocessor: whether it applies to a script; its run over the
     // text as it stands, for the analyzers, with the way back; and its
@@ -1024,6 +1038,11 @@ private:
     // opens other scripts, and the list stays what it was.
     void fillReferences();
     void onReferenceChosen(bool to_editor);
+    // The Weights tab: whether it is looked at; the script in front's
+    // weights put in it; and a part chosen there, gone to.
+    bool weightsShown() const;
+    void refreshWeights();
+    void onWeightChosen(bool to_editor);
     // A place in an include opened in a tab of its own where the include
     // is a script or a notecard in the world; one on disk is only named.
     void openIncludeAt(const std::string& path, const std::string& name, S32 line, S32 column, S32 length);
@@ -1601,6 +1620,12 @@ private:
     LLComboBox*                        mOutputFilter  = nullptr;
     ALScopeBar*                        mSearchBar     = nullptr;
     ALPaneList*                        mSearchResults = nullptr;
+    // The Weights tab, and whether it was looked at last frame and has
+    // been told of everything since: it is filled while it is looked at.
+    std::unique_ptr<ALScriptWeightsPane> mWeightsPane;
+    ALPaneList*                        mWeightsParts      = nullptr;
+    bool                               mWeightsWereShown  = false;
+    bool                               mWeightsStale      = true;
     LLTextBox*                         mSearchCount   = nullptr;
     LLLineEditor*                      mSearchReplacement = nullptr;
     LLButton*                          mSearchReplace     = nullptr;

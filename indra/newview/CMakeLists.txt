@@ -174,6 +174,7 @@ if(AL_BUILD_VIEWER)
     alscriptkeymap.cpp
     alscriptmodules.cpp
     alscriptpreprocessor.cpp
+    alscriptweightspane.cpp
     alscriptworkspace.cpp
     alterrainsurfacemaps.cpp
     alfloaterscriptstudio.cpp
@@ -968,6 +969,7 @@ if(AL_BUILD_VIEWER)
     alscriptkeymap.h
     alscriptmodules.h
     alscriptpreprocessor.h
+    alscriptweightspane.h
     alscriptworkspace.h
     alterrainsurfacemaps.h
     altexturetable.h
@@ -2391,6 +2393,16 @@ if(AL_BUILD_TESTS)
     PROJECT ${test_project}
     LIBRARIES ${test_libs}
     SOURCES tests/llviewertexture_stub.cpp
+  )
+
+  # The Script Studio's Weights tab over the studio's own window, from the
+  # source tree's skins and fonts as llui's widget tests have them.
+  al_add_test(
+    alscriptweightspane
+    UNIT
+    PROJECT ${test_project}
+    LIBRARIES llui alscript ${test_libs}
+    DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
 
   al_add_test(cppfeatures PROJECT ${test_project} LIBRARIES ${test_libs})
