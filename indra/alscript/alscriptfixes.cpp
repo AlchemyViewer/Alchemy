@@ -782,6 +782,65 @@ namespace ALScriptFixes
         changeName(problem, Lines(text), was, now, std::move(fix), false);
     }
 
+    void offerRemoval(ALScriptProblem& problem, std::string_view text, S32 line, S32 column, S32 endLine, S32 endColumn, const std::string& name)
+    {
+        const Lines lines(text);
+        std::string_view first = lines.line(line);
+        std::string_view last  = lines.line(endLine);
+        if (!lines.offsetOf(line, column) || !lines.offsetOf(endLine, endColumn) || endLine < line || (endLine == line && endColumn <= column))
+        {
+            return;
+        }
+        // The type it is declared as, before its name.
+        static const char* const TYPES[] = { "integer", "float", "string", "key", "vector", "rotation", "quaternion", "list" };
+        S32 word_end = column;
+        while (word_end > 0 && isspace(static_cast<unsigned char>(first[word_end - 1])))
+        {
+            --word_end;
+        }
+        S32 word = word_end;
+        while (word > 0 && identifierByte(first[word - 1]))
+        {
+            --word;
+        }
+        if (word < word_end && std::find(std::begin(TYPES), std::end(TYPES), first.substr(word, word_end - word)) != std::end(TYPES))
+        {
+            column = word;
+        }
+        // The `;` that ends it, where the tree leaves it out.
+        S32 after = endColumn;
+        while (after < static_cast<S32>(last.size()) && isspace(static_cast<unsigned char>(last[after])))
+        {
+            ++after;
+        }
+        if (after < static_cast<S32>(last.size()) && last[after] == ';')
+        {
+            endColumn = after + 1;
+        }
+        // Its lines whole, where nothing else stands on them.
+        const bool alone_before = first.substr(0, column).find_first_not_of(" \t") == std::string_view::npos;
+        const bool alone_after  = last.substr(endColumn).find_first_not_of(" \t") == std::string_view::npos;
+        ALScriptFix fix         = titled("ScriptFixRemove", "Remove '[1]'", { name });
+        fix.preferred           = true;
+        fix.safe                = true;
+        if (alone_before && alone_after)
+        {
+            if (lines.offsetOf(endLine + 1, 0))
+            {
+                fix.edits.push_back({ line, 0, endLine + 1, 0, std::string() });
+            }
+            else
+            {
+                fix.edits.push_back({ line, 0, endLine, static_cast<S32>(last.size()), std::string() });
+            }
+        }
+        else
+        {
+            fix.edits.push_back({ line, column, endLine, endColumn, std::string() });
+        }
+        problem.fixes.push_back(std::move(fix));
+    }
+
     void attach(ALScriptProblems& problems, std::string_view text, bool lua)
     {
         const Lines lines(text);

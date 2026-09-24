@@ -31,6 +31,7 @@
 #include "alscriptengine.h"
 
 #include "almessagemap.h"
+#include "allsltraits.h"
 
 #include "llfile.h"
 
@@ -837,6 +838,44 @@ namespace
         problem.message = ALScriptProblem::fill(wanted.empty() ? "Unexpected [1]." : "Unexpected [1]; expected [2].", problem.args);
         problem.args.resize(wanted.empty() ? 1 : 2);
     }
+    // Whether a node declares something a warning could say goes unused: a
+    // local, a global, a function, a label or a state -- not a parameter,
+    // which cannot go.
+    bool declares(Tailslide::LSLASTNode* node)
+    {
+        const Tailslide::LSLNodeType    type = node->getNodeType();
+        const Tailslide::LSLNodeSubType sub  = node->getNodeSubType();
+        return type == Tailslide::NODE_GLOBAL_VARIABLE || type == Tailslide::NODE_GLOBAL_FUNCTION || type == Tailslide::NODE_STATE ||
+               (type == Tailslide::NODE_STATEMENT && (sub == Tailslide::NODE_DECLARATION || sub == Tailslide::NODE_LABEL));
+    }
+
+    // The declaration a warning about something unused is at: the one that
+    // starts there, or whose name does -- Tailslide places the warning at
+    // the symbol, whose place is the one or the other.
+    Tailslide::LSLASTNode* declarationAt(Tailslide::LSLASTNode* node, S32 line, S32 column)
+    {
+        if (!node)
+        {
+            return nullptr;
+        }
+        const auto at = [line, column](Tailslide::LSLASTNode* one) {
+            const Tailslide::YYLTYPE* loc = one->getLoc();
+            return zeroBased(loc->first_line) == line && zeroBased(loc->first_column) == column;
+        };
+        if (declares(node) && (at(node) || (node->getChild(0) && at(node->getChild(0)))))
+        {
+            return node;
+        }
+        for (Tailslide::LSLASTNode* child = node->getChild(0); child; child = child->getNext())
+        {
+            if (Tailslide::LSLASTNode* found = declarationAt(child, line, column))
+            {
+                return found;
+            }
+        }
+        return nullptr;
+    }
+
     // The names in scope at a place, as a name there could be spelt: the
     // script's own -- a local only from where it is declared -- and, with
     // `builtins`, the language's functions and constants.
@@ -1131,6 +1170,35 @@ ALScriptProblems ALLSLService::check(std::string_view source, bool mono)
                     ALScriptFixes::offerName(problem, source, problem.args[0], near);
                 }
             }
+        }
+    }
+    // A declaration nothing uses taken out: a local only where what it is
+    // given changes nothing, the rest -- a global's constant, a function,
+    // a label, a state -- whole.
+    if (script)
+    {
+        for (ALScriptProblem& problem : problems)
+        {
+            if (problem.key != "LSLDeclaredButNotUsed" || problem.args.size() != 2)
+            {
+                continue;
+            }
+            Tailslide::LSLASTNode* declaration = declarationAt(script, problem.line, problem.column);
+            if (!declaration)
+            {
+                continue;
+            }
+            if (declaration->getNodeSubType() == Tailslide::NODE_DECLARATION)
+            {
+                Tailslide::LSLASTNode* given = declaration->getChild(1);
+                if (given && given->getNodeType() != Tailslide::NODE_NULL && !ALLSLTraits::sideEffectFree(given))
+                {
+                    continue;
+                }
+            }
+            const Tailslide::YYLTYPE* loc = declaration->getLoc();
+            ALScriptFixes::offerRemoval(problem, source, zeroBased(loc->first_line), zeroBased(loc->first_column), zeroBased(loc->last_line),
+                                        zeroBased(loc->last_column), problem.args[1]);
         }
     }
     // What would put each right, where its words and its place say.

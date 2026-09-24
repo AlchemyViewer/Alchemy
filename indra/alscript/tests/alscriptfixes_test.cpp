@@ -383,4 +383,33 @@ namespace tut
         made = fixed("--!nonstrickt\nprint(1)\n", true, "LuauLintDirectiveUnknownDidYouMean", "Change 'nonstrickt' to 'nonstrict'");
         ensure("spelt: " + made, made.compare(0, 12, "--!nonstrict") == 0);
     }
+
+    template<> template<>
+    void object::test<14>()
+    {
+        set_test_name("an LSL declaration nothing uses is taken out whole, and a local only where what it is given does nothing");
+        ensure("builtins: " + error, lslLoaded);
+        const std::string state = "default\n{\n    state_entry()\n    {\n        llOwnerSay(\"x\");\n    }\n}\n";
+        std::string made = fixed("integer unused = 5;\n" + state, false, "LSLDeclaredButNotUsed", "Remove 'unused'");
+        ensure_equals("the global's line gone", made, state);
+        made = fixed("integer helper(integer x)\n{\n    return x;\n}\n" + state, false, "LSLDeclaredButNotUsed", "Remove 'helper'");
+        ensure_equals("the function's lines gone", made, state);
+        made = fixed("default\n{\n    state_entry()\n    {\n        integer a = 1 + 2;\n        llOwnerSay(\"x\");\n    }\n}\n", false,
+                     "LSLDeclaredButNotUsed", "Remove 'a'");
+        ensure_equals("the local's line gone", made, state);
+        const ALScriptProblem* problem = nullptr;
+        const ALScriptProblems problems =
+            check("default\n{\n    state_entry()\n    {\n        integer h = llListen(0, \"\", NULL_KEY, \"\");\n    }\n}\n", false);
+        for (const ALScriptProblem& each : problems)
+        {
+            problem = each.key == "LSLDeclaredButNotUsed" ? &each : problem;
+        }
+        ensure("said: " + said(problems), problem != nullptr);
+        ensure("kept where what it is given does something", problem->fixes.empty());
+        // One that shares its line keeps the line.
+        ALScriptProblem shared;
+        shared.line = 0;
+        ALScriptFixes::offerRemoval(shared, "integer a = 1; integer b = 2;\n", 0, 8, 0, 13, "a");
+        ensure_equals("only itself", ALScriptFixes::apply("integer a = 1; integer b = 2;\n", shared.fixes.front()).value_or(""), std::string(" integer b = 2;\n"));
+    }
 }

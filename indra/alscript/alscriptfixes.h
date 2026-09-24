@@ -55,6 +55,12 @@ namespace ALScriptFixes
     // what a service offers once it knows the names in scope there, which
     // attach() does not.
     void offerName(ALScriptProblem& problem, std::string_view text, const std::string& was, const std::string& now);
+    // The fix that takes a declaration nothing uses out of `text`, given
+    // where the service's tree says it stands: with the `;` after it and
+    // the type word before its name, and the whole of its lines where
+    // nothing else stands on them. Safe: what nobody uses changes nothing
+    // by going, where the service has seen that what it is given does not.
+    void offerRemoval(ALScriptProblem& problem, std::string_view text, S32 line, S32 column, S32 endLine, S32 endColumn, const std::string& name);
 
     // `text` with a fix's edits made, or nothing where two of them overlap
     // or one lies outside the text.
