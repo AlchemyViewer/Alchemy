@@ -148,7 +148,10 @@ namespace
                 p.line      = zeroBased(loc->first_line);
                 p.column    = zeroBased(loc->first_column);
                 p.endLine   = zeroBased(loc->last_line);
-                p.endColumn = std::max(0, loc->last_column);
+                // Tailslide's last column is one past the end, counted from
+                // one: the end as the studio counts it, as the LSL service
+                // reads it.
+                p.endColumn = zeroBased(loc->last_column);
             }
             p.message = ALScriptProblem::fill(text, args);
             p.key     = key;

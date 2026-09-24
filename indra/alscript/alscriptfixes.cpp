@@ -784,6 +784,14 @@ namespace ALScriptFixes
 
     void offerRemoval(ALScriptProblem& problem, std::string_view text, S32 line, S32 column, S32 endLine, S32 endColumn, const std::string& name)
     {
+        ALScriptFix fix = titled("ScriptFixRemove", "Remove '[1]'", { name });
+        fix.preferred   = true;
+        fix.safe        = true;
+        offerRemoval(problem, text, line, column, endLine, endColumn, std::move(fix));
+    }
+
+    void offerRemoval(ALScriptProblem& problem, std::string_view text, S32 line, S32 column, S32 endLine, S32 endColumn, ALScriptFix fix)
+    {
         const Lines lines(text);
         std::string_view first = lines.line(line);
         std::string_view last  = lines.line(endLine);
@@ -820,9 +828,7 @@ namespace ALScriptFixes
         // Its lines whole, where nothing else stands on them.
         const bool alone_before = first.substr(0, column).find_first_not_of(" \t") == std::string_view::npos;
         const bool alone_after  = last.substr(endColumn).find_first_not_of(" \t") == std::string_view::npos;
-        ALScriptFix fix         = titled("ScriptFixRemove", "Remove '[1]'", { name });
-        fix.preferred           = true;
-        fix.safe                = true;
+        fix.edits.clear();
         if (alone_before && alone_after)
         {
             if (lines.offsetOf(endLine + 1, 0))
@@ -839,6 +845,108 @@ namespace ALScriptFixes
             fix.edits.push_back({ line, column, endLine, endColumn, std::string() });
         }
         problem.fixes.push_back(std::move(fix));
+    }
+
+    void attachOptimizer(ALScriptProblem& problem, std::string_view text)
+    {
+        const std::string&              key  = problem.key;
+        const std::vector<std::string>& args = problem.args;
+        if ((key == "OptimizerFolded" || key == "OptimizerEvaluated" || key == "OptimizerSimplified" || key == "OptimizerWroteAs") && args.size() == 2 &&
+            problem.endLine == problem.line)
+        {
+            // The expression as the optimizer printed it, and as the source
+            // has it, the same but for blanks: then what it became may go in
+            // its place. A rewrite of what was written, which the scripter
+            // may not want, so never preferred.
+            const Lines            lines(text);
+            const std::string_view line = lines.line(problem.line);
+            if (problem.column < 0 || problem.endColumn > static_cast<S32>(line.size()) || problem.endColumn <= problem.column)
+            {
+                return;
+            }
+            const auto bare = [](std::string_view words) {
+                std::string out;
+                for (char c : words)
+                {
+                    if (!isspace(static_cast<unsigned char>(c)))
+                    {
+                        out += c;
+                    }
+                }
+                return out;
+            };
+            if (bare(line.substr(problem.column, problem.endColumn - problem.column)) != bare(args[0]))
+            {
+                return;
+            }
+            ALScriptFix fix = titled("ScriptFixOptimized", "Write '[1]' here", { args[1] });
+            fix.edits.push_back({ problem.line, problem.column, problem.line, problem.endColumn, args[1] });
+            problem.fixes.push_back(std::move(fix));
+        }
+        else if (key == "OptimizerRemovedUnreachable" || key == "OptimizerRemovedNoEffect")
+        {
+            // What can never run, or does nothing, gone from the source as
+            // it goes from the upload: safe, and preferred.
+            ALScriptFix fix = key == "OptimizerRemovedUnreachable" ? titled("ScriptFixRemoveUnreachable", "Remove what can never run", {})
+                                                                   : titled("ScriptFixRemoveNoEffect", "Remove what does nothing", {});
+            fix.preferred = true;
+            fix.safe      = true;
+            offerRemoval(problem, text, problem.line, problem.column, problem.endLine, problem.endColumn, std::move(fix));
+        }
+        else if ((key == "OptimizerRemovedLocal" || key == "OptimizerRemovedGlobal" || key == "OptimizerRemovedFunction" ||
+                  key == "OptimizerRemovedState") &&
+                 args.size() == 1)
+        {
+            // The analyzer offers these already, as unused; offered here as
+            // well, but not preferred, so that one is not made twice.
+            offerRemoval(problem, text, problem.line, problem.column, problem.endLine, problem.endColumn, args[0]);
+            if (!problem.fixes.empty())
+            {
+                problem.fixes.back().preferred = false;
+            }
+        }
+    }
+
+    void mapThrough(const ALSourceMap& map, ALScriptProblem& problem)
+    {
+        std::vector<ALScriptFix> kept;
+        for (ALScriptFix& fix : problem.fixes)
+        {
+            bool whole = !fix.edits.empty();
+            for (ALScriptEdit& edit : fix.edits)
+            {
+                ALSourceMap::Loc begin, end;
+                if (edit.line == edit.endLine && map.verbatimSpan(edit.line, edit.column, edit.endColumn, begin, end) && begin.file == 0)
+                {
+                    edit.line      = begin.line;
+                    edit.column    = begin.column;
+                    edit.endLine   = end.line;
+                    edit.endColumn = end.column;
+                    continue;
+                }
+                // A whole line or lines taken out: the lines of the source
+                // they came from, where the first and the last are the
+                // script's own, copied.
+                if (edit.text.empty() && edit.column == 0 && edit.endColumn == 0 && edit.endLine > edit.line)
+                {
+                    const ALSourceMap::Loc first = map.toSource(edit.line, 0);
+                    const ALSourceMap::Loc last  = map.toSource(edit.endLine - 1, 0);
+                    if (first.found() && last.found() && first.file == 0 && last.file == 0 && last.line - first.line == edit.endLine - 1 - edit.line)
+                    {
+                        edit.line      = first.line;
+                        edit.endLine   = last.line + 1;
+                        continue;
+                    }
+                }
+                whole = false;
+                break;
+            }
+            if (whole)
+            {
+                kept.push_back(std::move(fix));
+            }
+        }
+        problem.fixes = std::move(kept);
     }
 
     void attach(ALScriptProblems& problems, std::string_view text, bool lua)

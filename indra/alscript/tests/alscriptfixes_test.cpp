@@ -28,6 +28,8 @@
 
 #include "../allslservice.h"
 #include "../alluauservice.h"
+#include "../alpreprocessor.h"
+#include "../allsloptimizer.h"
 
 #include "../test/lltut.h"
 
@@ -411,5 +413,35 @@ namespace tut
         shared.line = 0;
         ALScriptFixes::offerRemoval(shared, "integer a = 1; integer b = 2;\n", 0, 8, 0, 13, "a");
         ensure_equals("only itself", ALScriptFixes::apply("integer a = 1; integer b = 2;\n", shared.fixes.front()).value_or(""), std::string(" integer b = 2;\n"));
+    }
+
+    template<> template<>
+    void object::test<15>()
+    {
+        set_test_name("what the optimizer did is offered as a change to the source, where the source says what it read");
+        ensure("builtins: " + error, lslLoaded);
+        const std::string script = "default\n{\n    state_entry()\n    {\n        llOwnerSay((string)(1 + 2));\n        return;\n"
+                                   "        llOwnerSay(\"never\");\n    }\n}\n";
+        ALPreprocessor::Options options;
+        options.fileName = "main.lsl";
+        options.optimize = true;
+        options.resolve  = [](const ALPreprocessor::Ask&, ALPreprocessor::Include&) { return ALPreprocessor::Found::No; };
+        const ALPreprocessor::Result result = ALPreprocessor::run(script, options);
+        std::string                  notes;
+        const ALScriptProblem*       folded      = nullptr;
+        const ALScriptProblem*       unreachable = nullptr;
+        for (const ALScriptProblem& p : result.problems)
+        {
+            notes += p.key + " " + p.message + llformat(" (%d fixes)\n", static_cast<int>(p.fixes.size()));
+            folded      = p.key == "OptimizerFolded" && !p.fixes.empty() ? &p : folded;
+            unreachable = p.key == "OptimizerRemovedUnreachable" && !p.fixes.empty() ? &p : unreachable;
+        }
+        ensure("a fold offered: " + notes, folded != nullptr);
+        ensure("never preferred: the source is the scripter's", !folded->fixes.front().preferred);
+        std::string made = ALScriptFixes::apply(script, folded->fixes.front()).value_or("refused");
+        ensure("written in: " + made, made.find("llOwnerSay(\"3\");") != std::string::npos);
+        ensure("what can never run offered: " + notes, unreachable != nullptr && unreachable->fixes.front().preferred && unreachable->fixes.front().safe);
+        made = ALScriptFixes::apply(script, unreachable->fixes.front()).value_or("refused");
+        ensure("gone: " + made, made.find("never") == std::string::npos && made.find("        return;\n    }\n") != std::string::npos);
     }
 }

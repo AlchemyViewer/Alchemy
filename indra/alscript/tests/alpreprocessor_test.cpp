@@ -1057,6 +1057,8 @@ namespace tut
         ensure_equals("to its end", end.column, 9);
         ensure_equals("in the script", begin.file, 0);
         ensure("an insertion after it too", r.map.verbatimSpan(say_line, say_column + 5, say_column + 5, begin, end) && begin.column == 9);
+        ensure("a stretch of several tokens, the blanks between them the source's", r.map.verbatimSpan(say_line, say_column, say_column + 13, begin, end));
+        ensure_equals("to the call's end", end.column, 17);
         ensure("what the macro made is not", !r.map.verbatimSpan(greet_line, greet_column, greet_column + 10, begin, end));
     }
 } // namespace tut

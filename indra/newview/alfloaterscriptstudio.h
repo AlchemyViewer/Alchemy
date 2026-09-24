@@ -484,6 +484,9 @@ private:
             // preferred first, a suppression last.
             std::string              key;
             std::vector<ALScriptFix> fixes;
+            // The version of the text the fixes are in the places of: the
+            // check's, or the preprocessor run's that made the note.
+            U32                      fixesFor = 0;
         };
         std::vector<Shown>                         shown;
         // What the analyzer said the script declares, at analysisVersion.
@@ -580,18 +583,13 @@ private:
     // The caret to the next problem of the script after it, or the one
     // before, round past the ends, with what it says in a card.
     void                goToProblem(Doc& doc, S32 direction);
-    // Each fix the analyzers made put in the source's places through the
-    // map the check was made over, and kept only where every edit lands
-    // in the script's own text as it was copied -- not in an include, nor
-    // in what a macro made.
-    static void         mapFixes(const ALSourceMap& map, ALScriptProblem& problem);
     // What a comment says is wanted dropped from the script's problems,
     // and a comment that would say so offered for every lint left.
     void                noLint(Doc& doc);
     // A fix made, as one step to undo, and the script checked again at
-    // once; refused where the text has moved on since the check it was
-    // made in, whose places it is in.
-    bool                applyFix(Doc& doc, const ALScriptFix& fix);
+    // once; refused where the text has moved on since `version`, the one
+    // it was made over, whose places it is in.
+    bool                applyFix(Doc& doc, const ALScriptFix& fix, U32 version);
     // Which fixes to make at once: every problem's preferred one, or one
     // kind's, or only those that change nothing a script does.
     struct FixPick

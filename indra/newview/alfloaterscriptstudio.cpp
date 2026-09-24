@@ -3333,8 +3333,9 @@ void ALFloaterScriptStudio::teachEditor(Doc& doc)
         const size_t      n     = static_cast<size_t>(value["fix"].asInteger());
         if (shown && n < shown->fixes.size())
         {
-            const ALScriptFix fix = shown->fixes[n];
-            applyFix(*raw, fix);
+            const ALScriptFix fix     = shown->fixes[n];
+            const U32         version = shown->fixesFor;
+            applyFix(*raw, fix, version);
         }
     });
     editor.setHoverProvider([lua, raw](const ALTextPos& at, std::string_view word, std::string& text) {
@@ -5179,7 +5180,7 @@ void ALFloaterScriptStudio::analysed(const ALScriptAnalysis::Result& result)
             }
             else
             {
-                mapFixes(map, problem);
+                ALScriptFixes::mapThrough(map, problem);
             }
         }
         std::vector<ALScriptOutlineEntry> outline;
@@ -5371,17 +5372,29 @@ void ALFloaterScriptStudio::refreshProblems(Doc& doc)
     }
     // The preprocessor's own word on the text as it stands, and the
     // optimizer's notes from the last run ahead of a save.
-    const auto preprocessorRow = [&](const ALScriptProblem& problem) {
+    // The optimizer's notes offer what it did as a change to the source,
+    // over the text the run was made of.
+    const U32  now             = doc.editor->document().version();
+    const auto preprocessorRow = [&](const ALScriptProblem& problem, U32 version) {
         const Doc::Level level     = levelOf(problem.severity);
         const bool       optimizer = problem.source == ALScriptProblem::Source::Optimizer;
         add(problem.line, problem.column, true, problem.endLine, problem.endColumn, markOf(level), level,
             getString(optimizer ? "OriginOptimizer" : "OriginPreprocessor"), problem.message, problem.file);
+        doc.shown.back().key      = problem.key;
+        doc.shown.back().fixes    = problem.fixes;
+        doc.shown.back().fixesFor = version;
+        if (version == now && problem.file.empty() && !problem.fixes.empty())
+        {
+            const bool changes = std::any_of(problem.fixes.begin(), problem.fixes.end(),
+                                             [](const ALScriptFix& fix) { return fix.kind == ALScriptFix::Kind::Fix; });
+            doc.editor->setFixable(problem.line, true, changes || doc.editor->changesAt(problem.line));
+        }
     };
     if (doc.expanded.valid)
     {
         for (const ALScriptProblem& problem : doc.expanded.problems)
         {
-            preprocessorRow(problem);
+            preprocessorRow(problem, doc.expanded.version);
         }
     }
     if (doc.uploaded.valid)
@@ -5390,7 +5403,7 @@ void ALFloaterScriptStudio::refreshProblems(Doc& doc)
         {
             if (problem.source == ALScriptProblem::Source::Optimizer)
             {
-                preprocessorRow(problem);
+                preprocessorRow(problem, doc.uploaded.version);
             }
         }
     }
@@ -5406,8 +5419,9 @@ void ALFloaterScriptStudio::refreshProblems(Doc& doc)
         const std::string message = named ? problem.message + " [" + problem.code + "]" : problem.message;
         add(problem.line, problem.column, true, problem.endLine, problem.endColumn, markOf(level), level, origin, message, problem.file,
             problem.source == ALScriptProblem::Source::Lint ? problem.code : std::string());
-        doc.shown.back().key   = problem.key;
-        doc.shown.back().fixes = problem.fixes;
+        doc.shown.back().key      = problem.key;
+        doc.shown.back().fixes    = problem.fixes;
+        doc.shown.back().fixesFor = doc.analysisVersion;
         // The gutter's word on what the line offers: a lightbulb where the
         // caret is, a round mark where a fix changes the script.
         if (analysis_current && problem.file.empty() && !problem.fixes.empty())
@@ -5892,34 +5906,6 @@ void ALFloaterScriptStudio::showProblemCard(Doc& doc, const ALTextPos& at)
     }
 }
 
-// static
-void ALFloaterScriptStudio::mapFixes(const ALSourceMap& map, ALScriptProblem& problem)
-{
-    std::vector<ALScriptFix> kept;
-    for (ALScriptFix& fix : problem.fixes)
-    {
-        bool whole = !fix.edits.empty();
-        for (ALScriptEdit& edit : fix.edits)
-        {
-            ALSourceMap::Loc begin, end;
-            if (edit.line != edit.endLine || !map.verbatimSpan(edit.line, edit.column, edit.endColumn, begin, end) || begin.file != 0)
-            {
-                whole = false;
-                break;
-            }
-            edit.line      = begin.line;
-            edit.column    = begin.column;
-            edit.endLine   = end.line;
-            edit.endColumn = end.column;
-        }
-        if (whole)
-        {
-            kept.push_back(std::move(fix));
-        }
-    }
-    problem.fixes = std::move(kept);
-}
-
 void ALFloaterScriptStudio::noLint(Doc& doc)
 {
     // The script's own lines, as they stand at the check: a problem in an
@@ -5950,17 +5936,17 @@ void ALFloaterScriptStudio::noLint(Doc& doc)
     }
 }
 
-bool ALFloaterScriptStudio::applyFix(Doc& doc, const ALScriptFix& fix)
+bool ALFloaterScriptStudio::applyFix(Doc& doc, const ALScriptFix& fix, U32 version)
 {
     if (!doc.loaded || !doc.modifiable || fix.edits.empty())
     {
         return false;
     }
-    // In the places of the check it was made in: a text typed in since is
+    // In the places of the text it was made over: a text typed in since is
     // checked again, and its fixes offered afresh.
     ALCodeEditor&         source = sourceInFront(doc);
     const ALTextDocument& text   = source.document();
-    if (doc.analysisVersion != text.version())
+    if (version != text.version())
     {
         setStatus(getString("FixStale"), true);
         scheduleAnalysis(doc, true);
@@ -5992,9 +5978,10 @@ bool ALFloaterScriptStudio::applyFix(Doc& doc, const ALScriptFix& fix)
 std::vector<const ALScriptFix*> ALFloaterScriptStudio::pickFixes(const Doc& doc, const FixPick& pick)
 {
     std::vector<const ALScriptFix*> taken;
+    const U32                       now = doc.editor->document().version();
     for (const Doc::Shown& shown : doc.shown)
     {
-        if (!shown.file.empty() || (!pick.key.empty() && shown.key != pick.key))
+        if (!shown.file.empty() || shown.fixesFor != now || (!pick.key.empty() && shown.key != pick.key))
         {
             continue;
         }
@@ -6043,7 +6030,7 @@ void ALFloaterScriptStudio::askFixAll(Doc& doc, const FixPick& pick)
     {
         if (!fixes.empty())
         {
-            applyFix(doc, *fixes.front());
+            applyFix(doc, *fixes.front(), doc.editor->document().version());
         }
         else
         {
@@ -6074,15 +6061,9 @@ bool ALFloaterScriptStudio::fixAll(Doc& doc, const FixPick& pick)
     {
         return false;
     }
-    ALCodeEditor&         source = sourceInFront(doc);
-    const ALTextDocument& text   = source.document();
-    if (doc.analysisVersion != text.version())
-    {
-        setStatus(getString("FixStale"), true);
-        scheduleAnalysis(doc, true);
-        return false;
-    }
-    const std::vector<const ALScriptFix*>            fixes = pickFixes(doc, pick);
+    // Only the fixes made over the text as it stands (pickFixes).
+    ALCodeEditor&                                    source = sourceInFront(doc);
+    const std::vector<const ALScriptFix*>            fixes  = pickFixes(doc, pick);
     std::vector<std::pair<ALTextRange, std::string>> edits;
     for (const ALScriptFix* fix : fixes)
     {
@@ -6105,15 +6086,12 @@ bool ALFloaterScriptStudio::fixAll(Doc& doc, const FixPick& pick)
 
 void ALFloaterScriptStudio::fixesOn(const Doc& doc, S32 line, std::vector<ALCodeEditor::Fix>& out) const
 {
-    // Only over the check they were made in: a text typed in since has
-    // other places, and is checked again a moment later.
-    if (doc.analysisVersion != doc.editor->document().version())
-    {
-        return;
-    }
+    // Only over the text they were made in: a text typed in since has other
+    // places, and is checked again a moment later.
+    const U32 now = doc.editor->document().version();
     for (const Doc::Shown& shown : doc.shown)
     {
-        if (!shown.file.empty() || shown.line != line)
+        if (!shown.file.empty() || shown.line != line || shown.fixesFor != now)
         {
             continue;
         }
@@ -13078,8 +13056,9 @@ void ALFloaterScriptStudio::onProblemMenu(const std::string& action)
         const size_t      n     = static_cast<size_t>(atoi(action.c_str() + 4));
         if (shown && n < shown->fixes.size())
         {
-            const ALScriptFix fix = shown->fixes[n];
-            applyFix(doc, fix);
+            const ALScriptFix fix     = shown->fixes[n];
+            const U32         version = shown->fixesFor;
+            applyFix(doc, fix, version);
         }
     }
     else if (action == "fix_kind")
@@ -14249,7 +14228,7 @@ bool ALFloaterScriptStudio::onMenuEnable(const LLSD& param)
     }
     if (action == "fix_all")
     {
-        return doc && doc->loaded && doc->modifiable && doc->analysisVersion == doc->editor->document().version() && !pickFixes(*doc, FixPick{}).empty();
+        return doc && doc->loaded && doc->modifiable && !pickFixes(*doc, FixPick{}).empty();
     }
     if (action == "go_to_line" || action == "find" || action == "replace" || action == "find_next" || action == "find_previous")
     {

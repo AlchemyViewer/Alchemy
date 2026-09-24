@@ -25,6 +25,7 @@
 #pragma once
 
 #include "alscriptproblem.h"
+#include "alsourcemap.h"
 
 #include <optional>
 #include <string>
@@ -61,6 +62,21 @@ namespace ALScriptFixes
     // nothing else stands on them. Safe: what nobody uses changes nothing
     // by going, where the service has seen that what it is given does not.
     void offerRemoval(ALScriptProblem& problem, std::string_view text, S32 line, S32 column, S32 endLine, S32 endColumn, const std::string& name);
+    // The same, titled as `fix` is, for what has no name of its own: code
+    // that can never run, a statement that does nothing.
+    void offerRemoval(ALScriptProblem& problem, std::string_view text, S32 line, S32 column, S32 endLine, S32 endColumn, ALScriptFix fix);
+
+    // What the optimizer did, offered as a change to the source where the
+    // source says just what the optimizer read -- blanks aside -- and the
+    // change is one expression or one thing removed: the notes of a run
+    // over `text`, in its places.
+    void attachOptimizer(ALScriptProblem& problem, std::string_view text);
+
+    // A problem's fixes taken through a map from the text they were made
+    // over to the source, kept only where every edit lands, on one line,
+    // in the script's own text as the map copied it -- not in an include,
+    // nor in what a macro made.
+    void mapThrough(const ALSourceMap& map, ALScriptProblem& problem);
 
     // `text` with a fix's edits made, or nothing where two of them overlap
     // or one lies outside the text.

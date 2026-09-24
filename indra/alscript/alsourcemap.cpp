@@ -152,15 +152,45 @@ bool ALSourceMap::verbatimSpan(S32 line, S32 column, S32 endColumn, Loc& begin, 
     {
         return false;
     }
+    // The segments of the line the stretch runs over, each of them copied
+    // from the same line of the same file at the same distance as the
+    // others -- the blanks between them the source's own -- so that the
+    // stretch is the source's as it stands. A segment's end is still its
+    // own: an insertion just after a token goes with the token.
+    const Segment* first = nullptr;
+    S32            shift = 0;
     for (size_t i = mLineStart[line]; i < mSegments.size() && mSegments[i].outLine == line; ++i)
     {
         const Segment& segment = mSegments[i];
-        // Its end is still its own: an insertion just after a token goes
-        // with the token.
-        if (segment.verbatim && segment.outColumn <= column && endColumn <= segment.outColumn + segment.length)
+        const S32      seg_end = segment.outColumn + segment.length;
+        if (!first)
         {
-            begin = Loc{ segment.file, segment.line, segment.column + (column - segment.outColumn) };
-            end   = Loc{ segment.file, segment.line, segment.column + (endColumn - segment.outColumn) };
+            if (segment.outColumn <= column && column <= seg_end)
+            {
+                if (!segment.verbatim)
+                {
+                    return false;
+                }
+                first = &segment;
+                shift = segment.column - segment.outColumn;
+            }
+            else
+            {
+                continue;
+            }
+        }
+        else if (segment.outColumn >= endColumn)
+        {
+            break;
+        }
+        else if (!segment.verbatim || segment.file != first->file || segment.line != first->line || segment.column - segment.outColumn != shift)
+        {
+            return false;
+        }
+        if (endColumn <= seg_end)
+        {
+            begin = Loc{ first->file, first->line, column + shift };
+            end   = Loc{ first->file, first->line, endColumn + shift };
             return true;
         }
     }

@@ -27,6 +27,8 @@
 
 #include "alpreprocessor.h"
 
+#include "alscriptfixes.h"
+
 #include "llstl.h"
 
 #include <boost/unordered/unordered_flat_map.hpp>
@@ -3747,7 +3749,15 @@ void ALPreprocessor::optimize(Result& result, const Options& options)
     ALLSLOptimizer::Result optimized   = ALLSLOptimizer::run(result.text, optimizing);
     for (ALScriptProblem p : optimized.problems)
     {
+        // What it did, as a change to the source where that can be said,
+        // taken back with the note.
+        ALScriptFixes::attachOptimizer(p, result.text);
+        ALScriptFixes::mapThrough(result.map, p);
         mapProblem(p, result.map);
+        if (!p.file.empty())
+        {
+            p.fixes.clear();
+        }
         result.problems.push_back(std::move(p));
     }
     if (optimized.optimized)

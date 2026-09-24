@@ -549,6 +549,9 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="ScriptFixLocal">Make '[1]' local</string>
 	<string name="ScriptFixInitNil">Initialize '[1]' with nil</string>
 	<string name="ScriptFixRemove">Remove '[1]'</string>
+	<string name="ScriptFixOptimized">Write '[1]' here</string>
+	<string name="ScriptFixRemoveUnreachable">Remove what can never run</string>
+	<string name="ScriptFixRemoveNoEffect">Remove what does nothing</string>
 
 	<!-- What the engines say, taken apart by ALMessageMap and said again
 	     with the words put in: Tailslide's messages by their error code,
