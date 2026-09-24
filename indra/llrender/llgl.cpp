@@ -3787,7 +3787,7 @@ void LLGLSquashToFarClip::setProjectionMatrix(LLMatrix4a projection, U32 layer)
     // Replacing row 2 with row 3 * depth forces ndc z = depth for every vertex regardless
     // of projection, so only the far-plane constant mirrors under reverse-Z (far = 0).
     // Under ZERO_TO_ONE ndc==window, so mirror the forward WINDOW depth (0.999995 - 5e-5*layer,
-    // i.e. ndc*0.5+0.5), not the raw ndc distance -- matching the sundisc/moon pins.
+    // i.e. ndc*0.5+0.5), not the raw ndc distance.
     F32 depth = LLRender::sReverseZ ? (0.000005f + 0.00005f * layer)
                                     : (0.99999f - 0.0001f * layer);
 
@@ -3861,30 +3861,6 @@ void LLGLSyncFence::wait()
         { //track the number of times we've waited here
         }
     }
-}
-
-LLGLSPipelineSkyBox::LLGLSPipelineSkyBox()
-: mCullFace(GL_CULL_FACE)
-, mSquashClip()
-{
-}
-
-LLGLSPipelineSkyBox::~LLGLSPipelineSkyBox()
-{
-}
-
-LLGLSPipelineDepthTestSkyBox::LLGLSPipelineDepthTestSkyBox(bool depth_test, bool depth_write)
-: LLGLSPipelineSkyBox()
-, mDepth(depth_test ? GL_TRUE : GL_FALSE, depth_write ? GL_TRUE : GL_FALSE, GL_LEQUAL)
-{
-
-}
-
-LLGLSPipelineBlendSkyBox::LLGLSPipelineBlendSkyBox(bool depth_test, bool depth_write)
-: LLGLSPipelineDepthTestSkyBox(depth_test, depth_write)
-, mBlend(GL_BLEND)
-{
-    gGL.setSceneBlendType(LLRender::BT_ALPHA);
 }
 
 #if LL_WINDOWS

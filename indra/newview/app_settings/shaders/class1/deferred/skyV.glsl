@@ -53,9 +53,17 @@ void main()
 
     vec4 transformed_pos = modelview_projection_matrix * vec4(position.xyz, 1.0);
 
-    gl_Position = transformed_pos;
-
  #ifdef HAS_HDRI
      vary_position = transformed_pos;
  #endif
+
+    // On the far plane, which the sky writes no depth over, so the depth test passes only where
+    // the world drew nothing. Reverse-Z puts the far plane at ndc z 0.
+#ifdef REVERSE_Z
+    transformed_pos.z = 0.0;
+#else
+    transformed_pos.z = transformed_pos.w;
+#endif
+
+    gl_Position = transformed_pos;
 }

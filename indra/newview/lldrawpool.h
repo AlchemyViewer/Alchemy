@@ -57,7 +57,6 @@ public:
         //
         POOL_SKY = 1,
         POOL_WATEREXCLUSION,
-        POOL_WL_SKY,
         POOL_SIMPLE,
         POOL_FULLBRIGHT,
         POOL_BUMP,
@@ -71,6 +70,7 @@ public:
         POOL_FULLBRIGHT_ALPHA_MASK,
         POOL_AVATAR,
         POOL_CONTROL_AV, // Animesh
+        POOL_WL_SKY, // after every opaque pool, so the depth test spares it all they cover
         POOL_GLOW,
         POOL_ALPHA_PRE_WATER,
         POOL_VOIDWATER,

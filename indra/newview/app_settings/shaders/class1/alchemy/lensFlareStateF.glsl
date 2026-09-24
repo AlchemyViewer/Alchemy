@@ -118,8 +118,9 @@ const float SNAP_FLOOR  = 1e-4; // drive luminance below which a black target sn
 
 float skyOf(float d)
 {
-    // Only the far plane counts as unoccluded. Sky pixels keep the cleared depth, and geometry at any
-    // distance stores a nearer value, however small: under an infinite projection 100 km stores 1e-6.
+    // Only the far plane counts as unoccluded: every sky layer lies on it and writes no depth, so the
+    // sky keeps the cleared depth (0 under reverse-Z), and geometry at any distance stores a nearer
+    // value, however small: under an infinite projection 100 km stores 1e-6.
 #ifdef REVERSE_Z
     return d <= 0.0 ? 1.0 : 0.0;
 #else

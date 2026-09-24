@@ -88,9 +88,6 @@ void LLDrawPoolWLSky::endDeferredPass(S32 pass)
     cloud_shader = nullptr;
     sun_shader   = nullptr;
     moon_shader  = nullptr;
-
-    // clear the depth buffer so haze shaders can use unwritten depth as a mask
-    glClear(GL_DEPTH_BUFFER_BIT);
 }
 
 void LLDrawPoolWLSky::renderDome(const LLVector3& camPosLocal, F32 camHeightLocal, LLGLSLShader * shader) const
@@ -173,8 +170,6 @@ void LLDrawPoolWLSky::renderSkyHazeDeferred(const LLVector3& camPosLocal, F32 ca
             sky_shader->bind();
         }
 
-        LLGLSPipelineDepthTestSkyBox sky(true, true);
-
         sky_shader->uniform1i(LLShaderMgr::CUBE_SNAPSHOT, gCubeSnapshot ? 1 : 0);
 
         LLSettingsSky::ptr_t psky = LLEnvironment::instance().getCurrentSky();
@@ -218,7 +213,7 @@ void LLDrawPoolWLSky::renderStarsDeferred(const LLVector3& camPosLocal) const
         return;
     }
 
-    LLGLSPipelineBlendSkyBox gls_sky(true, false);
+    LLGLEnable blend(GL_BLEND);
 
     // Pre-multiplied additive blend: the shader multiplies the star's RGB by
     // its shape/alpha before output, so the framebuffer operation is a simple
@@ -296,7 +291,7 @@ void LLDrawPoolWLSky::renderMeteorsDeferred(const LLVector3& camPosLocal) const
     gSky.mVOWLSkyp->tickMeteors(dt);
     gSky.mVOWLSkyp->updateMeteorGeometry();
 
-    LLGLSPipelineBlendSkyBox gls_sky(true, false);
+    LLGLEnable blend(GL_BLEND);
     gGL.setSceneBlendType(LLRender::BT_ADD);
 
     gDeferredMeteorProgram.bind();
@@ -335,7 +330,7 @@ void LLDrawPoolWLSky::renderAuroraDeferred(const LLVector3& camPosLocal, F32 cam
     const F32 intensity = aurora_intensity * llmax(0.0f, 1.0f - moon_wash * 0.85f);
     if (intensity <= 0.001f) return;
 
-    LLGLSPipelineBlendSkyBox gls_sky(true, false);
+    LLGLEnable blend(GL_BLEND);
     gGL.setSceneBlendType(LLRender::BT_ADD);
 
     gDeferredAuroraProgram.bind();
@@ -368,7 +363,8 @@ void LLDrawPoolWLSky::renderSkyCloudsDeferred(const LLVector3& camPosLocal, F32 
     {
         LLSettingsSky::ptr_t psky = LLEnvironment::instance().getCurrentSky();
 
-        LLGLSPipelineBlendSkyBox pipeline(true, true);
+        LLGLEnable blend(GL_BLEND);
+        gGL.setSceneBlendType(LLRender::BT_ALPHA);
 
         cloudshader->bind();
 
@@ -425,7 +421,8 @@ void LLDrawPoolWLSky::renderHeavenlyBodies()
 {
     if (!gSky.mVOSkyp || use_hdri_sky()) return;
 
-    LLGLSPipelineBlendSkyBox gls_skybox(true, true); // SL-14113 we need moon to write to depth to clip stars behind
+    LLGLEnable blend(GL_BLEND);
+    gGL.setSceneBlendType(LLRender::BT_ALPHA);
 
     LLVector3 const & origin = LLViewerCamera::getInstance()->getOrigin();
     gGL.pushMatrix();
@@ -567,17 +564,29 @@ void LLDrawPoolWLSky::renderDeferred(S32 pass)
 
     if (gPipeline.canUseWindLightShaders())
     {
+        // Every layer lies on the far plane and writes no depth. The pool draws after all the
+        // opaque geometry, so the depth test passes only where the world drew nothing, and the
+        // layers cover one another in the order they are drawn: the stars behind the sun and
+        // moon, the meteors and aurora in front of them, the clouds in front of everything.
+        LLGLDisable cull(GL_CULL_FACE);
+        LLGLDepthTest depth(GL_TRUE, GL_FALSE, GL_LEQUAL);
+
         renderSkyHazeDeferred(origin, camHeightLocal);
-        renderHeavenlyBodies();
         if (!gCubeSnapshot)
         {
             renderStarsDeferred(origin);
-            renderAuroraDeferred(origin, camHeightLocal);
-            renderMeteorsDeferred(origin);
-
-            // Reset blend type after drawing effects that need BT_ADD
-            gGL.setSceneBlendType(LLRender::BT_ALPHA);
         }
+
+        renderHeavenlyBodies();
+
+        if (!gCubeSnapshot)
+        {
+            renderMeteorsDeferred(origin);
+            renderAuroraDeferred(origin, camHeightLocal);
+        }
+
+        // Reset blend type after drawing effects that need BT_ADD
+        gGL.setSceneBlendType(LLRender::BT_ALPHA);
 
         if (!gCubeSnapshot || gPipeline.mReflectionMapManager.isRadiancePass()) // don't draw clouds in irradiance maps to avoid popping
         {

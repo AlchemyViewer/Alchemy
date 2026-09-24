@@ -80,9 +80,10 @@ void main()
     vec2 ndc_offset = pixel_offset * (2.0 / max(screen_res, vec2(1.0)));
     clip_center.xy += ndc_offset * clip_center.w;
 
-    // Smash Z to the far clip plane so stars never poke through the moon/sky. Reverse-Z
-    // (glClipControl ZERO_TO_ONE) puts the far plane at ndc z 0, not 1; the sky depth func
-    // flips to GEQUAL so it still passes against a 0-cleared buffer.
+    // On the far plane with the rest of the sky, so geometry occludes stars and the sun and
+    // moon, drawn after them, cover them. Reverse-Z (glClipControl ZERO_TO_ONE) puts the far
+    // plane at ndc z 0, not 1; the sky depth func flips to GEQUAL so it still passes against a
+    // 0-cleared buffer.
 #ifdef REVERSE_Z
     clip_center.z = 0.0;
 #else
