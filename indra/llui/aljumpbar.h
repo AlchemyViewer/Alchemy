@@ -26,7 +26,9 @@
 
 #include "aldeferredrebuild.h"
 #include "llpanel.h"
+#include "v4color.h"
 
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -98,9 +100,12 @@ public:
         std::string text;
         std::string value;
         std::string toolTip;
+        // Said in a colour of its own, where it is a warning; the quiet
+        // ink otherwise.
+        std::optional<LLColor4> color;
         friend bool operator==(const TrailerPart& a, const TrailerPart& b)
         {
-            return a.text == b.text && a.value == b.value && a.toolTip == b.toolTip;
+            return a.text == b.text && a.value == b.value && a.toolTip == b.toolTip && a.color == b.color;
         }
     };
     void setTrailer(std::vector<TrailerPart> parts);

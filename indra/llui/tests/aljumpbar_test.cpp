@@ -332,4 +332,38 @@ namespace tut
         ensure_equals("with as many crumbs", crumbsIn(bar), 4);
         delete bar;
     }
+    // A piece may be said in a colour of its own -- a warning's -- and the
+    // colour changing builds the piece again in the new one.
+    template<> template<>
+    void aljumpbar_object::test<8>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        ALJumpBar* bar = make();
+        bar->setPath(path());
+        std::vector<ALJumpBar::TrailerPart> parts = { { "Ln 3, Col 1", "line", "Go to a line" }, { "200 KB of 256 KB", std::string(), "The size" } };
+        bar->setTrailer(parts);
+        LLTextBox* size = bar->findChild<LLTextBox>("trailer_1", true);
+        ensure("a piece", size != nullptr);
+        const LLColor4 quiet = size->getColor().get();
+
+        parts[1].color = LLColor4::yellow;
+        bar->setTrailer(parts);
+        size = bar->findChild<LLTextBox>("trailer_1", true);
+        ensure("in its colour", size && size->getColor().get() == LLColor4::yellow);
+        ensure("the others as they were", bar->findChild<LLTextBox>("trailer_0", true)->getColor().get() == quiet);
+
+        parts[1].color = LLColor4::red;
+        bar->setTrailer(parts);
+        size = bar->findChild<LLTextBox>("trailer_1", true);
+        ensure("in another", size && size->getColor().get() == LLColor4::red);
+
+        parts[1].color.reset();
+        bar->setTrailer(parts);
+        size = bar->findChild<LLTextBox>("trailer_1", true);
+        ensure("and back in the quiet ink", size && size->getColor().get() == quiet);
+        delete bar;
+    }
 }

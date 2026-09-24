@@ -96,7 +96,7 @@ void ALJumpBar::setTrailer(std::vector<TrailerPart> parts)
     bool same_pieces = mTrailer && parts.size() == mTrailerParts.size() && parts.size() == mTrailerPieces.size();
     for (size_t i = 0; same_pieces && i < parts.size(); ++i)
     {
-        same_pieces = parts[i].value == mTrailerParts[i].value && parts[i].toolTip == mTrailerParts[i].toolTip;
+        same_pieces = parts[i].value == mTrailerParts[i].value && parts[i].toolTip == mTrailerParts[i].toolTip && parts[i].color == mTrailerParts[i].color;
     }
     mTrailerParts = std::move(parts);
     mTrailerText.clear();
@@ -265,6 +265,10 @@ void ALJumpBar::build()
             tp.tool_tip     = part.toolTip;
             tp.mouse_opaque = !part.value.empty();
             LLTextBox* piece = LLUICtrlFactory::create<LLTextBox>(tp);
+            if (part.color)
+            {
+                piece->setColor(*part.color);
+            }
             if (!part.value.empty())
             {
                 const std::string value = part.value;
