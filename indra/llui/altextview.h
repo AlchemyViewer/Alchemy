@@ -643,6 +643,10 @@ protected:
     virtual bool complete() { return false; }
     // What the call at the caret takes, asked for again.
     virtual bool signatureHelp() { return false; }
+    // The fixes for the problem at the caret offered, and whether there are
+    // any to offer.
+    virtual bool quickFix() { return false; }
+    virtual bool canQuickFix() const { return false; }
     // What the map shows beside a line: a mark's colour, where the
     // subclass has one for it; and a count that moves on whenever the
     // marks do, so that the lines with one are not looked for every frame.

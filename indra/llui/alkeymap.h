@@ -96,6 +96,8 @@ enum class ALEditorCommand : U8
     Replace,
     FindNext,
     FindPrevious,
+    // What would put right the problem at the caret, offered as a list.
+    QuickFix,
     COUNT
 };
 

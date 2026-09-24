@@ -120,6 +120,7 @@ namespace
             case ALEditorCommand::DeleteLine:
             case ALEditorCommand::Complete:
             case ALEditorCommand::Rename:
+            case ALEditorCommand::QuickFix:
                 return true;
             case ALEditorCommand::None:
             case ALEditorCommand::MoveLeft:
@@ -2301,6 +2302,8 @@ bool ALTextView::perform(ALEditorCommand command)
             return complete();
         case C::SignatureHelp:
             return signatureHelp();
+        case C::QuickFix:
+            return quickFix();
         case C::GoToDefinition:
         case C::FindReferences:
         case C::Rename:
@@ -2349,6 +2352,8 @@ bool ALTextView::canPerform(ALEditorCommand command) const
         case C::FindReferences:
         case C::Rename:
             return canSymbol(command);
+        case C::QuickFix:
+            return !mReadOnly && canQuickFix();
         default:
             return !(mReadOnly && editsText(command));
     }
@@ -2862,6 +2867,10 @@ void ALTextView::showContextMenu(S32 x, S32 y)
     {
         menu->setItemVisible(symbol, offersSymbols());
     }
+    // What would put right a problem at the caret, where there is one.
+    const bool fixes = !mReadOnly && canQuickFix();
+    menu->setItemVisible("quick_fix", fixes);
+    menu->setItemVisible("Fix Separator", fixes);
     S32 screen_x, screen_y;
     localPointToScreen(x, y, &screen_x, &screen_y);
     menu->show(screen_x, screen_y, this);

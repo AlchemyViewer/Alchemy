@@ -103,6 +103,7 @@
     <panel.string name="cmd_replace">Replace</panel.string>
     <panel.string name="cmd_find_next">Find next</panel.string>
     <panel.string name="cmd_find_previous">Find previous</panel.string>
+    <panel.string name="cmd_quick_fix">Quick fix</panel.string>
     <line_editor
      follows="left|top|right"
      height="22"

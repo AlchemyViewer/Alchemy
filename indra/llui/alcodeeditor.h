@@ -426,6 +426,49 @@ public:
     // Where that list opens in the detail, or npos.
     static size_t parameterListAt(std::string_view detail, std::string_view name);
 
+    // --- quick fixes -------------------------------------------------------------------
+
+    // What would put right a problem on a line: what it does, the edits it
+    // makes -- each a stretch and what goes in its place -- whether it is
+    // the one to take without asking, whether it only says the problem is
+    // wanted, and a value for whoever makes it. The editor lists fixes and
+    // previews them; the one taken is handed back by its value, and
+    // whoever supplied it makes it, knowing whether the text has moved on
+    // since the fixes were made.
+    struct Fix
+    {
+        std::string                                      title;
+        std::vector<std::pair<ALTextRange, std::string>> edits;
+        bool                                             preferred = false;
+        bool                                             suppress  = false;
+        LLSD                                             value;
+    };
+    typedef std::function<void(S32 line, std::vector<Fix>& out)> fix_provider_t;
+    void setFixProvider(fix_provider_t provider) { mFixProvider = std::move(provider); }
+    typedef std::function<void(const LLSD& value)> fix_handler_t;
+    void setFixHandler(fix_handler_t handler) { mFixHandler = std::move(handler); }
+    // What the problems on a line offer: any fix at all -- a suppression
+    // among them -- brings the lightbulb up on the caret's line; one that
+    // changes the script makes the line's mark round rather than square.
+    // Cleared with the marks, and slid with them by an edit.
+    void setFixable(S32 line, bool any, bool changes);
+    bool fixableAt(S32 line) const;
+    bool changesAt(S32 line) const;
+    // The fixes of a line listed under it -- the preferred first, a
+    // suppression last -- each previewed beside the list as it is chosen,
+    // as the lines it touches read now and would read after; Return, Tab
+    // or a double click takes one. False where the line has none.
+    bool                    openFixes(S32 line);
+    bool                    fixesOpen() const;
+    void                    closeFixes();
+    const std::vector<Fix>& fixes() const { return mFixes; }
+    // The lines a fix touches as they would read with it made, and which
+    // lines they are.
+    static std::string fixedLines(const ALTextDocument& text, const Fix& fix, S32& first, S32& last);
+    // In the order they are offered: the preferred first, a suppression
+    // last, the rest as given.
+    static void        rankFixes(std::vector<Fix>& fixes);
+
     // --- hover -------------------------------------------------------------------
 
     // Asked what to say about the word the mouse rests on; answers into
@@ -536,6 +579,8 @@ protected:
     bool canFold(ALEditorCommand command) const override;
     bool complete() override;
     bool signatureHelp() override;
+    bool quickFix() override;
+    bool canQuickFix() const override;
     bool performSymbol(ALEditorCommand command) override;
     bool canSymbol(ALEditorCommand command) const override;
     bool offersSymbols() const override { return static_cast<bool>(mSymbolRequest); }
@@ -571,6 +616,17 @@ private:
     void openCompletion();
     void refreshCompletion();
     void placeCompletion();
+    // A list of so many rows put under the row of a place, at its column,
+    // or over it where under would run off the bottom.
+    void placeListAt(ALChoiceList& list, const ALTextPos& at, S32 rows, S32 width);
+    // The box beside a list that says more about its chosen line -- a
+    // completion's documentation, a fix's preview -- made the first time it
+    // is wanted and shared, one list being up at a time; and put beside a
+    // list, as tall as it says up to a limit.
+    ALTextView* sideBox();
+    void        placeSideBox(const LLRect& list);
+    void        showFixPreview();
+    void        takeFix(S32 index);
     // The list shown; the one chosen kept by its word where the list is
     // still about what was typed, else the best.
     void listCompletions(bool keep_choice);
@@ -692,6 +748,12 @@ private:
     symbol_request_t        mSymbolRequest;
     ALChoiceList*           mCompletionList = nullptr;
     ALTextView*             mCompletionDoc  = nullptr;
+    fix_provider_t          mFixProvider;
+    fix_handler_t           mFixHandler;
+    ALChoiceList*           mFixList = nullptr;
+    std::vector<Fix>        mFixes;
+    // One per line, as the marks are: what its problems offer.
+    std::vector<U8>         mFixable;
     // What the list was last made for, the head and the prefix: a new
     // list for the same is the old one with an answer joined to it.
     std::string             mListedFor;

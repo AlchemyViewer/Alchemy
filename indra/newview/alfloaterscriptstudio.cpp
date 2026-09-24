@@ -3322,6 +3322,19 @@ void ALFloaterScriptStudio::teachEditor(Doc& doc)
     editor.setHoverRequest([this, raw](const ALTextPos& at, std::string_view) { askAnalyzer(*raw, ALScriptAnalysis::Kind::Hover, at); });
     editor.setSignatureRequest([this, raw](const ALTextPos& caret) { askAnalyzer(*raw, ALScriptAnalysis::Kind::Signature, caret); });
     editor.setSymbolRequest([this, raw](ALEditorCommand command, const ALTextRange& word) { askSymbol(*raw, command, word); });
+    // What would put right the problems on a line, as the list, the card
+    // and the gutter offer them; the one taken made here, where it is known
+    // whether the text is still the one the fixes were made for.
+    editor.setFixProvider([this, raw](S32 line, std::vector<ALCodeEditor::Fix>& out) { fixesOn(*raw, line, out); });
+    editor.setFixHandler([this, raw](const LLSD& value) {
+        const Doc::Shown* shown = shownOf(value);
+        const size_t      n     = static_cast<size_t>(value["fix"].asInteger());
+        if (shown && n < shown->fixes.size())
+        {
+            const ALScriptFix fix = shown->fixes[n];
+            applyFix(*raw, fix);
+        }
+    });
     editor.setHoverProvider([lua, raw](const ALTextPos& at, std::string_view word, std::string& text) {
         // The word as the vocabulary knows it: `Say` under the mouse in
         // `ll.Say` is asked about as `ll.Say`, and `pi` in `math.pi` as
@@ -5382,6 +5395,14 @@ void ALFloaterScriptStudio::refreshProblems(Doc& doc)
             problem.source == ALScriptProblem::Source::Lint ? problem.code : std::string());
         doc.shown.back().key   = problem.key;
         doc.shown.back().fixes = problem.fixes;
+        // The gutter's word on what the line offers: a lightbulb where the
+        // caret is, a round mark where a fix changes the script.
+        if (analysis_current && problem.file.empty() && !problem.fixes.empty())
+        {
+            const bool changes = std::any_of(problem.fixes.begin(), problem.fixes.end(),
+                                             [](const ALScriptFix& fix) { return fix.kind == ALScriptFix::Kind::Fix; });
+            doc.editor->setFixable(problem.line, true, changes || doc.editor->changesAt(problem.line));
+        }
     }
     for (const Doc::RuntimeProblem& problem : doc.runtime)
     {
@@ -6058,6 +6079,44 @@ void ALFloaterScriptStudio::fixAllOfKind(Doc& doc, const std::string& key)
         source.undoJournal().label("fix");
         setStatus(counted("FixesMade", static_cast<S32>(fixes.size())));
         scheduleAnalysis(doc, true);
+    }
+}
+
+void ALFloaterScriptStudio::fixesOn(const Doc& doc, S32 line, std::vector<ALCodeEditor::Fix>& out) const
+{
+    // Only over the check they were made in: a text typed in since has
+    // other places, and is checked again a moment later.
+    if (doc.analysisVersion != doc.editor->document().version())
+    {
+        return;
+    }
+    for (const Doc::Shown& shown : doc.shown)
+    {
+        if (!shown.file.empty() || shown.line != line)
+        {
+            continue;
+        }
+        for (size_t i = 0; i < shown.fixes.size(); ++i)
+        {
+            const ALScriptFix&   fix = shown.fixes[i];
+            ALCodeEditor::Fix    one;
+            one.title     = fix.title;
+            one.preferred = fix.preferred;
+            one.suppress  = fix.kind == ALScriptFix::Kind::Suppress;
+            for (const ALScriptEdit& edit : fix.edits)
+            {
+                one.edits.emplace_back(ALTextRange(ALTextPos(edit.line, edit.column), ALTextPos(edit.endLine, edit.endColumn)), edit.text);
+            }
+            // The problem by what the pane's rows carry, and the fix by its
+            // place among the problem's.
+            one.value["doc"]     = doc.id;
+            one.value["line"]    = shown.line;
+            one.value["column"]  = shown.column;
+            one.value["file"]    = shown.file;
+            one.value["message"] = shown.message;
+            one.value["fix"]     = static_cast<S32>(i);
+            out.push_back(std::move(one));
+        }
     }
 }
 
@@ -13758,6 +13817,10 @@ void ALFloaterScriptStudio::onMenuAction(const LLSD& param)
     {
         doc->shownText()->perform(ALEditorCommand::Rename);
     }
+    else if (doc && action == "quick_fix")
+    {
+        doc->shownText()->perform(ALEditorCommand::QuickFix);
+    }
     else if (doc && action == "go_to_line")
     {
         goToLine();
@@ -14144,6 +14207,10 @@ bool ALFloaterScriptStudio::onMenuEnable(const LLSD& param)
     if (action == "rename")
     {
         return doc && doc->shownText()->canPerform(ALEditorCommand::Rename);
+    }
+    if (action == "quick_fix")
+    {
+        return doc && doc->modifiable && doc->shownText()->canPerform(ALEditorCommand::QuickFix);
     }
     if (action == "go_to_line" || action == "find" || action == "replace" || action == "find_next" || action == "find_previous")
     {

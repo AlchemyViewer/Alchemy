@@ -598,6 +598,10 @@ private:
     // The problem a row of the pane is, in its script's list, where its
     // fixes are.
     const Doc::Shown*   shownOf(const LLSD& value) const;
+    // The fixes of the problems on a line, as the editor lists them, each
+    // with the value that finds it again; none where the text has moved on
+    // since the check they were made in.
+    void                fixesOn(const Doc& doc, S32 line, std::vector<ALCodeEditor::Fix>& out) const;
     // The keymap's keys beside the menu's editor commands that have none.
     void                showEditorKeys();
     static Doc::Level   levelOf(const std::string& said);

@@ -1,9 +1,16 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
-<!-- The right-click menu of a code editor: what the name the click landed
-     on is about, the text view's own, and what an editor of code has
-     besides. -->
+<!-- The right-click menu of a code editor: what would put a problem at
+     the caret right, what the name the click landed on is about, the text
+     view's own, and what an editor of code has besides. -->
 <context_menu
  name="Code editor context menu">
+  <!-- What would put right a problem at the caret, where there is one:
+       the list Control-. opens. -->
+  <menu_item_call label="Quick Fix..." layout="topleft" name="quick_fix">
+    <menu_item_call.on_click function="TextView.Perform" parameter="quick_fix" />
+    <menu_item_call.on_enable function="TextView.Enable" parameter="quick_fix" />
+  </menu_item_call>
+  <menu_item_separator layout="topleft" name="Fix Separator" />
   <!-- The dictionary's suggestions for the word under the caret, where
        the spell check is on and the word is not in it. -->
   <menu_item_call label="(unknown)" layout="topleft" name="Suggestion 1">

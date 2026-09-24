@@ -62,6 +62,12 @@ namespace
     const S32 FOLD_BOX_GAP = 6;
     const S32 COMPLETION_WIDTH   = 360;
     const S32 COMPLETION_ROWS    = 8;
+    // The box beside a list: a completion's documentation, a fix's preview.
+    const S32 SIDE_WIDTH         = 320;
+    const S32 SIDE_PAD           = 6;
+    // What a line's problems offer, as the gutter keeps it.
+    const U8  FIXES_ANY          = 1;
+    const U8  FIXES_CHANGE       = 2;
     const size_t COMPLETION_CAP  = 200;
     const S32    SIGNATURE_PAD   = 6;
 
@@ -181,6 +187,7 @@ ALCodeEditor::ALCodeEditor(const Params& p)
         mMarkColors[mark] = LLUIColorTable::instance().getColor(MARK_COLOR_NAMES[mark], LLColor4::red);
     }
     mMarks.assign(document().lineCount(), Mark::None);
+    mFixable.assign(document().lineCount(), 0);
     mEditConnection    = document().onChanged([this](const ALTextDocument::Edit& edit) { onEdit(edit); });
     layout().setInlayProvider([this](S32 line, std::vector<ALTextLayout::Inlay>& out) { provideInlays(line, out); });
     mChangedConnection = onTextChanged([this]() {
@@ -224,6 +231,20 @@ ALCodeEditor::ALCodeEditor(const Params& p)
         }
     });
     addChild(mCompletionList);
+
+    // The fixes offered at a problem, on a list of their own made the same
+    // way: a fix is not a completion, and the one list open at a time
+    // keeps its own keys.
+    list.name("fixes");
+    mFixList = LLUICtrlFactory::create<ALChoiceList>(list);
+    mFixList->onPicked([this](S32 index) { takeFix(index); });
+    mFixList->onChosen([this](S32) {
+        if (fixesOpen())
+        {
+            showFixPreview();
+        }
+    });
+    addChild(mFixList);
 }
 
 ALCodeEditor::~ALCodeEditor() = default;
@@ -242,6 +263,15 @@ void ALCodeEditor::onEdit(const ALTextDocument::Edit& edit)
     }
     mMarks.insert(mMarks.begin() + first, made, Mark::None);
     mMarks.resize(document().lineCount(), Mark::None);
+    // What the problems there offered goes with them: a check says again.
+    mFixable.resize(llmax(mFixable.size(), static_cast<size_t>(last + 1)), 0);
+    if (first < static_cast<S32>(mFixable.size()))
+    {
+        mFixable.erase(mFixable.begin() + first, mFixable.begin() + last + 1);
+    }
+    mFixable.insert(mFixable.begin() + first, made, 0);
+    mFixable.resize(document().lineCount(), 0);
+    closeFixes();
     // What is known of bracket depth below the edit is known no more.
     mDepthValid = llmin(mDepthValid, first);
     // The lines the edit touched are changed until the next save.
@@ -482,7 +512,28 @@ LLColor4 ALCodeEditor::selectionDrawColor() const
 void ALCodeEditor::clearMarks()
 {
     std::fill(mMarks.begin(), mMarks.end(), Mark::None);
+    std::fill(mFixable.begin(), mFixable.end(), 0);
     ++mMarksRevision;
+}
+
+void ALCodeEditor::setFixable(S32 line, bool any, bool changes)
+{
+    if (line < 0 || line >= document().lineCount())
+    {
+        return;
+    }
+    mFixable.resize(document().lineCount(), 0);
+    mFixable[line] = static_cast<U8>((any || changes ? FIXES_ANY : 0) | (changes ? FIXES_CHANGE : 0));
+}
+
+bool ALCodeEditor::fixableAt(S32 line) const
+{
+    return line >= 0 && line < static_cast<S32>(mFixable.size()) && (mFixable[line] & FIXES_ANY) != 0;
+}
+
+bool ALCodeEditor::changesAt(S32 line) const
+{
+    return line >= 0 && line < static_cast<S32>(mFixable.size()) && (mFixable[line] & FIXES_CHANGE) != 0;
 }
 
 void ALCodeEditor::setDecorations(std::vector<Decoration> decorations)
@@ -836,10 +887,38 @@ void ALCodeEditor::drawGutter(const LLRect& text, F32 alpha)
             font->renderUTF8(std::to_string(shown), 0, static_cast<F32>(numbers_right), static_cast<F32>(screen_top - ascent),
                              line == caret_line ? lit : ink, LLFontGL::RIGHT, LLFontGL::BASELINE, LLFontGL::NORMAL, LLFontGL::NO_SHADOW);
             const Mark mark = markAt(line);
-            if (mark != Mark::None)
+            if (line == caret_line && fixableAt(line) && !isReadOnly())
+            {
+                // The lightbulb: what the problems here offer is a press on
+                // it, or Control-., away. Ringed in the mark's colour where
+                // what it is about is an error.
+                const F32 cx = static_cast<F32>(gutter.mLeft + MARK_INSET) + MARK_SIZE / 2.f;
+                const F32 r  = llmax(3.f, llmin(row_h / 2.f - 2.f, 5.f));
+                const F32 cy = static_cast<F32>(screen_top) - row_h / 2.f + 1.f;
+                if (mark == Mark::Error || mark == Mark::Runtime)
+                {
+                    gGL.color4fv((markColor(mark) % alpha).mV);
+                    gl_circle_2d(cx, cy, r + 1.5f, 16, true);
+                }
+                gGL.color4fv((paint(Paint::Warning) % alpha).mV);
+                gl_circle_2d(cx, cy, r, 16, true);
+                gl_rect_2d(static_cast<S32>(cx - r / 2.f), static_cast<S32>(cy - r + 1.f), static_cast<S32>(cx + r / 2.f + 1.f),
+                           static_cast<S32>(cy - r - 2.f), ink);
+            }
+            else if (mark != Mark::None)
             {
                 const S32 y = screen_top - (row_h - MARK_SIZE) / 2;
-                gl_rect_2d(gutter.mLeft + MARK_INSET, y, gutter.mLeft + MARK_INSET + MARK_SIZE, y - MARK_SIZE, markColor(mark) % alpha);
+                if (changesAt(line) && !isReadOnly())
+                {
+                    // Round where a fix would put it right.
+                    gGL.color4fv((markColor(mark) % alpha).mV);
+                    gl_circle_2d(static_cast<F32>(gutter.mLeft + MARK_INSET) + MARK_SIZE / 2.f, static_cast<F32>(y) - MARK_SIZE / 2.f,
+                                 MARK_SIZE / 2.f + 0.5f, 12, true);
+                }
+                else
+                {
+                    gl_rect_2d(gutter.mLeft + MARK_INSET, y, gutter.mLeft + MARK_INSET + MARK_SIZE, y - MARK_SIZE, markColor(mark) % alpha);
+                }
             }
         }
         // A marker at a block's first line: pointing right at a folded
@@ -2362,23 +2441,14 @@ void ALCodeEditor::hideCompletionDoc()
     }
 }
 
-void ALCodeEditor::showCompletionDoc()
+ALTextView* ALCodeEditor::sideBox()
 {
-    const S32 index = chosenCompletion();
-    if (index < 0 || index >= static_cast<S32>(mCompletions.size()) || mCompletions[index].documentation.empty())
-    {
-        hideCompletionDoc();
-        return;
-    }
-    const Completion& c      = mCompletions[index];
-    const LLColor4    ground = paint(Paint::Widget);
-    const S32         WIDTH  = 320;
-    const S32         PAD    = 6;
+    const LLColor4 ground = paint(Paint::Widget);
     if (!mCompletionDoc)
     {
         ALTextView::Params p(LLUICtrlFactory::getDefaultParams<ALTextView>());
         p.name                = "completion_doc";
-        p.rect                = LLRect(0, 20, WIDTH, 0);
+        p.rect                = LLRect(0, 20, SIDE_WIDTH, 0);
         p.read_only           = true;
         p.word_wrap           = true;
         p.tab_stop            = false;
@@ -2389,8 +2459,8 @@ void ALCodeEditor::showCompletionDoc()
         p.bg_color            = ground;
         p.bg_readonly_color   = ground;
         p.text_readonly_color = textColor();
-        p.h_pad               = PAD;
-        p.v_pad               = PAD - 2;
+        p.h_pad               = SIDE_PAD;
+        p.v_pad               = SIDE_PAD - 2;
         p.context_menu        = std::string();
         mCompletionDoc        = LLUICtrlFactory::create<ALTextView>(p);
         mCompletionDoc->setVisible(false);
@@ -2404,41 +2474,24 @@ void ALCodeEditor::showCompletionDoc()
     }
     mCompletionDoc->setBackgroundColor(ground);
     mCompletionDoc->setTextColor(textColor());
-    // Its declaration as code, then what it does in the reading face.
-    std::string says = c.detail.empty() ? c.text : c.detail;
-    if (c.deprecated)
-    {
-        says += "\n" + deprecatedNote();
-    }
-    says += "\n" + c.documentation;
-    mCompletionDoc->setText(says);
-    std::vector<ALTextView::Style> styles;
-    styleAsCode(*mCompletionDoc, 0, styles, c.text, c.kind);
-    if (c.deprecated)
-    {
-        ALTextView::Style note;
-        note.range = ALTextRange(ALTextPos(1, 0), mCompletionDoc->document().lineEnd(1));
-        note.color = markColor(Mark::Warning);
-        styles.push_back(note);
-    }
-    mCompletionDoc->setStyles(std::move(styles));
-    const S32 lines = mCompletionDoc->document().lineCount();
-    for (S32 line = 0; line < lines; ++line)
-    {
-        mCompletionDoc->linkUrlsOn(line);
-    }
+    return mCompletionDoc;
+}
+
+void ALCodeEditor::placeSideBox(const LLRect& list)
+{
     // Beside the list where there is room, on the right or else the
     // left; else under it, or over it; as tall as it says, up to a
     // limit, the rest cut.
+    ALTextView&  box   = *mCompletionDoc;
     const LLRect local = getLocalRect();
-    const LLRect list  = mCompletionList->getRect();
-    const S32    width = llmin(WIDTH, llmax(120, local.getWidth() - 8));
-    mCompletionDoc->setShape(LLRect(0, 40, width, 0));
+    const S32    width = llmin(SIDE_WIDTH, llmax(120, local.getWidth() - 8));
+    const S32    lines = box.document().lineCount();
+    box.setShape(LLRect(0, 40, width, 0));
     for (S32 line = 0; line < lines; ++line)
     {
-        mCompletionDoc->layout().line(line);
+        box.layout().line(line);
     }
-    const S32 height = llmin(mCompletionDoc->layout().totalHeight() + 2 * (PAD - 2) + 2, llmax(list.getHeight(), 200));
+    const S32 height = llmin(box.layout().totalHeight() + 2 * (SIDE_PAD - 2) + 2, llmax(list.getHeight(), 200));
     LLRect    rect;
     if (list.mRight + 2 + width <= local.mRight)
     {
@@ -2465,8 +2518,44 @@ void ALCodeEditor::showCompletionDoc()
     {
         rect.translate(0, local.mTop - rect.mTop);
     }
-    mCompletionDoc->setShape(rect);
-    mCompletionDoc->setVisible(true);
+    box.setShape(rect);
+    box.setVisible(true);
+}
+
+void ALCodeEditor::showCompletionDoc()
+{
+    const S32 index = chosenCompletion();
+    if (index < 0 || index >= static_cast<S32>(mCompletions.size()) || mCompletions[index].documentation.empty())
+    {
+        hideCompletionDoc();
+        return;
+    }
+    const Completion& c   = mCompletions[index];
+    ALTextView&       box = *sideBox();
+    // Its declaration as code, then what it does in the reading face.
+    std::string says = c.detail.empty() ? c.text : c.detail;
+    if (c.deprecated)
+    {
+        says += "\n" + deprecatedNote();
+    }
+    says += "\n" + c.documentation;
+    box.setText(says);
+    std::vector<ALTextView::Style> styles;
+    styleAsCode(box, 0, styles, c.text, c.kind);
+    if (c.deprecated)
+    {
+        ALTextView::Style note;
+        note.range = ALTextRange(ALTextPos(1, 0), box.document().lineEnd(1));
+        note.color = markColor(Mark::Warning);
+        styles.push_back(note);
+    }
+    box.setStyles(std::move(styles));
+    const S32 lines = box.document().lineCount();
+    for (S32 line = 0; line < lines; ++line)
+    {
+        box.linkUrlsOn(line);
+    }
+    placeSideBox(mCompletionList->getRect());
 }
 
 void ALCodeEditor::supplyCompletions(const ALTextPos& at, std::vector<Completion> more)
@@ -2482,15 +2571,20 @@ void ALCodeEditor::supplyCompletions(const ALTextPos& at, std::vector<Completion
 
 void ALCodeEditor::placeCompletion()
 {
-    const LLRect text  = textRect();
     const LLRect local = getLocalRect();
-    const S32    row_h = layout().rowHeight();
+    placeListAt(*mCompletionList, mCompletionRange.begin, llmin(static_cast<S32>(mCompletions.size()), COMPLETION_ROWS),
+                llmin(COMPLETION_WIDTH, llmax(60, local.getWidth() - 8)));
+}
+
+void ALCodeEditor::placeListAt(ALChoiceList& list, const ALTextPos& at, S32 rows, S32 width)
+{
+    const LLRect text   = textRect();
+    const LLRect local  = getLocalRect();
+    const S32    row_h  = layout().rowHeight();
     S32          row;
-    const F32    x      = layout().xOf(mCompletionRange.begin.line, mCompletionRange.begin.column, &row);
-    const S32    top    = screenTopOf(text, mCompletionRange.begin.line, row);
-    const S32    rows   = llmin(static_cast<S32>(mCompletions.size()), COMPLETION_ROWS);
-    const S32    height = mCompletionList->heightFor(rows);
-    const S32    width  = llmin(COMPLETION_WIDTH, llmax(60, local.getWidth() - 8));
+    const F32    x      = layout().xOf(at.line, at.column, &row);
+    const S32    top    = screenTopOf(text, at.line, row);
+    const S32    height = list.heightFor(rows);
     S32          left   = static_cast<S32>(static_cast<F32>(text.mLeft) - scrollX() + x);
     left                = llclamp(left, local.mLeft, llmax(local.mLeft, local.mRight - width));
     LLRect rect;
@@ -2503,7 +2597,217 @@ void ALCodeEditor::placeCompletion()
     {
         rect = LLRect(left, top + height, left + width, top);
     }
-    mCompletionList->setShape(rect);
+    list.setShape(rect);
+}
+
+// --- quick fixes -----------------------------------------------------------------
+
+bool ALCodeEditor::fixesOpen() const
+{
+    return mFixList && mFixList->getVisible();
+}
+
+void ALCodeEditor::closeFixes()
+{
+    const bool was = fixesOpen();
+    if (mFixList)
+    {
+        mFixList->setVisible(false);
+        mFixList->setChoices({});
+    }
+    mFixes.clear();
+    // The preview is the side box's, which the completions share.
+    if (was)
+    {
+        hideCompletionDoc();
+    }
+}
+
+bool ALCodeEditor::openFixes(S32 line)
+{
+    closeFixes();
+    if (!mFixProvider || isReadOnly() || line < 0 || line >= document().lineCount())
+    {
+        return false;
+    }
+    std::vector<Fix> fixes;
+    mFixProvider(line, fixes);
+    if (fixes.empty())
+    {
+        return false;
+    }
+    rankFixes(fixes);
+    closeCompletion();
+    hideSignature();
+    hideCard();
+    mFixes = std::move(fixes);
+
+    // In the editor's colours, as the completions are; a suppression
+    // quieter than what puts the problem right.
+    mFixList->setBackgroundColor(paint(Paint::Widget));
+    mFixList->setTextColor(textColor());
+    mFixList->setSelectionColor(paint(Paint::WidgetSelection));
+    mFixList->setBorderColor(paint(Paint::WidgetBorder));
+    std::vector<ALChoiceList::Choice> choices;
+    S32                               widest = 0;
+    for (const Fix& fix : mFixes)
+    {
+        ALChoiceList::Choice choice;
+        choice.text = fix.title;
+        if (fix.suppress)
+        {
+            choice.color = paint(Paint::InlayHint);
+        }
+        widest = llmax(widest, getFont()->getWidth(fix.title));
+        choices.push_back(std::move(choice));
+    }
+    const LLRect local = getLocalRect();
+    const S32    width = llclamp(widest + 24, 120, llmax(120, local.getWidth() - 8));
+    mFixList->setShape(LLRect(0, 40, width, 0));
+    mFixList->setChoices(std::move(choices), 0);
+    // Under the caret where it is on the line, else under the line's text.
+    const ALTextPos caret  = this->caret();
+    const std::string& text = document().line(line);
+    const size_t       lead = text.find_first_not_of(" \t");
+    const ALTextPos    at   = caret.line == line ? caret : ALTextPos(line, lead == std::string::npos ? 0 : static_cast<S32>(lead));
+    placeListAt(*mFixList, at, llmin(static_cast<S32>(mFixes.size()), COMPLETION_ROWS), width);
+    mFixList->setVisible(true);
+    showFixPreview();
+    return true;
+}
+
+// static
+void ALCodeEditor::rankFixes(std::vector<Fix>& fixes)
+{
+    const auto rank = [](const Fix& fix) { return fix.suppress ? 2 : fix.preferred ? 0 : 1; };
+    std::stable_sort(fixes.begin(), fixes.end(), [&rank](const Fix& a, const Fix& b) { return rank(a) < rank(b); });
+}
+
+// static
+std::string ALCodeEditor::fixedLines(const ALTextDocument& text, const Fix& fix, S32& first, S32& last)
+{
+    first = S32_MAX;
+    last  = -1;
+    for (const auto& [range, with] : fix.edits)
+    {
+        const ALTextRange ordered = range.normalised();
+        first                     = llmin(first, ordered.begin.line);
+        last                      = llmax(last, ordered.end.line);
+    }
+    if (last < 0 || first >= text.lineCount())
+    {
+        first = last = 0;
+        return std::string();
+    }
+    first = llmax(0, first);
+    last  = llmin(last, text.lineCount() - 1);
+    std::string         block;
+    std::vector<size_t> starts;
+    for (S32 line = first; line <= last; ++line)
+    {
+        starts.push_back(block.size());
+        block += text.line(line);
+        if (line < last)
+        {
+            block += "\n";
+        }
+    }
+    // From the last edit back, so that each one's places are still the
+    // text's as it was.
+    std::vector<std::pair<ALTextRange, std::string>> edits = fix.edits;
+    std::sort(edits.begin(), edits.end(), [](const auto& a, const auto& b) { return b.first.normalised().begin < a.first.normalised().begin; });
+    const auto offset = [&](const ALTextPos& at) {
+        const S32 line = llclamp(at.line, first, last);
+        return starts[line - first] + static_cast<size_t>(llclamp(at.column, 0, static_cast<S32>(text.line(line).size())));
+    };
+    for (const auto& [range, with] : edits)
+    {
+        const ALTextRange ordered = range.normalised();
+        const size_t      from    = offset(ordered.begin);
+        const size_t      to      = offset(ordered.end);
+        if (to >= from && to <= block.size())
+        {
+            block.replace(from, to - from, with);
+        }
+    }
+    return block;
+}
+
+void ALCodeEditor::showFixPreview()
+{
+    const S32 index = fixesOpen() ? mFixList->chosen() : -1;
+    if (index < 0 || index >= static_cast<S32>(mFixes.size()))
+    {
+        hideCompletionDoc();
+        return;
+    }
+    // The lines it touches as they read and as they would, as a diff has
+    // them: what goes in the error colour, what comes coloured as code.
+    S32               first = 0, last = 0;
+    const std::string after = fixedLines(document(), mFixes[index], first, last);
+    std::string       says;
+    S32               removed = 0;
+    for (S32 line = first; line <= last && line < document().lineCount(); ++line)
+    {
+        says += (says.empty() ? "- " : "\n- ") + document().line(line);
+        ++removed;
+    }
+    std::string_view rest = after;
+    while (true)
+    {
+        const size_t cut = rest.find('\n');
+        says += "\n+ " + std::string(rest.substr(0, cut));
+        if (cut == std::string_view::npos)
+        {
+            break;
+        }
+        rest.remove_prefix(cut + 1);
+    }
+    ALTextView& box = *sideBox();
+    box.setText(says);
+    std::vector<ALTextView::Style> styles;
+    for (S32 line = 0; line < box.document().lineCount(); ++line)
+    {
+        if (line < removed)
+        {
+            ALTextView::Style gone;
+            gone.range = ALTextRange(ALTextPos(line, 0), box.document().lineEnd(line));
+            gone.color = markColor(Mark::Error);
+            styles.push_back(gone);
+        }
+        else
+        {
+            styleAsCode(box, line, styles);
+        }
+    }
+    box.setStyles(std::move(styles));
+    placeSideBox(mFixList->getRect());
+}
+
+void ALCodeEditor::takeFix(S32 index)
+{
+    if (index < 0 || index >= static_cast<S32>(mFixes.size()))
+    {
+        return;
+    }
+    // Made by whoever gave it, which knows whether the text is still the
+    // one it was made for.
+    const LLSD value = mFixes[index].value;
+    closeFixes();
+    if (mFixHandler)
+    {
+        mFixHandler(value);
+    }
+}
+
+bool ALCodeEditor::quickFix()
+{
+    return openFixes(caret().line);
+}
+
+bool ALCodeEditor::canQuickFix() const
+{
+    return mFixProvider && mFixHandler && fixableAt(caret().line);
 }
 
 void ALCodeEditor::openCompletion()
@@ -3281,6 +3585,40 @@ void ALCodeEditor::dropTyping()
 bool ALCodeEditor::handleKeyHere(KEY key, MASK mask)
 {
     hideCard();
+    // The fixes listed take the keys that walk them and take one, in any
+    // mode a modal keymap is in -- the list was asked for; any other key
+    // lets them go and is the text's.
+    if (fixesOpen())
+    {
+        if (mask == MASK_NONE)
+        {
+            switch (key)
+            {
+                case KEY_ESCAPE:
+                    closeFixes();
+                    return true;
+                case KEY_UP:
+                    mFixList->moveChoice(-1, true);
+                    return true;
+                case KEY_DOWN:
+                    mFixList->moveChoice(1, true);
+                    return true;
+                case KEY_PAGE_UP:
+                    mFixList->moveChoice(-COMPLETION_ROWS, false);
+                    return true;
+                case KEY_PAGE_DOWN:
+                    mFixList->moveChoice(COMPLETION_ROWS, false);
+                    return true;
+                case KEY_RETURN:
+                case KEY_TAB:
+                    takeFix(mFixList->chosen());
+                    return true;
+                default:
+                    break;
+            }
+        }
+        closeFixes();
+    }
     // Outside a modal keymap's inserting modes a key is a command, and
     // nothing the typing puts up -- the list, the signature, a snippet's
     // stops -- is in play: the keymap has the key, whatever it is.
@@ -3537,6 +3875,10 @@ bool ALCodeEditor::handleMouseDown(S32 x, S32 y, MASK mask)
     {
         return LLUICtrl::handleMouseDown(x, y, mask);
     }
+    if (fixesOpen() && mFixList->getRect().pointInRect(x, y))
+    {
+        return LLUICtrl::handleMouseDown(x, y, mask);
+    }
     if (cardShown() && mCard->getRect().pointInRect(x, y))
     {
         return LLUICtrl::handleMouseDown(x, y, mask);
@@ -3547,10 +3889,21 @@ bool ALCodeEditor::handleMouseDown(S32 x, S32 y, MASK mask)
     }
     hideCard();
     closeCompletion();
+    closeFixes();
     clearPlaceholders();
     mAutoClosed.clear();
     const LLRect text         = textRect();
     const S32    gutter_right = leftEdge() + gutterWidth();
+    // The mark column of a line whose problems offer fixes: its fixes,
+    // listed as Control-. would list them.
+    if (mShowLineNumbers && x >= leftEdge() && x < leftEdge() + MARK_INSET + MARK_SIZE + GUTTER_PAD / 2)
+    {
+        const S32 line = posAtLocal(text.mLeft, y, false).line;
+        if (fixableAt(line) && openFixes(line))
+        {
+            return true;
+        }
+    }
     if (mShowFoldMarkers && x < gutter_right && x >= gutter_right - FOLD_COLUMN)
     {
         const S32 line = posAtLocal(text.mLeft, y, false).line;
@@ -3837,6 +4190,18 @@ void ALCodeEditor::showCard(const ALTextRange& about, const std::string& says, c
                 LLUrlAction::clickAction(link.url, false);
                 return;
             }
+            // A fix: made by whoever gave it, and the card goes, being
+            // about a problem the fix is to take away.
+            if (link.value.isMap() && link.value.has("fix"))
+            {
+                const LLSD value = link.value["fix"];
+                hideCard();
+                if (mFixHandler)
+                {
+                    mFixHandler(value);
+                }
+                return;
+            }
             // A way somewhere the caller gave: gone to, and the card with
             // it, since it is about where the caret is no longer.
             if (link.value.isDefined() && mCardLinkHandler)
@@ -3866,6 +4231,22 @@ void ALCodeEditor::showCard(const ALTextRange& about, const std::string& says, c
         for (S32 i = 0; i < made; ++i)
         {
             problem_lines.emplace_back(line_count++, &problem.color);
+        }
+    }
+    // What would put them right, each a link on a line of its own under
+    // them that makes it: the fixes of the line they are on.
+    std::vector<std::pair<S32, LLSD>> fix_lines;
+    if (!problems.empty() && mFixProvider && mFixHandler && !isReadOnly())
+    {
+        std::vector<Fix> fixes;
+        mFixProvider(about.begin.line, fixes);
+        rankFixes(fixes);
+        for (const Fix& fix : fixes)
+        {
+            LLStringUtil::format_map_t args;
+            args["[TITLE]"] = fix.title;
+            all += "\n" + alSaid("CodeFixLink", "Fix: [TITLE]", args);
+            fix_lines.emplace_back(line_count++, fix.value);
         }
     }
     S32 head_line = -1;
@@ -3916,6 +4297,14 @@ void ALCodeEditor::showCard(const ALTextRange& about, const std::string& says, c
         }
     }
     mCard->setStyles(std::move(styles));
+    for (const auto& [line, value] : fix_lines)
+    {
+        ALTextView::Substitution fix;
+        fix.range = ALTextRange(ALTextPos(line, 0), mCard->document().lineEnd(line));
+        fix.link  = true;
+        fix.value = LLSD().with("fix", value);
+        mCard->addSubstitution(std::move(fix));
+    }
     // The caller's own links, each on the line that says it, below the
     // head; then every URL.
     for (const CardLink& link : links)
@@ -3988,6 +4377,8 @@ void ALCodeEditor::showCard(const ALTextRange& about, const std::string& says, c
 
 bool ALCodeEditor::handleScrollWheel(S32 x, S32 y, LLScrollDelta delta)
 {
+    // A list of fixes is about a row the scroll takes away.
+    closeFixes();
     if (cardShown() && mCard->getRect().pointInRect(x, y))
     {
         return mCard->handleScrollWheel(x - mCard->getRect().mLeft, y - mCard->getRect().mBottom, delta);
@@ -4248,5 +4639,6 @@ void ALCodeEditor::draw()
 void ALCodeEditor::onFocusLost()
 {
     closeCompletion();
+    closeFixes();
     ALTextView::onFocusLost();
 }

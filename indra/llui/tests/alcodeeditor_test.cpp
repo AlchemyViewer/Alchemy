@@ -1217,4 +1217,100 @@ namespace tut
         }
         ensure("llSetPos for setp", e.completionOpen() && found);
     }
+
+    template<> template<>
+    void alcodeeditor_object::test<34>()
+    {
+        set_test_name("a line's fixes are listed preferred first, previewed as they are chosen, and taken by their value");
+        ALCodeEditor& e = make("integer a = 1\nllOwnerSay((string)a);\n");
+        std::vector<LLSD> taken;
+        e.setFixProvider([](S32 line, std::vector<ALCodeEditor::Fix>& out) {
+            if (line != 0)
+            {
+                return;
+            }
+            ALCodeEditor::Fix suppress;
+            suppress.title    = "Suppress it";
+            suppress.suppress = true;
+            suppress.value    = "suppress";
+            suppress.edits.emplace_back(ALTextRange(ALTextPos(0, 13), ALTextPos(0, 13)), "  // NOLINT");
+            ALCodeEditor::Fix other;
+            other.title = "Rename it";
+            other.value = "other";
+            other.edits.emplace_back(ALTextRange(ALTextPos(0, 8), ALTextPos(0, 9)), "b");
+            ALCodeEditor::Fix semi;
+            semi.title     = "Insert ';'";
+            semi.preferred = true;
+            semi.value     = "semi";
+            semi.edits.emplace_back(ALTextRange(ALTextPos(0, 13), ALTextPos(0, 13)), ";");
+            out = { suppress, other, semi };
+        });
+        e.setFixHandler([&taken](const LLSD& value) { taken.push_back(value); });
+        ensure("nothing offered where the line says nothing", !e.canPerform(ALEditorCommand::QuickFix));
+        e.setFixable(0, true, true);
+        ensure("offered on the caret's line", e.canPerform(ALEditorCommand::QuickFix) && e.changesAt(0));
+        ensure("listed by Control-.", e.handleKeyHere('.', MASK_CONTROL) && e.fixesOpen());
+        ensure_equals("three", e.fixes().size(), static_cast<size_t>(3));
+        ensure_equals("the preferred first", e.fixes().front().title, std::string("Insert ';'"));
+        ensure_equals("the suppression last", e.fixes().back().title, std::string("Suppress it"));
+        const ALTextView* box = e.findChild<ALTextView>("completion_doc", false);
+        ensure("previewed", box && box->getVisible());
+        ensure_equals("as a diff", box->text(), std::string("- integer a = 1\n+ integer a = 1;"));
+        key(KEY_DOWN);
+        ensure_equals("the next, previewed", box->text(), std::string("- integer a = 1\n+ integer b = 1"));
+        key(KEY_ESCAPE);
+        ensure("escape lets it go", !e.fixesOpen() && taken.empty() && !box->getVisible());
+        e.handleKeyHere('.', MASK_CONTROL);
+        key(KEY_RETURN);
+        ensure("Return takes the chosen one by its value", taken.size() == 1 && taken.front().asString() == "semi" && !e.fixesOpen());
+        ensure_equals("and changes nothing itself", e.document().line(0), std::string("integer a = 1"));
+        e.handleKeyHere('.', MASK_CONTROL);
+        type("x");
+        ensure("typing lets it go", !e.fixesOpen());
+        ensure("and the line it edited offers nothing until it is checked again", !e.fixableAt(0) && !e.canPerform(ALEditorCommand::QuickFix));
+    }
+
+    template<> template<>
+    void alcodeeditor_object::test<35>()
+    {
+        set_test_name("what a line offers slides with the edits above it, and a fix reads as the lines it makes");
+        ALCodeEditor& e = make("one\ntwo\nthree\n");
+        e.setFixable(1, true, false);
+        ensure("a suppression only", e.fixableAt(1) && !e.changesAt(1));
+        // A line put in above it: a bare break, since a word typed would
+        // open the completions, and Return would take one.
+        e.setSelection(ALTextRange(ALTextPos(0, 0), ALTextPos(0, 0)));
+        type("\n");
+        ensure("moved down with its line", e.fixableAt(2) && !e.fixableAt(1));
+        e.clearMarks();
+        ensure("cleared with the marks", !e.fixableAt(2));
+
+        ALCodeEditor::Fix fix;
+        fix.edits.emplace_back(ALTextRange(ALTextPos(2, 1), ALTextPos(3, 2)), "X");
+        fix.edits.emplace_back(ALTextRange(ALTextPos(2, 0), ALTextPos(2, 0)), ">");
+        S32 first = -1, last = -1;
+        ensure_equals("both edits, in the text's order", ALCodeEditor::fixedLines(e.document(), fix, first, last), std::string(">tXree"));
+        ensure_equals("the text itself untouched", e.document().line(2), std::string("two"));
+        ensure("over the lines they touch", first == 2 && last == 3);
+    }
+
+    template<> template<>
+    void alcodeeditor_object::test<36>()
+    {
+        set_test_name("a problem's card offers its line's fixes, in the list's order");
+        ALCodeEditor& e = make("integer a = 1\n");
+        e.setFixProvider([](S32 line, std::vector<ALCodeEditor::Fix>& out) {
+            ALCodeEditor::Fix suppress;
+            suppress.title    = "Suppress it";
+            suppress.suppress = true;
+            ALCodeEditor::Fix semi;
+            semi.title     = "Insert ';'";
+            semi.preferred = true;
+            out            = { suppress, semi };
+        });
+        e.setFixHandler([](const LLSD&) {});
+        e.showCard(ALTextRange(ALTextPos(0, 0), ALTextPos(0, 7)), std::string(), { { "Missing ';'.", LLColor4::red } });
+        ensure("shown", e.cardShown());
+        ensure_equals("each a line under the problem", e.card()->text(), std::string("Missing ';'.\nFix: Insert ';'\nFix: Suppress it"));
+    }
 }
