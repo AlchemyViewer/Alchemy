@@ -13531,20 +13531,21 @@ void ALFloaterScriptStudio::fillExplorer()
     std::vector<ExplorerRow> chosen = explorerChoice();
     const S32                scroll = mExplorer->getScrollPos();
     mExplorer->deleteAllItems();
-    // What a row is -- an object, a prim, a script -- is its icon and its
-    // tip; the columns are its name and its state.
-    auto row = [&](const LLSD& value, const char* image, const std::string& name, const std::string& run, const std::string& tip) {
+    // What a row is -- an object, a prim, a script -- is its icon; the
+    // columns are its name and its state. It has no tip: all a tip could
+    // say the row shows, and what can be done with it the right-click
+    // menu and the buttons under the list show. The mouse over a row shows
+    // only a name cut short, whole where it stands, as a tree of files does.
+    auto row = [&](const LLSD& value, const char* image, const std::string& name, const std::string& run) {
         LLSD r;
-        r["value"]                  = value;
-        r["columns"][0]["column"]   = "icon";
-        r["columns"][0]["type"]     = "icon";
-        r["columns"][0]["value"]    = image;
-        r["columns"][0]["tool_tip"] = tip;
+        r["value"]                = value;
+        r["columns"][0]["column"] = "icon";
+        r["columns"][0]["type"]   = "icon";
+        r["columns"][0]["value"]  = image;
         for (S32 i = 1; i < 3; ++i)
         {
-            r["columns"][i]["column"]   = i == 1 ? "name" : "run";
-            r["columns"][i]["value"]    = i == 1 ? name : run;
-            r["columns"][i]["tool_tip"] = tip;
+            r["columns"][i]["column"] = i == 1 ? "name" : "run";
+            r["columns"][i]["value"]  = i == 1 ? name : run;
         }
         return mExplorer->addElement(r);
     };
@@ -13588,15 +13589,11 @@ void ALFloaterScriptStudio::fillExplorer()
         }
         LLSD at;
         at["root"] = object.root;
-        const std::string pin  = object.pinned ? getString("PinnedMark") : LLStringUtil::null;
-        const bool        many = object.prims.size() > 1;
-        LLStringUtil::format_map_t args;
-        args["[NAME]"]   = object.name;
-        args["[OBJECT]"] = object.name;
+        const std::string pin           = object.pinned ? getString("PinnedMark") : LLStringUtil::null;
+        const bool        many          = object.prims.size() > 1;
         const bool        object_folded = filter.empty() && mExplorerFolded.contains(object.root);
         LLScrollListItem* line = row(at, many ? "Inv_Object_Multi" : "Inv_Object", (object_folded ? arrow_folded : arrow_open) + pin + object.name,
-                                     object.present ? LLStringUtil::null : getString("KindAway"),
-                                     object.present ? counted("RowObjectTip", static_cast<S32>(object.prims.size()), args) : getString("RowAwayTip", args));
+                                     object.present ? LLStringUtil::null : getString("KindAway"));
         line->setSelected(wasChosen(at));
         if (object_folded)
         {
@@ -13617,11 +13614,10 @@ void ALFloaterScriptStudio::fillExplorer()
             }
             if (many)
             {
-                at["prim"]     = prim.id;
-                args["[NAME]"] = prim.name.empty() ? getString("ObjectUnnamed") : prim.name;
+                at["prim"]             = prim.id;
                 const bool prim_folded = filter.empty() && mExplorerFoldedPrims.contains(prim.id);
                 line = row(at, "Studio_Prim", "    " + (prim_folded ? arrow_folded : arrow_open) + (prim.name.empty() ? getString("ObjectUnnamed") : prim.name),
-                           LLStringUtil::null, getString("RowPrimTip", args));
+                           LLStringUtil::null);
                 line->setSelected(wasChosen(at));
                 if (prim_folded)
                 {
@@ -13660,12 +13656,8 @@ void ALFloaterScriptStudio::fillExplorer()
                     }
                     run = getString(state < 0 ? "StateUnknown" : state ? "RunningYes" : "RunningNo");
                 }
-                const std::string kind = getString(item.script ? (item.lua ? "KindLua" : "KindScript") : "KindNotecard");
-                args["[NAME]"]         = item.name;
-                args["[KIND]"]         = kind;
-                args["[STATE]"]        = run;
                 const char* image = item.script ? (item.lua ? "Inv_Script_Luau" : "Inv_Script") : item.name == ".luaurc" || item.name == ".lslrc" ? "Studio_Config" : "Inv_Notecard";
-                line = row(value, image, indent + item.name, run, getString(item.script ? "RowScriptTip" : "RowNotecardTip", args));
+                line = row(value, image, indent + item.name, run);
                 line->setSelected(wasChosen(value));
             }
         }
