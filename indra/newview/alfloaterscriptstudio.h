@@ -1104,7 +1104,11 @@ private:
     // What is dragged from the inventory over a row of the explorer, or
     // dropped on it: into the prim the row is of, as into the build
     // floater's contents.
-    void dropOnExplorer(const LLSD& row, MASK mask, bool drop, EDragAndDropType type, void* cargo, EAcceptance* accept);
+    // Answers the row the drop goes to, for the list to light.
+    LLSD dropOnExplorer(const LLSD& row, MASK mask, bool drop, EDragAndDropType type, void* cargo, EAcceptance* accept);
+    // What is dragged put into a prim, as the build floater's contents
+    // take it; true where it would go.
+    bool dropIntoPrim(LLViewerObject* prim, MASK mask, bool drop, EDragAndDropType type, void* cargo);
     // Where a drop on the explorer's empty space goes: the prim of what is
     // chosen in it, where all of that is of one; the object selected in
     // world where nothing is. Nowhere, where either is more than one.

@@ -80,10 +80,11 @@ public:
 
     // What the viewer's drag tool carries over a row, or drops on it: the
     // handler is given the row's value -- undefined over no row -- says in
-    // `accept` what it would do, and does it on the drop. The row under
-    // the pointer is lit meanwhile, and near the list's top or bottom the
-    // list scrolls, for a row out of sight.
-    typedef std::function<void(const LLSD& row, MASK mask, bool drop, EDragAndDropType type, void* cargo, EAcceptance* accept, std::string& tooltip)>
+    // `accept` what it would do, and does it on the drop; and it answers
+    // the value of the row the drop would go to, which is lit, or an
+    // undefined one for none. Near the list's top or bottom the list
+    // scrolls, for a row out of sight; the light goes with the pointer.
+    typedef std::function<LLSD(const LLSD& row, MASK mask, bool drop, EDragAndDropType type, void* cargo, EAcceptance* accept, std::string& tooltip)>
         drop_t;
     void setDropHandler(drop_t handler) { mDropHandler = std::move(handler); }
 
@@ -94,6 +95,10 @@ public:
     void onMouseCaptureLost() override;
     bool handleDragAndDrop(S32 x, S32 y, MASK mask, bool drop, EDragAndDropType type, void* cargo, EAcceptance* accept,
                            std::string& tooltip) override;
+    // Over the rows, a row's own tip; over none of them, the list's own,
+    // which a plain list only ever shows as its hidden column heading's.
+    bool handleToolTip(S32 x, S32 y, MASK mask) override;
+    void draw() override;
 
 protected:
     friend class LLUICtrlFactory;
@@ -111,6 +116,8 @@ private:
     ALDragGesture               mPress;
     LLSD                        mPressed;
     drop_t                      mDropHandler;
-    // A row a step, and no faster, while a drag rests at an edge.
+    // A row a step, and no faster, while a drag rests at an edge; and
+    // whether a row is lit for a drop, until the pointer leaves.
     LLFrameTimer                mDropScroll;
+    bool                        mDropLit = false;
 };

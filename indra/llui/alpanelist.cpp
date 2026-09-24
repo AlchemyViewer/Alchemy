@@ -27,11 +27,38 @@
 
 #include "llscrolllistcell.h"
 #include "llscrolllistitem.h"
+#include "llsdutil.h"
 #include "llui.h"
 
 #include <utility>
 
 static LLDefaultChildRegistry::Register<ALPaneList> r("pane_list");
+
+namespace
+{
+    // Whether a row's value is the one asked for: as the list keeps them,
+    // each scalar made words on the way in, so a key's words against the
+    // key's words rather than type against type.
+    bool sameValue(const LLSD& kept, const LLSD& asked)
+    {
+        if (asked.isMap())
+        {
+            if (!kept.isMap() || kept.size() != asked.size())
+            {
+                return false;
+            }
+            for (const auto& [key, value] : llsd::inMap(asked))
+            {
+                if (!kept.has(key) || !sameValue(kept[key], value))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+        return !kept.isMap() && kept.asString() == asked.asString();
+    }
+}
 
 ALPaneList::Params::Params()
 {
@@ -133,10 +160,53 @@ bool ALPaneList::handleDragAndDrop(S32 x, S32 y, MASK mask, bool drop, EDragAndD
         setScrollPos(llmax(0, getScrollPos() + (y < rows.mBottom + EDGE ? 1 : -1)));
     }
     LLScrollListItem* row = hitItem(x, y);
-    mouseOverHighlightNthItem(row && !drop ? getItemIndex(row) : -1);
-    *accept = ACCEPT_NO;
-    mDropHandler(row ? row->getValue() : LLSD(), mask, drop, type, cargo, accept, tooltip);
+    *accept               = ACCEPT_NO;
+    const LLSD target     = mDropHandler(row ? row->getValue() : LLSD(), mask, drop, type, cargo, accept, tooltip);
+    // The row it would go to lit, not the one under the pointer: an item's
+    // row may stand for what holds it.
+    S32 lit = -1;
+    if (!drop && target.isDefined())
+    {
+        S32 index = 0;
+        for (LLScrollListItem* item : getAllData())
+        {
+            if (sameValue(item->getValue(), target))
+            {
+                lit = index;
+                break;
+            }
+            ++index;
+        }
+    }
+    mouseOverHighlightNthItem(lit);
+    mDropLit = lit >= 0;
     return true;
+}
+
+bool ALPaneList::handleToolTip(S32 x, S32 y, MASK mask)
+{
+    if (!hitItem(x, y) && getItemListRect().pointInRect(x, y))
+    {
+        return LLUICtrl::handleToolTip(x, y, mask);
+    }
+    return LLScrollListCtrl::handleToolTip(x, y, mask);
+}
+
+void ALPaneList::draw()
+{
+    // A drag gone elsewhere tells the list nothing: its light goes when
+    // the pointer is no longer over it.
+    if (mDropLit)
+    {
+        S32 x = 0, y = 0;
+        LLUI::getInstance()->getMousePositionLocal(this, &x, &y);
+        if (!pointInView(x, y))
+        {
+            mouseOverHighlightNthItem(-1);
+            mDropLit = false;
+        }
+    }
+    LLScrollListCtrl::draw();
 }
 
 void ALPaneList::onMouseCaptureLost()

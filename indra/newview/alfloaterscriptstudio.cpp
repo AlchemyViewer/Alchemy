@@ -970,7 +970,7 @@ bool ALFloaterScriptStudio::postBuild()
         }
     });
     mExplorer->setDropHandler([this](const LLSD& row, MASK mask, bool drop, EDragAndDropType type, void* cargo, EAcceptance* accept, std::string&) {
-        dropOnExplorer(row, mask, drop, type, cargo, accept);
+        return dropOnExplorer(row, mask, drop, type, cargo, accept);
     });
     mExplorer->setCommitCallback([this](LLUICtrl*, const LLSD&) { refreshExplorerButtons(); });
     mExplorerFilter = getChild<LLFilterEditor>("explorer_filter");
@@ -14127,31 +14127,53 @@ LLViewerObject* ALFloaterScriptStudio::explorerDropTarget() const
     return node->getObject();
 }
 
-void ALFloaterScriptStudio::dropOnExplorer(const LLSD& row, MASK mask, bool drop, EDragAndDropType type, void* cargo, EAcceptance* accept)
+LLSD ALFloaterScriptStudio::dropOnExplorer(const LLSD& row, MASK mask, bool drop, EDragAndDropType type, void* cargo, EAcceptance* accept)
 {
     // Into the prim the row is of: an item's, a prim's own, an object's
-    // root, which is where a drop on the object in world goes too.
-    *accept = ACCEPT_NO;
-    LLViewerObject* prim = nullptr;
-    if (row.isMap())
+    // root, which is where a drop on the object in world goes too; below
+    // the rows, the prim of what is chosen.
+    *accept              = ACCEPT_NO;
+    LLViewerObject* prim = row.isMap() ? gObjectList.findObject(row.has("prim") ? row["prim"].asUUID() : row["root"].asUUID()) : explorerDropTarget();
+    if (!prim || !dropIntoPrim(prim, mask, drop, type, cargo))
     {
-        prim = gObjectList.findObject(row.has("prim") ? row["prim"].asUUID() : row["root"].asUUID());
+        return LLSD();
     }
-    else
+    *accept = ACCEPT_YES_MULTI;
+    if (drop)
     {
-        prim = explorerDropTarget();
+        return LLSD();
     }
-    if (!prim)
+    // The row the drop goes to, lit: the prim's, where its object shows
+    // its prims, and the object's otherwise.
+    LLSD at;
+    for (const ExplorerObject& object : mExplorerModel)
     {
-        return;
+        for (const ExplorerPrim& each : object.prims)
+        {
+            if (each.id != prim->getID())
+            {
+                continue;
+            }
+            at["root"] = object.root;
+            if (object.prims.size() > 1 && !mExplorerFolded.contains(object.root))
+            {
+                at["prim"] = each.id;
+            }
+            return at;
+        }
     }
+    return LLSD();
+}
+
+bool ALFloaterScriptStudio::dropIntoPrim(LLViewerObject* prim, MASK mask, bool drop, EDragAndDropType type, void* cargo)
+{
     // Nothing from a notecard, which the drag tool will not put into an
     // object.
     LLToolDragAndDrop*               tool   = LLToolDragAndDrop::getInstance();
     const LLToolDragAndDrop::ESource source = tool->getSource();
     if (source == LLToolDragAndDrop::SOURCE_NOTECARD)
     {
-        return;
+        return false;
     }
     if (source == LLToolDragAndDrop::SOURCE_WORLD)
     {
@@ -14162,10 +14184,9 @@ void ALFloaterScriptStudio::dropOnExplorer(const LLSD& row, MASK mask, bool drop
         LLViewerInventoryItem* item = static_cast<LLViewerInventoryItem*>(cargo);
         const LLUUID           from = tool->getSourceID();
         const bool ok = type != DAD_CATEGORY && item && gObjectList.findObject(from) && LLToolDragAndDrop::isInventoryDropAcceptable(prim, item);
-        *accept       = ok ? ACCEPT_YES_MULTI : ACCEPT_NO;
         if (!ok || !drop)
         {
-            return;
+            return ok;
         }
         if (tool->getCargoIndex() == 0)
         {
@@ -14176,7 +14197,7 @@ void ALFloaterScriptStudio::dropOnExplorer(const LLSD& row, MASK mask, bool drop
         {
             transferBetween(from, std::exchange(mTransferring, {}), prim->getID(), (mask & MASK_CONTROL) == 0);
         }
-        return;
+        return true;
     }
     // As the build floater's contents take it: a folder's items, each
     // thing that may go in, and a script running unless Control is held.
@@ -14215,7 +14236,6 @@ void ALFloaterScriptStudio::dropOnExplorer(const LLSD& row, MASK mask, bool drop
         default:
             break;
     }
-    *accept = ok ? ACCEPT_YES_MULTI : ACCEPT_NO;
     if (ok && drop)
     {
         // Listed again now, and again in a moment for what a folder sends
@@ -14223,6 +14243,7 @@ void ALFloaterScriptStudio::dropOnExplorer(const LLSD& row, MASK mask, bool drop
         refreshExplorer(true);
         mExplorerRefetchAt = LLTimer::getTotalSeconds() + 2.0;
     }
+    return ok;
 }
 
 bool ALFloaterScriptStudio::handleMouseDown(S32 x, S32 y, MASK mask)
@@ -16247,10 +16268,9 @@ void ALFloaterScriptStudio::refreshExperience()
         const std::string name = experience[LLExperienceCache::NAME].asString();
         return name.empty() ? LLTrans::getString("ExperienceNameUntitled") : name;
     };
-    // What can be picked: none, the agent's own by name, and the one it
-    // runs under where that is not the agent's; and its profile, where
-    // it has one. Only what it has, and the profile, where it may not be
-    // changed.
+    // What can be picked: none, the ones the agent contributes to by name,
+    // and the one it runs under where that is not one of them; only what
+    // it has, where it may not be changed.
     const bool known = doc->experienceKnown || doc->experienceChosen;
     std::vector<std::pair<std::string, LLUUID>> offered;
     for (const LLUUID& id : own)

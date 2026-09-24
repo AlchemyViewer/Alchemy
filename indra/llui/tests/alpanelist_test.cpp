@@ -241,16 +241,23 @@ namespace tut
             group   = defined ? row["group"].asInteger() : -1;
             dropped = drop;
             *accept = defined ? ACCEPT_YES_MULTI : ACCEPT_NO;
+            // It goes to the first row, whichever it is over.
+            LLSD first;
+            first["group"]   = 1;
+            first["heading"] = false;
+            return defined ? first : LLSD();
         });
         const LLRect second = l.getCellRect(1, 0);
         EAcceptance  accept = ACCEPT_NO;
         std::string  tip;
         ensure("over a row, taken", l.handleDragAndDrop(second.getCenterX(), second.getCenterY(), MASK_NONE, false, DAD_NOTECARD, nullptr, &accept, tip));
         ensure("with its value", defined && group == 2 && !dropped && accept == ACCEPT_YES_MULTI);
+        ensure_equals("the row it goes to lit, not the one under it", l.getHighlightedItemInx(), 0);
         l.handleDragAndDrop(second.getCenterX(), second.getCenterY(), MASK_NONE, true, DAD_NOTECARD, nullptr, &accept, tip);
         ensure("and dropped", dropped && group == 2);
         const LLRect rows = l.getItemListRect();
         l.handleDragAndDrop(rows.getCenterX(), rows.mBottom + 12, MASK_NONE, false, DAD_NOTECARD, nullptr, &accept, tip);
         ensure("over no row, none", !defined && accept == ACCEPT_NO);
+        ensure_equals("and nothing lit", l.getHighlightedItemInx(), -1);
     }
 }
