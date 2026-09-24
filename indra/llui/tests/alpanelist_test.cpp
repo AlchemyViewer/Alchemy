@@ -160,7 +160,7 @@ namespace tut
         const LLRect third = l.getCellRect(2, 0);
         S32          asked = 0;
         bool         agree = true;
-        l.setDragStarter([&]() {
+        l.setDragStarter([&](const LLSD&) {
             ++asked;
             return agree;
         });
@@ -184,5 +184,45 @@ namespace tut
         l.handleHover(third.getCenterX(), third.getCenterY(), MASK_NONE);
         ensure("with no starter, as any list", asked == 2 && l.getFirstSelectedIndex() == 2);
         l.handleMouseUp(third.getCenterX(), third.getCenterY(), MASK_NONE);
+    }
+
+    template<> template<>
+    void alpanelist_object::test<4>()
+    {
+        set_test_name("a plain press on one of several chosen rows keeps them all for a drag, which is told the row pressed; let go without one, it chooses its row alone");
+        ALPaneList& l = make();
+        l.setAllowMultipleSelection(true);
+        add("one", 1);
+        add("two", 2);
+        add("three", 3);
+        const auto click = [&](S32 row, MASK mask) {
+            const LLRect r = l.getCellRect(row, 0);
+            l.handleMouseDown(r.getCenterX(), r.getCenterY(), mask);
+            l.handleMouseUp(r.getCenterX(), r.getCenterY(), mask);
+        };
+        S32 asked = 0, chosen_then = 0, pressed_group = 0;
+        l.setDragStarter([&](const LLSD& pressed) {
+            ++asked;
+            chosen_then   = l.getNumSelected();
+            pressed_group = pressed["group"].asInteger();
+            return true;
+        });
+        click(0, MASK_NONE);
+        click(2, MASK_CONTROL);
+        ensure_equals("two chosen", l.getNumSelected(), 2);
+        const LLRect second = l.getCellRect(1, 0);
+        const LLRect third  = l.getCellRect(2, 0);
+        l.handleMouseDown(third.getCenterX(), third.getCenterY(), MASK_NONE);
+        ensure_equals("pressed, both stay chosen while it may be a drag", l.getNumSelected(), 2);
+        l.handleMouseUp(third.getCenterX(), third.getCenterY(), MASK_NONE);
+        ensure("let go where it was, its row alone", l.getNumSelected() == 1 && l.getFirstSelectedIndex() == 2);
+        ensure_equals("and no drag", asked, 0);
+
+        click(0, MASK_CONTROL);
+        ensure_equals("both again", l.getNumSelected(), 2);
+        l.handleMouseDown(third.getCenterX(), third.getCenterY(), MASK_NONE);
+        l.handleHover(second.getCenterX(), second.getCenterY(), MASK_NONE);
+        ensure("a drag of both, told the row pressed", asked == 1 && chosen_then == 2 && pressed_group == 3);
+        l.handleMouseUp(second.getCenterX(), second.getCenterY(), MASK_NONE);
     }
 }

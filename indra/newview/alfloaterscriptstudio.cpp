@@ -949,7 +949,7 @@ bool ALFloaterScriptStudio::postBuild()
     mExplorer->setDoubleClickCallback(boost::bind(&ALFloaterScriptStudio::onExplorerChosen, this));
     // The buttons follow what is chosen, which the list says as it changes.
     mExplorer->setCommitOnSelectionChange(true);
-    mExplorer->setDragStarter([this]() { return startExplorerDrag(); });
+    mExplorer->setDragStarter([this](const LLSD& pressed) { return startExplorerDrag(pressed); });
     mExplorer->setCommitCallback([this](LLUICtrl*, const LLSD&) { refreshExplorerButtons(); });
     mExplorerFilter = getChild<LLFilterEditor>("explorer_filter");
     mExplorerFilter->setCommitCallback([this](LLUICtrl*, const LLSD&) { fillExplorer(); });
@@ -13863,17 +13863,18 @@ bool ALFloaterScriptStudio::explorerArrowAt(S32 x, S32 y, LLUUID& id, bool& prim
     return true;
 }
 
-bool ALFloaterScriptStudio::startExplorerDrag()
+bool ALFloaterScriptStudio::startExplorerDrag(const LLSD& pressed)
 {
-    // One drag comes out of one prim: the chosen items of the first chosen
-    // item's prim. Each goes as the build floater's contents let it go --
+    // One drag comes out of one prim: the chosen items of the prim whose
+    // item was pressed, or of the first chosen item's where an object or
+    // a prim was. Each goes as the build floater's contents let it go --
     // a copy where it may be copied and given, the item itself out of an
     // object of one's own where it may not -- and nothing comes out of a
     // locked attachment, nor anything but a copy out of any attachment,
     // whose contents the region does not keep up with.
     std::vector<EDragAndDropType> types;
     uuid_vec_t                    ids;
-    LLUUID                        from;
+    LLUUID                        from = pressed.has("item") ? pressed["prim"].asUUID() : LLUUID::null;
     for (const ExplorerRow& row : explorerChoice())
     {
         if (!row.isItem() || (from.notNull() && row.prim != from))

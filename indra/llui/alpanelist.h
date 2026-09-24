@@ -67,10 +67,14 @@ public:
 
     // A press on a row that moves on with the button held, past the
     // viewer's dead zone for a drag: offered as a drag of what is chosen,
-    // which the starter begins with the viewer's drag tool and says it
-    // did. Not begun, or with no starter, the list chooses the rows the
-    // pointer passes, as any list does.
-    typedef std::function<bool()> drag_t;
+    // with the value of the row pressed -- the rows may be made again
+    // while the button is held -- which the starter begins with the viewer's
+    // drag tool and says it did. Not begun, or with no starter, the list
+    // chooses the rows the pointer passes, as any list does. With a
+    // starter, a plain press on one of several rows chosen keeps them all
+    // chosen, for a drag of them all; let go without one, it chooses its
+    // row alone, as a press would have.
+    typedef std::function<bool(const LLSD& pressed)> drag_t;
     void setDragStarter(drag_t starter) { mDragStarter = std::move(starter); }
 
     bool handleKeyHere(KEY key, MASK mask) override;
@@ -93,4 +97,5 @@ private:
     boost::signals2::connection mSortConnection;
     drag_t                      mDragStarter;
     ALDragGesture               mPress;
+    LLSD                        mPressed;
 };

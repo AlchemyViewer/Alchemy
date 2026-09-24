@@ -29,6 +29,8 @@
 #include "llscrolllistitem.h"
 #include "llui.h"
 
+#include <utility>
+
 static LLDefaultChildRegistry::Register<ALPaneList> r("pane_list");
 
 ALPaneList::Params::Params()
@@ -52,12 +54,35 @@ bool ALPaneList::handleKeyHere(KEY key, MASK mask)
 
 bool ALPaneList::handleMouseDown(S32 x, S32 y, MASK mask)
 {
+    mPressed.clear();
+    // One of several chosen, pressed plainly: all of them stay chosen,
+    // held for a drag, and the release chooses the row alone where no drag
+    // came, as the list's own release does.
+    if (mDragStarter && mask == MASK_NONE)
+    {
+        const LLScrollListItem* hit = hitItem(x, y);
+        if (hit && hit->getSelected() && getNumSelected() > 1)
+        {
+            if (!childrenHandleMouseDown(x, y, mask))
+            {
+                setFocus(true);
+                gFocusMgr.setMouseCapture(this);
+                mPressed = hit->getValue();
+                mPress.press(x, y);
+            }
+            return true;
+        }
+    }
     const bool handled = LLScrollListCtrl::handleMouseDown(x, y, mask);
     // A row pressed, which the list has chosen and holds the pointer for:
     // one that goes on to move may be a drag.
-    if (mDragStarter && hasMouseCapture() && hitItem(x, y))
+    if (mDragStarter && hasMouseCapture())
     {
-        mPress.press(x, y);
+        if (const LLScrollListItem* hit = hitItem(x, y))
+        {
+            mPressed = hit->getValue();
+            mPress.press(x, y);
+        }
     }
     return handled;
 }
@@ -65,6 +90,7 @@ bool ALPaneList::handleMouseDown(S32 x, S32 y, MASK mask)
 bool ALPaneList::handleMouseUp(S32 x, S32 y, MASK mask)
 {
     mPress.release();
+    mPressed.clear();
     return LLScrollListCtrl::handleMouseUp(x, y, mask);
 }
 
@@ -79,8 +105,9 @@ bool ALPaneList::handleHover(S32 x, S32 y, MASK mask)
             return true;
         }
         mPress.release();
+        const LLSD pressed = std::exchange(mPressed, LLSD());
         // Begun, the drag tool has the pointer from here.
-        if (mDragStarter())
+        if (mDragStarter(pressed))
         {
             return true;
         }
@@ -91,6 +118,7 @@ bool ALPaneList::handleHover(S32 x, S32 y, MASK mask)
 void ALPaneList::onMouseCaptureLost()
 {
     mPress.cancel();
+    mPressed.clear();
     LLScrollListCtrl::onMouseCaptureLost();
 }
 
