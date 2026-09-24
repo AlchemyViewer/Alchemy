@@ -63,6 +63,9 @@ public:
     bool handleMouseDown(S32 x, S32 y, MASK mask) override;
     bool handleMouseUp(S32 x, S32 y, MASK mask) override;
     bool handleHover(S32 x, S32 y, MASK mask) override;
+    // A drag ends with the button, or with the mouse taken away: either
+    // way the pointer stops moving the colour.
+    void onMouseCaptureLost() override;
     void reshape(S32 width, S32 height, bool called_from_parent = true) override;
 
 protected:
@@ -103,6 +106,11 @@ private:
     F32         mVal = 0.f;
     bool        mShowAlpha = true;
     Grab        mGrab = Grab::None;
+    // Where the drag last applied, so a press that does not move never
+    // commits again: the viewer calls a captured widget's handleHover every
+    // frame, not only on motion.
+    S32         mLastPointerX = -1;
+    S32         mLastPointerY = -1;
 
     // Where each part sits, worked out from the rect on every reshape.
     // Sized from the widget rather than fixed: see layout().

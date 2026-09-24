@@ -26,6 +26,7 @@
 
 #include "../alcolorpicker.h"
 
+#include "../llfocusmgr.h"
 #include "../lluictrlfactory.h"
 
 #include "alheadlessui_fixture.h"
@@ -219,6 +220,68 @@ namespace tut
         // The swatch of the current colour is not a choice.
         picker->handleMouseDown(ringSide() + GAP + 2, top_row, MASK_NONE);
         ensure_equals("pressing the colour itself chooses nothing", commits, 1);
+        picker->die();
+    }
+
+    // The viewer hands a held drag a hover every frame, moved or not. A
+    // pointer held still commits nothing more; one that moves commits once
+    // for the move.
+    template<> template<>
+    void alcolorpicker_object::test<5>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        ALColorPicker* picker = make();
+        picker->setColor(LLColor4::white);
+        S32 commits = 0;
+        picker->setCommitCallback([&commits](LLUICtrl*, const LLSD&) { ++commits; });
+
+        const S32 red_y = sliderMiddle(3, true);
+        picker->handleMouseDown(slidersLeft(), red_y, MASK_NONE);
+        ensure_equals("the press commits once", commits, 1);
+        for (S32 frame = 0; frame < 3; ++frame)
+        {
+            picker->handleHover(slidersLeft(), red_y, MASK_NONE);
+        }
+        ensure_equals("held still, it commits nothing more", commits, 1);
+
+        const S32 middle = (slidersLeft() + WIDTH) / 2;
+        picker->handleHover(middle, red_y, MASK_NONE);
+        ensure_equals("moved, it commits once for the move", commits, 2);
+        ensure("and moved the channel to where the pointer went", closeTo(picker->color().mV[VRED], 0.5f));
+        picker->handleHover(middle, red_y, MASK_NONE);
+        ensure_equals("and held still there, nothing more", commits, 2);
+        picker->handleMouseUp(middle, red_y, MASK_NONE);
+        picker->die();
+    }
+
+    // The mouse taken away mid-drag ends the drag rather than pausing it:
+    // given the mouse back, a hover moves nothing until it is pressed again.
+    template<> template<>
+    void alcolorpicker_object::test<6>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        ALColorPicker* picker = make();
+        picker->setColor(LLColor4::white);
+        S32 commits = 0;
+        picker->setCommitCallback([&commits](LLUICtrl*, const LLSD&) { ++commits; });
+
+        const S32 red_y = sliderMiddle(3, true);
+        picker->handleMouseDown(slidersLeft(), red_y, MASK_NONE);
+        gFocusMgr.setMouseCapture(nullptr);
+        picker->handleHover(WIDTH - 1, red_y, MASK_NONE);
+        ensure_equals("a hover after the loss moves nothing", commits, 1);
+
+        gFocusMgr.setMouseCapture(picker);
+        picker->handleHover(WIDTH - 1, red_y, MASK_NONE);
+        ensure_equals("nor one with the mouse given back", commits, 1);
+        ensure("red stays where the press left it", closeTo(picker->color().mV[VRED], 0.f));
+        gFocusMgr.setMouseCapture(nullptr);
         picker->die();
     }
 }

@@ -104,6 +104,9 @@ public:
     bool handleMouseUp(S32 x, S32 y, MASK mask) override;
     bool handleHover(S32 x, S32 y, MASK mask) override;
     bool handleDoubleClick(S32 x, S32 y, MASK mask) override;
+    /// A drag ends with the button, or with the mouse taken away: either way
+    /// the pointer stops moving the puck, and the puck stops drawing as held.
+    void onMouseCaptureLost() override;
 
     /// Three reals, in channel order. Anything else is ignored, so a
     /// mis-typed control_name degrades to an inert widget rather than a crash.
@@ -160,6 +163,11 @@ private:
     S32  mDecimalDigits;
     bool mDragging = false;
     bool mUpdating = false;
+    /// Pointer position at the last drag publish, so a press that does not
+    /// move never publishes again: the viewer calls a captured widget's
+    /// handleHover every frame, not only on motion.
+    S32  mLastPointerX = -1;
+    S32  mLastPointerY = -1;
     /// Held so a puck dragged exactly to the centre does not snap its hue to
     /// zero and jump on the way back out.
     F32  mLastHue = 0.f;

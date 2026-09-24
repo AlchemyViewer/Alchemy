@@ -504,6 +504,8 @@ bool ALColorPicker::handleMouseDown(S32 x, S32 y, MASK mask)
     if (mGrab != Grab::None)
     {
         gFocusMgr.setMouseCapture(this);
+        mLastPointerX = x;
+        mLastPointerY = y;
         apply(mGrab, x, y);
         return true;
     }
@@ -514,10 +516,26 @@ bool ALColorPicker::handleHover(S32 x, S32 y, MASK mask)
 {
     if (mGrab != Grab::None && hasMouseCapture())
     {
+        // Called every frame while the mouse is held, moved or not. A
+        // pointer that has not moved has nothing new to say, and committing
+        // it anyway writes the same colour to whoever is listening, once a
+        // frame for as long as the button is down.
+        if (x == mLastPointerX && y == mLastPointerY)
+        {
+            return true;
+        }
+        mLastPointerX = x;
+        mLastPointerY = y;
         apply(mGrab, x, y);
         return true;
     }
     return LLUICtrl::handleHover(x, y, mask);
+}
+
+void ALColorPicker::onMouseCaptureLost()
+{
+    mGrab = Grab::None;
+    LLUICtrl::onMouseCaptureLost();
 }
 
 bool ALColorPicker::handleMouseUp(S32 x, S32 y, MASK mask)

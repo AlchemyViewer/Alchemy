@@ -349,6 +349,8 @@ bool ALColorWheelCtrl::handleMouseDown(S32 x, S32 y, MASK mask)
     mDragging = true;
     gFocusMgr.setMouseCapture(this);
     setFocus(true);
+    mLastPointerX = x;
+    mLastPointerY = y;
 
     F32 hue, sat;
     pointToPolar(x, y, hue, sat);
@@ -366,6 +368,17 @@ bool ALColorWheelCtrl::handleHover(S32 x, S32 y, MASK mask)
         return true;
     }
 
+    // The viewer calls the captor's handleHover every frame (updateUI in
+    // llviewerwindow.cpp), not only on motion. A puck held still has nothing
+    // new to say, and publishing it anyway rewrites the setting and fires the
+    // commit once a frame for as long as the button is down.
+    if (x == mLastPointerX && y == mLastPointerY)
+    {
+        return true;
+    }
+    mLastPointerX = x;
+    mLastPointerY = y;
+
     F32 hue, sat;
     pointToPolar(x, y, hue, sat);
     mLastHue = hue;
@@ -374,6 +387,12 @@ bool ALColorWheelCtrl::handleHover(S32 x, S32 y, MASK mask)
 
     getWindow()->setCursor(UI_CURSOR_ARROW);
     return true;
+}
+
+void ALColorWheelCtrl::onMouseCaptureLost()
+{
+    mDragging = false;
+    LLUICtrl::onMouseCaptureLost();
 }
 
 bool ALColorWheelCtrl::handleMouseUp(S32 x, S32 y, MASK mask)
