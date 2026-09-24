@@ -367,6 +367,7 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="CodeStringHead">string</string>
 	<string name="CodeFixLink">Fix: [TITLE]</string>
 	<string name="CodeFixNone">Nothing to fix or refactor here</string>
+	<string name="CodeInlayWrite">Double-click to write '[TEXT]' in</string>
 	<string name="CodeDeprecated">(deprecated)</string>
 	<string name="CodeStringBytesA">[COUNT] byte</string>
 	<string name="CodeStringBytesB">[COUNT] bytes</string>

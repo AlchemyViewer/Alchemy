@@ -5190,6 +5190,9 @@ void ALFloaterScriptStudio::analysed(const ALScriptAnalysis::Result& result)
     for (const ALScriptInlayHint& hint : result.hints)
     {
         ALTextPos at(hint.line, hint.column);
+        // Written in only where the place is the script's own text as it
+        // stands, not a macro's making.
+        bool writable = hint.writable;
         if (map)
         {
             const ALSourceMap::Loc loc = map->toSource(hint.line, hint.column);
@@ -5198,11 +5201,18 @@ void ALFloaterScriptStudio::analysed(const ALScriptAnalysis::Result& result)
                 continue;
             }
             at = ALTextPos(loc.line, loc.column);
+            ALSourceMap::Loc begin, end;
+            writable = writable && map->verbatimSpan(hint.line, hint.column, hint.column, begin, end) && begin.file == 0 && begin.line == loc.line &&
+                       begin.column == loc.column;
         }
         ALCodeEditor::InlayHint one;
         one.at     = at;
         one.text   = hint.text;
         one.before = hint.kind == ALScriptInlayHint::Kind::Parameter;
+        if (writable)
+        {
+            one.insert = hint.text;
+        }
         hints.push_back(std::move(one));
     }
     if (result.understood)

@@ -1382,4 +1382,72 @@ namespace tut
         e.supplyActions(asked.back(), { extract });
         ensure("dropped", !e.fixesOpen());
     }
+
+    template<> template<>
+    void alcodeeditor_object::test<38>()
+    {
+        set_test_name("a double-click on a hint the text can say writes it in as one step to undo, and the lightbulb asks for the refactors");
+        ALCodeEditor& e = make("local count = 5\nprint(count)\n");
+        ALCodeEditor::InlayHint type;
+        type.at     = ALTextPos(0, 11);
+        type.text   = ": number";
+        type.before = false;
+        type.insert = ": number";
+        ALCodeEditor::InlayHint name;
+        name.at   = ALTextPos(1, 6);
+        name.text = "value:";
+        e.setInlayHints({ type, name });
+        const LLRect text  = e.textRect();
+        const S32    row_h = e.layout().rowHeight();
+        const auto   rowY  = [&](S32 line) { return text.mTop - row_h * line - row_h / 2; };
+        // The first point along a line's row that is on a pill.
+        const auto pill = [&](S32 line) {
+            for (S32 x = text.mLeft; x < text.mRight; ++x)
+            {
+                if (e.inlayAtLocal(x, rowY(line)) >= 0)
+                {
+                    return x;
+                }
+            }
+            return -1;
+        };
+        const S32 on_type = pill(0);
+        ensure("found where it is drawn, past the name", on_type > text.mLeft + static_cast<S32>(e.layout().xOf(0, 10, nullptr)));
+        ensure_equals("the type's", e.inlayAtLocal(on_type + 2, rowY(0)), 0);
+        ensure("not over the text", e.inlayAtLocal(text.mLeft + 1, rowY(0)) < 0);
+        ensure("a tip says what a double-click does", e.handleToolTip(on_type + 2, rowY(0), MASK_NONE));
+        ensure("taken", e.handleDoubleClick(on_type + 2, rowY(0), MASK_NONE));
+        ensure_equals("written in", e.document().line(0), std::string("local count: number = 5"));
+        ensure_equals("and the hint gone with its line's edit", e.inlayHints().size(), static_cast<size_t>(1));
+        e.undo();
+        ensure_equals("one step to undo", e.document().line(0), std::string("local count = 5"));
+        // A parameter's name: nothing the text can say, so a double-click
+        // there is a double-click on the text.
+        const S32 on_name = pill(1);
+        ensure("the name's pill", on_name >= 0);
+        e.handleDoubleClick(on_name + 2, rowY(1), MASK_NONE);
+        ensure_equals("nothing written", e.document().line(1), std::string("print(count)"));
+
+        // The lightbulb on the caret's line is Control-.: the refactors
+        // asked for with the fixes. On another line, that line's fixes.
+        std::vector<ALTextRange> asked;
+        e.setFixProvider([](S32 line, std::vector<ALCodeEditor::Fix>& out) {
+            ALCodeEditor::Fix semi;
+            semi.title     = "Insert ';'";
+            semi.preferred = true;
+            semi.value     = "semi";
+            semi.edits.emplace_back(ALTextRange(ALTextPos(line, 0), ALTextPos(line, 0)), ";");
+            out = { semi };
+        });
+        e.setFixHandler([](const LLSD&) {});
+        e.setActionRequest([&asked](const ALTextRange& at) { asked.push_back(at); });
+        e.setFixable(0, true, true);
+        e.setFixable(1, true, true);
+        e.setSelection(ALTextRange(ALTextPos(0, 3), ALTextPos(0, 3)));
+        ensure("the caret's lightbulb pressed", e.handleMouseDown(e.leftEdge() + 2, rowY(0), MASK_NONE) && e.fixesOpen());
+        ensure("and the refactors asked for", asked.size() == 1 && asked.front() == ALTextRange(ALTextPos(0, 3), ALTextPos(0, 3)));
+        e.closeFixes();
+        ensure("another line's mark pressed", e.handleMouseDown(e.leftEdge() + 2, rowY(1), MASK_NONE) && e.fixesOpen());
+        ensure("its fixes alone", asked.size() == 1);
+    }
 }

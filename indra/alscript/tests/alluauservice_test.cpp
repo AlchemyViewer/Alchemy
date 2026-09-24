@@ -458,6 +458,13 @@ namespace tut
             return false;
         };
         ensure("the local's type after its name:" + listed, has(1, 11, ": number"));
+        for (const ALScriptInlayHint& h : hints)
+        {
+            ensure("a type may be written in, a parameter's name never: " + h.text, h.writable == (h.kind == ALScriptInlayHint::Kind::Type));
+        }
+        // A type cut short says less than the text would have to.
+        const std::vector<ALScriptInlayHint> wide = service.inlayHints("local t = { a = 1, b = 2, c = 3, d = 4, e = 5 }\n", false, true);
+        ensure("not a table cut short", wide.empty() || !wide.front().writable || wide.front().text.find("...") == std::string::npos);
         ensure("not one that says its type:" + listed, !has(2, 11, ": number"));
         ensure("name: before the string:" + listed, has(3, 6, "name:"));
         ensure("nothing before an argument that is the name:" + listed, !has(3, 12, "times:"));

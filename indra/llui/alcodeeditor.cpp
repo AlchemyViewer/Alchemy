@@ -36,6 +36,7 @@
 #include "llrender2dutils.h"
 #include "alchoicelist.h"
 #include "llstring.h"
+#include "lltooltip.h"
 #include "llui.h"
 #include "lluicolortable.h"
 #include "llurlaction.h"
@@ -1184,6 +1185,74 @@ void ALCodeEditor::provideInlays(S32 line, std::vector<ALTextLayout::Inlay>& out
         inlay.id     = static_cast<S32>(it - mInlays.begin());
         out.push_back(inlay);
     }
+}
+
+S32 ALCodeEditor::inlayAtLocal(S32 x, S32 y)
+{
+    const LLRect text  = textRect();
+    const S32    row_h = layout().rowHeight();
+    if (mInlays.empty() || row_h <= 0 || !text.pointInRect(x, y) || document().lineCount() == 0)
+    {
+        return -1;
+    }
+    // Not under a header pinned at the top, which stands over what it hides.
+    if ((text.mTop - y) / row_h < static_cast<S32>(stickyLines().size()))
+    {
+        return -1;
+    }
+    // As the pills are drawn: the row under the point, and the gap each
+    // inlay's glyph holds, less the pill's inset.
+    const S32 doc_y = (text.mTop - y) + scrollY();
+    const S32 line  = layout().lineAtY(llmax(0, doc_y));
+    const S32 row   = layout().rowAtY(line, doc_y - layout().lineTop(line));
+    const ALTextLayout::Line& laid = layout().line(line);
+    if (row < 0 || row >= static_cast<S32>(laid.rows.size()))
+    {
+        return -1;
+    }
+    const ALTextLayout::Row& r     = laid.rows[static_cast<size_t>(row)];
+    const F32                x_rel = static_cast<F32>(x - text.mLeft) + scrollX();
+    for (size_t k = r.glyphBegin; k < r.glyphEnd; ++k)
+    {
+        const ALTextLayout::Glyph& glyph = laid.glyphs[k];
+        if (glyph.inlay < 0 || glyph.inlay >= static_cast<S32>(mInlays.size()))
+        {
+            continue;
+        }
+        const F32 x0 = glyph.pen - r.xStart + INLAY_GAP;
+        const F32 x1 = glyph.pen - r.xStart + glyph.advance - INLAY_GAP;
+        if (x_rel >= x0 && x_rel < x1)
+        {
+            return glyph.inlay;
+        }
+    }
+    return -1;
+}
+
+bool ALCodeEditor::writeInlay(S32 index)
+{
+    if (index < 0 || index >= static_cast<S32>(mInlays.size()) || mInlays[index].insert.empty() || isReadOnly())
+    {
+        return false;
+    }
+    const InlayHint hint = mInlays[static_cast<size_t>(index)];
+    if (document().clamp(hint.at) != hint.at)
+    {
+        return false;
+    }
+    // The text says it now, so the hint goes; an insertion at a hint's
+    // place would only slide it along.
+    std::vector<InlayHint> kept = mInlays;
+    mInlays.erase(mInlays.begin() + index);
+    layout().invalidateLine(hint.at.line);
+    if (!replaceAll({ { ALTextRange(hint.at, hint.at), hint.insert } }))
+    {
+        mInlays = std::move(kept);
+        layout().invalidateLine(hint.at.line);
+        return false;
+    }
+    undoJournal().label("refactor");
+    return true;
 }
 
 // --- headers pinned at the top ------------------------------------------------------
@@ -3984,7 +4053,9 @@ bool ALCodeEditor::handleMouseDown(S32 x, S32 y, MASK mask)
     if (mShowLineNumbers && x >= leftEdge() && x < leftEdge() + MARK_INSET + MARK_SIZE + GUTTER_PAD / 2)
     {
         const S32 line = posAtLocal(text.mLeft, y, false).line;
-        if (fixableAt(line) && openFixes(line))
+        // On the caret's line the lightbulb, which is Control-.: the
+        // refactors asked for with the fixes.
+        if (fixableAt(line) && (line == caret().line ? quickFix() : openFixes(line)))
         {
             return true;
         }
@@ -4087,6 +4158,14 @@ bool ALCodeEditor::handleToolTip(S32 x, S32 y, MASK mask)
     if (cardShown() && mCard->getRect().pointInRect(x, y))
     {
         // Resting on the card itself: it stays, and says nothing more.
+        return true;
+    }
+    // A hint the text can say: what a double-click does with it.
+    if (const S32 inlay = isReadOnly() ? -1 : inlayAtLocal(x, y); inlay >= 0 && !mInlays[static_cast<size_t>(inlay)].insert.empty())
+    {
+        LLStringUtil::format_map_t args;
+        args["[TEXT]"] = mInlays[static_cast<size_t>(inlay)].insert;
+        LLToolTipMgr::instance().show(alSaid("CodeInlayWrite", "Double-click to write '[TEXT]' in", args));
         return true;
     }
     if (!text.pointInRect(x, y) || (mCompletionList && mCompletionList->getVisible() && mCompletionList->getRect().pointInRect(x, y)))
@@ -4517,6 +4596,15 @@ void ALCodeEditor::supplyHover(const ALTextPos& at, const std::string& text, std
 
 bool ALCodeEditor::handleDoubleClick(S32 x, S32 y, MASK mask)
 {
+    // A hint the text can say, written in where it stands: a type after a
+    // name declared without one, as Visual Studio Code writes its hints.
+    const S32 inlay = isReadOnly() ? -1 : inlayAtLocal(x, y);
+    if (inlay >= 0 && !mInlays[static_cast<size_t>(inlay)].insert.empty())
+    {
+        setFocus(true);
+        writeInlay(inlay);
+        return true;
+    }
     // An identifier, as code reads one; the document's word otherwise.
     const ALTextRange word = textRect().pointInRect(x, y) && sameClickSpot(x, y) ? identifierAt(posAtLocal(x, y, false)) : ALTextRange();
     if (word.empty())

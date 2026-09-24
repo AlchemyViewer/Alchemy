@@ -172,6 +172,11 @@ struct ALScriptInlayHint
     Kind        kind   = Kind::Parameter;
     // As shown: `channel:` before an argument, `: number` after a name.
     std::string text;
+    // Whether the text may be written in where it stands, as it reads: a
+    // type printed whole -- not cut short, not a cycle, nothing Luau made
+    // up for what it could not name. Never a parameter's name, which the
+    // language has no way to say.
+    bool        writable = false;
 
     friend bool operator<(const ALScriptInlayHint& a, const ALScriptInlayHint& b)
     {

@@ -170,9 +170,18 @@ public:
         ALTextPos   at;
         std::string text;
         bool        before = true;
+        // What a double-click on it writes in at its place, where the text
+        // can say it -- a type after a name declared without one -- as
+        // one step to undo. Empty for what it cannot: a parameter's name.
+        std::string insert;
     };
     void                          setInlayHints(std::vector<InlayHint> hints);
     const std::vector<InlayHint>& inlayHints() const { return mInlays; }
+    // The inlay drawn under a point of the view, by its place among the
+    // hints, or -1.
+    S32                           inlayAtLocal(S32 x, S32 y);
+    // A hint written in where it stands, as a double-click on it does.
+    bool                          writeInlay(S32 index);
 
     // The places a name stands, washed over until they are cleared or
     // the caret leaves them all; an edit slides them as it does the

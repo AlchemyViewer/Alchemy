@@ -812,13 +812,14 @@ namespace
         {
         }
 
-        void add(const Luau::Position& at, ALScriptInlayHint::Kind kind, std::string text)
+        void add(const Luau::Position& at, ALScriptInlayHint::Kind kind, std::string text, bool writable = false)
         {
             ALScriptInlayHint hint;
-            hint.line   = static_cast<S32>(at.line);
-            hint.column = static_cast<S32>(at.column);
-            hint.kind   = kind;
-            hint.text   = std::move(text);
+            hint.line     = static_cast<S32>(at.line);
+            hint.column   = static_cast<S32>(at.column);
+            hint.kind     = kind;
+            hint.text     = std::move(text);
+            hint.writable = writable;
             out.push_back(std::move(hint));
         }
 
@@ -892,10 +893,11 @@ namespace
                 {
                     continue;
                 }
-                Luau::ToStringOptions options;
+                Luau::ToStringOptions       options;
                 options.maxTableLength = 3;
                 options.maxTypeLength  = 40;
-                std::string text = Luau::toString(*type, options);
+                const Luau::ToStringResult said = Luau::toStringDetailed(*type, options);
+                const std::string&         text = said.name;
                 // A glance, not a listing; and nothing where there is
                 // nothing to know.
                 if (text.empty() || text == "any" || text == "nil" || text == "unknown" || text == "*error-type*"
@@ -903,7 +905,12 @@ namespace
                 {
                     continue;
                 }
-                add(local->location.end, ALScriptInlayHint::Kind::Type, ": " + text);
+                // Written in only as Luau would read it back: whole, and
+                // with no name of Luau's own making -- a free type's
+                // quote, a blocked or an error type's stars.
+                const bool writable = !said.invalid && !said.error && !said.cycle && !said.truncated &&
+                                      text.find_first_of("*'") == std::string::npos && text.find("...") == std::string::npos;
+                add(local->location.end, ALScriptInlayHint::Kind::Type, ": " + text, writable);
             }
             return true;
         }
@@ -1840,7 +1847,7 @@ std::vector<ALScriptFix> ALLuauService::actions(std::string_view source, S32 lin
         {
             --from;
         }
-        if (column >= from && hint.text.size() > 2 && hint.text.size() < 64)
+        if (column >= from && hint.writable && hint.text.size() > 2)
         {
             ALScriptFix fix = refactor(ALScriptFixes::titled("ScriptActionAnnotate", "Declare it as '[1]'", { hint.text.substr(2) }));
             fix.edits.push_back({ hint.line, hint.column, hint.line, hint.column, hint.text });
