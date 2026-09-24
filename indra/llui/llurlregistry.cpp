@@ -126,8 +126,9 @@ void LLUrlRegistry::buildUrlSet()
     // Every entry's pattern that reads as the set's do; any other entry is
     // tried whatever the set says. A set that cannot be made says nothing,
     // and every entry is tried, as each was before there was one.
-    mUrlSetBuilt = true;
-    mUrlSet      = ALRegexSet(ALRegex::ICASE);
+    mUrlSetBuilt  = true;
+    mUrlSetHasAll = true;
+    mUrlSet       = ALRegexSet(ALRegex::ICASE);
     mUrlSetIndex.assign(mUrlEntry.size(), -1);
     for (size_t i = 0; i < mUrlEntry.size(); ++i)
     {
@@ -136,6 +137,7 @@ void LLUrlRegistry::buildUrlSet()
         {
             mUrlSetIndex[i] = mUrlSet.add(pattern.pattern());
         }
+        mUrlSetHasAll = mUrlSetHasAll && mUrlSetIndex[i] >= 0;
     }
     if (!mUrlSet.compile())
     {
@@ -179,98 +181,19 @@ static bool matchRegex(const std::string& text, const LLUrlEntryBase& entry, U32
     return true;
 }
 
-static bool stringHasUrl(const std::string &text)
-{
-    // fast heuristic test for a URL in a string. This is used
-    // to avoid lots of costly regex calls, BUT it needs to be
-    // kept in sync with the LLUrlEntry regexes we support.
-
-    // Early exit for empty or very short strings
-    // Smallest url is 5 characters
-    if (text.length() < 3)
-    {
-        return false;
-    }
-
-    // Single pass search for common URL indicators
-    for (size_t i = 0; i < text.length(); ++i)
-    {
-        char c = text[i];
-
-        // Check for @ (email or mention)
-        if (c == '@')
-        {
-            return true;
-        }
-
-        if (i + 3 >= text.length())
-        {
-            // Nothing else is going to match or fit if we don't
-            // have at least 4 characters left
-            // Ex: expectation is that there is something after protocol delimiter
-            // and .com takes 4 characters.
-            return false;
-        }
-
-        // Check for protocol delimiter
-        if (c == ':' && text[i + 1] == '/' && text[i + 2] == '/')
-        {
-            return true;
-        }
-
-        // Check for www. at start of word
-        if (c == 'w'
-            && text[i + 1] == 'w'
-            && text[i + 2] == 'w'
-            && text[i + 3] == '.')
-        {
-            return true;
-        }
-
-        // Check for .com (and similar)
-        if (c == '.')
-        {
-            const char* suffix = text.c_str() + i + 1;
-            if ((suffix[0] == 'c' && suffix[1] == 'o' && suffix[2] == 'm') ||
-                (suffix[0] == 'n' && suffix[1] == 'e' && suffix[2] == 't') ||
-                (suffix[0] == 'o' && suffix[1] == 'r' && suffix[2] == 'g') ||
-                (suffix[0] == 'e' && suffix[1] == 'd' && suffix[2] == 'u'))
-            {
-                return true;
-            }
-        }
-
-        // Check for <nolink> or <icon
-        if (c == '<')
-        {
-            if (i + 7 < text.length() && text.compare(i + 1, 6, "nolink") == 0)
-            {
-                return true;
-            }
-            if (i + 4 < text.length() && text.compare(i + 1, 4, "icon") == 0)
-            {
-                return true;
-            }
-        }
-    }
-
-    return false;
-}
-
 bool LLUrlRegistry::findUrl(const std::string &text, LLUrlMatch &match, const LLUrlLabelCallback &cb, bool is_content_trusted, bool skip_non_mentions)
 {
-    // avoid costly regexes if there is clearly no URL in the text
-    if (! stringHasUrl(text))
-    {
-        return false;
-    }
-
     // which entries' patterns match anywhere in the text, in one pass,
-    // where the set can say: the others cannot match, and are passed over
+    // where the set can say: the others cannot match, and are passed over,
+    // and a text none can match in is done with
     std::vector<S32> could_match;
     const bool       set_says = !skip_non_mentions && mUrlSet.match(text, could_match);
     if (set_says)
     {
+        if (could_match.empty() && mUrlSetHasAll)
+        {
+            return false;
+        }
         std::sort(could_match.begin(), could_match.end());
     }
 
@@ -383,12 +306,6 @@ void LLUrlRegistry::setKeybindingHandler(LLKeyBindingToStringHandler* handler)
 
 bool LLUrlRegistry::containsAgentMention(const std::string& text)
 {
-    // avoid costly regexes if there is clearly no URL in the text
-    if (!stringHasUrl(text))
-    {
-        return false;
-    }
-
     bool mentioned = false;
     mUrlEntryAgentMention->getPattern().forEach(text, [&](const ALRegexMatch& match) {
         mentioned = mUrlEntryAgentMention->isAgentID(match.str());

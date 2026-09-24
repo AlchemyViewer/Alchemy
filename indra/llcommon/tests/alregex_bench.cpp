@@ -275,6 +275,118 @@ namespace
         row("the same, the set asked first (re2)", boost_ns, re2_set_ns);
     }
 
+    // The check LLUrlRegistry::findUrl made before any pattern, as it was:
+    // a line with none of these could hold no Url, it held.
+    bool oldUrlCheck(const std::string& text)
+    {
+        if (text.length() < 3)
+        {
+            return false;
+        }
+        for (size_t i = 0; i < text.length(); ++i)
+        {
+            const char c = text[i];
+            if (c == '@')
+            {
+                return true;
+            }
+            if (i + 3 >= text.length())
+            {
+                return false;
+            }
+            if (c == ':' && text[i + 1] == '/' && text[i + 2] == '/')
+            {
+                return true;
+            }
+            if (c == 'w' && text[i + 1] == 'w' && text[i + 2] == 'w' && text[i + 3] == '.')
+            {
+                return true;
+            }
+            if (c == '.')
+            {
+                const char* suffix = text.c_str() + i + 1;
+                if ((suffix[0] == 'c' && suffix[1] == 'o' && suffix[2] == 'm') || (suffix[0] == 'n' && suffix[1] == 'e' && suffix[2] == 't') ||
+                    (suffix[0] == 'o' && suffix[1] == 'r' && suffix[2] == 'g') || (suffix[0] == 'e' && suffix[1] == 'd' && suffix[2] == 'u'))
+                {
+                    return true;
+                }
+            }
+            if (c == '<')
+            {
+                if (i + 7 < text.length() && text.compare(i + 1, 6, "nolink") == 0)
+                {
+                    return true;
+                }
+                if (i + 4 < text.length() && text.compare(i + 1, 4, "icon") == 0)
+                {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    // Chat with no Url in it, some of it with what the old check took for
+    // the start of one.
+    const char* const CHAT_WITHOUT_URLS[] = {
+        "hey everyone, how is the sim tonight?",
+        "brb",
+        "I'll be right back, the cat is on the keyboard again and will not get off it",
+        "lol",
+        "has anyone seen the new hair at the fair? it is really nice, the blonde one especially",
+        "meet me @ the club at 9",
+        "the .com boom was a long time ago",
+        "is www. a word now",
+        "ty!",
+        "that build is gorgeous, how many prims is it? the windows are amazing",
+    };
+
+    void bench_url_gate()
+    {
+        heading("Urls: a line of chat with none, as findUrl is asked of every line", "line");
+        std::vector<boost::regex> boost_patterns;
+        ALRegexSet                set(ALRegex::ICASE);
+        for (const UrlPattern& p : URL_PATTERNS)
+        {
+            boost_patterns.emplace_back(p.boost, boost::regex::perl | boost::regex::icase);
+            set.add(p.re2 ? p.re2 : p.boost);
+        }
+        set.compile();
+        const size_t lines = std::size(CHAT_WITHOUT_URLS);
+
+        // As it was: the check, and where it was fooled every pattern.
+        const double boost_ns = time_per_item(lines, [&] {
+            for (const char* line : CHAT_WITHOUT_URLS)
+            {
+                const std::string text(line);
+                if (!oldUrlCheck(text))
+                {
+                    continue;
+                }
+                for (const boost::regex& pattern : boost_patterns)
+                {
+                    boost::cmatch found;
+                    g_sink = g_sink + boost::regex_search(text.c_str(), found, pattern);
+                }
+            }
+        });
+        const double check_ns = time_per_item(lines, [&] {
+            for (const char* line : CHAT_WITHOUT_URLS)
+            {
+                g_sink = g_sink + oldUrlCheck(line);
+            }
+        });
+        const double set_ns = time_per_item(lines, [&] {
+            std::vector<S32> hits;
+            for (const char* line : CHAT_WITHOUT_URLS)
+            {
+                g_sink = g_sink + (set.match(line, hits) ? hits.size() + 1 : 0);
+            }
+        });
+        row("old check, then patterns (boost) vs set", boost_ns, set_ns);
+        row("the old check alone vs the set", check_ns, set_ns);
+    }
+
     // --- RLVa's hidden names ----------------------------------------------
 
     const char* const NEARBY[] = {
@@ -636,6 +748,7 @@ int main(int, char**)
 #else
     std::printf("alregex_bench: Boost.Regex against ALRegex over RE2");
     bench_urls();
+    bench_url_gate();
     bench_rlva();
     bench_lexing();
     bench_chat_log();

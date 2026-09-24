@@ -80,5 +80,20 @@ namespace tut
         ensure_equals("an app Url in any case", found("go SECONDLIFE:///app/chat/42/hello there"), std::string("SECONDLIFE:///app/chat/42/hello"));
         ensure_equals("nothing where there is none", found("the :// alone, and www. alone"), std::string(""));
         ensure_equals("nor in plain words", found("nothing to see here"), std::string(""));
+        ensure_equals("nor where an at or a .com is only a word's", found("meet me @ the club, the .com boom is over"), std::string(""));
+    }
+
+    template<> template<>
+    void llurlregistry_object::test<2>()
+    {
+        set_test_name("a text is asked of every entry as its pattern reads, in any case, with nothing else Url-like in it");
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        // A check before the patterns once took only a lowercase tag, where
+        // the entry's pattern takes one in any case.
+        ensure_equals("a nolink tag in capitals", found("say <NOLINK>hello</NOLINK> ok"), std::string("<NOLINK>hello</NOLINK>"));
+        ensure_equals("and in lowercase", found("say <nolink>hello</nolink> ok"), std::string("<nolink>hello</nolink>"));
     }
 }
