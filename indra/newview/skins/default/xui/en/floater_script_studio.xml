@@ -368,6 +368,15 @@
     <floater.string name="PaletteOff">off</floater.string>
     <floater.string name="UndoWhatRename">Rename</floater.string>
     <floater.string name="UndoWhatFix">Fix</floater.string>
+    <floater.string name="TrailerWeight">[TARGET] [SIZE] of [LIMIT] KB</floater.string>
+    <floater.string name="TrailerWeightEstimate">[TARGET] ~[SIZE] of [LIMIT] KB</floater.string>
+    <floater.string name="TrailerWeightTip">What the script's code weighs for [TARGET]: [BYTES] of the [MAX] bytes it runs a script in. What it allocates as it runs is not in this.</floater.string>
+    <floater.string name="TrailerWeightEstimateTip">About what the script's code weighs for [TARGET]: [BYTES] of the [MAX] bytes it runs a script in, estimated from the code its compiler makes. What it allocates as it runs is not in this.</floater.string>
+    <floater.string name="TrailerWeightBeforeTip">Weighed before the preprocessor's optimizer, which a save runs: the saved script may weigh less.</floater.string>
+    <floater.string name="OriginWeight">Weight</floater.string>
+    <floater.string name="WeightOver">The script's code is [SIZE] KB, more than the [LIMIT] KB [TARGET] runs a script in.</floater.string>
+    <floater.string name="WeightOverEstimate">The script's code is about [SIZE] KB, likely more than the [LIMIT] KB [TARGET] runs a script in.</floater.string>
+    <floater.string name="WeightOverBefore">The script's code is [SIZE] KB before the optimizer, more than the [LIMIT] KB [TARGET] runs a script in: it may fit once the optimizer has been over it.</floater.string>
     <floater.string name="TrailerSize">[SIZE] KB of [LIMIT] KB</floater.string>
     <floater.string name="TrailerSizeTip">What saving this script sends: [BYTES] of the [MAX] bytes a script may be. A preprocessed script is sent as written and as expanded, measured here before the optimizer and compression a save adds.</floater.string>
     <floater.string name="TrailerSizeOverTip">What saving this script sends: [BYTES] bytes, [OVER] more than the [MAX] a script may be. A save is refused until it is shorter.</floater.string>

@@ -440,6 +440,15 @@ private:
         // that asking again saves it, however long after, and a change
         // asks the question afresh -- or -1 for none.
         bool                                       saveAfterCheck    = false;
+        // What the script weighs for its target, as the last weighing said
+        // of the text at weightVersion; whether what was weighed is what a
+        // save compiles -- not where the optimizer changes it after; and a
+        // weighing on its way, and a save waiting on it.
+        std::optional<ALScriptWeight>              weight;
+        U32                                        weightVersion     = 0;
+        bool                                       weightExact       = false;
+        bool                                       weighing          = false;
+        bool                                       saveAfterWeigh    = false;
         // The safe fixes made ahead of the save under way, once: a fix that
         // left its problem standing would be made again at every check the
         // save waits on.
@@ -766,6 +775,13 @@ private:
     // The refactors at the caret, kept on the Doc and handed to the editor
     // to join the fixes it lists.
     void                      actionsAnswered(Doc& doc, const ALScriptAnalysis::Result& result, U32 expansion);
+    // What a script is weighed for: its compile target's, where there is a
+    // weigher for it; nothing for a notecard or an include.
+    std::optional<ALScriptWeight::Target> weightTarget(const Doc& doc) const;
+    // The script weighed a moment after its check, of what a save would
+    // compile as nearly as the check has it; and the answer kept.
+    void                      weigh(Doc& doc);
+    void                      weighed(Doc& doc, const ALScriptAnalysis::Result& result);
 
     // The preprocessor: whether it applies to a script; its run over the
     // text as it stands, for the analyzers, with the way back; and its

@@ -27,6 +27,7 @@
 #include "alluauconfig.h"
 #include "alscriptproblem.h"
 #include "alscriptsymbol.h"
+#include "alscriptweight.h"
 #include "llsingleton.h"
 #include "llstl.h"
 
@@ -123,7 +124,10 @@ public:
         References,
         // What could be done at the caret, or to the stretch chosen from
         // it, that no problem asks for: the refactors.
-        Actions
+        Actions,
+        // What the script weighs for each target asked for: its code, by
+        // part and by line (ALScriptWeight).
+        Weigh
     };
     struct Request
     {
@@ -144,6 +148,8 @@ public:
         // or the same place for the caret alone.
         S32         endLine   = 0;
         S32         endColumn = 0;
+        // Weigh only: the targets to weigh it for.
+        std::vector<ALScriptWeight::Target> targets;
         // What a check says beyond the problems and the outline: what
         // every name is, and what the editor may show beside the text.
         bool        semantics      = false;
@@ -167,6 +173,7 @@ public:
         ALScriptSignature                 signature;
         ALScriptReferences                references;
         std::vector<ALScriptFix>          actions;
+        std::vector<ALScriptWeight>       weights;
         // Why the analyzer ran without its definitions, or nothing.
         std::string                     definitionsError;
         // Whether the text parsed at all, and whether there was a tree to

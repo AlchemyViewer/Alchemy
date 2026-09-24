@@ -3672,7 +3672,7 @@ void ALFloaterScriptStudio::askAnalyzer(Doc& doc, ALScriptAnalysis::Kind kind, c
         // A position inside a directive has nothing there to ask about.
         expansion    = doc.expanded.generation;
         request.text = doc.expanded.text;
-        if (kind != ALScriptAnalysis::Kind::Check)
+        if (kind != ALScriptAnalysis::Kind::Check && kind != ALScriptAnalysis::Kind::Weigh)
         {
             const ALSourceMap::Loc loc = doc.expanded.map.toExpanded(0, at.line, at.column);
             if (!loc.found())
@@ -3692,7 +3692,16 @@ void ALFloaterScriptStudio::askAnalyzer(Doc& doc, ALScriptAnalysis::Kind kind, c
             request.endColumn = kept ? last.column : loc.column;
         }
     }
-    if (lslFragment(doc))
+    if (kind == ALScriptAnalysis::Kind::Weigh)
+    {
+        const std::optional<ALScriptWeight::Target> target = weightTarget(doc);
+        if (!target)
+        {
+            return;
+        }
+        request.targets = { *target };
+    }
+    else if (lslFragment(doc))
     {
         request.text += FRAGMENT_STATE;
     }
@@ -3771,7 +3780,7 @@ void ALFloaterScriptStudio::answered(const ALScriptAnalysis::Result& result, U32
         }
         return;
     }
-    if (expansion != 0 && result.kind != ALScriptAnalysis::Kind::Check)
+    if (expansion != 0 && result.kind != ALScriptAnalysis::Kind::Check && result.kind != ALScriptAnalysis::Kind::Weigh)
     {
         // Answered about the expanded text; the editor wants the source's
         // place, which is where it asked.
@@ -3864,6 +3873,58 @@ void ALFloaterScriptStudio::answered(const ALScriptAnalysis::Result& result, U32
         case ALScriptAnalysis::Kind::Actions:
             actionsAnswered(doc, result, expansion);
             break;
+        case ALScriptAnalysis::Kind::Weigh:
+            weighed(doc, result);
+            break;
+    }
+}
+
+std::optional<ALScriptWeight::Target> ALFloaterScriptStudio::weightTarget(const Doc& doc) const
+{
+    if (!doc.loaded || doc.notecard || lslFragment(doc))
+    {
+        return std::nullopt;
+    }
+    if (doc.language.lua)
+    {
+        return ALScriptWeight::Target::SLua;
+    }
+    // LSL on Luau waits on the fork's own compiler for it.
+    const std::string& target = doc.language.compileTarget;
+    return target == "lsl2" ? std::optional(ALScriptWeight::Target::LSO)
+           : target == "mono" || target.empty() ? std::optional(ALScriptWeight::Target::Mono)
+                                                : std::nullopt;
+}
+
+void ALFloaterScriptStudio::weigh(Doc& doc)
+{
+    if (!weightTarget(doc))
+    {
+        doc.weight.reset();
+        return;
+    }
+    doc.weighing = true;
+    askAnalyzer(doc, ALScriptAnalysis::Kind::Weigh, ALTextPos());
+}
+
+void ALFloaterScriptStudio::weighed(Doc& doc, const ALScriptAnalysis::Result& result)
+{
+    doc.weighing = false;
+    if (result.version != doc.editor->document().version() || result.weights.empty())
+    {
+        return;
+    }
+    doc.weight        = result.weights.front();
+    doc.weightVersion = result.version;
+    // What was weighed is what a save compiles where the preprocessor does
+    // not run, or runs without the optimizer, which comes after the check's
+    // expansion: SLua's is never optimized.
+    doc.weightExact = !preprocessed(doc) || doc.language.lua || !gSavedSettings.getBOOL("ALScriptPreprocOptimizer");
+    refreshProblems(doc);
+    if (doc.saveAfterWeigh)
+    {
+        doc.saveAfterWeigh = false;
+        save(doc);
     }
 }
 
@@ -4101,6 +4162,33 @@ void ALFloaterScriptStudio::refreshTrailer(Doc& doc)
     if (warnings > 0)
     {
         parts.push_back({ counted("ProblemWarnings", warnings), "problems", mTrailerProblemsTip });
+    }
+    // What its code weighs for its target, against what the target runs
+    // it in: in the warning colour past four fifths, the error's past it.
+    if (doc.weight && doc.weight->total > 0)
+    {
+        const ALScriptWeight&      weight = *doc.weight;
+        LLStringUtil::format_map_t args;
+        args["[TARGET]"] = ALScriptWeight::nameOf(weight.target);
+        args["[SIZE]"]   = llformat("%.1f", (F64)weight.total / 1024.0);
+        args["[LIMIT]"]  = std::to_string(weight.limit / 1024);
+        args["[BYTES]"]  = std::to_string(weight.total);
+        args["[MAX]"]    = std::to_string(weight.limit);
+        std::string tip  = getString(weight.estimate ? "TrailerWeightEstimateTip" : "TrailerWeightTip", args);
+        if (!doc.weightExact)
+        {
+            tip += " " + getString("TrailerWeightBeforeTip");
+        }
+        ALJumpBar::TrailerPart part{ getString(weight.estimate ? "TrailerWeightEstimate" : "TrailerWeight", args), std::string(), tip };
+        if (weight.total > weight.limit)
+        {
+            part.color = doc.editor->markColor(ALCodeEditor::Mark::Error);
+        }
+        else if (weight.total * 5 > weight.limit * 4)
+        {
+            part.color = doc.editor->markColor(ALCodeEditor::Mark::Warning);
+        }
+        parts.push_back(std::move(part));
     }
     // What a save would send, once it is past half of what a script may
     // be: in the warning colour past nine tenths, the error's past the
@@ -5069,7 +5157,7 @@ bool ALFloaterScriptStudio::sendQueuedSave(Doc& doc)
         return false;
     }
     save(doc);
-    return doc.saving || doc.preprocessing || doc.saveAfterCheck;
+    return doc.saving || doc.preprocessing || doc.saveAfterCheck || doc.saveAfterWeigh;
 }
 
 // --- the analyzers -------------------------------------------------------------
@@ -5363,6 +5451,8 @@ void ALFloaterScriptStudio::analysed(const ALScriptAnalysis::Result& result)
     }
     refreshProblems(doc);
     refreshOutline(doc);
+    // Weighed a moment after, of the same text.
+    weigh(doc);
     if (doc.saveAfterCheck)
     {
         doc.saveAfterCheck = false;
@@ -5748,6 +5838,23 @@ void ALFloaterScriptStudio::refreshProblems(Doc& doc)
         row.level   = Doc::Level::Note;
         row.origin  = getString("OriginDefinitions");
         row.message = doc.definitionsError;
+        doc.shown.push_back(std::move(row));
+    }
+    // Code heavier than its target runs a script in: an error where the
+    // number is the target's own and of what a save compiles, a warning
+    // where it is an estimate or of the text before the optimizer.
+    if (doc.weight && doc.weightVersion == doc.editor->document().version() && doc.weight->total > doc.weight->limit)
+    {
+        const ALScriptWeight&      weight = *doc.weight;
+        LLStringUtil::format_map_t args;
+        args["[SIZE]"]   = llformat("%.1f", (F64)weight.total / 1024.0);
+        args["[LIMIT]"]  = std::to_string(weight.limit / 1024);
+        args["[TARGET]"] = ALScriptWeight::nameOf(weight.target);
+        const bool hard  = doc.weightExact && !weight.estimate;
+        Doc::Shown row;
+        row.level   = hard ? Doc::Level::Error : Doc::Level::Warning;
+        row.origin  = getString("OriginWeight");
+        row.message = getString(weight.estimate ? "WeightOverEstimate" : !doc.weightExact ? "WeightOverBefore" : "WeightOver", args);
         doc.shown.push_back(std::move(row));
     }
     std::stable_sort(doc.shown.begin(), doc.shown.end(), [](const Doc::Shown& a, const Doc::Shown& b) {
@@ -10502,7 +10609,7 @@ void ALFloaterScriptStudio::saveToClose(const std::string& id)
     save(doc);
     // Gone already -- a file, saved and let go of on the spot -- or on its
     // way: sent, or waiting on the preprocessor or a check.
-    if (indexOf(id) == NONE || doc.saving || doc.preprocessing || doc.saveAfterCheck)
+    if (indexOf(id) == NONE || doc.saving || doc.preprocessing || doc.saveAfterCheck || doc.saveAfterWeigh)
     {
         return;
     }
@@ -10549,7 +10656,7 @@ void ALFloaterScriptStudio::popOut()
     // Not while a save of it is on its way: the answer comes to whichever
     // window holds the tab then, where the save is not its own, and a close
     // waiting on it here would wait on a tab gone from here.
-    if (doc->saving || doc->preprocessing || doc->saveAfterCheck)
+    if (doc->saving || doc->preprocessing || doc->saveAfterCheck || doc->saveAfterWeigh)
     {
         LLStringUtil::format_map_t args;
         args["[NAME]"] = doc->name;
@@ -12265,6 +12372,25 @@ bool ALFloaterScriptStudio::preflight(Doc& doc)
             {
                 ++errors;
             }
+        }
+    }
+    // What it weighs, of this text: over an exact target's limit, what went
+    // up would not compile or would not run.
+    if (weightTarget(doc))
+    {
+        if (!doc.weight || doc.weightVersion != version)
+        {
+            // Asked for whether or not one is on its way: one waiting on an
+            // expansion the text has moved past is dropped with it, and a
+            // second answer does no harm.
+            doc.saveAfterWeigh = true;
+            weigh(doc);
+            setStatus(getString("Preflight", args));
+            return false;
+        }
+        if (doc.weightExact && !doc.weight->estimate && doc.weight->total > doc.weight->limit)
+        {
+            ++errors;
         }
     }
     if (errors == 0)

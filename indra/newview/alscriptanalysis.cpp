@@ -236,6 +236,15 @@ void ALScriptAnalysis::ask(Request request, callback_t callback)
                     case Kind::Actions:
                         result.actions = mWorker->luau.actions(request.text, request.line, request.column, request.endLine, request.endColumn);
                         break;
+                    case Kind::Weigh:
+                        for (const ALScriptWeight::Target target : request.targets)
+                        {
+                            if (target == ALScriptWeight::Target::SLua)
+                            {
+                                result.weights.push_back(ALScriptWeigh::slua(request.text));
+                            }
+                        }
+                        break;
                 }
             }
             else
@@ -268,6 +277,19 @@ void ALScriptAnalysis::ask(Request request, callback_t callback)
                         break;
                     case Kind::Actions:
                         result.actions = mWorker->lsl.actions(request.text, request.line, request.column, request.endLine, request.endColumn);
+                        break;
+                    case Kind::Weigh:
+                        for (const ALScriptWeight::Target target : request.targets)
+                        {
+                            if (target == ALScriptWeight::Target::LSO)
+                            {
+                                result.weights.push_back(ALScriptWeigh::lso(request.text));
+                            }
+                            else if (target == ALScriptWeight::Target::Mono)
+                            {
+                                result.weights.push_back(ALScriptWeigh::mono(request.text));
+                            }
+                        }
                         break;
                 }
                 result.parsed     = mWorker->lsl.parsed();
