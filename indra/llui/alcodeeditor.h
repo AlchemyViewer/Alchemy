@@ -441,6 +441,9 @@ public:
         std::vector<std::pair<ALTextRange, std::string>> edits;
         bool                                             preferred = false;
         bool                                             suppress  = false;
+        // A change no problem asks for, which the list offers after what
+        // puts a problem right and before a suppression.
+        bool                                             refactor  = false;
         LLSD                                             value;
     };
     typedef std::function<void(S32 line, std::vector<Fix>& out)> fix_provider_t;
@@ -465,9 +468,20 @@ public:
     // The lines a fix touches as they would read with it made, and which
     // lines they are.
     static std::string fixedLines(const ALTextDocument& text, const Fix& fix, S32& first, S32& last);
-    // In the order they are offered: the preferred first, a suppression
-    // last, the rest as given.
+    // In the order they are offered: the preferred first, then the other
+    // fixes, the refactors, and a suppression last, each as given.
     static void        rankFixes(std::vector<Fix>& fixes);
+    // Asked, as a quick fix opens the list, what could be done at the
+    // caret, or to the stretch chosen, that no problem asks for; the
+    // answer comes back through supplyActions when it is ready, the list
+    // showing the line's fixes meanwhile.
+    typedef std::function<void(const ALTextRange& at)> action_request_t;
+    void setActionRequest(action_request_t request) { mActionRequest = std::move(request); }
+    // The refactors for the place last asked about: joined to the fixes
+    // listed, or listed alone where the line has none -- or, where there is
+    // nothing at all, a word that says so. Dropped where the list has
+    // closed since, or the caret moved.
+    void supplyActions(const ALTextRange& at, std::vector<Fix> actions);
 
     // --- hover -------------------------------------------------------------------
 
@@ -627,6 +641,8 @@ private:
     void        placeSideBox(const LLRect& list);
     void        showFixPreview();
     void        takeFix(S32 index);
+    // The list made of `fixes`, under `line`, with one chosen.
+    void        showFixes(S32 line, std::vector<Fix> fixes, S32 chosen);
     // The list shown; the one chosen kept by its word where the list is
     // still about what was typed, else the best.
     void listCompletions(bool keep_choice);
@@ -752,6 +768,13 @@ private:
     fix_handler_t           mFixHandler;
     ALChoiceList*           mFixList = nullptr;
     std::vector<Fix>        mFixes;
+    S32                     mFixLine = -1;
+    // Where refactors were asked for, and where the caret was, while the
+    // quick fix that asked waits on them.
+    action_request_t        mActionRequest;
+    ALTextRange             mActionsFor;
+    ALTextPos               mActionsCaret;
+    bool                    mActionsWanted = false;
     // One per line, as the marks are: what its problems offer.
     std::vector<U8>         mFixable;
     // What the list was last made for, the head and the prefix: a new

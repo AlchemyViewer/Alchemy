@@ -1313,4 +1313,73 @@ namespace tut
         ensure("shown", e.cardShown());
         ensure_equals("each a line under the problem", e.card()->text(), std::string("Missing ';'.\nFix: Insert ';'\nFix: Suppress it"));
     }
+
+    template<> template<>
+    void alcodeeditor_object::test<37>()
+    {
+        set_test_name("a quick fix asks for the refactors too, and joins them to the line's fixes as they come, after the fixes and before a suppression");
+        ALCodeEditor& e = make("integer a = 1\nllOwnerSay((string)a);\n");
+        std::vector<ALTextRange> asked;
+        std::vector<LLSD>        taken;
+        e.setFixProvider([](S32 line, std::vector<ALCodeEditor::Fix>& out) {
+            if (line != 0)
+            {
+                return;
+            }
+            ALCodeEditor::Fix suppress;
+            suppress.title    = "Suppress it";
+            suppress.suppress = true;
+            suppress.value    = "suppress";
+            suppress.edits.emplace_back(ALTextRange(ALTextPos(0, 13), ALTextPos(0, 13)), "  // NOLINT");
+            ALCodeEditor::Fix semi;
+            semi.title     = "Insert ';'";
+            semi.preferred = true;
+            semi.value     = "semi";
+            semi.edits.emplace_back(ALTextRange(ALTextPos(0, 13), ALTextPos(0, 13)), ";");
+            out = { suppress, semi };
+        });
+        e.setFixHandler([&taken](const LLSD& value) { taken.push_back(value); });
+        ensure("nothing offered where the line says nothing", !e.canPerform(ALEditorCommand::QuickFix));
+        e.setActionRequest([&asked](const ALTextRange& at) { asked.push_back(at); });
+        ensure("offered anywhere once refactors may be asked for", e.canPerform(ALEditorCommand::QuickFix));
+        e.setFixable(0, true, true);
+        ensure("listed by Control-.", e.handleKeyHere('.', MASK_CONTROL) && e.fixesOpen());
+        ensure_equals("the fixes listed meanwhile", e.fixes().size(), static_cast<size_t>(2));
+        ensure("the refactors asked for at the caret", asked.size() == 1 && asked.front() == ALTextRange(e.caret(), e.caret()));
+        key(KEY_DOWN);
+        ALCodeEditor::Fix extract;
+        extract.title = "Put it in a local";
+        extract.value = "extract";
+        extract.edits.emplace_back(ALTextRange(ALTextPos(0, 12), ALTextPos(0, 13)), "value");
+        e.supplyActions(ALTextRange(ALTextPos(1, 0), ALTextPos(1, 0)), { extract });
+        ensure_equals("another place's dropped", e.fixes().size(), static_cast<size_t>(2));
+        e.supplyActions(asked.front(), { extract });
+        ensure_equals("joined", e.fixes().size(), static_cast<size_t>(3));
+        ensure_equals("after the fixes", e.fixes()[1].title, std::string("Put it in a local"));
+        ensure("marked a refactor", e.fixes()[1].refactor);
+        ensure_equals("before the suppression", e.fixes()[2].title, std::string("Suppress it"));
+        key(KEY_RETURN);
+        ensure("the choice stayed where it was", taken.size() == 1 && taken.front().asString() == "suppress");
+
+        // A line with no fixes: the stretch chosen asked about, and the
+        // refactors listed alone when they come, or a word that there is
+        // nothing.
+        e.setSelection(ALTextRange(ALTextPos(1, 0), ALTextPos(1, 10)));
+        e.handleKeyHere('.', MASK_CONTROL);
+        ensure("nothing listed yet", !e.fixesOpen());
+        ensure("the stretch asked about", asked.size() == 2 && asked.back() == ALTextRange(ALTextPos(1, 0), ALTextPos(1, 10)));
+        e.supplyActions(asked.back(), {});
+        ensure("a word that there is nothing", e.fixesOpen() && e.fixes().size() == 1 && e.fixes().front().value.isUndefined());
+        key(KEY_RETURN);
+        ensure("which takes nothing", taken.size() == 1 && !e.fixesOpen());
+        e.handleKeyHere('.', MASK_CONTROL);
+        e.supplyActions(asked.back(), { extract });
+        ensure("listed alone", e.fixesOpen() && e.fixes().size() == 1 && e.fixes().front().refactor);
+        key(KEY_ESCAPE);
+        // An answer for a caret since moved goes nowhere.
+        e.handleKeyHere('.', MASK_CONTROL);
+        e.setSelection(ALTextRange(ALTextPos(0, 0), ALTextPos(0, 0)));
+        e.supplyActions(asked.back(), { extract });
+        ensure("dropped", !e.fixesOpen());
+    }
 }
