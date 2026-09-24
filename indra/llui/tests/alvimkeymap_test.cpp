@@ -1277,4 +1277,31 @@ namespace tut
         keys("A<C-j>q<Esc>");
         ensure_equals("a line broken", flat(r.text()), std::string("foo bar|foo!|foo!|q|"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<36>()
+    {
+        set_test_name("a count makes its text once, and not past a megabyte");
+        ALCodeEditor& e = make("abcdefghijklmnopqrstuvwxyz\n");
+        // Twenty-six bytes a hundred thousand times over is past it: said,
+        // and nothing put.
+        keys("yiw100000p");
+        ensure("said: " + vim->message(), vim->messageIsError() && vim->message().find("Too large a count") != std::string::npos);
+        ensure_equals("nothing put", flat(e.text()), std::string("abcdefghijklmnopqrstuvwxyz|"));
+        keys("2p");
+        ensure_equals("a count within it is put", flat(e.text()),
+                      std::string("aabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzbcdefghijklmnopqrstuvwxyz|"));
+        // An insert's count likewise: what was typed stands, once.
+        make("\n");
+        keys("100000iabcdefghijk<Esc>");
+        ensure("said: " + vim->message(), vim->messageIsError() && vim->message().find("Too large a count") != std::string::npos);
+        ensure_equals("typed once", flat(editor->text()), std::string("abcdefghijk|"));
+        keys("u");
+        ensure_equals("and undone as one", flat(editor->text()), std::string("|"));
+        // Within it, the lot in one edit, undone at once.
+        keys("20000ixy<Esc>");
+        ensure_equals("forty thousand characters", editor->text().size(), size_t(40001));
+        keys("u");
+        ensure_equals("undone at once", flat(editor->text()), std::string("|"));
+    }
 }

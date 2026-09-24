@@ -246,6 +246,8 @@ private:
     void     store(char name, std::string text, bool linewise, bool block, bool yanked);
     Register fetch(char name) const;
     void     put(ALTextView& view, char name, bool after, S32 count);
+    // Says a count would make more text than it may, and how much.
+    void     tooMuch(size_t bytes);
 
     // Searching, with the last pattern kept for n and N.
     bool search(ALTextView& view, const std::string& pattern, bool forward, S32 count, bool whole_word);

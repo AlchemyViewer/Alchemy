@@ -194,6 +194,11 @@ namespace
     // held to the same most, which their product would otherwise pass far
     // enough to wrap round.
     S32 countTimes(S32 a, S32 b) { return static_cast<S32>(llmin<S64>(static_cast<S64>(a) * static_cast<S64>(b), MAX_COUNT)); }
+    // The most text a count may make of text there already -- a register
+    // put, what an insert typed -- which the count alone does not bound:
+    // a hundred thousand of a register a hundred kilobytes long is ten
+    // gigabytes. A megabyte is more than any script.
+    constexpr size_t MAX_COUNT_TEXT = 1024 * 1024;
 }
 
 ALVimKeymap::ALVimKeymap() = default;
@@ -2918,6 +2923,11 @@ ALVimKeymap::Register ALVimKeymap::fetch(char name) const
     return reg;
 }
 
+void ALVimKeymap::tooMuch(size_t bytes)
+{
+    say(said("VimCountTooLarge", "Too large a count: it would put in [SIZE] MB", { { "[SIZE]", llformat("%.1f", (F64)bytes / (1024.0 * 1024.0)) } }), true);
+}
+
 void ALVimKeymap::put(ALTextView& view, char name, bool after, S32 count)
 {
     const ALTextDocument& d   = view.document();
@@ -2925,6 +2935,11 @@ void ALVimKeymap::put(ALTextView& view, char name, bool after, S32 count)
     if (reg.text.empty())
     {
         say(said("VimNothingInRegister", "E353: Nothing in register [REGISTER]", { { "[REGISTER]", std::string(1, name ? name : '"') } }), true);
+        return;
+    }
+    if (count > 1 && reg.text.size() * static_cast<size_t>(count) > MAX_COUNT_TEXT)
+    {
+        tooMuch(reg.text.size() * static_cast<size_t>(count));
         return;
     }
     const ALTextPos from = view.caret();
@@ -2974,9 +2989,14 @@ void ALVimKeymap::put(ALTextView& view, char name, bool after, S32 count)
         return;
     }
     std::string text;
+    text.reserve((reg.text.size() + 1) * static_cast<size_t>(count));
     for (S32 n = 0; n < count; ++n)
     {
-        text += reg.linewise && n > 0 ? "\n" + reg.text : reg.text;
+        if (reg.linewise && n > 0)
+        {
+            text += '\n';
+        }
+        text += reg.text;
     }
     if (reg.linewise)
     {
@@ -3035,10 +3055,25 @@ void ALVimKeymap::enterInsert(ALTextView& view, S32 count)
 void ALVimKeymap::leaveInsert(ALTextView& view)
 {
     const ALTextDocument& d = view.document();
-    // What was typed, again as many times as the count said.
-    for (S32 n = 1; n < mInsertCount; ++n)
+    // What was typed, again as many times as the count said: made once and
+    // put in as one edit, not an edit a time.
+    if (mInsertCount > 1 && !mTyped.empty())
     {
-        view.insertText(mTyped);
+        const size_t size = mTyped.size() * static_cast<size_t>(mInsertCount - 1);
+        if (size > MAX_COUNT_TEXT)
+        {
+            tooMuch(size);
+        }
+        else
+        {
+            std::string again;
+            again.reserve(size);
+            for (S32 n = 1; n < mInsertCount; ++n)
+            {
+                again += mTyped;
+            }
+            view.insertText(again);
+        }
     }
     // And onto every other line of a block.
     if (mBlockInsert && !mTyped.empty() && mTyped.find('\n') == std::string::npos)
