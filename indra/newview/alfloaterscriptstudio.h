@@ -808,6 +808,11 @@ private:
     // What the text weighs while it is the text saved, kept for the Weights
     // tab to count from.
     void                      keepSavedWeights(Doc& doc);
+    // What the script's own target's code weighs, put beside its text as
+    // the view asks: each part's bytes after the line it is declared on,
+    // and each line's heat in the gutter. Only of a weight of the text as
+    // it stands; what is there already slides with the edits until then.
+    void                      showWeightsInEditor(Doc& doc);
 
     // The preprocessor: whether it applies to a script; its run over the
     // text as it stands, for the analyzers, with the way back; and its
@@ -1534,6 +1539,11 @@ private:
     bool                               mSemanticColors  = true;
     bool                               mInlayParameters = true;
     bool                               mInlayTypes      = true;
+    // What the code weighs, beside it: each function's bytes after the
+    // line it is declared on, and the gutter's strip of heat by line. Off
+    // until asked for.
+    bool                               mWeightNotes     = false;
+    bool                               mWeightHeat      = false;
     // The words the dictionary lacks squiggled: in comments and strings
     // of a script, throughout a notecard.
     bool                               mSpellCheck      = true;

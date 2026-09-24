@@ -64,6 +64,7 @@ namespace
         { "ScriptStickyHeaderColor", "Pinned headers" },
         { "ScriptInlayHintColor", "Inlay hints" },
         { "ScriptInlayHintBgColor", "Inlay hints, background" },
+        { "ScriptHeatColor", "Weight heat" },
         { "ScriptErrorColor", "Errors" },
         { "ScriptWarningColor", "Warnings" },
         { "ScriptNoteColor", "Notes" },

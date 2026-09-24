@@ -415,6 +415,13 @@
     <floater.string name="WeightsKindFrame">Overhead</floater.string>
     <floater.string name="WeightsStateTip">The state's table of handlers and the handlers themselves, whose bytes are listed each on its own as well.</floater.string>
     <floater.string name="WeightsFrameTip">What the target spends on the script as a whole, whatever is in it.</floater.string>
+    <floater.string name="WeightNote">[BYTES] bytes</floater.string>
+    <floater.string name="WeightNoteEstimate">~[BYTES] bytes</floater.string>
+    <floater.string name="WeightNoteNamed">[NAME] [NOTE]</floater.string>
+    <floater.string name="WeightNoteTip">[NAME]: [BYTES] bytes of code on [TARGET], [SHARE] of the [LIMIT] KB it runs a script in.</floater.string>
+    <floater.string name="WeightNoteEstimateTip">[NAME]: about [BYTES] bytes of code on [TARGET], [SHARE] of the [LIMIT] KB it runs a script in.</floater.string>
+    <floater.string name="WeightHeatTip">Line [LINE]: [BYTES] bytes of code on [TARGET], [SHARE] of the [LIMIT] KB it runs a script in.</floater.string>
+    <floater.string name="WeightHeatEstimateTip">Line [LINE]: about [BYTES] bytes of code on [TARGET], [SHARE] of the [LIMIT] KB it runs a script in.</floater.string>
     <floater.string name="SaveOverWeight">[NAME] was not saved: as it would be sent, its code is [SIZE] KB, more than the [LIMIT] KB [TARGET] runs a script in. Save again to upload anyway.</floater.string>
     <floater.string name="SaveTooLarge">[NAME] was not saved: it is [SIZE] bytes, [OVER] more than the [LIMIT] a script may be.</floater.string>
     <floater.string name="SaveTooLargePlain">Moving part of it into another script, or into a notecard it reads, would bring it under.</floater.string>
@@ -778,6 +785,14 @@
             <menu_item_check label="Type Hints" layout="topleft" name="inlay_types">
                 <menu_item_check.on_check function="ScriptStudio.Check" parameter="inlay_types" />
                 <menu_item_check.on_click function="ScriptStudio.Menu" parameter="inlay_types" />
+            </menu_item_check>
+            <menu_item_check label="Bytes After Declarations" layout="topleft" name="weight_notes">
+                <menu_item_check.on_check function="ScriptStudio.Check" parameter="weight_notes" />
+                <menu_item_check.on_click function="ScriptStudio.Menu" parameter="weight_notes" />
+            </menu_item_check>
+            <menu_item_check label="Weight Heat in Gutter" layout="topleft" name="weight_heat">
+                <menu_item_check.on_check function="ScriptStudio.Check" parameter="weight_heat" />
+                <menu_item_check.on_click function="ScriptStudio.Menu" parameter="weight_heat" />
             </menu_item_check>
             <menu_item_check label="Spell Check" layout="topleft" name="spell_check">
                 <menu_item_check.on_check function="ScriptStudio.Check" parameter="spell_check" />

@@ -1724,6 +1724,9 @@ void ALFloaterScriptStudio::applyEditorOptions(ALCodeEditor& editor) const
     editor.setRelativeLineNumbers(mRelativeNumbers);
     editor.setColorBrackets(mRainbowBrackets);
     editor.setStickyHeaders(mStickyHeaders);
+    // The heat is of the script's own lines, which the Preprocessed view
+    // does not show.
+    editor.setHeatShown(mWeightHeat && !LLStringUtil::endsWith(editor.getName(), ":expanded"));
     editor.setScrollMapWidth(mScrollMapWidth);
     editor.setScrollMapPreview(mScrollMapPreview);
     editor.setScrollMapOnLeft(mScrollMapLeft);
@@ -3985,6 +3988,7 @@ void ALFloaterScriptStudio::weighed(Doc& doc, const ALScriptAnalysis::Result& re
         // the check's expansion: SLua's is never optimized.
         doc.weightExact = !preprocessed(doc) || doc.language.lua || !gSavedSettings.getBOOL("ALScriptPreprocOptimizer");
         refreshProblems(doc);
+        showWeightsInEditor(doc);
     }
     if (doc.saveAfterWeigh)
     {
@@ -4048,6 +4052,7 @@ void ALFloaterScriptStudio::weighedSent(Doc& doc, const ALScriptAnalysis::Result
         doc.weightExact   = true;
         doc.weightSent    = true;
         refreshProblems(doc);
+        showWeightsInEditor(doc);
         if (&doc == active())
         {
             mWeightsStale = true;
@@ -4125,6 +4130,112 @@ void ALFloaterScriptStudio::keepSavedWeights(Doc& doc)
     if (&doc == active())
     {
         mWeightsStale = true;
+    }
+}
+
+void ALFloaterScriptStudio::showWeightsInEditor(Doc& doc)
+{
+    if (!doc.editor)
+    {
+        return;
+    }
+    if (!mWeightNotes)
+    {
+        doc.editor->setLineNotes({});
+    }
+    if (!mWeightHeat)
+    {
+        doc.editor->setLineHeat({});
+    }
+    if ((!mWeightNotes && !mWeightHeat) || !doc.weight || doc.weightVersion != doc.editor->document().version())
+    {
+        return;
+    }
+    const ALScriptWeight&      weight = *doc.weight;
+    LLStringUtil::format_map_t args;
+    args["[TARGET]"] = ALScriptWeight::nameOf(weight.target);
+    args["[LIMIT]"]  = std::to_string(weight.limit / 1024);
+    const auto share = [&weight](size_t bytes) { return weight.limit ? llformat("%.1f%%", (F64)bytes * 100.0 / (F64)weight.limit) : std::string(); };
+    // Said as weighed before the optimizer, where it was.
+    const std::string before = doc.weightExact ? std::string() : " " + getString("WeightsHeadBefore");
+    if (mWeightNotes)
+    {
+        // Each function, handler, state and global of the script's own, by
+        // the line it is declared on; more than one on a line each by name.
+        std::map<S32, std::vector<const ALScriptWeight::Part*>> by_line;
+        for (const ALScriptWeight::Part& part : weight.parts)
+        {
+            const bool declared = part.kind == ALScriptWeight::Part::Kind::Function || part.kind == ALScriptWeight::Part::Kind::Handler ||
+                                  part.kind == ALScriptWeight::Part::Kind::State || part.kind == ALScriptWeight::Part::Kind::Global;
+            if (declared && part.file.empty() && part.line >= 0 && part.bytes > 0)
+            {
+                by_line[part.line].push_back(&part);
+            }
+        }
+        std::vector<ALCodeEditor::LineNote> notes;
+        for (const auto& [line, parts] : by_line)
+        {
+            ALCodeEditor::LineNote note;
+            note.line = line;
+            for (const ALScriptWeight::Part* part : parts)
+            {
+                LLStringUtil::format_map_t said = args;
+                said["[BYTES]"]                 = std::to_string(part->bytes);
+                said["[SHARE]"]                 = share(part->bytes);
+                if (part->name.empty())
+                {
+                    said["[NAME]"] = getString("WeightsPartUnnamed");
+                }
+                else if (!part->within.empty())
+                {
+                    LLStringUtil::format_map_t handler;
+                    handler["[EVENT]"] = part->name;
+                    handler["[STATE]"] = part->within;
+                    said["[NAME]"]     = getString("WeightsPartHandler", handler);
+                }
+                else
+                {
+                    said["[NAME]"] = part->name;
+                }
+                std::string bytes = getString(weight.estimate ? "WeightNoteEstimate" : "WeightNote", said);
+                if (parts.size() > 1)
+                {
+                    said["[NOTE]"] = bytes;
+                    bytes          = getString("WeightNoteNamed", said);
+                }
+                note.text += (note.text.empty() ? "" : "  \xC2\xB7  ") + bytes;
+                note.tip += (note.tip.empty() ? "" : "\n") + getString(weight.estimate ? "WeightNoteEstimateTip" : "WeightNoteTip", said);
+            }
+            note.tip += before;
+            notes.push_back(std::move(note));
+        }
+        doc.editor->setLineNotes(notes);
+    }
+    if (mWeightHeat)
+    {
+        // Each of the script's own lines by the most any line came to, so
+        // that the warmest is the heat's own colour; by its square root,
+        // so that a line of a tenth of that is still seen.
+        size_t most = 0;
+        for (const ALScriptWeight::Line& line : weight.lines)
+        {
+            most = line.file.empty() ? std::max(most, line.bytes) : most;
+        }
+        std::vector<ALCodeEditor::LineHeat> heat;
+        for (const ALScriptWeight::Line& line : weight.lines)
+        {
+            if (!line.file.empty() || line.bytes == 0 || most == 0)
+            {
+                continue;
+            }
+            LLStringUtil::format_map_t said = args;
+            said["[LINE]"]                  = std::to_string(line.line + 1);
+            said["[BYTES]"]                 = std::to_string(line.bytes);
+            said["[SHARE]"]                 = share(line.bytes);
+            heat.push_back({ line.line, std::sqrt(static_cast<F32>(line.bytes) / static_cast<F32>(most)),
+                             getString(weight.estimate ? "WeightHeatEstimateTip" : "WeightHeatTip", said) + before });
+        }
+        doc.editor->setLineHeat(heat);
     }
 }
 
@@ -14727,6 +14838,17 @@ void ALFloaterScriptStudio::onMenuAction(const LLSD& param)
         }
         saveState();
     }
+    else if (action == "weight_notes" || action == "weight_heat")
+    {
+        bool& flag = action == "weight_notes" ? mWeightNotes : mWeightHeat;
+        flag       = !flag;
+        applyEditorOptions();
+        for (std::unique_ptr<Doc>& each : mDocs)
+        {
+            showWeightsInEditor(*each);
+        }
+        saveState();
+    }
     else if (action == "semantic_colors" || action == "inlay_parameters" || action == "inlay_types")
     {
         bool& flag = action == "semantic_colors" ? mSemanticColors : action == "inlay_parameters" ? mInlayParameters : mInlayTypes;
@@ -15030,6 +15152,14 @@ bool ALFloaterScriptStudio::onMenuCheck(const LLSD& param)
     if (action == "inlay_types")
     {
         return mInlayTypes;
+    }
+    if (action == "weight_notes")
+    {
+        return mWeightNotes;
+    }
+    if (action == "weight_heat")
+    {
+        return mWeightHeat;
     }
     if (action == "line_numbers")
     {
@@ -15583,6 +15713,8 @@ void ALFloaterScriptStudio::writeState(LLSD& state) const
     state["semantic_colors"]  = mSemanticColors;
     state["inlay_parameters"] = mInlayParameters;
     state["inlay_types"]      = mInlayTypes;
+    state["weight_notes"]     = mWeightNotes;
+    state["weight_heat"]      = mWeightHeat;
     state["scroll_map"]   = mScrollMap;
     state["map_width"]    = mScrollMapWidth;
     state["map_preview"]  = mScrollMapPreview;
@@ -15752,6 +15884,14 @@ void ALFloaterScriptStudio::readState(const LLSD& state)
     if (state.has("inlay_types"))
     {
         mInlayTypes = state["inlay_types"].asBoolean();
+    }
+    if (state.has("weight_notes"))
+    {
+        mWeightNotes = state["weight_notes"].asBoolean();
+    }
+    if (state.has("weight_heat"))
+    {
+        mWeightHeat = state["weight_heat"].asBoolean();
     }
     if (state.has("scroll_map"))
     {

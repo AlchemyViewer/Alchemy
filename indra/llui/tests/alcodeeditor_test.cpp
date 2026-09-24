@@ -1450,4 +1450,66 @@ namespace tut
         ensure("another line's mark pressed", e.handleMouseDown(e.leftEdge() + 2, rowY(1), MASK_NONE) && e.fixesOpen());
         ensure("its fixes alone", asked.size() == 1);
     }
+
+    template<> template<>
+    void alcodeeditor_object::test<39>()
+    {
+        set_test_name("the gutter's strip of heat is a column of its own while asked for, and each line's heat stays with what is left of the line");
+        ALCodeEditor& e     = make("a\nb\nc\nd\n");
+        const S32     plain = e.gutterWidth();
+        e.setHeatShown(true);
+        ensure("a column of its own", e.gutterWidth() > plain);
+        const S32 with_heat = e.gutterWidth();
+        e.setLineHeat({ { 1, 0.5f, "b's" }, { 2, 1.f, "c's" } });
+        ensure("as said", e.heatAt(1) == 0.5f && e.heatAt(2) == 1.f && e.heatAt(0) == 0.f);
+        ensure_equals("the gutter no wider for what is in it", e.gutterWidth(), with_heat);
+
+        // A line made above one pushes its heat down with it.
+        e.document().replace(ALTextRange(ALTextPos(1, 0), ALTextPos(1, 0)), "\n");
+        ensure("pushed down", e.heatAt(1) == 0.f && e.heatAt(2) == 0.5f && e.heatAt(3) == 1.f);
+        // Typing in a line keeps its heat, and breaking it keeps it on
+        // what is left of the line.
+        e.document().replace(ALTextRange(ALTextPos(2, 1), ALTextPos(2, 1)), "x");
+        ensure("typed in", e.heatAt(2) == 0.5f);
+        e.document().replace(ALTextRange(ALTextPos(3, 1), ALTextPos(3, 1)), "\n");
+        ensure("broken", e.heatAt(3) == 1.f && e.heatAt(4) == 0.f);
+        // The lines taken from a line's start take theirs with them, and
+        // the line after is pulled up with its own.
+        e.document().replace(ALTextRange(ALTextPos(1, 0), ALTextPos(3, 0)), "");
+        ensure("pulled up", e.heatAt(1) == 1.f && e.heatAt(2) == 0.f);
+        e.setLineHeat({});
+        ensure("replaced whole", e.heatAt(1) == 0.f);
+        e.setHeatShown(false);
+        ensure_equals("the column gone", e.gutterWidth(), plain);
+    }
+
+    template<> template<>
+    void alcodeeditor_object::test<40>()
+    {
+        set_test_name("a line's note is drawn after its end, says more to the mouse, and stays with what is left of the line");
+        ALCodeEditor& e = make("integer twice(integer n)\n{\n    return n * 2;\n}\n");
+        e.setLineNotes({ { 0, "28 bytes", "twice: 28 bytes of code" } });
+        ensure_equals("as said", e.noteAt(0), std::string("28 bytes"));
+        ensure("nowhere else", e.noteAt(1).empty());
+        const LLRect text  = e.textRect();
+        const S32    row_h = e.layout().rowHeight();
+        const S32    y     = text.mTop - row_h / 2;
+        S32          on    = -1;
+        for (S32 x = text.mLeft; x < text.mRight && on < 0; ++x)
+        {
+            on = e.noteAtLocal(x, y) == 0 ? x : -1;
+        }
+        const S32 end = text.mLeft + static_cast<S32>(e.layout().xOf(0, static_cast<S32>(e.document().line(0).size()), nullptr));
+        ensure("drawn after the line's end", on > end);
+        ensure("not over the text", e.noteAtLocal(text.mLeft + 2, y) < 0);
+        ensure("nor over a line with none", e.noteAtLocal(on + 2, y - row_h) < 0);
+        ensure("says more to the mouse", e.handleToolTip(on + 2, y, MASK_NONE));
+
+        e.document().replace(ALTextRange(ALTextPos(0, 8), ALTextPos(0, 13)), "double");
+        ensure_equals("kept through an edit in its line", e.noteAt(0), std::string("28 bytes"));
+        e.document().replace(ALTextRange(ALTextPos(0, 0), ALTextPos(0, 0)), "// doubles\n");
+        ensure("pushed down with its line", e.noteAt(0).empty() && e.noteAt(1) == "28 bytes");
+        e.setLineNotes({});
+        ensure("replaced whole", e.noteAt(1).empty());
+    }
 }

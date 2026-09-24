@@ -121,6 +121,7 @@ public:
         Note,
         RuntimeError,
         SelectionInactive, // the selection once the keyboard has left
+        Heat,              // the gutter's strip of heat, at its warmest
         COUNT
     };
     static const char* paintName(Paint which);
@@ -182,6 +183,39 @@ public:
     S32                           inlayAtLocal(S32 x, S32 y);
     // A hint written in where it stands, as a double-click on it does.
     bool                          writeInlay(S32 index);
+
+    // A line's share of what the script's code weighs, as a strip of heat
+    // down the gutter's edge beside the text -- nothing where a line made
+    // nothing, the warmest where it made the most -- with what it came to
+    // in words, for the mouse. The strip is there while it is asked for,
+    // heat or none, so that the text does not move as weighings come and
+    // go. Replaced whole; an edit keeps a line's heat with what is left of
+    // the line -- typed in, broken, or pushed down by lines made above it
+    // -- and the lines it makes have none until they are said again.
+    struct LineHeat
+    {
+        S32         line = 0;
+        // From nothing to the warmest, 0 to 1.
+        F32         heat = 0.f;
+        std::string tip;
+    };
+    void setHeatShown(bool shown);
+    bool heatShown() const { return mHeatShown; }
+    void setLineHeat(const std::vector<LineHeat>& heat);
+    F32  heatAt(S32 line) const;
+    // Words drawn dim after a line's end, taking no room in the text: what
+    // a function declared there weighs. After a folded block's box where
+    // the line is folded. As the heat is for an edit.
+    struct LineNote
+    {
+        S32         line = 0;
+        std::string text;
+        std::string tip;
+    };
+    void        setLineNotes(const std::vector<LineNote>& notes);
+    std::string noteAt(S32 line) const;
+    // The line whose note is drawn under a point of the view, or -1.
+    S32         noteAtLocal(S32 x, S32 y);
 
     // The places a name stands, washed over until they are cleared or
     // the caret leaves them all; an edit slides them as it does the
@@ -632,6 +666,11 @@ private:
     // coordinates, or an empty rect.
     LLRect foldBoxOf(S32 line, const LLRect& text);
     std::string foldBoxText(S32 line);
+    // Where a line's note is drawn, likewise.
+    LLRect noteBoxOf(S32 line, const LLRect& text);
+    // The gutter's strip of heat, and the fold column beside it: how wide
+    // the one is, and where the other ends.
+    S32 heatWidth() const;
     // How far a line is indented, in columns; a blank line as the next
     // line that is not, so that the guides run through it.
     S32 indentOf(S32 line) const;
@@ -755,6 +794,18 @@ private:
     std::vector<ALTextRange>           mHighlights;
     std::vector<SemanticToken>         mSemantics;
     std::vector<InlayHint>             mInlays;
+    // Beside each line: its heat and its note, and what they say to the
+    // mouse; empty until either is set.
+    struct Aside
+    {
+        F32         heat = 0.f;
+        std::string heatTip;
+        std::string note;
+        std::string noteTip;
+    };
+    std::vector<Aside>                 mAsides;
+    bool                               mHeatShown = false;
+    void slideAsides(const ALTextDocument::Edit& edit, S32 made);
     // What the layout is told about a line's inlays.
     void provideInlays(S32 line, std::vector<ALTextLayout::Inlay>& out) const;
     F32  inlayWidth(const InlayHint& hint) const;

@@ -61,6 +61,11 @@ namespace
     const S32 FOLD_COLUMN = 12;
     const S32 FOLD_MARKER = 7;
     const S32 FOLD_BOX_GAP = 6;
+    // The gutter's strip of heat, at its edge beside the text, with a
+    // pixel of the gutter on either side; and how far after a line's end
+    // its note begins.
+    const S32 HEAT_COLUMN  = 5;
+    const S32 NOTE_GAP     = 16;
     const S32 COMPLETION_WIDTH   = 360;
     const S32 COMPLETION_ROWS    = 8;
     // The box beside a list: a completion's documentation, a fix's preview.
@@ -280,6 +285,7 @@ void ALCodeEditor::onEdit(const ALTextDocument::Edit& edit)
     mChanged.erase(mChanged.begin() + first, mChanged.begin() + last + 1);
     mChanged.insert(mChanged.begin() + first, made, 1);
     mChanged.resize(document().lineCount(), 0);
+    slideAsides(edit, made);
 
     // Decorations and highlights after the edit move along with the text;
     // the ones it cut into go.
@@ -439,7 +445,7 @@ const char* ALCodeEditor::paintName(Paint which)
 {
     static const char* const NAMES[] = {
         "ActiveLineNumberColor", "IndentGuideColor", "WhitespaceColor", "InlayHintColor", "InlayHintBgColor", "StickyHeaderColor", "WidgetColor",
-        "WidgetBorderColor", "WidgetSelectionColor", "ErrorColor", "WarningColor", "NoteColor", "RuntimeErrorColor", "SelectionInactiveColor",
+        "WidgetBorderColor", "WidgetSelectionColor", "ErrorColor", "WarningColor", "NoteColor", "RuntimeErrorColor", "SelectionInactiveColor", "HeatColor",
     };
     static_assert(sizeof(NAMES) / sizeof(NAMES[0]) == static_cast<size_t>(Paint::COUNT), "every paint has a name");
     const size_t index = static_cast<size_t>(which);
@@ -480,6 +486,7 @@ LLColor4 ALCodeEditor::paint(Paint which) const
         case Paint::Warning:           return mMarkColors[static_cast<size_t>(Mark::Warning)].get();
         case Paint::Note:              return mMarkColors[static_cast<size_t>(Mark::Note)].get();
         case Paint::RuntimeError:      return mMarkColors[static_cast<size_t>(Mark::Runtime)].get();
+        case Paint::Heat:              return paint(Paint::Warning);
         case Paint::SelectionInactive:
         {
             // Quieter than the selection the keys act on, as every modern
@@ -830,7 +837,12 @@ S32 ALCodeEditor::gutterWidth() const
     {
         width += FOLD_COLUMN;
     }
-    return width;
+    return width + heatWidth();
+}
+
+S32 ALCodeEditor::heatWidth() const
+{
+    return mHeatShown ? HEAT_COLUMN : 0;
 }
 
 void ALCodeEditor::goToLine(S32 line)
@@ -852,7 +864,9 @@ void ALCodeEditor::drawGutter(const LLRect& text, F32 alpha)
     const LLFontGL* font   = getFont();
     const S32       row_h  = layout().rowHeight();
     const S32       ascent = ll_round(font->getAscenderHeight());
-    const S32       numbers_right = gutter.mRight - (mShowFoldMarkers ? FOLD_COLUMN : 0) - GUTTER_PAD;
+    const S32       fold_right    = gutter.mRight - heatWidth();
+    const S32       numbers_right = fold_right - (mShowFoldMarkers ? FOLD_COLUMN : 0) - GUTTER_PAD;
+    const LLColor4  warm          = paint(Paint::Heat);
     const LLColor4  ink     = lineNumberColor() % alpha;
     const LLColor4  lit     = paint(Paint::ActiveLineNumber) % alpha;
     const LLColor4  fold    = foldColor() % alpha;
@@ -870,6 +884,15 @@ void ALCodeEditor::drawGutter(const LLRect& text, F32 alpha)
         if (lineChanged(line))
         {
             gl_rect_2d(gutter.mLeft, screen_top, gutter.mLeft + 2, screen_top - row_h, changed);
+        }
+        // Down every row of the line, a line that made something at least
+        // faintly and the warmest in the heat's own colour.
+        if (mHeatShown)
+        {
+            if (const F32 heat = heatAt(line); heat > 0.f)
+            {
+                gl_rect_2d(fold_right + 1, screen_top, gutter.mRight - 1, screen_top - row_h, warm % (alpha * (0.15f + 0.85f * llclamp(heat, 0.f, 1.f))));
+            }
         }
         if (shown && line >= shown->start && line <= shown->end)
         {
@@ -927,7 +950,7 @@ void ALCodeEditor::drawGutter(const LLRect& text, F32 alpha)
         // over the gutter, so that the gutter is quiet otherwise.
         if (mShowFoldMarkers && regionStartingAt(line) && (isFolded(line) || mGutterHover))
         {
-            const S32 cx = gutter.mRight - FOLD_COLUMN / 2;
+            const S32 cx = fold_right - FOLD_COLUMN / 2;
             const S32 cy = screen_top - row_h / 2;
             const S32 h  = FOLD_MARKER / 2;
             if (isFolded(line))
@@ -942,7 +965,7 @@ void ALCodeEditor::drawGutter(const LLRect& text, F32 alpha)
     });
     if (shown && guide_top != 0 && !isFolded(shown->start))
     {
-        const S32 cx = gutter.mRight - FOLD_COLUMN / 2;
+        const S32 cx = fold_right - FOLD_COLUMN / 2;
         gl_rect_2d(cx, guide_top - row_h + FOLD_MARKER / 2, cx + 1, guide_bottom, fold);
     }
     // The headers pinned over the text have their numbers pinned over
@@ -1229,6 +1252,104 @@ S32 ALCodeEditor::inlayAtLocal(S32 x, S32 y)
     return -1;
 }
 
+void ALCodeEditor::setHeatShown(bool shown)
+{
+    if (mHeatShown != shown)
+    {
+        mHeatShown = shown;
+        // The gutter is another width: the text moves over.
+        reshape(getRect().getWidth(), getRect().getHeight());
+    }
+}
+
+void ALCodeEditor::setLineHeat(const std::vector<LineHeat>& heat)
+{
+    for (Aside& aside : mAsides)
+    {
+        aside.heat = 0.f;
+        aside.heatTip.clear();
+    }
+    for (const LineHeat& one : heat)
+    {
+        if (one.line < 0 || one.line >= document().lineCount())
+        {
+            continue;
+        }
+        mAsides.resize(llmax(mAsides.size(), static_cast<size_t>(document().lineCount())));
+        mAsides[static_cast<size_t>(one.line)].heat    = one.heat;
+        mAsides[static_cast<size_t>(one.line)].heatTip = one.tip;
+    }
+}
+
+F32 ALCodeEditor::heatAt(S32 line) const
+{
+    return line >= 0 && line < static_cast<S32>(mAsides.size()) ? mAsides[static_cast<size_t>(line)].heat : 0.f;
+}
+
+void ALCodeEditor::setLineNotes(const std::vector<LineNote>& notes)
+{
+    for (Aside& aside : mAsides)
+    {
+        aside.note.clear();
+        aside.noteTip.clear();
+    }
+    for (const LineNote& one : notes)
+    {
+        if (one.line < 0 || one.line >= document().lineCount())
+        {
+            continue;
+        }
+        mAsides.resize(llmax(mAsides.size(), static_cast<size_t>(document().lineCount())));
+        mAsides[static_cast<size_t>(one.line)].note    = one.text;
+        mAsides[static_cast<size_t>(one.line)].noteTip = one.tip;
+    }
+}
+
+std::string ALCodeEditor::noteAt(S32 line) const
+{
+    return line >= 0 && line < static_cast<S32>(mAsides.size()) ? mAsides[static_cast<size_t>(line)].note : std::string();
+}
+
+S32 ALCodeEditor::noteAtLocal(S32 x, S32 y)
+{
+    const LLRect text = textRect();
+    if (mAsides.empty() || !text.pointInRect(x, y) || document().lineCount() == 0)
+    {
+        return -1;
+    }
+    const S32 line = posAtLocal(text.mLeft, y, false).line;
+    return noteBoxOf(line, text).pointInRect(x, y) ? line : -1;
+}
+
+void ALCodeEditor::slideAsides(const ALTextDocument::Edit& edit, S32 made)
+{
+    if (mAsides.empty())
+    {
+        return;
+    }
+    const ALTextRange range = edit.range.normalised();
+    const S32         first = llmax(0, range.begin.line);
+    const S32         last  = llmax(first, range.end.line);
+    mAsides.resize(llmax(mAsides.size(), static_cast<size_t>(last + 1)));
+    const Aside from_first = mAsides[static_cast<size_t>(first)];
+    const Aside from_last  = mAsides[static_cast<size_t>(last)];
+    mAsides.erase(mAsides.begin() + first, mAsides.begin() + last + 1);
+    mAsides.insert(mAsides.begin() + first, static_cast<size_t>(made), Aside());
+    // What is left of a line keeps its heat and its note: the line the
+    // edit begins inside -- typed in, or broken in two -- or, where the
+    // edit begins at a line's start, the line it ends in, pushed down by
+    // the lines made above it or pulled up over the lines taken.
+    if (range.begin.column > 0)
+    {
+        mAsides[static_cast<size_t>(first)] = from_first;
+    }
+    else
+    {
+        mAsides[static_cast<size_t>(first + made - 1)] = from_last;
+    }
+    mAsides.resize(static_cast<size_t>(llmax(document().lineCount(), 0)));
+}
+
 bool ALCodeEditor::writeInlay(S32 index)
 {
     if (index < 0 || index >= static_cast<S32>(mInlays.size()) || mInlays[index].insert.empty() || isReadOnly())
@@ -1359,6 +1480,27 @@ LLRect ALCodeEditor::foldBoxOf(S32 line, const LLRect& text)
     const S32                row_h = layout().rowHeight();
     const S32                x0    = static_cast<S32>(static_cast<F32>(text.mLeft) - scrollX() + last.xStart + last.width) + FOLD_BOX_GAP;
     const S32                w     = getFont()->getWidth(foldBoxText(line)) + 8;
+    return LLRect(x0, top - 1, x0 + w, top - row_h + 1);
+}
+
+LLRect ALCodeEditor::noteBoxOf(S32 line, const LLRect& text)
+{
+    if (line < 0 || line >= static_cast<S32>(mAsides.size()) || mAsides[static_cast<size_t>(line)].note.empty() || layout().rowCount(line) <= 0)
+    {
+        return LLRect();
+    }
+    const ALTextLayout::Line& laid = layout().line(line);
+    if (laid.rows.empty())
+    {
+        return LLRect();
+    }
+    const ALTextLayout::Row& last  = laid.rows.back();
+    const S32                row   = static_cast<S32>(laid.rows.size()) - 1;
+    const S32                top   = screenTopOf(text, line, row);
+    const S32                row_h = layout().rowHeight();
+    const LLRect             fold  = foldBoxOf(line, text);
+    const S32 x0 = fold.notEmpty() ? fold.mRight + NOTE_GAP : static_cast<S32>(static_cast<F32>(text.mLeft) - scrollX() + last.xStart + last.width) + NOTE_GAP;
+    const S32 w  = getFont()->getWidth(mAsides[static_cast<size_t>(line)].note);
     return LLRect(x0, top - 1, x0 + w, top - row_h + 1);
 }
 
@@ -1692,6 +1834,17 @@ void ALCodeEditor::drawRowExtras(S32 line, S32 row, const LLRect& text, S32 scre
             gl_rect_2d(box, ink, false);
             getFont()->renderUTF8(foldBoxText(line), 0, static_cast<F32>(box.mLeft + 4), static_cast<F32>(screen_top - llround(getFont()->getAscenderHeight())), ink, LLFontGL::LEFT, LLFontGL::BASELINE,
                                   LLFontGL::NORMAL, LLFontGL::NO_SHADOW);
+        }
+    }
+    // Its note, dim, after all of that; as much of it as is in view.
+    if (row + 1 == layout().rowCount(line) && line >= 0 && line < static_cast<S32>(mAsides.size()) && !mAsides[static_cast<size_t>(line)].note.empty())
+    {
+        const LLRect box = noteBoxOf(line, text);
+        if (box.notEmpty() && box.mLeft < text.mRight)
+        {
+            getFont()->renderUTF8(mAsides[static_cast<size_t>(line)].note, 0, static_cast<F32>(box.mLeft),
+                                  static_cast<F32>(screen_top - llround(getFont()->getAscenderHeight())), paint(Paint::InlayHint) % alpha, LLFontGL::LEFT,
+                                  LLFontGL::BASELINE, LLFontGL::NORMAL, LLFontGL::NO_SHADOW, S32_MAX, text.mRight - box.mLeft);
         }
     }
 }
@@ -4060,7 +4213,7 @@ bool ALCodeEditor::handleMouseDown(S32 x, S32 y, MASK mask)
             return true;
         }
     }
-    if (mShowFoldMarkers && x < gutter_right && x >= gutter_right - FOLD_COLUMN)
+    if (mShowFoldMarkers && x < gutter_right - heatWidth() && x >= gutter_right - heatWidth() - FOLD_COLUMN)
     {
         const S32 line = posAtLocal(text.mLeft, y, false).line;
         if (regionStartingAt(line))
@@ -4135,10 +4288,20 @@ bool ALCodeEditor::handleMouseDown(S32 x, S32 y, MASK mask)
 bool ALCodeEditor::handleToolTip(S32 x, S32 y, MASK mask)
 {
     const LLRect text = textRect();
-    // A mark in the gutter says what is on its line: every problem there.
+    // A mark in the gutter says what is on its line: every problem there;
+    // the strip of heat at its edge, what the line came to.
     if (x >= leftEdge() && x < leftEdge() + gutterWidth() && text.mBottom <= y && y <= text.mTop)
     {
-        const S32                line = posAtLocal(text.mLeft, y, false).line;
+        const S32 line = posAtLocal(text.mLeft, y, false).line;
+        if (mHeatShown && x >= leftEdge() + gutterWidth() - heatWidth())
+        {
+            if (line >= 0 && line < static_cast<S32>(mAsides.size()) && !mAsides[static_cast<size_t>(line)].heatTip.empty())
+            {
+                LLToolTipMgr::instance().show(mAsides[static_cast<size_t>(line)].heatTip);
+                return true;
+            }
+            return ALTextView::handleToolTip(x, y, mask);
+        }
         std::vector<CardProblem> problems;
         for (const Decoration& d : mDecorations)
         {
@@ -4158,6 +4321,12 @@ bool ALCodeEditor::handleToolTip(S32 x, S32 y, MASK mask)
     if (cardShown() && mCard->getRect().pointInRect(x, y))
     {
         // Resting on the card itself: it stays, and says nothing more.
+        return true;
+    }
+    // A note after a line: what it stands for, at more length.
+    if (const S32 line = noteAtLocal(x, y); line >= 0 && !mAsides[static_cast<size_t>(line)].noteTip.empty())
+    {
+        LLToolTipMgr::instance().show(mAsides[static_cast<size_t>(line)].noteTip);
         return true;
     }
     // A hint the text can say: what a double-click does with it.
