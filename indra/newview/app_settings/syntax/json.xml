@@ -8,17 +8,23 @@
   word (an identifier, looked up in `tables`, each a table and the kind a
   word found there is), span (an opening with an end, an escape, and
   multiline), span_regex with end_regex (where \1 stands for the opening's
-  first capture), regex (anchored where it is tried), or eol (the line's
-  end; unless_after names what, ending a line, carries the state on to the
+  first capture), regex (anchored where it is tried; not_after_chars, a
+  class the character before it may not be in, and consume, the group that
+  is the token, the rest of the match only read), or eol (the line's end;
+  unless_after names what, ending a line, carries the state on to the
   next). It names the kind it makes and where it goes: push, pop or next.
   What nothing matches is one character of the state's default kind.
+  Patterns are RE2's, which has no lookaround and no backreference:
+  not_after_chars, consume and an opener's unless stand in for them.
 
   words: the words the grammar itself puts in its tables; the language
   service adds the rest at runtime.
 
   indent: how the language indents. opens, a pattern found at the end
-  of the text before the caret, which sends a new line in a level, and
-  closes, one matched at the start of a line's text, which brings the
+  of the text before the caret, which sends a new line in a level -- or a
+  list of them, each a pattern or a map of one, regex, and unless, what
+  keeps it from opening a block if found anywhere from where it starts --
+  and closes, one matched at the start of a line's text, which brings the
   line out to the level of what opened it as it is typed.
   pairs: the brackets and quotes typed in pairs, each its opener and
   its closer, which the editor closes as the opener is typed.
@@ -59,7 +65,9 @@
       <array>
         <map>
           <key>regex</key>
-          <string>"(?:[^"\\]|\\.)*"(?=\s*:)</string>
+          <string>("(?:[^"\\]|\\.)*")\s*:</string>
+          <key>consume</key>
+          <integer>1</integer>
           <key>kind</key>
           <string>property</string>
         </map>

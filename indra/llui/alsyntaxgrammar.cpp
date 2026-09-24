@@ -26,15 +26,12 @@
 
 #include "alsyntaxgrammar.h"
 
+#include "alregex.h"
 #include "lldir.h"
 #include "llsdserialize.h"
 #include "llstring.h"
 
-#include <boost/regex.hpp>
-
 #include <bitset>
-#include <cstring>
-#include <stdexcept>
 
 // --- kinds -------------------------------------------------------------------
 
@@ -114,20 +111,6 @@ namespace
             }
         }
         return true;
-    }
-
-    std::string regexEscaped(std::string_view text)
-    {
-        std::string out;
-        for (char c : text)
-        {
-            if (std::strchr("\\^$.|?*+()[]{}", c))
-            {
-                out.push_back('\\');
-            }
-            out.push_back(c);
-        }
-        return out;
     }
 }
 
@@ -249,7 +232,28 @@ struct ALSyntaxGrammar::Impl
         // a word found there is.
         std::vector<std::pair<std::string, ALSyntaxKind>> tables;
         // Regex, and a span opened by one.
-        std::shared_ptr<boost::regex> regex;
+        ALRegex      regex;
+        // The bytes a match of the regex can begin with, from firstLo to
+        // firstHi, where that could be said: at a place with another byte
+        // the regex is not tried.
+        bool         firstKnown = false;
+        U8           firstLo    = 0;
+        U8           firstHi    = 0xFF;
+        // Regex: what may not come right before a match, and the group
+        // whose text the rule takes; the rest of the match is only read.
+        CharClass    notAfter;
+        bool         hasNotAfter = false;
+        S32          consume     = 0;
+
+        bool mayStartWith(unsigned char c) const { return !firstKnown || (c >= firstLo && c <= firstHi); }
+    };
+
+    // What opens a block, and what may not come after it on the line for
+    // it to.
+    struct Opener
+    {
+        ALRegex regex;
+        ALRegex unless;
     };
 
     struct State
@@ -267,8 +271,8 @@ struct ALSyntaxGrammar::Impl
     bool                     prose = false;
     // What opens a block, searched for at the end of the text before the
     // caret, and what closes one, matched at the start of a line's text.
-    std::shared_ptr<boost::regex> indentOpens;
-    std::shared_ptr<boost::regex> indentCloses;
+    std::vector<Opener>      indentOpens;
+    ALRegex                  indentCloses;
     std::vector<State>       states;
     // The words the grammar declares for its tables, ahead of whatever is
     // filled in at runtime.
@@ -279,36 +283,7 @@ struct ALSyntaxGrammar::Impl
     // The end regexes of spans, one per capture they were written with,
     // up to a number, then made afresh: a grammar is every view's, for
     // the whole session, and a capture may be any text at all.
-    mutable std::map<std::string, std::shared_ptr<boost::regex>> endRegexes;
-    // Whether a match that gave up has been said, which is once; and
-    // whether the last one tried did, which the lexer asks after each
-    // rule, since one that gave up has spent all the engine allows and
-    // would spend it again at every place on the line after.
-    mutable bool gaveUpSaid = false;
-    mutable bool gaveUp     = false;
-
-    // A regex tried where it stands, and taken for no match where the
-    // engine gives up -- the text is anyone's, and a pattern may take
-    // longer over it than the engine will go -- rather than throwing out
-    // of the lexer, which runs every frame.
-    template <typename It, typename Results>
-    bool search(It begin, It end, Results& found, const boost::regex& regex, boost::match_flag_type flags) const
-    {
-        try
-        {
-            return boost::regex_search(begin, end, found, regex, flags);
-        }
-        catch (const std::runtime_error& fault)
-        {
-            gaveUp = true;
-            if (!gaveUpSaid)
-            {
-                gaveUpSaid = true;
-                LL_WARNS("Syntax") << name << ": a pattern gave up on a line, taken as no match: " << fault.what() << LL_ENDL;
-            }
-            return false;
-        }
-    }
+    mutable std::map<std::string, ALRegex> endRegexes;
 
     S32 stateIndex(std::string_view name) const
     {
@@ -332,24 +307,51 @@ struct ALSyntaxGrammar::Impl
     };
 
     bool loadRule(const LLSD& in, const std::string& state_name, size_t index, std::vector<Target>& targets, std::string& error);
-    bool compileRegex(const std::string& pattern, std::shared_ptr<boost::regex>& out, std::string& error) const;
+    bool compileRegex(const std::string& pattern, ALRegex& out, std::string& error) const;
+    bool compileOpeners(const LLSD& opens, std::string& error);
     size_t tryRule(const Rule& rule, std::string_view line, size_t pos, const std::string& payload, const ALSyntaxWords& words,
                    ALSyntaxKind& kind, std::string& capture) const;
-    const boost::regex* endRegexFor(const Rule& rule, const std::string& payload) const;
+    const ALRegex* endRegexFor(const Rule& rule, const std::string& payload) const;
 };
 
-bool ALSyntaxGrammar::Impl::compileRegex(const std::string& pattern, std::shared_ptr<boost::regex>& out, std::string& error) const
+bool ALSyntaxGrammar::Impl::compileRegex(const std::string& pattern, ALRegex& out, std::string& error) const
 {
-    try
+    out = ALRegex(pattern);
+    if (!out.ok())
     {
-        out = std::make_shared<boost::regex>(pattern, boost::regex::perl | boost::regex::optimize);
-    }
-    catch (const boost::regex_error& e)
-    {
-        error = "regex '" + pattern + "': " + e.what();
+        error = "regex '" + pattern + "': " + out.error();
         return false;
     }
     return true;
+}
+
+bool ALSyntaxGrammar::Impl::compileOpeners(const LLSD& opens, std::string& error)
+{
+    // One pattern, or a list of them, each a pattern or a map of one and
+    // what may not follow it on the line.
+    const LLSD list = opens.isArray() ? opens : LLSD::emptyArray().with(0, opens);
+    for (LLSD::array_const_iterator it = list.beginArray(); it != list.endArray(); ++it)
+    {
+        Opener opener;
+        if (it->isMap())
+        {
+            if (!it->has("regex") || !compileRegex((*it)["regex"].asString(), opener.regex, error) ||
+                (it->has("unless") && !compileRegex((*it)["unless"].asString(), opener.unless, error)))
+            {
+                if (error.empty())
+                {
+                    error = "an opener is a pattern, or a map with a regex and what it is not followed by";
+                }
+                return false;
+            }
+        }
+        else if (!compileRegex(it->asString(), opener.regex, error))
+        {
+            return false;
+        }
+        indentOpens.push_back(std::move(opener));
+    }
+    return !indentOpens.empty();
 }
 
 bool ALSyntaxGrammar::Impl::loadRule(const LLSD& in, const std::string& state_name, size_t index,
@@ -378,6 +380,11 @@ bool ALSyntaxGrammar::Impl::loadRule(const LLSD& in, const std::string& state_na
         rule.kind = *kind;
     }
     rule.wholeWord = in["whole_word"].asBoolean();
+    if ((in.has("not_after_chars") || in.has("consume")) && !in.has("regex"))
+    {
+        error = where + "not_after_chars and consume are for a regex";
+        return false;
+    }
 
     // What it matches.
     S32 matchers = 0;
@@ -442,6 +449,29 @@ bool ALSyntaxGrammar::Impl::loadRule(const LLSD& in, const std::string& state_na
             error = where + error;
             return false;
         }
+        rule.firstKnown = rule.regex.firstByteRange(rule.firstLo, rule.firstHi);
+        // What RE2 has no lookaround for: the byte before, which may not be
+        // one of these, and what follows the token, which the regex matches
+        // and the rule does not take.
+        if (in.has("not_after_chars"))
+        {
+            std::string bad;
+            if (!parseCharClass(in["not_after_chars"].asStringRef(), rule.notAfter, bad))
+            {
+                error = where + bad;
+                return false;
+            }
+            rule.hasNotAfter = true;
+        }
+        if (in.has("consume"))
+        {
+            rule.consume = static_cast<S32>(in["consume"].asInteger());
+            if (rule.consume < 1 || rule.consume > rule.regex.groups())
+            {
+                error = where + "consume names a group of the regex";
+                return false;
+            }
+        }
     }
     if (in.has("eol"))
     {
@@ -464,7 +494,11 @@ bool ALSyntaxGrammar::Impl::loadRule(const LLSD& in, const std::string& state_na
             error = where + error;
             return false;
         }
-        if (rule.text.empty() && !rule.regex)
+        else
+        {
+            rule.firstKnown = rule.regex.firstByteRange(rule.firstLo, rule.firstHi);
+        }
+        if (rule.text.empty() && !rule.regex.ok())
         {
             error = where + "span is empty";
             return false;
@@ -542,12 +576,12 @@ bool ALSyntaxGrammar::Impl::loadRule(const LLSD& in, const std::string& state_na
     return true;
 }
 
-const boost::regex* ALSyntaxGrammar::Impl::endRegexFor(const Rule& rule, const std::string& payload) const
+const ALRegex* ALSyntaxGrammar::Impl::endRegexFor(const Rule& rule, const std::string& payload) const
 {
     std::string pattern = rule.text;
     for (size_t at = pattern.find("\\1"); at != std::string::npos; at = pattern.find("\\1", at))
     {
-        const std::string escaped = regexEscaped(payload);
+        const std::string escaped = ALRegex::escape(payload);
         pattern.replace(at, 2, escaped);
         at += escaped.size();
     }
@@ -558,15 +592,15 @@ const boost::regex* ALSyntaxGrammar::Impl::endRegexFor(const Rule& rule, const s
         {
             endRegexes.clear();
         }
-        std::shared_ptr<boost::regex> compiled;
-        std::string                   error;
+        ALRegex     compiled;
+        std::string error;
         if (!compileRegex(pattern, compiled, error))
         {
             LL_WARNS("Syntax") << name << ": " << error << LL_ENDL;
         }
         it = endRegexes.emplace(pattern, std::move(compiled)).first;
     }
-    return it->second.get();
+    return it->second.ok() ? &it->second : nullptr;
 }
 
 size_t ALSyntaxGrammar::Impl::tryRule(const Rule& rule, std::string_view line, size_t pos, const std::string& payload,
@@ -651,32 +685,43 @@ size_t ALSyntaxGrammar::Impl::tryRule(const Rule& rule, std::string_view line, s
         }
         case Rule::Match::Span:
         {
-            if (!rule.regex)
+            if (!rule.regex.ok())
             {
                 return line.compare(pos, rule.text.size(), rule.text) == 0 ? pos + rule.text.size() : npos;
             }
-            boost::cmatch found;
-            const char*   begin = line.data() + pos;
-            const char*   end   = line.data() + len;
-            const auto    flags = boost::match_continuous | (pos > 0 ? boost::match_prev_avail : boost::match_default);
-            if (!search(begin, end, found, *rule.regex, flags) || found.length(0) == 0)
+            // Anchored where the lexer is, with the line before it read.
+            ALRegexMatch found;
+            if (!rule.mayStartWith(static_cast<unsigned char>(line[pos])) || !rule.regex.search(line, &found, pos, true, 1) ||
+                found.length() == 0)
             {
                 return npos;
             }
-            capture = found.size() > 1 ? found.str(1) : std::string();
-            return pos + found.length(0);
+            capture = found.str(1);
+            return found.end();
         }
         case Rule::Match::Regex:
         {
-            boost::cmatch found;
-            const char*   begin = line.data() + pos;
-            const char*   end   = line.data() + len;
-            const auto    flags = boost::match_continuous | (pos > 0 ? boost::match_prev_avail : boost::match_default);
-            if (!search(begin, end, found, *rule.regex, flags) || found.length(0) == 0)
+            if (!rule.mayStartWith(static_cast<unsigned char>(line[pos])) ||
+                (rule.hasNotAfter && pos > 0 && rule.notAfter.matches(static_cast<unsigned char>(line[pos - 1]))))
             {
                 return npos;
             }
-            return pos + found.length(0);
+            // Only the group the rule takes is asked for: none, mostly,
+            // which the search answers quickest.
+            ALRegexMatch found;
+            if (!rule.regex.search(line, &found, pos, true, rule.consume) || found.length() == 0)
+            {
+                return npos;
+            }
+            if (rule.consume == 0)
+            {
+                return found.end();
+            }
+            if (found.begin(rule.consume) != pos || found.length(rule.consume) == 0)
+            {
+                return npos;
+            }
+            return found.end(rule.consume);
         }
         case Rule::Match::SpanEnd:
         {
@@ -684,20 +729,13 @@ size_t ALSyntaxGrammar::Impl::tryRule(const Rule& rule, std::string_view line, s
             {
                 return line.compare(pos, rule.text.size(), rule.text) == 0 ? pos + rule.text.size() : npos;
             }
-            const boost::regex* regex = endRegexFor(rule, payload);
-            if (!regex)
+            const ALRegex* regex = endRegexFor(rule, payload);
+            ALRegexMatch   found;
+            if (!regex || !regex->search(line, &found, pos, true, 0) || found.length() == 0)
             {
                 return npos;
             }
-            boost::cmatch found;
-            const char*   begin = line.data() + pos;
-            const char*   end   = line.data() + len;
-            const auto    flags = boost::match_continuous | (pos > 0 ? boost::match_prev_avail : boost::match_default);
-            if (!search(begin, end, found, *regex, flags) || found.length(0) == 0)
-            {
-                return npos;
-            }
-            return pos + found.length(0);
+            return found.end();
         }
         case Rule::Match::Eol:
             return npos;
@@ -743,7 +781,7 @@ bool ALSyntaxGrammar::load(const LLSD& description, std::string& error)
     {
         const LLSD& indent = description["indent"];
         if (!indent.isMap() || !indent.has("opens") || !indent.has("closes") ||
-            !impl->compileRegex(indent["opens"].asString(), impl->indentOpens, error) ||
+            !impl->compileOpeners(indent["opens"], error) ||
             !impl->compileRegex(indent["closes"].asString(), impl->indentCloses, error))
         {
             if (error.empty())
@@ -901,27 +939,39 @@ bool ALSyntaxGrammar::prose() const
 
 bool ALSyntaxGrammar::indents() const
 {
-    return mImpl->indentOpens && mImpl->indentCloses;
+    return !mImpl->indentOpens.empty() && mImpl->indentCloses.ok();
 }
 
 bool ALSyntaxGrammar::opensBlock(std::string_view before) const
 {
-    boost::match_results<std::string_view::const_iterator> found;
-    return mImpl->indentOpens && mImpl->search(before.begin(), before.end(), found, *mImpl->indentOpens, boost::match_default);
+    for (const Impl::Opener& opener : mImpl->indentOpens)
+    {
+        // Only a match with nothing it may not be followed by at or after
+        // where it starts: one past the last of those, where there are any.
+        size_t from = 0;
+        if (opener.unless.ok())
+        {
+            opener.unless.forEach(before, [&from](const ALRegexMatch& found) {
+                from = found.begin() + 1;
+                return true;
+            }, 0);
+        }
+        if (opener.regex.search(before, nullptr, from))
+        {
+            return true;
+        }
+    }
+    return false;
 }
 
 size_t ALSyntaxGrammar::closesBlock(std::string_view text) const
 {
-    if (!mImpl->indentCloses)
+    ALRegexMatch found;
+    if (!mImpl->indentCloses.search(text, &found, 0, true, 0))
     {
         return 0;
     }
-    boost::match_results<std::string_view::const_iterator> found;
-    if (!mImpl->search(text.begin(), text.end(), found, *mImpl->indentCloses, boost::match_continuous))
-    {
-        return 0;
-    }
-    return static_cast<size_t>(found.length(0));
+    return found.length();
 }
 
 size_t ALSyntaxGrammar::cachedEndPatterns() const
@@ -985,10 +1035,7 @@ void ALSyntaxGrammar::lexLine(std::string_view line, ALSyntaxState& state, std::
         }
     };
 
-    // The rules whose patterns gave up on this line, passed over for the
-    // rest of it.
-    std::vector<const Rule*> gave_up;
-    size_t                   pos = 0;
+    size_t pos = 0;
     while (pos < len)
     {
         const ALSyntaxState::Frame& frame = state.frames.back();
@@ -999,16 +1046,11 @@ void ALSyntaxGrammar::lexLine(std::string_view line, ALSyntaxState& state, std::
         std::string                 capture;
         for (const Rule& rule : current.rules)
         {
-            if (rule.match == Rule::Match::Eol || (!gave_up.empty() && std::find(gave_up.begin(), gave_up.end(), &rule) != gave_up.end()))
+            if (rule.match == Rule::Match::Eol)
             {
                 continue;
             }
-            mImpl->gaveUp = false;
-            end           = mImpl->tryRule(rule, line, pos, frame.payload, words, kind, capture);
-            if (mImpl->gaveUp)
-            {
-                gave_up.push_back(&rule);
-            }
+            end = mImpl->tryRule(rule, line, pos, frame.payload, words, kind, capture);
             if (end != std::string_view::npos)
             {
                 hit = &rule;

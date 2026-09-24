@@ -218,7 +218,7 @@ namespace tut
     template<> template<>
     void alsyntaxgrammars_object::test<8>()
     {
-        set_test_name("a pattern that gives up on a line is no match there, once; states nest so deep and no deeper; span ends are not kept without end");
+        set_test_name("a pattern a backtracking engine would take for ever over is only as long as its line; states nest so deep and no deeper; span ends are not kept without end");
         LLSD states;
         states["main"] = LLSD::emptyArray()
                              .with(0, LLSD().with("regex", "(a*)*b").with("kind", "keyword"))
@@ -233,8 +233,8 @@ namespace tut
         ensure("loads: " + error, grammar.load(description, error));
         ALSyntaxWords words;
 
-        // Nested repeats over a long line: the engine gives up, and the
-        // line lexes all the same, in its default kind.
+        // Nested repeats over a long line, which Boost.Regex gave up on:
+        // RE2 goes over the line once, and it lexes in its default kind.
         const std::string          long_line(4000, 'a');
         ALSyntaxState              state = grammar.initialState();
         std::vector<ALSyntaxToken> tokens;

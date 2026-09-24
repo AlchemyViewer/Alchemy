@@ -219,6 +219,24 @@ namespace tut
         bad = mini();
         bad["states"]["main"][3]["chars"] = "z-a";
         ensure("a class that runs downward", !grammar.load(bad, error));
+
+        // RE2 has no lookaround; not_after_chars and consume stand in.
+        bad = mini();
+        bad["states"]["main"] = rules({ LLSD().with("regex", "x(?=y)").with("kind", "keyword") });
+        ensure("lookahead", !grammar.load(bad, error));
+        ensure("said as a regex: " + error, error.find("x(?=y)") != std::string::npos);
+
+        bad = mini();
+        bad["states"]["main"] = rules({ LLSD().with("regex", "(x)y").with("consume", 2).with("kind", "keyword") });
+        ensure("consuming a group the regex has not", !grammar.load(bad, error));
+
+        bad = mini();
+        bad["states"]["main"] = rules({ LLSD().with("match", "x").with("not_after_chars", "a-z").with("kind", "keyword") });
+        ensure("not_after_chars on no regex", !grammar.load(bad, error));
+
+        LLSD good = mini();
+        good["states"]["main"] = rules({ LLSD().with("regex", "(x)y").with("consume", 1).with("not_after_chars", "a-z").with("kind", "keyword") });
+        ensure("both on a regex: " + error, grammar.load(good, error));
     }
 
     template<> template<>
