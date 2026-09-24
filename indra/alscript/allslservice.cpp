@@ -1062,9 +1062,11 @@ ALLSLService::~ALLSLService() = default;
 bool ALLSLService::loadBuiltins(const std::string& path, std::string& error)
 {
     AL_SCRIPT_ENGINE_HELD;
-    // Tailslide exits the process over a file it cannot open, so the file
-    // is opened here first. A line it cannot read it reports on stderr and
-    // skips, which the process survives.
+    // A file that is not there has nothing loaded, which is said here: the
+    // file is opened first. A line Tailslide cannot read -- a type it does
+    // not know, a constant it cannot parse, blanks -- it says so on stderr
+    // and skips, since the tailslide port's builtins-skip-unreadable.patch;
+    // before that it ended the process, over a file the grid sends.
     LLFILE* file = LLFile::fopen(path, LLFILE_MODE("rb"));
     if (!file)
     {

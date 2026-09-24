@@ -28,6 +28,11 @@
 
 #include "../test/lltut.h"
 
+#include "lluuid.h"
+
+#include <filesystem>
+#include <fstream>
+
 namespace tut
 {
     struct allslservice_data
@@ -590,5 +595,37 @@ namespace tut
         p = first_error("default\n{\n    state_entry()\n    {\n        llSay(0, \"x\") y;\n    }\n}\n");
         ensure("not a parameter: " + p.message, p.key != "LSLParameterUntyped");
         ensure("said plainly: " + p.message, p.message.find("Unexpected a") == std::string::npos && p.message.find("syntax error") == std::string::npos);
+    }
+    template<> template<>
+    void allslservice_object::test<17>()
+    {
+        set_test_name("a definitions file with lines the engine cannot read loads the rest, and the process goes on");
+        // What a grid newer than this viewer may send: a type the engine does
+        // not know, a constant it cannot read, blank lines of CR LF and of
+        // blanks -- each of which ended the process before.
+        const std::string path = (std::filesystem::temp_directory_path() / ("al_builtins_" + LLUUID::generateNewID().asString() + ".txt")).string();
+        {
+            std::ofstream out(path, std::ios::binary);
+            out << "// the grid's definitions, as a newer grid might send them\n"
+                   "integer llAlchemyProbe(integer a)\n"
+                   "\r\n"
+                   "   \n"
+                   "const uuid ALCHEMY_UUID = \"00000000-0000-0000-0000-000000000000\"\n"
+                   "uuid llAlchemyBadReturn()\n"
+                   "integer llAlchemyBadParam(uuid a)\n"
+                   "const integer ALCHEMY_BAD = abc\n"
+                   "integer llAlchemyAfter(string s)\n";
+        }
+        std::string   why;
+        const bool    read = service.loadBuiltins(path, why);
+        std::error_code gone;
+        std::filesystem::remove(path, gone);
+        ensure("loaded: " + why, read);
+        const std::string head = "default\n{\n    state_entry()\n    {\n";
+        const std::string tail = "    }\n}\n";
+        const ALScriptProblems kept = service.check(head + "        llOwnerSay((string)(llAlchemyProbe(1) + llAlchemyAfter(\"x\")));\n" + tail, true);
+        ensure_equals("the lines it could read are known: " + said(kept), errors(kept), size_t(0));
+        const ALScriptProblems left = service.check(head + "        llAlchemyBadReturn();\n" + tail, true);
+        ensure("a line it could not read is not: " + said(left), errors(left) > 0);
     }
 }
