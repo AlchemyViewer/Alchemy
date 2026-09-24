@@ -296,6 +296,23 @@ void ALQuickOpen::setQuery(const std::string& query)
     mQueryChanged(mQuery);
 }
 
+void ALQuickOpen::setPrefix(const std::string& prefix)
+{
+    mPrefix = prefix;
+    fill();
+}
+
+std::string_view ALQuickOpen::matched() const
+{
+    std::string_view query(mQuery);
+    if (!mPrefix.empty() && query.compare(0, mPrefix.size(), mPrefix) == 0)
+    {
+        query.remove_prefix(mPrefix.size());
+        query.remove_prefix(std::min(query.size(), query.find_first_not_of(' ')));
+    }
+    return query;
+}
+
 void ALQuickOpen::setHint(const std::string& hint)
 {
     mFreeform = true;
@@ -321,18 +338,19 @@ void ALQuickOpen::fill()
         // the list, which is a box of its own width under the field's.
         return;
     }
-    mRanked = rank(mCandidates, mQuery);
+    const std::string_view asked = matched();
+    mRanked                      = rank(mCandidates, asked);
     // As many as were asked for while something is typed: the answer
     // meant is at the top, and a list of seven hundred rows made again on
     // every letter typed is what the ranking exists to spare. With nothing
     // typed the list is being browsed, and all of it is there to scroll.
-    if (mRows > 0 && !mQuery.empty() && mRanked.size() > (size_t)mRows)
+    if (mRows > 0 && !asked.empty() && mRanked.size() > (size_t)mRows)
     {
         mRanked.resize((size_t)mRows);
     }
     mList->deleteAllItems();
     // Nothing to choose says so, rather than being an empty box.
-    mList->setCommentText(mRanked.empty() && !mQuery.empty() ? alSaid("QuickOpenNone", "Nothing matches") : LLStringUtil::null);
+    mList->setCommentText(mRanked.empty() && !asked.empty() ? alSaid("QuickOpenNone", "Nothing matches") : LLStringUtil::null);
     for (size_t at : mRanked)
     {
         LLSD row;

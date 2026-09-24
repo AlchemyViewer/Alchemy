@@ -734,14 +734,25 @@ bool ALTabStrip::handleMouseUp(S32 x, S32 y, MASK mask)
     if (hasMouseCapture())
     {
         // Likewise: letting go forgets the drag, and a drag forgotten
-        // before it was told left the host's tabs in the old order.
-        const bool dragged = mDrag.dragging();
-        mPressed           = -1;
+        // before it was told left the host's tabs in the old order. A tab
+        // let go of off the strip is torn out, which is said after the
+        // order it was dragged into on the way.
+        const bool        dragged = mDrag.dragging();
+        const bool        torn    = mTearing && mPressed >= 0 && mPressed < (S32)mTabs.size();
+        const std::string value   = torn ? mTabs[(size_t)mPressed].value : std::string();
+        mPressed                  = -1;
+        mTearing                  = false;
         mDrag.release();
         gFocusMgr.setMouseCapture(nullptr);
         if (dragged)
         {
             sayOrder();
+        }
+        if (torn)
+        {
+            S32 screen_x = 0, screen_y = 0;
+            localPointToScreen(x, y, &screen_x, &screen_y);
+            mTornSignal(value, screen_x, screen_y);
         }
         return true;
     }
@@ -755,6 +766,7 @@ void ALTabStrip::onMouseCaptureLost()
 {
     const bool dragged = mDrag.dragging();
     mPressed      = -1;
+    mTearing      = false;
     mDrag.cancel();
     mPressedClose = -1;
     if (dragged)
@@ -838,6 +850,22 @@ bool ALTabStrip::handleHover(S32 x, S32 y, MASK mask)
     }
     if (mPressed >= 0 && hasMouseCapture())
     {
+        // Pulled well off the strip, any way, the tab is being torn out: it
+        // stops finding its place along the strip, and the cursor says it
+        // is carried. Brought back, it goes on finding it.
+        const LLRect local = getLocalRect();
+        mTearing           = y < local.mBottom - TEAR || y > local.mTop + TEAR || x < local.mLeft - TEAR || x > local.mRight + TEAR;
+        if (mTearing)
+        {
+            if (LLWindow* window = getWindow())
+            {
+                window->setCursor(UI_CURSOR_ARROWDRAG);
+            }
+            mHover  = mPressed;
+            mHoverX = x;
+            mHoverY = y;
+            return true;
+        }
         // A press that has travelled along the strip is a drag: the tab
         // moves past a neighbour once the mouse is past that neighbour's
         // middle.

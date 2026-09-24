@@ -183,6 +183,7 @@ namespace ALScriptKeymap
             { "move_tab_right", KEY_PAGE_DOWN, MASK_CONTROL | MASK_SHIFT },
             { "focus_tabs", KEY_NONE, MASK_NONE },
             { "command_palette", 'P', MASK_CONTROL | MASK_SHIFT },
+            { "quick_open", 'P', MASK_CONTROL },
             { "explorer", '0', MASK_CONTROL | MASK_ALT },
             { "problems", '1', MASK_CONTROL | MASK_ALT },
             { "references", '2', MASK_CONTROL | MASK_ALT },

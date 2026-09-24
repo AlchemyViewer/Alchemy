@@ -85,6 +85,13 @@ public:
     void setQuery(const std::string& query);
     const std::string& query() const { return mQuery; }
 
+    // What a query begins with to say which list it is asked of -- the
+    // `>` before a command, as in Visual Studio Code -- and so is not
+    // matched against the candidates: taken off, with the blanks after it,
+    // before ranking, where the query begins with it. Who asked changes the
+    // candidates as the query comes to begin with it or no longer does.
+    void setPrefix(const std::string& prefix);
+
     // Freeform from here on: the candidates are put aside, the one row
     // says this, and return sends what was typed. Say it again as the
     // query changes, since what return will do has changed with it.
@@ -157,6 +164,9 @@ private:
     std::vector<size_t>     mRanked;
     std::string             mQuery;
     std::string             mPlaceholder;
+    std::string             mPrefix;
+    // The query as it is matched: less the prefix it begins with.
+    std::string_view        matched() const;
     S32                     mRows;
     bool                    mFreeform = false;
     std::string             mHint;

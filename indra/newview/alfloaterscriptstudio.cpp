@@ -361,6 +361,10 @@ namespace
 {
     // The studio window the keyboard was last in.
     LLHandle<LLFloater> sLastWorkedIn;
+    // Where a window made by tearing a tab off is put against the point it
+    // was let go of: its tabs under the mouse, a little in from its left.
+    constexpr S32 TORN_OFFSET_X = 60;
+    constexpr S32 TORN_OFFSET_Y = 30;
 }
 
 // static
@@ -700,6 +704,7 @@ bool ALFloaterScriptStudio::postBuild()
     mTabs->onClosed(boost::bind(&ALFloaterScriptStudio::closeDocument, this, _1));
     mTabs->onMenu(boost::bind(&ALFloaterScriptStudio::showTabMenu, this, _1, _2, _3));
     mTabs->onReordered(boost::bind(&ALFloaterScriptStudio::onTabsReordered, this, _1));
+    mTabs->onTorn([this](const std::string& id, S32 x, S32 y) { onTabTorn(id, x, y); });
     mTabs->onListAsked([this]() { showAllTabs(); });
     // A preview double-clicked is held.
     mTabs->onHeld([this](const std::string& id) {
@@ -9239,15 +9244,20 @@ void ALFloaterScriptStudio::goToLine()
 
 void ALFloaterScriptStudio::showCommandPalette()
 {
-    LLMenuBarGL* bar = menuBar();
+    showQuickOpen(true);
+}
+
+std::vector<ALQuickOpen::Candidate> ALFloaterScriptStudio::paletteCommands()
+{
+    std::vector<ALQuickOpen::Candidate> candidates;
+    LLMenuBarGL*                        bar = menuBar();
     if (!bar)
     {
-        return;
+        return candidates;
     }
     // Every command the menus hold that could be given now, by the path
     // of menus it is under, with its keys beside it: the menus searched
     // by name rather than walked.
-    std::vector<ALQuickOpen::Candidate> candidates;
     std::function<void(LLView*, const std::string&)> collect = [&](LLView* menu, const std::string& path) {
         for (LLView* child : *menu->getChildList())
         {
@@ -9260,7 +9270,8 @@ void ALFloaterScriptStudio::showCommandPalette()
                 continue;
             }
             LLMenuItemGL* item = dynamic_cast<LLMenuItemGL*>(child);
-            if (!item || dynamic_cast<LLMenuItemSeparatorGL*>(item) || item->getLabel().empty() || item->getName() == "command_palette")
+            if (!item || dynamic_cast<LLMenuItemSeparatorGL*>(item) || item->getLabel().empty() || item->getName() == "command_palette" ||
+                item->getName() == "quick_open")
             {
                 continue;
             }
@@ -9273,7 +9284,7 @@ void ALFloaterScriptStudio::showCommandPalette()
             ALQuickOpen::Candidate one;
             one.label  = path + item->getLabel();
             one.detail = item->getAcceleratorString();
-            one.value  = item->getName();
+            one.value  = "cmd:" + item->getName();
             // A toggle says which way it is set, before its keys: the menu
             // shows a mark, and a row here has none.
             if (dynamic_cast<LLMenuItemCheckGL*>(item))
@@ -9285,20 +9296,184 @@ void ALFloaterScriptStudio::showCommandPalette()
         }
     };
     collect(bar, std::string());
-    const LLHandle<LLFloater> handle = getHandle();
-    quickOpen(std::move(candidates), getString("CommandsPlaceholder"), getString("CommandsTitle"), [handle](const std::string& value) {
-        ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get());
-        LLMenuBarGL*           bar    = studio ? studio->menuBar() : nullptr;
-        if (LLMenuItemGL* item = bar ? bar->findChild<LLMenuItemGL>(value, true) : nullptr)
+    return candidates;
+}
+
+std::vector<ALQuickOpen::Candidate> ALFloaterScriptStudio::paletteScripts(std::vector<GoTo>& targets)
+{
+    std::vector<ALQuickOpen::Candidate> candidates;
+    std::set<std::string>               listed;
+    const auto add = [&](GoTo target, const std::string& label, const std::string& detail) {
+        ALQuickOpen::Candidate one;
+        one.label  = label;
+        one.detail = detail;
+        one.value  = "go:" + std::to_string(targets.size());
+        candidates.push_back(std::move(one));
+        targets.push_back(std::move(target));
+    };
+    // Every tab open, this window's first, another window's said by its
+    // title.
+    std::vector<ALFloaterScriptStudio*> windows = { this };
+    for (LLFloater* floater : LLFloaterReg::getFloaterList("script_studio"))
+    {
+        ALFloaterScriptStudio* other = ALViewType::as<ALFloaterScriptStudio>(floater);
+        if (other && other != this && other->getVisible())
         {
-            if (Doc* doc = studio->active())
+            windows.push_back(other);
+        }
+    }
+    for (ALFloaterScriptStudio* window : windows)
+    {
+        for (const std::unique_ptr<Doc>& each : window->mDocs)
+        {
+            const Doc&        doc   = *each;
+            const std::string where = !doc.file.empty()         ? doc.file
+                                      : doc.notecard            ? getString("TabNotecardTip")
+                                      : doc.ref.inInventory()   ? getString("TabInventoryTip")
+                                      : !doc.objectName.empty() ? doc.objectName
+                                                                : getString("TabObjectTip");
+            GoTo target;
+            target.kind   = GoTo::Kind::Tab;
+            target.window = window->getHandle();
+            target.id     = doc.id;
+            add(std::move(target), doc.name, window == this ? where : window->getTitle() + "  \xC2\xB7  " + where);
+            listed.insert(doc.file.empty() ? doc.ref.id() : "disk:" + doc.file);
+        }
+    }
+    // The scripts and notecards of the objects the explorer shows, open or
+    // not yet.
+    for (const ExplorerObject& object : mExplorerModel)
+    {
+        for (const ExplorerPrim& prim : object.prims)
+        {
+            for (const ALScriptWorkspace::Item& item : prim.items)
             {
-                // The command is about the view the palette came up over.
-                focusShown(*doc);
+                const ALScriptRef ref(prim.id, item.id);
+                if (!listed.insert(ref.id()).second)
+                {
+                    continue;
+                }
+                GoTo target;
+                target.kind = GoTo::Kind::Script;
+                target.ref  = ref;
+                target.name = item.name;
+                add(std::move(target), item.name, prim.name.empty() || prim.name == object.name ? object.name : object.name + " \xE2\x80\xBA " + prim.name);
             }
-            item->onCommit();
+        }
+    }
+    // Then what was opened lately and is not open now.
+    for (const Recent& recent : mRecentScripts)
+    {
+        if (!listed.insert(recent.ref.id()).second)
+        {
+            continue;
+        }
+        GoTo target;
+        target.kind = GoTo::Kind::Script;
+        target.ref  = recent.ref;
+        target.name = recent.name;
+        add(std::move(target), recent.name, getString("QuickOpenRecent"));
+    }
+    for (const std::string& path : mRecentFiles)
+    {
+        if (!listed.insert("disk:" + path).second)
+        {
+            continue;
+        }
+        GoTo target;
+        target.kind = GoTo::Kind::File;
+        target.path = path;
+        add(std::move(target), gDirUtilp->getBaseFileName(path), path);
+    }
+    return candidates;
+}
+
+void ALFloaterScriptStudio::showQuickOpen(bool commands)
+{
+    auto                                targets        = std::make_shared<std::vector<GoTo>>();
+    std::vector<ALQuickOpen::Candidate> command_list   = paletteCommands();
+    std::vector<ALQuickOpen::Candidate> script_list    = paletteScripts(*targets);
+    const LLHandle<LLFloater>           handle         = getHandle();
+    ALQuickOpen*                        quick          = quickOpen(commands ? command_list : script_list, getString("QuickOpenPlaceholder"),
+                                                                   getString("QuickOpenTitle"), [handle, targets](const std::string& value) {
+        ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get());
+        if (!studio)
+        {
+            return;
+        }
+        if (value.compare(0, 4, "cmd:") == 0)
+        {
+            LLMenuBarGL* bar = studio->menuBar();
+            if (LLMenuItemGL* item = bar ? bar->findChild<LLMenuItemGL>(value.substr(4), true) : nullptr)
+            {
+                if (Doc* doc = studio->active())
+                {
+                    // The command is about the view the palette came up over.
+                    studio->focusShown(*doc);
+                }
+                item->onCommit();
+            }
+            return;
+        }
+        if (value.compare(0, 3, "go:") != 0)
+        {
+            return;
+        }
+        const size_t at = static_cast<size_t>(std::atoi(value.c_str() + 3));
+        if (at >= targets->size())
+        {
+            return;
+        }
+        const GoTo& to = (*targets)[at];
+        switch (to.kind)
+        {
+            case GoTo::Kind::Tab:
+                if (ALFloaterScriptStudio* window = ALViewType::as<ALFloaterScriptStudio>(to.window.get()))
+                {
+                    const size_t index = window->indexOf(to.id);
+                    if (index != NONE)
+                    {
+                        window->openFloater(window->getKey());
+                        window->setFocus(true);
+                        window->activate(index, true);
+                    }
+                }
+                break;
+            case GoTo::Kind::Script:
+                studio->openScript(to.ref, to.name);
+                break;
+            case GoTo::Kind::File:
+                studio->openFile(to.path, false);
+                break;
         }
     }, mEditorHost);
+    if (!quick)
+    {
+        return;
+    }
+    // A `>` typed at the start asks for the commands, and taking it away for
+    // the scripts again, as in Visual Studio Code.
+    quick->setPrefix(">");
+    auto shown           = std::make_shared<bool>(commands);
+    mQuickModeConnection = quick->onQueryChanged(
+        [quick, shown, command_list = std::move(command_list), script_list = std::move(script_list)](const std::string& typed) {
+            const bool now = !typed.empty() && typed.front() == '>';
+            if (now != *shown)
+            {
+                *shown = now;
+                quick->setCandidates(now ? command_list : script_list);
+            }
+        });
+    // Asked for one way while it is up the other: the `>` put in, or taken
+    // out, with the list to match.
+    if (commands)
+    {
+        quick->setQuery(">");
+    }
+    else if (!quick->query().empty() && quick->query().front() == '>')
+    {
+        quick->setQuery(std::string());
+    }
 }
 
 void ALFloaterScriptStudio::showAllTabs()
@@ -11285,7 +11460,7 @@ void ALFloaterScriptStudio::continueClosing()
     }
 }
 
-void ALFloaterScriptStudio::popOut()
+void ALFloaterScriptStudio::popOut(std::optional<LLCoordGL> screen)
 {
     Doc* doc = active();
     if (!doc || !doc->loaded || !movable(*doc))
@@ -11309,7 +11484,17 @@ void ALFloaterScriptStudio::popOut()
     }
     window->openFloater(window->getKey());
     LLRect rect = getRect();
-    rect.translate(40, -40);
+    if (screen)
+    {
+        // Its tabs under the mouse, as the tab was carried there.
+        S32 x = 0, y = 0;
+        gFloaterView->screenPointToLocal(screen->mX, screen->mY, &x, &y);
+        rect.setLeftTopAndSize(x - TORN_OFFSET_X, y + TORN_OFFSET_Y, rect.getWidth(), rect.getHeight());
+    }
+    else
+    {
+        rect.translate(40, -40);
+    }
     window->setShape(rect);
     gFloaterView->adjustToFitScreen(window, false);
     if (!moveActiveTo(window))
@@ -11318,6 +11503,48 @@ void ALFloaterScriptStudio::popOut()
         // stays here, and the empty window goes.
         window->closeFloater();
     }
+}
+
+void ALFloaterScriptStudio::onTabTorn(const std::string& id, S32 screen_x, S32 screen_y)
+{
+    const size_t index = indexOf(id);
+    if (index == NONE)
+    {
+        return;
+    }
+    if (index != mActive)
+    {
+        activate(index);
+    }
+    // Dropped on another studio window: moved into it, as the tab menu
+    // would move it.
+    for (LLFloater* floater : LLFloaterReg::getFloaterList("script_studio"))
+    {
+        ALFloaterScriptStudio* other = ALViewType::as<ALFloaterScriptStudio>(floater);
+        if (other && other != this && other->getVisible() && !other->isMinimized() && other->calcScreenRect().pointInRect(screen_x, screen_y))
+        {
+            moveActiveTo(other);
+            return;
+        }
+    }
+    // Back over its own window, where it came from: nothing.
+    if (calcScreenRect().pointInRect(screen_x, screen_y))
+    {
+        return;
+    }
+    // The only tab: this window taken there, rather than a second one made
+    // and this left holding nothing.
+    if (mDocs.size() == 1)
+    {
+        S32 x = 0, y = 0;
+        gFloaterView->screenPointToLocal(screen_x, screen_y, &x, &y);
+        LLRect rect = getRect();
+        rect.setLeftTopAndSize(x - TORN_OFFSET_X, y + TORN_OFFSET_Y, rect.getWidth(), rect.getHeight());
+        setShape(rect);
+        gFloaterView->adjustToFitScreen(this, false);
+        return;
+    }
+    popOut(LLCoordGL(screen_x, screen_y));
 }
 
 bool ALFloaterScriptStudio::movable(const Doc& doc)
@@ -14935,6 +15162,10 @@ void ALFloaterScriptStudio::onMenuAction(const LLSD& param)
     else if (doc && action == "go_to_line")
     {
         goToLine();
+    }
+    else if (action == "quick_open")
+    {
+        showQuickOpen(false);
     }
     else if (doc && action == "go_to_symbol")
     {

@@ -185,8 +185,9 @@
     <floater.string name="CrumbTip">Go to [NAME]; its arrow lists what is beside it</floater.string>
     <floater.string name="GoToSymbolTitle">Go to Symbol</floater.string>
     <floater.string name="AllTabsTitle">Open Tabs</floater.string>
-    <floater.string name="CommandsTitle">Commands</floater.string>
-    <floater.string name="CommandsPlaceholder">A command by name: format, fold, vim, preprocess...</floater.string>
+    <floater.string name="QuickOpenTitle">Go to</floater.string>
+    <floater.string name="QuickOpenPlaceholder">A script by name, or &gt; and a command: format, fold, vim, preprocess...</floater.string>
+    <floater.string name="QuickOpenRecent">Opened lately</floater.string>
     <floater.string name="AllTabsPlaceholder">A script or a notecard by name</floater.string>
     <floater.string name="TabUnsaved">unsaved</floater.string>
     <floater.string name="GoToSymbolPlaceholder">Type a symbol's name</floater.string>
@@ -672,6 +673,9 @@
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="forward" />
             </menu_item_call>
             <menu_item_separator layout="topleft" />
+            <menu_item_call label="Go to Script..." layout="topleft" name="quick_open" shortcut="control|P">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="quick_open" />
+            </menu_item_call>
             <menu_item_call label="Go to Line..." layout="topleft" name="go_to_line" shortcut="control|G">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="go_to_line" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="go_to_line" />

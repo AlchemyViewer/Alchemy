@@ -595,4 +595,49 @@ namespace tut
         gFocusMgr.setKeyboardFocus(nullptr);
         strip->die();
     }
+
+    // A tab pulled well off the strip and let go of is torn out: said by
+    // its value and where on the screen, and the order left as it was; let
+    // go of on the strip, it is not.
+    template<> template<>
+    void altabstrip_object::test<12>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        ALTabStrip* strip = make();
+        strip->setTabs(three(), "a");
+        std::vector<std::string>              torn;
+        std::vector<std::pair<S32, S32>>      where;
+        std::vector<std::vector<std::string>> orders;
+        strip->onTorn([&](const std::string& value, S32 x, S32 y) {
+            torn.push_back(value);
+            where.emplace_back(x, y);
+        });
+        strip->onReordered([&](const std::vector<std::string>& order) { orders.push_back(order); });
+        const LLRect second = strip->rectOf(1);
+        strip->handleMouseDown(second.getCenterX(), second.getCenterY(), MASK_NONE);
+        strip->handleHover(second.getCenterX(), second.getCenterY() - 10, MASK_NONE);
+        ensure("a little off the strip is still along it", !strip->tearing());
+        strip->handleHover(second.getCenterX() + 5, -120, MASK_NONE);
+        ensure("well off it, torn", strip->tearing());
+        strip->handleMouseUp(second.getCenterX() + 5, -120, MASK_NONE);
+        ensure_equals("said once", torn.size(), size_t(1));
+        ensure_equals("which", torn.front(), std::string("b"));
+        S32 screen_x = 0, screen_y = 0;
+        strip->localPointToScreen(second.getCenterX() + 5, -120, &screen_x, &screen_y);
+        ensure("where, on the screen", where.front() == std::make_pair(screen_x, screen_y));
+        ensure("no longer tearing", !strip->tearing());
+        ensure("and the order as it was", orders.empty() || orders.back() == std::vector<std::string>({ "a", "b", "c" }));
+
+        // Pulled off and brought back: moved along the strip, not torn.
+        strip->handleMouseDown(second.getCenterX(), second.getCenterY(), MASK_NONE);
+        strip->handleHover(second.getCenterX(), -120, MASK_NONE);
+        strip->handleHover(strip->rectOf(2).getCenterX() + 10, second.getCenterY(), MASK_NONE);
+        ensure("back on the strip", !strip->tearing());
+        strip->handleMouseUp(strip->rectOf(2).getCenterX() + 10, second.getCenterY(), MASK_NONE);
+        ensure_equals("not torn", torn.size(), size_t(1));
+        ensure("moved along instead", !orders.empty() && orders.back() == std::vector<std::string>({ "a", "c", "b" }));
+    }
 }

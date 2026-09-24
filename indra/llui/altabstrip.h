@@ -155,6 +155,17 @@ public:
     {
         return mMenuSignal.connect(cb);
     }
+    // A tab dragged well off the strip and let go of there, as a tab is
+    // torn out of a modern editor's window: by its value and where on the
+    // screen it was let go of, for the caller to move it to a window of its
+    // own, or into the window it was dropped on. The strip moves nothing.
+    typedef boost::signals2::signal<void(const std::string&, S32, S32)> torn_signal_t;
+    boost::signals2::connection onTorn(const torn_signal_t::slot_type& cb)
+    {
+        return mTornSignal.connect(cb);
+    }
+    // Whether the tab being dragged is off the strip, being torn out.
+    bool tearing() const { return mTearing; }
     // The list button pressed, while the tabs run past the strip, or the
     // down arrow: for the caller to offer every tab to choose from.
     typedef boost::signals2::signal<void()> list_signal_t;
@@ -237,6 +248,7 @@ private:
     tab_menu_signal_t   mMenuSignal;
     order_signal_t      mReorderedSignal;
     list_signal_t       mListSignal;
+    torn_signal_t       mTornSignal;
     // How far along the tabs the strip is scrolled, in pixels; a wheel's
     // fractions kept until they make a pixel.
     S32                 mScroll = 0;
@@ -254,4 +266,8 @@ private:
     // along the strip.
     S32                 mPressed  = -1;
     ALDragGesture       mDrag{ 4, ALDragGesture::Zone::Across };
+    // The pressed tab pulled this far off the strip, any way, is being torn
+    // out rather than moved along it.
+    static constexpr S32 TEAR = 24;
+    bool                mTearing  = false;
 };

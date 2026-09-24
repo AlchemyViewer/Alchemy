@@ -350,4 +350,38 @@ namespace tut
         ensure_equals("both are offered", order.size(), size_t(2));
         ensure_equals("the run first", order.front(), size_t(1));
     }
+
+    // A prefix says which list is asked of and is not matched: `>sav`
+    // finds what `sav` would, `>` alone lists everything, and a query
+    // without it is matched whole.
+    template<> template<>
+    void alquickopen_object::test<11>()
+    {
+        ll_test::HeadlessUI& ui = ll_test::HeadlessUI::get();
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        ALQuickOpen::Params p(LLUICtrlFactory::getDefaultParams<ALQuickOpen>());
+        p.name = "quick";
+        p.rect = LLRect(100, 400, 400, 200);
+        ALQuickOpen* quick = LLUICtrlFactory::create<ALQuickOpen>(p);
+        gFloaterView->addChild(quick);
+        quick->setCandidates(files());
+        quick->setPrefix(">");
+        LLScrollListCtrl* list = quick->findChild<LLScrollListCtrl>("matches");
+        ensure("the list", list != nullptr);
+        const auto first = [list]() { return list->getFirstData() ? list->getFirstData()->getValue().asString() : std::string(); };
+        quick->setQuery(">people");
+        ensure_equals("matched without it", first(), std::string("panel_people.xml"));
+        quick->setQuery("> people");
+        ensure_equals("nor the blanks after it", first(), std::string("panel_people.xml"));
+        quick->setQuery(">");
+        ensure_equals("alone, everything to browse", list->getItemCount(), S32(files().size()));
+        quick->setQuery("people");
+        ensure_equals("without it, the query whole", first(), std::string("panel_people.xml"));
+        quick->setQuery(">>people");
+        ensure("with it twice, the second is matched", list->getItemCount() == 0 || first() != "panel_people.xml");
+        quick->die();
+    }
 }

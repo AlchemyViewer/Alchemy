@@ -151,7 +151,9 @@ public:
     // The active script moved to a window of its own, its unsaved text
     // going with it; or to another studio window already open. False where
     // it could not go.
-    void popOut();
+    // At a point of the screen where one is given -- where a tab torn off
+    // the strip was let go of -- else beside this window.
+    void popOut(std::optional<LLCoordGL> screen = std::nullopt);
     bool moveActiveTo(ALFloaterScriptStudio* window);
     // The next script closed on the way to closing the window, or the
     // window closed once none is left.
@@ -747,6 +749,10 @@ private:
     Doc* docOf(const ALTextView& view);
     // The tab pressed with the right button: a menu about it.
     void   showTabMenu(const std::string& value, S32 x, S32 y);
+    // A tab torn off the strip and let go of at a point of the screen: into
+    // the studio window it was dropped on, else a window of its own there --
+    // or this one moved there, where it was the only tab.
+    void onTabTorn(const std::string& id, S32 screen_x, S32 screen_y);
     void   onTabAction(const std::string& action);
     // The tab after or before the active one, round the ends.
     void   cycleTab(S32 direction);
@@ -1079,6 +1085,30 @@ private:
     bool explorerArrowAt(S32 x, S32 y, LLUUID& id, bool& prim);
     // Every command the menus hold, to give one by name.
     void showCommandPalette();
+    // One field for going anywhere, as Visual Studio Code's: a script by
+    // name -- a tab open in any studio window, one in an object the
+    // explorer shows, one opened lately -- or, after a `>`, a command, which
+    // is how the command palette opens it; the list follows the `>` as it
+    // is typed or taken away.
+    void showQuickOpen(bool commands);
+    std::vector<ALQuickOpen::Candidate> paletteCommands();
+    struct GoTo
+    {
+        enum class Kind : U8
+        {
+            Tab,
+            Script,
+            File
+        };
+        Kind                kind = Kind::Tab;
+        LLHandle<LLFloater> window;
+        std::string         id;
+        ALScriptRef         ref;
+        std::string         name;
+        std::string         path;
+    };
+    std::vector<ALQuickOpen::Candidate> paletteScripts(std::vector<GoTo>& targets);
+    boost::signals2::scoped_connection mQuickModeConnection;
 
     // The outline and the breadcrumb, from what the check said the script
     // declares; the inspector, from what is at the caret, a moment after
