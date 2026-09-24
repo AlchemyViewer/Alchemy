@@ -98,6 +98,9 @@ private:
     struct Row
     {
         ALScriptWeight::Part part;
+        // Which of the parts of its kind, name and file it is, in order:
+        // every anonymous function has the same empty name.
+        size_t               nth = 0;
         std::optional<S64>   change;
         bool                 fresh = false;
     };

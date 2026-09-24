@@ -311,4 +311,39 @@ namespace tut
         ensure_equals("why", floater->findChild<LLTextBox>("weights_head", true)->getText(), std::string("Nothing open to weigh."));
         ensure("and whose it is forgotten", pane.shownId().empty());
     }
+
+    // Anonymous functions share an empty name: each is matched to the one
+    // in its place among them then, not all to their sum.
+    template<> template<>
+    void alscriptweightspane_object::test<5>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        using Kind = ALScriptWeight::Part::Kind;
+        ALScriptWeightsPane        pane(*tab(), *floater);
+        ALScriptWeightsPane::Shown shown;
+        shown.id   = "script-3";
+        shown.name = "Handlers";
+        ALScriptWeight slua;
+        slua.target   = ALScriptWeight::Target::SLua;
+        slua.compiled = true;
+        slua.limit    = 131072;
+        slua.total    = 600;
+        slua.parts    = { part(Kind::Function, "", 100, 1), part(Kind::Function, "", 200, 5), part(Kind::Function, "", 300, 9) };
+        shown.weights = { slua };
+        shown.saved   = { slua };
+        pane.show(shown);
+        std::vector<std::string> changes = column(list("weights_parts"), 4);
+        ensure_equals("nothing changed" + joined(changes), joined(changes), std::string("|||"));
+        // The middle one heavier, and one added after them.
+        ALScriptWeight now = slua;
+        now.parts[1].bytes = 250;
+        now.parts.push_back(part(Kind::Function, "", 40, 12));
+        shown.weights = { now };
+        pane.show(shown);
+        changes = column(list("weights_parts"), 4);
+        ensure_equals("the middle one, and one new" + joined(changes), joined(changes), std::string("||+50||new"));
+    }
 }

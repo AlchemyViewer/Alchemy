@@ -55,10 +55,26 @@ namespace
     };
 
     // What a part is across two weighings of the same script: which part
-    // it is, not where it is, which an edit above it moves.
-    std::tuple<ALScriptWeight::Part::Kind, std::string, std::string, std::string> identity(const ALScriptWeight::Part& part)
+    // it is, not where it is, which an edit above it moves -- and, among
+    // parts of one kind, name and file, which of them in order, since
+    // every anonymous function has the same empty name.
+    using Identity = std::tuple<ALScriptWeight::Part::Kind, std::string, std::string, std::string, size_t>;
+    Identity identity(const ALScriptWeight::Part& part, size_t nth)
     {
-        return { part.kind, part.within, part.name, part.file };
+        return { part.kind, part.within, part.name, part.file, nth };
+    }
+
+    // Which of the parts like it each part is, in order.
+    std::vector<size_t> nths(const std::vector<ALScriptWeight::Part>& parts)
+    {
+        std::map<Identity, size_t> seen;
+        std::vector<size_t>        out;
+        out.reserve(parts.size());
+        for (const ALScriptWeight::Part& part : parts)
+        {
+            out.push_back(seen[identity(part, 0)]++);
+        }
+        return out;
     }
 
     std::string share(size_t bytes, size_t limit)
@@ -233,10 +249,10 @@ void ALScriptWeightsPane::fillParts()
     const S32 was      = mParts->getFirstSelected() ? mParts->getFirstSelected()->getValue().asInteger() : -1;
     // What was chosen, by which part it is, since the rows are numbered
     // afresh.
-    std::optional<decltype(identity(ALScriptWeight::Part()))> held;
+    std::optional<Identity> held;
     if (was >= 0 && static_cast<size_t>(was) < mRows.size())
     {
-        held = identity(mRows[static_cast<size_t>(was)].part);
+        held = identity(mRows[static_cast<size_t>(was)].part, mRows[static_cast<size_t>(was)].nth);
     }
     mParts->deleteAllItems();
     mRows.clear();
@@ -278,25 +294,29 @@ void ALScriptWeightsPane::fillParts()
 
     // Each part, with how it moved since the text was last saved, where it
     // was weighed for this target then.
-    const ALScriptWeight* saved = savedFor(weight->target);
-    std::map<decltype(identity(ALScriptWeight::Part())), size_t> before;
+    const ALScriptWeight*      saved = savedFor(weight->target);
+    std::map<Identity, size_t> before;
     if (saved)
     {
-        for (const ALScriptWeight::Part& part : saved->parts)
+        const std::vector<size_t> nth = nths(saved->parts);
+        for (size_t i = 0; i < saved->parts.size(); ++i)
         {
-            before[identity(part)] += part.bytes;
+            before[identity(saved->parts[i], nth[i])] = saved->parts[i].bytes;
         }
     }
-    const std::string state_tip = mStrings.getString("WeightsStateTip");
-    const std::string frame_tip = mStrings.getString("WeightsFrameTip");
-    S32               select    = -1;
-    for (const ALScriptWeight::Part& part : weight->parts)
+    const std::string         state_tip = mStrings.getString("WeightsStateTip");
+    const std::string         frame_tip = mStrings.getString("WeightsFrameTip");
+    S32                       select    = -1;
+    const std::vector<size_t> nth       = nths(weight->parts);
+    for (size_t i = 0; i < weight->parts.size(); ++i)
     {
-        Row one;
+        const ALScriptWeight::Part& part = weight->parts[i];
+        Row                         one;
         one.part = part;
+        one.nth  = nth[i];
         if (saved)
         {
-            const auto found = before.find(identity(part));
+            const auto found = before.find(identity(part, one.nth));
             one.fresh        = found == before.end();
             if (!one.fresh)
             {
@@ -304,7 +324,7 @@ void ALScriptWeightsPane::fillParts()
             }
         }
         const S32 index = static_cast<S32>(mRows.size());
-        if (held && identity(part) == *held)
+        if (held && identity(part, one.nth) == *held)
         {
             select = index;
         }
