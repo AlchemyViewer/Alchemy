@@ -59,6 +59,22 @@ public:
     // Nothing for anything else.
     std::optional<std::string> admits(const std::string& file) const;
 
+    // The files under the blessed folder `folder`, and the folders under
+    // it, whose names end in one of `extensions`, each where it stands
+    // once its links are followed and by its path from the folder, `/`
+    // between the parts: what a script might name one of them by. No
+    // hidden folder, nor a link to a folder, nor anything more than
+    // `depth` folders down; no more than `entries` looked at, nor `files`
+    // found -- a scripter's include folder may be a home folder. Nothing
+    // for a folder that is not blessed.
+    struct Listed
+    {
+        std::string file;
+        std::string relative;
+    };
+    std::vector<Listed> filesUnder(const std::string& folder, const std::vector<std::string>& extensions, int depth, size_t entries,
+                                   size_t files) const;
+
     // An ordinary file of at most MAX_BYTES, read whole; false for
     // anything else, and for one that grew past the limit while it was
     // being read. Which files may be read at all is `admits`'s to say;

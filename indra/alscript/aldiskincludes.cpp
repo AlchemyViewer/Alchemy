@@ -114,6 +114,54 @@ std::optional<std::string> ALDiskIncludes::admits(const std::string& file) const
     return std::nullopt;
 }
 
+std::vector<ALDiskIncludes::Listed> ALDiskIncludes::filesUnder(const std::string& folder, const std::vector<std::string>& extensions, int depth,
+                                                               size_t entries, size_t files) const
+{
+    std::vector<Listed>           out;
+    const std::optional<fs::path> root = real(folder);
+    if (!root || std::none_of(mFolders.begin(), mFolders.end(), [&root](const std::string& blessed) { return under(*root, fsyspath(blessed)); }))
+    {
+        return out;
+    }
+    std::error_code                        ec;
+    fs::recursive_directory_iterator       it(*root, fs::directory_options::skip_permission_denied, ec);
+    const fs::recursive_directory_iterator end;
+    size_t                                 seen = 0;
+    for (; !ec && it != end && seen < entries && out.size() < files; it.increment(ec))
+    {
+        ++seen;
+        const fs::directory_entry& entry = *it;
+        const std::string          leaf  = fsyspath(entry.path().filename()).string();
+        std::error_code            kind;
+        if (entry.is_directory(kind))
+        {
+            // Not a hidden folder -- a repository's own, an editor's -- nor
+            // one too deep. A link to a folder is not followed down.
+            if (leaf.empty() || leaf[0] == '.' || it.depth() >= depth)
+            {
+                it.disable_recursion_pending();
+            }
+            continue;
+        }
+        const bool wanted = std::any_of(extensions.begin(), extensions.end(), [&leaf](const std::string& extension) {
+            return leaf.size() > extension.size() && leaf.compare(leaf.size() - extension.size(), extension.size(), extension) == 0;
+        });
+        if (kind || !wanted)
+        {
+            continue;
+        }
+        const std::optional<std::string> file = admits(fsyspath(entry.path()).string());
+        if (!file)
+        {
+            continue;
+        }
+        std::string relative = fsyspath(entry.path().lexically_relative(*root)).string();
+        std::replace(relative.begin(), relative.end(), '\\', '/');
+        out.push_back({ *file, std::move(relative) });
+    }
+    return out;
+}
+
 // static
 bool ALDiskIncludes::readOrdinary(const std::string& file, std::string& out)
 {

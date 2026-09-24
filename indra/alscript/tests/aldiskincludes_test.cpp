@@ -30,6 +30,7 @@
 
 #include "../test/lltut.h"
 
+#include <algorithm>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
@@ -174,5 +175,55 @@ namespace tut
         ensure("none where there is none", ALDiskIncludes::lslrcFolders(s.at("project/src")).empty());
         s.write("broken/.lslrc", "{not json");
         ensure("nor where it is not a configuration", ALDiskIncludes::lslrcFolders(s.at("broken")).empty());
+    }
+
+    template<> template<>
+    void aldiskincludes_object::test<4>()
+    {
+        set_test_name("a blessed folder's files are listed through its folders, by their paths from it, and no further than asked");
+        Scratch s;
+        s.write("lib/util.luau", "return {}\n");
+        s.write("lib/net/http.luau", "return {}\n");
+        s.write("lib/net/deep/deeper/far.luau", "return {}\n");
+        s.write("lib/.git/hooks.luau", "return {}\n");
+        s.write("lib/notes.txt", "not a module\n");
+        s.write("elsewhere/secret.luau", "return {}\n");
+        const auto listed = [](const std::vector<ALDiskIncludes::Listed>& found) {
+            std::vector<std::string> out;
+            for (const ALDiskIncludes::Listed& one : found)
+            {
+                out.push_back(one.relative);
+            }
+            std::sort(out.begin(), out.end());
+            std::string said;
+            for (const std::string& one : out)
+            {
+                said += (said.empty() ? "" : " ") + one;
+            }
+            return said;
+        };
+        ALDiskIncludes blessed;
+        ensure("nothing of a folder not blessed", blessed.filesUnder(s.at("lib"), { ".luau" }, 3, 100, 100).empty());
+        blessed.bless(s.at("lib"));
+        const std::vector<ALDiskIncludes::Listed> found = blessed.filesUnder(s.at("lib"), { ".luau", ".lua" }, 2, 100, 100);
+        ensure_equals("two folders down, no hidden one, only what is asked for", listed(found), std::string("net/http.luau util.luau"));
+        for (const ALDiskIncludes::Listed& one : found)
+        {
+            ensure_equals("each where it stands", one.file, s.at("lib/" + one.relative));
+        }
+        ensure_equals("deeper where asked", listed(blessed.filesUnder(s.at("lib"), { ".luau" }, 4, 100, 100)),
+                      std::string("net/deep/deeper/far.luau net/http.luau util.luau"));
+        ensure_equals("a folder under a blessed one, from itself", listed(blessed.filesUnder(s.at("lib/net"), { ".luau" }, 1, 100, 100)),
+                      std::string("http.luau"));
+        ensure_equals("no more than asked for", blessed.filesUnder(s.at("lib"), { ".luau" }, 4, 100, 1).size(), size_t(1));
+        ensure("nothing outside", blessed.filesUnder(s.at("elsewhere"), { ".luau" }, 4, 100, 100).empty());
+#if LL_DARWIN || LL_LINUX
+        // A link to a folder outside is not followed down.
+        std::error_code ec;
+        fs::create_directory_symlink(s.under("elsewhere"), s.under("lib/linked"), ec);
+        ensure("linked", !ec);
+        ensure_equals("not through a link", listed(blessed.filesUnder(s.at("lib"), { ".luau" }, 4, 100, 100)),
+                      std::string("net/deep/deeper/far.luau net/http.luau util.luau"));
+#endif
     }
 }
