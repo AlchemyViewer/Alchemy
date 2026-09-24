@@ -676,6 +676,18 @@ public:
     /// return a path to the temporary directory on the system
     static const std::string& tmpdir();
 
+    /// check if name can be joined onto a directory as the name of a file in it
+    static bool isSafeFileName(std::string_view name);
+    ///< For names from outside the viewer, which a path join takes as they
+    ///  stand. Refuses anything that is not a single path component, that some
+    ///  platform would alter or refuse when creating it, or that Windows opens
+    ///  as a device: an empty name, "." and "..", a path separator, a control
+    ///  character or any of : * ? " < > |, a trailing dot or space, more than
+    ///  255 bytes, and CON, PRN, AUX, NUL, CONIN$, CONOUT$, and COM or LPT
+    ///  with a digit or superscript digit, in any case and with any extension.
+    ///  The same names are refused on every platform.
+    ///  @returns true if the name is safe to create as it stands
+
 private:
 #if LL_WINDOWS
     typedef HANDLE        llfile_handle_t;

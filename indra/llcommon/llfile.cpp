@@ -32,6 +32,8 @@
 #include "llerror.h"
 #include "stringize.h"
 
+#include <algorithm>
+
 #if LL_WINDOWS
 #include <fcntl.h>
 #else
@@ -1067,6 +1069,66 @@ const std::string& LLFile::tmpdir()
     }
 
     return temppath;
+}
+
+namespace
+{
+    // Names Windows opens as a device rather than a file in any directory,
+    // whatever follows the first dot: NUL.xml is NUL. Upper case, with the
+    // superscript digits spelled as their UTF-8 bytes.
+    constexpr std::string_view DEVICE_NAMES[] = {
+        "CON", "PRN", "AUX", "NUL", "CONIN$", "CONOUT$",
+        "COM0", "COM1", "COM2", "COM3", "COM4",
+        "COM5", "COM6", "COM7", "COM8", "COM9",
+        "COM\xC2\xB9", "COM\xC2\xB2", "COM\xC2\xB3",
+        "LPT0", "LPT1", "LPT2", "LPT3", "LPT4",
+        "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+        "LPT\xC2\xB9", "LPT\xC2\xB2", "LPT\xC2\xB3",
+    };
+
+    bool is_windows_device_name(std::string_view name)
+    {
+        // Windows drops the spaces between the device name and its dot.
+        std::string_view stem = name.substr(0, name.find('.'));
+        stem = stem.substr(0, stem.find_last_not_of(' ') + 1);
+
+        auto same_letter = [](char c, char device)
+        {
+            return (c >= 'a' && c <= 'z' ? static_cast<char>(c - 'a' + 'A') : c) == device;
+        };
+        return std::any_of(std::begin(DEVICE_NAMES), std::end(DEVICE_NAMES),
+            [&](std::string_view device)
+            {
+                return std::equal(stem.begin(), stem.end(), device.begin(), device.end(), same_letter);
+            });
+    }
+}
+
+// static
+bool LLFile::isSafeFileName(std::string_view name)
+{
+    // The longest name every filesystem we write to will hold.
+    constexpr size_t MAX_LENGTH = 255;
+    if (name.empty() || name.size() > MAX_LENGTH)
+    {
+        return false;
+    }
+    // Windows drops a trailing dot or space when it creates the file, so the
+    // name on disk would not be the name asked for. This refuses "." and ".."
+    // as well.
+    if (name.back() == '.' || name.back() == ' ')
+    {
+        return false;
+    }
+    constexpr std::string_view FORBIDDEN = "/\\:*?\"<>|";
+    for (char c : name)
+    {
+        if (static_cast<unsigned char>(c) < 0x20 || FORBIDDEN.find(c) != std::string_view::npos)
+        {
+            return false;
+        }
+    }
+    return !is_windows_device_name(name);
 }
 
 #if LL_WINDOWS

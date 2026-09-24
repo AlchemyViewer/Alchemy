@@ -32,6 +32,7 @@
 #include "llagent.h"
 #include "llappviewer.h"
 #include "llsdserialize.h"
+#include "lluri.h"
 #include "llviewerregion.h"
 #include "llcorehttputil.h"
 
@@ -56,6 +57,8 @@ namespace
     const std::string FILENAME_LSL_BUILTINS        = "builtins.txt";
 
     constexpr U32     LLSD_SYNTAX_LSL_VERSION_EXPECTED = 2;
+    // Longest file name, in bytes, a region may give a syntax definition.
+    constexpr size_t  MAX_DEFINITION_NAME_LENGTH = 128;
     const std::string LLSD_SYNTAX_LSL_VERSION_KEY("llsd-lsl-syntax-version");
 
     const std::unordered_set<std::string> MEMCACHED_LLSD = {
@@ -334,6 +337,18 @@ void LLSyntaxDefCache::fetchKeywordsDefsCoro(std::string url, LLUUID syntax_id)
 
         for (const auto &[filename, contents] : llsd::inMap(files))
         {
+            // The region names the file, and the name is joined onto the
+            // cache directory as it stands. A definition's name is also short
+            // and not hidden.
+            if (!LLFile::isSafeFileName(filename) || filename.size() > MAX_DEFINITION_NAME_LENGTH
+                || filename.starts_with('.'))
+            {
+                LL_WARNS("SyntaxLSL") << "Skipping syntax definition with unsafe file name '"
+                                      << LLURI::escape(filename.substr(0, MAX_DEFINITION_NAME_LENGTH))
+                                      << "' (" << filename.size() << " bytes)." << LL_ENDL;
+                continue;
+            }
+
             std::string full_path = gDirUtilp->add(path, filename);
 
             // Kept only where it reads as definitions this viewer knows,
