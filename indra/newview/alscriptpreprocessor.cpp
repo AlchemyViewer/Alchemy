@@ -160,18 +160,13 @@ namespace
         return !relative || at == base;
     }
 
-    class NamedScriptOrNotecard : public LLInventoryCollectFunctor
+    class ScriptOrNotecard : public LLInventoryCollectFunctor
     {
     public:
-        explicit NamedScriptOrNotecard(const std::string& name) : mName(name) {}
         bool operator()(LLInventoryCategory*, LLInventoryItem* item) override
         {
-            return item && item->getName() == mName &&
-                   (item->getType() == LLAssetType::AT_LSL_TEXT || item->getType() == LLAssetType::AT_NOTECARD);
+            return item && (item->getType() == LLAssetType::AT_LSL_TEXT || item->getType() == LLAssetType::AT_NOTECARD);
         }
-
-    private:
-        std::string mName;
     };
 } // namespace
 
@@ -217,17 +212,22 @@ const LLInventoryModel::item_array_t& ALScriptPreprocessor::namedItems(const std
     {
         mWatcher = std::make_unique<Watcher>(mInventoryGeneration);
     }
-    Named& named = mNamed[name];
-    if (named.generation == mInventoryGeneration)
+    if (mNamedFor != mInventoryGeneration)
     {
-        return named.items;
+        LLInventoryModel::cat_array_t  cats;
+        LLInventoryModel::item_array_t items;
+        ScriptOrNotecard               wanted;
+        gInventory.collectDescendentsIf(gInventory.getRootFolderID(), cats, items, LLInventoryModel::EXCLUDE_TRASH, wanted);
+        mNamed.clear();
+        for (const LLPointer<LLViewerInventoryItem>& item : items)
+        {
+            mNamed[item->getName()].push_back(item);
+        }
+        mNamedFor = mInventoryGeneration;
     }
-    LLInventoryModel::cat_array_t cats;
-    NamedScriptOrNotecard         wanted(name);
-    named.items.clear();
-    gInventory.collectDescendentsIf(gInventory.getRootFolderID(), cats, named.items, LLInventoryModel::EXCLUDE_TRASH, wanted);
-    named.generation = mInventoryGeneration;
-    return named.items;
+    static const LLInventoryModel::item_array_t NONE;
+    const auto                                   found = mNamed.find(name);
+    return found == mNamed.end() ? NONE : found->second;
 }
 
 // static
@@ -293,6 +293,70 @@ bool ALScriptPreprocessor::heldText(const std::string& path, std::string& text) 
     // its identity reaches anybody to ask with.
     std::string file;
     return mAdmitted.count(path) && fileOf(path, file) && ALDiskIncludes::readOrdinary(file, text);
+}
+
+std::vector<std::string> ALScriptPreprocessor::heldPaths() const
+{
+    std::vector<std::string> out;
+    out.reserve(mTexts.size());
+    for (const auto& [path, cached] : mTexts)
+    {
+        out.push_back(path);
+    }
+    return out;
+}
+
+ALPreprocessor::Found ALScriptPreprocessor::requireOf(const Request& request, const std::string& name, ALPreprocessor::Include& out)
+{
+    ALPreprocessor::Ask ask;
+    ask.name    = name;
+    ask.require = true;
+    // Where an alias of a `.luaurc` on disk points is blessed for the
+    // asking, as it is for a run.
+    std::vector<std::string> alias_folders;
+    return resolve(ask, out, request, nullptr, false, &alias_folders);
+}
+
+std::vector<std::pair<std::string, std::string>> ALScriptPreprocessor::moduleFolders(const Request& request)
+{
+    static LLCachedControl<bool>                     disk(gSavedSettings, "ALScriptPreprocDiskIncludes", false);
+    std::vector<std::pair<std::string, std::string>> out;
+    if (disk)
+    {
+        for (const std::string& folder : includeFolders())
+        {
+            out.emplace_back(std::string(), folder);
+        }
+    }
+    if (!request.lua)
+    {
+        return out;
+    }
+    // Each alias of the `.luaurc` that governs the script, where that is a
+    // file on disk: the path it stands for, from beside the file.
+    std::string config_path, config_text, config_file;
+    const std::string from = request.path.empty() ? pathOf(request.ref) : request.path;
+    if (configFor(from, request, nullptr, false, config_path, config_text) != ALPreprocessor::Found::Yes || !fileOf(config_path, config_file))
+    {
+        return out;
+    }
+    ALLuauConfig parsed;
+    std::string  error;
+    if (!ALLuauConfig::parse(config_text, parsed, error))
+    {
+        return out;
+    }
+    for (const auto& [alias, path] : parsed.aliases)
+    {
+        std::string value = path;
+        while (!value.empty() && (value.back() == '/' || value.back() == '\\'))
+        {
+            value.pop_back();
+        }
+        const std::string folder = ALLuauConfig::absolute(value) ? value : gDirUtilp->add(gDirUtilp->getDirName(config_file), value);
+        out.emplace_back("@" + alias + "/", folder);
+    }
+    return out;
 }
 
 ALDiskIncludes ALScriptPreprocessor::blessedFor(const ALPreprocessor::Ask& ask, const Request& request, const std::vector<std::string>& alias_folders)

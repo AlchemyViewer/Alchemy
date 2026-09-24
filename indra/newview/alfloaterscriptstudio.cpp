@@ -29,6 +29,7 @@
 #include "alcodeeditor.h"
 #include "alfilewrite.h"
 #include "alnotecarditems.h"
+#include "alscriptmodules.h"
 #include "alscriptpreprocessor.h"
 #include "alemptystate.h"
 #include "aljumpbar.h"
@@ -5277,6 +5278,7 @@ void ALFloaterScriptStudio::analysed(const ALScriptAnalysis::Result& result)
     }
     // In the source's places now, where the words are, and where a comment
     // may say a lint is wanted.
+    offerRequires(doc);
     noLint(doc);
     if (!doc.language.lua)
     {
@@ -5288,6 +5290,91 @@ void ALFloaterScriptStudio::analysed(const ALScriptAnalysis::Result& result)
     {
         doc.saveAfterCheck = false;
         save(doc);
+    }
+}
+
+void ALFloaterScriptStudio::offerRequires(Doc& doc)
+{
+    // Only where a require is read: a script the preprocessor runs over,
+    // or a module, which is read into one.
+    if (!doc.language.lua || !(preprocessed(doc) || doc.notecard))
+    {
+        return;
+    }
+    const auto unknown = [](const ALScriptProblem& problem) {
+        return problem.file.empty() && problem.args.size() == 1 && (problem.key == "LuauUnknownGlobal" || problem.key == "LuauLintUnknownGlobal");
+    };
+    if (std::none_of(doc.analysis.begin(), doc.analysis.end(), unknown))
+    {
+        return;
+    }
+    const ALScriptPreprocessor::Request request = preprocessRequest(doc, /*with_source*/ false);
+    const std::string self = ALScriptModules::identity(request.path.empty() ? ALScriptPreprocessor::pathOf(request.ref) : request.path);
+    const std::string                   text    = doc.editor->text();
+    ALScriptPreprocessor&               preprocessor = ALScriptPreprocessor::instance();
+    // The SLua texts open here, as they are being written.
+    const auto open = [this, &doc]() {
+        std::vector<ALScriptModules::Open> out;
+        for (const auto& other : mDocs)
+        {
+            if (other.get() != &doc && other->loaded && other->language.lua)
+            {
+                out.push_back({ other->file.empty() ? ALScriptPreprocessor::pathOf(other->ref) : "disk:" + other->file, other->name, other->editor->text() });
+            }
+        }
+        return out;
+    };
+    const std::vector<ALScriptModules::Module>* modules = nullptr;
+    for (ALScriptProblem& problem : doc.analysis)
+    {
+        if (!unknown(problem))
+        {
+            continue;
+        }
+        const std::string& name    = problem.args[0];
+        const size_t       before  = problem.fixes.size();
+        // A module by the name itself, wherever a require of it finds one;
+        // then what the index knows: a module so named under another
+        // name, and each that exports the name.
+        ALPreprocessor::Include found;
+        if (preprocessor.requireOf(request, name, found) == ALPreprocessor::Found::Yes && ALScriptModules::identity(found.path) != self)
+        {
+            ALScriptFixes::offerRequire(problem, text, name, false);
+        }
+        if (!modules)
+        {
+            modules = &ALScriptModules::instance().inReach(request, open);
+        }
+        for (const ALScriptModules::Module& module : *modules)
+        {
+            if (problem.fixes.size() - before >= 4)
+            {
+                break;
+            }
+            if (module.name == name)
+            {
+                ALScriptFixes::offerRequire(problem, text, module.require, false);
+            }
+            else if (std::find(module.exports.begin(), module.exports.end(), name) != module.exports.end())
+            {
+                ALScriptFixes::offerRequire(problem, text, module.require, true);
+            }
+        }
+        // In the viewer's words, as the analyzer's own fixes were said.
+        for (size_t i = before; i < problem.fixes.size(); ++i)
+        {
+            problem.fixes[i].title = alScriptKeyedWords(problem.fixes[i].key, problem.fixes[i].args, problem.fixes[i].title);
+        }
+        // One module meant, by its very name: that, before a guess at a
+        // spelling.
+        if (problem.fixes.size() == before + 1)
+        {
+            for (ALScriptFix& fix : problem.fixes)
+            {
+                fix.preferred = false;
+            }
+            problem.fixes.back().preferred = true;
+        }
     }
 }
 

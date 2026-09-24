@@ -44,6 +44,7 @@ namespace LL
 
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -170,6 +171,21 @@ public:
     // cache holds of one in the world, a file's as the disk has it now.
     // False where neither is in hand; nothing is fetched.
     bool               heldText(const std::string& path, std::string& text) const;
+    // The identities of everything the cache holds, in no order.
+    std::vector<std::string> heldPaths() const;
+
+    // What a SLua `require` of a name from a script finds now, as a run
+    // would: Yes with its identity and text; Pending where it is in the
+    // world and not in hand, or the object has not said what it holds;
+    // No where nothing is so named. Nothing is fetched, so that the fixes
+    // may ask about every name a script does not know.
+    ALPreprocessor::Found requireOf(const Request& request, const std::string& name, ALPreprocessor::Include& out);
+    // The folders on disk a require from a script reads, each with what a
+    // name under it starts with: the scripter's include folders while disk
+    // includes are on, bare, and each alias of a `.luaurc` on disk that
+    // governs the script, as `@alias/`. What a `.luaurc` in the world says
+    // blesses nothing, and is not here.
+    std::vector<std::pair<std::string, std::string>> moduleFolders(const Request& request);
 
 private:
     typedef boost::unordered_flat_set<std::string, ll::string_hash, std::equal_to<>> wanted_t;
@@ -275,12 +291,12 @@ private:
     // What a name stands for changes when the inventory does, which is
     // all the generation counts; the folders a name gives are weighed
     // after the walk, so a relative include is still answered afresh.
-    struct Named
-    {
-        U32                            generation = 0;
-        LLInventoryModel::item_array_t items;
-    };
-    boost::unordered_flat_map<std::string, Named, ll::string_hash, std::equal_to<>> mNamed;
+    // Every script and notecard in the inventory by name, from one walk
+    // an inventory generation: the fixes ask about each name a script
+    // does not know, and a walk a name would go over the whole inventory
+    // each time.
+    boost::unordered_flat_map<std::string, LLInventoryModel::item_array_t, ll::string_hash, std::equal_to<>> mNamed;
+    std::optional<U32>                                                                                        mNamedFor;
     struct Watcher;
     std::unique_ptr<Watcher>                                                        mWatcher;
     U32                                                                             mInventoryGeneration = 1;

@@ -554,6 +554,8 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="ScriptFixOptimized">Write '[1]' here</string>
 	<string name="ScriptFixRemoveUnreachable">Remove what can never run</string>
 	<string name="ScriptFixRemoveNoEffect">Remove what does nothing</string>
+	<string name="ScriptFixRequire">Require '[1]'</string>
+	<string name="ScriptFixRequireField">Take '[1]' from '[2]'</string>
 	<string name="ScriptActionAnnotate">Declare it as '[1]'</string>
 	<string name="ScriptActionExtract">Put it in a local, '[1]'</string>
 	<string name="ScriptActionInterpolate">Write it as an interpolated string</string>
