@@ -442,13 +442,18 @@ private:
         bool                                       saveAfterCheck    = false;
         // What the script weighs for its target, as the last weighing said
         // of the text at weightVersion; whether what was weighed is what a
-        // save compiles -- not where the optimizer changes it after; and a
-        // weighing on its way, and a save waiting on it.
+        // save compiles -- not where the optimizer changes it after -- and
+        // whether it is what a preprocessor's run made to be sent, which a
+        // check's weighing of the same text, before the optimizer, does not
+        // replace; a weighing on its way, and a save waiting on it; and an
+        // upload waiting on the weighing of what it sends.
         std::optional<ALScriptWeight>              weight;
         U32                                        weightVersion     = 0;
         bool                                       weightExact       = false;
+        bool                                       weightSent        = false;
         bool                                       weighing          = false;
         bool                                       saveAfterWeigh    = false;
+        bool                                       uploadAfterWeigh  = false;
         // The safe fixes made ahead of the save under way, once: a fix that
         // left its problem standing would be made again at every check the
         // save waits on.
@@ -782,6 +787,13 @@ private:
     // compile as nearly as the check has it; and the answer kept.
     void                      weigh(Doc& doc);
     void                      weighed(Doc& doc, const ALScriptAnalysis::Result& result);
+    // What a preprocessor's run made to be sent -- optimized, compressed,
+    // every include in; or the text as written where it is off -- weighed
+    // as it is, after every run; and, for a save, uploaded once the weight
+    // says it fits: `sent` is what was weighed, which is what goes, however
+    // many runs have come since.
+    void                      weighSent(Doc& doc, bool then_upload);
+    void                      weighedSent(Doc& doc, const ALScriptAnalysis::Result& result, const Doc::Expanded* sent);
 
     // The preprocessor: whether it applies to a script; its run over the
     // text as it stands, for the analyzers, with the way back; and its
@@ -798,6 +810,9 @@ private:
     ALScriptPreprocessor::Request preprocessRequest(const Doc& doc, bool with_source = true) const;
     void                          preprocess(Doc& doc, bool then_save);
     void                          preprocessedAnswer(const std::string& id, U32 version, bool then_save, const ALPreprocessor::Result& result);
+    // What a run made, uploaded: in the envelope with the source as
+    // written, or as written alone where the run was switched off.
+    void                          sendPreprocessed(Doc& doc, const Doc::Expanded& sent);
     // The text sent to be saved and compiled, with the map it was expanded
     // through where it was.
     void                          upload(Doc& doc, const std::string& text, const ALSourceMap* map = nullptr);

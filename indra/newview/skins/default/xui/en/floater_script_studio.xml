@@ -373,6 +373,7 @@
     <floater.string name="TrailerWeightTip">What the script's code weighs for [TARGET]: [BYTES] of the [MAX] bytes it runs a script in. What it allocates as it runs is not in this.</floater.string>
     <floater.string name="TrailerWeightEstimateTip">About what the script's code weighs for [TARGET]: [BYTES] of the [MAX] bytes it runs a script in, estimated from the code its compiler makes. What it allocates as it runs is not in this.</floater.string>
     <floater.string name="TrailerWeightBeforeTip">Weighed before the preprocessor's optimizer, which a save runs: the saved script may weigh less.</floater.string>
+    <floater.string name="TrailerWeightSentTip">Weighed as a save sends it, after the preprocessor.</floater.string>
     <floater.string name="OriginWeight">Weight</floater.string>
     <floater.string name="WeightOver">The script's code is [SIZE] KB, more than the [LIMIT] KB [TARGET] runs a script in.</floater.string>
     <floater.string name="WeightOverEstimate">The script's code is about [SIZE] KB, likely more than the [LIMIT] KB [TARGET] runs a script in.</floater.string>
@@ -380,6 +381,7 @@
     <floater.string name="TrailerSize">[SIZE] KB of [LIMIT] KB</floater.string>
     <floater.string name="TrailerSizeTip">What saving this script sends: [BYTES] of the [MAX] bytes a script may be. A preprocessed script is sent as written and as expanded, measured here before the optimizer and compression a save adds.</floater.string>
     <floater.string name="TrailerSizeOverTip">What saving this script sends: [BYTES] bytes, [OVER] more than the [MAX] a script may be. A save is refused until it is shorter.</floater.string>
+    <floater.string name="SaveOverWeight">[NAME] was not saved: as it would be sent, its code is [SIZE] KB, more than the [LIMIT] KB [TARGET] runs a script in. Save again to upload anyway.</floater.string>
     <floater.string name="SaveTooLarge">[NAME] was not saved: it is [SIZE] bytes, [OVER] more than the [LIMIT] a script may be.</floater.string>
     <floater.string name="SaveTooLargePlain">Moving part of it into another script, or into a notecard it reads, would bring it under.</floater.string>
     <floater.string name="SaveTooLargeCompress">A preprocessed script is sent as written and as expanded: turning on Compress in the preprocessor's settings shrinks the expanded half.</floater.string>
