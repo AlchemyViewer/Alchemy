@@ -975,4 +975,22 @@ namespace tut
         ensure("said: " + said(problems), problem != nullptr && problem->fixes.size() == 1 && problem->fixes.front().preferred);
         ensure_equals("swapped back", ALScriptFixes::editDistance("totla", "total"), size_t(1));
     }
+
+    template<> template<>
+    void object::test<32>()
+    {
+        set_test_name("a fix's edits are made in the text's order, something put in at a place before a stretch replaced from there, whatever order it gives them");
+        for (const bool insertion_first : { true, false })
+        {
+            ALScriptFix fix;
+            const ALScriptEdit put{ 0, 0, 0, 0, "local v = print(x)\n" };
+            const ALScriptEdit swap{ 0, 0, 0, 8, "v" };
+            fix.edits = insertion_first ? std::vector<ALScriptEdit>{ put, swap } : std::vector<ALScriptEdit>{ swap, put };
+            ensure_equals(insertion_first ? "put in first" : "replaced first", ALScriptFixes::apply("print(x)\n", fix).value_or("refused"),
+                          std::string("local v = print(x)\nv\n"));
+        }
+        ALScriptFix two;
+        two.edits = { { 0, 0, 0, 0, "a" }, { 0, 0, 0, 0, "b" } };
+        ensure_equals("two at one place in the order given", ALScriptFixes::apply("x", two).value_or("refused"), std::string("abx"));
+    }
 }

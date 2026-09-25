@@ -1698,7 +1698,13 @@ bool ALTextView::replaceAll(std::vector<std::pair<ALTextRange, std::string>> edi
         // Measured without it above; taken out now, before the caret is.
         resetPreedit();
     }
-    std::sort(edits.begin(), edits.end(), [](const auto& a, const auto& b) { return a.first.begin < b.first.begin; });
+    // In the text's order: by where each begins, then where it ends, and
+    // two alike in the order given -- so that, made from the last, what is
+    // put in at a place stands before a stretch replaced from there, and
+    // two put in at one place stand in the order given; as ALScriptFixes
+    // applies a fix, and the fix preview shows it.
+    std::stable_sort(edits.begin(), edits.end(),
+                     [](const auto& a, const auto& b) { return a.first.begin < b.first.begin || (a.first.begin == b.first.begin && a.first.end < b.first.end); });
 
     // Where the caret ends up: past every replacement before it on its
     // line, its column moves by what each grew or shrank; inside one, it

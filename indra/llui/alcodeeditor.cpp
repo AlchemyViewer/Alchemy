@@ -3034,16 +3034,23 @@ std::string ALCodeEditor::fixedLines(const ALTextDocument& text, const Fix& fix,
             block += "\n";
         }
     }
-    // From the last edit back, so that each one's places are still the
-    // text's as it was.
+    // In the order the editor makes them (ALTextView::replaceAll), from
+    // the last back, so that each one's places are still the text's as
+    // it was.
     std::vector<std::pair<ALTextRange, std::string>> edits = fix.edits;
-    std::sort(edits.begin(), edits.end(), [](const auto& a, const auto& b) { return b.first.normalised().begin < a.first.normalised().begin; });
+    for (auto& one : edits)
+    {
+        one.first = one.first.normalised();
+    }
+    std::stable_sort(edits.begin(), edits.end(),
+                     [](const auto& a, const auto& b) { return a.first.begin < b.first.begin || (a.first.begin == b.first.begin && a.first.end < b.first.end); });
     const auto offset = [&](const ALTextPos& at) {
         const S32 line = llclamp(at.line, first, last);
         return starts[line - first] + static_cast<size_t>(llclamp(at.column, 0, static_cast<S32>(text.line(line).size())));
     };
-    for (const auto& [range, with] : edits)
+    for (auto it = edits.rbegin(); it != edits.rend(); ++it)
     {
+        const auto& [range, with] = *it;
         const ALTextRange ordered = range.normalised();
         const size_t      from    = offset(ordered.begin);
         const size_t      to      = offset(ordered.end);

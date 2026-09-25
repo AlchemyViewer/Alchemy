@@ -1443,9 +1443,12 @@ namespace ALScriptFixes
             }
             spans.push_back({ *begin, *end, &edit.text });
         }
-        // In the text's order; two insertions at one place in the order
-        // the fix gives them.
-        std::stable_sort(spans.begin(), spans.end(), [](const Span& a, const Span& b) { return a.begin < b.begin; });
+        // In the text's order: by where each begins, then where it ends --
+        // so that something put in at a place goes before a stretch
+        // replaced from there -- and two alike in the order the fix gives
+        // them. The editor (ALTextView::replaceAll) and the preview
+        // (ALCodeEditor::fixedLines) order them the same way.
+        std::stable_sort(spans.begin(), spans.end(), [](const Span& a, const Span& b) { return a.begin < b.begin || (a.begin == b.begin && a.end < b.end); });
         std::string out;
         out.reserve(text.size());
         size_t at = 0;

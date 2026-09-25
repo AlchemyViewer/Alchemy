@@ -1293,6 +1293,23 @@ namespace tut
         ensure_equals("both edits, in the text's order", ALCodeEditor::fixedLines(e.document(), fix, first, last), std::string(">tXree"));
         ensure_equals("the text itself untouched", e.document().line(2), std::string("two"));
         ensure("over the lines they touch", first == 2 && last == 3);
+        // Something put in where a stretch replaced begins goes before it,
+        // whichever order the fix gives them in, as the editor makes them.
+        for (const bool insertion_first : { true, false })
+        {
+            ALCodeEditor::Fix both;
+            if (insertion_first)
+            {
+                both.edits.emplace_back(ALTextRange(ALTextPos(2, 0), ALTextPos(2, 0)), "local v = two\n");
+            }
+            both.edits.emplace_back(ALTextRange(ALTextPos(2, 0), ALTextPos(2, 3)), "v");
+            if (!insertion_first)
+            {
+                both.edits.emplace_back(ALTextRange(ALTextPos(2, 0), ALTextPos(2, 0)), "local v = two\n");
+            }
+            ensure_equals(insertion_first ? "put in, then replaced" : "replaced, then put in", ALCodeEditor::fixedLines(e.document(), both, first, last),
+                          std::string("local v = two\nv"));
+        }
     }
 
     template<> template<>

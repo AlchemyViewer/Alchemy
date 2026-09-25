@@ -1055,6 +1055,15 @@ namespace tut
         ensure("back where it was", v.caret() == ALTextPos(0, 4));
         v.redo();
         ensure("and redone to where the replace left it", v.caret() == ALTextPos(0, 6));
+        // Something put in where a stretch replaced begins stands before
+        // it, whichever order they come in; two put in at one place stand
+        // in the order given.
+        v.setText("print(x)");
+        ensure("replaced first", v.replaceAll({ { ALTextRange(ALTextPos(0, 0), ALTextPos(0, 8)), "v" }, { ALTextRange(ALTextPos(0, 0), ALTextPos(0, 0)), "local v = print(x)\n" } }));
+        ensure_equals("put in before it", v.text(), std::string("local v = print(x)\nv"));
+        v.setText("x");
+        ensure("two at one place", v.replaceAll({ { ALTextRange(ALTextPos(0, 0), ALTextPos(0, 0)), "a" }, { ALTextRange(ALTextPos(0, 0), ALTextPos(0, 0)), "b" } }));
+        ensure_equals("in the order given", v.text(), std::string("abx"));
     }
 
     template<> template<>
