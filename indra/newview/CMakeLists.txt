@@ -173,6 +173,7 @@ if(AL_BUILD_VIEWER)
     alfloaterscriptpreferences.cpp
     alscriptkeymap.cpp
     alscriptmodules.cpp
+    alscriptnotecardtab.cpp
     alscriptpreprocessor.cpp
     alscriptstudiodoc.cpp
     alscriptweightspane.cpp
