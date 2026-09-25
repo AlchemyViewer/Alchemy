@@ -1507,4 +1507,27 @@ namespace tut
         keys(":reg<CR>");
         ensure_equals("without a host, the heading said", vim->message(), std::string("Type Name Content"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<45>()
+    {
+        set_test_name("a host's command named with underscores is one name on the : line, typed or completed");
+        make("x");
+        std::vector<std::string> heard;
+        vim->hooks().command = [&heard](ALTextView&, const std::string& name, const std::string& args) {
+            heard.push_back(name + "|" + args);
+            return true;
+        };
+        vim->hooks().complete = [](ALTextView&, const std::string& command, const std::string&, std::vector<std::string>& out) {
+            if (command.empty())
+            {
+                out.push_back("go_to_line");
+            }
+        };
+        keys(":go_to_line<CR>:save_all!<CR>");
+        ensure("whole, with a bang", heard == std::vector<std::string>{ "go_to_line|", "save_all!|" });
+        keys(":go_<Tab>");
+        ensure_equals("completed from the underscore on", vim->commandLine(), std::string("go_to_line"));
+        keys("<Esc>");
+    }
 }

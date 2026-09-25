@@ -190,6 +190,8 @@ namespace
     // no more than this.
     constexpr S32 MAX_COUNT = 100000;
     S32 countOr(S32 count, S32 fallback = 1) { return count > 0 ? count : fallback; }
+    // A letter of a : command's name.
+    bool isNameChar(char c) { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z'); }
     // An operator's count and its motion's together -- 3d2w is six words --
     // held to the same most, which their product would otherwise pass far
     // enough to wrap round.
@@ -3758,7 +3760,7 @@ void ALVimKeymap::complete(ALTextView& view, bool forward)
             ++at;
         }
         const size_t name_start = at;
-        while (at < mLine.size() && ((mLine[at] >= 'a' && mLine[at] <= 'z') || (mLine[at] >= 'A' && mLine[at] <= 'Z')))
+        while (at < mLine.size() && (isNameChar(mLine[at]) || (at > name_start && mLine[at] == '_')))
         {
             ++at;
         }
@@ -4157,9 +4159,11 @@ void ALVimKeymap::runCommand(ALTextView& view, const std::string& line_in)
         }
         return;
     }
-    // The command's name: letters, or one symbol.
+    // The command's name: letters -- and after the first, underscores,
+    // which a host's names have (go_to_line) and vim's do not -- or one
+    // symbol.
     size_t name_end = 0;
-    while (name_end < rest.size() && ((rest[name_end] >= 'a' && rest[name_end] <= 'z') || (rest[name_end] >= 'A' && rest[name_end] <= 'Z')))
+    while (name_end < rest.size() && (isNameChar(rest[name_end]) || (name_end > 0 && rest[name_end] == '_')))
     {
         ++name_end;
     }
