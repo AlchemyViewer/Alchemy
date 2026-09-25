@@ -7,28 +7,13 @@
      preferences does. -->
 <context_menu
  name="Script studio problem menu">
-  <!-- Named and shown as the problem offers them (Problem.FixVisible). -->
-  <menu_item_call label="(fix)" layout="topleft" name="fix_0">
-    <menu_item_call.on_click function="Problem.Action" parameter="fix:0" />
-    <menu_item_call.on_visible function="Problem.FixVisible" parameter="0" />
-  </menu_item_call>
-  <menu_item_call label="(fix)" layout="topleft" name="fix_1">
-    <menu_item_call.on_click function="Problem.Action" parameter="fix:1" />
-    <menu_item_call.on_visible function="Problem.FixVisible" parameter="1" />
-  </menu_item_call>
-  <menu_item_call label="(fix)" layout="topleft" name="fix_2">
-    <menu_item_call.on_click function="Problem.Action" parameter="fix:2" />
-    <menu_item_call.on_visible function="Problem.FixVisible" parameter="2" />
-  </menu_item_call>
-  <menu_item_call label="(fix)" layout="topleft" name="fix_3">
-    <menu_item_call.on_click function="Problem.Action" parameter="fix:3" />
-    <menu_item_call.on_visible function="Problem.FixVisible" parameter="3" />
-  </menu_item_call>
+  <!-- Each fix the problem offers goes in above these, by what it does,
+       however many it offers. -->
   <menu_item_call label="Fix All of This Kind" layout="topleft" name="fix_kind">
     <menu_item_call.on_click function="Problem.Action" parameter="fix_kind" />
     <menu_item_call.on_visible function="Problem.FixVisible" parameter="kind" />
   </menu_item_call>
-  <menu_item_call label="Fix All Issues" layout="topleft" name="fix_all">
+  <menu_item_call label="Fix All Problems" layout="topleft" name="fix_all">
     <menu_item_call.on_click function="Problem.Action" parameter="fix_all" />
     <menu_item_call.on_visible function="Problem.FixVisible" parameter="all" />
   </menu_item_call>

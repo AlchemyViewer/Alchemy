@@ -14899,20 +14899,7 @@ void ALFloaterScriptStudio::showProblemMenu(S32 x, S32 y)
         {
             return pickFixes(*doc, FixPick{ shown->key }).size() > 1;
         }
-        if (param.asString() == "all")
-        {
-            return pickFixes(*doc, FixPick{}).size() > 1;
-        }
-        const size_t n = static_cast<size_t>(param.asInteger());
-        if (n >= shown->fixes.size())
-        {
-            return false;
-        }
-        if (LLMenuItemGL* item = ALViewType::as<LLMenuItemGL>(ctrl))
-        {
-            item->setLabel(shown->fixes[n].title);
-        }
-        return true;
+        return param.asString() == "all" && pickFixes(*doc, FixPick{}).size() > 1;
     });
     LLContextMenu* menu = LLUICtrlFactory::createFromFile<LLContextMenu>("menu_script_studio_problem.xml", LLMenuGL::sMenuContainer,
                                                                           LLMenuHolderGL::child_registry_t::instance());
@@ -14923,6 +14910,22 @@ void ALFloaterScriptStudio::showProblemMenu(S32 x, S32 y)
     mProblemMenuHandle = menu->getHandle();
     const Doc::Shown* shown = shown_of();
     const Doc*        doc   = doc_of();
+    // Each fix the problem offers, by what it does, first in the menu:
+    // however many -- a name's guesses and the suppressions come to more
+    // than a menu of fixed places held.
+    if (shown && doc && doc->modifiable)
+    {
+        for (size_t n = 0; n < shown->fixes.size(); ++n)
+        {
+            LLMenuItemCallGL::Params p;
+            p.name  = "fix_" + std::to_string(n);
+            p.label = shown->fixes[n].title;
+            LLMenuItemCallGL* item = LLUICtrlFactory::create<LLMenuItemCallGL>(p);
+            const std::string action = "fix:" + std::to_string(n);
+            item->setClickCallback([this, action](LLUICtrl*, const LLSD&) { onProblemMenu(action); });
+            menu->insert(static_cast<S32>(n), item);
+        }
+    }
     menu->setItemVisible("fix_separator", shown && doc && doc->modifiable && !shown->fixes.empty());
     menu->show(x, y);
     LLMenuGL::showPopup(mProblems, menu, x, y);

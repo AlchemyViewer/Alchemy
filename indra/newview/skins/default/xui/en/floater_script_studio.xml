@@ -611,7 +611,7 @@
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="quick_fix" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="quick_fix" />
             </menu_item_call>
-            <menu_item_call label="Fix All Issues" layout="topleft" name="fix_all">
+            <menu_item_call label="Fix All Problems" layout="topleft" name="fix_all">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="fix_all" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="fix_all" />
             </menu_item_call>
