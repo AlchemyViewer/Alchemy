@@ -1342,4 +1342,27 @@ namespace tut
         keys("<Esc>");
         ensure_equals("composed in insert mode", flat(e.text()), std::string("x|") + flat(was));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<38>()
+    {
+        set_test_name("r<CR> breaks the line -- one break for a count, indented as a Return would -- and Enter and Tab are what a waiting command takes");
+        make("    one two");
+        keys("0ft");
+        ensure_equals("on the word", caretText(), std::string("0:8"));
+        keys("h");
+        keys("r<CR>");
+        ensure_equals("the space a line break, the new line indented", flat(editor->text()), std::string("    one|    two"));
+        ensure_equals("the caret on its first word", caretText(), std::string("1:4"));
+
+        make("abcdef");
+        keys("l3r<CR>");
+        ensure_equals("three characters, one break", flat(editor->text()), std::string("a|ef"));
+
+        make("a b");
+        keys("lr<Tab>");
+        ensure_equals("a tab for the space", editor->text(), std::string("a\tb"));
+        keys("0f<Tab>");
+        ensure_equals("found by f", caretText(), std::string("0:1"));
+    }
 }

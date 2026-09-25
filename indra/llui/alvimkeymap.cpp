@@ -777,6 +777,14 @@ bool ALVimKeymap::normal(ALTextView& view, const Input& input)
 {
     if (!input.isChar)
     {
+        // A command waiting for a character -- r, f, t, m and the like --
+        // takes Return and Tab as the characters they are: r<CR> breaks
+        // the line, where the motion Return is would have been its
+        // character.
+        if (mPending && (input.key == KEY_RETURN || input.key == KEY_TAB) && !(input.mask & (CONTROL | MASK_CONTROL | MASK_ALT)))
+        {
+            return command(view, input.key == KEY_RETURN ? '\r' : '\t');
+        }
         // Keys: the ones vim gives a meaning, and the rest left to the
         // view's own keymap.
         const bool ctrl = (input.mask & CONTROL) != 0;
@@ -1015,7 +1023,9 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
                     return true;
                 }
                 // The character under the caret, and the count after it,
-                // replaced; a return breaks the line.
+                // replaced; a return breaks the line -- once, whatever the
+                // count, as vim's does -- the new line indented as a
+                // Return would indent it, the caret at its start.
                 ALTextPos from = view.caret();
                 ALTextPos to   = from;
                 for (S32 n = 0; n < count; ++n)
@@ -1027,14 +1037,21 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
                     }
                     to = d.nextCluster(to);
                 }
+                view.setSelection(ALTextRange(from, to));
+                if (ch == '\r' || ch == '\n')
+                {
+                    view.perform(ALEditorCommand::NewLine);
+                    moveTo(view, view.caret());
+                    finishCommand(true);
+                    return true;
+                }
                 std::string with;
                 for (S32 n = 0; n < count; ++n)
                 {
-                    with += ch == '\r' ? std::string("\n") : utf8Of(ch);
+                    with += utf8Of(ch);
                 }
-                view.setSelection(ALTextRange(from, to));
                 view.insertText(with);
-                moveTo(view, ch == '\r' ? view.caret() : d.prevCluster(view.caret()));
+                moveTo(view, d.prevCluster(view.caret()));
                 finishCommand(true);
                 return true;
             }
