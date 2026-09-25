@@ -1340,9 +1340,11 @@ void ALScriptPreprocessor::finish(const std::shared_ptr<Job>& job, ALPreprocesso
             }
             problem.key     = include ? "PreprocIncludeInWorld" : "PreprocModuleInWorld";
             problem.message = ALScriptProblem::fill(include ? "could not find include file '[1]': one so named is in the object or the inventory, "
-                                                              "which includes are not taken from unless Script Studio's preferences say so"
+                                                              "which includes are not taken from -- only folders on disk are, with Build > "
+                                                              "Include from Disk on and a folder added"
                                                             : "could not find module '[1]': one so named is in the object or the inventory, which "
-                                                              "modules are not taken from unless Script Studio's preferences say so",
+                                                              "modules are not taken from -- only folders on disk are, with Build > Include from "
+                                                              "Disk on and a folder added",
                                                     problem.args);
         }
     }

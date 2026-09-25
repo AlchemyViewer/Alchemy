@@ -728,6 +728,10 @@ end</floater.string>
              width="370">
                 Includes
             </text>
+            <!-- Includes from the object and the inventory, and the order the
+                 world's places and the disk are looked in, are hidden, and
+                 the world is off, until Linden Lab's own viewer settles how
+                 it takes them. -->
             <check_box
              control_name="ALScriptPreprocWorldIncludes"
              follows="left|top"
@@ -738,6 +742,7 @@ end</floater.string>
              name="preproc_world"
              tool_tip="An #include or a require may name a script or a notecard in the object the script is in, or anywhere in your inventory. Off, a script opened from somebody else's object cannot pull your own scripts into itself, and only the folders on disk below are looked in"
              top_pad="6"
+             visible="false"
              width="370" />
             <check_box
              control_name="ALScriptPreprocDiskIncludes"
@@ -747,8 +752,8 @@ end</floater.string>
              layout="topleft"
              left="12"
              name="preproc_disk"
-             tool_tip="An #include may name a file in the folders below, looked for in order after the object and inventory unless the order below says otherwise. Nothing else on the disk is read, but where a .lslrc or .luaurc on disk points -- and only within its own folder or one below: to reach further, add that folder here. Off, nothing on the disk is read at all"
-             top_pad="2"
+             tool_tip="An #include or a require may name a file in the folders below, looked for from the top. Nothing else on the disk is read, but where a .lslrc or .luaurc on disk points -- and only within its own folder or one below: to reach further, add that folder here. Off, nothing on the disk is read at all"
+             top_delta="0"
              width="370" />
             <scroll_list
              column_padding="0"
@@ -759,7 +764,7 @@ end</floater.string>
              left="32"
              multi_select="false"
              name="include_folders"
-             tool_tip="The folders on disk an #include is read from, looked in from the top"
+             tool_tip="The folders on disk an #include or a require is read from, looked in from the top"
              top_pad="4"
              width="260">
                 <scroll_list.columns dynamic_width="true" name="folder" />
@@ -791,6 +796,7 @@ end</floater.string>
              left="12"
              name="order_label"
              top_pad="12"
+             visible="false"
              width="370">
                 Where an include is looked for, first to last:
             </text>
@@ -805,6 +811,7 @@ end</floater.string>
              name="include_order"
              tool_tip="The places an #include or require is looked for, the first that has it winning; a place unticked is not looked in"
              top_pad="4"
+             visible="false"
              width="220">
                 <scroll_list.columns name="on" type="checkbox" width="22" />
                 <scroll_list.columns dynamic_width="true" name="place" />
@@ -818,6 +825,7 @@ end</floater.string>
              name="order_up"
              tool_tip="Look in the chosen place sooner"
              top_delta="0"
+             visible="false"
              width="70" />
             <button
              follows="left|top"
@@ -828,6 +836,7 @@ end</floater.string>
              name="order_down"
              tool_tip="Look in the chosen place later"
              top_pad="4"
+             visible="false"
              width="70" />
 
             <!-- The right column: what the preprocessor does on a save. -->
