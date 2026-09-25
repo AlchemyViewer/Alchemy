@@ -765,7 +765,7 @@ void ALScriptWorkspace::prepare(const ALScriptRef& ref, const std::string& name,
     });
 }
 
-void ALScriptWorkspace::recompile(const ALScriptRef& ref, const std::string& requested, compile_callback_t callback)
+void ALScriptWorkspace::recompile(const ALScriptRef& ref, const std::string& requested, compile_callback_t callback, std::optional<bool> running)
 {
     auto fail = [this, ref, callback](const std::string& why) {
         CompileResult result;
@@ -807,14 +807,14 @@ void ALScriptWorkspace::recompile(const ALScriptRef& ref, const std::string& req
     }
     const std::string name = item->getName();
     // Its text, then the upload, which keeps the experience it runs under.
-    load(ref, [this, target, lua, name, callback, fail](const Loaded& loaded) {
+    load(ref, [this, target, lua, name, callback, fail, running](const Loaded& loaded) {
         if (!loaded.error.empty())
         {
             fail(loaded.error);
             return;
         }
         const ALScriptRef ref = loaded.ref;
-        prepare(ref, name, loaded.assetId, loaded.text, lua, target, [this, ref, target, callback, fail](const Prepared& prepared) {
+        prepare(ref, name, loaded.assetId, loaded.text, lua, target, [this, ref, target, callback, fail, running](const Prepared& prepared) {
             if (!prepared.errors.empty())
             {
                 CompileResult result;
@@ -829,7 +829,7 @@ void ALScriptWorkspace::recompile(const ALScriptRef& ref, const std::string& req
             }
             SaveOptions options;
             options.compileTarget = target;
-            options.running       = true;
+            options.running       = running.value_or(true);
             std::string error;
             if (!save(ref, prepared.text, options, callback, error))
             {
@@ -1588,7 +1588,8 @@ bool ALScriptWorkspace::remove(const ALScriptRef& ref, std::string& error)
     return true;
 }
 
-bool ALScriptWorkspace::queue(Queue kind, const std::vector<std::pair<LLUUID, std::string>>& prims, const std::string& target, std::string& error)
+bool ALScriptWorkspace::queue(Queue kind, const std::vector<std::pair<LLUUID, std::string>>& prims, const std::string& target, std::string& error,
+                              std::map<std::pair<LLUUID, LLUUID>, bool> running)
 {
     // Only the objects RLVa lets be changed; none, and why.
     std::vector<std::pair<LLUUID, std::string>> allowed;
@@ -1621,6 +1622,7 @@ bool ALScriptWorkspace::queue(Queue kind, const std::vector<std::pair<LLUUID, st
         return false;
     }
     queue->setCompileTarget(target.empty() ? std::string("auto") : target);
+    queue->setKnownRunning(std::move(running));
     for (const auto& [prim, prim_name] : allowed)
     {
         queue->addObject(prim, prim_name);

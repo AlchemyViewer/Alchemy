@@ -545,7 +545,7 @@ bool LLFloaterCompileQueue::processScript(LLHandle<LLFloaterCompileQueue> hfloat
             }
             ALScriptWorkspace::SaveOptions options;
             options.compileTarget = compile_target;
-            options.running       = true;
+            options.running       = floater->runsAfterCompile(object->getID(), inventory->getUUID());
             options.experience    = experienceId;
             std::string error;
             const bool  sent = ALScriptWorkspace::instance().save(
@@ -579,7 +579,7 @@ bool LLFloaterCompileQueue::processScript(LLHandle<LLFloaterCompileQueue> hfloat
             inventory->getUUID(),
             assetId,
             compile_target,
-            true,
+            floater->runsAfterCompile(object->getID(), inventory->getUUID()),
             inventory->getName(),
             LLUUID(),
             experienceId,

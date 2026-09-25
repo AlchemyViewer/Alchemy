@@ -1352,6 +1352,10 @@ private:
     void explorerRename(const ExplorerRow& row);
     void explorerDelete(const std::vector<ExplorerRow>& rows);
     void explorerRecompile(const std::vector<ExplorerRow>& rows);
+    // Whether a script runs, as far as the studio knows: its tab's word,
+    // else the region's last answer to the explorer; nothing where neither
+    // has said.
+    std::optional<bool> knownRunning(const LLUUID& prim, const LLUUID& item) const;
     // An object pinned, the explorer shown, and the object's row chosen.
     void exploreObject(const LLUUID& root);
     bool isPinned(const LLUUID& root) const;

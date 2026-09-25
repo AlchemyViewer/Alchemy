@@ -36,6 +36,7 @@
 #include <deque>
 #include <functional>
 #include <memory>
+#include <map>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -217,8 +218,9 @@ public:
     // A script fetched, prepared, and uploaded to compile for a target:
     // what was asked, or "auto" for what it compiles for now. What the
     // compiler said reaches the callback and every listener; a script
-    // that cannot go up says why in the result's error.
-    void recompile(const ALScriptRef& ref, const std::string& target, compile_callback_t callback);
+    // that cannot go up says why in the result's error. It runs after
+    // unless `running` says it was known to be stopped.
+    void recompile(const ALScriptRef& ref, const std::string& target, compile_callback_t callback, std::optional<bool> running = std::nullopt);
 
     // The server's error strings as diagnostics.
     static std::vector<Diagnostic> parseDiagnostics(const LLSD& errors, bool lua);
@@ -381,7 +383,10 @@ public:
         Start,
         Stop
     };
-    bool queue(Queue kind, const std::vector<std::pair<LLUUID, std::string>>& prims, const std::string& target, std::string& error);
+    // A recompile leaves a script `running` knows to be stopped stopped,
+    // by prim and item; the rest run after it, as the queue always had it.
+    bool queue(Queue kind, const std::vector<std::pair<LLUUID, std::string>>& prims, const std::string& target, std::string& error,
+               std::map<std::pair<LLUUID, LLUUID>, bool> running = {});
 
     // --- what scripts say ------------------------------------------------------
 

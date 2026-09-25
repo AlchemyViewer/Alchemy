@@ -15483,11 +15483,24 @@ void ALFloaterScriptStudio::explorerDelete(const std::vector<ExplorerRow>& rows)
                              });
 }
 
+std::optional<bool> ALFloaterScriptStudio::knownRunning(const LLUUID& prim, const LLUUID& item) const
+{
+    const size_t index = indexOf(ALScriptRef(prim, item));
+    if (index != NONE && mDocs[index]->running >= 0)
+    {
+        return mDocs[index]->running != 0;
+    }
+    const auto known = mRunningKnown.find({ prim, item });
+    return known != mRunningKnown.end() ? std::optional<bool>(known->second) : std::nullopt;
+}
+
 void ALFloaterScriptStudio::explorerRecompile(const std::vector<ExplorerRow>& rows)
 {
     // Each script chosen goes up again on its own, for what it compiles
     // for now; a prim or an object chosen has every script walked by the
-    // compile queue, which reports in a window of its own.
+    // compile queue, which reports in a window of its own. A script known
+    // to be stopped stays stopped, which the standard viewer's recompile
+    // does not do; one not known to be either runs after, as there.
     const LLHandle<LLFloater>                         handle = getHandle();
     const std::vector<std::pair<LLUUID, std::string>> prims  = containerPrims(rows);
     for (const ExplorerRow& row : rows)
@@ -15502,6 +15515,7 @@ void ALFloaterScriptStudio::explorerRecompile(const std::vector<ExplorerRow>& ro
         LLStringUtil::format_map_t args;
         args["[NAME]"] = name;
         setStatus(getString("Recompiling", args));
+        const std::optional<bool> running = knownRunning(ref.object, ref.item);
         ALScriptWorkspace::instance().recompile(ref, "auto", [handle, ref, name](const ALScriptWorkspace::CompileResult& result) {
             ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get());
             if (!studio || studio->indexOf(ref) != NONE)
@@ -15525,12 +15539,20 @@ void ALFloaterScriptStudio::explorerRecompile(const std::vector<ExplorerRow>& ro
             {
                 studio->report(studio->counted("CompileFailed", static_cast<S32>(result.diagnostics.size()), args), true);
             }
-        });
+        }, running);
     }
     if (!prims.empty())
     {
         std::string error;
-        if (!ALScriptWorkspace::instance().queue(ALScriptWorkspace::Queue::Recompile, prims, "auto", error))
+        std::map<std::pair<LLUUID, LLUUID>, bool> running = mRunningKnown;
+        for (const std::unique_ptr<Doc>& doc : mDocs)
+        {
+            if (!doc->ref.inInventory() && doc->running >= 0)
+            {
+                running[{ doc->ref.object, doc->ref.item }] = doc->running != 0;
+            }
+        }
+        if (!ALScriptWorkspace::instance().queue(ALScriptWorkspace::Queue::Recompile, prims, "auto", error, std::move(running)))
         {
             report(error, true);
         }
