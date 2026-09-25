@@ -153,6 +153,12 @@ namespace
         if (!objectp)
             return;
 
+        // Copy the linkset root's key while building unless editing individual prims.
+        if (LLFloaterReg::instanceVisible("build") && !gSavedSettings.getBOOL("EditLinkedParts"))
+        {
+            objectp = objectp->getRootEdit();
+        }
+
         const std::string id_str = objectp->getID().asString();
         LLClipboard::instance().copyToClipboard(id_str, 0, narrow(id_str.size()));
     }
