@@ -651,7 +651,7 @@ end</floater.string>
              layout="topleft"
              left="12"
              name="fix_on_save"
-             tool_tip="The fixes that change nothing a script does -- an unused local marked unused, a misspelt directive -- are made before it is saved, as one step to undo. Nothing is taken out: a function nothing calls, or code that can never run, is left for Fix All"
+             tool_tip="The fixes that change nothing a script does are made before it is saved, as one step to undo: an SLua local nothing uses renamed to start with an underscore (count to _count), which is how SLua says a name is unused on purpose, or a misspelt directive corrected. Nothing is taken out: a function nothing calls, or code that can never run, is left for Fix All"
              top_pad="4"
              width="370" />
             <check_box
