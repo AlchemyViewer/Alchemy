@@ -440,7 +440,7 @@
     <floater.string name="WeightsKindGlobal">Global</floater.string>
     <floater.string name="WeightsKindConstant">Constant</floater.string>
     <floater.string name="WeightsKindFrame">Overhead</floater.string>
-    <floater.string name="WeightsStateTip">The state's table of handlers and the handlers themselves, whose bytes are listed each on its own as well.</floater.string>
+    <floater.string name="WeightsStateTip">The state's table of handlers; the handlers are listed each on its own.</floater.string>
     <floater.string name="WeightsFrameTip">What the target spends on the script as a whole, whatever is in it.</floater.string>
     <floater.string name="WeightNote">[BYTES] bytes</floater.string>
     <floater.string name="WeightNoteEstimate">~[BYTES] bytes</floater.string>

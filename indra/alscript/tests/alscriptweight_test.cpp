@@ -216,12 +216,9 @@ namespace tut
         ensure("each a part:" + listed(weight), twice && state && touch && named(weight, "state_entry") && named(weight, "registers"));
         ensure_equals("a function where it is", twice->line, 2);
         ensure_equals("a handler in its state", touch->within, std::string("default"));
-        ensure("the state holds its handlers", state->bytes > touch->bytes);
-        // Where its handlers begin, a jump table entry for each, and each
-        // handler from where it begins to where it ends -- the first as
-        // well, which begins where the table ends.
-        ensure_equals("a state is its table and its handlers:" + listed(weight), state->bytes,
-                      5 + 8 * 2 + named(weight, "state_entry")->bytes + touch->bytes);
+        // Where its handlers begin and a jump table entry for each; each
+        // handler, from where it begins to where it ends, its own part.
+        ensure_equals("a state is its table, its handlers apart:" + listed(weight), state->bytes, size_t(5 + 8 * 2));
         const ALScriptWeight::Part* count = named(weight, "gCount");
         const ALScriptWeight::Part* name  = named(weight, "gName");
         ensure("the globals too", count && name);

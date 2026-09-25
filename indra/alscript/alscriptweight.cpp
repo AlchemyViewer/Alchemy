@@ -711,9 +711,13 @@ namespace
         {
             const std::string was = mState;
             mState                = nameOf(state->getChild(0));
+            mHandlerBytes         = 0;
             const size_t before   = _mStateBS.pos();
             LSOScriptCompiler::visit(state);
-            add(ALScriptWeight::Part::Kind::State, state, mState, std::string(), _mStateBS.pos() - before);
+            // Its own: the table of its handlers, theirs listed each apart,
+            // so that no byte is counted twice.
+            const size_t whole = _mStateBS.pos() - before;
+            add(ALScriptWeight::Part::Kind::State, state, mState, std::string(), whole > mHandlerBytes ? whole - mHandlerBytes : 0);
             mState = was;
             return false;
         }
@@ -721,6 +725,7 @@ namespace
         {
             const size_t before = _mStateBS.pos();
             LSOScriptCompiler::visit(handler);
+            mHandlerBytes += _mStateBS.pos() - before;
             add(ALScriptWeight::Part::Kind::Handler, handler, nameOf(handler->getChild(0)), mState, _mStateBS.pos() - before);
             lineCode(handler);
             return false;
@@ -757,6 +762,8 @@ namespace
         }
 
         std::string mState;
+        // What the state being weighed's handlers came to.
+        size_t      mHandlerBytes = 0;
     };
 }
 

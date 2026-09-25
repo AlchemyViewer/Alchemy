@@ -96,8 +96,10 @@ struct ALScriptWeight
         // itself.
         std::string file;
     };
-    // In the order the compiler made them. A handler's bytes are in its
-    // state's as well, so the parts do not add up to the total.
+    // In the order the compiler made them. A state's bytes are its own --
+    // the table of its handlers -- and each handler's are its own part:
+    // no byte is counted twice, so the parts come to no more than the
+    // total, the rest being what the target spends that no part is.
     std::vector<Part> parts;
 
     // The bytes of code each line made, by line: for the Luau targets as
