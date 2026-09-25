@@ -104,7 +104,10 @@
 #include <cerrno>
 #include <fcntl.h>
 #include <sys/stat.h>
+
+#ifndef LL_WINDOWS
 #include <unistd.h>
+#endif
 
 void ALFloaterScriptStudio::preprocess(Doc& doc)
 {
