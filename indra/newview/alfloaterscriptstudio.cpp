@@ -220,21 +220,6 @@ namespace
         return holds(outer, ALTextPos(inner.line, inner.column)) && holds(outer, ALTextPos(inner.endLine, inner.endColumn));
     }
 
-    // A day and a time, in the viewer's own time zone.
-    std::string timeOf(const LLDate& date)
-    {
-        const time_t when = static_cast<time_t>(date.secondsSinceEpoch());
-        struct tm    local;
-#if LL_WINDOWS
-        localtime_s(&local, &when);
-#else
-        localtime_r(&when, &local);
-#endif
-        char buffer[32];
-        strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M", &local);
-        return buffer;
-    }
-
     // A message as one row reads it.
     std::string oneLine(std::string text)
     {
@@ -9827,7 +9812,7 @@ void ALFloaterScriptStudio::refreshNotice()
     {
         // Said so where the script was saved since the text was kept.
         LLStringUtil::format_map_t args;
-        args["[WHEN]"]   = timeOf(doc->recoverable->when);
+        args["[WHEN]"]   = doc->recoverable->whenSaid();
         const bool stale = doc->recoverable->baseAsset.notNull() && doc->assetId.notNull() && doc->recoverable->baseAsset != doc->assetId;
         text             = getString(stale ? "NoticeRecoverableStale" : "NoticeRecoverable", args);
         buttons[0]       = { "restore", "NoticeRestore" };
@@ -10203,7 +10188,7 @@ void ALFloaterScriptStudio::showRecovery()
                                                                                      : "RecoverUnsaved";
         ALQuickOpen::Candidate one;
         one.label  = entry.name.empty() ? gDirUtilp->getBaseFileName(entry.file) : entry.name;
-        one.detail = getString(state) + ", " + timeOf(entry.when);
+        one.detail = getString(state) + ", " + entry.whenSaid();
         one.also   = !entry.file.empty() ? entry.file : entry.objectName + " " + entry.region;
         one.value  = std::to_string(i);
         candidates.push_back(std::move(one));

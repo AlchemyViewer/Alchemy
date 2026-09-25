@@ -578,4 +578,17 @@ namespace tut
         ensure("failed, by key", failed.size() == 1 && failed.front() == "item:w");
         ensure("and said once", nowhere.takeFailures().empty());
     }
+
+    template<> template<>
+    void alscriptrecovery_object::test<17>()
+    {
+        set_test_name("when an entry was written, said as a day and a time");
+        ALScriptRecoveryEntry one;
+        one.when                = LLDate(1758772800.0);
+        const std::string said  = one.whenSaid();
+        // The day and the hour are the local zone's; the shape is not.
+        ensure_equals("YYYY-MM-DD HH:MM: " + said, said.size(), size_t(16));
+        ensure("dashes and a colon: " + said, said[4] == '-' && said[7] == '-' && said[10] == ' ' && said[13] == ':');
+        ensure("the year: " + said, said.starts_with("2025-09-2"));
+    }
 }

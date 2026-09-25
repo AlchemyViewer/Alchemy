@@ -33,6 +33,7 @@
 #include <algorithm>
 #include <cmath>
 #include <condition_variable>
+#include <ctime>
 #include <cstdlib>
 #include <filesystem>
 #include <map>
@@ -118,6 +119,20 @@ namespace
         }
         return names;
     }
+}
+
+std::string ALScriptRecoveryEntry::whenSaid() const
+{
+    const time_t moment = static_cast<time_t>(when.secondsSinceEpoch());
+    struct tm    local;
+#if LL_WINDOWS
+    localtime_s(&local, &moment);
+#else
+    localtime_r(&moment, &local);
+#endif
+    char buffer[32];
+    strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M", &local);
+    return buffer;
 }
 
 LLSD ALScriptRecoveryEntry::asLLSD() const

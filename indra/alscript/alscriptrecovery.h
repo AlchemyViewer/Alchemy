@@ -87,6 +87,9 @@ struct ALScriptRecoveryEntry
 
     LLSD        asLLSD() const;
     static bool fromLLSD(const LLSD& sd, ALScriptRecoveryEntry& out);
+    // When it was written, as a day and a time in the viewer's own time
+    // zone, for a person to read.
+    std::string whenSaid() const;
 };
 
 // When a kept text's script is loaded again after loads that failed: a
