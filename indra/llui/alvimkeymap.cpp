@@ -816,6 +816,15 @@ bool ALVimKeymap::normal(ALTextView& view, const Input& input)
         {
             switch (input.key)
             {
+                case '6':
+                case '^':
+                {
+                    // The alternate tab, or with a count the Nth: :buffer.
+                    const S32 given = mCount;
+                    clearPending();
+                    runCommand(view, given > 0 ? "buffer " + std::to_string(given) : std::string("buffer #"));
+                    return true;
+                }
                 case 'R':
                     for (S32 n = countOr(mCount); n > 0; --n)
                     {
@@ -1061,6 +1070,21 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
                 {
                     case 'g':
                         return command(view, 0x01);  // gg, as a motion the table knows
+                    case 't':
+                    case 'T':
+                    {
+                        // The host's tabs: gt the next, {N}gt the Nth; gT
+                        // back one, or N.
+                        const S32  given    = mCount;
+                        const bool operated = mOperator != 0;
+                        clearPending();
+                        if (!operated)
+                        {
+                            const std::string tabs = ch == 't' ? "tabnext" : "tabprevious";
+                            runCommand(view, given > 0 ? tabs + " " + std::to_string(given) : tabs);
+                        }
+                        return true;
+                    }
                     case '&':
                         // The last :s again on every line, with its flags.
                         clearPending();

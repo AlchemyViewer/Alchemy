@@ -1394,4 +1394,23 @@ namespace tut
         keys("G@a");
         ensure_equals("played with its break", flat(editor->text()), std::string("p!|-|q!|-"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<40>()
+    {
+        set_test_name("gt, gT and Ctrl-^ ask the host for its tabs as :tabnext, :tabprevious and :buffer, with the count");
+        make("a\nb");
+        std::vector<std::string> heard;
+        vim->hooks().command = [&heard](ALTextView&, const std::string& name, const std::string& args) {
+            heard.push_back(name + "|" + args);
+            return true;
+        };
+        keys("gt3gtgT2gT<C-6>4<C-6>");
+        ensure("each as its command",
+               heard == std::vector<std::string>{ "tabnext|", "tabnext|3", "tabprevious|", "tabprevious|2", "buffer|#", "buffer|4" });
+        heard.clear();
+        keys("dgt");
+        ensure("not after an operator", heard.empty());
+        ensure_equals("nothing changed", flat(editor->text()), std::string("a|b"));
+    }
 }

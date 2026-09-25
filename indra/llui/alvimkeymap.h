@@ -109,6 +109,9 @@ public:
     // command unknown; cleared by the next key.
     std::string message() const override { return mMessage; }
     bool        messageIsError() const override { return mMessageError; }
+    // Said where the mode says things, as its own are: what a host's :
+    // command has to say of itself -- an error, in the error colour.
+    void        say(const std::string& message, bool error = false);
     // The completions Tab offers on the : line, while it does.
     bool        menu(std::vector<std::string>& items, S32& chosen) const override;
     // A register's text, or nothing.
@@ -315,7 +318,6 @@ private:
     };
     void noteVisualOperation(const Span& span, S32 lines_hint = -1);
 
-    void say(const std::string& message, bool error = false);
     // What the mode says, in the skin's words where the skin has them
     // (strings.xml, keys Vim*), else in vim's own English; [NAME]s
     // filled in from the map either way.
