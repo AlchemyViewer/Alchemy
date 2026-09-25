@@ -10777,6 +10777,8 @@ void ALFloaterScriptStudio::addEditCommands()
     addEditorCommand("quick_fix", ALEditorCommand::QuickFix, true);
     addEditorCommand("next_misspelling", ALEditorCommand::NextMisspelling, false);
     addEditorCommand("join_lines", ALEditorCommand::JoinLines, true);
+    addEditorCommand("previous_change", ALEditorCommand::PreviousChange, false);
+    addEditorCommand("next_change", ALEditorCommand::NextChange, false);
     // The whole script's indentation made of spaces, or of tabs.
     for (const auto& [name, spaces] : { std::pair{ "indent_spaces", true }, std::pair{ "indent_tabs", false } })
     {

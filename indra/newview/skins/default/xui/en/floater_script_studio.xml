@@ -764,6 +764,14 @@
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="forward" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="forward" />
             </menu_item_call>
+            <menu_item_call label="Last Edit Location" layout="topleft" name="previous_change" shortcut="control|shift|Backsp">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="previous_change" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="previous_change" />
+            </menu_item_call>
+            <menu_item_call label="Next Edit Location" layout="topleft" name="next_change">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="next_change" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="next_change" />
+            </menu_item_call>
             <menu_item_separator layout="topleft" />
             <menu_item_call label="Go to Script..." layout="topleft" name="quick_open" shortcut="control|P">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="quick_open" />

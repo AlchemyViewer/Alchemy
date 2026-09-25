@@ -115,6 +115,8 @@
     <panel.string name="cmd_quick_fix">Quick fix</panel.string>
     <panel.string name="cmd_next_misspelling">Next misspelling</panel.string>
     <panel.string name="cmd_join_lines">Join lines</panel.string>
+    <panel.string name="cmd_previous_change">Last edit location</panel.string>
+    <panel.string name="cmd_next_change">Next edit location</panel.string>
     <panel.string name="cmd_previous_misspelling">Previous misspelling</panel.string>
     <line_editor
      follows="left|top|right"
