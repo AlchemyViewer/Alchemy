@@ -325,6 +325,7 @@ target_sources(
         alstringmatch.h
         alcodeeditor.h
         alcompletionmodel.h
+        alfixlistmodel.h
         alfindings.h
         alfindbar.h
         alkeymap.h
@@ -525,6 +526,7 @@ if(AL_BUILD_TESTS)
     altextview
     alcodeeditor
     alcompletionmodel
+    alfixlistmodel
     alscripttheme
     alvimkeymap
     alxuiservice

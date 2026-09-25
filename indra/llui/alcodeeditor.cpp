@@ -2496,16 +2496,6 @@ void ALCodeEditor::placeListAt(ALChoiceList& list, const ALTextPos& at, S32 rows
 
 // --- quick fixes -----------------------------------------------------------------
 
-namespace
-{
-    // The word that there is nothing to offer, which the list shows as it
-    // shows a fix: nothing to make, and nothing to hand back.
-    bool isNothing(const ALCodeEditor::Fix& fix)
-    {
-        return fix.edits.empty() && fix.value.isUndefined();
-    }
-}
-
 bool ALCodeEditor::fixesOpen() const
 {
     return mFixList && mFixList->getVisible();
@@ -2519,9 +2509,7 @@ void ALCodeEditor::closeFixes()
         mFixList->setVisible(false);
         mFixList->setChoices({});
     }
-    mFixes.clear();
-    mFixLine       = -1;
-    mActionsWanted = false;
+    mFixListModel.close();
     // The preview is the side box's, which the completions share.
     if (was)
     {
@@ -2542,7 +2530,7 @@ bool ALCodeEditor::openFixes(S32 line)
     {
         return false;
     }
-    rankFixes(fixes);
+    ALFixListModel::rank(fixes);
     showFixes(line, std::move(fixes), 0);
     return true;
 }
@@ -2552,13 +2540,11 @@ void ALCodeEditor::showFixes(S32 line, std::vector<Fix> fixes, S32 chosen)
     closeCompletion();
     hideSignature();
     hideCard();
-    mFixes   = std::move(fixes);
-    mFixLine = line;
+    const U32 shown = mFixListModel.show(line, std::move(fixes));
     fillFixList(chosen);
-    ++mFixShowing;
     if (mFixesShown)
     {
-        mFixesShown(mFixShowing, mFixes);
+        mFixesShown(shown, mFixListModel.fixes());
     }
 }
 
@@ -2570,15 +2556,16 @@ void ALCodeEditor::fillFixList(S32 chosen)
     mFixList->setTextColor(textColor());
     mFixList->setSelectionColor(paint(Paint::WidgetSelection));
     mFixList->setBorderColor(paint(Paint::WidgetBorder));
+    const std::vector<Fix>&           fixes = mFixListModel.fixes();
     std::vector<ALChoiceList::Choice> choices;
     S32                               widest = 0;
     S32                               noted  = 0;
-    for (const Fix& fix : mFixes)
+    for (const Fix& fix : fixes)
     {
         ALChoiceList::Choice choice;
         choice.text = fix.title;
         choice.note = fix.note;
-        if (fix.suppress || isNothing(fix))
+        if (fix.suppress || ALFixListModel::isNothing(fix))
         {
             choice.color = paint(Paint::InlayHint);
         }
@@ -2589,92 +2576,52 @@ void ALCodeEditor::fillFixList(S32 chosen)
     const LLRect local = getLocalRect();
     const S32    width = llclamp(widest + (noted > 0 ? noted + 24 : 0) + 24, 120, llmax(120, local.getWidth() - 8));
     mFixList->setShape(LLRect(0, 40, width, 0));
-    mFixList->setChoices(std::move(choices), llclamp(chosen, 0, llmax(0, static_cast<S32>(mFixes.size()) - 1)));
+    mFixList->setChoices(std::move(choices), llclamp(chosen, 0, llmax(0, static_cast<S32>(fixes.size()) - 1)));
     // Under the caret where it is on the line, else under the line's text.
-    const S32          line  = mFixLine;
+    const S32          line  = mFixListModel.line();
     const ALTextPos    caret = this->caret();
     const std::string& text  = document().line(llclamp(line, 0, document().lineCount() - 1));
     const size_t       lead  = text.find_first_not_of(" \t");
     const ALTextPos    at    = caret.line == line ? caret : ALTextPos(line, lead == std::string::npos ? 0 : static_cast<S32>(lead));
-    placeListAt(*mFixList, at, llmin(static_cast<S32>(mFixes.size()), COMPLETION_ROWS), width);
+    placeListAt(*mFixList, at, llmin(static_cast<S32>(fixes.size()), COMPLETION_ROWS), width);
     mFixList->setVisible(true);
     showFixPreview();
 }
 
 void ALCodeEditor::noteFixes(U32 shown, const std::vector<std::string>& notes)
 {
-    if (shown != mFixShowing || !fixesOpen() || notes.size() != mFixes.size())
+    if (!fixesOpen() || !mFixListModel.note(shown, notes))
     {
         return;
-    }
-    for (size_t i = 0; i < notes.size(); ++i)
-    {
-        mFixes[i].note = notes[i];
     }
     fillFixList(mFixList->chosen());
 }
 
 void ALCodeEditor::supplyActions(const ALTextRange& at, std::vector<Fix> actions)
 {
-    if (!mActionsWanted || !(at == mActionsFor) || !(caret() == mActionsCaret) || isReadOnly())
+    if (isReadOnly())
     {
         return;
     }
-    mActionsWanted = false;
-    const S32        line = caret().line;
-    std::vector<Fix> fixes;
-    std::string      was;
-    if (fixesOpen())
+    const bool                            open   = fixesOpen();
+    std::optional<ALFixListModel::Joined> joined = mFixListModel.join(at, caret(), std::move(actions), open, open ? mFixList->chosen() : -1);
+    if (joined)
     {
-        fixes = mFixes;
-        const S32 chosen = mFixList->chosen();
-        if (chosen >= 0 && chosen < static_cast<S32>(fixes.size()))
-        {
-            was = fixes[chosen].title;
-        }
+        showFixes(caret().line, std::move(joined->fixes), joined->chosen);
     }
-    for (Fix& action : actions)
-    {
-        action.refactor = true;
-        fixes.push_back(std::move(action));
-    }
-    if (fixes.empty())
-    {
-        // Asked for, and nothing to offer: said, rather than nothing
-        // happening at all.
-        Fix none;
-        none.title = alSaid("CodeFixNone", "Nothing to fix or refactor here");
-        fixes.push_back(std::move(none));
-    }
-    else if (fixesOpen() && fixes.size() == mFixes.size())
-    {
-        return;
-    }
-    rankFixes(fixes);
-    // The choice stays on what was chosen: the refactors come in while the
-    // list is already being read.
-    S32 chosen = 0;
-    for (size_t i = 0; i < fixes.size() && !was.empty(); ++i)
-    {
-        if (fixes[i].title == was)
-        {
-            chosen = static_cast<S32>(i);
-            break;
-        }
-    }
-    showFixes(line, std::move(fixes), chosen);
 }
 
 void ALCodeEditor::showFixPreview()
 {
     const S32 index = fixesOpen() ? mFixList->chosen() : -1;
-    if (index < 0 || index >= static_cast<S32>(mFixes.size()) || isNothing(mFixes[index]))
+    const std::vector<Fix>& fixes = mFixListModel.fixes();
+    if (index < 0 || index >= static_cast<S32>(fixes.size()) || ALFixListModel::isNothing(fixes[index]))
     {
         hideCompletionDoc();
         return;
     }
     std::vector<char> kinds;
-    const std::string says = previewOf(document(), mFixes[index], kinds);
+    const std::string says = ALFixListModel::previewOf(document(), fixes[index], kinds);
     ALTextView& box = *sideBox();
     box.setText(says);
     std::vector<ALTextView::Style> styles;
@@ -2698,14 +2645,15 @@ void ALCodeEditor::showFixPreview()
 
 void ALCodeEditor::takeFix(S32 index)
 {
-    if (index < 0 || index >= static_cast<S32>(mFixes.size()))
+    const std::vector<Fix>& fixes = mFixListModel.fixes();
+    if (index < 0 || index >= static_cast<S32>(fixes.size()))
     {
         return;
     }
     // Made by whoever gave it, which knows whether the text is still the
     // one it was made for.
-    const LLSD value   = mFixes[index].value;
-    const bool nothing = isNothing(mFixes[index]);
+    const LLSD value   = fixes[index].value;
+    const bool nothing = ALFixListModel::isNothing(fixes[index]);
     closeFixes();
     if (mFixHandler && !nothing)
     {
@@ -2722,10 +2670,9 @@ bool ALCodeEditor::quickFix()
     }
     // The refactors come later, from the analyzer's thread: joined to the
     // list when they do, or making it where the line has no fixes.
-    mActionsFor    = selection().normalised();
-    mActionsCaret  = caret();
-    mActionsWanted = true;
-    mActionRequest(mActionsFor);
+    const ALTextRange at = selection().normalised();
+    mFixListModel.ask(at, caret());
+    mActionRequest(at);
     return true;
 }
 
@@ -4206,7 +4153,7 @@ void ALCodeEditor::showCard(const ALTextRange& about, const std::string& says, c
     {
         std::vector<Fix> fixes;
         mFixProvider(about.begin.line, fixes);
-        rankFixes(fixes);
+        ALFixListModel::rank(fixes);
         for (const Fix& fix : fixes)
         {
             LLStringUtil::format_map_t args;

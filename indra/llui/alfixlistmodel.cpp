@@ -24,19 +24,21 @@
 
 #include "linden_common.h"
 
-#include "alcodeeditor.h"
+#include "alfixlistmodel.h"
+
+#include "alsaid.h"
 
 #include <algorithm>
 
 // static
-void ALCodeEditor::rankFixes(std::vector<Fix>& fixes)
+void ALFixListModel::rank(std::vector<ALCodeFix>& fixes)
 {
-    const auto rank = [](const Fix& fix) { return fix.suppress ? 3 : fix.refactor ? 2 : fix.preferred ? 0 : 1; };
-    std::stable_sort(fixes.begin(), fixes.end(), [&rank](const Fix& a, const Fix& b) { return rank(a) < rank(b); });
+    const auto rank = [](const ALCodeFix& fix) { return fix.suppress ? 3 : fix.refactor ? 2 : fix.preferred ? 0 : 1; };
+    std::stable_sort(fixes.begin(), fixes.end(), [&rank](const ALCodeFix& a, const ALCodeFix& b) { return rank(a) < rank(b); });
 }
 
 // static
-std::string ALCodeEditor::fixedLines(const ALTextDocument& text, const Fix& fix, S32& first, S32& last)
+std::string ALFixListModel::fixedLines(const ALTextDocument& text, const ALCodeFix& fix, S32& first, S32& last)
 {
     first = S32_MAX;
     last  = -1;
@@ -93,7 +95,7 @@ std::string ALCodeEditor::fixedLines(const ALTextDocument& text, const Fix& fix,
 }
 
 // static
-std::string ALCodeEditor::previewOf(const ALTextDocument& text, const Fix& fix, std::vector<char>& kinds)
+std::string ALFixListModel::previewOf(const ALTextDocument& text, const ALCodeFix& fix, std::vector<char>& kinds)
 {
     // The lines it touches as they read and as they would, as a diff has
     // them: what goes in the error colour, what comes coloured as code. A
@@ -107,7 +109,7 @@ std::string ALCodeEditor::previewOf(const ALTextDocument& text, const Fix& fix, 
         one.first = one.first.normalised();
     }
     std::stable_sort(edits.begin(), edits.end(), [](const auto& a, const auto& b) { return a.first.begin < b.first.begin; });
-    std::vector<Fix> stretches;
+    std::vector<ALCodeFix> stretches;
     S32              reach = -1;
     for (const auto& one : edits)
     {
@@ -149,4 +151,86 @@ std::string ALCodeEditor::previewOf(const ALTextDocument& text, const Fix& fix, 
         }
     }
     return says;
+}
+
+U32 ALFixListModel::show(S32 line, std::vector<ALCodeFix> fixes)
+{
+    mFixes = std::move(fixes);
+    mLine  = line;
+    return ++mShowing;
+}
+
+void ALFixListModel::close()
+{
+    mFixes.clear();
+    mLine    = -1;
+    mAwaited = false;
+}
+
+bool ALFixListModel::note(U32 shown, const std::vector<std::string>& notes)
+{
+    if (shown != mShowing || notes.size() != mFixes.size())
+    {
+        return false;
+    }
+    for (size_t i = 0; i < notes.size(); ++i)
+    {
+        mFixes[i].note = notes[i];
+    }
+    return true;
+}
+
+void ALFixListModel::ask(const ALTextRange& at, const ALTextPos& caret)
+{
+    mAskedAt    = at;
+    mAskedCaret = caret;
+    mAwaited    = true;
+}
+
+std::optional<ALFixListModel::Joined> ALFixListModel::join(const ALTextRange& at, const ALTextPos& caret, std::vector<ALCodeFix> actions, bool open, S32 chosen)
+{
+    if (!mAwaited || !(at == mAskedAt) || !(caret == mAskedCaret))
+    {
+        return std::nullopt;
+    }
+    mAwaited = false;
+    Joined      joined;
+    std::string was;
+    if (open)
+    {
+        joined.fixes = mFixes;
+        if (chosen >= 0 && chosen < static_cast<S32>(joined.fixes.size()))
+        {
+            was = joined.fixes[chosen].title;
+        }
+    }
+    for (ALCodeFix& action : actions)
+    {
+        action.refactor = true;
+        joined.fixes.push_back(std::move(action));
+    }
+    if (joined.fixes.empty())
+    {
+        // Asked for, and nothing to offer: said, rather than nothing
+        // happening at all.
+        ALCodeFix none;
+        none.title = alSaid("CodeFixNone", "Nothing to fix or refactor here");
+        joined.fixes.push_back(std::move(none));
+    }
+    else if (open && joined.fixes.size() == mFixes.size())
+    {
+        return std::nullopt;
+    }
+    rank(joined.fixes);
+    // The choice stays on what was chosen: the refactors come in while the
+    // list is already being read.
+    for (size_t i = 0; i < joined.fixes.size() && !was.empty(); ++i)
+    {
+        if (joined.fixes[i].title == was)
+        {
+            joined.chosen = static_cast<S32>(i);
+            break;
+        }
+    }
+    return joined;
 }

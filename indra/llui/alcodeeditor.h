@@ -25,6 +25,7 @@
 #pragma once
 
 #include "alcompletionmodel.h"
+#include "alfixlistmodel.h"
 #include "altextview.h"
 
 #include <array>
@@ -447,27 +448,8 @@ public:
 
     // --- quick fixes -------------------------------------------------------------------
 
-    // What would put right a problem on a line: what it does, the edits it
-    // makes -- each a stretch and what goes in its place -- whether it is
-    // the one to take without asking, whether it only says the problem is
-    // wanted, and a value for whoever makes it. The editor lists fixes and
-    // previews them; the one taken is handed back by its value, and
-    // whoever supplied it makes it, knowing whether the text has moved on
-    // since the fixes were made.
-    struct Fix
-    {
-        std::string                                      title;
-        std::vector<std::pair<ALTextRange, std::string>> edits;
-        bool                                             preferred = false;
-        bool                                             suppress  = false;
-        // A change no problem asks for, which the list offers after what
-        // puts a problem right and before a suppression.
-        bool                                             refactor  = false;
-        LLSD                                             value;
-        // Said after its title, dim: what it would do beyond its words --
-        // what the script would weigh made, say -- where that is known.
-        std::string                                      note;
-    };
+    // What would put right a problem on a line (ALCodeFix).
+    typedef ALCodeFix Fix;
     typedef std::function<void(S32 line, std::vector<Fix>& out)> fix_provider_t;
     void setFixProvider(fix_provider_t provider) { mFixProvider = std::move(provider); }
     typedef std::function<void(const LLSD& value)> fix_handler_t;
@@ -486,18 +468,17 @@ public:
     bool                    openFixes(S32 line);
     bool                    fixesOpen() const;
     void                    closeFixes();
-    const std::vector<Fix>& fixes() const { return mFixes; }
-    // The lines a fix touches as they would read with it made, and which
-    // lines they are.
-    static std::string fixedLines(const ALTextDocument& text, const Fix& fix, S32& first, S32& last);
-    // What the preview shows of a fix: each stretch of lines it changes as
-    // they read and as they would, a line `- ` and `+ ` before each, edits
-    // a few lines apart or less in one stretch, and an ellipsis between
-    // stretches; `kinds` says each line's -- '-', '+' or ' '.
-    static std::string previewOf(const ALTextDocument& text, const Fix& fix, std::vector<char>& kinds);
-    // In the order they are offered: the preferred first, then the other
-    // fixes, the refactors, and a suppression last, each as given.
-    static void        rankFixes(std::vector<Fix>& fixes);
+    const std::vector<Fix>& fixes() const { return mFixListModel.fixes(); }
+    // What a fix would make of the lines it touches, and the preview of it
+    // (ALFixListModel).
+    static std::string fixedLines(const ALTextDocument& text, const Fix& fix, S32& first, S32& last)
+    {
+        return ALFixListModel::fixedLines(text, fix, first, last);
+    }
+    static std::string previewOf(const ALTextDocument& text, const Fix& fix, std::vector<char>& kinds)
+    {
+        return ALFixListModel::previewOf(text, fix, kinds);
+    }
     // Asked, as a quick fix opens the list, what could be done at the
     // caret, or to the stretch chosen, that no problem asks for; the
     // answer comes back through supplyActions when it is ready, the list
@@ -519,7 +500,7 @@ public:
     void noteFixes(U32 shown, const std::vector<std::string>& notes);
     // Whether the refactors asked for are still to come, and will make the
     // list again when they do.
-    bool actionsAwaited() const { return mActionsWanted; }
+    bool actionsAwaited() const { return mFixListModel.awaited(); }
 
     // --- hover -------------------------------------------------------------------
 
@@ -825,17 +806,11 @@ private:
     fix_provider_t          mFixProvider;
     fix_handler_t           mFixHandler;
     ALChoiceList*           mFixList = nullptr;
-    std::vector<Fix>        mFixes;
-    S32                     mFixLine = -1;
-    // Which showing of the list this is, counted from one, and who is told.
-    U32                     mFixShowing = 0;
+    // What the list holds (ALFixListModel); who is told each showing of
+    // it, and who is asked for the refactors.
+    ALFixListModel          mFixListModel;
     fixes_shown_t           mFixesShown;
-    // Where refactors were asked for, and where the caret was, while the
-    // quick fix that asked waits on them.
     action_request_t        mActionRequest;
-    ALTextRange             mActionsFor;
-    ALTextPos               mActionsCaret;
-    bool                    mActionsWanted = false;
     // One per line, as the marks are: what its problems offer.
     std::vector<U8>         mFixable;
     // What the list offers, as it narrows (ALCompletionModel).
