@@ -178,6 +178,8 @@
     <floater.string name="LevelNote">Note</floater.string>
     <floater.string name="NotRenamable">[NAME] is not this script's to rename.</floater.string>
     <floater.string name="RenameBadName">&quot;[NAME]&quot; is not a name.</floater.string>
+    <floater.string name="DeleteItemAsk">Delete &quot;[NAME]&quot; from the object? An item taken out of an object is gone for good.</floater.string>
+    <floater.string name="DeleteItemsAsk">Delete [COUNT] items from their objects? An item taken out of an object is gone for good.</floater.string>
     <floater.string name="RenameStale">The script changed before the rename; ask again.</floater.string>
     <floater.string name="RenamedHere">[PLACES] renamed to [NAME]</floater.string>
     <floater.string name="RenamedIn">[PLACES] renamed to [NAME] in [SCRIPTS]</floater.string>

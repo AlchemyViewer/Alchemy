@@ -1836,26 +1836,24 @@ A theme that comes with the viewer is called &quot;[NAME]&quot;. Save yours unde
 
   <notification
    icon="alertmodal.tga"
-   name="ScriptStudioDeleteItem"
-   type="alertmodal">
-Delete &quot;[NAME]&quot; from the object? An item taken out of an object is gone for good.
-    <tag>confirm</tag>
-    <usetemplate
-     name="okcancelbuttons"
-     notext="Cancel"
-     yestext="Delete"/>
-  </notification>
-
-  <notification
-   icon="alertmodal.tga"
    name="ScriptStudioDeleteItems"
    type="alertmodal">
-Delete [COUNT] items from their objects? An item taken out of an object is gone for good.
+[QUESTION]
     <tag>confirm</tag>
-    <usetemplate
-     name="okcancelbuttons"
-     notext="Cancel"
-     yestext="Delete"/>
+    <form name="form">
+      <ignore name="ignore"
+       session_only="true"
+       text="Confirm before deleting items from an object in Script Studio"/>
+      <button
+       default="true"
+       index="0"
+       name="Delete"
+       text="Delete"/>
+      <button
+       index="1"
+       name="Cancel"
+       text="Cancel"/>
+    </form>
   </notification>
 
   <notification

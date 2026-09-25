@@ -12327,8 +12327,17 @@ void ALFloaterScriptStudio::explorerDelete(const std::vector<ExplorerRow>& rows)
         const size_t           index  = holder ? holder->indexOf(row.ref()) : NONE;
         unsaved = unsaved || (index != NONE && holder->mDocs[index]->editor->isDirty() && holder->mDocs[index]->modifiable);
     }
-    const char* question = items.size() == 1 ? (unsaved ? "ScriptStudioDeleteItemOpen" : "ScriptStudioDeleteItem")
-                                             : (unsaved ? "ScriptStudioDeleteItemsOpen" : "ScriptStudioDeleteItems");
+    // Nothing unsaved in it: one question, one item or many, which may be
+    // left unasked for the rest of the session, as the build tools' is.
+    // With unsaved changes it is asked every time.
+    const char* question = unsaved ? (items.size() == 1 ? "ScriptStudioDeleteItemOpen" : "ScriptStudioDeleteItemsOpen") : "ScriptStudioDeleteItems";
+    if (!unsaved)
+    {
+        LLStringUtil::format_map_t words;
+        words["[NAME]"]  = items.front().name;
+        words["[COUNT]"] = std::to_string(items.size());
+        args["QUESTION"] = getString(items.size() == 1 ? "DeleteItemAsk" : "DeleteItemsAsk", words);
+    }
     const LLHandle<LLFloater> handle = getHandle();
     LLNotificationsUtil::add(question, args, LLSD(),
                              [handle, items](const LLSD& notification, const LLSD& response) {
