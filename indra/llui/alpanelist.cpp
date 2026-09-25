@@ -79,6 +79,21 @@ bool ALPaneList::handleKeyHere(KEY key, MASK mask)
     return LLScrollListCtrl::handleKeyHere(key, mask);
 }
 
+void ALPaneList::onFocusReceived()
+{
+    LLScrollListCtrl::onFocusReceived();
+    gEditMenuHandler = this;
+}
+
+void ALPaneList::onFocusLost()
+{
+    if (gEditMenuHandler == this)
+    {
+        gEditMenuHandler = nullptr;
+    }
+    LLScrollListCtrl::onFocusLost();
+}
+
 bool ALPaneList::handleMouseDown(S32 x, S32 y, MASK mask)
 {
     mPressed.clear();

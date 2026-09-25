@@ -89,6 +89,13 @@ public:
     void setDropHandler(drop_t handler) { mDropHandler = std::move(handler); }
 
     bool handleKeyHere(KEY key, MASK mask) override;
+    // The Edit menu's commands are the list's while it has the keyboard,
+    // as they are a text's: else they are whatever last took them, and
+    // with a prim chosen in the build tools that is the world's selection,
+    // whose Delete -- on the plain key, which the menu hears before the
+    // list does -- deletes the prim.
+    void onFocusReceived() override;
+    void onFocusLost() override;
     bool handleMouseDown(S32 x, S32 y, MASK mask) override;
     bool handleMouseUp(S32 x, S32 y, MASK mask) override;
     bool handleHover(S32 x, S32 y, MASK mask) override;

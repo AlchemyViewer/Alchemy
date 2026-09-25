@@ -260,4 +260,27 @@ namespace tut
         ensure("over no row, none", !defined && accept == ACCEPT_NO);
         ensure_equals("and nothing lit", l.getHighlightedItemInx(), -1);
     }
+
+    template<> template<>
+    void alpanelist_object::test<6>()
+    {
+        set_test_name("with the keyboard, the list has the Edit menu's commands, and none of them deletes; without it, it lets them go");
+        // What had them before: the world's selection, say, whose Delete
+        // deletes a prim.
+        struct World final : public LLEditMenuHandler
+        {
+            LLView* asView() override { return nullptr; }
+            bool    canDoDelete() const override { return true; }
+        } world;
+        LLEditMenuHandler::gEditMenuHandler = &world;
+        ALPaneList& pane = make();
+        add("one", 0);
+        pane.selectFirstItem();
+        pane.setFocus(true);
+        ensure("the list's while it has the keyboard", LLEditMenuHandler::gEditMenuHandler == &pane);
+        ensure("and a Delete there is nothing's", !LLEditMenuHandler::gEditMenuHandler->canDoDelete());
+        ensure("a copy is the rows'", LLEditMenuHandler::gEditMenuHandler->canCopy());
+        pane.setFocus(false);
+        ensure("let go of with it", LLEditMenuHandler::gEditMenuHandler == nullptr);
+    }
 }
