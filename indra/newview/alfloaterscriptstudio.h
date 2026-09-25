@@ -243,6 +243,11 @@ private:
         // find, go to a line, fold, copy, undo -- act on, and whose caret
         // the trailer reads.
         View          shownView() const { return view == View::Expanded && expandedEditor ? View::Expanded : View::Source; }
+        // Whether a save has anything to send: the text changed, or a
+        // compile target or an experience picked for the next save to set --
+        // what the tab's dot, Save All and a close all go by. What is kept
+        // against a crash is the text alone.
+        bool          unsaved() const { return (editor && editor->isDirty()) || targetChosen || experienceChosen; }
         ALCodeEditor* shownText() const { return shownView() == View::Expanded ? expandedEditor : editor; }
         // A notecard rather than a script: plain text, saved as a
         // notecard with the items it came with, never analysed.
@@ -430,8 +435,11 @@ private:
         // no longer what was compiled or run.
         boost::signals2::scoped_connection         placedEdits;
         // Text brought from another window, put in place of the server's
-        // once that has loaded.
+        // once that has loaded; and a compile target and an experience
+        // picked there for the next save, picked again here once it has.
         std::optional<std::string>                 carriedText;
+        std::optional<std::string>                 carriedTarget;
+        std::optional<LLUUID>                      carriedExperience;
         // A line to go to once the script has loaded, or -1; and a
         // stretch of it to select, where a column is given.
         S32                                        pendingLine   = -1;

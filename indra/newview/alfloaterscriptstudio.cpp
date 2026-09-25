@@ -1328,7 +1328,7 @@ void ALFloaterScriptStudio::closeFloater(bool app_quitting)
     std::string one;
     for (const std::unique_ptr<Doc>& doc : mDocs)
     {
-        if (doc->loaded && doc->modifiable && doc->editor->isDirty())
+        if (doc->loaded && doc->modifiable && doc->unsaved())
         {
             ++unsaved;
             one = doc->name;
@@ -2531,6 +2531,18 @@ void ALFloaterScriptStudio::loaded(const ALScriptWorkspace::Loaded& answer)
     doc.experienceChosen = false;
     doc.modifiable       = answer.modifiable;
     doc.notecard         = answer.notecard;
+    // What was picked for the next save in the window it came from, picked
+    // here, over what the item says.
+    if (const std::optional<std::string> target = std::exchange(doc.carriedTarget, std::nullopt); target && answer.error.empty())
+    {
+        doc.language.compileTarget = *target;
+        doc.targetChosen           = true;
+    }
+    if (const std::optional<LLUUID> experience = std::exchange(doc.carriedExperience, std::nullopt); experience && answer.error.empty())
+    {
+        doc.experience       = *experience;
+        doc.experienceChosen = true;
+    }
     if (doc.recovering && (!answer.error.empty() || !answer.modifiable))
     {
         // Opened to take up a kept text, and what it came from cannot be
@@ -4579,7 +4591,7 @@ void ALFloaterScriptStudio::fillTabs()
         const Doc& doc = *mDocs[i];
         facts[i].id    = doc.id;
         facts[i].name  = doc.name;
-        facts[i].dirty = doc.editor->isDirty();
+        facts[i].dirty = doc.unsaved();
         facts[i].preview = doc.preview;
         facts[i].readOnly = doc.loaded && !doc.modifiable;
         facts[i].image = imageNameOf(doc);
@@ -5002,7 +5014,7 @@ bool ALFloaterScriptStudio::vimCommand(ALTextView& view, const std::string& name
     }
     if (name == "wq" || name == "x" || name == "xit" || name == "wq!" || name == "x!")
     {
-        if (doc->editor->isDirty() && doc->modifiable)
+        if (doc->unsaved() && doc->modifiable)
         {
             saveToClose(doc->id);
         }
@@ -5251,7 +5263,7 @@ void ALFloaterScriptStudio::onTabAction(const std::string& action)
         for (const std::unique_ptr<Doc>& each : mDocs)
         {
             const bool other = each.get() != doc;
-            if ((action == "close_others" && other) || action == "close_all" || (action == "close_saved" && !each->editor->isDirty()))
+            if ((action == "close_others" && other) || action == "close_all" || (action == "close_saved" && !each->unsaved()))
             {
                 ids.push_back(each->id);
             }
@@ -5344,7 +5356,7 @@ void ALFloaterScriptStudio::refreshToolbar()
     bool anyDirty = false;
     for (const std::unique_ptr<Doc>& each : mDocs)
     {
-        anyDirty = anyDirty || (each->editor->isDirty() && each->modifiable);
+        anyDirty = anyDirty || (each->unsaved() && each->modifiable);
     }
     mSaveAllButton->setEnabled(anyDirty);
     mUndoButton->setEnabled(doc && doc->shownText()->canUndo());
@@ -5602,7 +5614,7 @@ void ALFloaterScriptStudio::saveAll()
 {
     for (std::unique_ptr<Doc>& doc : mDocs)
     {
-        if (doc->editor->isDirty())
+        if (doc->unsaved())
         {
             save(*doc);
         }
@@ -5690,6 +5702,8 @@ void ALFloaterScriptStudio::compiledHere(const ALScriptWorkspace::CompileResult&
             doc.experience      = *result.experience;
             doc.experienceKnown = true;
         }
+        // Nothing picked waits on a save any more.
+        fillTabs();
         keepSavedWeights(doc);
     }
     if (result.newAssetId.notNull())
@@ -5828,7 +5842,7 @@ bool ALFloaterScriptStudio::sendQueuedSave(Doc& doc)
 {
     // Asked for while the last was on its way, and something is unsaved
     // still: sent now, and a close waiting on the save waits on this one.
-    if (!std::exchange(doc.saveAgain, false) || !doc.editor->isDirty())
+    if (!std::exchange(doc.saveAgain, false) || !doc.unsaved())
     {
         return false;
     }
@@ -11548,7 +11562,7 @@ void ALFloaterScriptStudio::closeWindowAnswered(S32 option)
     for (size_t i = mDocs.size(); i-- > 0;)
     {
         Doc& doc = *mDocs[i];
-        if (option == 0 && doc.editor->isDirty() && doc.modifiable)
+        if (option == 0 && doc.unsaved() && doc.modifiable)
         {
             saving.push_back(doc.id);
         }
@@ -11628,7 +11642,7 @@ void ALFloaterScriptStudio::continueClosing()
             ++i;
             continue;
         }
-        if (doc.editor->isDirty() && doc.modifiable)
+        if (doc.unsaved() && doc.modifiable)
         {
             // Asked; the answer carries on from here, or stops.
             closeDocument(doc.id);
@@ -11780,6 +11794,15 @@ bool ALFloaterScriptStudio::moveActiveTo(ALFloaterScriptStudio* window)
         {
             Doc& there = *window->mDocs[moved];
             there.recovering = moving;
+            // And what was picked for its next save.
+            if (doc->targetChosen)
+            {
+                there.carriedTarget = doc->language.compileTarget;
+            }
+            if (doc->experienceChosen)
+            {
+                there.carriedExperience = doc->experience;
+            }
             if (doc->notecard)
             {
                 there.carriedEmbedded = doc->embedded;
@@ -15470,7 +15493,7 @@ void ALFloaterScriptStudio::closeDocument(std::string_view id)
         return;
     }
     Doc& doc = *mDocs[index];
-    if (doc.editor->isDirty() && doc.modifiable)
+    if (doc.unsaved() && doc.modifiable)
     {
         LLSD args;
         args["NAME"]                     = doc.name;
@@ -15524,7 +15547,7 @@ void ALFloaterScriptStudio::closeMany(const std::vector<std::string>& ids)
         {
             continue;
         }
-        if (mDocs[index]->editor->isDirty() && mDocs[index]->modifiable)
+        if (mDocs[index]->unsaved() && mDocs[index]->modifiable)
         {
             unsaved.push_back(id);
         }
@@ -16121,7 +16144,7 @@ bool ALFloaterScriptStudio::onMenuEnable(const LLSD& param)
     {
         for (const std::unique_ptr<Doc>& each : mDocs)
         {
-            if (each->editor->isDirty() && each->modifiable)
+            if (each->unsaved() && each->modifiable)
             {
                 return true;
             }
@@ -16442,6 +16465,9 @@ void ALFloaterScriptStudio::onCompileTarget()
         // says the script compiles for meanwhile. What the script is --
         // its grammar, its words -- stays what the item says.
         doc->targetChosen = true;
+        // An unsaved change, as the tab says.
+        fillTabs();
+        refreshToolbar();
     }
 }
 
@@ -16600,6 +16626,8 @@ void ALFloaterScriptStudio::onExperience()
     args["[NAME]"] = doc->name;
     args["[EXPERIENCE]"] = mExperience->getSelectedItemLabel();
     setStatus(getString(picked.isNull() ? "ExperienceClearedOnSave" : "ExperienceSetOnSave", args));
+    // An unsaved change, as the tab says.
+    fillTabs();
     refreshToolbar();
 }
 
