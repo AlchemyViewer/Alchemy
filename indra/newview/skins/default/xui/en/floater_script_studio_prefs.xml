@@ -1039,9 +1039,10 @@ end</floater.string>
              layout="topleft"
              left_pad="4"
              name="luau_mode"
-             tool_tip="How strictly a script is type checked where neither a --!strict comment nor a .luaurc says"
+             tool_tip="How strictly a script is type checked where neither a --!strict comment nor a .luaurc says. As the solver suits: nonstrict with the old solver, as the grid compiles, and strict with the new, whose nonstrict reports only a checked function called wrongly"
              top_delta="-3"
              width="210">
+                <combo_box.item label="As the solver suits" name="auto" value="auto" />
                 <combo_box.item label="Nonstrict, as the grid compiles" name="nonstrict" value="nonstrict" />
                 <combo_box.item label="Strict" name="strict" value="strict" />
                 <combo_box.item label="No checking" name="nocheck" value="nocheck" />
@@ -1063,7 +1064,7 @@ end</floater.string>
              layout="topleft"
              left_pad="4"
              name="luau_solver"
-             tool_tip="Which of Luau's two type solvers checks SLua scripts. The new one works out more of what a script's types are, and finds some mistakes the old one misses and misses some it finds; it can take longer, and some of its messages are shown in English whatever the viewer's language"
+             tool_tip="Which of Luau's two type solvers checks SLua scripts. The new one works out more of what a script's types are, and finds some mistakes the old one misses and misses some it finds; it can take longer, and some of its messages are shown in English whatever the viewer's language. Its nonstrict finds little, so a script left to the solver is checked strict by it"
              top_delta="-3"
              width="210">
                 <combo_box.item label="Old" name="old" value="old" />

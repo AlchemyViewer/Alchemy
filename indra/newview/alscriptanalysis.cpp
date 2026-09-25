@@ -542,7 +542,7 @@ namespace ALScriptLints
     void reset()
     {
         gSavedSettings.setLLSD("ALScriptLintLevels", LLSD::emptyMap());
-        gSavedSettings.setString("ALScriptLuauMode", "nonstrict");
+        gSavedSettings.setString("ALScriptLuauMode", "auto");
         gSavedSettings.setString("ALScriptLuauSolver", "old");
     }
 
@@ -593,8 +593,19 @@ namespace ALScriptLints
                     break;
             }
         }
+        // Left to the solver: the new one's nonstrict reports only a
+        // checked function called wrongly, so a script it checks is
+        // checked strict unless something says otherwise; the old one's
+        // nonstrict is how the grid compiles.
         const std::string mode = gSavedSettings.getString("ALScriptLuauMode");
-        base.mode              = mode == "strict" || mode == "nocheck" ? mode : std::string("nonstrict");
+        if (mode == "strict" || mode == "nocheck" || mode == "nonstrict")
+        {
+            base.mode = mode;
+        }
+        else
+        {
+            base.mode = gSavedSettings.getString("ALScriptLuauSolver") == "new" ? "strict" : "nonstrict";
+        }
         return base;
     }
 }

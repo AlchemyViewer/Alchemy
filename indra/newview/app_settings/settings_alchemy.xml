@@ -489,13 +489,13 @@
         <key>ALScriptLuauMode</key>
         <map>
             <key>Comment</key>
-            <string>The type checking an SLua script is analyzed in where neither a --! comment nor a .luaurc says: "nonstrict", as the grid compiles, "strict" or "nocheck".</string>
+            <string>The type checking an SLua script is analyzed in where neither a --! comment nor a .luaurc says: "auto", nonstrict with the old type solver and strict with the new, whose nonstrict finds little; "nonstrict", as the grid compiles; "strict"; or "nocheck".</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
             <string>String</string>
             <key>Value</key>
-            <string>nonstrict</string>
+            <string>auto</string>
         </map>
         <key>ALScriptLuauSolver</key>
         <map>
