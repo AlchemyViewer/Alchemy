@@ -2297,35 +2297,39 @@ void ALCodeEditor::refreshCompletion()
     }
     // What was answered about this word, narrowed to the prefix as typed
     // now; what was known already keeps its place, and what is new about
-    // it fills what was empty.
+    // it fills what was empty. Each found by its name, not by a walk of
+    // the list for each answer.
+    boost::unordered_flat_map<std::string, size_t, ll::string_hash, std::equal_to<>> listed;
+    if (!mSupplied.empty())
+    {
+        listed.reserve(mCompletions.size() + mSupplied.size());
+        for (size_t i = 0; i < mCompletions.size(); ++i)
+        {
+            listed.emplace(mCompletions[i].text, i);
+        }
+    }
     for (const Completion& c : mSupplied)
     {
         if (matchTier(c.text, prefix) < 0)
         {
             continue;
         }
-        bool known = false;
-        for (Completion& have : mCompletions)
+        if (const auto known = listed.find(c.text); known != listed.end())
         {
-            if (have.text == c.text)
+            Completion& have = mCompletions[known->second];
+            if (have.detail.empty())
             {
-                known = true;
-                if (have.detail.empty())
-                {
-                    have.detail = c.detail;
-                    have.kind   = c.kind;
-                }
-                if (have.documentation.empty())
-                {
-                    have.documentation = c.documentation;
-                }
-                break;
+                have.detail = c.detail;
+                have.kind   = c.kind;
             }
+            if (have.documentation.empty())
+            {
+                have.documentation = c.documentation;
+            }
+            continue;
         }
-        if (!known)
-        {
-            mCompletions.push_back(c);
-        }
+        listed.emplace(c.text, mCompletions.size());
+        mCompletions.push_back(c);
     }
     if (head.empty())
     {
@@ -2443,11 +2447,38 @@ namespace
     // was typed is answered once and remembered, since a word of many
     // parts starting alike would otherwise be tried every way there is --
     // `a_a_a_a...` against a near miss, over and again at every keystroke.
+    //
+    // Asked of nearly every name at every keystroke, and refused by most:
+    // refused cheaply first where a letter typed is not in the word in
+    // its turn, or the first begins no part of it; and the table kept
+    // from one word to the next rather than made for each.
     bool byParts(std::string_view word, std::string_view typed)
     {
-        const size_t        across = word.size() + 1;
-        std::vector<U8>     known((typed.size() + 1) * across * 2, 0);
-        std::function<bool(size_t, size_t, bool)> fits = [&](size_t j, size_t i, bool running) -> bool {
+        size_t at = 0;
+        for (const char c : typed)
+        {
+            while (at < word.size() && !sameLetter(word[at], c))
+            {
+                ++at;
+            }
+            if (at++ == word.size())
+            {
+                return false;
+            }
+        }
+        bool begins = false;
+        for (size_t k = 0; k < word.size() && !begins; ++k)
+        {
+            begins = partAt(word, k) && sameLetter(word[k], typed.front());
+        }
+        if (!begins)
+        {
+            return false;
+        }
+        thread_local std::vector<U8> known;
+        const size_t                 across = word.size() + 1;
+        known.assign((typed.size() + 1) * across * 2, 0);
+        const auto fits = [&](const auto& self, size_t j, size_t i, bool running) -> bool {
             if (i == typed.size())
             {
                 return true;
@@ -2457,15 +2488,15 @@ namespace
             {
                 return seen == 2;
             }
-            bool ok = running && j < word.size() && sameLetter(word[j], typed[i]) && fits(j + 1, i + 1, true);
+            bool ok = running && j < word.size() && sameLetter(word[j], typed[i]) && self(self, j + 1, i + 1, true);
             for (size_t k = j; !ok && k < word.size(); ++k)
             {
-                ok = partAt(word, k) && sameLetter(word[k], typed[i]) && fits(k + 1, i + 1, true);
+                ok = partAt(word, k) && sameLetter(word[k], typed[i]) && self(self, k + 1, i + 1, true);
             }
             seen = ok ? 2 : 1;
             return ok;
         };
-        return fits(0, 0, false);
+        return fits(fits, 0, 0, false);
     }
 }
 
