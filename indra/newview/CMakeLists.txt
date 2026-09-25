@@ -185,6 +185,7 @@ if(AL_BUILD_VIEWER)
     alscriptsearch.cpp
     alscriptsearchpane.cpp
     alscriptstudiodoc.cpp
+    alscriptstudiorecovery.cpp
     alscriptstudiosave.cpp
     alscriptweightspane.cpp
     alscriptworkspace.cpp
