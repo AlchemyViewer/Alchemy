@@ -4962,7 +4962,7 @@ void ALFloaterScriptStudio::refreshBottomTabs()
     title("output_tab", getString(mOutputPane && mOutputPane->unread() ? "TabOutputUnread" : "TabOutput"));
 }
 
-void ALFloaterScriptStudio::goToProblem(Doc& doc, S32 direction)
+std::vector<ALTextPos> ALFloaterScriptStudio::problemPlaces(const Doc& doc) const
 {
     // The script's own problems, each place once and in order; not the
     // note about the definitions, which is about no place.
@@ -4977,6 +4977,41 @@ void ALFloaterScriptStudio::goToProblem(Doc& doc, S32 direction)
     }
     std::sort(places.begin(), places.end());
     places.erase(std::unique(places.begin(), places.end()), places.end());
+    return places;
+}
+
+void ALFloaterScriptStudio::goToProblemAt(Doc& doc, const ALTextPos& to)
+{
+    noteJump();
+    ALCodeEditor& source = sourceInFront(doc);
+    source.goTo(ALTextRange(to, to));
+    source.setFocus(true);
+    showProblemCard(doc, to);
+}
+
+bool ALFloaterScriptStudio::goToProblemNumber(Doc& doc, S32 number)
+{
+    const std::vector<ALTextPos> places = problemPlaces(doc);
+    if (places.empty())
+    {
+        return false;
+    }
+    // Counted from 1, or back from -1 the last, past either end the one
+    // at that end; 0 the one at the caret or the next after it.
+    const S32 count = static_cast<S32>(places.size());
+    S32       index = number > 0 ? llmin(number, count) - 1 : llmax(count + number, 0);
+    if (number == 0)
+    {
+        const ALTextPos caret = sourceInFront(doc).selection().normalised().begin;
+        index = static_cast<S32>(std::lower_bound(places.begin(), places.end(), caret) - places.begin()) % count;
+    }
+    goToProblemAt(doc, places[index]);
+    return true;
+}
+
+void ALFloaterScriptStudio::goToProblem(Doc& doc, S32 direction)
+{
+    const std::vector<ALTextPos> places = problemPlaces(doc);
     if (places.empty())
     {
         LLStringUtil::format_map_t args;
@@ -4986,7 +5021,6 @@ void ALFloaterScriptStudio::goToProblem(Doc& doc, S32 direction)
     }
     // From the caret, round past the end to the other: the source's, where
     // the problems are.
-    noteJump();
     ALCodeEditor&     source    = sourceInFront(doc);
     const ALTextRange selection = source.selection().normalised();
     ALTextPos         to        = direction > 0 ? places.front() : places.back();
@@ -5006,9 +5040,7 @@ void ALFloaterScriptStudio::goToProblem(Doc& doc, S32 direction)
             to = *(next - 1);
         }
     }
-    source.goTo(ALTextRange(to, to));
-    source.setFocus(true);
-    showProblemCard(doc, to);
+    goToProblemAt(doc, to);
 }
 
 void ALFloaterScriptStudio::showProblemCard(Doc& doc, const ALTextPos& at)

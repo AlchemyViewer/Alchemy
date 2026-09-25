@@ -119,6 +119,13 @@ namespace
             return bool(out);
         }
         std::vector<std::string> fileFolders(const Doc&) const override { return folders; }
+        bool goToProblemNumber(Doc&, S32 number) override
+        {
+            problemNumbers.push_back(number);
+            return hasProblems;
+        }
+        std::vector<S32> problemNumbers;
+        bool             hasProblems = true;
 
         al_studio_test::FakeServices*               services = nullptr;
         std::vector<std::string>                    folders;
@@ -147,6 +154,7 @@ namespace tut
         // The table's commands run, by name; and two of its toggles.
         Names                              ran;
         bool                               lineNumbers = false, relativeNumbers = false;
+        bool                               problemsThere = false, problemsShown = false;
         // A folder of files, where a test makes one.
         std::string                        folder;
 
@@ -194,10 +202,21 @@ namespace tut
             {
                 skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
             }
-            for (const char* name : { "save", "close", "save_all", "format", "quick_fix", "fix_all", "problems" })
+            for (const char* name : { "save", "close", "save_all", "format", "quick_fix", "fix_all" })
             {
                 commands.add(name, [this, name]() { ran.push_back(name); });
             }
+            for (const char* name : { "next_problem", "previous_problem" })
+            {
+                commands.add(name, [this, name]() { ran.push_back(name); }, [this]() { return problemsThere; });
+            }
+            commands.add(
+                "problems",
+                [this]() {
+                    ran.push_back("problems");
+                    problemsShown = !problemsShown;
+                },
+                nullptr, [this]() { return problemsShown; });
             commands.add("revert", [this]() { ran.push_back("revert"); }, []() { return false; });
             commands.add(
                 "line_numbers",
@@ -663,5 +682,50 @@ namespace tut
         ensure("hidden where a dot is typed", offered("e", ".") == Names{ ".hidden" });
         ensure("where a whole path says", offered("tabe", folder + "/li") == Names{ folder + "/lib/" });
         ensure("not after anything else", offered("q", std::string()).empty());
+    }
+
+    template<> template<>
+    void alscriptstudiovim_object::test<14>()
+    {
+        set_test_name("the Problems tab is vim's quickfix and location lists: :cn and :cp step, :cc by number, :cfirst, :clast, :copen, :cclose");
+        make();
+        Doc&         a    = tab("a");
+        ALVimKeymap* said = vimOver(a);
+        ex(a, "cn");
+        ensure_equals("none: said", said->message(), std::string("VimNoErrors"));
+        ensure("nothing run", ran.empty());
+
+        problemsThere = true;
+        ensure(":cn, :cnext 2, :lne", ex(a, "cn") && ex(a, "cnext", "2") && ex(a, "lne"));
+        ensure("each a step", ran == Names(4, "next_problem"));
+        ran.clear();
+        ensure(":cp, :cN, :lprevious 2", ex(a, "cp") && ex(a, "cN") && ex(a, "lprevious", "2"));
+        ensure("each a step back", ran == Names(4, "previous_problem"));
+        ex(a, "cn", "x");
+        ensure_equals("a count that is none", said->message(), std::string("VimBadArgument"));
+
+        for (const auto& [name, args] : { std::pair{ "cc", "3" }, std::pair{ "cc", "" }, std::pair{ "ll", "2" },
+                                          std::pair{ "cfirst", "" }, std::pair{ "cr", "" }, std::pair{ "lfir", "" },
+                                          std::pair{ "clast", "" }, std::pair{ "lla", "" } })
+        {
+            ensure(name, ex(a, name, args));
+        }
+        ensure("by number: 0 at the caret, 1 the first, -1 the last",
+               studio.problemNumbers == std::vector<S32>{ 3, 0, 2, 1, 1, 1, -1, -1 });
+        studio.hasProblems = false;
+        ex(a, "cc", "1");
+        ensure_equals("none to go to: said", said->message(), std::string("VimNoErrors"));
+
+        ran.clear();
+        ex(a, "copen");
+        ensure(":copen shows the tab", ran == Names{ "problems" } && problemsShown);
+        ex(a, "cw");
+        ensure("shown already: left", ran.size() == 1);
+        ex(a, "ccl");
+        ensure(":cclose folds it", ran.size() == 2 && !problemsShown);
+        ex(a, "lcl");
+        ensure("folded already: left", ran.size() == 2);
+        ex(a, "clist");
+        ensure(":clist shows it", problemsShown);
     }
 }

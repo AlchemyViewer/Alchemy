@@ -93,6 +93,10 @@ public:
         // the folder of the tab's own file, where it is one, then the
         // include folders.
         virtual std::vector<std::string> fileFolders(const Doc& doc) const = 0;
+        // The caret to a problem of the tab's by its number, counted from 1
+        // or back from -1, past either end the one at that end; 0 the one
+        // at the caret or after it. False where it has none.
+        virtual bool goToProblemNumber(Doc& doc, S32 number) = 0;
 
     protected:
         ~Window() = default;
@@ -151,6 +155,10 @@ private:
     std::string pathOf(const Doc& doc, const std::string& name, bool existing);
     // The files and folders on disk a word typed may be the start of.
     void completeFile(const std::string& typed, std::vector<std::string>& out);
+    // The Problems tab as vim's quickfix and location lists, which are one
+    // list here, the tab in front's: :cn, :cp, :cc, :cfirst, :clast,
+    // :copen, :cclose, :clist and the :l ones. False for any other.
+    bool problemCommand(ALTextView& view, Doc& doc, const std::string& name, const std::string& args);
     // An entry for the Output tab, of vim's.
     ALOutputView::Entry listing() const;
     // Said where vim says things, as an error or not; in the status line

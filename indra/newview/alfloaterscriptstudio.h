@@ -216,6 +216,11 @@ private:
     // The caret to the next problem of the script after it, or the one
     // before, round past the ends, with what it says in a card.
     void                goToProblem(Doc& doc, S32 direction);
+    // The script's own problems' places, each once and in order; the caret
+    // taken to one; and to one by its number (ALScriptStudioVim::Window).
+    std::vector<ALTextPos> problemPlaces(const Doc& doc) const;
+    void                   goToProblemAt(Doc& doc, const ALTextPos& to);
+    bool                   goToProblemNumber(Doc& doc, S32 number) override;
     // What a comment says is wanted dropped from the script's problems,
     // and a comment that would say so offered for every lint left.
     void                noLint(Doc& doc);

@@ -195,7 +195,7 @@ bool ALScriptStudioVim::command(ALTextView& view, const std::string& name, const
     {
         return false;
     }
-    if (fileCommand(view, *doc, name, args))
+    if (fileCommand(view, *doc, name, args) || problemCommand(view, *doc, name, args))
     {
         return true;
     }
@@ -323,11 +323,14 @@ void ALScriptStudioVim::complete(const std::string& command, const std::string& 
     // The names command answers to, in their long forms, and the menu's
     // actions; what :set and :history take after them, and the tabs'
     // names after :b and :bd.
-    static const char* NAMES[]   = { "bNext",    "bdelete",  "bfirst",   "blast",   "bnext",       "bprevious", "brewind",   "buffer",
-                                     "buffers",  "bunload",  "bwipeout", "close",   "edit",        "files",     "fix",       "fixall",
-                                     "history",  "ls",       "qall",     "quit",    "read",        "tabNext",   "tabclose",  "tabedit",
-                                     "tabfirst", "tablast",  "tabmove",  "tabnew",  "tabnext",     "tabonly",   "tabprevious", "tabrewind",
-                                     "update",   "wall",     "wq",       "wqall",   "write",       "xall",      "xit" };
+    static const char* NAMES[] = { "bNext",   "bdelete",   "bfirst",    "blast",   "bnext",     "bprevious", "brewind",  "buffer",
+                                   "buffers", "bunload",   "bwipeout",  "cNext",   "cclose",    "cfirst",    "clast",    "clist",
+                                   "close",   "cnext",     "copen",     "cprevious", "crewind", "cwindow",   "edit",     "files",
+                                   "fix",     "fixall",    "history",   "lNext",   "lclose",    "lfirst",    "llast",    "llist",
+                                   "lnext",   "lopen",     "lprevious", "lrewind", "ls",        "lwindow",   "qall",     "quit",
+                                   "read",    "tabNext",   "tabclose",  "tabedit", "tabfirst",  "tablast",   "tabmove",  "tabnew",
+                                   "tabnext", "tabonly",   "tabprevious", "tabrewind", "update", "wall",     "wq",       "wqall",
+                                   "write",   "xall",      "xit" };
     static const char* OPTIONS[] = { "number", "nonumber", "relativenumber", "norelativenumber" };
     static const char* KINDS[]   = { "all", "cmd", "search" };
     if (command.empty())
@@ -899,6 +902,65 @@ bool ALScriptStudioVim::fileCommand(ALTextView& view, Doc& doc, const std::strin
                     mWindow.closeDocument(id);
                 }
             }
+        }
+        return true;
+    }
+    return false;
+}
+
+bool ALScriptStudioVim::problemCommand(ALTextView& view, Doc& doc, const std::string& name, const std::string& args)
+{
+    // Each of vim's list commands, as its quickfix and location list names
+    // it.
+    auto either = [&name](const char* least, const char* whole, const char* l_least, const char* l_whole) {
+        return abbreviates(name, least, whole) || abbreviates(name, l_least, l_whole);
+    };
+    const bool next     = either("cn", "cnext", "lne", "lnext");
+    const bool previous = either("cp", "cprevious", "lp", "lprevious") || either("cN", "cNext", "lN", "lNext");
+    if (next || previous)
+    {
+        const char* step  = next ? "next_problem" : "previous_problem";
+        const S32   times = args.empty() ? 1 : numberOf(args);
+        if (times < 1)
+        {
+            fail(view, mServices.words("VimBadArgument"));
+            return true;
+        }
+        if (!mCommands.enabled(step))
+        {
+            fail(view, mServices.words("VimNoErrors"));
+            return true;
+        }
+        for (S32 n = 0; n < times; ++n)
+        {
+            mCommands.run(step);
+        }
+        return true;
+    }
+    const bool first = either("cfir", "cfirst", "lfir", "lfirst") || either("cr", "crewind", "lr", "lrewind");
+    const bool last  = either("cla", "clast", "lla", "llast");
+    if (name == "cc" || name == "ll" || first || last)
+    {
+        const S32 number = first ? 1 : last ? -1 : args.empty() ? 0 : numberOf(args);
+        if (number < 0 && !last)
+        {
+            fail(view, mServices.words("VimBadArgument"));
+        }
+        else if (!mWindow.goToProblemNumber(doc, number))
+        {
+            fail(view, mServices.words("VimNoErrors"));
+        }
+        return true;
+    }
+    // The tab shown, folded: the table's toggle, where it is not so already.
+    const bool open = either("cope", "copen", "lop", "lopen") || either("cw", "cwindow", "lw", "lwindow") ||
+                      either("cl", "clist", "lli", "llist");
+    const bool close = either("ccl", "cclose", "lcl", "lclose");
+    if (open || close)
+    {
+        if (mCommands.checked("problems") != open)
+        {
+            mCommands.run("problems");
         }
         return true;
     }
