@@ -400,6 +400,12 @@ public:
     // replaceAll. Nothing is asked with the caret on no identifier.
     typedef std::function<void(ALEditorCommand command, const ALTextRange& word)> symbol_request_t;
     void setSymbolRequest(symbol_request_t request) { mSymbolRequest = std::move(request); }
+    // What a place leads to of itself, asked before the identifier there
+    // by Go to Definition and Control-click: an include's name, a
+    // module's, anywhere on the line that names it. The stretch it covers,
+    // or an empty one for nothing; and gone to where `follow`.
+    typedef std::function<ALTextRange(const ALTextPos& at, bool follow)> link_request_t;
+    void setLinkRequest(link_request_t request) { mLinkRequest = std::move(request); }
     // The identifier at a position -- letters, digits and underscores,
     // which is narrower than a word to the document, where a dot between
     // letters joins them as it does in "e.g." -- or an empty range. The
@@ -784,6 +790,7 @@ private:
     hover_request_t         mHoverRequest;
     signature_request_t     mSignatureRequest;
     symbol_request_t        mSymbolRequest;
+    link_request_t          mLinkRequest;
     ALChoiceList*           mCompletionList = nullptr;
     ALTextView*             mCompletionDoc  = nullptr;
     fix_provider_t          mFixProvider;

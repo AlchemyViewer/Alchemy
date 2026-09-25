@@ -2679,6 +2679,10 @@ bool ALCodeEditor::mapMark(S32 line, LLColor4& color) const
 
 bool ALCodeEditor::canSymbol(ALEditorCommand command) const
 {
+    if (command == ALEditorCommand::GoToDefinition && mLinkRequest && !mLinkRequest(caret(), false).empty())
+    {
+        return true;
+    }
     if (!mSymbolRequest || (command == ALEditorCommand::Rename && isReadOnly()))
     {
         return false;
@@ -2693,6 +2697,11 @@ bool ALCodeEditor::performSymbol(ALEditorCommand command)
         return false;
     }
     closeCompletion();
+    // A name that leads somewhere of itself goes there: an include's.
+    if (command == ALEditorCommand::GoToDefinition && mLinkRequest && !mLinkRequest(caret(), true).empty())
+    {
+        return true;
+    }
     mSymbolRequest(command, identifierAtCaret());
     return true;
 }
@@ -3731,9 +3740,17 @@ bool ALCodeEditor::handleMouseDown(S32 x, S32 y, MASK mask)
     }
     // Control-click on a name -- Command-click on a Mac -- goes to where it
     // is declared, as in every editor of code.
-    if (mask == MASK_CONTROL && mSymbolRequest && text.pointInRect(x, y))
+    if (mask == MASK_CONTROL && (mSymbolRequest || mLinkRequest) && text.pointInRect(x, y))
     {
-        const ALTextRange word = identifierAt(posAtLocal(x, y, false));
+        const ALTextPos at = posAtLocal(x, y, false);
+        if (mLinkRequest && !mLinkRequest(at, false).empty())
+        {
+            setFocus(true);
+            placeCaret(at, false);
+            mLinkRequest(at, true);
+            return true;
+        }
+        const ALTextRange word = mSymbolRequest ? identifierAt(at) : ALTextRange();
         if (!word.empty())
         {
             setFocus(true);

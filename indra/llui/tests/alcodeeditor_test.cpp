@@ -1685,4 +1685,44 @@ namespace tut
         e.handleHover(x + 1, y, MASK_NONE);
         ensure("the mouse moved: a card again", e.handleToolTip(x + 1, y, MASK_NONE) && e.cardShown());
     }
+
+    template<> template<>
+    void alcodeeditor_object::test<44>()
+    {
+        set_test_name("a place that leads somewhere of itself -- an include's name -- is gone to by F12 and Control-click, before any identifier");
+        ALCodeEditor& e = make("#include \"lib/util.lsl\"\ninteger x;\n", "lsl");
+        std::vector<ALTextPos>   followed;
+        std::vector<ALTextRange> asked;
+        e.setLinkRequest([&](const ALTextPos& at, bool follow) {
+            if (at.line != 0)
+            {
+                return ALTextRange();
+            }
+            if (follow)
+            {
+                followed.push_back(at);
+            }
+            return ALTextRange(ALTextPos(0, 9), ALTextPos(0, 23));
+        });
+        e.setCaret(ALTextPos(0, 13));  // on the slash: no identifier
+        ensure("F12 can, with no one to ask about names", e.canPerform(ALEditorCommand::GoToDefinition));
+        ensure("not the references", !e.canPerform(ALEditorCommand::FindReferences));
+        key(KEY_F12);
+        ensure("gone to", followed == std::vector<ALTextPos>{ ALTextPos(0, 13) });
+
+        e.setSymbolRequest([&](ALEditorCommand, const ALTextRange& word) { asked.push_back(word); });
+        e.setCaret(ALTextPos(1, 8));
+        key(KEY_F12);
+        ensure("elsewhere, the identifier asked about", asked.size() == 1 && followed.size() == 1);
+        e.setCaret(ALTextPos(0, 3));  // in `include`, an identifier
+        key(KEY_F12);
+        ensure("the link before it", followed.size() == 2 && asked.size() == 1);
+
+        const LLRect text = e.textRect();
+        const S32    x    = text.mLeft + 2;
+        const S32    y    = text.mTop - e.layout().rowHeight() / 2;
+        ensure("Control-click on it", e.handleMouseDown(x, y, MASK_CONTROL));
+        e.handleMouseUp(x, y, MASK_CONTROL);
+        ensure("gone to where it was clicked", followed.size() == 3 && followed.back().line == 0 && e.caret().line == 0);
+    }
 }
