@@ -73,6 +73,7 @@
 #include "lllandmarkactions.h"
 #include "lllandmarklist.h"
 #include "llenvironment.h"
+#include "llinventoryfunctions.h"
 #include "llinventoryicon.h"
 #include "llinventorymodel.h"
 #include "lllayoutstack.h"
@@ -9602,6 +9603,52 @@ std::vector<ALQuickOpen::Candidate> ALFloaterScriptStudio::paletteScripts(std::v
         target.kind = GoTo::Kind::File;
         target.path = path;
         add(std::move(target), gDirUtilp->getBaseFileName(path), path);
+    }
+    // Last, every script and notecard in the inventory, outside the Trash,
+    // with the folder it is in. A link is its item, listed once.
+    if (gInventory.isInventoryUsable())
+    {
+        LLInventoryModel::cat_array_t  folders;
+        LLInventoryModel::item_array_t items;
+        LLIsOneOfTypes                 wanted({ LLAssetType::AT_LSL_TEXT, LLAssetType::AT_NOTECARD });
+        gInventory.collectDescendentsIf(gInventory.getRootFolderID(), folders, items, LLInventoryModel::EXCLUDE_TRASH, wanted);
+        std::map<LLUUID, std::string> paths;
+        const auto path_of = [&paths](const LLUUID& folder) -> const std::string& {
+            if (const auto known = paths.find(folder); known != paths.end())
+            {
+                return known->second;
+            }
+            std::vector<std::string> names;
+            for (const LLViewerInventoryCategory* at = gInventory.getCategory(folder);
+                 at && at->getUUID() != gInventory.getRootFolderID(); at = gInventory.getCategory(at->getParentUUID()))
+            {
+                names.push_back(at->getName());
+            }
+            std::string path;
+            for (auto name = names.rbegin(); name != names.rend(); ++name)
+            {
+                path += (path.empty() ? "" : " \xE2\x80\xBA ") + *name;
+            }
+            return paths.emplace(folder, path.empty() ? LLTrans::getString("InvFolder My Inventory") : path).first->second;
+        };
+        for (const LLPointer<LLViewerInventoryItem>& item : items)
+        {
+            const ALScriptRef ref(LLUUID::null, item->getLinkedUUID());
+            if (!listed.insert(ref.id()).second)
+            {
+                continue;
+            }
+            const LLViewerInventoryItem* real = gInventory.getItem(ref.item);
+            if (!real)
+            {
+                continue;
+            }
+            GoTo target;
+            target.kind = GoTo::Kind::Script;
+            target.ref  = ref;
+            target.name = real->getName();
+            add(std::move(target), real->getName(), path_of(real->getParentUUID()));
+        }
     }
     return candidates;
 }
