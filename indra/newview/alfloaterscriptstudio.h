@@ -1160,10 +1160,13 @@ private:
     // Every open tab, to pick one from by name.
     void showAllTabs();
     // An object's or a prim's row in the explorer folded shut or opened,
-    // by what it stands for; and the one under a point of the explorer,
-    // where the point is on its arrow.
+    // by what it stands for; a linkset's row of prims holding nothing, by
+    // its object; either by the row's value; and the row under a point of
+    // the explorer, where the point is on its arrow.
     void explorerFold(const LLUUID& id, bool prim, std::optional<bool> folded = std::nullopt);
-    bool explorerArrowAt(S32 x, S32 y, LLUUID& id, bool& prim);
+    void explorerFoldEmpties(const LLUUID& root, std::optional<bool> folded = std::nullopt);
+    void explorerFoldRow(const LLSD& row, std::optional<bool> folded = std::nullopt);
+    bool explorerArrowAt(S32 x, S32 y, LLSD& row);
     // What is chosen of what a prim holds, dragged out with the viewer's
     // drag tool -- to the inventory, as the build floater's contents are --
     // from the prim of the row pressed; false where none of it may go.
@@ -1889,6 +1892,9 @@ private:
     // object's.
     boost::unordered_flat_set<LLUUID>  mExplorerFolded;
     boost::unordered_flat_set<LLUUID>  mExplorerFoldedPrims;
+    // The linksets whose prims holding nothing are listed, by root; folded
+    // under one row otherwise.
+    boost::unordered_flat_set<LLUUID>  mExplorerEmptiesOpen;
     std::vector<Pinned>                mPinned;
     // The new items to be opened once their prims list them: each by its
     // prim, and by its id, or its name where the region gave no id; with

@@ -1562,11 +1562,10 @@ bool ALFloaterScriptStudio::handleKeyHere(KEY key, MASK mask)
     // explorer, as a tree's keys do.
     if ((key == KEY_LEFT || key == KEY_RIGHT) && mask == MASK_NONE && mExplorer && mExplorer->hasFocus())
     {
-        const std::vector<ExplorerRow> rows = explorerChoice();
-        if (rows.size() == 1 && !rows.front().isItem())
+        const std::vector<LLScrollListItem*> rows = mExplorer->getAllSelected();
+        if (rows.size() == 1 && rows.front()->getValue().isMap() && !rows.front()->getValue().has("item"))
         {
-            const ExplorerRow& row = rows.front();
-            explorerFold(row.primRow ? row.prim : row.root, row.primRow, key == KEY_LEFT);
+            explorerFoldRow(rows.front()->getValue(), key == KEY_LEFT);
             return true;
         }
     }
@@ -14063,8 +14062,16 @@ void ALFloaterScriptStudio::fillExplorer()
     mExplorerFilled = LLTimer::getTotalSeconds();
     // What was chosen stays chosen, by what it stands for rather than
     // where it sat.
-    std::vector<ExplorerRow> chosen = explorerChoice();
-    const S32                scroll = mExplorer->getScrollPos();
+    std::vector<ExplorerRow>          chosen = explorerChoice();
+    boost::unordered_flat_set<LLUUID> chosen_empties;
+    for (const LLScrollListItem* item : mExplorer->getAllSelected())
+    {
+        if (item->getValue().isMap() && item->getValue().has("empties"))
+        {
+            chosen_empties.insert(item->getValue()["root"].asUUID());
+        }
+    }
+    const S32 scroll = mExplorer->getScrollPos();
     mExplorer->deleteAllItems();
     // What a row is -- an object, a prim, a script -- is its icon; the
     // columns are its name and its state. It has no tip: all a tip could
@@ -14140,69 +14147,100 @@ void ALFloaterScriptStudio::fillExplorer()
             continue;
         }
         const std::string indent = many ? "        " : "    ";
-        for (const ExplorerPrim& prim : object.prims)
+        // A linkset's prims known to hold nothing, but its root, under one
+        // row after the rest, folded until opened: there to drop into, and
+        // otherwise only keeping apart what the object holds. Not while a
+        // filter looks, which shows a prim by its name.
+        const auto holds_nothing = [&object](const ExplorerPrim& prim) {
+            return &prim != &object.prims.front() && prim.fetched && prim.items.empty();
+        };
+        const size_t empties = many && filter.empty() ? std::count_if(object.prims.begin(), object.prims.end(), holds_nothing) : 0;
+        const bool   grouped = empties > 1;
+        for (S32 pass = 0; pass < (grouped ? 2 : 1); ++pass)
         {
-            const bool prim_named = object_named || has(prim.name);
-            bool       prim_any   = prim_named;
-            for (const ALScriptWorkspace::Item& item : prim.items)
+            if (pass == 1)
             {
-                prim_any = prim_any || has(item.name);
-            }
-            if (!prim_any)
-            {
-                continue;
-            }
-            if (many)
-            {
-                at["prim"]             = prim.id;
-                const bool prim_folded = filter.empty() && mExplorerFoldedPrims.contains(prim.id);
-                if (object.present && !prim.named)
+                const bool open = mExplorerEmptiesOpen.contains(object.root);
+                LLSD       group;
+                group["root"]    = object.root;
+                group["empties"] = true;
+                LLStringUtil::format_map_t args;
+                args["[COUNT]"] = std::to_string(empties);
+                line = row(group, "Studio_Prim", "    " + (open ? arrow_open : arrow_folded) + getString("ExplorerEmptyPrims", args), LLStringUtil::null);
+                line->setSelected(chosen_empties.contains(object.root));
+                if (!open)
                 {
-                    askExplorerName(prim.id);
+                    break;
                 }
-                line = row(at, "Studio_Prim", "    " + (prim_folded ? arrow_folded : arrow_open) + (prim.name.empty() ? getString("ObjectNameComing") : prim.name),
-                           LLStringUtil::null);
-                line->setSelected(wasChosen(at));
-                if (prim_folded)
+            }
+            for (const ExplorerPrim& prim : object.prims)
+            {
+                if (grouped && holds_nothing(prim) != (pass == 1))
                 {
                     continue;
                 }
-            }
-            for (const ALScriptWorkspace::Item& item : prim.items)
-            {
-                if (!prim_named && !has(item.name))
+                const bool prim_named = object_named || has(prim.name);
+                bool       prim_any   = prim_named;
+                for (const ALScriptWorkspace::Item& item : prim.items)
+                {
+                    prim_any = prim_any || has(item.name);
+                }
+                if (!prim_any)
                 {
                     continue;
                 }
-                LLSD value;
-                value["root"]   = object.root;
-                value["prim"]   = prim.id;
-                value["item"]   = item.id;
-                value["name"]   = item.name;
-                value["script"] = item.script;
-                value["lua"]    = item.lua;
-                std::string run;
-                if (item.script)
+                if (many)
                 {
-                    S32          state = -1;
-                    const size_t index = indexOf(ALScriptRef(prim.id, item.id));
-                    if (index != NONE)
+                    at["prim"]             = prim.id;
+                    const bool prim_folded = filter.empty() && mExplorerFoldedPrims.contains(prim.id);
+                    if (object.present && !prim.named)
                     {
-                        state = mDocs[index]->running;
+                        askExplorerName(prim.id);
                     }
-                    if (state < 0)
+                    line = row(at, "Studio_Prim", "    " + (prim_folded ? arrow_folded : arrow_open) + (prim.name.empty() ? getString("ObjectNameComing") : prim.name),
+                               LLStringUtil::null);
+                    line->setSelected(wasChosen(at));
+                    if (prim_folded)
                     {
-                        const auto known = mRunningKnown.find({ prim.id, item.id });
-                        if (known != mRunningKnown.end())
+                        continue;
+                    }
+                }
+                for (const ALScriptWorkspace::Item& item : prim.items)
+                {
+                    if (!prim_named && !has(item.name))
+                    {
+                        continue;
+                    }
+                    LLSD value;
+                    value["root"]   = object.root;
+                    value["prim"]   = prim.id;
+                    value["item"]   = item.id;
+                    value["name"]   = item.name;
+                    value["script"] = item.script;
+                    value["lua"]    = item.lua;
+                    std::string run;
+                    if (item.script)
+                    {
+                        S32          state = -1;
+                        const size_t index = indexOf(ALScriptRef(prim.id, item.id));
+                        if (index != NONE)
                         {
-                            state = known->second ? 1 : 0;
+                            state = mDocs[index]->running;
                         }
+                        if (state < 0)
+                        {
+                            const auto known = mRunningKnown.find({ prim.id, item.id });
+                            if (known != mRunningKnown.end())
+                            {
+                                state = known->second ? 1 : 0;
+                            }
+                        }
+                        run = getString(state < 0 ? "StateUnknown" : state ? "RunningYes" : "RunningNo");
                     }
-                    run = getString(state < 0 ? "StateUnknown" : state ? "RunningYes" : "RunningNo");
+                    const char* image = item.script ? (item.lua ? "Inv_Script_Luau" : "Inv_Script") : item.name == ".luaurc" || item.name == ".lslrc" ? "Studio_Config" : "Inv_Notecard";
+                    line = row(value, image, indent + item.name, run);
+                    line->setSelected(wasChosen(value));
                 }
-                const char* image = item.script ? (item.lua ? "Inv_Script_Luau" : "Inv_Script") : item.name == ".luaurc" || item.name == ".lslrc" ? "Studio_Config" : "Inv_Notecard";
-                line = row(value, image, indent + item.name, run);
-                line->setSelected(wasChosen(value));
             }
         }
     }
@@ -14237,8 +14275,10 @@ std::vector<ALFloaterScriptStudio::ExplorerRow> ALFloaterScriptStudio::explorerC
     std::vector<ExplorerRow> rows;
     for (const LLScrollListItem* item : mExplorer->getAllSelected())
     {
+        // Not a linkset's row of prims holding nothing, which stands for
+        // no prim to act on or drop into.
         const LLSD& value = item->getValue();
-        if (!value.isMap())
+        if (!value.isMap() || value.has("empties"))
         {
             continue;
         }
@@ -14298,6 +14338,15 @@ std::vector<std::pair<LLUUID, std::string>> ALFloaterScriptStudio::containerPrim
 
 void ALFloaterScriptStudio::onExplorerChosen()
 {
+    // A linkset's row of prims holding nothing, which stands for no prim
+    // of its own and so is not among the rows chosen.
+    for (const LLScrollListItem* item : mExplorer->getAllSelected())
+    {
+        if (item->getValue().isMap() && item->getValue().has("empties"))
+        {
+            explorerFoldRow(item->getValue());
+        }
+    }
     for (const ExplorerRow& row : explorerChoice())
     {
         if (row.isItem())
@@ -14332,7 +14381,43 @@ void ALFloaterScriptStudio::explorerFold(const LLUUID& id, bool prim, std::optio
     refreshExplorer();
 }
 
-bool ALFloaterScriptStudio::explorerArrowAt(S32 x, S32 y, LLUUID& id, bool& prim_row)
+void ALFloaterScriptStudio::explorerFoldEmpties(const LLUUID& root, std::optional<bool> folded)
+{
+    const bool now  = !mExplorerEmptiesOpen.contains(root);
+    const bool want = folded.value_or(!now);
+    if (want == now)
+    {
+        return;
+    }
+    if (want)
+    {
+        mExplorerEmptiesOpen.erase(root);
+    }
+    else
+    {
+        // What they hold is known already: that is how they came to be here.
+        mExplorerEmptiesOpen.insert(root);
+    }
+    fillExplorer();
+}
+
+void ALFloaterScriptStudio::explorerFoldRow(const LLSD& row, std::optional<bool> folded)
+{
+    if (row.has("empties"))
+    {
+        explorerFoldEmpties(row["root"].asUUID(), folded);
+    }
+    else if (row.has("prim"))
+    {
+        explorerFold(row["prim"].asUUID(), true, folded);
+    }
+    else
+    {
+        explorerFold(row["root"].asUUID(), false, folded);
+    }
+}
+
+bool ALFloaterScriptStudio::explorerArrowAt(S32 x, S32 y, LLSD& row)
 {
     LLScrollListItem* item = mExplorer->hitItem(x, y);
     if (!item || !item->getValue().isMap() || item->getValue().has("item"))
@@ -14342,7 +14427,7 @@ bool ALFloaterScriptStudio::explorerArrowAt(S32 x, S32 y, LLUUID& id, bool& prim
     // The arrow is the start of the name, after a prim's indent: from
     // the name column's edge to just past the arrow.
     const LLSD&         value = item->getValue();
-    const bool          prim  = value.has("prim");
+    const bool          prim  = value.has("prim") || value.has("empties");
     const LLScrollListColumn* icon = mExplorer->getColumn("icon");
     const S32           left  = mExplorer->getItemListRect().mLeft + (icon ? icon->getWidth() : 0) + mExplorer->getColumnPadding();
     const S32           right = left + LLFontGL::getFontSansSerifSmall()->getWidth((prim ? std::string("    ") : std::string()) + getString("ArrowOpen")) + 4;
@@ -14350,8 +14435,7 @@ bool ALFloaterScriptStudio::explorerArrowAt(S32 x, S32 y, LLUUID& id, bool& prim
     {
         return false;
     }
-    id       = prim ? value["prim"].asUUID() : value["root"].asUUID();
-    prim_row = prim;
+    row = value;
     return true;
 }
 
@@ -14487,7 +14571,11 @@ LLSD ALFloaterScriptStudio::dropOnExplorer(const LLSD& row, MASK mask, bool drop
     // Into the prim the row is of: an item's, a prim's own, an object's
     // root, which is where a drop on the object in world goes too; below
     // the rows, the prim of what is chosen.
-    *accept              = ACCEPT_NO;
+    *accept = ACCEPT_NO;
+    if (row.isMap() && row.has("empties"))
+    {
+        return LLSD();
+    }
     LLViewerObject* prim = row.isMap() ? gObjectList.findObject(row.has("prim") ? row["prim"].asUUID() : row["root"].asUUID()) : explorerDropTarget();
     if (!prim || !dropIntoPrim(prim, mask, drop, type, cargo))
     {
@@ -14639,11 +14727,10 @@ bool ALFloaterScriptStudio::handleMouseDown(S32 x, S32 y, MASK mask)
     {
         S32 lx = 0, ly = 0;
         localPointToOtherView(x, y, &lx, &ly, mExplorer);
-        LLUUID id;
-        bool   prim = false;
-        if (mExplorer->pointInView(lx, ly) && explorerArrowAt(lx, ly, id, prim))
+        LLSD row;
+        if (mExplorer->pointInView(lx, ly) && explorerArrowAt(lx, ly, row))
         {
-            explorerFold(id, prim);
+            explorerFoldRow(row);
         }
     }
     // And one in the outline its symbol.
