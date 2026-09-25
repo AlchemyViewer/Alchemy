@@ -34,11 +34,6 @@
 
 #include <algorithm>
 
-namespace
-{
-    const S32    SIGNATURE_PAD   = 6;
-}
-
 bool ALCodeEditor::hoverCardAt(S32 x, S32 y)
 {
     const ALTextPos at = posAtLocal(x, y, false);
@@ -76,21 +71,18 @@ bool ALCodeEditor::hoverCardAt(S32 x, S32 y)
         // that shows when it comes, or the next time the mouse rests
         // here.
         const U32 version = document().version();
-        if (word == mHoverAsked && version == mHoverAskedVersion)
+        if (mCards.askedAbout(word, version))
         {
-            if (!mHoverAnswer.empty())
+            if (!mCards.answer().empty())
             {
-                says  = mHoverAnswer;
-                links = mHoverLinks;
+                says  = mCards.answer();
+                links = mCards.links();
                 about = about.empty() ? word : ALTextRange(std::min(about.begin, word.begin), std::max(about.end, word.end));
             }
         }
         else if (mHoverRequest)
         {
-            mHoverAsked        = word;
-            mHoverAskedVersion = version;
-            mHoverAnswer.clear();
-            mHoverLinks.clear();
+            mCards.asking(word, version);
             mHoverRequest(word.begin, document().text(word));
         }
     }
@@ -120,8 +112,7 @@ std::vector<ALCodeEditor::CardProblem> ALCodeEditor::problemsUnder(const ALTextP
 // static
 const std::string& ALCodeEditor::deprecatedNote()
 {
-    static const std::string note = alSaid("CodeDeprecated", "(deprecated)");
-    return note;
+    return ALCodeCards::deprecatedNote();
 }
 
 ALSyntaxKind ALCodeEditor::semanticKindAt(const ALTextPos& at) const
@@ -179,13 +170,12 @@ void ALCodeEditor::showCard(const ALTextRange& about, const std::string& says, c
     // a frame in a quarter of the ink, which `draw` puts on over it.
     // Taken afresh each time, since the colour table may have moved.
     const LLColor4         ground    = paint(Paint::Widget);
-    const S32              MAX_WIDTH = 560;
-    const S32              PAD       = 6;
+    const S32              PAD       = ALCodeCards::PAD;
     if (!mCard)
     {
         ALTextView::Params p(LLUICtrlFactory::getDefaultParams<ALTextView>());
         p.name        = "hover_card";
-        p.rect        = LLRect(0, 20, MAX_WIDTH, 0);
+        p.rect        = LLRect(0, 20, ALCodeCards::MAX_WIDTH, 0);
         p.read_only   = true;
         p.word_wrap   = true;
         p.tab_stop    = false;
@@ -232,51 +222,16 @@ void ALCodeEditor::showCard(const ALTextRange& about, const std::string& says, c
     }
     mCard->setBackgroundColor(ground);
     mCard->setTextColor(textColor());
-    // The problems, a line or more each, then a blank line, then what the
-    // word is, its first line the head.
-    std::string                                 all;
-    std::vector<std::pair<S32, const LLColor4*>> problem_lines;
-    S32                                         line_count = 0;
-    for (const CardProblem& problem : problems)
-    {
-        if (!all.empty())
-        {
-            all += "\n";
-        }
-        all += problem.message;
-        const S32 made = 1 + static_cast<S32>(std::count(problem.message.begin(), problem.message.end(), '\n'));
-        for (S32 i = 0; i < made; ++i)
-        {
-            problem_lines.emplace_back(line_count++, &problem.color);
-        }
-    }
-    // What would put them right, each a link on a line of its own under
-    // them that makes it: the fixes of the line they are on.
-    std::vector<std::pair<S32, LLSD>> fix_lines;
+    // What would put the problems right: the fixes of the line they are
+    // on, best first.
+    std::vector<Fix> fixes;
     if (!problems.empty() && mFixProvider && mFixHandler && !isReadOnly())
     {
-        std::vector<Fix> fixes;
         mFixProvider(about.begin.line, fixes);
         ALFixListModel::rank(fixes);
-        for (const Fix& fix : fixes)
-        {
-            LLStringUtil::format_map_t args;
-            args["[TITLE]"] = fix.title;
-            all += "\n" + alSaid("CodeFixLink", "Fix: [TITLE]", args);
-            fix_lines.emplace_back(line_count++, fix.value);
-        }
     }
-    S32 head_line = -1;
-    if (!says.empty())
-    {
-        if (!all.empty())
-        {
-            all += "\n\n";
-            line_count += 1;
-        }
-        head_line = line_count;
-        all += says;
-    }
+    const ALCodeCards::Composition card = ALCodeCards::compose(problems, fixes, says, links);
+    const std::string&             all  = card.text;
     if (cardShown() && about == mCardAbout && all == mCard->text())
     {
         // The mouse resting on again: the card is up already.
@@ -287,34 +242,31 @@ void ALCodeEditor::showCard(const ALTextRange& about, const std::string& says, c
     // about deprecation in the warning colour, every URL a link.
     mCard->setText(all);
     std::vector<ALTextView::Style> styles;
-    for (const auto& [line, color] : problem_lines)
+    for (const auto& [line, problem] : card.problemLines)
     {
         ALTextView::Style one;
         one.range = ALTextRange(ALTextPos(line, 0), mCard->document().lineEnd(line));
-        one.color = *color;
+        one.color = problems[problem].color;
         styles.push_back(one);
     }
-    if (head_line >= 0)
+    if (card.headLine >= 0)
     {
         // The name in the head coloured as the text colours it where the
         // analyzer said what it is: a global, a parameter, a function of
         // the script's own, which the grammar alone does not know.
         const ALTextRange word = mMouseX >= 0 ? identifierAt(posAtLocal(mMouseX, mMouseY, false)) : identifierAt(about.begin);
-        styleAsCode(*mCard, head_line, styles, document().text(word), word.empty() ? ALSyntaxKind::Text : semanticKindAt(word.begin));
+        styleAsCode(*mCard, card.headLine, styles, document().text(word), word.empty() ? ALSyntaxKind::Text : semanticKindAt(word.begin));
     }
     const S32 lines = mCard->document().lineCount();
-    for (S32 line = head_line + 1; line < lines && head_line >= 0; ++line)
+    for (const S32 line : card.deprecatedLines)
     {
-        if (mCard->document().line(line).find(deprecatedNote()) != std::string::npos)
-        {
-            ALTextView::Style note;
-            note.range = ALTextRange(ALTextPos(line, 0), mCard->document().lineEnd(line));
-            note.color = markColor(Mark::Warning);
-            styles.push_back(note);
-        }
+        ALTextView::Style note;
+        note.range = ALTextRange(ALTextPos(line, 0), mCard->document().lineEnd(line));
+        note.color = markColor(Mark::Warning);
+        styles.push_back(note);
     }
     mCard->setStyles(std::move(styles));
-    for (const auto& [line, value] : fix_lines)
+    for (const auto& [line, value] : card.fixLines)
     {
         ALTextView::Substitution fix;
         fix.range = ALTextRange(ALTextPos(line, 0), mCard->document().lineEnd(line));
@@ -324,21 +276,14 @@ void ALCodeEditor::showCard(const ALTextRange& about, const std::string& says, c
     }
     // The caller's own links, each on the line that says it, below the
     // head; then every URL.
-    for (const CardLink& link : links)
+    for (const auto& [line, link] : card.linkLines)
     {
-        for (S32 line = llmax(0, head_line + 1); line < lines; ++line)
-        {
-            if (mCard->document().line(line) == link.line)
-            {
-                ALTextView::Substitution way;
-                way.range   = ALTextRange(ALTextPos(line, 0), mCard->document().lineEnd(line));
-                way.link    = true;
-                way.tooltip = link.tooltip;
-                way.value   = link.value;
-                mCard->addSubstitution(std::move(way));
-                break;
-            }
-        }
+        ALTextView::Substitution way;
+        way.range   = ALTextRange(ALTextPos(line, 0), mCard->document().lineEnd(line));
+        way.link    = true;
+        way.tooltip = links[link].tooltip;
+        way.value   = links[link].value;
+        mCard->addSubstitution(std::move(way));
     }
     for (S32 line = 0; line < lines; ++line)
     {
@@ -347,7 +292,7 @@ void ALCodeEditor::showCard(const ALTextRange& about, const std::string& says, c
     // Its size: as wide as its widest line up to the limit, and as tall
     // as the lines wrapped at that width come to.
     const LLRect text  = textRect();
-    const S32    limit = llmin(MAX_WIDTH, llmax(80, text.getWidth() - 2 * PAD));
+    const S32    limit = ALCodeCards::widthLimit(text.getWidth());
     mCard->setShape(LLRect(0, 40, limit, 0));
     mCard->setWordWrap(false);
     // Laid out before it is measured: the layout guesses the width of a
@@ -359,15 +304,14 @@ void ALCodeEditor::showCard(const ALTextRange& about, const std::string& says, c
     {
         mCard->layout().line(line);
     }
-    const S32 widest = static_cast<S32>(mCard->layout().contentWidth()) + 2 * PAD + 2;
+    const S32 width = ALCodeCards::width(static_cast<S32>(mCard->layout().contentWidth()), limit);
     mCard->setWordWrap(true);
-    const S32 width = llmin(limit, llmax(40, widest));
     mCard->setShape(LLRect(0, 40, width, 0));
     for (S32 line = 0; line < lines; ++line)
     {
         mCard->layout().line(line);
     }
-    const S32 height = mCard->layout().totalHeight() + 2 * (PAD - 2) + 2;
+    const S32 height = ALCodeCards::height(mCard->layout().totalHeight());
     // Where: under the row of what it is about, at its start; above it
     // where under would run off the bottom; within the text's width.
     S32       row;
@@ -382,13 +326,7 @@ void ALCodeEditor::showCard(const ALTextRange& about, const std::string& says, c
         mCardAnchor.mLeft  = static_cast<S32>(left + x0);
         mCardAnchor.mRight = static_cast<S32>(left + x1);
     }
-    S32 x = llclamp(mCardAnchor.mLeft, text.mLeft, llmax(text.mLeft, text.mRight - width));
-    S32 y = mCardAnchor.mBottom - 2;
-    if (y - height < text.mBottom && mCardAnchor.mTop + 2 + height <= text.mTop)
-    {
-        y = mCardAnchor.mTop + 2 + height;
-    }
-    mCard->setShape(LLRect(x, y, x + width, y - height));
+    mCard->setShape(ALCodeCards::place(mCardAnchor, text, width, height));
     mCard->setVisible(true);
 }
 
@@ -408,26 +346,20 @@ bool ALCodeEditor::cardShown() const
 
 void ALCodeEditor::supplyHover(const ALTextPos& at, const std::string& text, std::vector<CardLink> links)
 {
-    if (text.empty() || mHoverAsked.empty() || at != mHoverAsked.begin || document().version() != mHoverAskedVersion)
-    {
-        return;
-    }
     // Kept for the word, and shown now if the mouse is still on it.
-    mHoverAnswer = text;
-    mHoverLinks  = std::move(links);
-    if (mMouseX < 0 || !textRect().pointInRect(mMouseX, mMouseY))
+    if (!mCards.heard(at, document().version(), text, std::move(links)) || mMouseX < 0 || !textRect().pointInRect(mMouseX, mMouseY))
     {
         return;
     }
     const ALTextPos   under = posAtLocal(mMouseX, mMouseY, false);
     const ALTextRange word  = identifierAt(under);
-    if (word != mHoverAsked)
+    if (word != mCards.asked())
     {
         return;
     }
     ALTextRange                    about;
     const std::vector<CardProblem> problems = problemsUnder(under, about);
-    showCard(about.empty() ? word : ALTextRange(std::min(about.begin, word.begin), std::max(about.end, word.end)), text, problems, mHoverLinks);
+    showCard(about.empty() ? word : ALTextRange(std::min(about.begin, word.begin), std::max(about.end, word.end)), text, problems, mCards.links());
 }
 
 // --- signature help -------------------------------------------------------------
@@ -439,27 +371,28 @@ void ALCodeEditor::showSignature(const ALTextPos& at, Signature signature)
         // An answer that came after a modal keymap stopped inserting.
         return;
     }
-    mSignature   = std::move(signature);
-    mSignatureAt = at;
+    mCards.showSignature(at, std::move(signature));
 }
 
 void ALCodeEditor::hideSignature()
 {
-    mSignature.reset();
+    mCards.hideSignature();
 }
 
 bool ALCodeEditor::signatureShown() const
 {
-    return mSignature && caret().line == mSignatureAt.line && !(caret() < mSignatureAt);
+    return mCards.signatureFor(caret());
 }
 
 void ALCodeEditor::drawSignature(const LLRect& text)
 {
-    if (!mSignature || mSignature->label.empty())
+    const Signature* shown = mCards.signature();
+    if (!shown || shown->label.empty())
     {
         return;
     }
-    const Signature& sig   = *mSignature;
+    const S32        SIGNATURE_PAD = ALCodeCards::SIGNATURE_PAD;
+    const Signature& sig   = *shown;
     const LLFontGL*  font  = getFont();
     const F32        alpha = getDrawContext().mAlpha;
     const S32        row_h = layout().rowHeight();
@@ -472,18 +405,11 @@ void ALCodeEditor::drawSignature(const LLRect& text)
     // Above the caret's row, left with the call's column, kept inside the
     // view; under the row where above would run off the top.
     S32       row;
-    const F32 x    = layout().xOf(mSignatureAt.line, mSignatureAt.column, &row);
-    const S32 top  = screenTopOf(text, mSignatureAt.line, row);
-    const LLRect local = getLocalRect();
-    // No wider than the view. A box sized to a signature longer than the
-    // window ran off the right edge and was cut there by the view's own
-    // rect, silently -- and a call with a long list of parameters is the
-    // one whose signature was worth reading.
-    const S32 width = llmin(wanted, llmax(4 * SIGNATURE_PAD, local.getWidth()));
-    const S32 room  = width - 2 * SIGNATURE_PAD;
-    S32       left = llclamp(static_cast<S32>(static_cast<F32>(text.mLeft) - scrollX() + x), local.mLeft, llmax(local.mLeft, local.mRight - width));
-    LLRect    box  = (top + height <= local.mTop) ? LLRect(left, top + height, left + width, top)
-                                                  : LLRect(left, top - row_h, left + width, top - row_h - height);
+    const ALTextPos at   = mCards.signatureAt();
+    const F32       x    = layout().xOf(at.line, at.column, &row);
+    const S32       top  = screenTopOf(text, at.line, row);
+    const LLRect    box  = ALCodeCards::signatureBox(wanted, height, static_cast<S32>(static_cast<F32>(text.mLeft) - scrollX() + x), top, row_h, getLocalRect());
+    const S32       room = box.getWidth() - 2 * SIGNATURE_PAD;
 
     const LLColor4 ink    = textColor() % alpha;
     const LLColor4 active = mBracketMatchColor.get() % alpha;
@@ -504,12 +430,8 @@ void ALCodeEditor::drawSignature(const LLRect& text)
     // the part already typed, so it is the part to give up; what runs off
     // the left edge under the clip reads as more of it being there.
     const F32 label_w = static_cast<F32>(font->getWidth(sig.label));
-    F32       shift   = 0.f;
-    if (label_w > static_cast<F32>(room))
-    {
-        const F32 through = end > 0 ? static_cast<F32>(font->getWidth(sig.label.substr(0, static_cast<size_t>(end)))) : label_w;
-        shift = llclamp(through - static_cast<F32>(room), 0.f, label_w - static_cast<F32>(room));
-    }
+    const F32 through = end > 0 ? static_cast<F32>(font->getWidth(sig.label.substr(0, static_cast<size_t>(end)))) : label_w;
+    const F32 shift   = ALCodeCards::labelShift(label_w, through, static_cast<F32>(room));
     F32 pen = static_cast<F32>(box.mLeft + SIGNATURE_PAD) - shift;
     auto piece = [&](S32 from, S32 to, const LLColor4& color) {
         if (to <= from)

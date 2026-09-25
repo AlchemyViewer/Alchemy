@@ -3042,14 +3042,14 @@ bool ALCodeEditor::handleKeyHere(KEY key, MASK mask)
         // when it comes, rather than the shift closing the list under it.
         closeCompletion();
     }
-    if (mSignature && key == KEY_ESCAPE && mask == MASK_NONE)
+    if (mCards.signature() && key == KEY_ESCAPE && mask == MASK_NONE)
     {
         hideSignature();
         return true;
     }
     if (key == KEY_BACKSPACE && mask == MASK_NONE && mAutoClose && deletePair())
     {
-        if (mSignature && mSignatureRequest)
+        if (mCards.signature() && mSignatureRequest)
         {
             mSignatureRequest(caret());
         }
@@ -3062,7 +3062,7 @@ bool ALCodeEditor::handleKeyHere(KEY key, MASK mask)
         dropTyping();
         return taken;
     }
-    if (taken && mSignature && mSignatureRequest && (key == KEY_BACKSPACE || key == KEY_DELETE))
+    if (taken && mCards.signature() && mSignatureRequest && (key == KEY_BACKSPACE || key == KEY_DELETE))
     {
         mSignatureRequest(caret());
     }
@@ -3104,7 +3104,7 @@ bool ALCodeEditor::handleUnicodeCharHere(llwchar uni_char)
         openCompletion();
     }
     // A call begins, moves on to its next argument, or ends.
-    if (mSignatureRequest && (uni_char == '(' || uni_char == ',' || uni_char == ')' || mSignature))
+    if (mSignatureRequest && (uni_char == '(' || uni_char == ',' || uni_char == ')' || mCards.signature()))
     {
         mSignatureRequest(caret());
     }
@@ -3518,7 +3518,7 @@ void ALCodeEditor::draw()
     // A signature is about a call on the caret's line; anywhere else it
     // is stale. (The placeholders are let go of as the caret leaves their
     // lines, where it moves: dropPlaceholdersLeft.)
-    if (mSignature && !signatureShown())
+    if (mCards.signature() && !signatureShown())
     {
         hideSignature();
     }
@@ -3533,7 +3533,7 @@ void ALCodeEditor::draw()
         hoverCardAt(mMouseX, mMouseY);
     }
     ALTextView::draw();
-    if (mSignature)
+    if (mCards.signature())
     {
         drawSignature(textRect());
     }

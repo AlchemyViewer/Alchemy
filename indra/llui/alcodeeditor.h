@@ -24,6 +24,7 @@
 
 #pragma once
 
+#include "alcodecards.h"
 #include "alcompletionmodel.h"
 #include "alfixlistmodel.h"
 #include "alfoldmodel.h"
@@ -513,12 +514,7 @@ public:
     // A line of what a card says that is a way somewhere -- where the word
     // was declared -- by its words: a link on the card that hands its
     // value to the handler, and the card goes.
-    struct CardLink
-    {
-        std::string line;
-        std::string tooltip;
-        LLSD        value;
-    };
+    typedef ALCodeCards::Link CardLink;
     void supplyHover(const ALTextPos& at, const std::string& text, std::vector<CardLink> links = {});
     typedef std::function<void(const LLSD& value)> card_link_t;
     void setCardLinkHandler(card_link_t handler) { mCardLinkHandler = std::move(handler); }
@@ -530,11 +526,7 @@ public:
     // and every URL a link. It stays while the mouse is on what it is
     // about or on the card, and goes with a key, an edit, a scroll or a
     // click elsewhere.
-    struct CardProblem
-    {
-        std::string message;
-        LLColor4    color;
-    };
+    typedef ALCodeCards::Problem CardProblem;
     void        showCard(const ALTextRange& about, const std::string& says, const std::vector<CardProblem>& problems = {},
                          const std::vector<CardLink>& links = {});
     // Whether the mouse resting on the text brings up a card at all, and
@@ -563,14 +555,7 @@ public:
 
     // The call the caret is in, drawn above its row: the label with the
     // parameter the caret is at picked out, and a line of documentation.
-    struct Signature
-    {
-        std::string                          label;
-        // Each parameter's span in the label, in bytes.
-        std::vector<std::pair<S32, S32>>     parameters;
-        S32                                  active = 0;
-        std::string                          documentation;
-    };
+    typedef ALCodeCards::Signature Signature;
     // Asked for the call at the caret when an opening bracket or a comma
     // is typed, and again at every change while one is shown; the answer
     // comes through showSignature, or hideSignature for none.
@@ -581,7 +566,7 @@ public:
     // Shown, and still about the call the caret is in: on its line, and
     // not before where it began.
     bool signatureShown() const;
-    const Signature* signature() const { return mSignature ? &*mSignature : nullptr; }
+    const Signature* signature() const { return mCards.signature(); }
 
     void draw() override;
     bool handleKeyHere(KEY key, MASK mask) override;
@@ -823,16 +808,12 @@ private:
     boost::signals2::scoped_connection mCaretConnection;
     // The word the analyzer was last asked about, and what it answered,
     // kept for the text at the version it was answered for, so that the
-    // mouse coming back to the word finds the answer waiting.
-    ALTextRange             mHoverAsked;
-    U32                     mHoverAskedVersion = 0;
-    std::string             mHoverAnswer;
-    std::vector<CardLink>   mHoverLinks;
+    // mouse coming back to the word finds the answer waiting; and the
+    // signature shown.
+    ALCodeCards             mCards;
     card_link_t             mCardLinkHandler;
     S32                     mMouseX = -1;
     S32                     mMouseY = -1;
-    std::optional<Signature> mSignature;
-    ALTextPos               mSignatureAt;
     // The card, made the first time it is wanted; what it is about, and
     // that as a rect of the view, which the mouse may rest on as on the
     // card.

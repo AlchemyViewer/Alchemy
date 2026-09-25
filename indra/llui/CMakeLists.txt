@@ -133,6 +133,7 @@ target_sources(
     alspecimenlist.cpp
     alstudiofloater.cpp
     alsurface.cpp
+    alcodecards.cpp
     alcodeeditor.cpp
     alcodeeditor_cards.cpp
     alcompletionmodel.cpp
@@ -328,6 +329,7 @@ target_sources(
         alsurface.h
         alundostack.h
         alstringmatch.h
+        alcodecards.h
         alcodeeditor.h
         alcompletionmodel.h
         alfixlistmodel.h
@@ -535,6 +537,7 @@ if(AL_BUILD_TESTS)
     altextsearch
     altextspelling
     altextview
+    alcodecards
     alcodeeditor
     alcompletionmodel
     alfixlistmodel
