@@ -1,0 +1,192 @@
+/**
+ * @file alscriptexplorerpane.h
+ * @brief Script Studio's explorer: the objects in hand, their prims and what each holds.
+ *
+ * $LicenseInfo:firstyear=2026&license=viewerlgpl$
+ * Alchemy Viewer Source Code
+ * Copyright (C) 2026, Rye <rye@alchemyviewer.org>
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation;
+ * version 2.1 of the License only.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * $/LicenseInfo$
+ */
+
+#pragma once
+
+#include "alscriptexplorermodel.h"
+#include "llui.h"
+#include "llhandle.h"
+#include "llpanel.h"
+
+#include <boost/signals2.hpp>
+
+#include <string>
+#include <utility>
+#include <vector>
+
+class ALPaneList;
+class ALScriptStudioServices;
+struct ALScriptStudioDoc;
+class LLContextMenu;
+class LLFilterEditor;
+class LLViewerObject;
+
+// The Script Studio's explorer, down the left: the objects in hand -- pinned,
+// selected in world, or holding a script that is open -- each prim's scripts
+// and notecards listed as they are fetched, with whether each script runs.
+// Its rows open, start, stop, reset, recompile, rename and delete what they
+// stand for; what is chosen drags out to the inventory or into another
+// prim, and what the inventory holds drops into one. The world is the
+// panel's to look at; what it lists is its model's.
+class ALScriptExplorerPane : public LLPanel
+{
+public:
+    AL_VIEW_TYPE(ALScriptExplorerPane, LLPanel);
+    typedef ALScriptExplorerModel Model;
+    typedef Model::Choice         Choice;
+
+    // What the pane asks of the window beyond its services.
+    class Window
+    {
+    public:
+        // The explorer brought into sight, where it was folded away.
+        virtual void showExplorer() = 0;
+        // The pins changed, which the window keeps between sessions.
+        virtual void explorerPinsChanged() = 0;
+        // An item renamed here: its tab, where it is open, called so.
+        virtual void itemRenamed(const ALScriptRef& ref, const std::string& name) = 0;
+        // An item deleted here: its tab closed, in whichever of the studio's
+        // windows holds it, and a window popped out for it alone with it.
+        virtual void itemDeleted(const ALScriptRef& ref) = 0;
+        // Whether an item is open with unsaved changes in any of them.
+        virtual bool unsavedAnywhere(const ALScriptRef& ref) const = 0;
+
+    protected:
+        ~Window() = default;
+    };
+
+    // Built by the skin (class="script_studio_explorer") in a Script
+    // Studio window it finds through the view tree, whose services it uses
+    // and which it asks what it does not do itself.
+    explicit ALScriptExplorerPane(const LLPanel::Params& params = getDefaultParams());
+    ~ALScriptExplorerPane() override;
+    bool postBuild() override;
+    // An arrow folds its row, and the press goes on to the list, which
+    // chooses the row as any press would.
+    bool handleMouseDown(S32 x, S32 y, MASK mask) override;
+
+    // Each frame: the names the region said put in, what came in since the
+    // list was filled put in it once, and the selection in world looked at.
+    void pump();
+    // The objects in hand listed again, and what each prim holds asked
+    // where it is not known or has changed -- of every prim where `refetch`.
+    void relist(bool refetch = false);
+    // A script's row, chosen and in view, with the explorer in sight and
+    // the keyboard in it: what holds it unfolded first, and the filter let
+    // go of where it hides the row.
+    void reveal(const ALScriptStudioDoc& doc);
+    // An object pinned, so that it stays listed once it is no longer
+    // selected in world; in sight; and chosen, so that the buttons act on it.
+    void explore(const LLUUID& root);
+
+    // The rows chosen, in the list's order.
+    std::vector<Choice> choice() const;
+    const Model&        model() const { return mModel; }
+    ALPaneList*         list() const { return mList; }
+
+    // The pins, kept between sessions.
+    void saveState(LLSD& state) const { mModel.saveState(state); }
+    void readState(const LLSD& state) { mModel.readState(state); }
+
+private:
+    void fill();
+    void contentsHeard(const ALScriptWorkspace::Contents& contents);
+    void rereadNames();
+    void askName(const LLUUID& id);
+    // What to call an object that has never said its name here: what a pin
+    // or an open script remembers it by, or an ellipsis while it is asked.
+    std::string nameGivenTo(const LLUUID& root) const;
+    void        refold(Model::Refold refold);
+    bool        arrowAt(S32 x, S32 y, LLSD& row);
+    bool        handleListKey(KEY key, MASK mask);
+
+    void onChosen();
+    void act(const std::string& action);
+    bool enabled(const std::string& action) const;
+    void showMenu(S32 x, S32 y);
+    void refreshButtons();
+    // Whether a script runs, as far as the studio knows: its tab's word,
+    // else the region's last answer; nothing where neither has said.
+    std::optional<bool> knownRunning(const ALScriptRef& ref) const;
+
+    // A script or notecard made in a prim, named through a dialog and
+    // opened once the region lists it.
+    void create(const LLUUID& prim, bool notecard, bool lua);
+    void created(const ALScriptWorkspace::Created& made, const std::optional<std::string>& opening);
+    // A row renamed where it stands; and the name it was given, taken.
+    void rename(const Choice& row);
+    void renamed(const Choice& row, const std::string& was, std::string name);
+    void remove(const std::vector<Choice>& rows);
+    void recompile(const std::vector<Choice>& rows);
+    // Start, stop, reset or restart over the rows, asked about first where
+    // it reaches more than one script.
+    void run(const std::string& action, const std::vector<Choice>& rows);
+
+    // What is chosen of what a prim holds, dragged out with the viewer's
+    // drag tool -- to the inventory, as the build floater's contents are --
+    // from the prim of the row pressed; false where none of it may go.
+    bool startDrag(const LLSD& pressed);
+    // What is dragged from the inventory over a row, or dropped on it: into
+    // the prim the row is of, as into the build floater's contents. Answers
+    // the row the drop goes to, for the list to light.
+    LLSD drop(const LLSD& row, MASK mask, bool drop, EDragAndDropType type, void* cargo, EAcceptance* accept, std::string& tooltip);
+    // Why a prim will not take what is carried over it, for the drag's tip.
+    std::string dropRefusal(LLViewerObject* prim, EDragAndDropType type, void* cargo) const;
+    // What is dragged put into a prim, as the build floater's contents
+    // take it; true where it would go.
+    bool dropIntoPrim(LLViewerObject* prim, MASK mask, bool drop, EDragAndDropType type, void* cargo);
+    // Where a drop on the empty space goes: the prim of what is chosen,
+    // where all of that is of one; the object selected in world where
+    // nothing is. Nowhere, where either is more than one.
+    LLViewerObject* dropTarget() const;
+    // Items of one prim put into another, through the agent's inventory,
+    // and said as it ends.
+    void transfer(const LLUUID& from, const std::vector<LLUUID>& items, const LLUUID& to, bool running);
+
+    ALScriptStudioServices* mServices = nullptr;
+    Window*                 mWindow   = nullptr;
+    ALPaneList*             mList     = nullptr;
+    LLFilterEditor*         mFilter   = nullptr;
+    Model                   mModel;
+    LLHandle<LLContextMenu> mMenu;
+    // Answers have come that the list does not show yet: it is filled a
+    // moment after it was last filled.
+    bool                    mStale  = false;
+    F64                     mFilled = 0.0;
+    // The roots selected in world when last looked, and when; whether the
+    // selection changed since.
+    std::vector<LLUUID>     mRoots;
+    F64                     mPolled           = 0.0;
+    bool                    mSelectionChanged = false;
+    // When what the prims hold is asked again after a drop, for what the
+    // drop sends on its own time: a folder's items, fetched first.
+    F64                     mRefetchAt = 0.0;
+    // What a drag from another prim has dropped so far, sent with its last.
+    std::vector<LLUUID>     mTransferring;
+    // Names the region said of what the list shows since the last frame.
+    bool                    mNamesStale = false;
+    boost::signals2::scoped_connection mPropertiesConnection;
+    boost::signals2::scoped_connection mSelectionConnection;
+    boost::signals2::scoped_connection mRunningConnection;
+};

@@ -1193,80 +1193,90 @@
          background_opaque="true"
          bg_opaque_color="DkGray2"
          border="true">
-            <filter_editor
-             follows="left|top|right"
-             height="20"
-             label="Filter"
-             layout="topleft"
-             left="2"
-             name="explorer_filter"
-             tool_tip="Only the objects, prims, scripts and notecards with these letters in their names"
-             top="2"
-             width="236" />
-            <pane_list
+            <panel
+             class="script_studio_explorer"
              follows="all"
-             height="414"
+             height="464"
              layout="topleft"
              left="0"
-             multi_select="true"
-             name="explorer"
-             tool_tip="The objects in hand -- pinned, selected in world, or holding a script that is open -- and their scripts and notecards. Double-click or return opens one, delete deletes it, F2 renames it -- or an object or a prim -- in its row, right-click for everything else. Drag them to your inventory or onto another object here, and drop on an object what your inventory holds, to put it in."
-             top="24"
+             name="explorer_pane"
+             top="0"
              width="240">
-                <pane_list.columns label="" name="icon" width="20" />
-                <pane_list.columns dynamic_width="true" label="Name" name="name" tool_tip="The objects in hand, each prim of a linkset, and what each prim holds" />
-                <pane_list.columns label="State" name="run" tool_tip="Whether a script runs in its object, and an object pinned while not in sight" width="70" />
-            </pane_list>
-            <button
-             follows="left|bottom"
-             height="22"
-             label="Open"
-             layout="topleft"
-             left="0"
-             name="explorer_open"
-             tool_tip="Open the chosen scripts and notecards"
-             top_pad="4"
-             width="46" />
-            <button
-             follows="left|bottom"
-             height="22"
-             label="Start"
-             layout="topleft"
-             left_pad="2"
-             name="explorer_start"
-             tool_tip="Set the chosen scripts running; every script of a chosen object or prim"
-             top_delta="0"
-             width="46" />
-            <button
-             follows="left|bottom"
-             height="22"
-             label="Stop"
-             layout="topleft"
-             left_pad="2"
-             name="explorer_stop"
-             tool_tip="Stop the chosen scripts; every script of a chosen object or prim"
-             top_delta="0"
-             width="46" />
-            <button
-             follows="left|bottom"
-             height="22"
-             label="Reset"
-             layout="topleft"
-             left_pad="2"
-             name="explorer_reset"
-             tool_tip="Reset the chosen scripts; every script of a chosen object or prim"
-             top_delta="0"
-             width="46" />
-            <button
-             follows="left|bottom"
-             height="22"
-             image_overlay="Refresh_Off"
-             layout="topleft"
-             left_pad="2"
-             name="explorer_refresh"
-             tool_tip="Refresh: ask the region for what the objects hold again"
-             top_delta="0"
-             width="46" />
+                <filter_editor
+                 follows="left|top|right"
+                 height="20"
+                 label="Filter"
+                 layout="topleft"
+                 left="2"
+                 name="explorer_filter"
+                 tool_tip="Only the objects, prims, scripts and notecards with these letters in their names"
+                 top="2"
+                 width="236" />
+                <pane_list
+                 follows="all"
+                 height="414"
+                 layout="topleft"
+                 left="0"
+                 multi_select="true"
+                 name="explorer"
+                 tool_tip="The objects in hand -- pinned, selected in world, or holding a script that is open -- and their scripts and notecards. Double-click or return opens one, delete deletes it, F2 renames it -- or an object or a prim -- in its row, right-click for everything else. Drag them to your inventory or onto another object here, and drop on an object what your inventory holds, to put it in."
+                 top="24"
+                 width="240">
+                    <pane_list.columns label="" name="icon" width="20" />
+                    <pane_list.columns dynamic_width="true" label="Name" name="name" tool_tip="The objects in hand, each prim of a linkset, and what each prim holds" />
+                    <pane_list.columns label="State" name="run" tool_tip="Whether a script runs in its object, and an object pinned while not in sight" width="70" />
+                </pane_list>
+                <button
+                 follows="left|bottom"
+                 height="22"
+                 label="Open"
+                 layout="topleft"
+                 left="0"
+                 name="explorer_open"
+                 tool_tip="Open the chosen scripts and notecards"
+                 top_pad="4"
+                 width="46" />
+                <button
+                 follows="left|bottom"
+                 height="22"
+                 label="Start"
+                 layout="topleft"
+                 left_pad="2"
+                 name="explorer_start"
+                 tool_tip="Set the chosen scripts running; every script of a chosen object or prim"
+                 top_delta="0"
+                 width="46" />
+                <button
+                 follows="left|bottom"
+                 height="22"
+                 label="Stop"
+                 layout="topleft"
+                 left_pad="2"
+                 name="explorer_stop"
+                 tool_tip="Stop the chosen scripts; every script of a chosen object or prim"
+                 top_delta="0"
+                 width="46" />
+                <button
+                 follows="left|bottom"
+                 height="22"
+                 label="Reset"
+                 layout="topleft"
+                 left_pad="2"
+                 name="explorer_reset"
+                 tool_tip="Reset the chosen scripts; every script of a chosen object or prim"
+                 top_delta="0"
+                 width="46" />
+                <button
+                 follows="left|bottom"
+                 height="22"
+                 image_overlay="Refresh_Off"
+                 layout="topleft"
+                 left_pad="2"
+                 name="explorer_refresh"
+                 tool_tip="Refresh: ask the region for what the objects hold again"
+                 top_delta="0"
+                 width="46" />
+            </panel>
         </layout_panel>
         <layout_panel
          auto_resize="true"

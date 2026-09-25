@@ -170,6 +170,7 @@ if(AL_BUILD_VIEWER)
     alsceneexplorerpredicate.cpp
     alscopedata.cpp
     alscriptanalysis.cpp
+    alscriptexplorermodel.cpp
     alscriptexplorerpane.cpp
     alfloaterscriptpreferences.cpp
     alscriptkeymap.cpp
@@ -975,6 +976,8 @@ if(AL_BUILD_VIEWER)
     alsceneexplorerpredicate.h
     alscopedata.h
     alscriptanalysis.h
+    alscriptexplorermodel.h
+    alscriptexplorerpane.h
     alfloaterscriptpreferences.h
     alscriptkeymap.h
     alscriptmodules.h
@@ -2421,6 +2424,15 @@ if(AL_BUILD_TESTS)
     PROJECT ${test_project}
     LIBRARIES llui alscript ${test_libs}
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
+  )
+
+  # What the Script Studio's explorer lists, and the rows it makes of them,
+  # with nothing of the world.
+  al_add_test(
+    alscriptexplorermodel
+    UNIT
+    PROJECT ${test_project}
+    LIBRARIES llui alscript ${test_libs}
   )
 
   # The Script Studio's Output tab over the studio's own window, the

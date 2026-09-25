@@ -35,7 +35,6 @@
 #include "alemptystate.h"
 #include "aljumpbar.h"
 #include "aloutputview.h"
-#include "alobjectproperties.h"
 #include "alpanelist.h"
 #include "llsdutil.h"
 #include "alscopebar.h"
@@ -76,11 +75,9 @@
 #include "llnotificationsutil.h"
 #include "llscrolllistctrl.h"
 #include "llsdserialize.h"
-#include "llselectmgr.h"
 #include "lltabcontainer.h"
 #include "lltextbox.h"
 #include "lltexteditor.h"
-#include "lltooldraganddrop.h"
 #include "lltrans.h"
 #include "llexternaleditor.h"
 #include "lllogchat.h"
@@ -91,7 +88,6 @@
 #include "llviewerassettype.h"
 #include "llviewercontrol.h"
 #include "llviewerinventory.h"
-#include "llviewermenu.h"
 #include "llweb.h"
 #include "llviewermenufile.h"
 #include "llviewerobject.h"
@@ -419,7 +415,7 @@ ALFloaterScriptStudio* ALFloaterScriptStudio::explore(const LLUUID& root)
     ALFloaterScriptStudio* studio = LLFloaterReg::showTypedInstance<ALFloaterScriptStudio>("script_studio", LLSD(), TAKE_FOCUS_YES);
     if (studio && root.notNull())
     {
-        studio->exploreObject(root);
+        studio->mExplorerPane->explore(root);
     }
     return studio;
 }
@@ -526,7 +522,7 @@ ALFloaterScriptStudio::~ALFloaterScriptStudio()
 {
     // A menu still open calls into this window, which is going: it goes
     // first. The menus live in the viewer's menu holder, not here.
-    for (LLHandle<LLContextMenu>* menu : { &mTabMenuHandle, &mExplorerMenuHandle, &mListMenuHandle })
+    for (LLHandle<LLContextMenu>* menu : { &mTabMenuHandle, &mListMenuHandle })
     {
         if (LLContextMenu* open = menu->get())
         {
@@ -637,7 +633,7 @@ bool ALFloaterScriptStudio::postBuild()
             refreshOutline(*doc);
         }
     });
-    mExplorer      = getChild<ALPaneList>("explorer");
+    mExplorerPane  = getChild<ALScriptExplorerPane>("explorer_pane");
     mCompileTarget = getChild<LLComboBox>("compile_target");
     mRunning       = getChild<LLCheckBoxCtrl>("running");
     mExperience    = getChild<LLComboBox>("experience");
@@ -758,90 +754,6 @@ bool ALFloaterScriptStudio::postBuild()
         }
         saveState();
     });
-    mExplorer->setDoubleClickCallback(boost::bind(&ALFloaterScriptStudio::onExplorerChosen, this));
-    // The buttons follow what is chosen, which the list says as it changes.
-    mExplorer->setCommitOnSelectionChange(true);
-    mExplorer->setDragStarter([this](const LLSD& pressed) { return startExplorerDrag(pressed); });
-    // A new selection in world, looked at on the next frame rather than at
-    // the next second's poll; the signal fires many times a frame while
-    // something is edited, so it only marks it.
-    mSelectionConnection = LLSelectMgr::getInstance()->mUpdateSignal.connect([this]() { mSelectionChanged = true; });
-    // A name the region said of anything the list shows, whether for a
-    // selection or asked here, is read on the next frame.
-    mPropertiesConnection = ALObjectPropertiesCache::instance().setChangeCallback([this](const LLUUID& id) {
-        if (mListedPrims.contains(id))
-        {
-            mExplorerNamesStale = true;
-        }
-    });
-    mExplorer->setDropHandler([this](const LLSD& row, MASK mask, bool drop, EDragAndDropType type, void* cargo, EAcceptance* accept, std::string& tooltip) {
-        return dropOnExplorer(row, mask, drop, type, cargo, accept, tooltip);
-    });
-    mExplorer->setCommitCallback([this](LLUICtrl*, const LLSD&) { refreshExplorerButtons(); });
-    mExplorerFilter = getChild<LLFilterEditor>("explorer_filter");
-    // A filter looks through what is folded too: what a large linkset's
-    // folded prims hold is asked for once there is one.
-    mExplorerFilter->setCommitCallback([this](LLUICtrl*, const LLSD&) {
-        if (mExplorerFilter->getText().empty())
-        {
-            fillExplorer();
-        }
-        else
-        {
-            refreshExplorer();
-        }
-    });
-    mExplorer->setRightMouseDownCallback([this](LLUICtrl*, S32 x, S32 y, MASK) { showExplorerMenu(x, y); });
-    // The keys a tree of files answers to, asked of the list first: the
-    // list would take left and right for its cells, and the panel it is in
-    // escape, to leave nothing with the keyboard -- where the arrows walk
-    // the avatar. Left and right fold and open the object or the prim
-    // chosen; return opens what is chosen, or folds it; delete deletes it,
-    // Command-Backspace too on a Mac; F2 renames it; and escape goes back
-    // to the script.
-    mExplorer->setKeyHandler([this](KEY key, MASK mask) {
-        if ((key == KEY_LEFT || key == KEY_RIGHT) && mask == MASK_NONE)
-        {
-            const std::vector<LLScrollListItem*> rows = mExplorer->getAllSelected();
-            if (rows.size() == 1 && rows.front()->getValue().isMap() && !rows.front()->getValue().has("item"))
-            {
-                explorerFoldRow(rows.front()->getValue(), key == KEY_LEFT);
-                return true;
-            }
-            return false;
-        }
-        if (key == KEY_RETURN && mask == MASK_NONE)
-        {
-            onExplorerChosen();
-            return true;
-        }
-        if ((key == KEY_DELETE && mask == MASK_NONE) || (key == KEY_BACKSPACE && mask == MASK_CONTROL))
-        {
-            if (explorerActionEnabled("delete"))
-            {
-                onExplorerAction("delete");
-            }
-            return true;
-        }
-        if (key == KEY_F2 && mask == MASK_NONE)
-        {
-            if (explorerActionEnabled("rename"))
-            {
-                onExplorerAction("rename");
-            }
-            return true;
-        }
-        if (key == KEY_ESCAPE && mask == MASK_NONE)
-        {
-            revealed(mExplorer, true);
-            return true;
-        }
-        return false;
-    });
-    for (const char* action : { "open", "start", "stop", "reset", "refresh" })
-    {
-        getChild<LLButton>(std::string("explorer_") + action)->setCommitCallback([this, action](LLUICtrl*, const LLSD&) { onExplorerAction(action); });
-    }
     mRunningConnection = ALScriptWorkspace::instance().onRunningState([this](const ALScriptWorkspace::RunningState& state) { runningState(state); });
     // Copy from the lists with no menu of their own; the problems' has
     // its own copying, and a right-click there would bring up both, the
@@ -971,7 +883,7 @@ bool ALFloaterScriptStudio::postBuild()
             0.25f);
     }
     // With the pins read, the objects in hand.
-    refreshExplorer();
+    mExplorerPane->relist();
     refreshToolbar();
     fillTabs();
     // A window opened with nothing in it says so from the first frame:
@@ -1280,7 +1192,7 @@ void ALFloaterScriptStudio::draw()
     pumpPreprocessor();
     pumpAnalysis();
     pumpCaret();
-    pumpExplorer();
+    mExplorerPane->pump();
     pumpVim();
     mSearchPane->pump();
     pumpSettle();
@@ -2009,7 +1921,7 @@ void ALFloaterScriptStudio::loaded(const ALScriptWorkspace::Loaded& answer)
         setStatus(getString(answer.modifiable ? "Loaded" : "LoadedReadOnly", args));
         if (!doc.ref.inInventory())
         {
-            refreshExplorer();
+            mExplorerPane->relist();
         }
         goToPending(doc);
     }
@@ -2087,7 +1999,7 @@ void ALFloaterScriptStudio::loaded(const ALScriptWorkspace::Loaded& answer)
             {
                 askExperienceOf(doc);
             }
-            refreshExplorer();
+            mExplorerPane->relist();
         }
         goToPending(doc);
     }
@@ -6132,10 +6044,10 @@ void ALFloaterScriptStudio::startLookup(Doc& doc, ALEditorCommand command, const
         const LLHandle<LLFloater> handle     = getHandle();
         const std::string         id         = doc.id;
         const U32                 generation = lookup.generation;
-        for (const ExplorerObject& object : mExplorerModel)
+        for (const ALScriptExplorerModel::Object& object : mExplorerPane->model().objects())
         {
             bool ours = false;
-            for (const ExplorerPrim& prim : object.prims)
+            for (const ALScriptExplorerModel::Prim& prim : object.prims)
             {
                 ours = ours || prim.id == doc.ref.object;
             }
@@ -6143,7 +6055,7 @@ void ALFloaterScriptStudio::startLookup(Doc& doc, ALEditorCommand command, const
             {
                 continue;
             }
-            for (const ExplorerPrim& prim : object.prims)
+            for (const ALScriptExplorerModel::Prim& prim : object.prims)
             {
                 for (const ALScriptWorkspace::Item& item : prim.items)
                 {
@@ -7755,9 +7667,9 @@ std::vector<ALQuickOpen::Candidate> ALFloaterScriptStudio::paletteScripts(std::v
     }
     // The scripts and notecards of the objects the explorer shows, open or
     // not yet.
-    for (const ExplorerObject& object : mExplorerModel)
+    for (const ALScriptExplorerModel::Object& object : mExplorerPane->model().objects())
     {
-        for (const ExplorerPrim& prim : object.prims)
+        for (const ALScriptExplorerModel::Prim& prim : object.prims)
         {
             for (const ALScriptWorkspace::Item& item : prim.items)
             {
@@ -8529,6 +8441,23 @@ void ALFloaterScriptStudio::refreshOutline(Doc& doc)
     followCaretInOutline(doc);
 }
 
+bool ALFloaterScriptStudio::handleMouseDown(S32 x, S32 y, MASK mask)
+{
+    // An arrow in the outline folds its symbol.
+    if (mask == MASK_NONE && mOutline && mOutline->isInVisibleChain())
+    {
+        S32 lx = 0, ly = 0;
+        localPointToOtherView(x, y, &lx, &ly, mOutline);
+        size_t index = 0;
+        if (mOutline->pointInView(lx, ly) && outlineArrowAt(lx, ly, index))
+        {
+            foldOutline(index);
+            return true;
+        }
+    }
+    return ALStudioFloater::handleMouseDown(x, y, mask);
+}
+
 bool ALFloaterScriptStudio::outlineArrowAt(S32 x, S32 y, size_t& index)
 {
     LLScrollListItem* item = mOutline->hitItem(x, y);
@@ -8859,7 +8788,7 @@ std::string ALFloaterScriptStudio::whereIs(const Doc& doc) const
 std::vector<ALScriptSearchPane::Window::Object> ALFloaterScriptStudio::objectsListed() const
 {
     std::vector<ALScriptSearchPane::Window::Object> listed;
-    for (const ExplorerObject& object : mExplorerModel)
+    for (const ALScriptExplorerModel::Object& object : mExplorerPane->model().objects())
     {
         if (!object.present)
         {
@@ -8868,7 +8797,7 @@ std::vector<ALScriptSearchPane::Window::Object> ALFloaterScriptStudio::objectsLi
         ALScriptSearchPane::Window::Object one;
         one.root = object.root;
         one.name = object.name;
-        for (const ExplorerPrim& prim : object.prims)
+        for (const ALScriptExplorerModel::Prim& prim : object.prims)
         {
             for (const ALScriptWorkspace::Item& item : prim.items)
             {
@@ -8883,7 +8812,7 @@ std::vector<ALScriptSearchPane::Window::Object> ALFloaterScriptStudio::objectsLi
 std::string ALFloaterScriptStudio::objectName(const LLUUID& root) const
 {
     std::string name;
-    for (const ExplorerObject& one : mExplorerModel)
+    for (const ALScriptExplorerModel::Object& one : mExplorerPane->model().objects())
     {
         if (one.root == root)
         {
@@ -8906,7 +8835,7 @@ LLUUID ALFloaterScriptStudio::objectInHand() const
     }
     if (only.isNull())
     {
-        const std::vector<ExplorerRow> rows = explorerChoice();
+        const std::vector<ALScriptExplorerPane::Choice> rows = mExplorerPane->choice();
         if (!rows.empty())
         {
             only = rows.front().root;
@@ -9694,9 +9623,9 @@ ALFloaterScriptStudio::Doc::Orphan ALFloaterScriptStudio::orphanOf(const Doc& do
     }
     // Gone from its object where the region has said what the prim holds;
     // while that is being asked again, as it was.
-    for (const ExplorerObject& one : mExplorerModel)
+    for (const ALScriptExplorerModel::Object& one : mExplorerPane->model().objects())
     {
-        for (const ExplorerPrim& prim : one.prims)
+        for (const ALScriptExplorerModel::Prim& prim : one.prims)
         {
             if (prim.id != doc.ref.object)
             {
@@ -10749,36 +10678,64 @@ void ALFloaterScriptStudio::outputGoToInclude(const std::string& file, const std
 
 // --- before a save --------------------------------------------------------------------
 
-// --- the explorer -----------------------------------------------------------------
+// --- what the explorer asks of the window -------------------------------------------
 
-bool ALFloaterScriptStudio::handleMouseDown(S32 x, S32 y, MASK mask)
+void ALFloaterScriptStudio::showExplorer()
 {
-    // An arrow in the explorer folds its row, and the press goes on to
-    // the list, which chooses the row as any press would.
-    if (mask == MASK_NONE && mExplorer && mExplorer->isInVisibleChain())
-    {
-        S32 lx = 0, ly = 0;
-        localPointToOtherView(x, y, &lx, &ly, mExplorer);
-        LLSD row;
-        if (mExplorer->pointInView(lx, ly) && explorerArrowAt(lx, ly, row))
-        {
-            explorerFoldRow(row);
-        }
-    }
-    // And one in the outline its symbol.
-    if (mask == MASK_NONE && mOutline && mOutline->isInVisibleChain())
-    {
-        S32 lx = 0, ly = 0;
-        localPointToOtherView(x, y, &lx, &ly, mOutline);
-        size_t index = 0;
-        if (mOutline->pointInView(lx, ly) && outlineArrowAt(lx, ly, index))
-        {
-            foldOutline(index);
-            return true;
-        }
-    }
-    return ALStudioFloater::handleMouseDown(x, y, mask);
+    mFolds.setCollapsed("explorer", false);
 }
+
+void ALFloaterScriptStudio::itemRenamed(const ALScriptRef& ref, const std::string& name)
+{
+    if (const size_t index = indexOf(ref); index != NONE)
+    {
+        renameDoc(*mDocs[index], name);
+    }
+}
+
+void ALFloaterScriptStudio::itemDeleted(const ALScriptRef& ref)
+{
+    // Its tab goes with it, whatever was typed there, in whichever window
+    // holds it; a window popped out for it alone goes too.
+    if (ALFloaterScriptStudio* holder = holderOf(ref, std::string()))
+    {
+        holder->letGoOf(holder->indexOf(ref));
+        if (holder != this && !holder->mMain && holder->mDocs.empty())
+        {
+            holder->closeFloater();
+        }
+    }
+}
+
+bool ALFloaterScriptStudio::unsavedAnywhere(const ALScriptRef& ref) const
+{
+    const ALFloaterScriptStudio* holder = holderOf(ref, std::string());
+    const size_t                 index  = holder ? holder->indexOf(ref) : NONE;
+    return index != NONE && holder->mDocs[index]->editor->isDirty() && holder->mDocs[index]->modifiable;
+}
+
+void ALFloaterScriptStudio::runningState(const ALScriptWorkspace::RunningState& state)
+{
+    const size_t index = indexOf(state.ref);
+    if (index == NONE)
+    {
+        return;
+    }
+    Doc& doc    = *mDocs[index];
+    doc.running = state.running ? 1 : 0;
+    // What it compiles for, as the region knows it, but for one picked
+    // here and not saved yet, which is what the next save sends.
+    if (!state.compileTarget.empty() && !doc.targetChosen)
+    {
+        doc.language.compileTarget = state.compileTarget;
+    }
+    if (&doc == active())
+    {
+        refreshToolbar();
+    }
+}
+
+// --- a new script in the inventory ----------------------------------------------------
 
 void ALFloaterScriptStudio::newInventoryScript(bool lua)
 {
@@ -11065,7 +11022,7 @@ void ALFloaterScriptStudio::letGoOf(size_t index, bool keep)
     {
         activate(llmin(index, mDocs.size() - 1));
     }
-    refreshExplorer();
+    mExplorerPane->relist();
 }
 
 // --- the menu and the toolbar ---------------------------------------------------
@@ -11111,7 +11068,7 @@ void ALFloaterScriptStudio::onMenuAction(const LLSD& param)
     {
         if (doc && !doc->ref.inInventory())
         {
-            revealInExplorer(*doc);
+            mExplorerPane->reveal(*doc);
         }
     }
     else if (action == "new_script" || action == "new_lua_script")
@@ -12465,15 +12422,10 @@ void ALFloaterScriptStudio::writeState(LLSD& state) const
     state["map_width"]    = mScrollMapWidth;
     state["map_preview"]  = mScrollMapPreview;
     state["map_left"]     = mScrollMapLeft;
-    LLSD pinned = LLSD::emptyArray();
-    for (const Pinned& pin : mPinned)
+    if (mExplorerPane)
     {
-        LLSD one;
-        one["id"]   = pin.root;
-        one["name"] = pin.name;
-        pinned.append(one);
+        mExplorerPane->saveState(state);
     }
-    state["pinned"] = pinned;
     LLSD recent = LLSD::emptyArray();
     for (const std::string& path : mRecentFiles)
     {
@@ -12649,17 +12601,9 @@ void ALFloaterScriptStudio::readState(const LLSD& state)
     {
         mScrollMapLeft = state["map_left"].asBoolean();
     }
-    if (state.has("pinned"))
+    if (mExplorerPane)
     {
-        mPinned.clear();
-        for (LLSD::array_const_iterator it = state["pinned"].beginArray(); it != state["pinned"].endArray(); ++it)
-        {
-            const LLUUID id = (*it)["id"].asUUID();
-            if (id.notNull() && !isPinned(id))
-            {
-                mPinned.push_back(Pinned{ id, (*it)["name"].asString() });
-            }
-        }
+        mExplorerPane->readState(state);
     }
     if (mProblemsPane)
     {

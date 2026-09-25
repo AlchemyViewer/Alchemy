@@ -25,6 +25,7 @@
 #pragma once
 
 #include "alcodeeditor.h"
+#include "alscriptexplorerpane.h"
 #include "alscriptnotecardtab.h"
 #include "alscriptoutputpane.h"
 #include "alscriptproblemspane.h"
@@ -93,7 +94,7 @@ class LLViewerObject;
 // with the author's source in a tab beside it. Its regions fold and come
 // out as any studio's do.
 class ALFloaterScriptStudio final : public ALStudioFloater, public ALScriptStudioServices, public ALScriptOutputPane::Window, public ALScriptProblemsPane::Window,
-                                    public ALScriptSearchPane::Window
+                                    public ALScriptSearchPane::Window, public ALScriptExplorerPane::Window
 {
     friend class LLFloaterReg;
 
@@ -631,42 +632,6 @@ private:
     void goToSymbol();
     // Every open tab, to pick one from by name.
     void showAllTabs();
-    // An object's or a prim's row in the explorer folded shut or opened,
-    // by what it stands for; a linkset's row of prims holding nothing, by
-    // its object; either by the row's value; and the row under a point of
-    // the explorer, where the point is on its arrow.
-    void explorerFold(const LLUUID& id, bool prim, std::optional<bool> folded = std::nullopt);
-    void explorerFoldEmpties(const LLUUID& root, std::optional<bool> folded = std::nullopt);
-    void explorerFoldRow(const LLSD& row, std::optional<bool> folded = std::nullopt);
-    bool explorerArrowAt(S32 x, S32 y, LLSD& row);
-    // What is chosen of what a prim holds, dragged out with the viewer's
-    // drag tool -- to the inventory, as the build floater's contents are --
-    // from the prim of the row pressed; false where none of it may go.
-    bool startExplorerDrag(const LLSD& pressed);
-    // What to call an object that has never said its name here: what a pin
-    // or an open script remembers it by, or an ellipsis while it is asked.
-    std::string nameGivenTo(const LLUUID& root) const;
-    // The names of what the list shows read again, now that the region has
-    // said some; and one asked of its region, once while it is shown.
-    void rereadExplorerNames();
-    void askExplorerName(const LLUUID& id);
-    // What is dragged from the inventory over a row of the explorer, or
-    // dropped on it: into the prim the row is of, as into the build
-    // floater's contents.
-    // Answers the row the drop goes to, for the list to light.
-    LLSD dropOnExplorer(const LLSD& row, MASK mask, bool drop, EDragAndDropType type, void* cargo, EAcceptance* accept, std::string& tooltip);
-    // Why a prim will not take what is carried over it, for the drag's tip.
-    std::string dropRefusal(LLViewerObject* prim, EDragAndDropType type, void* cargo) const;
-    // What is dragged put into a prim, as the build floater's contents
-    // take it; true where it would go.
-    bool dropIntoPrim(LLViewerObject* prim, MASK mask, bool drop, EDragAndDropType type, void* cargo);
-    // Where a drop on the explorer's empty space goes: the prim of what is
-    // chosen in it, where all of that is of one; the object selected in
-    // world where nothing is. Nowhere, where either is more than one.
-    LLViewerObject* explorerDropTarget() const;
-    // Items of one prim put into another, through the agent's inventory,
-    // and said as it ends.
-    void transferBetween(const LLUUID& from, const std::vector<LLUUID>& items, const LLUUID& to, bool running);
     // Every command the menus hold, to give one by name.
     void showCommandPalette();
     // One field for going anywhere, as Visual Studio Code's: a script by
@@ -744,87 +709,14 @@ private:
     void outputGoTo(const ALScriptRef& ref, const std::string& name, S32 line, S32 column) override;
     void outputGoToInclude(const std::string& file, const std::string& file_name, S32 line, S32 column) override;
 
-    // The explorer: the objects in hand -- pinned, selected in world, or
-    // holding a script that is open -- each prim's scripts and notecards
-    // listed as they are fetched, with whether each script runs. A pinned
-    // object stays listed when it is neither, and across sessions; one
-    // that is not around is listed by the name it had.
-    struct ExplorerPrim
-    {
-        LLUUID                            id;
-        std::string                       name;
-        // The name is the prim's own, not a stand-in until it is heard.
-        bool                              named   = false;
-        bool                              fetched = false;
-        std::vector<ALScriptWorkspace::Item> items;
-    };
-    struct ExplorerObject
-    {
-        LLUUID                    root;
-        std::string               name;
-        bool                      named   = false;
-        bool                      pinned  = false;
-        bool                      present = true;
-        std::vector<ExplorerPrim> prims;
-    };
-    struct Pinned
-    {
-        LLUUID      root;
-        std::string name;
-    };
-    // An object's name, and its pin's with it.
-    void renameExplorerObject(ExplorerObject& object, const std::string& name);
-    // What a row of the explorer stands for: an object, a prim of one, or
-    // a script or notecard in a prim.
-    struct ExplorerRow
-    {
-        LLUUID      root;
-        LLUUID      prim;
-        LLUUID      item;
-        std::string name;
-        bool        script = false;
-        bool        lua    = false;
-        // A prim of a linkset's own row, rather than its object's.
-        bool        primRow = false;
-        bool        isItem() const { return item.notNull(); }
-        ALScriptRef ref() const { return ALScriptRef(prim, item); }
-    };
-    void pumpExplorer();
-    // The objects in hand listed again; what each prim holds asked where
-    // it is not known or has changed, and of every prim where `refetch` --
-    // a person asked, or something was made, renamed or deleted in one.
-    void refreshExplorer(bool refetch = false);
-    void explorerContents(const ALScriptWorkspace::Contents& contents);
-    void fillExplorer();
-    // The rows chosen, in the list's order.
-    std::vector<ExplorerRow> explorerChoice() const;
-    // The prims the rows chosen as prims or objects stand for, each once,
-    // with the name the queues report under; an object row means every
-    // prim of it. A script's own prim is not among them.
-    std::vector<std::pair<LLUUID, std::string>> containerPrims(const std::vector<ExplorerRow>& rows) const;
-    void                     onExplorerChosen();
-    void                     onExplorerAction(const std::string& action);
-    void                     showExplorerMenu(S32 x, S32 y);
-    bool                     explorerActionEnabled(const std::string& action) const;
-    // A script or notecard made in a prim, named through a dialog and
-    // opened once the region lists it.
-    void explorerCreate(const LLUUID& prim, bool notecard, bool lua);
-    void explorerCreated(const ALScriptWorkspace::Created& made, const std::optional<std::string>& opening);
-    // A row renamed where it stands; and the name it was given, taken.
-    void explorerRename(const ExplorerRow& row);
-    void explorerRenamed(const ExplorerRow& row, const std::string& was, std::string name);
-    void explorerDelete(const std::vector<ExplorerRow>& rows);
-    void explorerRecompile(const std::vector<ExplorerRow>& rows);
-    // Whether a script runs, as far as the studio knows: its tab's word,
-    // else the region's last answer to the explorer; nothing where neither
-    // has said.
-    std::optional<bool> knownRunning(const LLUUID& prim, const LLUUID& item) const;
-    // An object pinned, the explorer shown, and the object's row chosen.
-    void exploreObject(const LLUUID& root);
-    bool isPinned(const LLUUID& root) const;
-    // Pinned or let go; the state and the list are the caller's to bring
-    // up to date.
-    void togglePinned(const LLUUID& root, const std::string& name);
+    // What the explorer asks of the window (ALScriptExplorerPane::Window).
+    void showExplorer() override;
+    void explorerPinsChanged() override { saveState(); }
+    void itemRenamed(const ALScriptRef& ref, const std::string& name) override;
+    void itemDeleted(const ALScriptRef& ref) override;
+    bool unsavedAnywhere(const ALScriptRef& ref) const override;
+    // Whether a script runs, what it compiles for: the region's word, on a
+    // tab that has it open.
     void runningState(const ALScriptWorkspace::RunningState& state);
 
     // Find in files: words looked for across the scripts open, one
@@ -1000,16 +892,6 @@ private:
     void refreshKeyTips();
     // Edit > Undo and Redo named for the step they take, where it has one.
     void refreshUndoLabels();
-    // The explorer's buttons, as what is chosen allows.
-    void refreshExplorerButtons();
-    // Start, stop, reset or restart over the rows, asked about first where
-    // it reaches more than one script.
-    void runExplorerScripts(const std::string& action, const std::vector<ExplorerRow>& rows);
-    S32  scriptsReached(const std::vector<ExplorerRow>& rows) const;
-    // Whether a queue over these prims walks the row's script already.
-    static bool walkedByQueue(const ExplorerRow& row, const std::vector<std::pair<LLUUID, std::string>>& prims);
-    // The explorer's row for a script, unfolded to and chosen.
-    void revealInExplorer(const Doc& doc);
     // A name that a rename may not take: one of the language's own.
     bool reservedName(const Doc& doc, const std::string& name) const;
     void onMenuAction(const LLSD& param);
@@ -1153,7 +1035,6 @@ private:
     // was last looked at.
     bool                               mOffline        = false;
     F64                                mOrphansChecked = 0.0;
-    LLFilterEditor*                    mExplorerFilter = nullptr;
     // What the editors' vim keymaps share: the : and / lines entered in
     // any of them, and the settings a :set changes.
     std::shared_ptr<ALVimKeymap::Shared> mVimShared = std::make_shared<ALVimKeymap::Shared>();
@@ -1262,56 +1143,8 @@ private:
     bool                               mWeightsStale      = true;
     // Which lookup across scripts the answers arriving belong to.
     U32                                mLookupGeneration = 0;
-    ALPaneList*                        mExplorer      = nullptr;
-    std::vector<ExplorerObject>        mExplorerModel;
-    // Answers have come that the list does not show yet: it is filled a
-    // moment after it was last filled. And the prims asked what they hold
-    // and not answered yet, which are not asked again meanwhile.
-    bool                               mExplorerStale  = false;
-    F64                                mExplorerFilled = 0.0;
-    boost::unordered_flat_set<LLUUID>  mContentsAsked;
-    // The objects and the prims of linksets folded shut in the explorer,
-    // each by its id -- apart, since a linkset's root prim has its
-    // object's.
-    boost::unordered_flat_set<LLUUID>  mExplorerFolded;
-    boost::unordered_flat_set<LLUUID>  mExplorerFoldedPrims;
-    // The linksets whose prims holding nothing are listed, by root; folded
-    // under one row otherwise.
-    boost::unordered_flat_set<LLUUID>  mExplorerEmptiesOpen;
-    std::vector<Pinned>                mPinned;
-    // The new items to be opened once their prims list them: each by its
-    // prim, and by its id, or its name where the region gave no id; with
-    // the scripter's template for it, put in place of the region's.
-    struct OpenWhenListed
-    {
-        LLUUID                     prim;
-        LLUUID                     item;
-        std::string                name;
-        std::optional<std::string> text;
-    };
-    std::vector<OpenWhenListed>        mOpenWhenListed;
-    LLHandle<LLContextMenu>            mExplorerMenuHandle;
+    ALScriptExplorerPane*              mExplorerPane  = nullptr;
     LLHandle<LLContextMenu>            mTabMenuHandle;
-    // The roots selected in world when last looked, and when.
-    std::vector<LLUUID>                mExplorerRoots;
-    F64                                mExplorerPolled = 0.0;
-    // When what the prims hold is asked again after a drop, for what the
-    // drop sends on its own time: a folder's items, fetched first.
-    F64                                mExplorerRefetchAt = 0.0;
-    // What a drag from another prim has dropped so far, sent with its last.
-    std::vector<LLUUID>                mTransferring;
-    // The prims the list shows, among which the object properties cache's
-    // word on a name is looked for; those whose names were asked of their
-    // regions while shown; whether any came in since the last frame.
-    boost::unordered_flat_set<LLUUID>  mListedPrims;
-    boost::unordered_flat_set<LLUUID>  mNamesAsked;
-    bool                               mExplorerNamesStale = false;
-    boost::signals2::scoped_connection mPropertiesConnection;
-    // The selection in world changed since the explorer last looked.
-    boost::signals2::scoped_connection mSelectionConnection;
-    bool                               mSelectionChanged = false;
-    // What the region said runs, by prim and item.
-    std::map<std::pair<LLUUID, LLUUID>, bool> mRunningKnown;
     bool                               mMain = true;
     // Whose path the bar at the bottom shows, so that a tab come to the
     // front is shown there whatever its own path was when last shown.
