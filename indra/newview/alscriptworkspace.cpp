@@ -26,6 +26,7 @@
 
 #include "alscriptworkspace.h"
 
+#include "alobjectproperties.h"
 #include "alscriptenvelope.h"
 #include "alscriptpreprocessor.h"
 #include "llagent.h"
@@ -47,6 +48,7 @@
 #include "llnotificationsutil.h"
 #include "llpreviewscript.h"
 #include "llscripteditorws.h"
+#include "llselectmgr.h"
 #include "lltooldraganddrop.h"
 #include "llsdutil.h"
 #include "lltrans.h"
@@ -845,6 +847,49 @@ namespace
 {
     // How long the items taken are waited for in the agent's inventory.
     constexpr F32 TRANSFER_TIMEOUT = 30.f;
+}
+
+// static
+std::string ALScriptWorkspace::objectName(LLViewerObject* object, const std::string& fallback)
+{
+    if (!object)
+    {
+        return fallback;
+    }
+    if (LLNameValue* nv = object->getNVPair("Name"); nv && nv->getString() && nv->getString()[0])
+    {
+        return nv->getString();
+    }
+    if (LLSelectNode* node = LLSelectMgr::getInstance()->getSelection()->findNode(object); node && !node->mName.empty())
+    {
+        return node->mName;
+    }
+    if (const ALObjectPropertiesCache::ServerProps* said = ALObjectPropertiesCache::instance().get(object->getID()); said && !said->mName.empty())
+    {
+        return said->mName;
+    }
+    return fallback;
+}
+
+// static
+bool ALScriptWorkspace::luaEnabled(const ALScriptRef& ref)
+{
+    LLViewerRegion* region = nullptr;
+    if (LLViewerObject* object = gObjectList.findObject(ref.object))
+    {
+        region = object->getRegion();
+    }
+    if (!region)
+    {
+        region = gAgent.getRegion();
+    }
+    if (region && region->simulatorFeaturesReceived())
+    {
+        LLSD features;
+        region->getSimulatorFeatures(features);
+        return features["LuaScriptsEnabled"].asBoolean();
+    }
+    return false;
 }
 
 // static

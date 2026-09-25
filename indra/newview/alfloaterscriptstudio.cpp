@@ -144,28 +144,6 @@ namespace
 
 namespace
 {
-    // Whether the region a script lives in runs Lua, which is whether the
-    // Lua targets are offered.
-    bool luaEnabledFor(const ALScriptRef& ref)
-    {
-        LLViewerRegion* region = nullptr;
-        if (LLViewerObject* object = gObjectList.findObject(ref.object))
-        {
-            region = object->getRegion();
-        }
-        if (!region)
-        {
-            region = gAgent.getRegion();
-        }
-        if (region && region->simulatorFeaturesReceived())
-        {
-            LLSD features;
-            region->getSimulatorFeatures(features);
-            return features["LuaScriptsEnabled"].asBoolean();
-        }
-        return false;
-    }
-
     // The most a file opened here may hold. A script's text goes up as at
     // most 256 KB (ALScriptEnvelope::MAX_ASSET_BYTES) and a notecard 64 KB;
     // this is room for any include, snippets file or log anyone edits by
@@ -281,32 +259,6 @@ namespace
             }
         }
         return text;
-    }
-
-    // What an object in world is called: an avatar's name; the selection's
-    // word for it, while it is selected, which a rename here changes at
-    // once; or the last the region said of it, which the object properties
-    // cache keeps -- bounded, and shared with the scene explorer -- whether
-    // it was selected or asked of by name.
-    std::string objectNameOf(LLViewerObject* object, const std::string& fallback)
-    {
-        if (!object)
-        {
-            return fallback;
-        }
-        if (LLNameValue* nv = object->getNVPair("Name"); nv && nv->getString() && nv->getString()[0])
-        {
-            return nv->getString();
-        }
-        if (LLSelectNode* node = LLSelectMgr::getInstance()->getSelection()->findNode(object); node && !node->mName.empty())
-        {
-            return node->mName;
-        }
-        if (const ALObjectPropertiesCache::ServerProps* said = ALObjectPropertiesCache::instance().get(object->getID()); said && !said->mName.empty())
-        {
-            return said->mName;
-        }
-        return fallback;
     }
 
     // The roots selected in world, in their order.
@@ -2180,7 +2132,7 @@ void ALFloaterScriptStudio::loaded(const ALScriptWorkspace::Loaded& answer)
         if (LLViewerObject* object = doc.ref.inInventory() ? nullptr : gObjectList.findObject(doc.ref.object))
         {
             LLViewerObject* root = object->getRootEdit() ? object->getRootEdit() : object;
-            doc.objectName       = objectNameOf(root, doc.objectName);
+            doc.objectName       = ALScriptWorkspace::objectName(root, doc.objectName);
             doc.regionName       = object->getRegion() ? object->getRegion()->getName() : doc.regionName;
         }
         // What was carried in is kept against a crash now, and an entry it
@@ -4645,7 +4597,7 @@ void ALFloaterScriptStudio::refreshToolbar()
         // The targets of the script's own language: Lua is a Lua script's
         // one, and the LSL machines an LSL script's, LSL on Luau where the
         // region runs Luau.
-        const bool region_lua = luaEnabledFor(doc->ref);
+        const bool region_lua = ALScriptWorkspace::luaEnabled(doc->ref);
         const bool lua        = doc->language.lua;
         for (const std::string target : { "mono", "lsl2", "lsl-luau", "luau" })
         {
@@ -8925,7 +8877,7 @@ std::string ALFloaterScriptStudio::whereIs(const Doc& doc) const
 {
     // What a row says an open script is in: its object, by the name it has
     // now; nothing for one in the inventory or on disk.
-    return doc.ref.inInventory() ? LLStringUtil::null : objectNameOf(gObjectList.findObject(doc.ref.object), getString("ObjectUnnamed"));
+    return doc.ref.inInventory() ? LLStringUtil::null : ALScriptWorkspace::objectName(gObjectList.findObject(doc.ref.object), getString("ObjectUnnamed"));
 }
 
 std::vector<ALScriptSearchPane::Window::Object> ALFloaterScriptStudio::objectsListed() const
@@ -9856,7 +9808,7 @@ void ALFloaterScriptStudio::checkOrphans()
         if (LLViewerObject* object = doc.ref.inInventory() || !doc.file.empty() ? nullptr : gObjectList.findObject(doc.ref.object))
         {
             LLViewerObject* root = object->getRootEdit() ? object->getRootEdit() : object;
-            doc.objectName       = objectNameOf(root, doc.objectName);
+            doc.objectName       = ALScriptWorkspace::objectName(root, doc.objectName);
             if (object->getRegion())
             {
                 doc.regionName = object->getRegion()->getName();
@@ -10869,7 +10821,7 @@ void ALFloaterScriptStudio::rereadExplorerNames()
         }
         for (ExplorerPrim& prim : object.prims)
         {
-            const std::string heard = objectNameOf(gObjectList.findObject(prim.id), LLStringUtil::null);
+            const std::string heard = ALScriptWorkspace::objectName(gObjectList.findObject(prim.id), LLStringUtil::null);
             if (heard.empty())
             {
                 continue;
@@ -10993,7 +10945,7 @@ void ALFloaterScriptStudio::refreshExplorer(bool refetch)
         }
         ExplorerObject one;
         one.root  = root->getID();
-        one.name  = objectNameOf(root, LLStringUtil::null);
+        one.name  = ALScriptWorkspace::objectName(root, LLStringUtil::null);
         one.named = !one.name.empty();
         if (!one.named)
         {
@@ -11011,7 +10963,7 @@ void ALFloaterScriptStudio::refreshExplorer(bool refetch)
             {
                 ExplorerPrim prim;
                 prim.id   = child->getID();
-                prim.name  = objectNameOf(child, LLStringUtil::null);
+                prim.name  = ALScriptWorkspace::objectName(child, LLStringUtil::null);
                 prim.named = !prim.name.empty();
                 carry(prim);
                 one.prims.push_back(std::move(prim));
@@ -11612,7 +11564,7 @@ void ALFloaterScriptStudio::transferBetween(const LLUUID& from, const std::vecto
     LLViewerObject*            prim = gObjectList.findObject(to);
     LLViewerObject*            root = prim && prim->getRootEdit() ? prim->getRootEdit() : prim;
     LLStringUtil::format_map_t args;
-    args["[NAME]"] = objectNameOf(root, getString("ObjectUnnamed"));
+    args["[NAME]"] = ALScriptWorkspace::objectName(root, getString("ObjectUnnamed"));
     setStatus(getString("TransferGoing", args));
     const LLHandle<LLFloater> handle = getHandle();
     ALScriptWorkspace::instance().transfer(from, items, to, running, [handle, args](const ALScriptWorkspace::TransferResult& result) {
@@ -11735,7 +11687,7 @@ std::string ALFloaterScriptStudio::dropRefusal(LLViewerObject* prim, EDragAndDro
 {
     LLViewerObject*            root = prim->getRootEdit() ? prim->getRootEdit() : prim;
     LLStringUtil::format_map_t args;
-    args["[NAME]"] = objectNameOf(root, getString("ObjectUnnamed"));
+    args["[NAME]"] = ALScriptWorkspace::objectName(root, getString("ObjectUnnamed"));
     if (std::string refused = ALScriptWorkspace::rlvRefusal(prim, LLAssetType::AT_NONE, ALScriptWorkspace::RlvUse::Change); !refused.empty())
     {
         return refused;
@@ -11869,7 +11821,7 @@ bool ALFloaterScriptStudio::explorerActionEnabled(const std::string& action) con
     if (action == "new_lsl" || action == "new_lua" || action == "new_notecard")
     {
         // One prim to put it in.
-        return rows.size() == 1 && present(rows.front()) && (action != "new_lua" || luaEnabledFor(ALScriptRef(rows.front().prim, LLUUID::null)));
+        return rows.size() == 1 && present(rows.front()) && (action != "new_lua" || ALScriptWorkspace::luaEnabled(ALScriptRef(rows.front().prim, LLUUID::null)));
     }
     if (action == "rename")
     {
@@ -12528,7 +12480,7 @@ void ALFloaterScriptStudio::exploreObject(const LLUUID& root)
     // world; in sight; and chosen, so that the buttons act on it.
     if (!isPinned(root))
     {
-        togglePinned(root, objectNameOf(gObjectList.findObject(root), getString("ObjectUnnamed")));
+        togglePinned(root, ALScriptWorkspace::objectName(gObjectList.findObject(root), getString("ObjectUnnamed")));
         saveState();
     }
     mFolds.setCollapsed("explorer", false);
@@ -13336,7 +13288,7 @@ bool ALFloaterScriptStudio::onMenuEnable(const LLSD& param)
     }
     if (action == "new_lua_script")
     {
-        return luaEnabledFor(ALScriptRef());
+        return ALScriptWorkspace::luaEnabled(ALScriptRef());
     }
     if (action == "recover")
     {

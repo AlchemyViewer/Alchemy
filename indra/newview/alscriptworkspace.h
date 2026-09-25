@@ -310,6 +310,16 @@ public:
     // the region does not keep up with. What a drag out of the studio's
     // explorer and a transfer both go by.
     static bool takeable(LLViewerObject* object, const LLInventoryItem& item);
+    // What an object in world is called: an avatar's name; the selection's
+    // word for it, while it is selected, which a rename there changes at
+    // once; or the last the region said of it, which the object properties
+    // cache keeps -- bounded, and shared with the scene explorer -- whether
+    // it was selected or asked of by name. `fallback` where none has said.
+    static std::string objectName(LLViewerObject* object, const std::string& fallback);
+    // Whether the region a script lives in runs Lua, which is whether the
+    // Lua targets are offered: the agent's region for one in the
+    // inventory, or whose object is out of sight.
+    static bool luaEnabled(const ALScriptRef& ref);
     struct TransferResult
     {
         S32                      moved = 0;
