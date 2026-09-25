@@ -175,6 +175,7 @@ if(AL_BUILD_VIEWER)
     alscriptmodules.cpp
     alscriptnotecardtab.cpp
     alscriptnotecardworld.cpp
+    alscriptoutputpane.cpp
     alscriptpreprocessor.cpp
     alscriptsaveflow.cpp
     alscriptstudiodoc.cpp
