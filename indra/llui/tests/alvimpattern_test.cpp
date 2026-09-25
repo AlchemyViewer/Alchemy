@@ -73,6 +73,9 @@ namespace tut
         ensure_equals("as few as may be", regexOf("a\\{-}"), std::string("a*?"));
         ensure_equals("very magic: bare", regexOf("\\v(a|b)+<x>"), std::string("(a|b)+\\bx\\b"));
         ensure_equals("very nomagic: only the end", regexOf("\\Va.*$"), std::string("a\\.\\*$"));
+        ensure_equals("and the start, past the \\V", regexOf("\\V^a.*$"), std::string("^a\\.\\*$"));
+        ensure_equals("or past a \\c", regexOf("\\c\\V^a"), std::string("^a"));
+        ensure_equals("a ^ inside is itself", regexOf("\\Va^b"), std::string("a\\^b"));
         ensure_equals("classes as brackets", regexOf("\\a\\l\\x"), std::string("[A-Za-z][a-z][0-9A-Fa-f]"));
         ensure_equals("a bracket expression as it stands", regexOf("[^a-z]"), std::string("[^a-z]"));
         ensure_equals("a character by its code", regexOf("\\%x41"), std::string("A"));

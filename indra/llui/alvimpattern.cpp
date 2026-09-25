@@ -484,7 +484,9 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
             case Magic::None:
                 switch (c)
                 {
-                    case '^': out.regex += i == 0 ? "^" : "\\^"; break;
+                    // At the pattern's start -- nothing put in yet, \V and \c
+                    // putting in nothing -- the line's start; elsewhere itself.
+                    case '^': out.regex += out.regex.empty() ? "^" : "\\^"; break;
                     case '$': out.regex += i + 1 == vim.size() ? "$" : "\\$"; break;
                     default: literal(c); break;
                 }
