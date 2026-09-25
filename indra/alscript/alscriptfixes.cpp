@@ -31,6 +31,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cstring>
+#include <optional>
 
 // Every problem a fix is offered for, by its key: named once here, and
 // compared only through `is`, so that each is a key strings.xml has --
@@ -204,10 +205,15 @@ namespace
         return seen;
     }
 
-    // `';'` as the syntax error words it, and the `;` it stands for.
-    std::string unquoted(const std::string& token)
+    // What an engine's message quotes, `';'` or `'string'`, without the
+    // quotes; nothing where it is not quoted.
+    std::optional<std::string> quoted(const std::string& said)
     {
-        return token.size() >= 3 && token.front() == '\'' && token.back() == '\'' ? token.substr(1, token.size() - 2) : std::string();
+        if (said.size() >= 2 && said.front() == '\'' && said.back() == '\'')
+        {
+            return said.substr(1, said.size() - 2);
+        }
+        return std::nullopt;
     }
 
     // The name at a problem's place put right: the one within the stretch
@@ -229,12 +235,6 @@ namespace
         }
         fix.edits.push_back({ problem.line, at, problem.line, at + static_cast<S32>(was.size()), now });
         problem.fixes.push_back(std::move(fix));
-    }
-
-    // `'string'` as a type error words it, and the type it names.
-    std::string typeNamed(const std::string& said)
-    {
-        return said.size() >= 2 && said.front() == '\'' && said.back() == '\'' ? said.substr(1, said.size() - 2) : said;
     }
 
     // Whether LSL casts one type to another: to a string or a list from
@@ -528,8 +528,8 @@ namespace
                 problem.fixes.push_back(std::move(fix));
             }
         }
-        else if (lua && (is(key, Fixed::LuauTypeMismatch) || is(key, Fixed::LuauTypeMismatchReason)) && args.size() >= 2 && typeNamed(args[0]) == "string" &&
-                 typeNamed(args[1]) != "string")
+        else if (lua && (is(key, Fixed::LuauTypeMismatch) || is(key, Fixed::LuauTypeMismatchReason)) && args.size() >= 2 && quoted(args[0]).value_or(args[0]) == "string" &&
+                 quoted(args[1]).value_or(args[1]) != "string")
         {
             // A value where a string is wanted, said as one. A declaration
             // marks the whole of itself: what it is given is after its `=`.
@@ -806,18 +806,19 @@ namespace
         return call != std::string_view::npos && line.compare(call, 8, "require(") == 0;
     }
 
-    // Where a require goes at the top of a script: after the last of those
-    // it opens with, else after the comments it opens with -- its hot
-    // comments, a header -- and whether a blank line should follow it,
-    // where code would stand against it otherwise.
-    S32 requireLine(const Lines& lines, bool& apart)
+    // Where a line goes at the top of a script: after the last of the
+    // lines of its kind the script opens with -- a SLua script's requires;
+    // an LSL script's directives, its includes and the defines that may
+    // say how an include is read -- else after the comments it opens with
+    // (its hot comments, a header); and whether a blank line should follow
+    // it, where code would stand against it otherwise.
+    S32 headLine(const Lines& lines, bool lua, bool& apart)
     {
         S32         after_comments = 0;
-        S32         last_require   = -1;
+        S32         last_kind      = -1;
         bool        in_block       = false;
         std::string closing;
-        S32         i = 0;
-        for (; i < lines.count(); ++i)
+        for (S32 i = 0; i < lines.count(); ++i)
         {
             std::string_view line = lines.line(i);
             const size_t     lead = line.find_first_not_of(" \t");
@@ -825,7 +826,7 @@ namespace
             if (in_block)
             {
                 in_block = line.find(closing) == std::string_view::npos;
-                if (last_require < 0)
+                if (last_kind < 0)
                 {
                     after_comments = i + 1;
                 }
@@ -835,10 +836,12 @@ namespace
             {
                 continue;
             }
-            if (line.compare(0, 2, "--") == 0)
+            bool comment = false;
+            if (lua && line.compare(0, 2, "--") == 0)
             {
                 // A block comment runs to its closing brackets, with as
                 // many equals signs between them as it opened with.
+                comment = true;
                 if (line.size() > 2 && line[2] == '[')
                 {
                     size_t equals = 3;
@@ -852,81 +855,71 @@ namespace
                         in_block = line.find(closing, equals + 1) == std::string_view::npos;
                     }
                 }
-                if (last_require < 0)
+            }
+            else if (!lua && (line.compare(0, 2, "//") == 0 || line.compare(0, 2, "/*") == 0))
+            {
+                comment  = true;
+                closing  = "*/";
+                in_block = line.compare(0, 2, "/*") == 0 && line.find(closing, 2) == std::string_view::npos;
+            }
+            if (comment)
+            {
+                if (last_kind < 0)
                 {
                     after_comments = i + 1;
                 }
                 continue;
             }
-            if (givesRequire(line))
+            if (lua && givesRequire(line))
             {
-                last_require = i;
+                last_kind = i;
                 continue;
             }
-            break;
-        }
-        if (last_require >= 0)
-        {
-            apart = false;
-            return last_require + 1;
-        }
-        const std::string_view next = lines.line(after_comments);
-        apart                       = after_comments < lines.count() && next.find_first_not_of(" \t") != std::string_view::npos;
-        return after_comments;
-    }
-
-    // Where an include goes at the top of an LSL script: after the last of
-    // the directives it opens with -- its includes, and the defines that
-    // may say how an include is read -- else after the comments it opens
-    // with, apart from code that would stand against it.
-    S32 includeLine(const Lines& lines, bool& apart)
-    {
-        S32  after_comments = 0;
-        S32  last_directive = -1;
-        bool in_block       = false;
-        for (S32 i = 0; i < lines.count(); ++i)
-        {
-            std::string_view line = lines.line(i);
-            const size_t     lead = line.find_first_not_of(" \t");
-            line                  = lead == std::string_view::npos ? std::string_view() : line.substr(lead);
-            if (in_block)
-            {
-                in_block = line.find("*/") == std::string_view::npos;
-                if (last_directive < 0)
-                {
-                    after_comments = i + 1;
-                }
-                continue;
-            }
-            if (line.empty())
-            {
-                continue;
-            }
-            if (line.compare(0, 2, "//") == 0 || line.compare(0, 2, "/*") == 0)
-            {
-                in_block = line.compare(0, 2, "/*") == 0 && line.find("*/", 2) == std::string_view::npos;
-                if (last_directive < 0)
-                {
-                    after_comments = i + 1;
-                }
-                continue;
-            }
-            if (line.front() == '#')
+            if (!lua && line.front() == '#')
             {
                 // With the lines a backslash carries it on to.
-                last_directive = i;
-                while (!lines.line(last_directive).empty() && lines.line(last_directive).back() == '\\' && last_directive + 1 < lines.count())
+                last_kind = i;
+                while (!lines.line(last_kind).empty() && lines.line(last_kind).back() == '\\' && last_kind + 1 < lines.count())
                 {
-                    ++last_directive;
+                    ++last_kind;
                 }
-                i = last_directive;
+                i = last_kind;
                 continue;
             }
             break;
         }
-        const S32 at = last_directive >= 0 ? last_directive + 1 : after_comments;
-        apart        = last_directive < 0 && at < lines.count() && lines.line(at).find_first_not_of(" \t") != std::string_view::npos;
+        const S32 at = last_kind >= 0 ? last_kind + 1 : after_comments;
+        apart        = last_kind < 0 && at < lines.count() && lines.line(at).find_first_not_of(" \t") != std::string_view::npos;
         return at;
+    }
+
+    // A line put where headLine says, as a fix of a problem's: on a line of
+    // its own past a last line with no break after it; once, whatever else
+    // already offers the same.
+    void offerAtHead(ALScriptProblem& problem, const Lines& lines, bool lua, std::string said, ALScriptFix fix)
+    {
+        bool apart  = false;
+        S32  line   = headLine(lines, lua, apart);
+        S32  column = 0;
+        if (line >= lines.count())
+        {
+            line   = lines.count() - 1;
+            column = static_cast<S32>(lines.line(line).size());
+            said   = "\n" + said;
+        }
+        else
+        {
+            said += apart ? "\n\n" : "\n";
+        }
+        for (const ALScriptFix& had : problem.fixes)
+        {
+            if (!had.edits.empty() && had.edits.front().text == said)
+            {
+                return;
+            }
+        }
+        fix.edits.push_back({ line, column, line, column, said });
+        problem.fixes.push_back(std::move(fix));
     }
 
     // A module's name as a string in the script's source.
@@ -1341,7 +1334,7 @@ namespace ALScriptFixes
             {
                 // Put in after the last thing before where the parser
                 // stopped, which is the one character the problem marks.
-                const std::string token = unquoted(args[0]);
+                const std::string token = quoted(args[0]).value_or(std::string());
                 if (!token.empty() && problem.endLine == problem.line && problem.endColumn == problem.column + 1 &&
                     lines.offsetOf(problem.line, problem.endColumn))
                 {
@@ -1437,34 +1430,9 @@ namespace ALScriptFixes
         {
             return;
         }
-        const std::string& name  = problem.args[0];
-        const Lines        lines(text);
-        bool               apart = false;
-        S32                line  = requireLine(lines, apart);
-        std::string        said  = "local " + name + " = require(" + luaString(module) + ")" + (field ? "." + name : std::string());
-        S32                column = 0;
-        if (line >= lines.count())
-        {
-            // Past a last line with no break after it: on a line of its own.
-            line   = lines.count() - 1;
-            column = static_cast<S32>(lines.line(line).size());
-            said   = "\n" + said;
-        }
-        else
-        {
-            said += apart ? "\n\n" : "\n";
-        }
-        for (const ALScriptFix& had : problem.fixes)
-        {
-            if (!had.edits.empty() && had.edits.front().text == said)
-            {
-                return;
-            }
-        }
-        ALScriptFix fix = field ? titled("ScriptFixRequireField", "Take '[1]' from '[2]'", { name, module })
-                                : titled("ScriptFixRequire", "Require '[1]'", { module });
-        fix.edits.push_back({ line, column, line, column, said });
-        problem.fixes.push_back(std::move(fix));
+        const std::string& name = problem.args[0];
+        offerAtHead(problem, Lines(text), /*lua*/ true, "local " + name + " = require(" + luaString(module) + ")" + (field ? "." + name : std::string()),
+                    field ? titled("ScriptFixRequireField", "Take '[1]' from '[2]'", { name, module }) : titled("ScriptFixRequire", "Require '[1]'", { module }));
     }
 
     void offerInclude(ALScriptProblem& problem, std::string_view text, const std::string& include)
@@ -1473,31 +1441,7 @@ namespace ALScriptFixes
         {
             return;
         }
-        const Lines lines(text);
-        bool        apart  = false;
-        S32         line   = includeLine(lines, apart);
-        S32         column = 0;
-        std::string said   = "#include \"" + include + "\"";
-        if (line >= lines.count())
-        {
-            line   = lines.count() - 1;
-            column = static_cast<S32>(lines.line(line).size());
-            said   = "\n" + said;
-        }
-        else
-        {
-            said += apart ? "\n\n" : "\n";
-        }
-        for (const ALScriptFix& had : problem.fixes)
-        {
-            if (!had.edits.empty() && had.edits.front().text == said)
-            {
-                return;
-            }
-        }
-        ALScriptFix fix = titled("ScriptFixInclude", "Include '[1]'", { include });
-        fix.edits.push_back({ line, column, line, column, said });
-        problem.fixes.push_back(std::move(fix));
+        offerAtHead(problem, Lines(text), /*lua*/ false, "#include \"" + include + "\"", titled("ScriptFixInclude", "Include '[1]'", { include }));
     }
 
     std::string freshName(std::string_view text, std::string_view base)
