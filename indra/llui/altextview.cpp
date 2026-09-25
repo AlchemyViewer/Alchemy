@@ -4005,8 +4005,50 @@ void ALTextView::drawRows(const LLRect& text)
     }
 }
 
+void ALTextView::dragSelectTo(S32 x, S32 y)
+{
+    mDragX = x;
+    mDragY = y;
+    // Past the top or the bottom, a step every twentieth of a second: a
+    // row, and a row more for every row's height further past.
+    const LLRect text  = textRect();
+    const S32    row_h = llmax(1, mLayout.rowHeight());
+    const F64    now   = LLTimer::getTotalSeconds();
+    const S32    past  = y > text.mTop ? y - text.mTop : y < text.mBottom ? text.mBottom - y : 0;
+    if (past > 0 && now >= mDragScrolled + 0.05)
+    {
+        mDragScrolled   = now;
+        const S32 rows  = 1 + past / row_h;
+        setScrollY(mScrollY + (y > text.mTop ? -rows : rows) * row_h);
+    }
+    const ALTextPos at        = posAtLocal(x, y, true);
+    const ALTextPos character = posAtLocal(x, y, false);
+    if (at == mDragAt && character == mDragToChar)
+    {
+        return;
+    }
+    mDragAt     = at;
+    mDragToChar = character;
+    placeSelection(mDragAnchor, at);
+    mDesiredX = -1.f;
+    if (mModal)
+    {
+        mModal->mouseChanged(*this);
+    }
+}
+
 void ALTextView::draw()
 {
+    // A drag held past the top or the bottom scrolls on with the mouse
+    // still, as a text field's does.
+    if (mSelecting && hasMouseCapture())
+    {
+        const LLRect text = textRect();
+        if (mDragY > text.mTop || mDragY < text.mBottom)
+        {
+            dragSelectTo(mDragX, mDragY);
+        }
+    }
     syncScrollbar();
     const F32 alpha = getDrawContext().mAlpha;
     if (mBgVisible)
@@ -4291,6 +4333,8 @@ bool ALTextView::handleMouseDown(S32 x, S32 y, MASK mask)
     mDragAnchor = mAnchor;
     mDesiredX   = -1.f;
     mSelecting  = true;
+    mDragX      = x;
+    mDragY      = y;
     gFocusMgr.setMouseCapture(this);
     if (mModal)
     {
@@ -4372,30 +4416,7 @@ bool ALTextView::handleHover(S32 x, S32 y, MASK mask)
     }
     if (mSelecting && hasMouseCapture())
     {
-        const LLRect text  = textRect();
-        const S32    row_h = mLayout.rowHeight();
-        if (y > text.mTop)
-        {
-            setScrollY(mScrollY - row_h);
-        }
-        else if (y < text.mBottom)
-        {
-            setScrollY(mScrollY + row_h);
-        }
-        const ALTextPos at        = posAtLocal(x, y, true);
-        const ALTextPos character = posAtLocal(x, y, false);
-        if (at == mDragAt && character == mDragToChar)
-        {
-            return true;
-        }
-        mDragAt     = at;
-        mDragToChar = character;
-        placeSelection(mDragAnchor, at);
-        mDesiredX = -1.f;
-        if (mModal)
-        {
-            mModal->mouseChanged(*this);
-        }
+        dragSelectTo(x, y);
         return true;
     }
     // On something over the text, it has the mouse: its buttons light and

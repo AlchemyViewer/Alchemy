@@ -867,6 +867,15 @@ private:
     // of each it is on.
     ALTextPos    mDragFromChar;
     ALTextPos    mDragToChar;
+    // Where the pointer was last seen in a drag, and when the text last
+    // scrolled on under one held past its top or bottom, which it does
+    // whether the mouse moves or not.
+    S32          mDragX = 0;
+    S32          mDragY = 0;
+    F64          mDragScrolled = 0.0;
+    // The selection taken to the pointer, the text scrolled on a step
+    // where it is past the top or the bottom.
+    void         dragSelectTo(S32 x, S32 y);
     LLFrameTimer mBlink;
     CaretStyle   mCaretStyle = CaretStyle::Line;
     bool         mCaretBlink = true;

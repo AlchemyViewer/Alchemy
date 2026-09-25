@@ -1127,4 +1127,31 @@ namespace tut
         ensure("a module's name", v.misspellings(0).empty());
         ensure_equals("a sentence", v.misspellings(1).size(), size_t(2));
     }
+
+    template<> template<>
+    void altextview_object::test<34>()
+    {
+        set_test_name("a drag held past the bottom scrolls on, a step a twentieth of a second, further the further past");
+        std::string lines;
+        for (int i = 0; i < 200; ++i)
+        {
+            lines += "line " + std::to_string(i) + "\n";
+        }
+        ALTextView& v = make(lines.c_str());
+        S32 x, y;
+        pointOf(0, 1, x, y);
+        ensure("down", v.handleMouseDown(x, y, MASK_NONE));
+        const LLRect text  = v.textRect();
+        const S32    row_h = v.layout().rowHeight();
+        v.handleHover(x, text.mBottom - 1, MASK_NONE);
+        const S32 first = v.scrollY();
+        ensure("a step", first == row_h);
+        v.handleHover(x, text.mBottom - 1, MASK_NONE);
+        ensure_equals("not twice in the same moment", v.scrollY(), first);
+        ms_sleep(60);
+        v.handleHover(x, text.mBottom - 1 - 3 * row_h, MASK_NONE);
+        ensure_equals("further past, further on", v.scrollY(), first + 4 * row_h);
+        ensure("the selection with it", v.selection().normalised().end.line > 0);
+        v.handleMouseUp(x, text.mBottom - 1, MASK_NONE);
+    }
 }
