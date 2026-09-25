@@ -776,10 +776,10 @@ bool ALFloaterScriptStudio::postBuild()
     mSaveButton->setCommitCallback([this](LLUICtrl*, const LLSD&) {
         if (Doc* doc = active())
         {
-            saveAsked(*doc);
+            mSaving.saveAsked(*doc);
         }
     });
-    mSaveAllButton->setCommitCallback([this](LLUICtrl*, const LLSD&) { saveAll(); });
+    mSaveAllButton->setCommitCallback([this](LLUICtrl*, const LLSD&) { mSaving.saveAll(); });
     mUndoButton->setCommitCallback([this](LLUICtrl*, const LLSD&) {
         undo();
         refreshToolbar();
@@ -801,7 +801,8 @@ bool ALFloaterScriptStudio::postBuild()
         }
     });
     mExpandedButton->setCommitCallback([this](LLUICtrl*, const LLSD&) { toggleExpanded(); });
-    mCompiledConnection = ALScriptWorkspace::instance().onCompiled([this](const ALScriptWorkspace::CompileResult& result) { compiled(result); });
+    mCompiledConnection =
+        ALScriptWorkspace::instance().onCompiled([this](const ALScriptWorkspace::CompileResult& result) { mSaving.compiled(result); });
     // New definitions from the region: the analyzers reload, the words
     // are rebuilt, and every script is checked again.
     mDefinitionsConnection = LLSyntaxDefCache::instance().addSyntaxIDCallback([this]() {
@@ -1158,6 +1159,76 @@ void ALFloaterScriptStudio::stopClosing()
     mClosingWindow = false;
     mAppQuitting   = false;
     mTabsAtQuit    = LLSD();
+}
+
+void ALFloaterScriptStudio::closeSaved(Doc& doc)
+{
+    if (const size_t index = indexOf(doc.id); index != NONE)
+    {
+        letGoOf(index);
+    }
+}
+
+ALScriptStudioSaving::Options ALFloaterScriptStudio::saveOptions() const
+{
+    static LLCachedControl<bool> hold(gSavedSettings, "ALScriptStudioPreflight", false);
+    ALScriptStudioSaving::Options options;
+    options.fix          = gSavedSettings.getBOOL("ALScriptFixOnSave");
+    options.format       = gSavedSettings.getBOOL("ALScriptFormatOnSave");
+    options.trim         = gSavedSettings.getBOOL("ALScriptTrimOnSave");
+    options.holdOnErrors = hold;
+    options.compress     = gSavedSettings.getBOOL("ALScriptPreprocCompress");
+    options.program      = LLVersionInfo::instance().getChannelAndVersion();
+    return options;
+}
+
+void ALFloaterScriptStudio::tidy(Doc& doc, bool fix, bool format_it, bool trim)
+{
+    // The safe fixes first, while the text is still the one they were made
+    // for.
+    if (fix)
+    {
+        fixAll(doc, FixPick{ std::string(), true });
+    }
+    if (format_it)
+    {
+        format(doc, false);
+    }
+    if (trim)
+    {
+        trimTrailing(doc);
+    }
+}
+
+bool ALFloaterScriptStudio::send(const Doc& doc, const std::string& text, const ALScriptWorkspace::SaveOptions& options, std::string& error)
+{
+    return ALScriptWorkspace::instance().save(doc.ref, text, options, nullptr, error);
+}
+
+bool ALFloaterScriptStudio::sendNotecard(const Doc& doc, const std::string& text, const std::vector<LLPointer<LLInventoryItem>>& items,
+                                         std::string& error)
+{
+    return ALScriptWorkspace::instance().saveNotecard(doc.ref, text, items, nullptr, error);
+}
+
+void ALFloaterScriptStudio::runPreprocessor(const Doc& doc, std::function<void(const ALPreprocessor::Result&)> answer)
+{
+    ALScriptPreprocessor::instance().run(preprocessRequest(doc), std::move(answer));
+}
+
+void ALFloaterScriptStudio::keepForRecovery(Doc& doc)
+{
+    mRecovery.keep(doc);
+}
+
+void ALFloaterScriptStudio::showProblems()
+{
+    showBottom("problems_tab");
+}
+
+void ALFloaterScriptStudio::selectFirstError(bool checkers_only)
+{
+    mProblemsPane->selectFirstError(checkers_only);
 }
 
 void ALFloaterScriptStudio::onClose(bool app_quitting)
@@ -1940,7 +2011,7 @@ void ALFloaterScriptStudio::loaded(const ALScriptWorkspace::Loaded& answer)
         {
             // Its includes fetched now, so that the analyzers have them,
             // and the expanded code shown as it would be uploaded.
-            preprocess(doc);
+            mSaving.preprocess(doc);
         }
         scheduleAnalysis(doc, true);
         if (!doc.ref.inInventory())
@@ -1986,7 +2057,7 @@ void ALFloaterScriptStudio::loaded(const ALScriptWorkspace::Loaded& answer)
         {
             doc.saveOnLoad = false;
             doc.save.letAllPast(doc.editor->document().version());
-            save(doc);
+            mSaving.save(doc);
         }
     }
     fillTabs();
@@ -2056,7 +2127,7 @@ void ALFloaterScriptStudio::toggleExpanded()
     // since is expanded again, and shows as it comes.
     if (to_expanded && doc->loaded && (!doc->uploaded.valid || doc->uploaded.version != doc->editor->document().version()))
     {
-        preprocess(*doc);
+        mSaving.preprocess(*doc);
     }
 }
 
@@ -3278,7 +3349,7 @@ void ALFloaterScriptStudio::weighed(Doc& doc, const ALScriptAnalysis::Result& re
         refreshProblems(doc);
         showWeightsInEditor(doc);
     }
-    warnOverWeight(doc);
+    mSaving.warnOverWeight(doc);
 }
 
 void ALFloaterScriptStudio::weighSent(Doc& doc)
@@ -3331,7 +3402,7 @@ void ALFloaterScriptStudio::weighedSent(Doc& doc, const ALScriptAnalysis::Result
             mWeightsStale = true;
         }
     }
-    warnOverWeight(doc);
+    mSaving.warnOverWeight(doc);
 }
 
 std::vector<ALScriptWeight::Target> ALFloaterScriptStudio::weighedTargets(const Doc& doc) const
@@ -4057,7 +4128,7 @@ bool ALFloaterScriptStudio::vimCommand(ALTextView& view, const std::string& name
     }
     if (name == "w" || name == "write" || name == "w!")
     {
-        saveAsked(*doc);
+        mSaving.saveAsked(*doc);
         return true;
     }
     if (name == "q" || name == "quit" || name == "close")
@@ -4078,7 +4149,7 @@ bool ALFloaterScriptStudio::vimCommand(ALTextView& view, const std::string& name
     {
         if (doc->unsaved() && doc->modifiable)
         {
-            saveToClose(doc->id);
+            mSaving.saveToClose(doc->id);
         }
         else
         {
@@ -4119,7 +4190,7 @@ bool ALFloaterScriptStudio::vimCommand(ALTextView& view, const std::string& name
     }
     if (name == "wa" || name == "wall")
     {
-        saveAll();
+        mSaving.saveAll();
         return true;
     }
     if (name == "qa" || name == "qall" || name == "qa!" || name == "qall!")
@@ -4541,7 +4612,7 @@ void ALFloaterScriptStudio::pumpPreprocessor()
         }
         if (preprocessed(*doc))
         {
-            preprocess(*doc);
+            mSaving.preprocess(*doc);
         }
         scheduleAnalysis(*doc, true);
     }
@@ -4782,7 +4853,7 @@ void ALFloaterScriptStudio::analysed(const ALScriptAnalysis::Result& result)
     }
     if (doc.save.checked())
     {
-        save(doc);
+        mSaving.save(doc);
     }
 }
 
@@ -6849,7 +6920,7 @@ void ALFloaterScriptStudio::takeExternal(Doc& doc, const std::string& text)
         return;
     }
     doc.save.fromExternal(doc.editor->document().version());
-    save(doc);
+    mSaving.save(doc);
 }
 
 void ALFloaterScriptStudio::syncExternal(Doc& doc)
@@ -7009,7 +7080,7 @@ void ALFloaterScriptStudio::saveFile(Doc& doc)
     if (!ALFileWrite::whole(doc.file, doc.editor->text()))
     {
         report(getString("SaveToFileFailed", args), true, &doc);
-        saveStopped(doc);
+        mSaving.stopped(doc);
         return;
     }
     if (doc.liveFile)
@@ -7052,7 +7123,7 @@ void ALFloaterScriptStudio::fileSettled(Doc& doc)
         if (each.get() != &doc && each->file.empty() && preprocessed(*each) && reads(*each))
         {
             each->expanded.valid = false;
-            preprocess(*each);
+            mSaving.preprocess(*each);
             scheduleAnalysis(*each);
         }
     }
@@ -9035,7 +9106,7 @@ void ALFloaterScriptStudio::closeWindowAnswered(S32 option)
     {
         if (mClosingWindow)
         {
-            saveToClose(id);
+            mSaving.saveToClose(id);
         }
         else if (const size_t index = indexOf(id); index != NONE)
         {
@@ -9815,7 +9886,7 @@ void ALFloaterScriptStudio::onNoticeAction(const std::string& action)
     }
     else if (action == "save")
     {
-        saveAsked(*doc);
+        mSaving.saveAsked(*doc);
     }
     refreshNotice();
 }
@@ -10187,11 +10258,11 @@ void ALFloaterScriptStudio::outputAction(Doc& doc, const std::string& action)
     activate(indexOf(doc.id));
     if (action == "save_anyway")
     {
-        saveAsked(doc);
+        mSaving.saveAsked(doc);
     }
     else if (action == "retry")
     {
-        save(doc);
+        mSaving.save(doc);
     }
     else if (action == "copy")
     {
@@ -10462,7 +10533,7 @@ void ALFloaterScriptStudio::closeDocumentAnswered(const std::string& id, S32 opt
     switch (option)
     {
         case 0:  // save
-            saveToClose(id);
+            mSaving.saveToClose(id);
             break;
         case 1:  // don't save
             letGoOf(index);
@@ -10529,7 +10600,7 @@ void ALFloaterScriptStudio::closeMany(const std::vector<std::string>& ids)
                 studio->letGoOf(index);
                 continue;
             }
-            studio->saveToClose(id);
+            studio->mSaving.saveToClose(id);
         }
     });
 }
@@ -10647,7 +10718,7 @@ void ALFloaterScriptStudio::addFileCommands()
         [this]() {
             if (Doc* doc = active())
             {
-                saveAsked(*doc);
+                mSaving.saveAsked(*doc);
             }
         },
         [this]() {
@@ -10655,7 +10726,7 @@ void ALFloaterScriptStudio::addFileCommands()
             return doc && doc->loaded && doc->modifiable;
         });
     mCommands.add(
-        "save_all", [this]() { saveAll(); },
+        "save_all", [this]() { mSaving.saveAll(); },
         [this]() {
             for (const std::unique_ptr<Doc>& each : mDocs)
             {
@@ -11095,7 +11166,7 @@ void ALFloaterScriptStudio::addBuildCommands()
         [this]() {
             if (Doc* doc = active(); doc && doc->loaded && !doc->notecard)
             {
-                preprocess(*doc);
+                mSaving.preprocess(*doc);
             }
         },
         [this]() {

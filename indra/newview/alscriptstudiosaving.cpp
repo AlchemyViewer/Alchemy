@@ -23,93 +23,20 @@
  */
 
 #include "llviewerprecompiledheaders.h"
-#include "alfloaterscriptstudio.h"
-#include "alcodeeditor.h"
-#include "alfilewrite.h"
-#include "alnotecarditems.h"
-#include "alscriptmodules.h"
-#include "alscriptpreprocessor.h"
-#include "alscriptweightspane.h"
-#include "alemptystate.h"
-#include "aljumpbar.h"
-#include "aloutputview.h"
-#include "alobjectproperties.h"
-#include "alpanelist.h"
-#include "llsdutil.h"
-#include "alscopebar.h"
-#include "alscriptfixes.h"
-#include "alscriptformatter.h"
-#include "alscriptkeymap.h"
-#include "alscriptmessages.h"
-#include "altabstrip.h"
-#include "altextsearch.h"
-#include "alvimkeymap.h"
-#include "llagent.h"
-#include "llappviewer.h"
+
+#include "alscriptstudiosaving.h"
+
+#include "alscriptnotecardtab.h"
+#include "alscriptstudioservices.h"
 #include "lldate.h"
-#include "lltimer.h"
-#include "llsyntaxid.h"
-#include "llversioninfo.h"
-#include "llbutton.h"
-#include "llcallbacklist.h"
-#include "llcheckboxctrl.h"
-#include "alsaid.h"
-#include "llclipboard.h"
-#include "llcombobox.h"
-#include "lldir.h"
-#include "lldirpicker.h"
-#include "lleditmenuhandler.h"
-#include "llfocusmgr.h"
-#include "llfilepicker.h"
-#include "llfiltereditor.h"
-#include "llfloaterperms.h"
-#include "llexperiencecache.h"
-#include "llfloaterreg.h"
-#include "llinventoryfunctions.h"
-#include "llinventorymodel.h"
-#include "lllayoutstack.h"
-#include "lllineeditor.h"
-#include "llmenugl.h"
-#include "llnotecard.h"
-#include "llnotificationsutil.h"
-#include "llscrolllistctrl.h"
-#include "llsdserialize.h"
-#include "llselectmgr.h"
-#include "lltabcontainer.h"
-#include "lltextbox.h"
-#include "lltexteditor.h"
-#include "lltooldraganddrop.h"
-#include "lltrans.h"
-#include "llexternaleditor.h"
-#include "lllogchat.h"
-#include "llscripteditorws.h"
-#include "llui.h"
-#include "lluicolortable.h"
-#include "lluictrlfactory.h"
-#include "llviewerassettype.h"
-#include "llviewercontrol.h"
-#include "llviewerinventory.h"
-#include "llviewermenu.h"
-#include "llweb.h"
-#include "llviewermenufile.h"
-#include "llviewerobject.h"
-#include "llviewerobjectlist.h"
-#include "llviewerregion.h"
-#include "llviewerwindow.h"
-#include "rlvhandler.h"
-#include "rlvlocks.h"
+
 #include <algorithm>
-#include <ctime>
-#include <fstream>
-#include <cerrno>
-#include <fcntl.h>
-#include <sys/stat.h>
 
-#ifndef LL_WINDOWS
-#include <unistd.h>
-#endif
+ALScriptStudioSaving::ALScriptStudioSaving(ALScriptStudioServices& services, Window& window) : mServices(services), mWindow(window)
+{
+}
 
-void ALFloaterScriptStudio::preprocess(Doc& doc)
+void ALScriptStudioSaving::preprocess(Doc& doc)
 {
     if (doc.preprocessing)
     {
@@ -121,26 +48,26 @@ void ALFloaterScriptStudio::preprocess(Doc& doc)
     doc.preprocessing = true;
     LLStringUtil::format_map_t args;
     args["[NAME]"] = doc.name;
-    setStatus(getString("Preprocessing", args));
-    const LLHandle<LLFloater> handle  = getHandle();
+    mServices.setStatus(mServices.words("Preprocessing", args));
+    const std::weak_ptr<bool> alive   = mAlive;
     const std::string         id      = doc.id;
     const U32                 version = doc.editor->document().version();
-    ALScriptPreprocessor::instance().run(preprocessRequest(doc), [handle, id, version](const ALPreprocessor::Result& result) {
-        if (ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get()))
+    mWindow.runPreprocessor(doc, [this, alive, id, version](const ALPreprocessor::Result& result) {
+        if (alive.lock())
         {
-            studio->preprocessedAnswer(id, version, result);
+            preprocessedAnswer(id, version, result);
         }
     });
 }
 
-void ALFloaterScriptStudio::preprocessedAnswer(const std::string& id, U32 version, const ALPreprocessor::Result& result)
+void ALScriptStudioSaving::preprocessedAnswer(const std::string& id, U32 version, const ALPreprocessor::Result& result)
 {
-    const size_t index = indexOf(id);
-    if (index == NONE)
+    Doc* found = mServices.findDoc(id);
+    if (!found)
     {
         return;
     }
-    Doc& doc          = *mDocs[index];
+    Doc& doc          = *found;
     doc.preprocessing = false;
     // What a save would upload, shown; the analyzers' own expansion is
     // made again now that every include is in, without the optimizer.
@@ -153,8 +80,8 @@ void ALFloaterScriptStudio::preprocessedAnswer(const std::string& id, U32 versio
     doc.uploaded.codeBefore = result.codeBefore;
     doc.uploaded.codeAfter  = result.codeAfter;
     doc.expanded.valid    = false;
-    showExpanded(doc, result.text);
-    refreshProblems(doc);
+    mWindow.showExpanded(doc, result.text);
+    mWindow.refreshProblems(doc);
     // And what it comes to for a save waiting on it.
     ALScriptSaveFlow::Run run;
     run.asked                             = version;
@@ -169,14 +96,14 @@ void ALFloaterScriptStudio::preprocessedAnswer(const std::string& id, U32 versio
         // The text moved on while the includes came: analysed again, and
         // saved again from the start if that was the point.
         doc.expanded.valid = false;
-        scheduleAnalysis(doc, true);
+        mWindow.scheduleAnalysis(doc, true);
         if (landed == ALScriptSaveFlow::Landed::MovedOn)
         {
             save(doc);
         }
         return;
     }
-    scheduleAnalysis(doc, true);
+    mWindow.scheduleAnalysis(doc, true);
     // The includes that never came, by the names the script gave them.
     std::string pending;
     for (const std::string& name : result.pending)
@@ -189,17 +116,17 @@ void ALFloaterScriptStudio::preprocessedAnswer(const std::string& id, U32 versio
         case ALScriptSaveFlow::Landed::NotForSave:
             if (!result.pending.empty())
             {
-                report(counted("PreprocessedPending", static_cast<S32>(result.pending.size()), args), true, &doc);
+                mServices.report(mServices.counted("PreprocessedPending", static_cast<S32>(result.pending.size()), args), true, &doc);
             }
             else
             {
                 // Said where the status goes, not added to the output: the
                 // view is expanded every time it is shown, and every open
                 // script is when a file one of them may include is saved.
-                setStatus(getString("Preprocessed", args));
+                mServices.setStatus(mServices.words("Preprocessed", args));
                 // Weighed as a save would send it; not with an include still
                 // to come, which a save would wait for.
-                weighSent(doc);
+                mWindow.weighSent(doc);
             }
             return;
         case ALScriptSaveFlow::Landed::StoppedByErrors:
@@ -209,14 +136,15 @@ void ALFloaterScriptStudio::preprocessedAnswer(const std::string& id, U32 versio
             {
                 errors += problem.severity == ALScriptProblem::Severity::Error ? 1 : 0;
             }
-            report(counted("PreprocessErrors", errors, args), true, &doc, { "save_anyway" });
-            saveStopped(doc);
-            showBottom("problems_tab");
+            mServices.report(mServices.counted("PreprocessErrors", errors, args), true, &doc, { "save_anyway" });
+            stopped(doc);
+            mWindow.showProblems();
             return;
         }
         case ALScriptSaveFlow::Landed::StoppedByPending:
-            report(counted("PreprocessPendingSave", static_cast<S32>(result.pending.size()), args), true, &doc, { "save_anyway" });
-            saveStopped(doc);
+            mServices.report(mServices.counted("PreprocessPendingSave", static_cast<S32>(result.pending.size()), args), true, &doc,
+                             { "save_anyway" });
+            stopped(doc);
             return;
         case ALScriptSaveFlow::Landed::MovedOn:
         case ALScriptSaveFlow::Landed::Send:
@@ -227,7 +155,7 @@ void ALFloaterScriptStudio::preprocessedAnswer(const std::string& id, U32 versio
     sendPreprocessed(doc, doc.uploaded);
 }
 
-void ALFloaterScriptStudio::sendPreprocessed(Doc& doc, const Doc::Expanded& sent)
+void ALScriptStudioSaving::sendPreprocessed(Doc& doc, const Doc::Expanded& sent)
 {
     if (sent.disabled)
     {
@@ -247,23 +175,23 @@ void ALFloaterScriptStudio::sendPreprocessed(Doc& doc, const Doc::Expanded& sent
     envelope.source        = doc.editor->text();
     envelope.expanded      = sent.text;
     envelope.compileTarget = doc.language.compileTarget;
-    envelope.programVersion = LLVersionInfo::instance().getChannelAndVersion();
+    envelope.programVersion = mWindow.saveOptions().program;
     envelope.lastCompiled   = LLDate::now().asString();
     doc.envelope            = envelope;
     upload(doc, envelope.wrap(), &sent.map);
 }
 
-void ALFloaterScriptStudio::weighForSave(Doc& doc)
+void ALScriptStudioSaving::weighForSave(Doc& doc)
 {
-    if (!weightTarget(doc))
+    if (!mWindow.weightTarget(doc))
     {
         return;
     }
     doc.save.setWarnWeightFor(doc.editor->document().version());
-    if (preprocessed(doc))
+    if (mWindow.preprocessed(doc))
     {
         // What the run made to be sent, which is what goes.
-        weighSent(doc);
+        mWindow.weighSent(doc);
     }
     else if (doc.weight && doc.weightVersion == doc.save.warnWeightFor())
     {
@@ -271,11 +199,11 @@ void ALFloaterScriptStudio::weighForSave(Doc& doc)
     }
     else
     {
-        weigh(doc);
+        mWindow.weigh(doc);
     }
 }
 
-void ALFloaterScriptStudio::warnOverWeight(Doc& doc)
+void ALScriptStudioSaving::warnOverWeight(Doc& doc)
 {
     if (doc.save.warnWeightFor() < 0 || !doc.weight || doc.weightVersion != doc.save.warnWeightFor())
     {
@@ -292,7 +220,7 @@ void ALFloaterScriptStudio::warnOverWeight(Doc& doc)
     }
 }
 
-void ALFloaterScriptStudio::save(Doc& doc)
+void ALScriptStudioSaving::save(Doc& doc)
 {
     if (!doc.loaded || !doc.modifiable)
     {
@@ -310,68 +238,58 @@ void ALFloaterScriptStudio::save(Doc& doc)
         case ALScriptSaveFlow::Start::Queued:
             return;
         case ALScriptSaveFlow::Start::OutOfReach:
-            setStatus(getString(doc.orphan == Doc::Orphan::Away       ? "SaveBlockedAway"
-                                : doc.orphan == Doc::Orphan::Removed  ? "SaveBlockedRemoved"
-                                : doc.orphan == Doc::Orphan::Locked   ? "SaveBlockedLocked"
-                                : doc.orphan == Doc::Orphan::Unloaded ? "SaveBlockedUnloaded"
-                                                                      : "SaveBlockedOffline",
-                                args),
-                      true);
+            mServices.setStatus(mServices.words(doc.orphan == Doc::Orphan::Away       ? "SaveBlockedAway"
+                                                : doc.orphan == Doc::Orphan::Removed  ? "SaveBlockedRemoved"
+                                                : doc.orphan == Doc::Orphan::Locked   ? "SaveBlockedLocked"
+                                                : doc.orphan == Doc::Orphan::Unloaded ? "SaveBlockedUnloaded"
+                                                                                      : "SaveBlockedOffline",
+                                                args),
+                                true);
             doc.noticeDismissed = false;
-            saveStopped(doc);
-            if (&doc == active())
+            stopped(doc);
+            if (&doc == mServices.frontDoc())
             {
-                refreshNotice();
+                mWindow.refreshNotice();
             }
             return;
         case ALScriptSaveFlow::Start::Detached:
             // Its item in reach, and not loaded under it yet -- a try that
             // failed waits its turn: loaded now, what it holds carried over,
             // so that it is saved as what the item is once asked again.
-            setStatus(getString("SaveWaitsForLoad", args), true);
+            mServices.setStatus(mServices.words("SaveWaitsForLoad", args), true);
             doc.reattachTries = 0;
-            reattach(doc);
-            saveStopped(doc);
+            mWindow.reattach(doc);
+            stopped(doc);
             return;
         case ALScriptSaveFlow::Start::Go:
             break;
     }
     // Saved, a preview is held.
-    holdPreview(doc);
+    mWindow.holdPreview(doc);
     // Tidied as the scripter asked before anything is sent or checked: a
     // step each to undo, and nothing where the text is tidy already. The
     // safe fixes first, while the text is still the one they were made
     // for.
+    const Options options = mWindow.saveOptions();
     if (!doc.notecard)
     {
-        if (gSavedSettings.getBOOL("ALScriptFixOnSave") && doc.analysisVersion == doc.editor->document().version() && doc.save.fixOnce())
-        {
-            fixAll(doc, FixPick{ std::string(), true });
-        }
-        if (gSavedSettings.getBOOL("ALScriptFormatOnSave"))
-        {
-            format(doc, false);
-        }
-        if (gSavedSettings.getBOOL("ALScriptTrimOnSave"))
-        {
-            trimTrailing(doc);
-        }
+        const bool fix = options.fix && doc.analysisVersion == doc.editor->document().version() && doc.save.fixOnce();
+        mWindow.tidy(doc, fix, options.format, options.trim);
     }
-    static LLCachedControl<bool> hold(gSavedSettings, "ALScriptStudioPreflight", false);
     ALScriptSaveFlow::Tab tab;
     tab.version          = doc.editor->document().version();
     tab.file             = !doc.file.empty();
     tab.notecard         = doc.notecard;
-    tab.preprocessed     = !tab.file && !tab.notecard && preprocessed(doc);
+    tab.preprocessed     = !tab.file && !tab.notecard && mWindow.preprocessed(doc);
     tab.preprocessorBusy = doc.preprocessing;
-    tab.holdOnErrors     = hold;
+    tab.holdOnErrors     = options.holdOnErrors;
     tab.checked          = doc.analysisVersion == tab.version;
     tab.checkerErrors    = checkerErrors(doc);
     const ALScriptSaveFlow::Route route = doc.save.route(tab);
     switch (route)
     {
         case ALScriptSaveFlow::Route::File:
-            saveFile(doc);
+            mWindow.saveFile(doc);
             return;
         case ALScriptSaveFlow::Route::Notecard:
         {
@@ -390,13 +308,13 @@ void ALFloaterScriptStudio::save(Doc& doc)
             }
             std::string                 error;
             const ALTextUndo::SavePoint at = doc.editor->savePoint();
-            if (!ALScriptWorkspace::instance().saveNotecard(doc.ref, text, items, nullptr, error))
+            if (!mWindow.sendNotecard(doc, text, items, error))
             {
                 LLStringUtil::format_map_t failed;
                 failed["[NAME]"]  = doc.name;
                 failed["[ERROR]"] = error;
-                report(getString("SaveFailed", failed), true, &doc, { "retry", "copy", "export" });
-                saveStopped(doc);
+                mServices.report(mServices.words("SaveFailed", failed), true, &doc, { "retry", "copy", "export" });
+                stopped(doc);
                 return;
             }
             std::vector<LLUUID> sent;
@@ -405,22 +323,22 @@ void ALFloaterScriptStudio::save(Doc& doc)
                 sent.push_back(each->getUUID());
             }
             doc.save.sent(at, std::nullopt, std::move(sent));
-            setStatus(getString("Saving", args));
-            refreshToolbar();
+            mServices.setStatus(mServices.words("Saving", args));
+            mWindow.refreshToolbar();
             return;
         }
         case ALScriptSaveFlow::Route::Check:
             // Checked first; the save follows the answer.
-            scheduleAnalysis(doc, true);
-            setStatus(getString("Preflight", args));
+            mWindow.scheduleAnalysis(doc, true);
+            mServices.setStatus(mServices.words("Preflight", args));
             return;
         case ALScriptSaveFlow::Route::StoppedByAnalyzers:
             // Said as what stopped it, and only that let past by asking
             // again; the first of the checkers' errors in sight.
-            report(counted("PreflightErrors", tab.checkerErrors, args), true, &doc, { "save_anyway" });
-            saveStopped(doc);
-            showBottom("problems_tab");
-            mProblemsPane->selectFirstError(true);
+            mServices.report(mServices.counted("PreflightErrors", tab.checkerErrors, args), true, &doc, { "save_anyway" });
+            stopped(doc);
+            mWindow.showProblems();
+            mWindow.selectFirstError(true);
             return;
         case ALScriptSaveFlow::Route::Preprocess:
         case ALScriptSaveFlow::Route::JoinPreprocessor:
@@ -429,13 +347,13 @@ void ALFloaterScriptStudio::save(Doc& doc)
     }
     // Not held for the analyzers, who are not the region's compiler: what
     // the check of this text found said, where it is in.
-    if (!hold && tab.checked)
+    if (!options.holdOnErrors && tab.checked)
     {
         const S32 errors = static_cast<S32>(std::count_if(doc.analysis.begin(), doc.analysis.end(),
                                                           [](const ALScriptProblem& p) { return p.severity == ALScriptProblem::Severity::Error; }));
         if (errors > 0)
         {
-            report(counted("SentWithErrors", errors, args), true, &doc);
+            mServices.report(mServices.counted("SentWithErrors", errors, args), true, &doc);
         }
     }
     if (route == ALScriptSaveFlow::Route::Preprocess)
@@ -453,7 +371,7 @@ void ALFloaterScriptStudio::save(Doc& doc)
     upload(doc, doc.editor->text());
 }
 
-S32 ALFloaterScriptStudio::checkerErrors(const Doc& doc) const
+S32 ALScriptStudioSaving::checkerErrors(const Doc& doc)
 {
     // The analyzers' errors, and the preprocessor's in the expansion they
     // read.
@@ -472,7 +390,7 @@ S32 ALFloaterScriptStudio::checkerErrors(const Doc& doc) const
     return errors;
 }
 
-void ALFloaterScriptStudio::upload(Doc& doc, const std::string& text, const ALSourceMap* map)
+void ALScriptStudioSaving::upload(Doc& doc, const std::string& text, const ALSourceMap* map)
 {
     // Longer than a script may be: refused here, saying by how much and
     // what would shrink it, rather than sent for the simulator to refuse.
@@ -485,15 +403,15 @@ void ALFloaterScriptStudio::upload(Doc& doc, const std::string& text, const ALSo
         args["[OVER]"]  = std::to_string(text.size() - ALScriptEnvelope::MAX_ASSET_BYTES);
         // A preprocessed script goes as written and as expanded; LSL's
         // expansion may be compressed.
-        const char* shrink = !map                                                                   ? "SaveTooLargePlain"
-                             : !doc.language.lua && !gSavedSettings.getBOOL("ALScriptPreprocCompress") ? "SaveTooLargeCompress"
-                                                                                                       : "SaveTooLargeWrapped";
-        report(getString("SaveTooLarge", args) + " " + getString(shrink), true, &doc);
+        const char* shrink = !map                                                    ? "SaveTooLargePlain"
+                             : !doc.language.lua && !mWindow.saveOptions().compress ? "SaveTooLargeCompress"
+                                                                                    : "SaveTooLargeWrapped";
+        mServices.report(mServices.words("SaveTooLarge", args) + " " + mServices.words(shrink), true, &doc);
         doc.assetBytes = text.size();
-        saveStopped(doc);
-        if (&doc == active())
+        stopped(doc);
+        if (&doc == mServices.frontDoc())
         {
-            refreshTrailer(doc);
+            mWindow.refreshTrailer(doc);
         }
         return;
     }
@@ -513,28 +431,28 @@ void ALFloaterScriptStudio::upload(Doc& doc, const std::string& text, const ALSo
     // Where the journal stands as the text goes, taken before anything
     // can be typed after it.
     const ALTextUndo::SavePoint at = doc.editor->savePoint();
-    if (!ALScriptWorkspace::instance().save(doc.ref, text, options, nullptr, error))
+    if (!mWindow.send(doc, text, options, error))
     {
         LLStringUtil::format_map_t failed;
         failed["[NAME]"]  = doc.name;
         failed["[ERROR]"] = error;
-        report(getString("SaveFailed", failed), true, &doc, { "retry", "copy", "export" });
-        saveStopped(doc);
+        mServices.report(mServices.words("SaveFailed", failed), true, &doc, { "retry", "copy", "export" });
+        stopped(doc);
         return;
     }
     // With the map the compiler's lines are read back through.
     doc.save.sent(at, map ? std::optional<ALSourceMap>(*map) : std::nullopt, {});
     doc.problems.clear();
-    refreshProblems(doc);
+    mWindow.refreshProblems(doc);
     LLStringUtil::format_map_t args;
     args["[NAME]"] = doc.name;
-    setStatus(getString("Saving", args));
-    refreshToolbar();
+    mServices.setStatus(mServices.words("Saving", args));
+    mWindow.refreshToolbar();
 }
 
-void ALFloaterScriptStudio::saveAll()
+void ALScriptStudioSaving::saveAll()
 {
-    for (std::unique_ptr<Doc>& doc : mDocs)
+    for (Doc* doc : mServices.openDocs())
     {
         if (doc->unsaved())
         {
@@ -543,51 +461,51 @@ void ALFloaterScriptStudio::saveAll()
     }
 }
 
-void ALFloaterScriptStudio::compiled(const ALScriptWorkspace::CompileResult& result)
+void ALScriptStudioSaving::compiled(const ALScriptWorkspace::CompileResult& result)
 {
     // A copy of another tab, saved -- compiled or not, the text is up: the
     // tab it copied is safe in the inventory, and closes, once everything
     // below is done with the tabs as they stand.
     std::string copy_of;
     U32         copied_at = 0;
-    if (const size_t index = indexOf(result.ref); index != NONE && result.error.empty())
+    if (Doc* doc = mServices.findDoc(result.ref); doc && result.error.empty())
     {
-        copy_of.swap(mDocs[index]->copyOf);
-        copied_at = mDocs[index]->copyOfVersion;
+        copy_of.swap(doc->copyOf);
+        copied_at = doc->copyOfVersion;
     }
     compiledHere(result);
-    if (const size_t original = copy_of.empty() ? NONE : indexOf(copy_of); original != NONE)
+    if (Doc* original = copy_of.empty() ? nullptr : mServices.findDoc(copy_of))
     {
-        Doc&                       from = *mDocs[original];
+        Doc&                       from = *original;
         LLStringUtil::format_map_t copied;
         copied["[NAME]"] = from.name;
         if (from.editor->document().version() != copied_at)
         {
             // Typed in since the copy was made: what was typed is not in the
             // copy, and the tab stays with it.
-            report(getString("CopiedToKeptOpen", copied), false, &from);
+            mServices.report(mServices.words("CopiedToKeptOpen", copied), false, &from);
             return;
         }
-        report(getString("CopiedTo", copied));
+        mServices.report(mServices.words("CopiedTo", copied));
         from.editor->resetDirty();
-        letGoOf(original);
+        mWindow.closeSaved(from);
     }
 }
 
-void ALFloaterScriptStudio::compiledHere(const ALScriptWorkspace::CompileResult& result)
+void ALScriptStudioSaving::compiledHere(const ALScriptWorkspace::CompileResult& result)
 {
-    const size_t index = indexOf(result.ref);
-    if (index == NONE)
+    Doc* found = mServices.findDoc(result.ref);
+    if (!found)
     {
         return;
     }
-    Doc& doc = *mDocs[index];
+    Doc& doc = *found;
     // Whether it answers this tab's own save, rather than a recompile from
     // the explorer, and what that save comes to.
     ALScriptSaveFlow::Answer answer;
     answer.up                             = result.error.empty();
     answer.compiled                       = result.success;
-    answer.quitting                       = quittingOnUs();
+    answer.quitting                       = mWindow.quittingOnUs();
     const ALScriptSaveFlow::Landing landing = doc.save.compiled(answer);
     const bool                      ours    = landing.ours;
     LLStringUtil::format_map_t args;
@@ -598,12 +516,13 @@ void ALFloaterScriptStudio::compiledHere(const ALScriptWorkspace::CompileResult&
         // The region would not say what experience it runs under: the box
         // beside Save says so and offers what may be picked, which the
         // next save sets.
-        report(getString(result.experienceUnknown ? "SaveExperienceUnknown" : "SaveFailed", args), true, &doc, { "retry", "copy", "export" });
+        mServices.report(mServices.words(result.experienceUnknown ? "SaveExperienceUnknown" : "SaveFailed", args), true, &doc,
+                         { "retry", "copy", "export" });
         if (landing.stopped)
         {
-            saveStopped(doc);
+            stopped(doc);
         }
-        refreshToolbar();
+        mWindow.refreshToolbar();
         return;
     }
     // The text is the server's now, compiled or not -- when it was this
@@ -629,8 +548,8 @@ void ALFloaterScriptStudio::compiledHere(const ALScriptWorkspace::CompileResult&
             doc.experienceKnown = true;
         }
         // Nothing picked waits on a save any more.
-        fillTabs();
-        keepSavedWeights(doc);
+        mWindow.fillTabs();
+        mWindow.keepSavedWeights(doc);
     }
     if (result.newAssetId.notNull())
     {
@@ -638,7 +557,7 @@ void ALFloaterScriptStudio::compiledHere(const ALScriptWorkspace::CompileResult&
     }
     // Saved: nothing of it to keep against a crash any more, or only what
     // was typed while the save was on its way.
-    mRecovery.keep(doc);
+    mWindow.keepForRecovery(doc);
     if (result.notecard)
     {
         // The asset carries what was sent, and the server can copy it out.
@@ -650,20 +569,17 @@ void ALFloaterScriptStudio::compiledHere(const ALScriptWorkspace::CompileResult&
             }
             doc.save.forgetSentItems();
         }
-        report(getString("SavedNotecard", args), false, &doc);
-        refreshToolbar();
-        fillTabs();
+        mServices.report(mServices.words("SavedNotecard", args), false, &doc);
+        mWindow.refreshToolbar();
+        mWindow.fillTabs();
         if (sendQueuedSave(doc))
         {
             return;
         }
         if (doc.save.closeAfter())
         {
-            letGoOf(index);
-            if (mClosingWindow)
-            {
-                continueClosing();
-            }
+            mWindow.closeSaved(doc);
+            mWindow.continueClosing();
         }
         return;
     }
@@ -697,62 +613,59 @@ void ALFloaterScriptStudio::compiledHere(const ALScriptWorkspace::CompileResult&
         // A new script runs from here; what the old one said is past.
         doc.runtime.clear();
     }
-    refreshProblems(doc);
+    mWindow.refreshProblems(doc);
     if (ours && doc.liveFile)
     {
         // The editor outside sees what was saved here, and what the
         // compiler made of it; its own save is not written back to it.
         if (!doc.save.external())
         {
-            syncExternal(doc);
+            mWindow.syncExternal(doc);
         }
         doc.save.endExternal();
-        logExternal(doc, result);
+        mWindow.logExternal(doc, result);
     }
 
     if (result.success)
     {
-        report(getString("Compiled", args), false, &doc);
+        mServices.report(mServices.words("Compiled", args), false, &doc);
     }
     else
     {
-        report(counted("CompileFailed", static_cast<S32>(doc.problems.size()), args), true, &doc);
+        mServices.report(mServices.counted("CompileFailed", static_cast<S32>(doc.problems.size()), args), true, &doc);
         // Saved, but not running: a close waiting on it leaves the tab
         // open with what the compiler said, rather than taking both away --
         // but for the viewer quitting, when the text is saved and that was
         // what was asked.
         if (landing.stopped)
         {
-            saveStopped(doc);
+            stopped(doc);
         }
         // What the compiler said, in sight, as the checks before a save
         // show theirs: the first error chosen.
-        if (ours && index == mActive && !doc.save.closeAfter())
+        if (ours && &doc == mServices.frontDoc() && !doc.save.closeAfter())
         {
-            showBottom("problems_tab");
-            mProblemsPane->selectFirstError(false);
+            mWindow.showProblems();
+            mWindow.selectFirstError(false);
         }
     }
-    if (index == mActive)
+    if (&doc == mServices.frontDoc())
     {
-        refreshToolbar();
+        mWindow.refreshToolbar();
     }
-    fillTabs();
+    mWindow.fillTabs();
     if (sendQueuedSave(doc))
     {
         return;
     }
     if (doc.save.closeAfter())
     {
-        letGoOf(index);
-        if (mClosingWindow)
-        {
-            continueClosing();
-        }
+        mWindow.closeSaved(doc);
+        mWindow.continueClosing();
     }
 }
 
-bool ALFloaterScriptStudio::sendQueuedSave(Doc& doc)
+bool ALScriptStudioSaving::sendQueuedSave(Doc& doc)
 {
     // Asked for while the last was on its way, and something is unsaved
     // still: sent now, and a close waiting on the save waits on this one.
@@ -764,45 +677,45 @@ bool ALFloaterScriptStudio::sendQueuedSave(Doc& doc)
     return doc.saveUnderway();
 }
 
-void ALFloaterScriptStudio::saveStopped(Doc& doc)
+void ALScriptStudioSaving::stopped(Doc& doc)
 {
     doc.save.stopped();
-    stopClosing();
+    mWindow.stopClosing();
 }
 
-void ALFloaterScriptStudio::saveToClose(const std::string& id)
+void ALScriptStudioSaving::saveToClose(const std::string& id)
 {
-    const size_t index = indexOf(id);
-    if (index == NONE)
+    Doc* found = mServices.findDoc(id);
+    if (!found)
     {
         return;
     }
-    Doc& doc = *mDocs[index];
+    Doc& doc = *found;
     doc.save.setCloseAfter(true);
     save(doc);
     // Gone already -- a file, saved and let go of on the spot -- or on its
     // way: sent, or waiting on the preprocessor or a check.
-    if (indexOf(id) == NONE || doc.saveUnderway())
+    if (!mServices.findDoc(id) || doc.saveUnderway())
     {
         return;
     }
     // It could not begin -- still loading, say: the tab stays for the
     // author, not set to close at whatever save comes next, and a close
     // waiting on it waits no longer.
-    saveStopped(doc);
+    stopped(doc);
 }
 
-void ALFloaterScriptStudio::reportOverWeight(const Doc& doc, const ALScriptWeight& weight)
+void ALScriptStudioSaving::reportOverWeight(const Doc& doc, const ALScriptWeight& weight)
 {
     LLStringUtil::format_map_t args;
     args["[NAME]"]   = doc.name;
     args["[SIZE]"]   = llformat("%.1f", (F64)weight.total / 1024.0);
     args["[LIMIT]"]  = std::to_string(weight.limit / 1024);
     args["[TARGET]"] = ALScriptWeight::nameOf(weight.target);
-    report(getString("SaveOverWeight", args), true, &doc);
+    mServices.report(mServices.words("SaveOverWeight", args), true, &doc);
 }
 
-void ALFloaterScriptStudio::saveAsked(Doc& doc)
+void ALScriptStudioSaving::saveAsked(Doc& doc)
 {
     // Asked for by the author: over the text the last save was stopped at,
     // past what stopped it.

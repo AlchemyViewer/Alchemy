@@ -995,6 +995,7 @@ if(AL_BUILD_VIEWER)
     alscriptstudiocommands.h
     alscriptstudiodoc.h
     alscriptstudiorecovery.h
+    alscriptstudiosaving.h
     alscriptstudioservices.h
     alscriptweightspane.h
     alscriptworkspace.h
@@ -2502,6 +2503,17 @@ if(AL_BUILD_TESTS)
   # Whole saves of a Script Studio tab through where they stand and where
   # they go, with nothing of the viewer.
   al_add_test(alscriptsaveflow UNIT PROJECT ${test_project} LIBRARIES llui alscript ${test_libs})
+
+  # Whole saves of Script Studio tabs done -- tidied, checked, preprocessed,
+  # sent, answered -- over the window's side faked.
+  al_add_test(
+    alscriptstudiosaving
+    UNIT
+    PROJECT ${test_project}
+    LIBRARIES llui alscript ${test_libs}
+    SOURCES alscriptnotecardtab.cpp alscriptsaveflow.cpp alscriptstudiodoc.cpp
+    DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
+  )
 
   # A Script Studio tab's own logic, and the fake of the window's services
   # the units split out of the window are tested with.
