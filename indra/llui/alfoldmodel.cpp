@@ -24,7 +24,9 @@
 
 #include "linden_common.h"
 
-#include "alcodeeditor.h"
+#include "alfoldmodel.h"
+
+#include <algorithm>
 
 namespace
 {
@@ -56,21 +58,19 @@ namespace
     }
 }
 
-// --- folding -----------------------------------------------------------------
-
-void ALCodeEditor::ensureRegions()
+const std::vector<ALFoldModel::Region>& ALFoldModel::regions(const ALTextDocument& doc, S32 tab_width)
 {
-    if (mRegionsValid && mRegionsVersion == document().version())
+    if (mValid && mVersion == doc.version())
     {
-        return;
+        return mRegions;
     }
     mRegions.clear();
-    const S32        count = document().lineCount();
-    const S32        tab   = getTabWidth();
+    const S32        count = doc.lineCount();
+    const S32        tab   = tab_width;
     std::vector<S32> indent(count, -1);
     for (S32 l = 0; l < count; ++l)
     {
-        const std::string& line  = document().line(l);
+        const std::string& line  = doc.line(l);
         S32                n     = 0;
         bool               blank = true;
         for (char c : line)
@@ -122,7 +122,7 @@ void ALCodeEditor::ensureRegions()
         {
             continue;
         }
-        if (k < count && indent[k] == indent[l] && closesBlock(trimmed(document().line(k))))
+        if (k < count && indent[k] == indent[l] && closesBlock(trimmed(doc.line(k))))
         {
             end = k;
         }
@@ -132,7 +132,7 @@ void ALCodeEditor::ensureRegions()
     // `{` under it fold as one block, from the header.
     for (S32 l = 0; l < count; ++l)
     {
-        if (end_of[l] < 0 || trimmed(document().line(l)) != "{")
+        if (end_of[l] < 0 || trimmed(doc.line(l)) != "{")
         {
             continue;
         }
@@ -151,33 +151,26 @@ void ALCodeEditor::ensureRegions()
     {
         if (end_of[l] > l)
         {
-            mRegions.push_back(FoldRegion{ l, end_of[l] });
+            mRegions.push_back(Region{ l, end_of[l] });
         }
     }
-    mRegionsVersion = document().version();
-    mRegionsValid   = true;
-}
-
-const std::vector<ALCodeEditor::FoldRegion>& ALCodeEditor::foldRegions()
-{
-    ensureRegions();
+    mVersion = doc.version();
+    mValid   = true;
     return mRegions;
 }
 
-const ALCodeEditor::FoldRegion* ALCodeEditor::regionStartingAt(S32 line)
+const ALFoldModel::Region* ALFoldModel::startingAt(const ALTextDocument& doc, S32 tab_width, S32 line)
 {
-    ensureRegions();
-    const auto it = std::lower_bound(mRegions.begin(), mRegions.end(), line,
-                                     [](const FoldRegion& region, S32 l) { return region.start < l; });
-    return (it != mRegions.end() && it->start == line) ? &*it : nullptr;
+    const std::vector<Region>& all = regions(doc, tab_width);
+    const auto it = std::lower_bound(all.begin(), all.end(), line, [](const Region& region, S32 l) { return region.start < l; });
+    return (it != all.end() && it->start == line) ? &*it : nullptr;
 }
 
-const ALCodeEditor::FoldRegion* ALCodeEditor::regionAround(S32 line)
+const ALFoldModel::Region* ALFoldModel::around(const ALTextDocument& doc, S32 tab_width, S32 line)
 {
-    ensureRegions();
     // The innermost: of those that hold the line, the one that starts last.
-    const FoldRegion* found = nullptr;
-    for (const FoldRegion& region : mRegions)
+    const Region* found = nullptr;
+    for (const Region& region : regions(doc, tab_width))
     {
         if (region.start >= line)
         {
@@ -191,48 +184,28 @@ const ALCodeEditor::FoldRegion* ALCodeEditor::regionAround(S32 line)
     return found;
 }
 
-bool ALCodeEditor::isFolded(S32 line) const
+bool ALFoldModel::isFolded(S32 line) const
 {
     return std::binary_search(mFolded.begin(), mFolded.end(), line);
 }
 
-void ALCodeEditor::applyFolds()
+std::optional<ALFoldModel::Region> ALFoldModel::fold(const ALTextDocument& doc, S32 tab_width, S32 line)
 {
-    ensureRegions();
-    layout().setHidden(0, document().lineCount() - 1, false);
-    // A fold whose block is gone is gone with it.
-    mFolded.erase(std::remove_if(mFolded.begin(), mFolded.end(), [&](S32 start) { return regionStartingAt(start) == nullptr; }), mFolded.end());
-    for (S32 start : mFolded)
-    {
-        const FoldRegion* region = regionStartingAt(start);
-        layout().setHidden(region->start + 1, region->end, true);
-    }
-}
-
-bool ALCodeEditor::foldAt(S32 line)
-{
-    const FoldRegion* region = regionStartingAt(line);
+    const Region* region = startingAt(doc, tab_width, line);
     if (!region)
     {
-        region = regionAround(line);
+        region = around(doc, tab_width, line);
     }
     if (!region || isFolded(region->start))
     {
-        return false;
+        return std::nullopt;
     }
-    const FoldRegion chosen = *region;
+    const Region chosen = *region;
     mFolded.insert(std::upper_bound(mFolded.begin(), mFolded.end(), chosen.start), chosen.start);
-    // The caret cannot stay in what is folded away.
-    const ALTextRange sel = selection().normalised();
-    if ((sel.begin.line > chosen.start && sel.begin.line <= chosen.end) || (sel.end.line > chosen.start && sel.end.line <= chosen.end))
-    {
-        setCaret(document().lineEnd(chosen.start));
-    }
-    applyFolds();
-    return true;
+    return chosen;
 }
 
-bool ALCodeEditor::unfoldAt(S32 line)
+bool ALFoldModel::unfold(const ALTextDocument& doc, S32 tab_width, S32 line)
 {
     S32 start = -1;
     if (isFolded(line))
@@ -246,7 +219,7 @@ bool ALCodeEditor::unfoldAt(S32 line)
         // this is a descendant of.
         for (S32 folded : mFolded)
         {
-            const FoldRegion* region = regionStartingAt(folded);
+            const Region* region = startingAt(doc, tab_width, folded);
             if (region && region->start < line && line <= region->end)
             {
                 start = folded;
@@ -258,94 +231,63 @@ bool ALCodeEditor::unfoldAt(S32 line)
         return false;
     }
     mFolded.erase(std::remove(mFolded.begin(), mFolded.end(), start), mFolded.end());
-    applyFolds();
     return true;
 }
 
-void ALCodeEditor::foldAll()
+void ALFoldModel::foldAll(const ALTextDocument& doc, S32 tab_width)
 {
-    ensureRegions();
     mFolded.clear();
-    for (const FoldRegion& region : mRegions)
+    for (const Region& region : regions(doc, tab_width))
     {
         mFolded.push_back(region.start);
     }
-    applyFolds();
-    if (layout().hidden(caret().line))
-    {
-        setCaret(document().lineEnd(layout().visibleFrom(caret().line, -1)));
-    }
 }
 
-void ALCodeEditor::unfoldAll()
-{
-    mFolded.clear();
-    applyFolds();
-}
-
-void ALCodeEditor::revealLine(S32 line)
+bool ALFoldModel::reveal(const ALTextDocument& doc, S32 tab_width, S32 line)
 {
     // Every folded block the line is inside opens.
     bool changed = false;
     for (S32 i = static_cast<S32>(mFolded.size()) - 1; i >= 0; --i)
     {
-        const FoldRegion* region = regionStartingAt(mFolded[i]);
+        const Region* region = startingAt(doc, tab_width, mFolded[i]);
         if (!region || (region->start < line && line <= region->end))
         {
             mFolded.erase(mFolded.begin() + i);
             changed = true;
         }
     }
-    if (changed)
-    {
-        applyFolds();
-    }
-    else
-    {
-        ALTextView::revealLine(line);
-    }
+    return changed;
 }
 
-bool ALCodeEditor::performFold(ALEditorCommand command)
+std::vector<std::pair<S32, S32>> ALFoldModel::hidden(const ALTextDocument& doc, S32 tab_width)
 {
-    switch (command)
+    // A fold whose block is gone is gone with it.
+    mFolded.erase(std::remove_if(mFolded.begin(), mFolded.end(), [&](S32 start) { return startingAt(doc, tab_width, start) == nullptr; }),
+                  mFolded.end());
+    std::vector<std::pair<S32, S32>> out;
+    for (S32 start : mFolded)
     {
-        case ALEditorCommand::Fold:
-            return foldAt(caret().line);
-        case ALEditorCommand::Unfold:
-            return unfoldAt(caret().line);
-        case ALEditorCommand::FoldAll:
-            foldAll();
-            return true;
-        case ALEditorCommand::UnfoldAll:
-            unfoldAll();
-            return true;
-        default:
-            return false;
+        const Region* region = startingAt(doc, tab_width, start);
+        out.emplace_back(region->start + 1, region->end);
     }
+    return out;
 }
 
-bool ALCodeEditor::canFold(ALEditorCommand command) const
+void ALFoldModel::edited(const ALTextDocument::Edit& edit, S32 first, S32 last, S32 made)
 {
-    ALCodeEditor* self = const_cast<ALCodeEditor*>(this);
-    switch (command)
+    const S32         delta   = made - (last - first + 1);
+    const ALTextRange removed = edit.range.normalised();
+    const bool last_kept = last > first && removed.end.column == 0 &&
+                           (edit.inserted.empty() ? removed.begin.column == 0 : edit.inserted.back() == '\n');
+    mFolded.erase(std::remove_if(mFolded.begin(), mFolded.end(),
+                                 [&](S32 start) { return start > first && (start < last || (start == last && !last_kept)); }),
+                  mFolded.end());
+    for (S32& start : mFolded)
     {
-        case ALEditorCommand::Fold:
+        if (start > last || (start == last && last_kept))
         {
-            const FoldRegion* region = self->regionStartingAt(caret().line);
-            if (!region)
-            {
-                region = self->regionAround(caret().line);
-            }
-            return region && !isFolded(region->start);
+            start += delta;
         }
-        case ALEditorCommand::Unfold:
-            return !mFolded.empty();
-        case ALEditorCommand::FoldAll:
-            return mFolded.size() < self->foldRegions().size();
-        case ALEditorCommand::UnfoldAll:
-            return !mFolded.empty();
-        default:
-            return false;
     }
+    mValid = false;
 }

@@ -26,6 +26,7 @@
 
 #include "alcompletionmodel.h"
 #include "alfixlistmodel.h"
+#include "alfoldmodel.h"
 #include "alsnippetsession.h"
 #include "altextview.h"
 
@@ -312,12 +313,8 @@ public:
     // --- folding ---------------------------------------------------------------
 
     // A block: the line it starts on stays in sight, the lines through
-    // `end` go when it is folded.
-    struct FoldRegion
-    {
-        S32 start = 0;
-        S32 end   = 0;
-    };
+    // `end` go when it is folded (ALFoldModel).
+    typedef ALFoldModel::Region FoldRegion;
     // Every block in the text, by start line, found again when the text
     // has changed.
     const std::vector<FoldRegion>& foldRegions();
@@ -793,11 +790,8 @@ private:
     void provideInlays(S32 line, std::vector<ALTextLayout::Inlay>& out) const;
     F32  inlayWidth(const InlayHint& hint) const;
 
-    std::vector<FoldRegion> mRegions;
-    U32                     mRegionsVersion = 0;
-    bool                    mRegionsValid   = false;
-    // The start lines of the blocks that are folded, in order.
-    std::vector<S32>        mFolded;
+    // The blocks that fold, and which are folded.
+    ALFoldModel             mFolds;
 
     completion_provider_t   mProvider;
     completion_request_t    mCompletionRequest;

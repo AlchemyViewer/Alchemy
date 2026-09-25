@@ -305,25 +305,9 @@ void ALCodeEditor::onEdit(const ALTextDocument::Edit& edit)
                                      }),
                       mAutoClosed.end());
 
-    // Folds slide the same way. One that starts on the edit's first line
-    // stays: typing on a block's first line is not opening the block. One
-    // on its last line stays too where the edit ended at that line's start
-    // and left it a line of its own -- whole lines taken from above a
-    // folded block -- and moves up with it.
-    const bool last_kept = last > first && removed.end.column == 0 &&
-                           (edit.inserted.empty() ? removed.begin.column == 0 : edit.inserted.back() == '\n');
-    mFolded.erase(std::remove_if(mFolded.begin(), mFolded.end(),
-                                 [&](S32 start) { return start > first && (start < last || (start == last && !last_kept)); }),
-                  mFolded.end());
-    for (S32& start : mFolded)
-    {
-        if (start > last || (start == last && last_kept))
-        {
-            start += delta;
-        }
-    }
-    mRegionsValid = false;
-    if (!mFolded.empty())
+    // Folds slide the same way (ALFoldModel::edited).
+    mFolds.edited(edit, first, last, made);
+    if (!mFolds.folded().empty())
     {
         applyFolds();
     }
@@ -1291,8 +1275,7 @@ std::vector<S32> ALCodeEditor::stickyLines()
     // The first row on screen, and the blocks around its line that start
     // above it: their first lines, outermost first, the innermost few.
     const S32 top_line = posAtLocal(textRect().mLeft, textRect().mTop - 1, false).line;
-    ensureRegions();
-    for (const FoldRegion& region : mRegions)
+    for (const FoldRegion& region : foldRegions())
     {
         if (region.start < top_line && region.end >= top_line && !isFolded(region.start))
         {
@@ -1754,6 +1737,141 @@ void ALCodeEditor::drawRowExtras(S32 line, S32 row, const LLRect& text, S32 scre
                                   static_cast<F32>(screen_top - llround(getFont()->getAscenderHeight())), paint(Paint::InlayHint) % alpha, LLFontGL::LEFT,
                                   LLFontGL::BASELINE, LLFontGL::NORMAL, LLFontGL::NO_SHADOW, S32_MAX, text.mRight - box.mLeft);
         }
+    }
+}
+
+// --- folding -----------------------------------------------------------------
+
+void ALCodeEditor::ensureRegions()
+{
+    mFolds.regions(document(), getTabWidth());
+}
+
+const std::vector<ALCodeEditor::FoldRegion>& ALCodeEditor::foldRegions()
+{
+    return mFolds.regions(document(), getTabWidth());
+}
+
+const ALCodeEditor::FoldRegion* ALCodeEditor::regionStartingAt(S32 line)
+{
+    return mFolds.startingAt(document(), getTabWidth(), line);
+}
+
+const ALCodeEditor::FoldRegion* ALCodeEditor::regionAround(S32 line)
+{
+    return mFolds.around(document(), getTabWidth(), line);
+}
+
+bool ALCodeEditor::isFolded(S32 line) const
+{
+    return mFolds.isFolded(line);
+}
+
+void ALCodeEditor::applyFolds()
+{
+    layout().setHidden(0, document().lineCount() - 1, false);
+    for (const auto& [first, last] : mFolds.hidden(document(), getTabWidth()))
+    {
+        layout().setHidden(first, last, true);
+    }
+}
+
+bool ALCodeEditor::foldAt(S32 line)
+{
+    const std::optional<FoldRegion> chosen = mFolds.fold(document(), getTabWidth(), line);
+    if (!chosen)
+    {
+        return false;
+    }
+    // The caret cannot stay in what is folded away.
+    const ALTextRange sel = selection().normalised();
+    if ((sel.begin.line > chosen->start && sel.begin.line <= chosen->end) || (sel.end.line > chosen->start && sel.end.line <= chosen->end))
+    {
+        setCaret(document().lineEnd(chosen->start));
+    }
+    applyFolds();
+    return true;
+}
+
+bool ALCodeEditor::unfoldAt(S32 line)
+{
+    if (!mFolds.unfold(document(), getTabWidth(), line))
+    {
+        return false;
+    }
+    applyFolds();
+    return true;
+}
+
+void ALCodeEditor::foldAll()
+{
+    mFolds.foldAll(document(), getTabWidth());
+    applyFolds();
+    if (layout().hidden(caret().line))
+    {
+        setCaret(document().lineEnd(layout().visibleFrom(caret().line, -1)));
+    }
+}
+
+void ALCodeEditor::unfoldAll()
+{
+    mFolds.unfoldAll();
+    applyFolds();
+}
+
+void ALCodeEditor::revealLine(S32 line)
+{
+    if (mFolds.reveal(document(), getTabWidth(), line))
+    {
+        applyFolds();
+    }
+    else
+    {
+        ALTextView::revealLine(line);
+    }
+}
+
+bool ALCodeEditor::performFold(ALEditorCommand command)
+{
+    switch (command)
+    {
+        case ALEditorCommand::Fold:
+            return foldAt(caret().line);
+        case ALEditorCommand::Unfold:
+            return unfoldAt(caret().line);
+        case ALEditorCommand::FoldAll:
+            foldAll();
+            return true;
+        case ALEditorCommand::UnfoldAll:
+            unfoldAll();
+            return true;
+        default:
+            return false;
+    }
+}
+
+bool ALCodeEditor::canFold(ALEditorCommand command) const
+{
+    ALCodeEditor* self = const_cast<ALCodeEditor*>(this);
+    switch (command)
+    {
+        case ALEditorCommand::Fold:
+        {
+            const FoldRegion* region = self->regionStartingAt(caret().line);
+            if (!region)
+            {
+                region = self->regionAround(caret().line);
+            }
+            return region && !isFolded(region->start);
+        }
+        case ALEditorCommand::Unfold:
+            return !mFolds.folded().empty();
+        case ALEditorCommand::FoldAll:
+            return mFolds.folded().size() < self->foldRegions().size();
+        case ALEditorCommand::UnfoldAll:
+            return !mFolds.folded().empty();
+        default:
+            return false;
     }
 }
 
@@ -3171,7 +3289,7 @@ bool ALCodeEditor::handleMouseDown(S32 x, S32 y, MASK mask)
         }
         return true;
     }
-    if (!mFolded.empty() && text.pointInRect(x, y))
+    if (!mFolds.folded().empty() && text.pointInRect(x, y))
     {
         const S32 line = posAtLocal(x, y, false).line;
         if (isFolded(line) && foldBoxOf(line, text).pointInRect(x, y))
