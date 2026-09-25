@@ -922,7 +922,7 @@ namespace tut
         S32           caret = 0;
         std::vector<std::string> items;
         S32                      chosen = -1;
-        vim->hooks().complete = [](ALTextView&, const std::string& command, std::vector<std::string>& out) {
+        vim->hooks().complete = [](ALTextView&, const std::string& command, const std::string&, std::vector<std::string>& out) {
             if (command.empty())
             {
                 out.push_back("write");
@@ -1412,5 +1412,27 @@ namespace tut
         keys("dgt");
         ensure("not after an operator", heard.empty());
         ensure_equals("nothing changed", flat(editor->text()), std::string("a|b"));
+    }
+
+    template<> template<>
+    void alvimkeymap_object::test<41>()
+    {
+        set_test_name("Tab on the : line tells the host the word typed, which a file's folder is read by");
+        make("x");
+        std::vector<std::string> asked;
+        vim->hooks().complete = [&asked](ALTextView&, const std::string& command, const std::string& typed, std::vector<std::string>& out) {
+            asked.push_back(command + "|" + typed);
+            if (command == "e")
+            {
+                out.push_back("scripts/");
+                out.push_back("other/");
+            }
+        };
+        keys(":e sc<Tab>");
+        ensure("the command and the word", asked == std::vector<std::string>{ "e|sc" });
+        ensure_equals("completed from what it gave", vim->commandLine(), std::string("e scripts/"));
+        keys("<Esc>:e scripts/fo<Tab>");
+        ensure_equals("a folder's word whole", asked.back(), std::string("e|scripts/fo"));
+        keys("<Esc>");
     }
 }

@@ -3736,11 +3736,11 @@ void ALVimKeymap::complete(ALTextView& view, bool forward)
                 found.assign(std::begin(OPTIONS), std::end(OPTIONS));
             }
         }
+        const std::string typed = mLine.substr(word_start, mLineCursor - word_start);
         if (mHooks.complete)
         {
-            mHooks.complete(view, command, found);
+            mHooks.complete(view, command, typed, found);
         }
-        const std::string typed = mLine.substr(word_start, mLineCursor - word_start);
         std::vector<std::string> items;
         for (const std::string& each : found)
         {

@@ -88,9 +88,10 @@ public:
         std::function<void(ALTextView& view, llwchar kind, const std::vector<std::string>& history, std::function<void(const std::string&, bool run)> chosen)> historyWindow;
         // The host's words for Tab on the : line: with no command, its
         // command names; with one, what may follow it -- a :set option,
-        // a :history kind. Added to the keymap's own, and cut to what
-        // was typed by the keymap.
-        std::function<void(ALTextView& view, const std::string& command, std::vector<std::string>& out)> complete;
+        // a :history kind, a file, given the word typed so far, whose
+        // folder a file's are read from. Added to the keymap's own, and
+        // cut to what was typed by the keymap.
+        std::function<void(ALTextView& view, const std::string& command, const std::string& typed, std::vector<std::string>& out)> complete;
     };
 
     ALVimKeymap();
