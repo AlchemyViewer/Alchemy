@@ -34,6 +34,7 @@
 #include "llinstantmessage.h"
 
 #include "alavataractions.h"
+#include "alchattimestamp.h"
 #include "alfloaterblocked.h"
 #include "llimview.h"
 #include "llcommandhandler.h"
@@ -1114,7 +1115,7 @@ private:
 
         LLRect rect_before = time_box->getRect();
 
-        time_box->setValue(chat.mTimeStr);
+        time_box->setValue(ALChatTimestamp::format(chat.mTimeStr, gSavedSettings.getBOOL("AlchemyIMShowSeconds")));
 
         // set necessary textbox width to fit all text
         time_box->reshapeToFitText();
@@ -1339,6 +1340,7 @@ void LLChatHistory::clear()
 void LLChatHistory::appendMessage(const LLChat& chat, const LLSD &args, const LLStyle::Params& input_append_params)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+    const std::string time = ALChatTimestamp::format(chat.mTimeStr, gSavedSettings.getBOOL("AlchemyIMShowSeconds"));
     bool use_plain_text_chat_history = args["chat_history_style"].asInteger() >= 1;
     bool use_irssi_text_chat_history = args["chat_history_style"].asInteger() >= 2;
     bool square_brackets = false; // square brackets necessary for a system messages
@@ -1462,7 +1464,7 @@ void LLChatHistory::appendMessage(const LLChat& chat, const LLSD &args, const LL
                 timestamp_style.color(timestamp_color);
                 timestamp_style.readonly_color(timestamp_color);
             }
-            mEditor->appendText("[" + chat.mTimeStr + "] ", prependNewLineState, timestamp_style);
+            mEditor->appendText("[" + time + "] ", prependNewLineState, timestamp_style);
             prependNewLineState = false;
         }
 
@@ -1664,7 +1666,7 @@ void LLChatHistory::appendMessage(const LLChat& chat, const LLSD &args, const LL
         view->reshape(target_rect.getWidth(), view->getRect().getHeight());
         view->setOrigin(target_rect.mLeft, view->getRect().mBottom);
 
-        std::string widget_associated_text = "\n[" + chat.mTimeStr + "] ";
+        std::string widget_associated_text = "\n[" + time + "] ";
         if (utf8str_trim(chat.mFromName).size() != 0 && chat.mFromName != SYSTEM_FROM)
             widget_associated_text += chat.mFromName + delimiter;
 

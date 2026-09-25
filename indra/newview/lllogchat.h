@@ -92,7 +92,7 @@ public:
         LOG_END
     };
 
-    static std::string timestamp2LogString(U32 timestamp, bool withdate);
+    static std::string timestamp2LogString(U32 timestamp, bool withdate, bool withseconds = false);
     static std::string makeLogFileName(std::string(filename));
     static void renameLogFile(const std::string& old_filename, const std::string& new_filename);
     /**

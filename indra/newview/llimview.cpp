@@ -27,6 +27,7 @@
 #include "llviewerprecompiledheaders.h"
 
 #include "llimview.h"
+#include "alchattimestamp.h"
 
 #include "llavatarnamecache.h"  // IDEVO
 #include "llavataractions.h"
@@ -1074,7 +1075,7 @@ void LLIMModel::LLIMSession::addMessagesFromHistoryCache(const chat_message_list
 
         // Save the last minute of messages so we can merge with the chat server history.
         // Really would be nice to have a numeric timestamp in the local cached chat file
-        const std::string & msg_time_str = msg[LL_IM_DATE_TIME].asString();
+        const std::string msg_time_str = ALChatTimestamp::format(msg[LL_IM_DATE_TIME].asString(), false);
         if (mLastHistoryCacheDateTime != msg_time_str)
         {
             mLastHistoryCacheDateTime = msg_time_str;   // Reset to the new time
@@ -1281,7 +1282,7 @@ void LLIMModel::LLIMSession::addMessagesFromServerHistory(const LLSD& history,  
 
             if (add_chat_to_conversation)
             {   // Finally add message to the chat session
-                std::string chat_time_str = LLConversation::createTimestamp((U64Seconds)history_msg_timestamp);
+                std::string chat_time_str = LLLogChat::timestamp2LogString(history_msg_timestamp, true, true);
                 std::string sender_name = cur_server_hist[LL_IM_FROM].asString();
 
                 std::string history_msg_text = cur_server_hist[LL_IM_TEXT].asString();
@@ -1673,7 +1674,7 @@ bool LLIMModel::addToHistory(const LLUUID& session_id,
     }
 
     // This is where a normal arriving message is added to the session.   Note that the time string created here is without the full date
-    session->addMessage(from, from_id, utf8_text, LLLogChat::timestamp2LogString(timestamp, false), false, is_region_msg, timestamp);
+    session->addMessage(from, from_id, utf8_text, LLLogChat::timestamp2LogString(timestamp, false, true), false, is_region_msg, timestamp);
 
     return true;
 }
@@ -1751,7 +1752,7 @@ void LLIMModel::processAddingMessage(const LLUUID& session_id, const std::string
     arg["message"] = utf8_text;
     arg["from"] = from;
     arg["from_id"] = from_id;
-    arg["time"] = LLLogChat::timestamp2LogString(time_stamp, true);
+    arg["time"] = LLLogChat::timestamp2LogString(time_stamp, true, true);
     arg["session_type"] = session->mSessionType;
     arg["is_region_msg"] = is_region_msg;
 

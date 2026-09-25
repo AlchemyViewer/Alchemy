@@ -56,6 +56,17 @@
          function="IMSession.Menu.ShowModes.Enable"
          parameter="IMShowTime" />
     </menu_item_check>
+    <menu_item_check name="AlchemyIMShowSeconds" label="Show seconds">
+        <menu_item_check.on_click
+         function="IMSession.Menu.Action"
+         parameter="AlchemyIMShowSeconds" />
+        <menu_item_check.on_check
+         function="IMSession.Menu.ShowModes.CheckItem"
+         parameter="AlchemyIMShowSeconds" />
+        <menu_item_check.on_enable
+         function="IMSession.Menu.ShowModes.Enable"
+         parameter="AlchemyIMShowSeconds" />
+    </menu_item_check>
     <menu_item_check name="IMShowNamesForP2PConv" label="Show names in one-to-one conversations">
         <menu_item_check.on_click
          function="IMSession.Menu.Action"

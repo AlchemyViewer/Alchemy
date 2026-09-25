@@ -143,6 +143,7 @@ if(AL_BUILD_VIEWER)
     alchatautocomplete.cpp
     alchatbar.cpp
     alchatcommand.cpp
+    alchattimestamp.cpp
     alcheatcodes.cpp
     alclassifieditem.cpp
     alcolorwheelctrl.cpp
@@ -985,6 +986,7 @@ if(AL_BUILD_VIEWER)
     alchatautocomplete.h
     alchatbar.h
     alchatcommand.h
+    alchattimestamp.h
     alclassifieditem.h
     alcolorwheelctrl.h
     alcolorwheelmodel.h
@@ -2488,6 +2490,7 @@ if(AL_BUILD_TESTS)
   foreach(
     test
     alagentlocationformat
+    alchattimestamp
     alcolorwheelmodel
     alcrashreporter
     alcurvemodel
