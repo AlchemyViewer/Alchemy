@@ -197,7 +197,9 @@ public:
 
     // A row: an object, a linkset's prim, the prims of a linkset holding
     // nothing, under one row after the rest, or a script or notecard. Its
-    // value is what it stands for, which a chosen row is kept by.
+    // value is what it stands for, which a chosen row is kept by. The rows
+    // are a tree's, in its order: what a folded row holds is listed after
+    // it too, for the tree to show once it is opened.
     struct Row
     {
         enum class Kind : U8
@@ -219,16 +221,19 @@ public:
         size_t      empties = 0;
         // Shown without the name the region gives it, which is to be asked.
         bool        unnamed = false;
+        // What it holds is known: an object's prims are, and a prim's items
+        // once the region has said them.
+        bool        known   = true;
         bool        script  = false;
         bool        lua     = false;
         ALScriptRef ref;
     };
     // The rows through a filter: an item whose name has its letters, and
     // what holds it; an object or a prim whose name has them, with all it
-    // holds. A filter shows what it finds whatever is folded, and a prim by
-    // its name, so the prims holding nothing are not put under one row
-    // while it looks -- nor are they otherwise unless there are two or more,
-    // and never the root.
+    // holds. A filter shows what it finds whatever is folded -- no row is
+    // folded while one looks -- and a prim by its name, so the prims holding
+    // nothing are not put under one row while it looks; nor are they
+    // otherwise unless there are two or more, and never the root.
     std::vector<Row> rows(const std::string& filter) const;
 
     // --- folding -------------------------------------------------------------------
@@ -271,9 +276,6 @@ public:
     // The prim a row is of, for a drop into it: an item's, a prim's own, an
     // object's root; none for the row of prims holding nothing.
     static LLUUID primOf(const LLSD& row);
-    // The row a drop into a prim lights: the prim's, where its object shows
-    // its prims, and the object's otherwise; none where it is not listed.
-    LLSD dropRow(const LLUUID& prim) const;
 
     // --- pins ----------------------------------------------------------------------
 

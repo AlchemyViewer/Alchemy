@@ -172,6 +172,7 @@ if(AL_BUILD_VIEWER)
     alscriptanalysis.cpp
     alscriptexplorermodel.cpp
     alscriptexplorerpane.cpp
+    alscriptexplorertree.cpp
     alfloaterscriptpreferences.cpp
     alscriptkeymap.cpp
     alscriptmodules.cpp
@@ -978,6 +979,7 @@ if(AL_BUILD_VIEWER)
     alscriptanalysis.h
     alscriptexplorermodel.h
     alscriptexplorerpane.h
+    alscriptexplorertree.h
     alfloaterscriptpreferences.h
     alscriptkeymap.h
     alscriptmodules.h
@@ -2433,6 +2435,17 @@ if(AL_BUILD_TESTS)
     UNIT
     PROJECT ${test_project}
     LIBRARIES llui alscript ${test_libs}
+  )
+
+  # The explorer's rows shown as the inventory's folder view, from the source
+  # tree's skins and fonts.
+  al_add_test(
+    alscriptexplorertree
+    UNIT
+    PROJECT ${test_project}
+    LIBRARIES llui alscript ${test_libs}
+    SOURCES alscriptexplorermodel.cpp
+    DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
 
   # The Script Studio's Output tab over the studio's own window, the

@@ -1212,20 +1212,16 @@
                  tool_tip="Only the objects, prims, scripts and notecards with these letters in their names"
                  top="2"
                  width="236" />
-                <pane_list
+                <panel
+                 class="script_studio_explorer_tree"
                  follows="all"
                  height="414"
                  layout="topleft"
                  left="0"
-                 multi_select="true"
-                 name="explorer"
-                 tool_tip="The objects in hand -- pinned, selected in world, or holding a script that is open -- and their scripts and notecards. Double-click or return opens one, delete deletes it, F2 renames it -- or an object or a prim -- in its row, right-click for everything else. Drag them to your inventory or onto another object here, and drop on an object what your inventory holds, to put it in."
+                 name="explorer_tree"
+                 tool_tip="The objects in hand -- pinned, selected in world, or holding a script that is open -- and their scripts and notecards. Double-click or return opens one, delete deletes it, F2 renames it -- or an object or a prim -- where it stands, right-click for everything else. Drag them to your inventory or onto another object here, and drop on an object what your inventory holds, to put it in."
                  top="24"
-                 width="240">
-                    <pane_list.columns label="" name="icon" width="20" />
-                    <pane_list.columns dynamic_width="true" label="Name" name="name" tool_tip="The objects in hand, each prim of a linkset, and what each prim holds" />
-                    <pane_list.columns label="State" name="run" tool_tip="Whether a script runs in its object, and an object pinned while not in sight" width="70" />
-                </pane_list>
+                 width="240" />
                 <button
                  follows="left|bottom"
                  height="22"

@@ -26,21 +26,16 @@
 
 #include "alscriptexplorerpane.h"
 
-#include "alcodeeditor.h"
 #include "alobjectproperties.h"
-#include "alpanelist.h"
+#include "alscriptexplorertree.h"
 #include "alscriptstudiodoc.h"
 #include "alscriptstudioservices.h"
 #include "llagent.h"
 #include "llbutton.h"
 #include "llfiltereditor.h"
 #include "llfloater.h"
-#include "llfontgl.h"
 #include "llmenugl.h"
 #include "llnotificationsutil.h"
-#include "llscrolllistcell.h"
-#include "llscrolllistcolumn.h"
-#include "llscrolllistitem.h"
 #include "llselectmgr.h"
 #include "lltimer.h"
 #include "lltooldraganddrop.h"
@@ -100,7 +95,7 @@ ALScriptExplorerPane::~ALScriptExplorerPane()
 
 bool ALScriptExplorerPane::postBuild()
 {
-    mList   = getChild<ALPaneList>("explorer");
+    mTree   = getChild<ALScriptExplorerTree>("explorer_tree");
     mFilter = getChild<LLFilterEditor>("explorer_filter");
     // The window this is the explorer of, found through the view tree, as
     // what the explorer asks of it.
@@ -112,16 +107,57 @@ bool ALScriptExplorerPane::postBuild()
         LL_WARNS() << "The explorer is not in a Script Studio window" << LL_ENDL;
         return true;
     }
-    mList->setDoubleClickCallback([this]() { onChosen(); });
-    // The buttons follow what is chosen, which the list says as it changes.
-    mList->setCommitOnSelectionChange(true);
-    mList->setCommitCallback([this](LLUICtrl*, const LLSD&) { refreshButtons(); });
-    mList->setDragStarter([this](const LLSD& pressed) { return startDrag(pressed); });
-    mList->setDropHandler([this](const LLSD& row, MASK mask, bool dropped, EDragAndDropType type, void* cargo, EAcceptance* accept, std::string& tooltip) {
-        return drop(row, mask, dropped, type, cargo, accept, tooltip);
-    });
-    mList->setRightMouseDownCallback([this](LLUICtrl*, S32 x, S32 y, MASK) { showMenu(x, y); });
-    mList->setKeyHandler([this](KEY key, MASK mask) { return handleListKey(key, mask); });
+    ALScriptExplorerTree::Hooks hooks;
+    hooks.opened = [this](const LLSD& row) {
+        if (std::optional<Choice> one = Choice::of(row); one && one->isItem())
+        {
+            mServices->openScript(one->ref(), one->name);
+        }
+    };
+    // Folded or opened by its arrow: what it now shows asked for, where it
+    // was not, once the tree is done with the click.
+    hooks.folded = [this](const LLSD& row, bool folded) {
+        if (mModel.foldRow(row, folded) == Model::Refold::Relist)
+        {
+            relistSoon(false);
+        }
+    };
+    hooks.renameable = [this](const LLSD& row) {
+        const std::optional<Choice> one = Choice::of(row);
+        return one && (one->isItem() || mModel.present(one->root));
+    };
+    hooks.renamed = [this](const LLSD& row, const std::string& name) {
+        const std::optional<Choice> one = Choice::of(row);
+        if (!one)
+        {
+            return;
+        }
+        // An object's row is its root prim's name; a prim's its own.
+        std::string was = one->name;
+        if (!one->isItem())
+        {
+            const LLUUID prim = one->primRow ? one->prim : one->root;
+            for (const Model::Object& object : mModel.objects())
+            {
+                for (const Model::Prim& each : object.prims)
+                {
+                    if (each.id == prim)
+                    {
+                        was = prim == object.root ? object.name : each.name;
+                    }
+                }
+            }
+        }
+        renamed(*one, was, name);
+    };
+    hooks.drop = [this](const LLSD& row, MASK mask, bool dropped, EDragAndDropType type, void* cargo, std::string& tooltip) {
+        return drop(row, mask, dropped, type, cargo, tooltip);
+    };
+    hooks.drag   = [this]() { return startDrag(); };
+    // The buttons follow what is chosen.
+    hooks.chosen = [this]() { refreshButtons(); };
+    hooks.menu   = [this](S32 x, S32 y) { showMenu(x, y); };
+    mTree->setHooks(std::move(hooks));
     // A filter looks through what is folded too: what a large linkset's
     // folded prims hold is asked for once there is one.
     mFilter->setCommitCallback([this](LLUICtrl*, const LLSD&) {
@@ -160,67 +196,30 @@ bool ALScriptExplorerPane::postBuild()
     return true;
 }
 
-bool ALScriptExplorerPane::handleMouseDown(S32 x, S32 y, MASK mask)
+bool ALScriptExplorerPane::handleKeyHere(KEY key, MASK mask)
 {
-    if (mask == MASK_NONE && mList && mList->isInVisibleChain())
+    if (key == KEY_ESCAPE && mask == MASK_NONE && mServices)
     {
-        S32 lx = 0, ly = 0;
-        localPointToOtherView(x, y, &lx, &ly, mList);
-        LLSD row;
-        if (mList->pointInView(lx, ly) && arrowAt(lx, ly, row))
-        {
-            refold(mModel.foldRow(row));
-        }
+        mServices->revealed(mTree, true);
+        return true;
     }
-    return LLPanel::handleMouseDown(x, y, mask);
-}
-
-bool ALScriptExplorerPane::handleListKey(KEY key, MASK mask)
-{
-    // The keys a tree of files answers to, asked of the list first: the
-    // list would take left and right for its cells, and the panel it is in
-    // escape, to leave nothing with the keyboard -- where the arrows walk
-    // the avatar. Left and right fold and open the object or the prim
-    // chosen; return opens what is chosen, or folds it; delete deletes it,
-    // Command-Backspace too on a Mac; F2 renames it; and escape goes back
-    // to the script.
-    if ((key == KEY_LEFT || key == KEY_RIGHT) && mask == MASK_NONE)
+    if (mServices && mTree && mTree->hasFocus())
     {
-        const std::vector<LLScrollListItem*> rows = mList->getAllSelected();
-        if (rows.size() == 1 && rows.front()->getValue().isMap() && !rows.front()->getValue().has("item"))
+        if (key == KEY_RETURN && mask == MASK_NONE)
         {
-            refold(mModel.foldRow(rows.front()->getValue(), key == KEY_LEFT));
+            onChosen();
             return true;
         }
-        return false;
-    }
-    if (key == KEY_RETURN && mask == MASK_NONE)
-    {
-        onChosen();
-        return true;
-    }
-    if ((key == KEY_DELETE && mask == MASK_NONE) || (key == KEY_BACKSPACE && mask == MASK_CONTROL))
-    {
-        if (enabled("delete"))
+        if ((key == KEY_DELETE && mask == MASK_NONE) || (key == KEY_BACKSPACE && mask == MASK_CONTROL))
         {
-            act("delete");
+            if (enabled("delete"))
+            {
+                act("delete");
+            }
+            return true;
         }
-        return true;
     }
-    if (key == KEY_F2 && mask == MASK_NONE)
-    {
-        if (enabled("rename"))
-        {
-            act("rename");
-        }
-        return true;
-    }
-    if (key == KEY_ESCAPE && mask == MASK_NONE)
-    {
-        mServices->revealed(mList, true);
-        return true;
-    }
-    return false;
+    return LLPanel::handleKeyHere(key, mask);
 }
 
 // --- what is listed ------------------------------------------------------------------
@@ -237,6 +236,12 @@ void ALScriptExplorerPane::pump()
     {
         mNamesStale = false;
         rereadNames();
+    }
+    if (mRelistWanted)
+    {
+        const bool refetch = *mRelistWanted;
+        mRelistWanted.reset();
+        relist(refetch);
     }
     // What came in since it was last filled -- contents, whether scripts
     // run, names -- put in the list once, however many answers there were,
@@ -404,113 +409,59 @@ void ALScriptExplorerPane::fill()
 {
     mStale  = false;
     mFilled = LLTimer::getTotalSeconds();
-    // What was chosen stays chosen, by what it stands for rather than
-    // where it sat.
-    const std::vector<Choice>         chosen = choice();
-    boost::unordered_flat_set<LLUUID> chosen_empties;
-    for (const LLScrollListItem* item : mList->getAllSelected())
-    {
-        if (item->getValue().isMap() && item->getValue().has("empties"))
-        {
-            chosen_empties.insert(item->getValue()["root"].asUUID());
-        }
-    }
-    const S32 scroll = mList->getScrollPos();
-    mList->deleteAllItems();
-    // What a row is -- an object, a prim, a script -- is its icon; the
-    // columns are its name and its state. It has no tip: all a tip could
-    // say the row shows, and what can be done with it the right-click
-    // menu and the buttons under the list show. The mouse over a row shows
-    // only a name cut short, whole where it stands, as a tree of files does.
-    auto add = [&](const LLSD& value, const char* image, const std::string& name, const std::string& run) {
-        LLSD r;
-        r["value"]                = value;
-        r["columns"][0]["column"] = "icon";
-        r["columns"][0]["type"]   = "icon";
-        r["columns"][0]["value"]  = image;
-        for (S32 i = 1; i < 3; ++i)
-        {
-            r["columns"][i]["column"] = i == 1 ? "name" : "run";
-            r["columns"][i]["value"]  = i == 1 ? name : run;
-        }
-        return mList->addElement(r);
-    };
-    auto wasChosen = [&chosen](const LLSD& value) {
-        const LLUUID root = value["root"].asUUID();
-        const LLUUID prim = value.has("prim") ? value["prim"].asUUID() : root;
-        const LLUUID item = value["item"].asUUID();
-        for (const Choice& each : chosen)
-        {
-            if (each.root == root && each.prim == prim && each.item == item)
-            {
-                return true;
-            }
-        }
-        return false;
-    };
-    const std::string arrow_open   = mServices->words("ArrowOpen");
-    const std::string arrow_folded = mServices->words("ArrowFolded");
-    std::string       filter       = mFilter->getText();
+    std::string filter = mFilter->getText();
     LLStringUtil::trim(filter);
-    bool many = false;
-    for (const Model::Row& row : mModel.rows(filter))
-    {
-        const std::string arrow = row.folded ? arrow_folded : arrow_open;
-        LLScrollListItem* line  = nullptr;
+    const std::vector<Model::Row> rows = mModel.rows(filter);
+    // What a row is -- an object, a prim, a script -- is its icon, and a
+    // script's state and an object out of sight follow its name, as the
+    // inventory's worn items say so.
+    const auto said = [this](const std::string& word) { return " (" + mServices->words(word) + ")"; };
+    const auto look = [&](const Model::Row& row) {
+        ALScriptExplorerTree::Look out;
         switch (row.kind)
         {
             case Model::Row::Kind::Object:
-                many = row.many;
-                line = add(row.value, many ? "Inv_Object_Multi" : "Inv_Object",
-                           arrow + (row.pinned ? mServices->words("PinnedMark") : LLStringUtil::null) + row.name,
-                           row.present ? LLStringUtil::null : mServices->words("KindAway"));
-                line->setSelected(wasChosen(row.value));
+                out.label  = (row.pinned ? mServices->words("PinnedMark") : LLStringUtil::null) + row.name;
+                out.suffix = row.present ? LLStringUtil::null : said("KindAway");
+                out.icon   = row.many ? "Inv_Object_Multi" : "Inv_Object";
                 break;
             case Model::Row::Kind::Empties:
             {
                 LLStringUtil::format_map_t args;
                 args["[COUNT]"] = std::to_string(row.empties);
-                line = add(row.value, "Studio_Prim", "    " + arrow + mServices->words("ExplorerEmptyPrims", args), LLStringUtil::null);
-                line->setSelected(chosen_empties.contains(row.value["root"].asUUID()));
+                out.label       = mServices->words("ExplorerEmptyPrims", args);
+                out.icon        = "Studio_Prim";
                 break;
             }
             case Model::Row::Kind::Prim:
-                line = add(row.value, "Studio_Prim", "    " + arrow + (row.name.empty() ? mServices->words("ObjectNameComing") : row.name), LLStringUtil::null);
-                line->setSelected(wasChosen(row.value));
+                out.label = row.name.empty() ? mServices->words("ObjectNameComing") : row.name;
+                out.icon  = "Studio_Prim";
                 break;
             case Model::Row::Kind::Item:
-            {
-                std::string run;
+                out.label = row.name;
                 if (row.script)
                 {
                     const std::optional<bool> running = knownRunning(row.ref);
-                    run = mServices->words(!running ? "StateUnknown" : *running ? "RunningYes" : "RunningNo");
+                    out.suffix = said(!running ? "StateUnknown" : *running ? "RunningYes" : "RunningNo");
                 }
-                const char* image = row.script ? (row.lua ? "Inv_Script_Luau" : "Inv_Script")
-                                    : row.name == ".luaurc" || row.name == ".lslrc" ? "Studio_Config"
-                                                                                    : "Inv_Notecard";
-                line = add(row.value, image, (row.many ? "        " : "    ") + row.name, run);
-                line->setSelected(wasChosen(row.value));
+                out.icon = row.script ? (row.lua ? "Inv_Script_Luau" : "Inv_Script")
+                           : row.name == ".luaurc" || row.name == ".lslrc" ? "Studio_Config"
+                                                                           : "Inv_Notecard";
                 break;
-            }
         }
-        // Shown without its own name, not being selected: asked of its region.
+        return out;
+    };
+    // The explorer is empty exactly when nothing is selected -- an object
+    // listed has a row of its own, whatever it holds -- so what it says
+    // while empty is what it is for, or that the filter found none.
+    mTree->show(rows, look, filter, mServices->words(!filter.empty() && !mModel.objects().empty() ? "ExplorerNoMatch" : "NoExplorerSelection"));
+    // Shown without its own name, not being selected: asked of its region.
+    for (const Model::Row& row : rows)
+    {
         if (row.unnamed)
         {
             askName(Model::primOf(row.value));
         }
-    }
-    mList->setScrollPos(scroll);
-    // The explorer is empty exactly when nothing is selected -- an object
-    // listed has a row of its own, whatever it holds -- so what it says
-    // while empty is what it is for, or that the filter found none.
-    if (mList->isEmpty())
-    {
-        mList->setCommentText(mServices->words(!filter.empty() && !mModel.objects().empty() ? "ExplorerNoMatch" : "NoExplorerSelection"));
-    }
-    else
-    {
-        mList->setCommentText(LLStringUtil::null);
     }
     refreshButtons();
 }
@@ -529,13 +480,13 @@ void ALScriptExplorerPane::refreshButtons()
 std::vector<ALScriptExplorerPane::Choice> ALScriptExplorerPane::choice() const
 {
     std::vector<Choice> rows;
-    if (!mList)
+    if (!mTree)
     {
         return rows;
     }
-    for (const LLScrollListItem* item : mList->getAllSelected())
+    for (const LLSD& value : mTree->chosen())
     {
-        if (std::optional<Choice> row = Choice::of(item->getValue()))
+        if (std::optional<Choice> row = Choice::of(value))
         {
             rows.push_back(std::move(*row));
         }
@@ -554,25 +505,19 @@ std::optional<bool> ALScriptExplorerPane::knownRunning(const ALScriptRef& ref) c
 
 void ALScriptExplorerPane::onChosen()
 {
-    // A linkset's row of prims holding nothing, which stands for no prim
-    // of its own and so is not among the rows chosen.
-    for (const LLScrollListItem* item : mList->getAllSelected())
+    // A script or notecard opened; an object, a prim or a linkset's row of
+    // prims holding nothing opened where it is folded, folded where it is
+    // open.
+    for (const LLSD& value : mTree->chosen())
     {
-        if (item->getValue().isMap() && item->getValue().has("empties"))
+        const std::optional<Choice> row = Choice::of(value);
+        if (row && row->isItem())
         {
-            refold(mModel.foldRow(item->getValue()));
-        }
-    }
-    for (const Choice& row : choice())
-    {
-        if (row.isItem())
-        {
-            mServices->openScript(row.ref(), row.name);
+            mServices->openScript(row->ref(), row->name);
         }
         else
         {
-            // An object or a prim: folded shut, or opened.
-            refold(mModel.fold(row.primRow ? row.prim : row.root, row.primRow));
+            mTree->toggle(value);
         }
     }
 }
@@ -588,65 +533,37 @@ void ALScriptExplorerPane::refold(Model::Refold refold)
     }
 }
 
-bool ALScriptExplorerPane::arrowAt(S32 x, S32 y, LLSD& row)
+void ALScriptExplorerPane::relistSoon(bool refetch)
 {
-    LLScrollListItem* item = mList->hitItem(x, y);
-    if (!item || !item->getValue().isMap() || item->getValue().has("item"))
-    {
-        return false;
-    }
-    // The arrow is the start of the name, after a prim's indent: from
-    // the name column's edge to just past the arrow.
-    const LLSD&               value = item->getValue();
-    const bool                prim  = value.has("prim") || value.has("empties");
-    const LLScrollListColumn* icon  = mList->getColumn("icon");
-    const S32                 left  = mList->getItemListRect().mLeft + (icon ? icon->getWidth() : 0) + mList->getColumnPadding();
-    const S32 right = left + LLFontGL::getFontSansSerifSmall()->getWidth((prim ? std::string("    ") : std::string()) + mServices->words("ArrowOpen")) + 4;
-    if (x < left - 2 || x > right)
-    {
-        return false;
-    }
-    row = value;
-    return true;
+    mRelistWanted = refetch || mRelistWanted.value_or(false);
+}
+
+void ALScriptExplorerPane::fillSoon()
+{
+    mStale  = true;
+    mFilled = 0.0;
 }
 
 void ALScriptExplorerPane::reveal(const ALScriptStudioDoc& doc)
 {
-    // What holds it unfolded first -- a folded object has no rows under it
-    // to choose -- and asked what it holds where, folded in a large
-    // linkset, it never was, for its rows to come.
+    // What holds it unfolded first, and asked what it holds where, folded
+    // in a large linkset, it never was, for its row to come; then its row
+    // chosen, with the keyboard, the filter let go of where it hides it.
     mWindow->showExplorer();
     if (mModel.unfoldTo(doc.ref.object))
     {
         relist();
     }
-    const auto find = [this, &doc]() -> LLScrollListItem* {
-        for (LLScrollListItem* item : mList->getAllData())
-        {
-            const LLSD& value = item->getValue();
-            if (value.isMap() && value["item"].asUUID() == doc.ref.item && value["prim"].asUUID() == doc.ref.object)
-            {
-                return item;
-            }
-        }
-        return nullptr;
-    };
     fill();
-    LLScrollListItem* row = find();
-    if (!row && !mFilter->getText().empty())
+    LLSD row;
+    row["prim"] = doc.ref.object;
+    row["item"] = doc.ref.item;
+    if (!mTree->choose(row, true) && !mFilter->getText().empty())
     {
         mFilter->setText(LLStringUtil::null);
         fill();
-        row = find();
+        mTree->choose(row, true);
     }
-    if (!row)
-    {
-        return;
-    }
-    mList->deselectAllItems();
-    row->setSelected(true);
-    mList->scrollToShowSelected();
-    mList->setFocus(true);
     refreshButtons();
 }
 
@@ -658,20 +575,12 @@ void ALScriptExplorerPane::explore(const LLUUID& root)
         mWindow->explorerPinsChanged();
     }
     mWindow->showExplorer();
-    relist();
-    mList->deselectAllItems();
-    for (LLScrollListItem* item : mList->getAllData())
-    {
-        const LLSD& value = item->getValue();
-        if (value.isMap() && !value.has("prim") && !value.has("item") && value["root"].asUUID() == root)
-        {
-            item->setSelected(true);
-            break;
-        }
-    }
-    mList->scrollToShowSelected();
     // Open, whatever it was: what it holds is what it was asked to show.
-    refold(mModel.fold(root, false, false));
+    mModel.fold(root, false, false);
+    relist();
+    LLSD row;
+    row["root"] = root;
+    mTree->choose(row, false);
     refreshButtons();
 }
 
@@ -688,7 +597,7 @@ bool ALScriptExplorerPane::enabled(const std::string& action) const
     }
     if (action == "copy")
     {
-        return mList->canCopy();
+        return !rows.empty();
     }
     if (action == "open")
     {
@@ -736,7 +645,7 @@ void ALScriptExplorerPane::act(const std::string& action)
     }
     if (action == "copy")
     {
-        mList->copy();
+        mTree->copy();
         return;
     }
     const std::vector<Choice> rows = choice();
@@ -754,7 +663,7 @@ void ALScriptExplorerPane::act(const std::string& action)
     }
     else if (action == "rename")
     {
-        rename(rows.front());
+        mTree->rename();
     }
     else if (action == "delete")
     {
@@ -853,21 +762,10 @@ void ALScriptExplorerPane::run(const std::string& action, const std::vector<Choi
 
 void ALScriptExplorerPane::showMenu(S32 x, S32 y)
 {
+    // At a point of the tree, which has chosen the row under it already.
     if (!LLMenuGL::sMenuContainer)
     {
         return;
-    }
-    // The row under the mouse is the choice, unless it is among what
-    // was chosen already; the empty part of the list chooses nothing,
-    // and the menu offers what needs nothing.
-    LLScrollListItem* hit = mList->hitItem(x, y);
-    if (hit && !hit->getSelected())
-    {
-        mList->selectItemAt(x, y, MASK_NONE);
-    }
-    else if (!hit)
-    {
-        mList->deselectAllItems();
     }
     if (LLContextMenu* old = mMenu.get())
     {
@@ -890,7 +788,7 @@ void ALScriptExplorerPane::showMenu(S32 x, S32 y)
     }
     mMenu = menu->getHandle();
     menu->show(x, y);
-    LLMenuGL::showPopup(mList, menu, x, y);
+    LLMenuGL::showPopup(mTree, menu, x, y);
 }
 
 // --- making, renaming, deleting and recompiling ----------------------------------------
@@ -952,53 +850,6 @@ void ALScriptExplorerPane::created(const ALScriptWorkspace::Created& made, const
     relist(true);
 }
 
-void ALScriptExplorerPane::rename(const Choice& row)
-{
-    // In its row, as a tree of files renames: the one chosen that stands
-    // for it -- not a linkset's row of prims holding nothing -- its name
-    // edited where it is shown, past the arrow, the pin and the indent.
-    const LLScrollListItem* item = nullptr;
-    for (const LLScrollListItem* chosen : mList->getAllSelected())
-    {
-        if (chosen->getValue().isMap() && !chosen->getValue().has("empties"))
-        {
-            item = chosen;
-            break;
-        }
-    }
-    const LLScrollListColumn* column = mList->getColumn("name");
-    const LLScrollListCell*   cell   = item && column ? item->getColumn(column->mIndex) : nullptr;
-    if (!cell)
-    {
-        return;
-    }
-    // An object's row is its root prim's name; a prim's its own.
-    std::string name = row.name;
-    if (!row.isItem())
-    {
-        const LLUUID prim = row.primRow ? row.prim : row.root;
-        for (const Model::Object& object : mModel.objects())
-        {
-            for (const Model::Prim& each : object.prims)
-            {
-                if (each.id == prim)
-                {
-                    name = prim == object.root ? object.name : each.name;
-                }
-            }
-        }
-    }
-    const std::string shown  = cell->getValue().asString();
-    const std::string before = shown.size() >= name.size() && shown.ends_with(name) ? shown.substr(0, shown.size() - name.size()) : std::string();
-    ALPaneList::Edit  edit;
-    edit.column   = "name";
-    edit.indent   = LLFontGL::getFontSansSerifSmall()->getWidth(before);
-    edit.text     = name;
-    edit.maxBytes = DB_INV_ITEM_NAME_STR_LEN;
-    edit.done     = [this, row, name](const std::string& typed) { renamed(row, name, typed); };
-    mList->editRow(item->getValue(), std::move(edit));
-}
-
 void ALScriptExplorerPane::renamed(const Choice& row, const std::string& was, std::string name)
 {
     LLStringUtil::trim(name);
@@ -1015,9 +866,10 @@ void ALScriptExplorerPane::renamed(const Choice& row, const std::string& was, st
             mServices->report(error, true);
             return;
         }
-        // The tab, if it is open, and the list.
+        // The tab, if it is open, and the list, once the tree is done with
+        // the name typed.
         mWindow->itemRenamed(ref, name);
-        relist(true);
+        relistSoon(true);
         return;
     }
     const LLUUID prim = row.primRow ? row.prim : row.root;
@@ -1035,7 +887,7 @@ void ALScriptExplorerPane::renamed(const Choice& row, const std::string& was, st
         mWindow->explorerPinsChanged();
     }
     askName(prim);
-    fill();
+    fillSoon();
 }
 
 void ALScriptExplorerPane::remove(const std::vector<Choice>& rows)
@@ -1165,18 +1017,17 @@ void ALScriptExplorerPane::recompile(const std::vector<Choice>& rows)
 
 // --- dragging out and dropping in --------------------------------------------------------
 
-bool ALScriptExplorerPane::startDrag(const LLSD& pressed)
+bool ALScriptExplorerPane::startDrag()
 {
-    // One drag comes out of one prim: the chosen items of the prim whose
-    // item was pressed, or of the first chosen item's where an object or
-    // a prim was. Each goes as the build floater's contents let it go --
+    // One drag comes out of one prim: the chosen items of the first chosen
+    // item's prim. Each goes as the build floater's contents let it go --
     // a copy where it may be copied and given, the item itself out of an
     // object of one's own where it may not -- and nothing comes out of a
     // locked attachment, nor anything but a copy out of any attachment,
     // whose contents the region does not keep up with.
     std::vector<EDragAndDropType> types;
     uuid_vec_t                    ids;
-    LLUUID                        from = pressed.has("item") ? pressed["prim"].asUUID() : LLUUID::null;
+    LLUUID                        from;
     for (const Choice& row : choice())
     {
         if (!row.isItem() || (from.notNull() && row.prim != from))
@@ -1280,27 +1131,24 @@ LLViewerObject* ALScriptExplorerPane::dropTarget() const
     return node->getObject();
 }
 
-LLSD ALScriptExplorerPane::drop(const LLSD& row, MASK mask, bool drop, EDragAndDropType type, void* cargo, EAcceptance* accept, std::string& tooltip)
+bool ALScriptExplorerPane::drop(const LLSD& row, MASK mask, bool drop, EDragAndDropType type, void* cargo, std::string& tooltip)
 {
     // Into the prim the row is of: an item's, a prim's own, an object's
     // root, which is where a drop on the object in world goes too; below
     // the rows, the prim of what is chosen. The row of prims holding
     // nothing is of none.
-    *accept              = ACCEPT_NO;
-    LLViewerObject* prim = row.isMap() ? gObjectList.findObject(Model::primOf(row)) : dropTarget();
-    if (!prim || !dropIntoPrim(prim, mask, drop, type, cargo))
+    LLViewerObject* prim = row.isDefined() ? gObjectList.findObject(Model::primOf(row)) : dropTarget();
+    if (!prim)
+    {
+        return false;
+    }
+    if (!dropIntoPrim(prim, mask, drop, type, cargo))
     {
         // Why not, beside the pointer, rather than a refusal with no word.
-        if (prim)
-        {
-            tooltip = dropRefusal(prim, type, cargo);
-        }
-        return LLSD();
+        tooltip = dropRefusal(prim, type, cargo);
+        return false;
     }
-    *accept = ACCEPT_YES_MULTI;
-    // The row the drop goes to, lit: the prim's, where its object shows
-    // its prims, and the object's otherwise.
-    return drop ? LLSD() : mModel.dropRow(prim->getID());
+    return true;
 }
 
 std::string ALScriptExplorerPane::dropRefusal(LLViewerObject* prim, EDragAndDropType type, void* cargo) const
@@ -1365,9 +1213,9 @@ bool ALScriptExplorerPane::dropIntoPrim(LLViewerObject* prim, MASK mask, bool dr
     const bool ok = tool->dropIntoContents(prim, mask, drop, type, cargo);
     if (ok && drop)
     {
-        // Listed again now, and again in a moment for what a folder sends
-        // once its items are in.
-        relist(true);
+        // Listed again once the tree is done with the drop, and again in a
+        // moment for what a folder sends once its items are in.
+        relistSoon(true);
         mRefetchAt = LLTimer::getTotalSeconds() + 2.0;
     }
     return ok;

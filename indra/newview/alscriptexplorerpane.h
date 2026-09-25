@@ -31,11 +31,12 @@
 
 #include <boost/signals2.hpp>
 
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
 
-class ALPaneList;
+class ALScriptExplorerTree;
 class ALScriptStudioServices;
 struct ALScriptStudioDoc;
 class LLContextMenu;
@@ -82,9 +83,13 @@ public:
     explicit ALScriptExplorerPane(const LLPanel::Params& params = getDefaultParams());
     ~ALScriptExplorerPane() override;
     bool postBuild() override;
-    // An arrow folds its row, and the press goes on to the list, which
-    // chooses the row as any press would.
-    bool handleMouseDown(S32 x, S32 y, MASK mask) override;
+    // The keys a tree of files answers to past the tree's own -- the arrows,
+    // F2, typing a name -- while the tree has the keyboard: return opens
+    // what is chosen, or opens and folds it; delete deletes it,
+    // Command-Backspace too on a Mac. Escape, from the tree or the filter,
+    // goes back to the script, rather than leaving nothing with the
+    // keyboard, as a panel does, where the arrows walk the avatar.
+    bool handleKeyHere(KEY key, MASK mask) override;
 
     // Each frame: the names the region said put in, what came in since the
     // list was filled put in it once, and the selection in world looked at.
@@ -100,10 +105,9 @@ public:
     // selected in world; in sight; and chosen, so that the buttons act on it.
     void explore(const LLUUID& root);
 
-    // The rows chosen, in the list's order.
-    std::vector<Choice> choice() const;
-    const Model&        model() const { return mModel; }
-    ALPaneList*         list() const { return mList; }
+    // The rows chosen, in the tree's order.
+    std::vector<Choice>   choice() const;
+    const Model&          model() const { return mModel; }
 
     // The pins, kept between sessions.
     void saveState(LLSD& state) const { mModel.saveState(state); }
@@ -118,8 +122,11 @@ private:
     // or an open script remembers it by, or an ellipsis while it is asked.
     std::string nameGivenTo(const LLUUID& root) const;
     void        refold(Model::Refold refold);
-    bool        arrowAt(S32 x, S32 y, LLSD& row);
-    bool        handleListKey(KEY key, MASK mask);
+    // Listed again, or filled again, on the next frame: asked for from
+    // within the tree's own handling of a click, a drop or a rename, which
+    // the tree is not to be changed under.
+    void        relistSoon(bool refetch);
+    void        fillSoon();
 
     void onChosen();
     void act(const std::string& action);
@@ -134,8 +141,7 @@ private:
     // opened once the region lists it.
     void create(const LLUUID& prim, bool notecard, bool lua);
     void created(const ALScriptWorkspace::Created& made, const std::optional<std::string>& opening);
-    // A row renamed where it stands; and the name it was given, taken.
-    void rename(const Choice& row);
+    // The name a row was given where it stands, taken.
     void renamed(const Choice& row, const std::string& was, std::string name);
     void remove(const std::vector<Choice>& rows);
     void recompile(const std::vector<Choice>& rows);
@@ -145,12 +151,12 @@ private:
 
     // What is chosen of what a prim holds, dragged out with the viewer's
     // drag tool -- to the inventory, as the build floater's contents are --
-    // from the prim of the row pressed; false where none of it may go.
-    bool startDrag(const LLSD& pressed);
+    // from the prim of the first item chosen; false where none of it may go.
+    bool startDrag();
     // What is dragged from the inventory over a row, or dropped on it: into
-    // the prim the row is of, as into the build floater's contents. Answers
-    // the row the drop goes to, for the list to light.
-    LLSD drop(const LLSD& row, MASK mask, bool drop, EDragAndDropType type, void* cargo, EAcceptance* accept, std::string& tooltip);
+    // the prim the row is of, as into the build floater's contents; below
+    // the rows, where the empty space's drop goes. True where it would go.
+    bool drop(const LLSD& row, MASK mask, bool drop, EDragAndDropType type, void* cargo, std::string& tooltip);
     // Why a prim will not take what is carried over it, for the drag's tip.
     std::string dropRefusal(LLViewerObject* prim, EDragAndDropType type, void* cargo) const;
     // What is dragged put into a prim, as the build floater's contents
@@ -166,7 +172,7 @@ private:
 
     ALScriptStudioServices* mServices = nullptr;
     Window*                 mWindow   = nullptr;
-    ALPaneList*             mList     = nullptr;
+    ALScriptExplorerTree*   mTree     = nullptr;
     LLFilterEditor*         mFilter   = nullptr;
     Model                   mModel;
     LLHandle<LLContextMenu> mMenu;
@@ -186,6 +192,8 @@ private:
     std::vector<LLUUID>     mTransferring;
     // Names the region said of what the list shows since the last frame.
     bool                    mNamesStale = false;
+    // Listed again on the next frame, and whether every prim is asked again.
+    std::optional<bool>     mRelistWanted;
     boost::signals2::scoped_connection mPropertiesConnection;
     boost::signals2::scoped_connection mSelectionConnection;
     boost::signals2::scoped_connection mRunningConnection;

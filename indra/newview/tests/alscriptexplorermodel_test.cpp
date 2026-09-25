@@ -193,7 +193,9 @@ namespace tut
         const LLUUID chair = object(10, "Chair");
         selected           = { chair };
         list();
+        ensure("what a prim holds not known yet, a folder of it may still be opened", !model.rows(std::string()).front().known);
         holds(chair, { "sit.lsl", "readme" });
+        ensure("known", model.rows(std::string()).front().known);
         ensure_equals(rows(), std::string("O:Chair I:sit.lsl I:readme"));
         list();
         ensure_equals("kept through a listing", rows(), std::string("O:Chair I:sit.lsl I:readme"));
@@ -214,10 +216,10 @@ namespace tut
         holds(id(11), { "door.lsl" });
         holds(id(12), {});
         holds(id(13), {});
-        ensure_equals("the root, empty, stays first; the two others holding nothing go under one row; one not answered stays", rows(),
-                      std::string("O:House P:House P:House.1 I:door.lsl P:House.4 E:2+"));
+        ensure_equals("the root, empty, stays first; the two others holding nothing go under one row, folded; one not answered stays", rows(),
+                      std::string("O:House P:House P:House.1 I:door.lsl P:House.4 E:2+ P:House.2 P:House.3"));
         const std::vector<Model::Row> all   = model.rows(std::string());
-        const Model::Row&             group = all.back();
+        const Model::Row&             group = all[all.size() - 3];
         ensure("the row of them is of no prim to act on or drop into", !Model::Choice::of(group.value) && Model::primOf(group.value).isNull());
         ensure("opened, it asks only to be filled again", model.foldRow(group.value) == Model::Refold::Refill);
         ensure_equals(rows(), std::string("O:House P:House P:House.1 I:door.lsl P:House.4 E:2 P:House.2 P:House.3"));
@@ -243,7 +245,8 @@ namespace tut
         holds(id(13), {});
         holds(chair, { "sit.lsl" });
         model.fold(house, false, true);
-        ensure_equals("folded, the object alone", rows(), std::string("O:House+ O:Chair I:sit.lsl"));
+        ensure_equals("folded, what the object holds is still listed, for the tree to show opened", rows(),
+                      std::string("O:House+ P:House I:main.lsl P:House.1 I:door.lsl I:notes E:2+ P:House.2 P:House.3 O:Chair I:sit.lsl"));
         ensure_equals("an item by its name, and what holds it, unfolded", rows("DOOR"), std::string("O:House P:House.1 I:door.lsl"));
         ensure_equals("a prim by its name, with all it holds", rows("house.1"), std::string("O:House P:House.1 I:door.lsl I:notes"));
         ensure_equals("an object by its name, with every prim, the empty ones by name", rows("house"),
@@ -263,6 +266,10 @@ namespace tut
         const auto always = [](const LLUUID&) { return true; };
         std::vector<LLUUID> asked = model.toAsk(false, false, always);
         ensure_equals("the root and the one open", asked.size(), size_t(2));
+        const std::vector<Model::Row> all = model.rows(std::string());
+        const Model::Row*             one = rowNamed(all, "Big.1");
+        ensure("a folded prim is listed, folded, what it holds not known", one && one->folded && !one->known);
+        ensure("the linkset's own row is known: its prims are", all.front().known);
         ensure("which", asked[0] == id(100) && asked[1] == id(105));
         ensure("asked, not again until answered", model.toAsk(false, false, always).empty());
         ensure_equals("a filter looks through the rest", model.toAsk(false, true, always).size(), count - 2);
@@ -365,7 +372,7 @@ namespace tut
     template<> template<>
     void alscriptexplorermodel_object::test<9>()
     {
-        set_test_name("an object folded shows its row alone, opened asks to be listed again; a drop lights a prim where its object shows them, the object where it does not");
+        set_test_name("an object folded is a folded row, opened asks to be listed again, and a prim revealed unfolds what holds it; pins from the rows");
         const LLUUID house = object(10, "House", 2);
         const LLUUID chair = object(20, "Chair");
         selected           = { house, chair };
@@ -373,12 +380,8 @@ namespace tut
         holds(id(10), { "a.lsl" });
         holds(id(11), { "b.lsl" });
         holds(chair, {});
-        ensure("a drop into a linkset's prim lights the prim", model.dropRow(id(11))["prim"].asUUID() == id(11));
-        ensure("into a single prim, its object", !model.dropRow(chair).has("prim") && model.dropRow(chair)["root"].asUUID() == chair);
-        ensure("into nothing listed, nothing", model.dropRow(id(99)).isUndefined());
         ensure("folded", model.fold(house, false) == Model::Refold::Refill && model.folded(house));
-        ensure_equals(rows(), std::string("O:House+ O:Chair"));
-        ensure("folded, the object lights", !model.dropRow(id(11)).has("prim"));
+        ensure_equals(rows(), std::string("O:House+ P:House I:a.lsl P:House.1 I:b.lsl O:Chair"));
         ensure("a prim revealed unfolds what holds it, and was asked what it holds", !model.unfoldTo(id(11)) && !model.folded(house));
         ensure("opened", model.fold(house, false, false) == Model::Refold::None);
         model.fold(house, false, true);

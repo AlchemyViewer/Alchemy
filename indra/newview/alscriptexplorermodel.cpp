@@ -22,7 +22,7 @@
  * $/LicenseInfo$
  */
 
-#include "linden_common.h"
+#include "llviewerprecompiledheaders.h"
 
 #include "alscriptexplorermodel.h"
 
@@ -380,11 +380,8 @@ std::vector<ALScriptExplorerModel::Row> ALScriptExplorerModel::rows(const std::s
         row.present = object.present;
         row.many    = many;
         row.unnamed = object.present && !object.named;
+        row.known   = many || object.prims.empty() || object.prims.front().fetched;
         out.push_back(row);
-        if (row.folded)
-        {
-            continue;
-        }
         // A linkset's prims known to hold nothing, but its root, under one
         // row after the rest, folded until opened: there to drop into, and
         // otherwise only keeping apart what the object holds.
@@ -404,10 +401,6 @@ std::vector<ALScriptExplorerModel::Row> ALScriptExplorerModel::rows(const std::s
                 group.folded           = !mEmptiesOpen.contains(object.root);
                 group.empties          = empties;
                 out.push_back(group);
-                if (group.folded)
-                {
-                    break;
-                }
             }
             for (const Prim& prim : object.prims)
             {
@@ -434,11 +427,8 @@ std::vector<ALScriptExplorerModel::Row> ALScriptExplorerModel::rows(const std::s
                     line.name    = prim.name;
                     line.folded  = filter.empty() && mFoldedPrims.contains(prim.id);
                     line.unnamed = object.present && !prim.named;
+                    line.known   = prim.fetched;
                     out.push_back(line);
-                    if (line.folded)
-                    {
-                        continue;
-                    }
                 }
                 for (const Item& item : prim.items)
                 {
@@ -648,28 +638,6 @@ LLUUID ALScriptExplorerModel::primOf(const LLSD& row)
         return LLUUID::null;
     }
     return row.has("prim") ? row["prim"].asUUID() : row["root"].asUUID();
-}
-
-LLSD ALScriptExplorerModel::dropRow(const LLUUID& prim) const
-{
-    for (const Object& object : mObjects)
-    {
-        for (const Prim& each : object.prims)
-        {
-            if (each.id != prim)
-            {
-                continue;
-            }
-            LLSD at;
-            at["root"] = object.root;
-            if (object.prims.size() > 1 && !mFolded.contains(object.root))
-            {
-                at["prim"] = each.id;
-            }
-            return at;
-        }
-    }
-    return LLSD();
 }
 
 // --- pins --------------------------------------------------------------------------
