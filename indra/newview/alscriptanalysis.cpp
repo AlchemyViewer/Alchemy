@@ -117,6 +117,12 @@ struct ALScriptAnalysis::Worker
         }
     }
 
+    // Once for the session, from the first region's builtins: Tailslide
+    // keeps them in a table of the whole process that it adds to and never
+    // replaces, so a region whose LSL has more functions than the first's
+    // is checked against the first's until the viewer starts again.
+    // Luau's front end is the service's own, and is loaded again
+    // (loadLuau).
     void loadLSL(const std::string& path)
     {
         if (lslLoaded)

@@ -777,7 +777,7 @@ void ALScriptWorkspace::recompile(const ALScriptRef& ref, const std::string& req
     const LLInventoryItem* item   = ref.inInventory() ? gInventory.getItem(ref.item) : object ? object->getInventoryItem(ref.item) : nullptr;
     if (!item)
     {
-        fail(ref.inInventory() ? "no such item" : object ? "no such item in the object" : "no such object");
+        fail(LLTrans::getString(ref.inInventory() ? "WorkspaceNoSuchItem" : object ? "WorkspaceNoSuchItemInObject" : "WorkspaceNoSuchObject"));
         return;
     }
     if (std::string refused = object ? rlvRefusal(object, LLAssetType::AT_LSL_TEXT, RlvUse::Change) : std::string(); !refused.empty())
@@ -800,7 +800,9 @@ void ALScriptWorkspace::recompile(const ALScriptRef& ref, const std::string& req
     }
     if ((target == "luau") != lua)
     {
-        fail(std::string(lua ? "a Luau" : "an LSL") + " script does not compile for " + target);
+        LLStringUtil::format_map_t args;
+        args["[TARGET]"] = target;
+        fail(LLTrans::getString(lua ? "WorkspaceLuaNotForTarget" : "WorkspaceLSLNotForTarget", args));
         return;
     }
     const std::string name = item->getName();

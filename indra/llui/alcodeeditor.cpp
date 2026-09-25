@@ -4415,7 +4415,6 @@ bool ALCodeEditor::hoverCardAt(S32 x, S32 y)
     // after its comma as much as the word before -- since what the
     // analyzer has to say about one is that it is a string, which the
     // quotes said already.
-    if (says.empty())
     {
         const ALTextRange literal = stringAt(at);
         const std::string size    = stringSize(literal);

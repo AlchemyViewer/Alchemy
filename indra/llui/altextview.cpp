@@ -4137,7 +4137,8 @@ bool ALTextView::handleKeyHere(KEY key, MASK mask)
 {
     // Escape closes the find bar, but for a modal keymap's inserting
     // mode, which it leaves first; the next Escape closes the bar.
-    if (key == KEY_ESCAPE && mask == MASK_NONE && findShown() && typingText() != (mModal != nullptr))
+    const bool inserting = mModal && mModal->inserting();
+    if (key == KEY_ESCAPE && mask == MASK_NONE && findShown() && !inserting)
     {
         hideFind();
         return true;

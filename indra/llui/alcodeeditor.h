@@ -44,7 +44,7 @@ class ALChoiceList;
 //
 // Blocks are found by indentation, which every language here writes by,
 // with a brace or an `end` on the line after a block taken as part of it;
-// an analyzer that knows better will hand over regions in phase 2.
+// none of the analyzers hands over regions of its own.
 // Completions come from whoever is set as the provider, and until someone
 // is, from the grammar's vocabulary and the words in the document.
 class ALCodeEditor : public ALTextView

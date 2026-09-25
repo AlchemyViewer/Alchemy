@@ -178,10 +178,11 @@ namespace
         return false;
     }
 
-    // The most a file opened here may hold. A script is 64 KB and a
-    // notecard less; this is room for any include, snippets file or log
-    // anyone edits by hand, and short of a file picked by mistake --
-    // which is read on the main thread, and put in an editor whole.
+    // The most a file opened here may hold. A script's text goes up as at
+    // most 256 KB (ALScriptEnvelope::MAX_ASSET_BYTES) and a notecard 64 KB;
+    // this is room for any include, snippets file or log anyone edits by
+    // hand, and short of a file picked by mistake -- which is read on the
+    // main thread, and put in an editor whole.
     constexpr S64 MOST_FILE_BYTES = 8 * 1024 * 1024;
 
     bool fileTooLarge(const std::string& path)
@@ -309,8 +310,6 @@ namespace
         return text;
     }
 
-    // What an object is called, where the viewer knows: its name value,
-    // or the selection's name for it.
     // What an object in world is called: an avatar's name; the selection's
     // word for it, while it is selected, which a rename here changes at
     // once; or the last the region said of it, which the object properties
@@ -14050,13 +14049,12 @@ void ALFloaterScriptStudio::fillExplorer()
         }
     }
     mExplorer->setScrollPos(scroll);
-    // The explorer is empty exactly when nothing is selected, so what it
-    // says while empty is what it is for -- or that the filter found none.
+    // The explorer is empty exactly when nothing is selected -- an object
+    // listed has a row of its own, whatever it holds -- so what it says
+    // while empty is what it is for, or that the filter found none.
     if (mExplorer->isEmpty())
     {
-        mExplorer->setCommentText(getString(!filter.empty() && !mExplorerModel.empty() ? "ExplorerNoMatch"
-                                            : mExplorerModel.empty()                   ? "NoExplorerSelection"
-                                                                                       : "NoExplorerContents"));
+        mExplorer->setCommentText(getString(!filter.empty() && !mExplorerModel.empty() ? "ExplorerNoMatch" : "NoExplorerSelection"));
     }
     else
     {

@@ -82,9 +82,7 @@ struct ALScriptFix
 // What the LSL and SLua analyzers report: a range in the script, how bad it
 // is, which pass said it, and the words. Lines and columns are zero-based
 // and a column counts bytes of UTF-8 -- the one convention every boundary
-// converts to. The interface
-// this belongs to, ALLanguageService, arrives with the editor in phase 1;
-// until then this is the library's own.
+// converts to.
 struct ALScriptProblem
 {
     enum class Severity : U8

@@ -776,6 +776,8 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="WorkspaceNotPermitted">not permitted</string>
 	<string name="WorkspaceNoSuchItemInObject">no such item in the object</string>
 	<string name="WorkspaceNoSuchObject">no such object</string>
+	<string name="WorkspaceLuaNotForTarget">a SLua script does not compile for [TARGET]</string>
+	<string name="WorkspaceLSLNotForTarget">an LSL script does not compile for [TARGET]</string>
 	<string name="WorkspaceAssetUnreadable">the asset could not be read</string>
 	<string name="WorkspaceNotecardUnreadable">the notecard could not be read</string>
 	<string name="WorkspaceNotecardUnwritable">the notecard could not be written</string>

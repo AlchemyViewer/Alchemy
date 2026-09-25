@@ -40,7 +40,6 @@
     <floater.string name="NoOutline">Nothing in this script to outline yet.</floater.string>
     <floater.string name="NoOutlineYet">Still loading.</floater.string>
     <floater.string name="NoExplorerSelection">Nothing selected. Select an object in the world to see what it holds.</floater.string>
-    <floater.string name="NoExplorerContents">Nothing selected is holding a script or a notecard.</floater.string>
     <floater.string name="ExplorerNoMatch">Nothing listed has those letters in its name.</floater.string>
     <floater.string name="NoOutput">Nothing yet. Compiling, running and the preprocessor say what they are doing here.</floater.string>
     <floater.string name="PaneExplorer">Explorer</floater.string>
