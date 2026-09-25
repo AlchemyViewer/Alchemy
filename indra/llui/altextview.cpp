@@ -440,10 +440,7 @@ void ALTextView::setFont(const LLFontGL* font)
 void ALTextView::setReadOnly(bool read_only)
 {
     mReadOnly = read_only;
-    if (hasFocus())
-    {
-        allowLanguageInput(!read_only);
-    }
+    syncLanguageInput();
 }
 
 void ALTextView::setWordWrap(bool wrap)
@@ -681,6 +678,7 @@ void ALTextView::setModalKeymap(std::unique_ptr<ALModalKeymap> keymap)
         mUndo.closeGroups();
     }
     mModal = std::move(keymap);
+    syncLanguageInput();
 }
 
 // --- the caret ---------------------------------------------------------------
@@ -2672,9 +2670,19 @@ void ALTextView::deselect()
 
 void ALTextView::allowLanguageInput(bool allow)
 {
+    mLanguageInput = allow;
     if (LLWindow* window = getWindow())
     {
         window->allowLanguageTextInput(this, allow);
+    }
+}
+
+void ALTextView::syncLanguageInput()
+{
+    const bool allow = hasFocus() && takesComposition();
+    if (allow != mLanguageInput)
+    {
+        allowLanguageInput(allow);
     }
 }
 
@@ -2685,7 +2693,9 @@ ALTextRange ALTextView::preeditRange() const
 
 void ALTextView::resetPreedit()
 {
-    if (hasSelection() && !hasPreedit())
+    // A composition begun over a selection types over it -- but not over
+    // one a modal keymap made, which is not being typed into.
+    if (hasSelection() && !hasPreedit() && takesComposition())
     {
         deleteRange(selection());
     }
@@ -2710,6 +2720,13 @@ void ALTextView::updatePreedit(std::string_view preedit_string, const segment_le
 {
     if (mReadOnly)
     {
+        return;
+    }
+    if (!takesComposition())
+    {
+        // What was being composed goes; nothing new is: the character it
+        // commits is the keymap's.
+        resetPreedit();
         return;
     }
     if (LLWindow* window = getWindow())
@@ -2774,6 +2791,10 @@ void ALTextView::updatePreedit(std::string_view preedit_string, const segment_le
 
 void ALTextView::markAsPreedit(S32 position, S32 length)
 {
+    if (!takesComposition())
+    {
+        return;
+    }
     if (hasPreedit())
     {
         LL_WARNS() << "markAsPreedit with a composition in progress" << LL_ENDL;
@@ -4094,6 +4115,9 @@ void ALTextView::dragSelectTo(S32 x, S32 y)
 
 void ALTextView::draw()
 {
+    // A modal keymap's mode moved by something other than a key -- the
+    // mouse dragging vim into visual mode.
+    syncLanguageInput();
     // A drag held past the top or the bottom scrolls on with the mouse
     // still, as a text field's does.
     if (mSelecting && hasMouseCapture())
@@ -4269,6 +4293,7 @@ bool ALTextView::handleKeyHere(KEY key, MASK mask)
     if (mModal && mModal->handleKey(*this, key, mask))
     {
         mBlink.reset();
+        syncLanguageInput();
         return true;
     }
     const ALEditorCommand command = mKeymap.lookup(key, mask);
@@ -4305,6 +4330,7 @@ bool ALTextView::handleUnicodeCharHere(llwchar uni_char)
     if (mModal && mModal->handleChar(*this, uni_char))
     {
         mBlink.reset();
+        syncLanguageInput();
         return true;
     }
     if (mReadOnly)
@@ -4748,7 +4774,7 @@ void ALTextView::setFocus(bool focus)
         gEditMenuHandler   = this;
         mChangedSinceFocus = false;
         mBlink.reset();
-        allowLanguageInput(!mReadOnly);
+        allowLanguageInput(takesComposition());
     }
     else
     {

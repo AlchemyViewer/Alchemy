@@ -754,6 +754,13 @@ private:
     void                 moveLines(S32 direction);
     void                 deleteLines();
     void                 allowLanguageInput(bool allow);
+    // Whether what an input method composes goes into the text: not in a
+    // read-only one, nor while a modal keymap is between its inserting
+    // modes, where what is typed is a command -- and a composition there
+    // would put text in, or take vim's visual selection out as one typed
+    // over. The window is told as that changes, while the view has focus.
+    bool                 takesComposition() const { return !mReadOnly && (!mModal || mModal->inserting()); }
+    void                 syncLanguageInput();
 
     void syncScrollbar();
     // The bars: where each is, where its thumb is on it, how faded they
@@ -858,6 +865,8 @@ private:
     bool mBgVisible  = true;
     bool mTakesFocus = true;
     bool mReadOnly   = false;
+    // What the window was last told of the input method.
+    bool mLanguageInput = false;
     bool mWordWrap  = false;
     // The line a closing word last brought out, where the caret stood
     // after it, and the blanks it had: undone if the next character makes

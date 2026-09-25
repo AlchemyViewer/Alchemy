@@ -1304,4 +1304,42 @@ namespace tut
         keys("u");
         ensure_equals("undone at once", flat(editor->text()), std::string("|"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<37>()
+    {
+        set_test_name("an input method composing while vim is not inserting puts nothing in and takes no selection out; in insert mode it composes");
+        ALCodeEditor& e = make("default\n{\n    state_entry()\n    {\n    }\n}\n");
+        const std::string was = e.text();
+        // A letter as SDL delivers it under an input method that composes
+        // every key: the composition, then the letter committed, each
+        // clearing what was composed before.
+        auto composed = [&](char c) {
+            LLPreeditor& ime = e.preeditor();
+            S32          at = 0, length = 0;
+            ime.getPreeditRange(&at, &length);
+            ime.resetPreedit();
+            ime.updatePreedit(std::string(1, c), { 1 }, { false }, 1);
+            ime.resetPreedit();
+            e.handleUnicodeCharHere(static_cast<llwchar>(c));
+        };
+        composed('j');
+        composed('V');
+        composed('j');
+        ensure_equals("V j over a composition: nothing gone", flat(e.text()), flat(was));
+        composed('j');
+        ensure_equals("nor on the next", flat(e.text()), flat(was));
+        ensure("still in visual line mode", vim->mode() == ALVimKeymap::Mode::VisualLine);
+        ensure_equals("over lines 2 to 4", caretText().substr(0, 2), std::string("3:"));
+        keys("<Esc>");
+        composed('v');
+        composed('k');
+        ensure_equals("nor under v", flat(e.text()), flat(was));
+        keys("<Esc>");
+        // Inserting, it is typing.
+        keys("ggO");
+        composed('x');
+        keys("<Esc>");
+        ensure_equals("composed in insert mode", flat(e.text()), std::string("x|") + flat(was));
+    }
 }
