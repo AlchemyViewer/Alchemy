@@ -27,6 +27,7 @@
 #include "alkeymap.h"
 #include "alsyntaxhighlighter.h"
 #include "altextdocument.h"
+#include "altextediting.h"
 #include "altextlayout.h"
 #include "altextsearch.h"
 #include "altextundo.h"
@@ -604,13 +605,6 @@ public:
     // What a tab typed at a place puts in: a tab, or spaces to the next
     // stop where tabs are soft.
     std::string tabText(const ALTextPos& at) const;
-    // The blanks a line begins with.
-    std::string leadingBlanks(S32 line) const;
-    // Where a line that closes a block belongs, by the grammar's rules:
-    // level with the line that opened it -- the bracket it closes, where
-    // a subclass can match one, or else the line above, if that opens a
-    // block, or a level out from it.
-    std::string closingIndent(S32 line);
     // The rect the text is drawn in.
     LLRect textRect() const;
     // The view less the band a modal keymap has under the text: where
@@ -707,8 +701,6 @@ protected:
     // beside them.
     S32  screenTopOf(const LLRect& text, S32 line, S32 row);
     void forEachVisibleRow(const LLRect& text, const std::function<void(S32 line, S32 row, S32 screen_top)>& visit);
-    // The lines a selection covers, as commands over whole lines count them.
-    std::pair<S32, S32>  selectedLines() const;
     // Every change goes through here: the document, the journal, the
     // caret, and whoever is listening.
     ALTextDocument::Edit edit(const ALTextRange& range, std::string_view text);
@@ -742,17 +734,12 @@ private:
     // first thing on its line: the line brought out to where it belongs;
     // and a word so brought out that goes on into a longer one put back.
     void                 outdentAsTyped(llwchar typed);
-    // A line's blanks put to an indentation, the caret keeping its place;
-    // only ever further out. True where the line moved.
-    bool                 reindentLine(S32 line, const std::string& indent);
-    // An indentation one level in from, or out from, another, in the kind
-    // of blank it is written in.
-    std::string          indentUnit(const std::string& like) const;
-    std::string          outdented(const std::string& indent) const;
-    void                 indentLines(bool in);
-    void                 duplicateLines();
-    void                 moveLines(S32 direction);
-    void                 deleteLines();
+    // What ALTextEditing works a command out with -- the view's tabs, and
+    // the bracket a closing one closes, where a subclass can match one --
+    // and what it works out done, as one step to undo.
+    ALTextEditing::Options  editingOptions() const;
+    ALTextEditing::opener_t openerOf();
+    void                    apply(const ALTextEditing::Change& change);
     void                 allowLanguageInput(bool allow);
     // Whether what an input method composes goes into the text: not in a
     // read-only one, nor while a modal keymap is between its inserting
@@ -871,13 +858,7 @@ private:
     // The line a closing word last brought out, where the caret stood
     // after it, and the blanks it had: undone if the next character makes
     // the word a longer one.
-    struct AutoOutdent
-    {
-        S32         line   = -1;
-        S32         column = -1;
-        std::string indent;
-    };
-    AutoOutdent mAutoOutdent;
+    ALTextEditing::AutoOutdent mAutoOutdent;
     bool mSoftTabs  = false;
     S32  mTabWidth  = 4;
     S32  mHPad      = 4;

@@ -340,6 +340,7 @@ target_sources(
         alsyntaxhighlighter.h
         altabstrip.h
         altextdocument.h
+        altextediting.h
         altextlayout.h
         altextsearch.h
         altextview.h
@@ -524,6 +525,7 @@ if(AL_BUILD_TESTS)
     lluicolortable
     alundostack
     alsyntaxgrammars
+    altextediting
     altextlayout
     altextsearch
     altextview

@@ -1837,6 +1837,89 @@ void ALTextView::deleteRange(const ALTextRange& range)
     }
 }
 
+// --- line commands and indentation ----------------------------------------------
+
+ALTextEditing::Options ALTextView::editingOptions() const
+{
+    ALTextEditing::Options options;
+    options.tabWidth = mTabWidth;
+    options.softTabs = mSoftTabs;
+    return options;
+}
+
+ALTextEditing::opener_t ALTextView::openerOf()
+{
+    return [this](const ALTextPos& closer, ALTextPos& opener) { return closerOpenedAt(closer, opener); };
+}
+
+void ALTextView::apply(const ALTextEditing::Change& change)
+{
+    mUndo.beginGroup();
+    for (const ALTextEditing::Replacement& one : change.replacements)
+    {
+        edit(one.range, one.text);
+    }
+    mUndo.endGroup();
+    if (change.selects)
+    {
+        placeSelection(change.anchor, change.caret);
+    }
+    else
+    {
+        placeCaret(change.caret, false);
+    }
+    afterEdit();
+}
+
+std::string ALTextView::tabText(const ALTextPos& at) const
+{
+    return ALTextEditing::tabText(mDocument, at, editingOptions());
+}
+
+void ALTextView::newLine()
+{
+    const ALSyntaxGrammar* grammar = mHighlighter.grammar().get();
+    mUndo.beginGroup();
+    if (const std::optional<ALTextEditing::Replacement> closing =
+            ALTextEditing::closingBeforeReturn(mDocument, mAnchor, mCaret, grammar, openerOf(), editingOptions()))
+    {
+        replaceAll({ { closing->range, closing->text } });
+    }
+    const ALTextEditing::Split split = ALTextEditing::splitLine(mDocument, selection(), grammar, editingOptions());
+    setSelection(split.range);
+    insertText(split.text);
+    if (split.caret)
+    {
+        setCaret(*split.caret);
+        mUndo.settle(selection());
+    }
+    mUndo.endGroup();
+}
+
+void ALTextView::outdentAsTyped(llwchar typed)
+{
+    const ALTextEditing::Outdent outdent =
+        ALTextEditing::outdentAsTyped(mDocument, mAnchor, mCaret, typed, mHighlighter.grammar().get(), openerOf(), mAutoOutdent, editingOptions());
+    mAutoOutdent = ALTextEditing::AutoOutdent();
+    if (outdent.replacement && replaceAll({ { outdent.replacement->range, outdent.replacement->text } }))
+    {
+        mAutoOutdent = outdent.next;
+    }
+}
+
+bool ALTextView::toggleComment()
+{
+    if (mReadOnly || !mHighlighter.grammar() || mHighlighter.grammar()->lineComment().empty())
+    {
+        return false;
+    }
+    if (const std::optional<ALTextEditing::Change> change = ALTextEditing::toggleComment(mDocument, mAnchor, mCaret, mHighlighter.grammar()->lineComment()))
+    {
+        apply(*change);
+    }
+    return true;
+}
+
 bool ALTextView::perform(ALEditorCommand command)
 {
     typedef ALEditorCommand C;
@@ -1984,7 +2067,7 @@ bool ALTextView::perform(ALEditorCommand command)
             // alone puts a tab in.
             if (hasSelection())
             {
-                indentLines(true);
+                apply(ALTextEditing::indentLines(mDocument, mAnchor, mCaret, true, editingOptions()));
             }
             else
             {
@@ -1992,7 +2075,7 @@ bool ALTextView::perform(ALEditorCommand command)
             }
             return true;
         case C::Unindent:
-            indentLines(false);
+            apply(ALTextEditing::indentLines(mDocument, mAnchor, mCaret, false, editingOptions()));
             return true;
         case C::Undo:
             undo();
@@ -2015,16 +2098,17 @@ bool ALTextView::perform(ALEditorCommand command)
         case C::ToggleComment:
             return toggleComment();
         case C::DuplicateLine:
-            duplicateLines();
+            apply(ALTextEditing::duplicateLines(mDocument, mAnchor, mCaret));
             return true;
         case C::MoveLineUp:
-            moveLines(-1);
-            return true;
         case C::MoveLineDown:
-            moveLines(1);
+            if (const std::optional<ALTextEditing::Change> change = ALTextEditing::moveLines(mDocument, mAnchor, mCaret, command == C::MoveLineUp ? -1 : 1))
+            {
+                apply(*change);
+            }
             return true;
         case C::DeleteLine:
-            deleteLines();
+            apply(ALTextEditing::deleteLines(mDocument, mAnchor, mCaret));
             return true;
         case C::Fold:
         case C::Unfold:

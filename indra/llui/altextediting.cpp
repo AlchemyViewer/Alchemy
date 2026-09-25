@@ -24,21 +24,10 @@
 
 #include "linden_common.h"
 
-#include "altextview.h"
+#include "altextediting.h"
 
 #include "altextchars.h"
-
-std::string ALTextView::tabText(const ALTextPos& at) const
-{
-    if (!mSoftTabs)
-    {
-        return "\t";
-    }
-    const S32 column = mDocument.displayColumn(at, mTabWidth);
-    return std::string(mTabWidth - (column % mTabWidth), ' ');
-}
-
-// --- indentation -------------------------------------------------------------
+#include "alsyntaxgrammar.h"
 
 namespace
 {
@@ -57,51 +46,71 @@ namespace
         }
         return width;
     }
-}
 
-std::string ALTextView::leadingBlanks(S32 line) const
-{
-    const std::string& text = mDocument.line(line);
-    size_t             n    = 0;
-    while (n < text.size() && isBlank(text[n]))
+    // Where a line's text begins, past its blanks.
+    S32 indentationOf(const std::string& line)
     {
-        ++n;
+        S32 n = 0;
+        while (n < static_cast<S32>(line.size()) && isBlank(line[n]))
+        {
+            ++n;
+        }
+        return n;
     }
-    return text.substr(0, n);
 }
 
-std::string ALTextView::indentUnit(const std::string& like) const
+namespace ALTextEditing
+{
+// --- indentation ------------------------------------------------------------------
+
+std::string tabText(const ALTextDocument& doc, const ALTextPos& at, const Options& options)
+{
+    if (!options.softTabs)
+    {
+        return "\t";
+    }
+    const S32 column = doc.displayColumn(at, options.tabWidth);
+    return std::string(options.tabWidth - (column % options.tabWidth), ' ');
+}
+
+std::string leadingBlanks(const ALTextDocument& doc, S32 line)
+{
+    const std::string& text = doc.line(line);
+    return text.substr(0, indentationOf(text));
+}
+
+std::string indentUnit(const std::string& like, const Options& options)
 {
     // In the blank the indentation around it is written in, else as tabs
     // are typed here.
-    const bool tabs = like.empty() ? !mSoftTabs : like.front() == '\t';
-    return tabs ? std::string("\t") : std::string(mTabWidth, ' ');
+    const bool tabs = like.empty() ? !options.softTabs : like.front() == '\t';
+    return tabs ? std::string("\t") : std::string(options.tabWidth, ' ');
 }
 
-std::string ALTextView::outdented(const std::string& indent) const
+std::string outdented(const std::string& indent, const Options& options)
 {
-    const S32 width = llmax(0, blanksWidth(indent, mTabWidth) - mTabWidth);
+    const S32 width = llmax(0, blanksWidth(indent, options.tabWidth) - options.tabWidth);
     if (indent.find('\t') != std::string::npos)
     {
-        return std::string(width / mTabWidth, '\t') + std::string(width % mTabWidth, ' ');
+        return std::string(width / options.tabWidth, '\t') + std::string(width % options.tabWidth, ' ');
     }
     return std::string(width, ' ');
 }
 
-std::string ALTextView::closingIndent(S32 line)
+std::string closingIndent(const ALTextDocument& doc, S32 line, const ALSyntaxGrammar* grammar, const opener_t& opener, const Options& options)
 {
-    const std::string  lead = leadingBlanks(line);
-    const std::string& text = mDocument.line(line);
+    const std::string  lead = leadingBlanks(doc, line);
+    const std::string& text = doc.line(line);
     if (lead.size() < text.size() && !alIdentifierByte(text[lead.size()]))
     {
-        ALTextPos opener;
-        if (closerOpenedAt(ALTextPos(line, static_cast<S32>(lead.size())), opener))
+        ALTextPos opened;
+        if (opener && opener(ALTextPos(line, static_cast<S32>(lead.size())), opened))
         {
-            return leadingBlanks(opener.line);
+            return leadingBlanks(doc, opened.line);
         }
     }
     S32 above = line - 1;
-    while (above >= 0 && leadingBlanks(above).size() == mDocument.line(above).size())
+    while (above >= 0 && leadingBlanks(doc, above).size() == doc.line(above).size())
     {
         --above;
     }
@@ -109,98 +118,54 @@ std::string ALTextView::closingIndent(S32 line)
     {
         return std::string();
     }
-    const std::string above_lead = leadingBlanks(above);
-    std::string_view  above_text = mDocument.line(above);
+    const std::string above_lead = leadingBlanks(doc, above);
+    std::string_view  above_text = doc.line(above);
     while (!above_text.empty() && isBlank(above_text.back()))
     {
         above_text.remove_suffix(1);
     }
-    const ALSyntaxGrammar* grammar = mHighlighter.grammar().get();
-    return grammar && grammar->opensBlock(above_text) ? above_lead : outdented(above_lead);
+    return grammar && grammar->opensBlock(above_text) ? above_lead : outdented(above_lead, options);
 }
 
-bool ALTextView::reindentLine(S32 line, const std::string& indent)
+std::optional<Replacement> reindent(const ALTextDocument& doc, S32 line, const std::string& indent, const Options& options)
 {
-    const std::string lead = leadingBlanks(line);
+    const std::string lead = leadingBlanks(doc, line);
     // Only ever out: a line put further out by hand stays where it was put.
-    if (lead == indent || blanksWidth(lead, mTabWidth) <= blanksWidth(indent, mTabWidth))
+    if (lead == indent || blanksWidth(lead, options.tabWidth) <= blanksWidth(indent, options.tabWidth))
     {
-        return false;
+        return std::nullopt;
     }
-    return replaceAll({ { ALTextRange(ALTextPos(line, 0), ALTextPos(line, static_cast<S32>(lead.size()))), indent } });
+    return Replacement{ ALTextRange(ALTextPos(line, 0), ALTextPos(line, static_cast<S32>(lead.size()))), indent };
 }
 
-void ALTextView::outdentAsTyped(llwchar typed)
+std::optional<Replacement> closingBeforeReturn(const ALTextDocument& doc, const ALTextPos& anchor, const ALTextPos& caret,
+                                               const ALSyntaxGrammar* grammar, const opener_t& opener, const Options& options)
 {
-    const AutoOutdent last = mAutoOutdent;
-    mAutoOutdent           = AutoOutdent();
-    const ALSyntaxGrammar* grammar = mHighlighter.grammar().get();
-    if (!grammar || !grammar->indents() || hasSelection())
+    if (!grammar || !grammar->indents() || anchor != caret)
     {
-        return;
+        return std::nullopt;
     }
-    const S32          line = mCaret.line;
-    const std::string& text = mDocument.line(line);
-    const std::string  lead = leadingBlanks(line);
-    if (static_cast<size_t>(mCaret.column) <= lead.size())
+    const std::string& text = doc.line(caret.line);
+    const size_t       lead = leadingBlanks(doc, caret.line).size();
+    if (static_cast<size_t>(caret.column) <= lead)
     {
-        return;
+        return std::nullopt;
     }
-    const std::string_view content(text.data() + lead.size(), mCaret.column - lead.size());
-    const size_t           closes     = grammar->closesBlock(content);
-    const bool             typed_word = typed < 0x80 && alIdentifierByte(static_cast<char>(typed));
-    if (typed_word && last.line == line && last.column + 1 == mCaret.column && closes != content.size())
+    const std::string_view content(text.data() + lead, caret.column - lead);
+    if (!alIdentifierByte(content.front()) || grammar->closesBlock(content) != content.size())
     {
-        // The word went on past a closing one -- `endpoint` -- and is a
-        // name: back where it was typed.
-        replaceAll({ { ALTextRange(ALTextPos(line, 0), ALTextPos(line, static_cast<S32>(lead.size()))), last.indent } });
-        return;
+        return std::nullopt;
     }
-    // The first thing on the line, just finished: a bracket as it is
-    // typed, a word with nothing after it on the line.
-    if (closes == 0 || closes != content.size())
-    {
-        return;
-    }
-    const bool word = alIdentifierByte(content.front());
-    if (word && text.find_first_not_of(" \t", mCaret.column) != std::string::npos)
-    {
-        return;
-    }
-    if (reindentLine(line, closingIndent(line)) && word)
-    {
-        mAutoOutdent.line   = line;
-        mAutoOutdent.column = mCaret.column;
-        mAutoOutdent.indent = lead;
-    }
+    return reindent(doc, caret.line, closingIndent(doc, caret.line, grammar, opener, options), options);
 }
 
-void ALTextView::newLine()
+Split splitLine(const ALTextDocument& doc, const ALTextRange& selection, const ALSyntaxGrammar* grammar, const Options& options)
 {
-    const ALSyntaxGrammar* grammar = mHighlighter.grammar().get();
-    const bool             rules   = grammar && grammar->indents();
-    mUndo.beginGroup();
-    if (rules && !hasSelection())
-    {
-        // A closing word the line is, finished by the Return rather than
-        // by a character after it: out first, as the character would have
-        // brought it.
-        const std::string& text = mDocument.line(mCaret.line);
-        const size_t       lead = leadingBlanks(mCaret.line).size();
-        if (static_cast<size_t>(mCaret.column) > lead)
-        {
-            const std::string_view content(text.data() + lead, mCaret.column - lead);
-            if (alIdentifierByte(content.front()) && grammar->closesBlock(content) == content.size())
-            {
-                reindentLine(mCaret.line, closingIndent(mCaret.line));
-            }
-        }
-    }
-
+    const bool rules = grammar && grammar->indents();
     // The new line starts with the indentation of the one it leaves, a
     // level further in under what opens a block.
-    const ALTextRange  sel    = selection().normalised();
-    const std::string& line   = mDocument.line(sel.begin.line);
+    const ALTextRange  sel    = selection.normalised();
+    const std::string& line   = doc.line(sel.begin.line);
     S32                blanks = 0;
     while (blanks < sel.begin.column && blanks < static_cast<S32>(line.size()) && isBlank(line[blanks]))
     {
@@ -214,7 +179,7 @@ void ALTextView::newLine()
     }
     // What goes down with the caret, without the blanks it began with,
     // which the new indentation stands in for.
-    const std::string& end_line = mDocument.line(sel.end.line);
+    const std::string& end_line = doc.line(sel.end.line);
     S32                skipped  = sel.end.column;
     while (skipped < static_cast<S32>(end_line.size()) && isBlank(end_line[skipped]))
     {
@@ -222,40 +187,83 @@ void ALTextView::newLine()
     }
     const std::string_view after(end_line.data() + skipped, end_line.size() - skipped);
 
-    ALTextRange range(sel.begin, ALTextPos(sel.end.line, skipped));
-    std::string text  = "\n" + indent;
-    ALTextPos   caret(-1, -1);
+    Split split;
+    split.range = ALTextRange(sel.begin, ALTextPos(sel.end.line, skipped));
+    split.text  = "\n" + indent;
     if (rules && grammar->opensBlock(before))
     {
-        const std::string inner = indent + indentUnit(indent);
-        text                    = "\n" + inner;
+        const std::string inner = indent + indentUnit(indent, options);
+        split.text              = "\n" + inner;
         if (!after.empty() && !alIdentifierByte(after.front()) && grammar->closesBlock(after) > 0)
         {
             // Between a bracket and the one that closes it: that one on a
             // line of its own, level with the opening, and the caret on the
             // line between them.
-            text += "\n" + indent;
-            caret = ALTextPos(sel.begin.line + 1, static_cast<S32>(inner.size()));
+            split.text += "\n" + indent;
+            split.caret = ALTextPos(sel.begin.line + 1, static_cast<S32>(inner.size()));
         }
     }
     if (before.empty() && after.empty())
     {
         // A line of nothing but blanks keeps none of them.
-        range.begin.column = 0;
+        split.range.begin.column = 0;
     }
-    setSelection(range);
-    insertText(text);
-    if (caret.line >= 0)
-    {
-        setCaret(caret);
-        mUndo.settle(selection());
-    }
-    mUndo.endGroup();
+    return split;
 }
 
-std::pair<S32, S32> ALTextView::selectedLines() const
+Outdent outdentAsTyped(const ALTextDocument& doc, const ALTextPos& anchor, const ALTextPos& caret, llwchar typed, const ALSyntaxGrammar* grammar,
+                       const opener_t& opener, const AutoOutdent& last, const Options& options)
 {
-    const ALTextRange range = selection().normalised();
+    Outdent out;
+    if (!grammar || !grammar->indents() || anchor != caret)
+    {
+        return out;
+    }
+    const S32          line = caret.line;
+    const std::string& text = doc.line(line);
+    const std::string  lead = leadingBlanks(doc, line);
+    if (static_cast<size_t>(caret.column) <= lead.size())
+    {
+        return out;
+    }
+    const std::string_view content(text.data() + lead.size(), caret.column - lead.size());
+    const size_t           closes     = grammar->closesBlock(content);
+    const bool             typed_word = typed < 0x80 && alIdentifierByte(static_cast<char>(typed));
+    const ALTextRange      blanks(ALTextPos(line, 0), ALTextPos(line, static_cast<S32>(lead.size())));
+    if (typed_word && last.line == line && last.column + 1 == caret.column && closes != content.size())
+    {
+        // The word went on past a closing one -- `endpoint` -- and is a
+        // name: back where it was typed.
+        out.replacement = Replacement{ blanks, last.indent };
+        return out;
+    }
+    // The first thing on the line, just finished: a bracket as it is
+    // typed, a word with nothing after it on the line.
+    if (closes == 0 || closes != content.size())
+    {
+        return out;
+    }
+    const bool word = alIdentifierByte(content.front());
+    if (word && text.find_first_not_of(" \t", caret.column) != std::string::npos)
+    {
+        return out;
+    }
+    out.replacement = reindent(doc, line, closingIndent(doc, line, grammar, opener, options), options);
+    if (out.replacement && word)
+    {
+        // The caret as the line's coming out leaves it.
+        out.next.line   = line;
+        out.next.column = caret.column + static_cast<S32>(out.replacement->text.size()) - static_cast<S32>(lead.size());
+        out.next.indent = lead;
+    }
+    return out;
+}
+
+// --- whole lines ------------------------------------------------------------------
+
+std::pair<S32, S32> selectedLines(const ALTextRange& selection)
+{
+    const ALTextRange range = selection.normalised();
     S32               last  = range.end.line;
     if (last > range.begin.line && range.end.column == 0)
     {
@@ -264,23 +272,21 @@ std::pair<S32, S32> ALTextView::selectedLines() const
     return { range.begin.line, last };
 }
 
-void ALTextView::indentLines(bool in)
+Change indentLines(const ALTextDocument& doc, const ALTextPos& anchor, const ALTextPos& caret, bool in, const Options& options)
 {
-    const auto [first, last]   = selectedLines();
-    const ALTextPos caret_was  = mCaret;
-    const ALTextPos anchor_was = mAnchor;
+    const auto [first, last] = selectedLines(ALTextRange(anchor, caret));
+    Change change;
     // What each line gained or lost at its start.
     std::vector<S32> delta(static_cast<size_t>(last - first + 1), 0);
-    mUndo.beginGroup();
     for (S32 l = first; l <= last; ++l)
     {
-        const std::string& line = mDocument.line(l);
+        const std::string& line = doc.line(l);
         if (in)
         {
             if (!line.empty())
             {
-                const std::string tab = mSoftTabs ? std::string(mTabWidth, ' ') : std::string("\t");
-                edit(ALTextRange(ALTextPos(l, 0), ALTextPos(l, 0)), tab);
+                const std::string tab = options.softTabs ? std::string(options.tabWidth, ' ') : std::string("\t");
+                change.replacements.push_back({ ALTextRange(ALTextPos(l, 0), ALTextPos(l, 0)), tab });
                 delta[l - first] = static_cast<S32>(tab.size());
             }
         }
@@ -293,19 +299,18 @@ void ALTextView::indentLines(bool in)
             }
             else
             {
-                while (taken < mTabWidth && taken < static_cast<S32>(line.size()) && line[taken] == ' ')
+                while (taken < options.tabWidth && taken < static_cast<S32>(line.size()) && line[taken] == ' ')
                 {
                     ++taken;
                 }
             }
             if (taken)
             {
-                edit(ALTextRange(ALTextPos(l, 0), ALTextPos(l, taken)), std::string_view());
+                change.replacements.push_back({ ALTextRange(ALTextPos(l, 0), ALTextPos(l, taken)), std::string() });
                 delta[l - first] = -taken;
             }
         }
     }
-    mUndo.endGroup();
     // The caret and the anchor stay where they were, moved by what their
     // lines gained or lost, and never before a line's start.
     const auto moved = [&](ALTextPos pos) {
@@ -313,97 +318,86 @@ void ALTextView::indentLines(bool in)
         {
             pos.column = llmax(0, pos.column + delta[pos.line - first]);
         }
-        return mDocument.clamp(pos);
+        return pos;
     };
-    placeSelection(moved(anchor_was), moved(caret_was));
-    afterEdit();
+    change.selects = true;
+    change.anchor  = moved(anchor);
+    change.caret   = moved(caret);
+    return change;
 }
 
-void ALTextView::duplicateLines()
+Change duplicateLines(const ALTextDocument& doc, const ALTextPos& anchor, const ALTextPos& caret)
 {
-    const auto [first, last] = selectedLines();
-    const std::string block  = mDocument.text(ALTextRange(mDocument.lineStart(first), mDocument.lineEnd(last)));
-    const ALTextPos   caret  = mCaret;
-    const ALTextPos   anchor = mAnchor;
+    const auto [first, last] = selectedLines(ALTextRange(anchor, caret));
+    const std::string block  = doc.text(ALTextRange(doc.lineStart(first), doc.lineEnd(last)));
     const S32         count  = last - first + 1;
-    mUndo.beginGroup();
-    edit(ALTextRange(mDocument.lineEnd(last), mDocument.lineEnd(last)), "\n" + block);
-    mUndo.endGroup();
+    Change            change;
+    change.replacements.push_back({ ALTextRange(doc.lineEnd(last), doc.lineEnd(last)), "\n" + block });
     // The caret and the selection go with the copy.
-    placeSelection(ALTextPos(anchor.line + count, anchor.column), ALTextPos(caret.line + count, caret.column));
-    afterEdit();
+    change.selects = true;
+    change.anchor  = ALTextPos(anchor.line + count, anchor.column);
+    change.caret   = ALTextPos(caret.line + count, caret.column);
+    return change;
 }
 
-void ALTextView::moveLines(S32 direction)
+std::optional<Change> moveLines(const ALTextDocument& doc, const ALTextPos& anchor, const ALTextPos& caret, S32 direction)
 {
-    const auto [first, last] = selectedLines();
-    if ((direction < 0 && first == 0) || (direction > 0 && last + 1 >= mDocument.lineCount()))
+    const auto [first, last] = selectedLines(ALTextRange(anchor, caret));
+    if ((direction < 0 && first == 0) || (direction > 0 && last + 1 >= doc.lineCount()))
     {
-        return;
+        return std::nullopt;
     }
-    const std::string block  = mDocument.text(ALTextRange(mDocument.lineStart(first), mDocument.lineEnd(last)));
-    const ALTextPos   caret  = mCaret;
-    const ALTextPos   anchor = mAnchor;
-    mUndo.beginGroup();
+    const std::string block = doc.text(ALTextRange(doc.lineStart(first), doc.lineEnd(last)));
+    Change            change;
     if (direction < 0)
     {
-        const std::string above = mDocument.line(first - 1);
-        edit(ALTextRange(mDocument.lineStart(first - 1), mDocument.lineEnd(last)), block + "\n" + above);
+        const std::string above = doc.line(first - 1);
+        change.replacements.push_back({ ALTextRange(doc.lineStart(first - 1), doc.lineEnd(last)), block + "\n" + above });
     }
     else
     {
-        const std::string below = mDocument.line(last + 1);
-        edit(ALTextRange(mDocument.lineStart(first), mDocument.lineEnd(last + 1)), below + "\n" + block);
+        const std::string below = doc.line(last + 1);
+        change.replacements.push_back({ ALTextRange(doc.lineStart(first), doc.lineEnd(last + 1)), below + "\n" + block });
     }
-    mUndo.endGroup();
-    placeSelection(ALTextPos(anchor.line + direction, anchor.column), ALTextPos(caret.line + direction, caret.column));
-    afterEdit();
+    change.selects = true;
+    change.anchor  = ALTextPos(anchor.line + direction, anchor.column);
+    change.caret   = ALTextPos(caret.line + direction, caret.column);
+    return change;
 }
 
-void ALTextView::deleteLines()
+Change deleteLines(const ALTextDocument& doc, const ALTextPos& anchor, const ALTextPos& caret)
 {
-    const auto [first, last] = selectedLines();
-    ALTextRange range(mDocument.lineStart(first), last + 1 < mDocument.lineCount() ? mDocument.lineStart(last + 1) : mDocument.lineEnd(last));
-    if (last + 1 >= mDocument.lineCount() && first > 0)
+    const auto [first, last] = selectedLines(ALTextRange(anchor, caret));
+    const S32   count        = doc.lineCount();
+    ALTextRange range(doc.lineStart(first), last + 1 < count ? doc.lineStart(last + 1) : doc.lineEnd(last));
+    // The line the caret lands on, and how long it is, once they are gone.
+    S32 line   = first;
+    S32 length = last + 1 < count ? doc.lineLength(last + 1) : 0;
+    if (last + 1 >= count && first > 0)
     {
         // The last line goes with the newline before it.
-        range.begin = mDocument.lineEnd(first - 1);
+        range.begin = doc.lineEnd(first - 1);
+        line        = first - 1;
+        length      = doc.lineLength(first - 1);
     }
-    const S32 column = mCaret.column;
-    mUndo.beginGroup();
-    edit(range, std::string_view());
-    mUndo.endGroup();
-    const S32 line = llmin(first, mDocument.lineCount() - 1);
-    placeCaret(ALTextPos(line, llmin(column, mDocument.lineLength(line))), false);
-    afterEdit();
+    Change change;
+    change.replacements.push_back({ range, std::string() });
+    change.caret  = ALTextPos(line, llmin(caret.column, length));
+    change.anchor = change.caret;
+    return change;
 }
 
-bool ALTextView::toggleComment()
+std::optional<Change> toggleComment(const ALTextDocument& doc, const ALTextPos& anchor, const ALTextPos& caret, const std::string& token)
 {
-    if (mReadOnly || !mHighlighter.grammar() || mHighlighter.grammar()->lineComment().empty())
-    {
-        return false;
-    }
-    const std::string& token   = mHighlighter.grammar()->lineComment();
-    const auto [first, last]   = selectedLines();
-    const bool had_selection   = hasSelection();
-    const ALTextPos caret_was  = mCaret;
+    const auto [first, last] = selectedLines(ALTextRange(anchor, caret));
 
     // Out where every line that says anything is commented; in otherwise.
-    auto indentation = [&](const std::string& line) {
-        S32 n = 0;
-        while (n < static_cast<S32>(line.size()) && (line[n] == ' ' || line[n] == '\t'))
-        {
-            ++n;
-        }
-        return n;
-    };
     bool all_commented = true;
     bool any_text      = false;
     for (S32 l = first; l <= last; ++l)
     {
-        const std::string& line = mDocument.line(l);
-        const S32          n    = indentation(line);
+        const std::string& line = doc.line(l);
+        const S32          n    = indentationOf(line);
         if (n == static_cast<S32>(line.size()))
         {
             continue;
@@ -416,18 +410,22 @@ bool ALTextView::toggleComment()
     }
     if (!any_text)
     {
-        return true;
+        return std::nullopt;
     }
-    S32 caret_shift = 0;
-    mUndo.beginGroup();
+    Change change;
+    S32    caret_shift = 0;
+    // What the last line gained or lost, for where a selection of the
+    // lines whole ends.
+    S32    last_delta  = 0;
     for (S32 l = first; l <= last; ++l)
     {
-        const std::string& line = mDocument.line(l);
-        const S32          n    = indentation(line);
+        const std::string& line = doc.line(l);
+        const S32          n    = indentationOf(line);
         if (n == static_cast<S32>(line.size()))
         {
             continue;
         }
+        S32 delta = 0;
         if (all_commented)
         {
             S32 taken = static_cast<S32>(token.size());
@@ -435,30 +433,38 @@ bool ALTextView::toggleComment()
             {
                 ++taken;
             }
-            edit(ALTextRange(ALTextPos(l, n), ALTextPos(l, n + taken)), std::string_view());
-            if (l == caret_was.line)
+            change.replacements.push_back({ ALTextRange(ALTextPos(l, n), ALTextPos(l, n + taken)), std::string() });
+            delta = -taken;
+            if (l == caret.line)
             {
-                caret_shift = caret_was.column >= n + taken ? -taken : (caret_was.column > n ? n - caret_was.column : 0);
+                caret_shift = caret.column >= n + taken ? -taken : (caret.column > n ? n - caret.column : 0);
             }
         }
         else
         {
-            edit(ALTextRange(ALTextPos(l, n), ALTextPos(l, n)), token + " ");
-            if (l == caret_was.line && caret_was.column >= n)
+            change.replacements.push_back({ ALTextRange(ALTextPos(l, n), ALTextPos(l, n)), token + " " });
+            delta = static_cast<S32>(token.size()) + 1;
+            if (l == caret.line && caret.column >= n)
             {
                 caret_shift = static_cast<S32>(token.size()) + 1;
             }
         }
+        if (l == last)
+        {
+            last_delta = delta;
+        }
     }
-    mUndo.endGroup();
-    if (had_selection)
+    if (anchor != caret)
     {
-        placeSelection(ALTextPos(first, 0), last + 1 < mDocument.lineCount() ? ALTextPos(last + 1, 0) : mDocument.lineEnd(last));
+        change.selects = true;
+        change.anchor  = ALTextPos(first, 0);
+        change.caret   = last + 1 < doc.lineCount() ? ALTextPos(last + 1, 0) : ALTextPos(last, doc.lineLength(last) + last_delta);
     }
     else
     {
-        placeCaret(ALTextPos(caret_was.line, caret_was.column + caret_shift), false);
+        change.caret  = ALTextPos(caret.line, caret.column + caret_shift);
+        change.anchor = change.caret;
     }
-    afterEdit();
-    return true;
+    return change;
+}
 }
