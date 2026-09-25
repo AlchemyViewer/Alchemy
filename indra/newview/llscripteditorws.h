@@ -318,7 +318,9 @@ protected:
         LLInventoryItem*   item{ nullptr };
         LLAssetType::EType type{ LLAssetType::AT_NONE };
     };
-    ValidatedItem validatePublishedItem(const LLSD& params, U32 permMask) const;
+    // And what RLVa allows of it: seeing it, or changing it
+    // (ALScriptWorkspace::rlvRefusal), refused in RLVa's words.
+    ValidatedItem validatePublishedItem(const LLSD& params, U32 permMask, ALScriptWorkspace::RlvUse use) const;
 
     // --- Object Content Publishing (helpers) ---
     static std::string getPrimName(LLViewerObject* obj);

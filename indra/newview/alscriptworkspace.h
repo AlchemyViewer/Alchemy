@@ -45,6 +45,7 @@ class LLChat;
 class LLEventTimer;
 class LLInventoryItem;
 class LLMessageSystem;
+class LLViewerObject;
 
 // Where a script lives: an item of the agent's inventory, or an item of an
 // object's contents. The one identity for a script wherever the viewer
@@ -225,6 +226,26 @@ public:
     typedef boost::signals2::signal<void(const CompileResult&)> compiled_signal_t;
     boost::signals2::connection onCompiled(const compiled_signal_t::slot_type& slot) { return mCompiled.connect(slot); }
 
+    // --- what RLVa allows ----------------------------------------------------
+
+    // Seeing an item -- its text, or what an object holds -- or changing
+    // it or what its object holds.
+    enum class RlvUse : U8
+    {
+        See,
+        Change
+    };
+    // Why RLVa refuses a use, in its own words, or nothing where it allows
+    // it, as the viewer's own windows have it: no script seen under
+    // @viewscript nor notecard under @viewnote, wherever it is; and in an
+    // object, nothing seen or changed where @edit or @editobj keeps the
+    // build floater -- whose Contents are where an object's items are --
+    // from the object, nor in a locked attachment. `object` is null for an
+    // item in the inventory; `type` is the item's, or AT_NONE for what the
+    // object holds as a whole. The studio, the compile queues and the
+    // external editors' bridge all ask it.
+    static std::string rlvRefusal(LLViewerObject* object, LLAssetType::EType type, RlvUse use);
+
     // --- a script in an object -----------------------------------------------
 
     bool setRunning(const ALScriptRef& ref, bool running);
@@ -298,7 +319,8 @@ public:
     {
         LLUUID            prim;
         std::string       name;
-        // False where the prim is not known here, or nothing came back.
+        // False where the prim is not known here, or nothing came back;
+        // listed as holding nothing where RLVa keeps its contents unseen.
         bool              fetched = false;
         std::vector<Item> items;
     };

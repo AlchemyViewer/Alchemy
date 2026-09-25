@@ -60,6 +60,8 @@
 #include "llvoinventorylistener.h"
 #include "message.h"
 // [RLVa:KB]
+#include "rlvactions.h"
+#include "rlvcommon.h"
 #include "rlvhandler.h"
 #include "alscriptmessages.h"
 #include "rlvlocks.h"
@@ -345,9 +347,10 @@ void ALScriptWorkspace::load(const ALScriptRef& ref, load_callback_t callback)
         answer.viewable      = gAgent.isGodlike() || (copyable && (answer.modifiable || library));
         answer.name          = item->getName();
         answer.assetId       = item->getAssetUUID();
-        if (!answer.viewable)
+        const std::string refused = rlvRefusal(nullptr, item->getType(), RlvUse::See);
+        if (!answer.viewable || !refused.empty())
         {
-            answer.error   = LLTrans::getString("WorkspaceNotPermitted");
+            answer.error   = refused.empty() ? LLTrans::getString("WorkspaceNotPermitted") : refused;
             answer.failure = Loaded::Failure::NotPermitted;
             callback(answer);
             return;
@@ -373,9 +376,10 @@ void ALScriptWorkspace::load(const ALScriptRef& ref, load_callback_t callback)
     answer.viewable     = gAgent.isGodlike() || (copyable && answer.modifiable);
     answer.name         = item->getName();
     answer.assetId      = item->getAssetUUID();
-    if (!answer.viewable)
+    const std::string refused = rlvRefusal(object, item->getType(), RlvUse::See);
+    if (!answer.viewable || !refused.empty())
     {
-        answer.error   = LLTrans::getString("WorkspaceNotPermitted");
+        answer.error   = refused.empty() ? LLTrans::getString("WorkspaceNotPermitted") : refused;
         answer.failure = Loaded::Failure::NotPermitted;
         callback(answer);
         return;
@@ -476,6 +480,14 @@ void ALScriptWorkspace::deliver(const CompileResult& result, const compile_callb
 
 bool ALScriptWorkspace::save(const ALScriptRef& ref, const std::string& text, const SaveOptions& options, compile_callback_t callback, std::string& error)
 {
+    if (!ref.inInventory())
+    {
+        if (std::string refused = rlvRefusal(gObjectList.findObject(ref.object), LLAssetType::AT_LSL_TEXT, RlvUse::Change); !refused.empty())
+        {
+            error = std::move(refused);
+            return false;
+        }
+    }
     if (!ref.inInventory() && !options.experience)
     {
         // What stops it here stops it before the region is asked, as it
@@ -680,6 +692,11 @@ bool ALScriptWorkspace::saveNotecard(const ALScriptRef& ref, const std::string& 
         error = LLTrans::getString("WorkspaceNoSuchObject");
         return false;
     }
+    if (std::string refused = rlvRefusal(object, LLAssetType::AT_NOTECARD, RlvUse::Change); !refused.empty())
+    {
+        error = std::move(refused);
+        return false;
+    }
     const std::string url = object->getRegion()->getCapability("UpdateNotecardTaskInventory");
     if (url.empty())
     {
@@ -761,6 +778,11 @@ void ALScriptWorkspace::recompile(const ALScriptRef& ref, const std::string& req
     if (!item)
     {
         fail(ref.inInventory() ? "no such item" : object ? "no such item in the object" : "no such object");
+        return;
+    }
+    if (std::string refused = object ? rlvRefusal(object, LLAssetType::AT_LSL_TEXT, RlvUse::Change) : std::string(); !refused.empty())
+    {
+        fail(refused);
         return;
     }
     // The target: what was asked, or what the script compiles for now.
@@ -882,6 +904,18 @@ void ALScriptWorkspace::transfer(const LLUUID& from_id, const std::vector<LLUUID
     if (!from || !to)
     {
         one->result.error = LLTrans::getString("WorkspaceNoSuchObject");
+        one->done(one->result);
+        return;
+    }
+    // Taken out of the one and put in the other: both changed.
+    std::string refused = rlvRefusal(from, LLAssetType::AT_NONE, RlvUse::Change);
+    if (refused.empty())
+    {
+        refused = rlvRefusal(to, LLAssetType::AT_NONE, RlvUse::Change);
+    }
+    if (!refused.empty())
+    {
+        one->result.error = refused;
         one->done(one->result);
         return;
     }
@@ -1073,6 +1107,32 @@ ALScriptWorkspace::~ALScriptWorkspace()
     }
 }
 
+// --- what RLVa allows ------------------------------------------------------------
+
+// static
+std::string ALScriptWorkspace::rlvRefusal(LLViewerObject* object, LLAssetType::EType type, RlvUse use)
+{
+    if (!RlvActions::isRlvEnabled())
+    {
+        return std::string();
+    }
+    if (use == RlvUse::See)
+    {
+        const bool script = type == LLAssetType::AT_LSL_TEXT;
+        if ((script && gRlvHandler.hasBehaviour(RLV_BHVR_VIEWSCRIPT)) || (type == LLAssetType::AT_NOTECARD && gRlvHandler.hasBehaviour(RLV_BHVR_VIEWNOTE)))
+        {
+            std::string words = RlvStrings::getString(RlvStringKeys::Blocked::ViewXxx);
+            LLStringUtil::format(words, LLSD().with("[TYPE]", LLAssetType::lookup(script ? LLAssetType::AT_SCRIPT : LLAssetType::AT_NOTECARD)));
+            return words;
+        }
+    }
+    if (object && (!RlvActions::canEdit(object) || gRlvAttachmentLocks.isLockedAttachment(object->getRootEdit())))
+    {
+        return RlvStrings::getString(RlvStringKeys::Blocked::Generic);
+    }
+    return std::string();
+}
+
 // --- a script in an object -------------------------------------------------------
 
 void ALScriptWorkspace::askExperience(const ALScriptRef& ref, experience_callback_t told)
@@ -1176,7 +1236,7 @@ bool ALScriptWorkspace::scriptMessage(const ALScriptRef& ref, const char* messag
         return false;
     }
 // [RLVa:KB] - Checked: 2010-09-28 (RLVa-1.2.1f) | Modified: RLVa-1.0.5a
-    if (rlv_handler_t::isEnabled() && gRlvAttachmentLocks.isLockedAttachment(object->getRootEdit()))
+    if (!rlvRefusal(object, LLAssetType::AT_LSL_TEXT, RlvUse::Change).empty())
     {
         RlvUtil::notifyBlockedGeneric();
         return false;
@@ -1262,6 +1322,16 @@ void ALScriptWorkspace::listContents(const LLUUID& prim, contents_callback_t cal
         callback(none);
         return;
     }
+    if (!rlvRefusal(object, LLAssetType::AT_NONE, RlvUse::See).empty())
+    {
+        // Not to be seen: listed as holding nothing, so that what was
+        // listed before goes as well.
+        Contents hidden;
+        hidden.prim    = prim;
+        hidden.fetched = true;
+        callback(hidden);
+        return;
+    }
     auto listener = std::make_shared<ContentsListener>(object, prim, std::move(callback));
     mListeners.push_back(listener);
     doAfterInterval([waiting = std::weak_ptr<ContentsListener>(listener)]() {
@@ -1291,6 +1361,11 @@ bool ALScriptWorkspace::create(const LLUUID& prim_id, bool notecard, bool lua, c
     if (!prim || !prim->getRegion())
     {
         error = LLTrans::getString("WorkspaceNoSuchObject");
+        return false;
+    }
+    if (std::string refused = rlvRefusal(prim, LLAssetType::AT_NONE, RlvUse::Change); !refused.empty())
+    {
+        error = std::move(refused);
         return false;
     }
     if (!prim->permModify())
@@ -1389,6 +1464,11 @@ bool ALScriptWorkspace::rename(const ALScriptRef& ref, const std::string& name, 
         error = LLTrans::getString(object ? "WorkspaceNoSuchItemInObject" : "WorkspaceNoSuchObject");
         return false;
     }
+    if (std::string refused = rlvRefusal(object, item->getType(), RlvUse::Change); !refused.empty())
+    {
+        error = std::move(refused);
+        return false;
+    }
     if (!object->permModify())
     {
         error = LLTrans::getString("WorkspaceObjectNotModifiable");
@@ -1430,6 +1510,11 @@ bool ALScriptWorkspace::remove(const ALScriptRef& ref, std::string& error)
         error = LLTrans::getString(object ? "WorkspaceNoSuchItemInObject" : "WorkspaceNoSuchObject");
         return false;
     }
+    if (std::string refused = rlvRefusal(object, item->getType(), RlvUse::Change); !refused.empty())
+    {
+        error = std::move(refused);
+        return false;
+    }
     if (!object->permModify())
     {
         error = LLTrans::getString("WorkspaceObjectNotModifiable");
@@ -1441,9 +1526,24 @@ bool ALScriptWorkspace::remove(const ALScriptRef& ref, std::string& error)
 
 bool ALScriptWorkspace::queue(Queue kind, const std::vector<std::pair<LLUUID, std::string>>& prims, const std::string& target, std::string& error)
 {
-    if (prims.empty())
+    // Only the objects RLVa lets be changed; none, and why.
+    std::vector<std::pair<LLUUID, std::string>> allowed;
+    std::string                                  refused;
+    for (const auto& prim : prims)
     {
-        error = LLTrans::getString("WorkspaceNothingToDo");
+        const std::string why = rlvRefusal(gObjectList.findObject(prim.first), LLAssetType::AT_NONE, RlvUse::Change);
+        if (why.empty())
+        {
+            allowed.push_back(prim);
+        }
+        else
+        {
+            refused = why;
+        }
+    }
+    if (allowed.empty())
+    {
+        error = refused.empty() ? LLTrans::getString("WorkspaceNothingToDo") : refused;
         return false;
     }
     const char* name  = kind == Queue::Recompile ? "compile_queue" : kind == Queue::Reset ? "reset_queue" : kind == Queue::Start ? "start_queue" : "stop_queue";
@@ -1457,7 +1557,7 @@ bool ALScriptWorkspace::queue(Queue kind, const std::vector<std::pair<LLUUID, st
         return false;
     }
     queue->setCompileTarget(target.empty() ? std::string("auto") : target);
-    for (const auto& [prim, prim_name] : prims)
+    for (const auto& [prim, prim_name] : allowed)
     {
         queue->addObject(prim, prim_name);
     }

@@ -72,6 +72,9 @@
 #include "llviewertexteditor.h"
 #include "llvoinventorylistener.h"
 #include "roles_constants.h"
+// [RLVa:KB]
+#include "rlvcommon.h"
+// [/RLVa:KB]
 
 #include <array>
 
@@ -197,6 +200,18 @@ namespace
     }
 
     // The object a command names, in view and in a published linkset.
+    // What RLVa refuses of an object or an item in it, refused in its
+    // words, by the rules the studio keeps (ALScriptWorkspace::rlvRefusal):
+    // a client acts as the user, and is held to what the user is.
+    void refuse_under_rlv(LLViewerObject* object, LLAssetType::EType type, ALScriptWorkspace::RlvUse use)
+    {
+        const std::string refused = ALScriptWorkspace::rlvRefusal(object, type, use);
+        if (!refused.empty())
+        {
+            throw LLJSONRPCConnection::ForbiddenError(refused);
+        }
+    }
+
     // Publishing scopes what a client works on; it does not keep anything
     // from the client, which can publish any object the agent may modify
     // with object.request. An authenticated client acts as the user.
@@ -963,6 +978,8 @@ LLSD LLScriptEditorWSServer::handleObjectScriptSetRunning(U32 connection_id, con
     if (!gAgent.allowOperation(PERM_MODIFY, item->getPermissions(), GP_OBJECT_MANIPULATE))
         throw LLJSONRPCConnection::ForbiddenError("No modify permission on script");
 
+    refuse_under_rlv(prim, LLAssetType::AT_LSL_TEXT, ALScriptWorkspace::RlvUse::Change);
+
     LLViewerRegion* region = region_of(prim);
 
     // Send SetScriptRunning message to simulator
@@ -1008,6 +1025,8 @@ LLSD LLScriptEditorWSServer::handleObjectScriptReset(U32 connection_id, const LL
     if (!gAgent.allowOperation(PERM_MODIFY, item->getPermissions(), GP_OBJECT_MANIPULATE))
         throw LLJSONRPCConnection::ForbiddenError("No modify permission on script");
 
+    refuse_under_rlv(prim, LLAssetType::AT_LSL_TEXT, ALScriptWorkspace::RlvUse::Change);
+
     LLViewerRegion* region = region_of(prim);
 
     // Send ScriptReset message to simulator
@@ -1045,6 +1064,7 @@ LLSD LLScriptEditorWSServer::handleObjectScriptResetAll(U32 connection_id, const
     {
         throw LLJSONRPCConnection::ForbiddenError("Object is not published");
     }
+    refuse_under_rlv(prim, LLAssetType::AT_NONE, ALScriptWorkspace::RlvUse::Change);
 
     if (!prim->flagScripted())
     {
@@ -1117,6 +1137,7 @@ LLSD LLScriptEditorWSServer::handleObjectScriptRecompileAll(
     {
         throw LLJSONRPCConnection::ForbiddenError("Object is not published");
     }
+    refuse_under_rlv(root, LLAssetType::AT_NONE, ALScriptWorkspace::RlvUse::Change);
 
     if (!root->flagScripted())
     {
@@ -1192,6 +1213,7 @@ LLSD LLScriptEditorWSServer::handleObjectModify(U32 connection_id, const LLSD& p
 
     if (!prim->permModify())
         throw LLJSONRPCConnection::ForbiddenError("No modify permission on object");
+    refuse_under_rlv(prim, LLAssetType::AT_NONE, ALScriptWorkspace::RlvUse::Change);
 
     // Step 3: Send Property Update Messages
     LLMessageSystem* msg = gMessageSystem;
@@ -1266,7 +1288,7 @@ LLSD LLScriptEditorWSServer::handleObjectItemModify(U32 connection_id, const LLS
             "At least one property (name, description, or permissions) must be specified");
 
     // Step 2: Validate Published Item (reuse existing helper)
-    ValidatedItem v = validatePublishedItem(params, PERM_MODIFY);
+    ValidatedItem v = validatePublishedItem(params, PERM_MODIFY, ALScriptWorkspace::RlvUse::Change);
 
     LLUUID prim_id = params["prim_id"].asUUID();
     LLUUID item_id = params["item_id"].asUUID();
@@ -1343,6 +1365,10 @@ LLSD LLScriptEditorWSServer::handleSaveBackToObjectContents(U32 connection_id, c
         throw LLJSONRPCConnection::InvalidParams(
             "object_id not found");
     }
+
+    // A copy of it put into the object it came from: that one changed.
+    refuse_under_rlv(root, LLAssetType::AT_NONE, ALScriptWorkspace::RlvUse::See);
+    refuse_under_rlv(gObjectList.findObject(published_info->mSourceTaskID), LLAssetType::AT_NONE, ALScriptWorkspace::RlvUse::Change);
 
     if (!save_object_back_to_contents(root, published_info->mSourceTaskID))
     {
@@ -1696,6 +1722,9 @@ LLSD LLScriptEditorWSServer::handleObjectRequest(U32 connection_id, const LLSD& 
             "Permission denied");
     }
 
+    // Published, its contents are listed to the client.
+    refuse_under_rlv(object, LLAssetType::AT_NONE, ALScriptWorkspace::RlvUse::See);
+
     bool accepted = publishObject(object_id);
     if (!accepted)
     {
@@ -1711,7 +1740,7 @@ LLSD LLScriptEditorWSServer::handleObjectRequest(U32 connection_id, const LLSD& 
 // item are valid, published, and have the required permissions.
 // Throws JSON-RPC exceptions if validation fails.
 LLScriptEditorWSServer::ValidatedItem LLScriptEditorWSServer::validatePublishedItem(
-    const LLSD& params, U32 permMask) const
+    const LLSD& params, U32 permMask, ALScriptWorkspace::RlvUse use) const
 {
     LLUUID prim_id = params["prim_id"].asUUID();
     LLUUID item_id = params["item_id"].asUUID();
@@ -1754,6 +1783,8 @@ LLScriptEditorWSServer::ValidatedItem LLScriptEditorWSServer::validatePublishedI
             throw LLJSONRPCConnection::ForbiddenError("No modify permission on object");
     }
 
+    refuse_under_rlv(prim, type, use);
+
     return { prim, root, item, type };
 }
 
@@ -1779,7 +1810,7 @@ LLSD LLScriptEditorWSServer::handleObjectContentGet(const std::string& method, c
         }
     }
 
-    auto v = validatePublishedItem(params, required_perms);
+    auto v = validatePublishedItem(params, required_perms, ALScriptWorkspace::RlvUse::See);
 
     LLUUID prim_id = params["prim_id"].asUUID();
     LLUUID item_id = params["item_id"].asUUID();
@@ -1827,7 +1858,7 @@ LLSD LLScriptEditorWSServer::handleObjectContentSave(const std::string& method, 
         throw LLJSONRPCConnection::InvalidParams("content is required");
     const std::string content = params["content"].asString();
 
-    auto v = validatePublishedItem(params, PERM_MODIFY);
+    auto v = validatePublishedItem(params, PERM_MODIFY, ALScriptWorkspace::RlvUse::Change);
 
     if (v.type == LLAssetType::AT_LSL_TEXT)
     {
@@ -2098,7 +2129,7 @@ LLSD LLScriptEditorWSServer::saveNotecard(LLViewerObject* prim, LLInventoryItem*
 
 LLSD LLScriptEditorWSServer::handleObjectItemDelete(U32 connection_id, const LLSD& params)
 {
-    auto v = validatePublishedItem(params, PERM_MODIFY);
+    auto v = validatePublishedItem(params, PERM_MODIFY, ALScriptWorkspace::RlvUse::Change);
 
     const LLUUID prim_id = v.prim->getID();
     const LLUUID root_id = v.root->getID();
@@ -2171,6 +2202,7 @@ LLSD LLScriptEditorWSServer::handleObjectItemCreate(const std::string& method, c
     {
         throw LLJSONRPCConnection::ForbiddenError("Object is not published");
     }
+    refuse_under_rlv(prim, LLAssetType::AT_NONE, ALScriptWorkspace::RlvUse::Change);
 
     // Nothing goes into a prim the agent may not change: the simulator
     // would drop the request without a word, and the wait for the item
@@ -2676,6 +2708,12 @@ bool LLScriptEditorWSServer::publishObject(const LLUUID& object_id)
     if (!root->permModify())
     {
         LL_WARNS("ScriptEditorWS") << "publishObject: no modify permission on object: " << object_id << LL_ENDL;
+        return false;
+    }
+
+    if (!ALScriptWorkspace::rlvRefusal(root, LLAssetType::AT_NONE, ALScriptWorkspace::RlvUse::See).empty())
+    {
+        RlvUtil::notifyBlockedGeneric();
         return false;
     }
 
