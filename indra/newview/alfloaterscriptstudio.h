@@ -27,6 +27,7 @@
 #include "alcodeeditor.h"
 #include "alscriptnotecardtab.h"
 #include "alscriptoutputpane.h"
+#include "alscriptproblemspane.h"
 #include "alscriptstudiodoc.h"
 #include "alscriptstudioservices.h"
 #include "alfindings.h"
@@ -90,7 +91,7 @@ class LLViewerObject;
 // a script the preprocessor wrapped shown as the code the server compiled
 // with the author's source in a tab beside it. Its regions fold and come
 // out as any studio's do.
-class ALFloaterScriptStudio final : public ALStudioFloater, public ALScriptStudioServices, public ALScriptOutputPane::Window
+class ALFloaterScriptStudio final : public ALStudioFloater, public ALScriptStudioServices, public ALScriptOutputPane::Window, public ALScriptProblemsPane::Window
 {
     friend class LLFloaterReg;
 
@@ -220,26 +221,12 @@ private:
     // A fix made, as one step to undo, and the script checked again at
     // once; refused where the text has moved on since `version`, the one
     // it was made over, whose places it is in.
-    bool                applyFix(Doc& doc, const ALScriptFix& fix, U32 version);
-    // Which fixes to make at once: every problem's preferred one, or one
-    // kind's, or only those that change nothing a script does.
-    struct FixPick
-    {
-        std::string key;
-        // Only what may be made on a save: safe, and taking nothing out.
-        bool        forSave = false;
-    };
+    bool                applyFix(Doc& doc, const ALScriptFix& fix, U32 version) override;
+    using FixPick = Doc::FixPick;
     // The preferred fix of every problem picked, made as one step, once
     // asked; and made, the asking done. True where anything was made.
     void                askFixAll(Doc& doc, const FixPick& pick);
     bool                fixAll(Doc& doc, const FixPick& pick);
-    // The preferred fixes picked, of the script's own problems, none of
-    // whose edits overlap another taken before it. Over the whole script,
-    // only the safe ones: a cast, a call put for a deprecated one that
-    // behaves otherwise, a guess at a name, a require, is each a choice,
-    // counted in `left` and left to be made one by one. Of one kind, asked
-    // for by it, every preferred one.
-    static std::vector<const ALScriptFix*> pickFixes(const Doc& doc, const FixPick& pick, size_t* left = nullptr);
     // The problem a row of the pane is, in its script's list, where its
     // fixes are.
     const Doc::Shown*   shownOf(const LLSD& value) const;
@@ -290,6 +277,7 @@ private:
     ALScriptStudioDoc* frontDoc() override { return active(); }
     ALScriptStudioDoc* findDoc(std::string_view id) override;
     ALScriptStudioDoc* findDoc(const ALScriptRef& ref) override;
+    std::vector<ALScriptStudioDoc*> openDocs() override;
 
     Doc*   active();
     size_t indexOf(const ALScriptRef& ref) const;
@@ -506,21 +494,12 @@ private:
     void saveAll();
     void compiled(const ALScriptWorkspace::CompileResult& result);
     void compiledHere(const ALScriptWorkspace::CompileResult& result);
-    void fillProblems(const Doc* doc);
-    // The pane's filters as a query over the store, for one script.
-    ALFindings<Doc::Shown, ProblemTraits>::Query problemQuery(const Doc& doc) const;
-    // The scripts the pane lists: the one it is about, and the others
-    // open when it lists every script's, in the tabs' order.
-    std::vector<const Doc*> problemDocs(const Doc* doc) const;
-    // The script the pane is about: the one in front, unless the pane was
-    // left on another's while a row of it was followed into another tab.
-    Doc* problemsDoc();
     // A row, a reference, a place found, an outline entry chosen: the
     // place shown in its script, and the keyboard left in the list to walk
     // on through it; or, asked for with return or a double-click, taken
     // to the script to type there. Tabs opened on the way leave the panes
     // on what they were listing.
-    void onProblemSelected(bool to_editor);
+    void problemChosen(const ALScriptProblemsPane::Place& place, bool to_editor) override;
     void revealed(LLUICtrl* list, bool to_editor) override;
     // A place, by the identity of the script or file it is in, in one that
     // is not open, chosen by walking the list: opened a moment later as a
@@ -542,15 +521,10 @@ private:
     // What is wrong at a place of a script, in the card the mouse would
     // bring up there.
     void showProblemCard(Doc& doc, const ALTextPos& at);
-    // The first error in the list, chosen and shown; the checkers' own,
-    // passing over the compiler's, where asked.
-    void selectFirstError(bool checkers_only);
     // The bottom tabs' titles: how many problems and places each lists,
     // and whether a script has said something the Output tab has not
     // shown yet.
     void refreshBottomTabs();
-    // The filters' row laid out again for the counts their labels carry.
-    void layoutProblemFilters();
     // What the studio did, said in the status line and kept in the
     // Output tab, where it can be read again: saving, compiling,
     // preprocessing, renaming. The script's name in it is a link to it;
@@ -577,7 +551,17 @@ private:
     void explainTransformWords(Doc& doc);
     // The marks, the squiggles and the pane, from the compiler's problems
     // and the analyzer's together.
-    void refreshProblems(Doc& doc);
+    void refreshProblems(Doc& doc) override;
+    // The rest of what the Problems tab asks of the window
+    // (ALScriptProblemsPane::Window).
+    void                 problemCountsChanged() override { refreshBottomTabs(); }
+    void                 problemFiltersChanged() override { saveState(); }
+    std::string          problemIcon(const Doc& doc, const std::string& include) const override;
+    void                 fixAllOfKind(Doc& doc, const std::string& key) override;
+    bool                 isLint(bool lua, const std::string& id) const override;
+    ALScriptLints::Level lintLevel(bool lua, const std::string& id) const override;
+    void                 setLintLevel(bool lua, const std::string& id, ALScriptLints::Level level) override;
+    void                 showLintSettings() override;
 
     // The name at the caret: asked about on a key or a menu item, and
     // answered by going there, lighting its places, or asking for a new
@@ -819,10 +803,6 @@ private:
     void                     onExplorerChosen();
     void                     onExplorerAction(const std::string& action);
     void                     showExplorerMenu(S32 x, S32 y);
-    // The problems list's right-click menu: the message copied, and the
-    // lint it is turned off, made an error, or looked up in the settings.
-    void                     showProblemMenu(S32 x, S32 y);
-    void                     onProblemMenu(const std::string& action);
     bool                     explorerActionEnabled(const std::string& action) const;
     // A script or notecard made in a prim, named through a dialog and
     // opened once the region lists it.
@@ -1237,23 +1217,10 @@ private:
     ALTabStrip*                        mTabs          = nullptr;
     ALJumpBar*                         mBreadcrumb    = nullptr;
     LLTabContainer*                    mBottomTabs    = nullptr;
-    ALPaneList*                        mProblems      = nullptr;
-    ALFindings<Doc::Shown, ProblemTraits> mProblemStore;
-    LLCheckBoxCtrl*                    mProblemErrors   = nullptr;
-    LLCheckBoxCtrl*                    mProblemWarnings = nullptr;
-    LLCheckBoxCtrl*                    mProblemFixable = nullptr;
-    LLCheckBoxCtrl*                    mProblemNotes    = nullptr;
-    LLComboBox*                        mProblemOrigin   = nullptr;
-    LLFilterEditor*                    mProblemFilter   = nullptr;
+    std::unique_ptr<ALScriptProblemsPane> mProblemsPane;
     ALPaneList*                        mReferences    = nullptr;
     ALPaneList*                        mOutline       = nullptr;
     ALTextView*                        mSymbol        = nullptr;
-    // Whose problems the list holds, so that a refill of the same
-    // script's keeps the row chosen and the scroll.
-    std::string                        mProblemsShownFor;
-    LLComboBox*                        mProblemScope    = nullptr;
-    // How many problems the pane has to list before its filters.
-    S32                                mProblemsHeld    = 0;
     // Held while a pane's row is followed into a tab, so that the panes
     // go on listing what they were rather than the tab's.
     S32                                mHoldPanes       = 0;
@@ -1391,7 +1358,6 @@ private:
     };
     std::vector<OpenWhenListed>        mOpenWhenListed;
     LLHandle<LLContextMenu>            mExplorerMenuHandle;
-    LLHandle<LLContextMenu>            mProblemMenuHandle;
     LLHandle<LLContextMenu>            mTabMenuHandle;
     // The roots selected in world when last looked, and when.
     std::vector<LLUUID>                mExplorerRoots;

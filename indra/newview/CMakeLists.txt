@@ -978,6 +978,7 @@ if(AL_BUILD_VIEWER)
     alscriptnotecardtab.h
     alscriptoutputpane.h
     alscriptpreprocessor.h
+    alscriptproblemspane.h
     alscriptsaveflow.h
     alscriptstudiodoc.h
     alscriptstudioservices.h
@@ -2421,6 +2422,17 @@ if(AL_BUILD_TESTS)
   # window's side faked.
   al_add_test(
     alscriptoutputpane
+    UNIT
+    PROJECT ${test_project}
+    LIBRARIES llui alscript ${test_libs}
+    SOURCES alscriptstudiodoc.cpp
+    DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
+  )
+
+  # The Script Studio's Problems tab over the studio's own window, the
+  # window's side faked, and a tab's problems gathered for it.
+  al_add_test(
+    alscriptproblemspane
     UNIT
     PROJECT ${test_project}
     LIBRARIES llui alscript ${test_libs}

@@ -222,6 +222,15 @@ namespace al_studio_test
             }
             return nullptr;
         }
+        std::vector<ALScriptStudioDoc*> openDocs() override
+        {
+            std::vector<ALScriptStudioDoc*> out;
+            for (const std::unique_ptr<ALScriptStudioDoc>& doc : docs)
+            {
+                out.push_back(doc.get());
+            }
+            return out;
+        }
         void openScript(const ALScriptRef& ref, const std::string& name, std::optional<std::string> carried = std::nullopt, S32 line = -1,
                         bool focus = true) override
         {

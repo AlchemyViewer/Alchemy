@@ -379,6 +379,24 @@ struct ALScriptStudioDoc
         U32                      fixesFor = 0;
     };
     std::vector<Shown>                         shown;
+    // The problem listed at a place, in the script or an include, saying
+    // what it says; null where the list has been made again without it.
+    const Shown* findShown(S32 line, S32 column, const std::string& file, const std::string& message) const;
+    // Which fixes to make at once: every problem's preferred one, or one
+    // kind's, or only those that change nothing a script does.
+    struct FixPick
+    {
+        std::string key;
+        // Only what may be made on a save: safe, and taking nothing out.
+        bool        forSave = false;
+    };
+    // The preferred fixes picked, of the script's own problems, none of
+    // whose edits overlap another taken before it. Over the whole script,
+    // only the safe ones: a cast, a call put for a deprecated one that
+    // behaves otherwise, a guess at a name, a require, is each a choice,
+    // counted in `left` and left to be made one by one. Of one kind, asked
+    // for by it, every preferred one.
+    std::vector<const ALScriptFix*> pickFixes(const FixPick& pick, size_t* left = nullptr) const;
     // The refactors last offered at the caret, in the source's places
     // at actionsVersion, and the stretch they were asked about.
     std::vector<ALScriptFix>                   actions;

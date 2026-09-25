@@ -417,7 +417,7 @@ void ALFloaterScriptStudio::save(Doc& doc)
             report(counted("PreflightErrors", tab.checkerErrors, args), true, &doc, { "save_anyway" });
             saveStopped(doc);
             showBottom("problems_tab");
-            selectFirstError(true);
+            mProblemsPane->selectFirstError(true);
             return;
         case ALScriptSaveFlow::Route::Preprocess:
         case ALScriptSaveFlow::Route::JoinPreprocessor:
@@ -727,7 +727,7 @@ void ALFloaterScriptStudio::compiledHere(const ALScriptWorkspace::CompileResult&
         if (ours && index == mActive && !doc.save.closeAfter())
         {
             showBottom("problems_tab");
-            selectFirstError(false);
+            mProblemsPane->selectFirstError(false);
         }
     }
     if (index == mActive)

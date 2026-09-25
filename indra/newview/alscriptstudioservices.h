@@ -63,6 +63,8 @@ public:
     virtual ALScriptStudioDoc* frontDoc()                        = 0;
     virtual ALScriptStudioDoc* findDoc(std::string_view id)      = 0;
     virtual ALScriptStudioDoc* findDoc(const ALScriptRef& ref) = 0;
+    // Every tab, in the strip's order.
+    virtual std::vector<ALScriptStudioDoc*> openDocs() = 0;
 
     // --- going places ------------------------------------------------------------
 

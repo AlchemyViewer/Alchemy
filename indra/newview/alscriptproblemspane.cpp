@@ -24,33 +24,33 @@
 
 #include "llviewerprecompiledheaders.h"
 
-#include "alfloaterscriptstudio.h"
+#include "alscriptproblemspane.h"
 
 #include "alcodeeditor.h"
 #include "alpanelist.h"
+#include "alscriptstudioservices.h"
 #include "llcheckboxctrl.h"
 #include "llclipboard.h"
 #include "llcombobox.h"
 #include "llfiltereditor.h"
-#include "llfloaterreg.h"
 #include "llmenugl.h"
+#include "llpanel.h"
+#include "llscrolllistitem.h"
 #include "lluicolortable.h"
 #include "lluictrlfactory.h"
 
 #include <algorithm>
 
-void ALFloaterScriptStudio::refreshProblems(Doc& doc)
+ALScriptProblemsPane::Made ALScriptProblemsPane::make(const Doc& doc, const ALScriptStudioServices& services, const Making& making)
 {
+    Made made;
     // In the theme's colours for each level, where it names them.
     const LLColor4 error_color   = doc.editor->markColor(ALCodeEditor::Mark::Error);
     const LLColor4 warning_color = doc.editor->markColor(ALCodeEditor::Mark::Warning);
     const LLColor4 note_color    = doc.editor->markColor(ALCodeEditor::Mark::Note);
     const LLColor4 runtime_color = doc.editor->markColor(ALCodeEditor::Mark::Runtime);
 
-    doc.shown.clear();
-    doc.editor->clearMarks();
-    std::vector<ALCodeEditor::Decoration> decorations;
-    const ALTextDocument&                 text = doc.editor->document();
+    const ALTextDocument& text = doc.editor->document();
 
     auto add = [&](S32 line, S32 column, bool has_column, S32 end_line, S32 end_column, ALCodeEditor::Mark mark,
                    Doc::Level level, const std::string& origin, const std::string& message, const std::string& file = std::string(),
@@ -69,15 +69,12 @@ void ALFloaterScriptStudio::refreshProblems(Doc& doc)
         if (!file.empty())
         {
             // In an include: listed under its name, not marked here.
-            row.fileName = includeName(doc, file);
-            doc.shown.push_back(std::move(row));
+            row.fileName = making.includeName ? making.includeName(file) : file;
+            made.rows.push_back(std::move(row));
             return;
         }
-        doc.shown.push_back(std::move(row));
-        if (doc.editor->markAt(line) < mark)
-        {
-            doc.editor->setMark(line, mark);
-        }
+        made.rows.push_back(std::move(row));
+        made.marks.emplace_back(line, mark);
         ALCodeEditor::Decoration decoration;
         const ALTextPos begin = text.clamp(ALTextPos(line, has_column ? column : 0));
         ALTextPos       end   = text.clamp(ALTextPos(end_line, end_column));
@@ -91,7 +88,7 @@ void ALFloaterScriptStudio::refreshProblems(Doc& doc)
                              : level == Doc::Level::Warning ? warning_color
                                                             : note_color;
         decoration.message = origin + ": " + message;
-        decorations.push_back(std::move(decoration));
+        made.decorations.push_back(std::move(decoration));
     };
 
     // The analyzer's word on a line as it is now over the compiler's on
@@ -114,7 +111,7 @@ void ALFloaterScriptStudio::refreshProblems(Doc& doc)
         {
             continue;
         }
-        add(problem.line, problem.column, problem.hasColumn, problem.line, problem.column, Doc::markOf(level), level, getString("OriginCompiler"), problem.message,
+        add(problem.line, problem.column, problem.hasColumn, problem.line, problem.column, Doc::markOf(level), level, services.words("OriginCompiler"), problem.message,
             problem.file);
     }
     // The preprocessor's own word on the text as it stands, and the
@@ -122,7 +119,7 @@ void ALFloaterScriptStudio::refreshProblems(Doc& doc)
     // The optimizer's notes offer what it did as a change to the source,
     // over the text the run was made of.
     const U32  now             = doc.editor->document().version();
-    const std::optional<ALScriptWeight::Target> target = weightTarget(doc);
+    const std::optional<ALScriptWeight::Target>& target = making.target;
     const auto preprocessorRow = [&](const ALScriptProblem& problem, U32 version) {
         const Doc::Level level     = Doc::levelOf(problem.severity);
         const bool       optimizer = problem.source == ALScriptProblem::Source::Optimizer;
@@ -134,18 +131,18 @@ void ALFloaterScriptStudio::refreshProblems(Doc& doc)
             LLStringUtil::format_map_t args;
             args["[BYTES]"]  = std::to_string(std::abs(*problem.savedBytes));
             args["[TARGET]"] = ALScriptWeight::nameOf(*target);
-            message += " " + getString(*problem.savedBytes > 0 ? "OptimizerNoteLighter" : *problem.savedBytes < 0 ? "OptimizerNoteHeavier" : "OptimizerNoteSame", args);
+            message += " " + services.words(*problem.savedBytes > 0 ? "OptimizerNoteLighter" : *problem.savedBytes < 0 ? "OptimizerNoteHeavier" : "OptimizerNoteSame", args);
         }
         add(problem.line, problem.column, true, problem.endLine, problem.endColumn, Doc::markOf(level), level,
-            getString(optimizer ? "OriginOptimizer" : "OriginPreprocessor"), message, problem.file);
-        doc.shown.back().key      = problem.key;
-        doc.shown.back().fixes    = problem.fixes;
-        doc.shown.back().fixesFor = version;
+            services.words(optimizer ? "OriginOptimizer" : "OriginPreprocessor"), message, problem.file);
+        made.rows.back().key      = problem.key;
+        made.rows.back().fixes    = problem.fixes;
+        made.rows.back().fixesFor = version;
         if (version == now && problem.file.empty() && !problem.fixes.empty())
         {
             const bool changes = std::any_of(problem.fixes.begin(), problem.fixes.end(),
                                              [](const ALScriptFix& fix) { return fix.kind == ALScriptFix::Kind::Fix; });
-            doc.editor->setFixable(problem.line, true, changes || doc.editor->changesAt(problem.line));
+            made.fixable.emplace_back(problem.line, changes);
         }
     };
     if (doc.expanded.valid)
@@ -168,25 +165,25 @@ void ALFloaterScriptStudio::refreshProblems(Doc& doc)
     for (const ALScriptProblem& problem : doc.analysis)
     {
         const Doc::Level  level  = Doc::levelOf(problem.severity);
-        const std::string origin = problem.source == ALScriptProblem::Source::Parser  ? getString("OriginParser")
-                                   : problem.source == ALScriptProblem::Source::Types ? getString("OriginTypes")
-                                                                                      : getString("OriginLint");
+        const std::string origin = problem.source == ALScriptProblem::Source::Parser  ? services.words("OriginParser")
+                                   : problem.source == ALScriptProblem::Source::Types ? services.words("OriginTypes")
+                                                                                      : services.words("OriginLint");
         // A Luau lint's name says what to look up or turn off; an LSL
         // error's number says nothing to whoever reads it.
         const bool        named   = !problem.code.empty() && problem.code.find_first_not_of("0123456789") != std::string::npos;
         const std::string message = named ? problem.message + " [" + problem.code + "]" : problem.message;
         add(problem.line, problem.column, true, problem.endLine, problem.endColumn, Doc::markOf(level), level, origin, message, problem.file,
             problem.source == ALScriptProblem::Source::Lint ? problem.code : std::string());
-        doc.shown.back().key      = problem.key;
-        doc.shown.back().fixes    = problem.fixes;
-        doc.shown.back().fixesFor = doc.analysisVersion;
+        made.rows.back().key      = problem.key;
+        made.rows.back().fixes    = problem.fixes;
+        made.rows.back().fixesFor = doc.analysisVersion;
         // The gutter's word on what the line offers: a lightbulb where the
         // caret is, a round mark where a fix changes the script.
         if (analysis_current && problem.file.empty() && !problem.fixes.empty())
         {
             const bool changes = std::any_of(problem.fixes.begin(), problem.fixes.end(),
                                              [](const ALScriptFix& fix) { return fix.kind == ALScriptFix::Kind::Fix; });
-            doc.editor->setFixable(problem.line, true, changes || doc.editor->changesAt(problem.line));
+            made.fixable.emplace_back(problem.line, changes);
         }
     }
     for (const Doc::RuntimeProblem& problem : doc.runtime)
@@ -199,18 +196,18 @@ void ALFloaterScriptStudio::refreshProblems(Doc& doc)
         {
             LLStringUtil::format_map_t args;
             args["[COUNT]"] = std::to_string(problem.count);
-            message += " " + getString("RepeatedTimes", args);
+            message += " " + services.words("RepeatedTimes", args);
         }
-        add(line, column, problem.column >= 0, line, column, ALCodeEditor::Mark::Runtime, Doc::Level::Error, getString("OriginRuntime"), message,
+        add(line, column, problem.column >= 0, line, column, ALCodeEditor::Mark::Runtime, Doc::Level::Error, services.words("OriginRuntime"), message,
             problem.file);
     }
     if (!doc.definitionsError.empty())
     {
         Doc::Shown row;
         row.level   = Doc::Level::Note;
-        row.origin  = getString("OriginDefinitions");
+        row.origin  = services.words("OriginDefinitions");
         row.message = doc.definitionsError;
-        doc.shown.push_back(std::move(row));
+        made.rows.push_back(std::move(row));
     }
     // Code heavier than its target runs a script in: a warning, since
     // the number is the studio's reckoning of what the region compiles --
@@ -225,11 +222,11 @@ void ALFloaterScriptStudio::refreshProblems(Doc& doc)
         args["[TARGET]"] = ALScriptWeight::nameOf(weight.target);
         Doc::Shown row;
         row.level   = Doc::Level::Warning;
-        row.origin  = getString("OriginWeight");
-        row.message = getString(weight.estimate ? "WeightOverEstimate" : !doc.weightExact ? "WeightOverBefore" : "WeightOver", args);
-        doc.shown.push_back(std::move(row));
+        row.origin  = services.words("OriginWeight");
+        row.message = services.words(weight.estimate ? "WeightOverEstimate" : !doc.weightExact ? "WeightOverBefore" : "WeightOver", args);
+        made.rows.push_back(std::move(row));
     }
-    std::stable_sort(doc.shown.begin(), doc.shown.end(), [](const Doc::Shown& a, const Doc::Shown& b) {
+    std::stable_sort(made.rows.begin(), made.rows.end(), [](const Doc::Shown& a, const Doc::Shown& b) {
         // The script's own first, then each include's together.
         if (a.file != b.file)
         {
@@ -237,38 +234,135 @@ void ALFloaterScriptStudio::refreshProblems(Doc& doc)
         }
         return a.line != b.line ? a.line < b.line : a.column < b.column;
     });
-    mProblemStore.replace(doc.id, doc.shown);
-    doc.editor->setDecorations(std::move(decorations));
-    // The pane, where it lists this script's: the one it is about, or
-    // every one open.
-    Doc* listed = problemsDoc();
-    if (listed && (listed == &doc || (mProblemScope && mProblemScope->getValue().asString() == "all")))
-    {
-        fillProblems(listed);
-    }
-    measureAsset(doc);
-    if (&doc == active())
-    {
-        refreshTrailer(doc);
-    }
-    fillTabs();
+    return made;
 }
 
-ALFindings<ALFloaterScriptStudio::Doc::Shown, ALFloaterScriptStudio::ProblemTraits>::Query ALFloaterScriptStudio::problemQuery(const Doc& doc) const
+ALScriptProblemsPane::ALScriptProblemsPane(LLPanel& tab, ALScriptStudioServices& services, Window& window) : mServices(services), mWindow(window)
 {
-    ALFindings<Doc::Shown, ProblemTraits>::Query query;
+    mList = tab.getChild<ALPaneList>("problems");
+    // A row chosen shows its place and keeps the keyboard in the list, so
+    // that the arrows walk on through them; a double-click goes there.
+    mList->setCommitCallback([this](LLUICtrl*, const LLSD&) { choose(false); });
+    mList->setDoubleClickCallback([this]() { choose(true); });
+    mList->setRightMouseDownCallback([this](LLUICtrl*, S32 x, S32 y, MASK) { showMenu(x, y); });
+    // The pane's filters: whose, which levels, which source, which words.
+    mErrors   = tab.getChild<LLCheckBoxCtrl>("problems_errors");
+    mWarnings = tab.getChild<LLCheckBoxCtrl>("problems_warnings");
+    mNotes    = tab.getChild<LLCheckBoxCtrl>("problems_notes");
+    mFixable  = tab.getChild<LLCheckBoxCtrl>("problems_fixable");
+    mScope    = tab.getChild<LLComboBox>("problems_scope");
+    mOrigin   = tab.getChild<LLComboBox>("problems_origin");
+    mFilter   = tab.getChild<LLFilterEditor>("problems_filter");
+    mOrigin->add(mServices.words("OriginAny"), LLSD(""));
+    for (const char* origin : { "OriginParser", "OriginTypes", "OriginLint", "OriginCompiler", "OriginPreprocessor", "OriginOptimizer", "OriginRuntime", "OriginDefinitions" })
+    {
+        mOrigin->add(mServices.words(origin), LLSD(mServices.words(origin)));
+    }
+    mOrigin->selectFirstItem();
+    mScope->selectFirstItem();
+    for (LLUICtrl* filter : { static_cast<LLUICtrl*>(mErrors), static_cast<LLUICtrl*>(mWarnings), static_cast<LLUICtrl*>(mNotes),
+                              static_cast<LLUICtrl*>(mFixable), static_cast<LLUICtrl*>(mScope), static_cast<LLUICtrl*>(mOrigin),
+                              static_cast<LLUICtrl*>(mFilter) })
+    {
+        filter->setCommitCallback([this](LLUICtrl*, const LLSD&) {
+            fill(listed());
+            mWindow.problemFiltersChanged();
+        });
+    }
+    // Sorted by a column's title: the problems within their scripts and
+    // includes, each heading over its own; a line as a number, and a
+    // problem's level as how bad it is.
+    mList->setGrouping([](const LLScrollListItem* item, S32& group, bool& heading) {
+        group   = item->getValue()["group"].asInteger();
+        heading = item->getValue().has("heading");
+    });
+    mList->setComparison([](S32 column, const LLScrollListItem* a, const LLScrollListItem* b) {
+        const LLSD& x = a->getValue();
+        const LLSD& y = b->getValue();
+        const auto  place = [&]() {
+            const S32 lx = x["line"].asInteger(), ly = y["line"].asInteger();
+            return lx != ly ? (lx < ly ? -1 : 1) : x["column"].asInteger() < y["column"].asInteger() ? -1 : x["column"].asInteger() > y["column"].asInteger() ? 1 : 0;
+        };
+        const auto rank = [](const LLSD& one) {
+            const std::string level = one["level"].asString();
+            return level == "ERROR" ? 0 : level == "WARNING" ? 1 : 2;
+        };
+        S32 said = 0;
+        switch (column)
+        {
+            case 0: said = rank(x) - rank(y); break;
+            case 1: said = LLStringUtil::compareDict(x["message"].asString(), y["message"].asString()); break;
+            case 2: said = LLStringUtil::compareDict(x["origin"].asString(), y["origin"].asString()); break;
+            default: break;
+        }
+        return said != 0 ? said : place();
+    });
+}
+
+ALScriptProblemsPane::~ALScriptProblemsPane()
+{
+    // A menu still open calls into this pane, which is going: it goes
+    // first. The menus live in the viewer's menu holder, not here.
+    if (LLContextMenu* open = mMenu.get())
+    {
+        open->die();
+    }
+}
+
+void ALScriptProblemsPane::changed(const Doc& doc)
+{
+    mStore.replace(doc.id, doc.shown);
+    // The list, where it lists this script's: the one it is about, or
+    // every one open.
+    Doc* shown = listed();
+    if (shown && (shown == &doc || everyScript()))
+    {
+        fill(shown);
+    }
+}
+
+void ALScriptProblemsPane::forget(const std::string& id)
+{
+    mStore.forget(id);
+}
+
+void ALScriptProblemsPane::closed(const std::string& id)
+{
+    mStore.forget(id);
+    if (id == mShownFor)
+    {
+        mShownFor.clear();
+    }
+}
+
+void ALScriptProblemsPane::rekey(const std::string& from, const std::string& to)
+{
+    if (mShownFor == from)
+    {
+        mShownFor = to;
+    }
+}
+
+bool ALScriptProblemsPane::everyScript() const
+{
+    return mScope->getValue().asString() == "all";
+}
+
+ALScriptProblemsPane::store_t::Query ALScriptProblemsPane::query(const Doc& doc) const
+{
+    store_t::Query query;
     query.file     = doc.id;
-    query.errors   = !mProblemErrors || mProblemErrors->get();
-    query.warnings = !mProblemWarnings || mProblemWarnings->get();
-    query.notes    = !mProblemNotes || mProblemNotes->get();
-    query.fixable  = mProblemFixable && mProblemFixable->get();
-    query.rule     = mProblemOrigin ? mProblemOrigin->getValue().asString() : std::string();
-    query.text     = mProblemFilter ? mProblemFilter->getText() : std::string();
+    query.errors   = mErrors->get();
+    query.warnings = mWarnings->get();
+    query.notes    = mNotes->get();
+    query.fixable  = mFixable->get();
+    query.rule     = mOrigin->getValue().asString();
+    query.text     = mFilter->getText();
     LLStringUtil::trim(query.text);
     return query;
 }
 
-std::vector<const ALFloaterScriptStudio::Doc*> ALFloaterScriptStudio::problemDocs(const Doc* doc) const
+std::vector<const ALScriptProblemsPane::Doc*> ALScriptProblemsPane::docsFor(const Doc* doc)
 {
     std::vector<const Doc*> docs;
     if (!doc)
@@ -276,44 +370,95 @@ std::vector<const ALFloaterScriptStudio::Doc*> ALFloaterScriptStudio::problemDoc
         return docs;
     }
     docs.push_back(doc);
-    if (mProblemScope && mProblemScope->getValue().asString() == "all")
+    if (everyScript())
     {
-        for (const std::unique_ptr<Doc>& other : mDocs)
+        for (const Doc* other : mServices.openDocs())
         {
-            if (other.get() != doc && !other->notecard)
+            if (other != doc && !other->notecard)
             {
-                docs.push_back(other.get());
+                docs.push_back(other);
             }
         }
     }
     return docs;
 }
 
-ALFloaterScriptStudio::Doc* ALFloaterScriptStudio::problemsDoc()
+ALScriptProblemsPane::Doc* ALScriptProblemsPane::listed()
 {
-    const size_t index = mProblemsShownFor.empty() ? NONE : indexOf(mProblemsShownFor);
-    return index != NONE ? mDocs[index].get() : active();
+    Doc* doc = mShownFor.empty() ? nullptr : mServices.findDoc(mShownFor);
+    return doc ? doc : mServices.frontDoc();
 }
 
-void ALFloaterScriptStudio::fillProblems(const Doc* doc)
+void ALScriptProblemsPane::choose(bool to_editor)
+{
+    LLScrollListItem* item = mList->getFirstSelected();
+    if (!item)
+    {
+        return;
+    }
+    const LLSD& problem = item->getValue();
+    if (!problem.isMap() || problem.has("heading") || !mServices.findDoc(problem["doc"].asString()))
+    {
+        return;
+    }
+    Place place;
+    place.doc       = problem["doc"].asString();
+    place.file      = problem["file"].asString();
+    place.fileName  = problem["fileName"].asString();
+    place.line      = problem["line"].asInteger();
+    place.column    = problem["column"].asInteger();
+    place.hasColumn = problem["hasColumn"].asBoolean();
+    place.endLine   = problem["endLine"].asInteger();
+    place.endColumn = problem["endColumn"].asInteger();
+    mWindow.problemChosen(place, to_editor);
+}
+
+void ALScriptProblemsPane::saveState(LLSD& state) const
+{
+    state["problem_levels"] = LLSD::emptyArray().with(0, mErrors->get()).with(1, mWarnings->get()).with(2, mNotes->get()).with(3, mFixable->get());
+    state["problem_scope"]  = mScope->getValue().asString();
+    state["problem_origin"] = mOrigin->getValue().asString();
+}
+
+void ALScriptProblemsPane::readState(const LLSD& state)
+{
+    if (state.has("problem_levels"))
+    {
+        const LLSD& levels = state["problem_levels"];
+        mErrors->set(levels[0].asBoolean());
+        mWarnings->set(levels[1].asBoolean());
+        mNotes->set(levels[2].asBoolean());
+        mFixable->set(levels.size() > 3 && levels[3].asBoolean());
+    }
+    if (state.has("problem_scope"))
+    {
+        mScope->selectByValue(state["problem_scope"]);
+    }
+    if (state.has("problem_origin") && !mOrigin->selectByValue(state["problem_origin"]))
+    {
+        mOrigin->selectFirstItem();
+    }
+}
+
+void ALScriptProblemsPane::fill(const Doc* doc)
 {
     // The row chosen and how far the list was scrolled are kept through a
     // refill of the same script's: a check comes at every pause in
     // typing, and whoever is working down the list keeps their place.
     LLSD      chosen;
-    const S32 scrolled = mProblems->getScrollPos();
-    if (LLScrollListItem* item = mProblems->getFirstSelected())
+    const S32 scrolled = mList->getScrollPos();
+    if (LLScrollListItem* item = mList->getFirstSelected())
     {
         chosen = item->getValue();
     }
-    const bool same = doc && doc->id == mProblemsShownFor;
-    mProblemsShownFor = doc ? doc->id : std::string();
-    mProblems->deleteAllItems();
-    mProblems->setCommentText(LLStringUtil::null);
+    const bool same = doc && doc->id == mShownFor;
+    mShownFor = doc ? doc->id : std::string();
+    mList->deleteAllItems();
+    mList->setCommentText(LLStringUtil::null);
 
     // How many of each there are before the filters: what the level
     // boxes and the tab say.
-    const std::vector<const Doc*> docs = problemDocs(doc);
+    const std::vector<const Doc*> docs = docsFor(doc);
     S32                           errors = 0, warnings = 0, notes = 0, fixable = 0;
     for (const Doc* each : docs)
     {
@@ -322,26 +467,26 @@ void ALFloaterScriptStudio::fillProblems(const Doc* doc)
             errors += shown.level == Doc::Level::Error ? 1 : 0;
             warnings += shown.level == Doc::Level::Warning ? 1 : 0;
             notes += shown.level == Doc::Level::Note ? 1 : 0;
-            fixable += ProblemTraits::fixable(shown) ? 1 : 0;
+            fixable += Doc::ProblemTraits::fixable(shown) ? 1 : 0;
         }
     }
     const S32 held = errors + warnings + notes;
     const auto label = [this](LLCheckBoxCtrl* box, const char* name, S32 count) {
         LLStringUtil::format_map_t args;
         args["[COUNT]"] = std::to_string(count);
-        const std::string said = count > 0 ? getString(std::string(name) + "Count", args) : getString(name);
+        const std::string said = count > 0 ? mServices.words(std::string(name) + "Count", args) : mServices.words(name);
         if (box->getLabel() != said)
         {
             box->setLabel(said);
         }
     };
-    label(mProblemErrors, "FilterErrors", errors);
-    label(mProblemWarnings, "FilterWarnings", warnings);
-    label(mProblemNotes, "FilterNotes", notes);
-    label(mProblemFixable, "FilterFixable", fixable);
-    layoutProblemFilters();
-    mProblemsHeld = held;
-    refreshBottomTabs();
+    label(mErrors, "FilterErrors", errors);
+    label(mWarnings, "FilterWarnings", warnings);
+    label(mNotes, "FilterNotes", notes);
+    label(mFixable, "FilterFixable", fixable);
+    layoutFilters();
+    mHeld = held;
+    mWindow.problemCountsChanged();
     if (!doc)
     {
         return;
@@ -360,7 +505,7 @@ void ALFloaterScriptStudio::fillProblems(const Doc* doc)
     S32                listed = 0;
     for (const Doc* each : docs)
     {
-        const auto selected = mProblemStore.select(problemQuery(*each));
+        const auto selected = mStore.select(query(*each));
         for (const Doc::Shown* problem : selected.found)
         {
             if (groups.empty() || groups.back().doc != each || groups.back().file != problem->file)
@@ -373,11 +518,11 @@ void ALFloaterScriptStudio::fillProblems(const Doc* doc)
     }
 
     static const LLUIColor ink = LLUIColorTable::instance().getColor("ScrollUnselectedColor", LLColor4::white);
-    const bool all      = docs.size() > 1 || (mProblemScope && mProblemScope->getValue().asString() == "all");
+    const bool all      = docs.size() > 1 || everyScript();
     // Whose they are, over them, wherever that is not plain: more than one
     // script's or file's, or another script's than the one in front, which
     // a row followed into an include leaves the list on.
-    const bool elsewhere = doc != active();
+    const bool elsewhere = doc != mServices.frontDoc();
     const bool headings  = all || groups.size() > 1 || elsewhere;
     for (size_t group_index = 0; group_index < groups.size(); ++group_index)
     {
@@ -396,20 +541,20 @@ void ALFloaterScriptStudio::fillProblems(const Doc* doc)
             std::vector<std::string> counts;
             if (group_errors > 0)
             {
-                counts.push_back(counted("ProblemErrors", group_errors));
+                counts.push_back(mServices.counted("ProblemErrors", group_errors));
             }
             if (group_warnings > 0)
             {
-                counts.push_back(counted("ProblemWarnings", group_warnings));
+                counts.push_back(mServices.counted("ProblemWarnings", group_warnings));
             }
             if (group_notes > 0)
             {
-                counts.push_back(counted("ProblemNotes", group_notes));
+                counts.push_back(mServices.counted("ProblemNotes", group_notes));
             }
             LLStringUtil::format_map_t args;
             args["[NAME]"] = group.doc->name;
             args["[FILE]"] = group.fileName;
-            std::string name = group.file.empty() ? group.doc->name : getString(all ? "ProblemsIncludedBy" : "ProblemsIncluded", args);
+            std::string name = group.file.empty() ? group.doc->name : mServices.words(all ? "ProblemsIncludedBy" : "ProblemsIncluded", args);
             for (size_t i = 0; i < counts.size(); ++i)
             {
                 name += (i == 0 ? "   \xC2\xB7   " : ", ") + counts[i];
@@ -419,12 +564,12 @@ void ALFloaterScriptStudio::fillProblems(const Doc* doc)
             heading["value"]["group"]        = static_cast<S32>(group_index);
             heading["columns"][0]["column"]  = "icon";
             heading["columns"][0]["type"]    = "icon";
-            heading["columns"][0]["value"]   = group.file.empty() ? imageNameOf(*group.doc) : includeImage(group.file, group.doc->language.lua);
+            heading["columns"][0]["value"]   = mWindow.problemIcon(*group.doc, group.file);
             heading["columns"][1]["column"]  = "message";
             heading["columns"][1]["value"]   = name;
             heading["columns"][1]["color"]   = ink.get().getValue();
             heading["columns"][1]["font"]["style"] = "BOLD";
-            if (LLScrollListItem* item = mProblems->addElement(heading))
+            if (LLScrollListItem* item = mList->addElement(heading))
             {
                 item->setEnabled(false);
             }
@@ -455,7 +600,7 @@ void ALFloaterScriptStudio::fillProblems(const Doc* doc)
                                                ? text.displayColumn(ALTextPos(problem->line, problem->column), group.doc->editor->getTabWidth())
                                                : problem->column;
             const std::string where = problem->hasColumn ? llformat("%d:%d", problem->line + 1, column + 1) : llformat("%d", problem->line + 1);
-            const std::string level = getString(problem->level == Doc::Level::Error     ? "LevelError"
+            const std::string level = mServices.words(problem->level == Doc::Level::Error     ? "LevelError"
                                                  : problem->level == Doc::Level::Warning ? "LevelWarning"
                                                                                          : "LevelNote");
             // Every column carries the whole of it: a diagnostic longer
@@ -469,10 +614,10 @@ void ALFloaterScriptStudio::fillProblems(const Doc* doc)
                 {
                     LLStringUtil::format_map_t fix_args;
                     fix_args["[TITLE]"] = fix.title;
-                    tip += "\n" + getString("ProblemFixTip", fix_args);
+                    tip += "\n" + mServices.words("ProblemFixTip", fix_args);
                 }
             }
-            const ALCodeEditor::Mark mark = problem->origin == getString("OriginRuntime") ? ALCodeEditor::Mark::Runtime : Doc::markOf(problem->level);
+            const ALCodeEditor::Mark mark = problem->origin == mServices.words("OriginRuntime") ? ALCodeEditor::Mark::Runtime : Doc::markOf(problem->level);
             LLSD row;
             row["value"]                = value;
             row["columns"][0]["column"] = "icon";
@@ -491,7 +636,7 @@ void ALFloaterScriptStudio::fillProblems(const Doc* doc)
             {
                 row["columns"][i]["tool_tip"] = tip;
             }
-            mProblems->addElement(row);
+            mList->addElement(row);
         }
     }
     // What the filters hide, said under what they let through.
@@ -503,8 +648,8 @@ void ALFloaterScriptStudio::fillProblems(const Doc* doc)
         more["columns"][0]["column"] = "icon";
         more["columns"][0]["value"]  = std::string();
         more["columns"][1]["column"] = "message";
-        more["columns"][1]["value"]  = counted("ProblemsHidden", held - listed);
-        if (LLScrollListItem* item = mProblems->addElement(more))
+        more["columns"][1]["value"]  = mServices.counted("ProblemsHidden", held - listed);
+        if (LLScrollListItem* item = mList->addElement(more))
         {
             item->setEnabled(false);
         }
@@ -519,8 +664,8 @@ void ALFloaterScriptStudio::fillProblems(const Doc* doc)
         if (chosen.isMap() && !chosen.has("heading"))
         {
             // In the order shown, which a sort by a column has changed.
-            mProblems->updateSort();
-            const std::vector<LLScrollListItem*> rows = mProblems->getAllData();
+            mList->updateSort();
+            const std::vector<LLScrollListItem*> rows = mList->getAllData();
             for (size_t i = 0; i < rows.size(); ++i)
             {
                 const LLSD& value = rows[i]->getValue();
@@ -540,9 +685,9 @@ void ALFloaterScriptStudio::fillProblems(const Doc* doc)
         }
         if (best >= 0)
         {
-            mProblems->selectNthItem(best);
+            mList->selectNthItem(best);
         }
-        mProblems->setScrollPos(scrolled);
+        mList->setScrollPos(scrolled);
     }
     if (held == 0)
     {
@@ -553,21 +698,21 @@ void ALFloaterScriptStudio::fillProblems(const Doc* doc)
         }
         LLStringUtil::format_map_t named;
         named["[NAME]"] = doc->name;
-        mProblems->setCommentText(!current ? std::string() : all ? getString("NoProblemsOpen") : elsewhere ? getString("NoProblemsIn", named) : getString("NoProblems"));
+        mList->setCommentText(!current ? std::string() : all ? mServices.words("NoProblemsOpen") : elsewhere ? mServices.words("NoProblemsIn", named) : mServices.words("NoProblems"));
     }
     else if (listed == 0)
     {
-        mProblems->setCommentText(counted("ProblemsAllHidden", held));
+        mList->setCommentText(mServices.counted("ProblemsAllHidden", held));
     }
 }
 
-void ALFloaterScriptStudio::layoutProblemFilters()
+void ALScriptProblemsPane::layoutFilters()
 {
     // The level boxes as wide as what they say, the rest after them, the
     // words' box taking what is left.
     const LLFontGL* font = LLFontGL::getFontSansSerifSmall();
     S32             left = 4;
-    for (LLCheckBoxCtrl* box : { mProblemErrors, mProblemWarnings, mProblemNotes, mProblemFixable })
+    for (LLCheckBoxCtrl* box : { mErrors, mWarnings, mNotes, mFixable })
     {
         const S32 width = 24 + font->getWidth(box->getLabel());
         box->reshape(width, box->getRect().getHeight());
@@ -575,41 +720,115 @@ void ALFloaterScriptStudio::layoutProblemFilters()
         left += width + 4;
     }
     left += 6;
-    for (LLUICtrl* combo : { static_cast<LLUICtrl*>(mProblemScope), static_cast<LLUICtrl*>(mProblemOrigin) })
+    for (LLUICtrl* combo : { static_cast<LLUICtrl*>(mScope), static_cast<LLUICtrl*>(mOrigin) })
     {
         combo->setOrigin(left, combo->getRect().mBottom);
         left += combo->getRect().getWidth() + 6;
     }
     left += 2;
-    const LLRect filter = mProblemFilter->getRect();
-    const S32    right  = mProblemFilter->getParent() ? mProblemFilter->getParent()->getRect().getWidth() - 4 : filter.mRight;
+    const LLRect filter = mFilter->getRect();
+    const S32    right  = mFilter->getParent() ? mFilter->getParent()->getRect().getWidth() - 4 : filter.mRight;
     const S32    width  = llmax(60, right - left);
     if (filter.mLeft != left || filter.getWidth() != width)
     {
-        mProblemFilter->reshape(width, filter.getHeight());
-        mProblemFilter->setOrigin(left, filter.mBottom);
+        mFilter->reshape(width, filter.getHeight());
+        mFilter->setOrigin(left, filter.mBottom);
     }
 }
 
-void ALFloaterScriptStudio::selectFirstError(bool checkers_only)
+void ALScriptProblemsPane::selectFirstError(bool checkers_only)
 {
-    mProblems->updateSort();
-    const std::vector<LLScrollListItem*> rows     = mProblems->getAllData();
-    const std::string                    compiler = getString("OriginCompiler");
+    mList->updateSort();
+    const std::vector<LLScrollListItem*> rows     = mList->getAllData();
+    const std::string                    compiler = mServices.words("OriginCompiler");
     for (size_t i = 0; i < rows.size(); ++i)
     {
         const LLSD& value = rows[i]->getValue();
         if (value.isMap() && !value.has("heading") && value["level"].asString() == "ERROR" && (!checkers_only || value["origin"].asString() != compiler))
         {
-            mProblems->selectNthItem(static_cast<S32>(i));
-            mProblems->scrollToShowSelected();
-            onProblemSelected(true);
+            mList->selectNthItem(static_cast<S32>(i));
+            mList->scrollToShowSelected();
+            choose(true);
             return;
         }
     }
 }
 
-void ALFloaterScriptStudio::showProblemMenu(S32 x, S32 y)
+ALScriptProblemsPane::Doc* ALScriptProblemsPane::chosenDoc() const
+{
+    LLScrollListItem* item = mList->getFirstSelected();
+    return item && item->getValue().isMap() ? mServices.findDoc(item->getValue()["doc"].asString()) : nullptr;
+}
+
+const ALScriptProblemsPane::Doc::Shown* ALScriptProblemsPane::chosenShown() const
+{
+    LLScrollListItem* item = mList->getFirstSelected();
+    const Doc*        doc  = chosenDoc();
+    if (!item || !doc)
+    {
+        return nullptr;
+    }
+    const LLSD& value = item->getValue();
+    return doc->findShown(value["line"].asInteger(), value["column"].asInteger(), value["file"].asString(), value["message"].asString());
+}
+
+std::string ALScriptProblemsPane::chosenLint(bool& lua) const
+{
+    // The lint the chosen problem is, in its script's language, where it
+    // is one there is a choice about.
+    const Doc*        doc  = chosenDoc();
+    LLScrollListItem* item = mList->getFirstSelected();
+    if (!doc || !item)
+    {
+        return std::string();
+    }
+    lua                    = doc->language.lua;
+    const std::string lint = item->getValue()["lint"].asString();
+    return !lint.empty() && mWindow.isLint(lua, lint) ? lint : std::string();
+}
+
+bool ALScriptProblemsPane::enabled(const std::string& what) const
+{
+    if (what == "copy" || what == "copy_where" || what == "copy_all" || what == "settings")
+    {
+        return true;
+    }
+    if (what == "clear_runtime")
+    {
+        const Doc* doc = chosenDoc();
+        return doc && !doc->runtime.empty();
+    }
+    bool lua = false;
+    return !chosenLint(lua).empty();
+}
+
+bool ALScriptProblemsPane::lintIsError() const
+{
+    bool              lua  = false;
+    const std::string lint = chosenLint(lua);
+    return !lint.empty() && mWindow.lintLevel(lua, lint) == ALScriptLints::Level::Error;
+}
+
+bool ALScriptProblemsPane::fixShown(const std::string& which) const
+{
+    // Every problem of its kind at once, where there is more than one to
+    // put right; and Fix All where it would only say what it leaves, too,
+    // so that it can.
+    const Doc::Shown* shown = chosenShown();
+    const Doc*        doc   = chosenDoc();
+    if (!shown || !doc || !doc->modifiable)
+    {
+        return false;
+    }
+    if (which == "kind")
+    {
+        return doc->pickFixes(Doc::FixPick{ shown->key }).size() > 1;
+    }
+    size_t left = 0;
+    return which == "all" && doc->pickFixes(Doc::FixPick{}, &left).size() + left > 1;
+}
+
+void ALScriptProblemsPane::showMenu(S32 x, S32 y)
 {
     if (!LLMenuGL::sMenuContainer)
     {
@@ -617,94 +836,32 @@ void ALFloaterScriptStudio::showProblemMenu(S32 x, S32 y)
     }
     // The row under the mouse is the one the menu is about; a heading is
     // about no problem.
-    LLScrollListItem* hit = mProblems->hitItem(x, y);
+    LLScrollListItem* hit = mList->hitItem(x, y);
     if (!hit || !hit->getEnabled())
     {
         return;
     }
-    mProblems->selectItemAt(x, y, MASK_NONE);
-    if (LLContextMenu* old = mProblemMenuHandle.get())
+    mList->selectItemAt(x, y, MASK_NONE);
+    if (LLContextMenu* old = mMenu.get())
     {
         old->die();
-        mProblemMenuHandle.markDead();
+        mMenu.markDead();
     }
-    // The script the chosen problem is of, in its language, and the lint
-    // it is where it is one there is a choice about.
-    const auto doc_of = [this]() -> Doc* {
-        LLScrollListItem* item = mProblems->getFirstSelected();
-        const size_t      index = item ? indexOf(item->getValue()["doc"].asString()) : NONE;
-        return index == NONE ? nullptr : mDocs[index].get();
-    };
-    const auto lint_of = [this, doc_of](bool& lua) -> std::string {
-        Doc*              doc  = doc_of();
-        LLScrollListItem* item = mProblems->getFirstSelected();
-        if (!doc || !item)
-        {
-            return std::string();
-        }
-        lua                    = doc->language.lua;
-        const std::string lint = item->getValue()["lint"].asString();
-        for (const ALScriptLints::Lint& one : ALScriptLints::all())
-        {
-            if (one.lua == lua && one.id == lint)
-            {
-                return lint;
-            }
-        }
-        return std::string();
-    };
     LLUICtrl::CommitCallbackRegistry::ScopedRegistrar commit;
     LLUICtrl::EnableCallbackRegistry::ScopedRegistrar enable;
-    commit.add("Problem.Action", [this](LLUICtrl*, const LLSD& param) { onProblemMenu(param.asString()); });
-    enable.add("Problem.Enable", [lint_of, doc_of](LLUICtrl*, const LLSD& param) {
-        const std::string what = param.asString();
-        if (what == "copy" || what == "copy_where" || what == "copy_all" || what == "settings")
-        {
-            return true;
-        }
-        if (what == "clear_runtime")
-        {
-            const Doc* doc = doc_of();
-            return doc && !doc->runtime.empty();
-        }
-        bool lua = false;
-        return !lint_of(lua).empty();
-    });
-    enable.add("Problem.Check", [lint_of](LLUICtrl*, const LLSD&) {
-        bool              lua  = false;
-        const std::string lint = lint_of(lua);
-        return !lint.empty() && ALScriptLints::level(lua, lint) == ALScriptLints::Level::Error;
-    });
-    // Each fix the problem offers, by what it does; and every problem of its
-    // kind at once, where there is more than one to put right.
-    const auto shown_of = [this]() -> const Doc::Shown* {
-        LLScrollListItem* item = mProblems->getFirstSelected();
-        return item ? shownOf(item->getValue()) : nullptr;
-    };
-    enable.add("Problem.FixVisible", [shown_of, doc_of](LLUICtrl* ctrl, const LLSD& param) {
-        const Doc::Shown* shown = shown_of();
-        const Doc*        doc   = doc_of();
-        if (!shown || !doc || !doc->modifiable)
-        {
-            return false;
-        }
-        if (param.asString() == "kind")
-        {
-            return pickFixes(*doc, FixPick{ shown->key }).size() > 1;
-        }
-        // Where Fix All would only say what it leaves, too, so that it can.
-        size_t left = 0;
-        return param.asString() == "all" && pickFixes(*doc, FixPick{}, &left).size() + left > 1;
-    });
+    commit.add("Problem.Action", [this](LLUICtrl*, const LLSD& param) { act(param.asString()); });
+    enable.add("Problem.Enable", [this](LLUICtrl*, const LLSD& param) { return enabled(param.asString()); });
+    enable.add("Problem.Check", [this](LLUICtrl*, const LLSD&) { return lintIsError(); });
+    enable.add("Problem.FixVisible", [this](LLUICtrl*, const LLSD& param) { return fixShown(param.asString()); });
     LLContextMenu* menu = LLUICtrlFactory::createFromFile<LLContextMenu>("menu_script_studio_problem.xml", LLMenuGL::sMenuContainer,
                                                                           LLMenuHolderGL::child_registry_t::instance());
     if (!menu)
     {
         return;
     }
-    mProblemMenuHandle = menu->getHandle();
-    const Doc::Shown* shown = shown_of();
-    const Doc*        doc   = doc_of();
+    mMenu = menu->getHandle();
+    const Doc::Shown* shown = chosenShown();
+    const Doc*        doc   = chosenDoc();
     // Each fix the problem offers, by what it does, first in the menu:
     // however many -- a name's guesses and the suppressions come to more
     // than a menu of fixed places held.
@@ -717,30 +874,31 @@ void ALFloaterScriptStudio::showProblemMenu(S32 x, S32 y)
             p.label = shown->fixes[n].title;
             LLMenuItemCallGL* item = LLUICtrlFactory::create<LLMenuItemCallGL>(p);
             const std::string action = "fix:" + std::to_string(n);
-            item->setClickCallback([this, action](LLUICtrl*, const LLSD&) { onProblemMenu(action); });
+            item->setClickCallback([this, action](LLUICtrl*, const LLSD&) { act(action); });
             menu->insert(static_cast<S32>(n), item);
         }
     }
     menu->setItemVisible("fix_separator", shown && doc && doc->modifiable && !shown->fixes.empty());
     menu->show(x, y);
-    LLMenuGL::showPopup(mProblems, menu, x, y);
+    LLMenuGL::showPopup(mList, menu, x, y);
 }
 
-void ALFloaterScriptStudio::onProblemMenu(const std::string& action)
+void ALScriptProblemsPane::act(const std::string& action)
 {
-    LLScrollListItem* item  = mProblems->getFirstSelected();
-    const size_t      index = item ? indexOf(item->getValue()["doc"].asString()) : NONE;
-    if (index == NONE)
+    LLScrollListItem* item = mList->getFirstSelected();
+    Doc*              of   = chosenDoc();
+    if (!item || !of)
     {
         return;
     }
-    Doc&              doc   = *mDocs[index];
+    Doc&              doc   = *of;
     const LLSD&       value = item->getValue();
     const std::string lint  = value["lint"].asString();
     const bool        lua   = doc.language.lua;
     // A problem as a line of text: where, what level, from whom, what.
     const auto as_text = [this](const LLSD& one) {
-        const std::string name  = one["fileName"].asString().empty() ? mDocs[indexOf(one["doc"].asString())]->name : one["fileName"].asString();
+        const Doc*        whose = mServices.findDoc(one["doc"].asString());
+        const std::string name  = !one["fileName"].asString().empty() ? one["fileName"].asString() : whose ? whose->name : std::string();
         const S32         line  = one["line"].asInteger() + 1;
         const std::string where = one["hasColumn"].asBoolean() ? llformat("%s:%d:%d", name.c_str(), line, one["column"].asInteger() + 1)
                                                                : llformat("%s:%d", name.c_str(), line);
@@ -761,60 +919,60 @@ void ALFloaterScriptStudio::onProblemMenu(const std::string& action)
         // Every problem the list shows, as a compiler lists them.
         std::string all;
         S32         count = 0;
-        for (LLScrollListItem* row : mProblems->getAllData())
+        for (LLScrollListItem* row : mList->getAllData())
         {
             const LLSD& one = row->getValue();
-            if (one.isMap() && !one.has("heading") && indexOf(one["doc"].asString()) != NONE)
+            if (one.isMap() && !one.has("heading") && mServices.findDoc(one["doc"].asString()))
             {
                 all += as_text(one) + "\n";
                 ++count;
             }
         }
         copy(all);
-        setStatus(counted("ProblemsCopied", count));
+        mServices.setStatus(mServices.counted("ProblemsCopied", count));
     }
     else if (action == "clear_runtime")
     {
         // What the script said as it ran, let go of until it says it again.
         doc.runtime.clear();
-        refreshProblems(doc);
+        mWindow.refreshProblems(doc);
     }
     else if (action == "off" && !lint.empty())
     {
         // The scripts are checked again as the setting changes.
-        ALScriptLints::setLevel(lua, lint, ALScriptLints::Level::Off);
+        mWindow.setLintLevel(lua, lint, ALScriptLints::Level::Off);
     }
     else if (action == "error" && !lint.empty())
     {
-        const bool now = ALScriptLints::level(lua, lint) == ALScriptLints::Level::Error;
-        ALScriptLints::setLevel(lua, lint, now ? ALScriptLints::Level::Warning : ALScriptLints::Level::Error);
+        const bool now = mWindow.lintLevel(lua, lint) == ALScriptLints::Level::Error;
+        mWindow.setLintLevel(lua, lint, now ? ALScriptLints::Level::Warning : ALScriptLints::Level::Error);
     }
     else if (action == "settings")
     {
-        LLFloaterReg::showInstance("script_studio_prefs", LLSD().with("tab", "lints"));
+        mWindow.showLintSettings();
     }
     else if (action.compare(0, 4, "fix:") == 0)
     {
         // A copy: making it checks the script again and fills the list anew.
-        const Doc::Shown* shown = shownOf(value);
+        const Doc::Shown* shown = chosenShown();
         const size_t      n     = static_cast<size_t>(atoi(action.c_str() + 4));
         if (shown && n < shown->fixes.size())
         {
             const ALScriptFix fix     = shown->fixes[n];
             const U32         version = shown->fixesFor;
-            applyFix(doc, fix, version);
+            mWindow.applyFix(doc, fix, version);
         }
     }
     else if (action == "fix_kind")
     {
-        if (const Doc::Shown* shown = shownOf(value))
+        if (const Doc::Shown* shown = chosenShown())
         {
             const std::string key = shown->key;
-            askFixAll(doc, FixPick{ key });
+            mWindow.fixAllOfKind(doc, key);
         }
     }
     else if (action == "fix_all")
     {
-        askFixAll(doc, FixPick{});
+        mWindow.fixAllOfKind(doc, std::string());
     }
 }

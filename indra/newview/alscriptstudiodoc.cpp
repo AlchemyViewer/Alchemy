@@ -61,6 +61,71 @@ const ALSourceMap* ALScriptStudioDoc::runningMap() const
     return uploaded.valid && !uploaded.disabled ? &uploaded.map : nullptr;
 }
 
+const ALScriptStudioDoc::Shown* ALScriptStudioDoc::findShown(S32 line, S32 column, const std::string& file, const std::string& message) const
+{
+    for (const Shown& one : shown)
+    {
+        if (one.line == line && one.column == column && one.file == file && one.message == message)
+        {
+            return &one;
+        }
+    }
+    return nullptr;
+}
+
+std::vector<const ALScriptFix*> ALScriptStudioDoc::pickFixes(const FixPick& pick, size_t* left) const
+{
+    std::vector<const ALScriptFix*> taken;
+    const U32                       now       = editor->document().version();
+    const bool                      only_safe = pick.forSave || pick.key.empty();
+    for (const Shown& one : shown)
+    {
+        if (!one.file.empty() || one.fixesFor != now || (!pick.key.empty() && one.key != pick.key))
+        {
+            continue;
+        }
+        for (const ALScriptFix& fix : one.fixes)
+        {
+            if (fix.preferred && fix.kind == ALScriptFix::Kind::Fix)
+            {
+                if (!only_safe || (fix.safe && !(pick.forSave && fix.removes)))
+                {
+                    taken.push_back(&fix);
+                }
+                else if (left)
+                {
+                    ++*left;
+                }
+                break;
+            }
+        }
+    }
+    // One step of edits that never meet: of two that would, the first.
+    const auto begin_of = [](const ALScriptEdit& edit) { return ALTextPos(edit.line, edit.column); };
+    const auto end_of   = [](const ALScriptEdit& edit) { return ALTextPos(edit.endLine, edit.endColumn); };
+    std::vector<const ALScriptFix*> kept;
+    std::vector<ALTextRange>        claimed;
+    for (const ALScriptFix* fix : taken)
+    {
+        const bool meets = std::any_of(fix->edits.begin(), fix->edits.end(), [&](const ALScriptEdit& edit) {
+            return std::any_of(claimed.begin(), claimed.end(), [&](const ALTextRange& range) {
+                return (begin_of(edit) < range.end && range.begin < end_of(edit)) ||
+                       (begin_of(edit) == end_of(edit) && range.begin == range.end && begin_of(edit) == range.begin);
+            });
+        });
+        if (meets)
+        {
+            continue;
+        }
+        for (const ALScriptEdit& edit : fix->edits)
+        {
+            claimed.emplace_back(begin_of(edit), end_of(edit));
+        }
+        kept.push_back(fix);
+    }
+    return kept;
+}
+
 // static
 ALCodeEditor::Mark ALScriptStudioDoc::markOf(Level level)
 {
