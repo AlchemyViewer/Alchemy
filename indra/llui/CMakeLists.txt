@@ -136,6 +136,7 @@ target_sources(
     alcodeeditor.cpp
     alcompletionmodel.cpp
     alfixlistmodel.cpp
+    alsnippetsession.cpp
     alfindbar.cpp
     alkeymap.cpp
     alvimkeymap.cpp
