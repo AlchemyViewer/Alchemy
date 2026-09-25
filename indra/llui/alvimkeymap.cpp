@@ -578,6 +578,7 @@ bool ALVimKeymap::handleChar(ALTextView& view, llwchar ch)
 bool ALVimKeymap::feed(ALTextView& view, const Input& input)
 {
     followDocument(view);
+    mTypedByView = false;
     if (mRecording && !mReplaying && mPlaying == 0)
     {
         mRecorded.push_back(input);
@@ -617,8 +618,8 @@ bool ALVimKeymap::feed(ALTextView& view, const Input& input)
             break;
     }
     // A key nobody took is not part of what was typed: its character
-    // follows, and is.
-    if (!taken && !input.isChar)
+    // follows, and is. One insert mode left the view to type is.
+    if (!taken && !input.isChar && !mTypedByView)
     {
         if (!mReplaying && !mCommandInputs.empty())
         {
@@ -3214,6 +3215,9 @@ bool ALVimKeymap::insert(ALTextView& view, const Input& input)
             return true;
         }
         // The rest is the view's: arrows, return, backspace, the keymap.
+        // What changes the text is part of what was typed all the same,
+        // for `.` and a macro to type again, which they do above.
+        mTypedByView = input.key == KEY_RETURN || input.key == KEY_TAB || input.key == KEY_BACKSPACE || input.key == KEY_DELETE;
         return false;
     }
     if (mMode == Mode::Replace)

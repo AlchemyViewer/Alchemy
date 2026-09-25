@@ -1365,4 +1365,33 @@ namespace tut
         keys("0f<Tab>");
         ensure_equals("found by f", caretText(), std::string("0:1"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<39>()
+    {
+        set_test_name("`.` and a macro type an insert's Return, Tab and Backspace again");
+        make("x");
+        keys("ofoo<CR>bar<Esc>");
+        ensure_equals("inserted", flat(editor->text()), std::string("x|foo|bar"));
+        keys(".");
+        ensure_equals("both lines again", flat(editor->text()), std::string("x|foo|bar|foo|bar"));
+
+        make("aaaa");
+        keys("s1<CR>2<Esc>");
+        ensure_equals("substituted", flat(editor->text()), std::string("1|2aaa"));
+        keys("l.");
+        ensure_equals("and again, the break with it", flat(editor->text()), std::string("1|21|2aa"));
+
+        make("pq<BS>");
+        keys("Ayz<BS><Esc>");
+        ensure_equals("a backspace", editor->text(), std::string("pq<BS>y"));
+        keys(".");
+        ensure_equals("typed again", editor->text(), std::string("pq<BS>yy"));
+
+        make("p\nq");
+        keys("qaA!<CR>-<Esc>q");
+        ensure_equals("recorded as typed", flat(editor->text()), std::string("p!|-|q"));
+        keys("G@a");
+        ensure_equals("played with its break", flat(editor->text()), std::string("p!|-|q!|-"));
+    }
 }

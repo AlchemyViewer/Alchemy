@@ -431,6 +431,9 @@ private:
     std::vector<Input> mCommandInputs;
     std::vector<Input> mLastChange;
     bool               mReplaying = false;
+    // The key being fed was left to the view to type, in insert mode: part
+    // of what was typed, for `.` and a macro, though nobody here took it.
+    bool               mTypedByView = false;
     // The last change, where it was an operator over a visual
     // selection: `.` selects as much again from the caret and does
     // the operator over it.
