@@ -327,6 +327,7 @@ target_sources(
         alcodeeditor.h
         alcompletionmodel.h
         alfixlistmodel.h
+        alsnippetsession.h
         alfindings.h
         alfindbar.h
         alkeymap.h
@@ -528,6 +529,7 @@ if(AL_BUILD_TESTS)
     alcodeeditor
     alcompletionmodel
     alfixlistmodel
+    alsnippetsession
     alscripttheme
     alvimkeymap
     alxuiservice

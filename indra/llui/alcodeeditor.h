@@ -26,6 +26,7 @@
 
 #include "alcompletionmodel.h"
 #include "alfixlistmodel.h"
+#include "alsnippetsession.h"
 #include "altextview.h"
 
 #include <array>
@@ -429,22 +430,21 @@ public:
     // one before, past the last the caret lands after the call, and
     // escape or a click lets them go. Typing over one keeps it as what
     // was typed until tab leaves it.
-    const std::vector<ALTextRange>& placeholders() const { return mPlaceholders; }
-    S32                             placeholderAt() const { return mPlaceholderAt; }
+    const std::vector<ALTextRange>& placeholders() const { return mSnippet.stops(); }
+    S32                             placeholderAt() const { return mSnippet.at(); }
     void                            setPlaceholders(std::vector<ALTextRange> ranges, const ALTextPos& after);
     bool                            nextPlaceholder(S32 direction);
     void                            clearPlaceholders();
     // Everything typing puts up let go of at once: the list, the
     // signature and the stops.
     void                            dropTyping();
-    // The names of a signature's parameters, from how a completion's
-    // detail reads: "integer llSay(integer channel, string msg)" or
-    // "(channel: number, msg: string) -> ()". The list is the bracket
-    // after the name where the detail has the name -- a return type may
-    // have brackets of its own before it -- else the first.
-    static std::vector<std::string> parameterNames(std::string_view detail, std::string_view name = std::string_view());
-    // Where that list opens in the detail, or npos.
-    static size_t parameterListAt(std::string_view detail, std::string_view name);
+    // The names of a signature's parameters, and where their list opens
+    // (ALSnippetSession).
+    static std::vector<std::string> parameterNames(std::string_view detail, std::string_view name = std::string_view())
+    {
+        return ALSnippetSession::parameterNames(detail, name);
+    }
+    static size_t parameterListAt(std::string_view detail, std::string_view name) { return ALSnippetSession::parameterListAt(detail, name); }
 
     // --- quick fixes -------------------------------------------------------------------
 
@@ -815,22 +815,8 @@ private:
     std::vector<U8>         mFixable;
     // What the list offers, as it narrows (ALCompletionModel).
     ALCompletionModel       mCompletionModel;
-    std::vector<ALTextRange> mPlaceholders;
-    S32                      mPlaceholderAt = -1;
-    ALTextPos                mPlaceholdersAfter;
-    // A snippet's placeholders that repeat another's number, by the index
-    // of the one they repeat: brought up to what that one holds as it is
-    // left. The one being brought up while it is.
-    struct Mirror
-    {
-        S32         of = -1;
-        ALTextRange range;
-    };
-    std::vector<Mirror>      mMirrors;
-    S32                      mSyncingMirror = -1;
-    // How long the text `${0:text}` put where the caret lands is, to be
-    // chosen as it lands; nothing for a bare $0.
-    S32                      mLandingLength = 0;
+    // The stops of a snippet or a call being filled in (ALSnippetSession).
+    ALSnippetSession         mSnippet;
     // Each placeholder's mirrors made what it holds.
     void                     syncMirrors(S32 index);
     // The placeholders let go of where the caret has left the lines they
