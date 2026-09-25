@@ -92,6 +92,13 @@ public:
         // folder a file's are read from. Added to the keymap's own, and
         // cut to what was typed by the keymap.
         std::function<void(ALTextView& view, const std::string& command, const std::string& typed, std::vector<std::string>& out)> complete;
+        // The caret jumped -- G, gg, a search, %, a sentence or paragraph,
+        // H, M, L, a mark, a line on the : line -- from `from`: for the
+        // host to keep, as vim's jump list does, for Ctrl-O to go back to.
+        std::function<void(ALTextView& view, const ALTextPos& from)> jumped;
+        // What :registers and :marks list, as lines, for the host to show
+        // where lists go. Without one, the first line is said.
+        std::function<void(ALTextView& view, const std::string& text)> listing;
     };
 
     ALVimKeymap();
@@ -318,6 +325,14 @@ private:
         size_t opAt = 0;
     };
     void noteVisualOperation(const Span& span, S32 lines_hint = -1);
+    // A jump from `from`: vim's context marks, '' and ``, set there, and
+    // the host told.
+    void noteJump(ALTextView& view, const ALTextPos& from);
+    // :registers and :marks, listed as vim lists them, of the names given
+    // or of all.
+    void listRegisters(ALTextView& view, const std::string& names);
+    void listMarks(ALTextView& view, const std::string& names);
+    void list(ALTextView& view, const std::string& text);
 
     // What the mode says, in the skin's words where the skin has them
     // (strings.xml, keys Vim*), else in vim's own English; [NAME]s

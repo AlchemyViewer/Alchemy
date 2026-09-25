@@ -1435,4 +1435,76 @@ namespace tut
         ensure_equals("a folder's word whole", asked.back(), std::string("e|scripts/fo"));
         keys("<Esc>");
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<42>()
+    {
+        set_test_name("vim's jumps set '' and tell the host where they began: G, gg, %, a search, a mark, a line on the : line; not j, w or an operator's");
+        make("one (x)\ntwo\nthree\nfour");
+        std::vector<ALTextPos> from;
+        vim->hooks().jumped = [&from](ALTextView&, const ALTextPos& at) { from.push_back(at); };
+        keys("G");
+        ensure("G from where it was", from == std::vector<ALTextPos>{ ALTextPos(0, 0) });
+        keys("''");
+        ensure("'' back to it", editor->caret().line == 0 && from.back() == ALTextPos(3, 0));
+        keys("jl");
+        ensure("j and l are no jumps", from.size() == 2);
+        keys("gg");
+        ensure("gg", from.size() == 3 && from.back() == ALTextPos(1, 1));
+        keys("f(%");
+        ensure("%", from.size() == 4 && from.back() == ALTextPos(0, 4) && editor->caret() == ALTextPos(0, 6));
+        keys("/thr<CR>");
+        ensure("a search", from.size() == 5 && editor->caret().line == 2);
+        keys("mak:4<CR>");
+        ensure("a line on the : line", from.size() == 6 && editor->caret().line == 3);
+        keys("'a");
+        ensure("a mark", from.size() == 7 && editor->caret().line == 2);
+        keys("dG");
+        ensure("not an operator's", from.size() == 7);
+    }
+
+    template<> template<>
+    void alvimkeymap_object::test<43>()
+    {
+        set_test_name("Ctrl-O and Ctrl-I go back and forward, Ctrl-] and gd to the definition, Ctrl-T back from it, Ctrl-G and K: the host's");
+        make("x y");
+        std::vector<std::string> heard;
+        vim->hooks().command = [&heard](ALTextView&, const std::string& name, const std::string& args) {
+            heard.push_back(name + "|" + args);
+            return true;
+        };
+        keys("<C-o>2<C-o><C-i>");
+        editor->handleKeyHere(']', ALVimKeymap::CONTROL);
+        keys("gd<C-t><C-g>K");
+        ensure("each as the host's",
+               heard == std::vector<std::string>{ "back|", "back|", "back|", "forward|", "tag|", "tag|", "pop|", "file|", "reference|" });
+    }
+
+    template<> template<>
+    void alvimkeymap_object::test<44>()
+    {
+        set_test_name(":registers and :marks list what is held and set, as vim lists them, to the host's listing");
+        make("one\n\ttwo three");
+        std::vector<std::string> listed;
+        vim->hooks().listing = [&listed](ALTextView&, const std::string& text) { listed.push_back(text); };
+        keys("yyj\"ayw");
+        keys(":registers<CR>");
+        ensure_equals("one listing", listed.size(), size_t(1));
+        ensure("the heading", listed[0].compare(0, 17, "Type Name Content") == 0);
+        ensure("a yank of lines", listed[0].find("\n  l  \"0   one^J") != std::string::npos);
+        ensure("a named one, of characters, a tab as ^I", listed[0].find("\n  c  \"a   ^I") != std::string::npos);
+        ensure("the last : line", listed[0].find("\n  c  \":   registers") != std::string::npos);
+        keys(":di a<CR>");
+        ensure("only those named", listed[1].find("\"0") == std::string::npos && listed[1].find("\"a") != std::string::npos);
+
+        keys("mb:marks<CR>");
+        ensure_equals("marks", listed[2], std::string("mark line  col file/text\n b      2    0 two three"));
+        keys("G");
+        keys(":marks<CR>");
+        ensure("a jump's", listed[3].find("\n '      2    0 two three") != std::string::npos);
+
+        vim->hooks().listing = nullptr;
+        keys(":reg<CR>");
+        ensure_equals("without a host, the heading said", vim->message(), std::string("Type Name Content"));
+    }
 }

@@ -816,6 +816,31 @@ bool ALVimKeymap::normal(ALTextView& view, const Input& input)
         {
             switch (input.key)
             {
+                case 'O':
+                case 'I':
+                {
+                    // The jump list is the host's, which goes between its
+                    // tabs as well: back, or forward again, the count times.
+                    const S32 times = countOr(mCount);
+                    clearPending();
+                    for (S32 n = 0; n < times && mHooks.command; ++n)
+                    {
+                        mHooks.command(view, input.key == 'O' ? "back" : "forward", std::string());
+                    }
+                    return true;
+                }
+                case ']':
+                    clearPending();
+                    runCommand(view, "tag");
+                    return true;
+                case 'T':
+                    clearPending();
+                    runCommand(view, "pop");
+                    return true;
+                case 'G':
+                    clearPending();
+                    runCommand(view, "file");
+                    return true;
                 case '6':
                 case '^':
                 {
@@ -1070,6 +1095,13 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
                 {
                     case 'g':
                         return command(view, 0x01);  // gg, as a motion the table knows
+                    case 'd':
+                    case 'D':
+                        // The declaration: the host's definition, as :tag
+                        // goes to it.
+                        clearPending();
+                        runCommand(view, "tag");
+                        return true;
                     case 't':
                     case 'T':
                     {
@@ -1242,6 +1274,10 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
                     applyOperator(view, op, span, 1);
                     finishCommand(op != 'y');
                     return true;
+                }
+                if ((pending == '`' || pending == '\'') && m.to != cursor(view))
+                {
+                    noteJump(view, cursor(view));
                 }
                 moveTo(view, m.to);
                 clearPending();
@@ -1471,6 +1507,14 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
     // Commands.
     switch (ch)
     {
+        case 'K':
+            // The word under the caret looked up: the host's reference.
+            clearPending();
+            if (!mOperator && mHooks.command)
+            {
+                mHooks.command(view, "reference", std::string());
+            }
+            return true;
         case 'd':
         case 'c':
         case 'y':
@@ -1892,10 +1936,17 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
             break;
     }
 
-    // A motion on its own.
+    // A motion on its own; one of vim's jumps notes where it began.
     Motion m = motion(view, ch, count, 0);
     if (m.ok)
     {
+        const ALTextPos from = cursor(view);
+        const bool      jump = ch == 'G' || ch == 0x01 || ch == '%' || ch == '(' || ch == ')' || ch == '{' || ch == '}' || ch == 'H' ||
+                          ch == 'M' || ch == 'L';
+        if (jump && m.to != from)
+        {
+            noteJump(view, from);
+        }
         moveTo(view, m.to);
     }
     clearPending();
@@ -3407,7 +3458,8 @@ bool ALVimKeymap::search(ALTextView& view, const std::string& pattern, bool forw
         say(said("VimPatternNotFound", "E486: Pattern not found: [PATTERN]", { { "[PATTERN]", pattern } }), true);
         return false;
     }
-    ALTextPos from = cursor(view);
+    const ALTextPos start = cursor(view);
+    ALTextPos       from  = start;
     for (S32 n = 0; n < count; ++n)
     {
         const S32 index = ALTextSearch::nearest(matches, forward ? d.nextCluster(from) : from, forward);
@@ -3422,6 +3474,10 @@ bool ALVimKeymap::search(ALTextView& view, const std::string& pattern, bool forw
     if (ALCodeEditor* editor = ALViewType::as<ALCodeEditor>(&view); editor && !isVisual())
     {
         editor->setHighlights(matches);
+    }
+    if (!mOperator && from != start)
+    {
+        noteJump(view, start);
     }
     moveTo(view, from);
     return true;
@@ -3718,7 +3774,8 @@ void ALVimKeymap::complete(ALTextView& view, bool forward)
         {
             // The name itself: the keymap's own, the long forms, and the
             // host's.
-            static const char* OWN[] = { "delete", "global", "nohlsearch", "normal", "set", "substitute", "vglobal", "yank" };
+            static const char* OWN[] = { "delete", "display", "global",     "marks",  "nohlsearch", "normal",
+                                         "registers", "set", "substitute", "vglobal", "yank" };
             found.assign(std::begin(OWN), std::end(OWN));
         }
         else
@@ -4090,8 +4147,13 @@ void ALVimKeymap::runCommand(ALTextView& view, const std::string& line_in)
     {
         if (ranged)
         {
-            // A line number alone goes there.
-            moveTo(view, ALTextPos(last, firstNonBlankColumn(d, last)));
+            // A line number alone goes there, a jump.
+            const ALTextPos to(last, firstNonBlankColumn(d, last));
+            if (to.line != view.caret().line)
+            {
+                noteJump(view, cursor(view));
+            }
+            moveTo(view, to);
         }
         return;
     }
@@ -4361,6 +4423,16 @@ void ALVimKeymap::runCommand(ALTextView& view, const std::string& line_in)
             escape.key = KEY_ESCAPE;
             feed(view, escape);
         }
+        return;
+    }
+    if (name == "reg" || name == "registers" || name == "di" || name == "display")
+    {
+        listRegisters(view, args);
+        return;
+    }
+    if (name == "marks")
+    {
+        listMarks(view, args);
         return;
     }
     if (name == "noh" || name == "nohlsearch")
@@ -4937,4 +5009,90 @@ bool ALVimKeymap::substitute(ALTextView& view, S32 first, S32 last, const std::s
         say(substitutionsSaid(count, lines));
     }
     return true;
+}
+
+void ALVimKeymap::noteJump(ALTextView& view, const ALTextPos& from)
+{
+    mMarks['\''] = from;
+    mMarks['`']  = from;
+    if (mHooks.jumped)
+    {
+        mHooks.jumped(view, from);
+    }
+}
+
+namespace
+{
+    // A register's or a line's text as vim lists it: a line break as ^J, a
+    // tab as ^I, cut to what fits a row.
+    std::string listed(const std::string& text, size_t most)
+    {
+        std::string out;
+        for (char c : text)
+        {
+            if (out.size() >= most)
+            {
+                break;
+            }
+            out += c == '\n' ? std::string("^J") : c == '\t' ? std::string("^I") : std::string(1, c);
+        }
+        return out;
+    }
+}
+
+void ALVimKeymap::listRegisters(ALTextView& view, const std::string& names)
+{
+    // Each that holds anything, as vim's :registers has them: its kind --
+    // c characters, l lines, b a block -- its name, and what it holds; the
+    // last : line and the last search after them.
+    std::string text = "Type Name Content";
+    auto        row  = [&](char kind, char name, const std::string& held) {
+        if (!held.empty() && (names.empty() || names.find(name) != std::string::npos))
+        {
+            text += llformat("\n  %c  \"%c   ", kind, name) + listed(held, 70);
+        }
+    };
+    for (const char* name = "\"0123456789abcdefghijklmnopqrstuvwxyz-"; *name; ++name)
+    {
+        // Lines are kept without the break that ends the last, which vim
+        // shows.
+        const Register held = fetch(*name);
+        row(held.block ? 'b' : held.linewise ? 'l' : 'c', *name, held.linewise && !held.text.empty() ? held.text + "\n" : held.text);
+    }
+    row('c', ':', mShared->command.empty() ? std::string() : mShared->command.back());
+    row('c', '/', mSearchPattern);
+    list(view, text);
+}
+
+void ALVimKeymap::listMarks(ALTextView& view, const std::string& names)
+{
+    // Each set, as vim's :marks has them: the name, the line and column
+    // it is at, and the text of that line.
+    followDocument(view);
+    const ALTextDocument& d    = view.document();
+    std::string           text = "mark line  col file/text";
+    for (const auto& [name, at] : mMarks)
+    {
+        if (!names.empty() && names.find(name) == std::string::npos)
+        {
+            continue;
+        }
+        const ALTextPos p = d.clamp(at);
+        std::string     line = d.line(p.line);
+        LLStringUtil::trimHead(line);
+        text += llformat("\n %c %6d %4d ", name, p.line + 1, p.column) + listed(line, 60);
+    }
+    list(view, text);
+}
+
+void ALVimKeymap::list(ALTextView& view, const std::string& text)
+{
+    if (mHooks.listing)
+    {
+        mHooks.listing(view, text);
+    }
+    else
+    {
+        say(text.substr(0, text.find('\n')));
+    }
 }
