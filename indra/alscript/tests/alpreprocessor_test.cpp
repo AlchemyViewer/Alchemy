@@ -1156,4 +1156,22 @@ namespace tut
         ALPreprocessor::Options plain = options();
         ensure_equals("the text as expanded, for the compiler to read", r.text, ALPreprocessor::run(source, plain).text);
     }
+
+    template<> template<>
+    void alpreprocessor_object::test<30>()
+    {
+        set_test_name("SLua: a field or a method named require is the table's, and only the global finds a module");
+        add("x", "return 1\n");
+        const ALPreprocessor::Result r = ALPreprocessor::run("local a = t.require(\"x\")\n"
+                                                             "local b = t : require(\"x\")\n"
+                                                             "local c = t .. require(\"x\")\n",
+                                                             options(true));
+        ensure_equals("problems", messages(r), std::string());
+        ensure_equals("only the concatenated call is a module's", r.text,
+                      std::string("local __modules = {}\n"
+                                  "__modules[\"x\"] = (function()\nreturn 1\nend)()\n"
+                                  "local a = t.require(\"x\")\n"
+                                  "local b = t : require(\"x\")\n"
+                                  "local c = t .. __modules[\"x\"]\n"));
+    }
 } // namespace tut

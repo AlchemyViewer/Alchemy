@@ -3365,7 +3365,7 @@ namespace
             while (i < tokens.size())
             {
                 const Token& t = tokens[i];
-                if (t.is(Kind::Ident, "require"))
+                if (t.is(Kind::Ident, "require") && !indexed(out))
                 {
                     const size_t a = skipBlank(tokens, i + 1);
                     const size_t b = a < tokens.size() && tokens[a].is(Kind::Punct, "(") ? skipBlank(tokens, a + 1) : tokens.size();
@@ -3442,6 +3442,21 @@ namespace
         }
 
     private:
+        // Whether the word last put out, past blanks, is a `.` or a `:`:
+        // `t.require("x")` and `t:require("x")` are a table's, not the
+        // global that finds a module.
+        static bool indexed(const Tokens& before)
+        {
+            for (auto it = before.rbegin(); it != before.rend(); ++it)
+            {
+                if (!it->blank())
+                {
+                    return it->is(Kind::Punct, ".") || it->is(Kind::Punct, ":");
+                }
+            }
+            return false;
+        }
+
         bool resolve(const std::string& name, const std::string& from, const Token& at, std::string& key)
         {
             ALPreprocessor::Ask ask;
