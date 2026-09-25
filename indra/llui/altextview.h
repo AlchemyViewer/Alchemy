@@ -471,6 +471,9 @@ public:
     S32  rowsPerPage() const;
     S32  scrollY() const { return mScrollY; }
     void setScrollY(S32 y);
+    // Whether there is more of the text to scroll to that way: below for
+    // a positive direction, above for a negative.
+    bool canScrollY(S32 direction);
     F32  scrollX() const { return mScrollX; }
     void setScrollX(F32 x);
     bool hasHorizontalScrollbar() const;

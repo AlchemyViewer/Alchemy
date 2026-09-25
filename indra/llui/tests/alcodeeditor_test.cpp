@@ -1638,4 +1638,51 @@ namespace tut
         e.handleMouseUp(x, y, MASK_NONE);
         ensure("and the one after that on the next press: " + std::to_string(e.caret().line), e.caret().line == 65);
     }
+
+    template<> template<>
+    void alcodeeditor_object::test<43>()
+    {
+        set_test_name("the wheel under a card that has nothing more to show scrolls the text, and brings no card until the mouse moves");
+        std::string text;
+        for (int i = 0; i < 60; ++i)
+        {
+            text += "llSay(0, \"line " + std::to_string(i) + "\");\n";
+        }
+        ALCodeEditor& e = make(text.c_str());
+        std::string   said;
+        e.setHoverProvider([&said](const ALTextPos&, std::string_view word, std::string& out) {
+            if (word != "llSay")
+            {
+                return false;
+            }
+            out = said;
+            return true;
+        });
+        const LLRect text_rect = e.textRect();
+        S32          row;
+        const S32    x = text_rect.mLeft + static_cast<S32>(e.layout().xOf(0, 2, &row)) + 1;
+        const S32    y = text_rect.mTop - e.layout().rowHeight() / 2;
+        const LLScrollDelta down(1, 1.f);
+
+        // A card of a few lines: all of it in sight, nothing for the wheel.
+        said = "llSay(integer channel, string msg)\nSays something.";
+        e.handleHover(x, y, MASK_NONE);
+        ensure("a card", e.handleToolTip(x, y, MASK_NONE) && e.cardShown());
+        const LLRect small = e.card()->getRect();
+        e.handleHover(small.getCenterX(), small.getCenterY(), MASK_NONE);
+        ensure("kept, the mouse on it", e.cardShown());
+        ensure("the wheel taken", e.handleScrollWheel(small.getCenterX(), small.getCenterY(), down));
+        ensure("the card gone", !e.cardShown());
+        ensure("the text scrolled", e.scrollY() > 0);
+        // Still: whatever is under the mouse now, no card.
+        e.handleToolTip(small.getCenterX(), small.getCenterY(), MASK_NONE);
+        ensure("none while the mouse is still", !e.cardShown());
+        const S32 scrolled = e.scrollY();
+        e.handleScrollWheel(small.getCenterX(), small.getCenterY(), down);
+        ensure("the text scrolls on", e.scrollY() > scrolled);
+
+        // Moved: a card may come again.
+        e.handleHover(x + 1, y, MASK_NONE);
+        ensure("the mouse moved: a card again", e.handleToolTip(x + 1, y, MASK_NONE) && e.cardShown());
+    }
 }

@@ -571,6 +571,12 @@ void ALTextView::setScrollY(S32 y)
     syncScrollbar();
 }
 
+bool ALTextView::canScrollY(S32 direction)
+{
+    const S32 most = llmax(0, mLayout.totalHeight() - llmax(1, textRect().getHeight()));
+    return direction > 0 ? mScrollY < most : direction < 0 && mScrollY > 0;
+}
+
 void ALTextView::setScrollX(F32 x)
 {
     if (x != mScrollX)

@@ -723,6 +723,10 @@ private:
     // since it last moved.
     LLFrameTimer mMouseRest;
     bool         mHoverTried = false;
+    // The wheel turned the text under a still mouse: what it brought
+    // there is not what the mouse rested on, and no card or tip comes
+    // until the mouse moves.
+    bool         mWheeled = false;
 
     LLUIColor mGutterColor;
     LLUIColor mLineNumberColor;

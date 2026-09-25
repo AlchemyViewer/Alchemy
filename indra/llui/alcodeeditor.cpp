@@ -3524,6 +3524,10 @@ bool ALCodeEditor::handleToolTip(S32 x, S32 y, MASK mask)
     {
         return ALTextView::handleToolTip(x, y, mask);
     }
+    if (mWheeled)
+    {
+        return true;
+    }
     const LLRect text = textRect();
     // A mark in the gutter says what is on its line: every problem there;
     // the strip of heat at its edge, what the line came to.
@@ -3952,7 +3956,10 @@ bool ALCodeEditor::handleScrollWheel(S32 x, S32 y, LLScrollDelta delta)
 {
     // A list of fixes is about a row the scroll takes away.
     closeFixes();
-    if (cardShown() && mCard->getRect().pointInRect(x, y))
+    // The card under the mouse scrolls while it has more to show that
+    // way; one that has not -- all of it in sight, or its end reached --
+    // goes, and the text scrolls on.
+    if (cardShown() && mCard->getRect().pointInRect(x, y) && mCard->canScrollY(delta.mPrecise > 0.f ? 1 : -1))
     {
         return mCard->handleScrollWheel(x - mCard->getRect().mLeft, y - mCard->getRect().mBottom, delta);
     }
@@ -3962,6 +3969,7 @@ bool ALCodeEditor::handleScrollWheel(S32 x, S32 y, LLScrollDelta delta)
         return mCompletionList->handleScrollWheel(x - rect.mLeft, y - rect.mBottom, delta);
     }
     hideCard();
+    mWheeled = true;
     return ALTextView::handleScrollWheel(x, y, delta);
 }
 
@@ -4056,6 +4064,7 @@ bool ALCodeEditor::handleHover(S32 x, S32 y, MASK mask)
         // Moved: the rest the card waits for starts again.
         mMouseRest.reset();
         mHoverTried = false;
+        mWheeled    = false;
     }
     mMouseX = x;
     mMouseY = y;
@@ -4224,7 +4233,7 @@ void ALCodeEditor::draw()
     mAutoClosed.erase(std::remove_if(mAutoClosed.begin(), mAutoClosed.end(), [this](const ALTextPos& at) { return at.line != caret().line; }),
                       mAutoClosed.end());
     // The mouse rested long enough on the text: its card, once.
-    if (mHoverCards && mHoverDelay >= 0.f && !mHoverTried && mMouseX >= 0 && mMouseRest.getElapsedTimeF32() >= mHoverDelay && !cardShown() &&
+    if (mHoverCards && mHoverDelay >= 0.f && !mHoverTried && !mWheeled && mMouseX >= 0 && mMouseRest.getElapsedTimeF32() >= mHoverDelay && !cardShown() &&
         textRect().pointInRect(mMouseX, mMouseY) && !(mCompletionList && mCompletionList->getVisible() && mCompletionList->getRect().pointInRect(mMouseX, mMouseY)))
     {
         mHoverTried = true;
