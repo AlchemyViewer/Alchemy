@@ -2004,6 +2004,19 @@ Make [FIXES] in &quot;[NAME]&quot;, one for each problem, such as &quot;[EXAMPLE
 
   <notification
    icon="alertmodal.tga"
+   name="ScriptStudioPrefsChanged"
+   type="alertmodal">
+Keep the changes made to Script Studio&apos;s preferences?
+    <tag>confirm</tag>
+    <usetemplate
+     canceltext="Cancel"
+     name="yesnocancelbuttons"
+     notext="Discard"
+     yestext="Keep"/>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
    name="ScriptStudioRevert"
    type="alertmodal">
 Revert &quot;[NAME]&quot; to its saved text? What was changed since it was last saved is set aside; File &gt; Recover Unsaved Changes has it for a week.

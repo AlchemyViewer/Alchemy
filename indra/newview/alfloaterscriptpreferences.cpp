@@ -38,6 +38,7 @@
 #include "lldirpicker.h"
 #include "llnotificationsutil.h"
 #include "llscrollcontainer.h"
+#include "llsdutil.h"
 #include "llscrolllistctrl.h"
 #include "lltabcontainer.h"
 #include "lltextbox.h"
@@ -352,6 +353,7 @@ void ALFloaterScriptPreferences::onOpen(const LLSD& key)
     mShowing = true;
     remember();
     mCancelled = false;
+    mLeaving   = false;
     fillThemes();
     refreshSwatches();
     refreshFont();
@@ -384,8 +386,8 @@ void ALFloaterScriptPreferences::onClose(bool app_quitting)
         // The viewer writes the colours itself on the way out.
         return;
     }
-    // Cancelled: as it was. Closed any other way, what was changed stays,
-    // as the window showed it changing.
+    // Cancelled, or Discard answered: as it was. OK, or Keep answered:
+    // what was changed stays, as the window showed it changing.
     if (mCancelled)
     {
         revert();
@@ -455,15 +457,83 @@ void ALFloaterScriptPreferences::revert()
     ALFloaterScriptStudio::refreshAll();
 }
 
+bool ALFloaterScriptPreferences::changed() const
+{
+    if (mSnippetsUnsaved)
+    {
+        return true;
+    }
+    for (const char* setting : SETTINGS)
+    {
+        const LLControlVariable* control = gSavedSettings.getControl(setting);
+        if (control && mWasSettings.has(setting) && !llsd_equals(control->getValue(), mWasSettings[setting]))
+        {
+            return true;
+        }
+    }
+    const LLUIColorTable& table = LLUIColorTable::instance();
+    for (const auto& [name, was] : mWasColors)
+    {
+        const bool skin = !table.colorExists(name) || table.isDefault(name);
+        if (skin != was.skin || (!skin && table.getColor(name).get() != was.color))
+        {
+            return true;
+        }
+    }
+    for (bool lua : { false, true })
+    {
+        bool              exists = false;
+        const std::string now    = ALScriptSnippets::fileText(lua, exists);
+        if (exists != mWasSnippetsFile[lua ? 1 : 0] || now != mWasSnippets[lua ? 1 : 0])
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool ALFloaterScriptPreferences::canClose()
+{
+    // OK and Cancel have said what becomes of the changes, the viewer
+    // going keeps them, and with none there is nothing to ask.
+    if (mLeaving || isQuitRequested() || !mShowing || !changed())
+    {
+        return true;
+    }
+    // Every change here shows as it is made, so a close that quietly put
+    // them back would surprise as much as one that quietly kept them:
+    // asked.
+    const LLHandle<LLFloater> handle = getHandle();
+    LLNotificationsUtil::add("ScriptStudioPrefsChanged", LLSD(), LLSD(), [handle](const LLSD& notification, const LLSD& response) {
+        ALFloaterScriptPreferences* prefs  = ALViewType::as<ALFloaterScriptPreferences>(handle.get());
+        const S32                   option = LLNotificationsUtil::getSelectedOption(notification, response);
+        if (!prefs || !prefs->mShowing)
+        {
+            return;
+        }
+        if (option == 0)
+        {
+            prefs->onOK();
+        }
+        else if (option == 1)
+        {
+            prefs->onCancel();
+        }
+    });
+    return false;
+}
+
 void ALFloaterScriptPreferences::onOK()
 {
     mCancelled = false;
+    mLeaving   = true;
     closeFloater();
 }
 
 void ALFloaterScriptPreferences::onCancel()
 {
     mCancelled = true;
+    mLeaving   = true;
     closeFloater();
 }
 

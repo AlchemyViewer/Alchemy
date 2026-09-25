@@ -60,13 +60,19 @@ public:
     bool postBuild() override;
     void onOpen(const LLSD& key) override;
     void onClose(bool app_quitting) override;
+    // The close box, Escape, or anything else that closes the window but
+    // OK and Cancel: where something was changed, asked first whether to
+    // keep it, put it back, or stay.
+    bool canClose() override;
 
 private:
     // Everything changes as it is changed, so that the editors show it;
-    // OK keeps it, and Cancel -- or the close box -- puts back every
-    // colour and setting as it was when the window opened.
+    // OK keeps it, and Cancel puts back every colour and setting as it
+    // was when the window opened.
     void remember();
     void revert();
+    // Whether anything differs from what was in force then.
+    bool changed() const;
     void onOK();
     void onCancel();
 
@@ -173,10 +179,12 @@ private:
     };
     std::map<std::string, WasColor>                        mWasColors;
     LLSD                                                   mWasSettings;
-    // Cancel pressed: what was changed goes back as the window closes. The
-    // window's own close keeps it, as every change here is live already
-    // and a window closed is not a change taken back.
+    // Cancel pressed, or Discard answered: what was changed goes back as
+    // the window closes. And the way out chosen -- OK, Cancel, an answer
+    // to the question a close with changes asks -- so that the close goes
+    // through without asking.
     bool                                                   mCancelled = false;
+    bool                                                   mLeaving   = false;
     // The lints being stored from here, so that a change of them made
     // elsewhere -- a problem's menu -- is told from one of this window's.
     bool                                                   mStoringLints = false;
