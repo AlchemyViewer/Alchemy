@@ -1778,27 +1778,6 @@ A name for the new [KIND]:
 
   <notification
    icon="alertmodal.tga"
-   label="Rename"
-   name="ScriptStudioRenameItem"
-   type="alertmodal">
-A new name for &quot;[NAME]&quot;:
-    <tag>confirm</tag>
-    <form name="form">
-      <input name="name" type="text" value="[NAME]" />
-      <button
-       default="true"
-       index="0"
-       name="OK"
-       text="Rename"/>
-      <button
-       index="1"
-       name="Cancel"
-       text="Cancel"/>
-    </form>
-  </notification>
-
-  <notification
-   icon="alertmodal.tga"
    label="Save Theme"
    name="ScriptStudioSaveTheme"
    type="alertmodal">

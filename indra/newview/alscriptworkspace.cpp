@@ -1548,6 +1548,44 @@ bool ALScriptWorkspace::rename(const ALScriptRef& ref, const std::string& name, 
     return true;
 }
 
+bool ALScriptWorkspace::renameObject(const LLUUID& prim_id, const std::string& name, std::string& error)
+{
+    if (name.empty())
+    {
+        error = LLTrans::getString("WorkspaceNameNeeded");
+        return false;
+    }
+    LLViewerObject* prim   = gObjectList.findObject(prim_id);
+    LLViewerRegion* region = prim ? prim->getRegion() : nullptr;
+    if (!region)
+    {
+        error = LLTrans::getString("WorkspaceNoSuchObject");
+        return false;
+    }
+    if (std::string refused = rlvRefusal(prim, LLAssetType::AT_NONE, RlvUse::Change); !refused.empty())
+    {
+        error = std::move(refused);
+        return false;
+    }
+    if (!prim->permModify())
+    {
+        error = LLTrans::getString("WorkspaceObjectNotModifiable");
+        return false;
+    }
+    // By its local id, as the selection's rename sends it, without its
+    // being selected.
+    LLMessageSystem* msg = gMessageSystem;
+    msg->newMessageFast(_PREHASH_ObjectName);
+    msg->nextBlockFast(_PREHASH_AgentData);
+    msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
+    msg->addUUIDFast(_PREHASH_SessionID, gAgent.getSessionID());
+    msg->nextBlockFast(_PREHASH_ObjectData);
+    msg->addU32Fast(_PREHASH_LocalID, prim->getLocalID());
+    msg->addStringFast(_PREHASH_Name, name);
+    msg->sendReliable(region->getHost());
+    return true;
+}
+
 bool ALScriptWorkspace::remove(const ALScriptRef& ref, std::string& error)
 {
     if (ref.inInventory())

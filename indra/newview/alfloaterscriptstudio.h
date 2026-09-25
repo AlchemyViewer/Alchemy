@@ -810,7 +810,9 @@ private:
     // opened once the region lists it.
     void explorerCreate(const LLUUID& prim, bool notecard, bool lua);
     void explorerCreated(const ALScriptWorkspace::Created& made, const std::optional<std::string>& opening);
+    // A row renamed where it stands; and the name it was given, taken.
     void explorerRename(const ExplorerRow& row);
+    void explorerRenamed(const ExplorerRow& row, const std::string& was, std::string name);
     void explorerDelete(const std::vector<ExplorerRow>& rows);
     void explorerRecompile(const std::vector<ExplorerRow>& rows);
     // Whether a script runs, as far as the studio knows: its tab's word,

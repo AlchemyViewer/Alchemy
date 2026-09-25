@@ -1210,7 +1210,7 @@
              left="0"
              multi_select="true"
              name="explorer"
-             tool_tip="The objects in hand -- pinned, selected in world, or holding a script that is open -- and their scripts and notecards. Double-click or return opens one, delete deletes it, F2 renames it, right-click for everything else. Drag them to your inventory or onto another object here, and drop on an object what your inventory holds, to put it in."
+             tool_tip="The objects in hand -- pinned, selected in world, or holding a script that is open -- and their scripts and notecards. Double-click or return opens one, delete deletes it, F2 renames it -- or an object or a prim -- in its row, right-click for everything else. Drag them to your inventory or onto another object here, and drop on an object what your inventory holds, to put it in."
              top="24"
              width="240">
                 <pane_list.columns label="" name="icon" width="20" />

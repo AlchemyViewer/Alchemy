@@ -369,6 +369,10 @@ public:
     bool create(const LLUUID& prim, bool notecard, bool lua, const std::string& name, created_callback_t callback, std::string& error);
     // A new name for a script or notecard, in an object or in inventory.
     bool rename(const ALScriptRef& ref, const std::string& name, std::string& error);
+    // A new name for a prim -- an object's is its root prim's -- as the
+    // build floater's gives one, whether or not it is selected: refused
+    // where it may not be changed, or RLVa keeps it from being edited.
+    bool renameObject(const LLUUID& prim, const std::string& name, std::string& error);
     // An item taken out of an object, which is for good, or an inventory
     // item put in the trash.
     bool remove(const ALScriptRef& ref, std::string& error);

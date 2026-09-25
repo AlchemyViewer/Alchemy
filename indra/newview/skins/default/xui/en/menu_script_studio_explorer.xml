@@ -22,7 +22,7 @@
     <menu_item_call.on_enable function="Explorer.Enable" parameter="new_notecard" />
   </menu_item_call>
   <menu_item_separator layout="topleft" />
-  <menu_item_call label="Rename..." layout="topleft" name="rename">
+  <menu_item_call label="Rename" layout="topleft" name="rename">
     <menu_item_call.on_click function="Explorer.Action" parameter="rename" />
     <menu_item_call.on_enable function="Explorer.Enable" parameter="rename" />
   </menu_item_call>

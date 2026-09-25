@@ -11865,7 +11865,8 @@ bool ALFloaterScriptStudio::explorerActionEnabled(const std::string& action) con
     }
     if (action == "rename")
     {
-        return rows.size() == 1 && rows.front().isItem();
+        // A script or notecard; or a prim or an object, which is in sight.
+        return rows.size() == 1 && (rows.front().isItem() || present(rows.front()));
     }
     if (action == "delete")
     {
@@ -11916,10 +11917,7 @@ void ALFloaterScriptStudio::onExplorerAction(const std::string& action)
     }
     else if (action == "rename")
     {
-        if (rows.front().isItem())
-        {
-            explorerRename(rows.front());
-        }
+        explorerRename(rows.front());
     }
     else if (action == "delete")
     {
@@ -12269,35 +12267,104 @@ void ALFloaterScriptStudio::explorerCreated(const ALScriptWorkspace::Created& ma
 
 void ALFloaterScriptStudio::explorerRename(const ExplorerRow& row)
 {
-    LLSD args;
-    args["NAME"] = row.name;
-    const LLHandle<LLFloater> handle = getHandle();
-    const ALScriptRef         ref    = row.ref();
-    LLNotificationsUtil::add("ScriptStudioRenameItem", args, LLSD(), [handle, ref, was = row.name](const LLSD& notification, const LLSD& response) {
-        ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get());
-        if (!studio || LLNotificationsUtil::getSelectedOption(notification, response) != 0)
+    // In its row, as a tree of files renames: the one chosen that stands
+    // for it -- not a linkset's row of prims holding nothing -- its name
+    // edited where it is shown, past the arrow, the pin and the indent.
+    const LLScrollListItem* item = nullptr;
+    for (const LLScrollListItem* chosen : mExplorer->getAllSelected())
+    {
+        if (chosen->getValue().isMap() && !chosen->getValue().has("empties"))
         {
-            return;
+            item = chosen;
+            break;
         }
-        std::string name = response["name"].asString();
-        LLStringUtil::trim(name);
-        if (name.empty() || name == was)
+    }
+    const LLScrollListColumn* column = mExplorer->getColumn("name");
+    const LLScrollListCell*   cell   = item && column ? item->getColumn(column->mIndex) : nullptr;
+    if (!cell)
+    {
+        return;
+    }
+    // An object's row is its root prim's name; a prim's its own.
+    std::string name = row.name;
+    if (!row.isItem())
+    {
+        const LLUUID prim = row.primRow ? row.prim : row.root;
+        for (const ExplorerObject& object : mExplorerModel)
         {
-            return;
+            for (const ExplorerPrim& each : object.prims)
+            {
+                if (each.id == prim)
+                {
+                    name = prim == object.root ? object.name : each.name;
+                }
+            }
         }
-        std::string error;
+    }
+    const std::string shown  = cell->getValue().asString();
+    const std::string before = shown.size() >= name.size() && shown.ends_with(name) ? shown.substr(0, shown.size() - name.size()) : std::string();
+    ALPaneList::Edit  edit;
+    edit.column   = "name";
+    edit.indent   = LLFontGL::getFontSansSerifSmall()->getWidth(before);
+    edit.text     = name;
+    edit.maxBytes = DB_INV_ITEM_NAME_STR_LEN;
+    edit.done     = [this, row, name](const std::string& typed) { explorerRenamed(row, name, typed); };
+    mExplorer->editRow(item->getValue(), std::move(edit));
+}
+
+void ALFloaterScriptStudio::explorerRenamed(const ExplorerRow& row, const std::string& was, std::string name)
+{
+    LLStringUtil::trim(name);
+    if (name.empty() || name == was)
+    {
+        return;
+    }
+    std::string error;
+    if (row.isItem())
+    {
+        const ALScriptRef ref = row.ref();
         if (!ALScriptWorkspace::instance().rename(ref, name, error))
         {
-            studio->report(error, true);
+            report(error, true);
             return;
         }
         // The tab, if it is open, and the list.
-        if (const size_t index = studio->indexOf(ref); index != NONE)
+        if (const size_t index = indexOf(ref); index != NONE)
         {
-            studio->renameDoc(*studio->mDocs[index], name);
+            renameDoc(*mDocs[index], name);
         }
-        studio->refreshExplorer(true);
-    });
+        refreshExplorer(true);
+        return;
+    }
+    const LLUUID prim = row.primRow ? row.prim : row.root;
+    if (!ALScriptWorkspace::instance().renameObject(prim, name, error))
+    {
+        report(error, true);
+        return;
+    }
+    // Called so here at once, and in the pin; and asked of the region
+    // again, whose answer is what the names are read from, so that the
+    // next reading has it too.
+    for (ExplorerObject& object : mExplorerModel)
+    {
+        for (ExplorerPrim& each : object.prims)
+        {
+            if (each.id != prim)
+            {
+                continue;
+            }
+            each.name  = name;
+            each.named = true;
+            if (prim == object.root)
+            {
+                object.named = true;
+                renameExplorerObject(object, name);
+            }
+        }
+    }
+    mNamesAsked.erase(prim);
+    askExplorerName(prim);
+    fillExplorer();
 }
 
 void ALFloaterScriptStudio::explorerDelete(const std::vector<ExplorerRow>& rows)
