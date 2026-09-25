@@ -434,6 +434,10 @@ std::string ALVimKeymap::status() const
             {
                 pending += utf8Of(mObjectKind);
             }
+            if (mOneCommand)
+            {
+                return recording + said("VimOneCommand", "-- (insert) --") + (pending.empty() ? "" : " " + pending);
+            }
             return recording + pending;
         }
     }
@@ -645,6 +649,18 @@ bool ALVimKeymap::feed(ALTextView& view, const Input& input)
     if (taken && (mMode == Mode::Normal || isVisual()) && !mVerticalMove && mCount == 0 && !mOperator && !mPending)
     {
         mWantColumn = -1;
+    }
+    // Ctrl-O's one command done -- nothing pending, back in normal mode --
+    // inserting again where it left off; not by the Ctrl-O itself.
+    if (mOneCommand == 2)
+    {
+        mOneCommand = 1;
+    }
+    else if (mOneCommand == 1 && taken && mMode == Mode::Normal && mCount == 0 && !mOperator && !mPending && !mRegister)
+    {
+        mOneCommand = 0;
+        mMode       = Mode::Insert;
+        view.undoJournal().beginGroup();
     }
     bump();
     return taken;
@@ -1128,6 +1144,83 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
                     case 'r':
                         mPending = PENDING_GR;
                         return true;
+                    case '_':
+                        return command(view, 0x06);
+                    case 'i':
+                    {
+                        // Inserting again where it last stopped.
+                        clearPending();
+                        if (!editing)
+                        {
+                            return true;
+                        }
+                        const auto mark = mMarks.find('^');
+                        if (mark != mMarks.end())
+                        {
+                            view.setCaret(d.clamp(mark->second));
+                        }
+                        enterInsert(view, count);
+                        return true;
+                    }
+                    case '*':
+                    case '#':
+                    {
+                        // As * and #, the word anywhere, not only whole.
+                        const ALTextRange word = d.wordAt(view.caret());
+                        clearPending();
+                        if (!word.empty())
+                        {
+                            mSearchPattern   = d.text(word);
+                            mSearchForward   = ch == '*';
+                            mSearchWholeWord = false;
+                            search(view, mSearchPattern, mSearchForward, count, false);
+                        }
+                        return true;
+                    }
+                    case 'p':
+                    case 'P':
+                        if (editing && !visual)
+                        {
+                            put(view, mRegister, ch == 'p', count, true);
+                            finishCommand(true);
+                        }
+                        else
+                        {
+                            clearPending();
+                        }
+                        return true;
+                    case 'n':
+                    case 'N':
+                    {
+                        // The last search's match here or next: selected, or
+                        // what an operator works on -- cgn, and . for the
+                        // next.
+                        const std::optional<ALTextRange> match = matchNear(view, ch == 'n');
+                        if (!match)
+                        {
+                            clearPending();
+                            return true;
+                        }
+                        if (mOperator)
+                        {
+                            Span span;
+                            span.range       = *match;
+                            const llwchar op = mOperator;
+                            applyOperator(view, op, span, 1);
+                            finishCommand(op != 'y');
+                            return true;
+                        }
+                        clearPending();
+                        if (!visual)
+                        {
+                            mVisualAnchor = match->begin;
+                            enterVisual(view, Mode::Visual);
+                        }
+                        mVisualAnchor = match->begin;
+                        mVisualCaret  = d.prevCluster(match->end);
+                        showVisual(view);
+                        return true;
+                    }
                     case 'O':
                         // The script's symbols, to go to one: the host's.
                         clearPending();
@@ -1320,8 +1413,9 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
             {
                 // ]d [d the problems, ]s [s the misspellings, [z ]z the fold
                 // the caret is in.
-                const bool forward = pending == ']';
-                const S32  given   = mCount;
+                const bool    forward  = pending == ']';
+                const S32     given    = mCount;
+                const llwchar operated = mOperator;
                 clearPending();
                 if (ch == 'd')
                 {
@@ -1334,6 +1428,24 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
                 else if (ch == 'z')
                 {
                     foldCommand(view, ch, pending);
+                }
+                else if ((forward && (ch == ')' || ch == '}')) || (!forward && (ch == '(' || ch == '{')))
+                {
+                    ALTextPos to;
+                    if (unmatchedBracket(view, ch, countOr(given), to))
+                    {
+                        if (operated)
+                        {
+                            // Exclusive, as vim's are: the bracket itself is
+                            // left.
+                            Span span;
+                            span.range = ALTextRange(cursor(view), to).normalised();
+                            applyOperator(view, operated, span, 1);
+                            finishCommand(operated != 'y');
+                            return true;
+                        }
+                        moveTo(view, to);
+                    }
                 }
                 return true;
             }
@@ -1444,7 +1556,7 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
             mPending = ch;
             return true;
         }
-        if (ch == 'f' || ch == 'F' || ch == 't' || ch == 'T' || ch == '`' || ch == '\'' || ch == 'g')
+        if (ch == 'f' || ch == 'F' || ch == 't' || ch == 'T' || ch == '`' || ch == '\'' || ch == 'g' || ch == '[' || ch == ']')
         {
             mPending = ch;
             return true;
@@ -2285,6 +2397,17 @@ ALVimKeymap::Motion ALVimKeymap::motion(ALTextView& view, llwchar ch, S32 count,
             m.moved     = m.to != from;
             return m;
         }
+        case 0x06:  // g_
+        {
+            // The last character on the line that is not a blank, the count
+            // lines on; inclusive, as $ is.
+            const S32          line = llmin(d.lineCount() - 1, from.line + count - 1);
+            const std::string& text = d.line(line);
+            const size_t       last = text.find_last_not_of(" \t");
+            m.to                    = ALTextPos(line, last == std::string::npos ? 0 : static_cast<S32>(last));
+            m.inclusive             = true;
+            return m;
+        }
         case 0x02:  // ge
         case 0x03:  // gE
         {
@@ -3058,7 +3181,7 @@ void ALVimKeymap::tooMuch(size_t bytes)
     say(said("VimCountTooLarge", "Too large a count: it would put in [SIZE] MB", { { "[SIZE]", llformat("%.1f", (F64)bytes / (1024.0 * 1024.0)) } }), true);
 }
 
-void ALVimKeymap::put(ALTextView& view, char name, bool after, S32 count)
+void ALVimKeymap::put(ALTextView& view, char name, bool after, S32 count, bool past)
 {
     const ALTextDocument& d   = view.document();
     const Register        reg = fetch(name);
@@ -3141,6 +3264,13 @@ void ALVimKeymap::put(ALTextView& view, char name, bool after, S32 count)
             view.insertText(text + "\n");
         }
         const S32 line = after ? from.line + 1 : from.line;
+        if (past)
+        {
+            // The line after the last one put.
+            const S32 below = llmin(line + static_cast<S32>(std::count(text.begin(), text.end(), '\n')) + 1, d.lineCount() - 1);
+            moveTo(view, ALTextPos(below, 0));
+            return;
+        }
         moveTo(view, ALTextPos(line, firstNonBlankColumn(d, line)));
         return;
     }
@@ -3151,8 +3281,8 @@ void ALVimKeymap::put(ALTextView& view, char name, bool after, S32 count)
     }
     view.setCaret(where);
     view.insertText(text);
-    // On the last character put, as vim leaves it.
-    moveTo(view, text.find('\n') == std::string::npos ? d.prevCluster(view.caret()) : where);
+    // On the last character put, as vim leaves it; gp just after it.
+    moveTo(view, past ? view.caret() : text.find('\n') == std::string::npos ? d.prevCluster(view.caret()) : where);
 }
 
 // --- insert mode ------------------------------------------------------------------------
@@ -3233,6 +3363,8 @@ void ALVimKeymap::leaveInsert(ALTextView& view)
     mLastTyped      = mTyped;
     view.undoJournal().endGroup();
     mMode = Mode::Normal;
+    // Where inserting stopped, for gi to go back to: vim's ^ mark.
+    mMarks['^'] = view.caret();
     // The caret steps back onto the last character typed.
     const ALTextPos caret = view.caret();
     moveTo(view, caret.column > 0 ? d.prevCluster(caret) : caret);
@@ -3269,6 +3401,17 @@ bool ALVimKeymap::insertControl(ALTextView& view, const Input& input)
     };
     switch (input.key)
     {
+        case 'O':
+            // One command of normal mode, then inserting again.
+            view.undoJournal().endGroup();
+            mMode       = Mode::Normal;
+            mOneCommand = 2;
+            bump();
+            return true;
+        case 'V':
+            mLiteral = true;
+            mLiteralCode.clear();
+            return true;
 #if LL_DARWIN
         case 'S':
             // What the call being typed takes, as Neovim's Control-S shows
@@ -3364,6 +3507,52 @@ bool ALVimKeymap::insertControl(ALTextView& view, const Input& input)
 bool ALVimKeymap::insert(ALTextView& view, const Input& input)
 {
     const ALTextDocument& d = view.document();
+    if (mLiteral)
+    {
+        // After Ctrl-V: a tab as a tab, whatever the tabs are set to; a
+        // character as it is, nothing typed along with it; u and four hex
+        // digits the character by its code.
+        if (!input.isChar)
+        {
+            if (input.key == KEY_TAB)
+            {
+                mLiteral = false;
+                typeIn(view, "\t");
+                return true;
+            }
+            const bool plain = !(input.mask & (CONTROL | MASK_CONTROL | MASK_ALT)) && input.key >= 0x20 && input.key < KEY_SPECIAL;
+            if (plain || input.key == KEY_SHIFT || input.key == KEY_CONTROL || input.key == KEY_ALT)
+            {
+                return false;
+            }
+            mLiteral = false;
+            mLiteralCode.clear();
+            return true;
+        }
+        const bool hex = input.ch < 0x80 && isxdigit(static_cast<int>(input.ch));
+        if (mLiteralCode.empty() && input.ch == 'u')
+        {
+            mLiteralCode = "u";
+            return true;
+        }
+        if (!mLiteralCode.empty() && hex)
+        {
+            mLiteralCode += static_cast<char>(input.ch);
+            if (mLiteralCode.size() == 5)
+            {
+                mLiteral = false;
+                const llwchar code = static_cast<llwchar>(std::strtoul(mLiteralCode.c_str() + 1, nullptr, 16));
+                mLiteralCode.clear();
+                typeIn(view, utf8Of(code));
+            }
+            return true;
+        }
+        mLiteral = false;
+        const std::string before = mLiteralCode;
+        mLiteralCode.clear();
+        typeIn(view, before + utf8Of(input.ch));
+        return true;
+    }
     if (mInsertRegister)
     {
         // The register after a Control-R: its text typed in. The key a
@@ -5472,4 +5661,117 @@ bool ALVimKeymap::foldCommand(ALTextView& view, llwchar ch, llwchar prefix)
         moveTo(view, ALTextPos(to, firstNonBlankColumn(d, to)));
     }
     return true;
+}
+
+std::optional<ALTextRange> ALVimKeymap::matchNear(ALTextView& view, bool forward)
+{
+    if (mSearchPattern.empty())
+    {
+        say(said("VimNoPreviousPattern", "E35: No previous regular expression"), true);
+        return std::nullopt;
+    }
+    ALTextSearchOptions options;
+    options.regex         = !mSearchWholeWord;
+    options.wholeWord     = mSearchWholeWord;
+    const Pattern pattern = mSearchWholeWord ? Pattern{ mSearchPattern, !mShared->ignoreCase } : patternOf(mSearchPattern);
+    options.caseSensitive = pattern.caseSensitive;
+    std::string              error;
+    std::vector<ALTextPos>   wholes;
+    std::vector<ALTextRange> matches = matchesOf(view, pattern, options, nullptr, error, wholes);
+    if (!error.empty() || matches.empty())
+    {
+        say(said("VimPatternNotFound", "E486: Pattern not found: [PATTERN]", { { "[PATTERN]", mSearchPattern } }), true);
+        return std::nullopt;
+    }
+    // gn: the one the caret is in, or the next; gN the one it is in, or
+    // the one before.
+    const ALTextPos at = cursor(view);
+    if (forward)
+    {
+        for (const ALTextRange& match : matches)
+        {
+            if (at < match.end)
+            {
+                return match;
+            }
+        }
+        return matches.front();
+    }
+    for (auto it = matches.rbegin(); it != matches.rend(); ++it)
+    {
+        if (!(at < it->begin))
+        {
+            return *it;
+        }
+    }
+    return matches.back();
+}
+
+bool ALVimKeymap::unmatchedBracket(const ALTextView& view, llwchar bracket, S32 count, ALTextPos& out) const
+{
+    // Out through the brackets of the other kind as well, counting pairs of
+    // this kind only: [( from a(b(c)d|) is the second (.
+    const ALTextDocument& d       = view.document();
+    const bool            forward = bracket == ')' || bracket == '}';
+    const char            open    = bracket == ')' || bracket == '(' ? '(' : '{';
+    const char            close   = open == '(' ? ')' : '}';
+    ALTextPos             at      = view.caret();
+    S32                   depth   = 0;
+    S32                   found   = 0;
+    for (;;)
+    {
+        if (forward)
+        {
+            if (atLineEnd(d, at))
+            {
+                if (at.line + 1 >= d.lineCount())
+                {
+                    return false;
+                }
+                at = ALTextPos(at.line + 1, 0);
+                if (d.lineLength(at.line) == 0)
+                {
+                    continue;
+                }
+            }
+            else
+            {
+                at = d.nextCluster(at);
+                if (atLineEnd(d, at))
+                {
+                    continue;
+                }
+            }
+        }
+        else
+        {
+            if (at.column == 0)
+            {
+                if (at.line == 0)
+                {
+                    return false;
+                }
+                at = ALTextPos(at.line - 1, d.lineLength(at.line - 1));
+                continue;
+            }
+            at = d.prevCluster(at);
+        }
+        const char c = d.line(at.line)[static_cast<size_t>(at.column)];
+        if (c == (forward ? open : close))
+        {
+            ++depth;
+        }
+        else if (c == (forward ? close : open))
+        {
+            if (depth > 0)
+            {
+                --depth;
+            }
+            else if (++found == count)
+            {
+                out = at;
+                return true;
+            }
+        }
+    }
 }

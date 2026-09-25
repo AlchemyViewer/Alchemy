@@ -261,7 +261,8 @@ private:
     // Registers, the unnamed one on the clipboard.
     void     store(char name, std::string text, bool linewise, bool block, bool yanked);
     Register fetch(char name) const;
-    void     put(ALTextView& view, char name, bool after, S32 count);
+    // gp and gP, `past`: the caret after what was put.
+    void     put(ALTextView& view, char name, bool after, S32 count, bool past = false);
     // Says a count would make more text than it may, and how much.
     void     tooMuch(size_t bytes);
 
@@ -343,6 +344,12 @@ private:
     void suggest(ALTextView& view, S32 given);
     // zo zc za zR zM zj zk [z ]z: the code editor's folds.
     bool foldCommand(ALTextView& view, llwchar ch, llwchar prefix);
+    // The last search's match at the caret or after it, or at it or before
+    // it, round past the ends: what gn and gN take.
+    std::optional<ALTextRange> matchNear(ALTextView& view, bool forward);
+    // [( [{ ]) ]}: the bracket the caret is inside of, open before it or
+    // closed after it, the count out; false where there is none.
+    bool unmatchedBracket(const ALTextView& view, llwchar bracket, S32 count, ALTextPos& out) const;
     // A jump from `from`: vim's context marks, '' and ``, set there, and
     // the host told.
     void noteJump(ALTextView& view, const ALTextPos& from);
@@ -373,6 +380,12 @@ private:
     llwchar mOperator     = 0;
     S32     mOperatorCount = 0;
     llwchar mPending      = 0;
+    // Insert mode's Ctrl-O: 2 as it is typed, 1 while the one command it
+    // allows waits, then back to inserting. And its Ctrl-V: the next key
+    // put in as it is -- a tab, a character, or uXXXX by its code.
+    S32         mOneCommand = 0;
+    bool        mLiteral    = false;
+    std::string mLiteralCode;
     // For a text object after an operator: whether the pending i or a
     // was read.
     llwchar mObjectKind   = 0;

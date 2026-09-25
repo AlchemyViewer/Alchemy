@@ -1706,4 +1706,95 @@ namespace tut
         keys(":set hlsearch<CR>n");
         ensure_equals("lit again", e.highlights().size(), size_t(3));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<52>()
+    {
+        set_test_name("gn selects the last search's match here or next, and an operator takes it: cgn then . for the next; gN back");
+        ALCodeEditor& e = make("foo bar foo baz foo\n");
+        keys("/foo<CR>gg");
+        keys("cgnqux<Esc>");
+        ensure_equals("the first changed", e.document().line(0), std::string("qux bar foo baz foo"));
+        keys(".");
+        ensure_equals(". the next", e.document().line(0), std::string("qux bar qux baz foo"));
+        keys("dgn");
+        ensure_equals("dgn the last", e.document().line(0), std::string("qux bar qux baz "));
+        keys("u0gn");
+        ensure("gn: selected",
+               vim->mode() == ALVimKeymap::Mode::Visual && e.selection() == ALTextRange(ALTextPos(0, 16), ALTextPos(0, 19)));
+        keys("<Esc>$gN");
+        ensure("gN: the one it is in, or before", e.selection() == ALTextRange(ALTextPos(0, 16), ALTextPos(0, 19)));
+        keys("<Esc>");
+    }
+
+    template<> template<>
+    void alvimkeymap_object::test<53>()
+    {
+        set_test_name("gi inserts again where inserting last stopped, as the ^ mark keeps it through edits above");
+        ALCodeEditor& e = make("abc\ndef\n");
+        keys("A!<Esc>ggyyPG");
+        keys("gi?<Esc>");
+        ensure_equals("where it stopped, moved down a line", flat(e.text()), std::string("abc!|abc!?|def|"));
+    }
+
+    template<> template<>
+    void alvimkeymap_object::test<54>()
+    {
+        set_test_name("g* and g# as * and # but not whole words; g_ the last non-blank; gp and gP leave the caret after what they put");
+        ALCodeEditor& e = make("foo foobar foo\n  abc  \nx\n");
+        keys("*");
+        ensure("* whole words only", e.caret() == ALTextPos(0, 11));
+        keys("gg0g*");
+        ensure("g* in foobar too", e.caret() == ALTextPos(0, 4));
+        keys("jg_");
+        ensure("g_ the last non-blank", e.caret() == ALTextPos(1, 4));
+        keys("0dg_");
+        ensure_equals("and an operator's", e.document().line(1), std::string("  "));
+        keys("u");
+        keys("3Gyykgp");
+        ensure("gp: a line put, the caret on the line after it",
+               e.document().line(2) == "x" && e.document().line(3) == "x" && e.caret().line == 3);
+        keys("ggywgP");
+        ensure("gP: characters put, the caret after them", e.document().line(0) == "foo foo foobar foo" && e.caret() == ALTextPos(0, 4));
+    }
+
+    template<> template<>
+    void alvimkeymap_object::test<55>()
+    {
+        set_test_name("[( [{ ]) ]} go to the bracket the caret is inside of, a count out, across lines; and are an operator's, exclusive");
+        ALCodeEditor& e = make("f(a, g(b), c)\n{\n  x { y }\n  z\n}\n");
+        keys("fb");
+        keys("[(");
+        ensure("the g's", e.caret() == ALTextPos(0, 6));
+        keys("fb2[(");
+        ensure("two out", e.caret() == ALTextPos(0, 1));
+        keys("fb])");
+        ensure("the close after it", e.caret() == ALTextPos(0, 8));
+        keys("0fad])");
+        ensure_equals("up to the close, not it", e.document().line(0), std::string("f()"));
+        keys("3G0fy[{");
+        ensure("an inner brace", e.caret() == ALTextPos(2, 4));
+        keys("j]}");
+        ensure("an outer one, across lines", e.caret() == ALTextPos(4, 0));
+    }
+
+    template<> template<>
+    void alvimkeymap_object::test<56>()
+    {
+        set_test_name("insert mode's Ctrl-O runs one command of normal mode and inserts again; Ctrl-V puts in the next key as it is");
+        ALCodeEditor& e = make("abc\n");
+        keys("A<C-o>");
+        ensure("one command waits", vim->mode() == ALVimKeymap::Mode::Normal && vim->status().find("-- (insert) --") != std::string::npos);
+        keys("0");
+        ensure("then inserting", vim->mode() == ALVimKeymap::Mode::Insert);
+        keys("X<Esc>");
+        ensure_equals("where the command left it", e.document().line(0), std::string("Xabc"));
+        keys("A<C-o>:s/a/Y/<CR>");
+        ensure("after a : line too", vim->mode() == ALVimKeymap::Mode::Insert && e.document().line(0) == "XYbc");
+        keys("<Esc>");
+
+        make("\n");
+        keys("i<C-v><Tab>x<C-v>u00e9<C-v>(<Esc>");
+        ensure_equals("a tab, an e by its code, a bracket alone", editor->document().line(0), std::string("\tx\xC3\xA9("));
+    }
 }
