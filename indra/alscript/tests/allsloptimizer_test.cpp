@@ -25,18 +25,21 @@
 
 #include "linden_common.h"
 
+#include "../alscriptengine.h"
 #include "../allslinliner.h"
 #include "../allsloptimizer.h"
 #include "../allslservice.h"
 
 #include "../test/lltut.h"
 
+#include <atomic>
 #include <cmath>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <initializer_list>
 #include <sstream>
+#include <thread>
 #include <vector>
 
 namespace tut
@@ -973,5 +976,36 @@ namespace tut
         ensure("went in: " + put.text, put.inlined == 1);
         r = ALLSLOptimizer::run(fn + wrap("integer g;\n", "        if (g) skip(g); else llOwnerSay(\"none\");\n        g = llGetUnixTime();\n"), o);
         ensure("the else still follows its if: " + notes(r) + r.text, r.optimized && r.text.find("else") != std::string::npos);
+    }
+    template<> template<>
+    void allsloptimizer_object::test<26>()
+    {
+        set_test_name("a long hold of the engine lets another thread in between its rounds, and only then");
+        std::atomic<bool> in{ false };
+        std::thread       other;
+        {
+            AL_SCRIPT_ENGINE_HELD;
+            // Nobody waiting: nothing to let go of for.
+            alScriptEngineYield();
+            other = std::thread([&in]() {
+                AL_SCRIPT_ENGINE_HELD;
+                in = true;
+            });
+            while (al_script_engine::waiting().load() == 0)
+            {
+                std::this_thread::yield();
+            }
+            ensure("kept out while held", !in.load());
+            {
+                // A hold within a hold lets go of nothing, and so waits
+                // for nobody.
+                AL_SCRIPT_ENGINE_HELD;
+                alScriptEngineYield();
+                ensure("not from an inner hold", !in.load());
+            }
+            alScriptEngineYield();
+            ensure("let in between rounds", in.load());
+        }
+        other.join();
     }
 } // namespace tut

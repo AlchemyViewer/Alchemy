@@ -3403,7 +3403,6 @@ namespace
 
 ALLSLOptimizer::Result ALLSLOptimizer::run(std::string_view source, const Options& options)
 {
-    AL_SCRIPT_ENGINE_HELD;
     Result result;
     result.text       = std::string(source);
     result.sizeBefore = source.size();
@@ -3422,7 +3421,8 @@ ALLSLOptimizer::Result ALLSLOptimizer::run(std::string_view source, const Option
 
     // The functions called once put in place first, in the text, so that
     // what is parsed below is an ordinary script; its map is under the
-    // printer's.
+    // printer's. Before the engine is taken for the rest, so that the
+    // inliner's hold is its only one and it can let go between rounds.
     std::string inlined;
     ALSourceMap inlinedMap;
     if (options.inlining)
@@ -3439,6 +3439,7 @@ ALLSLOptimizer::Result ALLSLOptimizer::run(std::string_view source, const Option
             }
         }
     }
+    AL_SCRIPT_ENGINE_HELD;
     // What is said from here on is said of the inlined text, and brought
     // back to the source on the way out.
     const size_t saidOfInlined = result.problems.size();
@@ -3512,6 +3513,8 @@ ALLSLOptimizer::Result ALLSLOptimizer::run(std::string_view source, const Option
     const size_t perRound = std::max<size_t>(1, nodes());
     for (int round = 0; round < 64; ++round)
     {
+        // A check waiting on another thread goes between rounds.
+        alScriptEngineYield();
         visited += perRound;
         if (visited > options.visitBudget)
         {

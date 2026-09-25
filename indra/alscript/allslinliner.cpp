@@ -1100,6 +1100,8 @@ ALLSLInliner::Result ALLSLInliner::run(std::string_view source, const std::vecto
     // the last's, until nothing more can go.
     for (int round = 0; round < 64; ++round)
     {
+        // A check waiting on another thread goes between rounds.
+        alScriptEngineYield();
         ALSourceMap      step;
         ALScriptProblems said;
         const S32        went = inlineRound(result.text, step, said, marked);
