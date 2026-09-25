@@ -1008,4 +1008,57 @@ namespace tut
         }
         other.join();
     }
+
+    template<> template<>
+    void allsloptimizer_object::test<27>()
+    {
+        set_test_name("a list literal as a sum brackets an element where the sum would bind it otherwise, and stays a literal where the order would show");
+        const auto compiles = [](const ALLSLOptimizer::Result& r) {
+            ALLSLService           service;
+            const ALScriptProblems said = service.check(r.text);
+            for (const ALScriptProblem& p : said)
+            {
+                ensure("no error in what was written: " + p.message + "\n" + r.text, p.severity != ALScriptProblem::Severity::Error);
+            }
+        };
+        // A comparison among the elements, as a preprocessor writes one:
+        // under a + it would take the sum before it as its left side.
+        ALLSLOptimizer::Result r = ALLSLOptimizer::run(wrap("", "        list loc_params;\n        integer loc_sitTargetsRemaining = 1;\n"
+                                                                "        loc_params = loc_params +\n"
+                                                                "            [ 41\n"
+                                                                "            , ((integer)-1) < --loc_sitTargetsRemaining\n"
+                                                                "            , <((float)0), ((float)0), ((float)0)>\n"
+                                                                "            , <((float)0), ((float)0), ((float)0), ((float)1)>\n"
+                                                                "            ];\n"),
+                                                       options());
+        ensure("optimized: " + notes(r), r.optimized);
+        ensure("the comparison bracketed: " + r.text,
+               r.text.find("(list)41 + (-1 < --loc_sitTargetsRemaining) + <0, 0, 0> + <0, 0, 0, 1>") != std::string::npos);
+        compiles(r);
+
+        // The first element under the cast, bracketed where the cast would
+        // take less of it; the rest where the sum would.
+        r = ALLSLOptimizer::run(wrap("", "        integer a = (integer)llFrand(9);\n        integer b = (integer)llFrand(9);\n        list l;\n"
+                                         "        l = [a - b, 1];\n        l = [--a, 2];\n        l = [-1, 3];\n        l = [a * b, a - b];\n        llSay(0, llList2CSV(l));\n"),
+                                options());
+        ensure("a difference: " + r.text, r.text.find("l = (list)(a - b) + 1;") != std::string::npos);
+        ensure("a step down: " + r.text, r.text.find("l = (list)(--a) + 2;") != std::string::npos);
+        ensure("a negative constant bare: " + r.text, r.text.find("l = (list)-1 + 3;") != std::string::npos);
+        ensure("a product under the cast, a difference after it: " + r.text, r.text.find("l = (list)(a * b) + (a - b);") != std::string::npos);
+        compiles(r);
+
+        // A sum takes its right side first, so the elements would be taken
+        // last to first: where more than one of them could see another's
+        // change, the literal stays.
+        r = ALLSLOptimizer::run(wrap("integer g;\ninteger bump()\n{\n    return ++g;\n}\n",
+                                     "        integer i = (integer)llFrand(9);\n        list l;\n"
+                                     "        l = [i, --i];\n        l = [bump(), bump()];\n        l = [llGetUnixTime(), bump()];\n        l = [i, g];\n"
+                                     "        llSay(0, llList2CSV(l));\n"),
+                                options());
+        ensure("a name and its change: " + r.text, r.text.find("l = [i, --i];") != std::string::npos);
+        ensure("two calls that change: " + r.text, r.text.find("l = [bump(), bump()];") != std::string::npos);
+        ensure("a read and a call that changes: " + r.text, r.text.find("l = [llGetUnixTime(), bump()];") != std::string::npos);
+        ensure("reads alone, a sum: " + r.text, r.text.find("l = (list)i + g;") != std::string::npos);
+        compiles(r);
+    }
 } // namespace tut

@@ -2356,12 +2356,25 @@ namespace
                     return false;
                 }
             }
+            // A sum takes its right side first, so its elements are taken
+            // last to first, where a literal's are taken first to last:
+            // where one of them changes something, and another is anything
+            // but a constant, that one could see the change the other way
+            // round.
+            size_t changing = 0;
+            size_t varying  = 0;
             for (LSLASTNode* child : *expr)
             {
                 if (child->getIType() == LST_LIST || child->getIType() == LST_ERROR)
                 {
                     return false;
                 }
+                changing += sideEffectFree(child) ? 0 : 1;
+                varying += child->getConstantValue() ? 0 : 1;
+            }
+            if (changing > 0 && varying > 1)
+            {
+                return false;
             }
             // [a, b, c] as (list)a + b + c.
             const std::string was = render(expr);
@@ -2374,7 +2387,7 @@ namespace
             {
                 auto* next = static_cast<LSLExpression*>(expr->takeChild(0));
                 expr->removeChild(expr->getChild(0));
-                sum = ctx.allocator->newTracked<LSLBinaryExpression>(sum, OP_PLUS, next);
+                sum = ctx.allocator->newTracked<LSLBinaryExpression>(sum, OP_PLUS, bracketed(next));
                 sum->setType(TYPE(LST_LIST));
                 sum->setLoc(next->getLoc());
             }
@@ -2449,6 +2462,46 @@ namespace
         }
 
     private:
+        // An element of a list as a sum has it, after the first: on the
+        // right of a +, which binds tighter than every operator but a
+        // product and what is unary, and so bracketed where it is any
+        // other. (The first goes under the cast, which the printer
+        // brackets for itself.)
+        LSLExpression* bracketed(LSLExpression* element)
+        {
+            bool bare = false;
+            switch (element->getNodeSubType())
+            {
+                case NODE_CONSTANT_EXPRESSION:
+                case NODE_LVALUE_EXPRESSION:
+                case NODE_PARENTHESIS_EXPRESSION:
+                case NODE_FUNCTION_EXPRESSION:
+                case NODE_PRINT_EXPRESSION:
+                case NODE_VECTOR_EXPRESSION:
+                case NODE_QUATERNION_EXPRESSION:
+                case NODE_LIST_EXPRESSION:
+                    bare = true;
+                    break;
+                case NODE_UNARY_EXPRESSION:
+                case NODE_TYPECAST_EXPRESSION:
+                    bare = true;
+                    break;
+                case NODE_BINARY_EXPRESSION:
+                    bare = element->getOperation() == OP_MUL || element->getOperation() == OP_DIV || element->getOperation() == OP_MOD;
+                    break;
+                default:
+                    break;
+            }
+            if (bare)
+            {
+                return element;
+            }
+            auto* parens = ctx.allocator->newTracked<LSLParenthesisExpression>(element);
+            parens->setType(element->getType());
+            parens->setLoc(element->getLoc());
+            return parens;
+        }
+
         static bool empty(LSLStatement* s)
         {
             if (!s)
