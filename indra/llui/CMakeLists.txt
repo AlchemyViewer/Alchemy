@@ -147,6 +147,7 @@ target_sources(
     alsyntaxhighlighter.cpp
     altabstrip.cpp
     altextdocument.cpp
+    altextediting.cpp
     altextlayout.cpp
     altextsearch.cpp
     altextview.cpp
