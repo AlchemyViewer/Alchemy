@@ -22,7 +22,11 @@ the build keeps the copies together, so this does:
     strings.xml against the code, for one that nothing says any more;
   * every key alscriptfixes.cpp offers a fix for, its AL_FIXED_KEYS list,
     against strings.xml, so that a problem renamed where it is made does
-    not quietly lose its fix.
+    not quietly lose its fix;
+  * every command the studio's Keys preferences list -- the editor's, in
+    alkeymap.cpp, and the menus', in alscriptkeymap.cpp -- against the
+    panel's name for it, and every such name against a command. A command
+    with no name is a missing string, which QA mode stops the viewer on.
 
 Tailslide and Luau are found under vcpkg/buildtrees, the newest checkout
 of each, unless named:
@@ -45,6 +49,9 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 STRINGS = os.path.join(ROOT, "indra", "newview", "skins", "default", "xui", "en", "strings.xml")
 MAP = os.path.join(ROOT, "indra", "alscript", "almessagemap.cpp")
 FIXES = os.path.join(ROOT, "indra", "alscript", "alscriptfixes.cpp")
+EDITOR_KEYS = os.path.join(ROOT, "indra", "llui", "alkeymap.cpp")
+MENU_KEYS = os.path.join(ROOT, "indra", "newview", "alscriptkeymap.cpp")
+KEYS_PANEL = os.path.join(ROOT, "indra", "newview", "skins", "default", "xui", "en", "panel_script_studio_keys.xml")
 CODE = [
     os.path.join(ROOT, "indra", "llui"),
     os.path.join(ROOT, "indra", "alscript"),
@@ -156,6 +163,18 @@ def read_fixed_keys():
         fail("alscriptfixes.cpp has no AL_FIXED_KEYS list")
         return []
     return re.findall(r"X\((\w+)\)", m.group(1))
+
+
+def read_key_commands():
+    """The names the Keys panel looks up: cmd_ and each editor command but
+    none, menu_ and each menu command."""
+    editor = open(EDITOR_KEYS, encoding="utf-8").read()
+    table = re.search(r"NAMES\[\]\s*=\s*\{(.*?)\};", editor, re.S)
+    names = ["cmd_" + n for n in re.findall(r'"([a-z_]+)"', table.group(1)) if n != "none"] if table else []
+    menus = open(MENU_KEYS, encoding="utf-8").read()
+    table = re.search(r"std::vector<MenuCommand>\s+commands\s*\{(.*?)\};", menus, re.S)
+    names += ["menu_" + n for n in re.findall(r'\{\s*"([a-z_]+)"', table.group(1))] if table else []
+    return names
 
 
 def arguments(text, at):
@@ -333,6 +352,18 @@ def main():
     for key in fixed:
         if key not in strings:
             fail("alscriptfixes.cpp offers a fix for %s, which strings.xml has no string for" % key)
+
+    commands = read_key_commands()
+    panel = {e.get("name"): e.text or "" for e in ET.parse(KEYS_PANEL).getroot().iter("panel.string")}
+    print("the Keys panel's names against the commands it lists (%d)" % len(commands))
+    if not commands:
+        fail("no commands read from alkeymap.cpp or alscriptkeymap.cpp")
+    for name in commands:
+        if name not in panel:
+            fail("panel_script_studio_keys.xml has no %s" % name)
+    for name in sorted(panel):
+        if (name.startswith("cmd_") or name.startswith("menu_")) and name not in commands:
+            fail("panel_script_studio_keys.xml names %s, which is no command" % name)
 
     print("strings.xml against the code")
     map_keys = {k for _, k, _ in lsl_rows} | {k for _, k, _ in lint_rows + shape_rows} | {k for k, _ in err_rows}

@@ -36,12 +36,14 @@
     <panel.string name="menu_move_tab_right">Move the tab right</panel.string>
     <panel.string name="menu_focus_tabs">The tabs, for the arrow keys</panel.string>
     <panel.string name="menu_command_palette">Command palette</panel.string>
+    <panel.string name="menu_quick_open">Go to a script by its name</panel.string>
     <panel.string name="menu_explorer">Show or hide the explorer</panel.string>
     <panel.string name="menu_problems">Show or hide the problems</panel.string>
     <panel.string name="menu_references">Show or hide the references</panel.string>
     <panel.string name="menu_output">Show or hide the output</panel.string>
     <panel.string name="menu_inspector">Show or hide the inspector</panel.string>
     <panel.string name="menu_search">Show or hide the search</panel.string>
+    <panel.string name="menu_weights">Show or hide the weights</panel.string>
     <panel.string name="menu_expanded">The preprocessed output</panel.string>
     <panel.string name="menu_preprocess">Preprocess now</panel.string>
     <panel.string name="menu_reference">Reference for the word at the caret</panel.string>
