@@ -150,6 +150,7 @@ target_sources(
     altextediting.cpp
     altextlayout.cpp
     altextsearch.cpp
+    altextspelling.cpp
     altextview.cpp
     altextundo.cpp
     alnotecarditems.cpp
