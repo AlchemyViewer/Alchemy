@@ -30,6 +30,7 @@
 #include "alscriptoutputpane.h"
 #include "alscriptproblemspane.h"
 #include "alscriptsearchpane.h"
+#include "alscriptstudiocommands.h"
 #include "alscriptstudiodoc.h"
 #include "alscriptstudioservices.h"
 #include "alscriptstudiorecovery.h"
@@ -876,9 +877,19 @@ private:
     void refreshUndoLabels();
     // A name that a rename may not take: one of the language's own.
     bool reservedName(const Doc& doc, const std::string& name) const;
-    void onMenuAction(const LLSD& param);
-    bool onMenuEnable(const LLSD& param);
-    bool onMenuCheck(const LLSD& param);
+    // The window's own commands in the table, by the menu that gives them;
+    // a unit split out of the window registers its own. An editor's own
+    // command, on the view in front: `changes` for one that changes the
+    // text, which a tab that may not be changed cannot do.
+    void addCommands();
+    void addFileCommands();
+    void addEditCommands();
+    void addInsertCommands();
+    void addGoCommands();
+    void addViewCommands();
+    void addBuildCommands();
+    void addHelpCommands();
+    void addEditorCommand(const std::string& name, ALEditorCommand command, bool changes);
     void onCompileTarget();
     void onRunning();
     // The strip's experience, for the script in front: shown where it has
@@ -1126,6 +1137,9 @@ private:
     // Which lookup across scripts the answers arriving belong to.
     U32                                mLookupGeneration = 0;
     ALScriptExplorerPane*              mExplorerPane  = nullptr;
+    // What each of the menus' items does, whether it can, and whether it
+    // is on, by the item's name.
+    ALScriptStudioCommands             mCommands;
     // What is unsaved in the tabs, kept against the viewer going.
     ALScriptStudioRecovery             mRecovery{ *this, *this };
     LLHandle<LLContextMenu>            mTabMenuHandle;

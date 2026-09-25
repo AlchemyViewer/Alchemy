@@ -26,7 +26,12 @@ the build keeps the copies together, so this does:
   * every command the studio's Keys preferences list -- the editor's, in
     alkeymap.cpp, and the menus', in alscriptkeymap.cpp -- against the
     panel's name for it, and every such name against a command. A command
-    with no name is a missing string, which QA mode stops the viewer on.
+    with no name is a missing string, which QA mode stops the viewer on;
+  * every item of the studio's menus against the command table
+    (ALScriptStudioCommands): each item names a command something
+    registers, and each command registered with `add` is an item -- one
+    reached otherwise is registered with `addUnlisted`. A name the table
+    does not have does nothing and is greyed.
 
 Tailslide and Luau are found under vcpkg/buildtrees, the newest checkout
 of each, unless named:
@@ -52,6 +57,7 @@ FIXES = os.path.join(ROOT, "indra", "alscript", "alscriptfixes.cpp")
 EDITOR_KEYS = os.path.join(ROOT, "indra", "llui", "alkeymap.cpp")
 MENU_KEYS = os.path.join(ROOT, "indra", "newview", "alscriptkeymap.cpp")
 KEYS_PANEL = os.path.join(ROOT, "indra", "newview", "skins", "default", "xui", "en", "panel_script_studio_keys.xml")
+STUDIO_SKIN = os.path.join(ROOT, "indra", "newview", "skins", "default", "xui", "en", "floater_script_studio.xml")
 CODE = [
     os.path.join(ROOT, "indra", "llui"),
     os.path.join(ROOT, "indra", "alscript"),
@@ -176,6 +182,40 @@ def read_key_commands():
     names += ["menu_" + n for n in re.findall(r'\{\s*"([a-z_]+)"', table.group(1))] if table else []
     return names
 
+
+def read_studio_commands():
+    """The names the studio's command table is given, as the code gives
+    them: the first argument of an `add`, `addUnlisted` or
+    `addEditorCommand` call on the table; and, inside a function named
+    add...Commands, the name that begins each `std::pair{ "name", ... }`
+    or `std::tuple{ "name", ... }`
+    and each name of a `for (const char* x : { "a", "b" })` list, which
+    the loops there register. Returns (listed, unlisted, twice)."""
+    listed, unlisted, twice = [], [], []
+    call = re.compile(r'(?:\bcommands\(\)|\bmCommands|\bcommands)\s*(?:\.|->)\s*add(Unlisted)?\(\s*"([a-z_]+)"|\baddEditorCommand\(\s*"([a-z_]+)"')
+    body_start = re.compile(r'\b\w+::add\w*Commands\(\)\s*\{')
+    for path in sorted(glob.glob(os.path.join(ROOT, "indra", "newview", "*.cpp"))):
+        text = open(path, encoding="utf-8", errors="replace").read()
+        for m in call.finditer(text):
+            if m.group(2):
+                (unlisted if m.group(1) else listed).append(m.group(2))
+            else:
+                listed.append(m.group(3))
+        for m in body_start.finditer(text):
+            depth, i = 1, m.end()
+            while depth and i < len(text):
+                depth += {"{": 1, "}": -1}.get(text[i], 0)
+                i += 1
+            body = text[m.end():i]
+            listed.extend(re.findall(r'std::(?:pair|tuple)\{\s*"([a-z_]+)"', body))
+            for names in re.findall(r'for \(const char\* \w+ : \{([^}]*)\}\)', body):
+                listed.extend(re.findall(r'"([a-z_]+)"', names))
+    seen = set()
+    for name in listed + unlisted:
+        if name in seen:
+            twice.append(name)
+        seen.add(name)
+    return set(listed), set(unlisted), twice
 
 def arguments(text, at):
     """The arguments of the call whose ( is at `at`, split at the commas
@@ -364,6 +404,19 @@ def main():
     for name in sorted(panel):
         if (name.startswith("cmd_") or name.startswith("menu_")) and name not in commands:
             fail("panel_script_studio_keys.xml names %s, which is no command" % name)
+
+    listed, unlisted, twice = read_studio_commands()
+    skin = open(STUDIO_SKIN, encoding="utf-8").read()
+    items = set(re.findall(r'function="ScriptStudio\.(?:Menu|Enable|Check)"\s+parameter="([^"]*)"', skin))
+    print("the studio's menus against its command table (%d items, %d commands)" % (len(items), len(listed | unlisted)))
+    if not listed:
+        fail("no commands read from the studio's add...Commands functions")
+    for name in sorted(set(twice)):
+        fail("the command %s is registered twice" % name)
+    for name in sorted(items - listed):
+        fail("floater_script_studio.xml has an item for %s, which %s" % (name, "is registered unlisted" if name in unlisted else "no command is"))
+    for name in sorted(listed - items):
+        fail("the command %s is registered with add and is no item of the menus; addUnlisted, if it is reached otherwise" % name)
 
     print("strings.xml against the code")
     map_keys = {k for _, k, _ in lsl_rows} | {k for _, k, _ in lint_rows + shape_rows} | {k for k, _ in err_rows}

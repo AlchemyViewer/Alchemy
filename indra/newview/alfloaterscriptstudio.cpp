@@ -512,9 +512,11 @@ ALFloaterScriptStudio::ALFloaterScriptStudio(const LLSD& key)
     // The main window is one and stays; a popped-out one is as many as
     // are wanted and goes when closed.
     setIsSingleInstance(mMain);
-    mCommitCallbackRegistrar.add("ScriptStudio.Menu", boost::bind(&ALFloaterScriptStudio::onMenuAction, this, _2));
-    mEnableCallbackRegistrar.add("ScriptStudio.Enable", boost::bind(&ALFloaterScriptStudio::onMenuEnable, this, _2));
-    mEnableCallbackRegistrar.add("ScriptStudio.Check", boost::bind(&ALFloaterScriptStudio::onMenuCheck, this, _2));
+    // The menus' items by name, in the table of what each does.
+    addCommands();
+    mCommitCallbackRegistrar.add("ScriptStudio.Menu", [this](LLUICtrl*, const LLSD& name) { mCommands.run(name.asString()); });
+    mEnableCallbackRegistrar.add("ScriptStudio.Enable", [this](LLUICtrl*, const LLSD& name) { return mCommands.enabled(name.asString()); });
+    mEnableCallbackRegistrar.add("ScriptStudio.Check", [this](LLUICtrl*, const LLSD& name) { return mCommands.checked(name.asString()); });
 }
 
 ALFloaterScriptStudio::~ALFloaterScriptStudio()
@@ -603,8 +605,8 @@ bool ALFloaterScriptStudio::postBuild()
         mNoDocs               = LLUICtrlFactory::create<ALEmptyState>(ep);
         mEditorHost->addChild(mNoDocs);
         mNoDocs->say(getString("NoScriptOpenHeadline"), getString("NoScriptOpenSentence"), getString("NoScriptOpenAction"), getString("NoScriptOpenNew"));
-        mNoDocs->onAction([this]() { onMenuAction(LLSD("open_file")); });
-        mNoDocs->onSecondAction([this]() { onMenuAction(LLSD("new_script")); });
+        mNoDocs->onAction([this]() { mCommands.run("open_file"); });
+        mNoDocs->onSecondAction([this]() { mCommands.run("new_script"); });
     }
     mTabs          = getChild<ALTabStrip>("tabs");
     mBreadcrumb    = getChild<ALJumpBar>("breadcrumb");
@@ -4153,7 +4155,7 @@ bool ALFloaterScriptStudio::vimCommand(ALTextView& view, const std::string& name
         {
             if (mLineNumbers == off)
             {
-                onMenuAction(LLSD("line_numbers"));
+                mCommands.run("line_numbers");
             }
             return true;
         }
@@ -4161,7 +4163,7 @@ bool ALFloaterScriptStudio::vimCommand(ALTextView& view, const std::string& name
         {
             if (mRelativeNumbers == off)
             {
-                onMenuAction(LLSD("relative_numbers"));
+                mCommands.run("relative_numbers");
             }
             return true;
         }
@@ -4174,10 +4176,7 @@ bool ALFloaterScriptStudio::vimCommand(ALTextView& view, const std::string& name
     const std::string menu_name = name == "fix" ? "quick_fix" : name == "fixall" ? "fix_all" : name;
     if (std::any_of(std::begin(VIM_MENU_COMMANDS), std::end(VIM_MENU_COMMANDS), [&menu_name](const char* command) { return menu_name == command; }))
     {
-        if (onMenuEnable(LLSD(menu_name)))
-        {
-            onMenuAction(LLSD(menu_name));
-        }
+        mCommands.runIfEnabled(menu_name);
         return true;
     }
     return false;
@@ -4336,7 +4335,7 @@ void ALFloaterScriptStudio::onTabAction(const std::string& action)
     }
     else
     {
-        onMenuAction(LLSD(action));
+        mCommands.run(action);
     }
 }
 
@@ -7580,7 +7579,7 @@ std::vector<ALQuickOpen::Candidate> ALFloaterScriptStudio::paletteCommands()
             // shows a mark, and a row here has none.
             if (dynamic_cast<LLMenuItemCheckGL*>(item))
             {
-                const std::string state = getString(onMenuCheck(LLSD(item->getName())) ? "PaletteOn" : "PaletteOff");
+                const std::string state = getString(mCommands.checked(item->getName()) ? "PaletteOn" : "PaletteOff");
                 one.detail              = one.detail.empty() ? state : state + "   " + one.detail;
             }
             candidates.push_back(std::move(one));
@@ -10608,791 +10607,559 @@ void ALFloaterScriptStudio::letGoOf(size_t index, bool keep)
 
 // --- the menu and the toolbar ---------------------------------------------------
 
-void ALFloaterScriptStudio::onMenuAction(const LLSD& param)
+void ALFloaterScriptStudio::addCommands()
 {
-    const std::string action = param.asString();
-    Doc*              doc    = active();
-    if (action == "save")
-    {
-        if (doc)
-        {
-            saveAsked(*doc);
-        }
-    }
-    else if (action == "save_all")
-    {
-        saveAll();
-    }
-    else if (action == "revert")
-    {
-        if (doc)
-        {
-            askRevert(*doc);
-        }
-    }
-    else if (action == "external_editor")
-    {
-        if (doc)
-        {
-            editExternally(*doc);
-        }
-    }
-    else if (action == "close")
-    {
-        if (doc)
-        {
-            // By the tab's own id: a file on disk has no item to be named by.
-            closeDocument(doc->id);
-        }
-    }
-    else if (action == "reveal")
-    {
-        if (doc && !doc->ref.inInventory())
-        {
-            mExplorerPane->reveal(*doc);
-        }
-    }
-    else if (action == "new_script" || action == "new_lua_script")
-    {
-        newInventoryScript(action == "new_lua_script");
-    }
-    else if (action == "recover")
-    {
-        mRecovery.show();
-    }
-    else if (action == "back" || action == "forward")
-    {
-        goBack(action == "forward");
-    }
-    else if (action == "load_file")
-    {
-        loadFromFile();
-    }
-    else if (action == "open_file")
-    {
-        openFileFromDisk();
-    }
-    else if (action == "save_file")
-    {
-        saveToFile();
-    }
-    else if (action == "save_as")
-    {
-        saveFileAs();
-    }
-    else if (action == "clear_recent")
-    {
+    addFileCommands();
+    addEditCommands();
+    addInsertCommands();
+    addGoCommands();
+    addViewCommands();
+    addBuildCommands();
+    addHelpCommands();
+}
+
+void ALFloaterScriptStudio::addEditorCommand(const std::string& name, ALEditorCommand command, bool changes)
+{
+    // The view in front's, as every command of the text's own is: the
+    // expansion being read says it cannot, where the source out of
+    // sight would have done it unseen.
+    mCommands.add(
+        name,
+        [this, command]() {
+            if (Doc* doc = active())
+            {
+                doc->shownText()->perform(command);
+            }
+        },
+        [this, command, changes]() {
+            Doc* doc = active();
+            return doc && (!changes || doc->modifiable) && doc->shownText()->canPerform(command);
+        });
+}
+
+void ALFloaterScriptStudio::addFileCommands()
+{
+    mCommands.add("new_script", [this]() { newInventoryScript(false); });
+    mCommands.add(
+        "new_lua_script", [this]() { newInventoryScript(true); }, []() { return ALScriptWorkspace::luaEnabled(ALScriptRef()); });
+    mCommands.add(
+        "save",
+        [this]() {
+            if (Doc* doc = active())
+            {
+                saveAsked(*doc);
+            }
+        },
+        [this]() {
+            Doc* doc = active();
+            return doc && doc->loaded && doc->modifiable;
+        });
+    mCommands.add(
+        "save_all", [this]() { saveAll(); },
+        [this]() {
+            for (const std::unique_ptr<Doc>& each : mDocs)
+            {
+                if (each->unsaved() && each->modifiable)
+                {
+                    return true;
+                }
+            }
+            return false;
+        });
+    mCommands.add(
+        "revert",
+        [this]() {
+            if (Doc* doc = active())
+            {
+                askRevert(*doc);
+            }
+        },
+        [this]() {
+            Doc* doc = active();
+            return doc && revertible(*doc);
+        });
+    mCommands.add("open_file", [this]() { openFileFromDisk(); });
+    mCommands.add(
+        "recover", [this]() { mRecovery.show(); },
+        []() {
+            const ALScriptRecoveryStore* store = ALScriptStudioRecovery::store();
+            return store && store->hasOffers();
+        });
+    mCommands.add(
+        "load_file", [this]() { loadFromFile(); },
+        [this]() {
+            Doc* doc = active();
+            return doc && doc->loaded && doc->modifiable;
+        });
+    mCommands.add(
+        "save_file", [this]() { saveToFile(); },
+        [this]() {
+            Doc* doc = active();
+            return doc && doc->loaded;
+        });
+    mCommands.add(
+        "save_as", [this]() { saveFileAs(); },
+        [this]() {
+            Doc* doc = active();
+            return doc && doc->loaded && !doc->file.empty();
+        });
+    mCommands.add(
+        "external_editor",
+        [this]() {
+            if (Doc* doc = active())
+            {
+                editExternally(*doc);
+            }
+        },
+        [this]() {
+            Doc* doc = active();
+            return doc && doc->loaded && doc->modifiable && !doc->notecard;
+        });
+    mCommands.add("preferences", []() { LLFloaterReg::showInstance("script_studio_prefs"); });
+    mCommands.add(
+        "pop_out", [this]() { popOut(); },
+        [this]() {
+            Doc* doc = active();
+            return doc && doc->loaded;
+        });
+    mCommands.add(
+        "close",
+        [this]() {
+            if (Doc* doc = active())
+            {
+                // By the tab's own id: a file on disk has no item to be named by.
+                closeDocument(doc->id);
+            }
+        },
+        [this]() { return active() != nullptr; });
+    // The Open Recent list's last item, made with the list.
+    mCommands.addUnlisted("clear_recent", [this]() {
         mRecentFiles.clear();
         mRecentScripts.clear();
         fillRecentMenu();
         saveState();
-    }
-    else if (action == "undo" || action == "redo")
-    {
-        // The field with the keyboard -- the search box, a filter -- where it
-        // has a step to take; the script otherwise.
-        const bool         forward = action == "redo";
-        LLEditMenuHandler* field   = focusedEditHandler();
-        if (field && (forward ? field->canRedo() : field->canUndo()))
+    });
+    // The tab strip's menu's.
+    mCommands.addUnlisted("reveal", [this]() {
+        if (Doc* doc = active(); doc && !doc->ref.inInventory())
         {
-            forward ? field->redo() : field->undo();
+            mExplorerPane->reveal(*doc);
         }
-        else
-        {
-            forward ? redo() : undo();
-        }
-    }
-    else if (action == "cut" || action == "copy" || action == "paste" || action == "select_all")
+    });
+}
+
+void ALFloaterScriptStudio::addEditCommands()
+{
+    for (const auto& [name, forward] : { std::pair{ "undo", false }, std::pair{ "redo", true } })
     {
-        // Whatever has the keyboard: a list of problems is worth copying
-        // as much as the text is.
+        mCommands.add(
+            name,
+            [this, forward]() {
+                // The field with the keyboard -- the search box, a filter -- where it
+                // has a step to take; the script otherwise.
+                LLEditMenuHandler* field = focusedEditHandler();
+                if (field && (forward ? field->canRedo() : field->canUndo()))
+                {
+                    forward ? field->redo() : field->undo();
+                }
+                else
+                {
+                    forward ? redo() : undo();
+                }
+            },
+            [this, forward]() {
+                Doc*               doc   = active();
+                LLEditMenuHandler* field = focusedEditHandler();
+                return (field && (forward ? field->canRedo() : field->canUndo())) || (doc && (forward ? doc->shownText()->canRedo() : doc->shownText()->canUndo()));
+            });
+    }
+    // Whatever has the keyboard: a list of problems is worth copying
+    // as much as the text is.
+    const auto handler = [this]() {
         LLEditMenuHandler* handler = focusedEditHandler();
-        if (!handler && doc)
+        if (Doc* doc = active(); !handler && doc)
         {
             handler = doc->shownText();
         }
-        if (handler)
-        {
-            if (action == "cut")
+        return handler;
+    };
+    for (const auto& [name, act, can] : { std::tuple{ "cut", &LLEditMenuHandler::cut, &LLEditMenuHandler::canCut },
+                                          std::tuple{ "copy", &LLEditMenuHandler::copy, &LLEditMenuHandler::canCopy },
+                                          std::tuple{ "paste", &LLEditMenuHandler::paste, &LLEditMenuHandler::canPaste },
+                                          std::tuple{ "select_all", &LLEditMenuHandler::selectAll, &LLEditMenuHandler::canSelectAll } })
+    {
+        mCommands.add(
+            name,
+            [handler, act]() {
+                if (LLEditMenuHandler* h = handler())
+                {
+                    (h->*act)();
+                }
+            },
+            [handler, can]() {
+                LLEditMenuHandler* h = handler();
+                return h && (h->*can)();
+            });
+    }
+    // The editor's own, by the names the keymap has; those that change
+    // the text only where the tab may be changed.
+    addEditorCommand("toggle_comment", ALEditorCommand::ToggleComment, true);
+    addEditorCommand("duplicate_line", ALEditorCommand::DuplicateLine, true);
+    addEditorCommand("delete_line", ALEditorCommand::DeleteLine, true);
+    addEditorCommand("move_line_up", ALEditorCommand::MoveLineUp, true);
+    addEditorCommand("move_line_down", ALEditorCommand::MoveLineDown, true);
+    addEditorCommand("rename", ALEditorCommand::Rename, false);
+    addEditorCommand("quick_fix", ALEditorCommand::QuickFix, true);
+    // What changes the text, or asks the analyzers about a place in it, is
+    // the source's to do: while the expansion is in front, it is read.
+    for (const auto& [name, command] : { std::pair{ "complete", ALEditorCommand::Complete }, std::pair{ "signature_help", ALEditorCommand::SignatureHelp } })
+    {
+        mCommands.add(
+            name,
+            [this, command]() {
+                if (Doc* doc = active())
+                {
+                    doc->shownText()->perform(command);
+                }
+            },
+            [this]() {
+                Doc* doc = active();
+                return doc && doc->shownView() == Doc::View::Source && doc->modifiable;
+            });
+    }
+    mCommands.add(
+        "fix_all",
+        [this]() {
+            if (Doc* doc = active())
             {
-                handler->cut();
+                askFixAll(*doc, FixPick{});
             }
-            else if (action == "copy")
+        },
+        [this]() {
+            Doc*   doc  = active();
+            size_t left = 0;
+            return doc && doc->loaded && doc->modifiable && (!doc->pickFixes(FixPick{}, &left).empty() || left > 0);
+        });
+    for (const auto& [name, selection] : { std::pair{ "format", false }, std::pair{ "format_selection", true } })
+    {
+        mCommands.add(
+            name,
+            [this, selection]() {
+                if (Doc* doc = active())
+                {
+                    format(*doc, selection);
+                }
+            },
+            [this, selection]() {
+                Doc* doc = active();
+                return doc && doc->shownView() == Doc::View::Source && doc->loaded && doc->modifiable && !doc->notecard &&
+                       (!selection || !doc->editor->selection().empty());
+            });
+    }
+    for (const auto& [name, command] : { std::pair{ "find", ALEditorCommand::Find }, std::pair{ "replace", ALEditorCommand::Replace },
+                                         std::pair{ "find_next", ALEditorCommand::FindNext }, std::pair{ "find_previous", ALEditorCommand::FindPrevious } })
+    {
+        mCommands.add(
+            name,
+            [this, command]() {
+                if (Doc* doc = active())
+                {
+                    doc->shownText()->perform(command);
+                }
+            },
+            [this]() { return active() != nullptr; });
+    }
+    mCommands.add("find_in_files", [this]() { findInFiles(); });
+}
+
+void ALFloaterScriptStudio::addInsertCommands()
+{
+    for (const char* name : { "insert_snippet", "insert_function", "insert_event", "insert_constant" })
+    {
+        mCommands.add(
+            name, [this, what = std::string(name).substr(7)]() { insertFromLibrary(what); },
+            [this]() {
+                Doc* doc = active();
+                return doc && doc->shownView() == Doc::View::Source && doc->loaded && doc->modifiable && !doc->notecard;
+            });
+    }
+}
+
+void ALFloaterScriptStudio::addGoCommands()
+{
+    mCommands.add("back", [this]() { goBack(false); }, [this]() { return !mBack.empty(); });
+    mCommands.add("forward", [this]() { goBack(true); }, [this]() { return !mForward.empty(); });
+    mCommands.add("quick_open", [this]() { showQuickOpen(false); });
+    mCommands.add(
+        "go_to_line",
+        [this]() {
+            if (active())
             {
-                handler->copy();
+                goToLine();
             }
-            else if (action == "paste")
+        },
+        [this]() { return active() != nullptr; });
+    mCommands.add(
+        "go_to_symbol",
+        [this]() {
+            if (active())
             {
-                handler->paste();
+                goToSymbol();
+            }
+        },
+        [this]() {
+            Doc* doc = active();
+            return doc && !doc->outline.empty();
+        });
+    addEditorCommand("go_to_definition", ALEditorCommand::GoToDefinition, false);
+    addEditorCommand("find_references", ALEditorCommand::FindReferences, false);
+    for (const auto& [name, step] : { std::pair{ "next_problem", 1 }, std::pair{ "previous_problem", -1 } })
+    {
+        mCommands.add(
+            name,
+            [this, step]() {
+                if (Doc* doc = active())
+                {
+                    goToProblem(*doc, step);
+                }
+            },
+            [this]() {
+                Doc* doc = active();
+                return doc && doc->loaded && !doc->shown.empty();
+            });
+    }
+    mCommands.add("next_tab", [this]() { cycleTab(1); });
+    mCommands.add("previous_tab", [this]() { cycleTab(-1); });
+    mCommands.add("all_tabs", [this]() { showAllTabs(); });
+    mCommands.add("move_tab_left", [this]() { moveTab(-1); });
+    mCommands.add("move_tab_right", [this]() { moveTab(1); });
+    mCommands.add("focus_tabs", [this]() { mTabs->setFocus(true); });
+}
+
+void ALFloaterScriptStudio::addViewCommands()
+{
+    mCommands.add("command_palette", [this]() { showCommandPalette(); });
+    // The editors' options, each on or off.
+    for (const auto& [name, flag] : { std::pair{ "word_wrap", &mWordWrap }, std::pair{ "line_numbers", &mLineNumbers },
+                                      std::pair{ "relative_numbers", &mRelativeNumbers }, std::pair{ "indent_guides", &mIndentGuides },
+                                      std::pair{ "rainbow_brackets", &mRainbowBrackets }, std::pair{ "sticky_headers", &mStickyHeaders },
+                                      std::pair{ "spell_check", &mSpellCheck }, std::pair{ "map_preview", &mScrollMapPreview },
+                                      std::pair{ "map_left", &mScrollMapLeft } })
+    {
+        mCommands.add(
+            name,
+            [this, flag]() {
+                *flag = !*flag;
+                applyEditorOptions();
+            },
+            nullptr, [flag]() { return *flag; });
+    }
+    for (const auto& [name, shown] :
+         { std::pair{ "blanks_none", ALCodeEditor::Whitespace::None }, std::pair{ "blanks_selection", ALCodeEditor::Whitespace::Selection },
+           std::pair{ "blanks_trailing", ALCodeEditor::Whitespace::Trailing }, std::pair{ "blanks_all", ALCodeEditor::Whitespace::All } })
+    {
+        mCommands.add(
+            name,
+            [this, shown]() {
+                mWhitespace = shown;
+                applyEditorOptions();
+            },
+            nullptr, [this, shown]() { return mWhitespace == shown; });
+    }
+    mCommands.add(
+        "vim_mode",
+        [this]() {
+            mVimMode = !mVimMode;
+            applyEditorOptions();
+            mVimBanner.clear();
+            if (Doc* each = active())
+            {
+                refreshTrailer(*each);
+            }
+            saveState();
+        },
+        nullptr, [this]() { return mVimMode; });
+    // Off at once; on with the next check, which is now.
+    for (const auto& [name, flag] : { std::pair{ "semantic_colors", &mSemanticColors }, std::pair{ "inlay_parameters", &mInlayParameters },
+                                      std::pair{ "inlay_types", &mInlayTypes } })
+    {
+        mCommands.add(
+            name,
+            [this, flag]() {
+                *flag = !*flag;
+                for (std::unique_ptr<Doc>& each : mDocs)
+                {
+                    if (!mSemanticColors)
+                    {
+                        each->editor->setSemanticTokens({});
+                    }
+                    if (!mInlayParameters && !mInlayTypes)
+                    {
+                        each->editor->setInlayHints({});
+                    }
+                    scheduleAnalysis(*each, true);
+                }
+                saveState();
+            },
+            nullptr, [flag]() { return *flag; });
+    }
+    for (const auto& [name, flag] : { std::pair{ "weight_notes", &mWeightNotes }, std::pair{ "weight_heat", &mWeightHeat } })
+    {
+        mCommands.add(
+            name,
+            [this, flag]() {
+                *flag = !*flag;
+                applyEditorOptions();
+                for (std::unique_ptr<Doc>& each : mDocs)
+                {
+                    showWeightsInEditor(*each);
+                }
+                saveState();
+            },
+            nullptr, [flag]() { return *flag; });
+    }
+    for (const auto& [name, map] : { std::pair{ "scroll_bar", false }, std::pair{ "scroll_map", true } })
+    {
+        mCommands.add(
+            name,
+            [this, map]() {
+                mScrollMap = map;
+                applyEditorOptions();
+            },
+            nullptr, [this, map]() { return mScrollMap == map; });
+    }
+    // Each width on for the widths nearest it: a width saved by hand is
+    // in one band or another.
+    for (const auto& [name, width] : { std::pair{ "map_narrow", 60 }, std::pair{ "map_medium", 90 }, std::pair{ "map_wide", 130 } })
+    {
+        mCommands.add(
+            name,
+            [this, width]() {
+                mScrollMapWidth = width;
+                applyEditorOptions();
+            },
+            nullptr, [this, width]() { return (mScrollMapWidth <= 60 ? 60 : mScrollMapWidth >= 130 ? 130 : 90) == width; });
+    }
+    addEditorCommand("fold", ALEditorCommand::Fold, false);
+    addEditorCommand("unfold", ALEditorCommand::Unfold, false);
+    addEditorCommand("fold_all", ALEditorCommand::FoldAll, false);
+    addEditorCommand("unfold_all", ALEditorCommand::UnfoldAll, false);
+    for (const char* region : { "explorer", "inspector" })
+    {
+        mCommands.add(
+            region, [this, region]() { mFolds.toggle(region); }, nullptr, [this, region]() { return !mFolds.collapsed(region); });
+    }
+    // The panel under the editor's tabs: shown; or the panel folded when
+    // it is the tab showing.
+    for (const auto& [name, tab] : { std::pair{ "problems", "problems_tab" }, std::pair{ "references", "references_tab" },
+                                     std::pair{ "output", "output_tab" }, std::pair{ "search", "search_tab" }, std::pair{ "weights", "weights_tab" } })
+    {
+        mCommands.add(
+            name,
+            [this, name, tab]() {
+                if (mCommands.checked(name))
+                {
+                    mFolds.setCollapsed("bottom", true);
+                }
+                else if (std::string_view(name) == "search")
+                {
+                    showBottom(tab);
+                }
+                else
+                {
+                    showBottom(tab, true);
+                }
+            },
+            nullptr,
+            [this, tab]() {
+                const LLPanel* current = mBottomTabs->getCurrentPanel();
+                return !mFolds.collapsed("bottom") && current && current->getName() == tab;
+            });
+    }
+    mCommands.add(
+        "expanded", [this]() { toggleExpanded(); },
+        [this]() {
+            Doc* doc = active();
+            return doc && doc->expandedEditor != nullptr;
+        },
+        [this]() {
+            const Doc* doc = active();
+            return doc && doc->shownView() == Doc::View::Expanded;
+        });
+}
+
+void ALFloaterScriptStudio::addBuildCommands()
+{
+    mCommands.add(
+        "preprocess",
+        [this]() {
+            if (Doc* doc = active(); doc && doc->loaded && !doc->notecard)
+            {
+                preprocess(*doc);
+            }
+        },
+        [this]() {
+            Doc* doc = active();
+            return doc && doc->loaded && !doc->notecard && !doc->preprocessing;
+        });
+    // The settings each turns on and off, heard as the preferences'
+    // changes are (pumpPreprocessor).
+    for (const auto& [name, setting] :
+         { std::pair{ "preflight", "ALScriptStudioPreflight" }, std::pair{ "preproc_enabled", "ALScriptPreprocEnabled" },
+           std::pair{ "preproc_disk", "ALScriptPreprocDiskIncludes" }, std::pair{ "preproc_switch", "ALScriptPreprocSwitch" },
+           std::pair{ "preproc_lazy", "ALScriptPreprocLazyLists" }, std::pair{ "preproc_compress", "ALScriptPreprocCompress" },
+           std::pair{ "preproc_extensions", "ALScriptPreprocExtensions" }, std::pair{ "preproc_optimize", "ALScriptPreprocOptimizer" },
+           std::pair{ "preproc_shrink", "ALScriptPreprocOptimizerShrinkNames" }, std::pair{ "preproc_addstrings", "ALScriptPreprocOptimizerAddStrings" },
+           std::pair{ "preproc_inline", "ALScriptPreprocOptimizerInlining" } })
+    {
+        mCommands.add(
+            name, [setting]() { gSavedSettings.setBOOL(setting, !gSavedSettings.getBOOL(setting)); }, nullptr,
+            [setting]() { return gSavedSettings.getBOOL(setting); });
+    }
+    mCommands.add("preproc_folder", [this]() { chooseIncludeFolder(); });
+}
+
+void ALFloaterScriptStudio::addHelpCommands()
+{
+    const auto script = [this]() {
+        Doc* doc = active();
+        return doc && doc->loaded && !doc->notecard;
+    };
+    mCommands.add(
+        "reference",
+        [this]() {
+            if (Doc* doc = active())
+            {
+                reference(*doc);
+            }
+        },
+        script);
+    mCommands.add("browse_reference", [this]() { browseReference(); });
+    mCommands.add(
+        "wiki",
+        [this]() {
+            Doc* doc = active();
+            if (!doc)
+            {
+                return;
+            }
+            // The wiki has pages for the language's words, not the script's:
+            // one of the script's own names is said to have none, rather than
+            // opening a page that is not there. No word at all is the portal.
+            const ALCodeEditor& shown = *doc->shownText();
+            const std::string   word  = shown.document().text(shown.identifierAtCaret());
+            if (!word.empty() && !vocabWord(doc->language.lua, word))
+            {
+                LLStringUtil::format_map_t args;
+                args["[NAME]"] = word;
+                setStatus(getString("NoWikiPage", args));
             }
             else
             {
-                handler->selectAll();
+                LLWeb::loadURL(helpUrl(doc->language.lua, word));
             }
-        }
-    }
-    else if (doc && action == "toggle_comment")
-    {
-        // The view in front's, as every command of the text's own is: the
-        // expansion being read says it cannot, where the source out of
-        // sight would have done it unseen.
-        doc->shownText()->perform(ALEditorCommand::ToggleComment);
-    }
-    else if (doc && (action == "duplicate_line" || action == "delete_line" || action == "move_line_up" || action == "move_line_down"))
-    {
-        // The editor's own line commands, by the names the keymap has.
-        if (const std::optional<ALEditorCommand> command = alEditorCommandFromName(action))
-        {
-            doc->shownText()->perform(*command);
-        }
-    }
-    else if (doc && action == "complete")
-    {
-        doc->shownText()->perform(ALEditorCommand::Complete);
-    }
-    else if (doc && action == "signature_help")
-    {
-        doc->shownText()->perform(ALEditorCommand::SignatureHelp);
-    }
-    else if (doc && (action == "next_problem" || action == "previous_problem"))
-    {
-        goToProblem(*doc, action == "next_problem" ? 1 : -1);
-    }
-    else if (doc && action == "fold")
-    {
-        doc->shownText()->perform(ALEditorCommand::Fold);
-    }
-    else if (doc && action == "unfold")
-    {
-        doc->shownText()->perform(ALEditorCommand::Unfold);
-    }
-    else if (doc && action == "fold_all")
-    {
-        doc->shownText()->perform(ALEditorCommand::FoldAll);
-    }
-    else if (doc && action == "unfold_all")
-    {
-        doc->shownText()->perform(ALEditorCommand::UnfoldAll);
-    }
-    else if (doc && action == "go_to_definition")
-    {
-        doc->shownText()->perform(ALEditorCommand::GoToDefinition);
-    }
-    else if (doc && action == "find_references")
-    {
-        doc->shownText()->perform(ALEditorCommand::FindReferences);
-    }
-    else if (doc && action == "rename")
-    {
-        doc->shownText()->perform(ALEditorCommand::Rename);
-    }
-    else if (doc && action == "quick_fix")
-    {
-        doc->shownText()->perform(ALEditorCommand::QuickFix);
-    }
-    else if (doc && action == "fix_all")
-    {
-        askFixAll(*doc, FixPick{});
-    }
-    else if (doc && action == "go_to_line")
-    {
-        goToLine();
-    }
-    else if (action == "quick_open")
-    {
-        showQuickOpen(false);
-    }
-    else if (doc && action == "go_to_symbol")
-    {
-        goToSymbol();
-    }
-    else if (doc && action == "find")
-    {
-        doc->shownText()->perform(ALEditorCommand::Find);
-    }
-    else if (doc && action == "replace")
-    {
-        doc->shownText()->perform(ALEditorCommand::Replace);
-    }
-    else if (doc && action == "find_next")
-    {
-        doc->shownText()->perform(ALEditorCommand::FindNext);
-    }
-    else if (doc && action == "find_previous")
-    {
-        doc->shownText()->perform(ALEditorCommand::FindPrevious);
-    }
-    else if (action == "preferences")
-    {
-        LLFloaterReg::showInstance("script_studio_prefs");
-    }
-    else if (doc && action == "reference")
-    {
-        reference(*doc);
-    }
-    else if (action == "browse_reference")
-    {
-        browseReference();
-    }
-    else if (doc && action == "wiki")
-    {
-        // The wiki has pages for the language's words, not the script's:
-        // one of the script's own names is said to have none, rather than
-        // opening a page that is not there. No word at all is the portal.
-        const ALCodeEditor& shown = *doc->shownText();
-        const std::string   word  = shown.document().text(shown.identifierAtCaret());
-        if (!word.empty() && !vocabWord(doc->language.lua, word))
-        {
-            LLStringUtil::format_map_t args;
-            args["[NAME]"] = word;
-            setStatus(getString("NoWikiPage", args));
-        }
-        else
-        {
-            LLWeb::loadURL(helpUrl(doc->language.lua, word));
-        }
-    }
-    else if (action == "word_wrap")
-    {
-        mWordWrap = !mWordWrap;
-        applyEditorOptions();
-    }
-    else if (action == "line_numbers")
-    {
-        mLineNumbers = !mLineNumbers;
-        applyEditorOptions();
-    }
-    else if (action == "scroll_bar" || action == "scroll_map")
-    {
-        mScrollMap = action == "scroll_map";
-        applyEditorOptions();
-    }
-    else if (action == "map_narrow" || action == "map_medium" || action == "map_wide")
-    {
-        mScrollMapWidth = action == "map_narrow" ? 60 : action == "map_medium" ? 90 : 130;
-        applyEditorOptions();
-    }
-    else if (action == "blanks_none" || action == "blanks_selection" || action == "blanks_trailing" || action == "blanks_all")
-    {
-        mWhitespace = action == "blanks_none"      ? ALCodeEditor::Whitespace::None
-                      : action == "blanks_selection" ? ALCodeEditor::Whitespace::Selection
-                      : action == "blanks_trailing"  ? ALCodeEditor::Whitespace::Trailing
-                                                     : ALCodeEditor::Whitespace::All;
-        applyEditorOptions();
-    }
-    else if (action == "map_preview")
-    {
-        mScrollMapPreview = !mScrollMapPreview;
-        applyEditorOptions();
-    }
-    else if (action == "map_left")
-    {
-        mScrollMapLeft = !mScrollMapLeft;
-        applyEditorOptions();
-    }
-    else if (action == "find_in_files")
-    {
-        findInFiles();
-    }
-    else if (action == "expanded")
-    {
-        toggleExpanded();
-    }
-    else if (action == "pop_out")
-    {
-        popOut();
-    }
-    else if (action == "next_tab" || action == "previous_tab")
-    {
-        cycleTab(action == "next_tab" ? 1 : -1);
-    }
-    else if (action == "all_tabs")
-    {
-        showAllTabs();
-    }
-    else if (action == "move_tab_left" || action == "move_tab_right")
-    {
-        moveTab(action == "move_tab_right" ? 1 : -1);
-    }
-    else if (action == "focus_tabs")
-    {
-        mTabs->setFocus(true);
-    }
-    else if (action == "command_palette")
-    {
-        showCommandPalette();
-    }
-    else if (action == "indent_guides")
-    {
-        mIndentGuides = !mIndentGuides;
-        applyEditorOptions();
-    }
-    else if (action == "relative_numbers")
-    {
-        mRelativeNumbers = !mRelativeNumbers;
-        applyEditorOptions();
-    }
-    else if (action == "rainbow_brackets")
-    {
-        mRainbowBrackets = !mRainbowBrackets;
-        applyEditorOptions();
-    }
-    else if (action == "sticky_headers")
-    {
-        mStickyHeaders = !mStickyHeaders;
-        applyEditorOptions();
-    }
-    else if (action == "spell_check")
-    {
-        mSpellCheck = !mSpellCheck;
-        applyEditorOptions();
-    }
-    else if (action == "vim_mode")
-    {
-        mVimMode = !mVimMode;
-        applyEditorOptions();
-        mVimBanner.clear();
-        if (Doc* each = active())
-        {
-            refreshTrailer(*each);
-        }
-        saveState();
-    }
-    else if (action == "weight_notes" || action == "weight_heat")
-    {
-        bool& flag = action == "weight_notes" ? mWeightNotes : mWeightHeat;
-        flag       = !flag;
-        applyEditorOptions();
-        for (std::unique_ptr<Doc>& each : mDocs)
-        {
-            showWeightsInEditor(*each);
-        }
-        saveState();
-    }
-    else if (action == "semantic_colors" || action == "inlay_parameters" || action == "inlay_types")
-    {
-        bool& flag = action == "semantic_colors" ? mSemanticColors : action == "inlay_parameters" ? mInlayParameters : mInlayTypes;
-        flag       = !flag;
-        // Off at once; on with the next check, which is now.
-        for (std::unique_ptr<Doc>& each : mDocs)
-        {
-            if (!mSemanticColors)
-            {
-                each->editor->setSemanticTokens({});
-            }
-            if (!mInlayParameters && !mInlayTypes)
-            {
-                each->editor->setInlayHints({});
-            }
-            scheduleAnalysis(*each, true);
-        }
-        saveState();
-    }
-    else if (doc && (action == "format" || action == "format_selection"))
-    {
-        format(*doc, action == "format_selection");
-    }
-    else if (action == "insert_snippet" || action == "insert_function" || action == "insert_event" || action == "insert_constant")
-    {
-        insertFromLibrary(action.substr(7));
-    }
-    else if (action == "problems" || action == "references" || action == "output" || action == "search" || action == "weights")
-    {
-        // The tab, shown; or the pane folded when it is the tab showing.
-        const char* tab = action == "problems"     ? "problems_tab"
-                          : action == "references" ? "references_tab"
-                          : action == "output"     ? "output_tab"
-                          : action == "weights"    ? "weights_tab"
-                                                   : "search_tab";
-        if (onMenuCheck(param))
-        {
-            mFolds.setCollapsed("bottom", true);
-        }
-        else if (action == "search")
-        {
-            showBottom(tab);
-        }
-        else
-        {
-            showBottom(tab, true);
-        }
-    }
-    else if (action == "inspector")
-    {
-        mFolds.toggle("inspector");
-    }
-    else if (action == "explorer")
-    {
-        mFolds.toggle("explorer");
-    }
-    else if (action == "preflight")
-    {
-        gSavedSettings.setBOOL("ALScriptStudioPreflight", !gSavedSettings.getBOOL("ALScriptStudioPreflight"));
-    }
-    else if (action == "preprocess")
-    {
-        if (Doc* doc = active(); doc && doc->loaded && !doc->notecard)
-        {
-            preprocess(*doc);
-        }
-    }
-    else if (action == "preproc_enabled" || action == "preproc_switch" || action == "preproc_lazy" || action == "preproc_compress" ||
-             action == "preproc_disk" || action == "preproc_optimize" || action == "preproc_shrink" || action == "preproc_addstrings" ||
-             action == "preproc_inline" || action == "preproc_extensions")
-    {
-        const char* setting = action == "preproc_enabled"    ? "ALScriptPreprocEnabled"
-                              : action == "preproc_switch"   ? "ALScriptPreprocSwitch"
-                              : action == "preproc_lazy"     ? "ALScriptPreprocLazyLists"
-                              : action == "preproc_compress" ? "ALScriptPreprocCompress"
-                              : action == "preproc_optimize" ? "ALScriptPreprocOptimizer"
-                              : action == "preproc_shrink"   ? "ALScriptPreprocOptimizerShrinkNames"
-                              : action == "preproc_addstrings" ? "ALScriptPreprocOptimizerAddStrings"
-                              : action == "preproc_inline"     ? "ALScriptPreprocOptimizerInlining"
-                              : action == "preproc_extensions" ? "ALScriptPreprocExtensions"
-                                                               : "ALScriptPreprocDiskIncludes";
-        // Heard as the preferences' changes are (pumpPreprocessor).
-        gSavedSettings.setBOOL(setting, !gSavedSettings.getBOOL(setting));
-    }
-    else if (action == "preproc_folder")
-    {
-        chooseIncludeFolder();
-    }
-}
-
-bool ALFloaterScriptStudio::onMenuEnable(const LLSD& param)
-{
-    const std::string action = param.asString();
-    Doc*              doc    = active();
-    if (action == "save" || action == "save_file")
-    {
-        return doc && doc->loaded && (action == "save_file" || doc->modifiable);
-    }
-    if (action == "revert")
-    {
-        return doc && revertible(*doc);
-    }
-    if (action == "save_as")
-    {
-        return doc && doc->loaded && !doc->file.empty();
-    }
-    if (action == "external_editor")
-    {
-        return doc && doc->loaded && doc->modifiable && !doc->notecard;
-    }
-    if (action == "save_all")
-    {
-        for (const std::unique_ptr<Doc>& each : mDocs)
-        {
-            if (each->unsaved() && each->modifiable)
-            {
-                return true;
-            }
-        }
-        return false;
-    }
-    if (action == "close")
-    {
-        return doc != nullptr;
-    }
-    if (action == "new_lua_script")
-    {
-        return ALScriptWorkspace::luaEnabled(ALScriptRef());
-    }
-    if (action == "recover")
-    {
-        const ALScriptRecoveryStore* store = ALScriptStudioRecovery::store();
-        return store && store->hasOffers();
-    }
-    if (action == "back")
-    {
-        return !mBack.empty();
-    }
-    if (action == "forward")
-    {
-        return !mForward.empty();
-    }
-    if (action == "cut" || action == "copy" || action == "paste" || action == "select_all")
-    {
-        LLEditMenuHandler* handler = focusedEditHandler();
-        if (!handler && doc)
-        {
-            handler = doc->shownText();
-        }
-        if (!handler)
-        {
-            return false;
-        }
-        return action == "cut" ? handler->canCut() : action == "copy" ? handler->canCopy() : action == "paste" ? handler->canPaste() : handler->canSelectAll();
-    }
-    if (action == "preprocess")
-    {
-        return doc && doc->loaded && !doc->notecard && !doc->preprocessing;
-    }
-    if (action == "load_file")
-    {
-        return doc && doc->loaded && doc->modifiable;
-    }
-    // What changes the text, or asks the analyzers about a place in it, is
-    // the source's to do: while the expansion is in front, it is read.
-    const bool source = doc && doc->shownView() == Doc::View::Source;
-    if (action == "toggle_comment")
-    {
-        return doc && doc->modifiable && doc->shownText()->canPerform(ALEditorCommand::ToggleComment);
-    }
-    if (action == "complete" || action == "signature_help")
-    {
-        return source && doc->modifiable;
-    }
-    if (action == "next_problem" || action == "previous_problem")
-    {
-        return doc && doc->loaded && !doc->shown.empty();
-    }
-    if (action == "reference" || action == "wiki")
-    {
-        return doc && doc->loaded && !doc->notecard;
-    }
-    if (action == "expanded")
-    {
-        return doc && doc->expandedEditor != nullptr;
-    }
-    if (action == "pop_out")
-    {
-        return doc && doc->loaded;
-    }
-    if (action == "format" || action == "insert_snippet" || action == "insert_function" || action == "insert_event" || action == "insert_constant")
-    {
-        return source && doc->loaded && doc->modifiable && !doc->notecard;
-    }
-    if (action == "format_selection")
-    {
-        return source && doc->loaded && doc->modifiable && !doc->notecard && !doc->editor->selection().empty();
-    }
-    if (action == "duplicate_line" || action == "delete_line" || action == "move_line_up" || action == "move_line_down")
-    {
-        const std::optional<ALEditorCommand> command = alEditorCommandFromName(action);
-        return doc && doc->modifiable && command && doc->shownText()->canPerform(*command);
-    }
-    if (action == "fold")
-    {
-        return doc && doc->shownText()->canPerform(ALEditorCommand::Fold);
-    }
-    if (action == "unfold")
-    {
-        return doc && doc->shownText()->canPerform(ALEditorCommand::Unfold);
-    }
-    if (action == "fold_all")
-    {
-        return doc && doc->shownText()->canPerform(ALEditorCommand::FoldAll);
-    }
-    if (action == "unfold_all")
-    {
-        return doc && doc->shownText()->canPerform(ALEditorCommand::UnfoldAll);
-    }
-    if (action == "go_to_definition")
-    {
-        return doc && doc->shownText()->canPerform(ALEditorCommand::GoToDefinition);
-    }
-    if (action == "find_references")
-    {
-        return doc && doc->shownText()->canPerform(ALEditorCommand::FindReferences);
-    }
-    if (action == "rename")
-    {
-        return doc && doc->shownText()->canPerform(ALEditorCommand::Rename);
-    }
-    if (action == "quick_fix")
-    {
-        return doc && doc->modifiable && doc->shownText()->canPerform(ALEditorCommand::QuickFix);
-    }
-    if (action == "fix_all")
-    {
-        size_t left = 0;
-        return doc && doc->loaded && doc->modifiable && (!doc->pickFixes(FixPick{}, &left).empty() || left > 0);
-    }
-    if (action == "go_to_line" || action == "find" || action == "replace" || action == "find_next" || action == "find_previous")
-    {
-        return doc != nullptr;
-    }
-    if (action == "go_to_symbol")
-    {
-        return doc && !doc->outline.empty();
-    }
-    if (action == "undo" || action == "redo")
-    {
-        const bool         forward = action == "redo";
-        LLEditMenuHandler* field   = focusedEditHandler();
-        return (field && (forward ? field->canRedo() : field->canUndo())) || (doc && (forward ? doc->shownText()->canRedo() : doc->shownText()->canUndo()));
-    }
-    return true;
-}
-
-bool ALFloaterScriptStudio::onMenuCheck(const LLSD& param)
-{
-    const std::string action = param.asString();
-    if (action == "expanded")
-    {
-        const Doc* doc = active();
-        return doc && doc->shownView() == Doc::View::Expanded;
-    }
-    if (action == "word_wrap")
-    {
-        return mWordWrap;
-    }
-    if (action == "indent_guides")
-    {
-        return mIndentGuides;
-    }
-    if (action == "relative_numbers")
-    {
-        return mRelativeNumbers;
-    }
-    if (action == "rainbow_brackets")
-    {
-        return mRainbowBrackets;
-    }
-    if (action == "sticky_headers")
-    {
-        return mStickyHeaders;
-    }
-    if (action == "vim_mode")
-    {
-        return mVimMode;
-    }
-    if (action == "spell_check")
-    {
-        return mSpellCheck;
-    }
-    if (action == "semantic_colors")
-    {
-        return mSemanticColors;
-    }
-    if (action == "inlay_parameters")
-    {
-        return mInlayParameters;
-    }
-    if (action == "inlay_types")
-    {
-        return mInlayTypes;
-    }
-    if (action == "weight_notes")
-    {
-        return mWeightNotes;
-    }
-    if (action == "weight_heat")
-    {
-        return mWeightHeat;
-    }
-    if (action == "line_numbers")
-    {
-        return mLineNumbers;
-    }
-    if (action == "scroll_bar")
-    {
-        return !mScrollMap;
-    }
-    if (action == "scroll_map")
-    {
-        return mScrollMap;
-    }
-    if (action == "blanks_none")
-    {
-        return mWhitespace == ALCodeEditor::Whitespace::None;
-    }
-    if (action == "blanks_selection")
-    {
-        return mWhitespace == ALCodeEditor::Whitespace::Selection;
-    }
-    if (action == "blanks_trailing")
-    {
-        return mWhitespace == ALCodeEditor::Whitespace::Trailing;
-    }
-    if (action == "blanks_all")
-    {
-        return mWhitespace == ALCodeEditor::Whitespace::All;
-    }
-    if (action == "map_narrow")
-    {
-        return mScrollMapWidth <= 60;
-    }
-    if (action == "map_medium")
-    {
-        return mScrollMapWidth > 60 && mScrollMapWidth < 130;
-    }
-    if (action == "map_wide")
-    {
-        return mScrollMapWidth >= 130;
-    }
-    if (action == "map_preview")
-    {
-        return mScrollMapPreview;
-    }
-    if (action == "map_left")
-    {
-        return mScrollMapLeft;
-    }
-    if (action == "problems" || action == "references" || action == "output" || action == "search" || action == "weights")
-    {
-        const LLPanel* current = mBottomTabs->getCurrentPanel();
-        const char*    tab     = action == "problems"     ? "problems_tab"
-                                 : action == "references" ? "references_tab"
-                                 : action == "output"     ? "output_tab"
-                                 : action == "weights"    ? "weights_tab"
-                                                          : "search_tab";
-        return !mFolds.collapsed("bottom") && current && current->getName() == tab;
-    }
-    if (action == "inspector")
-    {
-        return !mFolds.collapsed("inspector");
-    }
-    if (action == "explorer")
-    {
-        return !mFolds.collapsed("explorer");
-    }
-    if (action == "preflight")
-    {
-        return gSavedSettings.getBOOL("ALScriptStudioPreflight");
-    }
-    if (action == "preproc_enabled")
-    {
-        return gSavedSettings.getBOOL("ALScriptPreprocEnabled");
-    }
-    if (action == "preproc_switch")
-    {
-        return gSavedSettings.getBOOL("ALScriptPreprocSwitch");
-    }
-    if (action == "preproc_lazy")
-    {
-        return gSavedSettings.getBOOL("ALScriptPreprocLazyLists");
-    }
-    if (action == "preproc_compress")
-    {
-        return gSavedSettings.getBOOL("ALScriptPreprocCompress");
-    }
-    if (action == "preproc_disk")
-    {
-        return gSavedSettings.getBOOL("ALScriptPreprocDiskIncludes");
-    }
-    if (action == "preproc_optimize")
-    {
-        return gSavedSettings.getBOOL("ALScriptPreprocOptimizer");
-    }
-    if (action == "preproc_shrink")
-    {
-        return gSavedSettings.getBOOL("ALScriptPreprocOptimizerShrinkNames");
-    }
-    if (action == "preproc_addstrings")
-    {
-        return gSavedSettings.getBOOL("ALScriptPreprocOptimizerAddStrings");
-    }
-    if (action == "preproc_inline")
-    {
-        return gSavedSettings.getBOOL("ALScriptPreprocOptimizerInlining");
-    }
-    if (action == "preproc_extensions")
-    {
-        return gSavedSettings.getBOOL("ALScriptPreprocExtensions");
-    }
-    return false;
+        },
+        script);
 }
 
 void ALFloaterScriptStudio::onCompileTarget()
@@ -11975,7 +11742,7 @@ void ALFloaterScriptStudio::fillRecentMenu()
     item->setClickCallback([handle](LLUICtrl*, const LLSD&) {
         if (ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get()))
         {
-            studio->onMenuAction(LLSD("clear_recent"));
+            studio->mCommands.run("clear_recent");
         }
     });
     menu->addChild(item);
