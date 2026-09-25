@@ -34,6 +34,7 @@
 #include "alscriptmodules.h"
 #include "alscriptpreprocessor.h"
 #include "alscriptweightspane.h"
+#include "alscriptstudiofileio.h"
 #include "alscriptstudiovimrc.h"
 #include "alemptystate.h"
 #include "aljumpbar.h"
@@ -107,13 +108,6 @@
 #include <filesystem>
 #include <fstream>
 
-#if !LL_WINDOWS
-#include <cerrno>
-#include <fcntl.h>
-#include <sys/stat.h>
-#include <unistd.h>
-#endif
-
 namespace
 {
     // How long after the last keystroke the analyzers are asked.
@@ -128,97 +122,13 @@ namespace
     const F64 RESTORE_WAIT = 5.0 * 60.0;
 }
 
+using ALScriptFileIO::fileTooLarge;
+using ALScriptFileIO::readWholeFile;
+using ALScriptFileIO::StudioLiveFile;
+using ALScriptFileIO::writeTempFile;
+
 namespace
 {
-    // The most a file opened here may hold. A script's text goes up as at
-    // most 256 KB (ALScriptEnvelope::MAX_ASSET_BYTES) and a notecard 64 KB;
-    // this is room for any include, snippets file or log anyone edits by
-    // hand, and short of a file picked by mistake -- which is read on the
-    // main thread, and put in an editor whole.
-    constexpr S64 MOST_FILE_BYTES = 8 * 1024 * 1024;
-
-    bool fileTooLarge(const std::string& path)
-    {
-        return LLFile::size(path) > MOST_FILE_BYTES;
-    }
-
-    // A file's text, whole, its line endings as an editor here keeps them:
-    // CRLF and a lone CR as LF. Compared as it came, a file saved with CRLF
-    // -- as an editor on Windows saves one -- is never the text it was
-    // taken as, and every save made to it after the first reads as made
-    // on both sides at once. False where it could not be opened, or holds
-    // more than a file opened here may.
-    bool readWholeFile(const std::string& path, std::string& text)
-    {
-        if (fileTooLarge(path))
-        {
-            return false;
-        }
-        std::ifstream in(path, std::ios::binary);
-        if (!in)
-        {
-            return false;
-        }
-        const std::string bytes((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
-        text.clear();
-        text.reserve(bytes.size());
-        for (size_t i = 0; i < bytes.size(); ++i)
-        {
-            if (bytes[i] != '\r')
-            {
-                text += bytes[i];
-                continue;
-            }
-            text += '\n';
-            if (i + 1 < bytes.size() && bytes[i + 1] == '\n')
-            {
-                ++i;
-            }
-        }
-        return true;
-    }
-
-    // A file of the studio's own written in place -- the external editor's
-    // copy and its log, which nobody keeps; false where any of it did not
-    // go, which the last of it, written as the file closes, is the
-    // likeliest not to. A file the author keeps is written by ALFileWrite,
-    // whole or not at all.
-    //
-    // They go in the temp folder, which on Linux is everyone's, by names
-    // anyone can work out: so the user's alone to read, never written
-    // through a link, and never one somebody else made by that name first,
-    // or linked to a file elsewhere.
-    bool writeTempFile(const std::string& path, std::string_view text)
-    {
-#if LL_WINDOWS
-        std::ofstream out(path, std::ios::binary);
-        out.write(text.data(), static_cast<std::streamsize>(text.size()));
-        out.close();
-        return !out.fail();
-#else
-        const int fd = ::open(path.c_str(), O_WRONLY | O_CREAT | O_NOFOLLOW | O_CLOEXEC, S_IRUSR | S_IWUSR);
-        if (fd < 0)
-        {
-            return false;
-        }
-        struct stat st;
-        bool        whole = fstat(fd, &st) == 0 && S_ISREG(st.st_mode) && st.st_uid == getuid() && st.st_nlink == 1 &&
-                     fchmod(fd, S_IRUSR | S_IWUSR) == 0 && ftruncate(fd, 0) == 0;
-        size_t done = 0;
-        while (whole && done < text.size())
-        {
-            const ssize_t wrote = ::write(fd, text.data() + done, text.size() - done);
-            if (wrote < 0 && errno == EINTR)
-            {
-                continue;
-            }
-            whole = wrote > 0;
-            done += wrote > 0 ? static_cast<size_t>(wrote) : 0;
-        }
-        return ::close(fd) == 0 && whole;
-#endif
-    }
-
     ALTextRange rangeOf(const ALScriptSpan& span)
     {
         return ALTextRange(ALTextPos(span.line, span.column), ALTextPos(span.endLine, span.endColumn));
@@ -6607,34 +6517,6 @@ void ALFloaterScriptStudio::applyPendingEdits(Doc& doc)
 
 namespace
 {
-    // The temp file an external editor is given, watched for its saves;
-    // gone from disk with it. What is written here is marked seen as it
-    // is written (ALWatchedFile::seen), and so is no save of the editor's.
-    class StudioLiveFile final : public ALWatchedFile
-    {
-    public:
-        // A temp file of the studio's own goes with the watch; a file
-        // the author keeps on disk stays.
-        StudioLiveFile(const std::string& path, changed_t changed, bool ours)
-        :   ALWatchedFile(path, std::move(changed)),
-            mOurs(ours)
-        {
-            // Twice a second: a save is heard within a second of it, once
-            // it has held still from one look to the next.
-            poll(0.5f);
-        }
-        ~StudioLiveFile() override
-        {
-            if (mOurs)
-            {
-                LLFile::remove(path());
-            }
-        }
-
-    private:
-        bool mOurs;
-    };
-
     bool writeWhole(const std::string& path, const std::string& text)
     {
         // An empty script is stored as one space, as it always was.

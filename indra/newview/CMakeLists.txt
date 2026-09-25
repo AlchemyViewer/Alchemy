@@ -186,6 +186,7 @@ if(AL_BUILD_VIEWER)
     alscriptsearchpane.cpp
     alscriptstudiocommands.cpp
     alscriptstudiodoc.cpp
+    alscriptstudiofileio.cpp
     alscriptstudiorecovery.cpp
     alscriptstudiosaving.cpp
     alscriptstudiovim.cpp
@@ -996,6 +997,7 @@ if(AL_BUILD_VIEWER)
     alscriptsearchpane.h
     alscriptstudiocommands.h
     alscriptstudiodoc.h
+    alscriptstudiofileio.h
     alscriptstudiorecovery.h
     alscriptstudiosaving.h
     alscriptstudiovim.h
