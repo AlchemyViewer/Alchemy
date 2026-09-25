@@ -25,6 +25,7 @@
 #pragma once
 
 #include "altextview.h"
+#include "alvimpattern.h"
 #include "alvimregisters.h"
 
 #include <functional>
@@ -255,55 +256,13 @@ private:
     // ~ for the last replacement, \r for a line break -- as the search
     // engine's.
     std::string replacementOf(const std::string& with) const;
-    // Vim's spelling of a pattern -- magic, with \( \) \| \+ \? \{ \< \>
-    // \zs \ze and the classes, \v for very magic and \V for very nomagic
-    // -- as the search engine's; and how its case is matched: \c and \C
-    // in it, else what the caller forces, else the ignorecase and
-    // smartcase settings.
-    struct Pattern
-    {
-        std::string regex;
-        bool        caseSensitive = true;
-        // Where a match may start, as \%V \%# \%23l \%<23l \%>23l \%23c
-        // and \%23v ask -- the last visual area, the caret, a line, a
-        // column -- since the engine has no such atoms: a match anywhere
-        // else is dropped. Vim ties the atom to its place in the pattern;
-        // here it is the match's start, which is where they are written.
-        struct Where
-        {
-            enum class Kind : U8
-            {
-                Visual,
-                Caret,
-                Line,
-                Column,
-                FileStart,
-                FileEnd
-            };
-            Kind kind    = Kind::Line;
-            // -1 before, 0 at, 1 after; the number, 1-based as vim counts.
-            S32  side    = 0;
-            S32  number  = 0;
-            // Written after a \zs: about the match as reported, not the
-            // whole of what the pattern matched.
-            bool afterStart = false;
-        };
-        std::vector<Where> where;
-        // The group the match is, where a \zs made one; the search is
-        // told, and says where the whole began. Where a \zs inside
-        // brackets had to be the engine's \K instead, the pattern
-        // without it, whose matches end where these do and say where
-        // the whole began.
-        S32         matchGroup = 0;
-        std::string wholeRegex;
-        // Whether a match may cross a line's end: the pattern has \n or
-        // a \_ class in it, which is what reaches one.
-        bool        acrossLines = false;
-    };
-    Pattern patternOf(const std::string& vim, std::optional<bool> force_case = std::nullopt) const;
-    // The matches a pattern's places allow, the rest dropped; `wholes`
-    // says where each whole match began, for the places before a \zs.
-    void    constrain(ALTextView& view, const Pattern& pattern, std::vector<ALTextRange>& matches, const std::vector<ALTextPos>& wholes) const;
+    // Vim's spelling of a pattern as the search engine's (ALVimPattern),
+    // with the last replacement for ~ and the ignorecase and smartcase
+    // settings; and what the places a pattern names are measured against:
+    // the caret, and the last visual area.
+    typedef ALVimPattern Pattern;
+    Pattern              patternOf(const std::string& vim, std::optional<bool> force_case = std::nullopt) const;
+    ALVimPattern::Places placesOf(const ALTextView& view) const;
     // The pattern's matches within a scope, the places applied, with
     // where each whole match began.
     std::vector<ALTextRange> matchesOf(ALTextView& view, const Pattern& pattern, ALTextSearchOptions options, const ALTextRange* scope, std::string& error,

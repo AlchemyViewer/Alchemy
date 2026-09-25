@@ -24,16 +24,14 @@
 
 #include "linden_common.h"
 
-#include "alvimkeymap.h"
+#include "alvimpattern.h"
 
 #include "llstring.h"
 
-namespace
-{
-    std::string utf8Of(llwchar ch) { return utf8str_from_cp(ch); }
-}
+#include <algorithm>
 
-ALVimKeymap::Pattern ALVimKeymap::patternOf(const std::string& vim, std::optional<bool> force_case) const
+// static
+ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_replacement, const Case& case_rules, std::optional<bool> force_case)
 {
     // Vim's magic spelling to Perl's: with a backslash, ( ) | + ? = { }
     // < > are the engine's own ( ) | + ? ? { } \b \b, and without one
@@ -43,7 +41,7 @@ ALVimKeymap::Pattern ALVimKeymap::patternOf(const std::string& vim, std::optiona
     // is \K; \ze looks ahead at the rest; \{-} is *?; the classes \a \l
     // \u \x \o \h \i \k are brackets; \c and \C say how case is matched;
     // a bracket expression is copied through as it stands.
-    Pattern             out;
+    ALVimPattern        out;
     std::optional<bool> case_in_pattern;
     enum class Magic : U8
     {
@@ -247,7 +245,7 @@ ALVimKeymap::Pattern ALVimKeymap::patternOf(const std::string& vim, std::optiona
                         {
                             // As the bytes it is, each escaped where it is
                             // anything to the engine.
-                            for (const char b : utf8Of(static_cast<llwchar>(code)))
+                            for (const char b : utf8str_from_cp(static_cast<llwchar>(code)))
                             {
                                 literal(b);
                             }
@@ -258,8 +256,8 @@ ALVimKeymap::Pattern ALVimKeymap::patternOf(const std::string& vim, std::optiona
                     // The file's ends: \%^ and \%$.
                     if (i + 1 < vim.size() && (vim[i + 1] == '^' || vim[i + 1] == '$'))
                     {
-                        Pattern::Where place;
-                        place.kind       = vim[i + 1] == '^' ? Pattern::Where::Kind::FileStart : Pattern::Where::Kind::FileEnd;
+                        Where place;
+                        place.kind       = vim[i + 1] == '^' ? Where::Kind::FileStart : Where::Kind::FileEnd;
                         place.afterStart = zs_seen;
                         out.where.push_back(place);
                         ++i;
@@ -282,17 +280,17 @@ ALVimKeymap::Pattern ALVimKeymap::patternOf(const std::string& vim, std::optiona
                     }
                     if (k < vim.size())
                     {
-                        Pattern::Where place;
+                        Where place;
                         place.side   = side;
                         place.number = number;
                         bool known   = true;
                         switch (vim[k])
                         {
-                            case 'V': place.kind = Pattern::Where::Kind::Visual; known = !digits; break;
-                            case '#': place.kind = Pattern::Where::Kind::Caret; known = !digits; break;
-                            case 'l': place.kind = Pattern::Where::Kind::Line; known = digits; break;
+                            case 'V': place.kind = Where::Kind::Visual; known = !digits; break;
+                            case '#': place.kind = Where::Kind::Caret; known = !digits; break;
+                            case 'l': place.kind = Where::Kind::Line; known = digits; break;
                             case 'c':
-                            case 'v': place.kind = Pattern::Where::Kind::Column; known = digits; break;
+                            case 'v': place.kind = Where::Kind::Column; known = digits; break;
                             default: known = false; break;
                         }
                         if (known)
@@ -456,7 +454,7 @@ ALVimKeymap::Pattern ALVimKeymap::patternOf(const std::string& vim, std::optiona
                         break;
                     }
                     case '~':
-                        for (const char r : mLastReplacement)
+                        for (const char r : last_replacement)
                         {
                             literal(r);
                         }
@@ -475,7 +473,7 @@ ALVimKeymap::Pattern ALVimKeymap::patternOf(const std::string& vim, std::optiona
                     case '*': out.regex += c; break;
                     case '~':
                         // The last replacement, as the text it is.
-                        for (const char r : mLastReplacement)
+                        for (const char r : last_replacement)
                         {
                             literal(r);
                         }
@@ -517,9 +515,9 @@ ALVimKeymap::Pattern ALVimKeymap::patternOf(const std::string& vim, std::optiona
     {
         out.caseSensitive = *force_case;
     }
-    else if (mShared->ignoreCase)
+    else if (case_rules.ignore)
     {
-        out.caseSensitive = mShared->smartCase && std::any_of(vim.begin(), vim.end(), [](char c) { return c >= 'A' && c <= 'Z'; });
+        out.caseSensitive = case_rules.smart && std::any_of(vim.begin(), vim.end(), [](char c) { return c >= 'A' && c <= 'Z'; });
     }
     else
     {
@@ -528,19 +526,18 @@ ALVimKeymap::Pattern ALVimKeymap::patternOf(const std::string& vim, std::optiona
     return out;
 }
 
-std::vector<ALTextRange> ALVimKeymap::matchesOf(ALTextView& view, const Pattern& pattern, ALTextSearchOptions options, const ALTextRange* scope, std::string& error,
-                                                std::vector<ALTextPos>& wholes) const
+std::vector<ALTextRange> ALVimPattern::matchesIn(const ALTextDocument& d, ALTextSearchOptions options, const ALTextRange* scope, const Places& places,
+                                                 std::string& error, std::vector<ALTextPos>& wholes) const
 {
-    const ALTextDocument& d = view.document();
-    options.matchGroup      = pattern.matchGroup;
-    options.acrossLines     = pattern.acrossLines;
-    std::vector<ALTextRange> matches = ALTextSearch::matches(d, pattern.regex, options, scope, &error, &wholes);
-    if (error.empty() && !pattern.wholeRegex.empty())
+    options.matchGroup      = matchGroup;
+    options.acrossLines     = acrossLines;
+    std::vector<ALTextRange> matches = ALTextSearch::matches(d, regex, options, scope, &error, &wholes);
+    if (error.empty() && !wholeRegex.empty())
     {
         // The pattern without its \K matches the same stretches whole:
         // each match here is the whole one that ends where it does.
         std::string              other;
-        std::vector<ALTextRange> full = ALTextSearch::matches(d, pattern.wholeRegex, options, scope, &other);
+        std::vector<ALTextRange> full = ALTextSearch::matches(d, wholeRegex, options, scope, &other);
         for (size_t i = 0; i < matches.size() && i < wholes.size(); ++i)
         {
             for (const ALTextRange& f : full)
@@ -555,52 +552,37 @@ std::vector<ALTextRange> ALVimKeymap::matchesOf(ALTextView& view, const Pattern&
     }
     if (error.empty())
     {
-        constrain(view, pattern, matches, wholes);
+        constrain(d, places, matches, wholes);
     }
     return matches;
 }
 
-void ALVimKeymap::constrain(ALTextView& view, const Pattern& pattern, std::vector<ALTextRange>& matches, const std::vector<ALTextPos>& wholes) const
+void ALVimPattern::constrain(const ALTextDocument& d, const Places& places, std::vector<ALTextRange>& matches, const std::vector<ALTextPos>& wholes) const
 {
-    if (pattern.where.empty())
+    if (where.empty())
     {
         return;
     }
-    const ALTextDocument& d = view.document();
-    // The last visual area, as a range: whole lines for a line-wise one,
-    // the character under either end included otherwise; a block is the
-    // lines between its ends and the columns between them.
-    ALTextRange visual;
-    S32         block_left = -1, block_right = -1;
-    if (mVisualLast != Mode::Normal)
-    {
-        const ALTextPos a = mVisualLastAnchor < mVisualLastCaret ? mVisualLastAnchor : mVisualLastCaret;
-        const ALTextPos b = mVisualLastAnchor < mVisualLastCaret ? mVisualLastCaret : mVisualLastAnchor;
-        visual            = mVisualLast == Mode::VisualLine ? ALTextRange(d.lineStart(a.line), d.lineEnd(b.line)) : ALTextRange(a, d.nextCluster(b));
-        if (mVisualLast == Mode::VisualBlock)
-        {
-            block_left  = llmin(mVisualLastAnchor.column, mVisualLastCaret.column);
-            block_right = llmax(mVisualLastAnchor.column, mVisualLastCaret.column);
-            visual      = ALTextRange(d.lineStart(a.line), d.lineEnd(b.line));
-        }
-    }
-    const ALTextPos caret = view.caret();
+    const ALTextRange& visual      = places.visualRange;
+    const S32          block_left  = places.blockLeft;
+    const S32          block_right = places.blockRight;
+    const ALTextPos&   caret       = places.caret;
     auto            allowed = [&](size_t index) {
         const ALTextRange match = matches[index].normalised();
-        for (const Pattern::Where& place : pattern.where)
+        for (const Where& place : where)
         {
             // Before a \zs, the place is the whole match's start; after
             // it, the reported match's.
             const ALTextPos at = place.afterStart || index >= wholes.size() ? match.begin : wholes[index];
             switch (place.kind)
             {
-                case Pattern::Where::Kind::FileStart:
+                case Where::Kind::FileStart:
                     if (at != d.start())
                     {
                         return false;
                     }
                     break;
-                case Pattern::Where::Kind::FileEnd:
+                case Where::Kind::FileEnd:
                 {
                     // The end of the text, or of its last line where the
                     // text ends with a line break, which vim does not
@@ -614,8 +596,8 @@ void ALVimKeymap::constrain(ALTextView& view, const Pattern& pattern, std::vecto
                     }
                     break;
                 }
-                case Pattern::Where::Kind::Visual:
-                    if (mVisualLast == Mode::Normal || at < visual.begin || !(at < visual.end))
+                case Where::Kind::Visual:
+                    if (!places.visual || at < visual.begin || !(at < visual.end))
                     {
                         return false;
                     }
@@ -624,13 +606,13 @@ void ALVimKeymap::constrain(ALTextView& view, const Pattern& pattern, std::vecto
                         return false;
                     }
                     break;
-                case Pattern::Where::Kind::Caret:
+                case Where::Kind::Caret:
                     if (at != caret)
                     {
                         return false;
                     }
                     break;
-                case Pattern::Where::Kind::Line:
+                case Where::Kind::Line:
                 {
                     const S32 line = at.line + 1;
                     if (place.side < 0 ? line >= place.number : place.side > 0 ? line <= place.number : line != place.number)
@@ -639,7 +621,7 @@ void ALVimKeymap::constrain(ALTextView& view, const Pattern& pattern, std::vecto
                     }
                     break;
                 }
-                case Pattern::Where::Kind::Column:
+                case Where::Kind::Column:
                 {
                     const S32 column = at.column + 1;
                     if (place.side < 0 ? column >= place.number : place.side > 0 ? column <= place.number : column != place.number)
@@ -663,7 +645,8 @@ void ALVimKeymap::constrain(ALTextView& view, const Pattern& pattern, std::vecto
     matches.swap(kept);
 }
 
-std::string ALVimKeymap::replacementOf(const std::string& with) const
+// static
+std::string ALVimPattern::replacementOf(const std::string& with)
 {
     // Vim's spelling to the search engine's: & and \0 are the whole
     // match, \1 to \9 the groups, \r and \n a line break, \t a tab;

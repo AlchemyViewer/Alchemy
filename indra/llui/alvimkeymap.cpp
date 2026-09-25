@@ -4665,6 +4665,46 @@ bool ALVimKeymap::global(ALTextView& view, S32 first, S32 last, bool ranged, con
     return !mMessageError;
 }
 
+ALVimKeymap::Pattern ALVimKeymap::patternOf(const std::string& vim, std::optional<bool> force_case) const
+{
+    return ALVimPattern::of(vim, mLastReplacement, { mShared->ignoreCase, mShared->smartCase }, force_case);
+}
+
+ALVimPattern::Places ALVimKeymap::placesOf(const ALTextView& view) const
+{
+    // The last visual area, as a range: whole lines for a line-wise one,
+    // the character under either end included otherwise; a block is the
+    // lines between its ends and the columns between them.
+    const ALTextDocument& d = view.document();
+    ALVimPattern::Places  places;
+    places.caret = view.caret();
+    if (mVisualLast != Mode::Normal)
+    {
+        const ALTextPos a = mVisualLastAnchor < mVisualLastCaret ? mVisualLastAnchor : mVisualLastCaret;
+        const ALTextPos b = mVisualLastAnchor < mVisualLastCaret ? mVisualLastCaret : mVisualLastAnchor;
+        places.visual     = true;
+        places.visualRange = mVisualLast == Mode::VisualLine ? ALTextRange(d.lineStart(a.line), d.lineEnd(b.line)) : ALTextRange(a, d.nextCluster(b));
+        if (mVisualLast == Mode::VisualBlock)
+        {
+            places.blockLeft   = llmin(mVisualLastAnchor.column, mVisualLastCaret.column);
+            places.blockRight  = llmax(mVisualLastAnchor.column, mVisualLastCaret.column);
+            places.visualRange = ALTextRange(d.lineStart(a.line), d.lineEnd(b.line));
+        }
+    }
+    return places;
+}
+
+std::vector<ALTextRange> ALVimKeymap::matchesOf(ALTextView& view, const Pattern& pattern, ALTextSearchOptions options, const ALTextRange* scope, std::string& error,
+                                                std::vector<ALTextPos>& wholes) const
+{
+    return pattern.matchesIn(view.document(), options, scope, placesOf(view), error, wholes);
+}
+
+std::string ALVimKeymap::replacementOf(const std::string& with) const
+{
+    return ALVimPattern::replacementOf(with);
+}
+
 bool ALVimKeymap::substitute(ALTextView& view, S32 first, S32 last, const std::string& spec)
 {
     // s/pattern/replacement/flags, with whatever follows s as the
