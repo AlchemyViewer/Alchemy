@@ -864,6 +864,52 @@ bool ALFloaterScriptStudio::postBuild()
         }
     });
     mExplorer->setRightMouseDownCallback([this](LLUICtrl*, S32 x, S32 y, MASK) { showExplorerMenu(x, y); });
+    // The keys a tree of files answers to, asked of the list first: the
+    // list would take left and right for its cells, and the panel it is in
+    // escape, to leave nothing with the keyboard -- where the arrows walk
+    // the avatar. Left and right fold and open the object or the prim
+    // chosen; return opens what is chosen, or folds it; delete deletes it,
+    // Command-Backspace too on a Mac; F2 renames it; and escape goes back
+    // to the script.
+    mExplorer->setKeyHandler([this](KEY key, MASK mask) {
+        if ((key == KEY_LEFT || key == KEY_RIGHT) && mask == MASK_NONE)
+        {
+            const std::vector<LLScrollListItem*> rows = mExplorer->getAllSelected();
+            if (rows.size() == 1 && rows.front()->getValue().isMap() && !rows.front()->getValue().has("item"))
+            {
+                explorerFoldRow(rows.front()->getValue(), key == KEY_LEFT);
+                return true;
+            }
+            return false;
+        }
+        if (key == KEY_RETURN && mask == MASK_NONE)
+        {
+            onExplorerChosen();
+            return true;
+        }
+        if ((key == KEY_DELETE && mask == MASK_NONE) || (key == KEY_BACKSPACE && mask == MASK_CONTROL))
+        {
+            if (explorerActionEnabled("delete"))
+            {
+                onExplorerAction("delete");
+            }
+            return true;
+        }
+        if (key == KEY_F2 && mask == MASK_NONE)
+        {
+            if (explorerActionEnabled("rename"))
+            {
+                onExplorerAction("rename");
+            }
+            return true;
+        }
+        if (key == KEY_ESCAPE && mask == MASK_NONE)
+        {
+            revealed(mExplorer, true);
+            return true;
+        }
+        return false;
+    });
     for (const char* action : { "open", "start", "stop", "reset", "refresh" })
     {
         getChild<LLButton>(std::string("explorer_") + action)->setCommitCallback([this, action](LLUICtrl*, const LLSD&) { onExplorerAction(action); });
@@ -1381,44 +1427,6 @@ bool ALFloaterScriptStudio::handleKeyHere(KEY key, MASK mask)
         return true;
     }
 #endif
-    // Left and right fold and open the object or the prim chosen in the
-    // explorer, as a tree's keys do.
-    if ((key == KEY_LEFT || key == KEY_RIGHT) && mask == MASK_NONE && mExplorer && mExplorer->hasFocus())
-    {
-        const std::vector<LLScrollListItem*> rows = mExplorer->getAllSelected();
-        if (rows.size() == 1 && rows.front()->getValue().isMap() && !rows.front()->getValue().has("item"))
-        {
-            explorerFoldRow(rows.front()->getValue(), key == KEY_LEFT);
-            return true;
-        }
-    }
-    // And the keys a list of files answers to: return opens what is chosen
-    // (or folds an object), delete deletes it -- Command-Backspace too, on
-    // a Mac -- and F2 renames it.
-    if (mExplorer && mExplorer->hasFocus())
-    {
-        if (key == KEY_RETURN && mask == MASK_NONE)
-        {
-            onExplorerChosen();
-            return true;
-        }
-        if ((key == KEY_DELETE && mask == MASK_NONE) || (key == KEY_BACKSPACE && mask == MASK_CONTROL))
-        {
-            if (explorerActionEnabled("delete"))
-            {
-                onExplorerAction("delete");
-            }
-            return true;
-        }
-        if (key == KEY_F2 && mask == MASK_NONE)
-        {
-            if (explorerActionEnabled("rename"))
-            {
-                onExplorerAction("rename");
-            }
-            return true;
-        }
-    }
     if (handleMenuAccelerator(key, mask) || handleUndoKeys(key, mask))
     {
         return true;
