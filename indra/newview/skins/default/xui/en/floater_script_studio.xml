@@ -230,6 +230,8 @@
     <floater.string name="VimWritten">"[FILE]" [LINES]L, [BYTES]B written</floater.string>
     <floater.string name="VimNoErrors">E42: No Errors</floater.string>
     <floater.string name="VimNotInPath">E447: Can't find file "[NAME]" in path</floater.string>
+    <floater.string name="VimSuggestTitle">Change "[WORD]" to</floater.string>
+    <floater.string name="VimSuggestPlaceholder">Type to find a spelling; Return puts it in</floater.string>
     <floater.string name="VimFileInfo">"[NAME]" [STATE][LINES] lines --[PERCENT]%--</floater.string>
     <floater.string name="VimStateModified">[Modified]</floater.string>
     <floater.string name="VimStateReadOnly">[readonly]</floater.string>

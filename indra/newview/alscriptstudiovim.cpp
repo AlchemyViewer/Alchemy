@@ -43,7 +43,7 @@ namespace
     const char* const VIM_MENU_COMMANDS[] = { "format", "problems", "references", "output", "search", "preferences", "pop_out",
                                               "reveal", "save_all", "revert", "external_editor", "save_file", "save_as", "load_file",
                                               "open_file", "fold_all", "unfold_all", "go_to_line", "quick_fix", "fix_all", "weights",
-                                              "back",      "forward",  "reference" };
+                                              "back",      "forward",  "reference", "go_to_symbol" };
 
     // Whether a command's name is one of vim's, as vim reads its names: any
     // of it from the least it may be shortened to, `least`, to the whole.
@@ -105,6 +105,38 @@ void ALScriptStudioVim::connect(ALVimKeymap& vim)
                 mWindow.jumpedFrom(*doc, view, from);
             }
         }
+    };
+    // z='s suggestions, one to pick from a list over the editor, which
+    // has the keyboard back after.
+    vim.hooks().pick = [this, alive](ALTextView& view, const std::string& word, const std::vector<std::string>& items,
+                                     std::function<void(size_t index)> chosen) {
+        if (!alive.lock())
+        {
+            return;
+        }
+        std::vector<ALQuickOpen::Candidate> candidates;
+        for (size_t i = 0; i < items.size(); ++i)
+        {
+            ALQuickOpen::Candidate c;
+            c.label = items[i];
+            c.value = std::to_string(i);
+            candidates.push_back(std::move(c));
+        }
+        const LLHandle<LLUICtrl> editor = view.getHandle();
+        auto                     back   = [editor]() {
+            if (LLUICtrl* e = editor.get())
+            {
+                e->setFocus(true);
+            }
+        };
+        auto take = [chosen, back](const std::string& value) {
+            back();
+            chosen(static_cast<size_t>(std::atoi(value.c_str())));
+        };
+        LLStringUtil::format_map_t args;
+        args["[WORD]"] = word;
+        mWindow.pickLine(std::move(candidates), mServices.words("VimSuggestPlaceholder"), mServices.words("VimSuggestTitle", args),
+                         llclamp(static_cast<S32>(items.size()), 1, 8), take, take, back);
     };
     vim.hooks().listing = [this, alive](ALTextView&, const std::string& text) {
         if (alive.lock())
@@ -344,8 +376,16 @@ bool ALScriptStudioVim::command(ALTextView& view, const std::string& name, const
         {
             option.erase(0, 2);
         }
+        // vim's list shows the blanks, which the window shows all or none of
+        // here.
+        if (option == "list")
+        {
+            mCommands.run(off ? "blanks_none" : "blanks_all");
+            return true;
+        }
         const char* toggled = option == "number" || option == "nu"          ? "line_numbers"
                               : option == "relativenumber" || option == "rnu" ? "relative_numbers"
+                              : option == "spell"                             ? "spell_check"
                                                                               : nullptr;
         if (!toggled)
         {
@@ -385,7 +425,7 @@ void ALScriptStudioVim::complete(const std::string& command, const std::string& 
                                    "tabnew",  "tag",
                                    "tabnext", "tabonly",   "tabprevious", "tabrewind", "update", "wall",     "wq",       "wqall",
                                    "write",   "xall",      "xit" };
-    static const char* OPTIONS[] = { "number", "nonumber", "relativenumber", "norelativenumber" };
+    static const char* OPTIONS[] = { "number", "nonumber", "relativenumber", "norelativenumber", "spell", "nospell", "list", "nolist" };
     static const char* KINDS[]   = { "all", "cmd", "search" };
     if (command.empty())
     {

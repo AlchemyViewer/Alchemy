@@ -167,7 +167,7 @@ namespace tut
         // The table's commands run, by name; and two of its toggles.
         Names                              ran;
         bool                               lineNumbers = false, relativeNumbers = false;
-        bool                               problemsThere = false, problemsShown = false;
+        bool                               problemsThere = false, problemsShown = false, spellCheck = false;
         // A folder of files, where a test makes one.
         std::string                        folder;
 
@@ -216,7 +216,7 @@ namespace tut
                 skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
             }
             for (const char* name : { "save", "close", "save_all", "format", "quick_fix", "fix_all", "back", "forward", "go_to_definition",
-                                      "reference" })
+                                      "reference", "go_to_symbol", "blanks_all", "blanks_none" })
             {
                 commands.add(name, [this, name]() { ran.push_back(name); });
             }
@@ -224,6 +224,13 @@ namespace tut
             {
                 commands.add(name, [this, name]() { ran.push_back(name); }, [this]() { return problemsThere; });
             }
+            commands.add(
+                "spell_check",
+                [this]() {
+                    ran.push_back("spell_check");
+                    spellCheck = !spellCheck;
+                },
+                nullptr, [this]() { return spellCheck; });
             commands.add(
                 "problems",
                 [this]() {
@@ -485,7 +492,8 @@ namespace tut
         vim.complete("q", std::string(), none);
         ensure("vim's own and the menus'", std::find(names.begin(), names.end(), "wall") != names.end() &&
                                                std::find(names.begin(), names.end(), "go_to_line") != names.end());
-        ensure("the options", options == Names{ "number", "nonumber", "relativenumber", "norelativenumber" });
+        ensure("the options",
+               options == Names{ "number", "nonumber", "relativenumber", "norelativenumber", "spell", "nospell", "list", "nolist" });
         ensure("the kinds", kinds == Names{ "all", "cmd", "search" });
         ensure("the tabs", tabs == Names{ "alpha", "beta" });
         ensure("nothing after anything else", none.empty());
@@ -795,5 +803,30 @@ namespace tut
         ensure_equals("nowhere", said->message(), std::string("VimNotInPath [NAME]=nowhere.lsl"));
         ex(a, "find");
         ensure_equals("a name wanted", said->message(), std::string("VimArgumentRequired"));
+    }
+
+    template<> template<>
+    void alscriptstudiovim_object::test<17>()
+    {
+        set_test_name(":set spell and :set list are the window's; z= picks from a list over the editor; gO the symbols");
+        make();
+        Doc&         a    = tab("a");
+        ALVimKeymap* said = vimOver(a);
+        ensure(":set spell", ex(a, "set", "spell") && spellCheck && ran == Names{ "spell_check" });
+        ensure("on already: left", ex(a, "set", "spell") && ran.size() == 1);
+        ensure(":set nospell", ex(a, "set", "nospell") && !spellCheck);
+        ensure(":set list, :set nolist", ex(a, "set", "list") && ex(a, "set", "nolist"));
+        ensure("the blanks all, then none", ran == Names{ "spell_check", "spell_check", "blanks_all", "blanks_none" });
+
+        std::vector<size_t> chose;
+        said->hooks().pick(*a.editor, "teh", { "the", "ten" }, [&chose](size_t index) { chose.push_back(index); });
+        ensure("offered, in order", studio.offered == Names{ "0", "1" });
+        ensure_equals("asking of the word", studio.asking, std::string("VimSuggestPlaceholder"));
+        ensure_equals("as tall as they are", studio.pickRows, 2);
+        studio.pick("1");
+        ensure("the one picked", chose == std::vector<size_t>{ 1 });
+
+        ran.clear();
+        ensure("gO", said->hooks().command(*a.editor, "go_to_symbol", std::string()) && ran == Names{ "go_to_symbol" });
     }
 }
