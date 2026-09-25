@@ -250,6 +250,12 @@ public:
 
     bool setRunning(const ALScriptRef& ref, bool running);
     bool reset(const ALScriptRef& ref);
+    // Stopped, then set running again once its region says it has stopped:
+    // sent back to back, a stop sent again after it went astray could reach
+    // the region after the start and leave the script stopped. Asked again
+    // while the region says it still runs, and started after a while all
+    // the same. False where the stop could not be sent.
+    bool restart(const ALScriptRef& ref);
 
     // Whether a script in an object runs and what it compiles for, asked
     // of the region; every listener hears the answer. False where there

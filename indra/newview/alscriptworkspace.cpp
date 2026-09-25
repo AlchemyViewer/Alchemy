@@ -1268,6 +1268,72 @@ bool ALScriptWorkspace::reset(const ALScriptRef& ref)
     return scriptMessage(ref, _PREHASH_ScriptReset, false, false);
 }
 
+namespace
+{
+    // How often a restart asks whether the stop has reached the region,
+    // and how many times before it starts the script all the same.
+    constexpr F32 RESTART_ASK_EVERY = 0.5f;
+    constexpr S32 RESTART_ASKS      = 20;
+}
+
+bool ALScriptWorkspace::restart(const ALScriptRef& ref)
+{
+    if (!setRunning(ref, false))
+    {
+        return false;
+    }
+    struct Pending
+    {
+        ALScriptRef                         ref;
+        bool                                done = false;
+        boost::signals2::scoped_connection  heard;
+    };
+    auto pending = std::make_shared<Pending>();
+    pending->ref = ref;
+    // Started once, by the first word that it has stopped or by the last
+    // ask going unanswered.
+    const auto start = [this](const std::shared_ptr<Pending>& one) {
+        if (one->done)
+        {
+            return;
+        }
+        one->done = true;
+        one->heard.disconnect();
+        if (setRunning(one->ref, true))
+        {
+            askRunning(one->ref);
+        }
+    };
+    pending->heard = mRunningState.connect([pending = std::weak_ptr<Pending>(pending), start](const RunningState& state) {
+        const std::shared_ptr<Pending> one = pending.lock();
+        if (one && state.ref == one->ref && !state.running)
+        {
+            start(one);
+        }
+    });
+    askRunning(ref);
+    // Asked again while it still runs, the stop not there yet.
+    auto ask = std::make_shared<std::function<void(S32)>>();
+    *ask = [this, pending, start, ask_weak = std::weak_ptr<std::function<void(S32)>>(ask)](S32 left) {
+        if (pending->done)
+        {
+            return;
+        }
+        if (left <= 0)
+        {
+            start(pending);
+            return;
+        }
+        askRunning(pending->ref);
+        if (const auto again = ask_weak.lock())
+        {
+            doAfterInterval([again, left]() { (*again)(left - 1); }, RESTART_ASK_EVERY);
+        }
+    };
+    doAfterInterval([ask]() { (*ask)(RESTART_ASKS); }, RESTART_ASK_EVERY);
+    return true;
+}
+
 // --- running -----------------------------------------------------------------------
 
 bool ALScriptWorkspace::askRunning(const ALScriptRef& ref)

@@ -14663,10 +14663,7 @@ void ALFloaterScriptStudio::runExplorerScripts(const std::string& action, const 
         else if (action == "restart")
         {
             // Stopped and set running again, keeping its state.
-            if (workspace.setRunning(ref, false) && workspace.setRunning(ref, true))
-            {
-                workspace.askRunning(ref);
-            }
+            workspace.restart(ref);
         }
         else if (workspace.setRunning(ref, action == "start"))
         {
