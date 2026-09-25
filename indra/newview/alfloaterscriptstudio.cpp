@@ -115,6 +115,13 @@
 #include <ctime>
 #include <fstream>
 
+#if !LL_WINDOWS
+#include <cerrno>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#endif
+
 namespace
 {
     // How long after the last keystroke the analyzers are asked.
@@ -200,15 +207,44 @@ namespace
     }
 
     // A file of the studio's own written in place -- the external editor's
-    // copy, which nobody keeps; false where any of it did not go, which the
-    // last of it, written as the file closes, is the likeliest not to. A
-    // file the author keeps is written by ALFileWrite, whole or not at all.
+    // copy and its log, which nobody keeps; false where any of it did not
+    // go, which the last of it, written as the file closes, is the
+    // likeliest not to. A file the author keeps is written by ALFileWrite,
+    // whole or not at all.
+    //
+    // They go in the temp folder, which on Linux is everyone's, by names
+    // anyone can work out: so the user's alone to read, never written
+    // through a link, and never one somebody else made by that name first,
+    // or linked to a file elsewhere.
     bool writeFile(const std::string& path, std::string_view text)
     {
+#if LL_WINDOWS
         std::ofstream out(path, std::ios::binary);
         out.write(text.data(), static_cast<std::streamsize>(text.size()));
         out.close();
         return !out.fail();
+#else
+        const int fd = ::open(path.c_str(), O_WRONLY | O_CREAT | O_NOFOLLOW | O_CLOEXEC, S_IRUSR | S_IWUSR);
+        if (fd < 0)
+        {
+            return false;
+        }
+        struct stat st;
+        bool        whole = fstat(fd, &st) == 0 && S_ISREG(st.st_mode) && st.st_uid == getuid() && st.st_nlink == 1 &&
+                     fchmod(fd, S_IRUSR | S_IWUSR) == 0 && ftruncate(fd, 0) == 0;
+        size_t done = 0;
+        while (whole && done < text.size())
+        {
+            const ssize_t wrote = ::write(fd, text.data() + done, text.size() - done);
+            if (wrote < 0 && errno == EINTR)
+            {
+                continue;
+            }
+            whole = wrote > 0;
+            done += wrote > 0 ? static_cast<size_t>(wrote) : 0;
+        }
+        return ::close(fd) == 0 && whole;
+#endif
     }
 
     ALTextRange rangeOf(const ALScriptSpan& span)
@@ -8710,22 +8746,19 @@ void ALFloaterScriptStudio::logExternal(Doc& doc, const ALScriptWorkspace::Compi
     {
         return;
     }
-    llofstream file(doc.liveLog.c_str());
-    if (!file.is_open())
-    {
-        return;
-    }
-    file << "// " << LLLogChat::timestamp2LogString(0, true) << "\n\n";
+    // Beside the copy, and made as it is (writeFile).
+    std::string text = "// " + LLLogChat::timestamp2LogString(0, true) + "\n\n";
     if (result.success)
     {
-        file << LLTrans::getString("CompileSuccessful") << "\n" << LLTrans::getString("SaveComplete") << "\n";
+        text += LLTrans::getString("CompileSuccessful") + "\n" + LLTrans::getString("SaveComplete") + "\n";
     }
     for (const std::string& message : result.messages)
     {
         std::string line = message;
         LLStringUtil::stripNonprintable(line);
-        file << line << "\n";
+        text += line + "\n";
     }
+    writeFile(doc.liveLog, text);
 }
 
 void ALFloaterScriptStudio::stopExternal(Doc& doc)
