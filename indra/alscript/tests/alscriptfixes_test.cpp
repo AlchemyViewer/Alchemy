@@ -574,6 +574,11 @@ namespace tut
         ensure("not with an else if", actedOn(chain, false, "if", false, "Invert the if").rfind("offered", 0) == 0);
         const std::string lone = head + "        if (n == 1) llOwnerSay(\"one\");\n" + tail;
         ensure("not without an else", actedOn(lone, false, "if", false, "Invert the if").rfind("offered", 0) == 0);
+        // An else branch ending in an if of its own goes first in braces,
+        // or the else would come to be that if's.
+        made = actedOn(head + "        if (n) llOwnerSay(\"a\"); else while (n--) if (n == 3) llOwnerSay(\"c\");\n" + tail, false, "if", false,
+                       "Invert the if");
+        ensure_equals("braced", made, head + "        if (!n) { while (n--) if (n == 3) llOwnerSay(\"c\"); } else llOwnerSay(\"a\");\n" + tail);
     }
 
     template<> template<>

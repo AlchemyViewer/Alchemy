@@ -1571,6 +1571,36 @@ namespace
         return node && node->getNodeType() != Tailslide::NODE_NULL;
     }
 
+    // Whether a statement ends in an `if` with no `else` of its own --
+    // itself, or the last of an else-if chain, a loop's body -- which an
+    // `else` written after it would be taken by.
+    bool endsInBareIf(Tailslide::LSLASTNode* statement)
+    {
+        Tailslide::LSLASTNode* s = statement;
+        while (s && s->getNodeType() == Tailslide::NODE_STATEMENT)
+        {
+            switch (s->getNodeSubType())
+            {
+                case Tailslide::NODE_IF_STATEMENT:
+                    if (!present(s->getChild(2)))
+                    {
+                        return true;
+                    }
+                    s = s->getChild(2);
+                    break;
+                case Tailslide::NODE_WHILE_STATEMENT:
+                    s = s->getChild(1);
+                    break;
+                case Tailslide::NODE_FOR_STATEMENT:
+                    s = s->getChild(3);
+                    break;
+                default:
+                    return false;
+            }
+        }
+        return false;
+    }
+
     ALScriptFix refactor(ALScriptFix fix)
     {
         fix.kind = ALScriptFix::Kind::Refactor;
@@ -1918,7 +1948,11 @@ std::vector<ALScriptFix> ALLSLService::actions(std::string_view source, S32 line
         {
             ALScriptFix fix = refactor(ALScriptFixes::titled("ScriptActionInvertIf", "Invert the if", {}));
             replace(fix, spanOf(*condition->getLoc()), negated(source, condition));
-            replace(fix, spanOf(*then->getLoc()), std::string(textOf(source, otherwise)));
+            // The else branch, first now, in braces where it ends in an if
+            // of its own with no else, which would take the else that now
+            // follows it.
+            const std::string first(textOf(source, otherwise));
+            replace(fix, spanOf(*then->getLoc()), endsInBareIf(otherwise) ? "{ " + first + " }" : first);
             replace(fix, spanOf(*otherwise->getLoc()), std::string(textOf(source, then)));
             out.push_back(std::move(fix));
         }
