@@ -3041,7 +3041,10 @@ void ALFloaterScriptStudio::preprocessedAnswer(const std::string& id, U32 versio
         }
         else
         {
-            report(getString("Preprocessed", args), false, &doc);
+            // Said where the status goes, not added to the output: the
+            // view is expanded every time it is shown, and every open
+            // script is when a file one of them may include is saved.
+            setStatus(getString("Preprocessed", args));
             // Weighed as a save would send it; not with an include still to
             // come, which a save would wait for.
             weighSent(doc, false);
@@ -8898,10 +8901,22 @@ void ALFloaterScriptStudio::fileSettled(Doc& doc)
     doc.editor->resetDirty();
     keepSavedWeights(doc);
     keepForRecovery(doc);
-    // The scripts that include it see the file as it is now.
+    // The scripts that include it see the file as it is now: those whose
+    // last expansion read it, and those that one may have been wanted by
+    // -- an expansion with a problem, an include not found say -- not
+    // every script open, each expanded again for a file it never reads.
+    const std::string saved = ALScriptModules::identity("disk:" + doc.file);
+    const auto        reads = [&saved](const Doc& each) {
+        if (!each.expanded.valid || !each.expanded.problems.empty())
+        {
+            return true;
+        }
+        const std::vector<ALSourceMap::File>& files = each.expanded.map.files();
+        return std::any_of(files.begin(), files.end(), [&saved](const ALSourceMap::File& file) { return ALScriptModules::identity(file.path) == saved; });
+    };
     for (std::unique_ptr<Doc>& each : mDocs)
     {
-        if (each.get() != &doc && each->file.empty() && preprocessed(*each))
+        if (each.get() != &doc && each->file.empty() && preprocessed(*each) && reads(*each))
         {
             each->expanded.valid = false;
             preprocess(*each, false);
