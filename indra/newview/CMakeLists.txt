@@ -176,6 +176,7 @@ if(AL_BUILD_VIEWER)
     alscriptnotecardtab.cpp
     alscriptnotecardworld.cpp
     alscriptpreprocessor.cpp
+    alscriptsaveflow.cpp
     alscriptstudiodoc.cpp
     alscriptstudiosave.cpp
     alscriptweightspane.cpp
@@ -974,6 +975,7 @@ if(AL_BUILD_VIEWER)
     alscriptmodules.h
     alscriptnotecardtab.h
     alscriptpreprocessor.h
+    alscriptsaveflow.h
     alscriptstudiodoc.h
     alscriptstudioservices.h
     alscriptweightspane.h
@@ -2412,6 +2414,10 @@ if(AL_BUILD_TESTS)
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
 
+  # Whole saves of a Script Studio tab through where they stand and where
+  # they go, with nothing of the viewer.
+  al_add_test(alscriptsaveflow UNIT PROJECT ${test_project} LIBRARIES llui alscript ${test_libs})
+
   # A Script Studio tab's own logic, and the fake of the window's services
   # the units split out of the window are tested with.
   al_add_test(
@@ -2419,6 +2425,7 @@ if(AL_BUILD_TESTS)
     UNIT
     PROJECT ${test_project}
     LIBRARIES llui alscript ${test_libs}
+    SOURCES alscriptsaveflow.cpp
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
 

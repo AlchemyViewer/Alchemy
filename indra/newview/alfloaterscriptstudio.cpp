@@ -527,7 +527,7 @@ void ALFloaterScriptStudio::savedElsewhere(const ALScriptRef& ref, const std::st
             continue;
         }
         Doc& doc = *window->mDocs[index];
-        if (doc.notecard || !doc.loaded || doc.saving)
+        if (doc.notecard || !doc.loaded || doc.save.sending())
         {
             continue;
         }
@@ -2302,7 +2302,7 @@ void ALFloaterScriptStudio::loaded(const ALScriptWorkspace::Loaded& answer)
         {
             // Its includes fetched now, so that the analyzers have them,
             // and the expanded code shown as it would be uploaded.
-            preprocess(doc, false);
+            preprocess(doc);
         }
         scheduleAnalysis(doc, true);
         if (!doc.ref.inInventory())
@@ -2347,7 +2347,7 @@ void ALFloaterScriptStudio::loaded(const ALScriptWorkspace::Loaded& answer)
         if (doc.saveOnLoad && doc.modifiable)
         {
             doc.saveOnLoad = false;
-            doc.letAllPast(doc.editor->document().version());
+            doc.save.letAllPast(doc.editor->document().version());
             save(doc);
         }
     }
@@ -2418,7 +2418,7 @@ void ALFloaterScriptStudio::toggleExpanded()
     // since is expanded again, and shows as it comes.
     if (to_expanded && doc->loaded && (!doc->uploaded.valid || doc->uploaded.version != doc->editor->document().version()))
     {
-        preprocess(*doc, false);
+        preprocess(*doc);
     }
 }
 
@@ -4776,7 +4776,7 @@ void ALFloaterScriptStudio::refreshToolbar()
     mCompileTarget->setEnabled(have && script && doc->modifiable);
     // Whether anything is unsaved: the one fact here that every
     // keystroke can move, and the only one that costs a walk.
-    mSaveButton->setEnabled(have && doc->modifiable && !doc->saving);
+    mSaveButton->setEnabled(have && doc->modifiable && !doc->save.sending());
     bool anyDirty = false;
     for (const std::unique_ptr<Doc>& each : mDocs)
     {
@@ -4906,7 +4906,7 @@ void ALFloaterScriptStudio::pumpPreprocessor()
         }
         if (preprocessed(*doc))
         {
-            preprocess(*doc, false);
+            preprocess(*doc);
         }
         scheduleAnalysis(*doc, true);
     }
@@ -5141,9 +5141,8 @@ void ALFloaterScriptStudio::analysed(const ALScriptAnalysis::Result& result)
         doc.fixAllAfterCheck.reset();
         askFixAll(doc, pick);
     }
-    if (doc.saveAfterCheck)
+    if (doc.save.checked())
     {
-        doc.saveAfterCheck = false;
         save(doc);
     }
 }
@@ -6528,7 +6527,7 @@ void ALFloaterScriptStudio::closePreview()
         }
         // One a pane is listing -- its problems, the places a name was
         // looked up from it -- is being worked from, and stays.
-        if (doc.editor->isDirty() || doc.saving || doc.id == mProblemsShownFor || doc.id == mFound.from)
+        if (doc.editor->isDirty() || doc.save.sending() || doc.id == mProblemsShownFor || doc.id == mFound.from)
         {
             holdPreview(doc);
             return;
@@ -7773,8 +7772,7 @@ void ALFloaterScriptStudio::takeExternal(Doc& doc, const std::string& text)
     {
         return;
     }
-    doc.externalSave      = true;
-    doc.letAllPast(doc.editor->document().version());
+    doc.save.fromExternal(doc.editor->document().version());
     save(doc);
 }
 
@@ -7842,7 +7840,7 @@ void ALFloaterScriptStudio::stopExternal(Doc& doc)
         LLFile::remove(doc.liveLog);
         doc.liveLog.clear();
     }
-    doc.externalSave = false;
+    doc.save.endExternal();
 }
 
 void ALFloaterScriptStudio::watchFile(Doc& doc)
@@ -7931,7 +7929,7 @@ void ALFloaterScriptStudio::fileChangedOutside(const std::string& id, const std:
 
 void ALFloaterScriptStudio::saveFile(Doc& doc)
 {
-    doc.fixedForSave = false;
+    doc.save.done();
     if (doc.liveFile)
     {
         // The watcher on the file: this write is not an outside change.
@@ -7980,13 +7978,13 @@ void ALFloaterScriptStudio::fileSettled(Doc& doc)
         if (each.get() != &doc && each->file.empty() && preprocessed(*each) && reads(*each))
         {
             each->expanded.valid = false;
-            preprocess(*each, false);
+            preprocess(*each);
             scheduleAnalysis(*each);
         }
     }
     fillTabs();
     refreshToolbar();
-    if (doc.closeAfterSave)
+    if (doc.save.closeAfter())
     {
         const size_t index = indexOf(doc.id);
         if (index != NONE)
@@ -10651,7 +10649,7 @@ void ALFloaterScriptStudio::closeWindowAnswered(S32 option)
     {
         if (const size_t index = indexOf(id); index != NONE)
         {
-            mDocs[index]->closeAfterSave = true;
+            mDocs[index]->save.setCloseAfter(true);
         }
     }
     for (const std::string& id : saving)
@@ -10663,7 +10661,7 @@ void ALFloaterScriptStudio::closeWindowAnswered(S32 option)
         else if (const size_t index = indexOf(id); index != NONE)
         {
             // A save before it stopped the close: this one stays, as it was.
-            mDocs[index]->closeAfterSave = false;
+            mDocs[index]->save.setCloseAfter(false);
         }
     }
     if (mClosingWindow && mDocs.empty())
@@ -10679,7 +10677,7 @@ void ALFloaterScriptStudio::continueClosing()
     while (mClosingWindow && i < mDocs.size())
     {
         Doc& doc = *mDocs[i];
-        if (doc.closeAfterSave)
+        if (doc.save.closeAfter())
         {
             // On its way: it goes when its save comes back.
             ++i;
@@ -15108,7 +15106,7 @@ void ALFloaterScriptStudio::onMenuAction(const LLSD& param)
     {
         if (Doc* doc = active(); doc && doc->loaded && !doc->notecard)
         {
-            preprocess(*doc, false);
+            preprocess(*doc);
         }
     }
     else if (action == "preproc_enabled" || action == "preproc_switch" || action == "preproc_lazy" || action == "preproc_compress" ||

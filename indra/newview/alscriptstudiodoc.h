@@ -30,6 +30,7 @@
 #include "alscriptenvelope.h"
 #include "alscriptproblem.h"
 #include "alscriptrecovery.h"
+#include "alscriptsaveflow.h"
 #include "alscriptsymbol.h"
 #include "alscriptweight.h"
 #include "alscriptworkspace.h"
@@ -79,13 +80,9 @@ struct ALScriptStudioDoc
     ALScriptWorkspace::Loaded::Failure         loadFailure = ALScriptWorkspace::Loaded::Failure::None;
     std::string                                loadError;
     bool                                       modifiable = false;
-    bool                                       saving     = false;
-    bool                                       closeAfterSave = false;
-    // A save asked for while one was on its way, made when it answers.
-    bool                                       saveAgain  = false;
-    // Where the editor's journal stood when the text went up: what the
-    // answer marks saved, whatever was typed while it came.
-    ALTextUndo::SavePoint                      sentAt;
+    // A save of it: where it stands, what it waits on, what the checks let
+    // past, and what went up (ALScriptSaveFlow).
+    ALScriptSaveFlow                           save;
     // What the preprocessor made of the source, in a read-only editor
     // of its own; made once there is expanded text to show.
     ALCodeEditor*                              expandedEditor = nullptr;
@@ -111,7 +108,7 @@ struct ALScriptStudioDoc
     // A save on its way: sent, or waiting on the preprocessor or a
     // check -- or the preprocessor busy with the tab for any reason,
     // whose answer a save may yet wait on.
-    bool          saveUnderway() const { return saving || preprocessing || saveAfterCheck; }
+    bool          saveUnderway() const { return save.underway() || preprocessing; }
     ALCodeEditor* shownText() const { return shownView() == View::Expanded ? expandedEditor : editor; }
     // A notecard rather than a script: plain text, saved as a
     // notecard with the items it came with, never analysed.
@@ -200,8 +197,6 @@ struct ALScriptStudioDoc
     // loaded or kept as one; none for a script or a text file. Shared so
     // that an answer coming after the tab has gone finds nothing.
     std::shared_ptr<ALScriptNotecardTab>       items;
-    // The ids of the items the save under way sent.
-    std::vector<LLUUID>                        saving_items;
     // The envelope the asset came in, whose source the editor holds
     // and whose expanded code the other editor shows; a save runs
     // the preprocessor over the source and wraps both again.
@@ -231,10 +226,6 @@ struct ALScriptStudioDoc
     Expanded                                   expanded;
     Expanded                                   uploaded;
     U32                                        expansions = 0;
-    // The map the last upload went with, where it was expanded: what
-    // the compiler's answer is read back through, whatever has been
-    // expanded since.
-    std::optional<ALSourceMap>                 sentMap;
     // The version an expansion has been asked for, or none -- not a
     // zero, which an empty text's version is: the preprocessor answers
     // on the main thread a moment later, and one text is expanded once
@@ -251,11 +242,9 @@ struct ALScriptStudioDoc
         ALTextPos              to;
     };
     std::vector<Waiting>                       waiting;
-    // A run of the preprocessor on its way, for a save or not; and a
-    // save asked for while one that was not for a save was, taken up
-    // when it answers as though it had been.
+    // A run of the preprocessor on its way, for a save or not: a save
+    // asked for meanwhile waits on it rather than starting another.
     bool                                       preprocessing       = false;
-    bool                                       saveAfterPreprocess = false;
     // Whether the script's `.luaurc` was asked for once, so that a
     // script with none is not asked for it at every check.
     bool                                       configAsked = false;
@@ -314,12 +303,6 @@ struct ALScriptStudioDoc
     bool                                       experienceKnown  = false;
     bool                                       experienceChosen = false;
     bool                                       experienceAsking = false;
-    // A save waiting on a check of the text as it stands; and the
-    // version of the text a save goes ahead for over what the check or
-    // the preprocessor found -- the one a save was refused over, so
-    // that asking again saves it, however long after, and a change
-    // asks the question afresh -- or -1 for none.
-    bool                                       saveAfterCheck    = false;
     // A Fix All asked before the text as it stands was checked, made
     // once it is: of the problems of one kind, or of all where empty.
     std::optional<std::string>                 fixAllAfterCheck;
@@ -328,14 +311,12 @@ struct ALScriptStudioDoc
     // save compiles -- not where the optimizer changes it after -- and
     // whether it is what a preprocessor's run made to be sent, which a
     // check's weighing of the same text, before the optimizer, does not
-    // replace; a weighing on its way; and the text a save sent, whose
-    // weight is said once it is known, where it is over the limit.
+    // replace; and a weighing on its way.
     std::optional<ALScriptWeight>              weight;
     U32                                        weightVersion     = 0;
     bool                                       weightExact       = false;
     bool                                       weightSent        = false;
     bool                                       weighing          = false;
-    S64                                        warnWeightFor     = -1;
     // What the Weights tab lists: each target the last check's text was
     // weighed for, its own first, in the source's places; and each
     // target's as the text was last saved, where it was weighed while
@@ -343,61 +324,6 @@ struct ALScriptStudioDoc
     std::vector<ALScriptWeight>                weights;
     U32                                        weightsVersion    = 0;
     std::vector<ALScriptWeight>                weightsSaved;
-    // The safe fixes made ahead of the save under way, once: a fix that
-    // left its problem standing would be made again at every check the
-    // save waits on.
-    bool                                       fixedForSave      = false;
-    // The checks a save passes, each of which may stop it: the
-    // analyzers' errors, the preprocessor's, an include still to come.
-    // (The code over its target's limit is said, not stopped for.) One
-    // that stopped a save is
-    // let past -- it alone -- where the author asks again over the same
-    // text: Save Anyway, or Save a second time. A later check still
-    // stops it, and says why.
-    enum SaveCheck : U8
-    {
-        CheckAnalyzers   = 1,
-        CheckPreprocessor = 2,
-        CheckPending     = 4,
-        CheckAll         = 0xFF
-    };
-    // The text the checks let past are for, which checks those are, and
-    // which stopped the last save of it.
-    S64                                        saveAnywayVersion = -1;
-    U8                                         saveAnyway        = 0;
-    U8                                         saveStoppedBy     = 0;
-    bool letsPast(S64 version, U8 check) const { return saveAnywayVersion == version && (saveAnyway & check) == check; }
-    void stoppedBy(S64 version, U8 check)
-    {
-        if (saveAnywayVersion != version)
-        {
-            saveAnywayVersion = version;
-            saveAnyway        = 0;
-        }
-        saveStoppedBy = check;
-    }
-    // Asked again over the text the last save was stopped at.
-    void letPast(S64 version)
-    {
-        if (saveAnywayVersion == version)
-        {
-            saveAnyway |= saveStoppedBy;
-        }
-    }
-    // Saved over whatever the checks would find: a copy made to be kept,
-    // a save from an editor outside.
-    void letAllPast(S64 version)
-    {
-        saveAnywayVersion = version;
-        saveAnyway        = CheckAll;
-        saveStoppedBy     = 0;
-    }
-    void clearSaveChecks()
-    {
-        saveAnywayVersion = -1;
-        saveAnyway        = 0;
-        saveStoppedBy     = 0;
-    }
     // What the analyzer said of the text at analysisVersion; when the
     // next check is due, or zero; the version last asked about.
     ALScriptProblems                           analysis;
@@ -513,13 +439,12 @@ struct ALScriptStudioDoc
     // The script held open in an external editor: the file under
     // the temp folder the editor was given, watched for the editor's
     // saves, and the log beside it the compiler's words go to;
-    // whether the bridge was told, so that VS Code can subscribe;
-    // and whether the save under way came from the editor, which
-    // does not write the file back.
+    // and whether the bridge was told, so that VS Code can subscribe.
+    // Whether the save under way came from the editor, which does not
+    // write the file back, is the save's (ALScriptSaveFlow::external).
     std::unique_ptr<LLLiveFile>                liveFile;
     std::string                                liveLog;
     bool                                       subscribed   = false;
-    bool                                       externalSave = false;
     // What the external editor's copy held when the studio last wrote
     // it or read it: a save there over changes made here since is
     // asked about rather than taken, the text it brought held in

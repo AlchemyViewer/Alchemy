@@ -427,8 +427,11 @@ private:
     void                          expandedAnswer(const std::string& id, U32 version, const ALPreprocessor::Result& result);
     // Without the source where only where the script is matters.
     ALScriptPreprocessor::Request preprocessRequest(const Doc& doc, bool with_source = true) const;
-    void                          preprocess(Doc& doc, bool then_save);
-    void                          preprocessedAnswer(const std::string& id, U32 version, bool then_save, const ALPreprocessor::Result& result);
+    // A run of the preprocessor over the text as it stands, fetching its
+    // includes; none where one is on its way already. A save waiting on it
+    // goes on when it answers (ALScriptSaveFlow::preprocessed).
+    void                          preprocess(Doc& doc);
+    void                          preprocessedAnswer(const std::string& id, U32 version, const ALPreprocessor::Result& result);
     // What a run made, uploaded: in the envelope with the source as
     // written, or as written alone where the run was switched off.
     void                          sendPreprocessed(Doc& doc, const Doc::Expanded& sent);
@@ -898,9 +901,10 @@ private:
     // The blanks at every line's end taken away, as one step to undo.
     void trimTrailing(Doc& doc);
 
-    // Whether a save may go ahead: the analyzers' check of the text as it
-    // stands found no errors, or the person asked twice.
-    bool preflight(Doc& doc);
+    // The errors the analyzers found in the text as they last checked it,
+    // and the preprocessor in the expansion they read: what holds a save,
+    // where saves are held on them.
+    S32  checkerErrors(const Doc& doc) const;
     void reportOverWeight(const Doc& doc, const ALScriptWeight& weight);
 
     // Copy, from whichever list or editor has the keyboard; and a

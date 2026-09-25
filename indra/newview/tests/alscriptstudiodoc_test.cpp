@@ -52,7 +52,7 @@ namespace tut
     template<> template<>
     void alscriptstudiodoc_object::test<1>()
     {
-        set_test_name("unsaved is the text, or a compile target or an experience picked; a save is under way while any of its stages is");
+        set_test_name("unsaved is the text, or a compile target or an experience picked; a save is under way at any stage of it, or while the preprocessor runs");
         Doc doc;
         ensure("nothing changed", !doc.unsaved());
         doc.targetChosen = true;
@@ -62,49 +62,21 @@ namespace tut
         ensure("an experience picked", doc.unsaved());
 
         ensure("no save", !doc.saveUnderway());
-        for (bool Doc::*stage : { &Doc::saving, &Doc::preprocessing, &Doc::saveAfterCheck })
-        {
-            Doc under;
-            under.*stage = true;
-            ensure("a stage of it", under.saveUnderway());
-        }
+        doc.preprocessing = true;
+        ensure("the preprocessor running, which a save may wait on", doc.saveUnderway());
+        doc.preprocessing = false;
+        ALScriptSaveFlow::Tab tab;
+        tab.holdOnErrors = true;
+        doc.save.route(tab);
+        ensure("waiting on a check", doc.saveUnderway());
+        doc.save.checked();
+        ensure("and not once it has come", !doc.saveUnderway());
+        doc.save.sent(ALTextUndo::SavePoint(), std::nullopt, {});
+        ensure("sent", doc.saveUnderway());
     }
 
     template<> template<>
     void alscriptstudiodoc_object::test<2>()
-    {
-        set_test_name("a save stopped by one check is let past that check alone, and for that text alone");
-        Doc doc;
-        doc.stoppedBy(5, Doc::CheckAnalyzers);
-        ensure("stopped", !doc.letsPast(5, Doc::CheckAnalyzers));
-        doc.letPast(5);
-        ensure("asked again: past the analyzers", doc.letsPast(5, Doc::CheckAnalyzers));
-        ensure("but not the preprocessor", !doc.letsPast(5, Doc::CheckPreprocessor));
-        ensure("nor an include to come", !doc.letsPast(5, Doc::CheckPending));
-        ensure("nor for another text", !doc.letsPast(6, Doc::CheckAnalyzers));
-
-        // Stopped again over the same text by the next check: each asked
-        // past on its own, and what was let past stays let past.
-        doc.stoppedBy(5, Doc::CheckPending);
-        ensure("the include stops it", !doc.letsPast(5, Doc::CheckPending));
-        doc.letPast(5);
-        ensure("both past now", doc.letsPast(5, Doc::CheckAnalyzers | Doc::CheckPending));
-        ensure("the preprocessor never asked about", !doc.letsPast(5, Doc::CheckPreprocessor));
-
-        // A changed text asks every question afresh.
-        doc.stoppedBy(6, Doc::CheckPreprocessor);
-        ensure("nothing past for the new text", !doc.letsPast(6, Doc::CheckAnalyzers) && !doc.letsPast(6, Doc::CheckPreprocessor));
-        doc.letPast(7);
-        ensure("asked again over yet another text: nothing", !doc.letsPast(6, Doc::CheckPreprocessor) && !doc.letsPast(7, Doc::CheckPreprocessor));
-
-        doc.letAllPast(8);
-        ensure("a copy, or the external editor's save: everything", doc.letsPast(8, Doc::CheckAll));
-        doc.clearSaveChecks();
-        ensure("gone once it went up", !doc.letsPast(8, Doc::CheckAnalyzers));
-    }
-
-    template<> template<>
-    void alscriptstudiodoc_object::test<3>()
     {
         set_test_name("the expansion is in front only where there is one");
         Doc doc;
@@ -114,7 +86,7 @@ namespace tut
     }
 
     template<> template<>
-    void alscriptstudiodoc_object::test<4>()
+    void alscriptstudiodoc_object::test<3>()
     {
         set_test_name("levels: the compiler's words, the checkers' severities, the marks, and how the findings store reads a problem");
         ensure("WARNING", Doc::levelOf("WARNING") == Doc::Level::Warning);
@@ -141,7 +113,7 @@ namespace tut
     }
 
     template<> template<>
-    void alscriptstudiodoc_object::test<5>()
+    void alscriptstudiodoc_object::test<4>()
     {
         set_test_name("the fake of the window's services: the studio's own words, counted, and its tabs found");
         al_studio_test::StudioWindow window;
