@@ -634,6 +634,10 @@
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="select_all" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="select_all" />
             </menu_item_call>
+            <menu_item_call label="Select Function" layout="topleft" name="select_function">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="select_function" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="select_function" />
+            </menu_item_call>
             <menu_item_separator layout="topleft" />
             <menu_item_call label="Toggle Comment" layout="topleft" name="toggle_comment" shortcut="control|/">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="toggle_comment" />
@@ -783,6 +787,14 @@
             <menu_item_call label="Go to Symbol..." layout="topleft" name="go_to_symbol" shortcut="control|shift|O">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="go_to_symbol" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="go_to_symbol" />
+            </menu_item_call>
+            <menu_item_call label="Next Function" layout="topleft" name="next_function" shortcut="alt|PGDN">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="next_function" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="next_function" />
+            </menu_item_call>
+            <menu_item_call label="Previous Function" layout="topleft" name="previous_function" shortcut="alt|PGUP">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="previous_function" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="previous_function" />
             </menu_item_call>
             <menu_item_separator layout="topleft" />
             <menu_item_call label="Go to Definition" layout="topleft" name="go_to_definition" shortcut="F12">

@@ -2790,6 +2790,17 @@ void ALFloaterScriptStudio::teachEditor(Doc& doc)
     editor.setHoverRequest([this, raw](const ALTextPos& at, std::string_view) { askAnalyzer(*raw, ALScriptAnalysis::Kind::Hover, at); });
     editor.setSignatureRequest([this, raw](const ALTextPos& caret) { askAnalyzer(*raw, ALScriptAnalysis::Kind::Signature, caret); });
     editor.setSymbolRequest([this, raw](ALEditorCommand command, const ALTextRange& word) { askSymbol(*raw, command, word); });
+    // The script's functions and events, where the analyzer last found them:
+    // what Next Function and Select Function go by, and vim's [[ and af.
+    editor.setFunctionProvider([raw](std::vector<ALTextRange>& out) {
+        for (const ALScriptOutlineEntry& entry : raw->outline)
+        {
+            if (entry.kind == ALScriptSymbolKind::Function || entry.kind == ALScriptSymbolKind::Event)
+            {
+                out.emplace_back(ALTextPos(entry.span.line, entry.span.column), ALTextPos(entry.span.endLine, entry.span.endColumn));
+            }
+        }
+    });
     // An include's name, or a module's, leads to its file of itself: Go to
     // Definition and Control-click open it, anywhere on its line or call.
     editor.setLinkRequest([this, raw](const ALTextPos& at, bool follow) {
@@ -10779,6 +10790,9 @@ void ALFloaterScriptStudio::addEditCommands()
     addEditorCommand("join_lines", ALEditorCommand::JoinLines, true);
     addEditorCommand("previous_change", ALEditorCommand::PreviousChange, false);
     addEditorCommand("next_change", ALEditorCommand::NextChange, false);
+    addEditorCommand("next_function", ALEditorCommand::NextFunction, false);
+    addEditorCommand("previous_function", ALEditorCommand::PreviousFunction, false);
+    addEditorCommand("select_function", ALEditorCommand::SelectFunction, false);
     // The whole script's indentation made of spaces, or of tabs.
     for (const auto& [name, spaces] : { std::pair{ "indent_spaces", true }, std::pair{ "indent_tabs", false } })
     {
