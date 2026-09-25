@@ -420,14 +420,21 @@ std::vector<std::pair<std::string, std::string>> ALScriptPreprocessor::moduleFol
 {
     static LLCachedControl<bool>                     disk(gSavedSettings, "ALScriptPreprocDiskIncludes", false);
     std::vector<std::pair<std::string, std::string>> out;
-    if (disk)
+    // Nothing on disk while disk includes are off: not the scripter's
+    // folders, nor what a configuration on disk lists.
+    if (!disk)
     {
-        for (const std::string& folder : includeFolders())
+        return out;
+    }
+    const ALDiskIncludes own = ownFolders();
+    for (const std::string& folder : includeFolders())
+    {
+        out.emplace_back(std::string(), folder);
+        if (!request.lua)
         {
-            out.emplace_back(std::string(), folder);
-            if (!request.lua)
+            for (const std::string& listed : ALDiskIncludes::lslrcFolders(folder))
             {
-                for (const std::string& listed : ALDiskIncludes::lslrcFolders(folder))
+                if (own.mayFromConfig(listed, folder))
                 {
                     out.emplace_back(std::string(), listed);
                 }
@@ -441,9 +448,13 @@ std::vector<std::pair<std::string, std::string>> ALScriptPreprocessor::moduleFol
         // The nearest `.lslrc` up from a script that is itself on disk.
         if (fileOf(from, file))
         {
-            for (const std::string& listed : ALDiskIncludes::nearestLslrcFolders(gDirUtilp->getDirName(file)))
+            std::string config_folder;
+            for (const std::string& listed : ALDiskIncludes::nearestLslrcFolders(gDirUtilp->getDirName(file), &config_folder))
             {
-                out.emplace_back(std::string(), listed);
+                if (own.mayFromConfig(listed, config_folder))
+                {
+                    out.emplace_back(std::string(), listed);
+                }
             }
         }
         return out;
@@ -469,26 +480,47 @@ std::vector<std::pair<std::string, std::string>> ALScriptPreprocessor::moduleFol
             value.pop_back();
         }
         const std::string folder = ALLuauConfig::absolute(value) ? value : gDirUtilp->add(gDirUtilp->getDirName(config_file), value);
-        out.emplace_back("@" + alias + "/", folder);
+        if (own.mayFromConfig(folder, gDirUtilp->getDirName(config_file)))
+        {
+            out.emplace_back("@" + alias + "/", folder);
+        }
     }
     return out;
+}
+
+ALDiskIncludes ALScriptPreprocessor::ownFolders()
+{
+    static LLCachedControl<bool> disk(gSavedSettings, "ALScriptPreprocDiskIncludes", false);
+    ALDiskIncludes               own;
+    if (disk)
+    {
+        for (const std::string& folder : includeFolders())
+        {
+            own.bless(folder);
+        }
+    }
+    return own;
 }
 
 ALDiskIncludes ALScriptPreprocessor::blessedFor(const ALPreprocessor::Ask& ask, const Request& request, const std::vector<std::string>& alias_folders)
 {
     static LLCachedControl<bool> disk(gSavedSettings, "ALScriptPreprocDiskIncludes", false);
-    ALDiskIncludes               blessed;
-    // The scripter's own, while disk includes are on, and what each of
-    // those folders' own `.lslrc` lists.
-    const std::vector<std::string> folders = disk ? includeFolders() : std::vector<std::string>();
-    for (const std::string& folder : folders)
+    // Nothing on disk while disk includes are off: not the scripter's
+    // folders, nor what a configuration on disk lists.
+    ALDiskIncludes blessed = ownFolders();
+    if (!disk)
     {
-        blessed.bless(folder);
+        return blessed;
+    }
+    // The scripter's own, blessed first, and what each of those folders'
+    // own `.lslrc` lists, as far as a configuration may reach.
+    for (const std::string& folder : includeFolders())
+    {
         if (!request.lua)
         {
             for (const std::string& listed : ALDiskIncludes::lslrcFolders(folder))
             {
-                blessed.bless(listed);
+                blessed.blessFromConfig(listed, folder);
             }
         }
     }
@@ -497,12 +529,14 @@ ALDiskIncludes ALScriptPreprocessor::blessedFor(const ALPreprocessor::Ask& ask, 
     std::string from;
     if (!request.lua && fileOf(ask.from, from))
     {
-        for (const std::string& listed : ALDiskIncludes::nearestLslrcFolders(gDirUtilp->getDirName(from)))
+        std::string config_folder;
+        for (const std::string& listed : ALDiskIncludes::nearestLslrcFolders(gDirUtilp->getDirName(from), &config_folder))
         {
-            blessed.bless(listed);
+            blessed.blessFromConfig(listed, config_folder);
         }
     }
-    // And the aliases of a `.luaurc` on disk this run has gone through.
+    // And the aliases of a `.luaurc` on disk this run has gone through,
+    // which resolve kept only where they may be.
     for (const std::string& folder : alias_folders)
     {
         blessed.bless(folder);
@@ -844,13 +878,20 @@ ALPreprocessor::Found ALScriptPreprocessor::resolve(const ALPreprocessor::Ask& a
         // A `.luaurc` on disk blesses where its aliases point, for this
         // run; one in the world blesses nothing, and its alias is only
         // ever a name to look for in the world.
-        std::string config_file;
-        if (alias_folders && fileOf(config_path, config_file))
+        // Only while disk includes are on, and only where a configuration
+        // may reach (ALDiskIncludes::mayFromConfig).
+        static LLCachedControl<bool> disk(gSavedSettings, "ALScriptPreprocDiskIncludes", false);
+        std::string                  config_file;
+        if (alias_folders && disk && fileOf(config_path, config_file))
         {
             const std::string folder = ALLuauConfig::absolute(value) ? value : gDirUtilp->add(gDirUtilp->getDirName(config_file), value);
             if (std::find(alias_folders->begin(), alias_folders->end(), folder) == alias_folders->end())
             {
-                alias_folders->push_back(folder);
+                ALDiskIncludes own = ownFolders();
+                if (own.blessFromConfig(folder, gDirUtilp->getDirName(config_file)))
+                {
+                    alias_folders->push_back(folder);
+                }
             }
         }
     }

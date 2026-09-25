@@ -236,6 +236,10 @@ private:
     // `.lslrc` or `.luaurc` on disk lists -- `alias_folders` being those
     // the run's aliases have blessed so far. Nothing else, ever.
     ALDiskIncludes         blessedFor(const ALPreprocessor::Ask& ask, const Request& request, const std::vector<std::string>& alias_folders);
+    // The scripter's own include folders, blessed, while disk includes are
+    // on; nothing otherwise. What a configuration on disk may reach past
+    // its own folder.
+    static ALDiskIncludes  ownFolders();
     // Every item of a name, from the walk or from the last one.
     const LLInventoryModel::item_array_t& namedItems(const std::string& name);
     // Whether an include or a module so named is in the world a script is

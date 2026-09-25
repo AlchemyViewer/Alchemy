@@ -171,7 +171,9 @@ namespace tut
         ensure_equals("both", listed.size(), size_t(2));
         ensure_equals("the one above, from beside the file", listed[0], s.at("lib"));
         ensure_equals("the one below, without its slash", listed[1], s.at("project/shared"));
-        ensure("the nearest up", ALDiskIncludes::nearestLslrcFolders(s.at("project/src/deep")) == listed);
+        std::string found_in;
+        ensure("the nearest up", ALDiskIncludes::nearestLslrcFolders(s.at("project/src/deep"), &found_in) == listed);
+        ensure_equals("and where it is", found_in, s.at("project"));
         ensure("none where there is none", ALDiskIncludes::lslrcFolders(s.at("project/src")).empty());
         s.write("broken/.lslrc", "{not json");
         ensure("nor where it is not a configuration", ALDiskIncludes::lslrcFolders(s.at("broken")).empty());
@@ -224,6 +226,38 @@ namespace tut
         ensure("linked", !ec);
         ensure_equals("not through a link", listed(blessed.filesUnder(s.at("lib"), { ".luau" }, 4, 100, 100)),
                       std::string("net/deep/deeper/far.luau net/http.luau util.luau"));
+#endif
+    }
+
+    template<> template<>
+    void aldiskincludes_object::test<5>()
+    {
+        set_test_name("a configuration blesses a folder under its own, or under one the scripter blessed, and no further");
+        Scratch s;
+        s.write("project/shared/a.lsl", "a\n");
+        s.write("lib/b.lsl", "b\n");
+        s.write("secret/key.txt", "k\n");
+        ALDiskIncludes none;
+        ensure("under its own", none.mayFromConfig(s.at("project/shared"), s.at("project")));
+        ensure("its own", none.mayFromConfig(s.at("project"), s.at("project")));
+        ensure("not a sibling", !none.mayFromConfig(s.at("lib"), s.at("project")));
+        ensure("not a root", !none.mayFromConfig(fsyspath(s.root.root_path()).string(), s.at("project")));
+        ensure("not by going up", !none.mayFromConfig(s.at("project/../secret"), s.at("project")));
+        ensure("not what is not there", !none.mayFromConfig(s.at("project/missing"), s.at("project")));
+        // The sibling, where the scripter's own folders hold it.
+        ALDiskIncludes own;
+        own.bless(fsyspath(s.root).string());
+        ensure("under the scripter's", own.mayFromConfig(s.at("lib"), s.at("project")));
+        ALDiskIncludes blessed;
+        blessed.bless(s.at("lib"));
+        ensure("blessed from it", blessed.blessFromConfig(s.at("lib"), s.at("project")));
+        ensure("and refused past it", !blessed.blessFromConfig(s.at("secret"), s.at("project")) && !blessed.admits(s.at("secret/key.txt")));
+#if LL_DARWIN || LL_LINUX
+        // A link inside that leads outside is where it leads.
+        std::error_code ec;
+        fs::create_directory_symlink(s.under("secret"), s.under("project/escape"), ec);
+        ensure("linked: " + ec.message(), !ec);
+        ensure("not through a link out", !none.mayFromConfig(s.at("project/escape"), s.at("project")));
 #endif
     }
 }

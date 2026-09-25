@@ -92,6 +92,36 @@ void ALDiskIncludes::bless(const std::string& folder)
     }
 }
 
+bool ALDiskIncludes::mayFromConfig(const std::string& folder, const std::string& config_folder) const
+{
+    const std::optional<fs::path> found = real(folder);
+    if (!found)
+    {
+        return false;
+    }
+    if (const std::optional<fs::path> own = real(config_folder); own && under(*found, *own))
+    {
+        return true;
+    }
+    return std::any_of(mFolders.begin(), mFolders.end(), [&found](const std::string& blessed) { return under(*found, fsyspath(blessed)); });
+}
+
+bool ALDiskIncludes::blessFromConfig(const std::string& folder, const std::string& config_folder)
+{
+    if (!mayFromConfig(folder, config_folder))
+    {
+        // Not a folder at all is no news; one outside is.
+        if (real(folder))
+        {
+            LL_WARNS_ONCE("ScriptPreprocessor") << "The configuration in " << config_folder << " lists " << folder
+                                                << ", which is outside it and outside the include folders set in Preferences: not used" << LL_ENDL;
+        }
+        return false;
+    }
+    bless(folder);
+    return true;
+}
+
 std::optional<std::string> ALDiskIncludes::admits(const std::string& file) const
 {
     const std::optional<fs::path> found = real(file);
@@ -237,7 +267,7 @@ std::vector<std::string> ALDiskIncludes::lslrcFolders(const std::string& folder)
 }
 
 // static
-std::vector<std::string> ALDiskIncludes::nearestLslrcFolders(std::string folder)
+std::vector<std::string> ALDiskIncludes::nearestLslrcFolders(std::string folder, std::string* found_in)
 {
     for (int depth = 0; depth < 32 && !folder.empty(); ++depth)
     {
@@ -245,6 +275,10 @@ std::vector<std::string> ALDiskIncludes::nearestLslrcFolders(std::string folder)
         std::error_code          ec;
         if (!found.empty() || fs::exists(fsyspath(folder) / ".lslrc", ec))
         {
+            if (found_in)
+            {
+                *found_in = folder;
+            }
             return found;
         }
         const fs::path    up   = fsyspath(folder).parent_path();
