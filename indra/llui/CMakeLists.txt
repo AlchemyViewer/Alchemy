@@ -134,6 +134,7 @@ target_sources(
     alstudiofloater.cpp
     alsurface.cpp
     alcodeeditor.cpp
+    alcodeeditor_cards.cpp
     alcompletionmodel.cpp
     alfixlistmodel.cpp
     alfoldmodel.cpp
