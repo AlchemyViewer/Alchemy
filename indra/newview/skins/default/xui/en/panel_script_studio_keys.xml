@@ -13,7 +13,7 @@
     <panel.string name="Changed">changed</panel.string>
     <panel.string name="KeyTaken">[KEYS] was [WHOSE]'s; it is [WHAT]'s now.</panel.string>
     <panel.string name="menu_new_script">New script</panel.string>
-    <panel.string name="menu_new_lua_script">New Lua script</panel.string>
+    <panel.string name="menu_new_lua_script">New SLua script</panel.string>
     <panel.string name="menu_save">Save</panel.string>
     <panel.string name="menu_save_all">Save all</panel.string>
     <panel.string name="menu_revert">Revert to saved</panel.string>

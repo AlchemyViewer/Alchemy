@@ -13,7 +13,7 @@
     <menu_item_call.on_click function="Explorer.Action" parameter="new_lsl" />
     <menu_item_call.on_enable function="Explorer.Enable" parameter="new_lsl" />
   </menu_item_call>
-  <menu_item_call label="New Lua Script" layout="topleft" name="new_lua">
+  <menu_item_call label="New SLua Script" layout="topleft" name="new_lua">
     <menu_item_call.on_click function="Explorer.Action" parameter="new_lua" />
     <menu_item_call.on_enable function="Explorer.Enable" parameter="new_lua" />
   </menu_item_call>

@@ -145,7 +145,7 @@
     <floater.string name="ArrowOpen">&#9662; </floater.string>
     <floater.string name="ArrowFolded">&#9656; </floater.string>
     <floater.string name="NewKindScript">script</floater.string>
-    <floater.string name="NewKindLua">Lua script</floater.string>
+    <floater.string name="NewKindLua">SLua script</floater.string>
     <floater.string name="NewKindNotecard">notecard</floater.string>
     <floater.string name="NewScriptName">New Script</floater.string>
     <floater.string name="NewNotecardName">New Note</floater.string>
@@ -475,7 +475,7 @@
     <floater.string name="RecentScripts">Scripts</floater.string>
     <floater.string name="RecentFiles">Files</floater.string>
     <floater.string name="NewScriptLSL">LSL script</floater.string>
-    <floater.string name="NewScriptLua">Lua script</floater.string>
+    <floater.string name="NewScriptLua">SLua script</floater.string>
 
     <menu_bar
      bg_visible="false"
@@ -497,7 +497,7 @@
             <menu_item_call label="New Script..." layout="topleft" name="new_script" shortcut="control|N">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="new_script" />
             </menu_item_call>
-            <menu_item_call label="New Lua Script..." layout="topleft" name="new_lua_script">
+            <menu_item_call label="New SLua Script..." layout="topleft" name="new_lua_script">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="new_lua_script" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="new_lua_script" />
             </menu_item_call>
@@ -1469,13 +1469,13 @@
                      layout="topleft"
                      name="compile_target"
                      right="-4"
-                     tool_tip="What the script compiles for when it is saved: LSL on Mono (the usual choice), on the legacy LSL2 machine, or on Luau, or Lua itself. A script written in one language compiles for that language's targets only."
+                     tool_tip="What the script compiles for when it is saved: an LSL script on Mono (the usual choice), on the legacy LSL2 machine, or on Luau; an SLua script as SLua. A script written in one language compiles for that language's targets only."
                      top="2"
                      width="132">
                         <combo_box.item label="LSL on Mono" name="compile_target_mono" value="mono" />
                         <combo_box.item label="LSL Legacy" name="compile_target_lsl2" value="lsl2" />
                         <combo_box.item label="LSL on Luau" name="compile_target_lsl_luau" value="lsl-luau" />
-                        <combo_box.item label="Lua" name="compile_target_luau" value="luau" />
+                        <combo_box.item label="SLua" name="compile_target_luau" value="luau" />
                     </combo_box>
                 </layout_panel>
                 </layout_stack>
