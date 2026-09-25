@@ -174,6 +174,7 @@ if(AL_BUILD_VIEWER)
     alscriptkeymap.cpp
     alscriptmodules.cpp
     alscriptnotecardtab.cpp
+    alscriptnotecardworld.cpp
     alscriptpreprocessor.cpp
     alscriptstudiodoc.cpp
     alscriptweightspane.cpp
@@ -970,6 +971,7 @@ if(AL_BUILD_VIEWER)
     alfloaterscriptpreferences.h
     alscriptkeymap.h
     alscriptmodules.h
+    alscriptnotecardtab.h
     alscriptpreprocessor.h
     alscriptstudiodoc.h
     alscriptstudioservices.h
@@ -2397,6 +2399,16 @@ if(AL_BUILD_TESTS)
     PROJECT ${test_project}
     LIBRARIES ${test_libs}
     SOURCES tests/llviewertexture_stub.cpp
+  )
+
+  # A notecard's items in its Script Studio tab, over a fake of the
+  # viewer's side and the studio's own window.
+  al_add_test(
+    alscriptnotecardtab
+    UNIT
+    PROJECT ${test_project}
+    LIBRARIES llui alscript ${test_libs}
+    DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
 
   # A Script Studio tab's own logic, and the fake of the window's services

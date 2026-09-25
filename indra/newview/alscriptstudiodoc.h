@@ -49,6 +49,8 @@
 #include <string_view>
 #include <vector>
 
+class ALScriptNotecardTab;
+
 // One tab of the studio: a script, a notecard or a file, and the views
 // of it the pane can show -- its source, and what the preprocessor made
 // of that where it made anything.
@@ -194,20 +196,12 @@ struct ALScriptStudioDoc
     // The outline's symbols folded shut, each by the names from the
     // outermost down to it.
     boost::unordered_flat_set<std::string, ll::string_hash, std::equal_to<>> outlineFolded;
-    std::vector<LLPointer<LLInventoryItem>>    embedded;
-    // The items the saved asset carries, by id: what the server can
-    // copy out of it. An item dropped since is only here once a save
-    // has taken it.
-    boost::unordered_flat_set<LLUUID>          inAsset;
+    // A notecard's items (ALScriptNotecardTab), from the moment it is
+    // loaded or kept as one; none for a script or a text file. Shared so
+    // that an answer coming after the tab has gone finds nothing.
+    std::shared_ptr<ALScriptNotecardTab>       items;
+    // The ids of the items the save under way sent.
     std::vector<LLUUID>                        saving_items;
-    // An edit that put a placeholder back -- an undo of a deletion,
-    // a redo of a drop -- has the items placed again.
-    boost::signals2::scoped_connection         embeddedEdits;
-    // Where the last drop's placeholder ended, and in which frame:
-    // several items dropped at once come one call each, at one point,
-    // and each goes after the one before.
-    ALTextPos                                  dropEnd{ -1, -1 };
-    U32                                        dropFrame = 0;
     // The envelope the asset came in, whose source the editor holds
     // and whose expanded code the other editor shows; a save runs
     // the preprocessor over the source and wraps both again.

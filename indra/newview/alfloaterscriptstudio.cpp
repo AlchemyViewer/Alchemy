@@ -48,8 +48,6 @@
 #include "alvimkeymap.h"
 #include "llagent.h"
 #include "llappviewer.h"
-#include "llaudioengine.h"
-#include "llavataractions.h"
 #include "lldate.h"
 #include "lltimer.h"
 #include "llsyntaxid.h"
@@ -69,16 +67,9 @@
 #include "llfloaterperms.h"
 #include "llexperiencecache.h"
 #include "llfloaterreg.h"
-#include "llfloatersidepanelcontainer.h"
-#include "lllandmarkactions.h"
-#include "lllandmarklist.h"
-#include "llenvironment.h"
 #include "llinventoryfunctions.h"
-#include "llinventoryicon.h"
 #include "llinventorymodel.h"
 #include "lllayoutstack.h"
-#include "llmaterialeditor.h"
-#include "llpreviewtexture.h"
 #include "lllineeditor.h"
 #include "llmenugl.h"
 #include "llnotecard.h"
@@ -1978,6 +1969,15 @@ void ALFloaterScriptStudio::openScript(const ALScriptRef& ref, const std::string
     });
 }
 
+ALScriptNotecardTab& ALFloaterScriptStudio::notecardItems(Doc& doc, bool fresh)
+{
+    if (!doc.items || fresh)
+    {
+        doc.items = std::make_shared<ALScriptNotecardTab>(doc, *this, ALScriptNotecardTab::viewer());
+    }
+    return *doc.items;
+}
+
 void ALFloaterScriptStudio::wireDoc(Doc& doc)
 {
     Doc* raw    = &doc;
@@ -2048,10 +2048,10 @@ bool ALFloaterScriptStudio::restoreHistory(Doc& doc, const ALScriptRecoveryEntry
     {
         doc.editor->goTo(doc.editor->document().clamp(ALTextPos(entry.caretLine, entry.caretColumn)));
     }
-    if (doc.notecard && doc.file.empty())
+    if (doc.items)
     {
         // The text came in whole, which takes the items' buttons with it.
-        placeEmbeddedItems(doc);
+        doc.items->place();
     }
     fillTabs();
     refreshToolbar();
@@ -2216,29 +2216,22 @@ void ALFloaterScriptStudio::loaded(const ALScriptWorkspace::Loaded& answer)
     {
         // Plain text, with whatever the notecard carried kept to go back
         // with it; nothing to analyse or compile.
-        doc.loaded   = true;
-        doc.embedded = answer.embedded;
-        doc.inAsset.clear();
-        for (const LLPointer<LLInventoryItem>& each : doc.embedded)
-        {
-            if (each.notNull())
-            {
-                doc.inAsset.insert(each->getUUID());
-            }
-        }
+        doc.loaded                 = true;
+        ALScriptNotecardTab& items = notecardItems(doc);
+        items.loaded(answer.embedded);
         doc.editor->setSyntax("text");
         doc.editor->setText(answer.text);
         // A kept or copied text says its items by their places in the list
         // it was kept with, which the text now put in is read against.
         if (doc.carriedEmbedded)
         {
-            doc.embedded = std::move(*doc.carriedEmbedded);
+            items.take(std::move(*doc.carriedEmbedded));
             doc.carriedEmbedded.reset();
         }
         takeCarriedText(doc);
-        placeEmbeddedItems(doc);
+        items.place();
         doc.editor->setReadOnly(!answer.modifiable);
-        wireNotecard(doc);
+        items.wire();
         LLStringUtil::format_map_t args;
         args["[NAME]"] = doc.name;
         setStatus(getString(answer.modifiable ? "Loaded" : "LoadedReadOnly", args));
@@ -5114,7 +5107,14 @@ void ALFloaterScriptStudio::save(Doc& doc)
         // numbers afresh from whatever the text then stands.
         std::string                             text;
         std::vector<LLPointer<LLInventoryItem>> items;
-        carriedForSave(doc, text, items);
+        if (doc.items)
+        {
+            doc.items->forSave(text, items);
+        }
+        else
+        {
+            text = doc.editor->text();
+        }
         std::string error;
         doc.sentAt = doc.editor->savePoint();
         if (!ALScriptWorkspace::instance().saveNotecard(doc.ref, text, items, nullptr, error))
@@ -5326,8 +5326,10 @@ void ALFloaterScriptStudio::compiledHere(const ALScriptWorkspace::CompileResult&
         // The asset carries what was sent, and the server can copy it out.
         if (ours)
         {
-            doc.inAsset.clear();
-            doc.inAsset.insert(doc.saving_items.begin(), doc.saving_items.end());
+            if (doc.items)
+            {
+                doc.items->saved(doc.saving_items);
+            }
             doc.saving_items.clear();
         }
         report(getString("SavedNotecard", args), false, &doc);
@@ -11495,10 +11497,7 @@ bool ALFloaterScriptStudio::moveActiveTo(ALFloaterScriptStudio* window)
             {
                 there.carriedExperience = doc->experience;
             }
-            if (doc->notecard)
-            {
-                there.carriedEmbedded = doc->embedded;
-            }
+            ALScriptNotecardTab::carry(*doc, there);
             // Showing what it showed here, once its expansion comes there.
             window->showView(there, doc->view);
         }
@@ -11561,7 +11560,7 @@ ALScriptRecoveryEntry ALFloaterScriptStudio::recoveryEntryOf(const Doc& doc) con
     entry.caretColumn = doc.editor->caret().column;
     if (doc.notecard && doc.file.empty())
     {
-        entry.embedded = itemsAsLLSD(doc.embedded);
+        entry.embedded = ALScriptNotecardTab::asLLSD(doc.items ? doc.items->items() : ALScriptNotecardTab::items_t());
     }
     return entry;
 }
@@ -11917,10 +11916,7 @@ void ALFloaterScriptStudio::reattach(Doc& doc)
     doc.detached                  = false;
     doc.recovering                = holding;
     doc.carriedText               = holding.text;
-    if (doc.notecard)
-    {
-        doc.carriedEmbedded = doc.embedded;
-    }
+    ALScriptNotecardTab::carry(doc, doc);
     doc.loaded = false;
     doc.editor->setReadOnly(true);
     const LLHandle<LLFloater> handle = getHandle();
@@ -12249,24 +12245,24 @@ void ALFloaterScriptStudio::takeUpEntry(Doc& doc, const ALScriptRecoveryEntry& e
     doc.carriedText = entry.text;
     if (entry.notecard && doc.file.empty())
     {
-        doc.carriedEmbedded = itemsFrom(entry.embedded);
+        doc.carriedEmbedded = ALScriptNotecardTab::fromLLSD(entry.embedded);
     }
     if (!doc.loaded)
     {
         // Put in once it has loaded.
         return;
     }
-    if (doc.carriedEmbedded && doc.notecard)
+    if (doc.carriedEmbedded && doc.items)
     {
-        doc.embedded = std::move(*doc.carriedEmbedded);
+        doc.items->take(std::move(*doc.carriedEmbedded));
     }
     doc.carriedEmbedded.reset();
     takeCarriedText(doc);
     // After, since putting the text in opens the editor to take it.
     doc.editor->setReadOnly(!doc.modifiable);
-    if (doc.notecard && doc.file.empty())
+    if (doc.items)
     {
-        placeEmbeddedItems(doc);
+        doc.items->place();
     }
     keepForRecovery(doc);
     refreshNotice();
@@ -12307,9 +12303,10 @@ void ALFloaterScriptStudio::becomeOrphan(Doc& doc, const ALScriptRecoveryEntry& 
     }
     if (entry.notecard && doc.file.empty())
     {
-        doc.embedded = itemsFrom(entry.embedded);
-        doc.inAsset.clear();
-        wireNotecard(doc);
+        // Nothing the asset carries is in reach: a list of its own.
+        ALScriptNotecardTab& items = notecardItems(doc, true);
+        items.take(ALScriptNotecardTab::fromLLSD(entry.embedded));
+        items.wire();
     }
     doc.editor->setText(entry.text);
     // Its history, where it has one and it fits the text; nothing it
@@ -12320,7 +12317,7 @@ void ALFloaterScriptStudio::becomeOrphan(Doc& doc, const ALScriptRecoveryEntry& 
     }
     if (entry.notecard && doc.file.empty())
     {
-        placeEmbeddedItems(doc);
+        doc.items->place();
     }
     doc.editor->setReadOnly(false);
     doc.editor->markUnsaved();
@@ -12580,9 +12577,9 @@ void ALFloaterScriptStudio::saveCopyToInventory(Doc& doc)
     const bool                              lua      = doc.language.lua;
     std::string                             text;
     std::vector<LLPointer<LLInventoryItem>> items;
-    if (notecard)
+    if (doc.items)
     {
-        carriedForSave(doc, text, items);
+        doc.items->forSave(text, items);
     }
     else
     {

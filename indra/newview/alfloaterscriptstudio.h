@@ -25,6 +25,7 @@
 #pragma once
 
 #include "alcodeeditor.h"
+#include "alscriptnotecardtab.h"
 #include "alscriptstudiodoc.h"
 #include "alscriptstudioservices.h"
 #include "alfindings.h"
@@ -492,27 +493,9 @@ private:
     // loaded, once it has.
     void goToPending(Doc& doc);
     void takeCarriedText(Doc& doc);
-    // What a notecard carries, each item a button in the text where its
-    // placeholder is -- the character that stands for it in the format
-    // -- that opens the item or offers a copy of it; and the opening.
-    void             placeEmbeddedItems(Doc& doc);
-    // The buttons for the placeholders on a stretch of lines that have
-    // none yet: what an edit that put one back asks for.
-    void             placeEmbeddedItems(Doc& doc, S32 first_line, S32 last_line);
-    ALTextView::Atom embeddedAtom(Doc& doc, const ALTextPos& at, size_t index);
-    // The text and the items as a save takes them: only the items the
-    // text still stands somewhere, numbered afresh in the text. The
-    // editor's own text and list are left as they are.
-    void             carriedForSave(Doc& doc, std::string& text, std::vector<LLPointer<LLInventoryItem>>& items);
-    // An inventory item dragged onto a notecard: taken where it is
-    // dropped, as the legacy notecard takes one, if it may be given on.
-    bool             dropOnNotecard(Doc& doc, S32 x, S32 y, bool drop, EDragAndDropType type, void* cargo, EAcceptance* accept, std::string& tooltip);
-    void             openEmbeddedItem(Doc& doc, LLPointer<LLInventoryItem> item);
-    // A copy of an embedded item taken into the inventory by the server,
-    // into a folder or the one it picks; what the server says of it
-    // reaches the status bar. False, said why, for an item the saved
-    // asset does not carry, which the server could not find.
-    bool             copyEmbeddedItem(Doc& doc, LLPointer<LLInventoryItem> item, const LLUUID& folder, U32 callback_id = 0);
+    // A notecard's items (ALScriptNotecardTab), made for a tab loaded or
+    // kept as a notecard, afresh where `fresh`.
+    ALScriptNotecardTab& notecardItems(Doc& doc, bool fresh = false);
     void save(Doc& doc);
     // A save the author asked for: past the one check that stopped the last
     // save of the same text, and then a save.
@@ -1013,13 +996,9 @@ private:
     // File > Recover Unsaved Changes: what earlier sessions left and what
     // was discarded lately, to open or to discard.
     void showRecovery();
-    // A notecard's items as an entry keeps them, and back.
-    static LLSD                                    itemsAsLLSD(const std::vector<LLPointer<LLInventoryItem>>& items);
-    static std::vector<LLPointer<LLInventoryItem>> itemsFrom(const LLSD& items);
     // What a tab needs from the moment it is made: its text's changes
-    // heard, its places slid; and a notecard's drops and items.
+    // heard, its places slid.
     void wireDoc(Doc& doc);
-    void wireNotecard(Doc& doc);
     // The notice over the editor, for the tab in front, and what its
     // buttons do.
     void refreshNotice();
