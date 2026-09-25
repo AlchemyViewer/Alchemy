@@ -35,8 +35,9 @@ default
 {
     touch_start(integer total)
     {
-        {if((llDetectedKey(0) == llGetOwner()) == (TRUE))jump _sw3_1;
-if((llDetectedKey(0) == llGetOwner()) == (FALSE))jump _sw3_2;
+        integer owner = llDetectedKey(0) == llGetOwner();
+        {if((owner) == (TRUE))jump _sw3_1;
+if((owner) == (FALSE))jump _sw3_2;
 jump _sw3_end;
 
             @_sw3_1; llSay(0, "owner"); jump _sw3_end;

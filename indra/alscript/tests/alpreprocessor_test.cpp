@@ -389,6 +389,15 @@ namespace tut
         ensure_equals("not used when not asked", ALPreprocessor::run("switch (a) { }\n", options()).text, std::string("switch (a) { }\n"));
         r = ALPreprocessor::run("switch (a) { case 1 }\n", o);
         ensure_equals("a case with no end", messages(r), std::string("E 0: cannot find ':' or '{' after case\n"));
+        // A value worked out again for each case, said where that is more
+        // than a cost: a call, or one that changes something.
+        const std::string warned = "W 0: the switch's value is worked out again for each case: put it in a local first\n";
+        ensure_equals("a call", messages(ALPreprocessor::run("switch ((integer)llFrand(3)) { case 1: break; }\n", o)), warned);
+        ensure_equals("an increment", messages(ALPreprocessor::run("switch (i++) { case 1: break; }\n", o)), warned);
+        ensure_equals("an assignment", messages(ALPreprocessor::run("switch (i = 2) { case 1: break; }\n", o)), warned);
+        ensure_equals("not a name", messages(ALPreprocessor::run("switch (i) { case 1: break; }\n", o)), std::string());
+        ensure_equals("nor arithmetic or a field", messages(ALPreprocessor::run("switch ((i + 1) * v.x) { case 1: break; }\n", o)), std::string());
+        ensure_equals("nor a comparison", messages(ALPreprocessor::run("switch (i == 2) { case 1: break; }\n", o)), std::string());
     }
 
     template<> template<>

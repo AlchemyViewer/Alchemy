@@ -457,6 +457,7 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="PreprocBadInclude">ill formed #include directive</string>
 	<string name="PreprocBadParameters">ill formed parameter list of macro '[1]'</string>
 	<string name="PreprocBadSwitch">ill formed switch statement</string>
+	<string name="PreprocSwitchValueRepeated">the switch's value is worked out again for each case: put it in a local first</string>
 	<string name="PreprocDefineNeedsName">macro name missing in #define</string>
 	<string name="PreprocDefinedNeedsClose">missing ')' after 'defined'</string>
 	<string name="PreprocDefinedNeedsName">macro name missing after 'defined'</string>

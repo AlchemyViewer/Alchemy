@@ -27,7 +27,8 @@ default
 {
     touch_start(integer total)
     {
-        switch (llDetectedKey(0) == llGetOwner())
+        integer owner = llDetectedKey(0) == llGetOwner();
+        switch (owner)
         {
             case TRUE: llSay(0, "owner"); break;
             case FALSE: llSay(0, "visitor");

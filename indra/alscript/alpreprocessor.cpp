@@ -2918,6 +2918,7 @@ namespace
                             const size_t m = matching(in, l, "{", "}");
                             if (m != std::string::npos)
                             {
+                                warnRepeated(in[i], slice(in, j + 1, k));
                                 append(out, build(in[i], slice(in, j, k + 1), run(slice(in, l + 1, m))));
                                 i = m + 1;
                                 continue;
@@ -2933,6 +2934,36 @@ namespace
         }
 
     private:
+        // The value is tested against each case in turn, and so worked out
+        // again for each, as Firestorm's is: said where that is more than
+        // a cost -- a call, which may answer differently each time or do
+        // something, or something the value changes as it is worked out.
+        void warnRepeated(const Token& site, const Tokens& value)
+        {
+            static const char* const CHANGES[] = { "++", "--", "=", "+=", "-=", "*=", "/=", "%=", "&=", "|=", "^=", "<<=", ">>=" };
+            bool         repeated = false;
+            const Token* before   = nullptr;
+            for (const Token& t : value)
+            {
+                if (t.blank())
+                {
+                    continue;
+                }
+                if (t.kind == Kind::Punct && ((t.text == "(" && before && before->kind == Kind::Ident) ||
+                                              std::find(std::begin(CHANGES), std::end(CHANGES), t.text) != std::end(CHANGES)))
+                {
+                    repeated = true;
+                    break;
+                }
+                before = &t;
+            }
+            if (repeated)
+            {
+                mEngine.problem(ALScriptProblem::Severity::Warning, "PreprocSwitchValueRepeated",
+                                "the switch's value is worked out again for each case: put it in a local first", {}, site);
+            }
+        }
+
         Tokens build(const Token& site, const Tokens& arg, const Tokens& body)
         {
             const S32         n       = ++mCounter;
