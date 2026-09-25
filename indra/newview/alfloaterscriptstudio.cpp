@@ -1970,8 +1970,20 @@ void ALFloaterScriptStudio::wireDoc(Doc& doc)
         {
             raw->preview = false;
         }
-        fillTabs();
-        refreshToolbar();
+        // The strip and the toolbar made again only where the tab's facts
+        // moved -- its unsaved dot, once in a stretch of typing -- and
+        // otherwise only what a keystroke does move: undo and redo.
+        const size_t index = indexOf(raw->id);
+        if (index >= mTabFacts.size() || mTabFacts[index] != tabFactsOf(*raw))
+        {
+            fillTabs();
+            refreshToolbar();
+        }
+        else if (raw == active())
+        {
+            mUndoButton->setEnabled(raw->shownText()->canUndo());
+            mRedoButton->setEnabled(raw->shownText()->canRedo());
+        }
         scheduleAnalysis(*raw);
         researchOpen(*raw);
         scheduleRecovery(*raw);
@@ -4585,17 +4597,11 @@ void ALFloaterScriptStudio::fillTabs()
     // strip is filled only where one of them moved, since a keystroke
     // asks for this and a keystroke changes none of them but the dirty
     // mark.
-    std::vector<TabFacts> facts(mDocs.size());
-    for (size_t i = 0; i < mDocs.size(); ++i)
+    std::vector<TabFacts> facts;
+    facts.reserve(mDocs.size());
+    for (const std::unique_ptr<Doc>& doc : mDocs)
     {
-        const Doc& doc = *mDocs[i];
-        facts[i].id    = doc.id;
-        facts[i].name  = doc.name;
-        facts[i].dirty = doc.unsaved();
-        facts[i].preview = doc.preview;
-        facts[i].readOnly = doc.loaded && !doc.modifiable;
-        facts[i].image = imageNameOf(doc);
-        problemCounts(doc, facts[i].errors, facts[i].warnings);
+        facts.push_back(tabFactsOf(*doc));
     }
     if (facts == mTabFacts && mTabFactsActive == mActive)
     {
@@ -4646,6 +4652,19 @@ void ALFloaterScriptStudio::fillTabs()
     // Every window says which script is in front, as a window of one did.
     const Doc* doc = active();
     setTitle(doc ? getString("WindowTitle") + " - " + doc->name : getString("WindowTitle"));
+}
+
+ALFloaterScriptStudio::TabFacts ALFloaterScriptStudio::tabFactsOf(const Doc& doc) const
+{
+    TabFacts facts;
+    facts.id       = doc.id;
+    facts.name     = doc.name;
+    facts.dirty    = doc.unsaved();
+    facts.preview  = doc.preview;
+    facts.readOnly = doc.loaded && !doc.modifiable;
+    facts.image    = imageNameOf(doc);
+    problemCounts(doc, facts.errors, facts.warnings);
+    return facts;
 }
 
 // static

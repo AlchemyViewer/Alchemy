@@ -1632,6 +1632,7 @@ private:
         }
         friend bool operator!=(const TabFacts& a, const TabFacts& b) { return !(a == b); }
     };
+    TabFacts tabFactsOf(const Doc& doc) const;
     std::vector<TabFacts>              mTabFacts;
     size_t                             mTabFactsActive = NONE;
     // The docs by id, for the lookups every answer makes.
