@@ -135,6 +135,7 @@ target_sources(
     alsurface.cpp
     alcodeeditor.cpp
     alcompletionmodel.cpp
+    alfixlistmodel.cpp
     alfindbar.cpp
     alkeymap.cpp
     alvimkeymap.cpp

@@ -1,0 +1,152 @@
+/**
+ * @file alfixlistmodel.cpp
+ * @brief What a code editor's quick-fix list offers, in what order, and what each would make of the text.
+ *
+ * $LicenseInfo:firstyear=2026&license=viewerlgpl$
+ * Alchemy Viewer Source Code
+ * Copyright (C) 2026, Rye <rye@alchemyviewer.org>
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation;
+ * version 2.1 of the License only.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * $/LicenseInfo$
+ */
+
+#include "linden_common.h"
+
+#include "alcodeeditor.h"
+
+#include <algorithm>
+
+// static
+void ALCodeEditor::rankFixes(std::vector<Fix>& fixes)
+{
+    const auto rank = [](const Fix& fix) { return fix.suppress ? 3 : fix.refactor ? 2 : fix.preferred ? 0 : 1; };
+    std::stable_sort(fixes.begin(), fixes.end(), [&rank](const Fix& a, const Fix& b) { return rank(a) < rank(b); });
+}
+
+// static
+std::string ALCodeEditor::fixedLines(const ALTextDocument& text, const Fix& fix, S32& first, S32& last)
+{
+    first = S32_MAX;
+    last  = -1;
+    for (const auto& [range, with] : fix.edits)
+    {
+        const ALTextRange ordered = range.normalised();
+        first                     = llmin(first, ordered.begin.line);
+        last                      = llmax(last, ordered.end.line);
+    }
+    if (last < 0 || first >= text.lineCount())
+    {
+        first = last = 0;
+        return std::string();
+    }
+    first = llmax(0, first);
+    last  = llmin(last, text.lineCount() - 1);
+    std::string         block;
+    std::vector<size_t> starts;
+    for (S32 line = first; line <= last; ++line)
+    {
+        starts.push_back(block.size());
+        block += text.line(line);
+        if (line < last)
+        {
+            block += "\n";
+        }
+    }
+    // In the order the editor makes them (ALTextView::replaceAll), from
+    // the last back, so that each one's places are still the text's as
+    // it was.
+    std::vector<std::pair<ALTextRange, std::string>> edits = fix.edits;
+    for (auto& one : edits)
+    {
+        one.first = one.first.normalised();
+    }
+    std::stable_sort(edits.begin(), edits.end(),
+                     [](const auto& a, const auto& b) { return a.first.begin < b.first.begin || (a.first.begin == b.first.begin && a.first.end < b.first.end); });
+    const auto offset = [&](const ALTextPos& at) {
+        const S32 line = llclamp(at.line, first, last);
+        return starts[line - first] + static_cast<size_t>(llclamp(at.column, 0, static_cast<S32>(text.line(line).size())));
+    };
+    for (auto it = edits.rbegin(); it != edits.rend(); ++it)
+    {
+        const auto& [range, with] = *it;
+        const ALTextRange ordered = range.normalised();
+        const size_t      from    = offset(ordered.begin);
+        const size_t      to      = offset(ordered.end);
+        if (to >= from && to <= block.size())
+        {
+            block.replace(from, to - from, with);
+        }
+    }
+    return block;
+}
+
+// static
+std::string ALCodeEditor::previewOf(const ALTextDocument& text, const Fix& fix, std::vector<char>& kinds)
+{
+    // The lines it touches as they read and as they would, as a diff has
+    // them: what goes in the error colour, what comes coloured as code. A
+    // stretch for each place it changes, edits a few lines apart or less
+    // together, and an ellipsis for what lies between -- a global put in
+    // at the top for a use two hundred lines down is two short stretches,
+    // not the two hundred lines.
+    std::vector<std::pair<ALTextRange, std::string>> edits = fix.edits;
+    for (auto& one : edits)
+    {
+        one.first = one.first.normalised();
+    }
+    std::stable_sort(edits.begin(), edits.end(), [](const auto& a, const auto& b) { return a.first.begin < b.first.begin; });
+    std::vector<Fix> stretches;
+    S32              reach = -1;
+    for (const auto& one : edits)
+    {
+        if (stretches.empty() || one.first.begin.line > reach + 2)
+        {
+            stretches.emplace_back();
+        }
+        stretches.back().edits.push_back(one);
+        reach = llmax(reach, one.first.end.line);
+    }
+    std::string says;
+    kinds.clear();
+    const auto add = [&says, &kinds](char kind, const std::string& line) {
+        says += (says.empty() ? "" : "\n") + (kind == ' ' ? line : std::string(1, kind) + " " + line);
+        kinds.push_back(kind);
+    };
+    for (size_t k = 0; k < stretches.size(); ++k)
+    {
+        if (k > 0)
+        {
+            add(' ', "\u2026");
+        }
+        S32               first = 0, last = 0;
+        const std::string after = fixedLines(text, stretches[k], first, last);
+        for (S32 line = first; line <= last && line < text.lineCount(); ++line)
+        {
+            add('-', text.line(line));
+        }
+        std::string_view rest = after;
+        while (true)
+        {
+            const size_t cut = rest.find('\n');
+            add('+', std::string(rest.substr(0, cut)));
+            if (cut == std::string_view::npos)
+            {
+                break;
+            }
+            rest.remove_prefix(cut + 1);
+        }
+    }
+    return says;
+}
