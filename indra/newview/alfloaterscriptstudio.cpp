@@ -858,11 +858,11 @@ bool ALFloaterScriptStudio::postBuild()
     // Whether vim's unnamed register is the system clipboard, as the
     // setting says, for every editor of this window; :set clipboard
     // changes it for the session, and the setting changed again says so.
-    mVimShared->unnamedClipboard = gSavedSettings.getBOOL("ALScriptStudioVimClipboard");
+    mVim.shared().unnamedClipboard = gSavedSettings.getBOOL("ALScriptStudioVimClipboard");
     if (LLControlVariable* control = gSavedSettings.getControl("ALScriptStudioVimClipboard"))
     {
         mSettingConnections.emplace_back(control->getSignal()->connect(
-            [this](LLControlVariable*, const LLSD& value, const LLSD&) { mVimShared->unnamedClipboard = value.asBoolean(); }));
+            [this](LLControlVariable*, const LLSD& value, const LLSD&) { mVim.shared().unnamedClipboard = value.asBoolean(); }));
     }
 
     loadState();
@@ -1161,12 +1161,35 @@ void ALFloaterScriptStudio::stopClosing()
     mTabsAtQuit    = LLSD();
 }
 
-void ALFloaterScriptStudio::closeSaved(Doc& doc)
+void ALFloaterScriptStudio::letGoOf(Doc& doc)
 {
     if (const size_t index = indexOf(doc.id); index != NONE)
     {
         letGoOf(index);
     }
+}
+
+void ALFloaterScriptStudio::saveToClose(const std::string& id)
+{
+    mSaving.saveToClose(id);
+}
+
+void ALFloaterScriptStudio::output(const ALOutputView::Entry& entry)
+{
+    mOutputPane->view()->append(entry);
+}
+
+void ALFloaterScriptStudio::showOutput()
+{
+    showBottom("output_tab");
+}
+
+void ALFloaterScriptStudio::pickLine(std::vector<ALQuickOpen::Candidate> candidates, const std::string& placeholder,
+                                     const std::string& title, S32 rows, std::function<void(const std::string& line)> chosen,
+                                     std::function<void(const std::string& line)> shifted, std::function<void()> cancelled)
+{
+    quickOpen(std::move(candidates), placeholder, title, std::move(chosen), mEditorHost, 420, ALQuickOpen::heightForRows(rows),
+              std::move(cancelled), std::move(shifted));
 }
 
 ALScriptStudioSaving::Options ALFloaterScriptStudio::saveOptions() const
@@ -1265,7 +1288,7 @@ void ALFloaterScriptStudio::draw()
     pumpAnalysis();
     pumpCaret();
     mExplorerPane->pump();
-    pumpVim();
+    mVim.pump();
     mSearchPane->pump();
     pumpSettle();
     refreshUndoLabels();
@@ -1582,7 +1605,7 @@ void ALFloaterScriptStudio::applyTypingOptions(ALCodeEditor& editor)
     editor.setHoverDelay(llclamp(gSavedSettings.getF32("ALScriptStudioHoverDelay"), 0.f, 5.f));
 }
 
-void ALFloaterScriptStudio::applyEditorOptions(ALCodeEditor& editor) const
+void ALFloaterScriptStudio::applyEditorOptions(ALCodeEditor& editor)
 {
     editor.setFont(editorFont());
     editor.keymap() = ALScriptKeymap::current();
@@ -1590,31 +1613,8 @@ void ALFloaterScriptStudio::applyEditorOptions(ALCodeEditor& editor) const
     // its marks and registers.
     if (mVimMode && !editor.modalKeymap())
     {
-        auto                      vim    = std::make_unique<ALVimKeymap>();
-        const LLHandle<LLFloater> handle = getHandle();
-        vim->share(mVimShared);
-        vim->hooks().command = [handle](ALTextView& view, const std::string& name, const std::string& args) {
-            ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get());
-            return studio && studio->vimCommand(view, name, args);
-        };
-        vim->hooks().format = [handle](ALTextView& view, S32 first, S32 last) {
-            if (ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get()))
-            {
-                studio->vimFormat(view, first, last);
-            }
-        };
-        vim->hooks().historyWindow = [handle](ALTextView& view, llwchar kind, const std::vector<std::string>& history, std::function<void(const std::string&, bool run)> chosen) {
-            if (ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get()))
-            {
-                studio->vimHistoryWindow(view, kind, history, std::move(chosen));
-            }
-        };
-        vim->hooks().complete = [handle](ALTextView& view, const std::string& command, std::vector<std::string>& out) {
-            if (ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get()))
-            {
-                studio->vimComplete(view, command, out);
-            }
-        };
+        auto vim = std::make_unique<ALVimKeymap>();
+        mVim.connect(*vim);
         editor.setModalKeymap(std::move(vim));
     }
     else if (!mVimMode && editor.modalKeymap())
@@ -3838,9 +3838,9 @@ void ALFloaterScriptStudio::refreshTrailer(Doc& doc)
     {
         parts.push_back({ getString("TrailerReadOnly"), std::string(), getString("TrailerReadOnlyTip") });
     }
-    if (!mVimBanner.empty())
+    if (!mVim.banner().empty())
     {
-        parts.push_back({ mVimBanner, std::string(), std::string() });
+        parts.push_back({ mVim.banner(), std::string(), std::string() });
     }
     parts.push_back({ getString("CaretPosition", args), "line", mTrailerLineTip });
     // What is selected: lines across lines, characters within one.
@@ -10782,7 +10782,7 @@ void ALFloaterScriptStudio::addViewCommands()
         [this]() {
             mVimMode = !mVimMode;
             applyEditorOptions();
-            mVimBanner.clear();
+            mVim.clearBanner();
             if (Doc* each = active())
             {
                 refreshTrailer(*each);

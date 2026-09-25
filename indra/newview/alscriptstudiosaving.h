@@ -141,9 +141,9 @@ public:
         virtual bool quittingOnUs() const = 0;
         // A close waiting on a save that stopped, waited on no longer.
         virtual void stopClosing() = 0;
-        // A tab a save has done with, let go of: saved to be closed, or the
-        // tab a copy saved was made of.
-        virtual void closeSaved(Doc& doc) = 0;
+        // A tab a save has done with, let go of as it stands: saved to be
+        // closed, or the tab a copy saved was made of.
+        virtual void letGoOf(Doc& doc) = 0;
         // A window's close that waits on its tabs' saves, gone on with;
         // nothing where the window is not closing.
         virtual void continueClosing() = 0;

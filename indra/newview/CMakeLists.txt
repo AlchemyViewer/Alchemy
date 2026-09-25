@@ -997,6 +997,7 @@ if(AL_BUILD_VIEWER)
     alscriptstudiodoc.h
     alscriptstudiorecovery.h
     alscriptstudiosaving.h
+    alscriptstudiovim.h
     alscriptstudioservices.h
     alscriptweightspane.h
     alscriptworkspace.h
@@ -2513,6 +2514,17 @@ if(AL_BUILD_TESTS)
     PROJECT ${test_project}
     LIBRARIES llui alscript ${test_libs}
     SOURCES alscriptnotecardtab.cpp alscriptsaveflow.cpp alscriptstudiodoc.cpp
+    DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
+  )
+
+  # Script Studio's side of vim over the window's commands and its side
+  # faked: the : commands, :set, :history, q:, = and the banner.
+  al_add_test(
+    alscriptstudiovim
+    UNIT
+    PROJECT ${test_project}
+    LIBRARIES llui alscript ${test_libs}
+    SOURCES alscriptstudiocommands.cpp alscriptstudiodoc.cpp
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
 

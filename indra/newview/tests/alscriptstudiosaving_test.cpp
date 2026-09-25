@@ -103,7 +103,7 @@ namespace
         bool quittingOnUs() const override { return false; }
         void stopClosing() override { ++stops; }
         // Let go of, as the window does: the tab is gone.
-        void closeSaved(Doc& doc) override
+        void letGoOf(Doc& doc) override
         {
             closed.push_back(doc.id);
             auto& docs = services->docs;

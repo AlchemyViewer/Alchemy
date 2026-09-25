@@ -35,6 +35,7 @@
 #include "alscriptstudioservices.h"
 #include "alscriptstudiorecovery.h"
 #include "alscriptstudiosaving.h"
+#include "alscriptstudiovim.h"
 #include "alfindings.h"
 #include "aloutputview.h"
 #include "alscriptanalysis.h"
@@ -97,7 +98,7 @@ class LLViewerObject;
 // out as any studio's do.
 class ALFloaterScriptStudio final : public ALStudioFloater, public ALScriptStudioServices, public ALScriptOutputPane::Window, public ALScriptProblemsPane::Window,
                                     public ALScriptSearchPane::Window, public ALScriptExplorerPane::Window, public ALScriptStudioRecovery::Window,
-                                    public ALScriptStudioSaving::Window
+                                    public ALScriptStudioSaving::Window, public ALScriptStudioVim::Window
 {
     friend class LLFloaterReg;
 
@@ -304,18 +305,14 @@ private:
     // the optimizer and the compression a save adds, near enough to say
     // how near the limit it is. The save measures what it sends exactly.
     void   measureAsset(Doc& doc);
-    // The vim mode's : commands the mode does not answer itself, and
-    // its = over lines; and its mode and its words shown as they change.
-    bool vimCommand(ALTextView& view, const std::string& name, const std::string& args);
-    // q: q/ and q?: the lines entered, in a quick-open over the editor,
-    // the one picked going back onto the line.
-    void vimHistoryWindow(ALTextView& view, llwchar kind, const std::vector<std::string>& history, std::function<void(const std::string&, bool run)> chosen);
-    void vimFormat(ALTextView& view, S32 first, S32 last);
-    // The words Tab completes on the : line: the studio's command names,
-    // its :set options, :history's kinds.
-    void vimComplete(ALTextView& view, const std::string& command, std::vector<std::string>& out);
-    void pumpVim();
-    Doc* docOf(const ALTextView& view);
+    // What vim (ALScriptStudioVim) asks of the window: an entry in the
+    // Output tab and the tab in sight, and a line picked from a list over
+    // the editors.
+    void output(const ALOutputView::Entry& entry) override;
+    void showOutput() override;
+    void pickLine(std::vector<ALQuickOpen::Candidate> candidates, const std::string& placeholder, const std::string& title, S32 rows,
+                  std::function<void(const std::string& line)> chosen, std::function<void(const std::string& line)> shifted,
+                  std::function<void()> cancelled) override;
     // The tab pressed with the right button: a menu about it.
     void   showTabMenu(const std::string& value, S32 x, S32 y);
     // A tab torn off the strip and let go of at a point of the screen: into
@@ -334,7 +331,7 @@ private:
 
     ALCodeEditor*             makeEditor(const std::string& id, bool read_only);
     // The options every editor shares, put on one.
-    void                      applyEditorOptions(ALCodeEditor& editor) const;
+    void                      applyEditorOptions(ALCodeEditor& editor);
     // The expanded text put in the document's other editor, which is shown
     // once there is one where the tab asked for it.
     void                      showExpanded(Doc& doc, const std::string& text) override;
@@ -745,7 +742,7 @@ private:
     // The formatter over the text as it stands, or the lines selected:
     // every line put right as one step to undo, the caret keeping its
     // place.
-    void format(Doc& doc, bool selection_only);
+    void format(Doc& doc, bool selection_only) override;
     // The blanks at every line's end taken away, as one step to undo.
     void trimTrailing(Doc& doc);
 
@@ -755,14 +752,14 @@ private:
     void                      listMenuFor(LLScrollListCtrl* list);
     void                      showListMenu(LLScrollListCtrl* list, S32 x, S32 y);
 
-    void closeDocument(std::string_view id);
+    void closeDocument(std::string_view id) override;
     void closeDocumentAnswered(const std::string& id, S32 option);
     // The quit's question about what is unsaved: saved, kept to be opened
     // again next time, let go of, or the quit called off.
     void quitAnswered(S32 option);
     // Several tabs closed at once -- the others, all of them, `:qa` -- the
     // unsaved among them asked about in one question, not one each.
-    void closeMany(const std::vector<std::string>& ids);
+    void closeMany(const std::vector<std::string>& ids) override;
     // A close of the window, or of several tabs, that is waited on no
     // longer; and a quit waiting on it called off.
     void stopClosing() override;
@@ -772,7 +769,9 @@ private:
     // where it can be had back for a while, unless it is kept -- moved to
     // another window, kept for next time, or kept as the viewer goes.
     void letGoOf(size_t index, bool keep = false);
-    void closeSaved(Doc& doc) override;
+    void letGoOf(Doc& doc) override;
+    // A tab saved, and closed once its save comes back.
+    void saveToClose(const std::string& id) override;
     // The window's close, with several scripts unsaved, asked about all of
     // them at once: saved, let go of, or the window kept.
     void closeWindowAnswered(S32 option);
@@ -1006,7 +1005,6 @@ private:
     F64                                mOrphansChecked = 0.0;
     // What the editors' vim keymaps share: the : and / lines entered in
     // any of them, and the settings a :set changes.
-    std::shared_ptr<ALVimKeymap::Shared> mVimShared = std::make_shared<ALVimKeymap::Shared>();
     bool                               mWordWrap    = false;
     bool                               mLineNumbers = true;
     bool                               mIndentGuides    = true;
@@ -1032,7 +1030,6 @@ private:
     // and what it says in the status line, and w, q and the rest
     // answered here.
     bool                               mVimMode      = false;
-    std::string                        mVimBanner;
     bool                               mStickyHeaders   = true;
     // The scrollbar as a map: whether, how wide, whether it previews the
     // lines under the mouse, and on which side.
@@ -1120,6 +1117,8 @@ private:
     ALScriptStudioRecovery             mRecovery{ *this, *this };
     // Saving and compiling the tabs.
     ALScriptStudioSaving               mSaving{ *this, *this };
+    // The window's side of vim, over its editors.
+    ALScriptStudioVim                  mVim{ *this, mCommands, *this };
     LLHandle<LLContextMenu>            mTabMenuHandle;
     bool                               mMain = true;
     // Whose path the bar at the bottom shows, so that a tab come to the

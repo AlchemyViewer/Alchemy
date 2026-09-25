@@ -488,7 +488,7 @@ void ALScriptStudioSaving::compiled(const ALScriptWorkspace::CompileResult& resu
         }
         mServices.report(mServices.words("CopiedTo", copied));
         from.editor->resetDirty();
-        mWindow.closeSaved(from);
+        mWindow.letGoOf(from);
     }
 }
 
@@ -578,7 +578,7 @@ void ALScriptStudioSaving::compiledHere(const ALScriptWorkspace::CompileResult& 
         }
         if (doc.save.closeAfter())
         {
-            mWindow.closeSaved(doc);
+            mWindow.letGoOf(doc);
             mWindow.continueClosing();
         }
         return;
@@ -660,7 +660,7 @@ void ALScriptStudioSaving::compiledHere(const ALScriptWorkspace::CompileResult& 
     }
     if (doc.save.closeAfter())
     {
-        mWindow.closeSaved(doc);
+        mWindow.letGoOf(doc);
         mWindow.continueClosing();
     }
 }
