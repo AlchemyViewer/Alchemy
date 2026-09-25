@@ -1750,4 +1750,39 @@ namespace tut
         ensure_equals("the second put in", e.document().line(0), std::string("// ten note"));
         ensure("the list gone", !e.fixesOpen());
     }
+
+    template<> template<>
+    void alcodeeditor_object::test<46>()
+    {
+        set_test_name("Next Function and Previous Function go between the host's functions; Select Function takes the one around, then the one around that");
+        ALCodeEditor& e = make("integer f(integer x)\n{\n    return x;\n}\ndefault\n{\n    state_entry()\n    {\n        f(1);\n    }\n"
+                               "    touch_start(integer n)\n    {\n        f(2);\n    }\n}\n", "lsl");
+        ensure("no host, no functions", !e.canPerform(ALEditorCommand::NextFunction) && !e.canPerform(ALEditorCommand::SelectFunction));
+        e.setFunctionProvider([](std::vector<ALTextRange>& out) {
+            out = { ALTextRange(ALTextPos(10, 4), ALTextPos(13, 5)), ALTextRange(ALTextPos(0, 0), ALTextPos(3, 1)),
+                    ALTextRange(ALTextPos(6, 4), ALTextPos(9, 5)) };
+        });
+        e.setCaret(ALTextPos(2, 0));
+        key(KEY_PAGE_DOWN, MASK_ALT);
+        ensure("the next's start", e.caret() == ALTextPos(6, 4));
+        key(KEY_PAGE_DOWN, MASK_ALT);
+        ensure("and the next", e.caret() == ALTextPos(10, 4));
+        ensure("none after the last", !e.canPerform(ALEditorCommand::NextFunction));
+        key(KEY_PAGE_UP, MASK_ALT);
+        ensure("back", e.caret() == ALTextPos(6, 4));
+        e.setCaret(ALTextPos(8, 9));
+        ensure("the one around, whole",
+               e.perform(ALEditorCommand::SelectFunction) && e.selection() == ALTextRange(ALTextPos(6, 4), ALTextPos(9, 5)));
+        ensure("nothing around it", !e.canPerform(ALEditorCommand::SelectFunction));
+
+        // Nested -- a function inside another, as SLua has them: the inner
+        // first, then the one around it.
+        e.setFunctionProvider([](std::vector<ALTextRange>& out) {
+            out = { ALTextRange(ALTextPos(4, 0), ALTextPos(14, 1)), ALTextRange(ALTextPos(6, 4), ALTextPos(9, 5)) };
+        });
+        e.setCaret(ALTextPos(8, 9));
+        ensure("the inner", e.perform(ALEditorCommand::SelectFunction) && e.selection() == ALTextRange(ALTextPos(6, 4), ALTextPos(9, 5)));
+        ensure("then the one around it",
+               e.perform(ALEditorCommand::SelectFunction) && e.selection() == ALTextRange(ALTextPos(4, 0), ALTextPos(14, 1)));
+    }
 }

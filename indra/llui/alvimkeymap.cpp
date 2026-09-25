@@ -1451,6 +1451,41 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
                 {
                     foldCommand(view, ch, pending);
                 }
+                else if (ch == '[' || ch == ']' || ch == 'm' || ch == 'M')
+                {
+                    // [[ ]] [m ]m the start of the function before or after
+                    // the caret; [] ][ [M ]M its end. The count on.
+                    const bool          ends   = ch == 'M' || (ch == '[' && forward) || (ch == ']' && !forward);
+                    const ALCodeEditor* editor = ALViewType::as<ALCodeEditor>(&view);
+                    // From past the character the caret is on, going on:
+                    // at a function's end already is not before it.
+                    ALTextPos                  at = forward && ends ? d.nextCluster(cursor(view)) : cursor(view);
+                    std::optional<ALTextRange> fn;
+                    for (S32 n = 0; n < countOr(given) && editor; ++n)
+                    {
+                        const std::optional<ALTextRange> next = editor->functionFrom(at, forward, ends);
+                        if (!next)
+                        {
+                            break;
+                        }
+                        fn = next;
+                        at = ends ? next->end : next->begin;
+                    }
+                    if (fn)
+                    {
+                        const ALTextPos to = ends ? d.prevCluster(fn->end) : fn->begin;
+                        if (operated)
+                        {
+                            Span span;
+                            span.range = ALTextRange(cursor(view), to).normalised();
+                            applyOperator(view, operated, span, 1);
+                            finishCommand(operated != 'y');
+                            return true;
+                        }
+                        noteJump(view, cursor(view));
+                        moveTo(view, to);
+                    }
+                }
                 else if ((forward && (ch == ')' || ch == '}')) || (!forward && (ch == '(' || ch == '{')))
                 {
                     ALTextPos to;
@@ -2920,6 +2955,45 @@ bool ALVimKeymap::textObject(ALTextView& view, llwchar kind, llwchar what, S32 c
                 while (last + 1 < d.lineCount() && lineBlank(d, last + 1))
                 {
                     ++last;
+                }
+            }
+            out.linewise = true;
+            out.range    = ALTextRange(d.lineStart(first), d.lineEnd(last));
+            return true;
+        }
+        case 'f':
+        {
+            // A function, as the host knows them: af its lines whole, if the
+            // lines of its body -- not a { alone under its header, nor what
+            // closes it. A count, the ones around it.
+            const ALCodeEditor* editor = ALViewType::as<ALCodeEditor>(&view);
+            std::optional<ALTextRange> fn = editor ? editor->functionAround(ALTextRange(from, from)) : std::nullopt;
+            for (S32 n = 1; n < count && fn; ++n)
+            {
+                if (const std::optional<ALTextRange> outer = editor->functionAround(*fn))
+                {
+                    fn = outer;
+                }
+            }
+            if (!fn)
+            {
+                return false;
+            }
+            S32 first = fn->begin.line;
+            S32 last  = fn->end.line;
+            if (!around)
+            {
+                ++first;
+                std::string brace = first <= last ? d.line(first) : std::string();
+                LLStringUtil::trim(brace);
+                if (d.line(fn->begin.line).find('{') == std::string::npos && brace == "{")
+                {
+                    ++first;
+                }
+                --last;
+                if (first > last)
+                {
+                    return false;
                 }
             }
             out.linewise = true;

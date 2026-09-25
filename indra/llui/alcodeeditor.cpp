@@ -1849,6 +1849,86 @@ bool ALCodeEditor::performFold(ALEditorCommand command)
     }
 }
 
+std::vector<ALTextRange> ALCodeEditor::functions() const
+{
+    std::vector<ALTextRange> out;
+    if (mFunctionProvider)
+    {
+        mFunctionProvider(out);
+    }
+    std::sort(out.begin(), out.end(), [](const ALTextRange& a, const ALTextRange& b) { return a.begin < b.begin; });
+    return out;
+}
+
+std::optional<ALTextRange> ALCodeEditor::functionFrom(const ALTextPos& at, bool forward, bool ends) const
+{
+    // The nearest start, or end, past the place that way.
+    std::optional<ALTextRange> best;
+    for (const ALTextRange& one : functions())
+    {
+        const ALTextPos mark = ends ? one.end : one.begin;
+        const bool      past = forward ? at < mark : mark < at;
+        const ALTextPos kept = best ? (ends ? best->end : best->begin) : mark;
+        if (past && (!best || (forward ? mark < kept : kept < mark)))
+        {
+            best = one;
+        }
+    }
+    return best;
+}
+
+std::optional<ALTextRange> ALCodeEditor::functionAround(const ALTextRange& range) const
+{
+    // The one holding it that starts last, not the stretch itself.
+    std::optional<ALTextRange> best;
+    for (const ALTextRange& one : functions())
+    {
+        const bool holds = !(range.begin < one.begin) && !(one.end < range.end) && !(one == range);
+        if (holds && (!best || best->begin < one.begin || (best->begin == one.begin && one.end < best->end)))
+        {
+            best = one;
+        }
+    }
+    return best;
+}
+
+bool ALCodeEditor::performFunction(ALEditorCommand command)
+{
+    if (command == ALEditorCommand::SelectFunction)
+    {
+        // The innermost around the selection; again, the one around that.
+        const std::optional<ALTextRange> around = functionAround(selection().normalised());
+        if (!around)
+        {
+            return false;
+        }
+        setSelection(*around);
+        scrollToCaret();
+        return true;
+    }
+    const std::optional<ALTextRange> to = functionFrom(caret(), command == ALEditorCommand::NextFunction, false);
+    if (!to)
+    {
+        return false;
+    }
+    setCaret(to->begin);
+    scrollToCaret();
+    return true;
+}
+
+bool ALCodeEditor::canFunction(ALEditorCommand command) const
+{
+    if (!mFunctionProvider)
+    {
+        return false;
+    }
+    if (command == ALEditorCommand::SelectFunction)
+    {
+        return functionAround(selection().normalised()).has_value();
+    }
+    return functionFrom(caret(), command == ALEditorCommand::NextFunction, false).has_value();
+}
+
 bool ALCodeEditor::canFold(ALEditorCommand command) const
 {
     ALCodeEditor* self = const_cast<ALCodeEditor*>(this);

@@ -164,6 +164,9 @@ namespace
             case ALEditorCommand::PreviousMisspelling:
             case ALEditorCommand::PreviousChange:
             case ALEditorCommand::NextChange:
+            case ALEditorCommand::NextFunction:
+            case ALEditorCommand::PreviousFunction:
+            case ALEditorCommand::SelectFunction:
             case ALEditorCommand::FindNext:
             case ALEditorCommand::FindPrevious:
             case ALEditorCommand::COUNT:
@@ -2079,6 +2082,10 @@ bool ALTextView::perform(ALEditorCommand command)
         case C::PreviousChange:
         case C::NextChange:
             return goToChange(command == C::PreviousChange ? -1 : 1);
+        case C::NextFunction:
+        case C::PreviousFunction:
+        case C::SelectFunction:
+            return performFunction(command);
         case C::JoinLines:
         {
             // The lines selected, or the caret's and the next.
@@ -2157,6 +2164,10 @@ bool ALTextView::canPerform(ALEditorCommand command) const
         case C::NextMisspelling:
         case C::PreviousMisspelling:
             return getSpellCheck();
+        case C::NextFunction:
+        case C::PreviousFunction:
+        case C::SelectFunction:
+            return canFunction(command);
         case C::PreviousChange:
             return mChangeAt > 0;
         case C::NextChange:

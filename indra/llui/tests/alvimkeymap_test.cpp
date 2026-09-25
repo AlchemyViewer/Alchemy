@@ -1910,4 +1910,44 @@ namespace tut
         ensure("listed", listed.size() == 1 && listed[0].compare(0, 21, "change line  col text") == 0 &&
                              listed[0].find("\n>    0     3    1 c?") != std::string::npos);
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<61>()
+    {
+        set_test_name("[[ ]] [m ]m go to the host's functions' starts, [] ][ [M ]M their ends; an operator takes them; af and if a function and its body");
+        ALCodeEditor& e = make("integer f(integer x)\n{\n    return x;\n}\ndefault\n{\n    state_entry()\n    {\n        f(1);\n    }\n"
+                               "    touch_start(integer n)\n    {\n        f(2);\n    }\n}\n");
+        e.setFunctionProvider([](std::vector<ALTextRange>& out) {
+            out = { ALTextRange(ALTextPos(10, 4), ALTextPos(13, 5)), ALTextRange(ALTextPos(0, 0), ALTextPos(3, 1)),
+                    ALTextRange(ALTextPos(6, 4), ALTextPos(9, 5)) };
+        });
+        keys("3G]]");
+        ensure("]] the next's start", e.caret() == ALTextPos(6, 4));
+        keys("]m");
+        ensure("]m the same", e.caret() == ALTextPos(10, 4));
+        keys("[[");
+        ensure("[[ back", e.caret() == ALTextPos(6, 4));
+        keys("2[m");
+        ensure("2[m two back", e.caret() == ALTextPos(0, 0));
+        keys("][");
+        ensure("][ its end", e.caret() == ALTextPos(3, 0));
+        keys("][");
+        ensure("and the next's", e.caret() == ALTextPos(9, 4));
+        keys("[]");
+        ensure("[] back", e.caret() == ALTextPos(3, 0));
+        keys("''");
+        ensure("a jump, as vim's are", e.caret() == ALTextPos(9, 4));
+
+        keys("9Gdaf");
+        ensure_equals("daf its lines", flat(e.text()),
+                      std::string("integer f(integer x)|{|    return x;|}|default|{|"
+                                  "    touch_start(integer n)|    {|        f(2);|    }|}|"));
+        keys("u9Gdif");
+        ensure_equals("dif its body, not the brace under its header", flat(e.text()),
+                      std::string("integer f(integer x)|{|    return x;|}|default|{|    state_entry()|    {|    }|"
+                                  "    touch_start(integer n)|    {|        f(2);|    }|}|"));
+        keys("u9Gvaf");
+        ensure("vaf selects its lines", vim->mode() == ALVimKeymap::Mode::VisualLine);
+        keys("<Esc>");
+    }
 }

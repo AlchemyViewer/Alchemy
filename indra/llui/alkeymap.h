@@ -103,6 +103,9 @@ enum class ALEditorCommand : U8
     JoinLines,
     PreviousChange,
     NextChange,
+    NextFunction,
+    PreviousFunction,
+    SelectFunction,
     COUNT
 };
 

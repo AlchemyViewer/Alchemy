@@ -690,6 +690,9 @@ protected:
     virtual void revealLine(S32 line) { mLayout.setHidden(line, line, false); }
     virtual bool performFold(ALEditorCommand command) { return false; }
     virtual bool canFold(ALEditorCommand command) const { return false; }
+    // And about the functions a code editor's host knows of.
+    virtual bool performFunction(ALEditorCommand command) { return false; }
+    virtual bool canFunction(ALEditorCommand command) const { return false; }
     // Whether a click lands where the last one did, which is what makes
     // it the next of a run; and the run armed for a third click, once a
     // subclass has taken a double click as its own.

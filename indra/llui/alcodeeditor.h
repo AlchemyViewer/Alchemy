@@ -456,6 +456,21 @@ public:
     typedef ALCodeFix Fix;
     typedef std::function<void(S32 line, std::vector<Fix>& out)> fix_provider_t;
     void setFixProvider(fix_provider_t provider) { mFixProvider = std::move(provider); }
+
+    // --- functions -------------------------------------------------------------------
+
+    // The text's functions -- a script's functions and events -- as the host
+    // knows them: each's whole stretch. What Next Function, Previous
+    // Function and Select Function go by, and vim's [[ ]] [m ]m, af and if.
+    typedef std::function<void(std::vector<ALTextRange>& out)> function_provider_t;
+    void setFunctionProvider(function_provider_t provider) { mFunctionProvider = std::move(provider); }
+    // The host's, in order of where they start; none without a host.
+    std::vector<ALTextRange> functions() const;
+    // The start of the next function after a place, or of the last one
+    // before it; or with `ends`, the end.
+    std::optional<ALTextRange> functionFrom(const ALTextPos& at, bool forward, bool ends) const;
+    // The innermost function holding a stretch and more besides.
+    std::optional<ALTextRange> functionAround(const ALTextRange& range) const;
     typedef std::function<void(const LLSD& value)> fix_handler_t;
     void setFixHandler(fix_handler_t handler) { mFixHandler = std::move(handler); }
     // What the problems on a line offer: any fix at all -- a suppression
@@ -601,6 +616,8 @@ protected:
     void revealLine(S32 line) override;
     bool performFold(ALEditorCommand command) override;
     bool canFold(ALEditorCommand command) const override;
+    bool performFunction(ALEditorCommand command) override;
+    bool canFunction(ALEditorCommand command) const override;
     bool complete() override;
     bool signatureHelp() override;
     bool quickFix() override;
@@ -797,6 +814,7 @@ private:
     ALChoiceList*           mCompletionList = nullptr;
     ALTextView*             mCompletionDoc  = nullptr;
     fix_provider_t          mFixProvider;
+    function_provider_t     mFunctionProvider;
     fix_handler_t           mFixHandler;
     ALChoiceList*           mFixList = nullptr;
     // What the list holds (ALFixListModel); who is told each showing of
