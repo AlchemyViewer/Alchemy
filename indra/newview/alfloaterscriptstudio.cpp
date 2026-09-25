@@ -1004,6 +1004,10 @@ bool ALFloaterScriptStudio::postBuild()
     // The buttons follow what is chosen, which the list says as it changes.
     mExplorer->setCommitOnSelectionChange(true);
     mExplorer->setDragStarter([this](const LLSD& pressed) { return startExplorerDrag(pressed); });
+    // A new selection in world, looked at on the next frame rather than at
+    // the next second's poll; the signal fires many times a frame while
+    // something is edited, so it only marks it.
+    mSelectionConnection = LLSelectMgr::getInstance()->mUpdateSignal.connect([this]() { mSelectionChanged = true; });
     // A name the region said of anything the list shows, whether for a
     // selection or asked here, is read on the next frame.
     mPropertiesConnection = ALObjectPropertiesCache::instance().setChangeCallback([this](const LLUUID& id) {
@@ -13601,11 +13605,12 @@ void ALFloaterScriptStudio::pumpExplorer()
         mExplorerRefetchAt = 0.0;
         refreshExplorer(true);
     }
-    if (now < mExplorerPolled + EXPLORER_POLL)
+    if (!mSelectionChanged && now < mExplorerPolled + EXPLORER_POLL)
     {
         return;
     }
-    mExplorerPolled = now;
+    mSelectionChanged = false;
+    mExplorerPolled   = now;
     std::vector<LLUUID> roots = selectedRoots();
     if (roots != mExplorerRoots)
     {
@@ -13832,6 +13837,10 @@ void ALFloaterScriptStudio::refreshExplorer(bool refetch)
         }
     }
     boost::unordered::erase_if(mNamesAsked, [this](const LLUUID& id) { return !mListedPrims.contains(id); });
+    // And whether the scripts of a prim no longer shown run, which would
+    // otherwise be kept for every script ever listed; asked again if it
+    // comes back.
+    std::erase_if(mRunningKnown, [this](const auto& known) { return !mListedPrims.contains(known.first.first); });
     fillExplorer();
     const LLHandle<LLFloater> handle    = getHandle();
     std::string               filter    = mExplorerFilter ? mExplorerFilter->getText() : std::string();

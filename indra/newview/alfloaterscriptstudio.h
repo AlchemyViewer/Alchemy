@@ -1900,6 +1900,9 @@ private:
     boost::unordered_flat_set<LLUUID>  mNamesAsked;
     bool                               mExplorerNamesStale = false;
     boost::signals2::scoped_connection mPropertiesConnection;
+    // The selection in world changed since the explorer last looked.
+    boost::signals2::scoped_connection mSelectionConnection;
+    bool                               mSelectionChanged = false;
     // What the region said runs, by prim and item.
     std::map<std::pair<LLUUID, LLUUID>, bool> mRunningKnown;
     bool                               mMain = true;
