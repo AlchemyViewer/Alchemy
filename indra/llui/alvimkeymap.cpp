@@ -37,6 +37,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cstdlib>
+#include <cstring>
 #include <optional>
 
 namespace
@@ -199,6 +200,11 @@ namespace
     }
     // A letter of a : command's name.
     bool isNameChar(char c) { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z'); }
+    // :set, and its local and global forms, which are one here.
+    bool isSetCommand(const std::string& name)
+    {
+        return name == "set" || name == "se" || name == "setl" || name == "setlocal" || name == "setg" || name == "setglobal";
+    }
     // An operator's count and its motion's together -- 3d2w is six words --
     // held to the same most, which their product would otherwise pass far
     // enough to wrap round.
@@ -382,13 +388,15 @@ std::string ALVimKeymap::status() const
     // Asked for every frame the band is drawn: the words come from a
     // cache, and the map is only made where a word goes into them.
     const std::string recording = mRecording ? said("VimRecording", "recording @[REGISTER]", { { "[REGISTER]", std::string(1, mRecording) } }) + " " : std::string();
+    // Keys held for a mapping, after the mode, as vim's showcmd has them.
+    const std::string held = mTypeahead.empty() ? std::string() : " " + heldShown();
     switch (mMode)
     {
-        case Mode::Insert:      return recording + said("VimModeInsert", "-- INSERT --");
-        case Mode::Replace:     return recording + said("VimModeReplace", "-- REPLACE --");
-        case Mode::Visual:      return recording + said("VimModeVisual", "-- VISUAL --");
-        case Mode::VisualLine:  return recording + said("VimModeVisualLine", "-- VISUAL LINE --");
-        case Mode::VisualBlock: return recording + said("VimModeVisualBlock", "-- VISUAL BLOCK --");
+        case Mode::Insert:      return recording + said("VimModeInsert", "-- INSERT --") + held;
+        case Mode::Replace:     return recording + said("VimModeReplace", "-- REPLACE --") + held;
+        case Mode::Visual:      return recording + said("VimModeVisual", "-- VISUAL --") + held;
+        case Mode::VisualLine:  return recording + said("VimModeVisualLine", "-- VISUAL LINE --") + held;
+        case Mode::VisualBlock: return recording + said("VimModeVisualBlock", "-- VISUAL BLOCK --") + held;
         case Mode::Command:
         case Mode::Search:      return utf8Of(mLineKind) + mLine;
         case Mode::Confirm:
@@ -433,6 +441,10 @@ std::string ALVimKeymap::status() const
             if (mObjectKind)
             {
                 pending += utf8Of(mObjectKind);
+            }
+            if (!mTypeahead.empty())
+            {
+                pending += heldShown();
             }
             if (mOneCommand)
             {
@@ -572,18 +584,225 @@ void ALVimKeymap::say(const std::string& message, bool error)
 
 bool ALVimKeymap::handleKey(ALTextView& view, KEY key, MASK mask)
 {
-    Input input;
-    input.key  = key;
-    input.mask = mask;
-    return feed(view, input);
+    return type(view, Input::keyOf(key, mask));
 }
 
 bool ALVimKeymap::handleChar(ALTextView& view, llwchar ch)
 {
-    Input input;
-    input.isChar = true;
-    input.ch     = ch;
-    return feed(view, input);
+    return type(view, Input::character(ch));
+}
+
+// --- mappings ----------------------------------------------------------------------
+
+namespace
+{
+    // How many mappings may stand for one another, each fed in place of
+    // the last without a key of their own fed between, before the chain
+    // is taken to be a loop: vim's maxmapdepth.
+    constexpr S32 MAX_MAP_DEPTH = 1000;
+}
+
+bool ALVimKeymap::type(ALTextView& view, const Input& input)
+{
+    // What a macro records is what was typed, before any mapping: played,
+    // the keys map again as they did.
+    const bool record = mRecording && !mReplaying && mPlaying == 0;
+    if (record)
+    {
+        mRecorded.push_back(input);
+    }
+    const bool taken = typeThrough(view, input);
+    // A key nobody took is not part of what was typed: its character
+    // follows, and is. One insert mode left the view to type is.
+    if (record && mRecording && !taken && !input.isChar && !mTypedByView && !mRecorded.empty())
+    {
+        mRecorded.pop_back();
+    }
+    return taken;
+}
+
+bool ALVimKeymap::typeThrough(ALTextView& view, const Input& input)
+{
+    // No mapping in sight, which is most keys: fed as they come.
+    if (!mappable(input) || (mTypeahead.empty() && (mShared->mappings.empty() || !mShared->mappings.starts(mapMode(), input))))
+    {
+        return feed(view, input);
+    }
+    Held held;
+    held.input = input;
+    held.typed = true;
+    mTypeahead.push_back(held);
+    mTypeaheadSince.reset();
+    std::optional<bool> taken;
+    drain(view, mTypeahead, false, false, &taken);
+    bump();
+    return taken.value_or(true);
+}
+
+void ALVimKeymap::drain(ALTextView& view, std::deque<Held>& queue, bool final, bool stop_on_error, std::optional<bool>* taken)
+{
+    S32 depth = 0;
+    while (!queue.empty())
+    {
+        // The keys at the front that may be mapped, in the mode as it is
+        // now: each key fed may change it.
+        const U8           mode = mapMode();
+        std::vector<Input> front;
+        for (const Held& held : queue)
+        {
+            if (!held.remap)
+            {
+                break;
+            }
+            front.push_back(held.input);
+        }
+        ALVimMappings::Match match;
+        if (mode != 0 && !front.empty())
+        {
+            match = mShared->mappings.match(mode, front, !final && front.size() == queue.size());
+        }
+        if (match.longer && !(match.full && match.full->nowait))
+        {
+            // Held for what is typed next, or the timeout.
+            return;
+        }
+        if (match.full)
+        {
+            if (++depth > MAX_MAP_DEPTH)
+            {
+                queue.clear();
+                say(said("VimRecursiveMapping", "E223: Recursive mapping"), true);
+                return;
+            }
+            // What it stands for in place of its keys: not mapped again
+            // where it was made with :noremap, nor its first key where it
+            // starts with the keys themselves, as vim has it.
+            const ALVimMappings::Mapping mapping = *match.full;
+            queue.erase(queue.begin(), queue.begin() + static_cast<std::ptrdiff_t>(mapping.from.size()));
+            bool starts_with_itself = mapping.to.size() >= mapping.from.size();
+            for (size_t i = 0; starts_with_itself && i < mapping.from.size(); ++i)
+            {
+                starts_with_itself = mapping.to[i].sameAs(mapping.from[i]);
+            }
+            for (size_t i = mapping.to.size(); i-- > 0;)
+            {
+                Held held;
+                held.input = mapping.to[i];
+                held.remap = !mapping.noremap && !(i == 0 && starts_with_itself);
+                queue.push_front(held);
+            }
+            continue;
+        }
+        // No mapping: the first key as it is, and what follows it looked
+        // at again.
+        depth              = 0;
+        const Held first = queue.front();
+        queue.pop_front();
+        if (first.typed && queue.empty() && taken)
+        {
+            // The key just typed, alone: as it came, for the view to do
+            // with it what it would have.
+            *taken = feed(view, first.input);
+            return;
+        }
+        feedMapped(view, first.input);
+        if (stop_on_error && mMessageError)
+        {
+            queue.clear();
+            return;
+        }
+    }
+}
+
+void ALVimKeymap::feedMapped(ALTextView& view, const Input& input)
+{
+    ++mMapped;
+    const bool taken = feed(view, input);
+    --mMapped;
+    if (!taken && !input.isChar)
+    {
+        // What the view's own keymap would have done with it, had it been
+        // typed rather than mapped.
+        const ALEditorCommand command = view.keymap().lookup(input.key, input.mask);
+        if (command != ALEditorCommand::None && view.perform(command) && !inserting())
+        {
+            mouseChanged(view);
+        }
+    }
+}
+
+U8 ALVimKeymap::mapMode() const
+{
+    switch (mMode)
+    {
+        case Mode::Insert:
+        case Mode::Replace:
+            // Ctrl-V's and Ctrl-R's character is taken as it is.
+            return mLiteral || mInsertRegister ? 0 : ALVimMappings::INSERT;
+        case Mode::Command:
+        case Mode::Search:
+            return ALVimMappings::COMMAND_LINE;
+        case Mode::Confirm:
+            return 0;
+        default:
+            break;
+    }
+    // A character a command waits for -- f's, r's, m's, a register's name,
+    // the second of g's and z's, a text object's -- is taken as it is
+    // typed, as vim has it; a mapping of two keys is found from the first.
+    if (mPending || mObjectKind)
+    {
+        return 0;
+    }
+    if (mOperator)
+    {
+        return ALVimMappings::OPERATOR;
+    }
+    return isVisual() ? ALVimMappings::VISUAL : ALVimMappings::NORMAL;
+}
+
+// static
+bool ALVimKeymap::mappable(const Input& input)
+{
+    if (input.isChar)
+    {
+        return true;
+    }
+    if (input.key == KEY_SHIFT || input.key == KEY_CONTROL || input.key == KEY_ALT || input.key == KEY_CAPSLOCK)
+    {
+        return false;
+    }
+#if LL_DARWIN
+    if (input.mask & MASK_CONTROL)
+    {
+        return false;
+    }
+#endif
+    // A key its character follows: the character is what is mapped.
+    const bool printable = input.key >= 0x20 && input.key < KEY_SPECIAL;
+    return !printable || (input.mask & (CONTROL | MASK_ALT));
+}
+
+std::string ALVimKeymap::heldShown() const
+{
+    std::vector<Input> keys;
+    for (const Held& held : mTypeahead)
+    {
+        keys.push_back(held.input);
+    }
+    return ALVimMappings::shown(keys);
+}
+
+void ALVimKeymap::idle(ALTextView& view)
+{
+    if (mTypeahead.empty() || !mShared->timeout || mTypeaheadSince.getElapsedTimeF32() * 1000.f < static_cast<F32>(mShared->timeoutLength))
+    {
+        return;
+    }
+    // Waited long enough: the longest mapping the keys make whole, or the
+    // first as it is and the rest looked at again.
+    drain(view, mTypeahead, true, false, nullptr);
+    bump();
 }
 
 // --- the dispatch ------------------------------------------------------------------
@@ -592,10 +811,6 @@ bool ALVimKeymap::feed(ALTextView& view, const Input& input)
 {
     followDocument(view);
     mTypedByView = false;
-    if (mRecording && !mReplaying && mPlaying == 0)
-    {
-        mRecorded.push_back(input);
-    }
     mVerticalMove = false;
     if (!mReplaying)
     {
@@ -640,16 +855,9 @@ bool ALVimKeymap::feed(ALTextView& view, const Input& input)
     }
     // A key nobody took is not part of what was typed: its character
     // follows, and is. One insert mode left the view to type is.
-    if (!taken && !input.isChar && !mTypedByView)
+    if (!taken && !input.isChar && !mTypedByView && !mReplaying && !mCommandInputs.empty())
     {
-        if (!mReplaying && !mCommandInputs.empty())
-        {
-            mCommandInputs.pop_back();
-        }
-        if (mRecording && !mReplaying && mPlaying == 0 && !mRecorded.empty())
-        {
-            mRecorded.pop_back();
-        }
+        mCommandInputs.pop_back();
     }
     // A command done that was no vertical move forgets the wanted
     // column; one still being typed -- a count, an operator -- keeps
@@ -716,7 +924,7 @@ bool ALVimKeymap::matchBracketIn(ALTextView& view, const ALTextPos& from, ALText
     return matchBracket(view.document(), from, match);
 }
 
-bool ALVimKeymap::play(ALTextView& view, const std::vector<Input>& inputs)
+bool ALVimKeymap::play(ALTextView& view, const std::vector<Input>& inputs, bool remap)
 {
     if (mPlaying >= 100)
     {
@@ -725,13 +933,30 @@ bool ALVimKeymap::play(ALTextView& view, const std::vector<Input>& inputs)
     }
     ++mPlaying;
     bool ok = true;
-    for (const Input& in : inputs)
+    if (remap && !mShared->mappings.empty())
     {
-        feed(view, in);
-        if (mMessageError)
+        // All the keys are there: a mapping they may be the start of does
+        // not wait for more.
+        std::deque<Held> queue;
+        for (const Input& in : inputs)
         {
-            ok = false;
-            break;
+            Held held;
+            held.input = in;
+            queue.push_back(held);
+        }
+        drain(view, queue, true, true, nullptr);
+        ok = !mMessageError;
+    }
+    else
+    {
+        for (const Input& in : inputs)
+        {
+            feed(view, in);
+            if (mMessageError)
+            {
+                ok = false;
+                break;
+            }
         }
     }
     --mPlaying;
@@ -1046,7 +1271,7 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
                 clearPending();
                 for (S32 n = 0; n < count; ++n)
                 {
-                    if (!play(view, inputs))
+                    if (!play(view, inputs, true))
                     {
                         break;
                     }
@@ -3702,7 +3927,7 @@ bool ALVimKeymap::insert(ALTextView& view, const Input& input)
             }
             mTyped.erase(cut);
         }
-        if (mReplaying || mPlaying > 0)
+        if (mReplaying || mPlaying > 0 || mMapped > 0)
         {
             // Nobody else will: the view's own keymap does what the key
             // would have done when it was typed.
@@ -3732,9 +3957,10 @@ bool ALVimKeymap::insert(ALTextView& view, const Input& input)
         return true;
     }
     mTyped += utf8Of(input.ch);
-    if (mReplaying || mPlaying > 0)
+    if (mReplaying || mPlaying > 0 || mMapped > 0)
     {
-        // Fed by hand -- `.`, a macro, :normal -- so nobody else will.
+        // Fed by hand -- `.`, a macro, :normal, a mapping -- so nobody
+        // else will.
         view.insertText(utf8Of(input.ch));
         return true;
     }
@@ -4230,9 +4456,12 @@ void ALVimKeymap::complete(ALTextView& view, bool forward)
         {
             // The name itself: the keymap's own, the long forms, and the
             // host's.
-            static const char* OWN[] = { "center", "changes", "delete", "display", "global", "join",    "left",     "mark",    "marks",
-                                         "nohlsearch", "normal", "put", "redo", "registers", "retab", "right", "set",
-                                         "substitute", "undo", "vglobal", "yank" };
+            static const char* OWN[] = { "center",   "changes",  "cmap",     "cnoremap", "cunmap",   "delete",   "display",  "global",
+                                         "imap",     "inoremap", "iunmap",   "join",     "left",     "let",      "map",      "mapclear",
+                                         "mark",     "marks",    "nmap",     "nnoremap", "nohlsearch", "noremap", "normal",  "nunmap",
+                                         "omap",     "onoremap", "ounmap",   "put",      "redo",     "registers", "retab",   "right",
+                                         "set",      "substitute", "undo",   "unmap",    "vglobal",  "vmap",     "vnoremap", "vunmap",
+                                         "xmap",     "xnoremap", "xunmap",   "yank" };
             found.assign(std::begin(OWN), std::end(OWN));
         }
         else
@@ -4244,12 +4473,12 @@ void ALVimKeymap::complete(ALTextView& view, bool forward)
             {
                 word_start = at;
             }
-            if (command == "set" || command == "se")
+            if (isSetCommand(command))
             {
                 static const char* OPTIONS[] = { "clipboard=",  "clipboard=unnamed", "expandtab",     "hlsearch",  "ignorecase",
                                                  "incsearch",   "noexpandtab",       "nohlsearch",    "noignorecase", "noincsearch",
-                                                 "nosmartcase", "nowrap",            "shiftwidth=",   "smartcase", "tabstop=",
-                                                 "wrap" };
+                                                 "nosmartcase", "notimeout",         "nowrap",        "shiftwidth=", "smartcase",
+                                                 "tabstop=",    "timeout",           "timeoutlen=",   "wrap" };
                 found.assign(std::begin(OPTIONS), std::end(OPTIONS));
             }
         }
@@ -4559,6 +4788,399 @@ bool ALVimKeymap::lineAddress(ALTextView& view, const std::string& line, size_t&
     }
     out = llclamp(out, 0, d.lineCount() - 1);
     return true;
+}
+
+// --- options ---------------------------------------------------------------------------
+
+namespace
+{
+    // One option as :set is given it: its name, and what is done with it
+    // -- set, unset, toggled (inv, !), shown (?), set back (&), given a
+    // value (= or :), or added to or taken from (+= -=).
+    struct OptionSetting
+    {
+        enum class Op : U8
+        {
+            On,
+            Off,
+            Toggle,
+            Query,
+            Default,
+            Assign,
+            Add,
+            Remove
+        };
+        std::string name;
+        Op          op = Op::On;
+        std::string value;
+    };
+
+    OptionSetting optionSetting(const std::string& word)
+    {
+        typedef OptionSetting::Op Op;
+        OptionSetting             out;
+        std::string               rest = word;
+        if (const size_t at = rest.find_first_of("=:"); at != std::string::npos)
+        {
+            out.value = rest.substr(at + 1);
+            rest.erase(at);
+            out.op = Op::Assign;
+            if (!rest.empty() && (rest.back() == '+' || rest.back() == '-' || rest.back() == '^'))
+            {
+                out.op = rest.back() == '-' ? Op::Remove : Op::Add;
+                rest.pop_back();
+            }
+        }
+        else if (!rest.empty() && (rest.back() == '?' || rest.back() == '!' || rest.back() == '&'))
+        {
+            out.op = rest.back() == '?' ? Op::Query : rest.back() == '!' ? Op::Toggle : Op::Default;
+            rest.pop_back();
+        }
+        else if (rest.compare(0, 3, "inv") == 0)
+        {
+            out.op = Op::Toggle;
+            rest.erase(0, 3);
+        }
+        else if (rest.compare(0, 2, "no") == 0)
+        {
+            out.op = Op::Off;
+            rest.erase(0, 2);
+        }
+        out.name = rest;
+        return out;
+    }
+
+    // What follows :set, a word an option: split at blanks, a backslash
+    // keeping the character after it.
+    std::vector<std::string> optionWords(const std::string& args)
+    {
+        std::vector<std::string> out;
+        std::string              word;
+        for (size_t i = 0; i < args.size(); ++i)
+        {
+            if (args[i] == '\\' && i + 1 < args.size())
+            {
+                word += args[++i];
+            }
+            else if (args[i] == ' ' || args[i] == '\t')
+            {
+                if (!word.empty())
+                {
+                    out.push_back(word);
+                    word.clear();
+                }
+            }
+            else
+            {
+                word += args[i];
+            }
+        }
+        if (!word.empty())
+        {
+            out.push_back(word);
+        }
+        return out;
+    }
+
+    std::string badOption(const std::string& word)
+    {
+        return alSaid("VimBadOptionValue", "E474: Invalid argument: [OPTION]", { { "[OPTION]", word } });
+    }
+
+    // A boolean option: set, unset, toggled, set back to `fallback`, or
+    // shown; a value is no value for it.
+    bool setFlag(bool& flag, bool fallback, const OptionSetting& setting, const char* name, const std::string& word, std::string& shown,
+                 std::string& error)
+    {
+        typedef OptionSetting::Op Op;
+        switch (setting.op)
+        {
+            case Op::On:      flag = true; break;
+            case Op::Off:     flag = false; break;
+            case Op::Toggle:  flag = !flag; break;
+            case Op::Default: flag = fallback; break;
+            case Op::Query:   shown = (flag ? "  " : "no") + std::string(name); break;
+            default:          error = badOption(word); break;
+        }
+        return true;
+    }
+
+    // A number option, from `least` to `most`: given, added to or taken
+    // from, set back to `fallback`, or shown -- by its name alone, too.
+    bool setNumber(S32& number, S32 fallback, S32 least, S32 most, const OptionSetting& setting, const char* name, const std::string& word,
+                   std::string& shown, std::string& error)
+    {
+        typedef OptionSetting::Op Op;
+        switch (setting.op)
+        {
+            case Op::On:
+            case Op::Query:
+                shown = llformat("  %s=%d", name, number);
+                return true;
+            case Op::Default:
+                number = fallback;
+                return true;
+            case Op::Assign:
+            case Op::Add:
+            case Op::Remove:
+            {
+                const std::string& value = setting.value;
+                if (value.empty() || value.size() > 6 || value.find_first_not_of("0123456789") != std::string::npos)
+                {
+                    error = badOption(word);
+                    return true;
+                }
+                const S32 given = std::atoi(value.c_str());
+                const S32 to    = setting.op == Op::Assign ? given : setting.op == Op::Add ? number + given : number - given;
+                if (to < least || to > most)
+                {
+                    error = badOption(word);
+                    return true;
+                }
+                number = to;
+                return true;
+            }
+            default:
+                error = badOption(word);
+                return true;
+        }
+    }
+
+    // One of the options the mode keeps, set; false where the option is
+    // none of those.
+    bool setSharedOption(ALVimKeymap::Shared& shared, const OptionSetting& setting, const std::string& word, std::string& shown, std::string& error)
+    {
+        const std::string& name = setting.name;
+        if (name == "ic" || name == "ignorecase")
+        {
+            return setFlag(shared.ignoreCase, false, setting, "ignorecase", word, shown, error);
+        }
+        if (name == "scs" || name == "smartcase")
+        {
+            return setFlag(shared.smartCase, false, setting, "smartcase", word, shown, error);
+        }
+        if (name == "is" || name == "incsearch")
+        {
+            return setFlag(shared.incrementalSearch, true, setting, "incsearch", word, shown, error);
+        }
+        if (name == "hls" || name == "hlsearch")
+        {
+            return setFlag(shared.highlightSearch, true, setting, "hlsearch", word, shown, error);
+        }
+        if (name == "to" || name == "timeout")
+        {
+            return setFlag(shared.timeout, true, setting, "timeout", word, shown, error);
+        }
+        if (name == "tm" || name == "timeoutlen")
+        {
+            return setNumber(shared.timeoutLength, 1000, 0, 100000, setting, "timeoutlen", word, shown, error);
+        }
+        if (name == "cb" || name == "clipboard")
+        {
+            // unnamed or unnamedplus, which are one clipboard here, among
+            // what the value lists; none for the editor's own.
+            typedef OptionSetting::Op Op;
+            bool                      named = false;
+            for (const std::string& part : LLStringUtil::getTokens(setting.value, ","))
+            {
+                named = named || part == "unnamed" || part == "unnamedplus";
+            }
+            switch (setting.op)
+            {
+                case Op::On:
+                case Op::Query:
+                    shown = std::string("  clipboard=") + (shared.unnamedClipboard ? "unnamed" : "");
+                    break;
+                case Op::Default:
+                    shared.unnamedClipboard = true;
+                    break;
+                case Op::Assign:
+                    if (named || setting.value.empty())
+                    {
+                        shared.unnamedClipboard = named;
+                    }
+                    else
+                    {
+                        error = badOption(word);
+                    }
+                    break;
+                case Op::Add:
+                case Op::Remove:
+                    if (named)
+                    {
+                        shared.unnamedClipboard = setting.op == Op::Add;
+                    }
+                    break;
+                default:
+                    error = badOption(word);
+                    break;
+            }
+            return true;
+        }
+        return false;
+    }
+
+    bool isViewOption(const std::string& name)
+    {
+        return name == "wrap" || name == "et" || name == "expandtab" || name == "ts" || name == "tabstop" || name == "sw" || name == "shiftwidth" ||
+               name == "sts" || name == "softtabstop";
+    }
+}
+
+// static
+bool ALVimKeymap::setViewOption(ALTextView& view, const std::string& word, std::string& shown, std::string& error)
+{
+    const OptionSetting setting = optionSetting(word);
+    const std::string&  name    = setting.name;
+    if (name == "wrap")
+    {
+        bool wrap = view.getWordWrap();
+        setFlag(wrap, true, setting, "wrap", word, shown, error);
+        view.setWordWrap(wrap);
+        return true;
+    }
+    if (name == "et" || name == "expandtab")
+    {
+        bool spaces = view.getSoftTabs();
+        setFlag(spaces, false, setting, "expandtab", word, shown, error);
+        view.setSoftTabs(spaces);
+        return true;
+    }
+    if (isViewOption(name))
+    {
+        // One width for a tab, an indent and a Tab typed, here; softtabstop
+        // 0, vim's own, leaves it be.
+        if ((name == "sts" || name == "softtabstop") && setting.op == OptionSetting::Op::Assign && setting.value == "0")
+        {
+            return true;
+        }
+        S32 width = view.getTabWidth();
+        setNumber(width, 4, 1, 16, setting, name.size() > 3 ? name.c_str() : name == "ts" ? "tabstop" : name == "sw" ? "shiftwidth" : "softtabstop", word,
+                  shown, error);
+        view.setTabWidth(width);
+        return true;
+    }
+    return false;
+}
+
+// static
+void ALVimKeymap::source(Shared& shared, std::string_view text, const std::function<bool(const std::string& option)>& host,
+                         std::vector<std::string>& errors)
+{
+    shared.mappings.forgetVimrc();
+    shared.viewOptions.clear();
+    // Its lines, with their numbers; one that starts with a backslash
+    // goes on the end of the one before it.
+    std::vector<std::pair<S32, std::string>> lines;
+    S32                                      number = 0;
+    for (size_t at = 0; at <= text.size();)
+    {
+        size_t end = text.find('\n', at);
+        if (end == std::string_view::npos)
+        {
+            end = text.size();
+        }
+        std::string line(text.substr(at, end - at));
+        at = end + 1;
+        ++number;
+        if (!line.empty() && line.back() == '\r')
+        {
+            line.pop_back();
+        }
+        const size_t first = line.find_first_not_of(" \t");
+        if (first != std::string::npos && line[first] == '\\' && !lines.empty())
+        {
+            lines.back().second += line.substr(first + 1);
+        }
+        else
+        {
+            lines.emplace_back(number, std::move(line));
+        }
+    }
+    for (auto& [line_number, line] : lines)
+    {
+        LLStringUtil::trim(line);
+        while (!line.empty() && (line[0] == ':' || line[0] == ' ' || line[0] == '\t'))
+        {
+            line.erase(0, 1);
+        }
+        if (line.empty() || line[0] == '"')
+        {
+            continue;
+        }
+        bool quiet = false;
+        for (const char* prefix : { "silent!", "sil!", "silent ", "sil " })
+        {
+            const size_t length = strlen(prefix);
+            if (line.compare(0, length, prefix) == 0)
+            {
+                quiet = prefix[length - 1] == '!';
+                line.erase(0, length);
+                LLStringUtil::trim(line);
+                break;
+            }
+        }
+        size_t name_end = 0;
+        while (name_end < line.size() && isNameChar(line[name_end]))
+        {
+            ++name_end;
+        }
+        std::string name = line.substr(0, name_end);
+        std::string args = line.substr(name_end);
+        if (!args.empty() && args[0] == '!')
+        {
+            name += '!';
+            args.erase(0, 1);
+        }
+        LLStringUtil::trim(args);
+        std::string error;
+        std::string listing;
+        if (!name.empty() && shared.mappings.command(name, args, true, listing, error))
+        {
+        }
+        else if (name == "let")
+        {
+            if (!shared.mappings.let(args, error))
+            {
+                error = said("VimLetOnly", "Only mapleader and maplocalleader are set with :let");
+            }
+        }
+        else if (isSetCommand(name))
+        {
+            // The mode's own options here; the host's, which the window
+            // they are shown in keeps; each editor's own, for the host to
+            // set on each.
+            for (const std::string& word : optionWords(args))
+            {
+                const OptionSetting setting = optionSetting(word);
+                std::string         shown;
+                if (setSharedOption(shared, setting, word, shown, error))
+                {
+                    if (!error.empty())
+                    {
+                        break;
+                    }
+                }
+                else if (!(host && host(word)))
+                {
+                    if (!isViewOption(setting.name))
+                    {
+                        error = said("VimUnknownOption", "E518: Unknown option: [OPTION]", { { "[OPTION]", word } });
+                        break;
+                    }
+                    shared.viewOptions.push_back(word);
+                }
+            }
+        }
+        else if (name != "noh" && name != "nohlsearch")
+        {
+            error = said("VimNotACommand", "E492: Not an editor command: [LINE]", { { "[LINE]", line } });
+        }
+        if (!error.empty() && !quiet)
+        {
+            errors.push_back(said("VimrcLine", "line [NUMBER]: [ERROR]", { { "[NUMBER]", std::to_string(line_number) }, { "[ERROR]", error } }));
+        }
+    }
 }
 
 void ALVimKeymap::runCommand(ALTextView& view, const std::string& line_in)
@@ -4875,7 +5497,7 @@ void ALVimKeymap::runCommand(ALTextView& view, const std::string& line_in)
             }
             view.setCaret(ALTextPos(line, 0));
             moveTo(view, view.caret());
-            if (!play(view, inputs))
+            if (!play(view, inputs, name.back() != '!'))
             {
                 break;
             }
@@ -5035,77 +5657,77 @@ void ALVimKeymap::runCommand(ALTextView& view, const std::string& line_in)
         }
         return;
     }
-    if (name == "set" || name == "se")
     {
-        // The view's own settings; the rest the host's.
-        std::string option = args;
-        std::string value;
-        if (const size_t eq = option.find('='); eq != std::string::npos)
+        // The :map family, and the leaders by :let.
+        std::string listing;
+        std::string error;
+        if (mShared->mappings.command(name, args, false, listing, error))
         {
-            value = option.substr(eq + 1);
-            option.erase(eq);
-        }
-        const bool off = option.compare(0, 2, "no") == 0;
-        if (off)
-        {
-            option.erase(0, 2);
-        }
-        if (option == "wrap")
-        {
-            view.setWordWrap(!off);
+            if (!error.empty())
+            {
+                say(error, true);
+            }
+            else if (listing.find('\n') == std::string::npos)
+            {
+                say(listing);
+            }
+            else
+            {
+                list(view, listing);
+            }
             return;
         }
-        if (option == "et" || option == "expandtab")
+        if (name == "let")
         {
-            view.setSoftTabs(!off);
+            if (!mShared->mappings.let(args, error))
+            {
+                error = said("VimLetOnly", "Only mapleader and maplocalleader are set with :let");
+            }
+            if (!error.empty())
+            {
+                say(error, true);
+            }
             return;
         }
-        if ((option == "ts" || option == "tabstop" || option == "sw" || option == "shiftwidth") && !value.empty())
+    }
+    if (isSetCommand(name))
+    {
+        // Each option in turn: the mode's own, then the view's, then the
+        // host's; what a query shows, said together at the end.
+        std::string shown_all;
+        bool        search_lit = false;
+        for (const std::string& word : optionWords(args))
         {
-            view.setTabWidth(llclamp(std::atoi(value.c_str()), 1, 16));
-            return;
+            std::string shown;
+            std::string error;
+            if (!setSharedOption(*mShared, optionSetting(word), word, shown, error) && !setViewOption(view, word, shown, error) &&
+                !(mHooks.command && mHooks.command(view, "set", word)))
+            {
+                error = said("VimUnknownOption", "E518: Unknown option: [OPTION]", { { "[OPTION]", word } });
+            }
+            if (!error.empty())
+            {
+                say(error, true);
+                return;
+            }
+            if (!shown.empty())
+            {
+                shown_all += (shown_all.empty() ? "" : "  ") + shown;
+            }
+            const std::string option = optionSetting(word).name;
+            search_lit               = search_lit || option == "hls" || option == "hlsearch";
         }
-        if (option == "ic" || option == "ignorecase")
+        if (search_lit && !mShared->highlightSearch)
         {
-            mShared->ignoreCase = !off;
-            return;
-        }
-        if (option == "scs" || option == "smartcase")
-        {
-            mShared->smartCase = !off;
-            return;
-        }
-        if (option == "is" || option == "incsearch")
-        {
-            mShared->incrementalSearch = !off;
-            return;
-        }
-        if (option == "hls" || option == "hlsearch")
-        {
-            mShared->highlightSearch = !off;
-            if (ALCodeEditor* editor = ALViewType::as<ALCodeEditor>(&view); editor && off)
+            if (ALCodeEditor* editor = ALViewType::as<ALCodeEditor>(&view))
             {
                 editor->clearHighlights();
             }
-            return;
         }
-        if (option == "cb" || option == "clipboard")
+        if (!shown_all.empty())
         {
-            // unnamed or unnamedplus, which are one clipboard here; empty
-            // for the editor's own.
-            if (value.empty() || value == "unnamed" || value == "unnamedplus")
-            {
-                mShared->unnamedClipboard = !value.empty();
-                return;
-            }
-            say(said("VimBadOptionValue", "E474: Invalid argument: [OPTION]", { { "[OPTION]", args } }), true);
-            return;
+            say(shown_all);
         }
-        if (mHooks.command && mHooks.command(view, "set", args))
-        {
-            return;
-        }
-        say(said("VimUnknownOption", "E518: Unknown option: [OPTION]", { { "[OPTION]", args } }), true);
         return;
     }
     if (mHooks.command && mHooks.command(view, name, args))

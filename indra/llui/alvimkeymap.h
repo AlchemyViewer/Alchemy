@@ -25,9 +25,12 @@
 #pragma once
 
 #include "altextview.h"
+#include "alvimmappings.h"
 #include "alvimpattern.h"
 #include "alvimregisters.h"
+#include "lltimer.h"
 
+#include <deque>
 #include <functional>
 #include <map>
 #include <memory>
@@ -137,6 +140,9 @@ public:
     std::string status() const override;
     U32         generation() const override { return mGeneration; }
     void        mouseChanged(ALTextView& view) override;
+    // Keys held for a mapping fed as they are, or as the mapping they
+    // make whole, once they have waited timeoutlen.
+    void        idle(ALTextView& view) override;
 
     // Whether keys are being recorded into a register, and which.
     bool recording() const { return mRecording != 0; }
@@ -163,27 +169,43 @@ public:
         // brought into sight, as incsearch has it.
         bool                     highlightSearch  = true;
         bool                     incrementalSearch = true;
+        // The :map family's mappings and the leaders; and how long keys
+        // that may be the start of a longer mapping wait for the rest,
+        // as vim's timeout and timeoutlen have it -- without the timeout,
+        // for as long as it takes.
+        ALVimMappings            mappings;
+        bool                     timeout       = true;
+        S32                      timeoutLength = 1000;
+        // What the vimrc set of each editor's own options -- expandtab,
+        // tabstop, shiftwidth -- as it said them, for the host to set on
+        // each editor it puts vim over (setViewOption).
+        std::vector<std::string> viewOptions;
     };
     const Shared&           shared() const { return *mShared; }
     std::shared_ptr<Shared> sharedState() const { return mShared; }
     void                    share(std::shared_ptr<Shared> shared);
 
-    // One thing typed: a character, or a key with its modifiers.
-    // The Control of vim's chords: the Mac's own Control key there, where
-    // MASK_CONTROL is Command and belongs to the menus -- Command-C copies
-    // and Command-V pastes in every mode -- and Control everywhere else.
-#if LL_DARWIN
-    static constexpr MASK CONTROL = MASK_MAC_CONTROL;
-#else
-    static constexpr MASK CONTROL = MASK_CONTROL;
-#endif
-    struct Input
-    {
-        bool    isChar = false;
-        llwchar ch     = 0;
-        KEY     key    = KEY_NONE;
-        MASK    mask   = MASK_NONE;
-    };
+    // A vimrc read into the shared state, a line at a time, what it made
+    // before taken away first: the :map family and :let mapleader and
+    // maplocalleader; :set of the options the mode keeps, and of each
+    // editor's own, into viewOptions; the rest of :set's options offered
+    // to `host`, true where it took one; comments, blank lines, lines that
+    // go on with a backslash, and silent! before a line to say nothing of
+    // it. Nothing else runs: a vimrc sets things up and does not edit.
+    // What was not understood, a line each with its number, in `errors`.
+    static void source(Shared& shared, std::string_view text, const std::function<bool(const std::string& option)>& host,
+                       std::vector<std::string>& errors);
+    // One of :set's options that are each view's own set on a view --
+    // wrap, expandtab, tabstop, shiftwidth, softtabstop -- as it is
+    // written after :set: `nowrap`, `ts=4`, `et!`, `sw?`. What a query
+    // shows in `shown`, what went wrong in `error`; false where the option
+    // is none of these.
+    static bool setViewOption(ALTextView& view, const std::string& option, std::string& shown, std::string& error);
+
+    // One thing typed: a character, or a key with its modifiers; and the
+    // Control of vim's chords (ALVimInput).
+    static constexpr MASK CONTROL = ALVimInput::CONTROL;
+    typedef ALVimInput    Input;
     // Keys as text, the way a macro's register holds them: characters
     // as themselves, `<` as `<lt>`, keys by name -- <Esc>, <CR>, <BS>,
     // <Tab>, <Del>, <Up>, <Down>, <Left>, <Right>, <Home>, <End>,
@@ -211,6 +233,44 @@ private:
         bool        linewise = false;
         bool        block    = false;
     };
+
+    // A key as typed: recorded where a macro is being, then through the
+    // mappings (typeThrough).
+    bool type(ALTextView& view, const Input& input);
+    // A key fed as it is; or, where it is the start of a mapping or one
+    // is waiting, held with the rest until they make one or cannot.
+    bool typeThrough(ALTextView& view, const Input& input);
+    // A key held or to be fed: whether it may be mapped, which what a
+    // :noremap mapping stands for may not; and whether it is the one just
+    // typed, which the view is told of.
+    struct Held
+    {
+        Input input;
+        bool  remap = true;
+        bool  typed = false;
+    };
+    // The keys at the front of a queue fed, those that make a mapping
+    // replaced by what it stands for first, until the queue is empty or
+    // what is left may yet be the start of a longer mapping, which waits.
+    // `final`: no more keys come -- the timeout ran out, or a macro's keys
+    // are all there -- and nothing waits. `stop_on_error`: what is left is
+    // dropped once one ends in an error, as a macro's keys are. `taken`:
+    // where the key just typed is fed alone as it came, whether it was
+    // taken -- the view types a character nobody took.
+    void drain(ALTextView& view, std::deque<Held>& queue, bool final, bool stop_on_error, std::optional<bool>* taken);
+    // One key fed as a mapping or a flush feeds it: its character typed by
+    // this rather than left to the view, and a key vim gives no meaning
+    // done as the view's keymap would do it.
+    void feedMapped(ALTextView& view, const Input& input);
+    // The mapping mode keys are looked up in now: none while a command
+    // waits for a character of its own -- f's, r's, the second of g's.
+    U8   mapMode() const;
+    // Whether a key may be mapped: a character, or a key no character
+    // follows -- a chord, Escape, the arrows -- but not a modifier alone,
+    // nor the Mac's Command chords, which are the menus'.
+    static bool mappable(const Input& input);
+    // The keys held for a mapping, spelt, for the status.
+    std::string heldShown() const;
 
     bool feed(ALTextView& view, const Input& input);
     bool normal(ALTextView& view, const Input& input);
@@ -338,9 +398,10 @@ private:
     // g and v: the command over every line the pattern picks out, or
     // every line it does not.
     bool global(ALTextView& view, S32 first, S32 last, bool ranged, const std::string& spec, bool invert);
-    // Keys fed as typed, for :normal and for a macro; false where they
-    // ended in an error message.
-    bool play(ALTextView& view, const std::vector<Input>& inputs);
+    // Keys fed as typed, for :normal and for a macro, through the mappings
+    // where `remap` says -- as a macro's and :normal's are, and :normal!'s
+    // are not; false where they ended in an error message.
+    bool play(ALTextView& view, const std::vector<Input>& inputs, bool remap);
     // The number at or after the caret on its line, changed by so much;
     // false where there is none.
     bool addToNumber(ALTextView& view, S64 by);
@@ -523,6 +584,13 @@ private:
     std::vector<Input> mRecorded;
     char               mLastPlayed = 0;
     S32                mPlaying    = 0;
+
+    // Keys typed and held while they may be the start of a mapping, and
+    // since when, for the timeout; how deep feeding what mappings stand
+    // for goes.
+    std::deque<Held> mTypeahead;
+    LLTimer          mTypeaheadSince;
+    S32              mMapped = 0;
 
     std::string mMessage;
     bool        mMessageError = false;

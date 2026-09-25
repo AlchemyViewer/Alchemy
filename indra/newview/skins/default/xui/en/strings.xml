@@ -459,6 +459,15 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="VimLinesPickedA">1 line</string>
 	<string name="VimLinesPickedB">[COUNT] lines</string>
 	<string name="VimNothingSubstituted">[MESSAGE] -- nothing substituted</string>
+	<string name="VimInvalidArgument">E474: Invalid argument</string>
+	<string name="VimMapExpr">E474: &lt;expr&gt; mappings are not supported</string>
+	<string name="VimNoSuchMapping">E31: No such mapping</string>
+	<string name="VimNoMappingFound">No mapping found</string>
+	<string name="VimMappingExists">E227: Mapping already exists for [KEYS]</string>
+	<string name="VimRecursiveMapping">E223: Recursive mapping</string>
+	<string name="VimBadExpression">E15: Invalid expression: [VALUE]</string>
+	<string name="VimLetOnly">Only mapleader and maplocalleader are set with :let</string>
+	<string name="VimrcLine">line [NUMBER]: [ERROR]</string>
 
 	<!-- Script Studio's own words about a script, from the alscript
 	     library: each problem carries a key and the words it is about,

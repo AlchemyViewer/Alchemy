@@ -113,6 +113,9 @@ public:
     // The mouse put the caret somewhere, or dragged a selection: the
     // keymap's own idea of where things are is told.
     virtual void mouseChanged(ALTextView& view) {}
+    // Each time the view is drawn: for what waits on time rather than on a
+    // key -- vim's keys held for a mapping, until timeoutlen.
+    virtual void idle(ALTextView& view) {}
 };
 
 class ALTextView : public LLUICtrl, public LLEditMenuHandler, public LLSpellCheckMenuHandler, protected LLPreeditor

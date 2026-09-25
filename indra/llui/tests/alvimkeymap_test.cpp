@@ -151,6 +151,9 @@ namespace tut
         }
 
         std::string caretText() const { return llformat("%d:%d", editor->caret().line, editor->caret().column); }
+        // A : line run as it is written, which keys() would read <Esc> in
+        // as the key.
+        void ex(const char* line) { vim->takeLine(*editor, ':', line, true); }
 
         // The local point of a column on a line, in the middle of its row.
         void pointOf(S32 line, S32 column, S32& x, S32& y)
@@ -963,7 +966,7 @@ namespace tut
         // keymap's own; a range in front does not confuse the name.
         keys(":%set no<Tab>");
         ensure("the options starting no",
-               vim->typingLine(line, caret) && line == ":%set noexpandtab" && vim->menu(items, chosen) && items.size() == 7);
+               vim->typingLine(line, caret) && line == ":%set noexpandtab" && vim->menu(items, chosen) && items.size() == 8);
         keys("<Tab><Tab><Tab><Tab>");
         ensure("nonumber among them", vim->typingLine(line, caret) && line == ":%set nonumber");
         // Typing on keeps what is on the line and lets the row go.
@@ -1949,5 +1952,174 @@ namespace tut
         keys("u9Gvaf");
         ensure("vaf selects its lines", vim->mode() == ALVimKeymap::Mode::VisualLine);
         keys("<Esc>");
+    }
+
+    template<> template<>
+    void alvimkeymap_object::test<62>()
+    {
+        set_test_name("mappings: keys that may be the start of one held and shown; typed as they are when what follows makes none, or the time runs out");
+        ALCodeEditor& e = make("abc\n");
+        ex("inoremap jk <Esc>");
+        keys("ijk");
+        ensure("jk left insert mode", vim->mode() == ALVimKeymap::Mode::Normal);
+        ensure_equals("nothing typed", flat(e.text()), std::string("abc|"));
+        keys("ijx");
+        ensure_equals("the j typed after all, then the x", flat(e.text()), std::string("jxabc|"));
+        keys("<Esc>");
+        ex("set timeoutlen=0");
+        keys("Aj");
+        ensure_equals("held, and shown after the mode", vim->status(), std::string("-- INSERT -- j"));
+        ensure_equals("not typed yet", flat(e.text()), std::string("jxabc|"));
+        vim->idle(e);
+        ensure_equals("typed once the time ran out", flat(e.text()), std::string("jxabcj|"));
+        ensure_equals("held no more", vim->status(), std::string("-- INSERT --"));
+        keys("<Esc>");
+        ex("set notimeout");
+        keys("Aj");
+        vim->idle(e);
+        ensure_equals("without the timeout it waits", flat(e.text()), std::string("jxabcj|"));
+        keys("k");
+        ensure("and the rest makes the mapping", vim->mode() == ALVimKeymap::Mode::Normal && flat(e.text()) == "jxabcj|");
+    }
+
+    template<> template<>
+    void alvimkeymap_object::test<63>()
+    {
+        set_test_name("mappings: map maps again and noremap does not, the leader, operator-pending's and the : line's own, and one that goes round");
+        ALCodeEditor& e = make("one two\nthree\nfour\n");
+        ex("nmap Q j");
+        ex("nmap W Q");
+        ex("nnoremap E W");
+        keys("W");
+        ensure_equals("W through Q to j", caretText(), std::string("1:0"));
+        keys("ggE");
+        ensure_equals("E is W itself, a WORD on", caretText(), std::string("0:4"));
+        ex("let mapleader = ','");
+        ex("nnoremap <leader>d dd");
+        keys(",");
+        ensure_equals("the leader held and shown", vim->status(), std::string(","));
+        keys("d");
+        ensure_equals("<leader>d is dd", flat(e.text()), std::string("three|four|"));
+        keys("u");
+        ensure_equals("undone as one", flat(e.text()), std::string("one two|three|four|"));
+        keys("gg,x");
+        ensure_equals("a leader nothing follows goes as it is: , then x", flat(e.text()), std::string("ne two|three|four|"));
+        ex("onoremap w iw");
+        keys("jldw");
+        ensure_equals("dw, with w the inner word after an operator", flat(e.text()), std::string("ne two||four|"));
+        ex("cnoremap <C-x> set ic");
+        keys(":<C-x>");
+        std::string line;
+        S32         caret = 0;
+        ensure("the : line's own", vim->typingLine(line, caret) && line == ":set ic");
+        keys("<CR>");
+        ensure("and it ran", vim->shared().ignoreCase);
+        ex("nmap K Kj");
+        keys("ggK");
+        ensure("what starts with its own keys does not map the first again", caretText() == "1:0" && !vim->messageIsError());
+        ex("nmap t dd");
+        keys("ggft");
+        ensure("the character f waits for is taken as it is", flat(e.text()) == "ne two||four|" && caretText() == "0:3");
+        ex("nmap a b");
+        ex("nmap b a");
+        keys("a");
+        ensure("round and round is stopped", vim->message().find("E223") != std::string::npos && vim->messageIsError());
+        ex("nunmap zz");
+        ensure("no such mapping", vim->message().find("E31") != std::string::npos);
+    }
+
+    template<> template<>
+    void alvimkeymap_object::test<64>()
+    {
+        set_test_name("mappings: a macro records the keys typed and plays them through the mappings; :normal maps them, :normal! not; . repeats what one did");
+        ALCodeEditor& e = make("a\nb\nc\nd\n");
+        ex("inoremap jk <Esc>");
+        keys("qaAxjkq");
+        ensure_equals("typed", flat(e.text()), std::string("ax|b|c|d|"));
+        ensure_equals("the keys as they were typed", vim->registerText('a'), std::string("Axjk"));
+        keys("j@a");
+        ensure("played through the mapping", flat(e.text()) == "ax|bx|c|d|" && vim->mode() == ALVimKeymap::Mode::Normal);
+        ex("nnoremap Q dd");
+        ex("3normal Q");
+        ensure_equals(":normal maps", flat(e.text()), std::string("ax|bx|d|"));
+        ex("1normal! Q");
+        ensure_equals(":normal! does not", flat(e.text()), std::string("ax|bx|d|"));
+        keys("ggQ.");
+        ensure_equals(". does what the mapping did", flat(e.text()), std::string("d|"));
+    }
+
+    template<> template<>
+    void alvimkeymap_object::test<65>()
+    {
+        set_test_name(":set takes several options, queries them and toggles them; the view's own set on a view");
+        ALCodeEditor& e = make("x\n");
+        ex("set ic scs tm=300");
+        ensure("all three", vim->shared().ignoreCase && vim->shared().smartCase && vim->shared().timeoutLength == 300);
+        ex("set ic? tm?");
+        ensure_equals("shown", vim->message(), std::string("  ignorecase    timeoutlen=300"));
+        ex("set invic scs!");
+        ensure("toggled", !vim->shared().ignoreCase && !vim->shared().smartCase);
+        ex("set tm=x");
+        ensure("a number wanted", vim->messageIsError() && vim->message().find("E474") != std::string::npos);
+        ex("set clipboard+=unnamed");
+        ensure("added to", vim->shared().unnamedClipboard);
+        ex("set clipboard-=unnamed");
+        ensure("taken from", !vim->shared().unnamedClipboard);
+        std::string shown;
+        std::string error;
+        ensure("tabstop", ALVimKeymap::setViewOption(e, "ts=2", shown, error) && e.getTabWidth() == 2 && error.empty());
+        ensure("shiftwidth shown", ALVimKeymap::setViewOption(e, "sw?", shown, error) && shown == "  shiftwidth=2");
+        ensure("expandtab", ALVimKeymap::setViewOption(e, "noet", shown, error) && !e.getSoftTabs());
+        ensure("out of reach", ALVimKeymap::setViewOption(e, "ts=99", shown, error) && !error.empty() && e.getTabWidth() == 2);
+        ensure("not a view's", !ALVimKeymap::setViewOption(e, "ic", shown, error));
+    }
+
+    template<> template<>
+    void alvimkeymap_object::test<66>()
+    {
+        set_test_name("a vimrc: mappings, the leader and options taken, the host offered the rest, and what is not understood said by its line");
+        ALVimKeymap::Shared      shared;
+        std::vector<std::string> errors;
+        std::vector<std::string> offered;
+        const auto               host = [&offered](const std::string& option) {
+            offered.push_back(option);
+            return option == "nu";
+        };
+        const char* vimrc = "\" a comment\n"
+                            "set ignorecase smartcase ts=2 et\n"
+                            "let mapleader = \"\\<Space>\"\n"
+                            "nnoremap <leader>w :w<CR>\n"
+                            "inoremap jk <Esc>\n"
+                            "  :set nu\n"
+                            "syntax on\n"
+                            "silent! colorscheme desert\n"
+                            "set tm=300 notimeout\n"
+                            "\n"
+                            "set foo\n"
+                            "noremap Y\n"
+                            "   \\ y$\n";
+        ALVimKeymap::source(shared, vimrc, host, errors);
+        ensure("its options", shared.ignoreCase && shared.smartCase && shared.timeoutLength == 300 && !shared.timeout);
+        ensure("each editor's for the host to set", shared.viewOptions == std::vector<std::string>{ "ts=2", "et" });
+        ensure("the host offered them first, and its own", offered.size() == 4 && offered[2] == "nu" && offered[3] == "foo");
+        const ALVimMappings& maps = shared.mappings;
+        ensure("<leader>w with the leader a space", maps.match(ALVimMappings::NORMAL, maps.keysOf("<Space>w"), true).full != nullptr);
+        ensure("jk", maps.match(ALVimMappings::INSERT, maps.keysOf("jk"), true).full != nullptr);
+        const ALVimMappings::Match y = maps.match(ALVimMappings::VISUAL, maps.keysOf("Y"), true);
+        ensure("a line that goes on with a backslash", y.full && ALVimMappings::shown(y.full->to) == "y$");
+        ensure_equals("two not understood", errors.size(), size_t(2));
+        ensure("by their lines", errors[0].find("line 7:") == 0 && errors[0].find("E492") != std::string::npos &&
+                                     errors[1].find("line 11:") == 0 && errors[1].find("E518") != std::string::npos);
+
+        std::string listing;
+        std::string error;
+        shared.mappings.command("nnoremap", "Q gq", false, listing, error);
+        errors.clear();
+        ALVimKeymap::source(shared, "nnoremap Z zz\n", host, errors);
+        ensure("read again, what it made before is gone", maps.match(ALVimMappings::INSERT, maps.keysOf("jk"), true).full == nullptr &&
+                                                            maps.match(ALVimMappings::NORMAL, maps.keysOf("Z"), true).full != nullptr);
+        ensure("and the leader vim's", maps.leader() == "\\");
+        ensure("one typed kept", maps.match(ALVimMappings::NORMAL, maps.keysOf("Q"), true).full != nullptr);
+        ensure("and the view's options it no longer sets", shared.viewOptions.empty());
     }
 }

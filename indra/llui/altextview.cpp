@@ -3765,8 +3765,13 @@ void ALTextView::dragSelectTo(S32 x, S32 y)
 
 void ALTextView::draw()
 {
-    // A modal keymap's mode moved by something other than a key -- the
-    // mouse dragging vim into visual mode.
+    // A modal keymap's keys that wait on time; then its mode, moved by
+    // something other than a key -- the mouse dragging vim into visual
+    // mode, the time run out on keys held.
+    if (mModal)
+    {
+        mModal->idle(*this);
+    }
     syncLanguageInput();
     // A drag held past the top or the bottom scrolls on with the mouse
     // still, as a text field's does.
