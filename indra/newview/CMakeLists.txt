@@ -184,6 +184,7 @@ if(AL_BUILD_VIEWER)
     alscriptsaveflow.cpp
     alscriptsearch.cpp
     alscriptsearchpane.cpp
+    alscriptstudiocommands.cpp
     alscriptstudiodoc.cpp
     alscriptstudiorecovery.cpp
     alscriptstudiosave.cpp
@@ -991,6 +992,7 @@ if(AL_BUILD_VIEWER)
     alscriptsaveflow.h
     alscriptsearch.h
     alscriptsearchpane.h
+    alscriptstudiocommands.h
     alscriptstudiodoc.h
     alscriptstudiorecovery.h
     alscriptstudioservices.h
@@ -2493,6 +2495,9 @@ if(AL_BUILD_TESTS)
     SOURCES alscriptnotecardtab.cpp alscriptstudiodoc.cpp
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
+
+  # The Script Studio's commands by name, with nothing of the window.
+  al_add_test(alscriptstudiocommands UNIT PROJECT ${test_project} LIBRARIES ${test_libs})
 
   # Whole saves of a Script Studio tab through where they stand and where
   # they go, with nothing of the viewer.
