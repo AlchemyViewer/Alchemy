@@ -993,4 +993,31 @@ namespace tut
         two.edits = { { 0, 0, 0, 0, "a" }, { 0, 0, 0, 0, "b" } };
         ensure_equals("two at one place in the order given", ALScriptFixes::apply("x", two).value_or("refused"), std::string("abx"));
     }
+
+    template<> template<>
+    void object::test<33>()
+    {
+        set_test_name("the optimizer's removal, offered beside the analyzer's, takes the preferred mark off its own fix only");
+        ALScriptProblem problem;
+        problem.key  = "OptimizerRemovedLocal";
+        problem.args = { "x" };
+        ALScriptFix other;
+        other.title     = "Something else";
+        other.preferred = true;
+        problem.fixes.push_back(other);
+        // Where nothing can be taken out -- past the text's end -- nothing
+        // is added, and the fix already there keeps its mark.
+        problem.line = problem.endLine = 9;
+        problem.column                 = 0;
+        problem.endColumn              = 1;
+        ALScriptFixes::attachOptimizer(problem, "integer x;\n");
+        ensure_equals("nothing added", problem.fixes.size(), size_t(1));
+        ensure("still preferred", problem.fixes.front().preferred);
+        // Where it can, its own is added unpreferred.
+        problem.line = problem.endLine = 0;
+        problem.column                 = 8;
+        problem.endColumn              = 9;
+        ALScriptFixes::attachOptimizer(problem, "integer x;\n");
+        ensure("added: " + std::to_string(problem.fixes.size()), problem.fixes.size() == 2 && !problem.fixes.back().preferred && problem.fixes.front().preferred);
+    }
 }

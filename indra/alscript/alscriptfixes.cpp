@@ -1130,9 +1130,11 @@ namespace ALScriptFixes
                  args.size() == 1)
         {
             // The analyzer offers these already, as unused; offered here as
-            // well, but not preferred, so that one is not made twice.
+            // well, but not preferred, so that one is not made twice -- that
+            // one, where offerRemoval made one, and no fix already there.
+            const size_t before = problem.fixes.size();
             offerRemoval(problem, text, problem.line, problem.column, problem.endLine, problem.endColumn, args[0]);
-            if (!problem.fixes.empty())
+            if (problem.fixes.size() > before)
             {
                 problem.fixes.back().preferred = false;
             }
