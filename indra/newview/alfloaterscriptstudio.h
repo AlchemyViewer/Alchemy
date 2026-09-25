@@ -248,6 +248,10 @@ private:
         // what the tab's dot, Save All and a close all go by. What is kept
         // against a crash is the text alone.
         bool          unsaved() const { return (editor && editor->isDirty()) || targetChosen || experienceChosen; }
+        // A save on its way: sent, or waiting on the preprocessor, a check
+        // or a weighing -- or the preprocessor busy with the tab for any
+        // reason, whose answer a save may yet wait on.
+        bool          saveUnderway() const { return saving || preprocessing || saveAfterCheck || saveAfterWeigh || uploadAfterWeigh; }
         ALCodeEditor* shownText() const { return shownView() == View::Expanded ? expandedEditor : editor; }
         // A notecard rather than a script: plain text, saved as a
         // notecard with the items it came with, never analysed.

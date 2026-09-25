@@ -5866,7 +5866,7 @@ bool ALFloaterScriptStudio::sendQueuedSave(Doc& doc)
         return false;
     }
     save(doc);
-    return doc.saving || doc.preprocessing || doc.saveAfterCheck || doc.saveAfterWeigh || doc.uploadAfterWeigh;
+    return doc.saveUnderway();
 }
 
 // --- the analyzers -------------------------------------------------------------
@@ -11711,7 +11711,7 @@ void ALFloaterScriptStudio::saveToClose(const std::string& id)
     save(doc);
     // Gone already -- a file, saved and let go of on the spot -- or on its
     // way: sent, or waiting on the preprocessor or a check.
-    if (indexOf(id) == NONE || doc.saving || doc.preprocessing || doc.saveAfterCheck || doc.saveAfterWeigh || doc.uploadAfterWeigh)
+    if (indexOf(id) == NONE || doc.saveUnderway())
     {
         return;
     }
@@ -11840,7 +11840,7 @@ bool ALFloaterScriptStudio::movable(const Doc& doc)
     // Not while a save of it is on its way: the answer comes to whichever
     // window holds the tab then, where the save is not its own, and a close
     // waiting on it here would wait on a tab gone from here.
-    if (doc.saving || doc.preprocessing || doc.saveAfterCheck || doc.saveAfterWeigh || doc.uploadAfterWeigh)
+    if (doc.saveUnderway())
     {
         LLStringUtil::format_map_t args;
         args["[NAME]"] = doc.name;
