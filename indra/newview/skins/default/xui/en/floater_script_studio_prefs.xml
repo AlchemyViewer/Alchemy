@@ -28,6 +28,10 @@
     <floater.string name="PlaceDisk">The folder on disk</floater.string>
     <floater.string name="OrderWorldOff">The places an #include or require is looked for, the first that has it winning; a place unticked is not looked in. The object and inventory are greyed while includes are not taken from them: tick the box above to let them in</floater.string>
     <floater.string name="ThemeNewName">My Theme</floater.string>
+    <floater.string name="VimrcFromFile">Without a notecard, the vimrc is the file [PATH]. It takes :map and its kin, let mapleader and :set.</floater.string>
+    <floater.string name="VimrcFromNotecard">The notecard is the vimrc. It takes :map and its kin, let mapleader and :set.</floater.string>
+    <floater.string name="VimrcUnknownNotecard">(a notecard not in inventory yet)</floater.string>
+    <floater.string name="VimrcOnlyNotecards">Only a notecard in your inventory can be the vimrc</floater.string>
     <floater.string name="HeadingEditor">Editor</floater.string>
     <floater.string name="HeadingSyntax">Syntax</floater.string>
     <floater.string name="NoFolder">No folders: Add... one to look in.</floater.string>
@@ -612,6 +616,58 @@ end</floater.string>
              tool_tip="As vim's clipboard=unnamed: y, d, x and p with no register named go by the clipboard other programs share; off, they stay in the editor, and only &quot;+ and &quot;* reach the clipboard. A named register, &quot;a, never does."
              top_pad="6"
              width="370" />
+            <text
+             follows="left|top"
+             height="16"
+             layout="topleft"
+             left="412"
+             name="vimrc_label"
+             top_pad="10"
+             width="370">
+                Your vimrc, as a notecard:
+            </text>
+            <line_editor
+             enabled="false"
+             follows="left|top"
+             height="22"
+             label="Drop a notecard here"
+             layout="topleft"
+             left="412"
+             max_length_bytes="255"
+             name="vimrc_notecard"
+             tool_tip="Drag a notecard from your inventory here to use it as your vimrc wherever you log in. It is kept on this computer, and fetched again only when it has been changed"
+             top_pad="4"
+             width="230" />
+            <button
+             follows="left|top"
+             height="22"
+             label="Edit"
+             layout="topleft"
+             left_pad="6"
+             name="vimrc_edit"
+             tool_tip="Open the vimrc in Script Studio: the notecard, or else the file, made where there is none yet"
+             top_delta="0"
+             width="64" />
+            <button
+             follows="left|top"
+             height="22"
+             label="Clear"
+             layout="topleft"
+             left_pad="4"
+             name="vimrc_clear"
+             tool_tip="Stop using the notecard: the vimrc file in the settings folder is read again"
+             top_delta="0"
+             width="64" />
+            <text
+             follows="left|top"
+             font="SansSerifSmall"
+             height="30"
+             layout="topleft"
+             left="412"
+             name="vimrc_where"
+             top_pad="4"
+             width="370"
+             wrap="true" />
         </panel>
         <panel
          follows="all"

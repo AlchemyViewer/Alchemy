@@ -64,6 +64,9 @@ public:
     // OK and Cancel: where something was changed, asked first whether to
     // keep it, put it back, or stay.
     bool canClose() override;
+    // A notecard dropped on the vimrc's box.
+    bool handleDragAndDrop(S32 x, S32 y, MASK mask, bool drop, EDragAndDropType cargo_type, void* cargo_data, EAcceptance* accept,
+                           std::string& tooltip_msg) override;
 
 private:
     // Everything changes as it is changed, so that the editors show it;
@@ -128,6 +131,9 @@ private:
     void storeLints(bool lua);
     void storeIncludeOrder();
     void moveIncludePlace(S32 by);
+    // The vimrc's box: the notecard's name, or none, and where the vimrc
+    // is read from or why it could not be.
+    void refreshVimrc();
 
     LLTabContainer*                                        mTabs        = nullptr;
     LLComboBox*                                            mThemes      = nullptr;
@@ -190,6 +196,10 @@ private:
     bool                                                   mStoringLints = false;
     // Open, with what Cancel goes back to remembered.
     bool                                                   mShowing = false;
+    LLLineEditor*                                          mVimrcNotecard = nullptr;
+    // The notecard that was the vimrc when the window opened, for Cancel.
+    std::string                                            mWasVimrc;
+    boost::signals2::scoped_connection                     mVimrcChanged;
     LLScrollListCtrl*                                      mLintsLSL  = nullptr;
     LLScrollListCtrl*                                      mLintsLuau = nullptr;
     // The settings the enabling follows, by their own signals, so that it
