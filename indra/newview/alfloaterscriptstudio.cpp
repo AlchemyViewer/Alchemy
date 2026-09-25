@@ -188,7 +188,7 @@ namespace
     // anyone can work out: so the user's alone to read, never written
     // through a link, and never one somebody else made by that name first,
     // or linked to a file elsewhere.
-    bool writeFile(const std::string& path, std::string_view text)
+    bool writeTempFile(const std::string& path, std::string_view text)
     {
 #if LL_WINDOWS
         std::ofstream out(path, std::ios::binary);
@@ -6638,7 +6638,7 @@ namespace
     bool writeWhole(const std::string& path, const std::string& text)
     {
         // An empty script is stored as one space, as it always was.
-        return writeFile(path, text.empty() ? std::string_view(" ") : std::string_view(text));
+        return writeTempFile(path, text.empty() ? std::string_view(" ") : std::string_view(text));
     }
 }
 
@@ -6866,7 +6866,8 @@ void ALFloaterScriptStudio::logExternal(Doc& doc, const ALScriptWorkspace::Compi
     {
         return;
     }
-    // Beside the copy, and made as it is (writeFile).
+    // Beside the copy, and made as it is (writeTempFile): never through a
+    // link somebody else left at its name.
     std::string text = "// " + LLLogChat::timestamp2LogString(0, true) + "\n\n";
     if (result.success)
     {
@@ -6878,7 +6879,7 @@ void ALFloaterScriptStudio::logExternal(Doc& doc, const ALScriptWorkspace::Compi
         LLStringUtil::stripNonprintable(line);
         text += line + "\n";
     }
-    writeFile(doc.liveLog, text);
+    writeTempFile(doc.liveLog, text);
 }
 
 void ALFloaterScriptStudio::stopExternal(Doc& doc)
