@@ -138,7 +138,11 @@ namespace
         return LLFile::size(path) > MOST_FILE_BYTES;
     }
 
-    // A file's bytes, whole; false where it could not be opened, or holds
+    // A file's text, whole, its line endings as an editor here keeps them:
+    // CRLF and a lone CR as LF. Compared as it came, a file saved with CRLF
+    // -- as an editor on Windows saves one -- is never the text it was
+    // taken as, and every save made to it after the first reads as made
+    // on both sides at once. False where it could not be opened, or holds
     // more than a file opened here may.
     bool readWholeFile(const std::string& path, std::string& text)
     {
@@ -151,7 +155,22 @@ namespace
         {
             return false;
         }
-        text.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+        const std::string bytes((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+        text.clear();
+        text.reserve(bytes.size());
+        for (size_t i = 0; i < bytes.size(); ++i)
+        {
+            if (bytes[i] != '\r')
+            {
+                text += bytes[i];
+                continue;
+            }
+            text += '\n';
+            if (i + 1 < bytes.size() && bytes[i + 1] == '\n')
+            {
+                ++i;
+            }
+        }
         return true;
     }
 
