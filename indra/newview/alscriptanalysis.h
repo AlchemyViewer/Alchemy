@@ -43,6 +43,10 @@ namespace LL
     template <class T> struct ThreadPoolUsing;
     class WorkQueue;
 }
+namespace Luau
+{
+    struct FrontendCancellationToken;
+}
 
 // The LSL and SLua analyzers, each owned by one worker thread and asked
 // about one script at a time:
@@ -55,7 +59,10 @@ namespace LL
 //
 // Tailslide's builtins are a table the library holds once for the whole
 // process and adds to rather than replaces, so the LSL builtins are loaded
-// once; the Luau definitions are read again when the region's change.
+// once; the Luau definitions are read again when the region's change, and
+// when ALScriptLuauSolver picks the other of Luau's type solvers. An SLua
+// type check is held to ALScriptLuauCheckSeconds, and one a newer check of
+// its script has made pointless is stopped where it is.
 // Words keyed as the library keys them, in the skin's language where it has
 // the key, else the English they came with.
 std::string alScriptKeyedWords(const std::string& key, const std::vector<std::string>& args, const std::string& english);
@@ -94,7 +101,7 @@ namespace ALScriptLints
     // A whole language's at once, so that what follows the setting --
     // every script checked again -- follows it once.
     void                     setLevels(bool lua, const std::vector<std::pair<std::string, Level>>& levels);
-    // Everything back to the default, the mode too.
+    // Everything back to the default, the mode and the solver too.
     void                     reset();
     // LSL's problems as chosen: a warning turned off dropped, one made an
     // error raised; the rest as they were. Errors are not a choice.
@@ -224,4 +231,11 @@ private:
     std::mutex                                          mLatestMutex;
     boost::unordered_flat_map<std::string, U32, ll::string_hash, std::equal_to<>> mLatestCheck;
     U32                                                 mAskSerial = 0;
+    // The SLua check the worker is running, if any, and what stops it: a
+    // newer check of the same script asked for stops it, its answer being
+    // one that would be thrown away, and so does the viewer closing. Under
+    // the same lock. Held as the Luau stop token, which only the service
+    // knows the inside of.
+    std::string                                         mRunningId;
+    std::shared_ptr<Luau::FrontendCancellationToken>    mRunningStop;
 };

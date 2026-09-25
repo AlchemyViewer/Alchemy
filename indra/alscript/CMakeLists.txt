@@ -88,6 +88,22 @@ if(AL_BUILD_TESTS)
     LIBRARIES alscript llcommon
     DEFINES ${definitions_defines}
   )
+  # The SLua checks again with Luau's new type solver, which a scripter may
+  # choose (ALScriptLuauSolver): the same tests, told by the environment.
+  foreach(test alluauservice alscriptfixes)
+    add_test(
+      NAME INTEGRATION_TEST_RUNNER_${test}_newsolver
+      COMMAND $<TARGET_FILE:INTEGRATION_TEST_${test}>
+      WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+    )
+    set_tests_properties(
+      INTEGRATION_TEST_RUNNER_${test}_newsolver
+      PROPERTIES
+        ENVIRONMENT "AL_TEST_LUAU_SOLVER=new"
+        ENVIRONMENT_MODIFICATION "${AL_TEST_ENVIRONMENT}"
+        SKIP_RETURN_CODE 125
+    )
+  endforeach()
   # What a script weighs: SLua by its bytecode, LSO by Tailslide's image,
   # with the grid's builtins loaded.
   al_add_test(

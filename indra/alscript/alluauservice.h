@@ -33,6 +33,11 @@
 #include <string_view>
 #include <vector>
 
+namespace Luau
+{
+    struct FrontendCancellationToken;
+}
+
 // The SLua analyzer: Luau's front end from Second Life's fork, given the
 // grid's definitions and asked about one script at a time: what is wrong
 // with it, what could go at a position, what is at one, what a call there
@@ -56,6 +61,28 @@ public:
     // parse or check; the globals are then Luau's own and nothing more.
     bool loadDefinitions(std::string_view source, std::string& error);
     bool hasDefinitions() const;
+
+    // Which of Luau's two type solvers checks scripts: the old one, the
+    // default, or the new. A front end is built for one of them, so a
+    // change builds it again and loads the definitions into it again;
+    // false, with the reason, where they did not load, as above.
+    bool setNewSolver(bool use, std::string& error);
+    bool newSolver() const;
+
+    // The longest one type check of a script may take, in seconds, 0 for
+    // as long as it takes: past it the check stops, a check answers what
+    // it found by then with the problem LuauCheckTimedOut, and a query
+    // answers from what was worked out. One pathological script would
+    // otherwise hold the thread every other script is checked on.
+    void setTimeLimit(double seconds);
+    // What another thread may stop the question running on this one with,
+    // through cancel(); a stopped question answers nothing, and stopped()
+    // says so. Each question asked until told otherwise watches it.
+    typedef std::shared_ptr<Luau::FrontendCancellationToken> Stop;
+    static Stop newStop();
+    static void cancel(const Stop& stop);
+    void        setStop(Stop stop);
+    bool        stopped() const;
 
     // The documentation, as secondlife.docs.json has it: a map from a
     // symbol such as "@sl-slua/global/ll.Say" to its text and link.

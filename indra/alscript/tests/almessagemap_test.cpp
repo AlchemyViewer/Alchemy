@@ -153,6 +153,15 @@ namespace tut
         ensure_equals("did you mean", m.key, std::string("LuauMissingPropertyDidYouMean"));
         ensure_equals("its words", joined(m.args), std::string("<b><{ a: number }><a>"));
         ensure("nothing the table knows", !ALMessageMap::luauError("Some words nobody wrote", m));
+        // The new solver's nonstrict mode.
+        ensure("a checked call", ALMessageMap::luauError("the function 'string.len' expects to get a string as its 1st argument, but is being given a number", m));
+        ensure_equals("its key", m.key, std::string("LuauCheckedCall"));
+        ensure_equals("and words", joined(m.args), std::string("<string.len><string><1st><number>"));
+        ensure("an argument that fails, in a function",
+               ALMessageMap::luauError("in the function 'f', 'the argument 'x' is used in a way that will error at runtime", m));
+        ensure_equals("in a function", m.key + joined(m.args), std::string("LuauFailsAtRuntimeIn<f><x>"));
+        ensure("and in none", ALMessageMap::luauError("the argument 'x' is used in a way that will error at runtime", m));
+        ensure_equals("in none", m.key + joined(m.args), std::string("LuauFailsAtRuntime<x>"));
     }
     template<> template<>
     void almessagemap_object::test<7>()

@@ -101,6 +101,22 @@ struct ALScriptAnalysis::Worker
         }
     }
 
+    // The solver the scripts are checked with: a change builds the front
+    // end again and loads the definitions into it again.
+    void useSolver(bool use_new)
+    {
+        if (luau.newSolver() == use_new)
+        {
+            return;
+        }
+        std::string error;
+        const bool  loaded = luau.setNewSolver(use_new, error);
+        if (!loaded || luau.hasDefinitions())
+        {
+            luauError = error;
+        }
+    }
+
     void loadLSL(const std::string& path)
     {
         if (lslLoaded)
@@ -128,6 +144,11 @@ ALScriptAnalysis::~ALScriptAnalysis() = default;
 
 void ALScriptAnalysis::cleanupSingleton()
 {
+    {
+        // A check still running is stopped rather than waited for.
+        const std::lock_guard<std::mutex> lock(mLatestMutex);
+        ALLuauService::cancel(mRunningStop);
+    }
     if (mPool)
     {
         mPool->close();
@@ -158,6 +179,12 @@ void ALScriptAnalysis::ask(Request request, callback_t callback)
     const std::string docs_path  = request.lua ? LLSyntaxDefCache::instance().getLuauDocsPath() : std::string();
     const std::string lsl_path   = request.lua ? std::string() : LLSyntaxDefCache::instance().getLSLBuiltinsPath();
     const U32         generation = mDefinitionsGeneration;
+    // The solver and the time limit, which are settings, and so the main
+    // thread's to read.
+    static LLCachedControl<std::string> solver_setting(gSavedSettings, "ALScriptLuauSolver", "old");
+    static LLCachedControl<F32>         seconds_setting(gSavedSettings, "ALScriptLuauCheckSeconds", 5.f);
+    const bool                          new_solver = std::string(solver_setting) == "new";
+    const F32                           seconds    = seconds_setting;
     // Which check of this script this is: a later one asked for while
     // this one waits makes it stale, and the worker passes it over. Only
     // checks are numbered -- a hover or a completion is about a place,
@@ -168,8 +195,17 @@ void ALScriptAnalysis::ask(Request request, callback_t callback)
         const std::lock_guard<std::mutex> lock(mLatestMutex);
         serial                    = ++mAskSerial;
         mLatestCheck[request.id] = serial;
+        // One of this script already running is stopped: its answer
+        // would be thrown away on arrival too.
+        if (mRunningStop && mRunningId == request.id)
+        {
+            ALLuauService::cancel(mRunningStop);
+        }
     }
-    mPool->getQueue().post([this, request = std::move(request), callback = std::move(callback), luau_path, docs_path, lsl_path, generation, serial]() {
+    mPool->getQueue().post([this, request = std::move(request), callback = std::move(callback), luau_path, docs_path, lsl_path, generation, serial,
+                            new_solver, seconds]() {
+        // What stops this one, where it is an SLua check.
+        ALLuauService::Stop stop;
         if (serial != 0)
         {
             const std::lock_guard<std::mutex> lock(mLatestMutex);
@@ -187,6 +223,12 @@ void ALScriptAnalysis::ask(Request request, callback_t callback)
             if (latest != mLatestCheck.end())
             {
                 mLatestCheck.erase(latest);
+            }
+            if (request.lua)
+            {
+                stop         = ALLuauService::newStop();
+                mRunningId   = request.id;
+                mRunningStop = stop;
             }
         }
         // The engines recurse on how the script nests; the pool's thread
@@ -206,13 +248,20 @@ void ALScriptAnalysis::ask(Request request, callback_t callback)
             result.column  = request.column;
             if (request.lua)
             {
+                mWorker->useSolver(new_solver);
                 mWorker->loadLuau(luau_path, docs_path, generation);
                 result.definitionsError = mWorker->luauError;
                 mWorker->luau.setConfig(request.config);
+                mWorker->luau.setTimeLimit(seconds);
+                mWorker->luau.setStop(stop);
                 switch (request.kind)
                 {
                     case Kind::Check:
                         result.problems = mWorker->luau.check(request.text);
+                        if (mWorker->luau.stopped())
+                        {
+                            break;
+                        }
                         result.outline  = mWorker->luau.outline(request.text);
                         if (request.semantics)
                         {
@@ -316,6 +365,26 @@ void ALScriptAnalysis::ask(Request request, callback_t callback)
                 result.understood = mWorker->lsl.understood();
             }
         });
+        bool stopped = false;
+        if (stop)
+        {
+            const std::lock_guard<std::mutex> lock(mLatestMutex);
+            if (mRunningStop == stop)
+            {
+                mRunningStop.reset();
+                mRunningId.clear();
+            }
+            if (mWorker)
+            {
+                stopped = mWorker->luau.stopped();
+                mWorker->luau.setStop(nullptr);
+            }
+        }
+        if (stopped)
+        {
+            // Stopped for a newer check, which answers in its place.
+            return;
+        }
         // The words in the viewer's language, on the main thread, where
         // the strings are.
         LLAppViewer::instance()->postToMainCoro([result = std::move(result), callback]() mutable {
@@ -468,6 +537,7 @@ namespace ALScriptLints
     {
         gSavedSettings.setLLSD("ALScriptLintLevels", LLSD::emptyMap());
         gSavedSettings.setString("ALScriptLuauMode", "nonstrict");
+        gSavedSettings.setString("ALScriptLuauSolver", "old");
     }
 
     void apply(ALScriptProblems& problems)

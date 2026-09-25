@@ -67,7 +67,7 @@ namespace
         "ALScriptPreprocOptimizerInlining",     "ALScriptPreprocExtensions",
         "ALScriptPreprocDiskIncludes", "ALScriptPreprocDiskIncludeFolder", "ALScriptPreprocIncludeOrder", "ALScriptPreprocWorldIncludes",
         "ALScriptStudioTabWidth",    "ALScriptStudioInsertSpaces",
-        "ALScriptLintLevels",        "ALScriptLuauMode",
+        "ALScriptLintLevels",        "ALScriptLuauMode",           "ALScriptLuauSolver",
         "ALScriptStudioAutoComplete", "ALScriptStudioCompleteAfter", "ALScriptStudioAcceptOnEnter", "ALScriptStudioAutoClose",
         "ALScriptStudioCaretStyle",  "ALScriptStudioCaretBlink",   "ALScriptStudioHoverCards",  "ALScriptStudioHoverDelay",
         "ALScriptStudioVimClipboard",

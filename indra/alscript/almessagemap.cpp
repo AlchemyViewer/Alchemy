@@ -255,6 +255,11 @@ namespace
         { "LuauCannotCompare", "Cannot compare unrelated types '[1]' and '[2]' with '[3]'" },
         { "LuauRedefinedTypeAt", "Redefinition of type '[1]', previously defined at line [2]" },
         { "LuauRedefinedType", "Redefinition of type '[1]'" },
+        // The new solver's nonstrict mode, which says only what is sure to
+        // fail as the script runs.
+        { "LuauCheckedCall", "the function '[1]' expects to get a [2] as its [3] argument, but is being given a [4]" },
+        { "LuauFailsAtRuntimeIn", "in the function '[1]', 'the argument '[2]' is used in a way that will error at runtime" },
+        { "LuauFailsAtRuntime", "the argument '[1]' is used in a way that will error at runtime" },
     };
 
     // A template cut at its marks: the literal stretches, and the number

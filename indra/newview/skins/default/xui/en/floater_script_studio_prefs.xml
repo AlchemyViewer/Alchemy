@@ -1006,7 +1006,7 @@ end</floater.string>
              layout="topleft"
              left="12"
              name="lints_defaults"
-             tool_tip="Every lint on, as a warning, and SLua checked nonstrict, as the grid compiles"
+             tool_tip="Every lint on, as a warning, and SLua checked nonstrict, as the grid compiles, by the old type solver"
              top_pad="8"
              width="100" />
 
@@ -1046,11 +1046,34 @@ end</floater.string>
                 <combo_box.item label="Strict" name="strict" value="strict" />
                 <combo_box.item label="No checking" name="nocheck" value="nocheck" />
             </combo_box>
+            <text
+             follows="left|top"
+             height="16"
+             layout="topleft"
+             left="408"
+             name="luau_solver_label"
+             top_pad="9"
+             width="170">
+                Type solver:
+            </text>
+            <combo_box
+             control_name="ALScriptLuauSolver"
+             follows="left|top"
+             height="22"
+             layout="topleft"
+             left_pad="4"
+             name="luau_solver"
+             tool_tip="Which of Luau's two type solvers checks SLua scripts. The new one works out more of what a script's types are, and finds some mistakes the old one misses and misses some it finds; it can take longer, and some of its messages are shown in English whatever the viewer's language"
+             top_delta="-3"
+             width="210">
+                <combo_box.item label="Old" name="old" value="old" />
+                <combo_box.item label="New" name="new" value="new" />
+            </combo_box>
             <scroll_list
              column_padding="2"
              draw_heading="true"
              follows="left|top|right|bottom"
-             height="370"
+             height="342"
              layout="topleft"
              left="408"
              multi_select="false"

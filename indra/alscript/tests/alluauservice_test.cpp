@@ -40,6 +40,9 @@ namespace tut
         std::string   definitions;
         std::string   error;
         bool          loaded = false;
+        // Luau's new type solver, where the run asks for it: CTest runs
+        // these twice, the second time with AL_TEST_LUAU_SOLVER=new.
+        const bool    newSolver = getenv("AL_TEST_LUAU_SOLVER") && std::string(getenv("AL_TEST_LUAU_SOLVER")) == "new";
 
         alluauservice_data()
         {
@@ -47,7 +50,22 @@ namespace tut
             std::stringstream text;
             text << in.rdbuf();
             definitions = text.str();
+            service.setNewSolver(newSolver, error);
             loaded      = service.loadDefinitions(definitions, error);
+        }
+
+        // The new solver's nonstrict mode says only what is sure to fail
+        // as the script runs, which a wrong argument to ll.Say is not: a
+        // test of what the checker says of a type asks it in strict mode
+        // there.
+        void strictUnderNewSolver()
+        {
+            if (newSolver)
+            {
+                ALLuauConfig config;
+                config.mode = "strict";
+                service.setConfig(config);
+            }
         }
 
         // Every problem on a line, for a failure message that says what
@@ -116,6 +134,7 @@ namespace tut
     {
         set_test_name("a wrong argument type is a type error");
         ensure("definitions load: " + error, loaded);
+        strictUnderNewSolver();
         ALScriptProblems problems = service.check("ll.Say(\"zero\", 0)\n");
         ensure("an error: " + said(problems), errors(problems) > 0);
         ensure("from the type checker", problems.front().source == ALScriptProblem::Source::Types);
@@ -284,7 +303,8 @@ namespace tut
         hover = service.hover(script, 5, 16);  // "x" where a number is wanted
         ensure("what is wanted there: " + hover.expected, hover.expected == "number");
         hover = service.hover(script, 6, 0);  // print
-        ensure("a builtin by its signature: " + hover.label, hover.label.rfind("function print(", 0) == 0);
+        // The new solver gives print its generic pack: print<T...>.
+        ensure("a builtin by its signature: " + hover.label, hover.label.rfind(newSolver ? "function print<" : "function print(", 0) == 0);
     }
 
     template<> template<>
@@ -374,6 +394,7 @@ namespace tut
     {
         set_test_name("a key that is not there is named by what was written, with the nearest key there is");
         ensure("definitions loaded: " + error, loaded);
+        strictUnderNewSolver();
         ALScriptProblems problems = service.check("ll.ay(0, \"hi\")\n");
         ensure("one problem", !problems.empty());
         const std::string& message = problems.front().message;
@@ -500,6 +521,7 @@ namespace tut
     {
         set_test_name("the engine's commonest messages come back keyed, which an upgrade that rewords them would end");
         ensure("definitions loaded: " + error, loaded);
+        strictUnderNewSolver();
         // Each script says one thing the map has a row for; a Luau whose
         // wording moved on gives the message with no key, and this is
         // where that shows -- run check_script_strings.py then.
@@ -587,5 +609,84 @@ namespace tut
         ALScriptSignature colon = service.signature(script, 3, 9);  // in "x"
         ensure_equals("with a colon, a and b", colon.parameters.size(), size_t(2));
         ensure("at b: " + colon.parameters[static_cast<size_t>(std::max(0, colon.active))], colon.active == 1 && colon.parameters[1].find("b") == 0);
+    }
+
+    template<> template<>
+    void alluauservice_object::test<22>()
+    {
+        set_test_name("either solver checks with the definitions, the new one in nonstrict mode saying only what is sure to fail as the script runs");
+        ensure("definitions loaded: " + error, loaded);
+        for (const bool use : { true, false, true })
+        {
+            std::string why;
+            ensure("switched: " + why, service.setNewSolver(use, why));
+            ensure_equals("the one asked for", service.newSolver(), use);
+            ensure("the definitions with it", service.hasDefinitions());
+            ALLuauConfig config;
+            config.mode = "strict";
+            service.setConfig(config);
+            ALScriptProblems problems = service.check("ll.Say(\"zero\", 0)\n");
+            ensure(std::string(use ? "new" : "old") + ", strict, a wrong argument: " + said(problems), errors(problems) > 0);
+            // A method called with a dot is a missing self, whichever says it.
+            problems      = service.check("local T = {}\nfunction T:m(a: number) end\nT.m(1)\n");
+            bool missing_self = false;
+            for (const ALScriptProblem& problem : problems)
+            {
+                missing_self |= problem.key == "LuauRequiresSelf" && problem.line == 2 && problem.column == 0;
+            }
+            ensure(std::string(use ? "new" : "old") + ": a missing self, at the call: " + said(problems), missing_self);
+        }
+        // Nonstrict, as the grid compiles: the new solver says nothing of
+        // ll.Say's argument, and what it does say comes keyed.
+        ALLuauConfig config;
+        config.mode = "nonstrict";
+        service.setConfig(config);
+        ensure("nothing of ll.Say: " + said(service.check("ll.Say(\"zero\", 0)\n")), errors(service.check("ll.Say(\"zero\", 0)\n")) == 0);
+        const ALScriptProblems problems = service.check("print(string.len(5))\n");
+        ensure("a checked function given the wrong type: " + said(problems), !problems.empty() && problems.front().key == "LuauCheckedCall");
+        std::string why;
+        service.setNewSolver(false, why);
+    }
+
+    template<> template<>
+    void alluauservice_object::test<23>()
+    {
+        set_test_name("a check past its time limit stops, says so, and answers what it found by then; a stopped one answers nothing");
+        ensure("definitions loaded: " + error, loaded);
+        std::string script;
+        for (int i = 0; i < 50; ++i)
+        {
+            script += llformat("local v%d: number = %d\nprint(v%d)\n", i, i, i);
+        }
+        for (const bool use : { false, true })
+        {
+            std::string why;
+            service.setNewSolver(use, why);
+            const std::string which = use ? "new: " : "old: ";
+            // Far less than any check takes.
+            service.setTimeLimit(1e-9);
+            ALScriptProblems problems = service.check(script);
+            ensure(which + "said to have stopped: " + said(problems), !problems.empty() && problems.front().key == "LuauCheckTimedOut" &&
+                                                                        problems.front().severity == ALScriptProblem::Severity::Warning);
+            service.setTimeLimit(0.0);
+            problems = service.check(script);
+            ensure(which + "unlimited, it runs its course: " + said(problems), problems.empty());
+            // Stopped before it began: nothing, and said to be stopped.
+            ALLuauService::Stop stop = ALLuauService::newStop();
+            ALLuauService::cancel(stop);
+            service.setStop(stop);
+            problems = service.check("local n: number = \"s\"\n");
+            ensure(which + "stopped, nothing: " + said(problems), problems.empty() && service.stopped());
+            // And a question after it is answered from a check of its own,
+            // not the part of one the stop left.
+            service.setStop(nullptr);
+            const ALScriptHover hover = service.hover("local n: number = \"s\"\n", 0, 6);
+            ensure(which + "not stopped now", !service.stopped());
+            ensure(which + "answered: " + hover.label, hover.label.find("n: number") != std::string::npos);
+            problems = service.check("local n: number = \"s\"\n");
+            ensure(which + "and checked in full: " + said(problems), errors(problems) > 0 || use);
+        }
+        std::string why;
+        service.setNewSolver(newSolver, why);
     }
 }

@@ -537,6 +537,7 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<!-- What the studio says in place of Luau's own words (alluauservice.cpp) -->
 	<string name="LuauKeyNotFound">Key '[1]' not found in [2]</string>
 	<string name="LuauKeyNotFoundDidYouMean">Key '[1]' not found in [2]; did you mean '[3]'?</string>
+	<string name="LuauCheckTimedOut">Type checking stopped after [1] seconds; what it found before then is shown</string>
 
 	<!-- What a fix offered for a problem does (alscriptfixes.cpp) -->
 	<string name="ScriptFixInsert">Insert '[1]'</string>
@@ -764,6 +765,9 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="LuauCannotCompare">Cannot compare unrelated types '[1]' and '[2]' with '[3]'</string>
 	<string name="LuauRedefinedTypeAt">Redefinition of type '[1]', previously defined at line [2]</string>
 	<string name="LuauRedefinedType">Redefinition of type '[1]'</string>
+	<string name="LuauCheckedCall">the function '[1]' expects to get a [2] as its [3] argument, but is being given a [4]</string>
+	<string name="LuauFailsAtRuntimeIn">in the function '[1]', 'the argument '[2]' is used in a way that will error at runtime</string>
+	<string name="LuauFailsAtRuntime">the argument '[1]' is used in a way that will error at runtime</string>
 
 	<!-- What the script workspace says when a load, a save or a queue
 	     cannot go ahead (alscriptworkspace.cpp), and the analyzers when

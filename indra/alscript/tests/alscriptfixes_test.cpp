@@ -50,6 +50,9 @@ namespace tut
         std::string  error;
         bool         lslLoaded  = false;
         bool         luauLoaded = false;
+        // Luau's new type solver, where the run asks for it: CTest runs
+        // these twice, the second time with AL_TEST_LUAU_SOLVER=new.
+        const bool   newSolver = getenv("AL_TEST_LUAU_SOLVER") && std::string(getenv("AL_TEST_LUAU_SOLVER")) == "new";
 
         alscriptfixes_data()
         {
@@ -57,6 +60,7 @@ namespace tut
             std::ifstream     in(std::string(AL_LSL_DEFINITIONS_DIR) + "/secondlife.d.luau", std::ios::binary);
             std::stringstream text;
             text << in.rdbuf();
+            luau.setNewSolver(newSolver, error);
             luauLoaded = luau.loadDefinitions(text.str(), error);
         }
 
@@ -243,6 +247,13 @@ namespace tut
     {
         set_test_name("an SLua key spelt wrong is changed to the nearest there is");
         ensure("definitions: " + error, luauLoaded);
+        if (newSolver)
+        {
+            // Whose nonstrict mode says nothing of a key not there.
+            ALLuauConfig config;
+            config.mode = "strict";
+            luau.setConfig(config);
+        }
         const std::string made = fixed("ll.OwnerSya(\"hi\")\n", true, "LuauKeyNotFoundDidYouMean", "Change 'OwnerSya' to 'OwnerSay'");
         ensure_equals("the call", made, std::string("ll.OwnerSay(\"hi\")\n"));
     }

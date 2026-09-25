@@ -1043,8 +1043,9 @@ bool ALFloaterScriptStudio::postBuild()
         }
     });
 
-    // The lints chosen again, or the mode: every script checked again.
-    for (const char* setting : { "ALScriptLintLevels", "ALScriptLuauMode" })
+    // The lints chosen again, the mode, the solver or how long a check may
+    // take: every script checked again.
+    for (const char* setting : { "ALScriptLintLevels", "ALScriptLuauMode", "ALScriptLuauSolver", "ALScriptLuauCheckSeconds" })
     {
         if (LLControlVariable* control = gSavedSettings.getControl(setting))
         {

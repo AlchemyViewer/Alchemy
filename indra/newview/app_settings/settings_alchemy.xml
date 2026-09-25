@@ -497,6 +497,28 @@
             <key>Value</key>
             <string>nonstrict</string>
         </map>
+        <key>ALScriptLuauSolver</key>
+        <map>
+            <key>Comment</key>
+            <string>Which of Luau's two type solvers Script Studio checks SLua scripts with: "old" or "new".</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>String</string>
+            <key>Value</key>
+            <string>old</string>
+        </map>
+        <key>ALScriptLuauCheckSeconds</key>
+        <map>
+            <key>Comment</key>
+            <string>The longest one type check of an SLua script may take, in seconds, before it stops and what it found by then is shown; 0 for as long as it takes. Every script is checked on one thread, so a script that takes long to check holds up the rest.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>5.0</real>
+        </map>
         <key>ALScriptStudioAutoComplete</key>
         <map>
             <key>Comment</key>

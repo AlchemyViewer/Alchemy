@@ -36,6 +36,7 @@
 #include "Luau/AstQuery.h"
 #include "Luau/Autocomplete.h"
 #include "Luau/BuiltinDefinitions.h"
+#include "Luau/Cancellation.h"
 #include "Luau/ConfigResolver.h"
 #include "Luau/Error.h"
 #include "Luau/FileResolver.h"
@@ -936,6 +937,15 @@ struct ALLuauService::Impl
     ModeResolver                    configs;
     std::unique_ptr<Luau::Frontend> frontend;
     bool                            definitions = false;
+    // The solver the front end was built for, and the definitions it was
+    // given, which a front end built for the other is given again.
+    Luau::SolverMode                solver = Luau::SolverMode::Old;
+    std::string                     definitionsSource;
+    // How long a type check may take, 0 for as long as it takes; what
+    // stops one early; and whether the last question was stopped.
+    double                          timeLimit = 0.0;
+    Stop                            stop;
+    bool                            wasStopped = false;
 
     struct Doc
     {
@@ -966,8 +976,23 @@ struct ALLuauService::Impl
     // the dearest thing here. Strict, whatever the script's own mode, so
     // that what a query reads -- every local's type, which nonstrict
     // mode does not work out -- is the same whichever came first.
+    // A check's options, held to the time limit and watching the stop.
+    Luau::FrontendOptions limited() const
+    {
+        Luau::FrontendOptions options = frontendOptions();
+        if (timeLimit > 0.0)
+        {
+            options.moduleTimeLimitSec = timeLimit;
+        }
+        options.cancellationToken = stop;
+        return options;
+    }
+
+    bool stopRequested() const { return stop && stop->requested(); }
+
     void checked(std::string_view source, bool for_autocomplete)
     {
+        wasStopped = false;
         Checked& was = for_autocomplete ? autocomplete : plain;
         if (was.valid && was.strict && was.text == source && frontend->getSourceModule(SCRIPT_MODULE))
         {
@@ -978,7 +1003,7 @@ struct ALLuauService::Impl
             files.text.assign(source);
         }
         frontend->markDirty(SCRIPT_MODULE);
-        Luau::FrontendOptions options = frontendOptions();
+        Luau::FrontendOptions options = limited();
         options.runLintChecks         = false;
         if (for_autocomplete)
         {
@@ -989,6 +1014,13 @@ struct ALLuauService::Impl
         configs.config.mode = configs.checkMode;
         ++checks;
         (for_autocomplete ? plain : autocomplete).valid = false;
+        // Stopped, the module is part of one: not kept as the text's.
+        if (stopRequested())
+        {
+            wasStopped = true;
+            was.valid  = false;
+            return;
+        }
         was.text   = std::string(source);
         was.strict = true;
         was.valid  = true;
@@ -1016,9 +1048,9 @@ struct ALLuauService::Impl
     // takes nothing more.
     // Autocomplete type-checks against a global scope of its own, so the
     // builtins and the definitions go into both.
-    static std::unique_ptr<Luau::Frontend> plainFrontend(ScriptResolver& files, ModeResolver& configs)
+    static std::unique_ptr<Luau::Frontend> plainFrontend(ScriptResolver& files, ModeResolver& configs, Luau::SolverMode solver)
     {
-        auto frontend = std::make_unique<Luau::Frontend>(&files, &configs, frontendOptions());
+        auto frontend = std::make_unique<Luau::Frontend>(solver, &files, &configs, frontendOptions());
         Luau::registerBuiltinGlobals(*frontend, frontend->globals);
         Luau::registerBuiltinGlobals(*frontend, frontend->globalsForAutocomplete, /*typeCheckForAutocomplete*/ true);
         return frontend;
@@ -1031,7 +1063,7 @@ ALLuauService::ALLuauService()
     // A type in a message is a glance, not a listing: `ll` has hundreds
     // of fields, and an error naming it must not print them all.
     FInt::LuauTableTypeMaximumStringifierLength.value = 8;
-    mImpl->frontend = Impl::plainFrontend(mImpl->files, mImpl->configs);
+    mImpl->frontend = Impl::plainFrontend(mImpl->files, mImpl->configs, mImpl->solver);
     Luau::freeze(mImpl->frontend->globals.globalTypes);
     Luau::freeze(mImpl->frontend->globalsForAutocomplete.globalTypes);
 }
@@ -1040,7 +1072,7 @@ ALLuauService::~ALLuauService() = default;
 
 bool ALLuauService::loadDefinitions(std::string_view source, std::string& error)
 {
-    std::unique_ptr<Luau::Frontend> frontend = Impl::plainFrontend(mImpl->files, mImpl->configs);
+    std::unique_ptr<Luau::Frontend> frontend = Impl::plainFrontend(mImpl->files, mImpl->configs, mImpl->solver);
     Luau::LoadDefinitionFileResult loaded = frontend->loadDefinitionFile(
         frontend->globals, frontend->globals.globalScope, source, DEFINITIONS_PACKAGE, /*captureComments*/ false);
     if (!loaded.success)
@@ -1074,11 +1106,71 @@ bool ALLuauService::loadDefinitions(std::string_view source, std::string& error)
     }
     Luau::freeze(frontend->globals.globalTypes);
     Luau::freeze(frontend->globalsForAutocomplete.globalTypes);
-    mImpl->frontend    = std::move(frontend);
-    mImpl->definitions = true;
+    mImpl->frontend          = std::move(frontend);
+    mImpl->definitions       = true;
+    mImpl->definitionsSource = std::string(source);
     mImpl->forgetChecks();
     error.clear();
     return true;
+}
+
+bool ALLuauService::setNewSolver(bool use, std::string& error)
+{
+    error.clear();
+    const Luau::SolverMode solver = use ? Luau::SolverMode::New : Luau::SolverMode::Old;
+    if (solver == mImpl->solver)
+    {
+        return true;
+    }
+    mImpl->solver = solver;
+    const std::string source = mImpl->definitionsSource;
+    if (!source.empty() && loadDefinitions(source, error))
+    {
+        return true;
+    }
+    // Nothing to load, or it did not load for this solver: Luau's own
+    // globals alone, in a front end for the solver asked for.
+    mImpl->frontend    = Impl::plainFrontend(mImpl->files, mImpl->configs, mImpl->solver);
+    Luau::freeze(mImpl->frontend->globals.globalTypes);
+    Luau::freeze(mImpl->frontend->globalsForAutocomplete.globalTypes);
+    mImpl->definitions = false;
+    mImpl->forgetChecks();
+    return source.empty();
+}
+
+bool ALLuauService::newSolver() const
+{
+    return mImpl->solver == Luau::SolverMode::New;
+}
+
+void ALLuauService::setTimeLimit(double seconds)
+{
+    mImpl->timeLimit = std::max(0.0, seconds);
+}
+
+// static
+ALLuauService::Stop ALLuauService::newStop()
+{
+    return std::make_shared<Luau::FrontendCancellationToken>();
+}
+
+// static
+void ALLuauService::cancel(const Stop& stop)
+{
+    if (stop)
+    {
+        stop->cancel();
+    }
+}
+
+void ALLuauService::setStop(Stop stop)
+{
+    mImpl->stop = std::move(stop);
+}
+
+bool ALLuauService::stopped() const
+{
+    return mImpl->wasStopped;
 }
 
 size_t ALLuauService::typeChecks() const
@@ -1146,28 +1238,94 @@ void ALLuauService::setConfig(const ALLuauConfig& config)
 ALScriptProblems ALLuauService::check(std::string_view source)
 {
     Impl& impl = *mImpl;
+    impl.wasStopped = false;
     impl.files.text.assign(source);
     impl.frontend->markDirty(SCRIPT_MODULE);
     impl.configs.config.mode = impl.configs.checkMode;
-    Luau::CheckResult result = impl.frontend->check(SCRIPT_MODULE);
+    Luau::CheckResult result = impl.frontend->check(SCRIPT_MODULE, impl.limited());
     ++impl.checks;
     // The module is the script's own mode's now: a query's is checked
     // again, strict, unless that is the script's mode too.
     impl.forgetChecks();
+    if (impl.stopRequested())
+    {
+        // Stopped part way: Luau keeps none of what it found, and the
+        // module is not the text's.
+        impl.wasStopped = true;
+        return ALScriptProblems();
+    }
     impl.plain.text   = std::string(source);
     impl.plain.strict = impl.configs.checkMode == Luau::Mode::Strict;
     impl.plain.valid  = true;
 
     ALScriptProblems problems;
+    if (!result.timeoutHits.empty())
+    {
+        // Past the time limit: what was found before it, and that there
+        // may be more.
+        const std::vector<std::string> args{ llformat("%g", impl.timeLimit) };
+        problems.push_back(problemAt(Luau::Location(Luau::Position(0, 0), Luau::Position(0, 0)), ALScriptProblem::Severity::Warning,
+                                     ALScriptProblem::Source::Types, std::string(),
+                                     ALScriptProblem::fill("Type checking stopped after [1] seconds; what it found before then is shown", args)));
+        problems.back().key  = "LuauCheckTimedOut";
+        problems.back().args = args;
+    }
     problems.reserve(result.errors.size() + result.lintResult.errors.size() + result.lintResult.warnings.size());
     const Luau::SourceModule* module_source = impl.frontend->getSourceModule(SCRIPT_MODULE);
+    const Luau::ModulePtr     module        = impl.frontend->moduleResolver.getModule(SCRIPT_MODULE);
+    // The call a count of its arguments is about.
+    const auto call_at = [&module_source](const Luau::Location& where) -> Luau::AstExprCall* {
+        if (!module_source || !module_source->root)
+        {
+            return nullptr;
+        }
+        const std::vector<Luau::AstNode*> ancestry = Luau::findAstAncestryOfPosition(*module_source, where.begin);
+        for (auto it = ancestry.rbegin(); it != ancestry.rend(); ++it)
+        {
+            if (Luau::AstExprCall* call = (*it)->as<Luau::AstExprCall>(); call && call->location.encloses(where))
+            {
+                return call;
+            }
+        }
+        return nullptr;
+    };
     for (const Luau::TypeError& error : result.errors)
     {
         const bool               syntax  = Luau::get_if<Luau::SyntaxError>(&error.data) != nullptr;
         std::string              message = Luau::toString(error);
         std::string              key;
         std::vector<std::string> args;
-        if (const Luau::UnknownProperty* unknown = Luau::get_if<Luau::UnknownProperty>(&error.data))
+        Luau::Location           where = error.location;
+        const Luau::CountMismatch* count = Luau::get_if<Luau::CountMismatch>(&error.data);
+        Luau::AstExprCall* counted = count && count->context == Luau::CountMismatch::Arg ? call_at(error.location) : nullptr;
+        const Luau::TypeId* callee = counted && module ? module->astTypes.find(counted->func) : nullptr;
+        const Luau::FunctionType* function = callee ? functionOf(*callee) : nullptr;
+        if (counted && function && !counted->self && counted->func->is<Luau::AstExprIndexName>() && count->actual < count->expected &&
+            !function->argNames.empty() && function->argNames[0] && function->argNames[0]->name == "self")
+        {
+            // A method called with a dot, one short: the new solver counts
+            // what the old says is a missing self, and it is the same
+            // mistake, with the same fix.
+            key     = "LuauRequiresSelf";
+            message = "This function must be called with self. Did you mean to use a colon instead of a dot?";
+            where   = counted->location;
+        }
+        else if (counted && count->function.empty() && !nameOf(counted->func).empty())
+        {
+            // A count with no function named, which the new solver says of
+            // a function it has no name for: named by what the script
+            // calls it, and so said in the words the map has.
+            Luau::CountMismatch named = *count;
+            named.function            = nameOf(counted->func);
+            message                   = Luau::toString(Luau::TypeError(error.location, error.moduleName, named));
+            ALMessageMap::Match known;
+            if (ALMessageMap::luauError(message, known))
+            {
+                key  = std::move(known.key);
+                args = std::move(known.args);
+            }
+        }
+        else if (const Luau::UnknownProperty* unknown = Luau::get_if<Luau::UnknownProperty>(&error.data))
         {
             // Named by what was written -- `ll`, not the table's fields --
             // with the nearest key there is, which is usually the one meant.
@@ -1204,7 +1362,7 @@ ALScriptProblems ALLuauService::check(std::string_view source)
                 args = std::move(known.args);
             }
         }
-        problems.push_back(problemAt(error.location,
+        problems.push_back(problemAt(where,
                                      ALScriptProblem::Severity::Error,
                                      syntax ? ALScriptProblem::Source::Parser : ALScriptProblem::Source::Types,
                                      std::string(),
@@ -1540,7 +1698,10 @@ ALScriptSignature ALLuauService::signature(std::string_view source, S32 line, S3
         parameter += typeText(arg_types[i]);
         answer.parameters.push_back(std::move(parameter));
     }
-    if (tail)
+    // A tail that takes more, where the function does: not a hidden one,
+    // which the new solver gives a function the script wrote, nor none.
+    const Luau::VariadicTypePack* variadic = tail ? Luau::get<Luau::VariadicTypePack>(Luau::follow(*tail)) : nullptr;
+    if (tail && !Luau::isEmpty(*tail) && !(variadic && variadic->hidden))
     {
         answer.parameters.push_back("..." + Luau::toString(*tail));
     }
