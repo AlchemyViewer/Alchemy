@@ -36,6 +36,7 @@
 #include "alscriptstudiorecovery.h"
 #include "alscriptstudiosaving.h"
 #include "alscriptstudiovim.h"
+#include "alscriptexternaleditor.h"
 #include "alfindings.h"
 #include "aloutputview.h"
 #include "alscriptanalysis.h"
@@ -98,7 +99,8 @@ class LLViewerObject;
 // out as any studio's do.
 class ALFloaterScriptStudio final : public ALStudioFloater, public ALScriptStudioServices, public ALScriptOutputPane::Window, public ALScriptProblemsPane::Window,
                                     public ALScriptSearchPane::Window, public ALScriptExplorerPane::Window, public ALScriptStudioRecovery::Window,
-                                    public ALScriptStudioSaving::Window, public ALScriptStudioVim::Window
+                                    public ALScriptStudioSaving::Window, public ALScriptStudioVim::Window,
+                                    public ALScriptExternalEditor::Window
 {
     friend class LLFloaterReg;
 
@@ -448,7 +450,7 @@ private:
     void                          fileSettled(Doc& doc);
     // The file watched for changes made outside the studio: taken in
     // where the editor is clean, told of where it is not.
-    void                          watchFile(Doc& doc);
+    void                          watchFile(Doc& doc) override;
     void                          fileChangedOutside(const std::string& id, const std::string& file);
     // A file chosen from disk, opened in a tab of its own.
     void                          openFileFromDisk();
@@ -599,25 +601,18 @@ private:
     void askNewName(Doc& doc);
     void renameTo(const std::string& id, U32 generation, const std::string& new_name);
     void applyPendingEdits(Doc& doc) override;
-    // The script handed to an external editor: written to a file under
-    // the temp folder and watched, so that the editor's saves are taken
-    // as the text and saved from here; the bridge told, so that VS Code
-    // can subscribe to it and hear the compiler; and the editor launched
-    // -- VS Code itself under tight integration, else the command the
-    // ExternalEditor setting gives. A save made here writes the file
-    // again, and what the compiler says goes in a log beside it, as the
-    // old editor did. Closing the tab ends it.
-    void               editExternally(Doc& doc);
-    // `settled` where the file was seen empty and is asked about again, to
-    // take it as empty if it still is.
-    void               externalChanged(const std::string& id, const std::string& file, bool settled = false);
-    void               syncExternal(Doc& doc) override;
-    // What the external editor saved, put in as one step to undo and
-    // saved from here.
-    void               takeExternal(Doc& doc, const std::string& text);
-    void               logExternal(Doc& doc, const ALScriptWorkspace::CompileResult& result) override;
-    void               stopExternal(Doc& doc);
-    static std::string externalFileName(const Doc& doc);
+    // The script handed to an external editor (ALScriptExternalEditor):
+    // saving's calls to it, a save from outside run here, and the bridge
+    // and the editor's launch, which are the window's -- VS Code itself
+    // under tight integration, else the command the ExternalEditor setting
+    // gives.
+    void        syncExternal(Doc& doc) override { mExternal.sync(doc); }
+    void        logExternal(Doc& doc, const ALScriptWorkspace::CompileResult& result) override { mExternal.log(doc, result); }
+    void        save(Doc& doc) override;
+    std::string bridgeId(const Doc& doc) const override;
+    bool        subscribe(Doc& doc) override;
+    void        unsubscribe(const Doc& doc) override;
+    void        startEditor(Doc& doc, const std::string& file, bool on_disk) override;
     // The places last found, whichever tab is in front: following them
     // opens other scripts, and the list stays what it was.
     void fillReferences();
@@ -1146,6 +1141,8 @@ private:
     ALScriptStudioSaving               mSaving{ *this, *this };
     // The window's side of vim, over its editors.
     ALScriptStudioVim                  mVim{ *this, mCommands, *this };
+    // Its tabs held open in an editor outside.
+    ALScriptExternalEditor             mExternal{ *this, *this };
     LLHandle<LLContextMenu>            mTabMenuHandle;
     bool                               mMain = true;
     // Whose path the bar at the bottom shows, so that a tab come to the

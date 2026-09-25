@@ -1,6 +1,6 @@
 /**
  * @file alscriptexternaleditor.cpp
- * @brief Script Studio's scripts held open in an editor outside the viewer: the copy it is given, its saves taken, the compiler's words beside it.
+ * @brief Script Studio's scripts held open in an editor outside the viewer: the copy it is given, its saves taken.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -24,17 +24,14 @@
 
 #include "llviewerprecompiledheaders.h"
 
-#include "alfloaterscriptstudio.h"
+#include "alscriptexternaleditor.h"
 
 #include "alscriptstudiofileio.h"
+#include "alscriptstudioservices.h"
 #include "llcallbacklist.h"
-#include "llexternaleditor.h"
+#include "llfile.h"
 #include "lllogchat.h"
-#include "llnotificationsutil.h"
-#include "llscripteditorws.h"
 #include "lltrans.h"
-#include "llviewerobject.h"
-#include "llviewerobjectlist.h"
 
 #include <algorithm>
 #include <set>
@@ -42,8 +39,6 @@
 using ALScriptFileIO::readWholeFile;
 using ALScriptFileIO::StudioLiveFile;
 using ALScriptFileIO::writeTempFile;
-
-// --- an editor outside ----------------------------------------------------------------
 
 namespace
 {
@@ -54,8 +49,12 @@ namespace
     }
 }
 
-// static
-std::string ALFloaterScriptStudio::externalFileName(const Doc& doc)
+ALScriptExternalEditor::ALScriptExternalEditor(ALScriptStudioServices& services, Window& window)
+    : mServices(services), mWindow(window)
+{
+}
+
+std::string ALScriptExternalEditor::fileName(const Doc& doc) const
 {
     // As the old editor named it, so that the bridge's script.list and
     // whoever reads the temp folder find the same file: the name
@@ -64,12 +63,12 @@ std::string ALFloaterScriptStudio::externalFileName(const Doc& doc)
     static const std::set<char> forbidden{ '<', '>', ':', '"', '\\', '/', '|', '?', '*' };
     std::string                 name = doc.name;
     name.erase(std::remove_if(name.begin(), name.end(), [](char c) { return forbidden.count(c) > 0; }), name.end());
-    const std::string hash      = LLScriptEditorWSServer::buildScriptSubscriptionId(doc.ref.object, doc.ref.item);
+    const std::string hash      = mWindow.bridgeId(doc);
     const std::string extension = doc.language.lua ? ".luau" : ".lsl";
     return std::string(LLFile::tmpdir()) + "sl_script_" + (name.empty() ? std::string() : name + "_") + hash + extension;
 }
 
-void ALFloaterScriptStudio::editExternally(Doc& doc)
+void ALScriptExternalEditor::edit(Doc& doc)
 {
     if (!doc.loaded || !doc.modifiable || doc.notecard)
     {
@@ -80,100 +79,63 @@ void ALFloaterScriptStudio::editExternally(Doc& doc)
     // The file, written afresh -- the editor may have been closed on an
     // old one -- and watched. A file on disk is edited where it is.
     const bool        on_disk  = !doc.file.empty();
-    const std::string filename = on_disk ? doc.file : externalFileName(doc);
+    const std::string filename = on_disk ? doc.file : fileName(doc);
     if (!on_disk && !writeWhole(filename, doc.editor->text()))
     {
         args["[FILE]"] = filename;
-        report(getString("ExternalWriteFailed", args), true, &doc);
+        mServices.report(mServices.words("ExternalWriteFailed", args), true, &doc);
         return;
     }
-    doc.externalWritten = doc.editor->text();
-    doc.externalWaiting.reset();
+    Doc::External& external = doc.external;
+    external.written        = doc.editor->text();
+    external.waiting.reset();
     if (on_disk)
     {
         // Watched since it was opened; a save there comes in as any
         // outside change does.
-        watchFile(doc);
+        mWindow.watchFile(doc);
     }
-    else if (!doc.liveFile || doc.liveFile->path() != filename)
+    else if (!external.watch || external.watch->path() != filename)
     {
         // Watched from what was just written, which is no save of the
         // editor's: a tab with unsaved changes is not saved for being
         // opened outside.
-        doc.liveFile.reset();
-        const LLHandle<LLFloater> handle = getHandle();
-        const std::string         id     = doc.id;
-        doc.liveFile                     = std::make_unique<StudioLiveFile>(
+        external.watch.reset();
+        const std::weak_ptr<bool> alive = mAlive;
+        const std::string         id    = doc.id;
+        external.watch                  = std::make_unique<StudioLiveFile>(
             filename,
-            [handle, id](const std::string& file) {
-                if (ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get()))
+            [this, alive, id](const std::string& file) {
+                if (alive.lock())
                 {
-                    studio->externalChanged(id, file);
+                    changed(id, file);
                 }
             },
             true);
     }
     else
     {
-        doc.liveFile->seen();
+        external.watch->seen();
     }
-    doc.liveLog = on_disk ? std::string() : filename + ".log";
+    external.log = on_disk ? std::string() : filename + ".log";
 
     // The bridge, so that VS Code can subscribe to the script and hear
     // what the compiler says of it; a file on disk is nothing to it.
-    const bool                       tight  = !on_disk && LLScriptEditorWSServer::isTightIntegration();
-    LLScriptEditorWSServer::ptr_t    server = !on_disk && LLScriptEditorWSServer::isEnabled() ? LLScriptEditorWSServer::ensureServerRunning() : nullptr;
-    if (server)
+    if (!on_disk)
     {
-        const std::string script_id = LLScriptEditorWSServer::buildScriptSubscriptionId(doc.ref.object, doc.ref.item);
-        doc.subscribed = server->subscribeScriptEditor(doc.ref.object, doc.ref.item, doc.name, getHandle(), script_id, doc.language.lua);
+        external.subscribed = mWindow.subscribe(doc);
     }
-    if (tight)
-    {
-        if (!server)
-        {
-            LLNotificationsUtil::add("GenericAlert", LLSD().with("MESSAGE", LLTrans::getString("ExternalEditorFailedToStart")));
-            return;
-        }
-        LLUUID root_id;
-        if (LLViewerObject* object = doc.ref.inInventory() ? nullptr : gObjectList.findObject(doc.ref.object))
-        {
-            root_id = object->getRootEdit() ? object->getRootEdit()->getID() : object->getID();
-        }
-        if (!LLScriptEditorWSServer::launchVSCode(root_id, doc.ref.item))
-        {
-            LLNotificationsUtil::add("GenericAlert", LLSD().with("MESSAGE", LLTrans::getString("VSCodeLaunchFailed")));
-            return;
-        }
-        report(getString("ExternalOpenedVSCode", args), false, &doc);
-        return;
-    }
-    LLExternalEditor             editor;
-    LLExternalEditor::EErrorCode status = editor.setCommand("LL_SCRIPT_EDITOR");
-    if (status != LLExternalEditor::EC_SUCCESS)
-    {
-        const std::string message = status == LLExternalEditor::EC_NOT_SPECIFIED ? LLTrans::getString("ExternalEditorNotSet")
-                                                                                   : LLExternalEditor::getErrorMessage(status);
-        LLNotificationsUtil::add("GenericAlert", LLSD().with("MESSAGE", message));
-        return;
-    }
-    status = editor.run(filename, doc.editor->caret().line + 1);
-    if (status != LLExternalEditor::EC_SUCCESS)
-    {
-        LLNotificationsUtil::add("GenericAlert", LLSD().with("MESSAGE", LLExternalEditor::getErrorMessage(status)));
-        return;
-    }
-    report(getString("ExternalOpened", args), false, &doc);
+    mWindow.startEditor(doc, filename, on_disk);
 }
 
-void ALFloaterScriptStudio::externalChanged(const std::string& id, const std::string& file, bool settled)
+void ALScriptExternalEditor::changed(const std::string& id, const std::string& file, bool settled)
 {
-    const size_t index = indexOf(id);
-    if (index == NONE)
+    Doc* found = mServices.findDoc(id);
+    if (!found)
     {
         return;
     }
-    Doc& doc = *mDocs[index];
+    Doc& doc = *found;
     if (!doc.loaded || !doc.modifiable)
     {
         return;
@@ -190,7 +152,7 @@ void ALFloaterScriptStudio::externalChanged(const std::string& id, const std::st
     {
         text.clear();
     }
-    if (settled && text == doc.externalWritten)
+    if (settled && text == doc.external.written)
     {
         // Emptied as the first of an editor's two steps, and the second
         // heard and taken since: nothing more to take, nor to save again.
@@ -202,12 +164,12 @@ void ALFloaterScriptStudio::externalChanged(const std::string& id, const std::st
         // if it is still empty a moment later, which a save in two steps
         // is not.
         constexpr F32             SETTLE = 1.5f;
-        const LLHandle<LLFloater> handle = getHandle();
+        const std::weak_ptr<bool> alive  = mAlive;
         doAfterInterval(
-            [handle, id, file]() {
-                if (ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get()))
+            [this, alive, id, file]() {
+                if (alive.lock())
                 {
-                    studio->externalChanged(id, file, true);
+                    changed(id, file, true);
                 }
             },
             SETTLE);
@@ -216,44 +178,44 @@ void ALFloaterScriptStudio::externalChanged(const std::string& id, const std::st
     // Changed here since the copy was written, and changed there too: one
     // of them would be lost, so the author is asked which, rather than
     // what was typed here left a step back in the undo.
-    if (text != doc.editor->text() && doc.editor->text() != doc.externalWritten && text != doc.externalWritten)
+    if (text != doc.editor->text() && doc.editor->text() != doc.external.written && text != doc.external.written)
     {
-        doc.externalWaiting = text;
+        doc.external.waiting = text;
         LLStringUtil::format_map_t args;
         args["[NAME]"] = doc.name;
-        report(getString("ExternalConflict", args), true, &doc, { "take_external", "keep_here" });
+        mServices.report(mServices.words("ExternalConflict", args), true, &doc, { "take_external", "keep_here" });
         return;
     }
-    takeExternal(doc, text);
+    take(doc, text);
 }
 
-void ALFloaterScriptStudio::takeExternal(Doc& doc, const std::string& text)
+void ALScriptExternalEditor::take(Doc& doc, const std::string& text)
 {
-    doc.externalWaiting.reset();
-    doc.externalWritten = text;
+    doc.external.waiting.reset();
+    doc.external.written = text;
     if (text != doc.editor->text())
     {
         // The editor's text, as one step to undo; then saved from here,
         // over whatever a check finds, since the editor outside is where
         // the author is looking.
         doc.carriedText = text;
-        takeCarriedText(doc);
+        mWindow.takeCarriedText(doc);
     }
     if (!doc.editor->isDirty() && doc.assetId.notNull())
     {
         return;
     }
     doc.save.fromExternal(doc.editor->document().version());
-    mSaving.save(doc);
+    mWindow.save(doc);
 }
 
-void ALFloaterScriptStudio::syncExternal(Doc& doc)
+void ALScriptExternalEditor::sync(Doc& doc)
 {
-    if (!doc.liveFile)
+    if (!doc.external.watch)
     {
         return;
     }
-    const std::string filename = doc.liveFile->path();
+    const std::string filename = doc.external.watch->path();
     if (!gDirUtilp->fileExists(filename))
     {
         return;
@@ -262,19 +224,19 @@ void ALFloaterScriptStudio::syncExternal(Doc& doc)
     // was sent, and a file written again under an editor that has it open
     // reads to that editor as changed.
     const std::string text = doc.editor->text();
-    doc.externalWritten    = text;
+    doc.external.written   = text;
     std::string       held;
     if (readWholeFile(filename, held) && (held == text || (text.empty() && held == " ")))
     {
         return;
     }
     writeWhole(filename, text);
-    doc.liveFile->seen();
+    doc.external.watch->seen();
 }
 
-void ALFloaterScriptStudio::logExternal(Doc& doc, const ALScriptWorkspace::CompileResult& result)
+void ALScriptExternalEditor::log(Doc& doc, const ALScriptWorkspace::CompileResult& result)
 {
-    if (doc.liveLog.empty())
+    if (doc.external.log.empty())
     {
         return;
     }
@@ -291,26 +253,21 @@ void ALFloaterScriptStudio::logExternal(Doc& doc, const ALScriptWorkspace::Compi
         LLStringUtil::stripNonprintable(line);
         text += line + "\n";
     }
-    writeTempFile(doc.liveLog, text);
+    writeTempFile(doc.external.log, text);
 }
 
-void ALFloaterScriptStudio::stopExternal(Doc& doc)
+void ALScriptExternalEditor::stop(Doc& doc)
 {
-    if (doc.subscribed)
+    if (doc.external.subscribed)
     {
-        if (LLScriptEditorWSServer::ptr_t server = LLScriptEditorWSServer::getServer())
-        {
-            const std::string script_id = LLScriptEditorWSServer::buildScriptSubscriptionId(doc.ref.object, doc.ref.item);
-            server->sendUnsubscribeScriptEditor(script_id);
-            server->unsubscribeEditor(script_id);
-        }
-        doc.subscribed = false;
+        mWindow.unsubscribe(doc);
+        doc.external.subscribed = false;
     }
-    doc.liveFile.reset();
-    if (!doc.liveLog.empty())
+    doc.external.watch.reset();
+    if (!doc.external.log.empty())
     {
-        LLFile::remove(doc.liveLog);
-        doc.liveLog.clear();
+        LLFile::remove(doc.external.log);
+        doc.external.log.clear();
     }
     doc.save.endExternal();
 }

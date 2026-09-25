@@ -6513,9 +6513,79 @@ void ALFloaterScriptStudio::applyPendingEdits(Doc& doc)
     }
 }
 
+void ALFloaterScriptStudio::save(Doc& doc)
+{
+    mSaving.save(doc);
+}
+
+std::string ALFloaterScriptStudio::bridgeId(const Doc& doc) const
+{
+    return LLScriptEditorWSServer::buildScriptSubscriptionId(doc.ref.object, doc.ref.item);
+}
+
+bool ALFloaterScriptStudio::subscribe(Doc& doc)
+{
+    LLScriptEditorWSServer::ptr_t server = LLScriptEditorWSServer::isEnabled() ? LLScriptEditorWSServer::ensureServerRunning() : nullptr;
+    return server && server->subscribeScriptEditor(doc.ref.object, doc.ref.item, doc.name, getHandle(), bridgeId(doc), doc.language.lua);
+}
+
+void ALFloaterScriptStudio::unsubscribe(const Doc& doc)
+{
+    if (LLScriptEditorWSServer::ptr_t server = LLScriptEditorWSServer::getServer())
+    {
+        const std::string script_id = bridgeId(doc);
+        server->sendUnsubscribeScriptEditor(script_id);
+        server->unsubscribeEditor(script_id);
+    }
+}
+
+void ALFloaterScriptStudio::startEditor(Doc& doc, const std::string& filename, bool on_disk)
+{
+    LLStringUtil::format_map_t args;
+    args["[NAME]"] = doc.name;
+    if (!on_disk && LLScriptEditorWSServer::isTightIntegration())
+    {
+        // VS Code itself, which subscribes over the bridge the copy was
+        // told to.
+        if (!LLScriptEditorWSServer::isEnabled() || !LLScriptEditorWSServer::getServer())
+        {
+            LLNotificationsUtil::add("GenericAlert", LLSD().with("MESSAGE", LLTrans::getString("ExternalEditorFailedToStart")));
+            return;
+        }
+        LLUUID root_id;
+        if (LLViewerObject* object = doc.ref.inInventory() ? nullptr : gObjectList.findObject(doc.ref.object))
+        {
+            root_id = object->getRootEdit() ? object->getRootEdit()->getID() : object->getID();
+        }
+        if (!LLScriptEditorWSServer::launchVSCode(root_id, doc.ref.item))
+        {
+            LLNotificationsUtil::add("GenericAlert", LLSD().with("MESSAGE", LLTrans::getString("VSCodeLaunchFailed")));
+            return;
+        }
+        report(getString("ExternalOpenedVSCode", args), false, &doc);
+        return;
+    }
+    LLExternalEditor             editor;
+    LLExternalEditor::EErrorCode status = editor.setCommand("LL_SCRIPT_EDITOR");
+    if (status != LLExternalEditor::EC_SUCCESS)
+    {
+        const std::string message = status == LLExternalEditor::EC_NOT_SPECIFIED ? LLTrans::getString("ExternalEditorNotSet")
+                                                                                   : LLExternalEditor::getErrorMessage(status);
+        LLNotificationsUtil::add("GenericAlert", LLSD().with("MESSAGE", message));
+        return;
+    }
+    status = editor.run(filename, doc.editor->caret().line + 1);
+    if (status != LLExternalEditor::EC_SUCCESS)
+    {
+        LLNotificationsUtil::add("GenericAlert", LLSD().with("MESSAGE", LLExternalEditor::getErrorMessage(status)));
+        return;
+    }
+    report(getString("ExternalOpened", args), false, &doc);
+}
+
 void ALFloaterScriptStudio::watchFile(Doc& doc)
 {
-    if (doc.file.empty() || doc.liveFile)
+    if (doc.file.empty() || doc.external.watch)
     {
         return;
     }
@@ -6523,7 +6593,7 @@ void ALFloaterScriptStudio::watchFile(Doc& doc)
     // editor the studio started, or anything else.
     const LLHandle<LLFloater> handle = getHandle();
     const std::string         id     = doc.id;
-    doc.liveFile                     = std::make_unique<StudioLiveFile>(
+    doc.external.watch               = std::make_unique<StudioLiveFile>(
         doc.file,
         [handle, id](const std::string& file) {
             if (ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get()))
@@ -6606,10 +6676,10 @@ void ALFloaterScriptStudio::saveFile(Doc& doc)
         mSaving.stopped(doc);
         return;
     }
-    if (doc.liveFile)
+    if (doc.external.watch)
     {
         // The watcher on the file: this write is not an outside change.
-        doc.liveFile->seen();
+        doc.external.watch->seen();
     }
     report(getString("SavedToFile", args), false, &doc);
     fileSettled(doc);
@@ -9833,16 +9903,16 @@ void ALFloaterScriptStudio::outputAction(Doc& doc, const std::string& action)
     {
         saveToFile();
     }
-    else if (action == "take_external" && doc.externalWaiting)
+    else if (action == "take_external" && doc.external.waiting)
     {
         // What was typed here a step back in the undo.
-        takeExternal(doc, *doc.externalWaiting);
+        mExternal.take(doc, *doc.external.waiting);
     }
-    else if (action == "keep_here" && doc.externalWaiting)
+    else if (action == "keep_here" && doc.external.waiting)
     {
         // The external editor's save not sent; its copy is written from
         // here at the next save.
-        doc.externalWaiting.reset();
+        doc.external.waiting.reset();
         LLStringUtil::format_map_t args;
         args["[NAME]"] = doc.name;
         setStatus(getString("ExternalKept", args));
@@ -10195,7 +10265,7 @@ void ALFloaterScriptStudio::letGoOf(size_t index, bool keep)
             }
             store->letGo(parting);
         }
-        stopExternal(doc);
+        mExternal.stop(doc);
         mProblemsPane->closed(doc.id);
         if (doc.id == mFound.from)
         {
@@ -10346,7 +10416,7 @@ void ALFloaterScriptStudio::addFileCommands()
         [this]() {
             if (Doc* doc = active())
             {
-                editExternally(*doc);
+                mExternal.edit(*doc);
             }
         },
         [this]() {
@@ -11289,7 +11359,7 @@ void ALFloaterScriptStudio::fileChosenToSaveAs(const std::string& id, const std:
     // it, watched for changes to it, its problems its own, and in the
     // language its name says.
     mProblemsPane->forget(doc->id);
-    doc->liveFile.reset();
+    doc->external.watch.reset();
     if (ALScriptRecoveryStore* store = ALScriptStudioRecovery::store(); store && !doc->recoveryKey.empty())
     {
         store->forget(doc->recoveryKey);

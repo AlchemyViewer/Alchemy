@@ -986,6 +986,7 @@ if(AL_BUILD_VIEWER)
     alscriptexplorermodel.h
     alscriptexplorerpane.h
     alscriptexplorertree.h
+    alscriptexternaleditor.h
     alfloaterscriptpreferences.h
     alscriptkeymap.h
     alscriptmodules.h
@@ -2519,6 +2520,21 @@ if(AL_BUILD_TESTS)
     PROJECT ${test_project}
     LIBRARIES llui alscript ${test_libs}
     SOURCES alscriptnotecardtab.cpp alscriptsaveflow.cpp alscriptstudiodoc.cpp
+    DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
+  )
+
+  # Script Studio's tabs held open in an editor outside, over the window's
+  # side faked: the copy, its saves taken or held, the log, letting go.
+  al_add_test(
+    alscriptexternaleditor
+    UNIT
+    PROJECT ${test_project}
+    LIBRARIES llui alscript ${test_libs}
+    SOURCES
+      alscriptnotecardtab.cpp
+      alscriptsaveflow.cpp
+      alscriptstudiodoc.cpp
+      alscriptstudiofileio.cpp
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
 

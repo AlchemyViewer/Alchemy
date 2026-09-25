@@ -615,7 +615,7 @@ void ALScriptStudioSaving::compiledHere(const ALScriptWorkspace::CompileResult& 
         doc.runtime.clear();
     }
     mWindow.refreshProblems(doc);
-    if (ours && doc.liveFile)
+    if (ours && doc.external.watch)
     {
         // The editor outside sees what was saved here, and what the
         // compiler made of it; its own save is not written back to it.

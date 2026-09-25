@@ -483,21 +483,27 @@ struct ALScriptStudioDoc
         bool         replace = false;
     };
     std::vector<PendingEdit>                   pendingEdits;
-    // The script held open in an external editor: the file under
-    // the temp folder the editor was given, watched for the editor's
-    // saves, and the log beside it the compiler's words go to;
-    // and whether the bridge was told, so that VS Code can subscribe.
+    // The script held open in an external editor (ALScriptExternalEditor).
     // Whether the save under way came from the editor, which does not
     // write the file back, is the save's (ALScriptSaveFlow::external).
-    std::unique_ptr<ALWatchedFile>             liveFile;
-    std::string                                liveLog;
-    bool                                       subscribed   = false;
-    // What the external editor's copy held when the studio last wrote
-    // it or read it: a save there over changes made here since is
-    // asked about rather than taken, the text it brought held in
-    // externalWaiting until the author says which.
-    std::string                                externalWritten;
-    std::optional<std::string>                 externalWaiting;
+    struct External
+    {
+        // The file under the temp folder the editor was given, watched
+        // for the editor's saves -- or the tab's file on disk, watched
+        // for changes made to it outside; and the log beside the copy the
+        // compiler's words go to.
+        std::unique_ptr<ALWatchedFile> watch;
+        std::string                    log;
+        // Whether the bridge was told, so that VS Code can subscribe.
+        bool                           subscribed = false;
+        // What the copy held when the studio last wrote it or read it: a
+        // save there over changes made here since is asked about rather
+        // than taken, the text it brought held in `waiting` until the
+        // author says which.
+        std::string                    written;
+        std::optional<std::string>     waiting;
+    };
+    External                                   external;
     // The crumb path the bar was last told, by the outline it was
     // read from: a caret that stays within the same symbols asks for
     // no new crumbs, and it is asked on every key.
