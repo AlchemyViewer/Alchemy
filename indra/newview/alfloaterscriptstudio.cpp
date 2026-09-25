@@ -5595,7 +5595,10 @@ void ALFloaterScriptStudio::compiledHere(const ALScriptWorkspace::CompileResult&
     if (!result.error.empty())
     {
         args["[ERROR]"] = result.error;
-        report(getString("SaveFailed", args), true, &doc, { "retry", "copy", "export" });
+        // The region would not say what experience it runs under: the box
+        // beside Save says so and offers what may be picked, which the
+        // next save sets.
+        report(getString(result.experienceUnknown ? "SaveExperienceUnknown" : "SaveFailed", args), true, &doc, { "retry", "copy", "export" });
         // What was asked for meanwhile would meet the same; Retry is offered.
         doc.saveAgain = false;
         if (ours)
@@ -5614,11 +5617,18 @@ void ALFloaterScriptStudio::compiledHere(const ALScriptWorkspace::CompileResult&
     {
         doc.editor->markSavedAt(doc.sentAt);
         doc.targetChosen = false;
-        // The experience it was sent with is the one it runs under now.
+        // The experience it was sent with is the one it runs under now:
+        // picked here, or asked of the region by the save itself where
+        // the box did not know it.
         if (doc.experienceChosen)
         {
             doc.experienceChosen = false;
             doc.experienceKnown  = true;
+        }
+        else if (result.experience && !doc.experienceKnown)
+        {
+            doc.experience      = *result.experience;
+            doc.experienceKnown = true;
         }
         keepSavedWeights(doc);
     }
@@ -16302,7 +16312,10 @@ void ALFloaterScriptStudio::refreshExperience()
     Doc*                       doc   = active();
     const bool                 task  = doc && doc->loaded && !doc->ref.inInventory() && !doc->notecard;
     const std::vector<LLUUID>& own   = ALScriptWorkspace::instance().ownExperiences();
-    const bool                 shown = task && (doc->experience.notNull() || !own.empty());
+    // And for one whose region would not say, since a save cannot go
+    // until it is known or picked.
+    const bool                 lost  = task && !doc->experienceKnown && !doc->experienceChosen && !doc->experienceAsking;
+    const bool                 shown = task && (doc->experience.notNull() || !own.empty() || lost);
     mExperience->setVisible(shown);
     // Its profile beside it, where it has one.
     mExperienceProfile->setVisible(shown && doc->experience.notNull());
@@ -16361,10 +16374,22 @@ void ALFloaterScriptStudio::refreshExperience()
     if (!known)
     {
         // Until the region says, nothing to pick from: a save meanwhile
-        // asks it again rather than say none.
+        // asks it again rather than say none. Where it would not say, what
+        // it runs under may be picked -- none, or one of the agent's --
+        // for the save to set, since a save that asks again may meet the
+        // same.
         mExperience->add(getString(doc->experienceAsking ? "ExperienceAsking" : "ExperienceUnknown"), LLSD("unknown"));
+        const bool pick = !doc->experienceAsking && doc->modifiable;
+        if (pick)
+        {
+            mExperience->add(getString("ExperienceNone"), LLSD("none"));
+            for (const auto& [label, id] : offered)
+            {
+                mExperience->add(label, LLSD(id.asString()));
+            }
+        }
         mExperience->setValue(LLSD("unknown"));
-        mExperience->setEnabled(false);
+        mExperience->setEnabled(pick);
         return;
     }
     const std::string current = doc->experience.isNull() ? std::string("none") : doc->experience.asString();
@@ -16385,9 +16410,11 @@ void ALFloaterScriptStudio::onExperience()
         return;
     }
     const std::string value   = mExperience->getValue().asString();
-    const std::string current = doc->experience.isNull() ? std::string("none") : doc->experience.asString();
+    const bool        known   = doc->experienceKnown || doc->experienceChosen;
+    const std::string current = !known ? std::string("unknown") : doc->experience.isNull() ? std::string("none") : doc->experience.asString();
     const LLUUID picked = value == "none" ? LLUUID::null : LLUUID(value);
-    if (value == "unknown" || picked == doc->experience || !doc->modifiable)
+    // Where it is not known, anything picked is a choice, none included.
+    if (value == "unknown" || (known && picked == doc->experience) || !doc->modifiable)
     {
         mExperience->setValue(LLSD(current));
         return;

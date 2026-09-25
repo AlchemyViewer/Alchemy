@@ -502,11 +502,12 @@ bool ALScriptWorkspace::save(const ALScriptRef& ref, const std::string& text, co
                     return;
                 }
             }
-            else
-            {
-                why = LLTrans::getString("WorkspaceExperienceUnknown");
-            }
             CompileResult result;
+            if (!experience)
+            {
+                why                      = LLTrans::getString("WorkspaceExperienceUnknown");
+                result.experienceUnknown = true;
+            }
             result.ref   = ref;
             result.error = why;
             deliver(result, callback);
@@ -528,12 +529,16 @@ bool ALScriptWorkspace::save(const ALScriptRef& ref, const std::string& text, co
         return false;
     }
     const bool lua = options.compileTarget == "luau";
-    auto answered  = [this, ref, lua, callback, running = options.running](const LLSD& response, const LLUUID& new_asset_id) {
+    auto answered  = [this, ref, lua, callback, running = options.running, experience = options.experience](const LLSD& response, const LLUUID& new_asset_id) {
         CompileResult result;
         result.ref        = ref;
         result.success    = response["compiled"].asBoolean();
         result.running    = running;
         result.newAssetId = new_asset_id;
+        if (!ref.inInventory())
+        {
+            result.experience = experience;
+        }
         for (LLSD::array_const_iterator it = response["errors"].beginArray(); it != response["errors"].endArray(); ++it)
         {
             result.messages.push_back(it->asString());

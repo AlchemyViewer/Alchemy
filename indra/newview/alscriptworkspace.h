@@ -167,8 +167,13 @@ public:
         std::vector<Diagnostic> diagnostics;
         // The server's lines as they came.
         std::vector<std::string> messages;
-        // Why nothing was compiled, where nothing was.
+        // Why nothing was compiled, where nothing was; and whether that was
+        // the region not saying what experience the script runs under.
         std::string error;
+        bool        experienceUnknown = false;
+        // Task scripts: the experience it was sent to run under -- the
+        // null one for none -- which it runs under now.
+        std::optional<LLUUID> experience;
     };
     typedef std::function<void(const CompileResult&)> compile_callback_t;
 
