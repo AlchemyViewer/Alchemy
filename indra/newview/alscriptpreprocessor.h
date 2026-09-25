@@ -42,6 +42,7 @@ namespace LL
 #include <boost/unordered/unordered_flat_map.hpp>
 #include <boost/unordered/unordered_flat_set.hpp>
 
+#include <deque>
 #include <functional>
 #include <memory>
 #include <optional>
@@ -156,7 +157,10 @@ public:
     void run(const Request& request, callback_t callback);
     // The same without the optimizer, for the analyzers: what the
     // compiler would see, mapped back to what the author wrote, and
-    // none of the renaming the optimizer may do on top of it.
+    // none of the renaming the optimizer may do on top of it. Waits for
+    // the worker behind every run, which a save waits on; and one still
+    // waiting when the same script is asked for again is not made at
+    // all, but answered with the later one's result.
     void expand(const Request& request, callback_t callback);
     // What the `.luaurc` governing a SLua script says -- its mode, its
     // lints, its globals -- over the base given, a scripter's own lints
@@ -270,7 +274,8 @@ private:
     ALScriptSnapshot        snapshotFor(const std::shared_ptr<Job>& job, wanted_t& wanted);
     // `fresh` asks the region what the object holds before anything
     // else, rather than going by what it last said.
-    void                    start(const Request& request, callback_t callback, bool fresh);
+    // `check` is an expansion for the analyzers, which gives way to a run.
+    void                    start(const Request& request, callback_t callback, bool fresh, bool check = false);
     void                    attemptJob(const std::shared_ptr<Job>& job);
     // What the worker made of a job, back on the main thread: another
     // round where the run asked for an include nobody had looked up
@@ -286,6 +291,21 @@ private:
     void                    optimizeAndFinish(const std::shared_ptr<Job>& job, ALPreprocessor::Result result);
     void                    finish(const std::shared_ptr<Job>& job, ALPreprocessor::Result result);
     void                    ensureWorker();
+    // Work for the worker thread, handed to it one piece at a time so
+    // that what waits can still be put in order: a run's first, then a
+    // check's, and a check whose script is asked to be checked again
+    // while it waits dropped for the later one.
+    void                    toWorker(const std::shared_ptr<Job>& job, std::function<void()> work);
+    void                    nextWork();
+    struct Queued
+    {
+        std::shared_ptr<Job>  job;
+        std::string           key;
+        std::function<void()> work;
+    };
+    std::deque<Queued>      mRunsWaiting;
+    std::deque<Queued>      mChecksWaiting;
+    bool                    mWorking = false;
     // An include by its identity, loaded into the cache -- or noted as
     // failed -- and `done` called either way.
     void                    fetch(const std::string& path, std::function<void()> done);

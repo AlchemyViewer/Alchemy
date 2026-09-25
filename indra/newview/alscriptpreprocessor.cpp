@@ -189,6 +189,10 @@ struct ALScriptPreprocessor::Job
     // The folders an alias of a `.luaurc` on disk has blessed in this run,
     // so that a module one brought in may require the modules beside it.
     std::vector<std::string>         aliasFolders;
+    // An expansion for the analyzers, and the answers of those of the
+    // same script it stood in for, which take its result.
+    bool                             check = false;
+    std::vector<callback_t>          alsoAnswer;
 };
 
 // Anything at all changing in the inventory is enough: what an include
@@ -1100,14 +1104,15 @@ void ALScriptPreprocessor::expand(const Request& request, callback_t callback)
 {
     Request without  = request;
     without.optimize = false;
-    start(without, std::move(callback), /*fresh*/ false);
+    start(without, std::move(callback), /*fresh*/ false, /*check*/ true);
 }
 
-void ALScriptPreprocessor::start(const Request& request, callback_t callback, bool fresh)
+void ALScriptPreprocessor::start(const Request& request, callback_t callback, bool fresh, bool check)
 {
     auto job      = std::make_shared<Job>();
     job->request  = request;
     job->callback = std::move(callback);
+    job->check    = check;
     // What this script's own includes failed at before may come now;
     // another script's failures are its own, and clearing them would
     // have every other tab fetch its missing include again.
@@ -1190,16 +1195,65 @@ void ALScriptPreprocessor::attemptJob(const std::shared_ptr<Job>& job)
     // And the expansion itself on a thread of its own: it tokenizes the
     // whole script and rescans what its macros make, which is the one
     // thing here that has nothing of the viewer in it.
-    ensureWorker();
-    mPool->getQueue().post([this, job, snapshot = std::move(snapshot)]() mutable {
+    toWorker(job, [this, job, snapshot = std::make_shared<ALScriptSnapshot>(std::move(snapshot))]() {
         // On a stack as deep as a script needs: the expansion recurses on
         // how the script nests, and a pool's thread on a Mac has half a
         // megabyte.
         ALPreprocessor::Result result;
-        alScriptOnLargeStack([&]() { result = snapshot.run(job->request.source); });
-        std::vector<ALPreprocessor::Ask> missed = snapshot.missed();
+        alScriptOnLargeStack([&]() { result = snapshot->run(job->request.source); });
+        std::vector<ALPreprocessor::Ask> missed = snapshot->missed();
         LLAppViewer::instance()->postToMainCoro([this, job, result = std::move(result), missed = std::move(missed)]() mutable {
             expandedJob(job, std::move(result), std::move(missed));
+        });
+    });
+}
+
+void ALScriptPreprocessor::toWorker(const std::shared_ptr<Job>& job, std::function<void()> work)
+{
+    ensureWorker();
+    Queued queued{ job, keyOf(job->request), std::move(work) };
+    if (job->check)
+    {
+        // One of the same script still waiting is for text that has
+        // moved on since: not made, its answer this one's.
+        const auto older = std::find_if(mChecksWaiting.begin(), mChecksWaiting.end(), [&queued](const Queued& q) { return q.key == queued.key; });
+        if (older != mChecksWaiting.end())
+        {
+            if (older->job->callback)
+            {
+                job->alsoAnswer.push_back(std::move(older->job->callback));
+            }
+            std::move(older->job->alsoAnswer.begin(), older->job->alsoAnswer.end(), std::back_inserter(job->alsoAnswer));
+            mChecksWaiting.erase(older);
+        }
+        mChecksWaiting.push_back(std::move(queued));
+    }
+    else
+    {
+        mRunsWaiting.push_back(std::move(queued));
+    }
+    nextWork();
+}
+
+void ALScriptPreprocessor::nextWork()
+{
+    if (mWorking || !mPool)
+    {
+        return;
+    }
+    std::deque<Queued>& lane = !mRunsWaiting.empty() ? mRunsWaiting : mChecksWaiting;
+    if (lane.empty())
+    {
+        return;
+    }
+    std::function<void()> work = std::move(lane.front().work);
+    lane.pop_front();
+    mWorking = true;
+    mPool->getQueue().post([this, work = std::move(work)]() {
+        work();
+        LLAppViewer::instance()->postToMainCoro([this]() {
+            mWorking = false;
+            nextWork();
         });
     });
 }
@@ -1247,6 +1301,8 @@ void ALScriptPreprocessor::ensureWorker()
 
 void ALScriptPreprocessor::cleanupSingleton()
 {
+    mRunsWaiting.clear();
+    mChecksWaiting.clear();
     if (mPool)
     {
         mPool->close();
@@ -1256,7 +1312,7 @@ void ALScriptPreprocessor::cleanupSingleton()
 
 void ALScriptPreprocessor::finish(const std::shared_ptr<Job>& job, ALPreprocessor::Result result)
 {
-    if (!job->callback)
+    if (!job->callback && job->alsoAnswer.empty())
     {
         return;
     }
@@ -1300,7 +1356,16 @@ void ALScriptPreprocessor::finish(const std::shared_ptr<Job>& job, ALPreprocesso
         }
     }
     alTranslateScriptProblems(result.problems);
-    job->callback(result);
+    if (job->callback)
+    {
+        job->callback(result);
+    }
+    // Then those it stood in for, whose text has moved on since, and who
+    // learn nothing from it but that they were answered.
+    for (const callback_t& also : job->alsoAnswer)
+    {
+        also(result);
+    }
 }
 
 bool ALScriptPreprocessor::inWorld(const Request& request, const std::string& name)
@@ -1330,10 +1395,9 @@ void ALScriptPreprocessor::optimizeAndFinish(const std::shared_ptr<Job>& job, AL
         finish(job, std::move(result));
         return;
     }
-    ensureWorker();
-    mPool->getQueue().post([this, job, result = std::move(result), options]() mutable {
-        alScriptOnLargeStack([&]() { ALPreprocessor::finish(result, options); });
-        LLAppViewer::instance()->postToMainCoro([this, job, result = std::move(result)]() mutable { finish(job, std::move(result)); });
+    toWorker(job, [this, job, result = std::make_shared<ALPreprocessor::Result>(std::move(result)), options]() {
+        alScriptOnLargeStack([&]() { ALPreprocessor::finish(*result, options); });
+        LLAppViewer::instance()->postToMainCoro([this, job, result]() { finish(job, std::move(*result)); });
     });
 }
 
