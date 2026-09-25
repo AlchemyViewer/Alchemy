@@ -665,6 +665,12 @@ private:
         std::string                                liveLog;
         bool                                       subscribed   = false;
         bool                                       externalSave = false;
+        // What the external editor's copy held when the studio last wrote
+        // it or read it: a save there over changes made here since is
+        // asked about rather than taken, the text it brought held in
+        // externalWaiting until the author says which.
+        std::string                                externalWritten;
+        std::optional<std::string>                 externalWaiting;
         // The crumb path the bar was last told, by the outline it was
         // read from: a caret that stays within the same symbols asks for
         // no new crumbs, and it is asked on every key.
@@ -1129,6 +1135,9 @@ private:
     // take it as empty if it still is.
     void               externalChanged(const std::string& id, const std::string& file, bool settled = false);
     void               syncExternal(Doc& doc);
+    // What the external editor saved, put in as one step to undo and
+    // saved from here.
+    void               takeExternal(Doc& doc, const std::string& text);
     void               logExternal(Doc& doc, const ALScriptWorkspace::CompileResult& result);
     void               stopExternal(Doc& doc);
     static std::string externalFileName(const Doc& doc);

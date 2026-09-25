@@ -8624,6 +8624,8 @@ void ALFloaterScriptStudio::editExternally(Doc& doc)
         report(getString("ExternalWriteFailed", args), true, &doc);
         return;
     }
+    doc.externalWritten = doc.editor->text();
+    doc.externalWaiting.reset();
     if (on_disk)
     {
         // Watched since it was opened; a save there comes in as any
@@ -8741,6 +8743,24 @@ void ALFloaterScriptStudio::externalChanged(const std::string& id, const std::st
             SETTLE);
         return;
     }
+    // Changed here since the copy was written, and changed there too: one
+    // of them would be lost, so the author is asked which, rather than
+    // what was typed here left a step back in the undo.
+    if (text != doc.editor->text() && doc.editor->text() != doc.externalWritten && text != doc.externalWritten)
+    {
+        doc.externalWaiting = text;
+        LLStringUtil::format_map_t args;
+        args["[NAME]"] = doc.name;
+        report(getString("ExternalConflict", args), true, &doc, { "take_external", "keep_here" });
+        return;
+    }
+    takeExternal(doc, text);
+}
+
+void ALFloaterScriptStudio::takeExternal(Doc& doc, const std::string& text)
+{
+    doc.externalWaiting.reset();
+    doc.externalWritten = text;
     if (text != doc.editor->text())
     {
         // The editor's text, as one step to undo; then saved from here,
@@ -8773,6 +8793,7 @@ void ALFloaterScriptStudio::syncExternal(Doc& doc)
     // was sent, and a file written again under an editor that has it open
     // reads to that editor as changed.
     const std::string text = doc.editor->text();
+    doc.externalWritten    = text;
     std::string       held;
     if (readWholeFile(filename, held) && (held == text || (text.empty() && held == " ")))
     {
@@ -10613,7 +10634,12 @@ void ALFloaterScriptStudio::report(const std::string& text, bool failure, const 
     // words: the save asked again, tried again, a copy, a file.
     for (const std::string& action : doc ? actions : std::vector<std::string>())
     {
-        const std::string key   = action == "save_anyway" ? "SaveAnyway" : action == "retry" ? "ActionRetry" : action == "copy" ? "ActionCopy" : "ActionExport";
+        const std::string key   = action == "save_anyway"     ? "SaveAnyway"
+                                  : action == "retry"         ? "ActionRetry"
+                                  : action == "copy"          ? "ActionCopy"
+                                  : action == "take_external" ? "ActionTakeExternal"
+                                  : action == "keep_here"     ? "ActionKeepHere"
+                                                              : "ActionExport";
         const std::string label = getString(key);
         const size_t      last  = entry.text.rfind('\n');
         const S32         line  = static_cast<S32>(std::count(entry.text.begin(), entry.text.end(), '\n'));
@@ -13445,6 +13471,20 @@ void ALFloaterScriptStudio::onOutputChosen(const ALOutputView::Entry& entry)
         else if (action == "export")
         {
             saveToFile();
+        }
+        else if (action == "take_external" && doc.externalWaiting)
+        {
+            // What was typed here a step back in the undo.
+            takeExternal(doc, *doc.externalWaiting);
+        }
+        else if (action == "keep_here" && doc.externalWaiting)
+        {
+            // The external editor's save not sent; its copy is written from
+            // here at the next save.
+            doc.externalWaiting.reset();
+            LLStringUtil::format_map_t args;
+            args["[NAME]"] = doc.name;
+            setStatus(getString("ExternalKept", args));
         }
         return;
     }

@@ -353,6 +353,12 @@
     <floater.string name="ActionRetryTip">Save [NAME] again</floater.string>
     <floater.string name="ActionCopy">Save a copy to inventory</floater.string>
     <floater.string name="ActionCopyTip">A new item in your inventory with what [NAME] holds, saved</floater.string>
+    <floater.string name="ExternalConflict">[NAME] was saved in the external editor while it had changes here not in that copy; nothing was replaced. Take one or the other:</floater.string>
+    <floater.string name="ExternalKept">Kept what is here in [NAME]; the external editor's save was not sent, and its copy is written from here at the next save.</floater.string>
+    <floater.string name="ActionTakeExternal">Take the external editor's</floater.string>
+    <floater.string name="ActionTakeExternalTip">What the external editor saved put in [NAME] and saved; what was typed here is a step back in the undo</floater.string>
+    <floater.string name="ActionKeepHere">Keep what is here</floater.string>
+    <floater.string name="ActionKeepHereTip">The external editor's save of [NAME] not sent</floater.string>
     <floater.string name="ActionExport">Export to a file</floater.string>
     <floater.string name="ActionExportTip">What [NAME] holds, written to a file on this computer</floater.string>
     <floater.string name="SaveAnywayTip">Save [NAME] as it stands, over what was found</floater.string>
