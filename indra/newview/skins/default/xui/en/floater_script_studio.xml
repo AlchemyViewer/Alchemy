@@ -385,8 +385,8 @@
     <floater.string name="NotecardCopyUnsaved">Save the notecard first; [NAME] can only be copied out of a saved notecard</floater.string>
     <floater.string name="NotecardCopyFailed">[NAME] could not be copied: no region to ask</floater.string>
     <floater.string name="NotecardCopyRefused">[NAME] could not be copied: [ERROR]</floater.string>
-    <floater.string name="PreprocHintSwitch">([WORD] is Firestorm's: turn on Preprocess on Save and Preprocessor > Firestorm > Switch Statements)</floater.string>
-    <floater.string name="PreprocHintExtensions">([WORD] is an extension: turn on Preprocess on Save and Preprocessor > Extensions)</floater.string>
+    <floater.string name="PreprocHintSwitch">([WORD] is Firestorm's: turn on Build > Preprocess on Save and Build > Firestorm > Switch Statements)</floater.string>
+    <floater.string name="PreprocHintExtensions">([WORD] is an extension: turn on Build > Preprocess on Save and Build > Extensions)</floater.string>
     <floater.string name="ClearRecentFiles">Clear Menu</floater.string>
     <floater.string name="OriginCompiler">Compiler</floater.string>
     <floater.string name="OriginParser">Parser</floater.string>
