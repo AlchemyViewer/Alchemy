@@ -1856,9 +1856,12 @@ private:
     std::string                        mSearchQuery;
     ALPaneList*                        mExplorer      = nullptr;
     std::vector<ExplorerObject>        mExplorerModel;
-    // Answers have come that the list does not show yet: it is filled with
-    // the next frame.
-    bool                               mExplorerStale = false;
+    // Answers have come that the list does not show yet: it is filled a
+    // moment after it was last filled. And the prims asked what they hold
+    // and not answered yet, which are not asked again meanwhile.
+    bool                               mExplorerStale  = false;
+    F64                                mExplorerFilled = 0.0;
+    boost::unordered_flat_set<LLUUID>  mContentsAsked;
     // The objects and the prims of linksets folded shut in the explorer,
     // each by its id -- apart, since a linkset's root prim has its
     // object's.

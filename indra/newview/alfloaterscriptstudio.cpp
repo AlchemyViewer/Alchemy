@@ -123,8 +123,15 @@ namespace
     // parser: a state after them. Put after the text, so that every place
     // in it is where it was; what is said of it is dropped.
     const char FRAGMENT_STATE[] = "\ndefault{state_entry(){}}\n";
-    // How often the explorer looks at what is selected in world.
-    const F64 EXPLORER_POLL = 1.0;
+    // How often the explorer looks at what is selected in world; how often
+    // at most it is filled again while answers come in; and past how many
+    // prims a linkset's prims are listed folded, what each holds asked of
+    // the region only once it is shown -- a build of 255 prims is 255
+    // downloads of what each holds, and a question for every script in it
+    // of whether it runs.
+    const F64    EXPLORER_POLL  = 1.0;
+    const F64    EXPLORER_FILL  = 0.2;
+    const size_t LARGE_LINKSET  = 16;
     // How many places a find across scripts lists; the rest are counted
     // and not listed, since a common word in an object's scripts is
     // thousands of rows nobody reads.
@@ -975,7 +982,18 @@ bool ALFloaterScriptStudio::postBuild()
     });
     mExplorer->setCommitCallback([this](LLUICtrl*, const LLSD&) { refreshExplorerButtons(); });
     mExplorerFilter = getChild<LLFilterEditor>("explorer_filter");
-    mExplorerFilter->setCommitCallback([this](LLUICtrl*, const LLSD&) { fillExplorer(); });
+    // A filter looks through what is folded too: what a large linkset's
+    // folded prims hold is asked for once there is one.
+    mExplorerFilter->setCommitCallback([this](LLUICtrl*, const LLSD&) {
+        if (mExplorerFilter->getText().empty())
+        {
+            fillExplorer();
+        }
+        else
+        {
+            refreshExplorer();
+        }
+    });
     mExplorer->setRightMouseDownCallback([this](LLUICtrl*, S32 x, S32 y, MASK) { showExplorerMenu(x, y); });
     for (const char* action : { "open", "start", "stop", "reset", "refresh" })
     {
@@ -13504,13 +13522,14 @@ void ALFloaterScriptStudio::pumpExplorer()
         mExplorerNamesStale = false;
         rereadExplorerNames();
     }
-    // What came in since the last frame -- contents, whether scripts run,
-    // names -- put in the list once, however many answers there were.
-    if (mExplorerStale)
+    // What came in since it was last filled -- contents, whether scripts
+    // run, names -- put in the list once, however many answers there were,
+    // and not at every frame while a linkset's answers stream in.
+    const F64 now = LLTimer::getTotalSeconds();
+    if (mExplorerStale && now >= mExplorerFilled + EXPLORER_FILL)
     {
         fillExplorer();
     }
-    const F64 now = LLTimer::getTotalSeconds();
     if (mExplorerRefetchAt > 0.0 && now >= mExplorerRefetchAt)
     {
         mExplorerRefetchAt = 0.0;
@@ -13649,7 +13668,7 @@ void ALFloaterScriptStudio::refreshExplorer(bool refetch)
         }
         return nullptr;
     };
-    auto add = [this, known, &carry](LLViewerObject* object) -> ExplorerObject* {
+    auto add = [this, known, &carry, &known_prims](LLViewerObject* object) -> ExplorerObject* {
         if (!object || object->isAvatar())
         {
             return nullptr;
@@ -13683,6 +13702,21 @@ void ALFloaterScriptStudio::refreshExplorer(bool refetch)
                 prim.named = !prim.name.empty();
                 carry(prim);
                 one.prims.push_back(std::move(prim));
+            }
+        }
+        // A large linkset's prims folded when first listed, but the root,
+        // which usually holds what the object does, and any with a script
+        // open in a tab; unfolded, each is asked what it holds.
+        if (one.prims.size() > LARGE_LINKSET)
+        {
+            for (size_t i = 1; i < one.prims.size(); ++i)
+            {
+                const LLUUID& id   = one.prims[i].id;
+                const bool    open = std::any_of(mDocs.begin(), mDocs.end(), [&id](const std::unique_ptr<Doc>& doc) { return doc->ref.object == id; });
+                if (!open && !known_prims.contains(id))
+                {
+                    mExplorerFoldedPrims.insert(id);
+                }
             }
         }
         mExplorerModel.push_back(std::move(one));
@@ -13731,19 +13765,35 @@ void ALFloaterScriptStudio::refreshExplorer(bool refetch)
     }
     boost::unordered::erase_if(mNamesAsked, [this](const LLUUID& id) { return !mListedPrims.contains(id); });
     fillExplorer();
-    const LLHandle<LLFloater> handle = getHandle();
+    const LLHandle<LLFloater> handle    = getHandle();
+    std::string               filter    = mExplorerFilter ? mExplorerFilter->getText() : std::string();
+    LLStringUtil::trim(filter);
+    const bool                filtering = !filter.empty();
     for (const ExplorerObject& object : mExplorerModel)
     {
+        const bool large         = object.prims.size() > LARGE_LINKSET;
+        const bool object_folded = mExplorerFolded.contains(object.root);
         for (const ExplorerPrim& prim : object.prims)
         {
             // What each prim holds, asked where it is not known, where the
             // object says it has changed since, or where a person asked --
-            // not again for every prim at every tab opened or closed.
+            // not again for every prim at every tab opened or closed, nor
+            // for one already asked and not answered yet. Of a large
+            // linkset, only what the list shows, or a filter looks through.
             LLViewerObject* in_world = gObjectList.findObject(prim.id);
             if (!refetch && prim.fetched && in_world && !in_world->isInventoryDirty())
             {
                 continue;
             }
+            if (large && !filtering && (object_folded || mExplorerFoldedPrims.contains(prim.id)))
+            {
+                continue;
+            }
+            if (!refetch && mContentsAsked.contains(prim.id))
+            {
+                continue;
+            }
+            mContentsAsked.insert(prim.id);
             ALScriptWorkspace::instance().listContents(prim.id, [handle](const ALScriptWorkspace::Contents& contents) {
                 if (ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get()))
                 {
@@ -13756,6 +13806,7 @@ void ALFloaterScriptStudio::refreshExplorer(bool refetch)
 
 void ALFloaterScriptStudio::explorerContents(const ALScriptWorkspace::Contents& contents)
 {
+    mContentsAsked.erase(contents.prim);
     for (ExplorerObject& object : mExplorerModel)
     {
         for (ExplorerPrim& prim : object.prims)
@@ -13818,7 +13869,8 @@ void ALFloaterScriptStudio::explorerContents(const ALScriptWorkspace::Contents& 
 
 void ALFloaterScriptStudio::fillExplorer()
 {
-    mExplorerStale = false;
+    mExplorerStale  = false;
+    mExplorerFilled = LLTimer::getTotalSeconds();
     // What was chosen stays chosen, by what it stands for rather than
     // where it sat.
     std::vector<ExplorerRow> chosen = explorerChoice();
@@ -14083,12 +14135,12 @@ void ALFloaterScriptStudio::explorerFold(const LLUUID& id, bool prim, std::optio
     if (want)
     {
         set.insert(id);
+        fillExplorer();
+        return;
     }
-    else
-    {
-        set.erase(id);
-    }
-    fillExplorer();
+    set.erase(id);
+    // Opened: what it now shows asked for, where it was not.
+    refreshExplorer();
 }
 
 bool ALFloaterScriptStudio::explorerArrowAt(S32 x, S32 y, LLUUID& id, bool& prim_row)
@@ -14645,6 +14697,7 @@ void ALFloaterScriptStudio::revealInExplorer(const Doc& doc)
     // no rows under it to choose -- and the filter let go of where it
     // hides the row.
     mFolds.setCollapsed("explorer", false);
+    bool unasked = false;
     for (const ExplorerObject& object : mExplorerModel)
     {
         for (const ExplorerPrim& prim : object.prims)
@@ -14653,8 +14706,15 @@ void ALFloaterScriptStudio::revealInExplorer(const Doc& doc)
             {
                 mExplorerFolded.erase(object.root);
                 mExplorerFoldedPrims.erase(prim.id);
+                unasked = !prim.fetched;
             }
         }
+    }
+    if (unasked)
+    {
+        // Folded in a large linkset, and never asked what it holds: asked
+        // now, for its rows to come.
+        refreshExplorer();
     }
     const auto find = [this, &doc]() -> LLScrollListItem* {
         for (LLScrollListItem* item : mExplorer->getAllData())
