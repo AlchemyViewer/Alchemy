@@ -1,6 +1,6 @@
 /**
  * @file alpanelist_test.cpp
- * @brief A pane's list: its keys asked first, a sort that keeps groups, and a row edited where it stands.
+ * @brief A pane's list: its keys asked first, and a sort that keeps groups.
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
  * Copyright (C) 2026, Rye <rye@alchemyviewer.org>
@@ -25,8 +25,6 @@
 
 #include "../alpanelist.h"
 
-#include "../llfocusmgr.h"
-#include "../lllineeditor.h"
 #include "../llscrolllistitem.h"
 #include "../lluictrlfactory.h"
 
@@ -80,15 +78,6 @@ namespace tut
             row["columns"][0]["column"] = "text";
             row["columns"][0]["value"]  = text;
             list->addElement(row);
-        }
-
-        // A row's value, as add() makes it.
-        static LLSD valueOf(S32 group)
-        {
-            LLSD value;
-            value["group"]   = group;
-            value["heading"] = false;
-            return value;
         }
 
         std::string order() const
@@ -293,87 +282,5 @@ namespace tut
         ensure("a copy is the rows'", LLEditMenuHandler::gEditMenuHandler->canCopy());
         pane.setFocus(false);
         ensure("let go of with it", LLEditMenuHandler::gEditMenuHandler == nullptr);
-    }
-
-    template<> template<>
-    void alpanelist_object::test<7>()
-    {
-        set_test_name("a row's words are edited where they stand: return gives them, escape leaves them, and the keys that walk the rows do nothing meanwhile");
-        ALPaneList& l = make();
-        add("one", 1);
-        add("two", 2);
-        add("three", 3);
-        l.selectNthItem(1);
-        l.setFocus(true);
-        std::vector<std::string> given;
-        const auto               edit = [&](const char* text) {
-            ALPaneList::Edit e;
-            e.column = "text";
-            e.indent = 12;
-            e.text   = text;
-            e.done   = [&given](const std::string& words) { given.push_back(words); };
-            return l.editRow(valueOf(2), std::move(e));
-        };
-        ensure("no such row, nothing edited", !l.editRow(valueOf(9), ALPaneList::Edit{ "text" }) && !l.editing());
-        ensure("begun", edit("two"));
-        LLLineEditor* field = l.rowEditor();
-        ensure("the field has the keyboard, and its words", l.editing() && field->hasFocus() && field->getText() == "two");
-        const LLRect cell = l.getCellRect(1, 0);
-        ensure("over its row, past the indent", field->getRect().mBottom == cell.mBottom && field->getRect().mLeft > cell.mLeft &&
-                                                     field->getRect().mRight <= cell.mRight);
-        field->setText(std::string("deux"));
-        field->handleKey(KEY_DOWN, MASK_NONE, false);
-        ensure("the rows not walked", l.editing() && l.getFirstSelectedIndex() == 1);
-        field->handleKey(KEY_RETURN, MASK_NONE, false);
-        ensure("return gives the words", given.size() == 1 && given.front() == "deux");
-        ensure("and the keyboard back with the rows", !l.editing() && !field->getVisible() && l.hasFocus());
-
-        edit("two");
-        field->setText(std::string("zwei"));
-        field->handleKey(KEY_ESCAPE, MASK_NONE, false);
-        ensure("escape leaves them", given.size() == 1 && !l.editing() && l.hasFocus());
-
-        edit("two");
-        field->handleKey(KEY_RETURN, MASK_NONE, false);
-        ensure("words not changed are not given", given.size() == 1 && !l.editing());
-        l.setFocus(false);
-    }
-
-    template<> template<>
-    void alpanelist_object::test<8>()
-    {
-        set_test_name("the keyboard going elsewhere keeps what was typed; the list filled again keeps the field over its row, and the row gone ends it with nothing given");
-        ALPaneList& l = make();
-        add("one", 1);
-        add("two", 2);
-        std::vector<std::string> given;
-        const auto               edit = [&](S32 group, const char* text) {
-            ALPaneList::Edit e;
-            e.column = "text";
-            e.text   = text;
-            e.done   = [&given](const std::string& words) { given.push_back(words); };
-            return l.editRow(valueOf(group), std::move(e));
-        };
-        l.setFocus(true);
-        edit(2, "two");
-        l.rowEditor()->setText(std::string("deux"));
-        gFocusMgr.setKeyboardFocus(nullptr);
-        ensure("the keyboard gone, the words given", given.size() == 1 && given.front() == "deux" && !l.editing());
-        ensure("and not taken back", !l.hasFocus());
-
-        l.setFocus(true);
-        edit(2, "two");
-        l.deleteAllItems();
-        add("zero", 0);
-        add("one", 1);
-        add("two", 2);
-        l.followEdit();
-        ensure("filled again, still edited", l.editing() && l.rowEditor()->getRect().mBottom == l.getCellRect(2, 0).mBottom);
-        l.deleteAllItems();
-        add("one", 1);
-        l.followEdit();
-        ensure("its row gone, nothing given", given.size() == 1 && !l.editing());
-        ensure("and the keyboard with the rows, not nowhere", l.hasFocus());
-        l.setFocus(false);
     }
 }

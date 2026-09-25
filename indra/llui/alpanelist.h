@@ -28,9 +28,6 @@
 #include "llscrolllistctrl.h"
 
 #include <functional>
-#include <optional>
-
-class LLLineEditor;
 
 // A studio pane's list -- problems, references, places found, an outline --
 // whose rows are places to go. Choosing a row shows its place and the arrow
@@ -91,33 +88,6 @@ public:
         drop_t;
     void setDropHandler(drop_t handler) { mDropHandler = std::move(handler); }
 
-    // A row's words edited where they stand, as a tree of files renames:
-    // a field over one of the row's cells, `indent` pixels into it -- past
-    // what the row shows before the words -- holding `text`, all of it
-    // chosen, and the keyboard. Return, or the keyboard going anywhere
-    // else, gives `done` the words, where they are not what they were;
-    // escape leaves them. The row is followed by its value, so the list
-    // may be filled again meanwhile: gone, the editing ends with nothing
-    // done; scrolled out of sight, as the keyboard going elsewhere. False
-    // where there is no such row or column.
-    struct Edit
-    {
-        std::string                                  column;
-        S32                                          indent   = 0;
-        std::string                                  text;
-        S32                                          maxBytes = 0;
-        std::function<void(const std::string& text)> done;
-    };
-    bool editRow(const LLSD& value, Edit edit);
-    bool editing() const { return mEdit.has_value(); }
-    // Ended: the words given where `keep`, else left as they were.
-    void endEditing(bool keep);
-    // The field kept over its row, which a scroll or the list filled again
-    // moves; each frame, from draw.
-    void followEdit();
-    LLLineEditor* rowEditor() const { return mEditor; }
-
-    ~ALPaneList() override;
     bool handleKeyHere(KEY key, MASK mask) override;
     // The Edit menu's commands are the list's while it has the keyboard,
     // as they are a text's: else they are whatever last took them, and
@@ -128,9 +98,6 @@ public:
     void onFocusLost() override;
     bool handleMouseDown(S32 x, S32 y, MASK mask) override;
     bool handleMouseUp(S32 x, S32 y, MASK mask) override;
-    // A double-click in the field a row is edited in is the field's: its
-    // word chosen, not the row opened.
-    bool handleDoubleClick(S32 x, S32 y, MASK mask) override;
     bool handleHover(S32 x, S32 y, MASK mask) override;
     void onMouseCaptureLost() override;
     bool handleDragAndDrop(S32 x, S32 y, MASK mask, bool drop, EDragAndDropType type, void* cargo, EAcceptance* accept,
@@ -147,11 +114,6 @@ protected:
 private:
     S32 compare(S32 column, const LLScrollListItem* a, const LLScrollListItem* b);
     void connectSort();
-    // Where a row is among them, by its value; -1 for none.
-    S32  indexOf(const LLSD& value) const;
-    // The field put over its row's cell; false where the row is out of
-    // sight.
-    bool placeEditor(S32 index);
 
     key_t                       mKeyHandler;
     group_t                     mGrouping;
@@ -165,10 +127,4 @@ private:
     // whether a row is lit for a drop, until the pointer leaves.
     LLFrameTimer                mDropScroll;
     bool                        mDropLit = false;
-    // The field a row is edited in, made when first wanted; the edit, and
-    // the row's value it follows.
-    LLLineEditor*                      mEditor = nullptr;
-    boost::signals2::scoped_connection mEditorLost;
-    std::optional<Edit>                mEdit;
-    LLSD                               mEditing;
 };
