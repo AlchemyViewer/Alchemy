@@ -1738,6 +1738,7 @@
                              width="574" />
                         </panel>
                         <panel
+                         class="script_studio_search"
                          follows="all"
                          height="168"
                          label="Search"

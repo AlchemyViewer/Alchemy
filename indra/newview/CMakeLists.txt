@@ -179,6 +179,7 @@ if(AL_BUILD_VIEWER)
     alscriptpreprocessor.cpp
     alscriptproblemspane.cpp
     alscriptsaveflow.cpp
+    alscriptsearch.cpp
     alscriptsearchpane.cpp
     alscriptstudiodoc.cpp
     alscriptstudiosave.cpp
@@ -981,6 +982,8 @@ if(AL_BUILD_VIEWER)
     alscriptpreprocessor.h
     alscriptproblemspane.h
     alscriptsaveflow.h
+    alscriptsearch.h
+    alscriptsearchpane.h
     alscriptstudiodoc.h
     alscriptstudioservices.h
     alscriptweightspane.h
@@ -2438,6 +2441,17 @@ if(AL_BUILD_TESTS)
     PROJECT ${test_project}
     LIBRARIES llui alscript ${test_libs}
     SOURCES alscriptstudiodoc.cpp
+    DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
+  )
+
+  # The Script Studio's Search tab over the studio's own window, the
+  # window's side faked; and what Replace All does with a script found.
+  al_add_test(
+    alscriptsearchpane
+    UNIT
+    PROJECT ${test_project}
+    LIBRARIES llui alscript ${test_libs}
+    SOURCES alscriptsearch.cpp alscriptstudiodoc.cpp
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
 

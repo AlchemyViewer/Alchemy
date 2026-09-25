@@ -44,6 +44,7 @@
 
 #include "../../llui/tests/alheadlessui_fixture.h"
 
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
@@ -235,6 +236,10 @@ namespace al_studio_test
                         bool focus = true) override
         {
             opened.push_back({ ref, name, std::move(carried), line, focus });
+            if (onOpen)
+            {
+                onOpen(ref, name);
+            }
         }
         void goToPlace(const ALScriptRef& ref, const std::string& name, S32 line, S32 column, S32 length) override
         {
@@ -249,6 +254,8 @@ namespace al_studio_test
         std::vector<Opened>                             opened;
         std::vector<Went>                               went;
         std::vector<bool>                               reveals;
+        // What a test does as a script is asked to open: a tab for it, say.
+        std::function<void(const ALScriptRef&, const std::string&)> onOpen;
 
     private:
         const LLPanel* mStrings = nullptr;

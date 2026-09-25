@@ -711,8 +711,6 @@ bool ALFloaterScriptStudio::postBuild()
         }
     });
     mExplorer      = getChild<ALPaneList>("explorer");
-    mSearchBar     = getChild<ALScopeBar>("search_bar");
-    mSearchResults = getChild<ALPaneList>("search_results");
     mCompileTarget = getChild<LLComboBox>("compile_target");
     mRunning       = getChild<LLCheckBoxCtrl>("running");
     mExperience    = getChild<LLComboBox>("experience");
@@ -762,26 +760,8 @@ bool ALFloaterScriptStudio::postBuild()
     }
     mRuntimeConnection = ALScriptWorkspace::instance().onRuntime([this](const ALScriptWorkspace::RuntimeEvent& event) { runtimeEvent(event); });
 
-    buildSearchBar();
-    // How many places, in the slot at the sentence's right end.
-    LLTextBox::Params count(LLUICtrlFactory::getDefaultParams<LLTextBox>());
-    count.name        = "search_count";
-    count.rect        = LLRect(0, 22, 170, 0);
-    count.font_halign = LLFontGL::RIGHT;
-    count.use_ellipses = true;
-    count.tool_tip    = getString("SearchCountTip");
-    mSearchCount      = LLUICtrlFactory::create<LLTextBox>(count);
-    mSearchBar->setAdornment(mSearchCount);
-    mSearchBar->onRun(boost::bind(&ALFloaterScriptStudio::search, this));
-    mSearchReplacement = getChild<LLLineEditor>("search_replacement");
-    mSearchReplace     = getChild<LLButton>("search_replace");
-    // Asked about first, on the button or return in the box -- and never on
-    // the keyboard leaving the box, which the skin says.
-    mSearchReplace->setCommitCallback([this](LLUICtrl*, const LLSD&) { askReplaceAll(); });
-    mSearchReplacement->setCommitCallback([this](LLUICtrl*, const LLSD&) { askReplaceAll(); });
-    mSearchBar->onChanged(boost::bind(&ALFloaterScriptStudio::onSearchChanged, this));
-    mSearchResults->setCommitCallback([this](LLUICtrl*, const LLSD&) { onSearchResult(false); });
-    mSearchResults->setDoubleClickCallback([this]() { onSearchResult(true); });
+    mSearchPane = getChild<ALScriptSearchPane>("search_tab");
+    mSearchPane->attach(*this, *this);
     // In a pane's list, return goes to the place chosen, to type there, and
     // escape goes back to the script without going anywhere -- asked of
     // the list first, since the panel it is in takes escape to mean
@@ -789,7 +769,7 @@ bool ALFloaterScriptStudio::postBuild()
     const std::pair<ALPaneList*, std::function<void()>> lists[] = { { mProblemsPane->list(), [this]() { mProblemsPane->choose(true); } },
                                                                           { mReferences, [this]() { onReferenceChosen(true); } },
                                                                           { mOutline, [this]() { onOutlineChosen(true); } },
-                                                                          { mSearchResults, [this]() { onSearchResult(true); } },
+                                                                          { mSearchPane->list(), [this]() { mSearchPane->choose(true); } },
                                                                           { mWeightsParts, [this]() { onWeightChosen(true); } } };
     for (const auto& [list, go] : lists)
     {
@@ -845,28 +825,6 @@ bool ALFloaterScriptStudio::postBuild()
         }
         return said != 0 ? said : x.span < y.span ? -1 : y.span < x.span ? 1 : 0;
     });
-    mSearchResults->setComparison([this](S32 column, const LLScrollListItem* a, const LLScrollListItem* b) {
-        const size_t fa = static_cast<size_t>(a->getValue()["found"].asInteger()), pa = static_cast<size_t>(a->getValue()["place"].asInteger());
-        const size_t fb = static_cast<size_t>(b->getValue()["found"].asInteger()), pb = static_cast<size_t>(b->getValue()["place"].asInteger());
-        if (fa >= mSearchFound.size() || fb >= mSearchFound.size() || pa >= mSearchFound[fa].places.size() || pb >= mSearchFound[fb].places.size())
-        {
-            return 0;
-        }
-        const ALTextPos x = mSearchFound[fa].places[pa].begin;
-        const ALTextPos y = mSearchFound[fb].places[pb].begin;
-        S32             said = 0;
-        switch (column)
-        {
-            case 0: said = LLStringUtil::compareDict(mSearchFound[fa].where, mSearchFound[fb].where); break;
-            case 2: said = LLStringUtil::compareDict(mSearchFound[fa].lines[pa], mSearchFound[fb].lines[pb]); break;
-            default: break;
-        }
-        if (said == 0 && column == 0 && fa != fb)
-        {
-            said = fa < fb ? -1 : 1;
-        }
-        return said != 0 ? said : x < y ? -1 : y < x ? 1 : fa < fb ? -1 : fa > fb ? 1 : 0;
-    });
     mOutlineSort = getChild<LLComboBox>("outline_sort");
     mOutlineSort->selectFirstItem();
     mOutlineSort->setCommitCallback([this](LLUICtrl*, const LLSD&) {
@@ -918,7 +876,7 @@ bool ALFloaterScriptStudio::postBuild()
     // Copy from the lists with no menu of their own; the problems' has
     // its own copying, and a right-click there would bring up both, the
     // copy menu over it.
-    for (LLScrollListCtrl* list : { mReferences, mSearchResults })
+    for (LLScrollListCtrl* list : { static_cast<LLScrollListCtrl*>(mReferences), static_cast<LLScrollListCtrl*>(mSearchPane->list()) })
     {
         listMenuFor(list);
     }
@@ -1354,7 +1312,7 @@ void ALFloaterScriptStudio::draw()
     pumpCaret();
     pumpExplorer();
     pumpVim();
-    pumpSearch();
+    mSearchPane->pump();
     pumpSettle();
     refreshUndoLabels();
     if (mPlacesStale)
@@ -1609,14 +1567,7 @@ void ALFloaterScriptStudio::rekeyDoc(Doc& doc, const std::string& id)
             follow(place.doc);
         }
     }
-    for (Found& found : mSearchFound)
-    {
-        follow(found.doc);
-    }
-    for (std::string& stale : mSearchStale)
-    {
-        follow(stale);
-    }
+    mSearchPane->rekey(was, id);
     for (const std::unique_ptr<Doc>& other : mDocs)
     {
         follow(other->copyOf);
@@ -1891,7 +1842,7 @@ void ALFloaterScriptStudio::wireDoc(Doc& doc)
             mRedoButton->setEnabled(raw->shownText()->canRedo());
         }
         scheduleAnalysis(*raw);
-        researchOpen(*raw);
+        mSearchPane->typedIn(*raw);
         scheduleRecovery(*raw);
     });
     doc.placedEdits = doc.editor->document().onChanged([this, raw](const ALTextDocument::Edit& edit) {
@@ -5836,9 +5787,9 @@ void ALFloaterScriptStudio::pumpSettle()
     {
         onReferenceChosen(false);
     }
-    else if (list == mSearchResults)
+    else if (list == mSearchPane->list())
     {
-        onSearchResult(false);
+        mSearchPane->choose(false);
     }
     else if (list == mWeightsParts)
     {
@@ -8958,28 +8909,167 @@ void ALFloaterScriptStudio::report(const std::string& text, bool failure, const 
     mOutputPane->said(text, failure, doc, actions);
 }
 
-std::string ALFloaterScriptStudio::searchWhere(const Doc& doc) const
+// --- find in files -------------------------------------------------------------------
+
+void ALFloaterScriptStudio::findInFiles()
+{
+    showBottom("search_tab");
+    mSearchPane->focusQuery(active());
+}
+
+std::string ALFloaterScriptStudio::whereIs(const Doc& doc) const
 {
     // What a row says an open script is in: its object, by the name it has
     // now; nothing for one in the inventory or on disk.
     return doc.ref.inInventory() ? LLStringUtil::null : objectNameOf(gObjectList.findObject(doc.ref.object), getString("ObjectUnnamed"));
 }
 
-void ALFloaterScriptStudio::searchLoaded(U32 generation, const std::string& where, const ALScriptWorkspace::Loaded& loaded)
+std::vector<ALScriptSearchPane::Window::Object> ALFloaterScriptStudio::objectsListed() const
 {
-    if (generation != mSearchGeneration)
+    std::vector<ALScriptSearchPane::Window::Object> listed;
+    for (const ExplorerObject& object : mExplorerModel)
+    {
+        if (!object.present)
+        {
+            continue;
+        }
+        ALScriptSearchPane::Window::Object one;
+        one.root = object.root;
+        one.name = object.name;
+        for (const ExplorerPrim& prim : object.prims)
+        {
+            for (const ALScriptWorkspace::Item& item : prim.items)
+            {
+                one.items.emplace_back(prim.id, item.id);
+            }
+        }
+        listed.push_back(std::move(one));
+    }
+    return listed;
+}
+
+std::string ALFloaterScriptStudio::objectName(const LLUUID& root) const
+{
+    std::string name;
+    for (const ExplorerObject& one : mExplorerModel)
+    {
+        if (one.root == root)
+        {
+            name = one.name;
+        }
+    }
+    return name;
+}
+
+LLUUID ALFloaterScriptStudio::objectInHand() const
+{
+    // The active script's, else the one chosen in the explorer.
+    LLUUID only;
+    if (const Doc* doc = mActive < mDocs.size() ? mDocs[mActive].get() : nullptr; doc && !doc->ref.inInventory())
+    {
+        if (LLViewerObject* object = gObjectList.findObject(doc->ref.object))
+        {
+            only = object->getRootEdit() ? object->getRootEdit()->getID() : object->getID();
+        }
+    }
+    if (only.isNull())
+    {
+        const std::vector<ExplorerRow> rows = explorerChoice();
+        if (!rows.empty())
+        {
+            only = rows.front().root;
+        }
+    }
+    return only;
+}
+
+LLUUID ALFloaterScriptStudio::rootOf(const ALScriptRef& ref) const
+{
+    if (ref.inInventory() || ref.isNull())
+    {
+        return LLUUID::null;
+    }
+    LLViewerObject* object = gObjectList.findObject(ref.object);
+    return object ? (object->getRootEdit() ? object->getRootEdit()->getID() : object->getID()) : LLUUID::null;
+}
+
+ALFloaterScriptStudio::Doc* ALFloaterScriptStudio::openElsewhere(const ALScriptRef& ref)
+{
+    ALFloaterScriptStudio* holder = indexOf(ref) == NONE ? holderOf(ref, std::string()) : nullptr;
+    return holder && holder != this ? holder->mDocs[holder->indexOf(ref)].get() : nullptr;
+}
+
+void ALFloaterScriptStudio::fetchForSearch(const ALScriptRef& ref, U32 generation, const std::string& where)
+{
+    const LLHandle<LLFloater> handle = getHandle();
+    ALScriptWorkspace::instance().load(ref, [handle, generation, where](const ALScriptWorkspace::Loaded& loaded) {
+        if (ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get()))
+        {
+            // A wrapped script is searched as its author wrote it, and that
+            // text kept for a replace to work over.
+            std::optional<std::string> text;
+            if (loaded.error.empty())
+            {
+                text = loaded.notecard ? loaded.text : sourceOf(loaded);
+            }
+            studio->mSearchPane->fetched(generation, where, loaded.ref, loaded.name, text, loaded.notecard);
+        }
+    });
+}
+
+void ALFloaterScriptStudio::confirmReplaceAll(const LLSD& args, std::function<void()> yes)
+{
+    const LLHandle<LLFloater> handle = getHandle();
+    LLNotificationsUtil::add("ScriptStudioReplaceAll", args, LLSD(), [handle, yes](const LLSD& notification, const LLSD& response) {
+        if (handle.get() && LLNotificationsUtil::getSelectedOption(notification, response) == 0)
+        {
+            yes();
+        }
+    });
+}
+
+void ALFloaterScriptStudio::searchResultChosen(const ALScriptSearch::Found& one, const ALTextRange& match, bool to_editor)
+{
+    const bool gone = !one.doc.empty() && indexOf(one.doc) == NONE;
+    if (gone && one.ref.isNull())
+    {
+        // A file on disk, closed since it was searched: its tab is how it
+        // was gone to, and it has no item to open it by.
+        return;
+    }
+    // Open in another window: gone to there when asked, and not while the
+    // list is walked, which would take the keyboard from the list.
+    if (!to_editor && one.doc.empty() && !one.ref.isNull() && indexOf(one.ref) == NONE)
+    {
+        if (ALFloaterScriptStudio* holder = holderOf(one.ref, std::string()); holder && holder != this)
+        {
+            return;
+        }
+    }
+    if (!to_editor && (one.doc.empty() || gone) && deferOpen(mSearchPane->list(), ALScriptPreprocessor::pathOf(one.ref)))
     {
         return;
     }
-    --mSearchPending;
-    if (loaded.error.empty())
+    noteJump(!to_editor);
+    ++mHoldPanes;
+    // A script open when it was searched -- a file on disk among them,
+    // which has no item to open it by -- is gone to in its tab.
+    const size_t open = one.doc.empty() ? NONE : indexOf(one.doc);
+    if (open != NONE)
     {
-        // A wrapped script is searched as its author wrote it, and that
-        // text kept for a replace to work over.
-        searchDocument(loaded.ref, loaded.name, where, ALTextDocument(loaded.notecard ? loaded.text : sourceOf(loaded)), 0, std::string(), true,
-                       loaded.notecard);
+        if (open != mActive)
+        {
+            activate(open);
+        }
+        sourceInFront(*mDocs[open]).goTo(match);
     }
-    searchSettled();
+    else
+    {
+        const S32 length = match.end.line == match.begin.line ? match.end.column - match.begin.column : 0;
+        goToPlace(one.ref, one.name, match.begin.line, match.begin.column, length);
+    }
+    --mHoldPanes;
+    revealed(mSearchPane->list(), to_editor);
 }
 
 void ALFloaterScriptStudio::goToPlace(const ALScriptRef& ref, const std::string& name, S32 line, S32 column, S32 length)
@@ -14119,19 +14209,16 @@ void ALFloaterScriptStudio::writeState(LLSD& state) const
     {
         state["output_kind"] = mOutputPane->kind();
     }
-    if (mSearchBar)
+    if (mSearchPane)
     {
-        for (const char* choice : { "how", "case", "scope" })
-        {
-            state["search"][choice] = mSearchBar->valueOf(choice);
-        }
+        mSearchPane->saveState(state);
     }
     if (mBottomTabs && mBottomTabs->getCurrentPanel())
     {
         state["bottom_tab"] = mBottomTabs->getCurrentPanel()->getName();
     }
     // How each list was sorted, by a column's title, and the outline.
-    for (auto [name, list] : { std::make_pair("problems", mProblemsPane ? mProblemsPane->list() : nullptr), std::make_pair("references", mReferences), std::make_pair("search", mSearchResults) })
+    for (auto [name, list] : { std::make_pair("problems", mProblemsPane ? mProblemsPane->list() : nullptr), std::make_pair("references", mReferences), std::make_pair("search", mSearchPane ? mSearchPane->list() : nullptr) })
     {
         if (list && !list->getSortColumnName().empty())
         {
@@ -14280,21 +14367,15 @@ void ALFloaterScriptStudio::readState(const LLSD& state)
     {
         mOutputPane->showKind(state["output_kind"].asString());
     }
-    if (state.has("search") && mSearchBar)
+    if (state.has("search") && mSearchPane)
     {
-        for (const char* choice : { "how", "case", "scope" })
-        {
-            if (state["search"].has(choice))
-            {
-                mSearchBar->setValue(choice, state["search"][choice].asString());
-            }
-        }
+        mSearchPane->readState(state);
     }
     if (state.has("bottom_tab") && mBottomTabs)
     {
         mBottomTabs->selectTabByName(state["bottom_tab"].asString());
     }
-    for (auto [name, list] : { std::make_pair("problems", mProblemsPane ? mProblemsPane->list() : nullptr), std::make_pair("references", mReferences), std::make_pair("search", mSearchResults) })
+    for (auto [name, list] : { std::make_pair("problems", mProblemsPane ? mProblemsPane->list() : nullptr), std::make_pair("references", mReferences), std::make_pair("search", mSearchPane ? mSearchPane->list() : nullptr) })
     {
         if (list && state["sort"].has(name))
         {

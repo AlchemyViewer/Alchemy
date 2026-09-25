@@ -28,6 +28,7 @@
 #include "alscriptnotecardtab.h"
 #include "alscriptoutputpane.h"
 #include "alscriptproblemspane.h"
+#include "alscriptsearchpane.h"
 #include "alscriptstudiodoc.h"
 #include "alscriptstudioservices.h"
 #include "alfindings.h"
@@ -91,7 +92,8 @@ class LLViewerObject;
 // a script the preprocessor wrapped shown as the code the server compiled
 // with the author's source in a tab beside it. Its regions fold and come
 // out as any studio's do.
-class ALFloaterScriptStudio final : public ALStudioFloater, public ALScriptStudioServices, public ALScriptOutputPane::Window, public ALScriptProblemsPane::Window
+class ALFloaterScriptStudio final : public ALStudioFloater, public ALScriptStudioServices, public ALScriptOutputPane::Window, public ALScriptProblemsPane::Window,
+                                    public ALScriptSearchPane::Window
 {
     friend class LLFloaterReg;
 
@@ -591,7 +593,7 @@ private:
     // one step if the text has not moved on.
     void askNewName(Doc& doc);
     void renameTo(const std::string& id, U32 generation, const std::string& new_name);
-    void applyPendingEdits(Doc& doc);
+    void applyPendingEdits(Doc& doc) override;
     // The script handed to an external editor: written to a file under
     // the temp folder and watched, so that the editor's saves are taken
     // as the text and saved from here; the bridge told, so that VS Code
@@ -829,36 +831,17 @@ private:
     // its script there. A script that is open is searched as it stands
     // in the editor, any other as the region has it, fetched if need be;
     // what arrives after another search has begun is dropped.
-    void buildSearchBar();
     void findInFiles();
-    void onSearchChanged();
-    void search();
-    // Every place the last search found replaced by what the box says:
-    // script by script, each script's own one step to undo, a script
-    // that is not open opened with the change unsaved. A script whose
-    // text has moved on since the search is left alone and searched
-    // again.
-    void replaceAllFound();
-    // A script not open is searched as the region has it: its text kept,
-    // for a replace to work over, and whether it is a notecard.
-    void searchDocument(const ALScriptRef& ref, const std::string& name, const std::string& where, const ALTextDocument& text, U32 version = 0,
-                        const std::string& doc_id = std::string(), bool keep_text = false, bool notecard = false);
-    // A script's places as rows, after the rest, up to what a list holds;
-    // and its rows told what it holds now, in place, where it holds as
-    // many places as its rows are -- false where it does not.
-    void addSearchRows(size_t index);
-    bool refreshSearchRows(size_t index);
-    void searchLoaded(U32 generation, const std::string& where, const ALScriptWorkspace::Loaded& loaded);
-    void searchSettled();
-    // The rows from what was found, the row chosen and the scroll kept.
-    void fillSearchResults();
-    // A script open here searched again as it stands now, a moment after
-    // it was typed in, its rows replaced where they were.
-    void researchOpen(Doc& doc);
-    // What a search's row says an open script is in.
-    std::string searchWhere(const Doc& doc) const;
-    void pumpSearch();
-    void onSearchResult(bool to_editor);
+    // What the Search tab asks of the window (ALScriptSearchPane::Window).
+    std::vector<ALScriptSearchPane::Window::Object> objectsListed() const override;
+    std::string                                     objectName(const LLUUID& root) const override;
+    std::string                                     whereIs(const Doc& doc) const override;
+    LLUUID                                          objectInHand() const override;
+    LLUUID                                          rootOf(const ALScriptRef& ref) const override;
+    Doc*                                            openElsewhere(const ALScriptRef& ref) override;
+    void fetchForSearch(const ALScriptRef& ref, U32 generation, const std::string& where) override;
+    void confirmReplaceAll(const LLSD& args, std::function<void()> yes) override;
+    void searchResultChosen(const ALScriptSearch::Found& one, const ALTextRange& place, bool to_editor) override;
     // Where to go in a script once it is open, or now.
     void goToPlace(const ALScriptRef& ref, const std::string& name, S32 line, S32 column, S32 length) override;
 
@@ -992,8 +975,6 @@ private:
     // whether there is anything to read again.
     void askRevert(Doc& doc);
     bool revertible(const Doc& doc) const;
-    // Replace All, asked about first.
-    void askReplaceAll();
     // The places jumped from, to go back to and forward again: a place in
     // a tab by its id. Walking a pane's list is one jump, from where the
     // caret was before the walk began.
@@ -1160,8 +1141,6 @@ private:
     // What Edit > Undo and Redo were last named for.
     std::string                        mUndoSaid;
     std::string                        mRedoSaid;
-    // Whether the last search's pattern did not parse.
-    bool                               mSearchBadPattern = false;
     // The notice over the editor.
     LLLayoutPanel*                     mNoticePanel  = nullptr;
     LLTextBox*                         mNoticeText   = nullptr;
@@ -1261,8 +1240,7 @@ private:
     std::string                        mTrailerSourceTip;
     std::string                        mTrailerExpandedTip;
     ALScriptOutputPane*                mOutputPane = nullptr;
-    ALScopeBar*                        mSearchBar     = nullptr;
-    ALPaneList*                        mSearchResults = nullptr;
+    ALScriptSearchPane*                mSearchPane    = nullptr;
     // The Weights tab, and whether it was looked at last frame and has
     // been told of everything since: it is filled while it is looked at.
     // The fix list last shown, to be weighed a frame later -- once the
@@ -1280,55 +1258,8 @@ private:
     ALPaneList*                        mWeightsParts      = nullptr;
     bool                               mWeightsWereShown  = false;
     bool                               mWeightsStale      = true;
-    LLTextBox*                         mSearchCount   = nullptr;
-    LLLineEditor*                      mSearchReplacement = nullptr;
-    LLButton*                          mSearchReplace     = nullptr;
-    // What each script's text was when it was searched, so that a
-    // replace knows whether the places it found still stand.
-    struct Found
-    {
-        ALScriptRef              ref;
-        // The tab it was searched in, where it was open.
-        std::string              doc;
-        std::string              name;
-        // What the row says it is in: the object and the script.
-        std::string              where;
-        U32                      version = 0;
-        std::vector<ALTextRange> places;
-        // A script that was not open: the text it was searched in, which a
-        // replace works out its replacements over, and whether it is a
-        // notecard, which a replace leaves alone.
-        std::string              text;
-        bool                     notecard = false;
-        // Each place's line as listed, trimmed, and where the words start
-        // in it.
-        std::vector<std::string> lines;
-        std::vector<S32>         at;
-    };
-    std::vector<Found>                 mSearchFound;
-    // The tab a script found is open in, or NONE; and whether Replace All
-    // would change it, which its question counts by.
-    size_t                             foundIndex(const Found& one) const;
-    bool                               replaceable(const Found& one) const;
-    // When the scripts typed in since the search are searched again, or
-    // zero; and which.
-    F64                                mSearchDue = 0.0;
-    std::vector<std::string>           mSearchStale;
-    // The object searched, for a search of one; null otherwise. And every
-    // object the search was over, which what is typed later is searched
-    // again within.
-    LLUUID                             mSearchRoot;
-    std::vector<LLUUID>                mSearchRoots;
-    // Which search the answers arriving belong to; how many files are
-    // still to answer; what was found so far, and in how many files; the
-    // words last searched for, so that a changed dropdown asks again
-    // about the same words while typing waits for return.
-    U32                                mSearchGeneration = 0;
+    // Which lookup across scripts the answers arriving belong to.
     U32                                mLookupGeneration = 0;
-    S32                                mSearchPending    = 0;
-    S32                                mSearchHits       = 0;
-    S32                                mSearchFiles      = 0;
-    std::string                        mSearchQuery;
     ALPaneList*                        mExplorer      = nullptr;
     std::vector<ExplorerObject>        mExplorerModel;
     // Answers have come that the list does not show yet: it is filled a
