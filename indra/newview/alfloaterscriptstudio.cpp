@@ -7174,8 +7174,11 @@ bool ALFloaterScriptStudio::fixAll(Doc& doc, const FixPick& pick)
     {
         return false;
     }
-    // Only the fixes made over the text as it stands (pickFixes).
-    ALCodeEditor&                                    source = sourceInFront(doc);
+    // Only the fixes made over the text as it stands (pickFixes). Made on
+    // a save, into the source where it stands, whichever view is in front,
+    // as the formatting and the trimming a save makes are; asked for,
+    // with the source brought forward, to be seen.
+    ALCodeEditor&                                    source = pick.forSave ? *doc.editor : sourceInFront(doc);
     const std::vector<const ALScriptFix*>            fixes  = pickFixes(doc, pick);
     std::vector<std::pair<ALTextRange, std::string>> edits;
     for (const ALScriptFix* fix : fixes)
