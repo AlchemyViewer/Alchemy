@@ -24,11 +24,25 @@
 
 #include "linden_common.h"
 
-#include "alvimkeymap.h"
+#include "alvimregisters.h"
 
 #include "llclipboard.h"
 
-void ALVimKeymap::store(char name, std::string text, bool linewise, bool block, bool yanked)
+#include <cctype>
+
+ALVimRegisters::ALVimRegisters()
+:   mCopy([](const std::string& text) { LLClipboard::instance().copyToClipboard(text, 0, static_cast<S32>(text.size())); }),
+    mPaste([](std::string& text) { return LLClipboard::instance().pasteFromClipboard(text); })
+{
+}
+
+void ALVimRegisters::setClipboard(copy_t copy, paste_t paste)
+{
+    mCopy  = std::move(copy);
+    mPaste = std::move(paste);
+}
+
+void ALVimRegisters::store(char name, std::string text, bool linewise, bool block, bool yanked, bool unnamed_clipboard)
 {
     Register reg;
     reg.text     = std::move(text);
@@ -66,7 +80,7 @@ void ALVimKeymap::store(char name, std::string text, bool linewise, bool block, 
     if (name == '+' || name == '*')
     {
         mUnnamed = reg;
-        LLClipboard::instance().copyToClipboard(reg.text, 0, static_cast<S32>(reg.text.size()));
+        mCopy(reg.text);
         return;
     }
     if (yanked)
@@ -94,13 +108,13 @@ void ALVimKeymap::store(char name, std::string text, bool linewise, bool block, 
     // The unnamed register: the clipboard, which the world shares, where
     // the setting says so; the editor's own otherwise.
     mUnnamed = reg;
-    if (mShared->unnamedClipboard)
+    if (unnamed_clipboard)
     {
-        LLClipboard::instance().copyToClipboard(reg.text, 0, static_cast<S32>(reg.text.size()));
+        mCopy(reg.text);
     }
 }
 
-ALVimKeymap::Register ALVimKeymap::fetch(char name) const
+ALVimRegisters::Register ALVimRegisters::fetch(char name, bool unnamed_clipboard) const
 {
     if (name >= 'A' && name <= 'Z')
     {
@@ -114,7 +128,7 @@ ALVimKeymap::Register ALVimKeymap::fetch(char name) const
     // "" by name: what was last put in a register, whichever it was. With
     // no register named, the same where the clipboard is not the unnamed
     // register's.
-    if (name == '"' || (name == 0 && !mShared->unnamedClipboard))
+    if (name == '"' || (name == 0 && !unnamed_clipboard))
     {
         return mUnnamed;
     }
@@ -122,7 +136,7 @@ ALVimKeymap::Register ALVimKeymap::fetch(char name) const
     // somebody else's, taken as characters.
     Register    reg;
     std::string text;
-    if (LLClipboard::instance().pasteFromClipboard(text))
+    if (mPaste(text))
     {
         reg.text = text;
         if (text == mUnnamed.text)
@@ -132,4 +146,13 @@ ALVimKeymap::Register ALVimKeymap::fetch(char name) const
         }
     }
     return reg;
+}
+
+void ALVimRegisters::record(char name, const std::string& keys)
+{
+    const bool append = name >= 'A' && name <= 'Z';
+    Register&  reg    = mRegisters[static_cast<char>(std::tolower(name))];
+    reg.text          = append ? reg.text + keys : keys;
+    reg.linewise      = false;
+    reg.block         = false;
 }

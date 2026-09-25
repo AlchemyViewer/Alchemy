@@ -25,6 +25,7 @@
 #pragma once
 
 #include "altextview.h"
+#include "alvimregisters.h"
 
 #include <functional>
 #include <map>
@@ -169,12 +170,7 @@ public:
     static std::vector<Input> decodeInputs(std::string_view text);
 
 private:
-    struct Register
-    {
-        std::string text;
-        bool        linewise = false;
-        bool        block    = false;
-    };
+    typedef ALVimRegisters::Register Register;
     // Where a motion goes, and how the stretch to there is taken.
     struct Motion
     {
@@ -399,9 +395,8 @@ private:
 
     // The registers by name: a-z, 0 for the last yank, 1-9 for the last
     // deletes of a line or more, newest first, and - for the last
-    // smaller one.
-    std::map<char, Register>  mRegisters;
-    Register                  mUnnamed;
+    // smaller one; and the unnamed one (ALVimRegisters).
+    ALVimRegisters            mRegisters;
     // The marks, which move with the text as it is edited: the document
     // they are in is listened to from the first key on it.
     std::map<char, ALTextPos> mMarks;

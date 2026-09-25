@@ -340,6 +340,7 @@ target_sources(
         alfindbar.h
         alkeymap.h
         alvimkeymap.h
+        alvimregisters.h
         alxuiservice.h
         alchoicelist.h
         aloutputview.h
@@ -546,6 +547,7 @@ if(AL_BUILD_TESTS)
     alsnippetsession
     alscripttheme
     alvimkeymap
+    alvimregisters
     alxuiservice
     aloutputview
     alchoicelist

@@ -1449,16 +1449,11 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
                 }
                 const char        into    = mRecording;
                 const std::string keys    = encodeInputs(mRecorded);
-                const bool        append  = into >= 'A' && into <= 'Z';
-                const char        lower   = static_cast<char>(std::tolower(into));
                 mRecording                = 0;
                 mRecorded.clear();
                 // Into its register alone: what was typed is not what the
                 // clipboard holds.
-                Register& reg = mRegisters[lower];
-                reg.text      = append ? reg.text + keys : keys;
-                reg.linewise  = false;
-                reg.block     = false;
+                mRegisters.record(into, keys);
                 clearPending();
                 return true;
             }
@@ -2816,6 +2811,16 @@ void ALVimKeymap::applyOperator(ALTextView& view, llwchar op, const Span& span_i
 }
 
 // --- registers --------------------------------------------------------------------------
+
+void ALVimKeymap::store(char name, std::string text, bool linewise, bool block, bool yanked)
+{
+    mRegisters.store(name, std::move(text), linewise, block, yanked, mShared->unnamedClipboard);
+}
+
+ALVimKeymap::Register ALVimKeymap::fetch(char name) const
+{
+    return mRegisters.fetch(name, mShared->unnamedClipboard);
+}
 
 void ALVimKeymap::tooMuch(size_t bytes)
 {
