@@ -402,6 +402,9 @@ namespace tut
         ensure("no lint to turn off", !out.enabled("off") && !out.enabled("error"));
         ensure("copying always", out.enabled("copy") && out.enabled("copy_all"));
         ensure("no run-time errors to let go of", !out.enabled("clear_runtime"));
+        ensure("of no kind, none to fix along with it", !out.fixShown("kind"));
+        out.act("fix_kind");
+        ensure("nor made", studio.kinds.empty());
         ensure("Fix All, over two", out.fixShown("all"));
 
         choose("shadowed once [LocalShadow]");

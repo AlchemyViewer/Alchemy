@@ -822,7 +822,9 @@ bool ALScriptProblemsPane::fixShown(const std::string& which) const
     }
     if (which == "kind")
     {
-        return doc->pickFixes(Doc::FixPick{ shown->key }).size() > 1;
+        // A problem of no kind -- the compiler's -- has none to fix along
+        // with it: an empty kind would be every kind.
+        return !shown->key.empty() && doc->pickFixes(Doc::FixPick{ shown->key }).size() > 1;
     }
     size_t left = 0;
     return which == "all" && doc->pickFixes(Doc::FixPick{}, &left).size() + left > 1;
@@ -965,7 +967,7 @@ void ALScriptProblemsPane::act(const std::string& action)
     }
     else if (action == "fix_kind")
     {
-        if (const Doc::Shown* shown = chosenShown())
+        if (const Doc::Shown* shown = chosenShown(); shown && !shown->key.empty())
         {
             const std::string key = shown->key;
             mWindow.fixAllOfKind(doc, key);
