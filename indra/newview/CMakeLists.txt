@@ -193,6 +193,7 @@ if(AL_BUILD_VIEWER)
     alscriptstudiosaving.cpp
     alscriptstudiovim.cpp
     alscriptstudiovimrc.cpp
+    alscriptstudioweighing.cpp
     alscriptweightspane.cpp
     alscriptworkspace.cpp
     alterrainsurfacemaps.cpp
