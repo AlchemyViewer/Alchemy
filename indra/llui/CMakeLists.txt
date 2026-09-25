@@ -135,7 +135,6 @@ target_sources(
     alsurface.cpp
     alcodecards.cpp
     alcodeeditor.cpp
-    alcodeeditor_cards.cpp
     alcompletionmodel.cpp
     alfixlistmodel.cpp
     alfoldmodel.cpp
