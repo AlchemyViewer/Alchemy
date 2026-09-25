@@ -48,6 +48,8 @@ bool ALLuauConfig::parse(std::string_view text, ALLuauConfig& out, std::string& 
         config.enabledLint.warningMask = base->lints;
         config.fatalLint.warningMask   = base->fatalLints;
         config.lintErrors              = base->lintErrors;
+        // Added to, as Luau adds a file's globals to the ones above it.
+        config.globals                 = base->globals;
     }
     Luau::ConfigOptions options;
     // Aliases are taken however they are cased in the file.

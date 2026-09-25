@@ -120,4 +120,21 @@ namespace tut
 
         ensure("without a base, Luau's defaults", ALLuauConfig::parse("{}", config, error) && (config.lints & unused) != 0 && config.mode.empty());
     }
+
+    template<> template<>
+    void alluauconfig_object::test<5>()
+    {
+        set_test_name("a file read over another adds its globals to the other's, and its aliases over the other's, as Luau reads a chain of them");
+        ALLuauConfig outer;
+        std::string  error;
+        ensure("the outer file", ALLuauConfig::parse("{ \"globals\": [\"shared\"], \"aliases\": { \"lib\": \"./lib\", \"util\": \"./util\" } }", outer, error));
+        ALLuauConfig inner;
+        ensure("the inner over it", ALLuauConfig::parse("{ \"globals\": [\"mine\"], \"aliases\": { \"lib\": \"./mylib\" } }", inner, error, &outer));
+        ensure("both globals", inner.globals == std::vector<std::string>{ "shared", "mine" });
+        ensure_equals("the nearer alias", inner.aliases["lib"], std::string("./mylib"));
+        ensure_equals("the outer's kept", inner.aliases["util"], std::string("./util"));
+        ALLuauConfig quiet;
+        ensure("one saying nothing of them", ALLuauConfig::parse("{}", quiet, error, &outer));
+        ensure("keeps them", quiet.globals == std::vector<std::string>{ "shared" });
+    }
 }

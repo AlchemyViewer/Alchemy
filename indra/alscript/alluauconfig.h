@@ -59,7 +59,9 @@ struct ALLuauConfig
     // False, with Luau's own word on what is wrong, for text that is not
     // a configuration. What the file does not say is the base's, where
     // one is given -- a scripter's own choice of lints and mode, which a
-    // `.luaurc` overrides key by key -- else Luau's defaults.
+    // `.luaurc` overrides key by key, or the file above this one -- else
+    // Luau's defaults; its globals are added to the base's, and its
+    // aliases put over them, as Luau reads a chain of files from the top.
     static bool parse(std::string_view text, ALLuauConfig& out, std::string& error, const ALLuauConfig* base = nullptr);
 
     // Every lint by the name a `.luaurc` gives it, in Luau's order, and
