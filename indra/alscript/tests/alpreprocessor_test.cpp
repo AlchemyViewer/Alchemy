@@ -1218,4 +1218,32 @@ namespace tut
         // was called for.
         ensure_equals("as many lookups as calls found", count("__modules[") - count("] = (function()"), found.size());
     }
-} // namespace tut
+
+    template<> template<>
+    void alpreprocessor_object::test<32>()
+    {
+        set_test_name("a run says what each include and module was found as, by the name the file asking wrote");
+        add("lib/util.lsl", "#include \"inner.lsl\"\nint util() { return 1; }\n");
+        files["lib/util.lsl"].path = "disk:/scripts/lib/util.lsl";
+        add("inner.lsl", "int inner() { return 2; }\n");
+        add("missing.lsl", "");
+        files.erase("missing.lsl");
+        const ALPreprocessor::Result r = ALPreprocessor::run("#include \"lib/util.lsl\"\n#include \"lib/util.lsl\"\ndefault {}\n", options());
+        // Included twice, with no #pragma once: its own include asked for
+        // twice as well.
+        ensure_equals("four found", r.resolved.size(), size_t(4));
+        ensure("the script's, by its name, as the identity found",
+               r.resolved[0].from.empty() && r.resolved[0].name == "lib/util.lsl" && r.resolved[0].path == "disk:/scripts/lib/util.lsl" &&
+                   !r.resolved[0].require);
+        ensure("the include's own, from it", r.resolved[1].from == "disk:/scripts/lib/util.lsl" && r.resolved[1].name == "inner.lsl" &&
+                                                 r.resolved[1].path == "inner.lsl");
+        ensure("the same asked twice, twice", r.resolved[2].name == "lib/util.lsl" && r.resolved[2].from.empty() &&
+                                                  r.resolved[3].name == "inner.lsl");
+
+        add("mod", "return 1\n");
+        files["mod"].path = "disk:/scripts/mod.luau";
+        const ALPreprocessor::Result lua = ALPreprocessor::run("local m = require(\"mod\")\nlocal n = require(\"none\")\n", options(true));
+        ensure_equals("a module found, one not", lua.resolved.size(), size_t(1));
+        ensure("as a require", lua.resolved[0].require && lua.resolved[0].name == "mod" && lua.resolved[0].path == "disk:/scripts/mod.luau");
+    }
+}

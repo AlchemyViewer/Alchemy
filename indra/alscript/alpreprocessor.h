@@ -169,6 +169,18 @@ public:
         std::vector<std::string> pending;
         // The paths of what was included, each once, in the order opened.
         std::vector<std::string> includes;
+        // What each #include and require found, as the file asking named
+        // it: that file's identity (empty for the script's own), the name
+        // as written, whether it was a require, and the identity found --
+        // what `includes` lists. Every one, where several ask for the same.
+        struct Resolved
+        {
+            std::string from;
+            std::string name;
+            bool        require = false;
+            std::string path;
+        };
+        std::vector<Resolved> resolved;
         // What the run did, whether asked or by the script's own defines.
         bool usedSwitches   = false;
         bool usedLazyLists  = false;

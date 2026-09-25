@@ -2102,6 +2102,7 @@ namespace
                 break;
         }
         const std::string identity = found.path.empty() ? ask.name : found.path;
+        mResult.resolved.push_back({ ask.from, ask.name, false, identity });
         if (mOnce.count(identity))
         {
             return;
@@ -3479,6 +3480,7 @@ namespace
                 return false;
             }
             key = found.path.empty() ? name : found.path;
+            mResult.resolved.push_back({ from, name, true, key });
             if (mDone.count(key))
             {
                 return true;
