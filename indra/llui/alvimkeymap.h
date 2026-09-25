@@ -425,6 +425,13 @@ private:
     // z=: the misspelled word at the caret put right -- by the count's
     // suggestion, or the one picked; zg: it taken into the dictionary.
     void suggest(ALTextView& view, S32 given);
+    // Surround, as surround.vim has it: a stretch with a pair put round
+    // it -- ys{motion}, yss, visual S -- on lines of their own where it is
+    // lines; and the pair round the caret that a character names taken
+    // away (ds), or changed to another's (cs, `with`; 0 to take it away),
+    // the count out. False where there is no such pair.
+    void surround(ALTextView& view, const Span& span, const std::string& open, const std::string& close);
+    bool changeSurround(ALTextView& view, llwchar target, llwchar with, S32 count);
     // zo zc za zR zM zj zk [z ]z: the code editor's folds.
     bool foldCommand(ALTextView& view, llwchar ch, llwchar prefix);
     // The last search's match at the caret or after it, or at it or before
@@ -472,6 +479,12 @@ private:
     // For a text object after an operator: whether the pending i or a
     // was read.
     llwchar mObjectKind   = 0;
+    // Surround's: the stretch ys or visual S took, while the character
+    // to surround it with is waited for, which holds the command open;
+    // and the pair cs is changing.
+    Span    mSurroundSpan;
+    bool    mSurroundWaiting = false;
+    llwchar mSurroundOld     = 0;
 
     // f, F, t and T, for ; and ,.
     llwchar mFindChar    = 0;

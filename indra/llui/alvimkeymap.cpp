@@ -194,9 +194,56 @@ namespace
     // Keys pending, and an operator, that are two typed: gr, and gc.
     constexpr llwchar PENDING_GR       = 0xE000;
     constexpr llwchar COMMENT_OPERATOR = 0xE001;
+    // Surround's: ys, an operator; the character a ys stretch waits for;
+    // ds and cs waiting for the pair to take away or change, and cs for
+    // the pair it becomes.
+    constexpr llwchar SURROUND_OPERATOR  = 0xE002;
+    constexpr llwchar SURROUND_WITH      = 0xE003;
+    constexpr llwchar DELETE_SURROUND    = 0xE004;
+    constexpr llwchar CHANGE_SURROUND    = 0xE005;
+    constexpr llwchar CHANGE_SURROUND_TO = 0xE006;
     std::string shownKey(llwchar key)
     {
-        return key == PENDING_GR ? std::string("gr") : key == COMMENT_OPERATOR ? std::string("gc") : utf8Of(key);
+        switch (key)
+        {
+            case PENDING_GR:         return "gr";
+            case COMMENT_OPERATOR:   return "gc";
+            case SURROUND_OPERATOR:
+            case SURROUND_WITH:      return "ys";
+            case DELETE_SURROUND:    return "ds";
+            case CHANGE_SURROUND:
+            case CHANGE_SURROUND_TO: return "cs";
+            default:                 return utf8Of(key);
+        }
+    }
+    // What a surround character puts round a stretch, as surround.vim has
+    // it: an opening bracket the pair with a space inside each, a closing
+    // one -- or b, r, B, a -- the pair alone, and any other mark itself on
+    // both sides. A letter, a digit or a blank is none.
+    bool surroundPair(llwchar ch, std::string& open, std::string& close)
+    {
+        switch (ch)
+        {
+            case '(': open = "( "; close = " )"; return true;
+            case ')':
+            case 'b': open = "("; close = ")"; return true;
+            case '[': open = "[ "; close = " ]"; return true;
+            case ']':
+            case 'r': open = "["; close = "]"; return true;
+            case '{': open = "{ "; close = " }"; return true;
+            case '}':
+            case 'B': open = "{"; close = "}"; return true;
+            case '<':
+            case '>':
+            case 'a': open = "<"; close = ">"; return true;
+            default:  break;
+        }
+        if (ch < 0x21 || ch == 0x7F || (ch < 0x80 && std::isalnum(static_cast<int>(ch))))
+        {
+            return false;
+        }
+        open = close = utf8Of(ch);
+        return true;
     }
     // A letter of a : command's name.
     bool isNameChar(char c) { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z'); }
@@ -965,6 +1012,7 @@ bool ALVimKeymap::play(ALTextView& view, const std::vector<Input>& inputs, bool 
 
 void ALVimKeymap::clearPending()
 {
+    mSurroundWaiting = false;
     mCount         = 0;
     mRegister      = 0;
     mOperator      = 0;
@@ -975,6 +1023,11 @@ void ALVimKeymap::clearPending()
 
 void ALVimKeymap::finishCommand(bool changed)
 {
+    if (mSurroundWaiting)
+    {
+        // ys's stretch is taken: the command goes on to its character.
+        return;
+    }
     clearPending();
     if (changed && !mReplaying)
     {
@@ -1182,6 +1235,40 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
         const S32 count       = countOr(mCount);
         switch (pending)
         {
+            case SURROUND_WITH:
+            {
+                // ys's stretch, or visual S's, with the pair round it.
+                std::string open;
+                std::string close;
+                mSurroundWaiting = false;
+                if (!editing || !surroundPair(ch, open, close))
+                {
+                    clearPending();
+                    return true;
+                }
+                surround(view, mSurroundSpan, open, close);
+                finishCommand(true);
+                return true;
+            }
+            case CHANGE_SURROUND:
+                mSurroundOld = ch;
+                mPending     = CHANGE_SURROUND_TO;
+                return true;
+            case DELETE_SURROUND:
+            case CHANGE_SURROUND_TO:
+            {
+                // ds's pair taken away, or cs's changed; the count before
+                // the d or the c the pair that many out.
+                const bool changed = editing && changeSurround(view, pending == DELETE_SURROUND ? ch : mSurroundOld,
+                                                               pending == DELETE_SURROUND ? 0 : ch, countOr(mOperatorCount));
+                if (!changed)
+                {
+                    clearPending();
+                    return true;
+                }
+                finishCommand(true);
+                return true;
+            }
             case '"':
                 if ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || ch == '"' || (ch >= '0' && ch <= '9') || ch == '-' || ch == '_' || ch == '+' ||
                     ch == '*')
@@ -1818,6 +1905,36 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
     if (mOperator)
     {
         const llwchar op = mOperator;
+        // Surround's: ys an operator of its own, ds and cs the pair to
+        // take away or change, as surround.vim has them.
+        if (op == 'y' && ch == 's')
+        {
+            mOperator = SURROUND_OPERATOR;
+            return true;
+        }
+        if ((op == 'd' || op == 'c') && ch == 's')
+        {
+            mOperator = 0;
+            mPending  = op == 'd' ? DELETE_SURROUND : CHANGE_SURROUND;
+            return true;
+        }
+        if (op == SURROUND_OPERATOR && ch == 's')
+        {
+            // yss: the line's text, from the first of it that is not blank
+            // to the last.
+            const S32          line = cursor(view).line;
+            const std::string& text = d.line(line);
+            S32                end  = static_cast<S32>(text.size());
+            while (end > 0 && isSpace(text[end - 1]))
+            {
+                --end;
+            }
+            Span span;
+            span.range = ALTextRange(ALTextPos(line, firstNonBlankColumn(d, line)), ALTextPos(line, llmax(end, firstNonBlankColumn(d, line))));
+            applyOperator(view, op, span, 1);
+            finishCommand(true);
+            return true;
+        }
         // The operator doubled -- dd, yy, cc, >>, <<, == -- is the line, and
         // the count more.
         if (ch == op || (op == '~' && ch == '~') || (op == 'u' && ch == 'u') || (op == 'U' && ch == 'U') ||
@@ -1906,6 +2023,19 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
                 if (ch == 'r')
                 {
                     mPending = 'r';
+                    return true;
+                }
+                if (ch == 'S')
+                {
+                    // The selection surrounded, as surround.vim's visual S:
+                    // kept for the character that says with what.
+                    const Span span = visualSpan(view);
+                    noteVisualOperation(span);
+                    leaveVisual(view);
+                    clearPending();
+                    mSurroundSpan    = span;
+                    mPending         = SURROUND_WITH;
+                    mSurroundWaiting = true;
                     return true;
                 }
                 Span span = visualSpan(view);
@@ -3241,6 +3371,16 @@ void ALVimKeymap::applyOperator(ALTextView& view, llwchar op, const Span& span_i
     const S32 last             = span.range.end.line;
     const bool editing         = !view.isReadOnly();
 
+    if (op == SURROUND_OPERATOR)
+    {
+        // ys: the stretch kept for the character that surrounds it, which
+        // comes next; the command goes on until it does.
+        clearPending();
+        mSurroundSpan    = span;
+        mPending         = SURROUND_WITH;
+        mSurroundWaiting = true;
+        return;
+    }
     if (op == COMMENT_OPERATOR)
     {
         // Every line the span touches -- not one an exclusive motion only
@@ -3966,6 +4106,156 @@ bool ALVimKeymap::insert(ALTextView& view, const Input& input)
     }
     // The view puts the character in.
     return false;
+}
+
+// --- surround ---------------------------------------------------------------------------
+
+void ALVimKeymap::surround(ALTextView& view, const Span& span, const std::string& open, const std::string& close)
+{
+    const ALTextDocument&                            d     = view.document();
+    const ALTextRange                                range = span.range.normalised();
+    std::vector<std::pair<ALTextRange, std::string>> edits;
+    ALTextPos                                        caret = range.begin;
+    const auto at_ = [&edits](const ALTextPos& where, const std::string& text) { edits.emplace_back(ALTextRange(where, where), text); };
+    if (span.linewise)
+    {
+        // Lines: the pair on lines of their own round them, at the first
+        // one's indent, without the spaces an opening bracket's has.
+        std::string o = open;
+        std::string c = close;
+        LLStringUtil::trim(o);
+        LLStringUtil::trim(c);
+        const S32         first  = range.begin.line;
+        const S32         last   = llmax(first, range.end.line);
+        const std::string indent = indentOf(d, first);
+        at_(d.lineStart(first), indent + o + "\n");
+        at_(d.lineEnd(last), "\n" + indent + c);
+        caret = ALTextPos(first, static_cast<S32>(indent.size()));
+    }
+    else if (span.block)
+    {
+        // A block: each of its lines' pieces surrounded.
+        for (S32 line = range.begin.line; line <= range.end.line; ++line)
+        {
+            const S32 length = d.lineLength(line);
+            if (range.begin.column >= length)
+            {
+                continue;
+            }
+            at_(ALTextPos(line, range.begin.column), open);
+            at_(ALTextPos(line, llmin(range.end.column + 1, length)), close);
+        }
+    }
+    else if (range.begin == range.end)
+    {
+        at_(range.begin, open + close);
+    }
+    else
+    {
+        at_(range.begin, open);
+        at_(range.end, close);
+    }
+    if (edits.empty())
+    {
+        return;
+    }
+    view.replaceAll(std::move(edits));
+    moveTo(view, caret);
+}
+
+bool ALVimKeymap::changeSurround(ALTextView& view, llwchar target, llwchar with, S32 count)
+{
+    const ALTextDocument& d = view.document();
+    std::string           open_text;
+    std::string           close_text;
+    if (with != 0 && !surroundPair(with, open_text, close_text))
+    {
+        return false;
+    }
+    // The two ends of the pair: a bracket's, the count out; a tag's; a
+    // quote's on the line; or any other mark's, the nearest on the line
+    // either side of the caret.
+    const llwchar object = target == 'r' ? '[' : target == 'a' ? '<' : target;
+    ALTextRange   open;
+    ALTextRange   close;
+    Span          outer;
+    Span          inner;
+    if (object == '(' || object == ')' || object == 'b' || object == '[' || object == ']' || object == '{' || object == '}' || object == 'B' ||
+        object == '<' || object == '>')
+    {
+        if (!textObject(view, 'a', object, count, outer))
+        {
+            return false;
+        }
+        open  = ALTextRange(outer.range.begin, d.nextCluster(outer.range.begin));
+        close = ALTextRange(d.prevCluster(outer.range.end), outer.range.end);
+    }
+    else if (object == 't')
+    {
+        if (!textObject(view, 'a', 't', count, outer) || !textObject(view, 'i', 't', count, inner))
+        {
+            return false;
+        }
+        open  = ALTextRange(outer.range.begin, inner.range.begin);
+        close = ALTextRange(inner.range.end, outer.range.end);
+    }
+    else if (object == '"' || object == '\'' || object == '`')
+    {
+        if (!textObject(view, 'i', object, 1, inner))
+        {
+            return false;
+        }
+        open  = ALTextRange(d.prevCluster(inner.range.begin), inner.range.begin);
+        close = ALTextRange(inner.range.end, d.nextCluster(inner.range.end));
+    }
+    else if (object >= 0x21 && object < 0x7F && !std::isalnum(static_cast<int>(object)))
+    {
+        const ALTextPos    caret = cursor(view);
+        const std::string& line  = d.line(caret.line);
+        const char         mark  = static_cast<char>(object);
+        size_t             left  = line.rfind(mark, static_cast<size_t>(caret.column));
+        if (left == std::string::npos)
+        {
+            return false;
+        }
+        size_t right = line.find(mark, left + 1);
+        if (right == std::string::npos)
+        {
+            // The caret on the closing one.
+            right = left;
+            left  = left > 0 ? line.rfind(mark, left - 1) : std::string::npos;
+            if (left == std::string::npos)
+            {
+                return false;
+            }
+        }
+        open  = ALTextRange(ALTextPos(caret.line, static_cast<S32>(left)), ALTextPos(caret.line, static_cast<S32>(left) + 1));
+        close = ALTextRange(ALTextPos(caret.line, static_cast<S32>(right)), ALTextPos(caret.line, static_cast<S32>(right) + 1));
+    }
+    else
+    {
+        return false;
+    }
+    if (target == '(' || target == '[' || target == '{')
+    {
+        // An opening bracket takes the blanks inside the pair with it, as
+        // surround.vim's does.
+        const auto blank = [&d](const ALTextPos& p) {
+            const char c = at(d, p);
+            return c == ' ' || c == '\t';
+        };
+        while (open.end < close.begin && open.end.column < d.lineLength(open.end.line) && blank(open.end))
+        {
+            ++open.end.column;
+        }
+        while (close.begin > open.end && close.begin.column > 0 && blank(ALTextPos(close.begin.line, close.begin.column - 1)))
+        {
+            --close.begin.column;
+        }
+    }
+    view.replaceAll({ { open, open_text }, { close, close_text } });
+    moveTo(view, open.begin);
+    return true;
 }
 
 // --- visual mode ------------------------------------------------------------------------

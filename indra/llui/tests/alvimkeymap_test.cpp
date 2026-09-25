@@ -2122,4 +2122,57 @@ namespace tut
         ensure("one typed kept", maps.match(ALVimMappings::NORMAL, maps.keysOf("Q"), true).full != nullptr);
         ensure("and the view's options it no longer sets", shared.viewOptions.empty());
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<67>()
+    {
+        set_test_name("surround: ys puts a pair round a motion's stretch, an opening bracket with spaces; ds takes it away, cs changes it; . again");
+        ALCodeEditor& e = make("say hello world\n");
+        keys("wysiw)");
+        ensure_equals("ysiw)", flat(e.text()), std::string("say (hello) world|"));
+        ensure_equals("the caret on the pair's start", caretText(), std::string("0:4"));
+        keys("ds)");
+        ensure_equals("ds)", flat(e.text()), std::string("say hello world|"));
+        keys("ysiw(");
+        ensure_equals("ysiw( has spaces inside", flat(e.text()), std::string("say ( hello ) world|"));
+        keys("ds(");
+        ensure_equals("ds( takes them too", flat(e.text()), std::string("say hello world|"));
+        keys("ysiw\"");
+        keys("cs\"'");
+        ensure_equals("cs\"'", flat(e.text()), std::string("say 'hello' world|"));
+        keys("$ysiw]");
+        ensure_equals("ysiw] on the last word", flat(e.text()), std::string("say 'hello' [world]|"));
+        keys("0.");
+        ensure_equals(". does it again here", flat(e.text()), std::string("[say] 'hello' [world]|"));
+        keys("ysiw");
+        ensure_equals("waiting for the character, said", vim->status(), std::string("ys"));
+        keys("<Esc>");
+        ensure("Escape lets it go", flat(e.text()) == "[say] 'hello' [world]|" && vim->status().empty());
+        keys("0x.");
+        ensure_equals("and the next command is one of its own, for . too", flat(e.text()), std::string("ay] 'hello' [world]|"));
+        keys("ysiwx");
+        ensure_equals("a letter is no pair", flat(e.text()), std::string("ay] 'hello' [world]|"));
+        keys("uuu");
+        ensure_equals("each undone as one step", flat(e.text()), std::string("say 'hello' [world]|"));
+    }
+
+    template<> template<>
+    void alvimkeymap_object::test<68>()
+    {
+        set_test_name("surround: a count out, a mark's pair and a tag's taken away; yss the line's text; visual S round lines");
+        ALCodeEditor& e = make("((a) b)\n*bold* and <b>x</b>\n  line text  \none\ntwo\n");
+        keys("ll2ds)");
+        ensure_equals("2ds) the outer pair", flat(e.text()), std::string("(a) b|*bold* and <b>x</b>|  line text  |one|two|"));
+        keys("jlds*");
+        ensure_equals("ds* the marks either side", flat(e.text()), std::string("(a) b|bold and <b>x</b>|  line text  |one|two|"));
+        keys("$Fxdst");
+        ensure_equals("dst the tags", flat(e.text()), std::string("(a) b|bold and x|  line text  |one|two|"));
+        keys("3Gyss)");
+        ensure_equals("yss the line's text, its blanks outside", flat(e.text()), std::string("(a) b|bold and x|  (line text)  |one|two|"));
+        keys("4GVjS{");
+        ensure_equals("visual S round lines, on lines of their own", flat(e.text()),
+                      std::string("(a) b|bold and x|  (line text)  |{|one|two|}|"));
+        keys("2Gcsbx");
+        ensure_equals("no such pair: nothing", flat(e.text()), std::string("(a) b|bold and x|  (line text)  |{|one|two|}|"));
+    }
 }
