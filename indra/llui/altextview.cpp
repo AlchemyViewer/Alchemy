@@ -697,7 +697,28 @@ void ALTextView::placeSelection(const ALTextPos& anchor, const ALTextPos& caret)
     mBlink.reset();
     if (selection() != was)
     {
+        if (hasSelection())
+        {
+            if (mSelecting)
+            {
+                mPrimaryStale = true;
+            }
+            else
+            {
+                offerPrimary();
+            }
+        }
         mCaretMoved();
+    }
+}
+
+void ALTextView::offerPrimary()
+{
+    mPrimaryStale = false;
+    if (hasSelection())
+    {
+        const std::string text = selectedText();
+        LLClipboard::instance().copyToClipboard(text, 0, static_cast<S32>(text.size()), true);
     }
 }
 
@@ -4343,6 +4364,38 @@ bool ALTextView::handleMouseDown(S32 x, S32 y, MASK mask)
     return true;
 }
 
+bool ALTextView::handleMiddleMouseDown(S32 x, S32 y, MASK mask)
+{
+    // Over the text only, not its map or bars; nor while a drag is held.
+    const bool on_text = textRect().pointInRect(x, y) && !(mScrollMap && mapRect().pointInRect(x, y));
+    if (mReadOnly || mSelecting || mBarDrag != BarDrag::None || mDraggingMap || !on_text || !LLClipboard::instance().isTextAvailable(true))
+    {
+        return LLUICtrl::handleMiddleMouseDown(x, y, mask);
+    }
+    std::string text;
+    if (!LLClipboard::instance().pasteFromClipboard(text, true) || text.empty())
+    {
+        return true;
+    }
+    if (mTakesFocus)
+    {
+        setFocus(true);
+    }
+    // Where the press is, leaving what is selected in place rather than
+    // replacing it, as X11 does: the selection goes, the text it had stays
+    // the primary one.
+    placeCaret(posAtLocal(x, y, true), false);
+    mDesiredX = -1.f;
+    mUndo.beginGroup();
+    insertText(text);
+    mUndo.endGroup();
+    if (mModal)
+    {
+        mModal->mouseChanged(*this);
+    }
+    return true;
+}
+
 bool ALTextView::handleRightMouseDown(S32 x, S32 y, MASK mask)
 {
     if (overlayAt(x, y))
@@ -4483,6 +4536,10 @@ bool ALTextView::handleMouseUp(S32 x, S32 y, MASK mask)
     {
         mSelecting = false;
         gFocusMgr.setMouseCapture(nullptr);
+        if (mPrimaryStale)
+        {
+            offerPrimary();
+        }
         // The link or the atom pressed, let go of on the same without a
         // drag: followed.
         const S32 pressed_link = mPressedLink;

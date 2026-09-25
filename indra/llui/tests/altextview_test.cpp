@@ -26,6 +26,7 @@
 
 #include "../alfindbar.h"
 #include "../altextview.h"
+#include "../llclipboard.h"
 
 #include "../llbutton.h"
 #include "../llfocusmgr.h"
@@ -1153,5 +1154,43 @@ namespace tut
         ensure_equals("further past, further on", v.scrollY(), first + 4 * row_h);
         ensure("the selection with it", v.selection().normalised().end.line > 0);
         v.handleMouseUp(x, text.mBottom - 1, MASK_NONE);
+    }
+
+    template<> template<>
+    void altextview_object::test<35>()
+    {
+        set_test_name("what is selected is the primary selection, and the middle button puts it where it is pressed");
+        LLClipboard& clipboard = LLClipboard::instance();
+        const std::string copied = "copied";
+        clipboard.copyToClipboard(copied, 0, static_cast<S32>(copied.size()));
+        ALTextView& v = make("alpha beta\ngamma\n");
+        v.setSelection(ALTextRange(ALTextPos(0, 6), ALTextPos(0, 10)));
+        std::string primary;
+        ensure("selected", clipboard.pasteFromClipboard(primary, true));
+        ensure_equals("is the primary selection", primary, std::string("beta"));
+        std::string held;
+        clipboard.pasteFromClipboard(held);
+        ensure_equals("and not what was copied", held, copied);
+        // A drag's once it is let go of, not at every step.
+        S32 x, y, x2, y2;
+        pointOf(1, 0, x, y);
+        pointOf(1, 3, x2, y2);
+        v.handleMouseDown(x, y, MASK_NONE);
+        v.handleHover(x2, y2, MASK_NONE);
+        clipboard.pasteFromClipboard(primary, true);
+        ensure_equals("not while the drag goes on", primary, std::string("beta"));
+        v.handleMouseUp(x2, y2, MASK_NONE);
+        clipboard.pasteFromClipboard(primary, true);
+        ensure_equals("once it is let go of", primary, std::string("gam"));
+        // Put at the press, the selection left as text.
+        pointOf(0, 5, x, y);
+        ensure("taken", v.handleMiddleMouseDown(x, y, MASK_NONE));
+        ensure_equals("put where pressed", v.text(), std::string("alphagam beta\ngamma\n"));
+        ensure("nothing selected after", !v.hasSelection());
+        v.undo();
+        ensure_equals("one undo", v.text(), std::string("alpha beta\ngamma\n"));
+        v.setReadOnly(true);
+        v.handleMiddleMouseDown(x, y, MASK_NONE);
+        ensure_equals("not into read-only text", v.text(), std::string("alpha beta\ngamma\n"));
     }
 }

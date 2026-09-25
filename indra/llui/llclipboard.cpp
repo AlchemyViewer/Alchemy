@@ -123,9 +123,10 @@ bool LLClipboard::copyToClipboard(std::string_view src, S32 byte_pos, S32 byte_l
 // Concatenate the input string to the LL and the system clipboard
 bool LLClipboard::addToClipboard(std::string_view src, S32 byte_pos, S32 byte_len, bool use_primary)
 {
+    std::string& held = use_primary ? mPrimary : mString;
     try
     {
-        mString.assign(src.substr(byte_pos, byte_len));
+        held.assign(src.substr(byte_pos, byte_len));
     }
     catch (const std::exception& e)
     {
@@ -139,23 +140,24 @@ bool LLClipboard::addToClipboard(std::string_view src, S32 byte_pos, S32 byte_le
     {
         return true;
     }
-    return (use_primary ? window->copyTextToPrimary(mString) : window->copyTextToClipboard(mString));
+    return (use_primary ? window->copyTextToPrimary(held) : window->copyTextToClipboard(held));
 }
 
 // Copy the System clipboard to the output string.
 // Manage the LL Clipboard / System clipboard consistency
 bool LLClipboard::pasteFromClipboard(std::string& dst, bool use_primary)
 {
-    LLWindow* window = LLView::getWindow();
+    std::string& held   = use_primary ? mPrimary : mString;
+    LLWindow*    window = LLView::getWindow();
     if (!window)
     {
-        dst = mString;
+        dst = held;
         return !dst.empty();
     }
     const bool res = (use_primary ? window->pasteTextFromPrimary(dst) : window->pasteTextFromClipboard(dst));
     if (res)
     {
-        mString = dst;
+        held = dst;
     }
     return res;
 }
@@ -166,7 +168,7 @@ bool LLClipboard::isTextAvailable(bool use_primary) const
     LLWindow* window = LLView::getWindow();
     if (!window)
     {
-        return !mString.empty();
+        return !(use_primary ? mPrimary : mString).empty();
     }
     return (use_primary ? window->isPrimaryTextAvailable() : window->isClipboardTextAvailable());
 }

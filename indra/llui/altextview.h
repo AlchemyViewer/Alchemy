@@ -560,6 +560,11 @@ public:
     bool handleUnicodeCharHere(llwchar uni_char) override;
     bool handleMouseDown(S32 x, S32 y, MASK mask) override;
     bool handleMouseUp(S32 x, S32 y, MASK mask) override;
+    // The primary selection -- what was last selected, here or anywhere --
+    // put where the middle button is pressed, as X11's text boxes and the
+    // viewer's own do; where the window has none, as on Windows and the
+    // Mac, nothing.
+    bool handleMiddleMouseDown(S32 x, S32 y, MASK mask) override;
     void onMouseLeave(S32 x, S32 y, MASK mask) override;
     bool handleRightMouseDown(S32 x, S32 y, MASK mask) override;
     bool handleHover(S32 x, S32 y, MASK mask) override;
@@ -857,6 +862,10 @@ private:
     // What a wheel moved that did not make a whole pixel yet.
     F32          mWheelRemainder = 0.f;
     bool         mSelecting = false;
+    // What is selected becomes the primary selection: at once, or, while a
+    // drag goes on, once it is let go of.
+    void         offerPrimary();
+    bool         mPrimaryStale = false;
     // A drag reaches from where the press put the anchor, not from where a
     // modal keymap then moved the caret -- vim's normal mode takes a click
     // past a line's end back onto its last character -- and only once the

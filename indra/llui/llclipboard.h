@@ -86,6 +86,7 @@ public:
 private:
     std::vector<LLUUID> mObjects;       // Objects on the clipboard. Can be empty while mString contains something licit (e.g. text from chat)
     std::string mString;                // The text string. If mObjects is not empty, this string is reflecting them (UUIDs for the moment) if the asset type is knowable.
+    std::string mPrimary;               // The primary selection's text, held apart so that selecting never stands in for what was copied.
     bool mCutMode;                      // This is a convenience flag for the viewer.
     int mGeneration;                    // Incremented when the clipboard changes so that interested parties can check for changes on the clipboard.
 };
