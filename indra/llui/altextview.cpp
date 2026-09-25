@@ -1278,25 +1278,106 @@ const ALTextView::Atom* ALTextView::atomAtLocal(S32 x, S32 y)
     return xr >= x0 && xr < x1 ? atom : nullptr;
 }
 
+// --- the spell check -------------------------------------------------------------
+
+void ALTextView::setSpellCheck(bool check)
+{
+    if (check == mSpellCheck)
+    {
+        return;
+    }
+    mSpellCheck = check;
+    if (check && !mSpellSettingsConnection.connected())
+    {
+        mSpellSettingsConnection = LLSpellChecker::setSettingsChangeCallback([this]() { recheckSpelling(); });
+    }
+    recheckSpelling();
+}
+
+bool ALTextView::getSpellCheck() const
+{
+    return mSpellCheck && !mReadOnly && mSpelling.available();
+}
+
+void ALTextView::setSpellChecker(spell_checker_t checker, spell_suggester_t suggester)
+{
+    mSpelling.setChecker(std::move(checker), std::move(suggester));
+}
+
+void ALTextView::recheckSpelling()
+{
+    mSpelling.recheck();
+}
+
+const std::vector<std::pair<S32, S32>>& ALTextView::misspellings(S32 line)
+{
+    return mSpelling.misspellings(mDocument, mHighlighter, line, getSpellCheck());
+}
+
+bool ALTextView::misspelledAt(const ALTextPos& pos, ALTextRange* word)
+{
+    return mSpelling.misspelledAt(mDocument, mHighlighter, pos, getSpellCheck(), word);
+}
+
+void ALTextView::refreshSuggestions()
+{
+    mSpelling.suggestAt(mDocument, mHighlighter, mCaret, getSpellCheck());
+}
+
+const std::string& ALTextView::getSuggestion(U32 index) const
+{
+    return index < mSpelling.suggestions().size() ? mSpelling.suggestions()[index] : LLStringUtil::null;
+}
+
+U32 ALTextView::getSuggestionCount() const
+{
+    return static_cast<U32>(mSpelling.suggestions().size());
+}
+
+void ALTextView::replaceWithSuggestion(U32 index)
+{
+    if (mReadOnly)
+    {
+        return;
+    }
+    if (const std::optional<std::pair<ALTextRange, std::string>> taken = mSpelling.take(index); taken && !edit(taken->first, taken->second).nothing())
+    {
+        afterEdit();
+    }
+}
+
+void ALTextView::addToDictionary()
+{
+    if (canAddToDictionary())
+    {
+        mSpelling.addToDictionary(mDocument);
+    }
+}
+
+bool ALTextView::canAddToDictionary() const
+{
+    return mSpelling.canTeach(getSpellCheck());
+}
+
+void ALTextView::addToIgnore()
+{
+    if (canAddToIgnore())
+    {
+        mSpelling.addToIgnore(mDocument);
+    }
+}
+
+bool ALTextView::canAddToIgnore() const
+{
+    return canAddToDictionary();
+}
+
 void ALTextView::onDocumentEdit(const ALTextDocument::Edit& edit)
 {
     // The lines the edit touched are checked again when they are next
     // drawn; the ones below slide.
-    {
-        const S32 count = static_cast<S32>(mSpellLines.size());
-        const S32 first = llclamp(edit.range.begin.line, 0, count);
-        const S32 last  = llclamp(edit.range.end.line, first, count - 1);
-        const S32 made  = 1 + static_cast<S32>(std::count(edit.inserted.begin(), edit.inserted.end(), '\n'));
-        if (first < count)
-        {
-            mSpellLines.erase(mSpellLines.begin() + first, mSpellLines.begin() + last + 1);
-        }
-        mSpellLines.insert(mSpellLines.begin() + llmin(first, static_cast<S32>(mSpellLines.size())), made, SpellLine());
-        mSpellLines.resize(static_cast<size_t>(mDocument.lineCount()));
-        mSpellTimer.reset();
-    }
-    mSuggestions.clear();
-    mSuggestedFor = ALTextRange();
+    mSpelling.edited(edit, mDocument.lineCount());
+    mSpellTimer.reset();
     // The stretch a search is held to grows and shrinks with what is done
     // within it.
     if (mFindInSelection)
@@ -2381,8 +2462,8 @@ void ALTextView::showContextMenu(S32 x, S32 y)
     }
     // The dictionary's items, where the menu has them: the suggestions
     // show themselves, the rest are shown here.
-    const bool misspelled = getSpellCheck() && !mSuggestedFor.empty();
-    menu->setItemVisible("Suggestion Separator", misspelled && !mSuggestions.empty());
+    const bool misspelled = getSpellCheck() && !mSpelling.suggestedFor().empty();
+    menu->setItemVisible("Suggestion Separator", misspelled && !mSpelling.suggestions().empty());
     menu->setItemVisible("Add to Dictionary", misspelled);
     menu->setItemVisible("Add to Ignore", misspelled);
     menu->setItemVisible("Spellcheck Separator", misspelled);

@@ -24,9 +24,11 @@
 
 #include "linden_common.h"
 
-#include "altextview.h"
+#include "altextspelling.h"
 
+#include "alsyntaxhighlighter.h"
 #include "llspellcheck.h"
+#include "llstring.h"
 
 namespace
 {
@@ -60,56 +62,40 @@ namespace
     }
 }
 
-// --- the spell check -------------------------------------------------------------
-
-void ALTextView::setSpellCheck(bool check)
+void ALTextSpelling::setChecker(checker_t checker, suggester_t suggester)
 {
-    if (check == mSpellCheck)
-    {
-        return;
-    }
-    mSpellCheck = check;
-    if (check && !mSpellSettingsConnection.connected())
-    {
-        mSpellSettingsConnection = LLSpellChecker::setSettingsChangeCallback([this]() { recheckSpelling(); });
-    }
-    recheckSpelling();
+    mChecker   = std::move(checker);
+    mSuggester = std::move(suggester);
+    recheck();
 }
 
-bool ALTextView::getSpellCheck() const
+bool ALTextSpelling::available() const
 {
-    return mSpellCheck && !mReadOnly && (mSpellChecker || LLSpellChecker::getUseSpellCheck());
+    return mChecker || LLSpellChecker::getUseSpellCheck();
 }
 
-void ALTextView::setSpellChecker(spell_checker_t checker, spell_suggester_t suggester)
+void ALTextSpelling::recheck()
 {
-    mSpellChecker   = std::move(checker);
-    mSpellSuggester = std::move(suggester);
-    recheckSpelling();
-}
-
-void ALTextView::recheckSpelling()
-{
-    mSpellLines.clear();
+    mLines.clear();
     mSuggestions.clear();
     mSuggestedFor = ALTextRange();
 }
 
-void ALTextView::checkLine(S32 line)
+void ALTextSpelling::checkLine(const ALTextDocument& doc, ALSyntaxHighlighter& highlighter, S32 line, bool on)
 {
-    if (static_cast<size_t>(line) >= mSpellLines.size())
+    if (static_cast<size_t>(line) >= mLines.size())
     {
-        mSpellLines.resize(static_cast<size_t>(mDocument.lineCount()));
+        mLines.resize(static_cast<size_t>(doc.lineCount()));
     }
-    SpellLine& checked = mSpellLines[static_cast<size_t>(line)];
-    checked.valid      = true;
-    checked.revision   = mHighlighter.revision(line);
+    Line& checked    = mLines[static_cast<size_t>(line)];
+    checked.valid    = true;
+    checked.revision = highlighter.revision(line);
     checked.words.clear();
-    if (!getSpellCheck())
+    if (!on)
     {
         return;
     }
-    const std::string& text = mDocument.line(line);
+    const std::string& text = doc.line(line);
     // What is prose: everything, without a grammar or with one that
     // says so; comments and strings otherwise.
     auto check_stretch = [&](S32 begin, S32 end) {
@@ -129,14 +115,14 @@ void ALTextView::checkLine(S32 line)
                 continue;
             }
             const std::string spelled(piece);
-            const bool        ok = mSpellChecker ? mSpellChecker(spelled) : LLSpellChecker::instance().checkSpelling(spelled);
+            const bool        ok = mChecker ? mChecker(spelled) : LLSpellChecker::instance().checkSpelling(spelled);
             if (!ok)
             {
                 checked.words.emplace_back(static_cast<S32>(word.first), static_cast<S32>(word_end));
             }
         }
     };
-    const std::shared_ptr<const ALSyntaxGrammar> grammar = mHighlighter.grammar();
+    const std::shared_ptr<const ALSyntaxGrammar> grammar = highlighter.grammar();
     if (!grammar || grammar->prose())
     {
         check_stretch(0, static_cast<S32>(text.size()));
@@ -144,7 +130,7 @@ void ALTextView::checkLine(S32 line)
     }
     // What names a file, a module or an address rather than saying
     // anything is the grammar's to say, as a path, which is never checked.
-    for (const ALSyntaxToken& token : mHighlighter.tokens(line))
+    for (const ALSyntaxToken& token : highlighter.tokens(line))
     {
         const bool prose = token.kind == ALSyntaxKind::Comment || token.kind == ALSyntaxKind::DocComment || token.kind == ALSyntaxKind::String;
         if (prose)
@@ -154,27 +140,27 @@ void ALTextView::checkLine(S32 line)
     }
 }
 
-const std::vector<std::pair<S32, S32>>& ALTextView::misspellings(S32 line)
+const ALTextSpelling::words_t& ALTextSpelling::misspellings(const ALTextDocument& doc, ALSyntaxHighlighter& highlighter, S32 line, bool on)
 {
-    static const std::vector<std::pair<S32, S32>> none;
-    if (line < 0 || line >= mDocument.lineCount())
+    static const words_t none;
+    if (line < 0 || line >= doc.lineCount())
     {
         return none;
     }
     // Checked again where the line's tokens changed since -- a comment
     // opened or closed on a line above makes it prose or code -- as well
     // as where the line itself did.
-    if (static_cast<size_t>(line) >= mSpellLines.size() || !mSpellLines[static_cast<size_t>(line)].valid ||
-        mSpellLines[static_cast<size_t>(line)].revision != mHighlighter.revision(line))
+    if (static_cast<size_t>(line) >= mLines.size() || !mLines[static_cast<size_t>(line)].valid ||
+        mLines[static_cast<size_t>(line)].revision != highlighter.revision(line))
     {
-        checkLine(line);
+        checkLine(doc, highlighter, line, on);
     }
-    return mSpellLines[static_cast<size_t>(line)].words;
+    return mLines[static_cast<size_t>(line)].words;
 }
 
-bool ALTextView::misspelledAt(const ALTextPos& pos, ALTextRange* word)
+bool ALTextSpelling::misspelledAt(const ALTextDocument& doc, ALSyntaxHighlighter& highlighter, const ALTextPos& pos, bool on, ALTextRange* word)
 {
-    for (const auto& [begin, end] : misspellings(pos.line))
+    for (const auto& [begin, end] : misspellings(doc, highlighter, pos.line, on))
     {
         if (begin <= pos.column && pos.column <= end)
         {
@@ -188,76 +174,69 @@ bool ALTextView::misspelledAt(const ALTextPos& pos, ALTextRange* word)
     return false;
 }
 
-void ALTextView::refreshSuggestions()
+void ALTextSpelling::edited(const ALTextDocument::Edit& edit, S32 line_count)
+{
+    // The lines the edit touched are checked again when they are next
+    // asked about; the ones below slide.
+    const S32 count = static_cast<S32>(mLines.size());
+    const S32 first = llclamp(edit.range.begin.line, 0, count);
+    const S32 last  = llclamp(edit.range.end.line, first, count - 1);
+    const S32 made  = 1 + static_cast<S32>(std::count(edit.inserted.begin(), edit.inserted.end(), '\n'));
+    if (first < count)
+    {
+        mLines.erase(mLines.begin() + first, mLines.begin() + last + 1);
+    }
+    mLines.insert(mLines.begin() + llmin(first, static_cast<S32>(mLines.size())), made, Line());
+    mLines.resize(static_cast<size_t>(line_count));
+    mSuggestions.clear();
+    mSuggestedFor = ALTextRange();
+}
+
+void ALTextSpelling::suggestAt(const ALTextDocument& doc, ALSyntaxHighlighter& highlighter, const ALTextPos& pos, bool on)
 {
     mSuggestions.clear();
     mSuggestedFor = ALTextRange();
     ALTextRange word;
-    if (!getSpellCheck() || !misspelledAt(mCaret, &word))
+    if (!on || !misspelledAt(doc, highlighter, pos, on, &word))
     {
         return;
     }
     mSuggestedFor = word;
-    if (mSpellSuggester)
+    if (mSuggester)
     {
-        mSpellSuggester(mDocument.text(word), mSuggestions);
+        mSuggester(doc.text(word), mSuggestions);
     }
-    else if (!mSpellChecker && LLSpellChecker::instanceExists())
+    else if (!mChecker && LLSpellChecker::instanceExists())
     {
-        LLSpellChecker::instance().getSuggestions(mDocument.text(word), mSuggestions);
+        LLSpellChecker::instance().getSuggestions(doc.text(word), mSuggestions);
     }
 }
 
-const std::string& ALTextView::getSuggestion(U32 index) const
+std::optional<std::pair<ALTextRange, std::string>> ALTextSpelling::take(U32 index)
 {
-    return index < mSuggestions.size() ? mSuggestions[index] : LLStringUtil::null;
-}
-
-U32 ALTextView::getSuggestionCount() const
-{
-    return static_cast<U32>(mSuggestions.size());
-}
-
-void ALTextView::replaceWithSuggestion(U32 index)
-{
-    if (index >= mSuggestions.size() || mSuggestedFor.empty() || mReadOnly)
+    std::optional<std::pair<ALTextRange, std::string>> taken;
+    if (index < mSuggestions.size() && !mSuggestedFor.empty())
     {
-        return;
+        taken.emplace(mSuggestedFor, mSuggestions[index]);
     }
-    const ALTextRange word       = mSuggestedFor;
-    const std::string suggestion = mSuggestions[index];
     mSuggestions.clear();
     mSuggestedFor = ALTextRange();
-    if (!edit(word, suggestion).nothing())
-    {
-        afterEdit();
-    }
+    return taken;
 }
 
-void ALTextView::addToDictionary()
+bool ALTextSpelling::canTeach(bool on) const
 {
-    if (canAddToDictionary())
-    {
-        LLSpellChecker::instance().addToCustomDictionary(mDocument.text(mSuggestedFor));
-        recheckSpelling();
-    }
+    return on && !mSuggestedFor.empty() && !mChecker && LLSpellChecker::instanceExists();
 }
 
-bool ALTextView::canAddToDictionary() const
+void ALTextSpelling::addToDictionary(const ALTextDocument& doc)
 {
-    return getSpellCheck() && !mSuggestedFor.empty() && !mSpellChecker && LLSpellChecker::instanceExists();
+    LLSpellChecker::instance().addToCustomDictionary(doc.text(mSuggestedFor));
+    recheck();
 }
 
-void ALTextView::addToIgnore()
+void ALTextSpelling::addToIgnore(const ALTextDocument& doc)
 {
-    if (canAddToIgnore())
-    {
-        LLSpellChecker::instance().addToIgnoreList(mDocument.text(mSuggestedFor));
-        recheckSpelling();
-    }
-}
-
-bool ALTextView::canAddToIgnore() const
-{
-    return canAddToDictionary();
+    LLSpellChecker::instance().addToIgnoreList(doc.text(mSuggestedFor));
+    recheck();
 }

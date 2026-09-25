@@ -28,6 +28,7 @@
 #include "alsyntaxhighlighter.h"
 #include "altextdocument.h"
 #include "altextediting.h"
+#include "altextspelling.h"
 #include "altextlayout.h"
 #include "altextsearch.h"
 #include "altextundo.h"
@@ -438,8 +439,8 @@ public:
     // Who says whether a word is spelled right, and what it might have
     // been: the viewer's dictionary unless told otherwise, which a test
     // is. Only the dictionary takes a word in or lets one pass.
-    typedef std::function<bool(const std::string& word)>                             spell_checker_t;
-    typedef std::function<void(const std::string& word, std::vector<std::string>& out)> spell_suggester_t;
+    typedef ALTextSpelling::checker_t   spell_checker_t;
+    typedef ALTextSpelling::suggester_t spell_suggester_t;
     void setSpellChecker(spell_checker_t checker, spell_suggester_t suggester = nullptr);
     // The dictionary's suggestions for the misspelling at the caret,
     // gathered again: what the right-click menu offers.
@@ -806,7 +807,6 @@ private:
     // on its glyphs.
     const Substitution* linkAtLocal(S32 x, S32 y);
     const Atom*         atomAtLocal(S32 x, S32 y);
-    void                checkLine(S32 line);
     // The atom whose view has the keyboard, or -1; and the keyboard taken
     // back from a view about to lose its box.
     S32                 focusedAtom() const;
@@ -974,21 +974,10 @@ private:
     // the line changes or the dictionary does; the word at the caret is
     // left alone for a moment after it was typed.
     bool                                    mSpellCheck = false;
-    spell_checker_t                         mSpellChecker;
-    spell_suggester_t                       mSpellSuggester;
-    struct SpellLine
-    {
-        bool                             valid = false;
-        // The line's tokens as they were checked by.
-        U32                              revision = 0;
-        std::vector<std::pair<S32, S32>> words;
-    };
-    std::vector<SpellLine>                  mSpellLines;
+    ALTextSpelling                          mSpelling;
     LLUIColor                               mSpellErrorColor;
     std::string                             mPlaceholder;
     LLFrameTimer                            mSpellTimer;
-    std::vector<std::string>                mSuggestions;
-    ALTextRange                             mSuggestedFor;
     boost::signals2::scoped_connection      mSpellSettingsConnection;
     std::vector<LLVector2>                  mSquiggleScratch;
 };

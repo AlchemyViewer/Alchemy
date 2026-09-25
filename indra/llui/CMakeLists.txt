@@ -344,6 +344,7 @@ target_sources(
         altextediting.h
         altextlayout.h
         altextsearch.h
+        altextspelling.h
         altextview.h
         altextundo.h
         alnotecarditems.h
@@ -529,6 +530,7 @@ if(AL_BUILD_TESTS)
     altextediting
     altextlayout
     altextsearch
+    altextspelling
     altextview
     alcodeeditor
     alcompletionmodel
