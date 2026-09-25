@@ -2702,6 +2702,12 @@ bool ALCodeEditor::performSymbol(ALEditorCommand command)
     {
         return true;
     }
+    // Asked for by the link, which has gone -- with nobody to ask about a
+    // name, or no name to ask about.
+    if (!mSymbolRequest || identifierAtCaret().empty())
+    {
+        return false;
+    }
     mSymbolRequest(command, identifierAtCaret());
     return true;
 }
