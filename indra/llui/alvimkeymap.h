@@ -325,6 +325,8 @@ private:
         size_t opAt = 0;
     };
     void noteVisualOperation(const Span& span, S32 lines_hint = -1);
+    // The file named under the caret, as gf reads one; empty for none.
+    std::string fileUnderCursor(const ALTextView& view) const;
     // A jump from `from`: vim's context marks, '' and ``, set there, and
     // the host told.
     void noteJump(ALTextView& view, const ALTextPos& from);

@@ -1530,4 +1530,28 @@ namespace tut
         ensure_equals("completed from the underscore on", vim->commandLine(), std::string("go_to_line"));
         keys("<Esc>");
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<46>()
+    {
+        set_test_name("gf runs :find on the name under the caret: a quoted one it is in or before on the line, else the file name around it");
+        make("#include \"lib/util.lsl\"\nlocal m = require('mod') -- x\nsee docs/read_me.txt now\n   \n");
+        std::vector<std::string> heard;
+        vim->hooks().command = [&heard](ALTextView&, const std::string& name, const std::string& args) {
+            heard.push_back(name + "|" + args);
+            return true;
+        };
+        keys("gf");
+        ensure_equals("the include's, from before it", heard.back(), std::string("find|lib/util.lsl"));
+        keys("fugf");
+        ensure_equals("from inside it", heard.back(), std::string("find|lib/util.lsl"));
+        keys("jgf");
+        ensure_equals("a require's", heard.back(), std::string("find|mod"));
+        keys("j0fdgf");
+        ensure_equals("a path in the text", heard.back(), std::string("find|docs/read_me.txt"));
+        const size_t asked = heard.size();
+        keys("jgf");
+        ensure("nothing there", heard.size() == asked);
+        ensure_equals("said", vim->message(), std::string("E446: No file name under cursor"));
+    }
 }

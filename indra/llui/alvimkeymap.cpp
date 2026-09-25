@@ -1097,6 +1097,23 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
                 {
                     case 'g':
                         return command(view, 0x01);  // gg, as a motion the table knows
+                    case 'f':
+                    {
+                        // The file named under the caret, as :find finds
+                        // one: an include's or a module's where the host has
+                        // one.
+                        clearPending();
+                        const std::string name = fileUnderCursor(view);
+                        if (name.empty())
+                        {
+                            say(said("VimNoFileUnderCursor", "E446: No file name under cursor"), true);
+                        }
+                        else
+                        {
+                            runCommand(view, "find " + name);
+                        }
+                        return true;
+                    }
                     case 'd':
                     case 'D':
                         // The declaration: the host's definition, as :tag
@@ -5099,4 +5116,42 @@ void ALVimKeymap::list(ALTextView& view, const std::string& text)
     {
         say(text.substr(0, text.find('\n')));
     }
+}
+
+std::string ALVimKeymap::fileUnderCursor(const ALTextView& view) const
+{
+    // A quoted name the caret is in, or the first after it on the line --
+    // an #include's, a require's -- whole, as vim's gf looks along the
+    // line; else the run of what a file's name may hold around the caret.
+    const ALTextPos    at   = view.caret();
+    const std::string& line = view.document().line(at.line);
+    const size_t       here = static_cast<size_t>(llclamp(at.column, 0, static_cast<S32>(line.size())));
+    for (size_t open = line.find_first_of("\"'"); open != std::string::npos; open = line.find_first_of("\"'", open + 1))
+    {
+        const size_t close = line.find(line[open], open + 1);
+        if (close == std::string::npos)
+        {
+            break;
+        }
+        if (close >= here && close > open + 1)
+        {
+            return line.substr(open + 1, close - open - 1);
+        }
+        open = close;
+    }
+    auto name_char = [](char c) {
+        return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || strchr("/._-+,#$%~=@:\\", c) != nullptr ||
+               (static_cast<unsigned char>(c) & 0x80) != 0;
+    };
+    size_t begin = here;
+    size_t end   = here;
+    while (begin > 0 && name_char(line[begin - 1]))
+    {
+        --begin;
+    }
+    while (end < line.size() && name_char(line[end]))
+    {
+        ++end;
+    }
+    return line.substr(begin, end - begin);
 }
