@@ -205,7 +205,9 @@ namespace tut
         }
     };
 
-    typedef test_group<alvimkeymap_data> alvimkeymap_group;
+    // More than TUT's fifty a group holds by default, which runs the first
+    // fifty and says nothing of the rest: keep this above the highest test.
+    typedef test_group<alvimkeymap_data, 100> alvimkeymap_group;
     typedef alvimkeymap_group::object    alvimkeymap_object;
     alvimkeymap_group                    alvimkeymap_group_instance("alvimkeymap");
 
@@ -960,8 +962,9 @@ namespace tut
         // An argument: what the command takes, the host's and the
         // keymap's own; a range in front does not confuse the name.
         keys(":%set no<Tab>");
-        ensure("the options starting no", vim->typingLine(line, caret) && line == ":%set noexpandtab" && vim->menu(items, chosen) && items.size() == 5);
-        keys("<Tab><Tab>");
+        ensure("the options starting no",
+               vim->typingLine(line, caret) && line == ":%set noexpandtab" && vim->menu(items, chosen) && items.size() == 6);
+        keys("<Tab><Tab><Tab>");
         ensure("nonumber among them", vim->typingLine(line, caret) && line == ":%set nonumber");
         // Typing on keeps what is on the line and lets the row go.
         keys("x");
@@ -1553,5 +1556,154 @@ namespace tut
         keys("jgf");
         ensure("nothing there", heard.size() == asked);
         ensure_equals("said", vim->message(), std::string("E446: No file name under cursor"));
+    }
+
+    template<> template<>
+    void alvimkeymap_object::test<47>()
+    {
+        set_test_name("]d and [d step through the problems as :cnext and :cprevious; grn, grr and gra are the editor's; gO the host's symbols");
+        ALCodeEditor&            e = make("integer count = 1;\ncount = 2;\n");
+        std::vector<std::string> heard;
+        vim->hooks().command = [&heard](ALTextView&, const std::string& name, const std::string& args) {
+            heard.push_back(name + "|" + args);
+            return true;
+        };
+        keys("]d3]d[d2[dgO");
+        ensure("each as the host's",
+               heard == std::vector<std::string>{ "cnext|", "cnext|3", "cprevious|", "cprevious|2", "go_to_symbol|" });
+        std::vector<ALEditorCommand> asked;
+        e.setSymbolRequest([&asked](ALEditorCommand command, const ALTextRange&) { asked.push_back(command); });
+        keys("grngrr");
+        ensure("rename and the references",
+               asked == std::vector<ALEditorCommand>{ ALEditorCommand::Rename, ALEditorCommand::FindReferences });
+        e.setFixProvider([](S32, std::vector<ALCodeEditor::Fix>& out) {
+            ALCodeEditor::Fix fix;
+            fix.title = "Put it right";
+            out.push_back(fix);
+        });
+        keys("gra");
+        ensure("the fixes at the caret", e.fixesOpen());
+        keys("<Esc>");
+    }
+
+    template<> template<>
+    void alvimkeymap_object::test<48>()
+    {
+        set_test_name("gc comments lines as Toggle Comment does: gcc a line, 2gcc two, gc with a motion, gc over a visual selection, and . again");
+        ALCodeEditor& e = make("one;\ntwo;\nthree;\nfour;\n");
+        keys("gcc");
+        ensure("the line", e.document().line(0).compare(0, 2, "//") == 0 && e.document().line(1) == "two;");
+        keys("gcc");
+        ensure_equals("and back", e.document().line(0), std::string("one;"));
+        keys("jgcj");
+        ensure("with a motion, its lines", e.document().line(1).compare(0, 2, "//") == 0 && e.document().line(2).compare(0, 2, "//") == 0 &&
+                                               e.document().line(3) == "four;");
+        keys(".");
+        ensure_equals(". again", flat(e.text()), std::string("one;|two;|three;|four;|"));
+        keys("gg2gcc");
+        ensure("a count", e.document().line(1).compare(0, 2, "//") == 0 && e.document().line(2) == "three;");
+        keys("u");
+        ensure_equals("one step to undo", flat(e.text()), std::string("one;|two;|three;|four;|"));
+        keys("ggVjjgc");
+        ensure("a visual selection's lines",
+               e.document().line(0).compare(0, 2, "//") == 0 && e.document().line(2).compare(0, 2, "//") == 0 && e.document().line(3) == "four;");
+        ensure("visual left", vim->mode() == ALVimKeymap::Mode::Normal);
+    }
+
+    template<> template<>
+    void alvimkeymap_object::test<49>()
+    {
+        set_test_name("zc zo za zM zR fold the code editor's blocks; zj and zk move between them; [z and ]z to the ends of the one around");
+        ALCodeEditor& e = make("default\n{\n    state_entry()\n    {\n        x();\n    }\n"
+                               "    touch_start(integer n)\n    {\n        y();\n    }\n}\n");
+        keys("3G");
+        keys("zc");
+        ensure("closed", e.isFolded(2));
+        keys("zo");
+        ensure("open", !e.isFolded(2));
+        keys("za");
+        ensure("za closes", e.isFolded(2));
+        keys("za");
+        ensure("and opens", !e.isFolded(2));
+        keys("zM");
+        ensure("every block", e.isFolded(0));
+        keys("zR");
+        ensure("none", !e.isFolded(0) && !e.isFolded(2) && !e.isFolded(6));
+        keys("gg");
+        keys("zj");
+        ensure_equals("zj to the next block's start", e.caret().line, 2);
+        keys("zj");
+        ensure_equals("and the next", e.caret().line, 6);
+        keys("zk");
+        ensure_equals("zk to the end of the one above", e.caret().line, 5);
+        keys("5G]z");
+        ensure_equals("]z the end of the block around", e.caret().line, 5);
+        keys("[z");
+        ensure_equals("[z its start", e.caret().line, 2);
+    }
+
+    template<> template<>
+    void alvimkeymap_object::test<50>()
+    {
+        set_test_name("]s and [s go to the misspelled words round past the ends; z= puts one right by a count or a pick; zg and no spell check say why");
+        ALCodeEditor& e = make("teh cat\nfine\nsecond teh\n", "text");
+        keys("]s");
+        ensure_equals("no spell check: said", vim->message(), std::string("E756: Spell checking is not enabled"));
+        e.setSpellChecker([](const std::string& word) { return word != "teh"; },
+                          [](const std::string&, std::vector<std::string>& out) {
+                              out.push_back("the");
+                              out.push_back("ten");
+                          });
+        e.setSpellCheck(true);
+        keys("]s");
+        ensure("the next", e.caret() == ALTextPos(2, 7));
+        keys("]s");
+        ensure("round past the end", e.caret() == ALTextPos(0, 0));
+        keys("[s");
+        ensure("and back past the start", e.caret() == ALTextPos(2, 7));
+        keys("2z=");
+        ensure_equals("by a count", e.document().line(2), std::string("second ten"));
+        std::vector<std::string>            offered;
+        std::function<void(size_t)>         chose;
+        vim->hooks().pick = [&](ALTextView&, const std::string&, const std::vector<std::string>& items,
+                                std::function<void(size_t)> chosen) {
+            offered = items;
+            chose   = std::move(chosen);
+        };
+        keys("gg");
+        keys("z=");
+        ensure("offered", offered == std::vector<std::string>{ "the", "ten" });
+        chose(0);
+        ensure_equals("picked", e.document().line(0), std::string("the cat"));
+        keys("z=");
+        ensure_equals("a word spelled right has none", vim->message(), std::string("Sorry, no suggestions"));
+        keys("jzg");
+        ensure_equals("only the viewer's dictionary takes a word", vim->message(), std::string("E764: Cannot add this word"));
+
+        // The one misspelling on the caret's own line, behind it: round the
+        // whole text back to it.
+        e.setText("x teh y teh");
+        e.setCaret(ALTextPos(0, 6));
+        keys("]s");
+        ensure("the next after the caret", e.caret() == ALTextPos(0, 8));
+        keys("]s");
+        ensure("round to its own line's first", e.caret() == ALTextPos(0, 2));
+        keys("[s");
+        ensure("and back round to its last", e.caret() == ALTextPos(0, 8));
+    }
+
+    template<> template<>
+    void alvimkeymap_object::test<51>()
+    {
+        set_test_name(":set nohlsearch leaves a search's matches unlit, and clears them; :set hlsearch lights them again");
+        ALCodeEditor& e = make("x a x b x\n");
+        keys("/x<CR>");
+        ensure_equals("lit", e.highlights().size(), size_t(3));
+        keys(":set nohls<CR>");
+        ensure("cleared", e.highlights().empty());
+        keys("/x<CR>");
+        ensure("left unlit", e.highlights().empty());
+        keys(":set hlsearch<CR>n");
+        ensure_equals("lit again", e.highlights().size(), size_t(3));
     }
 }

@@ -190,6 +190,13 @@ namespace
     // no more than this.
     constexpr S32 MAX_COUNT = 100000;
     S32 countOr(S32 count, S32 fallback = 1) { return count > 0 ? count : fallback; }
+    // Keys pending, and an operator, that are two typed: gr, and gc.
+    constexpr llwchar PENDING_GR       = 0xE000;
+    constexpr llwchar COMMENT_OPERATOR = 0xE001;
+    std::string shownKey(llwchar key)
+    {
+        return key == PENDING_GR ? std::string("gr") : key == COMMENT_OPERATOR ? std::string("gc") : utf8Of(key);
+    }
     // A letter of a : command's name.
     bool isNameChar(char c) { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z'); }
     // An operator's count and its motion's together -- 3d2w is six words --
@@ -413,7 +420,7 @@ std::string ALVimKeymap::status() const
             }
             if (mOperator)
             {
-                pending += utf8Of(mOperator);
+                pending += shownKey(mOperator);
             }
             if (mCount > 0)
             {
@@ -421,7 +428,7 @@ std::string ALVimKeymap::status() const
             }
             if (mPending)
             {
-                pending += utf8Of(mPending);
+                pending += shownKey(mPending);
             }
             if (mObjectKind)
             {
@@ -1097,6 +1104,38 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
                 {
                     case 'g':
                         return command(view, 0x01);  // gg, as a motion the table knows
+                    case 'c':
+                        // Comments: an operator over lines, gcc a line, gc
+                        // a visual selection's lines.
+                        if (visual)
+                        {
+                            const Span span = visualSpan(view);
+                            noteVisualOperation(span);
+                            applyOperator(view, COMMENT_OPERATOR, span, 1);
+                            leaveVisual(view);
+                            finishCommand(true);
+                            return true;
+                        }
+                        if (!editing)
+                        {
+                            clearPending();
+                            return true;
+                        }
+                        mOperator      = COMMENT_OPERATOR;
+                        mOperatorCount = mCount;
+                        mCount         = 0;
+                        return true;
+                    case 'r':
+                        mPending = PENDING_GR;
+                        return true;
+                    case 'O':
+                        // The script's symbols, to go to one: the host's.
+                        clearPending();
+                        if (mHooks.command)
+                        {
+                            mHooks.command(view, "go_to_symbol", std::string());
+                        }
+                        return true;
                     case 'f':
                     {
                         // The file named under the caret, as :find finds
@@ -1220,6 +1259,8 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
                 const S32 line = cursor(view).line;
                 const S32 row  = view.layout().rowHeight();
                 const S32 top  = view.layout().lineTop(line);
+                const S32 given = mCount;
+                clearPending();
                 if (ch == 't')
                 {
                     view.setScrollY(top);
@@ -1232,7 +1273,68 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
                 {
                     view.setScrollY(top - (view.rowsPerPage() - 1) * row);
                 }
+                else if (ch == '=' || ch == 'g')
+                {
+                    // The misspelled word at the caret: put right, or taken
+                    // into the dictionary.
+                    if (ch == 'g')
+                    {
+                        view.refreshSuggestions();
+                        if (view.canAddToDictionary())
+                        {
+                            view.addToDictionary();
+                        }
+                        else
+                        {
+                            say(said("VimNotAddable", "E764: Cannot add this word"), true);
+                        }
+                    }
+                    else if (editing)
+                    {
+                        suggest(view, given);
+                    }
+                }
+                else
+                {
+                    foldCommand(view, ch, 'z');
+                }
+                return true;
+            }
+            case PENDING_GR:
+            {
+                // grn rename, grr the references, gra the fixes and actions
+                // at the caret: the editor's own.
+                const ALEditorCommand command = ch == 'n' ? ALEditorCommand::Rename
+                                                : ch == 'r' ? ALEditorCommand::FindReferences
+                                                : ch == 'a' ? ALEditorCommand::QuickFix
+                                                            : ALEditorCommand::None;
                 clearPending();
+                if (command != ALEditorCommand::None)
+                {
+                    view.perform(command);
+                }
+                return true;
+            }
+            case '[':
+            case ']':
+            {
+                // ]d [d the problems, ]s [s the misspellings, [z ]z the fold
+                // the caret is in.
+                const bool forward = pending == ']';
+                const S32  given   = mCount;
+                clearPending();
+                if (ch == 'd')
+                {
+                    runCommand(view, std::string(forward ? "cnext" : "cprevious") + (given > 0 ? " " + std::to_string(given) : ""));
+                }
+                else if (ch == 's')
+                {
+                    misspelling(view, forward, countOr(given));
+                }
+                else if (ch == 'z')
+                {
+                    foldCommand(view, ch, pending);
+                }
                 return true;
             }
             case 'Z':
@@ -1324,7 +1426,8 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
         const llwchar op = mOperator;
         // The operator doubled -- dd, yy, cc, >>, <<, == -- is the line, and
         // the count more.
-        if (ch == op || (op == '~' && ch == '~') || (op == 'u' && ch == 'u') || (op == 'U' && ch == 'U'))
+        if (ch == op || (op == '~' && ch == '~') || (op == 'u' && ch == 'u') || (op == 'U' && ch == 'U') ||
+            (op == COMMENT_OPERATOR && ch == 'c'))
         {
             const S32 lines = countTimes(countOr(mOperatorCount), count);
             Span      span;
@@ -1577,6 +1680,8 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
         case 'T':
         case '`':
         case '\'':
+        case '[':
+        case ']':
             mPending = ch;
             return true;
         case 'r':
@@ -2698,6 +2803,20 @@ void ALVimKeymap::applyOperator(ALTextView& view, llwchar op, const Span& span_i
     const S32 last             = span.range.end.line;
     const bool editing         = !view.isReadOnly();
 
+    if (op == COMMENT_OPERATOR)
+    {
+        // Every line the span touches -- not one an exclusive motion only
+        // reached the start of -- as Toggle Comment does them, one step.
+        const S32 through = !span.linewise && !span.block && span.range.end.column == 0 && last > first ? last - 1 : last;
+        if (editing)
+        {
+            view.setSelection(ALTextRange(d.lineStart(first), d.lineEnd(through)));
+            view.perform(ALEditorCommand::ToggleComment);
+        }
+        moveTo(view, ALTextPos(first, firstNonBlankColumn(d, first)));
+        return;
+    }
+
     // The text the operator works on: whole lines, a block's columns
     // line by line, or the stretch as it is.
     std::vector<ALTextRange> pieces;
@@ -3150,6 +3269,13 @@ bool ALVimKeymap::insertControl(ALTextView& view, const Input& input)
     };
     switch (input.key)
     {
+#if LL_DARWIN
+        case 'S':
+            // What the call being typed takes, as Neovim's Control-S shows
+            // it: on a Mac, where Command-S saves and Control-S is free.
+            view.perform(ALEditorCommand::SignatureHelp);
+            return true;
+#endif
         case 'W':
             view.perform(ALEditorCommand::DeleteWordLeft);
             return true;
@@ -3490,7 +3616,7 @@ bool ALVimKeymap::search(ALTextView& view, const std::string& pattern, bool forw
     }
     // Every match lit, as hlsearch has it, until :noh or the caret
     // leaves them.
-    if (ALCodeEditor* editor = ALViewType::as<ALCodeEditor>(&view); editor && !isVisual())
+    if (ALCodeEditor* editor = ALViewType::as<ALCodeEditor>(&view); editor && !isVisual() && mShared->highlightSearch)
     {
         editor->setHighlights(matches);
     }
@@ -3808,7 +3934,9 @@ void ALVimKeymap::complete(ALTextView& view, bool forward)
             }
             if (command == "set" || command == "se")
             {
-                static const char* OPTIONS[] = { "clipboard=", "clipboard=unnamed", "expandtab", "ignorecase", "noexpandtab", "noignorecase", "nosmartcase", "nowrap", "shiftwidth=", "smartcase", "tabstop=", "wrap" };
+                static const char* OPTIONS[] = { "clipboard=",  "clipboard=unnamed", "expandtab",   "hlsearch", "ignorecase", "noexpandtab",
+                                                 "nohlsearch",  "noignorecase",      "nosmartcase", "nowrap",   "shiftwidth=", "smartcase",
+                                                 "tabstop=",    "wrap" };
                 found.assign(std::begin(OPTIONS), std::end(OPTIONS));
             }
         }
@@ -4504,6 +4632,15 @@ void ALVimKeymap::runCommand(ALTextView& view, const std::string& line_in)
             mShared->smartCase = !off;
             return;
         }
+        if (option == "hls" || option == "hlsearch")
+        {
+            mShared->highlightSearch = !off;
+            if (ALCodeEditor* editor = ALViewType::as<ALCodeEditor>(&view); editor && off)
+            {
+                editor->clearHighlights();
+            }
+            return;
+        }
         if (option == "cb" || option == "clipboard")
         {
             // unnamed or unnamedplus, which are one clipboard here; empty
@@ -5154,4 +5291,218 @@ std::string ALVimKeymap::fileUnderCursor(const ALTextView& view) const
         ++end;
     }
     return line.substr(begin, end - begin);
+}
+
+bool ALVimKeymap::misspelling(ALTextView& view, bool forward, S32 count)
+{
+    if (!view.getSpellCheck())
+    {
+        say(said("VimNoSpellCheck", "E756: Spell checking is not enabled"), true);
+        return false;
+    }
+    const ALTextDocument& d     = view.document();
+    const S32             lines = d.lineCount();
+    ALTextPos             at    = cursor(view);
+    bool                  found = false;
+    for (S32 n = 0; n < count; ++n)
+    {
+        // Line by line from the caret's, round past the end to its own
+        // again, the part of it not yet looked at last.
+        bool step = false;
+        for (S32 i = 0; i <= lines && !step; ++i)
+        {
+            const S32  line  = ((forward ? at.line + i : at.line - i) % lines + lines) % lines;
+            const bool own   = i == 0;
+            const bool again = i == lines;
+            const auto& words = view.misspellings(line);
+            if (forward)
+            {
+                for (const auto& [begin, end] : words)
+                {
+                    if ((own && begin > at.column) || (again && begin <= at.column) || (!own && !again))
+                    {
+                        at   = ALTextPos(line, begin);
+                        step = true;
+                        break;
+                    }
+                }
+            }
+            else
+            {
+                for (auto it = words.rbegin(); it != words.rend(); ++it)
+                {
+                    if ((own && it->first < at.column) || (again && it->first >= at.column) || (!own && !again))
+                    {
+                        at   = ALTextPos(line, it->first);
+                        step = true;
+                        break;
+                    }
+                }
+            }
+        }
+        if (!step)
+        {
+            break;
+        }
+        found = true;
+    }
+    if (!found)
+    {
+        say(said("VimNoMisspelling", "No misspelled words"), true);
+        return false;
+    }
+    moveTo(view, at);
+    return true;
+}
+
+void ALVimKeymap::suggest(ALTextView& view, S32 given)
+{
+    if (!view.getSpellCheck())
+    {
+        say(said("VimNoSpellCheck", "E756: Spell checking is not enabled"), true);
+        return;
+    }
+    ALTextRange word;
+    if (!view.misspelledAt(cursor(view), &word))
+    {
+        say(said("VimNoSuggestions", "Sorry, no suggestions"), true);
+        return;
+    }
+    view.setCaret(cursor(view));
+    view.refreshSuggestions();
+    const U32 count = view.getSuggestionCount();
+    if (count == 0)
+    {
+        say(said("VimNoSuggestions", "Sorry, no suggestions"), true);
+        return;
+    }
+    // 2z= the second, as vim takes it without asking.
+    auto take = [this, &view](U32 index) {
+        view.replaceWithSuggestion(index);
+        moveTo(view, view.caret());
+    };
+    if (given > 0)
+    {
+        if (static_cast<U32>(given) <= count)
+        {
+            take(static_cast<U32>(given) - 1);
+        }
+        return;
+    }
+    std::vector<std::string> items;
+    for (U32 i = 0; i < count; ++i)
+    {
+        items.push_back(view.getSuggestion(i));
+    }
+    if (!mHooks.pick)
+    {
+        // Said as vim lists them, for a count to pick with.
+        std::string list;
+        for (size_t i = 0; i < items.size(); ++i)
+        {
+            list += llformat("%s%d \"%s\"", i ? "  " : "", static_cast<int>(i + 1), items[i].c_str());
+        }
+        say(list);
+        return;
+    }
+    // Picked later: the word may have changed by then, and is looked for
+    // again at the caret.
+    const LLHandle<LLUICtrl> handle = view.getHandle();
+    mHooks.pick(view, view.document().text(word), items, [handle](size_t index) {
+        ALTextView* again = dynamic_cast<ALTextView*>(handle.get());
+        if (again && again->misspelledAt(again->caret()))
+        {
+            again->refreshSuggestions();
+            if (index < again->getSuggestionCount())
+            {
+                again->replaceWithSuggestion(static_cast<U32>(index));
+            }
+        }
+    });
+}
+
+bool ALVimKeymap::foldCommand(ALTextView& view, llwchar ch, llwchar prefix)
+{
+    ALCodeEditor* editor = ALViewType::as<ALCodeEditor>(&view);
+    if (!editor)
+    {
+        return false;
+    }
+    const S32 line = cursor(view).line;
+    const ALTextDocument& d = view.document();
+    if (prefix == 'z')
+    {
+        switch (ch)
+        {
+            case 'o':
+            case 'O':
+            case 'v':
+                // Open: the block at the caret, or around it; zv what
+                // hides the caret, which is the same here.
+                editor->unfoldAt(line);
+                return true;
+            case 'c':
+            case 'C':
+                editor->foldAt(line);
+                return true;
+            case 'a':
+            case 'A':
+                if (editor->isFolded(line))
+                {
+                    editor->unfoldAt(line);
+                }
+                else
+                {
+                    editor->foldAt(line);
+                }
+                return true;
+            case 'R':
+                editor->unfoldAll();
+                return true;
+            case 'M':
+                editor->foldAll();
+                return true;
+            case 'j':
+            case 'k':
+            {
+                // zj the start of the next block below; zk the end of the
+                // last one above.
+                S32 to = -1;
+                for (const ALCodeEditor::FoldRegion& region : editor->foldRegions())
+                {
+                    if (ch == 'j' && region.start > line && (to < 0 || region.start < to))
+                    {
+                        to = region.start;
+                    }
+                    if (ch == 'k' && region.end < line && region.end > to)
+                    {
+                        to = region.end;
+                    }
+                }
+                if (to >= 0)
+                {
+                    moveTo(view, ALTextPos(to, firstNonBlankColumn(d, to)));
+                }
+                return true;
+            }
+            default:
+                return false;
+        }
+    }
+    // [z and ]z: the start and the end of the innermost block the caret is
+    // in.
+    const ALCodeEditor::FoldRegion* around = nullptr;
+    for (const ALCodeEditor::FoldRegion& region : editor->foldRegions())
+    {
+        if (region.start <= line && line <= region.end && (!around || region.start >= around->start))
+        {
+            around = &region;
+        }
+    }
+    if (around)
+    {
+        const S32 to = prefix == '[' ? around->start : around->end;
+        moveTo(view, ALTextPos(to, firstNonBlankColumn(d, to)));
+    }
+    return true;
 }

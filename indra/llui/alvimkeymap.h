@@ -99,6 +99,12 @@ public:
         // What :registers and :marks list, as lines, for the host to show
         // where lists go. Without one, the first line is said.
         std::function<void(ALTextView& view, const std::string& text)> listing;
+        // One of a list picked -- z='s suggestions -- by its index, with
+        // what to call with the one chosen. Without one, the list is said
+        // and a count picks: 2z= the second.
+        std::function<void(ALTextView& view, const std::string& title, const std::vector<std::string>& items,
+                           std::function<void(size_t index)> chosen)>
+            pick;
     };
 
     ALVimKeymap();
@@ -152,6 +158,8 @@ public:
         bool                     ignoreCase       = false;
         bool                     smartCase        = false;
         bool                     unnamedClipboard = true;
+        // Every match of the last search lit, as hlsearch has it.
+        bool                     highlightSearch  = true;
     };
     const Shared&           shared() const { return *mShared; }
     std::shared_ptr<Shared> sharedState() const { return mShared; }
@@ -327,6 +335,14 @@ private:
     void noteVisualOperation(const Span& span, S32 lines_hint = -1);
     // The file named under the caret, as gf reads one; empty for none.
     std::string fileUnderCursor(const ALTextView& view) const;
+    // ]s and [s: the caret to the next misspelled word, or the one before,
+    // round past the ends, the count times. False where there is none.
+    bool misspelling(ALTextView& view, bool forward, S32 count);
+    // z=: the misspelled word at the caret put right -- by the count's
+    // suggestion, or the one picked; zg: it taken into the dictionary.
+    void suggest(ALTextView& view, S32 given);
+    // zo zc za zR zM zj zk [z ]z: the code editor's folds.
+    bool foldCommand(ALTextView& view, llwchar ch, llwchar prefix);
     // A jump from `from`: vim's context marks, '' and ``, set there, and
     // the host told.
     void noteJump(ALTextView& view, const ALTextPos& from);
