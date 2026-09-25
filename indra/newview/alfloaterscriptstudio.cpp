@@ -6128,6 +6128,13 @@ void ALFloaterScriptStudio::analysed(const ALScriptAnalysis::Result& result)
     refreshOutline(doc);
     // Weighed a moment after, of the same text.
     weigh(doc);
+    if (doc.fixAllAfterCheck && doc.analysisVersion == doc.editor->document().version())
+    {
+        FixPick pick;
+        pick.key = *doc.fixAllAfterCheck;
+        doc.fixAllAfterCheck.reset();
+        askFixAll(doc, pick);
+    }
     if (doc.saveAfterCheck)
     {
         doc.saveAfterCheck = false;
@@ -7115,6 +7122,18 @@ std::vector<const ALScriptFix*> ALFloaterScriptStudio::pickFixes(const Doc& doc,
 
 void ALFloaterScriptStudio::askFixAll(Doc& doc, const FixPick& pick)
 {
+    // Asked of a text not checked yet -- typed in a moment ago -- whose
+    // problems are not known: checked first, and asked again then, rather
+    // than said to have nothing to fix.
+    if (!pick.forSave && doc.loaded && !doc.notecard && doc.analysisVersion != doc.editor->document().version())
+    {
+        doc.fixAllAfterCheck = pick.key;
+        scheduleAnalysis(doc, true);
+        LLStringUtil::format_map_t args;
+        args["[NAME]"] = doc.name;
+        setStatus(getString("FixChecking", args));
+        return;
+    }
     const std::vector<const ALScriptFix*> fixes = pickFixes(doc, pick);
     if (fixes.size() < 2)
     {

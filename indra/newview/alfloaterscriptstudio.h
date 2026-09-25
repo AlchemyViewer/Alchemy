@@ -456,6 +456,9 @@ private:
         // that asking again saves it, however long after, and a change
         // asks the question afresh -- or -1 for none.
         bool                                       saveAfterCheck    = false;
+        // A Fix All asked before the text as it stands was checked, made
+        // once it is: of the problems of one kind, or of all where empty.
+        std::optional<std::string>                 fixAllAfterCheck;
         // What the script weighs for its target, as the last weighing said
         // of the text at weightVersion; whether what was weighed is what a
         // save compiles -- not where the optimizer changes it after -- and
