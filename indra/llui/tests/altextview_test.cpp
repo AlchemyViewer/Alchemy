@@ -1231,4 +1231,25 @@ namespace tut
         v.setText("all fine");
         ensure("none: nothing to go to", !v.perform(ALEditorCommand::NextMisspelling));
     }
+
+    template<> template<>
+    void altextview_object::test<38>()
+    {
+        set_test_name("Control-J joins the caret's line and the next, or the lines selected; Convert Indentation redoes the lines' blanks");
+        ALTextView& v = make("one\n  two\n  three\nfour");
+        v.setCaret(ALTextPos(0, 1));
+        key('J', MASK_CONTROL);
+        ensure_equals("the next joined on", v.text(), std::string("one two\n  three\nfour"));
+        v.setSelection(ALTextRange(ALTextPos(0, 0), ALTextPos(2, 2)));
+        key('J', MASK_CONTROL);
+        ensure_equals("the lines selected", v.text(), std::string("one two three four"));
+        v.undo();
+        ensure_equals("one step back", v.text(), std::string("one two\n  three\nfour"));
+
+        v.setText("\tone\n\t\ttwo");
+        v.setTabWidth(2);
+        ensure("to spaces", v.convertIndentation(0, 1, true) && v.text() == "  one\n    two");
+        ensure("nothing more to do", !v.convertIndentation(0, 1, true));
+        ensure("back to tabs", v.convertIndentation(0, 1, false) && v.text() == "\tone\n\t\ttwo");
+    }
 }

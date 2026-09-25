@@ -42,6 +42,7 @@ const char* alEditorCommandName(ALEditorCommand command)
         "move_line_down", "delete_line",    "fold",            "unfold",           "fold_all",         "unfold_all",
         "complete",      "signature_help", "go_to_definition", "find_references", "rename",         "find",             "replace",
         "find_next",     "find_previous",   "quick_fix",       "next_misspelling", "previous_misspelling",
+        "join_lines",
     };
     static_assert(sizeof(NAMES) / sizeof(NAMES[0]) == static_cast<size_t>(ALEditorCommand::COUNT), "every command has a name");
     const size_t index = static_cast<size_t>(command);
@@ -201,6 +202,7 @@ ALKeymap ALKeymap::standard()
     map.bind(KEY_RETURN, MASK_ALT, C::QuickFix);
     map.bind(KEY_F7, MASK_NONE, C::NextMisspelling);
     map.bind(KEY_F7, MASK_SHIFT, C::PreviousMisspelling);
+    map.bind('J', MASK_CONTROL, C::JoinLines);
 #if LL_DARWIN
     // The Mac's own, where MASK_CONTROL is Command: Command with an arrow
     // goes to the ends of the line and of the text, Option with one by

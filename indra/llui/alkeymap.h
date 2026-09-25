@@ -100,6 +100,7 @@ enum class ALEditorCommand : U8
     QuickFix,
     NextMisspelling,
     PreviousMisspelling,
+    JoinLines,
     COUNT
 };
 

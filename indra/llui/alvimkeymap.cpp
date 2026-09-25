@@ -1305,23 +1305,15 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
                         }
                         const S32 first = visual ? llmin(mVisualAnchor.line, cursor(view).line) : view.caret().line;
                         const S32 last  = visual ? llmax(mVisualAnchor.line, cursor(view).line) : first;
-                        S32       until = visual ? last : llmin(d.lineCount() - 1, first + llmax(1, count - 1));
-                        if (!visual && until == first)
-                        {
-                            until = llmin(d.lineCount() - 1, first + 1);
-                        }
-                        std::vector<std::pair<ALTextRange, std::string>> edits;
-                        for (S32 line = first; line < until; ++line)
-                        {
-                            edits.emplace_back(ALTextRange(d.lineEnd(line), d.lineStart(line + 1)), std::string());
-                        }
+                        const S32 until = visual ? llmax(last, first + 1) : first + llmax(1, count - 1);
                         if (visual)
                         {
                             leaveVisual(view);
                         }
-                        if (!edits.empty())
+                        if (const std::optional<ALTextEditing::Change> join = ALTextEditing::joinLines(d, first, until, true))
                         {
-                            view.replaceAll(std::move(edits));
+                            view.apply(*join);
+                            moveTo(view, join->caret);
                         }
                         finishCommand(true);
                         return true;
@@ -1982,22 +1974,14 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
             }
             // Lines joined with one space, their leading blanks gone.
             const S32 first = view.caret().line;
-            const S32 until = llmin(d.lineCount() - 1, first + llmax(1, count - 1));
-            if (until == first)
+            const std::optional<ALTextEditing::Change> join = ALTextEditing::joinLines(d, first, first + llmax(1, count - 1), false);
+            if (!join)
             {
                 clearPending();
                 return true;
             }
-            std::vector<std::pair<ALTextRange, std::string>> edits;
-            for (S32 line = first; line < until; ++line)
-            {
-                const ALTextPos next_text(line + 1, firstNonBlankColumn(d, line + 1));
-                const bool      empty = d.lineLength(line + 1) == next_text.column || at(d, next_text) == ')';
-                edits.emplace_back(ALTextRange(d.lineEnd(line), next_text), empty ? std::string() : std::string(" "));
-            }
-            ALTextPos caret = d.lineEnd(first);
-            view.replaceAll(std::move(edits));
-            moveTo(view, caret);
+            view.apply(*join);
+            moveTo(view, join->caret);
             finishCommand(true);
             return true;
         }
@@ -4150,8 +4134,9 @@ void ALVimKeymap::complete(ALTextView& view, bool forward)
         {
             // The name itself: the keymap's own, the long forms, and the
             // host's.
-            static const char* OWN[] = { "delete", "display", "global",     "marks",  "nohlsearch", "normal",
-                                         "registers", "set", "substitute", "vglobal", "yank" };
+            static const char* OWN[] = { "center", "delete", "display", "global", "join",       "left",     "mark",    "marks",
+                                         "nohlsearch", "normal", "put", "redo", "registers", "retab", "right", "set",
+                                         "substitute", "undo", "vglobal", "yank" };
             found.assign(std::begin(OWN), std::end(OWN));
         }
         else
@@ -4482,7 +4467,8 @@ bool ALVimKeymap::lineAddress(ALTextView& view, const std::string& line, size_t&
 
 void ALVimKeymap::runCommand(ALTextView& view, const std::string& line_in)
 {
-    const ALTextDocument& d    = view.document();
+    const ALTextDocument& d       = view.document();
+    const bool            editing = !view.isReadOnly();
     std::string           line = line_in;
     LLStringUtil::trim(line);
     if (line.empty())
@@ -4803,6 +4789,113 @@ void ALVimKeymap::runCommand(ALTextView& view, const std::string& line_in)
             Input escape;
             escape.key = KEY_ESCAPE;
             feed(view, escape);
+        }
+        return;
+    }
+    if (name == "j" || name == "join" || name == "j!" || name == "join!")
+    {
+        // The range's lines, the last and one more where it is one line;
+        // or, with a count, that many from the range's last.
+        S32 from  = first;
+        S32 until = last > first ? last : first + 1;
+        if (const S32 lines = args.empty() ? 0 : std::atoi(args.c_str()); lines > 0)
+        {
+            from  = last;
+            until = last + lines - 1;
+        }
+        if (editing)
+        {
+            if (const std::optional<ALTextEditing::Change> join = ALTextEditing::joinLines(d, from, until, name.back() == '!'))
+            {
+                view.apply(*join);
+                moveTo(view, join->caret);
+            }
+        }
+        return;
+    }
+    if (name == "retab" || name == "ret" || name == "retab!" || name == "ret!")
+    {
+        // Every line's leading blanks, or the range's, as the tabs are set:
+        // spaces where they are, else tabs; a width given sets it, the
+        // blanks measured as the tabs were.
+        const S32 was = view.getTabWidth();
+        if (const S32 width = args.empty() ? 0 : std::atoi(args.c_str()); width > 0)
+        {
+            view.setTabWidth(llclamp(width, 1, 16));
+        }
+        if (editing)
+        {
+            view.convertIndentation(ranged ? first : 0, ranged ? last : d.lineCount() - 1, view.getSoftTabs(), was);
+        }
+        return;
+    }
+    if (name == "u" || name == "undo" || name == "red" || name == "redo")
+    {
+        view.perform(name[0] == 'u' ? ALEditorCommand::Undo : ALEditorCommand::Redo);
+        moveTo(view, view.caret());
+        return;
+    }
+    if (name == "pu" || name == "put" || name == "pu!" || name == "put!")
+    {
+        // A register's text as lines, whatever it was taken as: under the
+        // range's last line, or above its first with !.
+        const Register reg = fetch(args.empty() ? mRegister : args[0]);
+        if (!editing || reg.text.empty())
+        {
+            return;
+        }
+        std::string text = reg.text;
+        if (!text.empty() && text.back() == '\n')
+        {
+            text.pop_back();
+        }
+        const bool above = name.back() == '!';
+        const S32  line  = above ? first : last;
+        view.setCaret(above ? d.lineStart(line) : d.lineEnd(line));
+        view.insertText(above ? text + "\n" : "\n" + text);
+        const S32 put_at = above ? line : line + 1;
+        moveTo(view, ALTextPos(put_at, firstNonBlankColumn(d, put_at)));
+        return;
+    }
+    if (name == "ma" || name == "mark" || name == "k")
+    {
+        // A mark at the range's last line, as m would set it there.
+        if (args.size() == 1 && ((args[0] >= 'a' && args[0] <= 'z') || args[0] == '\'' || args[0] == '`'))
+        {
+            mMarks[args[0]] = ALTextPos(last, 0);
+        }
+        else
+        {
+            say(said("VimBadMark", "E191: Argument must be a letter or forward/backward quote"), true);
+        }
+        return;
+    }
+    if (name == "le" || name == "left" || name == "ri" || name == "right" || name == "ce" || name == "center")
+    {
+        // The range's lines to the left with an indent, or to the right or
+        // centred within a width: eighty, where none is given.
+        if (!editing)
+        {
+            return;
+        }
+        const bool left   = name[0] == 'l';
+        const S32  amount = args.empty() ? (left ? 0 : 80) : llmax(0, std::atoi(args.c_str()));
+        std::vector<std::pair<ALTextRange, std::string>> edits;
+        for (S32 line = first; line <= last; ++line)
+        {
+            std::string text = d.line(line);
+            LLStringUtil::trim(text);
+            if (text.empty())
+            {
+                continue;
+            }
+            const S32 size   = static_cast<S32>(text.size());
+            const S32 indent = left ? amount : name[0] == 'r' ? llmax(0, amount - size) : llmax(0, (amount - size) / 2);
+            edits.emplace_back(ALTextRange(d.lineStart(line), d.lineEnd(line)), std::string(static_cast<size_t>(indent), ' ') + text);
+        }
+        if (!edits.empty())
+        {
+            view.replaceAll(std::move(edits));
         }
         return;
     }

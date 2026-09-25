@@ -286,4 +286,29 @@ namespace tut
         ensure("not a word that is a name", !closingBeforeReturn(ALTextDocument("x\n    ending"), ALTextPos(1, 10), ALTextPos(1, 10), slua,
                                                                  none(), spaces));
     }
+
+    template<> template<>
+    void altextediting_object::test<8>()
+    {
+        set_test_name("lines joined as vim's J joins them, or with their blanks kept as its gJ; indentation made of spaces or of tabs");
+        const std::string text = "call(a,\n    b\n    )\n\nend";
+        const ALTextDocument doc(text);
+        const std::optional<Change> j = joinLines(doc, 0, 2, false);
+        ensure("joined", j.has_value());
+        ensure_equals("one space, none before the )", applied(text, *j), std::string("call(a, b)\n\nend"));
+        ensure("the caret where the first join is", j->caret == ALTextPos(0, 7));
+        ensure_equals("a blank line takes no space", applied(text, *joinLines(doc, 2, 4, false)), std::string("call(a,\n    b\n    ) end"));
+        ensure_equals("the blanks kept", applied(text, *joinLines(doc, 0, 1, true)), std::string("call(a,    b\n    )\n\nend"));
+        ensure("one line is nothing to join", !joinLines(doc, 4, 4, false) && !joinLines(doc, 4, 9, false));
+
+        const std::string code = "\tif x\n  \ty\n      z\nw";
+        const ALTextDocument indented(code);
+        ensure_equals("to spaces, a tab to its stop", applied(code, *convertIndentation(indented, 0, 3, true, 4)),
+                      std::string("    if x\n    y\n      z\nw"));
+        ensure_equals("to tabs, as far as they go", applied(code, *convertIndentation(indented, 0, 3, false, 4)),
+                      std::string("\tif x\n\ty\n\t  z\nw"));
+        ensure("nothing to change is nothing", !convertIndentation(ALTextDocument("    a\nb"), 0, 1, true, 4));
+        ensure_equals("measured as the tabs were: a tab of two, two spaces at four",
+                      applied("\ta", *convertIndentation(ALTextDocument("\ta"), 0, 0, false, 4, 2)), std::string("  a"));
+    }
 }

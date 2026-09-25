@@ -459,6 +459,13 @@ public:
     // Next Misspelling and Previous Misspelling: the word selected, from
     // the selection's end or its start. False where there is none.
     bool goToMisspelling(bool forward);
+    // A change worked out over the document (ALTextEditing) made, as one
+    // step to undo, and the selection it says after.
+    void apply(const ALTextEditing::Change& change);
+    // Convert Indentation: the leading blanks of lines first through last
+    // made of spaces, or of tabs as far as they go, at the view's tab
+    // width. False where nothing changed.
+    bool convertIndentation(S32 first, S32 last, bool to_spaces, S32 measured_width = 0);
 
     // --- LLSpellCheckMenuHandler ---------------------------------------------
 
@@ -747,7 +754,7 @@ private:
     // and what it works out done, as one step to undo.
     ALTextEditing::Options  editingOptions() const;
     ALTextEditing::opener_t openerOf();
-    void                    apply(const ALTextEditing::Change& change);
+
     void                 allowLanguageInput(bool allow);
     // Whether what an input method composes goes into the text: not in a
     // read-only one, nor while a modal keymap is between its inserting

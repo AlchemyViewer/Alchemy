@@ -467,4 +467,63 @@ std::optional<Change> toggleComment(const ALTextDocument& doc, const ALTextPos& 
     }
     return change;
 }
+
+std::optional<Change> joinLines(const ALTextDocument& doc, S32 first, S32 last, bool keep_blanks)
+{
+    last = llmin(last, doc.lineCount() - 1);
+    if (first < 0 || last <= first)
+    {
+        return std::nullopt;
+    }
+    // From the bottom up, so each join's place is the text's as it was.
+    Change change;
+    for (S32 line = last - 1; line >= first; --line)
+    {
+        if (keep_blanks)
+        {
+            change.replacements.push_back({ ALTextRange(doc.lineEnd(line), doc.lineStart(line + 1)), std::string() });
+            continue;
+        }
+        const std::string& next  = doc.line(line + 1);
+        const size_t       text  = next.find_first_not_of(" \t");
+        const bool         blank = text == std::string::npos || next[text] == ')';
+        const S32          at    = text == std::string::npos ? static_cast<S32>(next.size()) : static_cast<S32>(text);
+        const std::string  space = blank ? std::string() : std::string(" ");
+        change.replacements.push_back({ ALTextRange(doc.lineEnd(line), ALTextPos(line + 1, at)), space });
+    }
+    change.caret = doc.lineEnd(first);
+    return change;
+}
+
+std::optional<Change> convertIndentation(const ALTextDocument& doc, S32 first, S32 last, bool to_spaces, S32 tab_width, S32 measured_width)
+{
+    tab_width               = llmax(1, tab_width);
+    const S32 measure_width = measured_width > 0 ? measured_width : tab_width;
+    last      = llmin(last, doc.lineCount() - 1);
+    Change change;
+    for (S32 line = llmax(0, first); line <= last; ++line)
+    {
+        // How wide the blanks are, each tab to its next stop.
+        const std::string& text  = doc.line(line);
+        S32                width = 0;
+        size_t             end   = 0;
+        for (; end < text.size() && (text[end] == ' ' || text[end] == '\t'); ++end)
+        {
+            width = text[end] == '\t' ? (width / measure_width + 1) * measure_width : width + 1;
+        }
+        const std::string again = to_spaces ? std::string(static_cast<size_t>(width), ' ')
+                                            : std::string(static_cast<size_t>(width / tab_width), '\t') +
+                                                  std::string(static_cast<size_t>(width % tab_width), ' ');
+        if (again != text.substr(0, end))
+        {
+            change.replacements.push_back({ ALTextRange(ALTextPos(line, 0), ALTextPos(line, static_cast<S32>(end))), again });
+        }
+    }
+    if (change.replacements.empty())
+    {
+        return std::nullopt;
+    }
+    change.caret = ALTextPos(llmax(0, first), 0);
+    return change;
+}
 }

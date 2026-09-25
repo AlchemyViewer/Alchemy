@@ -156,4 +156,17 @@ namespace ALTextEditing
     // back in where they all are: the selection the lines whole, or the
     // caret where it was in its text. Nothing where no line says anything.
     std::optional<Change> toggleComment(const ALTextDocument& doc, const ALTextPos& anchor, const ALTextPos& caret, const std::string& token);
+    // Lines first through last joined into one, as vim's J does: each break
+    // and the next line's leading blanks gone, one space in their place --
+    // none before a `)`, nor where the next line is blank; or, with
+    // `keep_blanks`, the break alone, as its gJ. The caret where the first
+    // join is. Nothing where last is not past first.
+    std::optional<Change> joinLines(const ALTextDocument& doc, S32 first, S32 last, bool keep_blanks);
+    // The leading blanks of lines first through last made again of spaces,
+    // or of tabs as far as they go, a tab `tab_width` wide: vim's :retab,
+    // Convert Indentation. Measured with tabs `measured_width` wide where
+    // that is given -- :retab 4 over tabs that were 2 -- else `tab_width`.
+    // Nothing where no line changes.
+    std::optional<Change> convertIndentation(const ALTextDocument& doc, S32 first, S32 last, bool to_spaces, S32 tab_width,
+                                             S32 measured_width = 0);
 }

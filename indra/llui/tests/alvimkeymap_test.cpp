@@ -1841,4 +1841,48 @@ namespace tut
         keys("n");
         ensure("n from the match, not from before it", e.caret() == ALTextPos(1, 4));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<59>()
+    {
+        set_test_name(":join, :retab, :undo and :redo, :put, :mark and :k, :left, :right and :center");
+        ALCodeEditor& e = make("a\n  b\n  c\nd\n");
+        keys(":j<CR>");
+        ensure_equals(":j the line and the next", flat(e.text()), std::string("a b|  c|d|"));
+        keys(":u<CR>");
+        ensure_equals(":u", flat(e.text()), std::string("a|  b|  c|d|"));
+        keys(":red<CR>");
+        ensure_equals(":red", flat(e.text()), std::string("a b|  c|d|"));
+        keys(":u<CR>:1,3j!<CR>");
+        ensure_equals(":j! a range, the blanks kept", flat(e.text()), std::string("a  b  c|d|"));
+        keys("u:2j 3<CR>");
+        ensure_equals(":j with a count, from the range's last", flat(e.text()), std::string("a|  b c d|"));
+        keys("u");
+
+        e.setSoftTabs(false);
+        e.setTabWidth(2);
+        keys(":retab<CR>");
+        ensure_equals(":retab: tabs where the tabs are set so", flat(e.text()), std::string("a|\tb|\tc|d|"));
+        keys(":retab 4<CR>");
+        ensure_equals("a width given sets it first", flat(e.text()), std::string("a|  b|  c|d|"));
+        keys("u");
+
+        keys("gg\"xyy:3pu x<CR>");
+        ensure_equals(":put under the line", flat(e.text()), std::string("a|\tb|\tc|a|d|"));
+        keys(":1pu! x<CR>");
+        ensure_equals(":put! above it", flat(e.text()), std::string("a|a|\tb|\tc|a|d|"));
+
+        keys(":4ma q<CR>gg'q");
+        ensure_equals(":mark", e.caret().line, 3);
+        keys(":2k w<CR>gg'w");
+        ensure_equals(":k", e.caret().line, 1);
+
+        make("x\n   yy\n");
+        keys(":%le 2<CR>");
+        ensure_equals(":left", flat(editor->text()), std::string("  x|  yy|"));
+        keys(":2ri 6<CR>");
+        ensure_equals(":right", editor->document().line(1), std::string("    yy"));
+        keys(":2ce 6<CR>");
+        ensure_equals(":center", editor->document().line(1), std::string("  yy"));
+    }
 }

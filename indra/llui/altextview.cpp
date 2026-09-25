@@ -119,6 +119,7 @@ namespace
             case ALEditorCommand::MoveLineUp:
             case ALEditorCommand::MoveLineDown:
             case ALEditorCommand::DeleteLine:
+            case ALEditorCommand::JoinLines:
             case ALEditorCommand::Complete:
             case ALEditorCommand::Rename:
             case ALEditorCommand::QuickFix:
@@ -1353,6 +1354,25 @@ std::optional<ALTextRange> ALTextView::misspellingFrom(const ALTextPos& from, bo
     return std::nullopt;
 }
 
+bool ALTextView::convertIndentation(S32 first, S32 last, bool to_spaces, S32 measured_width)
+{
+    if (mReadOnly)
+    {
+        return false;
+    }
+    const std::optional<ALTextEditing::Change> change =
+        ALTextEditing::convertIndentation(mDocument, first, last, to_spaces, getTabWidth(), measured_width);
+    if (!change)
+    {
+        return false;
+    }
+    // The caret where it was, on its line.
+    ALTextEditing::Change keep = *change;
+    keep.caret                 = mCaret;
+    apply(keep);
+    return true;
+}
+
 bool ALTextView::goToMisspelling(bool forward)
 {
     const ALTextRange                selected = selection().normalised();
@@ -2017,6 +2037,17 @@ bool ALTextView::perform(ALEditorCommand command)
         case C::DeleteLine:
             apply(ALTextEditing::deleteLines(mDocument, mAnchor, mCaret));
             return true;
+        case C::JoinLines:
+        {
+            // The lines selected, or the caret's and the next.
+            const auto [first, last] = ALTextEditing::selectedLines(ALTextRange(mAnchor, mCaret).normalised());
+            if (const std::optional<ALTextEditing::Change> join = ALTextEditing::joinLines(mDocument, first, llmax(last, first + 1), false))
+            {
+                apply(*join);
+                return true;
+            }
+            return false;
+        }
         case C::Fold:
         case C::Unfold:
         case C::FoldAll:
