@@ -1346,6 +1346,35 @@ void ALScriptPreprocessor::finish(const std::shared_ptr<Job>& job, ALPreprocesso
                                                     problem.args);
         }
     }
+    // What could not be found where the disk was not looked in -- disk
+    // includes off, or on with no folder of the scripter's to look in --
+    // said so, and how it is: a module kept in a folder on disk, as the VS
+    // Code plugin keeps them, is what a scripter new to the studio runs
+    // into. Said from the settings alone: nothing on the disk is touched
+    // to say it. A file on disk asking may have folders a `.luaurc` beside
+    // it let in, and is not second-guessed.
+    static LLCachedControl<bool> disk(gSavedSettings, "ALScriptPreprocDiskIncludes", false);
+    const bool                   no_folders = includeFolders().empty();
+    std::string                  file;
+    for (ALScriptProblem& problem : result.problems)
+    {
+        const bool include = problem.key == "PreprocIncludeNotFound";
+        if ((!include && problem.key != "PreprocModuleNotFound") || problem.args.size() != 1)
+        {
+            continue;
+        }
+        const bool from_disk = fileOf(job->request.path, file) || fileOf(problem.file, file);
+        if (disk && (!no_folders || from_disk))
+        {
+            continue;
+        }
+        problem.key     = include ? "PreprocIncludeNotOnDisk" : "PreprocModuleNotOnDisk";
+        problem.message = ALScriptProblem::fill(include ? "could not find include file '[1]': the disk was not looked in -- it is only with "
+                                                          "Build > Include from Disk on and a folder added"
+                                                        : "could not find module '[1]': the disk was not looked in -- it is only with Build > "
+                                                          "Include from Disk on and a folder added",
+                                                problem.args);
+    }
     alTranslateScriptProblems(result.problems);
     if (job->callback)
     {
