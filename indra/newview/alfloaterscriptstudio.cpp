@@ -695,7 +695,8 @@ bool ALFloaterScriptStudio::postBuild()
     mBottomTabs    = getChild<LLTabContainer>("bottom_tabs");
     mReferences    = getChild<ALPaneList>("references");
     mOutline       = getChild<ALPaneList>("outline");
-    mWeightsPane   = std::make_unique<ALScriptWeightsPane>(*getChild<LLPanel>("weights_tab"), *this);
+    mWeightsPane   = getChild<ALScriptWeightsPane>("weights_tab");
+    mWeightsPane->setStrings(*this);
     mWeightsParts  = mWeightsPane->partsList();
     mSymbol        = getChild<ALTextView>("symbol");
     // The declaration, in the script the inspector is about or in the
@@ -744,14 +745,16 @@ bool ALFloaterScriptStudio::postBuild()
     });
     mBreadcrumb->onChose(boost::bind(&ALFloaterScriptStudio::onCrumbChosen, this, _1, _2));
     mBreadcrumb->onTrailerChosen([this](const std::string& value) { onTrailerChosen(value); });
-    mProblemsPane = std::make_unique<ALScriptProblemsPane>(*getChild<LLPanel>("problems_tab"), *this, *this);
+    mProblemsPane = getChild<ALScriptProblemsPane>("problems_tab");
+    mProblemsPane->attach(*this, *this);
     mReferences->setCommitCallback([this](LLUICtrl*, const LLSD&) { onReferenceChosen(false); });
     mReferences->setDoubleClickCallback([this]() { onReferenceChosen(true); });
     mWeightsParts->setCommitCallback([this](LLUICtrl*, const LLSD&) { onWeightChosen(false); });
     mWeightsParts->setDoubleClickCallback([this]() { onWeightChosen(true); });
     mOutline->setCommitCallback([this](LLUICtrl*, const LLSD&) { onOutlineChosen(false); });
     mOutline->setDoubleClickCallback([this]() { onOutlineChosen(true); });
-    mOutputPane = std::make_unique<ALScriptOutputPane>(*getChild<LLPanel>("output_tab"), *this, *this);
+    mOutputPane = getChild<ALScriptOutputPane>("output_tab");
+    mOutputPane->attach(*this, *this);
     // What was said before the window opened, then everything after.
     for (const ALScriptWorkspace::RuntimeEvent& event : ALScriptWorkspace::instance().recentRuntime())
     {

@@ -58,13 +58,24 @@ namespace
     }
 }
 
-ALScriptOutputPane::ALScriptOutputPane(LLPanel& tab, ALScriptStudioServices& services, Window& window) : mServices(services), mWindow(window)
+static LLPanelInjector<ALScriptOutputPane> t_script_studio_output("script_studio_output");
+
+ALScriptOutputPane::ALScriptOutputPane(const LLPanel::Params& params) : LLPanel(params) {}
+
+bool ALScriptOutputPane::postBuild()
 {
-    mView  = tab.getChild<ALOutputView>("output");
-    mWhose = tab.getChild<LLComboBox>("output_filter");
-    mKind  = tab.getChild<LLComboBox>("output_kind");
-    mFind  = tab.getChild<LLFilterEditor>("output_find");
-    mView->setPlaceholder(mServices.words("NoOutput"));
+    mView  = getChild<ALOutputView>("output");
+    mWhose = getChild<LLComboBox>("output_filter");
+    mKind  = getChild<LLComboBox>("output_kind");
+    mFind  = getChild<LLFilterEditor>("output_find");
+    return true;
+}
+
+void ALScriptOutputPane::attach(ALScriptStudioServices& services, Window& window)
+{
+    mServices = &services;
+    mWindow   = &window;
+    mView->setPlaceholder(mServices->words("NoOutput"));
     // What the studio did has its own lane in the log, so that a busy
     // debug channel does not push it out.
     mView->setCapacity(200, 1);
@@ -75,13 +86,13 @@ ALScriptOutputPane::ALScriptOutputPane(LLPanel& tab, ALScriptStudioServices& ser
     }
     mKind->selectFirstItem();
     mView->onEntryChosen([this](const ALOutputView::Entry& entry) { choose(entry); });
-    tab.getChild<LLButton>("output_clear")->setCommitCallback([this](LLUICtrl*, const LLSD&) {
+    getChild<LLButton>("output_clear")->setCommitCallback([this](LLUICtrl*, const LLSD&) {
         // What was said goes; whose words are listened to stays.
         mView->clearEntries();
         mUnread = false;
-        mWindow.outputUnreadChanged();
+        mWindow->outputUnreadChanged();
     });
-    tab.getChild<LLButton>("output_copy")->setCommitCallback([this](LLUICtrl*, const LLSD&) {
+    getChild<LLButton>("output_copy")->setCommitCallback([this](LLUICtrl*, const LLSD&) {
         // What the pane shows through its filters, as it reads, on the
         // clipboard; nothing shown leaves the clipboard as it was.
         std::string all;
@@ -98,11 +109,11 @@ ALScriptOutputPane::ALScriptOutputPane(LLPanel& tab, ALScriptStudioServices& ser
         }
         if (lines == 0)
         {
-            mServices.setStatus(mServices.words("OutputNothingToCopy"));
+            mServices->setStatus(mServices->words("OutputNothingToCopy"));
             return;
         }
         LLClipboard::instance().copyToClipboard(all, 0, static_cast<S32>(all.size()));
-        mServices.setStatus(mServices.counted("OutputCopied", lines));
+        mServices->setStatus(mServices->counted("OutputCopied", lines));
     });
 }
 
@@ -120,7 +131,7 @@ ALScriptOutputPane::Place ALScriptOutputPane::heard(const ALScriptWorkspace::Run
     // The script, where it is open here: what runs is its expansion,
     // where the preprocessor ran, and a line the run names is the
     // expansion's -- back to the source's, or an include's.
-    const ALScriptStudioDoc* open     = event.item.notNull() ? mServices.findDoc(ALScriptRef(event.prim, event.item)) : nullptr;
+    const ALScriptStudioDoc* open     = event.item.notNull() ? mServices->findDoc(ALScriptRef(event.prim, event.item)) : nullptr;
     const auto               where_of = [&](S32 line, S32 column) {
         Place where;
         where.line   = line;
@@ -163,7 +174,7 @@ ALScriptOutputPane::Place ALScriptOutputPane::heard(const ALScriptWorkspace::Run
     ALOutputView::Entry entry;
     entry.time   = clockOf(event.time);
     entry.source = event.scriptName.empty() ? event.objectName : event.objectName + " / " + event.scriptName;
-    entry.kind   = event.isError ? mServices.words("KindError") : event.channel == ALScriptWorkspace::RuntimeEvent::Channel::OwnerSay ? mServices.words("KindOwnerSay") : std::string();
+    entry.kind   = event.isError ? mServices->words("KindError") : event.channel == ALScriptWorkspace::RuntimeEvent::Channel::OwnerSay ? mServices->words("KindOwnerSay") : std::string();
     entry.text   = event.isError && !event.error.empty() ? event.error : event.message;
     while (!entry.text.empty() && (entry.text.back() == '\n' || entry.text.back() == '\r'))
     {
@@ -174,7 +185,7 @@ ALScriptOutputPane::Place ALScriptOutputPane::heard(const ALScriptWorkspace::Run
     entry.key["prim"] = event.prim;
     entry.key["item"] = event.item;
     entry.key["kind"] = event.isError ? "error" : event.channel == ALScriptWorkspace::RuntimeEvent::Channel::OwnerSay ? "owner" : "debug";
-    entry.key["mine"] = event.channel == ALScriptWorkspace::RuntimeEvent::Channel::OwnerSay || (event.root.notNull() && mWindow.ownsObject(event.root));
+    entry.key["mine"] = event.channel == ALScriptWorkspace::RuntimeEvent::Channel::OwnerSay || (event.root.notNull() && mWindow->ownsObject(event.root));
     if (event.isError)
     {
         entry.color = runtime_color.get();
@@ -182,7 +193,7 @@ ALScriptOutputPane::Place ALScriptOutputPane::heard(const ALScriptWorkspace::Run
         {
             LLStringUtil::format_map_t line;
             line["[LINE]"] = std::to_string(at.line + 1);
-            entry.text += " " + mServices.words("OutputAtLine", line);
+            entry.text += " " + mServices->words("OutputAtLine", line);
         }
         // The stack under it, as the VM said it: each frame of the
         // script's own chunk -- the one the error's line names, which the
@@ -215,7 +226,7 @@ ALScriptOutputPane::Place ALScriptOutputPane::heard(const ALScriptWorkspace::Run
                 LLStringUtil::format_map_t args;
                 args["[NAME]"] = there.file.empty() ? event.scriptName : there.fileName;
                 args["[LINE]"] = std::to_string(there.line + 1);
-                link.tooltip   = mServices.words("OutputOpenAtLine", args);
+                link.tooltip   = mServices->words("OutputOpenAtLine", args);
                 link.value     = link_value(there);
                 entry.links.push_back(std::move(link));
             }
@@ -233,7 +244,7 @@ ALScriptOutputPane::Place ALScriptOutputPane::heard(const ALScriptWorkspace::Run
         args["[NAME]"] = event.scriptName;
         args["[LINE]"] = llformat("%d", at.line + 1);
         entry.link     = true;
-        entry.tooltip  = mServices.words(event.isError && at.line >= 0 ? "OutputOpenAtLine" : "OutputOpen", args);
+        entry.tooltip  = mServices->words(event.isError && at.line >= 0 ? "OutputOpenAtLine" : "OutputOpen", args);
         entry.value    = link_value(at);
     }
     mView->append(std::move(entry));
@@ -251,7 +262,7 @@ void ALScriptOutputPane::said(const std::string& text, bool failure, const ALScr
     static const LLUIColor alarm = LLUIColorTable::instance().getColor("LtOrange", LLColor4::yellow);
     ALOutputView::Entry entry;
     entry.time        = clockOf(LLDate::now().secondsSinceEpoch());
-    entry.source      = mServices.words("OutputSourceStudio");
+    entry.source      = mServices->words("OutputSourceStudio");
     entry.text        = text;
     entry.key["kind"] = "studio";
     entry.lane        = 1;
@@ -272,7 +283,7 @@ void ALScriptOutputPane::said(const std::string& text, bool failure, const ALScr
         link.end   = link.begin + static_cast<S32>(doc->name.size());
         LLStringUtil::format_map_t args;
         args["[NAME]"]      = doc->name;
-        link.tooltip        = mServices.words("OutputStudioShow", args);
+        link.tooltip        = mServices->words("OutputStudioShow", args);
         link.value["doc"]   = doc->id;
         link.value["issue"] = failure;
         entry.links.push_back(std::move(link));
@@ -287,7 +298,7 @@ void ALScriptOutputPane::said(const std::string& text, bool failure, const ALScr
                                   : action == "take_external" ? "ActionTakeExternal"
                                   : action == "keep_here"     ? "ActionKeepHere"
                                                               : "ActionExport";
-        const std::string label = mServices.words(key);
+        const std::string label = mServices->words(key);
         const size_t      last  = entry.text.rfind('\n');
         const S32         line  = static_cast<S32>(std::count(entry.text.begin(), entry.text.end(), '\n'));
         entry.text += "   ";
@@ -298,7 +309,7 @@ void ALScriptOutputPane::said(const std::string& text, bool failure, const ALScr
         link.end   = link.begin + static_cast<S32>(label.size());
         LLStringUtil::format_map_t args;
         args["[NAME]"]       = doc->name;
-        link.tooltip         = mServices.words(key + "Tip", args);
+        link.tooltip         = mServices->words(key + "Tip", args);
         link.value["action"] = action;
         link.value["doc"]    = doc->id;
         entry.links.push_back(std::move(link));
@@ -308,20 +319,20 @@ void ALScriptOutputPane::said(const std::string& text, bool failure, const ALScr
 
 void ALScriptOutputPane::markUnread()
 {
-    if (!mWindow.outputInSight())
+    if (!mWindow->outputInSight())
     {
         mUnread = true;
-        mWindow.outputUnreadChanged();
+        mWindow->outputUnreadChanged();
     }
 }
 
 void ALScriptOutputPane::pump()
 {
     // What the Output tab had not shown, it has once it is looked at.
-    if (mUnread && mWindow.outputInSight())
+    if (mUnread && mWindow->outputInSight())
     {
         mUnread = false;
-        mWindow.outputUnreadChanged();
+        mWindow->outputUnreadChanged();
     }
 }
 
@@ -393,13 +404,13 @@ void ALScriptOutputPane::offerObject(const LLUUID& root, const std::string& name
     std::vector<std::pair<LLUUID, std::string>> ordered = mObjects;
     std::sort(ordered.begin(), ordered.end(), [](const auto& a, const auto& b) { return LLStringUtil::compareDict(a.second, b.second) < 0; });
     mWhose->clearRows();
-    mWhose->add(mServices.words("OutputAllObjects"), LLSD(""));
-    mWhose->add(mServices.words("OutputOpenScripts"), LLSD("open"));
-    mWhose->add(mServices.words("OutputMyObjects"), LLSD("mine"));
+    mWhose->add(mServices->words("OutputAllObjects"), LLSD(""));
+    mWhose->add(mServices->words("OutputOpenScripts"), LLSD("open"));
+    mWhose->add(mServices->words("OutputMyObjects"), LLSD("mine"));
     mWhose->addSeparator();
     for (const auto& [id, label] : ordered)
     {
-        mWhose->add(label.empty() ? mServices.words("ObjectUnnamed") : label, LLSD(id.asString()));
+        mWhose->add(label.empty() ? mServices->words("ObjectUnnamed") : label, LLSD(id.asString()));
     }
     if (!mWhose->selectByValue(LLSD(chosen)))
     {
@@ -428,7 +439,7 @@ void ALScriptOutputPane::filter()
         // are, but for one object's alone.
         if (whose == "open")
         {
-            if (said != "studio" && !mServices.findDoc(ALScriptRef(entry.key["prim"].asUUID(), entry.key["item"].asUUID())))
+            if (said != "studio" && !mServices->findDoc(ALScriptRef(entry.key["prim"].asUUID(), entry.key["item"].asUUID())))
             {
                 return false;
             }
@@ -453,18 +464,18 @@ void ALScriptOutputPane::choose(const ALOutputView::Entry& entry)
     // What the words said could be done, done.
     if (entry.value.has("action"))
     {
-        if (ALScriptStudioDoc* doc = mServices.findDoc(entry.value["doc"].asString()))
+        if (ALScriptStudioDoc* doc = mServices->findDoc(entry.value["doc"].asString()))
         {
-            mWindow.outputAction(*doc, entry.value["action"].asString());
+            mWindow->outputAction(*doc, entry.value["action"].asString());
         }
         return;
     }
     // A line of the studio's own: the script it names, brought forward.
     if (entry.value.has("doc"))
     {
-        if (ALScriptStudioDoc* doc = mServices.findDoc(entry.value["doc"].asString()))
+        if (ALScriptStudioDoc* doc = mServices->findDoc(entry.value["doc"].asString()))
         {
-            mWindow.outputShowDoc(*doc, entry.value["issue"].asBoolean());
+            mWindow->outputShowDoc(*doc, entry.value["issue"].asBoolean());
         }
         return;
     }
@@ -477,8 +488,8 @@ void ALScriptOutputPane::choose(const ALOutputView::Entry& entry)
     // A frame in an include: the include, where it can be opened.
     if (!entry.value["file"].asString().empty())
     {
-        mWindow.outputGoToInclude(entry.value["file"].asString(), entry.value["fileName"].asString(), line, column);
+        mWindow->outputGoToInclude(entry.value["file"].asString(), entry.value["fileName"].asString(), line, column);
         return;
     }
-    mWindow.outputGoTo(ALScriptRef(entry.value["prim"].asUUID(), entry.value["item"].asUUID()), entry.value["name"].asString(), line, column);
+    mWindow->outputGoTo(ALScriptRef(entry.value["prim"].asUUID(), entry.value["item"].asUUID()), entry.value["name"].asString(), line, column);
 }

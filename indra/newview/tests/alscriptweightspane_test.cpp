@@ -51,6 +51,14 @@ namespace tut
         LLFloater*                   floater = window.floater;
 
         LLPanel* tab() const { return floater ? floater->findChild<LLPanel>("weights_tab", true) : nullptr; }
+        // The tab as the skin built it, in the window's words.
+        ALScriptWeightsPane& weights() const
+        {
+            ALScriptWeightsPane* pane = floater->findChild<ALScriptWeightsPane>("weights_tab", true);
+            ensure("the skin builds the tab as the pane", pane != nullptr);
+            pane->setStrings(*floater);
+            return *pane;
+        }
         ALPaneList* list(const char* name) const { return floater ? floater->findChild<ALPaneList>(name, true) : nullptr; }
 
         static std::string cell(const LLScrollListItem* item, S32 column)
@@ -138,7 +146,7 @@ namespace tut
             skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         ensure("the studio's window builds with its Weights tab", tab() != nullptr);
-        ALScriptWeightsPane pane(*tab(), *floater);
+        ALScriptWeightsPane& pane = weights();
         pane.show(lsl());
         ALPaneList* targets = list("weights_targets");
         ALPaneList* parts   = list("weights_parts");
@@ -170,7 +178,7 @@ namespace tut
         {
             skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
-        ALScriptWeightsPane pane(*tab(), *floater);
+        ALScriptWeightsPane& pane = weights();
         pane.show(lsl());
         ALPaneList* targets = list("weights_targets");
         ALPaneList* parts   = list("weights_parts");
@@ -207,7 +215,7 @@ namespace tut
         {
             skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
-        ALScriptWeightsPane pane(*tab(), *floater);
+        ALScriptWeightsPane& pane = weights();
         ALScriptWeightsPane::Shown shown = lsl();
         ALScriptWeight             saved = shown.weights[0];
         saved.total                      = 4000;
@@ -245,7 +253,7 @@ namespace tut
         {
             skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
-        ALScriptWeightsPane pane(*tab(), *floater);
+        ALScriptWeightsPane& pane = weights();
         pane.show(lsl());
         pane.showNothing("Nothing open to weigh.");
         ensure_equals("no targets", list("weights_targets")->getItemCount(), 0);
@@ -265,7 +273,7 @@ namespace tut
             skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
         }
         using Kind = ALScriptWeight::Part::Kind;
-        ALScriptWeightsPane        pane(*tab(), *floater);
+        ALScriptWeightsPane&       pane = weights();
         ALScriptWeightsPane::Shown shown;
         shown.id   = "script-3";
         shown.name = "Handlers";

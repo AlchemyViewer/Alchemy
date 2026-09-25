@@ -28,6 +28,7 @@
 #include "alscriptanalysis.h"
 #include "alscriptstudiodoc.h"
 #include "llhandle.h"
+#include "llpanel.h"
 
 #include <functional>
 #include <optional>
@@ -41,7 +42,6 @@ class LLCheckBoxCtrl;
 class LLComboBox;
 class LLContextMenu;
 class LLFilterEditor;
-class LLPanel;
 
 // The Script Studio's Problems tab: what is wrong with a script, as each
 // thing that looks at it last said -- the analyzers, the preprocessor and
@@ -50,9 +50,10 @@ class LLPanel;
 // origin and by words, for the tab in front or every one open; with the
 // counts the tab's title says, and a menu of what can be done about one.
 // Going to a problem's place, and making a fix, are the window's.
-class ALScriptProblemsPane
+class ALScriptProblemsPane : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(ALScriptProblemsPane, LLPanel);
     typedef ALScriptStudioDoc Doc;
 
     // --- the list of a tab's problems ----------------------------------------------
@@ -126,9 +127,13 @@ public:
         ~Window() = default;
     };
 
-    // Over the tab's widgets.
-    ALScriptProblemsPane(LLPanel& tab, ALScriptStudioServices& services, Window& window);
-    ~ALScriptProblemsPane();
+    // Built by the skin, as the tab (class="script_studio_problems");
+    // given the window's services, and what it asks of the window, once
+    // the window is built, before anything is listed.
+    explicit ALScriptProblemsPane(const LLPanel::Params& params = getDefaultParams());
+    ~ALScriptProblemsPane() override;
+    bool postBuild() override;
+    void attach(ALScriptStudioServices& services, Window& window);
 
     // A tab's problems made anew: kept, and listed again where the list
     // holds that tab's, or every one's.
@@ -186,8 +191,8 @@ private:
     const Doc::Shown* chosenShown() const;
     std::string       chosenLint(bool& lua) const;
 
-    ALScriptStudioServices& mServices;
-    Window&                 mWindow;
+    ALScriptStudioServices* mServices = nullptr;
+    Window*                 mWindow   = nullptr;
     ALPaneList*             mList     = nullptr;
     LLCheckBoxCtrl*         mErrors   = nullptr;
     LLCheckBoxCtrl*         mWarnings = nullptr;

@@ -83,11 +83,15 @@ namespace
     }
 }
 
-ALScriptWeightsPane::ALScriptWeightsPane(LLPanel& tab, const LLPanel& strings) : mStrings(strings)
+static LLPanelInjector<ALScriptWeightsPane> t_script_studio_weights("script_studio_weights");
+
+ALScriptWeightsPane::ALScriptWeightsPane(const LLPanel::Params& params) : LLPanel(params) {}
+
+bool ALScriptWeightsPane::postBuild()
 {
-    mHead    = tab.getChild<LLTextBox>("weights_head");
-    mTargets = tab.getChild<ALPaneList>("weights_targets");
-    mParts   = tab.getChild<ALPaneList>("weights_parts");
+    mHead    = getChild<LLTextBox>("weights_head");
+    mTargets = getChild<ALPaneList>("weights_targets");
+    mParts   = getChild<ALPaneList>("weights_parts");
     // A target chosen shows its parts; the script's own until then.
     mTargets->setCommitCallback([this](LLUICtrl*, const LLSD&) {
         if (LLScrollListItem* item = mTargets->getFirstSelected())
@@ -128,6 +132,7 @@ ALScriptWeightsPane::ALScriptWeightsPane(LLPanel& tab, const LLPanel& strings) :
                 return order((F64)x->target, (F64)y->target);
         }
     });
+    return true;
 }
 
 void ALScriptWeightsPane::show(Shown shown)
@@ -180,14 +185,14 @@ std::string ALScriptWeightsPane::kilobytes(size_t bytes, bool estimate) const
 {
     LLStringUtil::format_map_t args;
     args["[SIZE]"] = llformat("%.1f", (F64)bytes / 1024.0);
-    return mStrings.getString(estimate ? "WeightsKilobytesEstimate" : "WeightsKilobytes", args);
+    return mStrings->getString(estimate ? "WeightsKilobytesEstimate" : "WeightsKilobytes", args);
 }
 
 std::string ALScriptWeightsPane::changeText(const std::optional<S64>& change, bool fresh) const
 {
     if (fresh)
     {
-        return mStrings.getString("WeightsNew");
+        return mStrings->getString("WeightsNew");
     }
     if (!change || *change == 0)
     {
@@ -211,21 +216,21 @@ void ALScriptWeightsPane::fillTargets()
         args["[MAX]"]    = std::to_string(weight.limit);
         args["[ERROR]"]  = weight.error;
         const bool  said = weight.total > 0;
-        std::string tip  = mStrings.getString(!said ? "WeightsTargetFailedTip" : weight.estimate ? "WeightsTargetEstimateTip" : "WeightsTargetTip", args);
+        std::string tip  = mStrings->getString(!said ? "WeightsTargetFailedTip" : weight.estimate ? "WeightsTargetEstimateTip" : "WeightsTargetTip", args);
         if (said && !weight.error.empty())
         {
-            tip += " " + mStrings.getString("WeightsTargetErrorTip", args);
+            tip += " " + mStrings->getString("WeightsTargetErrorTip", args);
         }
         if (i == 0)
         {
-            tip += " " + mStrings.getString("WeightsTargetOwnTip");
+            tip += " " + mStrings->getString("WeightsTargetOwnTip");
         }
         LLSD row;
         row["value"]                             = static_cast<S32>(weight.target);
         row["columns"][TARGET_NAME]["column"]    = "target";
         row["columns"][TARGET_NAME]["value"]     = ALScriptWeight::nameOf(weight.target);
         row["columns"][TARGET_CODE]["column"]    = "code";
-        row["columns"][TARGET_CODE]["value"]     = said ? kilobytes(weight.total, weight.estimate) : mStrings.getString("WeightsNone");
+        row["columns"][TARGET_CODE]["value"]     = said ? kilobytes(weight.total, weight.estimate) : mStrings->getString("WeightsNone");
         row["columns"][TARGET_SHARE]["column"]   = "share";
         row["columns"][TARGET_SHARE]["value"]    = said ? share(weight.total, weight.limit) : std::string();
         row["columns"][TARGET_CHANGE]["column"]  = "change";
@@ -271,10 +276,10 @@ void ALScriptWeightsPane::fillParts()
     args["[LIMIT]"]  = std::to_string(weight->limit / 1024);
     args["[SHARE]"]  = share(weight->total, weight->limit);
     args["[ERROR]"]  = weight->error;
-    std::string head = mStrings.getString(weight->total == 0 ? "WeightsHeadFailed" : weight->estimate ? "WeightsHeadEstimate" : "WeightsHead", args);
+    std::string head = mStrings->getString(weight->total == 0 ? "WeightsHeadFailed" : weight->estimate ? "WeightsHeadEstimate" : "WeightsHead", args);
     if (weight->total > 0 && !weight->error.empty())
     {
-        head += " " + mStrings.getString("WeightsHeadError", args);
+        head += " " + mStrings->getString("WeightsHeadError", args);
     }
     if (mShown.beforeOptimizer)
     {
@@ -282,15 +287,15 @@ void ALScriptWeightsPane::fillParts()
         if (own && mShown.sent)
         {
             args["[SENT]"] = llformat("%.1f", (F64)*mShown.sent / 1024.0);
-            head += " " + mStrings.getString("WeightsHeadSent", args);
+            head += " " + mStrings->getString("WeightsHeadSent", args);
         }
         else
         {
-            head += " " + mStrings.getString("WeightsHeadBefore");
+            head += " " + mStrings->getString("WeightsHeadBefore");
         }
     }
     mHead->setText(head);
-    mHead->setToolTip(mStrings.getString("WeightsHeadTip"));
+    mHead->setToolTip(mStrings->getString("WeightsHeadTip"));
 
     // Each part, with how it moved since the text was last saved, where it
     // was weighed for this target then.
@@ -304,8 +309,8 @@ void ALScriptWeightsPane::fillParts()
             before[identity(saved->parts[i], nth[i])] = saved->parts[i].bytes;
         }
     }
-    const std::string         state_tip = mStrings.getString("WeightsStateTip");
-    const std::string         frame_tip = mStrings.getString("WeightsFrameTip");
+    const std::string         state_tip = mStrings->getString("WeightsStateTip");
+    const std::string         frame_tip = mStrings->getString("WeightsFrameTip");
     S32                       select    = -1;
     const std::vector<size_t> nth       = nths(weight->parts);
     for (size_t i = 0; i < weight->parts.size(); ++i)
@@ -378,20 +383,20 @@ std::string ALScriptWeightsPane::partName(const ALScriptWeight::Part& part) cons
         {
             if (part.name == word)
             {
-                return mStrings.getString(key);
+                return mStrings->getString(key);
             }
         }
     }
     if (part.name.empty())
     {
-        return mStrings.getString("WeightsPartUnnamed");
+        return mStrings->getString("WeightsPartUnnamed");
     }
     if (!part.within.empty())
     {
         LLStringUtil::format_map_t args;
         args["[EVENT]"] = part.name;
         args["[STATE]"] = part.within;
-        return mStrings.getString("WeightsPartHandler", args);
+        return mStrings->getString("WeightsPartHandler", args);
     }
     return part.name;
 }
@@ -401,18 +406,18 @@ std::string ALScriptWeightsPane::kindName(ALScriptWeight::Part::Kind kind) const
     switch (kind)
     {
         case ALScriptWeight::Part::Kind::Function:
-            return mStrings.getString("WeightsKindFunction");
+            return mStrings->getString("WeightsKindFunction");
         case ALScriptWeight::Part::Kind::Handler:
-            return mStrings.getString("WeightsKindHandler");
+            return mStrings->getString("WeightsKindHandler");
         case ALScriptWeight::Part::Kind::State:
-            return mStrings.getString("WeightsKindState");
+            return mStrings->getString("WeightsKindState");
         case ALScriptWeight::Part::Kind::Global:
-            return mStrings.getString("WeightsKindGlobal");
+            return mStrings->getString("WeightsKindGlobal");
         case ALScriptWeight::Part::Kind::Constant:
-            return mStrings.getString("WeightsKindConstant");
+            return mStrings->getString("WeightsKindConstant");
         case ALScriptWeight::Part::Kind::Frame:
         default:
-            return mStrings.getString("WeightsKindFrame");
+            return mStrings->getString("WeightsKindFrame");
     }
 }
 

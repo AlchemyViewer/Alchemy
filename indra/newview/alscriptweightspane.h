@@ -25,6 +25,7 @@
 #pragma once
 
 #include "alscriptweight.h"
+#include "llpanel.h"
 
 #include <boost/unordered/unordered_flat_map.hpp>
 
@@ -33,7 +34,6 @@
 #include <vector>
 
 class ALPaneList;
-class LLPanel;
 class LLScrollListItem;
 class LLTextBox;
 
@@ -45,9 +45,10 @@ class LLTextBox;
 // fills its lists from what it is given and says what is chosen; going
 // there is the window's. What a script allocates as it runs is in none of
 // it.
-class ALScriptWeightsPane
+class ALScriptWeightsPane : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(ALScriptWeightsPane, LLPanel);
     // What the pane shows of one script.
     struct Shown
     {
@@ -77,8 +78,11 @@ public:
         S32         column = 0;
     };
 
-    // Over the tab's widgets, in the words of `strings`: the window's.
-    ALScriptWeightsPane(LLPanel& tab, const LLPanel& strings);
+    // Built by the skin, as the tab (class="script_studio_weights"); it
+    // speaks in the words of `strings`, the window's, once given them.
+    explicit ALScriptWeightsPane(const LLPanel::Params& params = getDefaultParams());
+    bool     postBuild() override;
+    void setStrings(const LLPanel& strings) { mStrings = &strings; }
 
     // A script's weights, the target chosen kept where it is the same
     // script, and the part chosen and the scroll kept through a refill.
@@ -116,7 +120,7 @@ private:
     std::string           kilobytes(size_t bytes, bool estimate) const;
     S32                   compare(S32 column, const LLScrollListItem* a, const LLScrollListItem* b) const;
 
-    const LLPanel&         mStrings;
+    const LLPanel*         mStrings = this;
     LLTextBox*             mHead    = nullptr;
     ALPaneList*            mTargets = nullptr;
     ALPaneList*            mParts   = nullptr;

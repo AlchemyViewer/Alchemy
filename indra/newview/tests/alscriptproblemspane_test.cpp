@@ -127,7 +127,7 @@ namespace tut
         al_studio_test::StudioWindow         window;
         al_studio_test::FakeServices         services{ window.floater };
         FakeWindow                           studio;
-        std::unique_ptr<ALScriptProblemsPane> pane;
+        ALScriptProblemsPane*                pane = nullptr;
 
         ALScriptProblemsPane& make()
         {
@@ -135,7 +135,10 @@ namespace tut
             {
                 skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
             }
-            pane = std::make_unique<ALScriptProblemsPane>(*window.tab("problems_tab"), services, studio);
+            // The tab as the skin built it.
+            pane = window.find<ALScriptProblemsPane>("problems_tab");
+            ensure("the skin builds the tab as the pane", pane != nullptr);
+            pane->attach(services, studio);
             return *pane;
         }
 

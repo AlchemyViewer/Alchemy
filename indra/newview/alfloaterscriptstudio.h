@@ -1217,7 +1217,7 @@ private:
     ALTabStrip*                        mTabs          = nullptr;
     ALJumpBar*                         mBreadcrumb    = nullptr;
     LLTabContainer*                    mBottomTabs    = nullptr;
-    std::unique_ptr<ALScriptProblemsPane> mProblemsPane;
+    ALScriptProblemsPane*              mProblemsPane = nullptr;
     ALPaneList*                        mReferences    = nullptr;
     ALPaneList*                        mOutline       = nullptr;
     ALTextView*                        mSymbol        = nullptr;
@@ -1260,7 +1260,7 @@ private:
     std::string                        mTrailerProblemsTip;
     std::string                        mTrailerSourceTip;
     std::string                        mTrailerExpandedTip;
-    std::unique_ptr<ALScriptOutputPane> mOutputPane;
+    ALScriptOutputPane*                mOutputPane = nullptr;
     ALScopeBar*                        mSearchBar     = nullptr;
     ALPaneList*                        mSearchResults = nullptr;
     // The Weights tab, and whether it was looked at last frame and has
@@ -1276,7 +1276,7 @@ private:
         std::vector<ALCodeEditor::Fix> fixes;
     };
     std::optional<FixesToWeigh>        mFixesToWeigh;
-    std::unique_ptr<ALScriptWeightsPane> mWeightsPane;
+    ALScriptWeightsPane*               mWeightsPane = nullptr;
     ALPaneList*                        mWeightsParts      = nullptr;
     bool                               mWeightsWereShown  = false;
     bool                               mWeightsStale      = true;

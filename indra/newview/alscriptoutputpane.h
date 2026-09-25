@@ -26,6 +26,7 @@
 
 #include "aloutputview.h"
 #include "alscriptworkspace.h"
+#include "llpanel.h"
 #include "lluuid.h"
 
 #include <string>
@@ -36,7 +37,6 @@ struct ALScriptStudioDoc;
 class ALScriptStudioServices;
 class LLComboBox;
 class LLFilterEditor;
-class LLPanel;
 
 // The Script Studio's Output tab: what scripts say -- to their owner, on
 // the debug channel, and their run-time errors with the stack under them
@@ -45,9 +45,11 @@ class LLPanel;
 // they say. An error or a failure said while the tab is not in sight is
 // unread until it is. It lists and filters; going where a link goes, and
 // doing what one asks, is the window's.
-class ALScriptOutputPane
+class ALScriptOutputPane : public LLPanel
 {
 public:
+    AL_VIEW_TYPE(ALScriptOutputPane, LLPanel);
+
     // What the pane asks of the window beyond its services.
     class Window
     {
@@ -87,8 +89,12 @@ public:
         std::string fileName;
     };
 
-    // Over the tab's widgets.
-    ALScriptOutputPane(LLPanel& tab, ALScriptStudioServices& services, Window& window);
+    // Built by the skin, as the tab (class="script_studio_output"); given
+    // the window's services, and what it asks of the window, once the
+    // window is built, before anything is said.
+    explicit ALScriptOutputPane(const LLPanel::Params& params = getDefaultParams());
+    bool postBuild() override;
+    void attach(ALScriptStudioServices& services, Window& window);
 
     // What a script said: a line of the log, or more where it said more,
     // its object offered in the filter the first time it speaks. What
@@ -130,8 +136,8 @@ private:
     // An error or a failure said: unread, where the tab is not in sight.
     void markUnread();
 
-    ALScriptStudioServices&                     mServices;
-    Window&                                     mWindow;
+    ALScriptStudioServices*                     mServices = nullptr;
+    Window*                                     mWindow   = nullptr;
     ALOutputView*                               mView  = nullptr;
     LLComboBox*                                 mWhose = nullptr;
     LLComboBox*                                 mKind  = nullptr;
