@@ -35,6 +35,7 @@
 
 #include <algorithm>
 #include <filesystem>
+#include <fstream>
 #include <sstream>
 
 namespace tut
@@ -521,5 +522,60 @@ namespace tut
         ensure("a stamp that is no number read past", LLFile::isfile(garbled));
         store.prune(60.0, LLDate(LLDate::now().secondsSinceEpoch() + 120.0));
         ensure("and pruned by what it says", !LLFile::isfile(garbled));
+    }
+
+    template<> template<>
+    void alscriptrecovery_object::test<16>()
+    {
+        set_test_name("what typing writes goes on the store's thread, the newest for a key winning, and whatever else is asked waits for it");
+        {
+            ALScriptRecoveryStore store(folder, "session-a");
+            for (int i = 0; i < 20; ++i)
+            {
+                store.writeSoon(entry("item:x", "typed " + std::to_string(i)));
+            }
+            store.writeSoon(entry("item:y", "other"));
+            store.flush();
+            const std::vector<ALScriptRecoveryEntry> all = store.list();
+            ensure_equals("one entry a key", all.size(), size_t(2));
+            for (const ALScriptRecoveryEntry& one : all)
+            {
+                ensure("the newest of x: " + one.text, one.key != "item:x" || one.text == "typed 19");
+                ensure("this session's", one.session == "session-a");
+            }
+            for (const std::string& name : files())
+            {
+                ensure("nothing half written: " + name, name.find(".tmp") == std::string::npos);
+            }
+            // Forgotten right after it was asked to be written: the write
+            // goes first, and the file does not come back after.
+            store.writeSoon(entry("item:x", "late"));
+            store.forget("item:x");
+            store.flush();
+            const std::vector<ALScriptRecoveryEntry> after = store.list();
+            ensure("x gone: " + std::to_string(after.size()), after.size() == 1 && after.front().key == "item:y");
+            ensure("nothing failed", store.takeFailures().empty());
+            // Left waiting as the store goes: written all the same.
+            store.writeSoon(entry("item:z", "as it went"));
+        }
+        ALScriptRecoveryStore again(folder, "session-a");
+        bool z = false;
+        for (const ALScriptRecoveryEntry& one : again.list())
+        {
+            z |= one.key == "item:z" && one.text == "as it went";
+        }
+        ensure("written as the store went", z);
+        // Where the folder cannot be written, said by key.
+        const std::string blocked = folder + "/blocked";
+        {
+            std::ofstream file(blocked);
+            file << "a file where a folder would be";
+        }
+        ALScriptRecoveryStore nowhere(blocked, "session-a");
+        nowhere.writeSoon(entry("item:w", "lost"));
+        nowhere.flush();
+        const std::vector<std::string> failed = nowhere.takeFailures();
+        ensure("failed, by key", failed.size() == 1 && failed.front() == "item:w");
+        ensure("and said once", nowhere.takeFailures().empty());
     }
 }

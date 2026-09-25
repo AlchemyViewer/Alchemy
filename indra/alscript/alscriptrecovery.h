@@ -28,6 +28,7 @@
 #include "llsd.h"
 #include "lluuid.h"
 
+#include <memory>
 #include <optional>
 #include <string>
 #include <vector>
@@ -108,10 +109,19 @@ struct ALScriptRecoveryRetry
 // that work by typing in it; what a session leaves behind it is found
 // again by the next, which offers it back. The discarded go into a folder
 // beside, and go for good once they are old.
+//
+// What typing writes goes on a thread of the store's own (writeSoon);
+// everything else is done where it is asked, once what that thread has
+// waiting is written, so that the files change in the order they were
+// asked to.
 class ALScriptRecoveryStore
 {
 public:
     ALScriptRecoveryStore(std::string directory, std::string session);
+    // What is waiting written first.
+    ~ALScriptRecoveryStore();
+    ALScriptRecoveryStore(const ALScriptRecoveryStore&)            = delete;
+    ALScriptRecoveryStore& operator=(const ALScriptRecoveryStore&) = delete;
 
     // Whose text: an item in an object, an item in the inventory, or a
     // file on disk.
@@ -121,9 +131,20 @@ public:
     const std::string& session() const { return mSession; }
 
     // This session's entry for the key written, replacing what it wrote
-    // before; the key, the session and the time filled in here. False where
-    // it could not be written, which the caller is to say.
+    // before; the key, the session and the time filled in here, and forced
+    // out to the disk. False where it could not be written, which the
+    // caller is to say.
     bool write(ALScriptRecoveryEntry entry);
+    // The same a moment from now, on the store's thread, as typing asks
+    // for it: the newest for a key in place of one still waiting, and not
+    // forced out to the disk -- what a crash of the viewer needs, the
+    // system holding what was written, where forcing it would hold up
+    // whoever waited on a slow disk or a scanner every time.
+    void writeSoon(ALScriptRecoveryEntry entry);
+    // Everything waiting written.
+    void flush() const;
+    // The keys whose entries writeSoon could not write, since last asked.
+    std::vector<std::string> takeFailures();
     // This session's entry for the key gone: the text was saved, or is not
     // this session's to keep any more.
     void forget(const std::string& key);
@@ -181,12 +202,16 @@ public:
 private:
     std::string fileOf(const std::string& key) const;
     std::string pathOf(const std::string& key, const std::string& session) const;
-    // Written whole beside the path, then put in its place.
-    static bool writeWhole(const std::string& path, const LLSD& sd);
+    // Written whole beside the path, forced out to the disk where it is to
+    // survive the machine going down, then put in its place.
+    static bool writeWhole(const std::string& path, const LLSD& sd, bool durable = true);
     static bool readEntry(const std::string& path, ALScriptRecoveryEntry& out);
     void        listIn(const std::string& folder, std::vector<ALScriptRecoveryEntry>& out) const;
 
     std::string mDirectory;
     std::string mDiscarded;
     std::string mSession;
+    // The thread writeSoon writes on, started with the first.
+    struct Writer;
+    std::unique_ptr<Writer> mWriter;
 };

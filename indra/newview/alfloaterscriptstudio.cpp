@@ -11842,6 +11842,40 @@ bool ALFloaterScriptStudio::keepForRecovery(Doc& doc, ALScriptRecoveryEntry::Sta
     return true;
 }
 
+void ALFloaterScriptStudio::keepForRecoverySoon(Doc& doc)
+{
+    ALScriptRecoveryStore* store = recoveryStore();
+    // What the last of these could not write, said once, as a write here
+    // says it.
+    if (store)
+    {
+        for (const std::string& key : store->takeFailures())
+        {
+            for (std::unique_ptr<Doc>& each : mDocs)
+            {
+                if (each->recoveryKey == key && !each->recoveryFailed)
+                {
+                    each->recoveryFailed = true;
+                    LLStringUtil::format_map_t args;
+                    args["[NAME]"] = each->name;
+                    report(getString("RecoveryWriteFailed", args), true, each.get());
+                }
+            }
+        }
+    }
+    // Anything but an unsaved text to write -- nothing to keep, an entry
+    // to let go of once it is written -- as it always is.
+    if (!store || doc.recoveryKey.empty() || !doc.loaded || !doc.modifiable || doc.carriedText || !doc.editor->isDirty() || doc.recovering)
+    {
+        keepForRecovery(doc);
+        return;
+    }
+    doc.recoveryDue             = 0.0;
+    ALScriptRecoveryEntry entry = recoveryEntryOf(doc);
+    entry.state                 = ALScriptRecoveryEntry::State::Unsaved;
+    store->writeSoon(std::move(entry));
+}
+
 bool ALFloaterScriptStudio::setAside(Doc& doc)
 {
     ALScriptRecoveryStore* store = recoveryStore();
@@ -11985,7 +12019,7 @@ void ALFloaterScriptStudio::pumpRecovery()
     {
         if (doc->recoveryDue > 0.0 && now >= doc->recoveryDue)
         {
-            keepForRecovery(*doc);
+            keepForRecoverySoon(*doc);
         }
     }
     // The connection lost: nothing can be saved, and the viewer may go

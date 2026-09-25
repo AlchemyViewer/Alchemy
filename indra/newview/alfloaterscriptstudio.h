@@ -1437,6 +1437,9 @@ private:
     // entry forgotten, and an entry it took up let go of. False where what
     // is unsaved could not be written.
     bool keepForRecovery(Doc& doc, ALScriptRecoveryEntry::State state = ALScriptRecoveryEntry::State::Unsaved);
+    // The same as typing goes: the unsaved text handed to the store's own
+    // thread to write, which says at the next pause where it could not.
+    void keepForRecoverySoon(Doc& doc);
     // What the tab holds unsaved put straight among the discarded, and
     // this session's entry for it gone once it is. False where it could
     // not be written, and nothing changed.

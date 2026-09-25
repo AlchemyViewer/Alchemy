@@ -32,9 +32,13 @@
 
 #include <algorithm>
 #include <cmath>
+#include <condition_variable>
 #include <cstdlib>
 #include <filesystem>
+#include <map>
+#include <mutex>
 #include <sstream>
+#include <thread>
 
 #if LL_WINDOWS
 #include <io.h>
@@ -187,11 +191,117 @@ F64 ALScriptRecoveryRetry::delayAfter(S32 failures)
     return FIRST * std::pow(3.0, static_cast<F64>(llmax(failures, 1) - 1));
 }
 
+// The thread writeSoon writes on: the entries waiting, by key, each as
+// the LLSD it is written as -- made on the thread that asked and handed
+// over whole, since an LLSD's count of who holds it is no thread's but
+// one's -- and whether one is being written now.
+struct ALScriptRecoveryStore::Writer
+{
+    std::mutex                                           mutex;
+    std::condition_variable                              changed;
+    std::map<std::string, std::pair<std::string, LLSD>> waiting;
+    bool                                                 busy     = false;
+    bool                                                 stopping = false;
+    std::vector<std::string>                             failed;
+    std::thread                                          thread;
+
+    void run()
+    {
+        std::unique_lock<std::mutex> lock(mutex);
+        while (true)
+        {
+            changed.wait(lock, [this] { return stopping || !waiting.empty(); });
+            if (waiting.empty())
+            {
+                // Stopping, with nothing left to write.
+                return;
+            }
+            auto one = waiting.extract(waiting.begin());
+            busy     = true;
+            lock.unlock();
+            const bool written = writeWhole(one.mapped().first, one.mapped().second, false);
+            const std::string key = one.key();
+            // Let go of here, the only thread that holds it.
+            one = {};
+            lock.lock();
+            busy = false;
+            if (!written)
+            {
+                failed.push_back(key);
+            }
+            changed.notify_all();
+        }
+    }
+};
+
 ALScriptRecoveryStore::ALScriptRecoveryStore(std::string directory, std::string session)
 :   mDirectory(withSeparator(std::move(directory))),
     mDiscarded(mDirectory + "discarded/"),
     mSession(std::move(session))
 {
+}
+
+ALScriptRecoveryStore::~ALScriptRecoveryStore()
+{
+    if (mWriter && mWriter->thread.joinable())
+    {
+        {
+            const std::lock_guard<std::mutex> lock(mWriter->mutex);
+            mWriter->stopping = true;
+        }
+        mWriter->changed.notify_all();
+        mWriter->thread.join();
+    }
+}
+
+void ALScriptRecoveryStore::writeSoon(ALScriptRecoveryEntry entry)
+{
+    if (entry.key.empty())
+    {
+        return;
+    }
+    LLFile::mkdir(mDirectory);
+    entry.session = mSession;
+    entry.when    = LLDate::now();
+    // Made into what is written here, the entry let go of here, so that
+    // the thread holds the only hold on it.
+    std::pair<std::string, LLSD> written(pathOf(entry.key, mSession), entry.asLLSD());
+    const std::string            key = std::move(entry.key);
+    entry                            = ALScriptRecoveryEntry();
+    if (!mWriter)
+    {
+        mWriter = std::make_unique<Writer>();
+    }
+    {
+        const std::lock_guard<std::mutex> lock(mWriter->mutex);
+        mWriter->waiting[key] = std::move(written);
+        if (!mWriter->thread.joinable())
+        {
+            mWriter->thread = std::thread([writer = mWriter.get()] { writer->run(); });
+        }
+    }
+    mWriter->changed.notify_all();
+}
+
+void ALScriptRecoveryStore::flush() const
+{
+    if (!mWriter)
+    {
+        return;
+    }
+    std::unique_lock<std::mutex> lock(mWriter->mutex);
+    mWriter->changed.wait(lock, [this] { return mWriter->waiting.empty() && !mWriter->busy; });
+}
+
+std::vector<std::string> ALScriptRecoveryStore::takeFailures()
+{
+    std::vector<std::string> out;
+    if (mWriter)
+    {
+        const std::lock_guard<std::mutex> lock(mWriter->mutex);
+        out.swap(mWriter->failed);
+    }
+    return out;
 }
 
 // static
@@ -217,15 +327,16 @@ std::string ALScriptRecoveryStore::pathOf(const std::string& key, const std::str
 }
 
 // static
-bool ALScriptRecoveryStore::writeWhole(const std::string& path, const LLSD& sd)
+bool ALScriptRecoveryStore::writeWhole(const std::string& path, const LLSD& sd, bool durable)
 {
     // As notation: a person can still read it, and it is a fraction of
     // what XML makes of a history's many small edits.
     std::ostringstream text;
     LLSDSerialize::serialize(sd, text, LLSDSerialize::LLSD_NOTATION, LLSDFormatter::OPTIONS_NONE);
     const std::string written = text.str();
-    // Beside it first, forced out to the disk, then put in its place: a
-    // crash, or the power going, leaves the last whole text or this one.
+    // Beside it first, forced out to the disk where it is to be durable,
+    // then put in its place: a crash leaves the last whole text or this
+    // one, and so does the power going, for one forced out.
     const std::string beside = path + HALF_WRITTEN;
     LLFILE*           file   = LLFile::fopen(beside, LLFILE_MODE("wb"));
     if (!file)
@@ -233,11 +344,14 @@ bool ALScriptRecoveryStore::writeWhole(const std::string& path, const LLSD& sd)
         return false;
     }
     const bool whole = fwrite(written.data(), 1, written.size(), file) == written.size() && fflush(file) == 0;
+    if (durable)
+    {
 #if LL_WINDOWS
-    _commit(_fileno(file));
+        _commit(_fileno(file));
 #else
-    fsync(fileno(file));
+        fsync(fileno(file));
 #endif
+    }
     fclose(file);
     if (!whole || LLFile::rename(beside, path) != 0)
     {
@@ -268,6 +382,7 @@ bool ALScriptRecoveryStore::readEntry(const std::string& path, ALScriptRecoveryE
 
 bool ALScriptRecoveryStore::write(ALScriptRecoveryEntry entry)
 {
+    flush();
     if (entry.key.empty())
     {
         return false;
@@ -280,11 +395,13 @@ bool ALScriptRecoveryStore::write(ALScriptRecoveryEntry entry)
 
 void ALScriptRecoveryStore::forget(const std::string& key)
 {
+    flush();
     LLFile::remove(pathOf(key, mSession), ENOENT);
 }
 
 bool ALScriptRecoveryStore::setAside(ALScriptRecoveryEntry entry)
 {
+    flush();
     if (entry.key.empty())
     {
         return false;
@@ -320,6 +437,7 @@ bool ALScriptRecoveryStore::discard(const ALScriptRecoveryEntry& entry)
 
 void ALScriptRecoveryStore::remove(const ALScriptRecoveryEntry& entry)
 {
+    flush();
     if (!entry.path.empty())
     {
         LLFile::remove(entry.path, ENOENT);
@@ -382,6 +500,7 @@ void ALScriptRecoveryStore::listIn(const std::string& folder, std::vector<ALScri
 
 std::vector<ALScriptRecoveryEntry> ALScriptRecoveryStore::list() const
 {
+    flush();
     std::vector<ALScriptRecoveryEntry> entries;
     listIn(mDirectory, entries);
     listIn(mDiscarded, entries);
