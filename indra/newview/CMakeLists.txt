@@ -187,7 +187,7 @@ if(AL_BUILD_VIEWER)
     alscriptstudiocommands.cpp
     alscriptstudiodoc.cpp
     alscriptstudiorecovery.cpp
-    alscriptstudiosave.cpp
+    alscriptstudiosaving.cpp
     alscriptweightspane.cpp
     alscriptworkspace.cpp
     alterrainsurfacemaps.cpp
