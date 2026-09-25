@@ -427,6 +427,15 @@ void ALQuickOpen::takeFocus()
 // exists to avoid.
 bool ALQuickOpen::handleKeyHere(KEY key, MASK mask)
 {
+    // Escape is for whatever holds the list -- a popover, which puts back
+    // what was previewed and gives the keyboard back where it was. The
+    // panel's own Escape only lets go of the keyboard, which the popover
+    // took for a look away, leaving the preview and the keyboard with
+    // nothing: the arrows then walked the avatar.
+    if (key == KEY_ESCAPE && mask == MASK_NONE)
+    {
+        return false;
+    }
     if (key == KEY_RETURN && mask == MASK_SHIFT)
     {
         // The panel's own Return asks for no shift; this one the field

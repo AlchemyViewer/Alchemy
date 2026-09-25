@@ -389,4 +389,55 @@ namespace tut
         gFocusMgr.setKeyboardFocus(nullptr);
         over->die();
     }
+
+    // Over a window with more in it than what had the keyboard -- a field
+    // before it in the tab order, say -- escape and return each give the
+    // keyboard back to what had it: the window taking it as its dependent
+    // closes puts it on its first control, which is not where the keys were,
+    // and the arrows there move the avatar.
+    template<> template<>
+    void alpopover_object::test<11>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        LLFloater::Params fp(LLFloater::getDefaultParams());
+        fp.name            = "home";
+        fp.rect            = LLRect(100, 500, 500, 100);
+        fp.save_rect       = false;
+        fp.save_visibility = false;
+        LLFloater* window  = new LLFloater(LLSD(), fp);
+        window->openFloater();
+        const auto field = [window](const char* name, S32 bottom) {
+            LLLineEditor::Params lp(LLUICtrlFactory::getDefaultParams<LLLineEditor>());
+            lp.name           = name;
+            lp.rect           = LLRect(10, bottom + 20, 130, bottom);
+            LLLineEditor* one = LLUICtrlFactory::create<LLLineEditor>(lp);
+            window->addChild(one);
+            return one;
+        };
+        LLLineEditor* first = field("first", 300);
+        LLLineEditor* typed = field("typed", 200);
+        (void)first;
+        for (const bool escaping : { true, false })
+        {
+            typed->setFocus(true);
+            ensure("the second field has the keyboard", gFocusMgr.getKeyboardFocus() == typed);
+            ALPopover* popover = ALPopover::showOver(window, content(), "Go to line");
+            ensure("shown", popover != nullptr);
+            ensure("it has the keyboard", gFocusMgr.getKeyboardFocus() != typed);
+            if (escaping)
+            {
+                popover->escape();
+            }
+            else
+            {
+                popover->settle();
+            }
+            ensure(escaping ? "escaped: the keyboard back where it was" : "settled: the keyboard back where it was", gFocusMgr.getKeyboardFocus() == typed);
+        }
+        gFocusMgr.setKeyboardFocus(nullptr);
+        window->closeFloater();
+    }
 }

@@ -25,6 +25,7 @@
 #include "linden_common.h"
 
 #include "../alquickopen.h"
+#include "../alpopover.h"
 
 #include "../lllineeditor.h"
 #include "../llscrolllistctrl.h"
@@ -383,5 +384,47 @@ namespace tut
         quick->setQuery(">>people");
         ensure("with it twice, the second is matched", list->getItemCount() == 0 || first() != "panel_people.xml");
         quick->die();
+    }
+
+    template<> template<>
+    void alquickopen_object::test<12>()
+    {
+        set_test_name("escape in the field is the popover's: said as escaped, not as looked away, and the keyboard back where it was");
+        if (!ll_test::HeadlessUI::get().ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        LLFloater::Params fp(LLFloater::getDefaultParams());
+        fp.name            = "home";
+        fp.rect            = LLRect(100, 500, 500, 100);
+        fp.save_rect       = false;
+        fp.save_visibility = false;
+        LLFloater* window  = new LLFloater(LLSD(), fp);
+        window->openFloater();
+        LLLineEditor::Params lp(LLUICtrlFactory::getDefaultParams<LLLineEditor>());
+        lp.name             = "typed";
+        lp.rect             = LLRect(10, 220, 130, 200);
+        LLLineEditor* typed = LLUICtrlFactory::create<LLLineEditor>(lp);
+        window->addChild(typed);
+        typed->setFocus(true);
+
+        ALQuickOpen::Params p(LLUICtrlFactory::getDefaultParams<ALQuickOpen>());
+        p.name             = "quick_open";
+        p.rect             = LLRect(0, 60, 300, 0);
+        ALQuickOpen* quick = LLUICtrlFactory::create<ALQuickOpen>(p);
+        ALPopover*   popover = ALPopover::showOver(window, quick, "Go to line");
+        ensure("shown", popover != nullptr);
+        std::vector<bool> said;
+        popover->onClosed([&said](bool escaped) { said.push_back(escaped); });
+        quick->takeFocus();
+        LLLineEditor* field = quick->findChild<LLLineEditor>("query");
+        ensure("the field has the keyboard", gFocusMgr.getKeyboardFocus() == field);
+        field->handleKey(KEY_ESCAPE, MASK_NONE, false);
+        ensure("closed", popover->isDead() || !popover->getVisible());
+        ensure_equals("once", said.size(), 1u);
+        ensure("as escaped", said.front());
+        ensure("the keyboard back where it was", gFocusMgr.getKeyboardFocus() == typed);
+        gFocusMgr.setKeyboardFocus(nullptr);
+        window->closeFloater();
     }
 }
