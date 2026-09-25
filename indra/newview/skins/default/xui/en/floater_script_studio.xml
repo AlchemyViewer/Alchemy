@@ -218,6 +218,14 @@
     <floater.string name="VimTabsMatch">E93: More than one match for [NAME]</floater.string>
     <floater.string name="VimNoTabMatch">E94: No matching buffer for [NAME]</floater.string>
     <floater.string name="VimBadArgument">E474: Invalid argument</floater.string>
+    <floater.string name="VimArgumentRequired">E471: Argument required</floater.string>
+    <floater.string name="VimNotSaved">E37: No write since last change (add ! to override)</floater.string>
+    <floater.string name="VimNoFile">E484: Can't open file [FILE]</floater.string>
+    <floater.string name="VimNoFileName">E32: No file name</floater.string>
+    <floater.string name="VimCannotChange">E21: Cannot make changes, 'modifiable' is off</floater.string>
+    <floater.string name="VimFileExists">E13: File exists (add ! to override)</floater.string>
+    <floater.string name="VimCannotWrite">E212: Can't open file for writing: [FILE]</floater.string>
+    <floater.string name="VimWritten">"[FILE]" [LINES]L, [BYTES]B written</floater.string>
     <floater.string name="GoToLinePlaceholder">Line, or line:column</floater.string>
     <floater.string name="GoToLineHint">Type a line number to go to (from 1 to [COUNT]).</floater.string>
     <floater.string name="GoToLineGo">Go to line [LINE].</floater.string>

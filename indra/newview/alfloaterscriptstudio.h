@@ -311,6 +311,9 @@ private:
     void output(const ALOutputView::Entry& entry) override;
     void showOutput() override;
     void reorderTabs(const std::vector<std::string>& order) override;
+    bool readFile(const std::string& path, std::string& text) override;
+    bool writeFile(const std::string& path, const std::string& text) override;
+    std::vector<std::string> fileFolders(const Doc& doc) const override;
     void pickLine(std::vector<ALQuickOpen::Candidate> candidates, const std::string& placeholder, const std::string& title, S32 rows,
                   std::function<void(const std::string& line)> chosen, std::function<void(const std::string& line)> shifted,
                   std::function<void()> cancelled) override;
@@ -827,7 +830,7 @@ private:
     // Revert to Saved, asked about where something would be lost; and
     // whether there is anything to read again.
     void askRevert(Doc& doc);
-    bool revertible(const Doc& doc) const;
+    bool revertible(const Doc& doc) const override;
     // The places jumped from, to go back to and forward again: a place in
     // a tab by its id. Walking a pane's list is one jump, from where the
     // caret was before the walk began.
@@ -874,7 +877,7 @@ private:
     void refreshExperience();
     void onExperience();
     void onReset();
-    void revert(Doc& doc);
+    void revert(Doc& doc) override;
     void loadFromFile();
     void saveToFile();
     // The pickers' answers, for the tab each was asked from, by its id.

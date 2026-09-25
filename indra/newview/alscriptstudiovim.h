@@ -77,6 +77,22 @@ public:
         // A tab brought to the front; and the tabs put in this order, by id.
         virtual void activate(Doc& doc)                                  = 0;
         virtual void reorderTabs(const std::vector<std::string>& order) = 0;
+        // A tab's text put back as it was last saved or loaded, what it
+        // held set aside first, nothing asked; and whether it can be.
+        virtual void revert(Doc& doc)                  = 0;
+        virtual bool revertible(const Doc& doc) const = 0;
+        // A file on disk opened in a tab where it is, read as the language
+        // its extension says, else `lua`; null where it could not be.
+        virtual Doc* openFileTab(const std::string& path, bool lua) = 0;
+        // A file's text read whole, its line endings as an editor here
+        // keeps them; and a text written to one whole. False where it
+        // could not be.
+        virtual bool readFile(const std::string& path, std::string& text)        = 0;
+        virtual bool writeFile(const std::string& path, const std::string& text) = 0;
+        // The folders a file named without one is looked for in, in order:
+        // the folder of the tab's own file, where it is one, then the
+        // include folders.
+        virtual std::vector<std::string> fileFolders(const Doc& doc) const = 0;
 
     protected:
         ~Window() = default;
@@ -101,8 +117,9 @@ public:
     // them by. False where it knows it no more than vim did.
     bool command(ALTextView& view, const std::string& name, const std::string& args);
     // The words Tab completes on the : line: the command names, :set's
-    // options, :history's kinds, the tabs' names after :b and :bd.
-    void complete(const std::string& command, std::vector<std::string>& out);
+    // options, :history's kinds, the tabs' names after :b and :bd, and the
+    // files and folders `typed` may be the start of after :e, :r and :w.
+    void complete(const std::string& command, const std::string& typed, std::vector<std::string>& out);
     // `=` over lines: the source's, formatted, where it was given there.
     void format(ALTextView& view, S32 first, S32 last);
     // q:, q/ and q?: the lines entered, the last first, in a list over the
@@ -124,11 +141,22 @@ private:
     // :tabclose, :tabonly, :tabmove. False for any other command.
     bool tabCommand(ALTextView& view, const std::string& name, const std::string& args);
     void listTabs();
+    // A tab's files on disk: :e and :e! with or without one, :tabedit and
+    // :tabnew, :r, :w with one, :update, :wqa. False for any other command.
+    bool fileCommand(ALTextView& view, Doc& doc, const std::string& name, const std::string& args);
+    // A file named on the : line, where it is: as it stands where it says
+    // its whole way, ~ the home folder; else in the tab's fileFolders, the
+    // first that has it -- or, `existing` false, where it would be made,
+    // in the first. Empty where it is nowhere.
+    std::string pathOf(const Doc& doc, const std::string& name, bool existing);
+    // The files and folders on disk a word typed may be the start of.
+    void completeFile(const std::string& typed, std::vector<std::string>& out);
     // An entry for the Output tab, of vim's.
     ALOutputView::Entry listing() const;
-    // Said where vim says things, as an error; in the status line where
-    // the view has no vim.
-    void fail(ALTextView& view, const std::string& message);
+    // Said where vim says things, as an error or not; in the status line
+    // where the view has no vim.
+    void fail(ALTextView& view, const std::string& message) { say(view, message, true); }
+    void say(ALTextView& view, const std::string& message, bool error = false);
 
     ALScriptStudioServices&              mServices;
     ALScriptStudioCommands&              mCommands;

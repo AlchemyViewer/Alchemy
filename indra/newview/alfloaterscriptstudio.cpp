@@ -28,6 +28,7 @@
 
 #include "alcodeeditor.h"
 #include "alfilewrite.h"
+#include "fsyspath.h"
 #include "alnotecarditems.h"
 #include "alscriptmodules.h"
 #include "alscriptpreprocessor.h"
@@ -1187,6 +1188,30 @@ void ALFloaterScriptStudio::showOutput()
 void ALFloaterScriptStudio::reorderTabs(const std::vector<std::string>& order)
 {
     onTabsReordered(order);
+}
+
+bool ALFloaterScriptStudio::readFile(const std::string& path, std::string& text)
+{
+    return readWholeFile(path, text);
+}
+
+bool ALFloaterScriptStudio::writeFile(const std::string& path, const std::string& text)
+{
+    return ALFileWrite::whole(path, text);
+}
+
+std::vector<std::string> ALFloaterScriptStudio::fileFolders(const Doc& doc) const
+{
+    std::vector<std::string> folders;
+    if (!doc.file.empty())
+    {
+        folders.push_back(fsyspath(fsyspath(doc.file).parent_path()).string());
+    }
+    for (const std::string& folder : ALScriptPreprocessor::includeFolders())
+    {
+        folders.push_back(folder);
+    }
+    return folders;
 }
 
 void ALFloaterScriptStudio::pickLine(std::vector<ALQuickOpen::Candidate> candidates, const std::string& placeholder,

@@ -29,7 +29,12 @@
 #include "../alscriptstudiocommands.h"
 #include "alscriptstudio_fixture.h"
 
+#include "fsyspath.h"
+
 #include "../test/lltut.h"
+
+#include <filesystem>
+#include <fstream>
 
 namespace
 {
@@ -94,7 +99,31 @@ namespace
             }
         }
 
-        al_studio_test::FakeServices*            services = nullptr;
+        void revert(Doc& doc) override { reverted.push_back(doc.id); }
+        bool revertible(const Doc&) const override { return true; }
+        Doc* openFileTab(const std::string& path, bool lua) override
+        {
+            openedFiles.emplace_back(path, lua);
+            return nullptr;
+        }
+        bool readFile(const std::string& path, std::string& text) override
+        {
+            std::ifstream in(fsyspath(path), std::ios::binary);
+            text.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+            return bool(in) || in.eof();
+        }
+        bool writeFile(const std::string& path, const std::string& text) override
+        {
+            std::ofstream out(fsyspath(path), std::ios::binary);
+            out << text;
+            return bool(out);
+        }
+        std::vector<std::string> fileFolders(const Doc&) const override { return folders; }
+
+        al_studio_test::FakeServices*               services = nullptr;
+        std::vector<std::string>                    folders;
+        std::vector<std::pair<std::string, bool>>   openedFiles;
+        Names                                       reverted;
         Names                                    asked, letGo, savedToClose, many, formatted, offered;
         std::vector<ALOutputView::Entry>         entries;
         S32                                      outputShown = 0, trailers = 0, pickRows = 0;
@@ -118,6 +147,46 @@ namespace tut
         // The table's commands run, by name; and two of its toggles.
         Names                              ran;
         bool                               lineNumbers = false, relativeNumbers = false;
+        // A folder of files, where a test makes one.
+        std::string                        folder;
+
+        ~alscriptstudiovim_data()
+        {
+            if (!folder.empty())
+            {
+                std::error_code ignored;
+                std::filesystem::remove_all(fsyspath(folder), ignored);
+            }
+        }
+        // The folder, with main.lsl, notes.txt, lib/util.luau and a hidden
+        // file; the tabs' folder to look for files in.
+        void files()
+        {
+            const fsyspath made = std::filesystem::temp_directory_path() / fsyspath("alscriptstudiovim_" + LLUUID::generateNewID().asString());
+            folder              = made.string();
+            std::filesystem::create_directories(fsyspath(folder + "/lib"));
+            for (const auto& [name, text] : { std::pair{ "main.lsl", "default {}\n" }, std::pair{ "notes.txt", "a note" },
+                                              std::pair{ "lib/util.luau", "local x = 1\nreturn x\n" }, std::pair{ ".hidden", "" } })
+            {
+                std::ofstream(fsyspath(folder + "/" + name), std::ios::binary) << text;
+            }
+            studio.folders = { folder };
+        }
+        std::string in(const std::string& name) const { return fsyspath((fsyspath(folder) / fsyspath(name)).lexically_normal()).string(); }
+        static std::string contents(const std::string& path)
+        {
+            std::ifstream in(fsyspath(path), std::ios::binary);
+            return std::string(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+        }
+        // What vim over a tab's editor says, where one is put over it.
+        ALVimKeymap* vimOver(Doc& doc)
+        {
+            auto         keymap = std::make_unique<ALVimKeymap>();
+            ALVimKeymap* over   = keymap.get();
+            vim->connect(*keymap);
+            doc.editor->setModalKeymap(std::move(keymap));
+            return over;
+        }
 
         ALScriptStudioVim& make()
         {
@@ -171,6 +240,11 @@ namespace tut
             doc.modifiable = true;
             doc.editor     = editor("editor_" + id, text);
             return doc;
+        }
+        static void type(Doc& doc, const std::string& text)
+        {
+            doc.editor->setCaret(doc.editor->document().end());
+            doc.editor->insertText(text);
         }
         bool ex(Doc& doc, const std::string& name, const std::string& args = std::string())
         {
@@ -349,7 +423,7 @@ namespace tut
         ensure("a : command it leaves reaches the table",
                connected.hooks().command(*a.editor, "w", std::string()) && ran == Names{ "save" });
         std::vector<std::string> words;
-        connected.hooks().complete(*a.editor, std::string(), words);
+        connected.hooks().complete(*a.editor, std::string(), std::string(), words);
         ensure("Tab completes the studio's names", std::find(words.begin(), words.end(), "fixall") != words.end());
 
         vim.pump();
@@ -371,11 +445,11 @@ namespace tut
         tab("alpha");
         tab("beta");
         std::vector<std::string> names, options, kinds, tabs, none;
-        vim.complete(std::string(), names);
-        vim.complete("set", options);
-        vim.complete("his", kinds);
-        vim.complete("bd", tabs);
-        vim.complete("w", none);
+        vim.complete(std::string(), std::string(), names);
+        vim.complete("set", std::string(), options);
+        vim.complete("his", std::string(), kinds);
+        vim.complete("bd", std::string(), tabs);
+        vim.complete("q", std::string(), none);
         ensure("vim's own and the menus'", std::find(names.begin(), names.end(), "wall") != names.end() &&
                                                std::find(names.begin(), names.end(), "go_to_line") != names.end());
         ensure("the options", options == Names{ "number", "nonumber", "relativenumber", "norelativenumber" });
@@ -470,5 +544,124 @@ namespace tut
                                   "  3 #h + \"gamma\"                        line 3\n"
                                   "  4  h-  \"delta\"                        line 1"));
         ensure("the tab in sight", studio.outputShown == 1);
+    }
+
+    template<> template<>
+    void alscriptstudiovim_object::test<11>()
+    {
+        set_test_name(":e opens a file where the tab's folders have it, or a tab by its name or file, # the one before; alone, reads the tab again");
+        ALScriptStudioVim& vim = make();
+        files();
+        Doc&         a     = tab("alpha");
+        ALVimKeymap* said  = vimOver(a);
+        a.language.lua     = true;
+        tab("beta");
+        vim.pump();
+
+        ensure("taken", ex(a, "e", "main.lsl"));
+        ensure("an LSL file as LSL", studio.openedFiles.size() == 1 && studio.openedFiles.back() == std::make_pair(in("main.lsl"), false));
+        ex(a, "edit", "lib/util.luau");
+        ensure("in a folder under it, as SLua",
+               studio.openedFiles.size() == 2 && studio.openedFiles.back() == std::make_pair(in("lib/util.luau"), true));
+        ex(a, "e", "notes.txt");
+        ensure("anything else as the tab it was named from is",
+               studio.openedFiles.size() == 3 && studio.openedFiles.back() == std::make_pair(in("notes.txt"), true));
+        ex(a, "e", in("main.lsl"));
+        ensure("where a whole path says", studio.openedFiles.size() == 4 && studio.openedFiles.back().first == in("main.lsl"));
+        ex(a, "tabe", "main.lsl");
+        ensure(":tabedit the same", studio.openedFiles.size() == 5);
+        ex(a, "e", "nowhere.lsl");
+        ensure_equals("nowhere: said", said->message(), std::string("VimNoFile [FILE]=nowhere.lsl"));
+        ensure("and nothing opened", studio.openedFiles.size() == 5);
+        ex(a, "tabnew");
+        ensure_equals(":tabnew wants a file", said->message(), std::string("VimArgumentRequired"));
+
+        ex(a, "e", "beta");
+        ensure_equals("a tab by its name", services.frontDoc()->id, std::string("beta"));
+        vim.pump();
+        ex(a, "e", "#");
+        ensure_equals("# the one before", services.frontDoc()->id, std::string("alpha"));
+        Doc& main = tab("mainfile");
+        main.file = in("main.lsl");
+        ex(a, "e", "main.lsl");
+        ensure("a file open already is gone to", services.frontDoc() == &main && studio.openedFiles.size() == 5);
+
+        ex(a, "e");
+        ensure("alone: read again", studio.reverted == Names{ "alpha" });
+        a.editor->setCaret(a.editor->document().end());
+        a.editor->insertText(" ");
+        ex(a, "e");
+        ensure_equals("not over unsaved work", said->message(), std::string("VimNotSaved"));
+        ensure("left", studio.reverted.size() == 1);
+        ex(a, "e!");
+        ensure("but with !", studio.reverted == Names{ "alpha", "alpha" });
+    }
+
+    template<> template<>
+    void alscriptstudiovim_object::test<12>()
+    {
+        set_test_name(":r puts a file below the caret's line; :w writes the text to one, over one there only with !; :update, :wqa");
+        make();
+        files();
+        Doc&         a    = tab("alpha", "one\ntwo");
+        ALVimKeymap* said = vimOver(a);
+        ex(a, "r", "lib/util.luau");
+        ensure_equals("below the line, its own last break dropped", a.editor->text(), std::string("one\nlocal x = 1\nreturn x\ntwo"));
+        ensure("the caret on the first line put in", a.editor->caret() == ALTextPos(1, 0));
+        ex(a, "read", "nowhere");
+        ensure_equals("nowhere: said", said->message(), std::string("VimNoFile [FILE]=nowhere"));
+        ex(a, "r");
+        ensure_equals("no file of its own", said->message(), std::string("VimNoFileName"));
+        a.expandedEditor = editor("expanded_alpha", "x");
+        ensure("not into the expansion", vim->command(*a.expandedEditor, "r", "main.lsl") && a.expandedEditor->text() == "x");
+
+        ex(a, "w", "out.lsl");
+        ensure_equals("written", contents(in("out.lsl")), a.editor->text());
+        const std::string written = "VimWritten [BYTES]=" + std::to_string(a.editor->text().size()) + " [FILE]=" + in("out.lsl") + " [LINES]=4";
+        ensure_equals("and said", said->message(), written);
+        ensure("not as an error", !said->messageIsError());
+        ensure("the tab left as it was", ran.empty());
+        a.editor->setCaret(a.editor->document().end());
+        a.editor->insertText("!");
+        ex(a, "w", "out.lsl");
+        ensure_equals("not over one there", said->message(), std::string("VimFileExists"));
+        ensure("left", contents(in("out.lsl")) != a.editor->text());
+        ex(a, "w!", "out.lsl");
+        ensure_equals("but with !", contents(in("out.lsl")), a.editor->text());
+        ex(a, "w", "!ls");
+        ensure_equals("no shell", said->message(), std::string("VimBadArgument"));
+
+        ex(a, "update");
+        ensure(":update over unsaved work saves", ran == Names{ "save" });
+        a.editor->resetDirty();
+        ex(a, "up");
+        ensure("over none, nothing", ran.size() == 1);
+        tab("beta");
+        type(a, "?");
+        ex(a, "wqa");
+        ensure(":wqa saves the unsaved to close, and closes the rest",
+               studio.savedToClose == Names{ "alpha" } && studio.asked == Names{ "beta" });
+    }
+
+    template<> template<>
+    void alscriptstudiovim_object::test<13>()
+    {
+        set_test_name("Tab after :e, :r and :w offers the files and folders in the tabs' folders, or where a whole path says; hidden ones where asked");
+        ALScriptStudioVim& vim = make();
+        files();
+        tab("alpha");
+        auto offered = [&vim](const char* command, const std::string& typed) {
+            std::vector<std::string> out;
+            vim.complete(command, typed, out);
+            std::sort(out.begin(), out.end());
+            return out;
+        };
+        ensure("the folder's", offered("e", std::string()) == Names{ "lib/", "main.lsl", "notes.txt" });
+        ensure("in a folder under it", offered("edit", "lib/u") == Names{ "lib/util.luau" });
+        ensure("by the start of a name", offered("r", "ma") == Names{ "main.lsl" });
+        ensure("after :w", offered("w", "n") == Names{ "notes.txt" });
+        ensure("hidden where a dot is typed", offered("e", ".") == Names{ ".hidden" });
+        ensure("where a whole path says", offered("tabe", folder + "/li") == Names{ folder + "/lib/" });
+        ensure("not after anything else", offered("q", std::string()).empty());
     }
 }

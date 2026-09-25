@@ -29,9 +29,11 @@
 #include "alcodeeditor.h"
 #include "alscriptstudiocommands.h"
 #include "alscriptstudioservices.h"
+#include "fsyspath.h"
 
 #include <algorithm>
 #include <cstring>
+#include <filesystem>
 #include <string_view>
 
 namespace
@@ -86,10 +88,10 @@ void ALScriptStudioVim::connect(ALVimKeymap& vim)
             historyWindow(view, kind, history, std::move(chosen));
         }
     };
-    vim.hooks().complete = [this, alive](ALTextView&, const std::string& command, std::vector<std::string>& out) {
+    vim.hooks().complete = [this, alive](ALTextView&, const std::string& command, const std::string& typed, std::vector<std::string>& out) {
         if (alive.lock())
         {
-            complete(command, out);
+            complete(command, typed, out);
         }
     };
 }
@@ -192,6 +194,10 @@ bool ALScriptStudioVim::command(ALTextView& view, const std::string& name, const
     if (!doc)
     {
         return false;
+    }
+    if (fileCommand(view, *doc, name, args))
+    {
+        return true;
     }
     // The tab typed in is the one in front, which the menus' commands are
     // about: those that have one go through it.
@@ -312,15 +318,16 @@ bool ALScriptStudioVim::command(ALTextView& view, const std::string& name, const
     return false;
 }
 
-void ALScriptStudioVim::complete(const std::string& command, std::vector<std::string>& out)
+void ALScriptStudioVim::complete(const std::string& command, const std::string& typed, std::vector<std::string>& out)
 {
     // The names command answers to, in their long forms, and the menu's
     // actions; what :set and :history take after them, and the tabs'
     // names after :b and :bd.
-    static const char* NAMES[]   = { "bNext",   "bdelete",  "bfirst",      "blast",    "bnext",       "bprevious", "brewind",  "buffer",
-                                     "buffers", "bunload",  "bwipeout",    "close",    "files",       "fix",       "fixall",   "history",
-                                     "ls",      "qall",     "quit",        "tabNext",  "tabclose",    "tabfirst",  "tablast",  "tabmove",
-                                     "tabnext", "tabonly",  "tabprevious", "tabrewind", "wall",       "wq",        "write",    "xit" };
+    static const char* NAMES[]   = { "bNext",    "bdelete",  "bfirst",   "blast",   "bnext",       "bprevious", "brewind",   "buffer",
+                                     "buffers",  "bunload",  "bwipeout", "close",   "edit",        "files",     "fix",       "fixall",
+                                     "history",  "ls",       "qall",     "quit",    "read",        "tabNext",   "tabclose",  "tabedit",
+                                     "tabfirst", "tablast",  "tabmove",  "tabnew",  "tabnext",     "tabonly",   "tabprevious", "tabrewind",
+                                     "update",   "wall",     "wq",       "wqall",   "write",       "xall",      "xit" };
     static const char* OPTIONS[] = { "number", "nonumber", "relativenumber", "norelativenumber" };
     static const char* KINDS[]   = { "all", "cmd", "search" };
     if (command.empty())
@@ -343,6 +350,11 @@ void ALScriptStudioVim::complete(const std::string& command, std::vector<std::st
         {
             out.push_back(doc->name);
         }
+    }
+    else if (abbreviates(command, "e", "edit") || abbreviates(command, "tabe", "tabedit") || command == "tabnew" ||
+             abbreviates(command, "r", "read") || abbreviates(command, "w", "write"))
+    {
+        completeFile(typed, out);
     }
 }
 
@@ -629,14 +641,266 @@ ALOutputView::Entry ALScriptStudioVim::listing() const
     return entry;
 }
 
-void ALScriptStudioVim::fail(ALTextView& view, const std::string& message)
+void ALScriptStudioVim::say(ALTextView& view, const std::string& message, bool error)
 {
     if (ALVimKeymap* vim = dynamic_cast<ALVimKeymap*>(view.modalKeymap()))
     {
-        vim->say(message, true);
+        vim->say(message, error);
     }
     else
     {
-        mServices.setStatus(message, true);
+        mServices.setStatus(message, error);
     }
+}
+
+namespace
+{
+    // What a name on the : line may break its folders with.
+#if LL_WINDOWS
+    constexpr const char* SEPARATORS = "/\\";
+    constexpr const char* HOME       = "USERPROFILE";
+#else
+    constexpr const char* SEPARATORS = "/";
+    constexpr const char* HOME       = "HOME";
+#endif
+
+    // A name starting with ~ as in the home folder.
+    std::string withHome(const std::string& name)
+    {
+        const bool home = name == "~" || (name.size() > 1 && name[0] == '~' && strchr(SEPARATORS, name[1]));
+        return home ? LLStringUtil::getenv(HOME) + name.substr(1) : name;
+    }
+    bool isFile(const std::filesystem::path& path)
+    {
+        std::error_code ec;
+        return std::filesystem::is_regular_file(path, ec);
+    }
+}
+
+std::string ALScriptStudioVim::pathOf(const Doc& doc, const std::string& name, bool existing)
+{
+    const fsyspath given(withHome(name));
+    if (given.is_absolute())
+    {
+        return fsyspath(given.lexically_normal()).string();
+    }
+    const std::vector<std::string> folders = mWindow.fileFolders(doc);
+    for (const std::string& folder : folders)
+    {
+        const std::filesystem::path path = (fsyspath(folder) / given).lexically_normal();
+        if (isFile(path))
+        {
+            return fsyspath(path).string();
+        }
+    }
+    return existing || folders.empty() ? std::string() : fsyspath((fsyspath(folders.front()) / given).lexically_normal()).string();
+}
+
+void ALScriptStudioVim::completeFile(const std::string& typed, std::vector<std::string>& out)
+{
+    // The folder part of what was typed as it was typed, which every word
+    // offered starts with, and the start of a name in it; the folder read
+    // where the name says, or in each of the front tab's folders.
+    const size_t      slash  = typed.find_last_of(SEPARATORS);
+    const std::string folder = slash == std::string::npos ? std::string() : typed.substr(0, slash + 1);
+    const std::string leaf   = typed.substr(folder.size());
+    std::vector<std::filesystem::path> reads;
+    const fsyspath                     given(withHome(folder));
+    if (given.is_absolute())
+    {
+        reads.push_back(given);
+    }
+    else if (const Doc* doc = mServices.frontDoc())
+    {
+        for (const std::string& each : mWindow.fileFolders(*doc))
+        {
+            reads.push_back(fsyspath(each) / given);
+        }
+    }
+    // A folder of thousands offers the first few hundred.
+    constexpr size_t MOST = 500;
+    for (const std::filesystem::path& read : reads)
+    {
+        std::error_code ec;
+        for (std::filesystem::directory_iterator it(read, ec), end; !ec && it != end && out.size() < MOST; it.increment(ec))
+        {
+            const std::string name = fsyspath(it->path().filename()).string();
+            // Hidden ones where a dot is typed for them.
+            if (name.compare(0, leaf.size(), leaf) != 0 || (name[0] == '.' && (leaf.empty() || leaf[0] != '.')))
+            {
+                continue;
+            }
+            std::error_code kind;
+            out.push_back(folder + name + (it->is_directory(kind) ? "/" : ""));
+        }
+    }
+}
+
+bool ALScriptStudioVim::fileCommand(ALTextView& view, Doc& doc, const std::string& name_in, const std::string& args)
+{
+    const bool                 bang = !name_in.empty() && name_in.back() == '!';
+    const std::string          name = bang ? name_in.substr(0, name_in.size() - 1) : name_in;
+    LLStringUtil::format_map_t words;
+    words["[FILE]"] = args;
+
+    const bool tab_form = abbreviates(name, "tabe", "tabedit") || name == "tabnew";
+    if (abbreviates(name, "e", "edit") || tab_form)
+    {
+        if (args.empty())
+        {
+            // The tab's own again, as it was last saved -- over unsaved work
+            // only with !, which sets that aside first.
+            if (tab_form)
+            {
+                fail(view, mServices.words("VimArgumentRequired"));
+            }
+            else if (doc.unsaved() && !bang)
+            {
+                fail(view, mServices.words("VimNotSaved"));
+            }
+            else if (mWindow.revertible(doc))
+            {
+                mWindow.revert(doc);
+            }
+            return true;
+        }
+        if (args == "#")
+        {
+            if (Doc* alternate = tabNamed(view, args))
+            {
+                mWindow.activate(*alternate);
+            }
+            return true;
+        }
+        // A tab by its name, or a file's by where it is; else the file,
+        // opened in a tab of its own.
+        for (Doc* each : mServices.openDocs())
+        {
+            if (each->name == args)
+            {
+                mWindow.activate(*each);
+                return true;
+            }
+        }
+        const std::string path = pathOf(doc, args, true);
+        if (path.empty())
+        {
+            fail(view, mServices.words("VimNoFile", words));
+            return true;
+        }
+        for (Doc* each : mServices.openDocs())
+        {
+            if (each->file == path)
+            {
+                mWindow.activate(*each);
+                return true;
+            }
+        }
+        // Read as its extension says, else as the tab it was named from.
+        std::string extension = fsyspath(fsyspath(path).extension()).string();
+        LLStringUtil::toLower(extension);
+        mWindow.openFileTab(path, extension == ".lua" || extension == ".luau" || (extension != ".lsl" && doc.language.lua));
+        return true;
+    }
+    if (abbreviates(name, "r", "read"))
+    {
+        // Below the caret's line, as one step to undo: the file named, or
+        // the tab's own.
+        if (&view != doc.editor || !doc.loaded || !doc.modifiable)
+        {
+            fail(view, mServices.words("VimCannotChange"));
+            return true;
+        }
+        if (args.empty() && doc.file.empty())
+        {
+            fail(view, mServices.words("VimNoFileName"));
+            return true;
+        }
+        const std::string path = args.empty() ? doc.file : pathOf(doc, args, true);
+        std::string       text;
+        if (path.empty() || !mWindow.readFile(path, text))
+        {
+            words["[FILE]"] = args.empty() ? doc.file : args;
+            fail(view, mServices.words("VimNoFile", words));
+            return true;
+        }
+        // The file's last line break is the line's own.
+        if (!text.empty() && text.back() == '\n')
+        {
+            text.pop_back();
+        }
+        const ALTextDocument& d    = doc.editor->document();
+        const S32             line = doc.editor->caret().line;
+        doc.editor->setSelection(ALTextRange(d.lineEnd(line), d.lineEnd(line)));
+        doc.editor->insertText("\n" + text);
+        doc.editor->setCaret(ALTextPos(line + 1, 0));
+        return true;
+    }
+    if (abbreviates(name, "w", "write") && !args.empty())
+    {
+        // The text as the view has it, to a file, the tab left as it is;
+        // over one there already only with !. No shell, no appending.
+        if (args[0] == '!' || args.compare(0, 2, ">>") == 0)
+        {
+            fail(view, mServices.words("VimBadArgument"));
+            return true;
+        }
+        const std::string path = pathOf(doc, args, false);
+        if (path.empty())
+        {
+            fail(view, mServices.words("VimNoFile", words));
+            return true;
+        }
+        std::error_code ec;
+        if (!bang && std::filesystem::exists(fsyspath(path), ec))
+        {
+            fail(view, mServices.words("VimFileExists"));
+            return true;
+        }
+        const std::string text = view.document().text();
+        words["[FILE]"]        = path;
+        if (!mWindow.writeFile(path, text))
+        {
+            fail(view, mServices.words("VimCannotWrite", words));
+            return true;
+        }
+        words["[LINES]"] = std::to_string(view.document().lineCount());
+        words["[BYTES]"] = std::to_string(text.size());
+        say(view, mServices.words("VimWritten", words));
+        return true;
+    }
+    if (abbreviates(name, "up", "update"))
+    {
+        if (doc.unsaved())
+        {
+            mCommands.run("save");
+        }
+        return true;
+    }
+    if (name == "wqa" || name == "wqall" || name == "xa" || name == "xall")
+    {
+        // :wq over each: the unsaved saved and closed once they are, the
+        // rest closed now.
+        std::vector<std::string> ids;
+        for (const Doc* each : mServices.openDocs())
+        {
+            ids.push_back(each->id);
+        }
+        for (const std::string& id : ids)
+        {
+            if (Doc* each = mServices.findDoc(id))
+            {
+                if (each->unsaved() && each->modifiable)
+                {
+                    mWindow.saveToClose(id);
+                }
+                else
+                {
+                    mWindow.closeDocument(id);
+                }
+            }
+        }
+        return true;
+    }
+    return false;
 }
