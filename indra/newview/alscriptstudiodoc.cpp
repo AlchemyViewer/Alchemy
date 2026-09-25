@@ -61,6 +61,91 @@ const ALSourceMap* ALScriptStudioDoc::runningMap() const
     return uploaded.valid && !uploaded.disabled ? &uploaded.map : nullptr;
 }
 
+// static
+std::optional<ALScriptStudioDoc::Named> ALScriptStudioDoc::namedIn(const ALTextDocument& text, const ALTextPos& at, bool lua,
+                                                                   const std::vector<ALPreprocessor::Required>& calls)
+{
+    if (at.line < 0 || at.line >= text.lineCount())
+    {
+        return std::nullopt;
+    }
+    // #include "name" or #include <name>, blanks allowed about the #.
+    const std::string& line = text.line(at.line);
+    size_t             i    = line.find_first_not_of(" \t");
+    if (i != std::string::npos && line[i] == '#')
+    {
+        i = line.find_first_not_of(" \t", i + 1);
+        if (i != std::string::npos && line.compare(i, 7, "include") == 0)
+        {
+            i = line.find_first_not_of(" \t", i + 7);
+            if (i != std::string::npos && (line[i] == '"' || line[i] == '<'))
+            {
+                const size_t close = line.find(line[i] == '"' ? '"' : '>', i + 1);
+                if (close != std::string::npos && close > i + 1)
+                {
+                    Named named;
+                    named.name  = line.substr(i + 1, close - i - 1);
+                    named.range = ALTextRange(ALTextPos(at.line, 0), ALTextPos(at.line, static_cast<S32>(line.size())));
+                    return named;
+                }
+            }
+        }
+    }
+    if (!lua)
+    {
+        return std::nullopt;
+    }
+    for (const ALPreprocessor::Required& call : calls)
+    {
+        const ALTextRange stretch(ALTextPos(call.line, call.column), ALTextPos(call.endLine, call.endColumn));
+        if (!(at < stretch.begin) && !(stretch.end < at))
+        {
+            Named named;
+            named.name    = call.name;
+            named.require = true;
+            named.range   = stretch;
+            return named;
+        }
+    }
+    return std::nullopt;
+}
+
+std::optional<ALScriptStudioDoc::Named> ALScriptStudioDoc::namedAt(const ALTextPos& at) const
+{
+    if (!editor)
+    {
+        return std::nullopt;
+    }
+    const ALTextDocument& text = editor->document();
+    if (language.lua && requiresOf != text.version())
+    {
+        requiresFound = ALPreprocessor::requiresIn(text.text());
+        requiresOf    = text.version();
+    }
+    return namedIn(text, at, language.lua, requiresFound);
+}
+
+std::string ALScriptStudioDoc::foundAs(const std::string& name, std::optional<bool> require) const
+{
+    // The script's own asks, of the last expansion for the analyzers and
+    // of the last save's run: an include's file is what either found.
+    for (const Expanded* run : { &expanded, &uploaded })
+    {
+        if (!run->valid)
+        {
+            continue;
+        }
+        for (const ALPreprocessor::Result::Resolved& each : run->resolved)
+        {
+            if (each.from.empty() && each.name == name && (!require || each.require == *require))
+            {
+                return each.path;
+            }
+        }
+    }
+    return std::string();
+}
+
 const ALScriptStudioDoc::Shown* ALScriptStudioDoc::findShown(S32 line, S32 column, const std::string& file, const std::string& message) const
 {
     for (const Shown& one : shown)

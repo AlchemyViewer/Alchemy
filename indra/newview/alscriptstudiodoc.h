@@ -26,6 +26,7 @@
 
 #include "alcodeeditor.h"
 #include "alfindings.h"
+#include "alpreprocessor.h"
 #include "alscriptanalysis.h"
 #include "alscriptenvelope.h"
 #include "alscriptproblem.h"
@@ -114,6 +115,25 @@ struct ALScriptStudioDoc
     // what the compiler's lines and a run-time error's are read back by.
     // Null where the text went up as written.
     const ALSourceMap* runningMap() const;
+
+    // An include or a module a place in a text names: anywhere on an
+    // #include line, the name it includes; anywhere in a require call of
+    // SLua, the module. The name as written, whether it is a require, and
+    // the stretch it is named over -- the line, or the call.
+    struct Named
+    {
+        std::string name;
+        bool        require = false;
+        ALTextRange range;
+    };
+    static std::optional<Named> namedIn(const ALTextDocument& text, const ALTextPos& at, bool lua,
+                                        const std::vector<ALPreprocessor::Required>& calls);
+    // The same in the tab's source, its require calls found once a text.
+    std::optional<Named> namedAt(const ALTextPos& at) const;
+    // The file an include or a module the script names is, as the last run
+    // of the preprocessor over its text found it -- its identity: an
+    // inventory path, a disk path -- or empty where no run did.
+    std::string foundAs(const std::string& name, std::optional<bool> require = std::nullopt) const;
     // A notecard rather than a script: plain text, saved as a
     // notecard with the items it came with, never analysed.
     bool                                       notecard = false;
@@ -226,10 +246,15 @@ struct ALScriptStudioDoc
         // optimizer and after, where it ran and was weighed.
         size_t           codeBefore = 0;
         size_t           codeAfter  = 0;
+        // What each include and module was found as (ALPreprocessor).
+        std::vector<ALPreprocessor::Result::Resolved> resolved;
     };
     Expanded                                   expanded;
     Expanded                                   uploaded;
     U32                                        expansions = 0;
+    // The source's require calls, of the text at requiresOf (namedAt).
+    mutable std::vector<ALPreprocessor::Required> requiresFound;
+    mutable std::optional<U32>                    requiresOf;
     // The version an expansion has been asked for, or none -- not a
     // zero, which an empty text's version is: the preprocessor answers
     // on the main thread a moment later, and one text is expanded once

@@ -378,9 +378,11 @@ void ALScriptStudioVim::complete(const std::string& command, const std::string& 
     static const char* NAMES[] = { "bNext",   "bdelete",   "bfirst",    "blast",   "bnext",     "bprevious", "brewind",  "buffer",
                                    "buffers", "bunload",   "bwipeout",  "cNext",   "cclose",    "cfirst",    "clast",    "clist",
                                    "close",   "cnext",     "copen",     "cprevious", "crewind", "cwindow",   "edit",     "files",
-                                   "file",    "fix",       "fixall",    "history", "lNext",     "lclose",    "lfirst",   "llast",   "llist",
+                                   "file",    "find",      "fix",       "fixall",  "history",   "lNext",     "lclose",   "lfirst",  "llast",
+                                   "llist",
                                    "lnext",   "lopen",     "lprevious", "lrewind", "ls",        "lwindow",   "pop",      "qall",    "quit",
-                                   "read",    "tabNext",   "tabclose",  "tabedit", "tabfirst",  "tablast",   "tabmove",  "tabnew",  "tag",
+                                   "read",    "tabNext",   "tabclose",  "tabedit", "tabfind",   "tabfirst",  "tablast",  "tabmove",
+                                   "tabnew",  "tag",
                                    "tabnext", "tabonly",   "tabprevious", "tabrewind", "update", "wall",     "wq",       "wqall",
                                    "write",   "xall",      "xit" };
     static const char* OPTIONS[] = { "number", "nonumber", "relativenumber", "norelativenumber" };
@@ -407,7 +409,8 @@ void ALScriptStudioVim::complete(const std::string& command, const std::string& 
         }
     }
     else if (abbreviates(command, "e", "edit") || abbreviates(command, "tabe", "tabedit") || command == "tabnew" ||
-             abbreviates(command, "r", "read") || abbreviates(command, "w", "write"))
+             abbreviates(command, "r", "read") || abbreviates(command, "w", "write") || abbreviates(command, "fin", "find") ||
+             abbreviates(command, "tabf", "tabfind"))
     {
         completeFile(typed, out);
     }
@@ -791,6 +794,23 @@ void ALScriptStudioVim::completeFile(const std::string& typed, std::vector<std::
     }
 }
 
+void ALScriptStudioVim::openPath(Doc& doc, const std::string& path)
+{
+    // A file open already is gone to; another opened, read as its
+    // extension says, else as the tab it was named from.
+    for (Doc* each : mServices.openDocs())
+    {
+        if (each->file == path)
+        {
+            mWindow.activate(*each);
+            return;
+        }
+    }
+    std::string extension = fsyspath(fsyspath(path).extension()).string();
+    LLStringUtil::toLower(extension);
+    mWindow.openFileTab(path, extension == ".lua" || extension == ".luau" || (extension != ".lsl" && doc.language.lua));
+}
+
 bool ALScriptStudioVim::fileCommand(ALTextView& view, Doc& doc, const std::string& name_in, const std::string& args)
 {
     const bool                 bang = !name_in.empty() && name_in.back() == '!';
@@ -843,18 +863,32 @@ bool ALScriptStudioVim::fileCommand(ALTextView& view, Doc& doc, const std::strin
             fail(view, mServices.words("VimNoFile", words));
             return true;
         }
-        for (Doc* each : mServices.openDocs())
+        openPath(doc, path);
+        return true;
+    }
+    if (abbreviates(name, "fin", "find") || abbreviates(name, "tabf", "tabfind"))
+    {
+        // As gf finds one: an include or a module the script names, where
+        // the preprocessor found it or would look; else a file as :e
+        // finds one.
+        if (args.empty())
         {
-            if (each->file == path)
-            {
-                mWindow.activate(*each);
-                return true;
-            }
+            fail(view, mServices.words("VimArgumentRequired"));
+            return true;
         }
-        // Read as its extension says, else as the tab it was named from.
-        std::string extension = fsyspath(fsyspath(path).extension()).string();
-        LLStringUtil::toLower(extension);
-        mWindow.openFileTab(path, extension == ".lua" || extension == ".luau" || (extension != ".lsl" && doc.language.lua));
+        if (mWindow.openIncluded(doc, args, std::nullopt))
+        {
+            return true;
+        }
+        const std::string path = pathOf(doc, args, true);
+        if (path.empty())
+        {
+            LLStringUtil::format_map_t missing;
+            missing["[NAME]"] = args;
+            fail(view, mServices.words("VimNotInPath", missing));
+            return true;
+        }
+        openPath(doc, path);
         return true;
     }
     if (abbreviates(name, "r", "read"))

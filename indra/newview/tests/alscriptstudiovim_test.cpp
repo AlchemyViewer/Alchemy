@@ -35,6 +35,7 @@
 
 #include <filesystem>
 #include <fstream>
+#include <set>
 
 namespace
 {
@@ -131,6 +132,13 @@ namespace
             jumps.push_back(doc.id + (&view == doc.expandedEditor ? " expanded " : " ") + std::to_string(from.line));
         }
         Names jumps;
+        bool openIncluded(Doc&, const std::string& name, std::optional<bool>) override
+        {
+            includedAsked.push_back(name);
+            return included.count(name) != 0;
+        }
+        Names                 includedAsked;
+        std::set<std::string> included;
 
         al_studio_test::FakeServices*               services = nullptr;
         std::vector<std::string>                    folders;
@@ -767,5 +775,25 @@ namespace tut
         said->hooks().listing(*a.editor, "mark line  col file/text");
         ensure("a listing to Output",
                studio.entries.size() == 1 && studio.entries[0].text == "mark line  col file/text" && studio.outputShown == 1);
+    }
+
+    template<> template<>
+    void alscriptstudiovim_object::test<16>()
+    {
+        set_test_name(":find opens an include or a module the script names, else a file as :e finds one, else says it is nowhere");
+        make();
+        files();
+        Doc&         a    = tab("a");
+        ALVimKeymap* said = vimOver(a);
+        studio.included   = { "lib/util.lsl" };
+        ensure("taken", ex(a, "find", "lib/util.lsl"));
+        ensure("the include, by the name written", studio.includedAsked == Names{ "lib/util.lsl" } && studio.openedFiles.empty());
+        ex(a, "fin", "main.lsl");
+        ensure("not an include: a file where :e would find it",
+               studio.openedFiles.size() == 1 && studio.openedFiles.back().first == in("main.lsl"));
+        ex(a, "tabfind", "nowhere.lsl");
+        ensure_equals("nowhere", said->message(), std::string("VimNotInPath [NAME]=nowhere.lsl"));
+        ex(a, "find");
+        ensure_equals("a name wanted", said->message(), std::string("VimArgumentRequired"));
     }
 }

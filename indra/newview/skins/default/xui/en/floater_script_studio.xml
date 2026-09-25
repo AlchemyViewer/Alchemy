@@ -167,6 +167,8 @@
     <floater.string name="NoProblemsHere">There are no problems in [NAME].</floater.string>
     <floater.string name="NothingKnownBroken">Nothing can be found out about [NAME] until the syntax errors in Problems are fixed.</floater.string>
     <floater.string name="NoDefinition">[NAME] is not defined in this script.</floater.string>
+    <floater.string name="IncludeNotFoundHere">[NAME] was not found: no run of the preprocessor has found it, and it is not in the include folders.</floater.string>
+    <floater.string name="ModuleNotFoundHere">The module [NAME] was not found: no run of the preprocessor has found it, and it is not in the include folders.</floater.string>
     <floater.string name="ReferencesFoundA">1 place where [NAME] stands.</floater.string>
     <floater.string name="ReferencesFoundB">[COUNT] places where [NAME] stands.</floater.string>
     <floater.string name="LookingAcrossA">Looking for [NAME] across 1 other script of the object...</floater.string>
@@ -227,6 +229,7 @@
     <floater.string name="VimCannotWrite">E212: Can't open file for writing: [FILE]</floater.string>
     <floater.string name="VimWritten">"[FILE]" [LINES]L, [BYTES]B written</floater.string>
     <floater.string name="VimNoErrors">E42: No Errors</floater.string>
+    <floater.string name="VimNotInPath">E447: Can't find file "[NAME]" in path</floater.string>
     <floater.string name="VimFileInfo">"[NAME]" [STATE][LINES] lines --[PERCENT]%--</floater.string>
     <floater.string name="VimStateModified">[Modified]</floater.string>
     <floater.string name="VimStateReadOnly">[readonly]</floater.string>

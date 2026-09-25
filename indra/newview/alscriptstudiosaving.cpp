@@ -77,6 +77,7 @@ void ALScriptStudioSaving::preprocessedAnswer(const std::string& id, U32 version
     doc.uploaded.text     = result.text;
     doc.uploaded.map      = result.map;
     doc.uploaded.problems = result.problems;
+    doc.uploaded.resolved = result.resolved;
     doc.uploaded.codeBefore = result.codeBefore;
     doc.uploaded.codeAfter  = result.codeAfter;
     doc.expanded.valid    = false;

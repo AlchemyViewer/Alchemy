@@ -100,6 +100,11 @@ public:
         // A place in a tab's source or expansion to come back to with Back,
         // where a vim jump began.
         virtual void jumpedFrom(Doc& doc, const ALTextView& view, const ALTextPos& from) = 0;
+        // The file an include or a module the tab's script names is,
+        // opened: the one the preprocessor found, else one on disk where it
+        // would look -- an include's, a module's, or either. False where it
+        // is nowhere known.
+        virtual bool openIncluded(Doc& doc, const std::string& name, std::optional<bool> require) = 0;
 
     protected:
         ~Window() = default;
@@ -151,6 +156,9 @@ private:
     // A tab's files on disk: :e and :e! with or without one, :tabedit and
     // :tabnew, :r, :w with one, :update, :wqa. False for any other command.
     bool fileCommand(ALTextView& view, Doc& doc, const std::string& name, const std::string& args);
+    // A file on disk in a tab: its own, where one has it open, else a new
+    // one, read as its extension says or as `doc` is.
+    void openPath(Doc& doc, const std::string& path);
     // A file named on the : line, where it is: as it stands where it says
     // its whole way, ~ the home folder; else in the tab's fileFolders, the
     // first that has it -- or, `existing` false, where it would be made,

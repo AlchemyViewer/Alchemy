@@ -143,4 +143,41 @@ namespace tut
         services.openScript(ref, "Door", std::nullopt, 12);
         ensure("asked to open at a line", services.opened.size() == 1 && services.opened.front().line == 12);
     }
+
+    template<> template<>
+    void alscriptstudiodoc_object::test<5>()
+    {
+        set_test_name("an include or a module a place names: anywhere on an #include line, or in a require call; and what a run found it as");
+        const ALTextDocument lsl("default {}\n  #  include \"lib/util.lsl\" // the helpers\n#include <sys.lsl>\n#define X \"y.lsl\"\n");
+        const std::vector<ALPreprocessor::Required> none;
+        const std::optional<Doc::Named> util = Doc::namedIn(lsl, ALTextPos(1, 0), false, none);
+        ensure("on its line, before the #", util.has_value() && util->name == "lib/util.lsl" && !util->require);
+        ensure("the whole line", util->range == ALTextRange(ALTextPos(1, 0), ALTextPos(1, lsl.lineLength(1))));
+        ensure("angled", Doc::namedIn(lsl, ALTextPos(2, 12), false, none)->name == "sys.lsl");
+        ensure("not a string elsewhere",
+               !Doc::namedIn(lsl, ALTextPos(3, 12), false, none) && !Doc::namedIn(lsl, ALTextPos(0, 3), false, none));
+
+        const std::string                           source = "local m = require(\"mod\")\nlocal n = 1\n";
+        const ALTextDocument                        lua(source);
+        const std::vector<ALPreprocessor::Required> calls  = ALPreprocessor::requiresIn(source);
+        const std::optional<Doc::Named>             mod    = Doc::namedIn(lua, ALTextPos(0, 12), true, calls);
+        ensure("in a require call", mod.has_value() && mod->name == "mod" && mod->require);
+        ensure("over the call", mod->range == ALTextRange(ALTextPos(0, 10), ALTextPos(0, 24)));
+        ensure("not before it", !Doc::namedIn(lua, ALTextPos(0, 3), true, calls));
+        ensure("not in LSL", !Doc::namedIn(lua, ALTextPos(0, 12), false, calls));
+
+        Doc doc;
+        ensure("no run, nothing found", doc.foundAs("lib/util.lsl").empty());
+        doc.expanded.valid    = true;
+        doc.expanded.resolved = { { "", "lib/util.lsl", false, "disk:/s/lib/util.lsl" },
+                                  { "disk:/s/lib/util.lsl", "inner.lsl", false, "disk:/s/inner.lsl" },
+                                  { "", "mod", true, "inv:mod" } };
+        ensure_equals("the script's own", doc.foundAs("lib/util.lsl"), std::string("disk:/s/lib/util.lsl"));
+        ensure("not an include's own", doc.foundAs("inner.lsl").empty());
+        ensure("a module as a module", doc.foundAs("mod", true) == "inv:mod" && doc.foundAs("mod", false).empty());
+        doc.expanded.valid  = false;
+        doc.uploaded.valid  = true;
+        doc.uploaded.resolved = { { "", "lib/util.lsl", false, "disk:/s/other.lsl" } };
+        ensure_equals("or the last save's run", doc.foundAs("lib/util.lsl"), std::string("disk:/s/other.lsl"));
+    }
 }

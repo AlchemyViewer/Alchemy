@@ -27,6 +27,7 @@
 #include "alfloaterscriptstudio.h"
 
 #include "alcodeeditor.h"
+#include "aldiskincludes.h"
 #include "alfilewrite.h"
 #include "fsyspath.h"
 #include "alnotecarditems.h"
@@ -102,6 +103,7 @@
 
 #include <algorithm>
 #include <ctime>
+#include <filesystem>
 #include <fstream>
 
 #if !LL_WINDOWS
@@ -2333,6 +2335,7 @@ void ALFloaterScriptStudio::expandedAnswer(const std::string& id, U32 version, c
     doc.expanded.text     = result.text;
     doc.expanded.map      = result.map;
     doc.expanded.problems = result.problems;
+    doc.expanded.resolved = result.resolved;
     // What the preprocessor found is shown with what the analyzers found.
     refreshProblems(doc);
     std::vector<Doc::Waiting> waiting;
@@ -2769,6 +2772,22 @@ void ALFloaterScriptStudio::teachEditor(Doc& doc)
     editor.setHoverRequest([this, raw](const ALTextPos& at, std::string_view) { askAnalyzer(*raw, ALScriptAnalysis::Kind::Hover, at); });
     editor.setSignatureRequest([this, raw](const ALTextPos& caret) { askAnalyzer(*raw, ALScriptAnalysis::Kind::Signature, caret); });
     editor.setSymbolRequest([this, raw](ALEditorCommand command, const ALTextRange& word) { askSymbol(*raw, command, word); });
+    // An include's name, or a module's, leads to its file of itself: Go to
+    // Definition and Control-click open it, anywhere on its line or call.
+    editor.setLinkRequest([this, raw](const ALTextPos& at, bool follow) {
+        const std::optional<Doc::Named> named = raw->namedAt(at);
+        if (!named)
+        {
+            return ALTextRange();
+        }
+        if (follow && !openIncluded(*raw, named->name, named->require))
+        {
+            LLStringUtil::format_map_t args;
+            args["[NAME]"] = named->name;
+            setStatus(getString(named->require ? "ModuleNotFoundHere" : "IncludeNotFoundHere", args), true);
+        }
+        return named->range;
+    });
     // What would put right the problems on a line, as the list, the card
     // and the gutter offer them; the one taken made here, where it is known
     // whether the text is still the one the fixes were made for.
@@ -5723,7 +5742,18 @@ void ALFloaterScriptStudio::symbolAnswered(Doc& doc, const ALScriptAnalysis::Res
     const ALScriptReferences& refs    = result.references;
     doc.symbolCommand                 = ALEditorCommand::None;
     LLStringUtil::format_map_t args;
-    args["[NAME]"] = refs.found ? refs.name : doc.editor->document().text(doc.editor->identifierAt(doc.symbolAt));
+    const std::string          name = refs.found ? refs.name : doc.editor->document().text(doc.editor->identifierAt(doc.symbolAt));
+    args["[NAME]"]                  = name;
+    // A word of the language has no definition in the script to go to --
+    // where the script has not made one of its own: its reference is where
+    // it is defined.
+    const Vocab* known = command == ALEditorCommand::GoToDefinition ? vocabWord(doc.language.lua, name) : nullptr;
+    if (known && (!refs.found || !refs.hasDefinition))
+    {
+        mFolds.setCollapsed("inspector", false);
+        showReference(*known, doc.language.lua);
+        return;
+    }
     if (!refs.found)
     {
         // Nothing known because nothing could be read, which the syntax
@@ -7235,6 +7265,39 @@ void ALFloaterScriptStudio::openIncludeAt(const std::string& path, const std::st
     }
 }
 
+
+bool ALFloaterScriptStudio::openIncluded(Doc& doc, const std::string& name, std::optional<bool> require)
+{
+    // As the last run of the preprocessor over the script found it.
+    if (const std::string path = doc.foundAs(name, require); !path.empty())
+    {
+        noteJump();
+        openIncludeAt(path, name, 0, 0, 0);
+        return true;
+    }
+    // Else where the preprocessor would look on disk -- the tab's own
+    // file's folder, then the include folders -- for an include, or a
+    // module with its extensions and a folder's init.
+    const std::vector<bool> kinds = require ? std::vector<bool>{ *require } : std::vector<bool>{ false, true };
+    for (const std::string& folder : fileFolders(doc))
+    {
+        for (const bool as_require : kinds)
+        {
+            for (const std::string& candidate : ALDiskIncludes::namesFor(name, doc.language.lua, as_require))
+            {
+                const fsyspath  path((fsyspath(folder) / fsyspath(candidate)).lexically_normal());
+                std::error_code ec;
+                if (std::filesystem::is_regular_file(path, ec))
+                {
+                    noteJump();
+                    openFile(path.string(), doc.language.lua);
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
 
 void ALFloaterScriptStudio::noteJump(bool walking)
 {

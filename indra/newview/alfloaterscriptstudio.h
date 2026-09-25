@@ -626,6 +626,11 @@ private:
     // A place in an include opened in a tab of its own where the include
     // is a script or a notecard in the world; one on disk is only named.
     void openIncludeAt(const std::string& path, const std::string& name, S32 line, S32 column, S32 length);
+    // The file an include or a module the script names is, opened: the one
+    // the last run of the preprocessor found, else one on disk where the
+    // preprocessor would look. An include's, a module's, or either. False
+    // where it is nowhere known.
+    bool openIncluded(Doc& doc, const std::string& name, std::optional<bool> require) override;
     // A line, or line:column, typed into the same popover, the editor
     // showing the line as it is typed and going back on escape.
     void goToLine();
