@@ -162,6 +162,8 @@ namespace
             case ALEditorCommand::Replace:
             case ALEditorCommand::NextMisspelling:
             case ALEditorCommand::PreviousMisspelling:
+            case ALEditorCommand::PreviousChange:
+            case ALEditorCommand::NextChange:
             case ALEditorCommand::FindNext:
             case ALEditorCommand::FindPrevious:
             case ALEditorCommand::COUNT:
@@ -332,6 +334,9 @@ void ALTextView::setText(std::string_view text)
     mPreeditOverwritten.clear();
     mDocument.setText(text);
     mUndo.clear();
+    // A new text has no changes to go back to.
+    mChanges.clear();
+    mChangeAt = 0;
     // The layers were about the text that was; the edit that replaced
     // it has dropped what it cut through, which is everything, and a
     // substitution over an empty text is nothing.
@@ -1354,6 +1359,19 @@ std::optional<ALTextRange> ALTextView::misspellingFrom(const ALTextPos& from, bo
     return std::nullopt;
 }
 
+bool ALTextView::goToChange(S32 steps)
+{
+    const S32 to = mChangeAt + steps;
+    if (steps == 0 || to < 0 || to >= static_cast<S32>(mChanges.size()))
+    {
+        return false;
+    }
+    mChangeAt = to;
+    placeCaret(mDocument.clamp(mChanges[static_cast<size_t>(to)]), false);
+    scrollToCaret();
+    return true;
+}
+
 bool ALTextView::convertIndentation(S32 first, S32 last, bool to_spaces, S32 measured_width)
 {
     if (mReadOnly)
@@ -1451,6 +1469,27 @@ bool ALTextView::canAddToIgnore() const
 
 void ALTextView::onDocumentEdit(const ALTextDocument::Edit& edit)
 {
+    // The change list: what it holds slides with the text, a place the edit
+    // took some of to where it began; and the edit's own place joins it, in
+    // the place of the last where that was on the same line.
+    const ALTextRange removed = edit.range.normalised();
+    for (ALTextPos& at : mChanges)
+    {
+        at = at < removed.begin ? at : at < removed.end ? removed.begin : edit.slidPast(at);
+    }
+    if (!mChanges.empty() && mChanges.back().line == removed.begin.line)
+    {
+        mChanges.back() = removed.begin;
+    }
+    else
+    {
+        mChanges.push_back(removed.begin);
+        if (mChanges.size() > 100)
+        {
+            mChanges.erase(mChanges.begin());
+        }
+    }
+    mChangeAt = static_cast<S32>(mChanges.size());
     // The lines the edit touched are checked again when they are next
     // drawn; the ones below slide.
     mSpelling.edited(edit, mDocument.lineCount());
@@ -2037,6 +2076,9 @@ bool ALTextView::perform(ALEditorCommand command)
         case C::DeleteLine:
             apply(ALTextEditing::deleteLines(mDocument, mAnchor, mCaret));
             return true;
+        case C::PreviousChange:
+        case C::NextChange:
+            return goToChange(command == C::PreviousChange ? -1 : 1);
         case C::JoinLines:
         {
             // The lines selected, or the caret's and the next.
@@ -2115,6 +2157,10 @@ bool ALTextView::canPerform(ALEditorCommand command) const
         case C::NextMisspelling:
         case C::PreviousMisspelling:
             return getSpellCheck();
+        case C::PreviousChange:
+            return mChangeAt > 0;
+        case C::NextChange:
+            return mChangeAt + 1 < static_cast<S32>(mChanges.size());
         default:
             return !(mReadOnly && editsText(command));
     }

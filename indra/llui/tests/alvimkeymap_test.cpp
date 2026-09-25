@@ -1885,4 +1885,29 @@ namespace tut
         keys(":2ce 6<CR>");
         ensure_equals(":center", editor->document().line(1), std::string("  yy"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<60>()
+    {
+        set_test_name("g; and g, go back and on through the change list; '. is the last change; :changes lists them");
+        ALCodeEditor& e = make("a\nb\nc\nd\n");
+        keys("g;");
+        ensure_equals("none yet", vim->message(), std::string("E664: Changelist is empty"));
+        keys("jA!<Esc>3GA?<Esc>gg");
+        keys("g;");
+        ensure_equals("the newest", e.caret().line, 2);
+        keys("g;");
+        ensure_equals("the one before", e.caret().line, 1);
+        keys("g;");
+        ensure_equals("no older", vim->message(), std::string("E662: At start of changelist"));
+        keys("g,");
+        ensure_equals("newer again", e.caret().line, 2);
+        keys("gg'.");
+        ensure_equals("'. the last change's line", e.caret().line, 2);
+        std::vector<std::string> listed;
+        vim->hooks().listing = [&listed](ALTextView&, const std::string& text) { listed.push_back(text); };
+        keys(":changes<CR>");
+        ensure("listed", listed.size() == 1 && listed[0].compare(0, 21, "change line  col text") == 0 &&
+                             listed[0].find("\n>    0     3    1 c?") != std::string::npos);
+    }
 }

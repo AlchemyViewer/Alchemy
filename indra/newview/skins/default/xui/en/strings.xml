@@ -421,6 +421,9 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="VimOneCommand">-- (insert) --</string>
 	<string name="VimBadOffset">E486: Pattern not found: [PATTERN]</string>
 	<string name="VimBadMark">E191: Argument must be a letter or forward/backward quote</string>
+	<string name="VimNoChanges">E664: Changelist is empty</string>
+	<string name="VimChangesStart">E662: At start of changelist</string>
+	<string name="VimChangesEnd">E663: At end of changelist</string>
 	<string name="VimNoFileUnderCursor">E446: No file name under cursor</string>
 	<string name="VimNoSpellCheck">E756: Spell checking is not enabled</string>
 	<string name="VimNoMisspelling">No misspelled words</string>

@@ -462,6 +462,19 @@ public:
     // A change worked out over the document (ALTextEditing) made, as one
     // step to undo, and the selection it says after.
     void apply(const ALTextEditing::Change& change);
+    // --- the change list --------------------------------------------------------
+
+    // Where the text was changed, oldest first, as vim's change list keeps
+    // them: one a line for changes one after another on it, each sliding
+    // with the text after, the last hundred.
+    const std::vector<ALTextPos>& changes() const { return mChanges; }
+    // Where in it the caret was last taken: its size past the newest.
+    S32 changeAt() const { return mChangeAt; }
+    // The caret to the place of a change so many older (negative) or newer
+    // than where it was last taken: Last Edit Location and vim's g; and g,.
+    // False past either end.
+    bool goToChange(S32 steps);
+
     // Convert Indentation: the leading blanks of lines first through last
     // made of spaces, or of tabs as far as they go, at the view's tab
     // width. False where nothing changed.
@@ -989,6 +1002,9 @@ private:
     // left alone for a moment after it was typed.
     bool                                    mSpellCheck = false;
     ALTextSpelling                          mSpelling;
+    // The change list (changes), and where in it the caret was last taken.
+    std::vector<ALTextPos>                  mChanges;
+    S32                                     mChangeAt = 0;
     LLUIColor                               mSpellErrorColor;
     std::string                             mPlaceholder;
     LLFrameTimer                            mSpellTimer;

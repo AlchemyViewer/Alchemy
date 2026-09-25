@@ -1252,4 +1252,31 @@ namespace tut
         ensure("nothing more to do", !v.convertIndentation(0, 1, true));
         ensure("back to tabs", v.convertIndentation(0, 1, false) && v.text() == "\tone\n\t\ttwo");
     }
+
+    template<> template<>
+    void altextview_object::test<39>()
+    {
+        set_test_name("the change list: one place a line, sliding with the text; Last Edit Location goes back through it, Next Edit Location on");
+        ALTextView& v = make("zero\none\ntwo\nthree");
+        ensure("nothing yet", v.changes().empty() && !v.canPerform(ALEditorCommand::PreviousChange));
+        v.setCaret(ALTextPos(1, 3));
+        v.insertText("!");
+        v.insertText("?");
+        v.setCaret(ALTextPos(3, 0));
+        v.insertText(">");
+        ensure("one a line, the last place on it", v.changes() == std::vector<ALTextPos>{ ALTextPos(1, 4), ALTextPos(3, 0) });
+        v.setCaret(ALTextPos(0, 0));
+        v.insertText("new\n");
+        ensure("sliding down with a line put in above",
+               v.changes().size() == 3 && v.changes()[0] == ALTextPos(2, 4) && v.changes()[1] == ALTextPos(4, 0));
+        v.setCaret(ALTextPos(4, 3));
+        key(KEY_BACKSPACE, MASK_CONTROL | MASK_SHIFT);
+        ensure("back to the newest", v.caret() == ALTextPos(0, 0));
+        key(KEY_BACKSPACE, MASK_CONTROL | MASK_SHIFT);
+        ensure("and the one before", v.caret() == ALTextPos(4, 0));
+        ensure("Next Edit Location on again", v.perform(ALEditorCommand::NextChange) && v.caret() == ALTextPos(0, 0));
+        ensure("not past the newest", !v.canPerform(ALEditorCommand::NextChange));
+        v.setText("fresh");
+        ensure("a new text, none", v.changes().empty());
+    }
 }

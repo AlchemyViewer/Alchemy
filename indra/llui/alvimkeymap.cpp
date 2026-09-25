@@ -1154,6 +1154,27 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
                         return true;
                     case '_':
                         return command(view, 0x06);
+                    case ';':
+                    case ',':
+                    {
+                        // The change list: older, or newer again.
+                        clearPending();
+                        if (view.changes().empty())
+                        {
+                            say(said("VimNoChanges", "E664: Changelist is empty"), true);
+                        }
+                        else if (!view.goToChange(ch == ';' ? -count : count))
+                        {
+                            say(ch == ';' ? said("VimChangesStart", "E662: At start of changelist")
+                                          : said("VimChangesEnd", "E663: At end of changelist"),
+                                true);
+                        }
+                        else
+                        {
+                            moveTo(view, view.caret());
+                        }
+                        return true;
+                    }
                     case 'i':
                     {
                         // Inserting again where it last stopped.
@@ -2562,14 +2583,15 @@ ALVimKeymap::Motion ALVimKeymap::motion(ALTextView& view, llwchar ch, S32 count,
         case '`':
         case '\'':
         {
+            // . the last change's place, as the change list has it.
             const auto mark = mMarks.find(static_cast<char>(arg));
-            if (mark == mMarks.end())
+            if (mark == mMarks.end() && !(arg == '.' && !view.changes().empty()))
             {
                 say(said("VimMarkNotSet", "E20: Mark not set"), true);
                 m.moved = false;
                 return m;
             }
-            const ALTextPos p = d.clamp(mark->second);
+            const ALTextPos p = d.clamp(mark != mMarks.end() ? mark->second : view.changes().back());
             m.to              = ch == '\'' ? ALTextPos(p.line, firstNonBlankColumn(d, p.line)) : p;
             m.linewise        = ch == '\'';
             return m;
@@ -4134,7 +4156,7 @@ void ALVimKeymap::complete(ALTextView& view, bool forward)
         {
             // The name itself: the keymap's own, the long forms, and the
             // host's.
-            static const char* OWN[] = { "center", "delete", "display", "global", "join",       "left",     "mark",    "marks",
+            static const char* OWN[] = { "center", "changes", "delete", "display", "global", "join",    "left",     "mark",    "marks",
                                          "nohlsearch", "normal", "put", "redo", "registers", "retab", "right", "set",
                                          "substitute", "undo", "vglobal", "yank" };
             found.assign(std::begin(OWN), std::end(OWN));
@@ -4907,6 +4929,28 @@ void ALVimKeymap::runCommand(ALTextView& view, const std::string& line_in)
     if (name == "marks")
     {
         listMarks(view, args);
+        return;
+    }
+    if (name == "changes")
+    {
+        // As vim's :changes: each by how far back it is from where the caret
+        // was last taken, with its line and column and the line's text; >
+        // where that is.
+        const std::vector<ALTextPos>& changes = view.changes();
+        const S32                     at      = view.changeAt();
+        std::string                   text    = "change line  col text";
+        for (S32 i = 0; i < static_cast<S32>(changes.size()); ++i)
+        {
+            const ALTextPos p    = d.clamp(changes[static_cast<size_t>(i)]);
+            std::string     line = d.line(p.line);
+            LLStringUtil::trimHead(line);
+            text += llformat("\n%c%5d %5d %4d ", i == at ? '>' : ' ', std::abs(at - i), p.line + 1, p.column) + line.substr(0, 60);
+        }
+        if (at >= static_cast<S32>(changes.size()))
+        {
+            text += "\n>";
+        }
+        list(view, text);
         return;
     }
     if (name == "noh" || name == "nohlsearch")
