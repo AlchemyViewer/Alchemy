@@ -1930,7 +1930,8 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
                 --end;
             }
             Span span;
-            span.range = ALTextRange(ALTextPos(line, firstNonBlankColumn(d, line)), ALTextPos(line, llmax(end, firstNonBlankColumn(d, line))));
+            const S32 first = firstNonBlankColumn(d, line);
+            span.range      = ALTextRange(ALTextPos(line, first), ALTextPos(line, llmax(end, first)));
             applyOperator(view, op, span, 1);
             finishCommand(true);
             return true;
@@ -4180,8 +4181,8 @@ bool ALVimKeymap::changeSurround(ALTextView& view, llwchar target, llwchar with,
     ALTextRange   close;
     Span          outer;
     Span          inner;
-    if (object == '(' || object == ')' || object == 'b' || object == '[' || object == ']' || object == '{' || object == '}' || object == 'B' ||
-        object == '<' || object == '>')
+    if (object == '(' || object == ')' || object == 'b' || object == '[' || object == ']' || object == '{' || object == '}' ||
+        object == 'B' || object == '<' || object == '>')
     {
         if (!textObject(view, 'a', object, count, outer))
         {
@@ -5238,7 +5239,8 @@ namespace
 
     // One of the options the mode keeps, set; false where the option is
     // none of those.
-    bool setSharedOption(ALVimKeymap::Shared& shared, const OptionSetting& setting, const std::string& word, std::string& shown, std::string& error)
+    bool setSharedOption(ALVimKeymap::Shared& shared, const OptionSetting& setting, const std::string& word, std::string& shown,
+                         std::string& error)
     {
         const std::string& name = setting.name;
         if (name == "ic" || name == "ignorecase")
@@ -5312,8 +5314,8 @@ namespace
 
     bool isViewOption(const std::string& name)
     {
-        return name == "wrap" || name == "et" || name == "expandtab" || name == "ts" || name == "tabstop" || name == "sw" || name == "shiftwidth" ||
-               name == "sts" || name == "softtabstop";
+        return name == "wrap" || name == "et" || name == "expandtab" || name == "ts" || name == "tabstop" || name == "sw" ||
+               name == "shiftwidth" || name == "sts" || name == "softtabstop";
     }
 }
 
@@ -5345,8 +5347,8 @@ bool ALVimKeymap::setViewOption(ALTextView& view, const std::string& word, std::
             return true;
         }
         S32 width = view.getTabWidth();
-        setNumber(width, 4, 1, 16, setting, name.size() > 3 ? name.c_str() : name == "ts" ? "tabstop" : name == "sw" ? "shiftwidth" : "softtabstop", word,
-                  shown, error);
+        const char* whole = name.size() > 3 ? name.c_str() : name == "ts" ? "tabstop" : name == "sw" ? "shiftwidth" : "softtabstop";
+        setNumber(width, 4, 1, 16, setting, whole, word, shown, error);
         view.setTabWidth(width);
         return true;
     }
@@ -5468,7 +5470,8 @@ void ALVimKeymap::source(Shared& shared, std::string_view text, const std::funct
         }
         if (!error.empty() && !quiet)
         {
-            errors.push_back(said("VimrcLine", "line [NUMBER]: [ERROR]", { { "[NUMBER]", std::to_string(line_number) }, { "[ERROR]", error } }));
+            errors.push_back(
+                said("VimrcLine", "line [NUMBER]: [ERROR]", { { "[NUMBER]", std::to_string(line_number) }, { "[ERROR]", error } }));
         }
     }
 }

@@ -66,7 +66,8 @@ struct ALVimInput
     // same modifiers.
     bool sameAs(const ALVimInput& other) const
     {
-        return isChar == other.isChar && (isChar ? ch == other.ch : key == other.key && (mask & MASK_MODIFIERS) == (other.mask & MASK_MODIFIERS));
+        return isChar == other.isChar &&
+               (isChar ? ch == other.ch : key == other.key && (mask & MASK_MODIFIERS) == (other.mask & MASK_MODIFIERS));
     }
 };
 

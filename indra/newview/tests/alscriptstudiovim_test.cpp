@@ -877,9 +877,10 @@ namespace tut
         ensure(":so", ex(a, "so") && maps.match(ALVimMappings::NORMAL, maps.keysOf("Q"), true).full &&
                           !maps.match(ALVimMappings::INSERT, maps.keysOf("jk"), true).full);
         type(a, "\nbad line");
-        ensure(":so % reads the tab, and brings up what it did not take", ex(a, "source", "%") && studio.outputShown == 1 &&
-                                                                              studio.entries.back().text.find("line 2:") != std::string::npos &&
-                                                                              studio.entries.back().text.find("the vimrc") == std::string::npos);
+        const bool         read  = ex(a, "source", "%");
+        const std::string& entry = studio.entries.back().text;
+        ensure(":so % reads the tab, and brings up what it did not take",
+               read && studio.outputShown == 1 && entry.find("line 2:") != std::string::npos && entry.find("the vimrc") == std::string::npos);
         ensure(":e $MYVIMRC", ex(a, "e", "$MYVIMRC") && studio.vimrcEdited == 1);
         ensure(":so of a file that is not there", ex(a, "so", "nowhere.vim") && said->messageIsError());
     }

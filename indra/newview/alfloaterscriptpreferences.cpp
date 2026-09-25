@@ -126,7 +126,8 @@ bool ALFloaterScriptPreferences::postBuild()
     getChild<LLButton>("external_browse")->setCommitCallback([this](LLUICtrl*, const LLSD&) { onBrowseExternalEditor(); });
     mVimrcNotecard = getChild<LLLineEditor>("vimrc_notecard");
     getChild<LLButton>("vimrc_edit")->setCommitCallback([](LLUICtrl*, const LLSD&) { ALFloaterScriptStudio::openVimrc(); });
-    getChild<LLButton>("vimrc_clear")->setCommitCallback([](LLUICtrl*, const LLSD&) { ALScriptStudioVimrc::instance().useNotecard(LLUUID::null); });
+    getChild<LLButton>("vimrc_clear")->setCommitCallback(
+        [](LLUICtrl*, const LLSD&) { ALScriptStudioVimrc::instance().useNotecard(LLUUID::null); });
     mVimrcChanged = ALScriptStudioVimrc::instance().onChanged([this]() { refreshVimrc(); });
     refreshVimrc();
     getChild<LLButton>("scripting_settings")->setCommitCallback([](LLUICtrl*, const LLSD&) { LLFloaterReg::showInstance("scripting_settings"); });

@@ -71,7 +71,8 @@ namespace tut
         ensure("<c-w> is Control and W", keys[3].key == 'W' && keys[3].mask == ALVimInput::CONTROL);
         ensure("two modifiers", keys[4].key == 'X' && keys[4].mask == (ALVimInput::CONTROL | MASK_SHIFT));
         ensure("<S-Tab>", keys[5].key == KEY_TAB && keys[5].mask == MASK_SHIFT);
-        ensure("<Space> <lt> <bar> <Bslash> are characters", keys[6].ch == ' ' && keys[7].ch == '<' && keys[8].ch == '|' && keys[9].ch == '\\');
+        ensure("<Space> <lt> <bar> <Bslash> are characters",
+               keys[6].ch == ' ' && keys[7].ch == '<' && keys[8].ch == '|' && keys[9].ch == '\\');
         ensure("<F5>", keys[10].key == KEY_F5);
         ensure("<nop> is nothing, and <foo> is five characters", keys[11].isChar && keys[11].ch == '<' && keys[15].ch == '>');
         ensure_equals("shown back as :map lists them", spelt("a<esc><c-w><Space><lt>"), std::string("a<Esc><C-W><Space><lt>"));
@@ -123,7 +124,8 @@ namespace tut
         ensure("nor is it in visual", maps.match(ALVimMappings::VISUAL, chars("Q"), true).full == nullptr);
         ensure("unmapping what is not there", run("iunmap", "zz") && !error.empty());
         ensure("imapclear", run("imapclear", "") && maps.match(ALVimMappings::INSERT, chars("jk"), true).full == nullptr);
-        ensure("mapclear! leaves normal mode's", run("mapclear!", "") && maps.match(ALVimMappings::NORMAL, chars("j"), true).full != nullptr &&
+        ensure("mapclear! leaves normal mode's", run("mapclear!", "") &&
+                                                    maps.match(ALVimMappings::NORMAL, chars("j"), true).full != nullptr &&
                                                     maps.match(ALVimMappings::COMMAND_LINE, maps.keysOf("<C-l>"), true).full == nullptr);
         ensure("not one of the family", !run("mapx", "a b") && !run("nnoremap!", "a b") && !run("marks", ""));
         ensure("an empty list says so", run("cmap", "") && listing == "No mapping found");
@@ -141,14 +143,16 @@ namespace tut
         ensure("nothing more is coming: not longer", !maps.match(ALVimMappings::NORMAL, chars("g"), false).longer);
         const ALVimMappings::Match gx = maps.match(ALVimMappings::NORMAL, chars("gxq"), true);
         ensure("gx the longest whole, the q after it none of it", gx.full && gx.full->from.size() == 2 && !gx.longer);
-        ensure("\\a waits for b", maps.match(ALVimMappings::NORMAL, chars("\\a"), true).longer && !maps.match(ALVimMappings::NORMAL, chars("\\a"), true).full);
+        const ALVimMappings::Match leader_a = maps.match(ALVimMappings::NORMAL, chars("\\a"), true);
+        ensure("\\a waits for b", leader_a.longer && !leader_a.full);
         ensure("\\c is nothing", !maps.match(ALVimMappings::NORMAL, chars("\\c"), true).longer);
         ensure("a mapping made again replaces the one there", run("nmap", "gx y") && maps.mappings().size() == 3);
         ensure("<nowait> kept", run("nnoremap", "<nowait> g G") && maps.match(ALVimMappings::NORMAL, chars("g"), true).full->nowait);
         ensure("<unique> refuses one there", run("nmap", "<unique> gx z") && !error.empty());
         ensure("<expr> is refused", run("nmap", "<expr> q 1") && !error.empty());
-        ensure("a bar ends it, \\| is one", run("nmap", "zb a\\|b|c") && ALVimMappings::shown(maps.match(ALVimMappings::NORMAL, chars("zb"), true).full->to) ==
-                                                                     std::string("a<Bar>b"));
+        ensure("a bar ends it", run("nmap", "zb a\\|b|c"));
+        const ALVimMappings::Match bar = maps.match(ALVimMappings::NORMAL, chars("zb"), true);
+        ensure_equals("\\| is one", ALVimMappings::shown(bar.full->to), std::string("a<Bar>b"));
     }
 
     template<> template<>
