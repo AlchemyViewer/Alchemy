@@ -4673,34 +4673,6 @@ ALFloaterScriptStudio::TabFacts ALFloaterScriptStudio::tabFactsOf(const Doc& doc
     return facts;
 }
 
-// static
-const char* ALFloaterScriptStudio::levelName(Doc::Level level)
-{
-    return level == Doc::Level::Error ? "ERROR" : level == Doc::Level::Warning ? "WARNING" : "NOTE";
-}
-
-// static
-ALFloaterScriptStudio::Doc::Level ALFloaterScriptStudio::levelOf(const std::string& said)
-{
-    // The compiler's own words: anything but a warning is an error, as
-    // the server has only the two.
-    return said == "WARNING" || said == "WARN" ? Doc::Level::Warning : Doc::Level::Error;
-}
-
-// static
-ALFloaterScriptStudio::Doc::Level ALFloaterScriptStudio::levelOf(ALScriptProblem::Severity severity)
-{
-    return severity == ALScriptProblem::Severity::Error     ? Doc::Level::Error
-           : severity == ALScriptProblem::Severity::Warning ? Doc::Level::Warning
-                                                            : Doc::Level::Note;
-}
-
-// static
-ALCodeEditor::Mark ALFloaterScriptStudio::markOf(Doc::Level level)
-{
-    return level == Doc::Level::Error ? ALCodeEditor::Mark::Error : level == Doc::Level::Warning ? ALCodeEditor::Mark::Warning : ALCodeEditor::Mark::Note;
-}
-
 void ALFloaterScriptStudio::problemCounts(const Doc& doc, S32& errors, S32& warnings) const
 {
     errors = warnings = 0;
@@ -6468,12 +6440,12 @@ void ALFloaterScriptStudio::refreshProblems(Doc& doc)
     };
     for (const Doc::Compiled& problem : doc.problems)
     {
-        const Doc::Level level = levelOf(problem.level);
+        const Doc::Level level = Doc::levelOf(problem.level);
         if (analysis_current && level == Doc::Level::Error && problem.file.empty() && analysed_error_on(problem.line))
         {
             continue;
         }
-        add(problem.line, problem.column, problem.hasColumn, problem.line, problem.column, markOf(level), level, getString("OriginCompiler"), problem.message,
+        add(problem.line, problem.column, problem.hasColumn, problem.line, problem.column, Doc::markOf(level), level, getString("OriginCompiler"), problem.message,
             problem.file);
     }
     // The preprocessor's own word on the text as it stands, and the
@@ -6483,7 +6455,7 @@ void ALFloaterScriptStudio::refreshProblems(Doc& doc)
     const U32  now             = doc.editor->document().version();
     const std::optional<ALScriptWeight::Target> target = weightTarget(doc);
     const auto preprocessorRow = [&](const ALScriptProblem& problem, U32 version) {
-        const Doc::Level level     = levelOf(problem.severity);
+        const Doc::Level level     = Doc::levelOf(problem.severity);
         const bool       optimizer = problem.source == ALScriptProblem::Source::Optimizer;
         // What the lines a change is on came to less in code, beside what
         // it did to them.
@@ -6495,7 +6467,7 @@ void ALFloaterScriptStudio::refreshProblems(Doc& doc)
             args["[TARGET]"] = ALScriptWeight::nameOf(*target);
             message += " " + getString(*problem.savedBytes > 0 ? "OptimizerNoteLighter" : *problem.savedBytes < 0 ? "OptimizerNoteHeavier" : "OptimizerNoteSame", args);
         }
-        add(problem.line, problem.column, true, problem.endLine, problem.endColumn, markOf(level), level,
+        add(problem.line, problem.column, true, problem.endLine, problem.endColumn, Doc::markOf(level), level,
             getString(optimizer ? "OriginOptimizer" : "OriginPreprocessor"), message, problem.file);
         doc.shown.back().key      = problem.key;
         doc.shown.back().fixes    = problem.fixes;
@@ -6526,7 +6498,7 @@ void ALFloaterScriptStudio::refreshProblems(Doc& doc)
     }
     for (const ALScriptProblem& problem : doc.analysis)
     {
-        const Doc::Level  level  = levelOf(problem.severity);
+        const Doc::Level  level  = Doc::levelOf(problem.severity);
         const std::string origin = problem.source == ALScriptProblem::Source::Parser  ? getString("OriginParser")
                                    : problem.source == ALScriptProblem::Source::Types ? getString("OriginTypes")
                                                                                       : getString("OriginLint");
@@ -6534,7 +6506,7 @@ void ALFloaterScriptStudio::refreshProblems(Doc& doc)
         // error's number says nothing to whoever reads it.
         const bool        named   = !problem.code.empty() && problem.code.find_first_not_of("0123456789") != std::string::npos;
         const std::string message = named ? problem.message + " [" + problem.code + "]" : problem.message;
-        add(problem.line, problem.column, true, problem.endLine, problem.endColumn, markOf(level), level, origin, message, problem.file,
+        add(problem.line, problem.column, true, problem.endLine, problem.endColumn, Doc::markOf(level), level, origin, message, problem.file,
             problem.source == ALScriptProblem::Source::Lint ? problem.code : std::string());
         doc.shown.back().key      = problem.key;
         doc.shown.back().fixes    = problem.fixes;
@@ -6802,7 +6774,7 @@ void ALFloaterScriptStudio::fillProblems(const Doc* doc)
             value["endColumn"] = problem->endColumn;
             value["file"]      = problem->file;
             value["fileName"]  = problem->fileName;
-            value["level"]     = levelName(problem->level);
+            value["level"]     = Doc::levelName(problem->level);
             value["origin"]    = problem->origin;
             value["message"]   = problem->message;
             value["lint"]      = problem->lint;
@@ -6831,7 +6803,7 @@ void ALFloaterScriptStudio::fillProblems(const Doc* doc)
                     tip += "\n" + getString("ProblemFixTip", fix_args);
                 }
             }
-            const ALCodeEditor::Mark mark = problem->origin == getString("OriginRuntime") ? ALCodeEditor::Mark::Runtime : markOf(problem->level);
+            const ALCodeEditor::Mark mark = problem->origin == getString("OriginRuntime") ? ALCodeEditor::Mark::Runtime : Doc::markOf(problem->level);
             LLSD row;
             row["value"]                = value;
             row["columns"][0]["column"] = "icon";
