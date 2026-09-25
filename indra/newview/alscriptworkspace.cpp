@@ -845,26 +845,22 @@ namespace
 {
     // How long the items taken are waited for in the agent's inventory.
     constexpr F32 TRANSFER_TIMEOUT = 30.f;
+}
 
-    // Whether an item may be taken out of an object, as the build floater's
-    // contents let one go: copied where it may be copied and given, the
-    // item itself out of an object of one's own; nothing out of a locked
-    // attachment, and only a copy out of any attachment, whose contents
-    // the region does not keep up with.
-    bool takeable(LLViewerObject* object, const LLInventoryItem& item)
+// static
+bool ALScriptWorkspace::takeable(LLViewerObject* object, const LLInventoryItem& item)
+{
+    const LLPermissions& perm     = item.getPermissions();
+    const bool           can_copy = gAgent.allowOperation(PERM_COPY, perm, GP_OBJECT_MANIPULATE);
+    if (rlv_handler_t::isEnabled() && gRlvAttachmentLocks.isLockedAttachment(object->getRootEdit()))
     {
-        const LLPermissions& perm     = item.getPermissions();
-        const bool           can_copy = gAgent.allowOperation(PERM_COPY, perm, GP_OBJECT_MANIPULATE);
-        if (rlv_handler_t::isEnabled() && gRlvAttachmentLocks.isLockedAttachment(object->getRootEdit()))
-        {
-            return false;
-        }
-        if (!can_copy && object->isAttachment())
-        {
-            return false;
-        }
-        return (can_copy && perm.allowTransferTo(gAgent.getID())) || object->permYouOwner();
+        return false;
     }
+    if (!can_copy && object->isAttachment())
+    {
+        return false;
+    }
+    return (can_copy && perm.allowTransferTo(gAgent.getID())) || object->permYouOwner();
 }
 
 // One transfer: the folder its items come into, and what is put in from it.

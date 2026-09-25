@@ -14482,17 +14482,7 @@ bool ALFloaterScriptStudio::startExplorerDrag(const LLSD& pressed)
         {
             continue;
         }
-        const LLPermissions& perm     = item->getPermissions();
-        const bool           can_copy = gAgent.allowOperation(PERM_COPY, perm, GP_OBJECT_MANIPULATE);
-        if (rlv_handler_t::isEnabled() && gRlvAttachmentLocks.isLockedAttachment(object->getRootEdit()))
-        {
-            continue;
-        }
-        if (!can_copy && object->isAttachment())
-        {
-            continue;
-        }
-        if (!(can_copy && perm.allowTransferTo(gAgent.getID())) && !object->permYouOwner())
+        if (!ALScriptWorkspace::takeable(object, *item))
         {
             continue;
         }
@@ -14691,43 +14681,8 @@ bool ALFloaterScriptStudio::dropIntoPrim(LLViewerObject* prim, MASK mask, bool d
         }
         return true;
     }
-    // As the build floater's contents take it: a folder's items, each
-    // thing that may go in, and a script running unless Control is held.
-    bool ok = false;
-    switch (type)
-    {
-        case DAD_CATEGORY:
-            ok = tool->dadUpdateInventoryCategory(prim, drop);
-            break;
-        case DAD_TEXTURE:
-        case DAD_SOUND:
-        case DAD_LANDMARK:
-        case DAD_OBJECT:
-        case DAD_NOTECARD:
-        case DAD_CLOTHING:
-        case DAD_BODYPART:
-        case DAD_ANIMATION:
-        case DAD_GESTURE:
-        case DAD_CALLINGCARD:
-        case DAD_MESH:
-        case DAD_SETTINGS:
-        case DAD_MATERIAL:
-            ok = LLToolDragAndDrop::isInventoryDropAcceptable(prim, static_cast<LLViewerInventoryItem*>(cargo));
-            if (ok && drop)
-            {
-                LLToolDragAndDrop::dropInventory(prim, static_cast<LLViewerInventoryItem*>(cargo), source, tool->getSourceID());
-            }
-            break;
-        case DAD_SCRIPT:
-            ok = LLToolDragAndDrop::isInventoryDropAcceptable(prim, static_cast<LLViewerInventoryItem*>(cargo));
-            if (ok && drop)
-            {
-                LLToolDragAndDrop::dropScript(prim, static_cast<LLViewerInventoryItem*>(cargo), (mask & MASK_CONTROL) == 0, source, tool->getSourceID());
-            }
-            break;
-        default:
-            break;
-    }
+    // As the build floater's contents take it.
+    const bool ok = tool->dropIntoContents(prim, mask, drop, type, cargo);
     if (ok && drop)
     {
         // Listed again now, and again in a moment for what a folder sends

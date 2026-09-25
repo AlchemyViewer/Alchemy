@@ -236,6 +236,11 @@ public:
 
     bool dadUpdateInventory(LLViewerObject* obj, bool drop);
     bool dadUpdateInventoryCategory(LLViewerObject* obj, bool drop);
+    // Whether what is dragged may go into an object's contents, and put
+    // there on a drop, as the build floater's contents take it: a folder's
+    // items, each kind of item that may go in, and a script running unless
+    // Control is held -- but no script from another object or a notecard.
+    bool dropIntoContents(LLViewerObject* obj, MASK mask, bool drop, EDragAndDropType cargo_type, void* cargo_data);
 
     // methods that act on the simulator state.
     static void dropScript(LLViewerObject* hit_obj,

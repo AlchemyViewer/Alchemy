@@ -300,6 +300,13 @@ public:
     // at a time, the rest waiting their turn, and each takes from the
     // folder only what it is waiting for: a transfer knows its items there
     // by their names alone.
+    // Whether an item may be taken out of an object, as the build floater's
+    // contents let one go: copied where it may be copied and given, the
+    // item itself out of an object of one's own; nothing out of a locked
+    // attachment, and only a copy out of any attachment, whose contents
+    // the region does not keep up with. What a drag out of the studio's
+    // explorer and a transfer both go by.
+    static bool takeable(LLViewerObject* object, const LLInventoryItem& item);
     struct TransferResult
     {
         S32                      moved = 0;

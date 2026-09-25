@@ -2267,6 +2267,57 @@ static void get_name_cb(const LLUUID& id,
 }
 
 // function used as drag-and-drop handler for simple agent give inventory requests
+bool LLToolDragAndDrop::dropIntoContents(LLViewerObject* obj, MASK mask, bool drop, EDragAndDropType cargo_type, void* cargo_data)
+{
+    bool accept = false;
+    switch (cargo_type)
+    {
+        case DAD_CATEGORY:
+            accept = dadUpdateInventoryCategory(obj, drop);
+            break;
+        case DAD_TEXTURE:
+        case DAD_SOUND:
+        case DAD_LANDMARK:
+        case DAD_OBJECT:
+        case DAD_NOTECARD:
+        case DAD_CLOTHING:
+        case DAD_BODYPART:
+        case DAD_ANIMATION:
+        case DAD_GESTURE:
+        case DAD_CALLINGCARD:
+        case DAD_MESH:
+        case DAD_SETTINGS:
+        case DAD_MATERIAL:
+            accept = isInventoryDropAcceptable(obj, (LLViewerInventoryItem*)cargo_data);
+            if (accept && drop)
+            {
+                dropInventory(obj, (LLViewerInventoryItem*)cargo_data, getSource(), getSourceID());
+            }
+            break;
+        case DAD_SCRIPT:
+            // *HACK: In order to resolve SL-22177, we need to block
+            // drags from notecards and objects onto other
+            // objects. uncomment the simpler version when we have
+            // that right.
+            //accept = isInventoryDropAcceptable(obj, (LLViewerInventoryItem*)cargo_data);
+            if (isInventoryDropAcceptable(obj, (LLViewerInventoryItem*)cargo_data) && SOURCE_WORLD != getSource() && SOURCE_NOTECARD != getSource())
+            {
+                accept = true;
+            }
+            if (accept && drop)
+            {
+                // rez in the script active by default, rez in
+                // inactive if the control key is being held down.
+                const bool active = ((mask & MASK_CONTROL) == 0);
+                dropScript(obj, (LLViewerInventoryItem*)cargo_data, active, getSource(), getSourceID());
+            }
+            break;
+        default:
+            break;
+    }
+    return accept;
+}
+
 //static
 bool LLToolDragAndDrop::handleGiveDragAndDrop(LLUUID dest_agent, LLUUID session_id, bool drop,
                                               EDragAndDropType cargo_type,

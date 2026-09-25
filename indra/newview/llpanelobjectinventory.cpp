@@ -758,66 +758,8 @@ bool LLTaskCategoryBridge::dragOrDrop(MASK mask, bool drop,
                                       std::string& tooltip_msg)
 {
     //LL_INFOS() << "LLTaskCategoryBridge::dragOrDrop()" << LL_ENDL;
-    bool accept = false;
     LLViewerObject* object = gObjectList.findObject(mPanel->getTaskUUID());
-    if(object)
-    {
-        switch(cargo_type)
-        {
-        case DAD_CATEGORY:
-            accept = LLToolDragAndDrop::getInstance()->dadUpdateInventoryCategory(object,drop);
-            break;
-        case DAD_TEXTURE:
-        case DAD_SOUND:
-        case DAD_LANDMARK:
-        case DAD_OBJECT:
-        case DAD_NOTECARD:
-        case DAD_CLOTHING:
-        case DAD_BODYPART:
-        case DAD_ANIMATION:
-        case DAD_GESTURE:
-        case DAD_CALLINGCARD:
-        case DAD_MESH:
-        case DAD_SETTINGS:
-        case DAD_MATERIAL:
-            accept = LLToolDragAndDrop::isInventoryDropAcceptable(object, (LLViewerInventoryItem*)cargo_data);
-            if(accept && drop)
-            {
-                LLToolDragAndDrop::dropInventory(object,
-                                                 (LLViewerInventoryItem*)cargo_data,
-                                                 LLToolDragAndDrop::getInstance()->getSource(),
-                                                 LLToolDragAndDrop::getInstance()->getSourceID());
-            }
-            break;
-        case DAD_SCRIPT:
-            // *HACK: In order to resolve SL-22177, we need to block
-            // drags from notecards and objects onto other
-            // objects. uncomment the simpler version when we have
-            // that right.
-            //accept = LLToolDragAndDrop::isInventoryDropAcceptable(object, (LLViewerInventoryItem*)cargo_data);
-            if(LLToolDragAndDrop::isInventoryDropAcceptable(
-                   object, (LLViewerInventoryItem*)cargo_data)
-               && (LLToolDragAndDrop::SOURCE_WORLD != LLToolDragAndDrop::getInstance()->getSource())
-               && (LLToolDragAndDrop::SOURCE_NOTECARD != LLToolDragAndDrop::getInstance()->getSource()))
-            {
-                accept = true;
-            }
-            if(accept && drop)
-            {
-                LLViewerInventoryItem* item = (LLViewerInventoryItem*)cargo_data;
-                // rez in the script active by default, rez in
-                // inactive if the control key is being held down.
-                bool active = ((mask & MASK_CONTROL) == 0);
-                LLToolDragAndDrop::dropScript(object, item, active,
-                                              LLToolDragAndDrop::getInstance()->getSource(),
-                                              LLToolDragAndDrop::getInstance()->getSourceID());
-            }
-            break;
-        default:
-            break;
-        }
-    }
-    return accept;
+    return object && LLToolDragAndDrop::getInstance()->dropIntoContents(object, mask, drop, cargo_type, cargo_data);
 }
 
 ///----------------------------------------------------------------------------
