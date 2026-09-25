@@ -1074,7 +1074,26 @@ namespace ALScriptFixes
         }
         else
         {
-            fix.edits.push_back({ line, column, endLine, endColumn, std::string() });
+            // With the blanks that parted it from what follows, where
+            // something does -- else from what stood before it -- so that
+            // no space is left where it was.
+            S32 from = column;
+            S32 to   = endColumn;
+            if (!alone_after)
+            {
+                while (to < static_cast<S32>(last.size()) && (last[to] == ' ' || last[to] == '\t'))
+                {
+                    ++to;
+                }
+            }
+            else
+            {
+                while (from > 0 && (first[from - 1] == ' ' || first[from - 1] == '\t'))
+                {
+                    --from;
+                }
+            }
+            fix.edits.push_back({ line, from, endLine, to, std::string() });
         }
         problem.fixes.push_back(std::move(fix));
     }

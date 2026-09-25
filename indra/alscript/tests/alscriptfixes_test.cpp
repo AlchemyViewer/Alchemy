@@ -486,7 +486,13 @@ namespace tut
         ALScriptProblem shared;
         shared.line = 0;
         ALScriptFixes::offerRemoval(shared, "integer a = 1; integer b = 2;\n", 0, 8, 0, 13, "a");
-        ensure_equals("only itself", ALScriptFixes::apply("integer a = 1; integer b = 2;\n", shared.fixes.front()).value_or(""), std::string(" integer b = 2;\n"));
+        ensure_equals("only itself, and the space after it", ALScriptFixes::apply("integer a = 1; integer b = 2;\n", shared.fixes.front()).value_or(""),
+                      std::string("integer b = 2;\n"));
+        // The last on its line takes the space before it instead.
+        ALScriptProblem last;
+        ALScriptFixes::offerRemoval(last, "integer a = 1; integer b = 2;\n", 0, 23, 0, 28, "b");
+        ensure_equals("and the space before it", ALScriptFixes::apply("integer a = 1; integer b = 2;\n", last.fixes.front()).value_or(""),
+                      std::string("integer a = 1;\n"));
     }
 
     template<> template<>
