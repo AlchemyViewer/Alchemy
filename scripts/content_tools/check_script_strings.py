@@ -19,7 +19,10 @@ the build keeps the copies together, so this does:
     from the file's own string literals -- and likewise the lints the map
     matches by shape against Linter.cpp;
   * every key in the tables against strings.xml, and every studio key in
-    strings.xml against the code, for one that nothing says any more.
+    strings.xml against the code, for one that nothing says any more;
+  * every key alscriptfixes.cpp offers a fix for, its AL_FIXED_KEYS list,
+    against strings.xml, so that a problem renamed where it is made does
+    not quietly lose its fix.
 
 Tailslide and Luau are found under vcpkg/buildtrees, the newest checkout
 of each, unless named:
@@ -41,6 +44,7 @@ import xml.etree.ElementTree as ET
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 STRINGS = os.path.join(ROOT, "indra", "newview", "skins", "default", "xui", "en", "strings.xml")
 MAP = os.path.join(ROOT, "indra", "alscript", "almessagemap.cpp")
+FIXES = os.path.join(ROOT, "indra", "alscript", "alscriptfixes.cpp")
 CODE = [
     os.path.join(ROOT, "indra", "llui"),
     os.path.join(ROOT, "indra", "alscript"),
@@ -141,6 +145,17 @@ def read_map():
             [(n, k, unescape_c(t)) for n, k, t in lint],
             [(n, k, unescape_c(t)) for n, k, t in shape],
             [(k, unescape_c(t)) for k, t in err])
+
+
+def read_fixed_keys():
+    """The X(...) entries of alscriptfixes.cpp's AL_FIXED_KEYS list."""
+    with open(FIXES, encoding="utf-8") as f:
+        text = f.read()
+    m = re.search(r"#define AL_FIXED_KEYS\(X\)((?:[^\n]*\\\n)*[^\n]*)", text)
+    if not m:
+        fail("alscriptfixes.cpp has no AL_FIXED_KEYS list")
+        return []
+    return re.findall(r"X\((\w+)\)", m.group(1))
 
 
 def arguments(text, at):
@@ -312,6 +327,12 @@ def main():
             fail("%s has no string in strings.xml" % key)
         elif not set(re.findall(r"\[[1-9]\]", strings[key])) <= set(re.findall(r"\[[1-9]\]", text)):
             fail("%s says words the map does not take\n    map:   %r\n    xml:   %r" % (key, text, strings[key]))
+
+    fixed = read_fixed_keys()
+    print("the keys the fixes are for against strings.xml (%d)" % len(fixed))
+    for key in fixed:
+        if key not in strings:
+            fail("alscriptfixes.cpp offers a fix for %s, which strings.xml has no string for" % key)
 
     print("strings.xml against the code")
     map_keys = {k for _, k, _ in lsl_rows} | {k for _, k, _ in lint_rows + shape_rows} | {k for k, _ in err_rows}

@@ -32,9 +32,75 @@
 #include <cctype>
 #include <cstring>
 
+// Every problem a fix is offered for, by its key: named once here, and
+// compared only through `is`, so that each is a key strings.xml has --
+// scripts/content_tools/check_script_strings.py sees to it -- and a key
+// renamed where it is made cannot quietly take its fix away.
+#define AL_FIXED_KEYS(X) \
+    X(LSLArgumentWrongType) \
+    X(LSLAssignmentInComparison) \
+    X(LSLBadReturnType) \
+    X(LSLChangeToCurrentState) \
+    X(LSLDeprecatedWithReplacement) \
+    X(LSLEqAsStatement) \
+    X(LSLIntFloatMulAssign) \
+    X(LSLInvalidOperator) \
+    X(LSLSyntaxMissing) \
+    X(LSLUndeclaredWithSuggestion) \
+    X(LSLWrongTypeInAssignment) \
+    X(LuauKeyNotFoundDidYouMean) \
+    X(LuauLintDeprecatedFunctionUse) \
+    X(LuauLintDeprecatedFunctionUseReason) \
+    X(LuauLintDeprecatedGlobal) \
+    X(LuauLintDeprecatedMemberUse) \
+    X(LuauLintDeprecatedMemberUseReason) \
+    X(LuauLintDirectiveNolintUnknownDidYouMean) \
+    X(LuauLintDirectiveUnknownDidYouMean) \
+    X(LuauLintFunctionUnused) \
+    X(LuauLintGlobalNeverRead) \
+    X(LuauLintGlobalUsedAsLocalFunction) \
+    X(LuauLintGlobalUsedAsLocalLine) \
+    X(LuauLintImportUnused) \
+    X(LuauLintLocalUnused) \
+    X(LuauLintUninitializedLocal) \
+    X(LuauMissingExternPropertyDidYouMean) \
+    X(LuauMissingPropertyDidYouMean) \
+    X(LuauNotTakeSelf) \
+    X(LuauRequiresSelf) \
+    X(LuauTypeMismatch) \
+    X(LuauTypeMismatchReason) \
+    X(OptimizerEvaluated) \
+    X(OptimizerFolded) \
+    X(OptimizerRemovedFunction) \
+    X(OptimizerRemovedGlobal) \
+    X(OptimizerRemovedLocal) \
+    X(OptimizerRemovedNoEffect) \
+    X(OptimizerRemovedState) \
+    X(OptimizerRemovedUnreachable) \
+    X(OptimizerSimplified) \
+    X(OptimizerWroteAs)
+
 namespace
 {
     using ALScriptFixes::titled;
+
+    enum class Fixed : U8
+    {
+#define AL_FIXED_ENUM(name) name,
+        AL_FIXED_KEYS(AL_FIXED_ENUM)
+#undef AL_FIXED_ENUM
+    };
+
+    constexpr std::string_view FIXED_KEYS[] = {
+#define AL_FIXED_NAME(name) #name,
+        AL_FIXED_KEYS(AL_FIXED_NAME)
+#undef AL_FIXED_NAME
+    };
+
+    bool is(std::string_view key, Fixed which)
+    {
+        return key == FIXED_KEYS[static_cast<size_t>(which)];
+    }
 
     // The text's lines, each without its break, and where each begins.
     class Lines
@@ -359,7 +425,7 @@ namespace
             return;
         }
         const std::string_view marked = line.substr(from, to - from);
-        if (!lua && key == "LSLArgumentWrongType" && args.size() >= 4)
+        if (!lua && is(key, Fixed::LSLArgumentWrongType) && args.size() >= 4)
         {
             // The argument the call was given, cast to what it takes.
             const std::vector<std::pair<S32, S32>> call  = callArguments(line, from, to);
@@ -369,7 +435,7 @@ namespace
                 offerCast(problem, line, call[which - 1].first, call[which - 1].second, args[0], args[3]);
             }
         }
-        else if (!lua && key == "LSLWrongTypeInAssignment" && args.size() == 3)
+        else if (!lua && is(key, Fixed::LSLWrongTypeInAssignment) && args.size() == 3)
         {
             // What a declaration is given, cast to what it declares.
             if (const S32 equals = loneEquals(line, from, to); equals >= 0)
@@ -377,7 +443,7 @@ namespace
                 offerCast(problem, line, equals + 1, to, args[2], args[0]);
             }
         }
-        else if (!lua && key == "LSLInvalidOperator" && args.size() == 3 && args[1] == "=")
+        else if (!lua && is(key, Fixed::LSLInvalidOperator) && args.size() == 3 && args[1] == "=")
         {
             // An assignment of the wrong type, which Tailslide words as an
             // operator it has no rule for.
@@ -386,14 +452,14 @@ namespace
                 offerCast(problem, line, equals + 1, to, args[2], args[0]);
             }
         }
-        else if (!lua && key == "LSLBadReturnType" && args.size() == 2)
+        else if (!lua && is(key, Fixed::LSLBadReturnType) && args.size() == 2)
         {
             if (const size_t at = marked.find("return"); at != std::string_view::npos)
             {
                 offerCast(problem, line, from + static_cast<S32>(at) + 6, to, args[0], args[1]);
             }
         }
-        else if (!lua && key == "LSLAssignmentInComparison")
+        else if (!lua && is(key, Fixed::LSLAssignmentInComparison))
         {
             // Either a comparison was meant, or the assignment is wanted and
             // says so in brackets. Neither is preferred: which was meant is
@@ -410,7 +476,7 @@ namespace
                 problem.fixes.push_back(std::move(brackets));
             }
         }
-        else if (!lua && key == "LSLEqAsStatement")
+        else if (!lua && is(key, Fixed::LSLEqAsStatement))
         {
             // A comparison thrown away is an assignment typed with one `=`
             // too many.
@@ -422,7 +488,7 @@ namespace
                 problem.fixes.push_back(std::move(fix));
             }
         }
-        else if (!lua && key == "LSLIntFloatMulAssign")
+        else if (!lua && is(key, Fixed::LSLIntFloatMulAssign))
         {
             // What the warning itself says to write: the product as a float,
             // cast back to the integer once.
@@ -445,7 +511,7 @@ namespace
                 }
             }
         }
-        else if (!lua && key == "LSLChangeToCurrentState")
+        else if (!lua && is(key, Fixed::LSLChangeToCurrentState))
         {
             // It does what `return` does, as the warning says; so write that.
             if (marked.compare(0, 5, "state") == 0)
@@ -462,7 +528,7 @@ namespace
                 problem.fixes.push_back(std::move(fix));
             }
         }
-        else if (lua && (key == "LuauTypeMismatch" || key == "LuauTypeMismatchReason") && args.size() >= 2 && typeNamed(args[0]) == "string" &&
+        else if (lua && (is(key, Fixed::LuauTypeMismatch) || is(key, Fixed::LuauTypeMismatchReason)) && args.size() >= 2 && typeNamed(args[0]) == "string" &&
                  typeNamed(args[1]) != "string")
         {
             // A value where a string is wanted, said as one. A declaration
@@ -484,10 +550,10 @@ namespace
                 problem.fixes.push_back(std::move(fix));
             }
         }
-        else if (lua && (key == "LuauRequiresSelf" || key == "LuauNotTakeSelf"))
+        else if (lua && (is(key, Fixed::LuauRequiresSelf) || is(key, Fixed::LuauNotTakeSelf)))
         {
             // The last `.` or `:` before the call's bracket, the other way.
-            const bool   colon = key == "LuauRequiresSelf";
+            const bool   colon = is(key, Fixed::LuauRequiresSelf);
             const size_t open  = marked.find('(');
             const size_t at    = marked.substr(0, open).find_last_of(colon ? '.' : ':');
             if (open != std::string_view::npos && at != std::string_view::npos)
@@ -499,7 +565,7 @@ namespace
                 problem.fixes.push_back(std::move(fix));
             }
         }
-        else if (lua && (key.compare(0, 23, "LuauLintGlobalUsedAsLoc") == 0 || key == "LuauLintGlobalNeverRead") && !args.empty() && isIdentifier(args[0]))
+        else if (lua && (is(key, Fixed::LuauLintGlobalUsedAsLocalFunction) || is(key, Fixed::LuauLintGlobalUsedAsLocalLine) || is(key, Fixed::LuauLintGlobalNeverRead)) && !args.empty() && isIdentifier(args[0]))
         {
             // Local where it is first given a value, which is the place the
             // lint marks: `local` put before the assignment, where that is
@@ -513,7 +579,7 @@ namespace
                 problem.fixes.push_back(std::move(fix));
             }
         }
-        else if (lua && key == "LuauLintUninitializedLocal" && args.size() == 2 && isIdentifier(args[0]))
+        else if (lua && is(key, Fixed::LuauLintUninitializedLocal) && args.size() == 2 && isIdentifier(args[0]))
         {
             // Given nil where it is declared, which is what it holds anyway:
             // the declaration's line is the lint's second word.
@@ -539,7 +605,7 @@ namespace
                 problem.fixes.push_back(std::move(fix));
             }
         }
-        else if (lua && (key == "LuauLintDirectiveUnknownDidYouMean" || key == "LuauLintDirectiveNolintUnknownDidYouMean") && args.size() == 2 &&
+        else if (lua && (is(key, Fixed::LuauLintDirectiveUnknownDidYouMean) || is(key, Fixed::LuauLintDirectiveNolintUnknownDidYouMean)) && args.size() == 2 &&
                  isIdentifier(args[0]) && isIdentifier(args[1]))
         {
             // A directive or a lint's name spelt as Luau suggests; a comment
@@ -1102,7 +1168,7 @@ namespace ALScriptFixes
     {
         const std::string&              key  = problem.key;
         const std::vector<std::string>& args = problem.args;
-        if ((key == "OptimizerFolded" || key == "OptimizerEvaluated" || key == "OptimizerSimplified" || key == "OptimizerWroteAs") && args.size() == 2 &&
+        if ((is(key, Fixed::OptimizerFolded) || is(key, Fixed::OptimizerEvaluated) || is(key, Fixed::OptimizerSimplified) || is(key, Fixed::OptimizerWroteAs)) && args.size() == 2 &&
             problem.endLine == problem.line)
         {
             // The expression as the optimizer printed it, and as the source
@@ -1134,18 +1200,18 @@ namespace ALScriptFixes
             fix.edits.push_back({ problem.line, problem.column, problem.line, problem.endColumn, args[1] });
             problem.fixes.push_back(std::move(fix));
         }
-        else if (key == "OptimizerRemovedUnreachable" || key == "OptimizerRemovedNoEffect")
+        else if (is(key, Fixed::OptimizerRemovedUnreachable) || is(key, Fixed::OptimizerRemovedNoEffect))
         {
             // What can never run, or does nothing, gone from the source as
             // it goes from the upload: safe, and preferred.
-            ALScriptFix fix = key == "OptimizerRemovedUnreachable" ? titled("ScriptFixRemoveUnreachable", "Remove what can never run", {})
+            ALScriptFix fix = is(key, Fixed::OptimizerRemovedUnreachable) ? titled("ScriptFixRemoveUnreachable", "Remove what can never run", {})
                                                                    : titled("ScriptFixRemoveNoEffect", "Remove what does nothing", {});
             fix.preferred = true;
             fix.safe      = true;
             offerRemoval(problem, text, problem.line, problem.column, problem.endLine, problem.endColumn, std::move(fix));
         }
-        else if ((key == "OptimizerRemovedLocal" || key == "OptimizerRemovedGlobal" || key == "OptimizerRemovedFunction" ||
-                  key == "OptimizerRemovedState") &&
+        else if ((is(key, Fixed::OptimizerRemovedLocal) || is(key, Fixed::OptimizerRemovedGlobal) || is(key, Fixed::OptimizerRemovedFunction) ||
+                  is(key, Fixed::OptimizerRemovedState)) &&
                  args.size() == 1)
         {
             // The analyzer offers these already, as unused; offered here as
@@ -1271,7 +1337,7 @@ namespace ALScriptFixes
         {
             const std::string&              key  = problem.key;
             const std::vector<std::string>& args = problem.args;
-            if (!lua && key == "LSLSyntaxMissing" && args.size() == 1)
+            if (!lua && is(key, Fixed::LSLSyntaxMissing) && args.size() == 1)
             {
                 // Put in after the last thing before where the parser
                 // stopped, which is the one character the problem marks.
@@ -1285,13 +1351,13 @@ namespace ALScriptFixes
                     problem.fixes.push_back(std::move(fix));
                 }
             }
-            else if (!lua && key == "LSLUndeclaredWithSuggestion" && args.size() == 2 && isIdentifier(args[0]) && isIdentifier(args[1]))
+            else if (!lua && is(key, Fixed::LSLUndeclaredWithSuggestion) && args.size() == 2 && isIdentifier(args[0]) && isIdentifier(args[1]))
             {
                 ALScriptFix fix = titled("ScriptFixChange", "Change '[1]' to '[2]'", { args[0], args[1] });
                 fix.preferred   = true;
                 changeName(problem, lines, args[0], args[1], std::move(fix), false);
             }
-            else if (!lua && key == "LSLDeprecatedWithReplacement" && args.size() == 2 && isIdentifier(args[0]) && isIdentifier(args[1]))
+            else if (!lua && is(key, Fixed::LSLDeprecatedWithReplacement) && args.size() == 2 && isIdentifier(args[0]) && isIdentifier(args[1]))
             {
                 // Only where the replacement is one name: Tailslide says
                 // some in prose ("llPlaySound, llLoopSound, or
@@ -1302,7 +1368,7 @@ namespace ALScriptFixes
                 fix.preferred   = true;
                 changeName(problem, lines, args[0], args[1], std::move(fix), false);
             }
-            else if (lua && (key == "LuauLintLocalUnused" || key == "LuauLintFunctionUnused" || key == "LuauLintImportUnused") && args.size() == 1 &&
+            else if (lua && (is(key, Fixed::LuauLintLocalUnused) || is(key, Fixed::LuauLintFunctionUnused) || is(key, Fixed::LuauLintImportUnused)) && args.size() == 1 &&
                      isIdentifier(args[0]) && args[0].front() != '_')
             {
                 // Marked unused as the lint asks: nothing reads the name, so
@@ -1318,7 +1384,7 @@ namespace ALScriptFixes
                     problem.fixes.push_back(std::move(fix));
                 }
             }
-            else if (lua && key == "LuauKeyNotFoundDidYouMean" && args.size() == 3 && isIdentifier(args[0]) && isIdentifier(args[2]))
+            else if (lua && is(key, Fixed::LuauKeyNotFoundDidYouMean) && args.size() == 3 && isIdentifier(args[0]) && isIdentifier(args[2]))
             {
                 // The key after its table: the last of its name where the
                 // problem is, `ll.Sya` being the stretch it marks.
@@ -1326,7 +1392,7 @@ namespace ALScriptFixes
                 fix.preferred   = surelyMeant(args[0], args[2]);
                 changeName(problem, lines, args[0], args[2], std::move(fix), true);
             }
-            else if (lua && (key == "LuauMissingPropertyDidYouMean" || key == "LuauMissingExternPropertyDidYouMean") && args.size() == 3 &&
+            else if (lua && (is(key, Fixed::LuauMissingPropertyDidYouMean) || is(key, Fixed::LuauMissingExternPropertyDidYouMean)) && args.size() == 3 &&
                      isIdentifier(args[0]) && isIdentifier(args[2]))
             {
                 ALScriptFix fix = titled("ScriptFixChange", "Change '[1]' to '[2]'", { args[0], args[2] });
@@ -1334,8 +1400,8 @@ namespace ALScriptFixes
                 changeName(problem, lines, args[0], args[2], std::move(fix), true);
             }
             else if (lua &&
-                     (key == "LuauLintDeprecatedGlobal" || key == "LuauLintDeprecatedFunctionUse" || key == "LuauLintDeprecatedFunctionUseReason" ||
-                      key == "LuauLintDeprecatedMemberUse" || key == "LuauLintDeprecatedMemberUseReason") &&
+                     (is(key, Fixed::LuauLintDeprecatedGlobal) || is(key, Fixed::LuauLintDeprecatedFunctionUse) || is(key, Fixed::LuauLintDeprecatedFunctionUseReason) ||
+                      is(key, Fixed::LuauLintDeprecatedMemberUse) || is(key, Fixed::LuauLintDeprecatedMemberUseReason)) &&
                      args.size() >= 2 && isDottedName(args[0]) && isDottedName(args[1]))
             {
                 // What the definitions say to use instead, where they name
