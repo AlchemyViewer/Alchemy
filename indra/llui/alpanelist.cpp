@@ -25,6 +25,8 @@
 
 #include "alpanelist.h"
 
+#include "llfontgl.h"
+#include "lllineeditor.h"
 #include "llscrolllistcell.h"
 #include "llscrolllistitem.h"
 #include "llsdutil.h"
@@ -70,8 +72,38 @@ ALPaneList::ALPaneList(const Params& p)
 {
 }
 
+ALPaneList::~ALPaneList()
+{
+    // Gone with the list, the field says nothing more of losing the
+    // keyboard: what it would tell is going too.
+    mEditorLost.disconnect();
+}
+
 bool ALPaneList::handleKeyHere(KEY key, MASK mask)
 {
+    // While a row's words are edited, return keeps them and escape leaves
+    // them, and the keys that would walk the rows do nothing: the field is
+    // over its row. The rest go on, the window's commands among them.
+    if (editing())
+    {
+        switch (key)
+        {
+            case KEY_RETURN:
+                endEditing(true);
+                return true;
+            case KEY_ESCAPE:
+                endEditing(false);
+                return true;
+            case KEY_UP:
+            case KEY_DOWN:
+            case KEY_PAGE_UP:
+            case KEY_PAGE_DOWN:
+            case KEY_F2:
+                return true;
+            default:
+                return false;
+        }
+    }
     if (mKeyHandler && mKeyHandler(key, mask))
     {
         return true;
@@ -134,6 +166,16 @@ bool ALPaneList::handleMouseUp(S32 x, S32 y, MASK mask)
     mPress.release();
     mPressed.clear();
     return LLScrollListCtrl::handleMouseUp(x, y, mask);
+}
+
+bool ALPaneList::handleDoubleClick(S32 x, S32 y, MASK mask)
+{
+    if (editing() && mEditor->getRect().pointInRect(x, y))
+    {
+        childrenHandleDoubleClick(x, y, mask);
+        return true;
+    }
+    return LLScrollListCtrl::handleDoubleClick(x, y, mask);
 }
 
 bool ALPaneList::handleHover(S32 x, S32 y, MASK mask)
@@ -209,6 +251,7 @@ bool ALPaneList::handleToolTip(S32 x, S32 y, MASK mask)
 
 void ALPaneList::draw()
 {
+    followEdit();
     // A drag gone elsewhere tells the list nothing: its light goes when
     // the pointer is no longer over it.
     if (mDropLit)
@@ -280,4 +323,122 @@ S32 ALPaneList::compare(S32 column, const LLScrollListItem* a, const LLScrollLis
     const LLScrollListCell* cell_a = a->getColumn(column);
     const LLScrollListCell* cell_b = b->getColumn(column);
     return cell_a && cell_b ? LLStringUtil::compareDict(cell_a->getValue().asString(), cell_b->getValue().asString()) : 0;
+}
+
+S32 ALPaneList::indexOf(const LLSD& value) const
+{
+    S32 index = 0;
+    for (const LLScrollListItem* item : getAllData())
+    {
+        if (sameValue(item->getValue(), value))
+        {
+            return index;
+        }
+        ++index;
+    }
+    return -1;
+}
+
+bool ALPaneList::editRow(const LLSD& value, Edit edit)
+{
+    endEditing(true);
+    const S32 index = indexOf(value);
+    if (index < 0 || !getColumn(edit.column))
+    {
+        return false;
+    }
+    // In sight first: a row off the page has no place for the field.
+    const S32 lines = llmax(1, getLinesPerPage());
+    if (index < getScrollPos())
+    {
+        setScrollPos(index);
+    }
+    else if (index >= getScrollPos() + lines)
+    {
+        setScrollPos(index - lines + 1);
+    }
+    if (!mEditor)
+    {
+        LLLineEditor::Params params;
+        params.name("row_editor");
+        params.font(LLFontGL::getFontSansSerifSmall());
+        params.rect(LLRect(0, 20, 100, 0));
+        params.follows.flags(FOLLOWS_NONE);
+        params.commit_on_focus_lost(false);
+        params.visible(false);
+        mEditor = LLUICtrlFactory::create<LLLineEditor>(params);
+        addChild(mEditor);
+        // The keyboard gone elsewhere -- a click on another row, in the
+        // world, in another window -- keeps what was typed, as a tree of
+        // files does.
+        mEditorLost = mEditor->setFocusLostCallback([this](LLFocusableElement*) { endEditing(true); });
+    }
+    mEditing = value;
+    mEdit    = std::move(edit);
+    mEditor->setMaxTextLength(mEdit->maxBytes > 0 ? mEdit->maxBytes : 1024);
+    mEditor->setText(mEdit->text);
+    placeEditor(indexOf(mEditing));
+    mEditor->setVisible(true);
+    mEditor->setFocus(true);
+    mEditor->selectAll();
+    return true;
+}
+
+void ALPaneList::followEdit()
+{
+    // Gone, there is nothing to name; out of sight, it is done with.
+    if (!editing())
+    {
+        return;
+    }
+    const S32 index = indexOf(mEditing);
+    if (index < 0)
+    {
+        endEditing(false);
+    }
+    else if (!placeEditor(index))
+    {
+        endEditing(true);
+    }
+}
+
+bool ALPaneList::placeEditor(S32 index)
+{
+    const LLScrollListColumn* column = getColumn(mEdit->column);
+    if (!column || index < getScrollPos() || index >= getScrollPos() + llmax(1, getLinesPerPage()))
+    {
+        return false;
+    }
+    // Its words where the row's were, less the field's own margin.
+    S32 pad_left = 0, pad_right = 0;
+    mEditor->getTextPadding(&pad_left, &pad_right);
+    const LLRect cell  = getCellRect(index, column->mIndex);
+    const S32    left  = llmin(cell.mLeft + llmax(0, mEdit->indent - pad_left), cell.mRight - 20);
+    const S32    right = llmin(cell.mRight, getItemListRect().mRight);
+    mEditor->setShape(LLRect(left, cell.mTop, llmax(left + 20, right), cell.mBottom));
+    return true;
+}
+
+void ALPaneList::endEditing(bool keep)
+{
+    if (!editing())
+    {
+        return;
+    }
+    // Over before anything is told, so that the keyboard coming back here
+    // does not end it again.
+    const Edit        edit = std::exchange(mEdit, std::nullopt).value();
+    const std::string text = mEditor->getText();
+    mEditing.clear();
+    // The keyboard back with the rows where the field had it, rather than
+    // with nothing, where the arrows would walk the avatar.
+    if (mEditor->hasFocus())
+    {
+        setFocus(true);
+    }
+    mEditor->setVisible(false);
+    if (keep && text != edit.text && edit.done)
+    {
+        edit.done(text);
+    }
 }
