@@ -155,6 +155,8 @@
     <floater.string name="Preflight">Checking [NAME] before saving...</floater.string>
     <floater.string name="PreflightErrorsA">The analyzers found 1 error in [NAME]; save again to compile anyway.</floater.string>
     <floater.string name="PreflightErrorsB">The analyzers found [COUNT] errors in [NAME]; save again to compile anyway.</floater.string>
+    <floater.string name="SentWithErrorsA">[NAME] was sent with 1 error the analyzers found; the region's compile has the last word.</floater.string>
+    <floater.string name="SentWithErrorsB">[NAME] was sent with [COUNT] errors the analyzers found; the region's compile has the last word.</floater.string>
     <floater.string name="VimNormal">vim</floater.string>
     <floater.string name="HoverExpected">Expected here: [TYPE]</floater.string>
     <floater.string name="InspectDeclared">Declared on line [LINE].</floater.string>
@@ -404,7 +406,7 @@
     <floater.string name="TrailerWeightBeforeTip">Weighed before the preprocessor's optimizer, which a save runs: the saved script may weigh less.</floater.string>
     <floater.string name="TrailerWeightSentTip">Weighed as a save sends it, after the preprocessor.</floater.string>
     <floater.string name="OriginWeight">Weight</floater.string>
-    <floater.string name="WeightOver">The script's code is [SIZE] KB, more than the [LIMIT] KB [TARGET] runs a script in.</floater.string>
+    <floater.string name="WeightOver">The script's code comes to about [SIZE] KB, more than the [LIMIT] KB [TARGET] runs a script in.</floater.string>
     <floater.string name="WeightOverEstimate">The script's code is about [SIZE] KB, likely more than the [LIMIT] KB [TARGET] runs a script in.</floater.string>
     <floater.string name="WeightOverBefore">The script's code is [SIZE] KB before the optimizer, more than the [LIMIT] KB [TARGET] runs a script in: it may fit once the optimizer has been over it.</floater.string>
     <floater.string name="TrailerSize">[SIZE] KB of [LIMIT] KB</floater.string>
@@ -464,7 +466,7 @@
     <floater.string name="FixLighterEstimate">about [BYTES] bytes lighter on [TARGET]</floater.string>
     <floater.string name="FixHeavier">[BYTES] bytes heavier on [TARGET]</floater.string>
     <floater.string name="FixHeavierEstimate">about [BYTES] bytes heavier on [TARGET]</floater.string>
-    <floater.string name="SaveOverWeight">[NAME] was not saved: as it would be sent, its code is [SIZE] KB, more than the [LIMIT] KB [TARGET] runs a script in. Save again to upload anyway.</floater.string>
+    <floater.string name="SaveOverWeight">[NAME] was sent, but by the studio's reckoning its code comes to about [SIZE] KB, more than the [LIMIT] KB [TARGET] runs a script in: the region may not compile it, or it may not run.</floater.string>
     <floater.string name="SaveTooLarge">[NAME] was not saved: it is [SIZE] bytes, [OVER] more than the [LIMIT] a script may be.</floater.string>
     <floater.string name="SaveTooLargePlain">Moving part of it into another script, or into a notecard it reads, would bring it under.</floater.string>
     <floater.string name="SaveTooLargeCompress">A preprocessed script is sent as written and as expanded: turning on Compress in the preprocessor's settings shrinks the expanded half.</floater.string>
@@ -947,7 +949,7 @@
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="preprocess" />
             </menu_item_call>
             <menu_item_separator layout="topleft" />
-            <menu_item_check label="Check Before Saving" layout="topleft" name="preflight">
+            <menu_item_check label="Hold Saves on Errors" layout="topleft" name="preflight">
                 <menu_item_check.on_check function="ScriptStudio.Check" parameter="preflight" />
                 <menu_item_check.on_click function="ScriptStudio.Menu" parameter="preflight" />
             </menu_item_check>

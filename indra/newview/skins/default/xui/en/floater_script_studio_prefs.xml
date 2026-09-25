@@ -636,11 +636,11 @@ end</floater.string>
              control_name="ALScriptStudioPreflight"
              follows="left|top"
              height="20"
-             label="Check scripts for errors before saving"
+             label="Hold a save when the checkers find errors"
              layout="topleft"
              left="12"
              name="preflight"
-             tool_tip="The analyzers look a script over before every save; errors they find hold the save until it is asked for again"
+             tool_tip="The analyzers look a script over before every save, and errors they find hold it until it is asked for again. Off, it goes up whatever they found, and how many errors they found is said: they are not the region's compiler, and what they call an error may compile"
              top_pad="6"
              width="370" />
             <check_box
@@ -992,7 +992,7 @@ end</floater.string>
              left="12"
              multi_select="false"
              name="lints_lsl"
-             tool_tip="What the LSL checker warns of: tick On to be told, Error to have it count as an error, which holds a save when scripts are checked before saving"
+             tool_tip="What the LSL checker warns of: tick On to be told, Error to have it count as an error, which holds a save where the checkers' errors hold one"
              top_pad="6"
              width="384">
                 <scroll_list.columns label="On" name="on" type="checkbox" width="30" />
@@ -1078,7 +1078,7 @@ end</floater.string>
              left="408"
              multi_select="false"
              name="lints_luau"
-             tool_tip="What the SLua linter warns of: tick On to be told, Error to have it count as an error, which holds a save when scripts are checked before saving"
+             tool_tip="What the SLua linter warns of: tick On to be told, Error to have it count as an error, which holds a save where the checkers' errors hold one"
              top_pad="6"
              width="384">
                 <scroll_list.columns label="On" name="on" type="checkbox" width="30" />

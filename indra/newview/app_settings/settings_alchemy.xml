@@ -720,13 +720,13 @@
         <key>ALScriptStudioPreflight</key>
         <map>
             <key>Comment</key>
-            <string>Script Studio checks a script with the analyzers before saving it, and asks for a second save to compile over errors they found.</string>
+            <string>Script Studio holds a save when the analyzers find errors in the script, until a second save asks for it to compile anyway. Off, the save goes up and the errors are said.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
             <string>Boolean</string>
             <key>Value</key>
-            <integer>1</integer>
+            <integer>0</integer>
         </map>
         <key>ALScriptStudioEnabled</key>
         <map>

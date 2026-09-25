@@ -248,10 +248,10 @@ private:
         // what the tab's dot, Save All and a close all go by. What is kept
         // against a crash is the text alone.
         bool          unsaved() const { return (editor && editor->isDirty()) || targetChosen || experienceChosen; }
-        // A save on its way: sent, or waiting on the preprocessor, a check
-        // or a weighing -- or the preprocessor busy with the tab for any
-        // reason, whose answer a save may yet wait on.
-        bool          saveUnderway() const { return saving || preprocessing || saveAfterCheck || saveAfterWeigh || uploadAfterWeigh; }
+        // A save on its way: sent, or waiting on the preprocessor or a
+        // check -- or the preprocessor busy with the tab for any reason,
+        // whose answer a save may yet wait on.
+        bool          saveUnderway() const { return saving || preprocessing || saveAfterCheck; }
         ALCodeEditor* shownText() const { return shownView() == View::Expanded ? expandedEditor : editor; }
         // A notecard rather than a script: plain text, saved as a
         // notecard with the items it came with, never analysed.
@@ -476,15 +476,14 @@ private:
         // save compiles -- not where the optimizer changes it after -- and
         // whether it is what a preprocessor's run made to be sent, which a
         // check's weighing of the same text, before the optimizer, does not
-        // replace; a weighing on its way, and a save waiting on it; and an
-        // upload waiting on the weighing of what it sends.
+        // replace; a weighing on its way; and the text a save sent, whose
+        // weight is said once it is known, where it is over the limit.
         std::optional<ALScriptWeight>              weight;
         U32                                        weightVersion     = 0;
         bool                                       weightExact       = false;
         bool                                       weightSent        = false;
         bool                                       weighing          = false;
-        bool                                       saveAfterWeigh    = false;
-        bool                                       uploadAfterWeigh  = false;
+        S64                                        warnWeightFor     = -1;
         // What the Weights tab lists: each target the last check's text was
         // weighed for, its own first, in the source's places; and each
         // target's as the text was last saved, where it was weighed while
@@ -497,8 +496,9 @@ private:
         // save waits on.
         bool                                       fixedForSave      = false;
         // The checks a save passes, each of which may stop it: the
-        // analyzers' errors, the preprocessor's, an include still to come,
-        // and the code over its target's limit. One that stopped a save is
+        // analyzers' errors, the preprocessor's, an include still to come.
+        // (The code over its target's limit is said, not stopped for.) One
+        // that stopped a save is
         // let past -- it alone -- where the author asks again over the same
         // text: Save Anyway, or Save a second time. A later check still
         // stops it, and says why.
@@ -507,7 +507,6 @@ private:
             CheckAnalyzers   = 1,
             CheckPreprocessor = 2,
             CheckPending     = 4,
-            CheckWeight      = 8,
             CheckAll         = 0xFF
         };
         // The text the checks let past are for, which checks those are, and
@@ -892,11 +891,16 @@ private:
     void                      weighed(Doc& doc, const ALScriptAnalysis::Result& result);
     // What a preprocessor's run made to be sent -- optimized, compressed,
     // every include in; or the text as written where it is off -- weighed
-    // as it is, after every run; and, for a save, uploaded once the weight
-    // says it fits: `sent` is what was weighed, which is what goes, however
-    // many runs have come since.
-    void                      weighSent(Doc& doc, bool then_upload);
-    void                      weighedSent(Doc& doc, const ALScriptAnalysis::Result& result, const Doc::Expanded& sent, bool then_upload);
+    // as it is, after every run: `sent` is what was weighed, however many
+    // runs have come since.
+    void                      weighSent(Doc& doc);
+    void                      weighedSent(Doc& doc, const ALScriptAnalysis::Result& result, const Doc::Expanded& sent);
+    // What a save sends weighed as it goes, not before it: over its
+    // target's limit it is said, once the weight is known, and goes up
+    // anyway -- the numbers assume how the region compiles, and are not
+    // its word.
+    void                      weighForSave(Doc& doc);
+    void                      warnOverWeight(Doc& doc);
     // The targets a script is weighed for: its own; and for an LSL script
     // in front while the Weights tab is looked at, the other two beside it.
     std::vector<ALScriptWeight::Target> weighedTargets(const Doc& doc) const;

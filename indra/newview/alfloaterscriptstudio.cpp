@@ -3075,7 +3075,7 @@ void ALFloaterScriptStudio::preprocessedAnswer(const std::string& id, U32 versio
             setStatus(getString("Preprocessed", args));
             // Weighed as a save would send it; not with an include still to
             // come, which a save would wait for.
-            weighSent(doc, false);
+            weighSent(doc);
         }
         return;
     }
@@ -3102,12 +3102,8 @@ void ALFloaterScriptStudio::preprocessedAnswer(const std::string& id, U32 versio
         saveStopped(doc);
         return;
     }
-    // Weighed as it goes, and sent once the weight says it fits.
-    if (weightTarget(doc))
-    {
-        weighSent(doc, true);
-        return;
-    }
+    // Weighed as it goes.
+    weighForSave(doc);
     sendPreprocessed(doc, doc.uploaded);
 }
 
@@ -4178,14 +4174,10 @@ void ALFloaterScriptStudio::weighed(Doc& doc, const ALScriptAnalysis::Result& re
         refreshProblems(doc);
         showWeightsInEditor(doc);
     }
-    if (doc.saveAfterWeigh)
-    {
-        doc.saveAfterWeigh = false;
-        save(doc);
-    }
+    warnOverWeight(doc);
 }
 
-void ALFloaterScriptStudio::weighSent(Doc& doc, bool then_upload)
+void ALFloaterScriptStudio::weighSent(Doc& doc)
 {
     const std::optional<ALScriptWeight::Target> target = weightTarget(doc);
     if (!target || !doc.uploaded.valid || doc.uploaded.version != doc.editor->document().version())
@@ -4199,37 +4191,26 @@ void ALFloaterScriptStudio::weighSent(Doc& doc, bool then_upload)
     request.lua     = doc.language.lua;
     request.text    = doc.uploaded.disabled ? doc.editor->text() : doc.uploaded.text;
     request.targets = { *target };
-    // What was weighed kept with the question, its map for the places and,
-    // for a save, its text as what goes: a run since -- a setting changed
-    // while it was weighed -- is of another text, and weighs its own.
-    doc.uploadAfterWeigh = doc.uploadAfterWeigh || then_upload;
+    // What was weighed kept with the question, its map for the places: a
+    // run since -- a setting changed while it was weighed -- is of another
+    // text, and weighs its own.
     const LLHandle<LLFloater> handle = getHandle();
-    ALScriptAnalysis::instance().ask(std::move(request), [handle, sent = doc.uploaded, then_upload](const ALScriptAnalysis::Result& result) {
+    ALScriptAnalysis::instance().ask(std::move(request), [handle, sent = doc.uploaded](const ALScriptAnalysis::Result& result) {
         ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get());
         const size_t           index  = studio ? studio->indexOf(result.id) : NONE;
         if (index != NONE)
         {
-            studio->weighedSent(*studio->mDocs[index], result, sent, then_upload);
+            studio->weighedSent(*studio->mDocs[index], result, sent);
         }
     });
 }
 
-void ALFloaterScriptStudio::weighedSent(Doc& doc, const ALScriptAnalysis::Result& result, const Doc::Expanded& sent, bool then_upload)
+void ALFloaterScriptStudio::weighedSent(Doc& doc, const ALScriptAnalysis::Result& result, const Doc::Expanded& sent)
 {
-    if (then_upload)
-    {
-        doc.uploadAfterWeigh = false;
-    }
     const U32 version = doc.editor->document().version();
     if (result.version != version)
     {
-        // The text moved on while it was weighed: a save goes again from
-        // the start, as it does where the text moves on while the
-        // includes come.
-        if (then_upload)
-        {
-            save(doc);
-        }
+        // The text moved on while it was weighed.
         return;
     }
     const ALScriptWeight* weight = result.weights.empty() ? nullptr : &result.weights.front();
@@ -4246,21 +4227,46 @@ void ALFloaterScriptStudio::weighedSent(Doc& doc, const ALScriptAnalysis::Result
             mWeightsStale = true;
         }
     }
-    if (!then_upload)
+    warnOverWeight(doc);
+}
+
+void ALFloaterScriptStudio::weighForSave(Doc& doc)
+{
+    if (!weightTarget(doc))
     {
         return;
     }
-    // Over an exact target's limit, what went up would not compile or would
-    // not run: stopped, as the preprocessor's errors stop it, unless asked
-    // again. Mono's is an estimate, and refuses nothing.
-    if (weight && !weight->estimate && weight->total > weight->limit && !doc.letsPast(version, Doc::CheckWeight))
+    doc.warnWeightFor = doc.editor->document().version();
+    if (preprocessed(doc))
     {
-        reportOverWeight(doc, *weight);
-        doc.stoppedBy(version, Doc::CheckWeight);
-        saveStopped(doc);
+        // What the run made to be sent, which is what goes.
+        weighSent(doc);
+    }
+    else if (doc.weight && doc.weightVersion == doc.warnWeightFor)
+    {
+        warnOverWeight(doc);
+    }
+    else
+    {
+        weigh(doc);
+    }
+}
+
+void ALFloaterScriptStudio::warnOverWeight(Doc& doc)
+{
+    if (doc.warnWeightFor < 0 || !doc.weight || doc.weightVersion != doc.warnWeightFor)
+    {
         return;
     }
-    sendPreprocessed(doc, sent);
+    doc.warnWeightFor = -1;
+    // Over the limit of a target counted as exact, as nearly as the studio
+    // can tell: Mono's is an estimate at the best of times, and its
+    // Problems row says so.
+    const ALScriptWeight& weight = *doc.weight;
+    if (doc.weightExact && !weight.estimate && weight.total > weight.limit)
+    {
+        reportOverWeight(doc, weight);
+    }
 }
 
 std::vector<ALScriptWeight::Target> ALFloaterScriptStudio::weighedTargets(const Doc& doc) const
@@ -5447,12 +5453,6 @@ void ALFloaterScriptStudio::save(Doc& doc)
         doc.saveAgain = true;
         return;
     }
-    if (doc.uploadAfterWeigh)
-    {
-        // One weighed ahead of its upload: it sends the text as it stands,
-        // or goes again from the start where the text has moved on.
-        return;
-    }
     // Where it cannot go -- its object out of sight, the item gone, the
     // connection lost -- said, with the notice back in sight to offer a
     // copy or a file; nothing is tried that would only fail.
@@ -5561,6 +5561,7 @@ void ALFloaterScriptStudio::save(Doc& doc)
         return;
     }
     doc.uploaded.valid = false;
+    weighForSave(doc);
     upload(doc, doc.editor->text());
 }
 
@@ -6570,9 +6571,10 @@ void ALFloaterScriptStudio::refreshProblems(Doc& doc)
         row.message = doc.definitionsError;
         doc.shown.push_back(std::move(row));
     }
-    // Code heavier than its target runs a script in: an error where the
-    // number is the target's own and of what a save compiles, a warning
-    // where it is an estimate or of the text before the optimizer.
+    // Code heavier than its target runs a script in: a warning, since
+    // the number is the studio's reckoning of what the region compiles --
+    // an estimate for Mono, and of the text before the optimizer where it
+    // runs after -- and not the region's word.
     if (doc.weight && doc.weightVersion == doc.editor->document().version() && doc.weight->total > doc.weight->limit)
     {
         const ALScriptWeight&      weight = *doc.weight;
@@ -6580,9 +6582,8 @@ void ALFloaterScriptStudio::refreshProblems(Doc& doc)
         args["[SIZE]"]   = llformat("%.1f", (F64)weight.total / 1024.0);
         args["[LIMIT]"]  = std::to_string(weight.limit / 1024);
         args["[TARGET]"] = ALScriptWeight::nameOf(weight.target);
-        const bool hard  = doc.weightExact && !weight.estimate;
         Doc::Shown row;
-        row.level   = hard ? Doc::Level::Error : Doc::Level::Warning;
+        row.level   = Doc::Level::Warning;
         row.origin  = getString("OriginWeight");
         row.message = getString(weight.estimate ? "WeightOverEstimate" : !doc.weightExact ? "WeightOverBefore" : "WeightOver", args);
         doc.shown.push_back(std::move(row));
@@ -13618,12 +13619,30 @@ void ALFloaterScriptStudio::onOutputChosen(const ALOutputView::Entry& entry)
 
 bool ALFloaterScriptStudio::preflight(Doc& doc)
 {
-    static LLCachedControl<bool> wanted(gSavedSettings, "ALScriptStudioPreflight", true);
-    if (!wanted || doc.notecard)
+    static LLCachedControl<bool> hold(gSavedSettings, "ALScriptStudioPreflight", false);
+    if (doc.notecard)
     {
         return true;
     }
     const S64 version = doc.editor->document().version();
+    if (!hold)
+    {
+        // Not held for the analyzers, who are not the region's compiler:
+        // what the check of this text found said, where it is in, and the
+        // save sent.
+        if (doc.analysisVersion == version)
+        {
+            const S32 errors = static_cast<S32>(std::count_if(doc.analysis.begin(), doc.analysis.end(),
+                                                              [](const ALScriptProblem& p) { return p.severity == ALScriptProblem::Severity::Error; }));
+            if (errors > 0)
+            {
+                LLStringUtil::format_map_t args;
+                args["[NAME]"] = doc.name;
+                report(counted("SentWithErrors", errors, args), true, &doc);
+            }
+        }
+        return true;
+    }
     if (doc.letsPast(version, Doc::CheckAll))
     {
         // Saved over whatever is found: a copy made to be kept, a save from
@@ -13662,42 +13681,15 @@ bool ALFloaterScriptStudio::preflight(Doc& doc)
             }
         }
     }
-    // What it weighs, of this text: over an exact target's limit, what went
-    // up would not compile or would not run. A script the preprocessor runs
-    // over is weighed as the run makes it to be sent, after it
-    // (weighSent): this text is not what goes.
-    bool over = false;
-    if (weightTarget(doc) && !preprocessed(doc) && !doc.letsPast(version, Doc::CheckWeight))
-    {
-        if (!doc.weight || doc.weightVersion != version)
-        {
-            // Asked for whether or not one is on its way: one waiting on an
-            // expansion the text has moved past is dropped with it, and a
-            // second answer does no harm.
-            doc.saveAfterWeigh = true;
-            weigh(doc);
-            setStatus(getString("Preflight", args));
-            return false;
-        }
-        over = doc.weightExact && !doc.weight->estimate && doc.weight->total > doc.weight->limit;
-    }
-    if (errors == 0 && !over)
+    // What it weighs is not asked here: a save goes up whatever its
+    // estimate, and says so where it is over (weighForSave).
+    if (errors == 0)
     {
         return true;
     }
-    // Said as what stopped it: the errors -- the weight among them, which
-    // the problems list as one -- or the weight alone; and only those let
-    // past by asking again.
-    if (errors > 0)
-    {
-        report(counted("PreflightErrors", errors + (over ? 1 : 0), args), true, &doc, { "save_anyway" });
-        doc.stoppedBy(version, over ? Doc::CheckAnalyzers | Doc::CheckWeight : Doc::CheckAnalyzers);
-    }
-    else
-    {
-        reportOverWeight(doc, *doc.weight);
-        doc.stoppedBy(version, Doc::CheckWeight);
-    }
+    // Said as what stopped it, and only that let past by asking again.
+    report(counted("PreflightErrors", errors, args), true, &doc, { "save_anyway" });
+    doc.stoppedBy(version, Doc::CheckAnalyzers);
     saveStopped(doc);
     // The first of the checkers' errors, in sight.
     showBottom("problems_tab");
@@ -13712,8 +13704,7 @@ void ALFloaterScriptStudio::reportOverWeight(const Doc& doc, const ALScriptWeigh
     args["[SIZE]"]   = llformat("%.1f", (F64)weight.total / 1024.0);
     args["[LIMIT]"]  = std::to_string(weight.limit / 1024);
     args["[TARGET]"] = ALScriptWeight::nameOf(weight.target);
-    report(getString("SaveOverWeight", args), true, &doc, { "save_anyway" });
-    showBottom("problems_tab");
+    report(getString("SaveOverWeight", args), true, &doc);
 }
 
 void ALFloaterScriptStudio::saveAsked(Doc& doc)
