@@ -1001,6 +1001,7 @@ if(AL_BUILD_VIEWER)
     alscriptstudiocommands.h
     alscriptstudiodoc.h
     alscriptstudiofileio.h
+    alscriptstudiofiles.h
     alscriptstudiorecovery.h
     alscriptstudiosaving.h
     alscriptstudiovim.h
@@ -2521,6 +2522,21 @@ if(AL_BUILD_TESTS)
     PROJECT ${test_project}
     LIBRARIES llui alscript ${test_libs}
     SOURCES alscriptnotecardtab.cpp alscriptsaveflow.cpp alscriptstudiodoc.cpp
+    DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
+  )
+
+  # Script Studio's files on disk, over the window's side faked: languages,
+  # the recent lists, writing, changes outside, loading, Save As.
+  al_add_test(
+    alscriptstudiofiles
+    UNIT
+    PROJECT ${test_project}
+    LIBRARIES llui alscript ${test_libs}
+    SOURCES
+      alscriptnotecardtab.cpp
+      alscriptsaveflow.cpp
+      alscriptstudiodoc.cpp
+      alscriptstudiofileio.cpp
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
 

@@ -2062,7 +2062,7 @@ void ALFloaterScriptStudio::loaded(const ALScriptWorkspace::Loaded& answer)
     {
         // In: an empty script is empty, not still loading.
         doc.editor->setPlaceholder(LLStringUtil::null);
-        noteRecentScript(doc);
+        mFiles.noteScript(doc);
         // Where it is, while it is in sight, for a kept text to say later.
         if (LLViewerObject* object = doc.ref.inInventory() ? nullptr : gObjectList.findObject(doc.ref.object))
         {
@@ -2416,12 +2416,12 @@ void ALFloaterScriptStudio::openFileHere(const std::string& path, bool lua, S32 
         doc->name = gDirUtilp->getBaseFileName(path);
         // The language its extension says; else the one it was asked for
         // from, where it was; else plain text.
-        const FileLanguage language  = languageOfFile(path, lua);
+        const FileLanguage language  = ALScriptStudioFiles::languageOf(path, lua);
         doc->language.lua            = language.lua;
         doc->language.compileTarget  = language.lua ? "luau" : "mono";
         doc->notecard                = !language.script;
         doc->editor                  = makeEditor(doc->id, false);
-        doc->editor->setSyntax(!language.script ? textSyntaxOf(path) : language.lua ? "slua" : "lsl");
+        doc->editor->setSyntax(!language.script ? ALScriptStudioFiles::textSyntaxOf(path) : language.lua ? "slua" : "lsl");
         doc->editor->setText(text);
         doc->loaded     = true;
         doc->modifiable = true;
@@ -2439,7 +2439,7 @@ void ALFloaterScriptStudio::openFileHere(const std::string& path, bool lua, S32 
             teachEditor(*mDocs[already]);
         }
         watchFile(*mDocs[already]);
-        noteRecentFile(path);
+        mFiles.noteFile(path);
         LLStringUtil::format_map_t args;
         args["[NAME]"] = mDocs[already]->name;
         setStatus(getString("Loaded", args));
@@ -2473,7 +2473,7 @@ void ALFloaterScriptStudio::speakFileLanguage(Doc& doc, const FileLanguage& lang
     doc.language.lua           = language.lua;
     doc.language.compileTarget = language.lua ? "luau" : "mono";
     doc.notecard               = !language.script;
-    doc.editor->setSyntax(!language.script ? textSyntaxOf(doc.file) : language.lua ? "slua" : "lsl");
+    doc.editor->setSyntax(!language.script ? ALScriptStudioFiles::textSyntaxOf(doc.file) : language.lua ? "slua" : "lsl");
     if (language.script)
     {
         teachEditor(doc);
@@ -6561,6 +6561,83 @@ void ALFloaterScriptStudio::startEditor(Doc& doc, const std::string& filename, b
     report(getString("ExternalOpened", args), false, &doc);
 }
 
+void ALFloaterScriptStudio::pickFilesToOpen(bool several, std::function<void(const std::vector<std::string>& files)> chosen)
+{
+    const LLHandle<LLFloater> handle = getHandle();
+    LLFilePickerReplyThread::startPicker(
+        [handle, chosen](const std::vector<std::string>& files, LLFilePicker::ELoadFilter, LLFilePicker::ESaveFilter) {
+            if (handle.get())
+            {
+                chosen(files);
+            }
+        },
+        LLFilePicker::FFLOAD_SCRIPT, several);
+}
+
+void ALFloaterScriptStudio::pickFileToSave(const std::string& name, std::function<void(const std::vector<std::string>& files)> chosen)
+{
+    const LLHandle<LLFloater> handle = getHandle();
+    LLFilePickerReplyThread::startPicker(
+        [handle, chosen](const std::vector<std::string>& files, LLFilePicker::ELoadFilter, LLFilePicker::ESaveFilter) {
+            if (handle.get())
+            {
+                chosen(files);
+            }
+        },
+        LLFilePicker::FFSAVE_SCRIPT, name);
+}
+
+void ALFloaterScriptStudio::askReload(const Doc& doc, std::function<void(bool reload)> answered)
+{
+    LLSD question;
+    question["NAME"] = doc.name;
+    LLNotificationsUtil::add("ScriptStudioFileChanged", question, LLSD(), [answered](const LLSD& notification, const LLSD& response) {
+        answered(LLNotificationsUtil::getSelectedOption(notification, response) == 0);
+    });
+}
+
+void ALFloaterScriptStudio::saveStopped(Doc& doc)
+{
+    mSaving.stopped(doc);
+}
+
+void ALFloaterScriptStudio::fileWritten(const std::string& path)
+{
+    for (bool lua : { false, true })
+    {
+        if (path == ALScriptSnippets::path(lua))
+        {
+            ALScriptSnippets::forget(lua);
+        }
+    }
+    if (path == ALScriptStudioVimrc::filePath())
+    {
+        ALScriptStudioVimrc::instance().check(true);
+    }
+}
+
+void ALFloaterScriptStudio::becomeFile(Doc& doc, const std::string& path)
+{
+    mProblemsPane->forget(doc.id);
+    if (ALScriptRecoveryStore* store = ALScriptStudioRecovery::store(); store && !doc.recoveryKey.empty())
+    {
+        store->forget(doc.recoveryKey);
+    }
+    doc.recoveryKey = ALScriptRecoveryStore::keyOf(LLUUID::null, LLUUID::null, path);
+    doc.file        = path;
+    doc.name        = gDirUtilp->getBaseFileName(path);
+    rekeyDoc(doc, "disk:" + path);
+    if (const FileLanguage said = ALScriptStudioFiles::languageOf(path, false); said.said)
+    {
+        speakFileLanguage(doc, said);
+    }
+}
+
+LLMenuGL* ALFloaterScriptStudio::recentMenu()
+{
+    return menuBar() ? menuBar()->findChild<LLMenuGL>("open_recent") : nullptr;
+}
+
 void ALFloaterScriptStudio::fileSettled(Doc& doc)
 {
     doc.editor->resetDirty();
@@ -7217,7 +7294,7 @@ std::vector<ALQuickOpen::Candidate> ALFloaterScriptStudio::paletteScripts(std::v
         }
     }
     // Then what was opened lately and is not open now.
-    for (const Recent& recent : mRecentScripts)
+    for (const ALScriptStudioFiles::Recent& recent : mFiles.recentScripts())
     {
         if (!listed.insert(recent.ref.id()).second)
         {
@@ -7229,7 +7306,7 @@ std::vector<ALQuickOpen::Candidate> ALFloaterScriptStudio::paletteScripts(std::v
         target.name = recent.name;
         add(std::move(target), recent.name, getString("QuickOpenRecent"));
     }
-    for (const std::string& path : mRecentFiles)
+    for (const std::string& path : mFiles.recentFiles())
     {
         if (!listed.insert("disk:" + path).second)
         {
@@ -9376,7 +9453,7 @@ void ALFloaterScriptStudio::onNoticeAction(const std::string& action)
     }
     else if (action == "export")
     {
-        saveToFile();
+        mFiles.saveCopy();
     }
     else if (action == "save")
     {
@@ -9413,7 +9490,9 @@ void ALFloaterScriptStudio::becomeOrphan(Doc& doc, const ALScriptRecoveryEntry& 
         doc.envelope.reset();
     }
     doc.editor->setPlaceholder(LLStringUtil::null);
-    doc.editor->setSyntax(entry.notecard ? (doc.file.empty() ? std::string("text") : textSyntaxOf(doc.file)) : entry.lua ? "slua" : "lsl");
+    doc.editor->setSyntax(entry.notecard ? (doc.file.empty() ? std::string("text") : ALScriptStudioFiles::textSyntaxOf(doc.file))
+                          : entry.lua    ? "slua"
+                                         : "lsl");
     if (!entry.notecard)
     {
         teachEditor(doc);
@@ -9764,7 +9843,7 @@ void ALFloaterScriptStudio::outputAction(Doc& doc, const std::string& action)
     }
     else if (action == "export")
     {
-        saveToFile();
+        mFiles.saveCopy();
     }
     else if (action == "take_external" && doc.external.waiting)
     {
@@ -10243,7 +10322,7 @@ void ALFloaterScriptStudio::addFileCommands()
             Doc* doc = active();
             return doc && revertible(*doc);
         });
-    mCommands.add("open_file", [this]() { openFileFromDisk(); });
+    mCommands.add("open_file", [this]() { mFiles.openFromDisk(); });
     mCommands.add(
         "recover", [this]() { mRecovery.show(); },
         []() {
@@ -10251,25 +10330,25 @@ void ALFloaterScriptStudio::addFileCommands()
             return store && store->hasOffers();
         });
     mCommands.add(
-        "insert_file", [this]() { loadFromFile(true); },
+        "insert_file", [this]() { mFiles.load(true); },
         [this]() {
             Doc* doc = active();
             return doc && doc->loaded && doc->modifiable;
         });
     mCommands.add(
-        "load_file", [this]() { loadFromFile(); },
+        "load_file", [this]() { mFiles.load(false); },
         [this]() {
             Doc* doc = active();
             return doc && doc->loaded && doc->modifiable;
         });
     mCommands.add(
-        "save_file", [this]() { saveToFile(); },
+        "save_file", [this]() { mFiles.saveCopy(); },
         [this]() {
             Doc* doc = active();
             return doc && doc->loaded;
         });
     mCommands.add(
-        "save_as", [this]() { saveFileAs(); },
+        "save_as", [this]() { mFiles.saveAs(); },
         [this]() {
             Doc* doc = active();
             return doc && doc->loaded && !doc->file.empty();
@@ -10315,12 +10394,7 @@ void ALFloaterScriptStudio::addFileCommands()
             });
     }
     // The Open Recent list's last item, made with the list.
-    mCommands.addUnlisted("clear_recent", [this]() {
-        mRecentFiles.clear();
-        mRecentScripts.clear();
-        fillRecentMenu();
-        saveState();
-    });
+    mCommands.addUnlisted("clear_recent", [this]() { mFiles.clearRecent(); });
     // The tab strip's menu's.
     mCommands.addUnlisted("reveal", [this]() {
         if (Doc* doc = active(); doc && !doc->ref.inInventory())
@@ -11093,22 +11167,7 @@ void ALFloaterScriptStudio::writeState(LLSD& state) const
     {
         mExplorerPane->saveState(state);
     }
-    LLSD recent = LLSD::emptyArray();
-    for (const std::string& path : mRecentFiles)
-    {
-        recent.append(path);
-    }
-    state["recent_files"] = recent;
-    LLSD scripts = LLSD::emptyArray();
-    for (const Recent& one : mRecentScripts)
-    {
-        LLSD entry;
-        entry["object"] = one.ref.object;
-        entry["item"]   = one.ref.item;
-        entry["name"]   = one.name;
-        scripts.append(entry);
-    }
-    state["recent_scripts"] = scripts;
+    mFiles.writeState(state);
     // The tabs, to be opened again next time where they can be -- as they
     // were when the quit began, which closes them one by one as it asks
     // about them.
@@ -11299,18 +11358,6 @@ void ALFloaterScriptStudio::readState(const LLSD& state)
     {
         mOutlineSort->selectByValue(state["outline_sort"]);
     }
-    if (state.has("recent_scripts"))
-    {
-        mRecentScripts.clear();
-        for (LLSD::array_const_iterator it = state["recent_scripts"].beginArray(); it != state["recent_scripts"].endArray(); ++it)
-        {
-            const ALScriptRef ref((*it)["object"].asUUID(), (*it)["item"].asUUID());
-            if (!ref.isNull())
-            {
-                mRecentScripts.push_back(Recent{ ref, (*it)["name"].asString() });
-            }
-        }
-    }
     if (state.has("open"))
     {
         mRestoreTabs = state["open"];
@@ -11319,17 +11366,5 @@ void ALFloaterScriptStudio::readState(const LLSD& state)
     {
         mRestoreWindows = state["windows"];
     }
-    if (state.has("recent_files"))
-    {
-        mRecentFiles.clear();
-        for (LLSD::array_const_iterator it = state["recent_files"].beginArray(); it != state["recent_files"].endArray(); ++it)
-        {
-            const std::string path = it->asString();
-            if (!path.empty() && std::find(mRecentFiles.begin(), mRecentFiles.end(), path) == mRecentFiles.end())
-            {
-                mRecentFiles.push_back(path);
-            }
-        }
-    }
-    fillRecentMenu();
+    mFiles.readState(state);
 }

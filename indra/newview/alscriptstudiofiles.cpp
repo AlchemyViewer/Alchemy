@@ -24,15 +24,15 @@
 
 #include "llviewerprecompiledheaders.h"
 
-#include "alfloaterscriptstudio.h"
+#include "alscriptstudiofiles.h"
 
 #include "alfilewrite.h"
-#include "alscriptsnippets.h"
 #include "alscriptstudiofileio.h"
-#include "alscriptstudiovimrc.h"
+#include "alscriptstudioservices.h"
+#include "lldir.h"
 #include "llmenugl.h"
-#include "llnotificationsutil.h"
-#include "llviewermenufile.h"
+#include "llsd.h"
+#include "lluictrlfactory.h"
 
 #include <algorithm>
 
@@ -40,8 +40,18 @@ using ALScriptFileIO::fileTooLarge;
 using ALScriptFileIO::readWholeFile;
 using ALScriptFileIO::StudioLiveFile;
 
+namespace
+{
+    // How many of each the recent lists keep.
+    constexpr size_t MOST_RECENT = 10;
+}
+
+ALScriptStudioFiles::ALScriptStudioFiles(ALScriptStudioServices& services, Window& window) : mServices(services), mWindow(window)
+{
+}
+
 // static
-std::string ALFloaterScriptStudio::textSyntaxOf(const std::string& path)
+std::string ALScriptStudioFiles::textSyntaxOf(const std::string& path)
 {
     // A file that is no script: coloured where it is XML or JSON, which
     // the studio has grammars for -- its snippets are XML -- else text.
@@ -51,18 +61,20 @@ std::string ALFloaterScriptStudio::textSyntaxOf(const std::string& path)
 }
 
 // static
-ALFloaterScriptStudio::FileLanguage ALFloaterScriptStudio::languageOfFile(const std::string& path, bool lua_hint)
+ALScriptStudioFiles::Language ALScriptStudioFiles::languageOf(const std::string& path, bool lua_hint)
 {
     std::string extension = gDirUtilp->getExtension(path);
     LLStringUtil::toLower(extension);
-    FileLanguage language;
+    Language language;
     language.said   = !extension.empty();
     language.script = extension == "lsl" || extension == "lua" || extension == "luau" || lua_hint;
     language.lua    = extension == "lua" || extension == "luau" || (extension != "lsl" && lua_hint);
     return language;
 }
 
-void ALFloaterScriptStudio::watchFile(Doc& doc)
+// --- watching and writing ---------------------------------------------------------------
+
+void ALScriptStudioFiles::watch(Doc& doc)
 {
     if (doc.file.empty() || doc.external.watch)
     {
@@ -70,27 +82,27 @@ void ALFloaterScriptStudio::watchFile(Doc& doc)
     }
     // The file watched for changes made outside, whoever makes them: an
     // editor the studio started, or anything else.
-    const LLHandle<LLFloater> handle = getHandle();
-    const std::string         id     = doc.id;
-    doc.external.watch               = std::make_unique<StudioLiveFile>(
+    const std::weak_ptr<bool> alive = mAlive;
+    const std::string         id    = doc.id;
+    doc.external.watch              = std::make_unique<StudioLiveFile>(
         doc.file,
-        [handle, id](const std::string& file) {
-            if (ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get()))
+        [this, alive, id](const std::string& file) {
+            if (alive.lock())
             {
-                studio->fileChangedOutside(id, file);
+                changedOutside(id, file);
             }
         },
         false);
 }
 
-void ALFloaterScriptStudio::fileChangedOutside(const std::string& id, const std::string& file)
+void ALScriptStudioFiles::changedOutside(const std::string& id, const std::string& file)
 {
-    const size_t index = indexOf(id);
-    if (index == NONE)
+    Doc* found = mServices.findDoc(id);
+    if (!found)
     {
         return;
     }
-    Doc& doc = *mDocs[index];
+    Doc& doc = *found;
     // Gone, or not to be read: nothing to take. Deleted, the tab keeps
     // what it holds and the check on what holds each tab says the file
     // is gone; mid-save by something that writes it in two steps, it is
@@ -107,28 +119,24 @@ void ALFloaterScriptStudio::fileChangedOutside(const std::string& id, const std:
         // What is typed here is not thrown away for it: the author is told,
         // and asked which to keep -- once, however often it changes while
         // the question is up.
-        report(getString("FileChangedOutside", args), true, &doc);
+        mServices.report(mServices.words("FileChangedOutside", args), true, &doc);
         if (doc.askingReload)
         {
             return;
         }
-        doc.askingReload = true;
-        LLSD question;
-        question["NAME"]                 = doc.name;
-        const LLHandle<LLFloater> handle = getHandle();
-        LLNotificationsUtil::add("ScriptStudioFileChanged", question, LLSD(), [handle, id](const LLSD& notification, const LLSD& response) {
-            ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get());
-            const size_t           index  = studio ? studio->indexOf(id) : NONE;
-            if (index == NONE)
+        doc.askingReload                = true;
+        const std::weak_ptr<bool> alive = mAlive;
+        mWindow.askReload(doc, [this, alive, id](bool reload) {
+            Doc* asked = alive.lock() ? mServices.findDoc(id) : nullptr;
+            if (!asked)
             {
                 return;
             }
-            Doc& asked         = *studio->mDocs[index];
-            asked.askingReload = false;
-            if (LLNotificationsUtil::getSelectedOption(notification, response) == 0)
+            asked->askingReload = false;
+            if (reload)
             {
                 // What is on disk, as one step to undo, and clean.
-                studio->revert(asked);
+                mWindow.revert(*asked);
             }
         });
         return;
@@ -139,20 +147,20 @@ void ALFloaterScriptStudio::fileChangedOutside(const std::string& id, const std:
     }
     // Taken as one step to undo, and clean, since it is what the file is.
     doc.carriedText = text;
-    takeCarriedText(doc);
-    fileSettled(doc);
-    report(getString("FileReloaded", args), false, &doc);
+    mWindow.takeCarriedText(doc);
+    mWindow.fileSettled(doc);
+    mServices.report(mServices.words("FileReloaded", args), false, &doc);
 }
 
-void ALFloaterScriptStudio::saveFile(Doc& doc)
+void ALScriptStudioFiles::write(Doc& doc)
 {
     doc.save.done();
     LLStringUtil::format_map_t args;
     args["[PATH]"] = doc.file;
     if (!ALFileWrite::whole(doc.file, doc.editor->text()))
     {
-        report(getString("SaveToFileFailed", args), true, &doc);
-        mSaving.stopped(doc);
+        mServices.report(mServices.words("SaveToFileFailed", args), true, &doc);
+        mWindow.saveStopped(doc);
         return;
     }
     if (doc.external.watch)
@@ -160,69 +168,53 @@ void ALFloaterScriptStudio::saveFile(Doc& doc)
         // The watcher on the file: this write is not an outside change.
         doc.external.watch->seen();
     }
-    report(getString("SavedToFile", args), false, &doc);
-    fileSettled(doc);
+    mServices.report(mServices.words("SavedToFile", args), false, &doc);
+    mWindow.fileSettled(doc);
     // The scripter's snippets, offered as saved from here on; the vimrc
     // read again at once.
-    for (bool lua : { false, true })
-    {
-        if (doc.file == ALScriptSnippets::path(lua))
+    mWindow.fileWritten(doc.file);
+}
+
+// --- the File menu -----------------------------------------------------------------------
+
+void ALScriptStudioFiles::openFromDisk()
+{
+    const std::weak_ptr<bool> alive = mAlive;
+    mWindow.pickFilesToOpen(true, [this, alive](const std::vector<std::string>& files) {
+        if (alive.lock())
         {
-            ALScriptSnippets::forget(lua);
-        }
-    }
-    if (doc.file == ALScriptStudioVimrc::filePath())
-    {
-        ALScriptStudioVimrc::instance().check(true);
-    }
-}
-
-void ALFloaterScriptStudio::openFileFromDisk()
-{
-    const LLHandle<LLFloater> handle = getHandle();
-    LLFilePickerReplyThread::startPicker(
-        [handle](const std::vector<std::string>& files, LLFilePicker::ELoadFilter, LLFilePicker::ESaveFilter) {
-            if (ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get()))
+            for (const std::string& file : files)
             {
-                for (const std::string& file : files)
-                {
-                    studio->openFile(file, false);
-                }
+                mWindow.openFileTab(file, false);
             }
-        },
-        LLFilePicker::FFLOAD_SCRIPT, true);
+        }
+    });
 }
 
-// Each picker answers for the tab it was asked from, by its id: the tab
-// in front when the answer comes may be another -- a script handed over,
-// a tab a pane opened -- or none, the one asked from closed meanwhile.
-
-void ALFloaterScriptStudio::loadFromFile(bool insert)
+void ALScriptStudioFiles::load(bool insert)
 {
-    const Doc* doc = active();
+    const Doc* doc = mServices.frontDoc();
     if (!doc)
     {
         return;
     }
-    const LLHandle<LLFloater> handle = getHandle();
-    LLFilePickerReplyThread::startPicker(
-        [handle, id = doc->id, insert](const std::vector<std::string>& files, LLFilePicker::ELoadFilter, LLFilePicker::ESaveFilter) {
-            if (ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get()))
-            {
-                studio->fileChosenToLoad(id, files, insert);
-            }
-        },
-        LLFilePicker::FFLOAD_SCRIPT, false);
+    const std::weak_ptr<bool> alive = mAlive;
+    mWindow.pickFilesToOpen(false, [this, alive, id = doc->id, insert](const std::vector<std::string>& files) {
+        if (alive.lock())
+        {
+            chosenToLoad(id, files, insert);
+        }
+    });
 }
 
-void ALFloaterScriptStudio::fileChosenToLoad(const std::string& id, const std::vector<std::string>& files, bool insert)
+void ALScriptStudioFiles::chosenToLoad(const std::string& id, const std::vector<std::string>& files, bool insert)
 {
-    const size_t index = indexOf(id);
-    if (index == NONE || files.empty())
+    Doc* found = mServices.findDoc(id);
+    if (!found || files.empty())
     {
         return;
     }
-    Doc& doc = *mDocs[index];
+    Doc& doc = *found;
     // Over the text as loaded, where it may be changed: over one still
     // loading, the load would put its own back over it.
     if (!doc.loaded || !doc.modifiable)
@@ -234,7 +226,7 @@ void ALFloaterScriptStudio::fileChosenToLoad(const std::string& id, const std::v
     {
         LLStringUtil::format_map_t args;
         args["[FILE]"] = files.front();
-        setStatus(getString(fileTooLarge(files.front()) ? "FileTooLarge" : "LoadFromFileFailed", args), true);
+        mServices.setStatus(mServices.words(fileTooLarge(files.front()) ? "FileTooLarge" : "LoadFromFileFailed", args), true);
         return;
     }
     if (text.empty())
@@ -242,7 +234,7 @@ void ALFloaterScriptStudio::fileChosenToLoad(const std::string& id, const std::v
         return;
     }
     // In place of the text, or where the caret is, as one step to undo.
-    activate(index);
+    mWindow.activate(doc);
     if (!insert)
     {
         doc.editor->selectAll();
@@ -250,28 +242,25 @@ void ALFloaterScriptStudio::fileChosenToLoad(const std::string& id, const std::v
     doc.editor->insertText(text);
 }
 
-void ALFloaterScriptStudio::saveToFile()
+void ALScriptStudioFiles::saveCopy()
 {
-    Doc* doc = active();
+    const Doc* doc = mServices.frontDoc();
     if (!doc)
     {
         return;
     }
-    const LLHandle<LLFloater> handle = getHandle();
-    LLFilePickerReplyThread::startPicker(
-        [handle, id = doc->id](const std::vector<std::string>& files, LLFilePicker::ELoadFilter, LLFilePicker::ESaveFilter) {
-            if (ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get()))
-            {
-                studio->fileChosenToSave(id, files);
-            }
-        },
-        LLFilePicker::FFSAVE_SCRIPT, doc->name);
+    const std::weak_ptr<bool> alive = mAlive;
+    mWindow.pickFileToSave(doc->name, [this, alive, id = doc->id](const std::vector<std::string>& files) {
+        if (alive.lock())
+        {
+            chosenToSave(id, files);
+        }
+    });
 }
 
-void ALFloaterScriptStudio::fileChosenToSave(const std::string& id, const std::vector<std::string>& files)
+void ALScriptStudioFiles::chosenToSave(const std::string& id, const std::vector<std::string>& files)
 {
-    const size_t index = indexOf(id);
-    Doc*         doc   = index == NONE ? nullptr : mDocs[index].get();
+    Doc* doc = mServices.findDoc(id);
     if (!doc || files.empty())
     {
         return;
@@ -279,31 +268,28 @@ void ALFloaterScriptStudio::fileChosenToSave(const std::string& id, const std::v
     const bool                 written = ALFileWrite::whole(files.front(), doc->editor->text());
     LLStringUtil::format_map_t args;
     args["[PATH]"] = files.front();
-    report(getString(written ? "SavedToFile" : "SaveToFileFailed", args), !written, doc);
+    mServices.report(mServices.words(written ? "SavedToFile" : "SaveToFileFailed", args), !written, doc);
 }
 
-void ALFloaterScriptStudio::saveFileAs()
+void ALScriptStudioFiles::saveAs()
 {
-    Doc* doc = active();
+    const Doc* doc = mServices.frontDoc();
     if (!doc || doc->file.empty())
     {
         return;
     }
-    const LLHandle<LLFloater> handle = getHandle();
-    LLFilePickerReplyThread::startPicker(
-        [handle, id = doc->id](const std::vector<std::string>& files, LLFilePicker::ELoadFilter, LLFilePicker::ESaveFilter) {
-            if (ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get()))
-            {
-                studio->fileChosenToSaveAs(id, files);
-            }
-        },
-        LLFilePicker::FFSAVE_SCRIPT, doc->name);
+    const std::weak_ptr<bool> alive = mAlive;
+    mWindow.pickFileToSave(doc->name, [this, alive, id = doc->id](const std::vector<std::string>& files) {
+        if (alive.lock())
+        {
+            chosenToSaveAs(id, files);
+        }
+    });
 }
 
-void ALFloaterScriptStudio::fileChosenToSaveAs(const std::string& id, const std::vector<std::string>& files)
+void ALScriptStudioFiles::chosenToSaveAs(const std::string& id, const std::vector<std::string>& files)
 {
-    const size_t index = indexOf(id);
-    Doc*         doc   = index == NONE ? nullptr : mDocs[index].get();
+    Doc* doc = mServices.findDoc(id);
     if (!doc || doc->file.empty() || files.empty())
     {
         return;
@@ -311,61 +297,50 @@ void ALFloaterScriptStudio::fileChosenToSaveAs(const std::string& id, const std:
     const std::string path = files.front();
     if (path == doc->file)
     {
-        saveFile(*doc);
+        write(*doc);
         return;
     }
     LLStringUtil::format_map_t args;
     args["[PATH]"] = path;
-    if (indexOf("disk:" + path) != NONE)
+    if (mServices.findDoc("disk:" + path))
     {
         // Open in another tab already: that tab is the file, not this one.
         args["[FILE]"] = path;
-        setStatus(getString("FileOpenElsewhere", args), true);
+        mServices.setStatus(mServices.words("FileOpenElsewhere", args), true);
         return;
     }
     if (!ALFileWrite::whole(path, doc->editor->text()))
     {
-        report(getString("SaveToFileFailed", args), true, doc);
+        mServices.report(mServices.words("SaveToFileFailed", args), true, doc);
         return;
     }
     // The tab is the new file from here on: keyed by it, named after
     // it, watched for changes to it, its problems its own, and in the
     // language its name says.
-    mProblemsPane->forget(doc->id);
     doc->external.watch.reset();
-    if (ALScriptRecoveryStore* store = ALScriptStudioRecovery::store(); store && !doc->recoveryKey.empty())
-    {
-        store->forget(doc->recoveryKey);
-    }
-    doc->recoveryKey = ALScriptRecoveryStore::keyOf(LLUUID::null, LLUUID::null, path);
-    doc->file = path;
-    doc->name = gDirUtilp->getBaseFileName(path);
-    rekeyDoc(*doc, "disk:" + path);
-    if (const FileLanguage said = languageOfFile(path, false); said.said)
-    {
-        speakFileLanguage(*doc, said);
-    }
-    watchFile(*doc);
-    noteRecentFile(path);
-    report(getString("SavedToFile", args), false, doc);
-    fileSettled(*doc);
-    scheduleAnalysis(*doc, true);
+    mWindow.becomeFile(*doc, path);
+    watch(*doc);
+    noteFile(path);
+    mServices.report(mServices.words("SavedToFile", args), false, doc);
+    mWindow.fileSettled(*doc);
+    mWindow.scheduleAnalysis(*doc, true);
 }
 
-void ALFloaterScriptStudio::noteRecentFile(const std::string& path)
+// --- the recent lists ---------------------------------------------------------------------
+
+void ALScriptStudioFiles::noteFile(const std::string& path)
 {
-    const size_t MOST = 10;
     mRecentFiles.erase(std::remove(mRecentFiles.begin(), mRecentFiles.end(), path), mRecentFiles.end());
     mRecentFiles.insert(mRecentFiles.begin(), path);
-    if (mRecentFiles.size() > MOST)
+    if (mRecentFiles.size() > MOST_RECENT)
     {
-        mRecentFiles.resize(MOST);
+        mRecentFiles.resize(MOST_RECENT);
     }
-    fillRecentMenu();
-    saveState();
+    fillMenu();
+    mWindow.recentChanged();
 }
 
-void ALFloaterScriptStudio::noteRecentScript(const Doc& doc)
+void ALScriptStudioFiles::noteScript(const Doc& doc)
 {
     // A script or a notecard from the world or the inventory: a file is
     // noted as a file.
@@ -373,21 +348,28 @@ void ALFloaterScriptStudio::noteRecentScript(const Doc& doc)
     {
         return;
     }
-    const size_t MOST = 10;
-    mRecentScripts.erase(std::remove_if(mRecentScripts.begin(), mRecentScripts.end(), [&doc](const Recent& one) { return one.ref == doc.ref; }),
-                         mRecentScripts.end());
+    const auto same = [&doc](const Recent& one) { return one.ref == doc.ref; };
+    mRecentScripts.erase(std::remove_if(mRecentScripts.begin(), mRecentScripts.end(), same), mRecentScripts.end());
     mRecentScripts.insert(mRecentScripts.begin(), Recent{ doc.ref, doc.name });
-    if (mRecentScripts.size() > MOST)
+    if (mRecentScripts.size() > MOST_RECENT)
     {
-        mRecentScripts.resize(MOST);
+        mRecentScripts.resize(MOST_RECENT);
     }
-    fillRecentMenu();
-    saveState();
+    fillMenu();
+    mWindow.recentChanged();
 }
 
-void ALFloaterScriptStudio::fillRecentMenu()
+void ALScriptStudioFiles::clearRecent()
 {
-    LLMenuGL* menu = menuBar() ? menuBar()->findChild<LLMenuGL>("open_recent") : nullptr;
+    mRecentFiles.clear();
+    mRecentScripts.clear();
+    fillMenu();
+    mWindow.recentChanged();
+}
+
+void ALScriptStudioFiles::fillMenu()
+{
+    LLMenuGL* menu = mWindow.recentMenu();
     if (!menu)
     {
         return;
@@ -395,11 +377,11 @@ void ALFloaterScriptStudio::fillRecentMenu()
     menu->empty();
     // The scripts and notecards opened lately, then the files, each under
     // a word saying which where there are both.
-    const LLHandle<LLFloater> handle = getHandle();
-    const auto heading = [menu](const std::string& label) {
+    const std::weak_ptr<bool> alive   = mAlive;
+    const auto                heading = [menu](const std::string& label) {
         LLMenuItemCallGL::Params p;
-        p.name  = "recent_heading_" + label;
-        p.label = label;
+        p.name                 = "recent_heading_" + label;
+        p.label                = label;
         LLMenuItemCallGL* item = LLUICtrlFactory::create<LLMenuItemCallGL>(p);
         item->setEnabled(false);
         menu->addChild(item);
@@ -408,20 +390,20 @@ void ALFloaterScriptStudio::fillRecentMenu()
     {
         if (!mRecentFiles.empty())
         {
-            heading(getString("RecentScripts"));
+            heading(mServices.words("RecentScripts"));
         }
         for (const Recent& one : mRecentScripts)
         {
             LLMenuItemCallGL::Params p;
-            p.name  = "recent_" + one.ref.id();
-            p.label = one.name;
+            p.name                 = "recent_" + one.ref.id();
+            p.label                = one.name;
             LLMenuItemCallGL* item = LLUICtrlFactory::create<LLMenuItemCallGL>(p);
             const ALScriptRef ref  = one.ref;
             const std::string name = one.name;
-            item->setClickCallback([handle, ref, name](LLUICtrl*, const LLSD&) {
-                if (ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get()))
+            item->setClickCallback([this, alive, ref, name](LLUICtrl*, const LLSD&) {
+                if (alive.lock())
                 {
-                    studio->openScript(ref, name);
+                    mServices.openScript(ref, name);
                 }
             });
             menu->addChild(item);
@@ -430,14 +412,14 @@ void ALFloaterScriptStudio::fillRecentMenu()
         {
             LLMenuItemSeparatorGL::Params sep;
             menu->addChild(LLUICtrlFactory::create<LLMenuItemSeparatorGL>(sep));
-            heading(getString("RecentFiles"));
+            heading(mServices.words("RecentFiles"));
         }
     }
     if (mRecentFiles.empty() && mRecentScripts.empty())
     {
         LLMenuItemCallGL::Params none;
-        none.name  = "no_recent";
-        none.label = getString("NoRecentFiles");
+        none.name              = "no_recent";
+        none.label             = mServices.words("NoRecentFiles");
         LLMenuItemCallGL* item = LLUICtrlFactory::create<LLMenuItemCallGL>(none);
         item->setEnabled(false);
         menu->addChild(item);
@@ -449,16 +431,16 @@ void ALFloaterScriptStudio::fillRecentMenu()
     for (const std::string& path : mRecentFiles)
     {
         const std::string name  = gDirUtilp->getBaseFileName(path);
-        const bool        twice = std::count_if(mRecentFiles.begin(), mRecentFiles.end(),
-                                                [&name](const std::string& other) { return gDirUtilp->getBaseFileName(other) == name; }) > 1;
+        const auto        named = [&name](const std::string& other) { return gDirUtilp->getBaseFileName(other) == name; };
+        const bool        twice = std::count_if(mRecentFiles.begin(), mRecentFiles.end(), named) > 1;
         LLMenuItemCallGL::Params p;
-        p.name  = "recent_" + path;
-        p.label = twice ? name + "  (" + gDirUtilp->getDirName(path) + ")" : name;
+        p.name                 = "recent_" + path;
+        p.label                = twice ? name + "  (" + gDirUtilp->getDirName(path) + ")" : name;
         LLMenuItemCallGL* item = LLUICtrlFactory::create<LLMenuItemCallGL>(p);
-        item->setClickCallback([handle, path](LLUICtrl*, const LLSD&) {
-            if (ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get()))
+        item->setClickCallback([this, alive, path](LLUICtrl*, const LLSD&) {
+            if (alive.lock())
             {
-                studio->openFile(path, false);
+                mWindow.openFileTab(path, false);
             }
         });
         menu->addChild(item);
@@ -466,14 +448,63 @@ void ALFloaterScriptStudio::fillRecentMenu()
     LLMenuItemSeparatorGL::Params sep;
     menu->addChild(LLUICtrlFactory::create<LLMenuItemSeparatorGL>(sep));
     LLMenuItemCallGL::Params clear;
-    clear.name  = "clear_recent";
-    clear.label = getString("ClearRecentFiles");
+    clear.name             = "clear_recent";
+    clear.label            = mServices.words("ClearRecentFiles");
     LLMenuItemCallGL* item = LLUICtrlFactory::create<LLMenuItemCallGL>(clear);
-    item->setClickCallback([handle](LLUICtrl*, const LLSD&) {
-        if (ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get()))
+    item->setClickCallback([this, alive](LLUICtrl*, const LLSD&) {
+        if (alive.lock())
         {
-            studio->mCommands.run("clear_recent");
+            clearRecent();
         }
     });
     menu->addChild(item);
+}
+
+void ALScriptStudioFiles::writeState(LLSD& state) const
+{
+    LLSD recent = LLSD::emptyArray();
+    for (const std::string& path : mRecentFiles)
+    {
+        recent.append(path);
+    }
+    state["recent_files"] = recent;
+    LLSD scripts = LLSD::emptyArray();
+    for (const Recent& one : mRecentScripts)
+    {
+        LLSD entry;
+        entry["object"] = one.ref.object;
+        entry["item"]   = one.ref.item;
+        entry["name"]   = one.name;
+        scripts.append(entry);
+    }
+    state["recent_scripts"] = scripts;
+}
+
+void ALScriptStudioFiles::readState(const LLSD& state)
+{
+    if (state.has("recent_scripts"))
+    {
+        mRecentScripts.clear();
+        for (LLSD::array_const_iterator it = state["recent_scripts"].beginArray(); it != state["recent_scripts"].endArray(); ++it)
+        {
+            const ALScriptRef ref((*it)["object"].asUUID(), (*it)["item"].asUUID());
+            if (!ref.isNull())
+            {
+                mRecentScripts.push_back(Recent{ ref, (*it)["name"].asString() });
+            }
+        }
+    }
+    if (state.has("recent_files"))
+    {
+        mRecentFiles.clear();
+        for (LLSD::array_const_iterator it = state["recent_files"].beginArray(); it != state["recent_files"].endArray(); ++it)
+        {
+            const std::string path = it->asString();
+            if (!path.empty() && std::find(mRecentFiles.begin(), mRecentFiles.end(), path) == mRecentFiles.end())
+            {
+                mRecentFiles.push_back(path);
+            }
+        }
+    }
+    fillMenu();
 }

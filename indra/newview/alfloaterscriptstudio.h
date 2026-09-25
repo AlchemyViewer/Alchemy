@@ -37,6 +37,7 @@
 #include "alscriptstudiosaving.h"
 #include "alscriptstudiovim.h"
 #include "alscriptexternaleditor.h"
+#include "alscriptstudiofiles.h"
 #include "alfindings.h"
 #include "aloutputview.h"
 #include "alscriptanalysis.h"
@@ -100,7 +101,7 @@ class LLViewerObject;
 class ALFloaterScriptStudio final : public ALStudioFloater, public ALScriptStudioServices, public ALScriptOutputPane::Window, public ALScriptProblemsPane::Window,
                                     public ALScriptSearchPane::Window, public ALScriptExplorerPane::Window, public ALScriptStudioRecovery::Window,
                                     public ALScriptStudioSaving::Window, public ALScriptStudioVim::Window,
-                                    public ALScriptExternalEditor::Window
+                                    public ALScriptExternalEditor::Window, public ALScriptStudioFiles::Window
 {
     friend class LLFloaterReg;
 
@@ -265,8 +266,6 @@ private:
     // Whether a position of an LSL script is straight inside a state,
     // where an event's handler goes.
     static bool                 inStateBody(ALCodeEditor& editor, const ALTextPos& at);
-    // The grammar a file that is no script is read with: XML, JSON, text.
-    static std::string          textSyntaxOf(const std::string& path);
     // A word of the vocabulary as a completion: a function with its
     // call, an event as a handler to fill in, a constant as itself.
     ALCodeEditor::Completion completionFor(const Vocab& word, bool lua) const;
@@ -442,18 +441,24 @@ private:
     // Opened in this window whatever another has open: where a tab is
     // being moved here from it.
     void                          openFileHere(const std::string& path, bool lua, S32 line = -1, S32 column = -1, S32 length = 0);
-    // A file's text written back where it came from; the scripts that
-    // include it are expanded again.
-    void                          saveFile(Doc& doc) override;
+    // A file's text written back where it came from, and the file watched
+    // for changes made outside the studio (ALScriptStudioFiles).
+    void                          saveFile(Doc& doc) override { mFiles.write(doc); }
+    void                          watchFile(Doc& doc) override { mFiles.watch(doc); }
     // A file's text is what is on disk now, however it got there: the
     // editor is clean, and the scripts that include it are expanded again.
-    void                          fileSettled(Doc& doc);
-    // The file watched for changes made outside the studio: taken in
-    // where the editor is clean, told of where it is not.
-    void                          watchFile(Doc& doc) override;
-    void                          fileChangedOutside(const std::string& id, const std::string& file);
-    // A file chosen from disk, opened in a tab of its own.
-    void                          openFileFromDisk();
+    void                          fileSettled(Doc& doc) override;
+    // The files' asks of the window: the viewer's pickers, the question
+    // over a file changed outside, a save that did not go, a file written
+    // that the studio reads, a tab become another file, Open Recent.
+    void                          pickFilesToOpen(bool several, std::function<void(const std::vector<std::string>& files)> chosen) override;
+    void pickFileToSave(const std::string& name, std::function<void(const std::vector<std::string>& files)> chosen) override;
+    void askReload(const Doc& doc, std::function<void(bool reload)> answered) override;
+    void saveStopped(Doc& doc) override;
+    void fileWritten(const std::string& path) override;
+    void becomeFile(Doc& doc, const std::string& path) override;
+    LLMenuGL* recentMenu() override;
+    void      recentChanged() override { saveState(); }
     // The inspector's words about the symbol at the caret: the text, with
     // every URL in it a link, and the line it says the symbol is
     // declared on a link to the place, where it says one -- in the
@@ -895,34 +900,10 @@ private:
     void onExperience();
     void onReset();
     void revert(Doc& doc) override;
-    // A file's text in place of the tab's, or put in at the caret.
-    void loadFromFile(bool insert = false);
-    void saveToFile();
-    // The pickers' answers, for the tab each was asked from, by its id.
-    void fileChosenToLoad(const std::string& id, const std::vector<std::string>& files, bool insert);
-    void fileChosenToSave(const std::string& id, const std::vector<std::string>& files);
-    // A disk tab saved under another name: the tab is that file from
-    // then on, in the language its name says.
-    void saveFileAs();
-    void fileChosenToSaveAs(const std::string& id, const std::vector<std::string>& files);
-    // What a file's name says it holds: an LSL or a Lua script, or, with
-    // neither extension, what it was asked for as, else plain text.
-    struct FileLanguage
-    {
-        bool script = false;
-        bool lua    = false;
-        // Whether the name said anything: it has an extension.
-        bool said   = false;
-    };
-    static FileLanguage languageOfFile(const std::string& path, bool lua_hint);
-    // The document's language set by it, the editor taught or untaught.
-    void                speakFileLanguage(Doc& doc, const FileLanguage& language);
-    // The files opened from disk lately, newest first, under File ▸
-    // Open Recent; kept with the state. The scripts and notecards opened
-    // from the world and the inventory lately, beside them.
-    void noteRecentFile(const std::string& path);
-    void noteRecentScript(const Doc& doc);
-    void fillRecentMenu();
+    // What a file's name says it holds (ALScriptStudioFiles); the
+    // document's language set by it, the editor taught or untaught.
+    typedef ALScriptStudioFiles::Language FileLanguage;
+    void                                  speakFileLanguage(Doc& doc, const FileLanguage& language);
     // The marks: what a document is, on its tab; what a symbol's kind
     // is, in the outline -- by texture name, as a scroll list wants it.
     static const char* imageNameOf(const Doc& doc);
@@ -965,13 +946,6 @@ private:
     // another name: the index, its editors' names, and whatever holds it
     // by its id, the panes and the history, told.
     void                               rekeyDoc(Doc& doc, const std::string& id);
-    std::vector<std::string>           mRecentFiles;
-    struct Recent
-    {
-        ALScriptRef ref;
-        std::string name;
-    };
-    std::vector<Recent>                mRecentScripts;
     // The tabs open when the state was last written, opened again once the
     // window is built; and those whose object or item was not in hand yet,
     // opened once it is, until a while after.
@@ -1143,6 +1117,8 @@ private:
     ALScriptStudioVim                  mVim{ *this, mCommands, *this };
     // Its tabs held open in an editor outside.
     ALScriptExternalEditor             mExternal{ *this, *this };
+    // Its files on disk, and the recent lists.
+    ALScriptStudioFiles                mFiles{ *this, *this };
     LLHandle<LLContextMenu>            mTabMenuHandle;
     bool                               mMain = true;
     // Whose path the bar at the bottom shows, so that a tab come to the
