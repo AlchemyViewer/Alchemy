@@ -177,6 +177,7 @@ if(AL_BUILD_VIEWER)
     alscriptnotecardworld.cpp
     alscriptpreprocessor.cpp
     alscriptstudiodoc.cpp
+    alscriptstudiosave.cpp
     alscriptweightspane.cpp
     alscriptworkspace.cpp
     alterrainsurfacemaps.cpp
