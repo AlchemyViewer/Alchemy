@@ -7109,10 +7109,11 @@ bool ALFloaterScriptStudio::applyFix(Doc& doc, const ALScriptFix& fix, U32 versi
 }
 
 // static
-std::vector<const ALScriptFix*> ALFloaterScriptStudio::pickFixes(const Doc& doc, const FixPick& pick)
+std::vector<const ALScriptFix*> ALFloaterScriptStudio::pickFixes(const Doc& doc, const FixPick& pick, size_t* left)
 {
     std::vector<const ALScriptFix*> taken;
-    const U32                       now = doc.editor->document().version();
+    const U32                       now       = doc.editor->document().version();
+    const bool                      only_safe = pick.forSave || pick.key.empty();
     for (const Doc::Shown& shown : doc.shown)
     {
         if (!shown.file.empty() || shown.fixesFor != now || (!pick.key.empty() && shown.key != pick.key))
@@ -7123,9 +7124,13 @@ std::vector<const ALScriptFix*> ALFloaterScriptStudio::pickFixes(const Doc& doc,
         {
             if (fix.preferred && fix.kind == ALScriptFix::Kind::Fix)
             {
-                if (!pick.forSave || (fix.safe && !fix.removes))
+                if (!only_safe || (fix.safe && !(pick.forSave && fix.removes)))
                 {
                     taken.push_back(&fix);
+                }
+                else if (left)
+                {
+                    ++*left;
                 }
                 break;
             }
@@ -7171,16 +7176,22 @@ void ALFloaterScriptStudio::askFixAll(Doc& doc, const FixPick& pick)
         setStatus(getString("FixChecking", args));
         return;
     }
-    const std::vector<const ALScriptFix*> fixes = pickFixes(doc, pick);
+    size_t                                left  = 0;
+    const std::vector<const ALScriptFix*> fixes = pickFixes(doc, pick, &left);
+    // What is not safe to make without a look, said to be left for one.
+    const std::string left_said = left > 0 ? counted("FixesLeft", static_cast<S32>(left)) : std::string();
     if (fixes.size() < 2)
     {
         if (!fixes.empty())
         {
-            applyFix(doc, *fixes.front(), doc.editor->document().version());
+            if (applyFix(doc, *fixes.front(), doc.editor->document().version()) && !left_said.empty())
+            {
+                setStatus(fixes.front()->title + " " + left_said);
+            }
         }
         else
         {
-            setStatus(getString("FixNone"));
+            setStatus(left_said.empty() ? getString("FixNone") : getString("FixNoneSafe") + " " + left_said);
         }
         return;
     }
@@ -7189,6 +7200,7 @@ void ALFloaterScriptStudio::askFixAll(Doc& doc, const FixPick& pick)
     args["FIXES"]                    = counted("Fixes", static_cast<S32>(fixes.size()));
     args["NAME"]                     = doc.name;
     args["EXAMPLE"]                  = fixes.front()->title;
+    args["LEFT"]                     = left_said.empty() ? std::string() : " " + left_said;
     const LLHandle<LLFloater> handle = getHandle();
     const std::string         id     = doc.id;
     LLNotificationsUtil::add("ScriptStudioFixAll", args, LLSD(), [handle, id, pick](const LLSD& notification, const LLSD& response) {
@@ -15154,7 +15166,9 @@ void ALFloaterScriptStudio::showProblemMenu(S32 x, S32 y)
         {
             return pickFixes(*doc, FixPick{ shown->key }).size() > 1;
         }
-        return param.asString() == "all" && pickFixes(*doc, FixPick{}).size() > 1;
+        // Where Fix All would only say what it leaves, too, so that it can.
+        size_t left = 0;
+        return param.asString() == "all" && pickFixes(*doc, FixPick{}, &left).size() + left > 1;
     });
     LLContextMenu* menu = LLUICtrlFactory::createFromFile<LLContextMenu>("menu_script_studio_problem.xml", LLMenuGL::sMenuContainer,
                                                                           LLMenuHolderGL::child_registry_t::instance());
@@ -16451,7 +16465,8 @@ bool ALFloaterScriptStudio::onMenuEnable(const LLSD& param)
     }
     if (action == "fix_all")
     {
-        return doc && doc->loaded && doc->modifiable && !pickFixes(*doc, FixPick{}).empty();
+        size_t left = 0;
+        return doc && doc->loaded && doc->modifiable && (!pickFixes(*doc, FixPick{}, &left).empty() || left > 0);
     }
     if (action == "go_to_line" || action == "find" || action == "replace" || action == "find_next" || action == "find_previous")
     {

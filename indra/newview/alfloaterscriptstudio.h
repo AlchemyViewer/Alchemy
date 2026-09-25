@@ -729,8 +729,12 @@ private:
     void                askFixAll(Doc& doc, const FixPick& pick);
     bool                fixAll(Doc& doc, const FixPick& pick);
     // The preferred fixes picked, of the script's own problems, none of
-    // whose edits overlap another taken before it.
-    static std::vector<const ALScriptFix*> pickFixes(const Doc& doc, const FixPick& pick);
+    // whose edits overlap another taken before it. Over the whole script,
+    // only the safe ones: a cast, a call put for a deprecated one that
+    // behaves otherwise, a guess at a name, a require, is each a choice,
+    // counted in `left` and left to be made one by one. Of one kind, asked
+    // for by it, every preferred one.
+    static std::vector<const ALScriptFix*> pickFixes(const Doc& doc, const FixPick& pick, size_t* left = nullptr);
     // The problem a row of the pane is, in its script's list, where its
     // fixes are.
     const Doc::Shown*   shownOf(const LLSD& value) const;

@@ -1994,7 +1994,7 @@ Replace [PLACES] in [SCRIPTS] with &quot;[WITH]&quot;? Each script's change is o
    icon="alertmodal.tga"
    name="ScriptStudioFixAll"
    type="alertmodal">
-Make [FIXES] in &quot;[NAME]&quot;, one for each problem, such as &quot;[EXAMPLE]&quot;? They are one step to undo.
+Make [FIXES] in &quot;[NAME]&quot;, one for each problem, such as &quot;[EXAMPLE]&quot;? They are one step to undo.[LEFT]
     <tag>confirm</tag>
     <usetemplate
      name="okcancelbuttons"

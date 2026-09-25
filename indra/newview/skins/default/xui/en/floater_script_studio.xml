@@ -90,6 +90,9 @@
     <floater.string name="FixesMadeA">Made 1 fix.</floater.string>
     <floater.string name="FixesMadeB">Made [COUNT] fixes.</floater.string>
     <floater.string name="FixNone">Nothing here has a fix to make.</floater.string>
+    <floater.string name="FixNoneSafe">Nothing here has a fix that is safe to make without a look.</floater.string>
+    <floater.string name="FixesLeftA">1 fix that may change what the script does, or guesses at what was meant, is left for you to choose in Problems.</floater.string>
+    <floater.string name="FixesLeftB">[COUNT] fixes that may change what the script does, or guess at what was meant, are left for you to choose in Problems.</floater.string>
     <floater.string name="FixChecking">Checking [NAME] for what to fix...</floater.string>
     <floater.string name="FilterFixable">Fixable</floater.string>
     <floater.string name="FilterFixableCount">Fixable ([COUNT])</floater.string>
