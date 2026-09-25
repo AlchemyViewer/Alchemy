@@ -32,6 +32,7 @@
 #include "llcheckboxctrl.h"
 #include "llclipboard.h"
 #include "llcombobox.h"
+#include "llfloater.h"
 #include "llfiltereditor.h"
 #include "llmenugl.h"
 #include "llpanel.h"
@@ -251,13 +252,16 @@ bool ALScriptProblemsPane::postBuild()
     mScope    = getChild<LLComboBox>("problems_scope");
     mOrigin   = getChild<LLComboBox>("problems_origin");
     mFilter   = getChild<LLFilterEditor>("problems_filter");
-    return true;
-}
-
-void ALScriptProblemsPane::attach(ALScriptStudioServices& services, Window& window)
-{
-    mServices = &services;
-    mWindow   = &window;
+    // The window this is a tab of, found through the view tree, as what
+    // the tab asks of it.
+    LLFloater* window = getParentByType<LLFloater>();
+    mServices         = dynamic_cast<ALScriptStudioServices*>(window);
+    mWindow           = dynamic_cast<Window*>(window);
+    if (!mServices || !mWindow)
+    {
+        LL_WARNS() << "The Problems tab is not in a Script Studio window" << LL_ENDL;
+        return true;
+    }
     // A row chosen shows its place and keeps the keyboard in the list, so
     // that the arrows walk on through them; a double-click goes there.
     mList->setCommitCallback([this](LLUICtrl*, const LLSD&) { choose(false); });
@@ -308,7 +312,10 @@ void ALScriptProblemsPane::attach(ALScriptStudioServices& services, Window& wind
         }
         return said != 0 ? said : place();
     });
+    return true;
 }
+
+
 
 ALScriptProblemsPane::~ALScriptProblemsPane()
 {

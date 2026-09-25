@@ -31,6 +31,7 @@
 #include "alscriptstudioservices.h"
 #include "alstringmatch.h"
 #include "llbutton.h"
+#include "llfloater.h"
 #include "llclipboard.h"
 #include "llcombobox.h"
 #include "llfiltereditor.h"
@@ -68,13 +69,16 @@ bool ALScriptOutputPane::postBuild()
     mWhose = getChild<LLComboBox>("output_filter");
     mKind  = getChild<LLComboBox>("output_kind");
     mFind  = getChild<LLFilterEditor>("output_find");
-    return true;
-}
-
-void ALScriptOutputPane::attach(ALScriptStudioServices& services, Window& window)
-{
-    mServices = &services;
-    mWindow   = &window;
+    // The window this is a tab of, found through the view tree, as what
+    // the tab asks of it.
+    LLFloater* window = getParentByType<LLFloater>();
+    mServices         = dynamic_cast<ALScriptStudioServices*>(window);
+    mWindow           = dynamic_cast<Window*>(window);
+    if (!mServices || !mWindow)
+    {
+        LL_WARNS() << "The Output tab is not in a Script Studio window" << LL_ENDL;
+        return true;
+    }
     mView->setPlaceholder(mServices->words("NoOutput"));
     // What the studio did has its own lane in the log, so that a busy
     // debug channel does not push it out.
@@ -115,7 +119,10 @@ void ALScriptOutputPane::attach(ALScriptStudioServices& services, Window& window
         LLClipboard::instance().copyToClipboard(all, 0, static_cast<S32>(all.size()));
         mServices->setStatus(mServices->counted("OutputCopied", lines));
     });
+    return true;
 }
+
+
 
 ALScriptOutputPane::Place ALScriptOutputPane::heard(const ALScriptWorkspace::RuntimeEvent& event)
 {

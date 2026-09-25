@@ -51,12 +51,11 @@ namespace tut
         LLFloater*                   floater = window.floater;
 
         LLPanel* tab() const { return floater ? floater->findChild<LLPanel>("weights_tab", true) : nullptr; }
-        // The tab as the skin built it, in the window's words.
+        // The tab as the skin built it, in its window's words.
         ALScriptWeightsPane& weights() const
         {
             ALScriptWeightsPane* pane = floater->findChild<ALScriptWeightsPane>("weights_tab", true);
             ensure("the skin builds the tab as the pane", pane != nullptr);
-            pane->setStrings(*floater);
             return *pane;
         }
         ALPaneList* list(const char* name) const { return floater ? floater->findChild<ALPaneList>(name, true) : nullptr; }

@@ -48,7 +48,7 @@ namespace
 
     // The window's side, answered as a test says, and what was asked of it
     // kept.
-    class FakeWindow final : public ALScriptSearchPane::Window
+    class FakeWindow : public ALScriptSearchPane::Window
     {
     public:
         struct Fetch
@@ -114,9 +114,10 @@ namespace tut
 {
     struct alscriptsearchpane_data
     {
-        al_studio_test::StudioWindow window;
-        al_studio_test::FakeServices services{ window.floater };
-        FakeWindow                   studio;
+        // The window the pane finds through the view tree: the fakes.
+        al_studio_test::StudioWindowOf<FakeWindow> window;
+        al_studio_test::FakeServices&             services = window.services();
+        FakeWindow&                               studio   = window.pane();
         ALScriptSearchPane*          pane = nullptr;
 
         ALScriptSearchPane& make()
@@ -128,7 +129,6 @@ namespace tut
             // The tab as the skin built it.
             pane = window.find<ALScriptSearchPane>("search_tab");
             ensure("the skin builds the tab as the pane", pane != nullptr);
-            pane->attach(services, studio);
             return *pane;
         }
 
@@ -287,7 +287,7 @@ namespace tut
         out.fetched(studio.fetches[0].generation, "Thing", away, "away.lsl", std::string("timer\n"), false);
         out.fetched(studio.fetches[1].generation, "Thing", card, "card", std::string("a timer\n"), true);
         ensure_equals("three found", out.search().found().size(), size_t(3));
-        services.onOpen = [this](const ALScriptRef& ref, const std::string&) {
+        services.whenOpened = [this](const ALScriptRef& ref, const std::string&) {
             Doc& opened = doc("away", "timer\n");
             opened.ref  = ref;
         };

@@ -62,72 +62,10 @@ const std::string& rlvGetAnonym(const LLAvatarName& av_name)
 
 namespace al_studio_test
 {
-    // The studio's window as the skin in the source tree has it, which is
-    // where a unit's widgets and words are. Null where there is no UI to
-    // build it with: LLUI_TEST_APP_DIR not pointing at the tree.
-    class StudioWindow
-    {
-    public:
-        StudioWindow()
-        {
-            // The UI first: a widget's parameters ask for its fonts.
-            if (!ll_test::HeadlessUI::get().ok())
-            {
-                return;
-            }
-            // Its widgets made reachable: a static library links a widget's
-            // registrar only with the object that holds its block.
-            ALCodeEditor::Params editor;
-            ALDockPanel::Params  dock;
-            ALJumpBar::Params    jump;
-            ALOutputView::Params output;
-            ALPaneList::Params   pane;
-            ALScopeBar::Params   scope;
-            ALTabStrip::Params   tabs;
-            (void)editor.name;
-            (void)dock.name;
-            (void)jump.name;
-            (void)output.name;
-            (void)pane.name;
-            (void)scope.name;
-            (void)tabs.name;
-            LLXMLNodePtr node;
-            if (!LLUICtrlFactory::getLayeredXMLNode("floater_script_studio.xml", node))
-            {
-                return;
-            }
-            LLPanel::Params sp(LLUICtrlFactory::getDefaultParams<LLPanel>());
-            sp.name = "stage";
-            sp.rect = LLRect(0, 1080, 1920, 0);
-            mStage  = LLUICtrlFactory::create<LLPanel>(sp);
-            floater = new LLFloater(LLSD(), LLFloater::getDefaultParams());
-            mStage->addChild(floater);
-            if (!floater->initFloaterXML(node, mStage, "floater_script_studio.xml"))
-            {
-                floater = nullptr;
-            }
-        }
-        ~StudioWindow() { delete mStage; }
-        StudioWindow(const StudioWindow&)            = delete;
-        StudioWindow& operator=(const StudioWindow&) = delete;
-
-        template <class T>
-        T* find(const std::string& name) const
-        {
-            return floater ? floater->findChild<T>(name, true) : nullptr;
-        }
-        LLPanel* tab(const std::string& name) const { return find<LLPanel>(name); }
-
-        LLFloater* floater = nullptr;
-
-    private:
-        LLPanel* mStage = nullptr;
-    };
-
     // The window's services, faked: the tabs a test makes, the window's
     // words where it has them, and a record of everything a unit said or
     // asked to go to.
-    class FakeServices final : public ALScriptStudioServices
+    class FakeServices : public ALScriptStudioServices
     {
     public:
         struct Said
@@ -236,9 +174,9 @@ namespace al_studio_test
                         bool focus = true) override
         {
             opened.push_back({ ref, name, std::move(carried), line, focus });
-            if (onOpen)
+            if (whenOpened)
             {
-                onOpen(ref, name);
+                whenOpened(ref, name);
             }
         }
         void goToPlace(const ALScriptRef& ref, const std::string& name, S32 line, S32 column, S32 length) override
@@ -255,11 +193,98 @@ namespace al_studio_test
         std::vector<Went>                               went;
         std::vector<bool>                               reveals;
         // What a test does as a script is asked to open: a tab for it, say.
-        std::function<void(const ALScriptRef&, const std::string&)> onOpen;
+        std::function<void(const ALScriptRef&, const std::string&)> whenOpened;
 
     private:
         const LLPanel* mStrings = nullptr;
     };
+    // A pane's window with nothing to fake: the services alone.
+    struct NoPane
+    {
+    };
+
+    // The studio's window for a test: a floater that is the window's
+    // services, faked, and what a pane asks of the window, faked where a
+    // test gives a fake of it -- a pane finds its window through the view
+    // tree, as the window it is a tab of.
+    template <class PaneWindow>
+    class FakeStudio final : public LLFloater, public FakeServices, public PaneWindow
+    {
+    public:
+        FakeStudio() : LLFloater(LLSD(), LLFloater::getDefaultParams()), FakeServices(this) {}
+    };
+
+    // The studio's window as the skin in the source tree has it, which is
+    // where a unit's widgets and words are, built into a FakeStudio. Null
+    // where there is no UI to build it with: LLUI_TEST_APP_DIR not pointing
+    // at the tree.
+    template <class PaneWindow = NoPane>
+    class StudioWindowOf
+    {
+    public:
+        StudioWindowOf()
+        {
+            // The UI first: a widget's parameters ask for its fonts.
+            if (!ll_test::HeadlessUI::get().ok())
+            {
+                return;
+            }
+            // Its widgets made reachable: a static library links a widget's
+            // registrar only with the object that holds its block.
+            ALCodeEditor::Params editor;
+            ALDockPanel::Params  dock;
+            ALJumpBar::Params    jump;
+            ALOutputView::Params output;
+            ALPaneList::Params   pane;
+            ALScopeBar::Params   scope;
+            ALTabStrip::Params   tabs;
+            (void)editor.name;
+            (void)dock.name;
+            (void)jump.name;
+            (void)output.name;
+            (void)pane.name;
+            (void)scope.name;
+            (void)tabs.name;
+            LLXMLNodePtr node;
+            if (!LLUICtrlFactory::getLayeredXMLNode("floater_script_studio.xml", node))
+            {
+                return;
+            }
+            LLPanel::Params sp(LLUICtrlFactory::getDefaultParams<LLPanel>());
+            sp.name = "stage";
+            sp.rect = LLRect(0, 1080, 1920, 0);
+            mStage  = LLUICtrlFactory::create<LLPanel>(sp);
+            floater = new FakeStudio<PaneWindow>();
+            mStage->addChild(floater);
+            if (!floater->initFloaterXML(node, mStage, "floater_script_studio.xml"))
+            {
+                floater = nullptr;
+            }
+        }
+        ~StudioWindowOf() { delete mStage; }
+        StudioWindowOf(const StudioWindowOf&)            = delete;
+        StudioWindowOf& operator=(const StudioWindowOf&) = delete;
+
+        template <class T>
+        T* find(const std::string& name) const
+        {
+            return floater ? floater->template findChild<T>(name, true) : nullptr;
+        }
+        LLPanel* tab(const std::string& name) const { return find<LLPanel>(name); }
+
+        // The fakes the window is: stand-ins where it could not be built,
+        // which a test skips then anyway.
+        FakeServices& services() { return floater ? static_cast<FakeServices&>(*floater) : mNoServices; }
+        PaneWindow&   pane() { return floater ? static_cast<PaneWindow&>(*floater) : mNoPane; }
+
+        FakeStudio<PaneWindow>* floater = nullptr;
+
+    private:
+        LLPanel*     mStage = nullptr;
+        FakeServices mNoServices;
+        PaneWindow   mNoPane;
+    };
+    using StudioWindow = StudioWindowOf<>;
 }
 
 #endif // AL_ALSCRIPTSTUDIO_FIXTURE_H

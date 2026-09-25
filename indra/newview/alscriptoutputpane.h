@@ -89,12 +89,11 @@ public:
         std::string fileName;
     };
 
-    // Built by the skin, as the tab (class="script_studio_output"); given
-    // the window's services, and what it asks of the window, once the
-    // window is built, before anything is said.
+    // Built by the skin, as the tab (class="script_studio_output"), in a
+    // Script Studio window it finds through the view tree, whose services
+    // it uses and which it asks what it does not do itself.
     explicit ALScriptOutputPane(const LLPanel::Params& params = getDefaultParams());
     bool postBuild() override;
-    void attach(ALScriptStudioServices& services, Window& window);
 
     // What a script said: a line of the log, or more where it said more,
     // its object offered in the filter the first time it speaks. What

@@ -31,6 +31,7 @@
 #include "alscopebar.h"
 #include "alscriptstudioservices.h"
 #include "llbutton.h"
+#include "llfloater.h"
 #include "llfontgl.h"
 #include "lllineeditor.h"
 #include "llpanel.h"
@@ -59,13 +60,16 @@ bool ALScriptSearchPane::postBuild()
     mResults     = getChild<ALPaneList>("search_results");
     mReplacement = getChild<LLLineEditor>("search_replacement");
     mReplace     = getChild<LLButton>("search_replace");
-    return true;
-}
-
-void ALScriptSearchPane::attach(ALScriptStudioServices& services, Window& window)
-{
-    mServices = &services;
-    mWindow   = &window;
+    // The window this is a tab of, found through the view tree, as what
+    // the tab asks of it.
+    LLFloater* window = getParentByType<LLFloater>();
+    mServices         = dynamic_cast<ALScriptStudioServices*>(window);
+    mWindow           = dynamic_cast<Window*>(window);
+    if (!mServices || !mWindow)
+    {
+        LL_WARNS() << "The Search tab is not in a Script Studio window" << LL_ENDL;
+        return true;
+    }
     buildSentence();
     // How many places, in the slot at the sentence's right end.
     LLTextBox::Params count(LLUICtrlFactory::getDefaultParams<LLTextBox>());
@@ -108,7 +112,10 @@ void ALScriptSearchPane::attach(ALScriptStudioServices& services, Window& window
         }
         return said != 0 ? said : x < y ? -1 : y < x ? 1 : fa < fb ? -1 : fa > fb ? 1 : 0;
     });
+    return true;
 }
+
+
 
 // Said as a sentence rather than as a form:
 //

@@ -78,11 +78,10 @@ public:
         S32         column = 0;
     };
 
-    // Built by the skin, as the tab (class="script_studio_weights"); it
-    // speaks in the words of `strings`, the window's, once given them.
+    // Built by the skin, as the tab (class="script_studio_weights"),
+    // speaking in the words of the window it is a tab of.
     explicit ALScriptWeightsPane(const LLPanel::Params& params = getDefaultParams());
     bool     postBuild() override;
-    void setStrings(const LLPanel& strings) { mStrings = &strings; }
 
     // A script's weights, the target chosen kept where it is the same
     // script, and the part chosen and the scroll kept through a refill.

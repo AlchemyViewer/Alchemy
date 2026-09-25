@@ -49,7 +49,7 @@ namespace
 
     // The window's side, answered as a test says, and what was asked of it
     // kept.
-    class FakeWindow final : public ALScriptProblemsPane::Window
+    class FakeWindow : public ALScriptProblemsPane::Window
     {
     public:
         void problemCountsChanged() override { ++counts; }
@@ -124,9 +124,10 @@ namespace tut
 {
     struct alscriptproblemspane_data
     {
-        al_studio_test::StudioWindow         window;
-        al_studio_test::FakeServices         services{ window.floater };
-        FakeWindow                           studio;
+        // The window the pane finds through the view tree: the fakes.
+        al_studio_test::StudioWindowOf<FakeWindow> window;
+        al_studio_test::FakeServices&             services = window.services();
+        FakeWindow&                               studio   = window.pane();
         ALScriptProblemsPane*                pane = nullptr;
 
         ALScriptProblemsPane& make()
@@ -138,7 +139,6 @@ namespace tut
             // The tab as the skin built it.
             pane = window.find<ALScriptProblemsPane>("problems_tab");
             ensure("the skin builds the tab as the pane", pane != nullptr);
-            pane->attach(services, studio);
             return *pane;
         }
 

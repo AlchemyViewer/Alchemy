@@ -127,13 +127,12 @@ public:
         ~Window() = default;
     };
 
-    // Built by the skin, as the tab (class="script_studio_problems");
-    // given the window's services, and what it asks of the window, once
-    // the window is built, before anything is listed.
+    // Built by the skin, as the tab (class="script_studio_problems"), in a
+    // Script Studio window it finds through the view tree, whose services
+    // it uses and which it asks what it does not do itself.
     explicit ALScriptProblemsPane(const LLPanel::Params& params = getDefaultParams());
     ~ALScriptProblemsPane() override;
     bool postBuild() override;
-    void attach(ALScriptStudioServices& services, Window& window);
 
     // A tab's problems made anew: kept, and listed again where the list
     // holds that tab's, or every one's.

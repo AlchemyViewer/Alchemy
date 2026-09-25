@@ -27,6 +27,7 @@
 #include "alscriptweightspane.h"
 
 #include "alpanelist.h"
+#include "llfloater.h"
 #include "llpanel.h"
 #include "llscrolllistitem.h"
 #include "lltextbox.h"
@@ -89,6 +90,11 @@ ALScriptWeightsPane::ALScriptWeightsPane(const LLPanel::Params& params) : LLPane
 
 bool ALScriptWeightsPane::postBuild()
 {
+    // The words it says things in: the window's.
+    if (const LLFloater* window = getParentByType<LLFloater>())
+    {
+        mStrings = window;
+    }
     mHead    = getChild<LLTextBox>("weights_head");
     mTargets = getChild<ALPaneList>("weights_targets");
     mParts   = getChild<ALPaneList>("weights_parts");

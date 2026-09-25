@@ -96,12 +96,11 @@ public:
         ~Window() = default;
     };
 
-    // Built by the skin, as the tab (class="script_studio_search"); given
-    // the window's services, and what it asks of the window, once the
-    // window is built, before anything is searched.
+    // Built by the skin, as the tab (class="script_studio_search"), in a
+    // Script Studio window it finds through the view tree, whose services
+    // it uses and which it asks what it does not do itself.
     explicit ALScriptSearchPane(const LLPanel::Params& params = getDefaultParams());
     bool postBuild() override;
-    void attach(ALScriptStudioServices& services, Window& window);
 
     // What the sentence says, searched for; and the words to look for
     // given the keyboard, what is chosen on a line of a tab in front put

@@ -696,7 +696,6 @@ bool ALFloaterScriptStudio::postBuild()
     mReferences    = getChild<ALPaneList>("references");
     mOutline       = getChild<ALPaneList>("outline");
     mWeightsPane   = getChild<ALScriptWeightsPane>("weights_tab");
-    mWeightsPane->setStrings(*this);
     mWeightsParts  = mWeightsPane->partsList();
     mSymbol        = getChild<ALTextView>("symbol");
     // The declaration, in the script the inspector is about or in the
@@ -744,7 +743,6 @@ bool ALFloaterScriptStudio::postBuild()
     mBreadcrumb->onChose(boost::bind(&ALFloaterScriptStudio::onCrumbChosen, this, _1, _2));
     mBreadcrumb->onTrailerChosen([this](const std::string& value) { onTrailerChosen(value); });
     mProblemsPane = getChild<ALScriptProblemsPane>("problems_tab");
-    mProblemsPane->attach(*this, *this);
     mReferences->setCommitCallback([this](LLUICtrl*, const LLSD&) { onReferenceChosen(false); });
     mReferences->setDoubleClickCallback([this]() { onReferenceChosen(true); });
     mWeightsParts->setCommitCallback([this](LLUICtrl*, const LLSD&) { onWeightChosen(false); });
@@ -752,7 +750,6 @@ bool ALFloaterScriptStudio::postBuild()
     mOutline->setCommitCallback([this](LLUICtrl*, const LLSD&) { onOutlineChosen(false); });
     mOutline->setDoubleClickCallback([this]() { onOutlineChosen(true); });
     mOutputPane = getChild<ALScriptOutputPane>("output_tab");
-    mOutputPane->attach(*this, *this);
     // What was said before the window opened, then everything after.
     for (const ALScriptWorkspace::RuntimeEvent& event : ALScriptWorkspace::instance().recentRuntime())
     {
@@ -761,7 +758,6 @@ bool ALFloaterScriptStudio::postBuild()
     mRuntimeConnection = ALScriptWorkspace::instance().onRuntime([this](const ALScriptWorkspace::RuntimeEvent& event) { runtimeEvent(event); });
 
     mSearchPane = getChild<ALScriptSearchPane>("search_tab");
-    mSearchPane->attach(*this, *this);
     // In a pane's list, return goes to the place chosen, to type there, and
     // escape goes back to the script without going anywhere -- asked of
     // the list first, since the panel it is in takes escape to mean
