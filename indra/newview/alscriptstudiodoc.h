@@ -36,7 +36,7 @@
 #include "alscriptworkspace.h"
 #include "alsourcemap.h"
 #include "alstringmatch.h"
-#include "lllivefile.h"
+#include "alwatchedfile.h"
 #include "llstl.h"
 
 #include <boost/signals2.hpp>
@@ -464,7 +464,7 @@ struct ALScriptStudioDoc
     // and whether the bridge was told, so that VS Code can subscribe.
     // Whether the save under way came from the editor, which does not
     // write the file back, is the save's (ALScriptSaveFlow::external).
-    std::unique_ptr<LLLiveFile>                liveFile;
+    std::unique_ptr<ALWatchedFile>             liveFile;
     std::string                                liveLog;
     bool                                       subscribed   = false;
     // What the external editor's copy held when the studio last wrote

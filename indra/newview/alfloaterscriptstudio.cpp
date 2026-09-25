@@ -6597,51 +6597,31 @@ void ALFloaterScriptStudio::applyPendingEdits(Doc& doc)
 namespace
 {
     // The temp file an external editor is given, watched for its saves;
-    // gone from disk with it.
-    class StudioLiveFile final : public LLLiveFile
+    // gone from disk with it. What is written here is marked seen as it
+    // is written (ALWatchedFile::seen), and so is no save of the editor's.
+    class StudioLiveFile final : public ALWatchedFile
     {
     public:
-        typedef std::function<void(const std::string& filename)> changed_t;
-
         // A temp file of the studio's own goes with the watch; a file
         // the author keeps on disk stays.
         StudioLiveFile(const std::string& path, changed_t changed, bool ours)
-        :   LLLiveFile(path, 1.f),
-            mChanged(std::move(changed)),
+        :   ALWatchedFile(path, std::move(changed)),
             mOurs(ours)
         {
+            // Twice a second: a save is heard within a second of it, once
+            // it has held still from one look to the next.
+            poll(0.5f);
         }
         ~StudioLiveFile() override
         {
             if (mOurs)
             {
-                LLFile::remove(filename());
+                LLFile::remove(path());
             }
-        }
-
-        // The next change is one made here, not to be taken as the
-        // editor's.
-        void ignoreNextUpdate() { mIgnoreNext = true; }
-
-    protected:
-        bool loadFile() override
-        {
-            if (mIgnoreNext)
-            {
-                mIgnoreNext = false;
-                return true;
-            }
-            if (mChanged)
-            {
-                mChanged(filename());
-            }
-            return true;
         }
 
     private:
-        changed_t mChanged;
-        bool      mOurs;
-        bool      mIgnoreNext = false;
+        bool mOurs;
     };
 
     bool writeWhole(const std::string& path, const std::string& text)
@@ -6692,12 +6672,15 @@ void ALFloaterScriptStudio::editExternally(Doc& doc)
         // outside change does.
         watchFile(doc);
     }
-    else if (!doc.liveFile || doc.liveFile->filename() != filename)
+    else if (!doc.liveFile || doc.liveFile->path() != filename)
     {
+        // Watched from what was just written, which is no save of the
+        // editor's: a tab with unsaved changes is not saved for being
+        // opened outside.
         doc.liveFile.reset();
         const LLHandle<LLFloater> handle = getHandle();
         const std::string         id     = doc.id;
-        auto                      watch  = std::make_unique<StudioLiveFile>(
+        doc.liveFile                     = std::make_unique<StudioLiveFile>(
             filename,
             [handle, id](const std::string& file) {
                 if (ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get()))
@@ -6706,12 +6689,10 @@ void ALFloaterScriptStudio::editExternally(Doc& doc)
                 }
             },
             true);
-        watch->addToEventTimer();
-        doc.liveFile = std::move(watch);
     }
     else
     {
-        static_cast<StudioLiveFile*>(doc.liveFile.get())->ignoreNextUpdate();
+        doc.liveFile->seen();
     }
     doc.liveLog = on_disk ? std::string() : filename + ".log";
 
@@ -6786,6 +6767,12 @@ void ALFloaterScriptStudio::externalChanged(const std::string& id, const std::st
     {
         text.clear();
     }
+    if (settled && text == doc.externalWritten)
+    {
+        // Emptied as the first of an editor's two steps, and the second
+        // heard and taken since: nothing more to take, nor to save again.
+        return;
+    }
     if (text.empty() && !settled && !doc.editor->text().empty())
     {
         // Emptied -- or caught between an editor's two steps: taken only
@@ -6843,7 +6830,7 @@ void ALFloaterScriptStudio::syncExternal(Doc& doc)
     {
         return;
     }
-    const std::string filename = doc.liveFile->filename();
+    const std::string filename = doc.liveFile->path();
     if (!gDirUtilp->fileExists(filename))
     {
         return;
@@ -6858,8 +6845,8 @@ void ALFloaterScriptStudio::syncExternal(Doc& doc)
     {
         return;
     }
-    static_cast<StudioLiveFile*>(doc.liveFile.get())->ignoreNextUpdate();
     writeWhole(filename, text);
+    doc.liveFile->seen();
 }
 
 void ALFloaterScriptStudio::logExternal(Doc& doc, const ALScriptWorkspace::CompileResult& result)
@@ -6914,7 +6901,7 @@ void ALFloaterScriptStudio::watchFile(Doc& doc)
     // editor the studio started, or anything else.
     const LLHandle<LLFloater> handle = getHandle();
     const std::string         id     = doc.id;
-    auto                      watch  = std::make_unique<StudioLiveFile>(
+    doc.liveFile                     = std::make_unique<StudioLiveFile>(
         doc.file,
         [handle, id](const std::string& file) {
             if (ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get()))
@@ -6923,8 +6910,6 @@ void ALFloaterScriptStudio::watchFile(Doc& doc)
             }
         },
         false);
-    watch->addToEventTimer();
-    doc.liveFile = std::move(watch);
 }
 
 void ALFloaterScriptStudio::fileChangedOutside(const std::string& id, const std::string& file)
@@ -6991,11 +6976,6 @@ void ALFloaterScriptStudio::fileChangedOutside(const std::string& id, const std:
 void ALFloaterScriptStudio::saveFile(Doc& doc)
 {
     doc.save.done();
-    if (doc.liveFile)
-    {
-        // The watcher on the file: this write is not an outside change.
-        static_cast<StudioLiveFile*>(doc.liveFile.get())->ignoreNextUpdate();
-    }
     LLStringUtil::format_map_t args;
     args["[PATH]"] = doc.file;
     if (!ALFileWrite::whole(doc.file, doc.editor->text()))
@@ -7003,6 +6983,11 @@ void ALFloaterScriptStudio::saveFile(Doc& doc)
         report(getString("SaveToFileFailed", args), true, &doc);
         saveStopped(doc);
         return;
+    }
+    if (doc.liveFile)
+    {
+        // The watcher on the file: this write is not an outside change.
+        doc.liveFile->seen();
     }
     report(getString("SavedToFile", args), false, &doc);
     fileSettled(doc);

@@ -20,6 +20,7 @@ target_sources(
     alfilewrite.cpp
     alparamtype.cpp
     alregex.cpp
+    alwatchedfile.cpp
     apply.cpp
     commoncontrol.cpp
     indra_constants.cpp
@@ -121,6 +122,7 @@ target_sources(
         alparamtype.h
         alregex.h
         alsimd.h
+        alwatchedfile.h
         always_return.h
         apply.h
         chrono.h
@@ -292,6 +294,7 @@ if(AL_BUILD_TESTS)
     test
     alfilewrite
     alregex
+    alwatchedfile
     apply
     bitpack
     classic_callback
