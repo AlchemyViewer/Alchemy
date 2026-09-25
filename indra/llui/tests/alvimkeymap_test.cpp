@@ -963,8 +963,8 @@ namespace tut
         // keymap's own; a range in front does not confuse the name.
         keys(":%set no<Tab>");
         ensure("the options starting no",
-               vim->typingLine(line, caret) && line == ":%set noexpandtab" && vim->menu(items, chosen) && items.size() == 6);
-        keys("<Tab><Tab><Tab>");
+               vim->typingLine(line, caret) && line == ":%set noexpandtab" && vim->menu(items, chosen) && items.size() == 7);
+        keys("<Tab><Tab><Tab><Tab>");
         ensure("nonumber among them", vim->typingLine(line, caret) && line == ":%set nonumber");
         // Typing on keeps what is on the line and lets the row go.
         keys("x");
@@ -1796,5 +1796,49 @@ namespace tut
         make("\n");
         keys("i<C-v><Tab>x<C-v>u00e9<C-v>(<Esc>");
         ensure_equals("a tab, an e by its code, a bracket alone", editor->document().line(0), std::string("\tx\xC3\xA9("));
+    }
+
+    template<> template<>
+    void alvimkeymap_object::test<57>()
+    {
+        set_test_name("the search line lights what is typed so far, as incsearch has it; Escape lets it go; :set noincsearch leaves it alone");
+        ALCodeEditor& e = make("abc\nxyz\nabd\n");
+        keys("/ab");
+        ensure_equals("each match lit as typed", e.highlights().size(), size_t(2));
+        ensure("the caret where it was", e.caret() == ALTextPos(0, 0));
+        keys("c");
+        ensure_equals("fewer as it narrows", e.highlights().size(), size_t(1));
+        keys("<Esc>");
+        ensure("let go of", e.highlights().empty() && e.caret() == ALTextPos(0, 0));
+        keys(":set nois<CR>/ab");
+        ensure("not lit where it is off", e.highlights().empty());
+        keys("<Esc>");
+    }
+
+    template<> template<>
+    void alvimkeymap_object::test<58>()
+    {
+        set_test_name("a search's offset: /x/e and e-1 by its end, s+1 and b by its start, +1 lines on; n keeps it, going on from the match");
+        ALCodeEditor& e = make("one foo two\nthree foo four\nfive foo\n");
+        keys("/foo/e<CR>");
+        ensure("its last character", e.caret() == ALTextPos(0, 6));
+        keys("n");
+        ensure("n keeps it, the next match's", e.caret() == ALTextPos(1, 8));
+        keys("N");
+        ensure("N back to the one before", e.caret() == ALTextPos(0, 6));
+        keys("gg/foo/s+1<CR>");
+        ensure("one on from its start", e.caret() == ALTextPos(0, 5));
+        keys("gg/foo/e-1<CR>");
+        ensure("one back from its end", e.caret() == ALTextPos(0, 5));
+        keys("gg/foo/+1<CR>");
+        ensure("the line after it", e.caret() == ALTextPos(1, 0));
+        keys("n");
+        ensure("n: the line after the next", e.caret() == ALTextPos(2, 0));
+        keys("gg//b<CR>");
+        ensure("the last pattern with another offset", e.caret() == ALTextPos(0, 4));
+        keys("gg/foo/s-2<CR>");
+        ensure("two back from its start", e.caret() == ALTextPos(0, 2));
+        keys("n");
+        ensure("n from the match, not from before it", e.caret() == ALTextPos(1, 4));
     }
 }

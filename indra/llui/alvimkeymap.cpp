@@ -622,6 +622,14 @@ bool ALVimKeymap::feed(ALTextView& view, const Input& input)
         case Mode::Command:
         case Mode::Search:
             taken = commandLine(view, input);
+            if (mMode == Mode::Search)
+            {
+                incrementalSearch(view);
+            }
+            else if (mIncrementalShown)
+            {
+                endIncremental(view);
+            }
             break;
         case Mode::Confirm:
             taken = confirmKey(view, input);
@@ -1173,6 +1181,7 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
                             mSearchPattern   = d.text(word);
                             mSearchForward   = ch == '*';
                             mSearchWholeWord = false;
+                            mSearchOffset    = SearchOffset();
                             search(view, mSearchPattern, mSearchForward, count, false);
                         }
                         return true;
@@ -2133,7 +2142,7 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
             }
             else
             {
-                search(view, mSearchPattern, ch == 'n' ? mSearchForward : !mSearchForward, count, mSearchWholeWord);
+                search(view, mSearchPattern, ch == 'n' ? mSearchForward : !mSearchForward, count, mSearchWholeWord, mSearchOffset);
             }
             clearPending();
             return true;
@@ -2149,6 +2158,7 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
             mSearchPattern   = d.text(word);
             mSearchForward   = ch == '*';
             mSearchWholeWord = true;
+            mSearchOffset    = SearchOffset();
             search(view, mSearchPattern, mSearchForward, count, true);
             clearPending();
             return true;
@@ -3769,7 +3779,7 @@ void ALVimKeymap::showVisual(ALTextView& view)
 
 // --- searching --------------------------------------------------------------------------
 
-bool ALVimKeymap::search(ALTextView& view, const std::string& pattern, bool forward, S32 count, bool whole_word)
+bool ALVimKeymap::search(ALTextView& view, const std::string& pattern, bool forward, S32 count, bool whole_word, const SearchOffset& offset)
 {
     const ALTextDocument& d = view.document();
     ALTextSearchOptions   options;
@@ -3793,7 +3803,10 @@ bool ALVimKeymap::search(ALTextView& view, const std::string& pattern, bool forw
         return false;
     }
     const ALTextPos start = cursor(view);
-    ALTextPos       from  = start;
+    // From the last match where an offset left the caret by it: n after
+    // /x/e goes on from that match, not from past its end.
+    ALTextPos   from = offset.kind && !mLastMatch.empty() && offsetFrom(d, mLastMatch, offset) == start ? mLastMatch.begin : start;
+    ALTextRange hit;
     for (S32 n = 0; n < count; ++n)
     {
         const S32 index = ALTextSearch::nearest(matches, forward ? d.nextCluster(from) : from, forward);
@@ -3801,7 +3814,13 @@ bool ALVimKeymap::search(ALTextView& view, const std::string& pattern, bool forw
         {
             break;
         }
-        from = matches[static_cast<size_t>(index)].begin;
+        hit  = matches[static_cast<size_t>(index)];
+        from = hit.begin;
+    }
+    if (!hit.empty())
+    {
+        mLastMatch = hit;
+        from       = offsetFrom(d, hit, offset);
     }
     // Every match lit, as hlsearch has it, until :noh or the caret
     // leaves them.
@@ -3917,6 +3936,7 @@ bool ALVimKeymap::commandLine(ALTextView& view, const Input& input)
                 mLine.clear();
                 mLineCursor = 0;
                 mMode       = Mode::Normal;
+                endIncremental(view);
                 moveTo(view, view.caret());
                 return true;
             case KEY_LEFT:
@@ -4017,16 +4037,38 @@ bool ALVimKeymap::commandLine(ALTextView& view, const Input& input)
                 {
                     runCommand(view, line);
                 }
-                else if (!line.empty())
+                else
                 {
-                    mSearchPattern   = line;
-                    mSearchForward   = kind == '/';
-                    mSearchWholeWord = false;
-                    search(view, line, mSearchForward, 1, false);
-                }
-                else if (!mSearchPattern.empty())
-                {
-                    search(view, mSearchPattern, kind == '/', 1, mSearchWholeWord);
+                    // /pattern/offset: an empty pattern the last one, with
+                    // the offset given, or the last one too where none is.
+                    std::string pattern;
+                    std::string offset_text;
+                    splitOffset(line, kind, pattern, offset_text);
+                    SearchOffset offset{};
+                    const bool   has_offset = line.size() > pattern.size();
+                    if (has_offset && !parseOffset(offset_text, offset))
+                    {
+                        endIncremental(view);
+                        say(said("VimBadOffset", "E486: Pattern not found: [PATTERN]", { { "[PATTERN]", line } }), true);
+                        finishCommand(false);
+                        return true;
+                    }
+                    if (!pattern.empty())
+                    {
+                        mSearchPattern   = pattern;
+                        mSearchWholeWord = false;
+                        mSearchOffset    = offset;
+                    }
+                    else if (has_offset)
+                    {
+                        mSearchOffset = offset;
+                    }
+                    mSearchForward = kind == '/';
+                    endIncremental(view);
+                    if (!mSearchPattern.empty())
+                    {
+                        search(view, mSearchPattern, mSearchForward, 1, mSearchWholeWord, mSearchOffset);
+                    }
                 }
                 if (mMode == Mode::Normal)
                 {
@@ -4123,9 +4165,10 @@ void ALVimKeymap::complete(ALTextView& view, bool forward)
             }
             if (command == "set" || command == "se")
             {
-                static const char* OPTIONS[] = { "clipboard=",  "clipboard=unnamed", "expandtab",   "hlsearch", "ignorecase", "noexpandtab",
-                                                 "nohlsearch",  "noignorecase",      "nosmartcase", "nowrap",   "shiftwidth=", "smartcase",
-                                                 "tabstop=",    "wrap" };
+                static const char* OPTIONS[] = { "clipboard=",  "clipboard=unnamed", "expandtab",     "hlsearch",  "ignorecase",
+                                                 "incsearch",   "noexpandtab",       "nohlsearch",    "noignorecase", "noincsearch",
+                                                 "nosmartcase", "nowrap",            "shiftwidth=",   "smartcase", "tabstop=",
+                                                 "wrap" };
                 found.assign(std::begin(OPTIONS), std::end(OPTIONS));
             }
         }
@@ -4819,6 +4862,11 @@ void ALVimKeymap::runCommand(ALTextView& view, const std::string& line_in)
         if (option == "scs" || option == "smartcase")
         {
             mShared->smartCase = !off;
+            return;
+        }
+        if (option == "is" || option == "incsearch")
+        {
+            mShared->incrementalSearch = !off;
             return;
         }
         if (option == "hls" || option == "hlsearch")
@@ -5774,4 +5822,132 @@ bool ALVimKeymap::unmatchedBracket(const ALTextView& view, llwchar bracket, S32 
             }
         }
     }
+}
+
+// static
+void ALVimKeymap::splitOffset(const std::string& line, llwchar kind, std::string& pattern, std::string& offset_text)
+{
+    // The pattern runs to the first `kind` not escaped; the rest is the
+    // offset.
+    for (size_t i = 0; i < line.size(); ++i)
+    {
+        if (line[i] == '\\')
+        {
+            ++i;
+            continue;
+        }
+        if (static_cast<llwchar>(static_cast<unsigned char>(line[i])) == kind)
+        {
+            pattern     = line.substr(0, i);
+            offset_text = line.substr(i + 1);
+            return;
+        }
+    }
+    pattern = line;
+    offset_text.clear();
+}
+
+// static
+bool ALVimKeymap::parseOffset(const std::string& text, SearchOffset& out)
+{
+    // [+-]N lines, e[+-N] from the end, s[+-N] or b[+-N] from the start;
+    // a sign alone is one.
+    out = SearchOffset{};
+    if (text.empty())
+    {
+        return true;
+    }
+    size_t at   = 0;
+    char   kind = 'l';
+    if (text[0] == 'e' || text[0] == 's' || text[0] == 'b')
+    {
+        kind = text[0] == 'e' ? 'e' : 's';
+        at   = 1;
+    }
+    S32 sign = 1;
+    if (at < text.size() && (text[at] == '+' || text[at] == '-'))
+    {
+        sign = text[at] == '-' ? -1 : 1;
+        ++at;
+    }
+    const bool signed_alone = at == text.size() && at > 0 && (text[at - 1] == '+' || text[at - 1] == '-');
+    S32        amount       = 0;
+    for (; at < text.size(); ++at)
+    {
+        if (text[at] < '0' || text[at] > '9')
+        {
+            return false;
+        }
+        amount = llmin(amount * 10 + (text[at] - '0'), 100000);
+    }
+    out.kind   = kind;
+    out.amount = sign * (signed_alone ? 1 : amount);
+    return true;
+}
+
+ALTextPos ALVimKeymap::offsetFrom(const ALTextDocument& d, const ALTextRange& match, const SearchOffset& offset) const
+{
+    if (offset.kind == 'l')
+    {
+        return ALTextPos(llclamp(match.begin.line + offset.amount, 0, d.lineCount() - 1), 0);
+    }
+    ALTextPos at = offset.kind == 'e' ? d.prevCluster(match.end) : match.begin;
+    for (S32 n = 0; n < std::abs(offset.amount); ++n)
+    {
+        at = offset.amount > 0 ? d.nextCluster(at) : d.prevCluster(at);
+    }
+    return offset.kind ? at : match.begin;
+}
+
+void ALVimKeymap::incrementalSearch(ALTextView& view)
+{
+    ALCodeEditor* editor = ALViewType::as<ALCodeEditor>(&view);
+    if (!mShared->incrementalSearch || !editor)
+    {
+        return;
+    }
+    std::string pattern;
+    std::string offset_text;
+    splitOffset(mLine, mLineKind, pattern, offset_text);
+    mIncrementalShown = true;
+    if (pattern.empty())
+    {
+        editor->clearHighlights();
+        view.scrollToCaret();
+        return;
+    }
+    // What is typed so far may not be a pattern yet: nothing lit then.
+    ALTextSearchOptions options;
+    options.regex             = true;
+    const Pattern parsed      = patternOf(pattern);
+    options.caseSensitive     = parsed.caseSensitive;
+    std::string              error;
+    std::vector<ALTextPos>   wholes;
+    std::vector<ALTextRange> matches = matchesOf(view, parsed, options, nullptr, error, wholes);
+    if (!error.empty() || matches.empty())
+    {
+        editor->clearHighlights();
+        view.scrollToCaret();
+        return;
+    }
+    const bool forward = mLineKind == '/';
+    const S32  index   = ALTextSearch::nearest(matches, forward ? view.document().nextCluster(cursor(view)) : cursor(view), forward);
+    const ALTextRange next = matches[static_cast<size_t>(index < 0 ? 0 : index)];
+    // Every match lit where hlsearch has them, else the next alone.
+    editor->setHighlights(mShared->highlightSearch ? matches : std::vector<ALTextRange>{ next });
+    view.scrollToLine(next.begin.line);
+}
+
+void ALVimKeymap::endIncremental(ALTextView& view)
+{
+    if (!mIncrementalShown)
+    {
+        return;
+    }
+    mIncrementalShown = false;
+    if (ALCodeEditor* editor = ALViewType::as<ALCodeEditor>(&view))
+    {
+        editor->clearHighlights();
+    }
+    view.scrollToCaret();
 }

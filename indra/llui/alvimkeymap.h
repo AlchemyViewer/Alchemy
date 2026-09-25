@@ -158,8 +158,11 @@ public:
         bool                     ignoreCase       = false;
         bool                     smartCase        = false;
         bool                     unnamedClipboard = true;
-        // Every match of the last search lit, as hlsearch has it.
+        // Every match of the last search lit, as hlsearch has it; and the
+        // matches of what is typed on the search line lit, and the next
+        // brought into sight, as incsearch has it.
         bool                     highlightSearch  = true;
+        bool                     incrementalSearch = true;
     };
     const Shared&           shared() const { return *mShared; }
     std::shared_ptr<Shared> sharedState() const { return mShared; }
@@ -266,8 +269,27 @@ private:
     // Says a count would make more text than it may, and how much.
     void     tooMuch(size_t bytes);
 
-    // Searching, with the last pattern kept for n and N.
-    bool search(ALTextView& view, const std::string& pattern, bool forward, S32 count, bool whole_word);
+    // Where a search leaves the caret by its match, as /pattern/e+1 says:
+    // lines on or back ('l', column 0), or characters on or back from the
+    // match's start ('s') or its last character ('e').
+    // Zero, as SearchOffset() makes it: none.
+    struct SearchOffset
+    {
+        char kind;
+        S32  amount;
+    };
+    // A search line's pattern and offset: split at the first unescaped
+    // `kind` after the pattern.
+    static void splitOffset(const std::string& line, llwchar kind, std::string& pattern, std::string& offset_text);
+    static bool parseOffset(const std::string& text, SearchOffset& out);
+    ALTextPos   offsetFrom(const ALTextDocument& d, const ALTextRange& match, const SearchOffset& offset) const;
+    // Searching, with the last pattern kept for n and N, and its offset.
+    bool search(ALTextView& view, const std::string& pattern, bool forward, S32 count, bool whole_word,
+                const SearchOffset& offset = SearchOffset());
+    // What is typed on the search line so far, lit and brought into sight;
+    // and that let go of, the caret's place in sight again.
+    void incrementalSearch(ALTextView& view);
+    void endIncremental(ALTextView& view);
 
     // The : line.
     void runCommand(ALTextView& view, const std::string& line);
@@ -398,6 +420,11 @@ private:
     // in the shared state: sensitive unless :set ignorecase says, as
     // vim's own default is.
     std::string mSearchPattern;
+    SearchOffset mSearchOffset{};
+    // The last match a search went to, which n from where an offset left
+    // the caret goes on from.
+    ALTextRange mLastMatch;
+    bool        mIncrementalShown = false;
     bool        mSearchForward   = true;
     bool        mSearchWholeWord = false;
 
