@@ -4376,12 +4376,16 @@ bool ALCodeEditor::handleToolTip(S32 x, S32 y, MASK mask)
         LLToolTipMgr::instance().show(mAsides[static_cast<size_t>(line)].noteTip);
         return true;
     }
-    // A hint the text can say: what a double-click does with it.
+    // A hint the text can say: how it is written in.
     if (const S32 inlay = isReadOnly() ? -1 : inlayAtLocal(x, y); inlay >= 0 && !mInlays[static_cast<size_t>(inlay)].insert.empty())
     {
         LLStringUtil::format_map_t args;
         args["[TEXT]"] = mInlays[static_cast<size_t>(inlay)].insert;
-        LLToolTipMgr::instance().show(alSaid("CodeInlayWrite", "Double-click to write '[TEXT]' in", args));
+#if LL_DARWIN
+        LLToolTipMgr::instance().show(alSaid("CodeInlayWriteMac", "Command-double-click to write '[TEXT]' in", args));
+#else
+        LLToolTipMgr::instance().show(alSaid("CodeInlayWrite", "Ctrl-double-click to write '[TEXT]' in", args));
+#endif
         return true;
     }
     if (!text.pointInRect(x, y) || (mCompletionList && mCompletionList->getVisible() && mCompletionList->getRect().pointInRect(x, y)))
@@ -4815,14 +4819,29 @@ bool ALCodeEditor::handleDoubleClick(S32 x, S32 y, MASK mask)
     {
         return ALTextView::handleDoubleClick(x, y, mask);
     }
-    // A hint the text can say, written in where it stands: a type after a
-    // name declared without one, as Visual Studio Code writes its hints.
-    const S32 inlay = isReadOnly() ? -1 : inlayAtLocal(x, y);
-    if (inlay >= 0 && !mInlays[static_cast<size_t>(inlay)].insert.empty())
+    // A hint the text can say, written in where it stands with Control
+    // (Command on a Mac) held: a type after a name declared without one.
+    // A double-click alone on it takes the name it stands beside, as one
+    // meant for the name, and landing on the hint drawn after it, would:
+    // the text is not changed by a click that only meant to choose.
+    const S32 inlay = inlayAtLocal(x, y);
+    if (inlay >= 0)
     {
+        const InlayHint& hint = mInlays[static_cast<size_t>(inlay)];
         setFocus(true);
-        writeInlay(inlay);
-        return true;
+        if ((mask & MASK_CONTROL) && !isReadOnly() && !hint.insert.empty())
+        {
+            writeInlay(inlay);
+            return true;
+        }
+        const ALTextPos   beside = hint.before || hint.at.column == 0 ? hint.at : document().prevCluster(hint.at);
+        const ALTextRange name   = identifierAt(beside);
+        if (!name.empty())
+        {
+            setSelection(name);
+            armTripleClick();
+            return true;
+        }
     }
     // An identifier, as code reads one; the document's word otherwise.
     const ALTextRange word = textRect().pointInRect(x, y) && sameClickSpot(x, y) ? identifierAt(posAtLocal(x, y, false)) : ALTextRange();

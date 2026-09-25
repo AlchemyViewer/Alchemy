@@ -1404,7 +1404,7 @@ namespace tut
     template<> template<>
     void alcodeeditor_object::test<38>()
     {
-        set_test_name("a double-click on a hint the text can say writes it in as one step to undo, and the lightbulb asks for the refactors");
+        set_test_name("a double-click on a hint takes the name beside it, a Control-double-click writes it in as one step to undo, and the lightbulb asks for the refactors");
         ALCodeEditor& e = make("local count = 5\nprint(count)\n");
         ALCodeEditor::InlayHint type;
         type.at     = ALTextPos(0, 11);
@@ -1433,18 +1433,23 @@ namespace tut
         ensure("found where it is drawn, past the name", on_type > text.mLeft + static_cast<S32>(e.layout().xOf(0, 10, nullptr)));
         ensure_equals("the type's", e.inlayAtLocal(on_type + 2, rowY(0)), 0);
         ensure("not over the text", e.inlayAtLocal(text.mLeft + 1, rowY(0)) < 0);
-        ensure("a tip says what a double-click does", e.handleToolTip(on_type + 2, rowY(0), MASK_NONE));
+        ensure("a tip says how it is written in", e.handleToolTip(on_type + 2, rowY(0), MASK_NONE));
+        // A double-click alone meant the name, and changes nothing.
         ensure("taken", e.handleDoubleClick(on_type + 2, rowY(0), MASK_NONE));
+        ensure_equals("nothing written", e.document().line(0), std::string("local count = 5"));
+        ensure("the name chosen", e.selection().normalised() == ALTextRange(ALTextPos(0, 6), ALTextPos(0, 11)));
+        ensure("taken with Control", e.handleDoubleClick(on_type + 2, rowY(0), MASK_CONTROL));
         ensure_equals("written in", e.document().line(0), std::string("local count: number = 5"));
         ensure_equals("and the hint gone with its line's edit", e.inlayHints().size(), static_cast<size_t>(1));
         e.undo();
         ensure_equals("one step to undo", e.document().line(0), std::string("local count = 5"));
-        // A parameter's name: nothing the text can say, so a double-click
-        // there is a double-click on the text.
+        // A parameter's name: nothing the text can say, Control or not;
+        // the argument it stands before is taken.
         const S32 on_name = pill(1);
         ensure("the name's pill", on_name >= 0);
-        e.handleDoubleClick(on_name + 2, rowY(1), MASK_NONE);
+        e.handleDoubleClick(on_name + 2, rowY(1), MASK_CONTROL);
         ensure_equals("nothing written", e.document().line(1), std::string("print(count)"));
+        ensure("the argument chosen", e.selection().normalised() == ALTextRange(ALTextPos(1, 6), ALTextPos(1, 11)));
 
         // The lightbulb on the caret's line is Control-.: the refactors
         // asked for with the fixes. On another line, that line's fixes.

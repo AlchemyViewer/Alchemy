@@ -171,9 +171,10 @@ public:
         ALTextPos   at;
         std::string text;
         bool        before = true;
-        // What a double-click on it writes in at its place, where the text
-        // can say it -- a type after a name declared without one -- as
-        // one step to undo. Empty for what it cannot: a parameter's name.
+        // What a Control-double-click on it writes in at its place, where
+        // the text can say it -- a type after a name declared without one
+        // -- as one step to undo; a double-click alone takes the name it
+        // stands beside. Empty for what it cannot: a parameter's name.
         std::string insert;
     };
     void                          setInlayHints(std::vector<InlayHint> hints);
