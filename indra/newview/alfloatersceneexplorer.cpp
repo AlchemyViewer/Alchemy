@@ -575,7 +575,9 @@ bool ALFloaterSceneExplorer::handleKeyHere(KEY key, MASK mask)
     // view itself leaves RETURN unhandled (it only consumes it mid-rename),
     // and routing it through openItem() would be wrong — folder expansion
     // calls openItem() too, which is why it stays inert for folder types.
-    if (key == KEY_RETURN && mask == MASK_NONE && mTree && mTree->hasFocus())
+    // The folder view is no control and never holds the keyboard itself: the
+    // tree has it when its scroller does, so ask the panel that holds both.
+    if (key == KEY_RETURN && mask == MASK_NONE && mTree && mTreePanel->hasFocus())
     {
         ALSceneExplorerItem* item = getSelectedItem();
         if (item && !item->isContainer() && !item->isDerenderedType())
@@ -755,6 +757,11 @@ void ALFloaterSceneExplorer::buildTree()
     scroller_rect.translate(-scroller_rect.mLeft, -scroller_rect.mBottom);
     LLScrollContainer::Params sp(LLUICtrlFactory::getDefaultParams<LLFolderViewScrollContainer>());
     sp.rect(scroller_rect);
+    // A click on the tree focuses mTreePanel, which passes the keyboard to its
+    // first tab stop. Be that stop, as the inventory's scroller is: it hands
+    // keys to the folder view, which takes none itself. Left on the panel, the
+    // arrows, type-ahead and Page Up/Down would never reach the tree.
+    sp.tab_stop = true;
     LLScrollContainer* scroller = LLUICtrlFactory::create<LLFolderViewScrollContainer>(sp);
     scroller->setFollowsAll();
     mTreePanel->addChild(scroller);
