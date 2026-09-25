@@ -470,6 +470,11 @@ void ALScriptStudioVim::format(ALTextView& view, S32 first, S32 last)
     mWindow.format(*doc, true);
 }
 
+ALScriptStudioVim::Doc* ALScriptStudioVim::alternateTab()
+{
+    return mAlternate.empty() ? nullptr : mServices.findDoc(mAlternate);
+}
+
 ALScriptStudioVim::Doc* ALScriptStudioVim::tabNamed(ALTextView& view, const std::string& which)
 {
     const std::vector<Doc*>    tabs = mServices.openDocs();
@@ -480,7 +485,7 @@ ALScriptStudioVim::Doc* ALScriptStudioVim::tabNamed(ALTextView& view, const std:
     }
     if (which == "#")
     {
-        Doc* doc = mAlternate.empty() ? nullptr : mServices.findDoc(mAlternate);
+        Doc* doc = alternateTab();
         if (!doc)
         {
             fail(view, mServices.words("VimNoAlternate"));
@@ -712,7 +717,7 @@ void ALScriptStudioVim::listTabs()
     // one in front and # the one before it, a shown or h not, - one that
     // cannot be changed, + one unsaved; and the line its caret is on.
     const Doc*          front     = mServices.frontDoc();
-    const Doc*          alternate = mAlternate.empty() ? nullptr : mServices.findDoc(mAlternate);
+    const Doc*          alternate = alternateTab();
     ALOutputView::Entry entry     = listing();
     entry.text                    = "tabs:";
     S32 number                    = 0;

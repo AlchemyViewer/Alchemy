@@ -775,6 +775,8 @@ private:
     // Several tabs closed at once -- the others, all of them, `:qa` -- the
     // unsaved among them asked about in one question, not one each.
     void closeMany(const std::vector<std::string>& ids) override;
+    // Close Others, Close Saved and Close All, about the tab `keep` is.
+    void closeTabs(std::string_view which, const Doc* keep);
     // A close of the window, or of several tabs, that is waited on no
     // longer; and a quit waiting on it called off.
     void stopClosing() override;
@@ -889,10 +891,11 @@ private:
     void onExperience();
     void onReset();
     void revert(Doc& doc) override;
-    void loadFromFile();
+    // A file's text in place of the tab's, or put in at the caret.
+    void loadFromFile(bool insert = false);
     void saveToFile();
     // The pickers' answers, for the tab each was asked from, by its id.
-    void fileChosenToLoad(const std::string& id, const std::vector<std::string>& files);
+    void fileChosenToLoad(const std::string& id, const std::vector<std::string>& files, bool insert);
     void fileChosenToSave(const std::string& id, const std::vector<std::string>& files);
     // A disk tab saved under another name: the tab is that file from
     // then on, in the language its name says.

@@ -556,6 +556,10 @@
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="recover" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="recover" />
             </menu_item_call>
+            <menu_item_call label="Insert File..." layout="topleft" name="insert_file">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="insert_file" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="insert_file" />
+            </menu_item_call>
             <menu_item_call label="Replace Text from File..." layout="topleft" name="load_file">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="load_file" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="load_file" />
@@ -584,6 +588,18 @@
             <menu_item_call label="Close Script" layout="topleft" name="close" shortcut="control|W">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="close" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="close" />
+            </menu_item_call>
+            <menu_item_call label="Close Others" layout="topleft" name="close_others">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="close_others" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="close_others" />
+            </menu_item_call>
+            <menu_item_call label="Close Saved" layout="topleft" name="close_saved">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="close_saved" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="close_saved" />
+            </menu_item_call>
+            <menu_item_call label="Close All" layout="topleft" name="close_all">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="close_all" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="close_all" />
             </menu_item_call>
         </menu>
         <menu
@@ -658,6 +674,14 @@
             <menu_item_call label="Fix All Problems" layout="topleft" name="fix_all">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="fix_all" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="fix_all" />
+            </menu_item_call>
+            <menu_item_call label="Next Misspelling" layout="topleft" name="next_misspelling" shortcut="F7">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="next_misspelling" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="next_misspelling" />
+            </menu_item_call>
+            <menu_item_call label="Previous Misspelling" layout="topleft" name="previous_misspelling" shortcut="shift|F7">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="previous_misspelling" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="previous_misspelling" />
             </menu_item_call>
             <menu_item_separator layout="topleft" />
             <menu_item_call label="Format Document" layout="topleft" name="format" shortcut="shift|alt|F">
@@ -764,6 +788,10 @@
             </menu_item_call>
             <menu_item_call label="Previous Tab" layout="topleft" name="previous_tab" shortcut="control|PGUP">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="previous_tab" />
+            </menu_item_call>
+            <menu_item_call label="Last Used Tab" layout="topleft" name="last_tab" shortcut="control|6" use_mac_ctrl="true">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="last_tab" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="last_tab" />
             </menu_item_call>
             <menu_item_call label="All Tabs..." layout="topleft" name="all_tabs">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="all_tabs" />

@@ -416,6 +416,8 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="VimNoPreviousCommand">E30: No previous command line</string>
 	<string name="VimNoPreviousPattern">E35: No previous regular expression</string>
 	<string name="VimMarkNotSet">E20: Mark not set</string>
+	<string name="CodeFixSpelling">Change to "[WORD]"</string>
+	<string name="CodeFixAddWord">Add "[WORD]" to the dictionary</string>
 	<string name="VimNoFileUnderCursor">E446: No file name under cursor</string>
 	<string name="VimNoSpellCheck">E756: Spell checking is not enabled</string>
 	<string name="VimNoMisspelling">No misspelled words</string>

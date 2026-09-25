@@ -1164,6 +1164,24 @@ void ALFloaterScriptStudio::stopClosing()
     mTabsAtQuit    = LLSD();
 }
 
+void ALFloaterScriptStudio::closeTabs(std::string_view which, const Doc* keep)
+{
+    // The unsaved among them asked about in one question; the ids gathered
+    // first, since closing moves the rest.
+    std::vector<std::string> ids;
+    for (const std::unique_ptr<Doc>& each : mDocs)
+    {
+        if ((which == "close_others" && each.get() != keep) || which == "close_all" || (which == "close_saved" && !each->unsaved()))
+        {
+            ids.push_back(each->id);
+        }
+    }
+    if (!ids.empty())
+    {
+        closeMany(ids);
+    }
+}
+
 void ALFloaterScriptStudio::letGoOf(Doc& doc)
 {
     if (const size_t index = indexOf(doc.id); index != NONE)
@@ -4181,18 +4199,7 @@ void ALFloaterScriptStudio::onTabAction(const std::string& action)
     }
     else if (action == "close_others" || action == "close_all" || action == "close_saved")
     {
-        // The unsaved among them asked about in one question; the ids
-        // gathered first, since closing moves the rest.
-        std::vector<std::string> ids;
-        for (const std::unique_ptr<Doc>& each : mDocs)
-        {
-            const bool other = each.get() != doc;
-            if ((action == "close_others" && other) || action == "close_all" || (action == "close_saved" && !each->unsaved()))
-            {
-                ids.push_back(each->id);
-            }
-        }
-        closeMany(ids);
+        closeTabs(action, doc);
     }
     else if (action == "copy_name")
     {
@@ -10627,6 +10634,12 @@ void ALFloaterScriptStudio::addFileCommands()
             return store && store->hasOffers();
         });
     mCommands.add(
+        "insert_file", [this]() { loadFromFile(true); },
+        [this]() {
+            Doc* doc = active();
+            return doc && doc->loaded && doc->modifiable;
+        });
+    mCommands.add(
         "load_file", [this]() { loadFromFile(); },
         [this]() {
             Doc* doc = active();
@@ -10673,6 +10686,17 @@ void ALFloaterScriptStudio::addFileCommands()
             }
         },
         [this]() { return active() != nullptr; });
+    // The tab menu's closes, about the tab in front.
+    for (const char* name : { "close_others", "close_saved", "close_all" })
+    {
+        mCommands.add(
+            name, [this, name]() { closeTabs(name, active()); },
+            [this, name]() {
+                const std::string_view which(name);
+                const auto             saved = [](const std::unique_ptr<Doc>& each) { return !each->unsaved(); };
+                return which == "close_all" ? !mDocs.empty() : which == "close_others" ? mDocs.size() > 1 : std::any_of(mDocs.begin(), mDocs.end(), saved);
+            });
+    }
     // The Open Recent list's last item, made with the list.
     mCommands.addUnlisted("clear_recent", [this]() {
         mRecentFiles.clear();
@@ -10751,6 +10775,8 @@ void ALFloaterScriptStudio::addEditCommands()
     addEditorCommand("move_line_down", ALEditorCommand::MoveLineDown, true);
     addEditorCommand("rename", ALEditorCommand::Rename, false);
     addEditorCommand("quick_fix", ALEditorCommand::QuickFix, true);
+    addEditorCommand("next_misspelling", ALEditorCommand::NextMisspelling, false);
+    addEditorCommand("previous_misspelling", ALEditorCommand::PreviousMisspelling, false);
     // What changes the text, or asks the analyzers about a place in it, is
     // the source's to do: while the expansion is in front, it is read.
     for (const auto& [name, command] : { std::pair{ "complete", ALEditorCommand::Complete }, std::pair{ "signature_help", ALEditorCommand::SignatureHelp } })
@@ -10870,6 +10896,16 @@ void ALFloaterScriptStudio::addGoCommands()
             });
     }
     mCommands.add("next_tab", [this]() { cycleTab(1); });
+    // The tab in front before this one, as vim's Ctrl-^ has it.
+    mCommands.add(
+        "last_tab",
+        [this]() {
+            if (Doc* doc = mVim.alternateTab())
+            {
+                activate(*doc);
+            }
+        },
+        [this]() { return mVim.alternateTab() != nullptr; });
     mCommands.add("previous_tab", [this]() { cycleTab(-1); });
     mCommands.add("all_tabs", [this]() { showAllTabs(); });
     mCommands.add("move_tab_left", [this]() { moveTab(-1); });
@@ -11412,7 +11448,7 @@ void ALFloaterScriptStudio::openFileFromDisk()
 // in front when the answer comes may be another -- a script handed over,
 // a tab a pane opened -- or none, the one asked from closed meanwhile.
 
-void ALFloaterScriptStudio::loadFromFile()
+void ALFloaterScriptStudio::loadFromFile(bool insert)
 {
     const Doc* doc = active();
     if (!doc)
@@ -11421,16 +11457,16 @@ void ALFloaterScriptStudio::loadFromFile()
     }
     const LLHandle<LLFloater> handle = getHandle();
     LLFilePickerReplyThread::startPicker(
-        [handle, id = doc->id](const std::vector<std::string>& files, LLFilePicker::ELoadFilter, LLFilePicker::ESaveFilter) {
+        [handle, id = doc->id, insert](const std::vector<std::string>& files, LLFilePicker::ELoadFilter, LLFilePicker::ESaveFilter) {
             if (ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get()))
             {
-                studio->fileChosenToLoad(id, files);
+                studio->fileChosenToLoad(id, files, insert);
             }
         },
         LLFilePicker::FFLOAD_SCRIPT, false);
 }
 
-void ALFloaterScriptStudio::fileChosenToLoad(const std::string& id, const std::vector<std::string>& files)
+void ALFloaterScriptStudio::fileChosenToLoad(const std::string& id, const std::vector<std::string>& files, bool insert)
 {
     const size_t index = indexOf(id);
     if (index == NONE || files.empty())
@@ -11456,8 +11492,12 @@ void ALFloaterScriptStudio::fileChosenToLoad(const std::string& id, const std::v
     {
         return;
     }
+    // In place of the text, or where the caret is, as one step to undo.
     activate(index);
-    doc.editor->selectAll();
+    if (!insert)
+    {
+        doc.editor->selectAll();
+    }
     doc.editor->insertText(text);
 }
 

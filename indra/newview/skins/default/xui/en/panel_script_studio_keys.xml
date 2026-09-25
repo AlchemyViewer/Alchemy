@@ -19,6 +19,10 @@
     <panel.string name="menu_revert">Revert to saved</panel.string>
     <panel.string name="menu_open_file">Open a file</panel.string>
     <panel.string name="menu_close">Close the script</panel.string>
+    <panel.string name="menu_close_others">Close the other scripts</panel.string>
+    <panel.string name="menu_close_saved">Close the saved scripts</panel.string>
+    <panel.string name="menu_close_all">Close every script</panel.string>
+    <panel.string name="menu_insert_file">Insert a file</panel.string>
     <panel.string name="menu_preferences">Preferences</panel.string>
     <panel.string name="menu_format">Format the document</panel.string>
     <panel.string name="menu_find_in_files">Find in files</panel.string>
@@ -31,6 +35,7 @@
     <panel.string name="menu_previous_problem">Previous problem</panel.string>
     <panel.string name="menu_next_tab">Next tab</panel.string>
     <panel.string name="menu_previous_tab">Previous tab</panel.string>
+    <panel.string name="menu_last_tab">Last used tab</panel.string>
     <panel.string name="menu_all_tabs">Every tab, to pick from</panel.string>
     <panel.string name="menu_move_tab_left">Move the tab left</panel.string>
     <panel.string name="menu_move_tab_right">Move the tab right</panel.string>
@@ -106,6 +111,8 @@
     <panel.string name="cmd_find_next">Find next</panel.string>
     <panel.string name="cmd_find_previous">Find previous</panel.string>
     <panel.string name="cmd_quick_fix">Quick fix</panel.string>
+    <panel.string name="cmd_next_misspelling">Next misspelling</panel.string>
+    <panel.string name="cmd_previous_misspelling">Previous misspelling</panel.string>
     <line_editor
      follows="left|top|right"
      height="22"

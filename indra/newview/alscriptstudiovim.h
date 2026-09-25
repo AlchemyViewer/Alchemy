@@ -146,6 +146,8 @@ public:
     // its name or a part of one, in any case, that no other has. Null
     // where none is, or more than one, which is said.
     Doc* tabNamed(ALTextView& view, const std::string& which);
+    // The tab in front before this one, where it is still open.
+    Doc* alternateTab();
 
 private:
     // The window's tabs as vim's buffers and tab pages: :ls, :b, :bn, :bp,
