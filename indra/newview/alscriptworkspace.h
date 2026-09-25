@@ -303,8 +303,11 @@ public:
     struct TransferResult
     {
         S32                      moved = 0;
-        // By name: what might not go, and what never came through.
+        // By name: what might not go, and never left the object; what came
+        // to the agent's inventory and the object then would not take,
+        // which is in the trash with the rest; and what never came through.
         std::vector<std::string> refused;
+        std::vector<std::string> stranded;
         std::vector<std::string> lost;
         std::string              error;
     };

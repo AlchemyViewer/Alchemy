@@ -126,6 +126,11 @@
     <floater.string name="TransferFailed">Nothing was put into [NAME]: [ERROR].</floater.string>
     <floater.string name="TransferRefused">Not taken: [REFUSED].</floater.string>
     <floater.string name="TransferLost">Never came through: [LOST]; look in your trash, in Passed between objects.</floater.string>
+    <floater.string name="TransferStranded">Came through but not taken by [NAME]: [STRANDED]; it is in your trash, in Passed between objects.</floater.string>
+    <floater.string name="DropNotYours">You may not change what [NAME] holds.</floater.string>
+    <floater.string name="DropFromNotecard">What a notecard holds cannot be put into an object.</floater.string>
+    <floater.string name="DropNotTransferable">This may not be given to [NAME].</floater.string>
+    <floater.string name="DropRefused">[NAME] will not take this.</floater.string>
     <floater.string name="ExperienceNone">No experience</floater.string>
     <floater.string name="ExperienceLoading">loading...</floater.string>
     <floater.string name="ExperienceAsking">Experience: asking...</floater.string>

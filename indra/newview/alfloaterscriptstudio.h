@@ -1170,7 +1170,9 @@ private:
     // dropped on it: into the prim the row is of, as into the build
     // floater's contents.
     // Answers the row the drop goes to, for the list to light.
-    LLSD dropOnExplorer(const LLSD& row, MASK mask, bool drop, EDragAndDropType type, void* cargo, EAcceptance* accept);
+    LLSD dropOnExplorer(const LLSD& row, MASK mask, bool drop, EDragAndDropType type, void* cargo, EAcceptance* accept, std::string& tooltip);
+    // Why a prim will not take what is carried over it, for the drag's tip.
+    std::string dropRefusal(LLViewerObject* prim, EDragAndDropType type, void* cargo) const;
     // What is dragged put into a prim, as the build floater's contents
     // take it; true where it would go.
     bool dropIntoPrim(LLViewerObject* prim, MASK mask, bool drop, EDragAndDropType type, void* cargo);

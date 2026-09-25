@@ -1016,8 +1016,8 @@ bool ALFloaterScriptStudio::postBuild()
             mExplorerNamesStale = true;
         }
     });
-    mExplorer->setDropHandler([this](const LLSD& row, MASK mask, bool drop, EDragAndDropType type, void* cargo, EAcceptance* accept, std::string&) {
-        return dropOnExplorer(row, mask, drop, type, cargo, accept);
+    mExplorer->setDropHandler([this](const LLSD& row, MASK mask, bool drop, EDragAndDropType type, void* cargo, EAcceptance* accept, std::string& tooltip) {
+        return dropOnExplorer(row, mask, drop, type, cargo, accept, tooltip);
     });
     mExplorer->setCommitCallback([this](LLUICtrl*, const LLSD&) { refreshExplorerButtons(); });
     mExplorerFilter = getChild<LLFilterEditor>("explorer_filter");
@@ -14342,8 +14342,9 @@ void ALFloaterScriptStudio::transferBetween(const LLUUID& from, const std::vecto
         };
         LLStringUtil::format_map_t said = args;
         said["[ERROR]"]   = result.error;
-        said["[REFUSED]"] = listed(result.refused);
-        said["[LOST]"]    = listed(result.lost);
+        said["[REFUSED]"]  = listed(result.refused);
+        said["[STRANDED]"] = listed(result.stranded);
+        said["[LOST]"]     = listed(result.lost);
         std::string words = !result.error.empty() ? studio->getString("TransferFailed", said)
                             : result.moved > 0    ? studio->counted("TransferDone", result.moved, said)
                                                   : studio->getString("TransferNone", said);
@@ -14351,11 +14352,15 @@ void ALFloaterScriptStudio::transferBetween(const LLUUID& from, const std::vecto
         {
             words += " " + studio->getString("TransferRefused", said);
         }
+        if (!result.stranded.empty())
+        {
+            words += " " + studio->getString("TransferStranded", said);
+        }
         if (!result.lost.empty())
         {
             words += " " + studio->getString("TransferLost", said);
         }
-        studio->report(words, !result.error.empty() || !result.refused.empty() || !result.lost.empty());
+        studio->report(words, !result.error.empty() || !result.refused.empty() || !result.stranded.empty() || !result.lost.empty());
         // The prims listed again, as after a drop from the inventory.
         studio->refreshExplorer(true);
         studio->mExplorerRefetchAt = LLTimer::getTotalSeconds() + 2.0;
@@ -14389,7 +14394,8 @@ LLViewerObject* ALFloaterScriptStudio::explorerDropTarget() const
     return node->getObject();
 }
 
-LLSD ALFloaterScriptStudio::dropOnExplorer(const LLSD& row, MASK mask, bool drop, EDragAndDropType type, void* cargo, EAcceptance* accept)
+LLSD ALFloaterScriptStudio::dropOnExplorer(const LLSD& row, MASK mask, bool drop, EDragAndDropType type, void* cargo, EAcceptance* accept,
+                                           std::string& tooltip)
 {
     // Into the prim the row is of: an item's, a prim's own, an object's
     // root, which is where a drop on the object in world goes too; below
@@ -14398,6 +14404,11 @@ LLSD ALFloaterScriptStudio::dropOnExplorer(const LLSD& row, MASK mask, bool drop
     LLViewerObject* prim = row.isMap() ? gObjectList.findObject(row.has("prim") ? row["prim"].asUUID() : row["root"].asUUID()) : explorerDropTarget();
     if (!prim || !dropIntoPrim(prim, mask, drop, type, cargo))
     {
+        // Why not, beside the pointer, rather than a refusal with no word.
+        if (prim)
+        {
+            tooltip = dropRefusal(prim, type, cargo);
+        }
         return LLSD();
     }
     *accept = ACCEPT_YES_MULTI;
@@ -14425,6 +14436,31 @@ LLSD ALFloaterScriptStudio::dropOnExplorer(const LLSD& row, MASK mask, bool drop
         }
     }
     return LLSD();
+}
+
+std::string ALFloaterScriptStudio::dropRefusal(LLViewerObject* prim, EDragAndDropType type, void* cargo) const
+{
+    LLViewerObject*            root = prim->getRootEdit() ? prim->getRootEdit() : prim;
+    LLStringUtil::format_map_t args;
+    args["[NAME]"] = objectNameOf(root, getString("ObjectUnnamed"));
+    if (std::string refused = ALScriptWorkspace::rlvRefusal(prim, LLAssetType::AT_NONE, ALScriptWorkspace::RlvUse::Change); !refused.empty())
+    {
+        return refused;
+    }
+    if (!prim->permModify())
+    {
+        return getString("DropNotYours", args);
+    }
+    if (LLToolDragAndDrop::getInstance()->getSource() == LLToolDragAndDrop::SOURCE_NOTECARD)
+    {
+        return getString("DropFromNotecard", args);
+    }
+    const LLViewerInventoryItem* item = type == DAD_CATEGORY ? nullptr : static_cast<const LLViewerInventoryItem*>(cargo);
+    if (item && !gAgent.allowOperation(PERM_TRANSFER, item->getPermissions(), GP_OBJECT_MANIPULATE) && !prim->permYouOwner())
+    {
+        return getString("DropNotTransferable", args);
+    }
+    return getString("DropRefused", args);
 }
 
 bool ALFloaterScriptStudio::dropIntoPrim(LLViewerObject* prim, MASK mask, bool drop, EDragAndDropType type, void* cargo)

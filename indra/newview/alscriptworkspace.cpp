@@ -1046,7 +1046,7 @@ void ALScriptWorkspace::transferArrived(const std::shared_ptr<Transfer>& one)
         {
             if (!to || !LLToolDragAndDrop::isInventoryDropAcceptable(to, item))
             {
-                one->result.refused.push_back(item->getName());
+                one->result.stranded.push_back(item->getName());
                 continue;
             }
             // As a drop from the inventory puts it in: what may not be
