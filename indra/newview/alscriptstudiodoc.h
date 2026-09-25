@@ -110,6 +110,10 @@ struct ALScriptStudioDoc
     // whose answer a save may yet wait on.
     bool          saveUnderway() const { return save.underway() || preprocessing; }
     ALCodeEditor* shownText() const { return shownView() == View::Expanded ? expandedEditor : editor; }
+    // The map the text the region compiled and runs was expanded through:
+    // what the compiler's lines and a run-time error's are read back by.
+    // Null where the text went up as written.
+    const ALSourceMap* runningMap() const;
     // A notecard rather than a script: plain text, saved as a
     // notecard with the items it came with, never analysed.
     bool                                       notecard = false;

@@ -274,6 +274,19 @@ namespace
         return buffer;
     }
 
+    // A message as one row reads it.
+    std::string oneLine(std::string text)
+    {
+        for (char& c : text)
+        {
+            if (c == '\n' || c == '\r' || c == '\t')
+            {
+                c = ' ';
+            }
+        }
+        return text;
+    }
+
     // What an object in world is called: an avatar's name; the selection's
     // word for it, while it is selected, which a rename here changes at
     // once; or the last the region said of it, which the object properties
@@ -701,11 +714,6 @@ bool ALFloaterScriptStudio::postBuild()
             refreshOutline(*doc);
         }
     });
-    mOutput        = getChild<ALOutputView>("output");
-    mOutput->setPlaceholder(getString("NoOutput"));
-    mOutputFilter  = getChild<LLComboBox>("output_filter");
-    mOutputKind    = getChild<LLComboBox>("output_kind");
-    mOutputFind    = getChild<LLFilterEditor>("output_find");
     mExplorer      = getChild<ALPaneList>("explorer");
     mSearchBar     = getChild<ALScopeBar>("search_bar");
     mSearchResults = getChild<ALPaneList>("search_results");
@@ -776,42 +784,7 @@ bool ALFloaterScriptStudio::postBuild()
     mWeightsParts->setDoubleClickCallback([this]() { onWeightChosen(true); });
     mOutline->setCommitCallback([this](LLUICtrl*, const LLSD&) { onOutlineChosen(false); });
     mOutline->setDoubleClickCallback([this]() { onOutlineChosen(true); });
-    offerOutputObject(LLUUID::null, std::string());
-    for (LLUICtrl* filter : { static_cast<LLUICtrl*>(mOutputFilter), static_cast<LLUICtrl*>(mOutputKind), static_cast<LLUICtrl*>(mOutputFind) })
-    {
-        filter->setCommitCallback([this](LLUICtrl*, const LLSD&) { onOutputFilter(); });
-    }
-    mOutputKind->selectFirstItem();
-    mOutput->onEntryChosen([this](const ALOutputView::Entry& entry) { onOutputChosen(entry); });
-    getChild<LLButton>("output_clear")->setCommitCallback([this](LLUICtrl*, const LLSD&) {
-        // What was said goes; whose words are listened to stays.
-        mOutput->clearEntries();
-        mOutputUnread = false;
-        refreshBottomTabs();
-    });
-    getChild<LLButton>("output_copy")->setCommitCallback([this](LLUICtrl*, const LLSD&) {
-        // What the pane shows through its filters, as it reads, on the
-        // clipboard; nothing shown leaves the clipboard as it was.
-        std::string all;
-        S32         lines = 0;
-        for (const ALOutputView::Entry& entry : mOutput->entries())
-        {
-            if (!mOutput->shows(entry))
-            {
-                continue;
-            }
-            all += ALOutputView::format(entry);
-            all += '\n';
-            ++lines;
-        }
-        if (lines == 0)
-        {
-            setStatus(getString("OutputNothingToCopy"));
-            return;
-        }
-        LLClipboard::instance().copyToClipboard(all, 0, static_cast<S32>(all.size()));
-        setStatus(counted("OutputCopied", lines));
-    });
+    mOutputPane = std::make_unique<ALScriptOutputPane>(*getChild<LLPanel>("output_tab"), *this, *this);
     // What was said before the window opened, then everything after.
     for (const ALScriptWorkspace::RuntimeEvent& event : ALScriptWorkspace::instance().recentRuntime())
     {
@@ -961,9 +934,6 @@ bool ALFloaterScriptStudio::postBuild()
         }
         saveState();
     });
-    // What the studio did has its own lane in the log, so that a busy
-    // debug channel does not push it out.
-    mOutput->setCapacity(200, 1);
     mExplorer->setDoubleClickCallback(boost::bind(&ALFloaterScriptStudio::onExplorerChosen, this));
     // The buttons follow what is chosen, which the list says as it changes.
     mExplorer->setCommitOnSelectionChange(true);
@@ -1449,13 +1419,7 @@ void ALFloaterScriptStudio::draw()
     {
         fillReferences();
     }
-    // What the Output tab had not shown, it has once it is looked at.
-    if (mOutputUnread && !mFolds.collapsed("bottom") && mBottomTabs->getCurrentPanel() &&
-        mBottomTabs->getCurrentPanel()->getName() == "output_tab")
-    {
-        mOutputUnread = false;
-        refreshBottomTabs();
-    }
+    mOutputPane->pump();
     // The fix list last shown, weighed once nothing more is coming to it;
     // dropped once it has closed.
     if (mFixesToWeigh)
@@ -1658,10 +1622,10 @@ void ALFloaterScriptStudio::reindexDocs()
         mByDocId.emplace(mDocs[i]->id, i);
     }
     // Output listening to the scripts open here: which those are has
-    // changed, and so has what it shows of what was said before.
-    if (mOutputFilter && mOutputFilter->getValue().asString() == "open")
+    // changed.
+    if (mOutputPane)
     {
-        onOutputFilter();
+        mOutputPane->openChanged();
     }
 }
 
@@ -4438,7 +4402,7 @@ bool ALFloaterScriptStudio::vimCommand(ALTextView& view, const std::string& name
             {
                 entry.text += llformat("\n%3d  %s", static_cast<int>(i + 1), lines[i].c_str());
             }
-            mOutput->append(entry);
+            mOutputPane->view()->append(entry);
         };
         if (commands)
         {
@@ -5908,7 +5872,7 @@ void ALFloaterScriptStudio::refreshBottomTabs()
     title("problems_tab", getString(mProblemsHeld > 0 ? "TabProblemsCount" : "TabProblems", args));
     args["[COUNT]"] = std::to_string(mFound.places.size());
     title("references_tab", getString(mFound.places.empty() ? "TabReferences" : "TabReferencesCount", args));
-    title("output_tab", getString(mOutputUnread ? "TabOutputUnread" : "TabOutput"));
+    title("output_tab", getString(mOutputPane && mOutputPane->unread() ? "TabOutputUnread" : "TabOutput"));
 }
 
 void ALFloaterScriptStudio::goToProblem(Doc& doc, S32 direction)
@@ -9586,7 +9550,7 @@ void ALFloaterScriptStudio::showBottom(const char* tab, bool focus)
     const std::string name(tab);
     LLUICtrl* list = name == "problems_tab" ? static_cast<LLUICtrl*>(mProblems)
                      : name == "references_tab" ? static_cast<LLUICtrl*>(mReferences)
-                     : name == "output_tab"     ? static_cast<LLUICtrl*>(mOutput)
+                     : name == "output_tab"     ? static_cast<LLUICtrl*>(mOutputPane->view())
                      : name == "weights_tab"    ? static_cast<LLUICtrl*>(mWeightsParts)
                                                 : nullptr;
     if (list)
@@ -9608,6 +9572,12 @@ void ALFloaterScriptStudio::showBottom(const char* tab, bool focus)
             }
         }
     }
+}
+
+void ALFloaterScriptStudio::report(const std::string& text, bool failure, const Doc* doc, const std::vector<std::string>& actions)
+{
+    setStatus(text, failure);
+    mOutputPane->said(text, failure, doc, actions);
 }
 
 // --- find in files -------------------------------------------------------------------
@@ -12038,6 +12008,135 @@ void ALFloaterScriptStudio::trimTrailing(Doc& doc)
     {
         doc.editor->replaceAll(std::move(edits));
     }
+}
+
+// --- what scripts say ---------------------------------------------------------------
+
+void ALFloaterScriptStudio::runtimeEvent(const ALScriptWorkspace::RuntimeEvent& event)
+{
+    const ALScriptOutputPane::Place at = mOutputPane->heard(event);
+
+    // A run-time error in a script that is open marks its line: said
+    // again, as a script failing in a timer says it every tick, it is
+    // the same problem, counted.
+    const size_t open = event.item.notNull() ? indexOf(ALScriptRef(event.prim, event.item)) : NONE;
+    if (event.isError && open != NONE)
+    {
+        Doc&                doc = *mDocs[open];
+        Doc::RuntimeProblem problem;
+        problem.line    = at.line;
+        problem.column  = at.column;
+        problem.file    = at.file;
+        problem.message = event.error.empty() ? oneLine(event.message) : event.error;
+        const auto same = std::find_if(doc.runtime.begin(), doc.runtime.end(), [&problem](const Doc::RuntimeProblem& one) {
+            return one.line == problem.line && one.column == problem.column && one.file == problem.file && one.message == problem.message;
+        });
+        if (same != doc.runtime.end())
+        {
+            ++same->count;
+        }
+        else
+        {
+            doc.runtime.push_back(std::move(problem));
+            // A script failing many ways at once is failing: the oldest go
+            // past a few dozen.
+            constexpr size_t RUNTIME_PROBLEMS = 50;
+            if (doc.runtime.size() > RUNTIME_PROBLEMS)
+            {
+                doc.runtime.erase(doc.runtime.begin());
+            }
+        }
+        refreshProblems(doc);
+    }
+}
+
+bool ALFloaterScriptStudio::outputInSight() const
+{
+    return !mFolds.collapsed("bottom") && mBottomTabs->getCurrentPanel() && mBottomTabs->getCurrentPanel()->getName() == "output_tab";
+}
+
+bool ALFloaterScriptStudio::ownsObject(const LLUUID& root) const
+{
+    const LLViewerObject* object = gObjectList.findObject(root);
+    return object && object->permYouOwner();
+}
+
+void ALFloaterScriptStudio::outputAction(Doc& doc, const std::string& action)
+{
+    // What the words said could be done, done: a save held over what was
+    // found asked again -- saved, as a second save would have been, where
+    // the text is still what was held -- a failed one tried again, a copy
+    // into the inventory, a file.
+    activate(indexOf(doc.id));
+    if (action == "save_anyway")
+    {
+        saveAsked(doc);
+    }
+    else if (action == "retry")
+    {
+        save(doc);
+    }
+    else if (action == "copy")
+    {
+        saveCopyToInventory(doc);
+    }
+    else if (action == "export")
+    {
+        saveToFile();
+    }
+    else if (action == "take_external" && doc.externalWaiting)
+    {
+        // What was typed here a step back in the undo.
+        takeExternal(doc, *doc.externalWaiting);
+    }
+    else if (action == "keep_here" && doc.externalWaiting)
+    {
+        // The external editor's save not sent; its copy is written from
+        // here at the next save.
+        doc.externalWaiting.reset();
+        LLStringUtil::format_map_t args;
+        args["[NAME]"] = doc.name;
+        setStatus(getString("ExternalKept", args));
+    }
+}
+
+void ALFloaterScriptStudio::outputShowDoc(Doc& doc, bool problems)
+{
+    activate(indexOf(doc.id));
+    if (problems)
+    {
+        showBottom("problems_tab");
+    }
+}
+
+void ALFloaterScriptStudio::outputGoTo(const ALScriptRef& ref, const std::string& name, S32 line, S32 column)
+{
+    noteJump();
+    size_t index = indexOf(ref);
+    if (index == NONE)
+    {
+        // The script it names, opened; the line once it has loaded.
+        openScript(ref, name);
+        index = indexOf(ref);
+        if (index != NONE)
+        {
+            mDocs[index]->pendingLine = line;
+        }
+        return;
+    }
+    activate(index);
+    if (line >= 0)
+    {
+        ALCodeEditor& source = sourceInFront(*mDocs[index]);
+        source.goTo(ALTextPos(line, llmax(0, column)));
+        source.setFocus(true);
+    }
+}
+
+void ALFloaterScriptStudio::outputGoToInclude(const std::string& file, const std::string& file_name, S32 line, S32 column)
+{
+    noteJump();
+    openIncludeAt(file, file_name, line, column, 0);
 }
 
 // --- before a save --------------------------------------------------------------------
@@ -15647,9 +15746,9 @@ void ALFloaterScriptStudio::writeState(LLSD& state) const
         state["problem_scope"]  = mProblemScope->getValue().asString();
         state["problem_origin"] = mProblemOrigin->getValue().asString();
     }
-    if (mOutputKind)
+    if (mOutputPane)
     {
-        state["output_kind"] = mOutputKind->getValue().asString();
+        state["output_kind"] = mOutputPane->kind();
     }
     if (mSearchBar)
     {
@@ -15820,10 +15919,9 @@ void ALFloaterScriptStudio::readState(const LLSD& state)
     {
         mProblemOrigin->selectFirstItem();
     }
-    if (state.has("output_kind") && mOutputKind)
+    if (state.has("output_kind") && mOutputPane)
     {
-        mOutputKind->selectByValue(state["output_kind"]);
-        onOutputFilter();
+        mOutputPane->showKind(state["output_kind"].asString());
     }
     if (state.has("search") && mSearchBar)
     {

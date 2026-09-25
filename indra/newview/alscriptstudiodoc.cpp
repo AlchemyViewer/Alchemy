@@ -48,6 +48,19 @@ ALScriptStudioDoc::Level ALScriptStudioDoc::levelOf(ALScriptProblem::Severity se
                                                             : Level::Note;
 }
 
+const ALSourceMap* ALScriptStudioDoc::runningMap() const
+{
+    // What the region compiled and runs is the expanded text that went up
+    // from here, where one did; else -- a recompile, or a script loaded and
+    // not saved since -- the text as it was last expanded, which is what
+    // its envelope holds as far as this tab knows.
+    if (save.sentMap())
+    {
+        return &*save.sentMap();
+    }
+    return uploaded.valid && !uploaded.disabled ? &uploaded.map : nullptr;
+}
+
 // static
 ALCodeEditor::Mark ALScriptStudioDoc::markOf(Level level)
 {

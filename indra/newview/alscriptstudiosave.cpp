@@ -665,7 +665,7 @@ void ALFloaterScriptStudio::compiledHere(const ALScriptWorkspace::CompileResult&
         return;
     }
     doc.problems.clear();
-    const ALSourceMap* read = runningMap(doc);
+    const ALSourceMap* read = doc.runningMap();
     for (const ALScriptWorkspace::Diagnostic& said : result.diagnostics)
     {
         Doc::Compiled one;
@@ -747,20 +747,6 @@ void ALFloaterScriptStudio::compiledHere(const ALScriptWorkspace::CompileResult&
             continueClosing();
         }
     }
-}
-
-// static
-const ALSourceMap* ALFloaterScriptStudio::runningMap(const Doc& doc)
-{
-    // What the region compiled and runs is the expanded text that went up
-    // from here, where one did; else -- a recompile, or a script loaded and
-    // not saved since -- the text as it was last expanded, which is what
-    // its envelope holds as far as this tab knows.
-    if (doc.save.sentMap())
-    {
-        return &*doc.save.sentMap();
-    }
-    return doc.uploaded.valid && !doc.uploaded.disabled ? &doc.uploaded.map : nullptr;
 }
 
 bool ALFloaterScriptStudio::sendQueuedSave(Doc& doc)

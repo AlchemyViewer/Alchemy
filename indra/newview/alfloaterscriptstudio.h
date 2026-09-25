@@ -26,6 +26,7 @@
 
 #include "alcodeeditor.h"
 #include "alscriptnotecardtab.h"
+#include "alscriptoutputpane.h"
 #include "alscriptstudiodoc.h"
 #include "alscriptstudioservices.h"
 #include "alfindings.h"
@@ -89,7 +90,7 @@ class LLViewerObject;
 // a script the preprocessor wrapped shown as the code the server compiled
 // with the author's source in a tab beside it. Its regions fold and come
 // out as any studio's do.
-class ALFloaterScriptStudio final : public ALStudioFloater, public ALScriptStudioServices
+class ALFloaterScriptStudio final : public ALStudioFloater, public ALScriptStudioServices, public ALScriptOutputPane::Window
 {
     friend class LLFloaterReg;
 
@@ -439,10 +440,6 @@ private:
     // through where it was.
     void                          upload(Doc& doc, const std::string& text, const ALSourceMap* map = nullptr);
     static S32                    mapSpan(const ALSourceMap& map, ALScriptSpan& span);
-    // The map the text the region compiled and runs was expanded through:
-    // what the compiler's lines and a run-time error's are read back by.
-    // Null where the text went up as written.
-    static const ALSourceMap*     runningMap(const Doc& doc);
     std::string                   includeName(const Doc& doc, const std::string& path) const;
     void                          chooseIncludeFolder();
     // A file on disk opened in a tab of its own, or brought forward, at
@@ -752,13 +749,14 @@ private:
     // What scripts say, from the workspace: listed in the Output tab, and
     // a run-time error in a script that is open marked on its line.
     void runtimeEvent(const ALScriptWorkspace::RuntimeEvent& event);
-    // The Output tab's filters, over whose words, of what kind, with what
-    // in them, as one filter.
-    void onOutputFilter();
-    void onOutputChosen(const ALOutputView::Entry& entry);
-    // An object offered in the Output tab's filter, the one least lately
-    // heard from giving way past a few dozen.
-    void offerOutputObject(const LLUUID& root, const std::string& name);
+    // What the Output tab asks of the window (ALScriptOutputPane::Window).
+    bool outputInSight() const override;
+    void outputUnreadChanged() override { refreshBottomTabs(); }
+    bool ownsObject(const LLUUID& root) const override;
+    void outputAction(Doc& doc, const std::string& action) override;
+    void outputShowDoc(Doc& doc, bool problems) override;
+    void outputGoTo(const ALScriptRef& ref, const std::string& name, S32 line, S32 column) override;
+    void outputGoToInclude(const std::string& file, const std::string& file_name, S32 line, S32 column) override;
 
     // The explorer: the objects in hand -- pinned, selected in world, or
     // holding a script that is open -- each prim's scripts and notecards
@@ -1295,13 +1293,7 @@ private:
     std::string                        mTrailerProblemsTip;
     std::string                        mTrailerSourceTip;
     std::string                        mTrailerExpandedTip;
-    // Whether a run-time error has come since the Output tab was last
-    // looked at, which its title says until it is.
-    bool                               mOutputUnread   = false;
-    LLComboBox*                        mOutputKind     = nullptr;
-    LLFilterEditor*                    mOutputFind     = nullptr;
-    ALOutputView*                      mOutput        = nullptr;
-    LLComboBox*                        mOutputFilter  = nullptr;
+    std::unique_ptr<ALScriptOutputPane> mOutputPane;
     ALScopeBar*                        mSearchBar     = nullptr;
     ALPaneList*                        mSearchResults = nullptr;
     // The Weights tab, and whether it was looked at last frame and has
@@ -1428,9 +1420,6 @@ private:
     bool                               mClosingWindow = false;
     LLHandle<LLContextMenu>            mListMenuHandle;
     LLScrollListCtrl*                  mListMenuFor   = nullptr;
-    // The objects heard from, offered in the filter, the one heard from
-    // most lately last.
-    std::vector<std::pair<LLUUID, std::string>> mOutputObjects;
     LLComboBox*                        mCompileTarget = nullptr;
     LLCheckBoxCtrl*                    mRunning       = nullptr;
     LLComboBox*                        mExperience    = nullptr;

@@ -975,6 +975,7 @@ if(AL_BUILD_VIEWER)
     alscriptkeymap.h
     alscriptmodules.h
     alscriptnotecardtab.h
+    alscriptoutputpane.h
     alscriptpreprocessor.h
     alscriptsaveflow.h
     alscriptstudiodoc.h
@@ -2412,6 +2413,17 @@ if(AL_BUILD_TESTS)
     UNIT
     PROJECT ${test_project}
     LIBRARIES llui alscript ${test_libs}
+    DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
+  )
+
+  # The Script Studio's Output tab over the studio's own window, the
+  # window's side faked.
+  al_add_test(
+    alscriptoutputpane
+    UNIT
+    PROJECT ${test_project}
+    LIBRARIES llui alscript ${test_libs}
+    SOURCES alscriptstudiodoc.cpp
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
 
