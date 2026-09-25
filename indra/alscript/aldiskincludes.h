@@ -78,6 +78,13 @@ public:
     // it, and as the Second Life VS Code plugin does.
     static std::vector<std::string> namesFor(const std::string& name, bool lua, bool require);
 
+    // The file of this name at the top of each blessed folder that has one
+    // it admits, in the order the folders were blessed: the configurations
+    // a scripter keeps with their includes, which serve a script that is
+    // not itself on disk and so has no folders of its own to look up
+    // through.
+    std::vector<std::string> atTop(const std::string& name) const;
+
     // The files under the blessed folder `folder`, and the folders under
     // it, whose names end in one of `extensions`, each where it stands
     // once its links are followed and by its path from the folder, `/`

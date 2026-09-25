@@ -85,6 +85,44 @@ bool ALLuauConfig::parse(std::string_view text, ALLuauConfig& out, std::string& 
 }
 
 // static
+bool ALLuauConfig::parseChain(const std::vector<std::string_view>& nearest_first, ALLuauConfig& out, const ALLuauConfig* base)
+{
+    out      = base ? *base : ALLuauConfig();
+    bool any = false;
+    for (auto it = nearest_first.rbegin(); it != nearest_first.rend(); ++it)
+    {
+        ALLuauConfig next;
+        std::string  error;
+        if (parse(*it, next, error, &out))
+        {
+            out = std::move(next);
+            any = true;
+        }
+    }
+    return any;
+}
+
+// static
+std::optional<size_t> ALLuauConfig::aliasIn(const std::vector<std::string_view>& nearest_first, const std::string& alias, std::string& value)
+{
+    for (size_t i = 0; i < nearest_first.size(); ++i)
+    {
+        ALLuauConfig one;
+        std::string  error;
+        if (!parse(nearest_first[i], one, error))
+        {
+            continue;
+        }
+        if (const auto found = one.aliases.find(alias); found != one.aliases.end())
+        {
+            value = found->second;
+            return i;
+        }
+    }
+    return std::nullopt;
+}
+
+// static
 bool ALLuauConfig::aliasOf(std::string_view name, std::string& alias, std::string& rest)
 {
     if (name.empty() || name.front() != '@')

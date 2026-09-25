@@ -256,11 +256,22 @@ private:
     // disk bless, for the rest of a run.
     ALPreprocessor::Found  resolve(const ALPreprocessor::Ask& ask, ALPreprocessor::Include& out, const Request& request, wanted_t* wanted,
                                    bool retry, std::vector<std::string>* alias_folders = nullptr);
-    // The `.luaurc` that governs a file, by the file's identity: its own
-    // identity and its text, fetched like an include where it is in the
-    // world. No where there is none.
-    ALPreprocessor::Found  configFor(const std::string& from, const Request& request, wanted_t* wanted, bool retry, std::string& path,
-                                     std::string& text);
+    // The `.luaurc` files over a file, by the file's identity, nearest
+    // first, as Luau reads a chain of them from the top down: a file on
+    // disk's up the directories to the root; a script in the world's up
+    // its folders or in its object -- only where includes are taken from
+    // the world -- and above those, the one at the top of each of the
+    // scripter's include folders, in their order, since a script in the
+    // world has no folders on disk to look up through and its modules are
+    // read from those. Each with its identity and its text, fetched like
+    // an include where it is in the world: Pending while any is on its
+    // way. Each alias is its own file's, taken from beside it.
+    struct Config
+    {
+        std::string path;
+        std::string text;
+    };
+    ALPreprocessor::Found  configsFor(const std::string& from, const Request& request, wanted_t* wanted, bool retry, std::vector<Config>& out);
     // An include's text, from the cache or a file; Pending, and wanted,
     // where it is in the world and not in hand yet.
     ALPreprocessor::Found  textOf(const Candidate& candidate, wanted_t* wanted, bool retry, std::string& text, std::string& assetId);

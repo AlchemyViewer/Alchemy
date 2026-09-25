@@ -752,7 +752,7 @@ end</floater.string>
              layout="topleft"
              left="12"
              name="preproc_disk"
-             tool_tip="An #include or a require may name a file in the folders below, looked for from the top. Nothing else on the disk is read, but where a .lslrc or .luaurc on disk points -- and only within its own folder or one below: to reach further, add that folder here. Off, nothing on the disk is read at all"
+             tool_tip="An #include or a require may name a file in the folders below, looked for from the top; a .luaurc at the top of each gives a script in the world its aliases and settings, an earlier folder's over a later one's. Nothing else on the disk is read, but where a .lslrc or .luaurc on disk points -- and only within its own folder or one below: to reach further, add that folder here. Off, nothing on the disk is read at all"
              top_delta="0"
              width="370" />
             <scroll_list

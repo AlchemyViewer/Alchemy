@@ -296,4 +296,38 @@ namespace tut
         ensure_equals("a file of the name before the folder", first("lib"), own);
         ensure_equals("init by its own name too", first("lib/init"), init);
     }
+
+    template<> template<>
+    void aldiskincludes_object::test<7>()
+    {
+        set_test_name("the configuration at the top of each blessed folder that has one, in their order, read as any file under it is");
+        Scratch        s;
+        ALDiskIncludes none;
+        ensure("nothing blessed, nothing found", none.atTop(".luaurc").empty());
+
+        s.write("first/util.luau", "return 1\n");
+        const std::string second = s.write("second/.luaurc", "{\"aliases\": {\"lib\": \"./lib\"}}\n");
+        const std::string third  = s.write("third/.luaurc", "{}\n");
+        s.write("first/deeper/.luaurc", "{}\n");
+        ALDiskIncludes blessed;
+        blessed.bless(s.at("first"));
+        blessed.bless(s.at("third"));
+        blessed.bless(s.at("second"));
+        typedef std::vector<std::string> files;
+        ensure("each folder's own, in the order blessed, not one further down", blessed.atTop(".luaurc") == files{ third, second });
+
+        // A folder so named is no file.
+        fs::create_directories(s.under("first/.luaurc"));
+        ensure("a folder so named passed over", blessed.atTop(".luaurc") == files{ third, second });
+#if LL_DARWIN || LL_LINUX
+        // A link out of the blessed folders is where it leads, and not read.
+        s.write("elsewhere/.luaurc", "{}\n");
+        std::error_code ec;
+        fs::remove(s.under("first/.luaurc"), ec);
+        fs::create_symlink(s.under("elsewhere/.luaurc"), s.under("first/.luaurc"), ec);
+        ensure("linked: " + ec.message(), !ec);
+        ensure("not through a link out", blessed.atTop(".luaurc") == files{ third, second });
+#endif
+        ensure("nor a name no folder has", blessed.atTop(".lslrc").empty());
+    }
 }

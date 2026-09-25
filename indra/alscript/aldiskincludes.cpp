@@ -153,6 +153,19 @@ std::vector<std::string> ALDiskIncludes::namesFor(const std::string& name, bool 
     return names;
 }
 
+std::vector<std::string> ALDiskIncludes::atTop(const std::string& name) const
+{
+    std::vector<std::string> out;
+    for (const std::string& folder : mFolders)
+    {
+        if (std::optional<std::string> real = admits(fsyspath(fsyspath(folder) / fsyspath(name)).string()))
+        {
+            out.push_back(std::move(*real));
+        }
+    }
+    return out;
+}
+
 std::optional<std::string> ALDiskIncludes::admits(const std::string& file) const
 {
     const std::optional<fs::path> found = real(file);

@@ -26,6 +26,7 @@
 
 #include <cstdint>
 #include <map>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -63,6 +64,16 @@ struct ALLuauConfig
     // Luau's defaults; its globals are added to the base's, and its
     // aliases put over them, as Luau reads a chain of files from the top.
     static bool parse(std::string_view text, ALLuauConfig& out, std::string& error, const ALLuauConfig* base = nullptr);
+    // A chain of files, given nearest first, read as Luau reads one: from
+    // the furthest to the nearest, each over the ones above it and over
+    // the base, so that the nearest to say a thing wins and globals add
+    // up. One that does not parse is passed over. False where none did,
+    // and the base or the defaults.
+    static bool parseChain(const std::vector<std::string_view>& nearest_first, ALLuauConfig& out, const ALLuauConfig* base = nullptr);
+    // Which file of a chain, given nearest first, says what an alias --
+    // in lower case -- stands for: the nearest that does, with what it
+    // says, which is from beside that file. Nothing where none does.
+    static std::optional<size_t> aliasIn(const std::vector<std::string_view>& nearest_first, const std::string& alias, std::string& value);
 
     // Every lint by the name a `.luaurc` gives it, in Luau's order, and
     // the bit of the masks above that one is.
