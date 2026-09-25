@@ -4762,7 +4762,11 @@ void ALFloaterScriptStudio::analysed(const ALScriptAnalysis::Result& result)
     // may say a lint is wanted.
     offerImports(doc);
     noLint(doc);
-    if (!doc.language.lua)
+    if (doc.language.lua)
+    {
+        explainRequires(doc);
+    }
+    else
     {
         explainTransformWords(doc);
     }
@@ -4944,6 +4948,31 @@ void ALFloaterScriptStudio::explainTransformWords(Doc& doc)
         LLStringUtil::format_map_t args;
         args["[WORD]"] = word;
         problem.message += " " + getString(transform == Transform::Switch ? "PreprocHintSwitch" : "PreprocHintExtensions", args);
+    }
+}
+
+void ALFloaterScriptStudio::explainRequires(Doc& doc)
+{
+    // Luau's own globals have a require, so nothing else says so: the
+    // script runs until the call, and stops there. A file is not what goes
+    // up, and a notecard is read into a script that is preprocessed.
+    if (doc.notecard || !doc.file.empty() || preprocessed(doc))
+    {
+        return;
+    }
+    for (const ALPreprocessor::Required& required : ALPreprocessor::requiresIn(doc.editor->text()))
+    {
+        ALScriptProblem problem;
+        problem.severity  = ALScriptProblem::Severity::Warning;
+        problem.source    = ALScriptProblem::Source::Preprocessor;
+        problem.line      = required.line;
+        problem.column    = required.column;
+        problem.endLine   = required.endLine;
+        problem.endColumn = required.endColumn;
+        LLStringUtil::format_map_t args;
+        args["[NAME]"]  = required.name;
+        problem.message = getString("RequireNotPreprocessed", args);
+        doc.analysis.push_back(std::move(problem));
     }
 }
 

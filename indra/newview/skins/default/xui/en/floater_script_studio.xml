@@ -386,6 +386,7 @@
     <floater.string name="NotecardCopyFailed">[NAME] could not be copied: no region to ask</floater.string>
     <floater.string name="NotecardCopyRefused">[NAME] could not be copied: [ERROR]</floater.string>
     <floater.string name="PreprocHintSwitch">([WORD] is Firestorm's: turn on Build > Preprocess on Save and Build > Firestorm > Switch Statements)</floater.string>
+    <floater.string name="RequireNotPreprocessed">require("[NAME]") goes up as written, and the grid has no require: turn on Build > Preprocess on Save to put the module in its place</floater.string>
     <floater.string name="PreprocHintExtensions">([WORD] is an extension: turn on Build > Preprocess on Save and Build > Extensions)</floater.string>
     <floater.string name="ClearRecentFiles">Clear Menu</floater.string>
     <floater.string name="OriginCompiler">Compiler</floater.string>
@@ -1120,7 +1121,7 @@
      layout="topleft"
      left_pad="8"
      name="expanded_btn"
-     tool_tip="Show what the preprocessor made of this script, as the server compiles it, in place of the source; press again for the source ([KEYS]). Read-only. Off while the preprocessor is, which the Script Studio preferences turn on."
+     tool_tip="Show what the preprocessor made of this script, as the server compiles it, in place of the source; press again for the source ([KEYS]). Read-only. Off while the preprocessor is: Build &gt; Preprocess on Save turns it on."
      top_delta="0"
      width="26" />
     <button

@@ -552,6 +552,9 @@ private:
     // A parse error on a preprocessor's word, with its transform off, told
     // so: over the problems in the source's places.
     void explainTransformWords(Doc& doc);
+    // A require in a script of SLua the preprocessor does not run over,
+    // warned of: it goes up as written, and the grid has no require.
+    void explainRequires(Doc& doc);
     // The marks, the squiggles and the pane, from the compiler's problems
     // and the analyzer's together.
     void refreshProblems(Doc& doc) override;

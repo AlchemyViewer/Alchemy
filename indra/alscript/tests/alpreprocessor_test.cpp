@@ -1174,4 +1174,48 @@ namespace tut
                                   "local b = t : require(\"x\")\n"
                                   "local c = t .. __modules[\"x\"]\n"));
     }
+
+    template<> template<>
+    void alpreprocessor_object::test<31>()
+    {
+        set_test_name("SLua: the calls a run puts a module in place of are found where they stand, and only those");
+        const std::string source = "local a = require(\"a\")\n"   // 0
+                                   "local b = require 'b'\n"       // 1: no parentheses
+                                   "local c = require( -- the next\n"
+                                   "    'c'\n"
+                                   ")\n"                           // 4
+                                   "-- require(\"d\")\n"
+                                   "local e = \"require('e')\"\n"
+                                   "local f = t.require(\"f\")\n"
+                                   "local g = require(name)\n"
+                                   "local h = require([[h]])\n"
+                                   "local i = x .. require(\"i\")\n"; // 10
+        const std::vector<ALPreprocessor::Required> found = ALPreprocessor::requiresIn(source);
+        ensure_equals("three", found.size(), size_t(3));
+        ensure_equals("a", found[0].name, std::string("a"));
+        ensure("a's stretch", found[0].line == 0 && found[0].column == 10 && found[0].endLine == 0 && found[0].endColumn == 22);
+        ensure_equals("c", found[1].name, std::string("c"));
+        ensure("c's stretch, across lines", found[1].line == 2 && found[1].column == 10 && found[1].endLine == 4 && found[1].endColumn == 1);
+        ensure_equals("i", found[2].name, std::string("i"));
+        ensure("i's line", found[2].line == 10 && found[2].column == 15);
+
+        // Every one of them is one a run puts a module in place of, and
+        // no other call is.
+        add("a", "return 1\n");
+        add("c", "return 3\n");
+        add("i", "return 9\n");
+        const ALPreprocessor::Result r = ALPreprocessor::run(source, options(true));
+        ensure_equals("problems", messages(r), std::string());
+        const auto count = [&r](const std::string& what) {
+            size_t n = 0;
+            for (size_t at = r.text.find(what); at != std::string::npos; at = r.text.find(what, at + 1))
+            {
+                ++n;
+            }
+            return n;
+        };
+        // Each module is filled once at the top, and looked up where it
+        // was called for.
+        ensure_equals("as many lookups as calls found", count("__modules[") - count("] = (function()"), found.size());
+    }
 } // namespace tut

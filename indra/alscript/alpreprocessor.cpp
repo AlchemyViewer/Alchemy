@@ -3931,6 +3931,63 @@ std::vector<ALPreprocessor::Token> ALPreprocessor::tokenize(std::string_view tex
 }
 
 // static
+std::vector<ALPreprocessor::Required> ALPreprocessor::requiresIn(std::string_view text)
+{
+    // The shape Requires::gather takes: the word, `(`, a quoted string and
+    // `)`, blanks and comments between them, and no `.` or `:` before it.
+    const std::vector<Token> tokens = tokenize(text, true);
+    const auto blank = [&tokens](size_t i) {
+        const Token::Kind kind = tokens[i].kind;
+        return kind == Token::Kind::Space || kind == Token::Kind::Newline || kind == Token::Kind::Comment;
+    };
+    const auto next = [&tokens, &blank](size_t i) {
+        while (i < tokens.size() && blank(i))
+        {
+            ++i;
+        }
+        return i;
+    };
+    const auto is = [&tokens](size_t i, Token::Kind kind, std::string_view word) {
+        return i < tokens.size() && tokens[i].kind == kind && tokens[i].text == word;
+    };
+    std::vector<Required> out;
+    bool                  indexed = false;
+    for (size_t i = 0; i < tokens.size(); ++i)
+    {
+        if (blank(i))
+        {
+            continue;
+        }
+        const bool field = indexed;
+        indexed          = is(i, Token::Kind::Punct, ".") || is(i, Token::Kind::Punct, ":");
+        if (field || !is(i, Token::Kind::Ident, "require"))
+        {
+            continue;
+        }
+        const size_t open = next(i + 1);
+        const size_t name = is(open, Token::Kind::Punct, "(") ? next(open + 1) : tokens.size();
+        const size_t shut = name < tokens.size() ? next(name + 1) : tokens.size();
+        if (!is(shut, Token::Kind::Punct, ")") || tokens[name].kind != Token::Kind::String)
+        {
+            continue;
+        }
+        const std::string& quoted = tokens[name].text;
+        if (quoted.size() < 2 || (quoted.front() != '"' && quoted.front() != '\''))
+        {
+            continue;
+        }
+        Required one;
+        one.line      = tokens[i].line;
+        one.column    = tokens[i].column;
+        one.endLine   = tokens[shut].line;
+        one.endColumn = tokens[shut].column + 1;
+        one.name      = quoted.substr(1, quoted.size() - 2);
+        out.push_back(std::move(one));
+    }
+    return out;
+}
+
+// static
 ALPreprocessor::Transform ALPreprocessor::transformAt(const std::function<std::string_view(S32)>& line, S32 count, S32 at, std::string& word)
 {
     const auto isWord = [](char c) { return isalnum(static_cast<unsigned char>(c)) || c == '_'; };

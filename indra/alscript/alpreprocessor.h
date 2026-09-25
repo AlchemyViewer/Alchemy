@@ -248,6 +248,21 @@ public:
     };
     static Transform transformAt(const std::function<std::string_view(S32)>& line, S32 count, S32 at, std::string& word);
 
+    // Where a script of SLua calls the global `require` with a name, as a
+    // run puts a module in the call's place: the call's stretch, zero-based
+    // and its end past the `)`, and the name. A script that goes up
+    // without a run goes up with each of these as written, and the grid
+    // has no `require` for them to call.
+    struct Required
+    {
+        S32         line      = 0;
+        S32         column    = 0;
+        S32         endLine   = 0;
+        S32         endColumn = 0;
+        std::string name;
+    };
+    static std::vector<Required> requiresIn(std::string_view text);
+
 private:
     // The optimizer alone, which is the first half of `finish`.
     static void optimize(Result& result, const Options& options);
