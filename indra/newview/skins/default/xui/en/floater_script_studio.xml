@@ -655,6 +655,10 @@
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="move_line_down" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="move_line_down" />
             </menu_item_call>
+            <menu_item_call label="Join Lines" layout="topleft" name="join_lines" shortcut="control|J">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="join_lines" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="join_lines" />
+            </menu_item_call>
             <menu_item_call label="Complete" layout="topleft" name="complete">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="complete" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="complete" />
@@ -691,6 +695,14 @@
             <menu_item_call label="Format Selection" layout="topleft" name="format_selection">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="format_selection" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="format_selection" />
+            </menu_item_call>
+            <menu_item_call label="Convert Indentation to Spaces" layout="topleft" name="indent_spaces">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="indent_spaces" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="indent_spaces" />
+            </menu_item_call>
+            <menu_item_call label="Convert Indentation to Tabs" layout="topleft" name="indent_tabs">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="indent_tabs" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="indent_tabs" />
             </menu_item_call>
             <menu_item_separator layout="topleft" />
             <menu_item_call label="Find..." layout="topleft" name="find" shortcut="control|F">

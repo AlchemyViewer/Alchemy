@@ -20,6 +20,8 @@
     <panel.string name="menu_open_file">Open a file</panel.string>
     <panel.string name="menu_close">Close the script</panel.string>
     <panel.string name="menu_close_others">Close the other scripts</panel.string>
+    <panel.string name="menu_indent_spaces">Convert indentation to spaces</panel.string>
+    <panel.string name="menu_indent_tabs">Convert indentation to tabs</panel.string>
     <panel.string name="menu_close_saved">Close the saved scripts</panel.string>
     <panel.string name="menu_close_all">Close every script</panel.string>
     <panel.string name="menu_insert_file">Insert a file</panel.string>
@@ -112,6 +114,7 @@
     <panel.string name="cmd_find_previous">Find previous</panel.string>
     <panel.string name="cmd_quick_fix">Quick fix</panel.string>
     <panel.string name="cmd_next_misspelling">Next misspelling</panel.string>
+    <panel.string name="cmd_join_lines">Join lines</panel.string>
     <panel.string name="cmd_previous_misspelling">Previous misspelling</panel.string>
     <line_editor
      follows="left|top|right"

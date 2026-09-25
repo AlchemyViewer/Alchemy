@@ -172,6 +172,8 @@ namespace ALScriptKeymap
             { "insert_file", KEY_NONE, MASK_NONE },
             { "preferences", KEY_NONE, MASK_NONE },
             { "format", 'F', MASK_SHIFT | MASK_ALT },
+            { "indent_spaces", KEY_NONE, MASK_NONE },
+            { "indent_tabs", KEY_NONE, MASK_NONE },
             { "find_in_files", 'F', MASK_CONTROL | MASK_SHIFT },
             { "insert_snippet", 'I', MASK_CONTROL | MASK_SHIFT },
             { "back", '-', REAL_CONTROL },

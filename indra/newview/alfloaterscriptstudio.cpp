@@ -10776,6 +10776,23 @@ void ALFloaterScriptStudio::addEditCommands()
     addEditorCommand("rename", ALEditorCommand::Rename, false);
     addEditorCommand("quick_fix", ALEditorCommand::QuickFix, true);
     addEditorCommand("next_misspelling", ALEditorCommand::NextMisspelling, false);
+    addEditorCommand("join_lines", ALEditorCommand::JoinLines, true);
+    // The whole script's indentation made of spaces, or of tabs.
+    for (const auto& [name, spaces] : { std::pair{ "indent_spaces", true }, std::pair{ "indent_tabs", false } })
+    {
+        mCommands.add(
+            name,
+            [this, spaces]() {
+                if (Doc* doc = active())
+                {
+                    doc->editor->convertIndentation(0, doc->editor->document().lineCount() - 1, spaces);
+                }
+            },
+            [this]() {
+                Doc* doc = active();
+                return doc && doc->loaded && doc->modifiable && doc->shownView() == Doc::View::Source;
+            });
+    }
     addEditorCommand("previous_misspelling", ALEditorCommand::PreviousMisspelling, false);
     // What changes the text, or asks the analyzers about a place in it, is
     // the source's to do: while the expansion is in front, it is read.
