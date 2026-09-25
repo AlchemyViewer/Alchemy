@@ -134,6 +134,7 @@ target_sources(
     alstudiofloater.cpp
     alsurface.cpp
     alcodeeditor.cpp
+    alcompletionmodel.cpp
     alfindbar.cpp
     alkeymap.cpp
     alvimkeymap.cpp
