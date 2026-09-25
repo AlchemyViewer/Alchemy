@@ -143,6 +143,7 @@ target_sources(
     alfindbar.cpp
     alkeymap.cpp
     alvimkeymap.cpp
+    alvimpattern.cpp
     alvimregisters.cpp
     alxuiservice.cpp
     alchoicelist.cpp
