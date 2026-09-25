@@ -606,6 +606,12 @@ namespace tut
         const std::string same = "default\n{\n    state_entry() {\n        llSensorRepeat(\"\", NULL_KEY, AGENT, 10.0, PI, 5.0);\n    }\n}\n";
         made = actedOn(same, false, "llSensorRepeat", false, "Add a handler for 'sensor'");
         ensure("on its line: " + made, made.find("\n\n    sensor(integer NumberDetected) {\n    }\n}\n") != std::string::npos);
+        // Asked for from a function a handler calls, and from one that one
+        // calls: offered all the same.
+        const std::string helper = "arm()\n{\n    llSetTimerEvent(1.0);\n}\nstart()\n{\n    arm();\n}\n"
+                                   "default\n{\n    state_entry()\n    {\n        start();\n    }\n}\n";
+        made = actedOn(helper, false, "start();\n    }", false, "Add a handler for 'timer'");
+        ensure("through two calls: " + made, made.find("    timer()\n    {\n    }\n") != std::string::npos);
     }
 
     template<> template<>
@@ -669,6 +675,10 @@ namespace tut
                       script + "\nLLEvents:on(\"listen\", function(Channel: number, Name: string, ID: uuid, Text: string)\nend)\n");
         const std::string heard = script + "LLEvents:on(\"listen\", function(channel, name, id, text) end)\n";
         ensure("heard: " + titles(actions(heard, true, 0, 3, 0, 3)), actedOn(heard, true, "Listen", false, "Add a handler for 'listen'").rfind("offered", 0) == 0);
+        // A handler taken off is no handler put on.
+        const std::string off = script + "local function said(channel, name, id, text) end\nLLEvents:off(\"listen\", said)\n";
+        ensure("offered where only taken off: " + titles(actions(off, true, 0, 3, 0, 3)),
+               actedOn(off, true, "Listen", false, "Add a handler for 'listen'").rfind("offered", 0) != 0);
     }
 
     template<> template<>

@@ -1961,7 +1961,10 @@ namespace
             {
                 calls.insert(index->index.value);
             }
-            else if (strcmp(table->name.value, "LLEvents") == 0 && call->args.size >= 1)
+            // Heard where a handler is put on it -- `LLEvents:on` and
+            // `:once` -- not where one is taken off, nor asked about.
+            else if (strcmp(table->name.value, "LLEvents") == 0 && call->args.size >= 1 &&
+                     (strcmp(index->index.value, "on") == 0 || strcmp(index->index.value, "once") == 0))
             {
                 if (Luau::AstExprConstantString* name = call->args.data[0]->as<Luau::AstExprConstantString>())
                 {

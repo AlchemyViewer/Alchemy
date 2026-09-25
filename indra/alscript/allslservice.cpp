@@ -1987,6 +1987,42 @@ std::vector<ALScriptFix> ALLSLService::actions(std::string_view source, S32 line
             heard.insert(static_cast<Tailslide::LSLIdentifier*>(handler->getChild(0))->getName());
             callsIn(handler->getChild(2), calls);
         }
+        // And what the script's own functions the handlers call ask for,
+        // and the functions those call: an event asked for from a helper
+        // is asked for all the same.
+        std::map<std::string, Tailslide::LSLASTNode*> functions;
+        if (Tailslide::LSLASTNode* globals = script->getGlobals())
+        {
+            for (Tailslide::LSLASTNode* global = globals->getChild(0); global; global = global->getNext())
+            {
+                if (global->getNodeType() == Tailslide::NODE_GLOBAL_FUNCTION && global->getChild(0) &&
+                    global->getChild(0)->getNodeType() == Tailslide::NODE_IDENTIFIER)
+                {
+                    functions[static_cast<Tailslide::LSLIdentifier*>(global->getChild(0))->getName()] = global->getChild(2);
+                }
+            }
+        }
+        std::vector<std::string> waiting(calls.begin(), calls.end());
+        std::set<std::string>    walked;
+        while (!waiting.empty())
+        {
+            const std::string name = std::move(waiting.back());
+            waiting.pop_back();
+            const auto function = functions.find(name);
+            if (function == functions.end() || !walked.insert(name).second)
+            {
+                continue;
+            }
+            std::set<std::string> more;
+            callsIn(function->second, more);
+            for (const std::string& call : more)
+            {
+                if (calls.insert(call).second)
+                {
+                    waiting.push_back(call);
+                }
+            }
+        }
         const ALScriptSpan whole  = spanOf(*state->getLoc());
         const S32          close  = whole.endColumn - 1;
         const size_t       brace  = offsetOf(source, whole.endLine, close);
