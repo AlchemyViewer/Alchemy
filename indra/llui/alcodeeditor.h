@@ -515,6 +515,11 @@ public:
     // The lines a fix touches as they would read with it made, and which
     // lines they are.
     static std::string fixedLines(const ALTextDocument& text, const Fix& fix, S32& first, S32& last);
+    // What the preview shows of a fix: each stretch of lines it changes as
+    // they read and as they would, a line `- ` and `+ ` before each, edits
+    // a few lines apart or less in one stretch, and an ellipsis between
+    // stretches; `kinds` says each line's -- '-', '+' or ' '.
+    static std::string previewOf(const ALTextDocument& text, const Fix& fix, std::vector<char>& kinds);
     // In the order they are offered: the preferred first, then the other
     // fixes, the refactors, and a suppression last, each as given.
     static void        rankFixes(std::vector<Fix>& fixes);

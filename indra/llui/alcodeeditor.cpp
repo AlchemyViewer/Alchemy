@@ -3062,6 +3062,65 @@ std::string ALCodeEditor::fixedLines(const ALTextDocument& text, const Fix& fix,
     return block;
 }
 
+// static
+std::string ALCodeEditor::previewOf(const ALTextDocument& text, const Fix& fix, std::vector<char>& kinds)
+{
+    // The lines it touches as they read and as they would, as a diff has
+    // them: what goes in the error colour, what comes coloured as code. A
+    // stretch for each place it changes, edits a few lines apart or less
+    // together, and an ellipsis for what lies between -- a global put in
+    // at the top for a use two hundred lines down is two short stretches,
+    // not the two hundred lines.
+    std::vector<std::pair<ALTextRange, std::string>> edits = fix.edits;
+    for (auto& one : edits)
+    {
+        one.first = one.first.normalised();
+    }
+    std::stable_sort(edits.begin(), edits.end(), [](const auto& a, const auto& b) { return a.first.begin < b.first.begin; });
+    std::vector<Fix> stretches;
+    S32              reach = -1;
+    for (const auto& one : edits)
+    {
+        if (stretches.empty() || one.first.begin.line > reach + 2)
+        {
+            stretches.emplace_back();
+        }
+        stretches.back().edits.push_back(one);
+        reach = llmax(reach, one.first.end.line);
+    }
+    std::string says;
+    kinds.clear();
+    const auto add = [&says, &kinds](char kind, const std::string& line) {
+        says += (says.empty() ? "" : "\n") + (kind == ' ' ? line : std::string(1, kind) + " " + line);
+        kinds.push_back(kind);
+    };
+    for (size_t k = 0; k < stretches.size(); ++k)
+    {
+        if (k > 0)
+        {
+            add(' ', "\u2026");
+        }
+        S32               first = 0, last = 0;
+        const std::string after = fixedLines(text, stretches[k], first, last);
+        for (S32 line = first; line <= last && line < text.lineCount(); ++line)
+        {
+            add('-', text.line(line));
+        }
+        std::string_view rest = after;
+        while (true)
+        {
+            const size_t cut = rest.find('\n');
+            add('+', std::string(rest.substr(0, cut)));
+            if (cut == std::string_view::npos)
+            {
+                break;
+            }
+            rest.remove_prefix(cut + 1);
+        }
+    }
+    return says;
+}
+
 void ALCodeEditor::showFixPreview()
 {
     const S32 index = fixesOpen() ? mFixList->chosen() : -1;
@@ -3070,41 +3129,21 @@ void ALCodeEditor::showFixPreview()
         hideCompletionDoc();
         return;
     }
-    // The lines it touches as they read and as they would, as a diff has
-    // them: what goes in the error colour, what comes coloured as code.
-    S32               first = 0, last = 0;
-    const std::string after = fixedLines(document(), mFixes[index], first, last);
-    std::string       says;
-    S32               removed = 0;
-    for (S32 line = first; line <= last && line < document().lineCount(); ++line)
-    {
-        says += (says.empty() ? "- " : "\n- ") + document().line(line);
-        ++removed;
-    }
-    std::string_view rest = after;
-    while (true)
-    {
-        const size_t cut = rest.find('\n');
-        says += "\n+ " + std::string(rest.substr(0, cut));
-        if (cut == std::string_view::npos)
-        {
-            break;
-        }
-        rest.remove_prefix(cut + 1);
-    }
+    std::vector<char> kinds;
+    const std::string says = previewOf(document(), mFixes[index], kinds);
     ALTextView& box = *sideBox();
     box.setText(says);
     std::vector<ALTextView::Style> styles;
-    for (S32 line = 0; line < box.document().lineCount(); ++line)
+    for (S32 line = 0; line < box.document().lineCount() && line < static_cast<S32>(kinds.size()); ++line)
     {
-        if (line < removed)
+        if (kinds[static_cast<size_t>(line)] == '-')
         {
             ALTextView::Style gone;
             gone.range = ALTextRange(ALTextPos(line, 0), box.document().lineEnd(line));
             gone.color = markColor(Mark::Error);
             styles.push_back(gone);
         }
-        else
+        else if (kinds[static_cast<size_t>(line)] == '+')
         {
             styleAsCode(box, line, styles);
         }

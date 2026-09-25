@@ -1310,6 +1310,27 @@ namespace tut
             ensure_equals(insertion_first ? "put in, then replaced" : "replaced, then put in", ALCodeEditor::fixedLines(e.document(), both, first, last),
                           std::string("local v = two\nv"));
         }
+        // Edits far apart preview as a stretch each, not every line between.
+        std::string many;
+        for (int i = 0; i < 200; ++i)
+        {
+            many += "line " + std::to_string(i) + "\n";
+        }
+        ALCodeEditor& far = make(many.c_str());
+        ALCodeEditor::Fix apart;
+        apart.edits.emplace_back(ALTextRange(ALTextPos(2, 0), ALTextPos(2, 0)), "top\n");
+        apart.edits.emplace_back(ALTextRange(ALTextPos(150, 0), ALTextPos(150, 4)), "LINE");
+        std::vector<char> kinds;
+        const std::string preview = ALCodeEditor::previewOf(far.document(), apart, kinds);
+        ensure_equals("two stretches and an ellipsis between", preview,
+                      std::string("- line 2\n+ top\n+ line 2\n\u2026\n- line 150\n+ LINE 150"));
+        ensure("each line's kind", std::string(kinds.begin(), kinds.end()) == "-++ -+");
+        // Near each other, one stretch.
+        ALCodeEditor::Fix near;
+        near.edits.emplace_back(ALTextRange(ALTextPos(10, 0), ALTextPos(10, 4)), "A");
+        near.edits.emplace_back(ALTextRange(ALTextPos(12, 0), ALTextPos(12, 4)), "B");
+        ensure_equals("together", ALCodeEditor::previewOf(far.document(), near, kinds),
+                      std::string("- line 10\n- line 11\n- line 12\n+ A 10\n+ line 11\n+ B 12"));
     }
 
     template<> template<>
