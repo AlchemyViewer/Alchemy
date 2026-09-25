@@ -277,7 +277,7 @@ namespace tut
 
         holds(id(100), { "core.lsl" });
         ensure("answered and current: not asked", model.toAsk(false, false, always).empty());
-        const auto changed = [](const LLUUID& prim) { return prim != id(100); };
+        const auto changed = [](const LLUUID& prim) { return prim != alscriptexplorermodel_data::id(100); };
         std::vector<LLUUID> again = model.toAsk(false, false, changed);
         ensure("answered, but changed since: asked again", again.size() == 1 && again[0] == id(100));
 
@@ -361,8 +361,8 @@ namespace tut
         model.renamed(house, "Home");
         ensure("the root is", model.objects().front().name == "Home" && model.takePinsChanged() && model.pins().front().name == "Home");
         ensure("told once", !model.takePinsChanged());
-        ensure("heard as it is, nothing changes", !model.rereadNames([](const LLUUID& prim) { return prim == id(10) ? std::string("Home") : std::string(); }));
-        ensure("heard otherwise, it does", model.rereadNames([](const LLUUID& prim) { return prim == id(10) ? std::string("Villa") : std::string(); }));
+        ensure("heard as it is, nothing changes", !model.rereadNames([](const LLUUID& prim) { return prim == alscriptexplorermodel_data::id(10) ? std::string("Home") : std::string(); }));
+        ensure("heard otherwise, it does", model.rereadNames([](const LLUUID& prim) { return prim == alscriptexplorermodel_data::id(10) ? std::string("Villa") : std::string(); }));
         ensure("the pin with it", model.nameOf(house) == "Villa" && model.takePinsChanged() && model.pins().front().name == "Villa");
         ensure("a name asked once while listed", model.askName(id(11)) && !model.askName(id(11)) && !model.askName(id(99)));
         model.renamed(id(11), "Gate");

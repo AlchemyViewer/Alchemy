@@ -1041,8 +1041,8 @@ namespace ALScriptFixes
 
     std::string nearest(std::string_view word, const std::vector<std::string>& names)
     {
-        const std::vector<std::string> near = nearestNames(word, names);
-        return near.size() == 1 ? near.front() : std::string();
+        const std::vector<std::string> nearest = nearestNames(word, names);
+        return nearest.size() == 1 ? nearest.front() : std::string();
     }
 
     bool surelyMeant(std::string_view word, std::string_view now) { return word.size() > 3 || editDistance(word, now) == 0; }
@@ -1061,14 +1061,14 @@ namespace ALScriptFixes
     void offerNames(ALScriptProblem& problem, std::string_view text, const std::string& was, const std::vector<std::string>& names)
     {
         // A few at most: past that the name was no near miss.
-        const std::vector<std::string> near = nearestNames(was, names);
-        if (near.size() > 3)
+        const std::vector<std::string> nearest = nearestNames(was, names);
+        if (nearest.size() > 3)
         {
             return;
         }
-        for (const std::string& now : near)
+        for (const std::string& now : nearest)
         {
-            offerName(problem, text, was, now, near.size() == 1 && surelyMeant(was, now));
+            offerName(problem, text, was, now, nearest.size() == 1 && surelyMeant(was, now));
         }
     }
 
