@@ -1149,7 +1149,7 @@ private:
     // from the prim of the row pressed; false where none of it may go.
     bool startExplorerDrag(const LLSD& pressed);
     // What to call an object that has never said its name here: what a pin
-    // or an open script remembers it by, or unnamed.
+    // or an open script remembers it by, or an ellipsis while it is asked.
     std::string nameGivenTo(const LLUUID& root) const;
     // The names of what the list shows read again, now that the region has
     // said some; and one asked of its region, once while it is shown.

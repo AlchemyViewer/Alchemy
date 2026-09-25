@@ -13647,7 +13647,9 @@ std::string ALFloaterScriptStudio::nameGivenTo(const LLUUID& root) const
             return doc->objectName;
         }
     }
-    return getString("ObjectUnnamed");
+    // Asked of the region, and on its way: said as something coming, not
+    // as a name the object has.
+    return getString("ObjectNameComing");
 }
 
 void ALFloaterScriptStudio::renameExplorerObject(ExplorerObject& object, const std::string& name)
@@ -14002,7 +14004,7 @@ void ALFloaterScriptStudio::fillExplorer()
                 {
                     askExplorerName(prim.id);
                 }
-                line = row(at, "Studio_Prim", "    " + (prim_folded ? arrow_folded : arrow_open) + (prim.name.empty() ? getString("ObjectUnnamed") : prim.name),
+                line = row(at, "Studio_Prim", "    " + (prim_folded ? arrow_folded : arrow_open) + (prim.name.empty() ? getString("ObjectNameComing") : prim.name),
                            LLStringUtil::null);
                 line->setSelected(wasChosen(at));
                 if (prim_folded)

@@ -116,6 +116,7 @@
     <floater.string name="RunningYes">running</floater.string>
     <floater.string name="RunningNo">stopped</floater.string>
     <floater.string name="ObjectUnnamed">(unnamed)</floater.string>
+    <floater.string name="ObjectNameComing">…</floater.string>
     <floater.string name="StateUnknown">asking...</floater.string>
     <floater.string name="TransferGoing">Putting into [NAME], by way of your inventory...</floater.string>
     <floater.string name="TransferDoneA">1 item put into [NAME], by way of your inventory; what was copied on the way is in your trash, in Passed between objects.</floater.string>
