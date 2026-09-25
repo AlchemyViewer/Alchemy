@@ -179,6 +179,7 @@ if(AL_BUILD_VIEWER)
     alscriptpreprocessor.cpp
     alscriptproblemspane.cpp
     alscriptsaveflow.cpp
+    alscriptsearchpane.cpp
     alscriptstudiodoc.cpp
     alscriptstudiosave.cpp
     alscriptweightspane.cpp
