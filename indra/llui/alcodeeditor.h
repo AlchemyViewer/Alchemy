@@ -24,6 +24,7 @@
 
 #pragma once
 
+#include "alcompletionmodel.h"
 #include "altextview.h"
 
 #include <array>
@@ -329,38 +330,12 @@ public:
 
     // --- completion --------------------------------------------------------------
 
-    struct Completion
-    {
-        std::string  text;
-        std::string  detail;
-        ALSyntaxKind kind = ALSyntaxKind::Text;
-        // A snippet rather than a word: accepting it puts this body in
-        // place of the prefix, with its placeholders to tab through.
-        std::string  snippet;
-        // What it does, shown beside the list while it is the one chosen.
-        std::string  documentation;
-        // Struck from the language: marked so on the list and last in it,
-        // but completed as what it is -- a function with its brackets.
-        bool         deprecated = false;
-        // The mark before it on the list, where the provider has one;
-        // else the icon of its kind, or a badge where the icons are not
-        // to be had.
-        LLUIImagePtr icon;
-    };
-    // The icon a kind wears on the list -- Symbol_Function and the rest,
-    // looked up once each -- and the badge, a letter, where there is no
-    // image provider to look them up in.
-    // How well what was typed matches a word, best first, or -1 for not
-    // at all: 0 its start as typed, 1 its start in either case, 2 a run
-    // of it from where one of its parts begins -- `Say` in `llSay`,
-    // `listen` in `llListen` -- and 3 a letter at the start of each of
-    // several parts, runs of each after -- `setpos` or `sp` in
-    // `llSetPos`. The parts begin after an underscore or a dot, at a
-    // capital after a small letter, and at a digit.
-    static S32          matchTier(std::string_view word, std::string_view typed);
-    static const char*  iconNameOf(const Completion& completion);
+    // A word offered to complete what is typed (ALCompletion), and how well
+    // what was typed matches a word (ALCompletionModel::matchTier). The
+    // icon a kind wears on the list, looked up once each.
+    typedef ALCompletion Completion;
+    static S32          matchTier(std::string_view word, std::string_view typed) { return ALCompletionModel::matchTier(word, typed); }
     static LLUIImagePtr iconOf(const Completion& completion);
-    static const char*  badgeOf(const Completion& completion);
     // Asked for what could go at a position, given the identifier typed
     // so far; answers into `out`, already narrowed to the prefix. The
     // words of the document itself are added after whatever it answers,
@@ -398,7 +373,7 @@ public:
     // with its brackets, the caret between them where it takes anything,
     // and the call's signature asked for. False with none open.
     bool                           acceptCompletion();
-    const std::vector<Completion>& completions() const { return mCompletions; }
+    const std::vector<Completion>& completions() const { return mCompletionModel.list(); }
     S32                            chosenCompletion() const;
     // What accepting does, for whoever has a completion in hand without
     // the list: the completion in place of the range.
@@ -739,7 +714,6 @@ private:
     // The problems squiggled under a position, and the stretch they span.
     std::vector<CardProblem> problemsUnder(const ALTextPos& at, ALTextRange& about) const;
     void vocabularyCompletions(std::string_view prefix, std::vector<Completion>& out);
-    void documentCompletions(const ALTextPos& at, std::string_view prefix, std::vector<Completion>& out);
 
     // The colours as drawn now: a skin's where it gave one, else mixed
     // from the text's.
@@ -864,15 +838,8 @@ private:
     bool                    mActionsWanted = false;
     // One per line, as the marks are: what its problems offer.
     std::vector<U8>         mFixable;
-    // What the list was last made for, the head and the prefix: a new
-    // list for the same is the old one with an answer joined to it.
-    std::string             mListedFor;
-    std::vector<Completion> mCompletions;
-    // The identifier the list is narrowing, which the choice replaces;
-    // and the name before the dot before it, where there is one, whose
-    // members are what is being asked for.
-    ALTextRange             mCompletionRange;
-    std::string             mCompletionHead;
+    // What the list offers, as it narrows (ALCompletionModel).
+    ALCompletionModel       mCompletionModel;
     std::vector<ALTextRange> mPlaceholders;
     S32                      mPlaceholderAt = -1;
     ALTextPos                mPlaceholdersAfter;
@@ -895,11 +862,6 @@ private:
     // and where the call or the snippet ends are on.
     void                     dropPlaceholdersLeft();
     boost::signals2::scoped_connection mCaretConnection;
-    // Where the last request was made, so a late answer is known for
-    // what it is about, and what was answered, kept through every
-    // narrowing until the list closes.
-    ALTextPos               mCompletionAsked{ -1, -1 };
-    std::vector<Completion> mSupplied;
     // The word the analyzer was last asked about, and what it answered,
     // kept for the text at the version it was answered for, so that the
     // mouse coming back to the word finds the answer waiting.

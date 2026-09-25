@@ -24,9 +24,16 @@
 
 #include "linden_common.h"
 
-#include "alcodeeditor.h"
+#include "alcompletionmodel.h"
 
+#include "altextchars.h"
+#include "llstl.h"
 #include "llstring.h"
+
+#include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/unordered/unordered_flat_set.hpp>
+
+#include <algorithm>
 
 namespace
 {
@@ -120,7 +127,7 @@ namespace
 }
 
 // static
-S32 ALCodeEditor::matchTier(std::string_view word, std::string_view typed)
+S32 ALCompletionModel::matchTier(std::string_view word, std::string_view typed)
 {
     if (typed.empty())
     {
@@ -165,7 +172,7 @@ S32 ALCodeEditor::matchTier(std::string_view word, std::string_view typed)
 }
 
 // static
-const char* ALCodeEditor::iconNameOf(const Completion& completion)
+const char* ALCompletionModel::iconNameOf(const ALCompletion& completion)
 {
     if (!completion.snippet.empty())
     {
@@ -199,7 +206,7 @@ const char* ALCodeEditor::iconNameOf(const Completion& completion)
 }
 
 // static
-const char* ALCodeEditor::badgeOf(const Completion& completion)
+const char* ALCompletionModel::badgeOf(const ALCompletion& completion)
 {
     if (!completion.snippet.empty())
     {
@@ -230,4 +237,204 @@ const char* ALCodeEditor::badgeOf(const Completion& completion)
         case ALSyntaxKind::Deprecated:   return "!";
         default:                         return "w";
     }
+}
+
+// static
+void ALCompletionModel::documentWords(const ALTextDocument& text, const ALTextPos& at, std::string_view prefix, std::vector<ALCompletion>& out)
+{
+    boost::unordered_flat_set<std::string, ll::string_hash, std::equal_to<>> seen;
+    for (const ALCompletion& c : out)
+    {
+        seen.insert(c.text);
+    }
+    const S32 count = text.lineCount();
+    for (S32 l = 0; l < count && out.size() < CAP; ++l)
+    {
+        const std::string& line = text.line(l);
+        size_t             i    = 0;
+        while (i < line.size())
+        {
+            if (!alIdentifierByte(line[i]))
+            {
+                ++i;
+                continue;
+            }
+            size_t j = i;
+            while (j < line.size() && alIdentifierByte(line[j]))
+            {
+                ++j;
+            }
+            const bool typing = (l == at.line && static_cast<S32>(j) == at.column);
+            if (!typing && (line[i] < '0' || line[i] > '9'))
+            {
+                std::string_view word(line.data() + i, j - i);
+                if (word.size() > prefix.size() && matchTier(word, prefix) >= 0 && seen.insert(std::string(word)).second)
+                {
+                    ALCompletion c;
+                    c.text = std::string(word);
+                    out.push_back(std::move(c));
+                }
+            }
+            i = j;
+        }
+    }
+}
+
+// static
+void ALCompletionModel::rank(std::vector<ALCompletion>& list, std::string_view prefix)
+{
+    const auto kindRank = [](const ALCompletion& c) {
+        if (c.deprecated || c.kind == ALSyntaxKind::Deprecated)
+        {
+            return 3;
+        }
+        switch (c.kind)
+        {
+            case ALSyntaxKind::Parameter:
+            case ALSyntaxKind::Variable:
+            case ALSyntaxKind::GlobalVariable:
+            case ALSyntaxKind::Property:
+                return 0;
+            case ALSyntaxKind::Constant:
+                return 2;
+            case ALSyntaxKind::Text:
+                return 4;
+            default:
+                return 1;
+        }
+    };
+    struct Sorted
+    {
+        S32 tier;
+        S32 rank;
+    };
+    std::vector<std::pair<Sorted, ALCompletion>> sorted;
+    sorted.reserve(list.size());
+    for (ALCompletion& c : list)
+    {
+        const S32 tier = prefix.empty() ? 0 : matchTier(c.text, prefix);
+        sorted.push_back({ { tier < 0 ? 9 : tier, kindRank(c) }, std::move(c) });
+    }
+    std::stable_sort(sorted.begin(), sorted.end(), [](const auto& a, const auto& b) {
+        if (a.first.tier != b.first.tier)
+        {
+            return a.first.tier < b.first.tier;
+        }
+        if (a.first.rank != b.first.rank)
+        {
+            return a.first.rank < b.first.rank;
+        }
+        return a.second.text < b.second.text;
+    });
+    list.clear();
+    for (auto& [order, c] : sorted)
+    {
+        list.push_back(std::move(c));
+    }
+    if (list.size() > CAP)
+    {
+        list.resize(CAP);
+    }
+}
+
+bool ALCompletionModel::narrow(const ALTextPos& start, const ALTextPos& at, std::string_view prefix, const std::string& head,
+                               std::vector<ALCompletion> answered, const ALTextDocument& text)
+{
+    const bool fresh = start != mAsked;
+    if (fresh)
+    {
+        mAsked = start;
+        mSupplied.clear();
+    }
+    mList = std::move(answered);
+    // After `ll.` the members of `ll` are wanted: the head was put before
+    // the prefix for whoever answers by whole names, and is taken off what
+    // they answer.
+    if (!head.empty())
+    {
+        const std::string dotted = head + ".";
+        for (ALCompletion& c : mList)
+        {
+            if (c.text.compare(0, dotted.size(), dotted) == 0)
+            {
+                c.text.erase(0, dotted.size());
+            }
+        }
+    }
+    // What was answered later about this identifier, narrowed to the
+    // prefix as typed now; what was known already keeps its place, and
+    // what is new about it fills what was empty. Each found by its name,
+    // not by a walk of the list for each answer.
+    boost::unordered_flat_map<std::string, size_t, ll::string_hash, std::equal_to<>> listed;
+    if (!mSupplied.empty())
+    {
+        listed.reserve(mList.size() + mSupplied.size());
+        for (size_t i = 0; i < mList.size(); ++i)
+        {
+            listed.emplace(mList[i].text, i);
+        }
+    }
+    for (const ALCompletion& c : mSupplied)
+    {
+        if (matchTier(c.text, prefix) < 0)
+        {
+            continue;
+        }
+        if (const auto known = listed.find(c.text); known != listed.end())
+        {
+            ALCompletion& have = mList[known->second];
+            if (have.detail.empty())
+            {
+                have.detail = c.detail;
+                have.kind   = c.kind;
+            }
+            if (have.documentation.empty())
+            {
+                have.documentation = c.documentation;
+            }
+            continue;
+        }
+        listed.emplace(c.text, mList.size());
+        mList.push_back(c);
+    }
+    if (head.empty())
+    {
+        documentWords(text, at, prefix, mList);
+    }
+    rank(mList, prefix);
+    if (!mList.empty())
+    {
+        mRange = ALTextRange(ALTextPos(at.line, at.column - static_cast<S32>(prefix.size())), at);
+    }
+    return fresh;
+}
+
+bool ALCompletionModel::supply(const ALTextPos& start, std::vector<ALCompletion> more)
+{
+    if (start != mAsked)
+    {
+        return false;
+    }
+    mSupplied = std::move(more);
+    return true;
+}
+
+void ALCompletionModel::hide()
+{
+    mList.clear();
+    mListedFor.clear();
+}
+
+void ALCompletionModel::close()
+{
+    hide();
+    mAsked = ALTextPos(-1, -1);
+    mSupplied.clear();
+}
+
+bool ALCompletionModel::relisted(const std::string& asked)
+{
+    const bool same = asked == mListedFor;
+    mListedFor      = asked;
+    return same;
 }

@@ -323,6 +323,7 @@ target_sources(
         alundostack.h
         alstringmatch.h
         alcodeeditor.h
+        alcompletionmodel.h
         alfindings.h
         alfindbar.h
         alkeymap.h
@@ -522,6 +523,7 @@ if(AL_BUILD_TESTS)
     altextsearch
     altextview
     alcodeeditor
+    alcompletionmodel
     alscripttheme
     alvimkeymap
     alxuiservice

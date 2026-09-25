@@ -74,7 +74,6 @@ namespace
     // What a line's problems offer, as the gutter keeps it.
     const U8  FIXES_ANY          = 1;
     const U8  FIXES_CHANGE       = 2;
-    const size_t COMPLETION_CAP  = 200;
     const S32    SIGNATURE_PAD   = 6;
 
     const char* const MARK_COLOR_NAMES[] = { "TextFgColor", "CodeMarkNote", "CodeMarkWarning", "CodeMarkError", "CodeMarkRuntime" };
@@ -2162,16 +2161,14 @@ void ALCodeEditor::hideCompletionList()
         mCompletionList->setVisible(false);
         mCompletionList->setChoices({});
     }
-    mCompletions.clear();
-    mListedFor.clear();
+    mCompletionModel.hide();
     hideCompletionDoc();
 }
 
 void ALCodeEditor::closeCompletion()
 {
     hideCompletionList();
-    mCompletionAsked = ALTextPos(-1, -1);
-    mSupplied.clear();
+    mCompletionModel.close();
 }
 
 S32 ALCodeEditor::chosenCompletion() const
@@ -2203,48 +2200,6 @@ void ALCodeEditor::vocabularyCompletions(std::string_view prefix, std::vector<Co
     }
 }
 
-void ALCodeEditor::documentCompletions(const ALTextPos& at, std::string_view prefix, std::vector<Completion>& out)
-{
-    boost::unordered_flat_set<std::string, ll::string_hash, std::equal_to<>> seen;
-    for (const Completion& c : out)
-    {
-        seen.insert(c.text);
-    }
-    auto begins = [&](std::string_view word) { return matchTier(word, prefix) >= 0; };
-    // The document's own words, other than the one being typed.
-    const S32 count = document().lineCount();
-    for (S32 l = 0; l < count && out.size() < COMPLETION_CAP; ++l)
-    {
-        const std::string& line = document().line(l);
-        size_t             i    = 0;
-        while (i < line.size())
-        {
-            if (!alIdentifierByte(line[i]))
-            {
-                ++i;
-                continue;
-            }
-            size_t j = i;
-            while (j < line.size() && alIdentifierByte(line[j]))
-            {
-                ++j;
-            }
-            const bool typing = (l == at.line && static_cast<S32>(j) == at.column);
-            if (!typing && (line[i] < '0' || line[i] > '9'))
-            {
-                std::string_view word(line.data() + i, j - i);
-                if (word.size() > prefix.size() && begins(word) && seen.insert(std::string(word)).second)
-                {
-                    Completion c;
-                    c.text = std::string(word);
-                    out.push_back(std::move(c));
-                }
-            }
-            i = j;
-        }
-    }
-}
-
 void ALCodeEditor::refreshCompletion()
 {
     const std::string prefix = wordBeforeCaret();
@@ -2267,146 +2222,30 @@ void ALCodeEditor::refreshCompletion()
         closeCompletion();
         return;
     }
-    const bool fresh = start != mCompletionAsked;
-    if (fresh)
-    {
-        mCompletionAsked = start;
-        mSupplied.clear();
-    }
-    mCompletionHead = head;
-    mCompletions.clear();
-    const std::string asked = head.empty() ? prefix : head + "." + prefix;
+    const std::string       asked = head.empty() ? prefix : head + "." + prefix;
+    std::vector<Completion> answered;
     if (mProvider)
     {
-        mProvider(at, asked, mCompletions);
+        mProvider(at, asked, answered);
     }
     else
     {
-        vocabularyCompletions(asked, mCompletions);
+        vocabularyCompletions(asked, answered);
     }
-    if (!head.empty())
-    {
-        const std::string dotted = head + ".";
-        for (Completion& c : mCompletions)
-        {
-            if (c.text.compare(0, dotted.size(), dotted) == 0)
-            {
-                c.text.erase(0, dotted.size());
-            }
-        }
-    }
-    // What was answered about this word, narrowed to the prefix as typed
-    // now; what was known already keeps its place, and what is new about
-    // it fills what was empty. Each found by its name, not by a walk of
-    // the list for each answer.
-    boost::unordered_flat_map<std::string, size_t, ll::string_hash, std::equal_to<>> listed;
-    if (!mSupplied.empty())
-    {
-        listed.reserve(mCompletions.size() + mSupplied.size());
-        for (size_t i = 0; i < mCompletions.size(); ++i)
-        {
-            listed.emplace(mCompletions[i].text, i);
-        }
-    }
-    for (const Completion& c : mSupplied)
-    {
-        if (matchTier(c.text, prefix) < 0)
-        {
-            continue;
-        }
-        if (const auto known = listed.find(c.text); known != listed.end())
-        {
-            Completion& have = mCompletions[known->second];
-            if (have.detail.empty())
-            {
-                have.detail = c.detail;
-                have.kind   = c.kind;
-            }
-            if (have.documentation.empty())
-            {
-                have.documentation = c.documentation;
-            }
-            continue;
-        }
-        listed.emplace(c.text, mCompletions.size());
-        mCompletions.push_back(c);
-    }
-    if (head.empty())
-    {
-        documentCompletions(at, prefix, mCompletions);
-    }
+    const bool fresh = mCompletionModel.narrow(start, at, prefix, head, std::move(answered), document());
     if (fresh && mCompletionRequest)
     {
         mCompletionRequest(start, prefix);
     }
-    // The best match first: the start of the word as typed, then in
-    // either case, then a part of it, then letters of its parts. Among
-    // equals the script's own names -- a parameter, a local, a field --
-    // then the language's words, then its constants, then what is
-    // deprecated, then the document's bare words; then the alphabet.
-    auto rank = [](const Completion& c) {
-        if (c.deprecated || c.kind == ALSyntaxKind::Deprecated)
-        {
-            return 3;
-        }
-        switch (c.kind)
-        {
-            case ALSyntaxKind::Parameter:
-            case ALSyntaxKind::Variable:
-            case ALSyntaxKind::GlobalVariable:
-            case ALSyntaxKind::Property:
-                return 0;
-            case ALSyntaxKind::Constant:
-                return 2;
-            case ALSyntaxKind::Text:
-                return 4;
-            default:
-                return 1;
-        }
-    };
-    struct Sorted
-    {
-        S32 tier;
-        S32 rank;
-    };
-    std::vector<std::pair<Sorted, Completion>> sorted;
-    sorted.reserve(mCompletions.size());
-    for (Completion& c : mCompletions)
-    {
-        const S32 tier = prefix.empty() ? 0 : matchTier(c.text, prefix);
-        sorted.push_back({ { tier < 0 ? 9 : tier, rank(c) }, std::move(c) });
-    }
-    std::stable_sort(sorted.begin(), sorted.end(), [](const auto& a, const auto& b) {
-        if (a.first.tier != b.first.tier)
-        {
-            return a.first.tier < b.first.tier;
-        }
-        if (a.first.rank != b.first.rank)
-        {
-            return a.first.rank < b.first.rank;
-        }
-        return a.second.text < b.second.text;
-    });
-    mCompletions.clear();
-    for (auto& [order, c] : sorted)
-    {
-        mCompletions.push_back(std::move(c));
-    }
-    if (mCompletions.size() > COMPLETION_CAP)
-    {
-        mCompletions.resize(COMPLETION_CAP);
-    }
-    if (mCompletions.empty())
+    if (mCompletionModel.list().empty())
     {
         hideCompletionList();
         return;
     }
-    mCompletionRange = ALTextRange(ALTextPos(at.line, at.column - static_cast<S32>(prefix.size())), at);
     // The same list again, an answer joined to it, keeps what was chosen
     // in it; a list for more typed starts from the best.
-    const bool same = completionOpen() && asked == mListedFor;
-    mListedFor      = asked;
-    listCompletions(same);
+    const bool again = mCompletionModel.relisted(asked);
+    listCompletions(completionOpen() && again);
 }
 
 // static
@@ -2417,7 +2256,7 @@ LLUIImagePtr ALCodeEditor::iconOf(const Completion& completion)
         return completion.icon;
     }
     static boost::unordered_flat_map<std::string, LLUIImagePtr, ll::string_hash, std::equal_to<>> looked_up;
-    const std::string_view                                                                       name = iconNameOf(completion);
+    const std::string_view                                                                       name = ALCompletionModel::iconNameOf(completion);
     auto                                                                                         found = looked_up.find(name);
     if (found == looked_up.end())
     {
@@ -2437,9 +2276,10 @@ void ALCodeEditor::listCompletions(bool keep_choice)
         was = mCompletionList->choices()[mCompletionList->chosen()].text;
     }
     S32 chosen = 0;
-    for (size_t i = 0; i < mCompletions.size() && !was.empty(); ++i)
+    const std::vector<Completion>& completions = mCompletionModel.list();
+    for (size_t i = 0; i < completions.size() && !was.empty(); ++i)
     {
-        if (mCompletions[i].text == was)
+        if (completions[i].text == was)
         {
             chosen = static_cast<S32>(i);
             break;
@@ -2458,14 +2298,14 @@ void ALCodeEditor::listCompletions(bool keep_choice)
     mCompletionList->setSelectionColor(paint(Paint::WidgetSelection));
     mCompletionList->setBorderColor(paint(Paint::WidgetBorder));
     std::vector<ALChoiceList::Choice> choices;
-    choices.reserve(mCompletions.size());
-    for (const Completion& c : mCompletions)
+    choices.reserve(completions.size());
+    for (const Completion& c : completions)
     {
         ALChoiceList::Choice choice;
         choice.text  = c.text;
         choice.note  = c.detail;
         choice.icon  = iconOf(c);
-        choice.badge = badgeOf(c);
+        choice.badge = ALCompletionModel::badgeOf(c);
         if (c.deprecated)
         {
             choice.color = colorForKind(ALSyntaxKind::Deprecated);
@@ -2579,12 +2419,13 @@ void ALCodeEditor::placeSideBox(const LLRect& list)
 void ALCodeEditor::showCompletionDoc()
 {
     const S32 index = chosenCompletion();
-    if (index < 0 || index >= static_cast<S32>(mCompletions.size()) || mCompletions[index].documentation.empty())
+    const std::vector<Completion>& completions = mCompletionModel.list();
+    if (index < 0 || index >= static_cast<S32>(completions.size()) || completions[index].documentation.empty())
     {
         hideCompletionDoc();
         return;
     }
-    const Completion& c   = mCompletions[index];
+    const Completion& c   = completions[index];
     ALTextView&       box = *sideBox();
     // Its declaration as code, then what it does in the reading face.
     std::string says = c.detail.empty() ? c.text : c.detail;
@@ -2615,18 +2456,17 @@ void ALCodeEditor::showCompletionDoc()
 void ALCodeEditor::supplyCompletions(const ALTextPos& at, std::vector<Completion> more)
 {
     // Only about the identifier the list is still narrowing.
-    if (at != mCompletionAsked || hasSelection() || isReadOnly())
+    if (hasSelection() || isReadOnly() || !mCompletionModel.supply(at, std::move(more)))
     {
         return;
     }
-    mSupplied = std::move(more);
     refreshCompletion();
 }
 
 void ALCodeEditor::placeCompletion()
 {
     const LLRect local = getLocalRect();
-    placeListAt(*mCompletionList, mCompletionRange.begin, llmin(static_cast<S32>(mCompletions.size()), COMPLETION_ROWS),
+    placeListAt(*mCompletionList, mCompletionModel.range().begin, llmin(static_cast<S32>(mCompletionModel.list().size()), COMPLETION_ROWS),
                 llmin(COMPLETION_WIDTH, llmax(60, local.getWidth() - 8)));
 }
 
@@ -3333,13 +3173,13 @@ bool ALCodeEditor::acceptCompletion()
         return false;
     }
     const S32 index = mCompletionList->chosen();
-    if (index < 0 || index >= static_cast<S32>(mCompletions.size()))
+    if (index < 0 || index >= static_cast<S32>(mCompletionModel.list().size()))
     {
         closeCompletion();
         return false;
     }
-    const Completion  chosen = mCompletions[index];
-    const ALTextRange range  = mCompletionRange;
+    const Completion  chosen = mCompletionModel.list()[index];
+    const ALTextRange range  = mCompletionModel.range();
     closeCompletion();
     complete(chosen, range);
     return true;
