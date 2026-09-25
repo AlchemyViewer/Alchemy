@@ -463,6 +463,22 @@ bool LLToastAlertPanel::handleKeyHere(KEY key, MASK mask )
         }
         return true;
     }
+    else if (KEY_ESCAPE == key && mask == MASK_NONE)
+    {
+        // Escape answers as Cancel does, where the alert has one -- its
+        // own, or a template's -- as a dialog does anywhere else; an alert
+        // with none has nothing that means "no" for it to press.
+        for (const ButtonData& data : mButtonData)
+        {
+            const std::string& name = data.mButton ? data.mButton->getName() : LLStringUtil::null;
+            if ((name == "Cancel" || name.starts_with("Cancel_")) && data.mButton->getVisible() && data.mButton->getEnabled())
+            {
+                data.mButton->onCommit();
+                break;
+            }
+        }
+        return true;
+    }
     else if (KEY_RIGHT == key)
     {
         LLToastPanel::focusNextItem(false);
