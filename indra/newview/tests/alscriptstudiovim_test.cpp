@@ -62,7 +62,39 @@ namespace
             cancel   = std::move(cancelled);
         }
         void refreshTrailer(Doc&) override { ++trailers; }
+        // As the window does: the tab in front, and the strip's order.
+        void activate(Doc& doc) override
+        {
+            for (size_t i = 0; i < services->docs.size(); ++i)
+            {
+                if (services->docs[i].get() == &doc)
+                {
+                    services->front = static_cast<S32>(i);
+                }
+            }
+        }
+        void reorderTabs(const std::vector<std::string>& order) override
+        {
+            const std::string front = services->frontDoc() ? services->frontDoc()->id : std::string();
+            std::vector<std::unique_ptr<Doc>> reordered;
+            for (const std::string& id : order)
+            {
+                for (std::unique_ptr<Doc>& doc : services->docs)
+                {
+                    if (doc && doc->id == id)
+                    {
+                        reordered.push_back(std::move(doc));
+                    }
+                }
+            }
+            services->docs = std::move(reordered);
+            if (Doc* doc = services->findDoc(front))
+            {
+                activate(*doc);
+            }
+        }
 
+        al_studio_test::FakeServices*            services = nullptr;
         Names                                    asked, letGo, savedToClose, many, formatted, offered;
         std::vector<ALOutputView::Entry>         entries;
         S32                                      outputShown = 0, trailers = 0, pickRows = 0;
@@ -112,7 +144,8 @@ namespace tut
                     relativeNumbers = !relativeNumbers;
                 },
                 nullptr, [this]() { return relativeNumbers; });
-            vim = std::make_unique<ALScriptStudioVim>(services, commands, studio);
+            studio.services = &services;
+            vim             = std::make_unique<ALScriptStudioVim>(services, commands, studio);
             return *vim;
         }
 
@@ -142,6 +175,38 @@ namespace tut
         bool ex(Doc& doc, const std::string& name, const std::string& args = std::string())
         {
             return vim->command(*doc.editor, name, args);
+        }
+        // Four tabs, alpha in front, with vim over alpha's editor to say
+        // what goes wrong.
+        ALVimKeymap* fourTabs()
+        {
+            for (const char* id : { "alpha", "beta", "gamma", "delta" })
+            {
+                tab(id);
+            }
+            auto         keymap = std::make_unique<ALVimKeymap>();
+            ALVimKeymap* said   = keymap.get();
+            vim->connect(*keymap);
+            services.docs[0]->editor->setModalKeymap(std::move(keymap));
+            vim->pump();
+            return said;
+        }
+        // A : command typed in alpha's editor, and the tab in front after it,
+        // which the window saw.
+        std::string go(const std::string& name, const std::string& args = std::string())
+        {
+            vim->command(*services.findDoc(std::string_view("alpha"))->editor, name, args);
+            vim->pump();
+            return services.frontDoc() ? services.frontDoc()->id : std::string();
+        }
+        std::string order() const
+        {
+            std::string out;
+            for (const std::unique_ptr<Doc>& doc : services.docs)
+            {
+                out += (out.empty() ? "" : " ") + doc->id;
+            }
+            return out;
         }
     };
 
@@ -301,16 +366,109 @@ namespace tut
     template<> template<>
     void alscriptstudiovim_object::test<7>()
     {
-        set_test_name("Tab completes the command names, :set's options and :history's kinds");
-        std::vector<std::string> names, options, kinds, none;
-        ALScriptStudioVim::complete(std::string(), names);
-        ALScriptStudioVim::complete("set", options);
-        ALScriptStudioVim::complete("his", kinds);
-        ALScriptStudioVim::complete("w", none);
+        set_test_name("Tab completes the command names, :set's options, :history's kinds and the tabs' names");
+        ALScriptStudioVim&       vim = make();
+        tab("alpha");
+        tab("beta");
+        std::vector<std::string> names, options, kinds, tabs, none;
+        vim.complete(std::string(), names);
+        vim.complete("set", options);
+        vim.complete("his", kinds);
+        vim.complete("bd", tabs);
+        vim.complete("w", none);
         ensure("vim's own and the menus'", std::find(names.begin(), names.end(), "wall") != names.end() &&
                                                std::find(names.begin(), names.end(), "go_to_line") != names.end());
         ensure("the options", options == Names{ "number", "nonumber", "relativenumber", "norelativenumber" });
         ensure("the kinds", kinds == Names{ "all", "cmd", "search" });
+        ensure("the tabs", tabs == Names{ "alpha", "beta" });
         ensure("nothing after anything else", none.empty());
+    }
+
+    template<> template<>
+    void alscriptstudiovim_object::test<8>()
+    {
+        set_test_name("the tabs are vim's buffers and tab pages: :bn and :bp round the strip, :b by number, name or #, first and last");
+        make();
+        ALVimKeymap* vim = fourTabs();
+        ensure_equals(":bn", go("bn"), std::string("beta"));
+        ensure_equals(":bnext 2", go("bnext", "2"), std::string("delta"));
+        ensure_equals("round past the end", go("bn"), std::string("alpha"));
+        ensure_equals(":bp round past the start", go("bp"), std::string("delta"));
+        ensure_equals(":bN 3", go("bN", "3"), std::string("alpha"));
+        ensure_equals(":b 3", go("b", "3"), std::string("gamma"));
+        ensure_equals(":b # the one before", go("b", "#"), std::string("alpha"));
+        ensure_equals("and back", go("buffer", "#"), std::string("gamma"));
+        ensure_equals(":b by a part of its name, in any case", go("b", "ELT"), std::string("delta"));
+        ensure_equals(":b by its whole name", go("b", "beta"), std::string("beta"));
+        ensure_equals(":bf", go("bf"), std::string("alpha"));
+        ensure_equals(":blast", go("blast"), std::string("delta"));
+        ensure_equals(":tabfirst", go("tabfirst"), std::string("alpha"));
+        ensure_equals(":tabl", go("tabl"), std::string("delta"));
+        ensure_equals(":tabn round past the end", go("tabn"), std::string("alpha"));
+        ensure_equals(":tabn 3 the third", go("tabn", "3"), std::string("gamma"));
+        ensure_equals(":tabn +1", go("tabnext", "+1"), std::string("delta"));
+        ensure_equals(":tabn $", go("tabn", "$"), std::string("delta"));
+        ensure_equals(":tabp 2", go("tabp", "2"), std::string("beta"));
+        ensure_equals(":tabN round past the start", go("tabN", "2"), std::string("delta"));
+
+        ensure_equals(":b a -- in every name", go("b", "a"), std::string("delta"));
+        ensure_equals("said as vim says it", vim->message(), std::string("VimTabsMatch [NAME]=a"));
+        ensure("an error", vim->messageIsError());
+        go("b", "zeta");
+        ensure_equals("none", vim->message(), std::string("VimNoTabMatch [NAME]=zeta"));
+        go("b", "9");
+        ensure_equals("no ninth", vim->message(), std::string("VimNoSuchTab [NUMBER]=9"));
+        go("tabn", "9");
+        ensure_equals("nor to go to", vim->message(), std::string("VimBadArgument"));
+        ensure_equals("still where it was", services.frontDoc()->id, std::string("delta"));
+    }
+
+    template<> template<>
+    void alscriptstudiovim_object::test<9>()
+    {
+        set_test_name(":bd and :tabclose close a tab, asked about or with ! let go of; :tabonly the others; :tabmove moves the one in front");
+        make();
+        ALVimKeymap* vim = fourTabs();
+        go("b", "beta");
+        ensure(":bd the one in front, asked about", go("bd") == "beta" && studio.asked == Names{ "beta" });
+        ensure(":bd! let go of", (go("bd!"), studio.letGo == Names{ "beta" }));
+        ensure(":bd by number", (go("bd", "3"), studio.asked == Names{ "beta", "gamma" }));
+        ensure(":tabclose! by number", (go("tabclose!", "4"), studio.letGo == Names{ "beta", "delta" }));
+        ensure(":tabonly asks about the others at once", (go("tabonly"), studio.many == Names{ "alpha", "gamma", "delta" }));
+        studio.letGo.clear();
+        ensure(":tabonly! lets them go", (go("tabo!"), studio.letGo == Names{ "alpha", "gamma", "delta" }));
+
+        ensure_equals(":tabm 0 to the start", (go("tabm", "0"), order()), std::string("beta alpha gamma delta"));
+        ensure_equals(":tabm to the end", (go("tabmove"), order()), std::string("alpha gamma delta beta"));
+        ensure_equals(":tabm 2 after the second", (go("tabm", "2"), order()), std::string("alpha gamma beta delta"));
+        ensure_equals(":tabm -1", (go("tabm", "-1"), order()), std::string("alpha beta gamma delta"));
+        ensure_equals(":tabm 3 after the third, past itself", (go("tabm", "3"), order()), std::string("alpha gamma beta delta"));
+        ensure_equals("still in front", services.frontDoc()->id, std::string("beta"));
+        go("tabm", "+5");
+        ensure_equals("not past the end", vim->message(), std::string("VimBadArgument"));
+        ensure_equals("where it was", order(), std::string("alpha gamma beta delta"));
+    }
+
+    template<> template<>
+    void alscriptstudiovim_object::test<10>()
+    {
+        set_test_name(":ls lists the tabs as vim lists its buffers: the one in front, the one before, unsaved, unchangeable, and their lines");
+        make();
+        fourTabs();
+        go("b", "gamma");
+        go("b", "beta");
+        Doc& gamma = *services.findDoc(std::string_view("gamma"));
+        gamma.editor->setCaret(gamma.editor->document().end());
+        gamma.editor->insertText("\n\n");
+        services.findDoc(std::string_view("delta"))->modifiable = false;
+        ensure("taken", ex(*services.docs[0], "ls"));
+        ensure_equals("one entry", studio.entries.size(), size_t(1));
+        ensure_equals("the tabs", studio.entries[0].text,
+                      std::string("tabs:\n"
+                                  "  1  h   \"alpha\"                        line 1\n"
+                                  "  2 %a   \"beta\"                         line 1\n"
+                                  "  3 #h + \"gamma\"                        line 3\n"
+                                  "  4  h-  \"delta\"                        line 1"));
+        ensure("the tab in sight", studio.outputShown == 1);
     }
 }

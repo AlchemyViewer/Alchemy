@@ -74,6 +74,9 @@ public:
                               std::function<void(const std::string& line)> shifted, std::function<void()> cancelled) = 0;
         // The strip under the editor said again.
         virtual void refreshTrailer(Doc& doc) = 0;
+        // A tab brought to the front; and the tabs put in this order, by id.
+        virtual void activate(Doc& doc)                                  = 0;
+        virtual void reorderTabs(const std::vector<std::string>& order) = 0;
 
     protected:
         ~Window() = default;
@@ -98,8 +101,8 @@ public:
     // them by. False where it knows it no more than vim did.
     bool command(ALTextView& view, const std::string& name, const std::string& args);
     // The words Tab completes on the : line: the command names, :set's
-    // options, :history's kinds.
-    static void complete(const std::string& command, std::vector<std::string>& out);
+    // options, :history's kinds, the tabs' names after :b and :bd.
+    void complete(const std::string& command, std::vector<std::string>& out);
     // `=` over lines: the source's, formatted, where it was given there.
     void format(ALTextView& view, S32 first, S32 last);
     // q:, q/ and q?: the lines entered, the last first, in a list over the
@@ -109,13 +112,32 @@ public:
 
     // The tab an editor is of, its source's or its expansion's.
     Doc* docOf(const ALTextView& view);
+    // The tab `which` names, as :b and :bd take one: its number in the
+    // strip, # the tab in front before this one, % the one in front, else
+    // its name or a part of one, in any case, that no other has. Null
+    // where none is, or more than one, which is said.
+    Doc* tabNamed(ALTextView& view, const std::string& which);
 
 private:
+    // The window's tabs as vim's buffers and tab pages: :ls, :b, :bn, :bp,
+    // :bf, :bl, :bd, :tabnext, :tabprevious, :tabfirst, :tablast,
+    // :tabclose, :tabonly, :tabmove. False for any other command.
+    bool tabCommand(ALTextView& view, const std::string& name, const std::string& args);
+    void listTabs();
+    // An entry for the Output tab, of vim's.
+    ALOutputView::Entry listing() const;
+    // Said where vim says things, as an error; in the status line where
+    // the view has no vim.
+    void fail(ALTextView& view, const std::string& message);
+
     ALScriptStudioServices&              mServices;
     ALScriptStudioCommands&              mCommands;
     Window&                              mWindow;
     std::shared_ptr<ALVimKeymap::Shared> mShared = std::make_shared<ALVimKeymap::Shared>();
     std::string                          mBanner;
+    // The tab in front as pump last saw it, and the one before it, by id.
+    std::string                          mCurrent;
+    std::string                          mAlternate;
     // Held while this is, for a keymap's hooks to know it still is.
     std::shared_ptr<bool>                mAlive = std::make_shared<bool>(true);
 };

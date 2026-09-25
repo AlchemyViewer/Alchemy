@@ -213,6 +213,11 @@
     <floater.string name="GoToLineTitle">Go to Line</floater.string>
     <floater.string name="VimHistoryTitle">[KIND] lines entered</floater.string>
     <floater.string name="VimHistoryPlaceholder">Type to find a line; Return runs it, Shift-Return puts it up to edit</floater.string>
+    <floater.string name="VimNoAlternate">E23: No alternate file</floater.string>
+    <floater.string name="VimNoSuchTab">E86: Buffer [NUMBER] does not exist</floater.string>
+    <floater.string name="VimTabsMatch">E93: More than one match for [NAME]</floater.string>
+    <floater.string name="VimNoTabMatch">E94: No matching buffer for [NAME]</floater.string>
+    <floater.string name="VimBadArgument">E474: Invalid argument</floater.string>
     <floater.string name="GoToLinePlaceholder">Line, or line:column</floater.string>
     <floater.string name="GoToLineHint">Type a line number to go to (from 1 to [COUNT]).</floater.string>
     <floater.string name="GoToLineGo">Go to line [LINE].</floater.string>

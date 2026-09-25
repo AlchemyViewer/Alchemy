@@ -310,6 +310,7 @@ private:
     // the editors.
     void output(const ALOutputView::Entry& entry) override;
     void showOutput() override;
+    void reorderTabs(const std::vector<std::string>& order) override;
     void pickLine(std::vector<ALQuickOpen::Candidate> candidates, const std::string& placeholder, const std::string& title, S32 rows,
                   std::function<void(const std::string& line)> chosen, std::function<void(const std::string& line)> shifted,
                   std::function<void()> cancelled) override;

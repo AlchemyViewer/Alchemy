@@ -1184,6 +1184,11 @@ void ALFloaterScriptStudio::showOutput()
     showBottom("output_tab");
 }
 
+void ALFloaterScriptStudio::reorderTabs(const std::vector<std::string>& order)
+{
+    onTabsReordered(order);
+}
+
 void ALFloaterScriptStudio::pickLine(std::vector<ALQuickOpen::Candidate> candidates, const std::string& placeholder,
                                      const std::string& title, S32 rows, std::function<void(const std::string& line)> chosen,
                                      std::function<void(const std::string& line)> shifted, std::function<void()> cancelled)

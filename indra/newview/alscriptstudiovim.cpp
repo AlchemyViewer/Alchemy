@@ -31,6 +31,8 @@
 #include "alscriptstudioservices.h"
 
 #include <algorithm>
+#include <cstring>
+#include <string_view>
 
 namespace
 {
@@ -39,6 +41,24 @@ namespace
     const char* const VIM_MENU_COMMANDS[] = { "format", "problems", "references", "output", "search", "preferences", "pop_out",
                                               "reveal", "save_all", "revert", "external_editor", "save_file", "save_as", "load_file",
                                               "open_file", "fold_all", "unfold_all", "go_to_line", "quick_fix", "fix_all", "weights" };
+
+    // Whether a command's name is one of vim's, as vim reads its names: any
+    // of it from the least it may be shortened to, `least`, to the whole.
+    bool abbreviates(const std::string& name, const char* least, const char* whole)
+    {
+        const size_t shortest = strlen(least);
+        return name.size() >= shortest && name.size() <= strlen(whole) && std::string_view(whole).substr(0, name.size()) == name;
+    }
+
+    // A count or a tab's number: digits alone; -1 for anything else.
+    S32 numberOf(const std::string& text)
+    {
+        if (text.empty() || text.size() > 6 || !std::all_of(text.begin(), text.end(), [](char c) { return c >= '0' && c <= '9'; }))
+        {
+            return -1;
+        }
+        return std::atoi(text.c_str());
+    }
 }
 
 ALScriptStudioVim::ALScriptStudioVim(ALScriptStudioServices& services, ALScriptStudioCommands& commands, Window& window)
@@ -66,7 +86,7 @@ void ALScriptStudioVim::connect(ALVimKeymap& vim)
             historyWindow(view, kind, history, std::move(chosen));
         }
     };
-    vim.hooks().complete = [alive](ALTextView&, const std::string& command, std::vector<std::string>& out) {
+    vim.hooks().complete = [this, alive](ALTextView&, const std::string& command, std::vector<std::string>& out) {
         if (alive.lock())
         {
             complete(command, out);
@@ -102,6 +122,16 @@ void ALScriptStudioVim::pump()
     if (!doc)
     {
         return;
+    }
+    // The tab in front before this one is the alternate, # to :b and
+    // Ctrl-^.
+    if (doc->id != mCurrent)
+    {
+        if (!mCurrent.empty())
+        {
+            mAlternate = mCurrent;
+        }
+        mCurrent = doc->id;
     }
     // The mode, the : line as it is typed and what the mode says are
     // all in the band the editor draws under its text, where vim has
@@ -198,13 +228,8 @@ bool ALScriptStudioVim::command(ALTextView& view, const std::string& name, const
         // ones, the search ones with / or search, both with all.
         const bool          searches = args == "/" || args == "search" || args == "all";
         const bool          commands = args.empty() || args == ":" || args == "cmd" || args == "all";
-        ALOutputView::Entry entry;
-        entry.source      = mServices.words("OutputSourceVim");
-        entry.key["kind"] = "studio";
-        entry.lane        = 1;
-        // A listing: its numbered rows a block at the left edge.
-        entry.hang = ALOutputView::Hang::None;
-        auto list  = [&](const std::vector<std::string>& lines, const char* kind) {
+        ALOutputView::Entry entry    = listing();
+        auto                list     = [&](const std::vector<std::string>& lines, const char* kind) {
             entry.text = std::string(kind) + " history:";
             for (size_t i = 0; i < lines.size(); ++i)
             {
@@ -226,6 +251,10 @@ bool ALScriptStudioVim::command(ALTextView& view, const std::string& name, const
     if (name == "wa" || name == "wall")
     {
         mCommands.run("save_all");
+        return true;
+    }
+    if (tabCommand(view, name, args))
+    {
         return true;
     }
     if (name == "qa" || name == "qall" || name == "qa!" || name == "qall!")
@@ -286,8 +315,12 @@ bool ALScriptStudioVim::command(ALTextView& view, const std::string& name, const
 void ALScriptStudioVim::complete(const std::string& command, std::vector<std::string>& out)
 {
     // The names command answers to, in their long forms, and the menu's
-    // actions; what :set and :history take after them.
-    static const char* NAMES[]   = { "close", "fix", "fixall", "history", "qall", "quit", "wall", "wq", "write", "xit" };
+    // actions; what :set and :history take after them, and the tabs'
+    // names after :b and :bd.
+    static const char* NAMES[]   = { "bNext",   "bdelete",  "bfirst",      "blast",    "bnext",       "bprevious", "brewind",  "buffer",
+                                     "buffers", "bunload",  "bwipeout",    "close",    "files",       "fix",       "fixall",   "history",
+                                     "ls",      "qall",     "quit",        "tabNext",  "tabclose",    "tabfirst",  "tablast",  "tabmove",
+                                     "tabnext", "tabonly",  "tabprevious", "tabrewind", "wall",       "wq",        "write",    "xit" };
     static const char* OPTIONS[] = { "number", "nonumber", "relativenumber", "norelativenumber" };
     static const char* KINDS[]   = { "all", "cmd", "search" };
     if (command.empty())
@@ -303,6 +336,14 @@ void ALScriptStudioVim::complete(const std::string& command, std::vector<std::st
     {
         out.insert(out.end(), std::begin(KINDS), std::end(KINDS));
     }
+    else if (abbreviates(command, "b", "buffer") || abbreviates(command, "bd", "bdelete") || abbreviates(command, "bw", "bwipeout") ||
+             abbreviates(command, "bun", "bunload"))
+    {
+        for (const Doc* doc : mServices.openDocs())
+        {
+            out.push_back(doc->name);
+        }
+    }
 }
 
 void ALScriptStudioVim::format(ALTextView& view, S32 first, S32 last)
@@ -317,4 +358,285 @@ void ALScriptStudioVim::format(ALTextView& view, S32 first, S32 last)
     const ALTextDocument& text = doc->editor->document();
     doc->editor->setSelection(ALTextRange(text.lineStart(first), text.lineEnd(llmin(last, text.lineCount() - 1))));
     mWindow.format(*doc, true);
+}
+
+ALScriptStudioVim::Doc* ALScriptStudioVim::tabNamed(ALTextView& view, const std::string& which)
+{
+    const std::vector<Doc*>    tabs = mServices.openDocs();
+    LLStringUtil::format_map_t args;
+    if (which.empty() || which == "%")
+    {
+        return mServices.frontDoc();
+    }
+    if (which == "#")
+    {
+        Doc* doc = mAlternate.empty() ? nullptr : mServices.findDoc(mAlternate);
+        if (!doc)
+        {
+            fail(view, mServices.words("VimNoAlternate"));
+        }
+        return doc;
+    }
+    if (const S32 number = numberOf(which); number >= 0)
+    {
+        if (number >= 1 && number <= static_cast<S32>(tabs.size()))
+        {
+            return tabs[number - 1];
+        }
+        args["[NUMBER]"] = which;
+        fail(view, mServices.words("VimNoSuchTab", args));
+        return nullptr;
+    }
+    // A name: whole first, else a part of one, in any case, that is one
+    // tab's alone.
+    for (Doc* doc : tabs)
+    {
+        if (doc->name == which)
+        {
+            return doc;
+        }
+    }
+    std::string wanted = which;
+    LLStringUtil::toLower(wanted);
+    std::vector<Doc*> found;
+    for (Doc* doc : tabs)
+    {
+        std::string name = doc->name;
+        LLStringUtil::toLower(name);
+        if (name.find(wanted) != std::string::npos)
+        {
+            found.push_back(doc);
+        }
+    }
+    if (found.size() == 1)
+    {
+        return found.front();
+    }
+    args["[NAME]"] = which;
+    fail(view, mServices.words(found.empty() ? "VimNoTabMatch" : "VimTabsMatch", args));
+    return nullptr;
+}
+
+bool ALScriptStudioVim::tabCommand(ALTextView& view, const std::string& name_in, const std::string& args)
+{
+    // The bang is its own: :bd! and :tabclose! let a tab go as it stands,
+    // where without one an unsaved tab is asked about.
+    const bool              bang  = !name_in.empty() && name_in.back() == '!';
+    const std::string       name  = bang ? name_in.substr(0, name_in.size() - 1) : name_in;
+    const std::vector<Doc*> tabs  = mServices.openDocs();
+    Doc*                    front = mServices.frontDoc();
+    const S32               count = static_cast<S32>(tabs.size());
+    const S32               at    = static_cast<S32>(std::find(tabs.begin(), tabs.end(), front) - tabs.begin());
+    auto go = [&](S32 index) {
+        if (index >= 0 && index < count)
+        {
+            mWindow.activate(*tabs[index]);
+        }
+    };
+    // Along the strip, round past either end, as vim's buffers and tab
+    // pages go.
+    auto step = [&](S32 by) {
+        if (front && count > 0)
+        {
+            go(((at + by) % count + count) % count);
+        }
+    };
+    auto invalid = [&]() { fail(view, mServices.words("VimBadArgument")); };
+    auto close   = [&](Doc& doc) {
+        if (bang)
+        {
+            mWindow.letGoOf(doc);
+        }
+        else
+        {
+            mWindow.closeDocument(doc.id);
+        }
+    };
+
+    if (name == "ls" || name == "buffers" || name == "files")
+    {
+        listTabs();
+        return true;
+    }
+    if (abbreviates(name, "b", "buffer"))
+    {
+        if (Doc* doc = tabNamed(view, args))
+        {
+            mWindow.activate(*doc);
+        }
+        return true;
+    }
+    if (abbreviates(name, "bn", "bnext") || abbreviates(name, "bN", "bNext") || abbreviates(name, "bp", "bprevious") ||
+        abbreviates(name, "tabp", "tabprevious") || abbreviates(name, "tabN", "tabNext"))
+    {
+        const S32 by = args.empty() ? 1 : numberOf(args);
+        if (by < 0)
+        {
+            invalid();
+            return true;
+        }
+        step(abbreviates(name, "bn", "bnext") ? by : -by);
+        return true;
+    }
+    if (abbreviates(name, "bf", "bfirst") || abbreviates(name, "br", "brewind") || abbreviates(name, "tabfir", "tabfirst") ||
+        abbreviates(name, "tabr", "tabrewind"))
+    {
+        go(0);
+        return true;
+    }
+    if (abbreviates(name, "bl", "blast") || abbreviates(name, "tabl", "tablast"))
+    {
+        go(count - 1);
+        return true;
+    }
+    if (abbreviates(name, "bd", "bdelete") || abbreviates(name, "bw", "bwipeout") || abbreviates(name, "bun", "bunload") ||
+        abbreviates(name, "tabc", "tabclose"))
+    {
+        if (Doc* doc = tabNamed(view, args))
+        {
+            close(*doc);
+        }
+        return true;
+    }
+    if (abbreviates(name, "tabn", "tabnext"))
+    {
+        // The next, round past the end; the Nth; N on or back; the last.
+        if (args.empty())
+        {
+            step(1);
+            return true;
+        }
+        S32 to = -1;
+        if (args == "$")
+        {
+            to = count - 1;
+        }
+        else if (args[0] == '+' || args[0] == '-')
+        {
+            const S32 by = numberOf(args.substr(1));
+            to           = by < 0 ? -1 : at + (args[0] == '+' ? by : -by);
+        }
+        else if (const S32 number = numberOf(args); number >= 1)
+        {
+            to = number - 1;
+        }
+        if (to < 0 || to >= count)
+        {
+            invalid();
+            return true;
+        }
+        go(to);
+        return true;
+    }
+    if (abbreviates(name, "tabo", "tabonly"))
+    {
+        std::vector<std::string> others;
+        for (const Doc* doc : tabs)
+        {
+            if (doc != front)
+            {
+                others.push_back(doc->id);
+            }
+        }
+        if (!front || others.empty())
+        {
+            return true;
+        }
+        if (!bang)
+        {
+            mWindow.closeMany(others);
+            return true;
+        }
+        for (const std::string& id : others)
+        {
+            if (Doc* doc = mServices.findDoc(id))
+            {
+                mWindow.letGoOf(*doc);
+            }
+        }
+        return true;
+    }
+    if (abbreviates(name, "tabm", "tabmove"))
+    {
+        // To the end; after the Nth as they stand, 0 the first; N on or
+        // back.
+        if (!front)
+        {
+            return true;
+        }
+        S32 to = -1;
+        if (args.empty() || args == "$")
+        {
+            to = count - 1;
+        }
+        else if (args[0] == '+' || args[0] == '-')
+        {
+            const S32 by = numberOf(args.substr(1));
+            to           = by < 0 ? -1 : at + (args[0] == '+' ? by : -by);
+        }
+        else if (const S32 after = numberOf(args); after >= 0 && after <= count)
+        {
+            to = after == 0 ? 0 : after - 1 < at ? after : after - 1;
+        }
+        if (to < 0 || to >= count)
+        {
+            invalid();
+            return true;
+        }
+        std::vector<std::string> order;
+        for (const Doc* doc : tabs)
+        {
+            order.push_back(doc->id);
+        }
+        order.erase(order.begin() + at);
+        order.insert(order.begin() + to, front->id);
+        mWindow.reorderTabs(order);
+        return true;
+    }
+    return false;
+}
+
+void ALScriptStudioVim::listTabs()
+{
+    // As vim's :ls lists its buffers: the number each is gone to by, % the
+    // one in front and # the one before it, a shown or h not, - one that
+    // cannot be changed, + one unsaved; and the line its caret is on.
+    const Doc*          front     = mServices.frontDoc();
+    const Doc*          alternate = mAlternate.empty() ? nullptr : mServices.findDoc(mAlternate);
+    ALOutputView::Entry entry     = listing();
+    entry.text                    = "tabs:";
+    S32 number                    = 0;
+    for (const Doc* doc : mServices.openDocs())
+    {
+        const char  mark = doc == front ? '%' : doc == alternate ? '#' : ' ';
+        std::string row  = llformat("%3d %c%c%c%c \"%s\"", ++number, mark, doc == front ? 'a' : 'h', doc->modifiable ? ' ' : '-',
+                                    doc->unsaved() ? '+' : ' ', doc->name.c_str());
+        row.resize(std::max<size_t>(row.size() + 1, 40), ' ');
+        entry.text += "\n" + row + llformat("line %d", doc->editor ? doc->editor->caret().line + 1 : 0);
+    }
+    mWindow.output(entry);
+    mWindow.showOutput();
+}
+
+ALOutputView::Entry ALScriptStudioVim::listing() const
+{
+    ALOutputView::Entry entry;
+    entry.source      = mServices.words("OutputSourceVim");
+    entry.key["kind"] = "studio";
+    entry.lane        = 1;
+    // A listing: its numbered rows a block at the left edge.
+    entry.hang = ALOutputView::Hang::None;
+    return entry;
+}
+
+void ALScriptStudioVim::fail(ALTextView& view, const std::string& message)
+{
+    if (ALVimKeymap* vim = dynamic_cast<ALVimKeymap*>(view.modalKeymap()))
+    {
+        vim->say(message, true);
+    }
+    else
+    {
+        mServices.setStatus(message, true);
+    }
 }
