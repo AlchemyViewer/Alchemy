@@ -25,6 +25,7 @@
 #pragma once
 
 #include "llassettype.h"
+#include "llextendedstatus.h"
 #include "llinventory.h"
 #include "llpointer.h"
 #include "llsd.h"

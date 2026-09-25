@@ -971,6 +971,7 @@ if(AL_BUILD_VIEWER)
     alscriptmodules.h
     alscriptpreprocessor.h
     alscriptstudiodoc.h
+    alscriptstudioservices.h
     alscriptweightspane.h
     alscriptworkspace.h
     alterrainsurfacemaps.h
@@ -2395,6 +2396,16 @@ if(AL_BUILD_TESTS)
     PROJECT ${test_project}
     LIBRARIES ${test_libs}
     SOURCES tests/llviewertexture_stub.cpp
+  )
+
+  # A Script Studio tab's own logic, and the fake of the window's services
+  # the units split out of the window are tested with.
+  al_add_test(
+    alscriptstudiodoc
+    UNIT
+    PROJECT ${test_project}
+    LIBRARIES llui alscript ${test_libs}
+    DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
 
   # The Script Studio's Weights tab over the studio's own window, from the

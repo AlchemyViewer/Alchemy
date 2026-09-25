@@ -26,6 +26,7 @@
 
 #include "alcodeeditor.h"
 #include "alscriptstudiodoc.h"
+#include "alscriptstudioservices.h"
 #include "alfindings.h"
 #include "aloutputview.h"
 #include "alscriptanalysis.h"
@@ -87,7 +88,7 @@ class LLViewerObject;
 // a script the preprocessor wrapped shown as the code the server compiled
 // with the author's source in a tab beside it. Its regions fold and come
 // out as any studio's do.
-class ALFloaterScriptStudio final : public ALStudioFloater
+class ALFloaterScriptStudio final : public ALStudioFloater, public ALScriptStudioServices
 {
     friend class LLFloaterReg;
 
@@ -148,7 +149,7 @@ public:
     // to undo, and the caret at a line; and the keyboard given to it, or
     // left where it is.
     void openScript(const ALScriptRef& ref, const std::string& name, std::optional<std::string> carried = std::nullopt, S32 line = -1,
-                    bool focus = true);
+                    bool focus = true) override;
     // The active script moved to a window of its own, its unsaved text
     // going with it; or to another studio window already open. False where
     // it could not go.
@@ -279,7 +280,14 @@ private:
     // filled in and whatever else the map holds; the plain name where
     // the skin has no such form, for a skin that has not been brought
     // up to the forms.
-    std::string counted(const char* name, S32 count, LLStringUtil::format_map_t args = LLStringUtil::format_map_t()) const;
+    std::string counted(const char* name, S32 count, LLStringUtil::format_map_t args = LLStringUtil::format_map_t()) const override;
+    // The rest of what the units split out of the window ask of it
+    // (ALScriptStudioServices).
+    void               setStatus(const std::string& text, bool failure = false) override { ALStudioFloater::setStatus(text, failure); }
+    std::string        words(const std::string& name, const LLStringUtil::format_map_t& args = LLStringUtil::format_map_t()) const override;
+    ALScriptStudioDoc* frontDoc() override { return active(); }
+    ALScriptStudioDoc* findDoc(std::string_view id) override;
+    ALScriptStudioDoc* findDoc(const ALScriptRef& ref) override;
 
     Doc*   active();
     size_t indexOf(const ALScriptRef& ref) const;
@@ -530,7 +538,7 @@ private:
     // to the script to type there. Tabs opened on the way leave the panes
     // on what they were listing.
     void onProblemSelected(bool to_editor);
-    void revealed(LLUICtrl* list, bool to_editor);
+    void revealed(LLUICtrl* list, bool to_editor) override;
     // A place, by the identity of the script or file it is in, in one that
     // is not open, chosen by walking the list: opened a moment later as a
     // preview, if the list is still on it, rather than a tab for every row
@@ -565,7 +573,7 @@ private:
     // preprocessing, renaming. The script's name in it is a link to it;
     // and after it a link for each thing to be done about it: save anyway,
     // try again, save a copy, export.
-    void report(const std::string& text, bool failure = false, const Doc* doc = nullptr, const std::vector<std::string>& actions = {});
+    void report(const std::string& text, bool failure = false, const Doc* doc = nullptr, const std::vector<std::string>& actions = {}) override;
 
     // The analyzers: a check is due a moment after the last keystroke,
     // sent from draw, answered whenever the worker gets to it, and kept
@@ -888,7 +896,7 @@ private:
     void pumpSearch();
     void onSearchResult(bool to_editor);
     // Where to go in a script once it is open, or now.
-    void goToPlace(const ALScriptRef& ref, const std::string& name, S32 line, S32 column, S32 length);
+    void goToPlace(const ALScriptRef& ref, const std::string& name, S32 line, S32 column, S32 length) override;
 
     // The reference, in the inspector rather than a web page: a word of
     // the vocabulary shown with its declaration, the keyword file's

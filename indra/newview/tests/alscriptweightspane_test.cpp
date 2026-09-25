@@ -26,21 +26,13 @@
 
 #include "../alscriptweightspane.h"
 
-#include "alcodeeditor.h"
-#include "aldockpanel.h"
-#include "aljumpbar.h"
-#include "aloutputview.h"
 #include "alpanelist.h"
-#include "alscopebar.h"
-#include "altabstrip.h"
 #include "llfloater.h"
 #include "llpanel.h"
 #include "llscrolllistitem.h"
 #include "lltextbox.h"
-#include "lluictrlfactory.h"
-#include "llxmlnode.h"
 
-#include "../../llui/tests/alheadlessui_fixture.h"
+#include "alscriptstudio_fixture.h"
 
 #include "../test/lltut.h"
 
@@ -48,64 +40,15 @@
 #include <string>
 #include <vector>
 
-// llui reaches the viewer for this one, and linking any of the library pulls
-// the object that calls it. Nothing under test goes near it.
-class LLAvatarName;
-const std::string gWeightsTestAnonName("Anon");
-const std::string& rlvGetAnonym(const LLAvatarName& av_name)
-{
-    return gWeightsTestAnonName;
-}
-
 namespace tut
 {
     struct alscriptweightspane_data
     {
-        ll_test::HeadlessUI& ui      = ll_test::HeadlessUI::get();
-        LLPanel*             stage   = nullptr;
-        LLFloater*           floater = nullptr;
-
+        ll_test::HeadlessUI&        ui      = ll_test::HeadlessUI::get();
         // The studio's window as the skin has it, which is where the tab's
         // widgets and words are.
-        alscriptweightspane_data()
-        {
-            // Its widgets made reachable: a static library links a widget's
-            // registrar only with the object that holds its block.
-            ALCodeEditor::Params editor;
-            ALDockPanel::Params  dock;
-            ALJumpBar::Params    jump;
-            ALOutputView::Params output;
-            ALPaneList::Params   pane;
-            ALScopeBar::Params   scope;
-            ALTabStrip::Params   tabs;
-            (void)editor.name;
-            (void)dock.name;
-            (void)jump.name;
-            (void)output.name;
-            (void)pane.name;
-            (void)scope.name;
-            (void)tabs.name;
-            if (!ui.ok())
-            {
-                return;
-            }
-            LLXMLNodePtr node;
-            if (!LLUICtrlFactory::getLayeredXMLNode("floater_script_studio.xml", node))
-            {
-                return;
-            }
-            LLPanel::Params sp(LLUICtrlFactory::getDefaultParams<LLPanel>());
-            sp.name = "stage";
-            sp.rect = LLRect(0, 1080, 1920, 0);
-            stage   = LLUICtrlFactory::create<LLPanel>(sp);
-            floater = new LLFloater(LLSD(), LLFloater::getDefaultParams());
-            stage->addChild(floater);
-            if (!floater->initFloaterXML(node, stage, "floater_script_studio.xml"))
-            {
-                floater = nullptr;
-            }
-        }
-        ~alscriptweightspane_data() { delete stage; }
+        al_studio_test::StudioWindow window;
+        LLFloater*                   floater = window.floater;
 
         LLPanel* tab() const { return floater ? floater->findChild<LLPanel>("weights_tab", true) : nullptr; }
         ALPaneList* list(const char* name) const { return floater ? floater->findChild<ALPaneList>(name, true) : nullptr; }

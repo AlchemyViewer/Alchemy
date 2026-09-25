@@ -1653,6 +1653,23 @@ std::string ALFloaterScriptStudio::counted(const char* name, S32 count, LLString
     return getString(hasString(formed) ? formed : std::string(name), args);
 }
 
+std::string ALFloaterScriptStudio::words(const std::string& name, const LLStringUtil::format_map_t& args) const
+{
+    return getString(name, args);
+}
+
+ALScriptStudioDoc* ALFloaterScriptStudio::findDoc(std::string_view id)
+{
+    const size_t index = indexOf(id);
+    return index != NONE ? mDocs[index].get() : nullptr;
+}
+
+ALScriptStudioDoc* ALFloaterScriptStudio::findDoc(const ALScriptRef& ref)
+{
+    const size_t index = indexOf(ref);
+    return index != NONE ? mDocs[index].get() : nullptr;
+}
+
 ALFloaterScriptStudio::Doc* ALFloaterScriptStudio::active()
 {
     return mActive < mDocs.size() ? mDocs[mActive].get() : nullptr;
