@@ -260,4 +260,40 @@ namespace tut
         ensure("not through a link out", !none.mayFromConfig(s.at("project/escape"), s.at("project")));
 #endif
     }
+
+    template<> template<>
+    void aldiskincludes_object::test<6>()
+    {
+        set_test_name("a require of a name with no extension finds a folder's init.luau after the name's own files");
+        typedef std::vector<std::string> names;
+        ensure("SLua's require", ALDiskIncludes::namesFor("lib", true, true) ==
+                                     names{ "lib", "lib.luau", "lib.lua", "lib/init.luau", "lib/init.lua" });
+        const names folder = ALDiskIncludes::namesFor("./shared/lib/", true, true);
+        ensure("a path's last folder, however it ends",
+               folder.size() == 5 && folder[3] == "./shared/lib/init.luau" && folder[4] == "./shared/lib/init.lua");
+        ensure("a name with its extension is that file", ALDiskIncludes::namesFor("lib.Luau", true, true) ==
+                                                              names{ "lib.Luau", "lib.Luau.luau", "lib.Luau.lua" });
+        ensure("an #include in SLua is a file", ALDiskIncludes::namesFor("lib", true, false) == names{ "lib", "lib.luau", "lib.lua" });
+        ensure("an LSL include", ALDiskIncludes::namesFor("lib", false, false) == names{ "lib", "lib.lsl" });
+
+        // As a folder is looked in: the first of the names it admits.
+        Scratch           s;
+        const std::string init = s.write("modules/lib/init.luau", "return {}\n");
+        ALDiskIncludes    blessed;
+        blessed.bless(s.at("modules"));
+        const auto first = [&](const std::string& name) {
+            for (const std::string& candidate : ALDiskIncludes::namesFor(name, true, true))
+            {
+                if (const std::optional<std::string> real = blessed.admits(s.at("modules/" + candidate)))
+                {
+                    return *real;
+                }
+            }
+            return std::string();
+        };
+        ensure_equals("the folder's module", first("lib"), init);
+        const std::string own = s.write("modules/lib.luau", "return 1\n");
+        ensure_equals("a file of the name before the folder", first("lib"), own);
+        ensure_equals("init by its own name too", first("lib/init"), init);
+    }
 }

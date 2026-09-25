@@ -37,6 +37,7 @@
 
 #include <algorithm>
 #include <functional>
+#include <string_view>
 
 namespace
 {
@@ -174,16 +175,34 @@ void ALScriptModules::listFolder(const std::string& prefix, const std::string& f
     for (const ALDiskIncludes::Listed& listed : blessed.filesUnder(folder, extensions, FOLDER_DEPTH, FOLDER_ENTRIES, FOLDER_FILES))
     {
         // By its path from the folder: a require without its extension, an
-        // include as it is named.
-        const std::string under = prefix + (lua ? stemOf(listed.relative, true) : listed.relative);
-        const std::string path  = DISK_PREFIX + listed.file;
+        // include as it is named. A folder's `init.luau` is the folder's
+        // module, and required by the folder's name first
+        // (ALDiskIncludes::namesFor).
+        const std::string        under = prefix + (lua ? stemOf(listed.relative, true) : listed.relative);
+        std::vector<std::string> unders{ under };
+        constexpr std::string_view INIT = "/init";
+        if (lua && under.size() > INIT.size() && std::string_view(under).substr(under.size() - INIT.size()) == INIT)
+        {
+            // Not the listed folder's own: `./init` is no folder's name.
+            const std::string folder = under.substr(0, under.size() - INIT.size());
+            const size_t      last   = folder.find_last_of('/');
+            const std::string tail   = last == std::string::npos ? folder : folder.substr(last + 1);
+            if (tail != "." && tail != "..")
+            {
+                unders.insert(unders.begin(), folder);
+            }
+        }
+        const std::string path = DISK_PREFIX + listed.file;
         // Found already -- open, or under another folder -- another name
         // for it; the script itself, none.
         if (const auto had = at.find(path); had != at.end())
         {
-            if (had->second < found.size() && !contains(found[had->second].names, under))
+            for (const std::string& name : unders)
             {
-                found[had->second].names.push_back(under);
+                if (had->second < found.size() && !contains(found[had->second].names, name))
+                {
+                    found[had->second].names.push_back(name);
+                }
             }
             continue;
         }
@@ -194,7 +213,7 @@ void ALScriptModules::listFolder(const std::string& prefix, const std::string& f
         }
         const size_t slash = listed.relative.find_last_of('/');
         at[path]           = found.size();
-        found.push_back({ path, slash == std::string::npos ? listed.relative : listed.relative.substr(slash + 1), { under }, *exports });
+        found.push_back({ path, slash == std::string::npos ? listed.relative : listed.relative.substr(slash + 1), unders, *exports });
     }
 }
 

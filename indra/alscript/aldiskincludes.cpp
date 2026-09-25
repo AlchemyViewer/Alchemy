@@ -32,8 +32,10 @@
 #include "llsdjson.h"
 
 #include <algorithm>
+#include <cctype>
 #include <filesystem>
 #include <fstream>
+#include <string_view>
 
 namespace
 {
@@ -120,6 +122,35 @@ bool ALDiskIncludes::blessFromConfig(const std::string& folder, const std::strin
     }
     bless(folder);
     return true;
+}
+
+// static
+std::vector<std::string> ALDiskIncludes::namesFor(const std::string& name, bool lua, bool require)
+{
+    std::vector<std::string> names{ name };
+    if (!lua)
+    {
+        names.push_back(name + ".lsl");
+        return names;
+    }
+    names.push_back(name + ".luau");
+    names.push_back(name + ".lua");
+    const auto ends = [&name](std::string_view extension) {
+        return name.size() >= extension.size() &&
+               std::equal(extension.begin(), extension.end(), name.end() - extension.size(),
+                          [](char a, char b) { return a == std::tolower(static_cast<unsigned char>(b)); });
+    };
+    std::string folder = name;
+    while (!folder.empty() && (folder.back() == '/' || folder.back() == '\\'))
+    {
+        folder.pop_back();
+    }
+    if (require && !folder.empty() && !ends(".luau") && !ends(".lua"))
+    {
+        names.push_back(folder + "/init.luau");
+        names.push_back(folder + "/init.lua");
+    }
+    return names;
 }
 
 std::optional<std::string> ALDiskIncludes::admits(const std::string& file) const

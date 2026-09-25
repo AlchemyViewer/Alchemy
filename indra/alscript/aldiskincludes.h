@@ -70,6 +70,14 @@ public:
     // Nothing for anything else.
     std::optional<std::string> admits(const std::string& file) const;
 
+    // The files a name may stand for in a folder, in the order they are
+    // looked for: the name as written, then with its language's
+    // extensions; and for a require of SLua whose name has no extension
+    // of its own, the `init.luau` and then the `init.lua` in a folder of
+    // that name, which is the folder's module -- as Luau's require takes
+    // it, and as the Second Life VS Code plugin does.
+    static std::vector<std::string> namesFor(const std::string& name, bool lua, bool require);
+
     // The files under the blessed folder `folder`, and the folders under
     // it, whose names end in one of `extensions`, each where it stands
     // once its links are followed and by its path from the folder, `/`

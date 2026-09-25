@@ -669,16 +669,7 @@ std::vector<ALScriptPreprocessor::Candidate> ALScriptPreprocessor::candidatesFor
                     dirs.push_back(folder);
                 }
             }
-            std::vector<std::string> names{ ask.name };
-            if (request.lua)
-            {
-                names.push_back(ask.name + ".luau");
-                names.push_back(ask.name + ".lua");
-            }
-            else
-            {
-                names.push_back(ask.name + ".lsl");
-            }
+            const std::vector<std::string> names = ALDiskIncludes::namesFor(ask.name, request.lua, ask.require);
             if (ALLuauConfig::absolute(ask.name))
             {
                 // A path from a root, which an alias may stand for: the
