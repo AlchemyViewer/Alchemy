@@ -149,6 +149,108 @@ void ALScriptStudioVim::connect(ALVimKeymap& vim)
     };
 }
 
+void ALScriptStudioVim::source(bool show)
+{
+    std::string       whence;
+    const std::string text = mWindow.vimrc(whence);
+    sourceText(text, whence, show);
+}
+
+void ALScriptStudioVim::sourceText(const std::string& text, const std::string& whence, bool show)
+{
+    mSourced = true;
+    std::vector<std::string> errors;
+    ALVimKeymap::source(*mShared, text, [this](const std::string& option) { return setOption(option, nullptr); }, errors);
+    if (!errors.empty())
+    {
+        LLStringUtil::format_map_t words;
+        words["[WHENCE]"] = whence;
+        ALOutputView::Entry entry = listing();
+        entry.text                = mServices.words("VimrcNotTaken", words);
+        for (const std::string& error : errors)
+        {
+            entry.text += "\n" + error;
+        }
+        mWindow.output(entry);
+        if (show)
+        {
+            mWindow.showOutput();
+        }
+    }
+    mWindow.refreshEditors();
+}
+
+void ALScriptStudioVim::applyViewOptions(ALTextView& view)
+{
+    for (const std::string& option : mShared->viewOptions)
+    {
+        std::string shown;
+        std::string error;
+        ALVimKeymap::setViewOption(view, option, shown, error);
+    }
+}
+
+bool ALScriptStudioVim::setOption(const std::string& word, std::string* shown)
+{
+    std::string option = word;
+    enum class How : U8
+    {
+        On,
+        Off,
+        Toggle,
+        Query
+    } how = How::On;
+    if (!option.empty() && (option.back() == '!' || option.back() == '?'))
+    {
+        how = option.back() == '!' ? How::Toggle : How::Query;
+        option.pop_back();
+    }
+    else if (option.compare(0, 3, "inv") == 0)
+    {
+        how = How::Toggle;
+        option.erase(0, 3);
+    }
+    else if (option.compare(0, 2, "no") == 0)
+    {
+        how = How::Off;
+        option.erase(0, 2);
+    }
+    // vim's list shows the blanks, which the window shows all or none of
+    // here.
+    const bool  list    = option == "list";
+    const char* toggled = list ? "blanks_all"
+                          : option == "number" || option == "nu"          ? "line_numbers"
+                          : option == "relativenumber" || option == "rnu" ? "relative_numbers"
+                          : option == "spell"                             ? "spell_check"
+                          : option == "wrap"                              ? "word_wrap"
+                                                                          : nullptr;
+    if (!toggled)
+    {
+        return false;
+    }
+    const bool now = mCommands.checked(toggled);
+    if (how == How::Query)
+    {
+        const std::string whole = list ? "list" : option == "nu" ? "number" : option == "rnu" ? "relativenumber" : option;
+        if (shown)
+        {
+            *shown = (now ? "  " : "no") + whole;
+        }
+        return true;
+    }
+    const bool want = how == How::On ? true : how == How::Off ? false : !now;
+    if (list)
+    {
+        // Two commands, all or none, each run whatever the other says.
+        mCommands.run(want ? "blanks_all" : "blanks_none");
+    }
+    else if (want != now)
+    {
+        mCommands.run(toggled);
+    }
+    return true;
+}
+
 ALScriptStudioVim::Doc* ALScriptStudioVim::docOf(const ALTextView& view)
 {
     // The editor carries its document's id in its name, which is what
@@ -370,30 +472,37 @@ bool ALScriptStudioVim::command(ALTextView& view, const std::string& name, const
     }
     if (name == "set")
     {
-        std::string option = args;
-        const bool  off    = option.compare(0, 2, "no") == 0;
-        if (off)
-        {
-            option.erase(0, 2);
-        }
-        // vim's list shows the blanks, which the window shows all or none of
-        // here.
-        if (option == "list")
-        {
-            mCommands.run(off ? "blanks_none" : "blanks_all");
-            return true;
-        }
-        const char* toggled = option == "number" || option == "nu"          ? "line_numbers"
-                              : option == "relativenumber" || option == "rnu" ? "relative_numbers"
-                              : option == "spell"                             ? "spell_check"
-                                                                              : nullptr;
-        if (!toggled)
+        std::string shown;
+        if (!setOption(args, &shown))
         {
             return false;
         }
-        if (mCommands.checked(toggled) == off)
+        if (!shown.empty())
         {
-            mCommands.run(toggled);
+            say(view, shown);
+        }
+        return true;
+    }
+    if (abbreviates(name, "so", "source"))
+    {
+        // The vimrc read again; or a tab's text, or a file's, read as it.
+        if (args.empty() || args == "$MYVIMRC")
+        {
+            source(true);
+        }
+        else if (args == "%")
+        {
+            sourceText((doc->editor ? doc->editor : &view)->text(), doc->name, true);
+        }
+        else if (std::string text; mWindow.readFile(pathOf(*doc, args, true), text))
+        {
+            sourceText(text, args, true);
+        }
+        else
+        {
+            LLStringUtil::format_map_t words;
+            words["[FILE]"] = args;
+            fail(view, mServices.words("VimNoFile", words));
         }
         return true;
     }
@@ -422,10 +531,11 @@ void ALScriptStudioVim::complete(const std::string& command, const std::string& 
                                    "llist",
                                    "lnext",   "lopen",     "lprevious", "lrewind", "ls",        "lwindow",   "pop",      "qall",    "quit",
                                    "read",    "tabNext",   "tabclose",  "tabedit", "tabfind",   "tabfirst",  "tablast",  "tabmove",
-                                   "tabnew",  "tag",
+                                   "tabnew",  "tag",       "source",
                                    "tabnext", "tabonly",   "tabprevious", "tabrewind", "update", "wall",     "wq",       "wqall",
                                    "write",   "xall",      "xit" };
     static const char* OPTIONS[] = { "number", "nonumber", "relativenumber", "norelativenumber", "spell", "nospell", "list", "nolist" };
+    static const char* VIMRC[]   = { "$MYVIMRC" };
     static const char* KINDS[]   = { "all", "cmd", "search" };
     if (command.empty())
     {
@@ -450,9 +560,16 @@ void ALScriptStudioVim::complete(const std::string& command, const std::string& 
     }
     else if (abbreviates(command, "e", "edit") || abbreviates(command, "tabe", "tabedit") || command == "tabnew" ||
              abbreviates(command, "r", "read") || abbreviates(command, "w", "write") || abbreviates(command, "fin", "find") ||
-             abbreviates(command, "tabf", "tabfind"))
+             abbreviates(command, "tabf", "tabfind") || abbreviates(command, "so", "source"))
     {
-        completeFile(typed, out);
+        if (!typed.empty() && typed[0] == '$')
+        {
+            out.insert(out.end(), std::begin(VIMRC), std::end(VIMRC));
+        }
+        else
+        {
+            completeFile(typed, out);
+        }
     }
 }
 
@@ -890,6 +1007,11 @@ bool ALScriptStudioVim::fileCommand(ALTextView& view, Doc& doc, const std::strin
             {
                 mWindow.activate(*alternate);
             }
+            return true;
+        }
+        if (args == "$MYVIMRC")
+        {
+            mWindow.editVimrc();
             return true;
         }
         // A tab by its name, or a file's by where it is; else the file,

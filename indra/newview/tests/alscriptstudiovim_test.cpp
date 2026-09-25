@@ -139,6 +139,15 @@ namespace
         }
         Names                 includedAsked;
         std::set<std::string> included;
+        std::string vimrc(std::string& whence) override
+        {
+            whence = "the vimrc";
+            return vimrcText;
+        }
+        void        editVimrc() override { ++vimrcEdited; }
+        void        refreshEditors() override { ++editorsRefreshed; }
+        std::string vimrcText;
+        S32         vimrcEdited = 0, editorsRefreshed = 0;
 
         al_studio_test::FakeServices*               services = nullptr;
         std::vector<std::string>                    folders;
@@ -828,5 +837,50 @@ namespace tut
 
         ran.clear();
         ensure("gO", said->hooks().command(*a.editor, "go_to_symbol", std::string()) && ran == Names{ "go_to_symbol" });
+    }
+
+    template<> template<>
+    void alscriptstudiovim_object::test<18>()
+    {
+        set_test_name("the vimrc read into the window's vim: the window's options through its toggles, each editor's set on it, what it did not take to Output");
+        make();
+        bool wrapped = false;
+        commands.add(
+            "word_wrap",
+            [this, &wrapped]() {
+                ran.push_back("word_wrap");
+                wrapped = !wrapped;
+            },
+            nullptr, [&wrapped]() { return wrapped; });
+        Doc& a           = tab("a");
+        studio.vimrcText = "set nu wrap ts=2 et\nlet mapleader = ','\ninoremap jk <Esc>\nbogus\n";
+        ensure("not read yet", !vim->sourced());
+        vim->source();
+        ensure("read", vim->sourced() && lineNumbers && wrapped);
+        ensure("the window's editors told", studio.editorsRefreshed == 1);
+        const ALVimMappings& maps = vim->shared().mappings;
+        ensure("its mapping, and its leader", maps.match(ALVimMappings::INSERT, maps.keysOf("jk"), true).full && maps.leader() == ",");
+        ensure("what it did not take in the Output tab, not brought up", !studio.entries.empty() &&
+                                                                        studio.entries.back().text.find("line 4:") != std::string::npos &&
+                                                                        studio.entries.back().text.find("the vimrc") != std::string::npos &&
+                                                                        studio.outputShown == 0);
+        vim->applyViewOptions(*a.editor);
+        ensure("each editor's own set on it", a.editor->getTabWidth() == 2 && a.editor->getSoftTabs());
+
+        // :set's ? shown, and the toggles.
+        ALVimKeymap* said = vimOver(a);
+        ensure(":set nu?", ex(a, "set", "nu?") && said->message() == "  number");
+        ensure(":set invwrap", ex(a, "set", "invwrap") && !wrapped);
+
+        // :source reads it again, or a tab as it; :e $MYVIMRC opens it.
+        studio.vimrcText = "nnoremap Q gq\n";
+        ensure(":so", ex(a, "so") && maps.match(ALVimMappings::NORMAL, maps.keysOf("Q"), true).full &&
+                          !maps.match(ALVimMappings::INSERT, maps.keysOf("jk"), true).full);
+        type(a, "\nbad line");
+        ensure(":so % reads the tab, and brings up what it did not take", ex(a, "source", "%") && studio.outputShown == 1 &&
+                                                                              studio.entries.back().text.find("line 2:") != std::string::npos &&
+                                                                              studio.entries.back().text.find("the vimrc") == std::string::npos);
+        ensure(":e $MYVIMRC", ex(a, "e", "$MYVIMRC") && studio.vimrcEdited == 1);
+        ensure(":so of a file that is not there", ex(a, "so", "nowhere.vim") && said->messageIsError());
     }
 }

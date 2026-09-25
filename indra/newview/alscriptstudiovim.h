@@ -105,6 +105,12 @@ public:
         // would look -- an include's, a module's, or either. False where it
         // is nowhere known.
         virtual bool openIncluded(Doc& doc, const std::string& name, std::optional<bool> require) = 0;
+        // The vimrc as it stands, and where it is, for saying: the file's
+        // path, or the notecard's name. Opened in a tab, to be edited.
+        virtual std::string vimrc(std::string& whence) = 0;
+        virtual void        editVimrc()                = 0;
+        // Every editor's options set again: the vimrc's among them.
+        virtual void        refreshEditors() = 0;
 
     protected:
         ~Window() = default;
@@ -115,6 +121,17 @@ public:
     // A keymap put over one of the window's editors: sharing its history
     // and options with the rest, and asking this what it leaves.
     void connect(ALVimKeymap& vim);
+    // The vimrc read into the history and options every editor shares,
+    // what it made before taken away first: once, before vim is first put
+    // over an editor, and again whenever it changes. What it did not
+    // understand goes to the Output tab, brought into sight with `show`;
+    // the options the window keeps -- line numbers, wrapping -- are set
+    // through its commands, and every editor's own set again.
+    void source(bool show = false);
+    bool sourced() const { return mSourced; }
+    // The vimrc's options that are each editor's own -- expandtab,
+    // tabstop -- set on one, after the studio's own settings.
+    void applyViewOptions(ALTextView& view);
     // The history and options every editor of the window shares.
     ALVimKeymap::Shared& shared() { return *mShared; }
 
@@ -174,6 +191,14 @@ private:
     bool problemCommand(ALTextView& view, Doc& doc, const std::string& name, const std::string& args);
     // An entry for the Output tab, of vim's.
     ALOutputView::Entry listing() const;
+    // A text read as the vimrc -- the vimrc itself, a tab's, a file's --
+    // where it is said to be from `whence`.
+    void sourceText(const std::string& text, const std::string& whence, bool show);
+    // One of :set's options the window keeps, as :set is given it --
+    // number, relativenumber, spell, list, wrap, with no, inv, ! and ? --
+    // set through its commands; what a ? shows in `shown`. False where the
+    // option is none of those.
+    bool setOption(const std::string& word, std::string* shown);
     // Said where vim says things, as an error or not; in the status line
     // where the view has no vim.
     void fail(ALTextView& view, const std::string& message) { say(view, message, true); }
@@ -184,6 +209,8 @@ private:
     Window&                              mWindow;
     std::shared_ptr<ALVimKeymap::Shared> mShared = std::make_shared<ALVimKeymap::Shared>();
     std::string                          mBanner;
+    // Whether the vimrc has been read into this window's vim yet.
+    bool                                 mSourced = false;
     // The tab in front as pump last saw it, and the one before it, by id.
     std::string                          mCurrent;
     std::string                          mAlternate;

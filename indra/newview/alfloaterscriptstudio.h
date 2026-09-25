@@ -117,6 +117,10 @@ public:
     // the XML they are kept in: made with an example in it where there is
     // none yet. What is saved there is offered at once.
     static void editSnippets(bool lua);
+    // The vimrc opened in the studio to be edited: the notecard where one
+    // is the vimrc, else the file, made with a few lines saying what it
+    // takes where there is none yet.
+    static void openVimrc();
     // The studio, with this object pinned in its explorer and chosen
     // there: what the build tool's Explore in IDE button means when no
     // external editor is listening.
@@ -631,6 +635,11 @@ private:
     // preprocessor would look. An include's, a module's, or either. False
     // where it is nowhere known.
     bool openIncluded(Doc& doc, const std::string& name, std::optional<bool> require) override;
+    // Vim's vimrc: its text and where it is, opened here to be edited; and
+    // every editor's options set again once it is read.
+    std::string vimrc(std::string& whence) override;
+    void        editVimrc() override;
+    void        refreshEditors() override { applyEditorOptions(); }
     // A line, or line:column, typed into the same popover, the editor
     // showing the line as it is typed and going back on escape.
     void goToLine();
@@ -1163,6 +1172,8 @@ private:
     LLButton*                          mExpandedButton = nullptr;
     boost::signals2::scoped_connection mCompiledConnection;
     boost::signals2::scoped_connection mDefinitionsConnection;
+    // The vimrc changed: read again into this window's vim.
+    boost::signals2::scoped_connection mVimrcConnection;
     // The settings the window follows as they change: the lints and the
     // Luau mode, the preprocessor's, vim's clipboard.
     std::vector<boost::signals2::scoped_connection> mSettingConnections;

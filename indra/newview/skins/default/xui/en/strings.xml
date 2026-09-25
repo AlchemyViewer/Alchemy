@@ -468,6 +468,8 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="VimBadExpression">E15: Invalid expression: [VALUE]</string>
 	<string name="VimLetOnly">Only mapleader and maplocalleader are set with :let</string>
 	<string name="VimrcLine">line [NUMBER]: [ERROR]</string>
+	<string name="VimrcTooLarge">The vimrc is too large to read.</string>
+	<string name="VimrcNotNotecard">The vimrc's item is not a notecard that can be read.</string>
 
 	<!-- Script Studio's own words about a script, from the alscript
 	     library: each problem carries a key and the words it is about,

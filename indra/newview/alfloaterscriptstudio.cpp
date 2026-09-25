@@ -34,6 +34,7 @@
 #include "alscriptmodules.h"
 #include "alscriptpreprocessor.h"
 #include "alscriptweightspane.h"
+#include "alscriptstudiovimrc.h"
 #include "alemptystate.h"
 #include "aljumpbar.h"
 #include "aloutputview.h"
@@ -409,6 +410,41 @@ void ALFloaterScriptStudio::editSnippets(bool lua)
         // As the XML it is, whichever language it holds snippets for.
         studio->openFile(path, false);
     }
+}
+
+// static
+void ALFloaterScriptStudio::openVimrc()
+{
+    if (ALFloaterScriptStudio* studio = LLFloaterReg::showTypedInstance<ALFloaterScriptStudio>("script_studio", LLSD(), TAKE_FOCUS_YES))
+    {
+        studio->editVimrc();
+    }
+}
+
+std::string ALFloaterScriptStudio::vimrc(std::string& whence)
+{
+    ALScriptStudioVimrc& vimrc = ALScriptStudioVimrc::instance();
+    whence                     = vimrc.notecard().notNull() ? vimrc.notecardName() : ALScriptStudioVimrc::filePath();
+    return vimrc.text();
+}
+
+void ALFloaterScriptStudio::editVimrc()
+{
+    ALScriptStudioVimrc& vimrc = ALScriptStudioVimrc::instance();
+    if (const LLUUID item = vimrc.notecard(); item.notNull())
+    {
+        openScript(ALScriptRef(LLUUID::null, item), vimrc.notecardName());
+        return;
+    }
+    const std::string path = ALScriptStudioVimrc::filePath();
+    if (!LLFile::isfile(path) && !ALFileWrite::whole(path, getString("VimrcNewFile")))
+    {
+        LLStringUtil::format_map_t args;
+        args["[FILE]"] = path;
+        setStatus(getString("VimrcNotMade", args), true);
+        return;
+    }
+    openFile(path, false);
 }
 
 // static
@@ -867,6 +903,14 @@ bool ALFloaterScriptStudio::postBuild()
         mSettingConnections.emplace_back(control->getSignal()->connect(
             [this](LLControlVariable*, const LLSD& value, const LLSD&) { mVim.shared().unnamedClipboard = value.asBoolean(); }));
     }
+    // The vimrc read again into this window's vim whenever it changes: its
+    // file saved, a notecard dropped on the preferences' box, or saved.
+    mVimrcConnection = ALScriptStudioVimrc::instance().onChanged([this]() {
+        if (mVim.sourced())
+        {
+            mVim.source();
+        }
+    });
 
     loadState();
     // Unsaved text kept against a crash, a lost connection noticed, and what
@@ -1344,6 +1388,10 @@ void ALFloaterScriptStudio::draw()
     pumpCaret();
     mExplorerPane->pump();
     mVim.pump();
+    if (mVimMode)
+    {
+        ALScriptStudioVimrc::instance().check();
+    }
     mSearchPane->pump();
     pumpSettle();
     refreshUndoLabels();
@@ -1665,7 +1713,11 @@ void ALFloaterScriptStudio::applyEditorOptions(ALCodeEditor& editor)
     editor.setFont(editorFont());
     editor.keymap() = ALScriptKeymap::current();
     // Vim put over the editor, or taken away; one already there keeps
-    // its marks and registers.
+    // its marks and registers. The vimrc is read before the first.
+    if (mVimMode && !mVim.sourced())
+    {
+        mVim.source();
+    }
     if (mVimMode && !editor.modalKeymap())
     {
         auto vim = std::make_unique<ALVimKeymap>();
@@ -1692,6 +1744,11 @@ void ALFloaterScriptStudio::applyEditorOptions(ALCodeEditor& editor)
     editor.setScrollMapOnLeft(mScrollMapLeft);
     editor.setScrollMap(mScrollMap);
     editor.setSpellCheck(mSpellCheck);
+    // The vimrc's own tabs and indents over the studio's.
+    if (mVimMode)
+    {
+        mVim.applyViewOptions(editor);
+    }
 }
 
 void ALFloaterScriptStudio::applyEditorOptions()
@@ -6945,13 +7002,18 @@ void ALFloaterScriptStudio::saveFile(Doc& doc)
     }
     report(getString("SavedToFile", args), false, &doc);
     fileSettled(doc);
-    // The scripter's snippets, offered as saved from here on.
+    // The scripter's snippets, offered as saved from here on; the vimrc
+    // read again at once.
     for (bool lua : { false, true })
     {
         if (doc.file == ALScriptSnippets::path(lua))
         {
             ALScriptSnippets::forget(lua);
         }
+    }
+    if (doc.file == ALScriptStudioVimrc::filePath())
+    {
+        ALScriptStudioVimrc::instance().check(true);
     }
 }
 

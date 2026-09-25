@@ -223,6 +223,14 @@
     <floater.string name="VimArgumentRequired">E471: Argument required</floater.string>
     <floater.string name="VimNotSaved">E37: No write since last change (add ! to override)</floater.string>
     <floater.string name="VimNoFile">E484: Can't open file [FILE]</floater.string>
+    <floater.string name="VimrcNotTaken">[WHENCE]: these lines of the vimrc were not taken</floater.string>
+    <floater.string name="VimrcNotMade">The vimrc could not be made at [FILE].</floater.string>
+    <floater.string name="VimrcNewFile">" Script Studio's vimrc, read when vim is turned on and again whenever it is saved.
+" Taken: the :map family (nnoremap, inoremap jk &lt;Esc&gt;, ...), let mapleader,
+" and :set of the options vim here knows. Nothing else runs.
+" A notecard dropped on the box in Script Studio Preferences, Editor, takes its place.
+
+</floater.string>
     <floater.string name="VimNoFileName">E32: No file name</floater.string>
     <floater.string name="VimCannotChange">E21: Cannot make changes, 'modifiable' is off</floater.string>
     <floater.string name="VimFileExists">E13: File exists (add ! to override)</floater.string>

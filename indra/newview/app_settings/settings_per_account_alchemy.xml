@@ -121,6 +121,17 @@
             <key>Value</key>
             <integer>0</integer>
         </map>
+        <key>ALScriptStudioVimrcNotecard</key>
+        <map>
+            <key>Comment</key>
+            <string>The notecard in inventory that is Script Studio's vimrc, by its item; empty for the file vimrc in the settings folder. Its text is kept on disk with the asset it was read from, and fetched again only when the notecard has a new one.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>String</string>
+            <key>Value</key>
+            <string></string>
+        </map>
         <key>ALRejectFriendshipRequestsChanged</key>
         <map>
             <key>Comment</key>
