@@ -452,6 +452,13 @@ public:
     bool        misspelledAt(const ALTextPos& pos, ALTextRange* word = nullptr);
     // Everything is checked again: the dictionary changed.
     void        recheckSpelling();
+    // The next misspelled word after a place, or the last before it, line
+    // by line round past the ends to the place's own line again; none
+    // where there is none, or no spell check.
+    std::optional<ALTextRange> misspellingFrom(const ALTextPos& from, bool forward);
+    // Next Misspelling and Previous Misspelling: the word selected, from
+    // the selection's end or its start. False where there is none.
+    bool goToMisspelling(bool forward);
 
     // --- LLSpellCheckMenuHandler ---------------------------------------------
 

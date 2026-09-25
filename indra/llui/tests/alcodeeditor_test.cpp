@@ -1725,4 +1725,29 @@ namespace tut
         e.handleMouseUp(x, y, MASK_CONTROL);
         ensure("gone to where it was clicked", followed.size() == 3 && followed.back().line == 0 && e.caret().line == 0);
     }
+
+    template<> template<>
+    void alcodeeditor_object::test<45>()
+    {
+        set_test_name("Quick Fix on a misspelled word offers the dictionary's words for it, which the editor puts in itself");
+        ALCodeEditor& e = make("// teh note\ninteger x;\n", "lsl");
+        e.setSpellChecker([](const std::string& word) { return word != "teh"; },
+                          [](const std::string&, std::vector<std::string>& out) {
+                              out.push_back("the");
+                              out.push_back("ten");
+                          });
+        e.setSpellCheck(true);
+        e.setCaret(ALTextPos(1, 3));
+        ensure("elsewhere, nothing to fix", !e.canPerform(ALEditorCommand::QuickFix));
+        e.setCaret(ALTextPos(0, 4));
+        ensure("on it, with no one else to ask", e.canPerform(ALEditorCommand::QuickFix));
+        key('.', MASK_CONTROL);
+        ensure("the list", e.fixesOpen() && e.fixes().size() == 2);
+        ensure_equals("the first word", e.fixes()[0].title, std::string("Change to \"the\""));
+        ensure("its edit, for the preview", e.fixes()[0].edits.size() == 1 && e.fixes()[0].edits[0].second == "the");
+        key(KEY_DOWN);
+        key(KEY_RETURN);
+        ensure_equals("the second put in", e.document().line(0), std::string("// ten note"));
+        ensure("the list gone", !e.fixesOpen());
+    }
 }

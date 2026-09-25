@@ -159,6 +159,8 @@ namespace
             case ALEditorCommand::FindReferences:
             case ALEditorCommand::Find:
             case ALEditorCommand::Replace:
+            case ALEditorCommand::NextMisspelling:
+            case ALEditorCommand::PreviousMisspelling:
             case ALEditorCommand::FindNext:
             case ALEditorCommand::FindPrevious:
             case ALEditorCommand::COUNT:
@@ -1309,6 +1311,61 @@ void ALTextView::recheckSpelling()
     mSpelling.recheck();
 }
 
+std::optional<ALTextRange> ALTextView::misspellingFrom(const ALTextPos& from, bool forward)
+{
+    const S32 lines = mDocument.lineCount();
+    if (!getSpellCheck() || lines == 0)
+    {
+        return std::nullopt;
+    }
+    for (S32 i = 0; i <= lines; ++i)
+    {
+        const S32   line  = ((forward ? from.line + i : from.line - i) % lines + lines) % lines;
+        // The place's own line first, after it or before it; and last, once
+        // round, what is left of it.
+        const bool  own   = i == 0;
+        const bool  again = i == lines;
+        const auto& words = misspellings(line);
+        auto found = [&](const std::pair<S32, S32>& word) {
+            return ALTextRange(ALTextPos(line, word.first), ALTextPos(line, word.second));
+        };
+        if (forward)
+        {
+            for (const auto& word : words)
+            {
+                if ((own && word.first > from.column) || (again && word.first <= from.column) || (!own && !again))
+                {
+                    return found(word);
+                }
+            }
+        }
+        else
+        {
+            for (auto it = words.rbegin(); it != words.rend(); ++it)
+            {
+                if ((own && it->first < from.column) || (again && it->first >= from.column) || (!own && !again))
+                {
+                    return found(*it);
+                }
+            }
+        }
+    }
+    return std::nullopt;
+}
+
+bool ALTextView::goToMisspelling(bool forward)
+{
+    const ALTextRange                selected = selection().normalised();
+    const std::optional<ALTextRange> word     = misspellingFrom(forward ? selected.end : selected.begin, forward);
+    if (!word)
+    {
+        return false;
+    }
+    setSelection(*word);
+    scrollToCaret();
+    return true;
+}
+
 const std::vector<std::pair<S32, S32>>& ALTextView::misspellings(S32 line)
 {
     return mSpelling.misspellings(mDocument, mHighlighter, line, getSpellCheck());
@@ -1971,6 +2028,9 @@ bool ALTextView::perform(ALEditorCommand command)
             return signatureHelp();
         case C::QuickFix:
             return quickFix();
+        case C::NextMisspelling:
+        case C::PreviousMisspelling:
+            return goToMisspelling(command == C::NextMisspelling);
         case C::GoToDefinition:
         case C::FindReferences:
         case C::Rename:
@@ -2021,6 +2081,9 @@ bool ALTextView::canPerform(ALEditorCommand command) const
             return canSymbol(command);
         case C::QuickFix:
             return !mReadOnly && canQuickFix();
+        case C::NextMisspelling:
+        case C::PreviousMisspelling:
+            return getSpellCheck();
         default:
             return !(mReadOnly && editsText(command));
     }

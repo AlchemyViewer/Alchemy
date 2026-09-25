@@ -1211,4 +1211,24 @@ namespace tut
         ensure("the one left slid with the text", v.findMatches().size() == 2 && v.findMatches().front() == ALTextRange(ALTextPos(0, 7), ALTextPos(0, 10)));
         ensure_equals("looked through when wanted", v.findBar()->countSaid(), std::string("2"));
     }
+
+    template<> template<>
+    void altextview_object::test<37>()
+    {
+        set_test_name("F7 and Shift-F7 select the next and the previous misspelled word, round past the ends; not with no spell check");
+        ALTextView& v = make("teh one\nfine\nand teh two");
+        ensure("off: not offered", !v.canPerform(ALEditorCommand::NextMisspelling));
+        v.setSpellChecker([](const std::string& word) { return word != "teh"; });
+        v.setSpellCheck(true);
+        ensure("on: offered", v.canPerform(ALEditorCommand::NextMisspelling) && v.canPerform(ALEditorCommand::PreviousMisspelling));
+        v.setCaret(ALTextPos(0, 2));
+        key(KEY_F7);
+        ensure("the next, selected", v.selection() == ALTextRange(ALTextPos(2, 4), ALTextPos(2, 7)));
+        key(KEY_F7);
+        ensure("round past the end", v.selection() == ALTextRange(ALTextPos(0, 0), ALTextPos(0, 3)));
+        key(KEY_F7, MASK_SHIFT);
+        ensure("back round past the start", v.selection() == ALTextRange(ALTextPos(2, 4), ALTextPos(2, 7)));
+        v.setText("all fine");
+        ensure("none: nothing to go to", !v.perform(ALEditorCommand::NextMisspelling));
+    }
 }

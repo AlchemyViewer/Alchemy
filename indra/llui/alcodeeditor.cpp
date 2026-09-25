@@ -2247,12 +2247,16 @@ void ALCodeEditor::closeFixes()
 bool ALCodeEditor::openFixes(S32 line)
 {
     closeFixes();
-    if (!mFixProvider || isReadOnly() || line < 0 || line >= document().lineCount())
+    if (isReadOnly() || line < 0 || line >= document().lineCount())
     {
         return false;
     }
     std::vector<Fix> fixes;
-    mFixProvider(line, fixes);
+    if (mFixProvider)
+    {
+        mFixProvider(line, fixes);
+    }
+    spellingFixes(line, fixes);
     if (fixes.empty())
     {
         return false;
@@ -2382,6 +2386,21 @@ void ALCodeEditor::takeFix(S32 index)
     const LLSD value   = fixes[index].value;
     const bool nothing = ALFixListModel::isNothing(fixes[index]);
     closeFixes();
+    // The dictionary's, made here: the word at the caret put right, or
+    // taken into it.
+    if (value.isMap() && (value.has("spelling") || value.has("spelling_add")))
+    {
+        refreshSuggestions();
+        if (value.has("spelling"))
+        {
+            replaceWithSuggestion(static_cast<U32>(value["spelling"].asInteger()));
+        }
+        else
+        {
+            addToDictionary();
+        }
+        return;
+    }
     if (mFixHandler && !nothing)
     {
         mFixHandler(value);
@@ -2403,9 +2422,48 @@ bool ALCodeEditor::quickFix()
     return true;
 }
 
+void ALCodeEditor::spellingFixes(S32 line, std::vector<Fix>& fixes)
+{
+    // The misspelled word at the caret, where the list is its line's: the
+    // dictionary's first few words for it, and it taken in.
+    ALTextRange word;
+    if (caret().line != line || !misspelledAt(caret(), &word))
+    {
+        return;
+    }
+    refreshSuggestions();
+    const U32 count = llmin(getSuggestionCount(), U32(5));
+    for (U32 i = 0; i < count; ++i)
+    {
+        Fix fix;
+        fix.title = alSaid("CodeFixSpelling", "Change to \"[WORD]\"", { { "[WORD]", getSuggestion(i) } });
+        fix.edits.emplace_back(word, getSuggestion(i));
+        fix.value = LLSD().with("spelling", static_cast<S32>(i));
+        fixes.push_back(std::move(fix));
+    }
+    if (canAddToDictionary())
+    {
+        Fix fix;
+        fix.title    = alSaid("CodeFixAddWord", "Add \"[WORD]\" to the dictionary", { { "[WORD]", document().text(word) } });
+        fix.refactor = true;
+        fix.value    = LLSD().with("spelling_add", true);
+        fixes.push_back(std::move(fix));
+    }
+}
+
 bool ALCodeEditor::canQuickFix() const
 {
-    if (!mFixHandler || isReadOnly())
+    if (isReadOnly())
+    {
+        return false;
+    }
+    // A misspelling at the caret has the dictionary's words for it; the
+    // check of a line is kept once made, which is why it is not const.
+    if (const_cast<ALCodeEditor*>(this)->misspelledAt(caret()))
+    {
+        return true;
+    }
+    if (!mFixHandler)
     {
         return false;
     }

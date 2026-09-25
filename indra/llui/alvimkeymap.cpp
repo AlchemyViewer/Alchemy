@@ -5300,58 +5300,25 @@ bool ALVimKeymap::misspelling(ALTextView& view, bool forward, S32 count)
         say(said("VimNoSpellCheck", "E756: Spell checking is not enabled"), true);
         return false;
     }
-    const ALTextDocument& d     = view.document();
-    const S32             lines = d.lineCount();
-    ALTextPos             at    = cursor(view);
-    bool                  found = false;
+    // The view's, round past the ends, the count times.
+    std::optional<ALTextRange> word;
+    ALTextPos                  at = cursor(view);
     for (S32 n = 0; n < count; ++n)
     {
-        // Line by line from the caret's, round past the end to its own
-        // again, the part of it not yet looked at last.
-        bool step = false;
-        for (S32 i = 0; i <= lines && !step; ++i)
-        {
-            const S32  line  = ((forward ? at.line + i : at.line - i) % lines + lines) % lines;
-            const bool own   = i == 0;
-            const bool again = i == lines;
-            const auto& words = view.misspellings(line);
-            if (forward)
-            {
-                for (const auto& [begin, end] : words)
-                {
-                    if ((own && begin > at.column) || (again && begin <= at.column) || (!own && !again))
-                    {
-                        at   = ALTextPos(line, begin);
-                        step = true;
-                        break;
-                    }
-                }
-            }
-            else
-            {
-                for (auto it = words.rbegin(); it != words.rend(); ++it)
-                {
-                    if ((own && it->first < at.column) || (again && it->first >= at.column) || (!own && !again))
-                    {
-                        at   = ALTextPos(line, it->first);
-                        step = true;
-                        break;
-                    }
-                }
-            }
-        }
-        if (!step)
+        const std::optional<ALTextRange> next = view.misspellingFrom(at, forward);
+        if (!next)
         {
             break;
         }
-        found = true;
+        word = next;
+        at   = next->begin;
     }
-    if (!found)
+    if (!word)
     {
         say(said("VimNoMisspelling", "No misspelled words"), true);
         return false;
     }
-    moveTo(view, at);
+    moveTo(view, word->begin);
     return true;
 }
 

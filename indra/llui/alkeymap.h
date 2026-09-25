@@ -98,6 +98,8 @@ enum class ALEditorCommand : U8
     FindPrevious,
     // What would put right the problem at the caret, offered as a list.
     QuickFix,
+    NextMisspelling,
+    PreviousMisspelling,
     COUNT
 };
 

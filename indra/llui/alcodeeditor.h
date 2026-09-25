@@ -471,6 +471,9 @@ public:
     // or a double click takes one. False where the line has none.
     bool                    openFixes(S32 line);
     bool                    fixesOpen() const;
+    // The dictionary's words for the misspelling at the caret, where `line`
+    // is the caret's: fixes the editor makes itself when one is taken.
+    void                    spellingFixes(S32 line, std::vector<Fix>& fixes);
     void                    closeFixes();
     const std::vector<Fix>& fixes() const { return mFixListModel.fixes(); }
     // What a fix would make of the lines it touches, and the preview of it
