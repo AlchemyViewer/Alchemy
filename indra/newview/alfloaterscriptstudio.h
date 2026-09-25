@@ -32,6 +32,7 @@
 #include "alscriptsearchpane.h"
 #include "alscriptstudiodoc.h"
 #include "alscriptstudioservices.h"
+#include "alscriptstudiorecovery.h"
 #include "alfindings.h"
 #include "aloutputview.h"
 #include "alscriptanalysis.h"
@@ -94,7 +95,7 @@ class LLViewerObject;
 // with the author's source in a tab beside it. Its regions fold and come
 // out as any studio's do.
 class ALFloaterScriptStudio final : public ALStudioFloater, public ALScriptStudioServices, public ALScriptOutputPane::Window, public ALScriptProblemsPane::Window,
-                                    public ALScriptSearchPane::Window, public ALScriptExplorerPane::Window
+                                    public ALScriptSearchPane::Window, public ALScriptExplorerPane::Window, public ALScriptStudioRecovery::Window
 {
     friend class LLFloaterReg;
 
@@ -483,7 +484,7 @@ private:
     // The caret to the line, or the stretch, asked for before the text had
     // loaded, once it has.
     void goToPending(Doc& doc);
-    void takeCarriedText(Doc& doc);
+    void takeCarriedText(Doc& doc) override;
     // A notecard's items (ALScriptNotecardTab), made for a tab loaded or
     // kept as a notecard, afresh where `fresh`.
     ALScriptNotecardTab& notecardItems(Doc& doc, bool fresh = false);
@@ -802,34 +803,16 @@ private:
     // inventory has it, with the scripter's template in it.
     void newInventoryScript(bool lua);
 
-    // Recovery. The store for this account, made on first asking, and the
-    // session every entry this process writes is under.
-    static ALScriptRecoveryStore* recoveryStore();
-    // A tab's text as an entry of the store.
-    ALScriptRecoveryEntry recoveryEntryOf(const Doc& doc) const;
-    // The tab's unsaved text written now, in the state given; a clean tab's
-    // entry forgotten, and an entry it took up let go of. False where what
-    // is unsaved could not be written.
-    bool keepForRecovery(Doc& doc, ALScriptRecoveryEntry::State state = ALScriptRecoveryEntry::State::Unsaved);
-    // The same as typing goes: the unsaved text handed to the store's own
-    // thread to write, which says at the next pause where it could not.
-    void keepForRecoverySoon(Doc& doc);
-    // What the tab holds unsaved put straight among the discarded, and
-    // this session's entry for it gone once it is. False where it could
-    // not be written, and nothing changed.
-    bool setAside(Doc& doc);
-    // Written a moment after the first change since the last writing,
-    // whatever is typed meanwhile; a tab gone clean forgotten at once.
-    void scheduleRecovery(Doc& doc);
-    // Due writings, a lost connection, and what holds each tab, looked at
-    // a few times a second, whether the window is shown or not.
+    // Due writings of what is unsaved, a lost connection, and what holds
+    // each tab, looked at a few times a second, whether the window is shown
+    // or not.
     void pumpRecovery();
     void checkOrphans();
     Doc::Orphan orphanOf(const Doc& doc) const;
     // What a tab holding a kept text is where its script could not be
     // loaded, by why: one that may not be changed, one that could not be
     // loaded, or one whose item or object is gone or out of sight.
-    Doc::Orphan failedAs(const Doc& doc, ALScriptWorkspace::Loaded::Failure failure) const;
+    Doc::Orphan failedAs(const Doc& doc, ALScriptWorkspace::Loaded::Failure failure) const override;
     // A detached tab's item loaded under it now that it is in reach, what
     // it holds carried over with its history; or loaded again after a load
     // that failed, where a person asks or the next try is due.
@@ -840,27 +823,24 @@ private:
     // script opened from outside -- the inventory, an object -- goes, as a
     // script window used to open over the last one.
     static ALFloaterScriptStudio* lastWorkedIn();
-    // An entry put back: into the tab that has its script or file, opened
-    // where it is not, or into a tab of its own where what it came from
-    // is gone.
-    void recoverEntry(const ALScriptRecoveryEntry& entry);
-    void takeUpEntry(Doc& doc, const ALScriptRecoveryEntry& entry);
-    // A kept text put back with its undo history and its caret, where the
-    // history fits the text; false, and nothing changed, where it does not.
-    bool restoreHistory(Doc& doc, const ALScriptRecoveryEntry& entry);
-    void openOrphan(const ALScriptRecoveryEntry& entry, Doc::Orphan orphan);
+    void openOrphan(const ALScriptRecoveryEntry& entry, Doc::Orphan orphan) override;
     // A tab made to hold a kept text with nothing loaded under it: unsaved,
     // with whatever its script or file was.
-    void becomeOrphan(Doc& doc, const ALScriptRecoveryEntry& entry, Doc::Orphan orphan);
-    // File > Recover Unsaved Changes: what earlier sessions left and what
-    // was discarded lately, to open or to discard.
-    void showRecovery();
+    void becomeOrphan(Doc& doc, const ALScriptRecoveryEntry& entry, Doc::Orphan orphan) override;
+    // What recovery asks of the window (ALScriptStudioRecovery::Window).
+    bool recoverElsewhere(const ALScriptRecoveryEntry& entry) override;
+    Doc* openFileTab(const std::string& path, bool lua) override;
+    bool scriptInHand(const ALScriptRef& ref) const override;
+    void activate(Doc& doc) override;
+    void tabsChanged() override;
+    void pick(std::vector<ALQuickOpen::Candidate> candidates, const std::string& placeholder, const std::string& title,
+              std::function<void(const std::string& value)> chosen, std::function<void(const std::string& value)> dropped) override;
     // What a tab needs from the moment it is made: its text's changes
     // heard, its places slid.
     void wireDoc(Doc& doc);
     // The notice over the editor, for the tab in front, and what its
     // buttons do.
-    void refreshNotice();
+    void refreshNotice() override;
     void onNoticeAction(const std::string& action);
     // What a tab holds saved as a new item in the inventory -- a script or
     // a notecard, its items with it -- and the tab closed once it is.
@@ -1144,6 +1124,8 @@ private:
     // Which lookup across scripts the answers arriving belong to.
     U32                                mLookupGeneration = 0;
     ALScriptExplorerPane*              mExplorerPane  = nullptr;
+    // What is unsaved in the tabs, kept against the viewer going.
+    ALScriptStudioRecovery             mRecovery{ *this, *this };
     LLHandle<LLContextMenu>            mTabMenuHandle;
     bool                               mMain = true;
     // Whose path the bar at the bottom shows, so that a tab come to the

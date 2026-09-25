@@ -635,7 +635,7 @@ void ALFloaterScriptStudio::compiledHere(const ALScriptWorkspace::CompileResult&
     }
     // Saved: nothing of it to keep against a crash any more, or only what
     // was typed while the save was on its way.
-    keepForRecovery(doc);
+    mRecovery.keep(doc);
     if (result.notecard)
     {
         // The asset carries what was sent, and the server can copy it out.

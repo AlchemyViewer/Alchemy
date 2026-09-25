@@ -992,6 +992,7 @@ if(AL_BUILD_VIEWER)
     alscriptsearch.h
     alscriptsearchpane.h
     alscriptstudiodoc.h
+    alscriptstudiorecovery.h
     alscriptstudioservices.h
     alscriptweightspane.h
     alscriptworkspace.h
@@ -2479,6 +2480,17 @@ if(AL_BUILD_TESTS)
     PROJECT ${test_project}
     LIBRARIES llui alscript ${test_libs}
     SOURCES alscriptsearch.cpp alscriptstudiodoc.cpp
+    DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
+  )
+
+  # A Script Studio window's unsaved texts kept in a recovery store of the
+  # test's, and taken up again over tabs of their own editors.
+  al_add_test(
+    alscriptstudiorecovery
+    UNIT
+    PROJECT ${test_project}
+    LIBRARIES llui alscript ${test_libs}
+    SOURCES alscriptnotecardtab.cpp alscriptstudiodoc.cpp
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
 
