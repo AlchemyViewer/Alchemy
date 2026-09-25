@@ -505,8 +505,16 @@ public:
     void       hideFind();
     bool       findShown() const;
     ALFindBar* findBar() { return mFindBar; }
-    const std::vector<ALTextRange>& findMatches() const { return mMatches; }
-    S32                             findCurrent() const { return mMatch; }
+    const std::vector<ALTextRange>& findMatches()
+    {
+        settleFind();
+        return mMatches;
+    }
+    S32 findCurrent()
+    {
+        settleFind();
+        return mMatch;
+    }
     // The next match selected and brought into view, or the one before;
     // round the ends. False with none.
     bool findNext(bool forward);
@@ -757,7 +765,17 @@ private:
     void   drawBars(F32 alpha);
     void drawRows(const LLRect& text);
     void placeFindBar();
+    // The bar's query looked for through the text again: at once, or once
+    // edits stop coming for a moment, the matches sliding with the text
+    // until then; and at once where they are about to be used.
     void refreshFind();
+    void settleFind()
+    {
+        if (mFindStale)
+        {
+            refreshFind();
+        }
+    }
     // The map: the lines it shows, hidden ones left out, and how far its
     // window is scrolled; the line at a y of it; the view scrolled so a
     // y of it is in the middle.
@@ -912,6 +930,8 @@ private:
     ALFindBar*               mFindBar = nullptr;
     std::vector<ALTextRange> mMatches;
     S32                      mMatch = -1;
+    bool                     mFindStale = false;
+    LLFrameTimer             mFindSettle;
     // The selection the bar was told to stay within, while it is.
     bool                     mFindInSelection = false;
     ALTextRange              mFindScope;

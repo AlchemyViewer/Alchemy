@@ -1193,4 +1193,22 @@ namespace tut
         v.handleMiddleMouseDown(x, y, MASK_NONE);
         ensure_equals("not into read-only text", v.text(), std::string("alpha beta\ngamma\n"));
     }
+
+    template<> template<>
+    void altextview_object::test<36>()
+    {
+        set_test_name("an edit slides the find bar's matches, and the text is looked through again only when they are wanted or the typing settles");
+        ALTextView& v = make("one two one\n");
+        key('F', MASK_CONTROL);
+        v.findBar()->setQuery("one");
+        ensure_equals("two", v.findBar()->countSaid(), std::string("2"));
+        v.setCaret(ALTextPos(0, 11));
+        v.insertText(" one");
+        ensure_equals("not looked through at the keystroke", v.findBar()->countSaid(), std::string("2"));
+        v.setSelection(ALTextRange(ALTextPos(0, 0), ALTextPos(0, 2)));
+        v.insertText("x");
+        ensure_equals("one the edit cut through goes at once", v.findBar()->countSaid(), std::string("1"));
+        ensure("the one left slid with the text", v.findMatches().size() == 2 && v.findMatches().front() == ALTextRange(ALTextPos(0, 7), ALTextPos(0, 10)));
+        ensure_equals("looked through when wanted", v.findBar()->countSaid(), std::string("2"));
+    }
 }

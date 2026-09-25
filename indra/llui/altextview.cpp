@@ -1530,6 +1530,24 @@ void ALTextView::onDocumentEdit(const ALTextDocument::Edit& edit)
     {
         mFindScope = edit.stretched(mFindScope);
     }
+    // Its matches slide with the text, those the edit cut through going,
+    // until the text is looked through again.
+    if (!mMatches.empty())
+    {
+        S32 kept    = 0;
+        S32 current = -1;
+        for (S32 i = 0; i < static_cast<S32>(mMatches.size()); ++i)
+        {
+            ALTextRange range = mMatches[i];
+            if (edit.slide(range))
+            {
+                current          = i == mMatch ? kept : current;
+                mMatches[kept++] = range;
+            }
+        }
+        mMatches.resize(kept);
+        mMatch = current;
+    }
 
     // The layers: what is after the edit slides with the text, what it
     // cut through goes.
@@ -1679,7 +1697,12 @@ void ALTextView::afterEdit()
     mChangedSinceFocus = true;
     mBlink.reset();
     scrollToCaret();
-    refreshFind();
+    if (findShown())
+    {
+        mFindStale = true;
+        mFindSettle.reset();
+        mFindBar->setCount(mMatch, static_cast<S32>(mMatches.size()), mFindError);
+    }
     mChanged();
 }
 
@@ -3058,7 +3081,8 @@ void ALTextView::hideFind()
     }
     mFindBar->setVisible(false);
     mMatches.clear();
-    mMatch = -1;
+    mMatch     = -1;
+    mFindStale = false;
     setFocus(true);
 }
 
@@ -3084,6 +3108,7 @@ void ALTextView::placeFindBar()
 
 void ALTextView::refreshFind()
 {
+    mFindStale = false;
     if (!findShown())
     {
         return;
@@ -3121,6 +3146,7 @@ bool ALTextView::findNext(bool forward)
     {
         showFind(false);
     }
+    settleFind();
     if (mMatches.empty())
     {
         return false;
@@ -3144,6 +3170,7 @@ bool ALTextView::replaceMatch()
     {
         return false;
     }
+    settleFind();
     if (mMatch < 0 || mMatch >= static_cast<S32>(mMatches.size()) || mMatches[mMatch] != selection().normalised())
     {
         return findNext(true);
@@ -3158,6 +3185,7 @@ bool ALTextView::replaceMatch()
 
 S32 ALTextView::replaceAllMatches()
 {
+    settleFind();
     if (mReadOnly || !findShown() || mMatches.empty())
     {
         return 0;
@@ -4069,6 +4097,13 @@ void ALTextView::draw()
         {
             dragSelectTo(mDragX, mDragY);
         }
+    }
+    // The find bar's query looked for through the text again once edits
+    // have stopped coming for a moment, not at every keystroke.
+    constexpr F32 FIND_SETTLE = 0.2f;
+    if (mFindStale && mFindSettle.getElapsedTimeF32() >= FIND_SETTLE)
+    {
+        refreshFind();
     }
     syncScrollbar();
     const F32 alpha = getDrawContext().mAlpha;

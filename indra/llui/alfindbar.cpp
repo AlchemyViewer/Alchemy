@@ -358,6 +358,11 @@ void ALFindBar::setReplaceAllowed(bool allowed)
     }
 }
 
+std::string ALFindBar::countSaid() const
+{
+    return mCount->getText();
+}
+
 void ALFindBar::setCount(S32 current, S32 total, const std::string& error)
 {
     std::string said;

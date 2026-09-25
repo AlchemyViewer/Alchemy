@@ -75,6 +75,7 @@ public:
     // What the view found: which one is current, of how many; or what was
     // wrong with the pattern.
     void setCount(S32 current, S32 total, const std::string& error);
+    std::string countSaid() const;
 
     // The colours of the view the bar is over: its glyphs and its count
     // in the view's ink, its background a shade off the view's.
