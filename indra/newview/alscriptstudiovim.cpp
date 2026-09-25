@@ -42,7 +42,8 @@ namespace
     // them by: what command runs and complete offers, one list.
     const char* const VIM_MENU_COMMANDS[] = { "format", "problems", "references", "output", "search", "preferences", "pop_out",
                                               "reveal", "save_all", "revert", "external_editor", "save_file", "save_as", "load_file",
-                                              "open_file", "fold_all", "unfold_all", "go_to_line", "quick_fix", "fix_all", "weights" };
+                                              "open_file", "fold_all", "unfold_all", "go_to_line", "quick_fix", "fix_all", "weights",
+                                              "back",      "forward",  "reference" };
 
     // Whether a command's name is one of vim's, as vim reads its names: any
     // of it from the least it may be shortened to, `least`, to the whole.
@@ -92,6 +93,26 @@ void ALScriptStudioVim::connect(ALVimKeymap& vim)
         if (alive.lock())
         {
             complete(command, typed, out);
+        }
+    };
+    // Its jumps are the window's to go back to, across its tabs; what it
+    // lists goes to the Output tab.
+    vim.hooks().jumped = [this, alive](ALTextView& view, const ALTextPos& from) {
+        if (alive.lock())
+        {
+            if (Doc* doc = docOf(view))
+            {
+                mWindow.jumpedFrom(*doc, view, from);
+            }
+        }
+    };
+    vim.hooks().listing = [this, alive](ALTextView&, const std::string& text) {
+        if (alive.lock())
+        {
+            ALOutputView::Entry entry = listing();
+            entry.text                = text;
+            mWindow.output(entry);
+            mWindow.showOutput();
         }
     };
 }
@@ -263,6 +284,37 @@ bool ALScriptStudioVim::command(ALTextView& view, const std::string& name, const
     {
         return true;
     }
+    if (abbreviates(name, "ta", "tag") || abbreviates(name, "po", "pop"))
+    {
+        // The tag stack is the definitions gone to and the way back: a
+        // name to go to is not taken, the caret's is.
+        if (!args.empty())
+        {
+            fail(view, mServices.words("VimBadArgument"));
+            return true;
+        }
+        mCommands.runIfEnabled(name[0] == 't' ? "go_to_definition" : "back");
+        return true;
+    }
+    if (abbreviates(name, "f", "file"))
+    {
+        // What the tab is, as vim's Ctrl-G says it; a tab is not renamed.
+        if (!args.empty())
+        {
+            fail(view, mServices.words("VimBadArgument"));
+            return true;
+        }
+        const ALTextDocument&      text  = view.document();
+        const S32                  lines = text.lineCount();
+        LLStringUtil::format_map_t words;
+        words["[NAME]"]    = doc->name;
+        const char* state  = !doc->modifiable ? "VimStateReadOnly" : doc->unsaved() ? "VimStateModified" : nullptr;
+        words["[STATE]"]   = state ? mServices.words(state) + " " : std::string();
+        words["[LINES]"]   = std::to_string(lines);
+        words["[PERCENT]"] = std::to_string(lines > 0 ? (view.caret().line + 1) * 100 / lines : 0);
+        say(view, mServices.words("VimFileInfo", words));
+        return true;
+    }
     if (name == "qa" || name == "qall" || name == "qa!" || name == "qall!")
     {
         std::vector<std::string> ids;
@@ -326,9 +378,9 @@ void ALScriptStudioVim::complete(const std::string& command, const std::string& 
     static const char* NAMES[] = { "bNext",   "bdelete",   "bfirst",    "blast",   "bnext",     "bprevious", "brewind",  "buffer",
                                    "buffers", "bunload",   "bwipeout",  "cNext",   "cclose",    "cfirst",    "clast",    "clist",
                                    "close",   "cnext",     "copen",     "cprevious", "crewind", "cwindow",   "edit",     "files",
-                                   "fix",     "fixall",    "history",   "lNext",   "lclose",    "lfirst",    "llast",    "llist",
-                                   "lnext",   "lopen",     "lprevious", "lrewind", "ls",        "lwindow",   "qall",     "quit",
-                                   "read",    "tabNext",   "tabclose",  "tabedit", "tabfirst",  "tablast",   "tabmove",  "tabnew",
+                                   "file",    "fix",       "fixall",    "history", "lNext",     "lclose",    "lfirst",   "llast",   "llist",
+                                   "lnext",   "lopen",     "lprevious", "lrewind", "ls",        "lwindow",   "pop",      "qall",    "quit",
+                                   "read",    "tabNext",   "tabclose",  "tabedit", "tabfirst",  "tablast",   "tabmove",  "tabnew",  "tag",
                                    "tabnext", "tabonly",   "tabprevious", "tabrewind", "update", "wall",     "wq",       "wqall",
                                    "write",   "xall",      "xit" };
     static const char* OPTIONS[] = { "number", "nonumber", "relativenumber", "norelativenumber" };

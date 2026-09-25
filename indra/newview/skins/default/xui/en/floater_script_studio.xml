@@ -227,6 +227,9 @@
     <floater.string name="VimCannotWrite">E212: Can't open file for writing: [FILE]</floater.string>
     <floater.string name="VimWritten">"[FILE]" [LINES]L, [BYTES]B written</floater.string>
     <floater.string name="VimNoErrors">E42: No Errors</floater.string>
+    <floater.string name="VimFileInfo">"[NAME]" [STATE][LINES] lines --[PERCENT]%--</floater.string>
+    <floater.string name="VimStateModified">[Modified]</floater.string>
+    <floater.string name="VimStateReadOnly">[readonly]</floater.string>
     <floater.string name="GoToLinePlaceholder">Line, or line:column</floater.string>
     <floater.string name="GoToLineHint">Type a line number to go to (from 1 to [COUNT]).</floater.string>
     <floater.string name="GoToLineGo">Go to line [LINE].</floater.string>

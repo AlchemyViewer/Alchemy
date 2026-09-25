@@ -126,6 +126,11 @@ namespace
         }
         std::vector<S32> problemNumbers;
         bool             hasProblems = true;
+        void jumpedFrom(Doc& doc, const ALTextView& view, const ALTextPos& from) override
+        {
+            jumps.push_back(doc.id + (&view == doc.expandedEditor ? " expanded " : " ") + std::to_string(from.line));
+        }
+        Names jumps;
 
         al_studio_test::FakeServices*               services = nullptr;
         std::vector<std::string>                    folders;
@@ -202,7 +207,8 @@ namespace tut
             {
                 skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
             }
-            for (const char* name : { "save", "close", "save_all", "format", "quick_fix", "fix_all" })
+            for (const char* name : { "save", "close", "save_all", "format", "quick_fix", "fix_all", "back", "forward", "go_to_definition",
+                                      "reference" })
             {
                 commands.add(name, [this, name]() { ran.push_back(name); });
             }
@@ -727,5 +733,39 @@ namespace tut
         ensure("folded already: left", ran.size() == 2);
         ex(a, "clist");
         ensure(":clist shows it", problemsShown);
+    }
+
+    template<> template<>
+    void alscriptstudiovim_object::test<15>()
+    {
+        set_test_name("vim's jumps are the window's to go back to; Ctrl-O, Ctrl-I, K, :tag and :pop through the table; :file; lists to Output");
+        make();
+        Doc&         a    = tab("a", "one\ntwo\nthree\nfour");
+        ALVimKeymap* said = vimOver(a);
+        a.expandedEditor  = editor("expanded_a", "x\ny");
+
+        said->hooks().jumped(*a.editor, ALTextPos(2, 0));
+        said->hooks().jumped(*a.expandedEditor, ALTextPos(1, 0));
+        ensure("a jump kept where it began, in the view it was in", studio.jumps == Names{ "a 2", "a expanded 1" });
+
+        ensure("Ctrl-O, Ctrl-I, K", said->hooks().command(*a.editor, "back", std::string()) &&
+                                        said->hooks().command(*a.editor, "forward", std::string()) &&
+                                        said->hooks().command(*a.editor, "reference", std::string()));
+        ensure(":tag, :pop", ex(a, "tag") && ex(a, "po"));
+        ensure("each its command", ran == Names{ "back", "forward", "reference", "go_to_definition", "back" });
+        ex(a, "tag", "llSay");
+        ensure_equals("a name to go to is not taken", said->message(), std::string("VimBadArgument"));
+
+        a.editor->setCaret(ALTextPos(1, 0));
+        ex(a, "file");
+        ensure_equals(":file", said->message(), std::string("VimFileInfo [LINES]=4 [NAME]=a [PERCENT]=50 [STATE]="));
+        ensure("not as an error", !said->messageIsError());
+        a.editor->insertText("!");
+        ex(a, "f");
+        ensure_equals("unsaved", said->message(), std::string("VimFileInfo [LINES]=4 [NAME]=a [PERCENT]=50 [STATE]=VimStateModified "));
+
+        said->hooks().listing(*a.editor, "mark line  col file/text");
+        ensure("a listing to Output",
+               studio.entries.size() == 1 && studio.entries[0].text == "mark line  col file/text" && studio.outputShown == 1);
     }
 }

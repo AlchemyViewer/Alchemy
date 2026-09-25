@@ -97,6 +97,9 @@ public:
         // or back from -1, past either end the one at that end; 0 the one
         // at the caret or after it. False where it has none.
         virtual bool goToProblemNumber(Doc& doc, S32 number) = 0;
+        // A place in a tab's source or expansion to come back to with Back,
+        // where a vim jump began.
+        virtual void jumpedFrom(Doc& doc, const ALTextView& view, const ALTextPos& from) = 0;
 
     protected:
         ~Window() = default;

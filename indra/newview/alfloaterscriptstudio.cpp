@@ -1200,6 +1200,11 @@ bool ALFloaterScriptStudio::writeFile(const std::string& path, const std::string
     return ALFileWrite::whole(path, text);
 }
 
+void ALFloaterScriptStudio::jumpedFrom(Doc& doc, const ALTextView& view, const ALTextPos& from)
+{
+    rememberPlace(NavPlace{ doc.id, from, &view == doc.expandedEditor ? Doc::View::Expanded : Doc::View::Source });
+}
+
 std::vector<std::string> ALFloaterScriptStudio::fileFolders(const Doc& doc) const
 {
     std::vector<std::string> folders;

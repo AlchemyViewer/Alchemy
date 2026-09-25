@@ -319,6 +319,7 @@ private:
     bool readFile(const std::string& path, std::string& text) override;
     bool writeFile(const std::string& path, const std::string& text) override;
     std::vector<std::string> fileFolders(const Doc& doc) const override;
+    void jumpedFrom(Doc& doc, const ALTextView& view, const ALTextPos& from) override;
     void pickLine(std::vector<ALQuickOpen::Candidate> candidates, const std::string& placeholder, const std::string& title, S32 rows,
                   std::function<void(const std::string& line)> chosen, std::function<void(const std::string& line)> shifted,
                   std::function<void()> cancelled) override;
