@@ -211,7 +211,6 @@ ALFloaterLightBox::ALFloaterLightBox(const LLSD& key)
     // not wanted here. The buttons are greyed when there is nothing to do.
     mCommitCallbackRegistrar.add("LightBox.Undo", [this](LLUICtrl*, const LLSD&) { applyHistory(false); });
     mCommitCallbackRegistrar.add("LightBox.Redo", [this](LLUICtrl*, const LLSD&) { applyHistory(true); });
-    mCommitCallbackRegistrar.add("LightBox.CommitVec3", std::bind(&ALFloaterLightBox::onCommitVec3, this, std::placeholders::_1));
     mCommitCallbackRegistrar.add("LightBox.CommitToneCurve", std::bind(&ALFloaterLightBox::onCommitToneCurve, this));
     mCommitCallbackRegistrar.add("LightBox.RefreshToneCurve", std::bind(&ALFloaterLightBox::refreshToneCurve, this));
     mCommitCallbackRegistrar.add("LightBox.ResetToneCurveChannel", std::bind(&ALFloaterLightBox::onClickResetToneCurveChannel, this));
@@ -386,35 +385,31 @@ bool ALFloaterLightBox::postBuild()
             });
         }
 
-        // A setting row's reset comes through here, the same as a reset
-        // button's: a named undo step of its own rather than a bare write
-        // that folds into a drag just before it.
-        if (ALSettingRow* row = ALViewType::as<ALSettingRow>(setting.mCtrl))
-        {
-            row->setResetHandler([self, key](ALSettingRow*)
-            {
-                if (ALFloaterLightBox* floater = self.get())
-                {
-                    floater->onClickResetControlDefault(LLSD(key));
-                }
-            });
-        }
     }
 
-    ALLightboxDirectory::collectVec3Controls(this, mVec3Rows);
-    for (const auto& row : mVec3Rows)
+    // A setting row's reset comes through here, the same as a reset
+    // button's: a named undo step of its own rather than a bare write that
+    // folds into a drag just before it. Every row, found by walking rather
+    // than from the directory, which keeps one row per setting: a vector's
+    // parts can be rows of their own.
+    std::function<void(LLView*)> name_resets = [&](LLView* view)
     {
-        const std::string& setting = row.first;
-        LLControlVariable* controlp = gSavedSettings.getControl(setting);
-        if (!controlp)
+        for (LLView* child : *view->getChildList())
         {
-            LL_WARNS() << "Vec3 row bound to unknown setting: " << setting << LL_ENDL;
-            continue;
+            if (ALSettingRow* row = ALViewType::as<ALSettingRow>(child))
+            {
+                row->setResetHandler([self](ALSettingRow* from)
+                {
+                    if (ALFloaterLightBox* floater = self.get())
+                    {
+                        floater->resetRow(from);
+                    }
+                });
+            }
+            name_resets(child);
         }
-        mVec3Connections.emplace_back(controlp->getSignal()->connect(
-            [this, setting](LLControlVariable*, const LLSD&, const LLSD&) { refreshVec3Row(setting); }));
-        refreshVec3Row(setting);
-    }
+    };
+    name_resets(this);
 
     setupToneCurve();
     setupSplitToneGraph();
@@ -612,6 +607,24 @@ void ALFloaterLightBox::onClickResetControlDefault(const LLSD& userdata)
         ScopedHistoryGroup group(mHistory, getString("history_reset_setting", args));
         controlp->resetToDefault(true);
     }
+}
+
+void ALFloaterLightBox::resetRow(ALSettingRow* row)
+{
+    LLControlVariable* controlp = row->getControlVariable();
+    if (!controlp)
+    {
+        return;
+    }
+    // Named as a reset button's is, for the setting; a row the directory
+    // does not name the setting by -- a vector's second part -- by its own
+    // label. The row resets what it shows: the whole setting, or its part.
+    const std::string                   key     = controlp->getName();
+    const ALLightboxDirectory::Setting* setting = mDirectory.setting(key);
+    LLStringUtil::format_map_t          args;
+    args["[SETTING]"] = (setting && setting->mCtrl == row) || row->getLabel().empty() ? mDirectory.captionFor(key) : row->getLabel();
+    ScopedHistoryGroup group(mHistory, getString("history_reset_setting", args));
+    row->resetToDefault();
 }
 
 void ALFloaterLightBox::onClickResetSection(const LLSD& userdata)
@@ -1733,38 +1746,6 @@ bool ALFloaterLightBox::handleKeyHere(KEY key, MASK mask)
     return ALStudioFloater::handleKeyHere(key, mask);
 }
 
-void ALFloaterLightBox::onCommitVec3(LLUICtrl* ctrl)
-{
-    if (mVec3Updating || !ctrl)
-    {
-        return;
-    }
-
-    std::string setting;
-    S32 component = 0;
-    if (!ALLightboxDirectory::parseVec3Name(ctrl->getName(), setting, component))
-    {
-        return;
-    }
-
-    LLControlVariable* controlp = gSavedSettings.getControl(setting);
-    if (!controlp)
-    {
-        return;
-    }
-
-    // Rebuild the full component array so a single spinner commit writes back
-    // one component without disturbing the others; works for VEC3 and COL3.
-    const LLSD current = controlp->getValue();
-    LLSD updated = LLSD::emptyArray();
-    for (S32 i = 0; i < 3; ++i)
-    {
-        updated.append(LLSD::Real(current[i].asReal()));
-    }
-    updated[component] = LLSD::Real(ctrl->getValue().asReal());
-    controlp->set(updated);
-}
-
 namespace
 {
 // The four curve settings are loaded fresh on every refresh and commit rather
@@ -2439,22 +2420,3 @@ void ALFloaterLightBox::refreshBloomSections()
     }
 }
 
-void ALFloaterLightBox::refreshVec3Row(const std::string& setting_name)
-{
-    auto row = mVec3Rows.find(setting_name);
-    LLControlVariable* controlp = gSavedSettings.getControl(setting_name);
-    if (row == mVec3Rows.end() || !controlp)
-    {
-        return;
-    }
-
-    const LLSD value = controlp->getValue();
-    ScopedTrue updating(mVec3Updating);
-    for (S32 i = 0; i < 3; ++i)
-    {
-        if (LLUICtrl* ctrlp = row->second[i])
-        {
-            ctrlp->setValue(value[i].asReal());
-        }
-    }
-}

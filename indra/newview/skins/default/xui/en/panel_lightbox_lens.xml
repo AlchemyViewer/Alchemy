@@ -1393,166 +1393,40 @@ wired.)
 				 tool_tip="Blend between luminance extraction (0) and warmth extraction (1)"
 				 disabled_control="RenderHDREnabled"
 				 control_name="RenderGlowWarmthAmount" />
-				<text
-				 follows="left|top"
+				<setting_row
+				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="10"
-				 width="110"
-				 height="15"
-				 name="glow_lum_weights_label"
+				 top_pad="9"
+				 right="-8"
+				 height="18"
+				 label="Lum weights"
+				 label_width="110"
+				 components="R G B"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0"
+				 max_val="1"
+				 name="glow_lum_weights"
 				 tool_tip="Per-channel weights for luminance extraction (should sum to 1)"
-				 value="Lum weights" />
-				<spinner
-				 follows="left|top"
-				 layout="topleft"
-				 left_delta="110"
-				 top_pad="-16"
-				 width="68"
-				 height="18"
-				 label="R"
-				 label_width="10"
-				 scrub="true"
-				 decimal_digits="2"
-				 increment="0.01"
-				 min_val="0"
-				 max_val="1"
-				 name="vec3_RenderGlowLumWeights_0">
-					<spinner.commit_callback
-					 function="LightBox.CommitVec3" />
-				</spinner>
-				<spinner
-				 follows="left|top"
-				 layout="topleft"
-				 left_delta="72"
-				 top_delta="0"
-				 width="68"
-				 height="18"
-				 label="G"
-				 label_width="10"
-				 scrub="true"
-				 decimal_digits="2"
-				 increment="0.01"
-				 min_val="0"
-				 max_val="1"
-				 name="vec3_RenderGlowLumWeights_1">
-					<spinner.commit_callback
-					 function="LightBox.CommitVec3" />
-				</spinner>
-				<spinner
-				 follows="left|top"
-				 layout="topleft"
-				 left_delta="72"
-				 top_delta="0"
-				 width="68"
-				 height="18"
-				 label="B"
-				 label_width="10"
-				 scrub="true"
-				 decimal_digits="2"
-				 increment="0.01"
-				 min_val="0"
-				 max_val="1"
-				 name="vec3_RenderGlowLumWeights_2">
-					<spinner.commit_callback
-					 function="LightBox.CommitVec3" />
-				</spinner>
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_delta="0"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="glow_lum_weights_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderGlowLumWeights" />
-				</button>
-				<text
-				 follows="left|top"
+				 control_name="RenderGlowLumWeights" />
+				<setting_row
+				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="10"
-				 width="110"
-				 height="15"
-				 name="glow_warmth_weights_label"
-				 tool_tip="Per-channel weights used before taking the max warmth"
-				 value="Warmth weights" />
-				<spinner
-				 follows="left|top"
-				 layout="topleft"
-				 left_delta="110"
-				 top_pad="-16"
-				 width="68"
-				 height="18"
-				 label="R"
-				 label_width="10"
-				 scrub="true"
-				 decimal_digits="2"
-				 increment="0.01"
-				 min_val="0"
-				 max_val="2"
-				 name="vec3_RenderGlowWarmthWeights_0">
-					<spinner.commit_callback
-					 function="LightBox.CommitVec3" />
-				</spinner>
-				<spinner
-				 follows="left|top"
-				 layout="topleft"
-				 left_delta="72"
-				 top_delta="0"
-				 width="68"
-				 height="18"
-				 label="G"
-				 label_width="10"
-				 scrub="true"
-				 decimal_digits="2"
-				 increment="0.01"
-				 min_val="0"
-				 max_val="2"
-				 name="vec3_RenderGlowWarmthWeights_1">
-					<spinner.commit_callback
-					 function="LightBox.CommitVec3" />
-				</spinner>
-				<spinner
-				 follows="left|top"
-				 layout="topleft"
-				 left_delta="72"
-				 top_delta="0"
-				 width="68"
-				 height="18"
-				 label="B"
-				 label_width="10"
-				 scrub="true"
-				 decimal_digits="2"
-				 increment="0.01"
-				 min_val="0"
-				 max_val="2"
-				 name="vec3_RenderGlowWarmthWeights_2">
-					<spinner.commit_callback
-					 function="LightBox.CommitVec3" />
-				</spinner>
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
+				 top_pad="9"
 				 right="-8"
-				 top_delta="0"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="glow_warmth_weights_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderGlowWarmthWeights" />
-				</button>
+				 height="18"
+				 label="Warmth weights"
+				 label_width="110"
+				 components="R G B"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0"
+				 max_val="2"
+				 name="glow_warmth_weights"
+				 tool_tip="Per-channel weights used before taking the max warmth"
+				 control_name="RenderGlowWarmthWeights" />
 				<check_box
 				 follows="left|top"
 				 layout="topleft"
@@ -2684,130 +2558,41 @@ wired.)
 					 function="LightBox.ResetControlDefault"
 					 parameter="RenderLensDistortionFit" />
 				</button>
-				<text
-				 follows="left|top"
+				<setting_row
+				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="10"
-				 width="110"
-				 height="15"
-				 name="distortion_center_label"
+				 top_pad="9"
+				 right="-8"
+				 height="18"
+				 label="Center"
+				 label_width="110"
+				 components="X Y"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="-0.5"
+				 max_val="0.5"
+				 name="distortion_center"
 				 tool_tip="Offset of the optical axis from the frame center"
-				 value="Center" />
-				<spinner
-				 follows="left|top"
-				 layout="topleft"
-				 left_delta="110"
-				 top_pad="-16"
-				 width="68"
-				 height="18"
-				 label="X"
-				 label_width="10"
-				 scrub="true"
-				 decimal_digits="2"
-				 increment="0.01"
-				 min_val="-0.5"
-				 max_val="0.5"
-				 name="vec3_RenderLensDistortionCenter_0">
-					<spinner.commit_callback
-					 function="LightBox.CommitVec3" />
-				</spinner>
-				<spinner
-				 follows="left|top"
-				 layout="topleft"
-				 left_delta="72"
-				 top_delta="0"
-				 width="68"
-				 height="18"
-				 label="Y"
-				 label_width="10"
-				 scrub="true"
-				 decimal_digits="2"
-				 increment="0.01"
-				 min_val="-0.5"
-				 max_val="0.5"
-				 name="vec3_RenderLensDistortionCenter_1">
-					<spinner.commit_callback
-					 function="LightBox.CommitVec3" />
-				</spinner>
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_delta="0"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="distortion_center_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderLensDistortionCenter" />
-				</button>
-				<text
-				 follows="left|top"
+				 control_name="RenderLensDistortionCenter" />
+				<setting_row
+				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="10"
-				 width="110"
-				 height="15"
-				 name="distortion_tangential_label"
-				 tool_tip="Decentering terms p1 and p2, modelling a lens element mounted slightly off-axis. Realistic values are tiny."
-				 value="Tangential" />
-				<spinner
-				 follows="left|top"
-				 layout="topleft"
-				 left_delta="110"
-				 top_pad="-16"
-				 width="68"
-				 height="18"
-				 label="P1"
-				 label_width="18"
-				 scrub="true"
-				 decimal_digits="3"
-				 increment="0.001"
-				 min_val="-0.05"
-				 max_val="0.05"
-				 name="vec3_RenderLensDistortionTangential_0">
-					<spinner.commit_callback
-					 function="LightBox.CommitVec3" />
-				</spinner>
-				<spinner
-				 follows="left|top"
-				 layout="topleft"
-				 left_delta="72"
-				 top_delta="0"
-				 width="68"
-				 height="18"
-				 label="P2"
-				 label_width="18"
-				 scrub="true"
-				 decimal_digits="3"
-				 increment="0.001"
-				 min_val="-0.05"
-				 max_val="0.05"
-				 name="vec3_RenderLensDistortionTangential_1">
-					<spinner.commit_callback
-					 function="LightBox.CommitVec3" />
-				</spinner>
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
+				 top_pad="9"
 				 right="-8"
-				 top_delta="0"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="distortion_tangential_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderLensDistortionTangential" />
-				</button>
+				 height="18"
+				 label="Tangential"
+				 label_width="110"
+				 components="P1 P2"
+				 letter_width="18"
+				 decimal_digits="3"
+				 increment="0.001"
+				 min_val="-0.05"
+				 max_val="0.05"
+				 name="distortion_tangential"
+				 tool_tip="Decentering terms p1 and p2, modelling a lens element mounted slightly off-axis. Realistic values are tiny."
+				 control_name="RenderLensDistortionTangential" />
 				<button
 				 follows="top|right"
 				 layout="topleft"
@@ -3042,86 +2827,23 @@ wired.)
 					 function="LightBox.ResetControlDefault"
 					 parameter="RenderVignetteMidColor" />
 				</button>
-				<text
-				 follows="left|top"
+				<setting_row
+				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
-				 top_pad="10"
-				 width="110"
-				 height="15"
-				 name="vignette_center_label"
-				 tool_tip="Offset of the vignette center (X and Y; the third value is unused)"
-				 value="Center" />
-				<spinner
-				 follows="left|top"
-				 layout="topleft"
-				 left_delta="110"
-				 top_pad="-16"
-				 width="68"
-				 height="18"
-				 label="X"
-				 label_width="10"
-				 scrub="true"
-				 decimal_digits="2"
-				 increment="0.01"
-				 min_val="-0.5"
-				 max_val="0.5"
-				 name="vec3_RenderVignetteCenter_0">
-					<spinner.commit_callback
-					 function="LightBox.CommitVec3" />
-				</spinner>
-				<spinner
-				 follows="left|top"
-				 layout="topleft"
-				 left_delta="72"
-				 top_delta="0"
-				 width="68"
-				 height="18"
-				 label="Y"
-				 label_width="10"
-				 scrub="true"
-				 decimal_digits="2"
-				 increment="0.01"
-				 min_val="-0.5"
-				 max_val="0.5"
-				 name="vec3_RenderVignetteCenter_1">
-					<spinner.commit_callback
-					 function="LightBox.CommitVec3" />
-				</spinner>
-				<spinner
-				 follows="left|top"
-				 layout="topleft"
-				 left_delta="72"
-				 top_delta="0"
-				 width="68"
-				 height="18"
-				 label="Z"
-				 label_width="10"
-				 scrub="true"
-				 decimal_digits="2"
-				 increment="0.01"
-				 min_val="-0.5"
-				 max_val="0.5"
-				 name="vec3_RenderVignetteCenter_2">
-					<spinner.commit_callback
-					 function="LightBox.CommitVec3" />
-				</spinner>
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
+				 top_pad="9"
 				 right="-8"
-				 top_delta="0"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="vignette_center_rst"
-				 tool_tip="Reset to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderVignetteCenter" />
-				</button>
+				 height="18"
+				 label="Center"
+				 label_width="110"
+				 components="X Y Z"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="-0.5"
+				 max_val="0.5"
+				 name="vignette_center"
+				 tool_tip="Offset of the vignette center (X and Y; the third value is unused)"
+				 control_name="RenderVignetteCenter" />
 				<check_box
 				 follows="left|top"
 				 layout="topleft"

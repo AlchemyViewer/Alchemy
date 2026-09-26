@@ -140,7 +140,7 @@ LLTextBox* ownLabelOf(LLUICtrl* ctrl)
 }
 
 /// The text to the control's left on the same line, which is how a row
-/// captions a dropdown, a colour or a vector: the one nearest the control
+/// captions a dropdown or a colour: the one nearest the control
 /// whose height takes in the control's middle.
 LLTextBox* labelToLeftOf(LLUICtrl* ctrl)
 {
@@ -177,50 +177,6 @@ LLTextBox* labelToLeftOf(LLUICtrl* ctrl)
 } // namespace
 
 // static
-bool ALLightboxDirectory::parseVec3Name(const std::string& name, std::string& setting, S32& component)
-{
-    static const std::string prefix = "vec3_";
-    if (name.size() <= prefix.size() || name.compare(0, prefix.size(), prefix) != 0)
-    {
-        return false;
-    }
-    size_t sep = name.rfind('_');
-    if (sep <= prefix.size() || sep + 2 != name.size())
-    {
-        return false;
-    }
-    S32 comp = name[sep + 1] - '0';
-    if (comp < 0 || comp > 2)
-    {
-        return false;
-    }
-    setting = name.substr(prefix.size(), sep - prefix.size());
-    component = comp;
-    return true;
-}
-
-// Descending into composites is safe because their internal children are
-// named for their role ("Slider", "value") and cannot parse as
-// vec3_<Setting>_<n>.
-// static
-void ALLightboxDirectory::collectVec3Controls(LLView* view, std::map<std::string, std::array<LLUICtrl*, 3>>& rows)
-{
-    for (LLView* child : *view->getChildList())
-    {
-        if (LLUICtrl* ctrl = ALViewType::as<LLUICtrl>(child))
-        {
-            std::string setting;
-            S32 component = 0;
-            if (parseVec3Name(ctrl->getName(), setting, component))
-            {
-                rows[setting][component] = ctrl;
-            }
-        }
-        collectVec3Controls(child, rows);
-    }
-}
-
-// static
 void ALLightboxDirectory::collectBoundKeys(LLView* view, std::set<std::string>& keys)
 {
     for (LLView* child : *view->getChildList())
@@ -235,12 +191,6 @@ void ALLightboxDirectory::collectBoundKeys(LLView* view, std::set<std::string>& 
                 {
                     keys.insert(control->getName());
                 }
-            }
-            std::string setting;
-            S32 component = 0;
-            if (parseVec3Name(ctrl->getName(), setting, component))
-            {
-                keys.insert(setting);
             }
             // A graph that edits settings not bound through control_name (an
             // LLSD point list cannot be) names them in XUI; enrol those too.
@@ -346,7 +296,7 @@ void ALLightboxDirectory::addGraphSettings(LLView* view, size_t section)
                 {
                     // A graph has no caption for any one of the settings it
                     // draws, and the text beside it is not about them.
-                    addSetting(key, graph, section, false, readableKey(key));
+                    addSetting(key, graph, section, readableKey(key));
                 }
             }
         }
@@ -373,22 +323,15 @@ void ALLightboxDirectory::addSettings(LLView* view, size_t section)
                     {
                         whole = check;
                     }
-                    addSetting(control->getName(), whole, section, false);
+                    addSetting(control->getName(), whole, section);
                 }
-            }
-            std::string setting;
-            S32 component = 0;
-            if (parseVec3Name(ctrl->getName(), setting, component))
-            {
-                addSetting(setting, ctrl, section, true);
             }
         }
         addSettings(child, section);
     });
 }
 
-void ALLightboxDirectory::addSetting(const std::string& key, LLUICtrl* ctrl, size_t section, bool vector_row,
-                                     const std::string& caption)
+void ALLightboxDirectory::addSetting(const std::string& key, LLUICtrl* ctrl, size_t section, const std::string& caption)
 {
     if (mSettingIndex.count(key))
     {
@@ -408,20 +351,19 @@ void ALLightboxDirectory::addSetting(const std::string& key, LLUICtrl* ctrl, siz
         return;
     }
 
-    // A vector row's spinners carry a channel letter each, which is no name
-    // for the setting; the row's caption is the text to their left.
     LLTextBox* box = nullptr;
     if (ALSettingRow* row = ALViewType::as<ALSettingRow>(ctrl))
     {
         // A setting row says its own name; its label is inside the slider it
-        // holds, a level below where a control's own label is looked for.
+        // holds, or a vector's caption beside its boxes -- a level below
+        // where a control's own label is looked for.
         // (This is also the viewer's reference to ALSettingRow, which is what
         // links the widget -- and its registrar -- in from llui: a static
         // library leaves out an object file nothing refers to, and the tag
         // would then build nothing. Keep a reference if this goes.)
         box = row->getLabelBox();
     }
-    else if (!vector_row)
+    else
     {
         box = ownLabelOf(ctrl);
     }

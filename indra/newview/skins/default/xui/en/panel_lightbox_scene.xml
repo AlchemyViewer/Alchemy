@@ -1101,81 +1101,40 @@ buffer reallocation, and a shader rebuild); it stays a prefs-level switch.
 				 tool_tip="Strength falloff factor for occlusion"
 				 enabled_control="RenderDeferredSSAO"
 				 control_name="RenderSSAOFactor" />
-				<text
-				 follows="left|top"
-				 layout="topleft"
-				 left="8"
-				 top_pad="10"
-				 width="140"
-				 height="15"
-				 name="ssao_effect_value_label"
-				 value="Occluded value" />
-				<!-- No scrub="true" on these two, unlike the labelled vector
-				     spinners on the Look and Lens tabs. Scrubbing drags a
-				     spinner's label, and these have none (the caption is the text
-				     beside them), so it would move onto the arrow buttons instead
-				     and cost them their hold-to-repeat. -->
-				<spinner
-				 follows="left|top"
-				 layout="topleft"
-				 left_delta="140"
-				 top_pad="-16"
-				 width="80"
-				 height="18"
-				 label_width="0"
-				 decimal_digits="2"
-				 increment="0.01"
-				 min_val="0"
-				 max_val="2"
-				 name="vec3_RenderSSAOEffect_0"
-				 tool_tip="Brightness (HSV value) multiplier for fully occluded areas; partial occlusion blends toward the original color"
-				 enabled_control="RenderDeferredSSAO">
-					<spinner.commit_callback
-					 function="LightBox.CommitVec3" />
-				</spinner>
-				<button
-				 follows="top|right"
-				 layout="topleft"
-				 height="18"
-				 width="18"
-				 right="-8"
-				 top_pad="-18"
-				 scale_image="true"
-				 image_overlay="Refresh_Off"
-				 image_overlay_alignment="center"
-				 name="ssao_effect_rst"
-				 tool_tip="Reset the occlusion effect (both components) to default">
-					<button.commit_callback
-					 function="LightBox.ResetControlDefault"
-					 parameter="RenderSSAOEffect" />
-				</button>
-				<text
-				 follows="left|top"
+				<setting_row
+				 follows="left|top|right"
 				 layout="topleft"
 				 left="8"
 				 top_pad="9"
-				 width="140"
-				 height="15"
-				 name="ssao_effect_sat_label"
-				 value="Occluded saturation" />
-				<spinner
-				 follows="left|top"
-				 layout="topleft"
-				 left_delta="140"
-				 top_pad="-16"
-				 width="80"
+				 right="-8"
 				 height="18"
-				 label_width="0"
+				 label="Occluded value"
+				 part="0"
 				 decimal_digits="2"
 				 increment="0.01"
 				 min_val="0"
 				 max_val="2"
-				 name="vec3_RenderSSAOEffect_1"
+				 name="ssao_effect_value"
+				 tool_tip="Brightness (HSV value) multiplier for fully occluded areas; partial occlusion blends toward the original color"
+				 enabled_control="RenderDeferredSSAO"
+				 control_name="RenderSSAOEffect" />
+				<setting_row
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
+				 label="Occluded saturation"
+				 part="1"
+				 decimal_digits="2"
+				 increment="0.01"
+				 min_val="0"
+				 max_val="2"
+				 name="ssao_effect_saturation"
 				 tool_tip="Saturation multiplier for fully occluded areas; partial occlusion blends toward the original color"
-				 enabled_control="RenderDeferredSSAO">
-					<spinner.commit_callback
-					 function="LightBox.CommitVec3" />
-				</spinner>
+				 enabled_control="RenderDeferredSSAO"
+				 control_name="RenderSSAOEffect" />
 				<button
 				 follows="top|right"
 				 layout="topleft"

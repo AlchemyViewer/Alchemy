@@ -27,7 +27,6 @@
 
 #include "stdtypes.h"
 
-#include <array>
 #include <functional>
 #include <map>
 #include <set>
@@ -57,8 +56,8 @@ class LLView;
  * @par Captions
  * A setting's caption is what its row calls it, read the way a person reads
  * the row: the control's own label if it has one ("Strength" on a slider, the
- * text beside a checkbox), else the text to its left on the same line (a
- * dropdown, a colour, a vector row), else -- for a switch on a section header
+ * text beside a checkbox, a setting row's caption), else the text to its left
+ * on the same line (a dropdown, a colour), else -- for a switch on a section header
  * -- the section's title, else the key made into words. Finding a setting by
  * name and naming an undo step both read it from here.
  */
@@ -115,17 +114,8 @@ public:
     /// The section a setting's row is in, or null for one no row shows.
     const Section* sectionOf(std::string_view key) const;
 
-    /// The widget naming contract of the vector rows, "vec3_<Setting>_<0|1|2>".
-    /// Setting names never contain '_', so the parse is unambiguous.
-    static bool parseVec3Name(const std::string& name, std::string& setting, S32& component);
-
-    /// Every widget under @a view that follows the vector naming contract,
-    /// by setting and component. Any LLUICtrl will do; the name is the whole
-    /// contract.
-    static void collectVec3Controls(LLView* view, std::map<std::string, std::array<LLUICtrl*, 3>>& rows);
-
-    /// The gSavedSettings keys bound anywhere under @a view, plus the settings
-    /// its vector rows name: what a section's Reset All resets.
+    /// The gSavedSettings keys bound anywhere under @a view, and the settings
+    /// its graphs edit: what a section's Reset All resets.
     static void collectBoundKeys(LLView* view, std::set<std::string>& keys);
 
 private:
@@ -137,8 +127,7 @@ private:
     void addGraphSettings(LLView* view, size_t section);
     /// @a caption, where one is given, is the setting's name as it stands;
     /// left empty, the name is read off the control's label or the text beside it.
-    void addSetting(const std::string& key, LLUICtrl* ctrl, size_t section, bool vector_row,
-                    const std::string& caption = std::string());
+    void addSetting(const std::string& key, LLUICtrl* ctrl, size_t section, const std::string& caption = std::string());
 
     std::vector<Section> mSections;
     std::vector<Setting> mSettings;
