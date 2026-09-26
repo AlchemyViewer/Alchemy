@@ -326,4 +326,28 @@ namespace tut
         popoverOpen()->escape();
         field->die();
     }
+
+    template<> template<>
+    void alfontfield_object::test<8>()
+    {
+        set_test_name("the sizes said in points as well as by name; chosen by name; a size a zoom made is not offered");
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        LLFontGL::getFontAtPoints("SansSerif", 23.f, LLFontGL::NORMAL);
+        ALFontField* field = make();
+        field->handleMouseDown(4, 10, MASK_NONE);
+        ALPopover*  popover = popoverOpen();
+        LLComboBox* sizes   = popover ? popover->findChild<LLComboBox>("size", true) : nullptr;
+        ensure("the sizes", sizes != nullptr);
+        sizes->setValue("Large");
+        const F32 large = LLFontGL::pointsOf("SansSerif", "Large");
+        ensure("fonts.xml gives Large", large > 0.f);
+        ensure_equals("said in points", sizes->getSelectedItemLabel(), "Large" + llformat(" (%g pt)", large));
+        ensure_equals("chosen by name", sizes->getValue().asString(), std::string("Large"));
+        ensure("the zoom's size not among them", !sizes->selectByValue(LLSD("23.0pt")));
+        popover->escape();
+        field->die();
+    }
 }

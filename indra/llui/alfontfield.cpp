@@ -77,6 +77,14 @@ namespace
         return out.empty() ? "NORMAL" : out;
     }
 
+    // A size name as a person reads it: with the points it is for the
+    // family, where fonts.xml gives them -- "Medium (10 pt)".
+    std::string sizeLabel(const std::string& name, const std::string& size)
+    {
+        const F32 points = LLFontGL::pointsOf(name.empty() ? "SansSerif" : name, size);
+        return points > 0.f ? size + llformat(" (%g pt)", points) : size;
+    }
+
     const LLFontGL* fontOf(const std::string& name, const std::string& size, const std::string& style)
     {
         const LLFontDescriptor desc(name.empty() ? "SansSerif" : name, size,
@@ -197,7 +205,7 @@ namespace
             mSizes->add(LLStringUtil::null);
             for (const std::string& size_name : LLFontGL::getDeclaredSizeNames())
             {
-                mSizes->add(size_name);
+                mSizes->add(sizeLabel(mName, size_name), LLSD(size_name));
             }
             if (!mSize.empty())
             {
@@ -410,7 +418,7 @@ std::string ALFontField::describe() const
     }
     if (!mSize.empty())
     {
-        said += " " + mSize;
+        said += " " + sizeLabel(mName, mSize);
     }
     if (!mStyle.empty())
     {
