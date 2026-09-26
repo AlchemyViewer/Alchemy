@@ -473,4 +473,37 @@ namespace tut
         ensure_equals("the same end", undone->front().mAfter.asReal(), shown.front().mAfter.asReal());
         ensure_equals("and the cursor says it is no longer in force", mHistory.cursor(), (size_t)1);
     }
+
+    // The stack shown oldest first through its steps forward too, however
+    // many; and a group closing is a change to what it shows, since it
+    // trims its step, where one closing inside it is not.
+    template<> template<>
+    void history_object::test<23>()
+    {
+        for (const char* name : { "one", "two", "three" })
+        {
+            mHistory.beginGroup(name);
+            mHistory.record(name, LLSD(0.0), LLSD(1.0), 1.f);
+            mHistory.endGroup();
+        }
+        mHistory.undo();
+        mHistory.undo();
+        ensure_equals("in force", mHistory.labelOf(0), std::string("one"));
+        ensure_equals("the next redo", mHistory.labelOf(1), std::string("two"));
+        ensure_equals("the last redo", mHistory.labelOf(2), std::string("three"));
+        ensure_equals("its changes", mHistory.at(2).front().mName, std::string("three"));
+
+        mHistory.clear();
+        mHistory.beginGroup("outer");
+        mHistory.beginGroup("inner");
+        mHistory.record("A", LLSD(0.0), LLSD(1.0), 1.f);
+        const U32 recorded = mHistory.revision();
+        mHistory.endGroup();
+        ensure_equals("an inner group closing is not a change", mHistory.revision(), recorded);
+        mHistory.endGroup();
+        ensure("the outermost closing is", mHistory.revision() != recorded);
+        const U32 closed = mHistory.revision();
+        mHistory.endGroup();
+        ensure_equals("nor is an end with no group open", mHistory.revision(), closed);
+    }
 }

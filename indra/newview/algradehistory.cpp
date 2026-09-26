@@ -30,19 +30,48 @@
 
 #include <algorithm>
 
-bool ALGradeHistory::canCoalesce(const std::string& name, F32 now) const
+namespace
 {
-    // Only ever into the newest step, and only when that step is a lone write
-    // to this same control. A transaction that already covers two controls was
-    // a deliberate group, and swallowing a stray write into it would make the
-    // group mean something its author did not intend.
-    return mHaveLast
-        && mGroupDepth == 0
-        && mCursor == mStack.size()
-        && !mStack.empty()
-        && mStack.back().mChanges.size() == 1
-        && mLastName == name
-        && (now - mLastTime) <= COALESCE_SECONDS;
+    using Change      = ALGradeHistory::Change;
+    using Transaction = ALGradeHistory::Transaction;
+
+    // A write joined to a step: to the control's own change where the step
+    // has one -- a drag still moving, or a control written twice in a group
+    // -- so that a step holds one before and one after per control; else a
+    // change of its own.
+    template <typename Step>
+    void join(Step& step, Step&& next)
+    {
+        for (Change& change : next.mChanges)
+        {
+            auto existing = std::find_if(step.mChanges.begin(), step.mChanges.end(),
+                                         [&change](const Change& c) { return c.mName == change.mName; });
+            if (existing != step.mChanges.end())
+            {
+                existing->mAfter = std::move(change.mAfter);
+            }
+            else
+            {
+                step.mChanges.push_back(std::move(change));
+            }
+        }
+    }
+
+    bool unchanged(const Change& change)
+    {
+        return llsd_equals(change.mBefore, change.mAfter);
+    }
+}
+
+const ALGradeHistory::Step& ALGradeHistory::stepAt(size_t index) const
+{
+    const std::vector<Step>& back = mSteps.undone();
+    if (index < back.size())
+    {
+        return back[index];
+    }
+    const std::vector<Step>& forward = mSteps.redone();
+    return forward[forward.size() - 1 - (index - back.size())];
 }
 
 void ALGradeHistory::record(const std::string& name, const LLSD& before, const LLSD& after, F32 now)
@@ -57,168 +86,66 @@ void ALGradeHistory::record(const std::string& name, const LLSD& before, const L
 
     ++mRevision;
 
-    // Anything recorded invalidates the redo tail: the future that was undone
-    // is no longer reachable from here.
-    if (mCursor < mStack.size())
-    {
-        mStack.resize(mCursor);
-    }
-
-    if (mGroupDepth > 0)
-    {
-        // Inside a group. Extend the group's transaction, unless this control
-        // is already in it -- in which case only the destination moves, so the
-        // group still describes one before and one after per control.
-        //
-        // MAX_DEPTH is deliberately not enforced here: evicting the front
-        // would shift mGroupIndex out from under the group. endGroup does it,
-        // once the index is dead.
-        if (mGroupIndex >= mStack.size())
-        {
-            mStack.push_back(Step{ {}, mGroupLabel });
-            mGroupIndex = mStack.size() - 1;
-        }
-
-        Transaction& group = mStack[mGroupIndex].mChanges;
-        auto existing = std::find_if(group.begin(), group.end(),
-                                     [&name](const Change& c) { return c.mName == name; });
-        if (existing != group.end())
-        {
-            existing->mAfter = after;
-        }
-        else
-        {
-            group.push_back({ name, before, after });
-        }
-
-        mCursor    = mStack.size();
-        mHaveLast  = false;
-        return;
-    }
-
-    if (canCoalesce(name, now))
-    {
-        // Same control, still moving: keep the value it started from and let
-        // the destination follow. One drag stays one step.
-        Change& moving = mStack.back().mChanges.front();
-        moving.mAfter = after;
-
-        // Back where it started, it is not a step any more. The drag may yet
-        // go on, and if it does it starts a new step from here -- which is
-        // this same starting value, so nothing is lost by letting go.
-        if (llsd_equals(moving.mBefore, moving.mAfter))
-        {
-            mStack.pop_back();
-            mCursor   = mStack.size();
-            mHaveLast = false;
-            return;
-        }
-    }
-    else
-    {
-        mStack.push_back(Step{ Transaction{ { name, before, after } }, std::string() });
-
-        if (mStack.size() > MAX_DEPTH)
-        {
-            mStack.erase(mStack.begin());
-        }
-    }
-
-    mCursor   = mStack.size();
-    mLastName = name;
-    mLastTime = now;
-    mHaveLast = true;
+    // Anything recorded invalidates the redo tail: the future that was
+    // undone is no longer reachable from here. Writes to the same control
+    // closer together than the window are one step -- one drag stays one
+    // step, its before the value it started from and its after following
+    // the puck -- and back where it started, it is not a step any more: the
+    // drag may yet go on, and if it does it starts a new step from here,
+    // which is this same starting value. Inside a group, every write joins
+    // the group's step.
+    Step step;
+    step.mChanges.push_back({ name, before, after });
+    mSteps.note(std::move(step), name, now, COALESCE_SECONDS, join<Step>,
+                [](const Step& s) { return std::all_of(s.mChanges.begin(), s.mChanges.end(), unchanged); });
 }
 
 void ALGradeHistory::beginGroup(const std::string& label)
 {
-    if (mGroupDepth++ == 0)
-    {
-        // One past the end: the transaction is created by the first write, so
-        // a group that records nothing leaves no empty step behind.
-        mGroupIndex = mStack.size();
-        mGroupLabel = label;
-        mHaveLast   = false;
-    }
+    mSteps.beginGroup(label);
 }
 
 void ALGradeHistory::endGroup()
 {
-    if (mGroupDepth > 0 && --mGroupDepth == 0)
+    const bool open = mSteps.inGroup();
+    // A control the group moved and then put back is not part of what the
+    // group did, and a group made of nothing else did nothing at all.
+    mSteps.endGroup([](Step& step) {
+        step.mChanges.erase(std::remove_if(step.mChanges.begin(), step.mChanges.end(), unchanged), step.mChanges.end());
+        return step.mChanges.empty();
+    });
+    if (open && !mSteps.inGroup())
     {
         ++mRevision;
-
-        // A control the group moved and then put back is not part of what the
-        // group did, and a group made of nothing else did nothing at all.
-        if (mGroupIndex < mStack.size())
-        {
-            Transaction& group = mStack[mGroupIndex].mChanges;
-            group.erase(std::remove_if(group.begin(), group.end(),
-                                       [](const Change& c) { return llsd_equals(c.mBefore, c.mAfter); }),
-                        group.end());
-            if (group.empty())
-            {
-                mStack.erase(mStack.begin() + mGroupIndex);
-                mCursor = std::min(mCursor, mStack.size());
-            }
-        }
-
-        // The eviction that record()'s plain path does as it pushes, deferred
-        // to here, where erasing the front can no longer shift mGroupIndex
-        // out from under an open group. A group adds at most one transaction
-        // -- that is its whole point -- so one erase restores the bound. The
-        // cursor counts applied transactions and the one dropped was applied,
-        // so it comes down with the stack.
-        if (mStack.size() > MAX_DEPTH)
-        {
-            mStack.erase(mStack.begin());
-            if (mCursor > 0)
-            {
-                --mCursor;
-            }
-        }
-
-        mGroupLabel.clear();
-
-        // A fresh write after the group starts its own step rather than
-        // coalescing into it.
-        mHaveLast = false;
     }
 }
 
 const ALGradeHistory::Transaction* ALGradeHistory::undo()
 {
-    if (!canUndo())
+    std::optional<Step> step = mSteps.takeUndo();
+    if (!step)
     {
         return nullptr;
     }
-
     ++mRevision;
-
-    // Applying the result must not fold back into the step it came from.
-    mHaveLast = false;
-    return &mStack[--mCursor].mChanges;
+    mSteps.pushRedo(std::move(*step));
+    return &mSteps.redone().back().mChanges;
 }
 
 const ALGradeHistory::Transaction* ALGradeHistory::redo()
 {
-    if (!canRedo())
+    std::optional<Step> step = mSteps.takeRedo();
+    if (!step)
     {
         return nullptr;
     }
-
     ++mRevision;
-    mHaveLast = false;
-    return &mStack[mCursor++].mChanges;
+    mSteps.pushUndo(std::move(*step));
+    return &mSteps.undone().back().mChanges;
 }
 
 void ALGradeHistory::clear()
 {
     ++mRevision;
-    mStack.clear();
-    mCursor     = 0;
-    mGroupDepth = 0;
-    mGroupIndex = 0;
-    mGroupLabel.clear();
-    mHaveLast   = false;
+    mSteps.clear();
 }
