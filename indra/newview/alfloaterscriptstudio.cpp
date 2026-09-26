@@ -459,8 +459,8 @@ void ALFloaterScriptStudio::itemRemoved(const ALScriptRef& ref)
         {
             // What was typed is not the deletion's to take: the tab stays,
             // its text kept on disk, and says what can be done with it.
-            doc.orphan          = Doc::Orphan::Removed;
-            doc.noticeDismissed = false;
+            doc.orphan.kind          = Doc::Orphan::Removed;
+            doc.orphan.noticeDismissed = false;
             window->mRecovery.keep(doc);
             window->report(window->getString("OrphanRemovedKept", args), true, &doc, { "copy", "export" });
             window->refreshNotice();
@@ -583,13 +583,7 @@ bool ALFloaterScriptStudio::postBuild()
     }
     mTabs          = getChild<ALTabStrip>("tabs");
     mBreadcrumb    = getChild<ALJumpBar>("breadcrumb");
-    mNoticePanel   = getChild<LLLayoutPanel>("editor_notice");
-    mNoticeText    = getChild<LLTextBox>("notice_text");
-    mNoticeFirst   = getChild<LLButton>("notice_first");
-    mNoticeSecond  = getChild<LLButton>("notice_second");
-    mNoticeFirst->setCommitCallback([this](LLUICtrl*, const LLSD&) { onNoticeAction(mNoticeActions[0]); });
-    mNoticeSecond->setCommitCallback([this](LLUICtrl*, const LLSD&) { onNoticeAction(mNoticeActions[1]); });
-    getChild<LLButton>("notice_close")->setCommitCallback([this](LLUICtrl*, const LLSD&) { onNoticeAction("close"); });
+    mNoticeBar     = findChild<ALScriptNoticeBar>("notice");
     mBottomTabs    = getChild<LLTabContainer>("bottom_tabs");
     mReferences    = getChild<ALPaneList>("references");
     mOutline       = getChild<ALPaneList>("outline");
@@ -1896,7 +1890,7 @@ void ALFloaterScriptStudio::loaded(const ALScriptWorkspace::Loaded& answer)
         doc.carriedEmbedded.reset();
         doc.loadFailure  = answer.error.empty() ? Failure::NotPermitted : answer.failure;
         doc.loadError    = answer.error;
-        doc.nextReattach = LLTimer::getTotalSeconds() + ALScriptRecoveryRetry::delayAfter(++doc.reattachTries);
+        doc.orphan.nextReattach = LLTimer::getTotalSeconds() + ALScriptRecoveryRetry::delayAfter(++doc.orphan.reattachTries);
         becomeOrphan(doc, entry, failedAs(doc, doc.loadFailure));
         if (doc.loadFailure == Failure::NotPermitted)
         {
@@ -1914,7 +1908,7 @@ void ALFloaterScriptStudio::loaded(const ALScriptWorkspace::Loaded& answer)
     doc.loadError   = answer.error;
     if (answer.error.empty())
     {
-        doc.reattachTries = 0;
+        doc.orphan.reattachTries = 0;
     }
     if (!answer.error.empty())
     {
@@ -8120,12 +8114,12 @@ void ALFloaterScriptStudio::pumpRecovery()
         {
             report(counted("OfflineKept", kept), true);
         }
-        checkOrphans();
+        mOrphans.check();
     }
     if (now >= mOrphansChecked + 1.0)
     {
         mOrphansChecked = now;
-        checkOrphans();
+        mOrphans.check();
     }
 }
 
@@ -8150,15 +8144,15 @@ void ALFloaterScriptStudio::becomeOrphan(Doc& doc, const ALScriptRecoveryEntry& 
     // a notecard's items.
     doc.loaded                 = true;
     doc.modifiable             = true;
-    doc.detached               = doc.file.empty();
+    doc.orphan.detached               = doc.file.empty();
     doc.notecard               = entry.notecard;
     doc.language.lua           = entry.lua;
     doc.language.compileTarget = !entry.compileTarget.empty() ? entry.compileTarget : entry.lua ? "luau" : "mono";
     doc.assetId                = entry.baseAsset;
     doc.objectName             = entry.objectName;
     doc.regionName             = entry.region;
-    doc.orphan                 = orphan;
-    doc.noticeDismissed        = false;
+    doc.orphan.kind                 = orphan;
+    doc.orphan.noticeDismissed        = false;
     if (entry.wrapped && !entry.notecard)
     {
         if (!doc.envelope)
@@ -8228,6 +8222,97 @@ void ALFloaterScriptStudio::openOrphan(const ALScriptRecoveryEntry& entry, Doc::
     const size_t index = mDocs.size() - 1;
     becomeOrphan(*mDocs[index], entry, orphan);
     activate(index);
+}
+
+ALFloaterScriptStudio::Doc::Orphan ALFloaterScriptStudio::failedAs(const Doc& doc, ALScriptWorkspace::Loaded::Failure failure) const
+{
+    LLViewerObject* object = doc.ref.inInventory() ? nullptr : gObjectList.findObject(doc.ref.object);
+    return ALScriptStudioOrphans::failedAs(doc, failure, object && !object->isDead());
+}
+
+ALScriptStudioOrphans::Reach ALFloaterScriptStudio::reach(const Doc& doc)
+{
+    ALScriptStudioOrphans::Reach reach;
+    reach.offline = gDisconnected;
+    if (!doc.file.empty())
+    {
+        reach.fileThere = LLFile::isfile(doc.file);
+        return reach;
+    }
+    if (doc.ref.isNull())
+    {
+        return reach;
+    }
+    if (doc.ref.inInventory())
+    {
+        reach.itemThere    = gInventory.getItem(doc.ref.item) != nullptr;
+        const LLUUID trash = gInventory.findCategoryUUIDForType(LLFolderType::FT_TRASH);
+        reach.trashed      = reach.itemThere && trash.notNull() && gInventory.isObjectDescendentOf(doc.ref.item, trash);
+        return reach;
+    }
+    LLViewerObject* object = gObjectList.findObject(doc.ref.object);
+    reach.objectThere      = object && !object->isDead();
+    // Whether its prim holds the item, where the region has said what the
+    // prim holds.
+    for (const ALScriptExplorerModel::Object& one : mExplorerPane->model().objects())
+    {
+        for (const ALScriptExplorerModel::Prim& prim : one.prims)
+        {
+            if (prim.id == doc.ref.object && prim.fetched)
+            {
+                const auto held = [&doc](const ALScriptWorkspace::Item& item) { return item.id == doc.ref.item; };
+                reach.heldByPrim = std::any_of(prim.items.begin(), prim.items.end(), held);
+                return reach;
+            }
+        }
+    }
+    return reach;
+}
+
+void ALFloaterScriptStudio::refreshPlace(Doc& doc)
+{
+    // Where it is, while it is in sight, for a kept text to say later.
+    if (LLViewerObject* object = doc.ref.inInventory() || !doc.file.empty() ? nullptr : gObjectList.findObject(doc.ref.object))
+    {
+        LLViewerObject* root = object->getRootEdit() ? object->getRootEdit() : object;
+        doc.objectName       = ALScriptWorkspace::objectName(root, doc.objectName);
+        if (object->getRegion())
+        {
+            doc.regionName = object->getRegion()->getName();
+        }
+    }
+    // Renamed where it lives since it was opened -- in the inventory, in
+    // its object: called so here too.
+    if (doc.loaded && doc.file.empty() && !doc.ref.isNull())
+    {
+        LLViewerObject*        holder = doc.ref.inInventory() ? nullptr : gObjectList.findObject(doc.ref.object);
+        const LLInventoryItem* item   = doc.ref.inInventory() ? gInventory.getItem(doc.ref.item)
+                                        : holder              ? holder->getInventoryItem(doc.ref.item)
+                                                              : nullptr;
+        if (item && !item->getName().empty())
+        {
+            renameDoc(doc, item->getName());
+        }
+    }
+}
+
+void ALFloaterScriptStudio::loadScript(const ALScriptRef& ref)
+{
+    const LLHandle<LLFloater> handle = getHandle();
+    ALScriptWorkspace::instance().load(ref, [handle](const ALScriptWorkspace::Loaded& answer) {
+        if (ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get()))
+        {
+            studio->loaded(answer);
+        }
+    });
+}
+
+void ALFloaterScriptStudio::discardRecovery(const ALScriptRecoveryEntry& entry)
+{
+    if (ALScriptRecoveryStore* store = ALScriptStudioRecovery::store())
+    {
+        store->discard(entry);
+    }
 }
 
 void ALFloaterScriptStudio::saveCopyToInventory(Doc& doc)
@@ -9736,8 +9821,8 @@ bool ALFloaterScriptStudio::revertible(const Doc& doc) const
     // nor one whose item, object or file is gone or out of reach -- where
     // a revert set the text aside and left the error in its place.
     using Orphan = Doc::Orphan;
-    return doc.loaded && doc.modifiable && !doc.detached && doc.orphan != Orphan::Away && doc.orphan != Orphan::Removed &&
-           doc.orphan != Orphan::Offline && doc.orphan != Orphan::FileGone;
+    return doc.loaded && doc.modifiable && !doc.orphan.detached && doc.orphan.kind != Orphan::Away && doc.orphan.kind != Orphan::Removed &&
+           doc.orphan.kind != Orphan::Offline && doc.orphan.kind != Orphan::FileGone;
 }
 
 void ALFloaterScriptStudio::askRevert(Doc& doc)

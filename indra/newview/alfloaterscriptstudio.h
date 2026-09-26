@@ -40,6 +40,7 @@
 #include "alscriptstudiofiles.h"
 #include "alscriptstudioweighing.h"
 #include "alscriptstudiowords.h"
+#include "alscriptstudioorphans.h"
 #include "alfindings.h"
 #include "aloutputview.h"
 #include "alscriptanalysis.h"
@@ -104,7 +105,8 @@ class ALFloaterScriptStudio final : public ALStudioFloater, public ALScriptStudi
                                     public ALScriptSearchPane::Window, public ALScriptExplorerPane::Window, public ALScriptStudioRecovery::Window,
                                     public ALScriptStudioSaving::Window, public ALScriptStudioVim::Window,
                                     public ALScriptExternalEditor::Window, public ALScriptStudioFiles::Window,
-                                    public ALScriptStudioWeighing::Window
+                                    public ALScriptStudioWeighing::Window, public ALScriptStudioOrphans::Window,
+                                    public ALScriptNoticeBar::Window
 {
     friend class LLFloaterReg;
 
@@ -766,16 +768,21 @@ private:
     // each tab, looked at a few times a second, whether the window is shown
     // or not.
     void pumpRecovery();
-    void checkOrphans();
-    Doc::Orphan orphanOf(const Doc& doc) const;
-    // What a tab holding a kept text is where its script could not be
-    // loaded, by why: one that may not be changed, one that could not be
-    // loaded, or one whose item or object is gone or out of sight.
+    // The orphans (ALScriptStudioOrphans): recovery's and saving's calls to
+    // them, and what they ask of the window -- what is in reach of a tab,
+    // which is the world's; its place; its script loaded; the notice; and
+    // the notice's actions.
     Doc::Orphan failedAs(const Doc& doc, ALScriptWorkspace::Loaded::Failure failure) const override;
-    // A detached tab's item loaded under it now that it is in reach, what
-    // it holds carried over with its history; or loaded again after a load
-    // that failed, where a person asks or the next try is due.
-    void reattach(Doc& doc) override;
+    void        reattach(Doc& doc) override { mOrphans.reattach(doc); }
+    ALScriptStudioOrphans::Reach reach(const Doc& doc) override;
+    void                         refreshPlace(Doc& doc) override;
+    void                         loadScript(const ALScriptRef& ref) override;
+    ALScriptNoticeBar*           noticeBar() override { return mNoticeBar; }
+    void                         saveCopyToFile() override { mFiles.saveCopy(); }
+    void                         saveAgain(Doc& doc) override { mSaving.saveAsked(doc); }
+    void                         takeUpRecovery(Doc& doc, const ALScriptRecoveryEntry& entry) override { mRecovery.takeUp(doc, entry); }
+    void                         discardRecovery(const ALScriptRecoveryEntry& entry) override;
+    void                         noticeAction(const std::string& action) override { mOrphans.noticeAction(action); }
     // The window, of all of them, that has a script or a file open.
     static ALFloaterScriptStudio* holderOf(const ALScriptRef& ref, const std::string& file);
     // The studio window the keyboard was last in, while it is open: where a
@@ -797,13 +804,11 @@ private:
     // What a tab needs from the moment it is made: its text's changes
     // heard, its places slid.
     void wireDoc(Doc& doc);
-    // The notice over the editor, for the tab in front, and what its
-    // buttons do.
-    void refreshNotice() override;
-    void onNoticeAction(const std::string& action);
+    // The notice over the editor, for the tab in front.
+    void refreshNotice() override { mOrphans.refreshNotice(); }
     // What a tab holds saved as a new item in the inventory -- a script or
     // a notecard, its items with it -- and the tab closed once it is.
-    void saveCopyToInventory(Doc& doc);
+    void saveCopyToInventory(Doc& doc) override;
     // Revert to Saved, asked about where something would be lost; and
     // whether there is anything to read again.
     void askRevert(Doc& doc);
@@ -941,11 +946,7 @@ private:
     std::string                        mUndoSaid;
     std::string                        mRedoSaid;
     // The notice over the editor.
-    LLLayoutPanel*                     mNoticePanel  = nullptr;
-    LLTextBox*                         mNoticeText   = nullptr;
-    LLButton*                          mNoticeFirst  = nullptr;
-    LLButton*                          mNoticeSecond = nullptr;
-    std::string                        mNoticeActions[2];
+    ALScriptNoticeBar*                 mNoticeBar = nullptr;
     // Whether the connection was seen lost; and when what holds each tab
     // was last looked at.
     bool                               mOffline        = false;
@@ -1058,6 +1059,8 @@ private:
     ALScriptStudioFiles                mFiles{ *this, *this };
     // What its scripts weigh.
     ALScriptStudioWeighing             mWeighing{ *this, *this };
+    // Its tabs whose script is gone or out of reach, and the notice.
+    ALScriptStudioOrphans              mOrphans{ *this, *this };
     LLHandle<LLContextMenu>            mTabMenuHandle;
     bool                               mMain = true;
     // Whose path the bar at the bottom shows, so that a tab come to the

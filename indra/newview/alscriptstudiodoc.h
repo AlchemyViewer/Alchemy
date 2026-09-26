@@ -187,21 +187,26 @@ struct ALScriptStudioDoc
         Locked,
         Unloaded
     };
-    Orphan                                     orphan          = Orphan::None;
-    bool                                       noticeDismissed = false;
-    // A kept text with nothing loaded under it -- its item out of reach
-    // as it was opened -- whose script is known only as the entry said:
-    // loaded under it once the item is in reach, before it is saved.
-    // How many loads have failed on the way since the last that went
-    // through, and when the next may be tried: further apart each time,
-    // and a few times only unless a person asks.
-    bool                                       detached        = false;
-    S32                                        reattachTries   = 0;
-    F64                                        nextReattach    = 0.0;
-    // Since when its object has been out of sight, or zero: an object
-    // at the edge of what is in view comes and goes, and is taken for
-    // gone only once it has been gone a moment.
-    F64                                        awaySince       = 0.0;
+    // What it is, and the rest of what ALScriptStudioOrphans keeps of it.
+    struct Orphaned
+    {
+        Orphan kind            = Orphan::None;
+        bool   noticeDismissed = false;
+        // A kept text with nothing loaded under it -- its item out of
+        // reach as it was opened -- whose script is known only as the
+        // entry said: loaded under it once the item is in reach, before
+        // it is saved. How many loads have failed on the way since the
+        // last that went through, and when the next may be tried: further
+        // apart each time, and a few times only unless a person asks.
+        bool   detached      = false;
+        S32    reattachTries = 0;
+        F64    nextReattach  = 0.0;
+        // Since when its object has been out of sight, or zero: an object
+        // at the edge of what is in view comes and goes, and is taken for
+        // gone only once it has been gone a moment.
+        F64    awaySince = 0.0;
+    };
+    Orphaned                                   orphan;
     // What its object and region were called, while they were in sight:
     // what a kept text says it came from once they are not.
     std::string                                objectName;

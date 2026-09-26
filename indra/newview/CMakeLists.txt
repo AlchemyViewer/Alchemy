@@ -177,6 +177,7 @@ if(AL_BUILD_VIEWER)
     alfloaterscriptpreferences.cpp
     alscriptkeymap.cpp
     alscriptmodules.cpp
+    alscriptnoticebar.cpp
     alscriptnotecardtab.cpp
     alscriptnotecardworld.cpp
     alscriptoutputpane.cpp
@@ -994,6 +995,7 @@ if(AL_BUILD_VIEWER)
     alfloaterscriptpreferences.h
     alscriptkeymap.h
     alscriptmodules.h
+    alscriptnoticebar.h
     alscriptnotecardtab.h
     alscriptoutputpane.h
     alscriptpreprocessor.h
@@ -1005,6 +1007,7 @@ if(AL_BUILD_VIEWER)
     alscriptstudiodoc.h
     alscriptstudiofileio.h
     alscriptstudiofiles.h
+    alscriptstudioorphans.h
     alscriptstudiorecovery.h
     alscriptstudiosaving.h
     alscriptstudiovim.h
@@ -2542,6 +2545,21 @@ if(AL_BUILD_TESTS)
       alscriptsaveflow.cpp
       alscriptstudiodoc.cpp
       alscriptstudiofileio.cpp
+    DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
+  )
+
+  # Script Studio's orphans, the world's reach faked: what a tab has become,
+  # the check, reattaching, and the notice over the editor with its bar.
+  al_add_test(
+    alscriptstudioorphans
+    UNIT
+    PROJECT ${test_project}
+    LIBRARIES llui alscript ${test_libs}
+    SOURCES
+      alscriptnoticebar.cpp
+      alscriptnotecardtab.cpp
+      alscriptstudiodoc.cpp
+      alscriptstudiorecovery.cpp
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
 

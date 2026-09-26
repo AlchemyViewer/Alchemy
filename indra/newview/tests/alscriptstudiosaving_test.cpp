@@ -239,14 +239,14 @@ namespace tut
         ensure("and kept as saved", studio.recovered == Names{ "card" } && !card.save.underway());
 
         Doc& away      = tab("away", "default {}");
-        away.orphan    = Doc::Orphan::Away;
+        away.orphan.kind    = Doc::Orphan::Away;
         services.front = 2;
         saving.save(away);
         ensure_equals("out of reach, said where", lastStatus(), std::string("SaveBlockedAway"));
         ensure("stopped, and the notice back", studio.stops == 1 && studio.notices == 1 && !away.save.underway() && studio.sent.empty());
 
         Doc& detached    = tab("detached", "default {}");
-        detached.detached = true;
+        detached.orphan.detached = true;
         saving.save(detached);
         ensure("loaded under its item first", studio.reattached == Names{ "detached" } && studio.sent.empty());
         ensure_equals("and said to wait", lastStatus(), std::string("SaveWaitsForLoad"));

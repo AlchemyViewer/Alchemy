@@ -319,7 +319,7 @@ bool ALScriptStudioRecovery::restoreHistory(Doc& doc, const Entry& entry)
     {
         return false;
     }
-    const std::optional<std::string> standing = doc.orphan == Doc::Orphan::None ? doc.editor->undoJournal().savedText() : std::nullopt;
+    const std::optional<std::string> standing = doc.orphan.kind == Doc::Orphan::None ? doc.editor->undoJournal().savedText() : std::nullopt;
     if (!doc.editor->setTextWithHistory(entry.text, entry.history))
     {
         // Not the history of this text: the tab is as it was.

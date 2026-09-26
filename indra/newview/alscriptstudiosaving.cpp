@@ -230,23 +230,24 @@ void ALScriptStudioSaving::save(Doc& doc)
     // Where it cannot go -- its object out of sight, the item gone, the
     // connection lost -- said, with the notice back in sight to offer a
     // copy or a file.
-    const bool out_of_reach = doc.orphan == Doc::Orphan::Away || doc.orphan == Doc::Orphan::Removed || doc.orphan == Doc::Orphan::Offline ||
-                              doc.orphan == Doc::Orphan::Locked || doc.orphan == Doc::Orphan::Unloaded;
+    const Doc::Orphan kind         = doc.orphan.kind;
+    const bool        out_of_reach = kind == Doc::Orphan::Away || kind == Doc::Orphan::Removed || kind == Doc::Orphan::Offline ||
+                              kind == Doc::Orphan::Locked || kind == Doc::Orphan::Unloaded;
     LLStringUtil::format_map_t args;
     args["[NAME]"] = doc.name;
-    switch (doc.save.ask(out_of_reach, doc.detached))
+    switch (doc.save.ask(out_of_reach, doc.orphan.detached))
     {
         case ALScriptSaveFlow::Start::Queued:
             return;
         case ALScriptSaveFlow::Start::OutOfReach:
-            mServices.setStatus(mServices.words(doc.orphan == Doc::Orphan::Away       ? "SaveBlockedAway"
-                                                : doc.orphan == Doc::Orphan::Removed  ? "SaveBlockedRemoved"
-                                                : doc.orphan == Doc::Orphan::Locked   ? "SaveBlockedLocked"
-                                                : doc.orphan == Doc::Orphan::Unloaded ? "SaveBlockedUnloaded"
+            mServices.setStatus(mServices.words(doc.orphan.kind == Doc::Orphan::Away       ? "SaveBlockedAway"
+                                                : doc.orphan.kind == Doc::Orphan::Removed  ? "SaveBlockedRemoved"
+                                                : doc.orphan.kind == Doc::Orphan::Locked   ? "SaveBlockedLocked"
+                                                : doc.orphan.kind == Doc::Orphan::Unloaded ? "SaveBlockedUnloaded"
                                                                                       : "SaveBlockedOffline",
                                                 args),
                                 true);
-            doc.noticeDismissed = false;
+            doc.orphan.noticeDismissed = false;
             stopped(doc);
             if (&doc == mServices.frontDoc())
             {
@@ -258,7 +259,7 @@ void ALScriptStudioSaving::save(Doc& doc)
             // failed waits its turn: loaded now, what it holds carried over,
             // so that it is saved as what the item is once asked again.
             mServices.setStatus(mServices.words("SaveWaitsForLoad", args), true);
-            doc.reattachTries = 0;
+            doc.orphan.reattachTries = 0;
             mWindow.reattach(doc);
             stopped(doc);
             return;

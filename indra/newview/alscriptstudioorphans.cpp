@@ -24,104 +24,90 @@
 
 #include "llviewerprecompiledheaders.h"
 
-#include "alfloaterscriptstudio.h"
+#include "alscriptstudioorphans.h"
 
 #include "alscriptnotecardtab.h"
 #include "alscriptrecovery.h"
-#include "llappviewer.h"
-#include "llbutton.h"
-#include "llinventorymodel.h"
-#include "lllayoutstack.h"
-#include "lltextbox.h"
-#include "llviewerobject.h"
-#include "llviewerobjectlist.h"
-#include "llviewerregion.h"
+#include "alscriptstudiorecovery.h"
+#include "alscriptstudioservices.h"
+#include "lltimer.h"
 
-#include <algorithm>
+#include <vector>
 
-ALFloaterScriptStudio::Doc::Orphan ALFloaterScriptStudio::orphanOf(const Doc& doc) const
+ALScriptStudioOrphans::ALScriptStudioOrphans(ALScriptStudioServices& services, Window& window) : mServices(services), mWindow(window)
+{
+}
+
+// static
+ALScriptStudioOrphans::Orphan ALScriptStudioOrphans::seen(const Doc& doc, const Reach& reach)
 {
     if (!doc.loaded)
     {
-        return Doc::Orphan::None;
+        return Orphan::None;
     }
     if (!doc.file.empty())
     {
-        return LLFile::isfile(doc.file) ? Doc::Orphan::None : Doc::Orphan::FileGone;
+        return reach.fileThere ? Orphan::None : Orphan::FileGone;
     }
     if (doc.ref.isNull())
     {
-        return Doc::Orphan::None;
+        return Orphan::None;
     }
-    if (gDisconnected)
+    if (reach.offline)
     {
-        return Doc::Orphan::Offline;
+        return Orphan::Offline;
     }
     // A kept text over a script that may no longer be changed, or that
     // could not be loaded, stays that while there is an item: nothing here
     // says it has changed, and loading it again is tried on its own terms.
-    const auto held = [&doc](Doc::Orphan seen) {
-        const bool stays = doc.orphan == Doc::Orphan::Locked || doc.orphan == Doc::Orphan::Unloaded;
-        return stays && (seen == Doc::Orphan::None || seen == Doc::Orphan::Trashed) ? doc.orphan : seen;
+    const auto held = [&doc](Orphan seen) {
+        const bool stays = doc.orphan.kind == Orphan::Locked || doc.orphan.kind == Orphan::Unloaded;
+        return stays && (seen == Orphan::None || seen == Orphan::Trashed) ? doc.orphan.kind : seen;
     };
     if (doc.ref.inInventory())
     {
-        if (!gInventory.getItem(doc.ref.item))
+        if (!reach.itemThere)
         {
-            return Doc::Orphan::Removed;
+            return Orphan::Removed;
         }
-        const LLUUID trash = gInventory.findCategoryUUIDForType(LLFolderType::FT_TRASH);
-        return held(trash.notNull() && gInventory.isObjectDescendentOf(doc.ref.item, trash) ? Doc::Orphan::Trashed : Doc::Orphan::None);
+        return held(reach.trashed ? Orphan::Trashed : Orphan::None);
     }
-    LLViewerObject* object = gObjectList.findObject(doc.ref.object);
-    if (!object || object->isDead())
+    if (!reach.objectThere)
     {
-        return Doc::Orphan::Away;
+        return Orphan::Away;
     }
     // Gone from its object where the region has said what the prim holds;
     // while that is being asked again, as it was.
-    for (const ALScriptExplorerModel::Object& one : mExplorerPane->model().objects())
+    if (!reach.heldByPrim)
     {
-        for (const ALScriptExplorerModel::Prim& prim : one.prims)
-        {
-            if (prim.id != doc.ref.object)
-            {
-                continue;
-            }
-            if (!prim.fetched)
-            {
-                return held(doc.orphan == Doc::Orphan::Removed ? Doc::Orphan::Removed : Doc::Orphan::None);
-            }
-            const bool there = std::any_of(prim.items.begin(), prim.items.end(), [&doc](const ALScriptWorkspace::Item& item) { return item.id == doc.ref.item; });
-            return held(there ? Doc::Orphan::None : Doc::Orphan::Removed);
-        }
+        return held(doc.orphan.kind == Orphan::Removed ? Orphan::Removed : Orphan::None);
     }
-    return held(doc.orphan == Doc::Orphan::Removed ? Doc::Orphan::Removed : Doc::Orphan::None);
+    return held(*reach.heldByPrim ? Orphan::None : Orphan::Removed);
 }
 
-ALFloaterScriptStudio::Doc::Orphan ALFloaterScriptStudio::failedAs(const Doc& doc, ALScriptWorkspace::Loaded::Failure failure) const
+// static
+ALScriptStudioOrphans::Orphan ALScriptStudioOrphans::failedAs(const Doc& doc, ALScriptWorkspace::Loaded::Failure failure, bool object_there)
 {
     using Failure = ALScriptWorkspace::Loaded::Failure;
     switch (failure)
     {
         case Failure::NotPermitted:
-            return Doc::Orphan::Locked;
+            return Orphan::Locked;
         case Failure::Unreadable:
         case Failure::Fetch:
-            return Doc::Orphan::Unloaded;
+            return Orphan::Unloaded;
         default:
             break;
     }
     // Gone: from the inventory or its object, or its object out of sight.
     if (doc.ref.inInventory())
     {
-        return Doc::Orphan::Removed;
+        return Orphan::Removed;
     }
-    LLViewerObject* object = gObjectList.findObject(doc.ref.object);
-    return object && !object->isDead() ? Doc::Orphan::Removed : Doc::Orphan::Away;
+    return object_there ? Orphan::Removed : Orphan::Away;
 }
 
-void ALFloaterScriptStudio::reattach(Doc& doc)
+void ALScriptStudioOrphans::reattach(Doc& doc)
 {
     // What the tab holds carried over what the item has, with its history,
     // as a kept text is taken up: the item loaded under it at last, so that
@@ -129,97 +115,70 @@ void ALFloaterScriptStudio::reattach(Doc& doc)
     // whether it runs, whether it may be changed, the items a notecard's
     // asset carries. Written first, so that nothing typed is only in the
     // tab while it loads.
-    mRecovery.keep(doc);
+    mWindow.keepForRecovery(doc);
     ALScriptRecoveryEntry holding = ALScriptStudioRecovery::entryOf(doc);
-    doc.detached                  = false;
+    doc.orphan.detached           = false;
     doc.recovering                = holding;
     doc.carriedText               = holding.text;
     ALScriptNotecardTab::carry(doc, doc);
     doc.loaded = false;
     doc.editor->setReadOnly(true);
-    const LLHandle<LLFloater> handle = getHandle();
-    ALScriptWorkspace::instance().load(doc.ref, [handle](const ALScriptWorkspace::Loaded& answer) {
-        if (ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get()))
-        {
-            studio->loaded(answer);
-        }
-    });
+    mWindow.loadScript(doc.ref);
 }
 
-void ALFloaterScriptStudio::checkOrphans()
+void ALScriptStudioOrphans::check()
 {
     bool changed = false;
-    for (std::unique_ptr<Doc>& each : mDocs)
+    for (Doc* each : mServices.openDocs())
     {
         Doc& doc = *each;
-        // Where it is, while it is in sight, for a kept text to say later.
-        if (LLViewerObject* object = doc.ref.inInventory() || !doc.file.empty() ? nullptr : gObjectList.findObject(doc.ref.object))
-        {
-            LLViewerObject* root = object->getRootEdit() ? object->getRootEdit() : object;
-            doc.objectName       = ALScriptWorkspace::objectName(root, doc.objectName);
-            if (object->getRegion())
-            {
-                doc.regionName = object->getRegion()->getName();
-            }
-        }
-        // Renamed where it lives since it was opened -- in the inventory, in
-        // its object: called so here too.
-        if (doc.loaded && doc.file.empty() && !doc.ref.isNull())
-        {
-            LLViewerObject*        holder = doc.ref.inInventory() ? nullptr : gObjectList.findObject(doc.ref.object);
-            const LLInventoryItem* item   = doc.ref.inInventory() ? gInventory.getItem(doc.ref.item)
-                                            : holder              ? holder->getInventoryItem(doc.ref.item)
-                                                                  : nullptr;
-            if (item && !item->getName().empty())
-            {
-                renameDoc(doc, item->getName());
-            }
-        }
-        const Doc::Orphan was       = doc.orphan;
-        const Doc::Orphan now_seen  = orphanOf(doc);
+        // Where it is, and what it is called, while it is in sight.
+        mWindow.refreshPlace(doc);
+        const Orphan was      = doc.orphan.kind;
+        const Orphan now_seen = seen(doc, mWindow.reach(doc));
         // Out of sight for a moment is not gone: an object at the edge of
         // what is in view comes and goes, and a region crossing takes it
         // away and gives it back.
         constexpr F64 AWAY_AFTER = 3.0;
-        if (now_seen == Doc::Orphan::Away && was != Doc::Orphan::Away)
+        if (now_seen == Orphan::Away && was != Orphan::Away)
         {
             const F64 now = LLTimer::getTotalSeconds();
-            if (doc.awaySince <= 0.0)
+            if (doc.orphan.awaySince <= 0.0)
             {
-                doc.awaySince = now;
+                doc.orphan.awaySince = now;
             }
-            if (now - doc.awaySince < AWAY_AFTER)
+            if (now - doc.orphan.awaySince < AWAY_AFTER)
             {
                 continue;
             }
         }
-        else if (now_seen != Doc::Orphan::Away)
+        else if (now_seen != Orphan::Away)
         {
-            doc.awaySince = 0.0;
+            doc.orphan.awaySince = 0.0;
         }
-        doc.orphan = now_seen;
-        if (doc.orphan == was)
+        doc.orphan.kind = now_seen;
+        if (doc.orphan.kind == was)
         {
             continue;
         }
-        changed             = true;
-        doc.noticeDismissed = false;
+        changed                    = true;
+        doc.orphan.noticeDismissed = false;
         LLStringUtil::format_map_t args;
         args["[NAME]"] = doc.name;
-        const bool lost = doc.orphan == Doc::Orphan::Away || doc.orphan == Doc::Orphan::Removed;
+        const bool lost = doc.orphan.kind == Orphan::Away || doc.orphan.kind == Orphan::Removed;
         if (lost && doc.modifiable && doc.editor->isDirty())
         {
             // What was typed is on disk now, not only in the tab, and the
             // Output says what can be done with it.
-            mRecovery.keep(doc);
-            report(getString(doc.orphan == Doc::Orphan::Away ? "OrphanAwayKept" : "OrphanRemovedKept", args), true, &doc,
-                   doc.file.empty() ? std::vector<std::string>{ "copy", "export" } : std::vector<std::string>{ "export" });
+            mWindow.keepForRecovery(doc);
+            mServices.report(mServices.words(doc.orphan.kind == Orphan::Away ? "OrphanAwayKept" : "OrphanRemovedKept", args), true, &doc,
+                             doc.file.empty() ? std::vector<std::string>{ "copy", "export" } : std::vector<std::string>{ "export" });
         }
-        else if ((was == Doc::Orphan::Away || was == Doc::Orphan::Removed || was == Doc::Orphan::Offline) && doc.orphan == Doc::Orphan::None &&
-                 !doc.detached)
+        else if ((was == Orphan::Away || was == Orphan::Removed || was == Orphan::Offline) && doc.orphan.kind == Orphan::None &&
+                 !doc.orphan.detached)
         {
             // A detached tab is loaded now, and what the load says is said.
-            report(getString("OrphanBack", args), false, &doc);
+            mServices.report(mServices.words("OrphanBack", args), false, &doc);
         }
     }
     // Detached tabs whose item is in reach loaded under what they hold, and
@@ -230,134 +189,108 @@ void ALFloaterScriptStudio::checkOrphans()
     // at once.
     const F64                now = LLTimer::getTotalSeconds();
     std::vector<std::string> reattaching;
-    for (const std::unique_ptr<Doc>& each : mDocs)
+    for (const Doc* each : mServices.openDocs())
     {
         const Doc& doc   = *each;
-        const bool ready = doc.orphan == Doc::Orphan::None ||
-                           (doc.orphan == Doc::Orphan::Unloaded && doc.loadFailure == ALScriptWorkspace::Loaded::Failure::Fetch);
-        if (doc.detached && doc.loaded && ready && ALScriptRecoveryRetry::mayTry(doc.reattachTries) && now >= doc.nextReattach)
+        const bool ready = doc.orphan.kind == Orphan::None ||
+                           (doc.orphan.kind == Orphan::Unloaded && doc.loadFailure == ALScriptWorkspace::Loaded::Failure::Fetch);
+        const bool due = ALScriptRecoveryRetry::mayTry(doc.orphan.reattachTries) && now >= doc.orphan.nextReattach;
+        if (doc.orphan.detached && doc.loaded && ready && due)
         {
             reattaching.push_back(doc.id);
         }
     }
     for (const std::string& id : reattaching)
     {
-        if (const size_t index = indexOf(id); index != NONE)
+        if (Doc* doc = mServices.findDoc(id))
         {
-            reattach(*mDocs[index]);
+            reattach(*doc);
         }
     }
     if (changed)
     {
         refreshNotice();
-        refreshToolbar();
+        mWindow.refreshToolbar();
     }
 }
 
-void ALFloaterScriptStudio::refreshNotice()
+// static
+ALScriptNoticeBar::Notice ALScriptStudioOrphans::noticeFor(const Doc* doc, const ALScriptStudioServices& services)
 {
-    if (!mNoticePanel)
-    {
-        return;
-    }
-    // What the tab in front has to reckon with, the most pressing first,
-    // and up to two things to be done about it: each an action and the
-    // name of its words, whose tip is the same name with Tip after it.
-    Doc*        doc = active();
-    std::string text;
-    std::pair<std::string, std::string> buttons[2];
+    // What the tab has to reckon with, the most pressing first, and up to
+    // two things to be done about it.
+    ALScriptNoticeBar::Notice notice;
+    std::string&              text    = notice.text;
+    auto&                     buttons = notice.buttons;
     if (doc && doc->recoverable)
     {
         // Said so where the script was saved since the text was kept.
         LLStringUtil::format_map_t args;
         args["[WHEN]"]   = doc->recoverable->whenSaid();
         const bool stale = doc->recoverable->baseAsset.notNull() && doc->assetId.notNull() && doc->recoverable->baseAsset != doc->assetId;
-        text             = getString(stale ? "NoticeRecoverableStale" : "NoticeRecoverable", args);
+        text             = services.words(stale ? "NoticeRecoverableStale" : "NoticeRecoverable", args);
         buttons[0]       = { "restore", "NoticeRestore" };
         buttons[1]       = { "discard_left", "NoticeDiscard" };
     }
-    else if (doc && !doc->noticeDismissed)
+    else if (doc && !doc->orphan.noticeDismissed)
     {
         LLStringUtil::format_map_t args;
         args["[FILE]"] = doc->file;
-        switch (doc->orphan)
+        switch (doc->orphan.kind)
         {
-            case Doc::Orphan::Away:
-                text       = getString("NoticeAway");
+            case Orphan::Away:
+                text       = services.words("NoticeAway");
                 buttons[0] = { "copy", "NoticeCopy" };
                 buttons[1] = { "export", "NoticeExport" };
                 break;
-            case Doc::Orphan::Removed:
-                text       = getString(doc->ref.inInventory() ? "NoticeRemovedInventory" : "NoticeRemoved");
+            case Orphan::Removed:
+                text       = services.words(doc->ref.inInventory() ? "NoticeRemovedInventory" : "NoticeRemoved");
                 buttons[0] = { "copy", "NoticeCopy" };
                 buttons[1] = { "export", "NoticeExport" };
                 break;
-            case Doc::Orphan::Offline:
-                text       = getString("NoticeOffline");
+            case Orphan::Offline:
+                text       = services.words("NoticeOffline");
                 buttons[0] = { "export", "NoticeExport" };
                 break;
-            case Doc::Orphan::Trashed:
-                text = getString("NoticeTrashed");
+            case Orphan::Trashed:
+                text = services.words("NoticeTrashed");
                 break;
-            case Doc::Orphan::Locked:
-                text       = getString("NoticeLocked");
+            case Orphan::Locked:
+                text       = services.words("NoticeLocked");
                 buttons[0] = { "copy", "NoticeCopy" };
                 buttons[1] = { "export", "NoticeExport" };
                 break;
-            case Doc::Orphan::Unloaded:
+            case Orphan::Unloaded:
             {
                 LLStringUtil::format_map_t why;
                 why["[ERROR]"] = doc->loadError;
-                text           = getString("NoticeUnloaded", why);
+                text           = services.words("NoticeUnloaded", why);
                 buttons[0]     = { "retry_load", "NoticeTryAgain" };
                 buttons[1]     = { "copy", "NoticeCopy" };
                 break;
             }
-            case Doc::Orphan::FileGone:
-                text       = getString("NoticeFileGone", args);
+            case Orphan::FileGone:
+                text       = services.words("NoticeFileGone", args);
                 buttons[0] = { "save", "NoticeSaveAgain" };
                 break;
             default:
                 break;
         }
     }
-    mNoticePanel->setVisible(!text.empty());
-    if (text.empty())
-    {
-        return;
-    }
-    mNoticeText->setText(text);
-    mNoticeText->setToolTip(text);
-    // The buttons as wide as their words, from the right, the way out
-    // last; the words have what is left.
-    const LLFontGL* font  = LLFontGL::getFontSansSerifSmall();
-    S32             right = mNoticePanel->getRect().getWidth() - 4 - 22 - 6;
-    LLButton*       shown[2] = { mNoticeFirst, mNoticeSecond };
-    for (S32 i = 1; i >= 0; --i)
-    {
-        LLButton*   button = shown[i];
-        const auto& [id, label] = buttons[i];
-        mNoticeActions[i]       = id;
-        button->setVisible(!id.empty());
-        if (id.empty())
-        {
-            continue;
-        }
-        const std::string said  = getString(label);
-        const S32         width = font->getWidth(said) + 24;
-        button->setLabel(said);
-        button->setToolTip(getString(label + "Tip"));
-        const LLRect was = button->getRect();
-        button->setShape(LLRect(right - width, was.mTop, right, was.mBottom));
-        right -= width + 4;
-    }
-    const LLRect words = mNoticeText->getRect();
-    mNoticeText->setShape(LLRect(words.mLeft, words.mTop, llmax(words.mLeft + 40, right - 6), words.mBottom));
+    return notice;
 }
 
-void ALFloaterScriptStudio::onNoticeAction(const std::string& action)
+void ALScriptStudioOrphans::refreshNotice()
 {
-    Doc* doc = active();
+    if (ALScriptNoticeBar* bar = mWindow.noticeBar())
+    {
+        bar->show(noticeFor(mServices.frontDoc(), mServices));
+    }
+}
+
+void ALScriptStudioOrphans::noticeAction(const std::string& action)
+{
+    Doc* doc = mServices.frontDoc();
     if (!doc)
     {
         return;
@@ -369,46 +302,43 @@ void ALFloaterScriptStudio::onNoticeAction(const std::string& action)
         // Hidden until there is something else to say; a kept text from an
         // earlier session stays offered, under File > Recover Unsaved
         // Changes, once the notice is gone.
-        doc->noticeDismissed = true;
+        doc->orphan.noticeDismissed = true;
         doc->recoverable.reset();
     }
     else if (action == "restore" && doc->recoverable)
     {
         const ALScriptRecoveryEntry entry = *doc->recoverable;
         doc->recoverable.reset();
-        mRecovery.takeUp(*doc, entry);
+        mWindow.takeUpRecovery(*doc, entry);
         // A tab left holding it on its own has said why instead.
-        if (doc->orphan == Doc::Orphan::None)
+        if (doc->orphan.kind == Orphan::None)
         {
-            report(getString("RecoveryRestored", args), false, doc);
+            mServices.report(mServices.words("RecoveryRestored", args), false, doc);
         }
     }
     else if (action == "discard_left" && doc->recoverable)
     {
-        if (ALScriptRecoveryStore* store = ALScriptStudioRecovery::store())
-        {
-            store->discard(*doc->recoverable);
-        }
+        mWindow.discardRecovery(*doc->recoverable);
         doc->recoverable.reset();
-        report(getString("RecoveryDiscarded", args), false, doc);
+        mServices.report(mServices.words("RecoveryDiscarded", args), false, doc);
     }
-    else if (action == "retry_load" && doc->detached && doc->loaded)
+    else if (action == "retry_load" && doc->orphan.detached && doc->loaded)
     {
         // Asked for: tried now, and a few more times after if it fails.
-        doc->reattachTries = 0;
+        doc->orphan.reattachTries = 0;
         reattach(*doc);
     }
     else if (action == "copy")
     {
-        saveCopyToInventory(*doc);
+        mWindow.saveCopyToInventory(*doc);
     }
     else if (action == "export")
     {
-        mFiles.saveCopy();
+        mWindow.saveCopyToFile();
     }
     else if (action == "save")
     {
-        mSaving.saveAsked(*doc);
+        mWindow.saveAgain(*doc);
     }
     refreshNotice();
 }

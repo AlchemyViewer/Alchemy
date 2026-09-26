@@ -1449,42 +1449,52 @@
                  background_opaque="true"
                  bg_opaque_color="DkGray"
                  border="true">
-                    <text
-                     follows="left|top|right"
-                     height="16"
+                    <panel
+                     class="script_studio_notice"
+                     follows="all"
+                     height="28"
                      layout="topleft"
-                     left="8"
-                     name="notice_text"
-                     text_color="AlertCautionTextColor"
-                     top="6"
-                     use_ellipses="true"
-                     width="300" />
-                    <button
-                     follows="right|top"
-                     height="22"
-                     layout="topleft"
-                     name="notice_first"
-                     right="-120"
-                     top="3"
-                     width="100" />
-                    <button
-                     follows="right|top"
-                     height="22"
-                     layout="topleft"
-                     name="notice_second"
-                     right="-30"
-                     top="3"
-                     width="86" />
-                    <button
-                     follows="right|top"
-                     height="22"
-                     label="&#215;"
-                     layout="topleft"
-                     name="notice_close"
-                     right="-4"
-                     tool_tip="Hide this until there is something else to say"
-                     top="3"
-                     width="22" />
+                     left="0"
+                     name="notice"
+                     top="0"
+                     width="574">
+                        <text
+                         follows="left|top|right"
+                         height="16"
+                         layout="topleft"
+                         left="8"
+                         name="notice_text"
+                         text_color="AlertCautionTextColor"
+                         top="6"
+                         use_ellipses="true"
+                         width="300" />
+                        <button
+                         follows="right|top"
+                         height="22"
+                         layout="topleft"
+                         name="notice_first"
+                         right="-120"
+                         top="3"
+                         width="100" />
+                        <button
+                         follows="right|top"
+                         height="22"
+                         layout="topleft"
+                         name="notice_second"
+                         right="-30"
+                         top="3"
+                         width="86" />
+                        <button
+                         follows="right|top"
+                         height="22"
+                         label="&#215;"
+                         layout="topleft"
+                         name="notice_close"
+                         right="-4"
+                         tool_tip="Hide this until there is something else to say"
+                         top="3"
+                         width="22" />
+                    </panel>
                 </layout_panel>
                 <layout_panel
                  auto_resize="true"
