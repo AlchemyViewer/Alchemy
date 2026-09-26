@@ -479,13 +479,12 @@ ALXUIEdit::Step::~Step()
         // What the step did is settled only now: where an element landed
         // is read after the splice that put it there, and the record was
         // taken at the first splice.
-        if (mDoc.mStepOpen && !mDoc.mUndoWhat.empty())
+        if (mDoc.mStepOpen && mDoc.mSteps.canUndo())
         {
-            mDoc.mUndoWhat.back() = mDoc.mPending;
+            mDoc.mSteps.newest().what = mDoc.mPending;
         }
         // A step that is done is a step past which nothing is redone.
         mDoc.mRedoHeld.clear();
-        mDoc.mRedoWhatHeld.clear();
         mDoc.mStepOpen = false;
     }
 }
@@ -496,13 +495,9 @@ void ALXUIEdit::abandonStep()
     {
         return;
     }
-    mText = std::move(mUndo.back());
-    mUndo.pop_back();
-    mUndoWhat.pop_back();
-    mRedo = std::move(mRedoHeld);
-    mRedoWhat = std::move(mRedoWhatHeld);
+    mText = std::move(mSteps.takeUndo()->text);
+    mSteps.putForward(std::move(mRedoHeld));
     mRedoHeld.clear();
-    mRedoWhatHeld.clear();
     --mTaken;
     mStepOpen = false;
     mDirty = mText != mSaved;
@@ -549,26 +544,11 @@ void ALXUIEdit::splice(const Span& span, std::string_view text)
     // fails before it changes anything leaves no step behind.
     if (mDepth > 0 && !mStepOpen)
     {
-        mUndo.push_back(mText);
-        mUndoWhat.push_back(mPending);
-        mRedoHeld = std::move(mRedo);
-        mRedoWhatHeld = std::move(mRedoWhat);
-        mRedo.clear();
-        mRedoWhat.clear();
+        mRedoHeld = mSteps.takeForward();
+        mSteps.note(Held{ mText, mPending, std::string() }, std::string_view(), 0.0, 0.0, [](Held&, Held&&) {});
         mStepOpen = true;
         ++mTaken;
-
-        size_t held = 0;
-        for (const std::string& step : mUndo)
-        {
-            held += step.size();
-        }
-        while (mUndo.size() > 1 && held > UNDO_BYTES)
-        {
-            held -= mUndo.front().size();
-            mUndo.erase(mUndo.begin());
-            mUndoWhat.erase(mUndoWhat.begin());
-        }
+        mSteps.forgetOverBudget(UNDO_BYTES, [](const Held& step) { return step.text.size(); });
     }
 
     mText.replace(span.offset, span.length, text);
@@ -578,48 +558,41 @@ void ALXUIEdit::splice(const Span& span, std::string_view text)
 
 bool ALXUIEdit::undo()
 {
-    if (mUndo.empty())
+    std::optional<Held> step = mSteps.takeUndo();
+    if (!step)
     {
         return false;
     }
     // The step being put back is the one that followed the text being
     // restored, so what it did travels with it onto the other stack.
-    mLastChange = mUndoWhat.back();
+    mLastChange = step->what;
     // The step is taken back, so the element reads as it did before it.
     mLastPath = mLastChange.path;
-    mRedo.push_back(std::move(mText));
-    mRedoWhat.push_back(mLastChange);
-    mUndoWhat.pop_back();
-    mText = std::move(mUndo.back());
-    mUndo.pop_back();
+    mSteps.pushRedo(Held{ std::move(mText), mLastChange, std::string() });
+    mText = std::move(step->text);
     mDirty = mText != mSaved;
     return parse();
 }
 
 bool ALXUIEdit::redo()
 {
-    if (mRedo.empty())
+    std::optional<Held> step = mSteps.takeRedo();
+    if (!step)
     {
         return false;
     }
-    mLastChange = mRedoWhat.back();
+    mLastChange = step->what;
     // The step is applied again, so the element is where the step put it.
     mLastPath = mLastChange.after;
-    mUndo.push_back(std::move(mText));
-    mUndoWhat.push_back(mLastChange);
-    mRedoWhat.pop_back();
-    mText = std::move(mRedo.back());
-    mRedo.pop_back();
+    mSteps.pushUndo(Held{ std::move(mText), mLastChange, std::string() });
+    mText = std::move(step->text);
     mDirty = mText != mSaved;
     return parse();
 }
 
 void ALXUIEdit::clearHistory()
 {
-    mUndo.clear();
-    mRedo.clear();
-    mUndoWhat.clear();
-    mRedoWhat.clear();
+    mSteps.clear();
     mLastChange = Change();
     mLastPath.clear();
     mTaken = 0;

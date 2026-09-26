@@ -148,9 +148,9 @@ ALXUIDocuments::Action::Action(ALXUIDocuments& documents)
 :   mDocuments(documents)
 {
     // Whatever was done before this is done: what happens from here is the
-    // one thing this Action stands for.
+    // one thing this Action stands for, a group of the stack's.
     mDocuments.settle();
-    ++mDocuments.mOpenActions;
+    mDocuments.mActions.beginGroup();
 }
 
 ALXUIDocuments::Action::~Action()
@@ -165,10 +165,9 @@ void ALXUIDocuments::Action::close()
         return;
     }
     mOpen = false;
-    if (--mDocuments.mOpenActions == 0)
-    {
-        mDocuments.settle();
-    }
+    // What it did since the last look goes into its step before it closes.
+    mDocuments.settle();
+    mDocuments.mActions.endGroup();
 }
 
 // Counted as steps taken rather than as the depth of the stack, since the
@@ -186,11 +185,6 @@ void ALXUIDocuments::remember()
 
 void ALXUIDocuments::settle()
 {
-    if (mOpenActions > 0)
-    {
-        return;     // still inside something, so it is not finished
-    }
-
     Taken taken;
     for (const std::string& path : mPaths)
     {
@@ -220,17 +214,40 @@ void ALXUIDocuments::settle()
     }
 
     // Everything taken since this last looked is one thing, because looking
-    // is what says a thing has finished: a caller settles after each edit,
-    // and an Action is a caller saying not to settle in the middle of one.
-    // A one-step edit to a field joins a run of edits to the same field,
-    // within the window: the steps add up, and what the run did is what
-    // its last step did.
+    // is what says a thing has finished: a caller settles after each edit.
+    // Inside an Action it is more of the Action's one thing, in whatever
+    // documents it went: steps of the same document added up, and it is not
+    // one field, having been more than one step. Outside one, a one-step
+    // edit to a field joins a run of edits to the same field, within the
+    // window: the steps add up, and what the run did is what its last step
+    // did.
     taken.sameField = taken.steps.size() == 1 && taken.steps.front().second == 1 && taken.what.oneField;
-    const std::string key = mCoalesceWindow > 0.0 && taken.sameField ? runKey(taken) : std::string();
+    const std::string key     = mCoalesceWindow > 0.0 && taken.sameField ? runKey(taken) : std::string();
+    const bool        grouped = mActions.inGroup();
     mActions.note(std::move(taken), key, LLFrameTimer::getTotalSeconds(), mCoalesceWindow,
-        [](Taken& last, Taken&& next)
+        [grouped](Taken& last, Taken&& next)
         {
-            last.steps.front().second += next.steps.front().second;
+            if (grouped)
+            {
+                for (auto& [path, count] : next.steps)
+                {
+                    auto same = std::find_if(last.steps.begin(), last.steps.end(),
+                                             [&path](const std::pair<std::string, S32>& step) { return step.first == path; });
+                    if (same != last.steps.end())
+                    {
+                        same->second += count;
+                    }
+                    else
+                    {
+                        last.steps.emplace_back(std::move(path), count);
+                    }
+                }
+                last.sameField = false;
+            }
+            else
+            {
+                last.steps.front().second += next.steps.front().second;
+            }
             last.what = std::move(next.what);
         });
 }

@@ -209,7 +209,6 @@ private:
     boost::unordered_flat_map<std::string, size_t, ll::string_hash, std::equal_to<> > mSeen;
     ALUndoStack<Taken>          mActions;
     F64                         mCoalesceWindow = 0.0;
-    S32                         mOpenActions = 0;
     ALXUIEdit::Change           mLastChange;
     ALXUIEdit::path_t           mLastPath;
     std::string                 mLastDocument;

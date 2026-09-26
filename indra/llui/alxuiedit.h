@@ -24,10 +24,12 @@
 
 #pragma once
 
+#include "alundostack.h"
 #include "stdtypes.h"
 
 #include <pugixml.hpp>
 
+#include <limits>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -181,12 +183,12 @@ public:
         bool        oneField = false;   // and nothing else was
     };
 
-    bool canUndo() const { return !mUndo.empty(); }
-    bool canRedo() const { return !mRedo.empty(); }
+    bool canUndo() const { return mSteps.canUndo(); }
+    bool canRedo() const { return mSteps.canRedo(); }
     bool undo();
     bool redo();
     void clearHistory();
-    size_t undoDepth() const { return mUndo.size(); }
+    size_t undoDepth() const { return mSteps.inForce(); }
     // How many steps have been taken since the file was read, undone or
     // not. The stack is capped by what it weighs, so its depth stops
     // growing once it is full; a caller counting steps counts this.
@@ -197,8 +199,8 @@ public:
 
     // And what the next one would, for a caller that says what a gesture is
     // about to do before it is asked to do it. Null where there is none.
-    const Change* nextUndo() const { return mUndoWhat.empty() ? nullptr : &mUndoWhat.back(); }
-    const Change* nextRedo() const { return mRedoWhat.empty() ? nullptr : &mRedoWhat.back(); }
+    const Change* nextUndo() const { return mSteps.canUndo() ? &mSteps.undone().back().what : nullptr; }
+    const Change* nextRedo() const { return mSteps.canRedo() ? &mSteps.redone().back().what : nullptr; }
 
     // And where the element it was about is to be found now: an undo leaves
     // it where it was before the step, a redo where the step put it. The two
@@ -361,14 +363,19 @@ private:
     void landed(size_t name_offset);
     pugi::xml_node elementNamedAt(size_t name_offset) const;
 
-    std::vector<std::string>        mUndo;
-    std::vector<std::string>        mRedo;
-    std::vector<Change>             mUndoWhat;      // beside each step
-    std::vector<Change>             mRedoWhat;
+    // A step: the whole text on the other side of it, and what the step
+    // did.
+    struct Held
+    {
+        std::string text;
+        Change      what;
+        std::string mLabel;
+    };
+    // Capped by what the texts weigh, not by how many there are.
+    ALUndoStack<Held>               mSteps{ std::numeric_limits<size_t>::max() };
     // What could be redone before the step in hand: gone once the step
     // is done, back if the step is abandoned.
-    std::vector<std::string>        mRedoHeld;
-    std::vector<Change>             mRedoWhatHeld;
+    std::vector<Held>               mRedoHeld;
     Change                          mPending;       // of the operation in hand
     Change                          mLastChange;    // of the last one put back
     path_t                          mLastPath;      // where that leaves it

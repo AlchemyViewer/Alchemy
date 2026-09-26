@@ -29,6 +29,7 @@
 #include "../test/lltut.h"
 
 #include <algorithm>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -298,5 +299,32 @@ namespace tut
         ensure("each named by the group", stack.undone()[1].mLabel == "Insert" && stack.undone()[2].mLabel == "Insert");
         ensure_equals("as many forgotten as it closes as are over", stack.endGroup(), size_t(2));
         ensure("the newest kept", stack.inForce() == 1 && stack.undone()[0].mNames == std::vector<std::string>{ "c", "d" });
+    }
+
+    template<> template<>
+    void alundostack_object::test<11>()
+    {
+        set_test_name("a stack capped by what its steps weigh, the newest always kept; the steps forward taken out whole and put back");
+        ALUndoStack<Step> stack(std::numeric_limits<size_t>::max());
+        const auto weight = [](const Step& step) { return step.mNames.front().size(); };
+        stack.note({ { "aaaa" } }, "", 0.0, 1.0, join);
+        stack.note({ { "bbb" } }, "", 5.0, 1.0, join);
+        stack.note({ { "cc" } }, "", 10.0, 1.0, join);
+        ensure_equals("within the budget: none", stack.forgetOverBudget(9, weight), size_t(0));
+        ensure_equals("past it: the oldest until within", stack.forgetOverBudget(5, weight), size_t(1));
+        ensure("the newer kept", stack.inForce() == 2 && stack.undone().front().mNames.front() == "bbb");
+        ensure_equals("the newest kept whatever it weighs", stack.forgetOverBudget(0, weight), size_t(1));
+        ensure("alone", stack.inForce() == 1 && stack.undone().front().mNames.front() == "cc");
+
+        stack.note({ { "d" } }, "", 20.0, 1.0, join);
+        stack.pushRedo(*stack.takeUndo());
+        stack.note({ { "e" } }, "", 30.0, 1.0, join);
+        stack.pushRedo(*stack.takeUndo());
+        stack.pushRedo(*stack.takeUndo());
+        std::vector<Step> forward = stack.takeForward();
+        ensure("taken out", forward.size() == 2 && !stack.canRedo());
+        stack.putForward(std::move(forward));
+        std::optional<Step> next = stack.takeRedo();
+        ensure("put back in their order", next && next->mNames.front() == "cc");
     }
 }

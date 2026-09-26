@@ -215,6 +215,33 @@ public:
     // back from a redo, or one that could not be taken put back.
     void pushUndo(Step step) { mUndo.push_back(std::move(step)); }
     void pushRedo(Step step) { mRedo.push_back(std::move(step)); }
+    // The steps forward taken out whole, and put back whole: what a change
+    // about to be noted throws away, held by a caller who may yet take that
+    // change back -- an edit that fails part way -- and give them back.
+    std::vector<Step> takeForward() { return std::exchange(mRedo, std::vector<Step>()); }
+    void              putForward(std::vector<Step> forward) { mRedo = std::move(forward); }
+
+    // The oldest steps back forgotten while what they weigh together --
+    // `weigh(step)` each -- is past a budget, the newest always kept: a
+    // stack of whole texts capped by the bytes it holds rather than by how
+    // many. How many were forgotten.
+    template <typename Weigh>
+    size_t forgetOverBudget(size_t budget, Weigh&& weigh)
+    {
+        size_t held = 0;
+        for (const Step& step : mUndo)
+        {
+            held += weigh(step);
+        }
+        size_t forgot = 0;
+        while (mUndo.size() > 1 && held > budget)
+        {
+            held -= weigh(mUndo.front());
+            mUndo.erase(mUndo.begin());
+            ++forgot;
+        }
+        return forgot;
+    }
 
     // Everything done, and how many are in force: the steps back, oldest
     // first, the last the next to be taken back; and the steps forward,

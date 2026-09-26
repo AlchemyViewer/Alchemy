@@ -430,4 +430,42 @@ namespace tut
         ensure_equals("a new run, and the one put back is gone", all.size(), 1u);
         ensure_equals("of one step", all[0].steps, 1);
     }
+
+    // Looked at in the middle -- a caller settling after each edit while an
+    // Action is open -- an Action is still the one thing: its steps in each
+    // document added up, not one field though its first step was, and put
+    // back and on again in one.
+    template<> template<>
+    void alxuidocuments_object::test<12>()
+    {
+        const std::string first  = write("first.xml", panel("a"));
+        const std::string second = write("second.xml", panel("b"));
+        ALXUIDocuments open;
+        open.setCoalesceWindow(60.0);
+        ALXUIEdit* one = open.open(first);
+        ALXUIEdit* two = open.open(second);
+        ensure("opens both", one && two);
+        {
+            ALXUIDocuments::Action together(open);
+            ensure("writes", one->setAttribute({ "a" }, "width", "11"));
+            open.settle();
+            ensure("writes", two->setAttribute({ "b" }, "width", "21"));
+            open.settle();
+            ensure("writes", one->setAttribute({ "a" }, "height", "12"));
+            open.settle();
+        }
+        std::vector<ALXUIDocuments::Entry> all = open.history();
+        ensure_equals("one action", all.size(), 1u);
+        ensure_equals("of three steps", all[0].steps, 3);
+        ensure_equals("in two documents", all[0].documents, 2);
+        ensure("not one field", !all[0].sameField);
+        ensure("put back", open.undo());
+        ensure("all of it", one->resolve({ "a" }).attribute("width").as_int() == 10 &&
+                                one->resolve({ "a" }).attribute("height").as_int() == 10 &&
+                                two->resolve({ "b" }).attribute("width").as_int() == 10);
+        ensure("nothing else", !open.canUndo());
+        ensure("done again", open.redo());
+        ensure("all of it", one->resolve({ "a" }).attribute("height").as_int() == 12 &&
+                                two->resolve({ "b" }).attribute("width").as_int() == 21);
+    }
 }
