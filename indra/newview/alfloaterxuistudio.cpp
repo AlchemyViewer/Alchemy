@@ -26,6 +26,8 @@
 
 #include "alfloaterxuistudio.h"
 
+#include "alpanelist.h"
+
 #include "alwatchedfile.h"
 #include "alxmldocument.h"
 #include "alxmllayermerge.h"
@@ -1267,8 +1269,6 @@ ALFloaterXUIStudio::ALFloaterXUIStudio(const LLSD& key)
     mDocuments.setCoalesceWindow(COALESCE_SECONDS);
     mCommitCallbackRegistrar.add("XUIStudio.Tree", boost::bind(&ALFloaterXUIStudio::onTreeAction, this, _2));
     mEnableCallbackRegistrar.add("XUIStudio.TreeEnabled", boost::bind(&ALFloaterXUIStudio::onTreeActionEnabled, this, _2));
-    mCommitCallbackRegistrar.add("XUIStudio.List", boost::bind(&ALFloaterXUIStudio::onListAction, this, _2));
-    mEnableCallbackRegistrar.add("XUIStudio.ListEnabled", boost::bind(&ALFloaterXUIStudio::onListActionEnabled, this, _2));
     mCommitCallbackRegistrar.add("XUIStudio.Menu", boost::bind(&ALFloaterXUIStudio::onMenuAction, this, _2));
     mEnableCallbackRegistrar.add("XUIStudio.MenuCheck", boost::bind(&ALFloaterXUIStudio::onMenuCheck, this, _2));
     mEnableCallbackRegistrar.add("XUIStudio.MenuEnable", boost::bind(&ALFloaterXUIStudio::onMenuEnable, this, _2));
@@ -1288,7 +1288,7 @@ bool ALFloaterXUIStudio::postBuild()
 {
     addKeys();
     mCatalogFilter = getChild<LLFilterEditor>("catalog_filter");
-    mFileList = getChild<LLScrollListCtrl>("file_list");
+    mFileList = getChild<ALPaneList>("file_list");
     mSkinCombo = getChild<LLComboBox>("skin_combo");
     mLanguageCombo = getChild<LLComboBox>("language_combo");
     mLanguageCombo2 = getChild<LLComboBox>("language_combo_2");
@@ -1299,14 +1299,14 @@ bool ALFloaterXUIStudio::postBuild()
     ALXUILint::readWords();
     ALXUINotes::get();
     mScopeBar = getChild<ALScopeBar>("scope_bar");
-    mFindResults = getChild<LLScrollListCtrl>("find_results");
+    mFindResults = getChild<ALPaneList>("find_results");
     mTreeFilter = getChild<LLFilterEditor>("tree_filter");
     mTreePanel = getChild<LLPanel>("tree_host");
     mBreadcrumb = getChild<ALJumpBar>("breadcrumb");
-    mFindings = getChild<LLScrollListCtrl>("findings");
+    mFindings = getChild<ALPaneList>("findings");
     mHistory = getChild<ALHistoryList>("history");
-    mDocumentList = getChild<LLScrollListCtrl>("documents");
-    mSourceLayerList = getChild<LLScrollListCtrl>("source_layer_list");
+    mDocumentList = getChild<ALPaneList>("documents");
+    mSourceLayerList = getChild<ALPaneList>("source_layer_list");
     mOverrideField = getChild<LLTextBox>("override_field");
     mFindingScope = getChild<LLComboBox>("finding_scope");
     mFindingRule = getChild<LLComboBox>("finding_rule");
@@ -1396,7 +1396,7 @@ bool ALFloaterXUIStudio::postBuild()
         {
             mAttributeGrid->setNested(ctrl->getValue().asBoolean());
         });
-    mLayout = getChild<LLScrollListCtrl>("layout");
+    mLayout = getChild<ALPaneList>("layout");
     mSourceLayers = getChild<LLTextBox>("source_layers");
     mSourceText = getChild<ALCodeEditor>("source_text");
     // The source as an editor: what could go here from the schema, what
@@ -1417,9 +1417,9 @@ bool ALFloaterXUIStudio::postBuild()
             refreshSource(selectedView());
         }
     });
-    mBindings = getChild<LLScrollListCtrl>("bindings");
-    mState = getChild<LLScrollListCtrl>("state");
-    mSelectionFindings = getChild<LLScrollListCtrl>("selection_findings");
+    mBindings = getChild<ALPaneList>("bindings");
+    mState = getChild<ALPaneList>("state");
+    mSelectionFindings = getChild<ALPaneList>("selection_findings");
     setMenuBar(getChild<LLMenuBarGL>("studio_menu"));
     // Two strips, split by what each mode needs rather than by what it is
     // about. The navigator holds the ones that are a list of names and read
@@ -1461,7 +1461,7 @@ bool ALFloaterXUIStudio::postBuild()
             mInspectors->setTabImage(panel, icon);
         }
     }
-    mNotifications = getChild<LLScrollListCtrl>("notifications");
+    mNotifications = getChild<ALPaneList>("notifications");
     mNotificationFilter = getChild<LLFilterEditor>("notification_filter");
     mAttributeGrid->onFieldCommit(boost::bind(&ALFloaterXUIStudio::onFieldCommit, this, _1, _2));
     mAttributeGrid->onFieldRemove(boost::bind(&ALFloaterXUIStudio::onFieldRemove, this, _1));
@@ -1471,7 +1471,7 @@ bool ALFloaterXUIStudio::postBuild()
         {
             mAttributeGrid->setAuthoredOnly(ctrl->getValue().asBoolean());
         });
-    mChannels = getChild<LLScrollListCtrl>("channels");
+    mChannels = getChild<ALPaneList>("channels");
     mChannelResponse = getChild<LLComboBox>("channel_response");
     mPalette = getChild<ALSpecimenList>("palette");
     getChild<LLButton>("palette_cells")->setCommitCallback([this](LLUICtrl* ctrl, const LLSD&)
@@ -1480,7 +1480,7 @@ bool ALFloaterXUIStudio::postBuild()
         mPalette->setCellSize(mPaletteCells ? PALETTE_CELL_WIDTH : 0, mPaletteCells ? PALETTE_CELL_HEIGHT : 0);
         saveState();
     });
-    mPaletteAttributes = getChild<LLScrollListCtrl>("palette_attributes");
+    mPaletteAttributes = getChild<ALPaneList>("palette_attributes");
     // The tag chosen above decides what is listed below it.
     mPalette->onChose([this](const std::string&) { fillPaletteAttributes(); });
     mPalette->setDragStarter(boost::bind(&ALFloaterXUIStudio::startPaletteDrag, this, _1));
@@ -1504,7 +1504,7 @@ bool ALFloaterXUIStudio::postBuild()
     getChild<LLButton>("tree_in")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::onTreeMove, this, "move_in"));
     getChild<LLButton>("tree_out")->setClickedCallback(boost::bind(&ALFloaterXUIStudio::onTreeMove, this, "move_out"));
     mTranslateLanguage = getChild<LLComboBox>("translate_language");
-    mTranslateList = getChild<LLScrollListCtrl>("translate_list");
+    mTranslateList = getChild<ALPaneList>("translate_list");
     mTranslateValue = getChild<LLTextEditor>("translate_value");
     mTranslateCounts = getChild<LLTextBox>("translate_counts");
     mEditTarget = getChild<LLTextBox>("edit_target");
@@ -1600,11 +1600,14 @@ bool ALFloaterXUIStudio::postBuild()
         filter->setCommitCallback(boost::bind(&ALFloaterXUIStudio::onFindingFilter, this));
     }
 
-    // Every table in the tool copies the same way.
-    for (LLScrollListCtrl* list : { mFileList, mFindResults, mFindings, mDocumentList, mSourceLayerList,
-                                    mLayout, mBindings, mState, mSelectionFindings, mTranslateList })
+    // Every table in the tool is one someone will want in a message or a
+    // bug report, and copies the same way: a line saying which file and
+    // which element it is about, then the rows as a table (ALPaneList).
+    for (ALPaneList* list : { mFileList, mFindResults, mFindings, mDocumentList, mSourceLayerList,
+                              mLayout, mBindings, mState, mSelectionFindings, mTranslateList })
     {
-        watchList(list);
+        list->setCopyable(true);
+        list->setCopyCaption([this, list]() { return listCaption(list); });
     }
     mInspectors->setCommitCallback(boost::bind(&ALFloaterXUIStudio::refreshInspectors, this));
     mModes->setCommitCallback(boost::bind(&ALFloaterXUIStudio::onMode, this));
@@ -2004,14 +2007,6 @@ bool ALFloaterXUIStudio::handleKeyHere(KEY key, MASK mask)
         case KEY_LEFT:  onTreeMove("move_out");  return true;
         case 'D':       onTreeMove("duplicate"); return true;
         default: break;
-        }
-    }
-    if (key == 'C' && mask == MASK_CONTROL)
-    {
-        if (LLScrollListCtrl* list = focusedList())
-        {
-            copyList(list, list->getAllSelected());
-            return true;
         }
     }
     // The panes keep their own keys: the hierarchy walks itself with the
@@ -6240,60 +6235,6 @@ void ALFloaterXUIStudio::finishLintAll()
     fillFindings();
 }
 
-// A list's rows are a table, and where a copied table is going is a bug
-// report or a message: it carries a line saying which file and which
-// element it is about, a heading naming its columns, and its columns lined
-// up. An empty column is left out, since a heading over nothing tells no
-// one anything.
-namespace
-{
-    // Widths count characters and not bytes, since these tables carry
-    // translated text.
-    S32 xui_display_width(const std::string& text)
-    {
-        S32 count = 0;
-        for (const char c : text)
-        {
-            count += ((U8)c & 0xC0) != 0x80;
-        }
-        return count;
-    }
-
-    // A cell with a newline or a tab in it would break the table it is
-    // being written into.
-    std::string xui_one_line(std::string text)
-    {
-        for (char& c : text)
-        {
-            if (c == '\n' || c == '\r' || c == '\t')
-            {
-                c = ' ';
-            }
-        }
-        return text;
-    }
-}
-
-void ALFloaterXUIStudio::watchList(LLScrollListCtrl* list)
-{
-    list->setRightMouseDownCallback(boost::bind(&ALFloaterXUIStudio::onListRightClick, this, _1, _2, _3, _4));
-    mLists.push_back(list);
-}
-
-// Control+C over a list copies what the menu's Copy would, rather than the
-// comma-separated rows the edit menu would reach.
-LLScrollListCtrl* ALFloaterXUIStudio::focusedList() const
-{
-    for (LLScrollListCtrl* list : mLists)
-    {
-        if (list->hasFocus())
-        {
-            return list;
-        }
-    }
-    return nullptr;
-}
-
 std::string ALFloaterXUIStudio::listCaption(const LLScrollListCtrl* list) const
 {
     LLStringUtil::format_map_t args;
@@ -6334,213 +6275,6 @@ std::string ALFloaterXUIStudio::listCaption(const LLScrollListCtrl* list) const
         args["[WHAT]"] = getString("CaptionOf", args);
     }
     return getString("CaptionIn", args);
-}
-
-std::string ALFloaterXUIStudio::listAsText(LLScrollListCtrl* list, const std::vector<LLScrollListItem*>& rows) const
-{
-    const S32 columns = list->getNumColumns();
-    if (columns <= 0 || rows.empty())
-    {
-        return std::string();
-    }
-
-    // A column draws no heading when it needs none, which leaves its name
-    // to stand for it here.
-    std::vector<std::string> heading((size_t)columns);
-    for (S32 i = 0; i < columns; ++i)
-    {
-        const LLScrollListColumn* column = list->getColumn(i);
-        if (!column)
-        {
-            continue;
-        }
-        heading[i] = column->mLabel.getString();
-        if (heading[i].empty())
-        {
-            heading[i] = column->mName;
-            if (!heading[i].empty())
-            {
-                heading[i][0] = (char)toupper((U8)heading[i][0]);
-            }
-        }
-    }
-
-    std::vector<std::vector<std::string>> cells;
-    std::vector<bool> used((size_t)columns, false);
-    cells.reserve(rows.size());
-    for (const LLScrollListItem* item : rows)
-    {
-        std::vector<std::string> line((size_t)columns);
-        for (S32 i = 0; i < columns; ++i)
-        {
-            const LLScrollListCell* cell = item->getColumn(i);
-            if (!cell)
-            {
-                continue;
-            }
-            line[i] = xui_one_line(cell->getValue().asString());
-            used[i] = used[i] || !line[i].empty();
-        }
-        cells.push_back(std::move(line));
-    }
-
-    S32 last = -1;
-    std::vector<S32> width((size_t)columns, 0);
-    for (S32 i = 0; i < columns; ++i)
-    {
-        if (!used[i])
-        {
-            continue;
-        }
-        last = i;
-        width[i] = xui_display_width(heading[i]);
-        for (const std::vector<std::string>& line : cells)
-        {
-            width[i] = llmax(width[i], xui_display_width(line[i]));
-        }
-        // One long value -- a tool tip, a translated label -- would push
-        // every other row's remaining columns out past reading distance,
-        // so it is the one that steps out of line instead.
-        width[i] = llmin(width[i], 48);
-    }
-    if (last < 0)
-    {
-        return std::string();
-    }
-
-    std::string text = listCaption(list);
-    if (!text.empty())
-    {
-        text += "\n\n";
-    }
-    auto append = [&](const std::vector<std::string>& line)
-    {
-        for (S32 i = 0; i <= last; ++i)
-        {
-            if (!used[i])
-            {
-                continue;
-            }
-            text += line[i];
-            if (i != last)
-            {
-                text.append((size_t)llmax(0, width[i] - xui_display_width(line[i])) + 2, ' ');
-            }
-        }
-        text += '\n';
-    };
-    append(heading);
-    for (const std::vector<std::string>& line : cells)
-    {
-        append(line);
-    }
-    return text;
-}
-
-void ALFloaterXUIStudio::copyList(LLScrollListCtrl* list, const std::vector<LLScrollListItem*>& rows) const
-{
-    const std::string text = listAsText(list, rows);
-    if (!text.empty())
-    {
-        LLClipboard::instance().copyToClipboard(text, 0, (S32)text.size());
-    }
-}
-
-void ALFloaterXUIStudio::onListRightClick(LLUICtrl* ctrl, S32 x, S32 y, MASK mask)
-{
-    mMenuList = ctrl ? ctrl->as<LLScrollListCtrl>() : nullptr;
-    if (!mMenuList)
-    {
-        return;
-    }
-
-    // The right button does not select, so Copy would have the wrong rows,
-    // or none at all on the first click. Take the row under it, unless the
-    // click landed inside a selection someone has already made.
-    LLScrollListItem* hit = mMenuList->hitItem(x, y);
-    if (hit && !hit->getSelected())
-    {
-        mMenuList->selectItemAt(x, y, MASK_NONE);
-    }
-
-    // The one cell under the pointer, for the copy that is meant to be
-    // pasted into a line of code and not read.
-    mMenuCell.clear();
-    if (hit)
-    {
-        if (const LLScrollListCell* cell = hit->getColumn(mMenuList->getColumnIndexFromOffset(x)))
-        {
-            mMenuCell = cell->getValue().asString();
-        }
-    }
-
-    LLContextMenu* menu = static_cast<LLContextMenu*>(mListMenu.get());
-    if (!menu)
-    {
-        // The floater's registrars are its own scope, active while it
-        // builds itself and not a moment longer; a menu built later finds
-        // the names in them only if that scope is pushed for the build,
-        // which is what the hierarchy's own menu does.
-        mCommitCallbackRegistrar.pushScope();
-        mEnableCallbackRegistrar.pushScope();
-        menu = LLUICtrlFactory::getInstance()->createFromFile<LLContextMenu>(
-            "menu_xui_studio_list.xml", LLMenuGL::sMenuContainer, LLMenuHolderGL::child_registry_t::instance());
-        mEnableCallbackRegistrar.popScope();
-        mCommitCallbackRegistrar.popScope();
-        if (!menu)
-        {
-            return;
-        }
-        mListMenu = menu->getHandle();
-    }
-
-    // A context menu places itself; the popup puts it in front and takes
-    // the mouse. Both, in that order, as every other list here does.
-    menu->show(x, y);
-    LLMenuGL::showPopup(mMenuList, menu, x, y);
-}
-
-bool ALFloaterXUIStudio::onListActionEnabled(const LLSD& param)
-{
-    if (!mMenuList)
-    {
-        return false;
-    }
-    const std::string action = param.asString();
-    if (action == "copy_cell")
-    {
-        return !mMenuCell.empty();
-    }
-    if (action == "copy_all" || action == "select_all")
-    {
-        return mMenuList->getFirstData() != nullptr;
-    }
-    return mMenuList->getFirstSelected() != nullptr;
-}
-
-void ALFloaterXUIStudio::onListAction(const LLSD& param)
-{
-    if (!mMenuList)
-    {
-        return;
-    }
-    const std::string action = param.asString();
-    if (action == "copy_cell")
-    {
-        LLClipboard::instance().copyToClipboard(mMenuCell, 0, (S32)mMenuCell.size());
-    }
-    else if (action == "copy")
-    {
-        copyList(mMenuList, mMenuList->getAllSelected());
-    }
-    else if (action == "copy_all")
-    {
-        copyList(mMenuList, mMenuList->getAllData());
-    }
-    else if (action == "select_all")
-    {
-        mMenuList->selectAll();
-    }
 }
 
 // ---------------------------------------------------------------------------
@@ -9067,7 +8801,7 @@ void ALFloaterXUIStudio::openGutterPopover(const std::string& field)
     pp.rect = LLRect(0, ROWS + FOOT, WIDTH, 0);
     LLPanel* content = LLUICtrlFactory::create<LLPanel>(pp);
 
-    LLScrollListCtrl::Params lp(LLUICtrlFactory::getDefaultParams<LLScrollListCtrl>());
+    ALPaneList::Params lp(LLUICtrlFactory::getDefaultParams<ALPaneList>());
     lp.name = "layers";
     lp.rect = LLRect(0, ROWS + FOOT, WIDTH, FOOT);
     lp.follows.flags = FOLLOWS_ALL;
@@ -9077,7 +8811,7 @@ void ALFloaterXUIStudio::openGutterPopover(const std::string& field)
     LLStringUtil::format_map_t tip_args;
     tip_args["[ATTR]"] = field;
     lp.tool_tip = getString("GutterListTip", tip_args);
-    mGutterList = LLUICtrlFactory::create<LLScrollListCtrl>(lp);
+    mGutterList = LLUICtrlFactory::create<ALPaneList>(lp);
     content->addChild(mGutterList);
 
     LLScrollListColumn::Params force;

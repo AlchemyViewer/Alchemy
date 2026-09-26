@@ -766,7 +766,7 @@
                          min_dim="80"
                          name="file_list_area"
                          width="376">
-                            <scroll_list
+                            <pane_list
                              column_padding="0"
                              draw_heading="true"
                              multi_select="true"
@@ -778,25 +778,25 @@
                              tool_tip="Every XUI file the skins hold, and which of them have a copy of each. Choose one to build it on the canvas."
                              top="0"
                              width="376">
-                                <scroll_list.columns
+                                <pane_list.columns
                                  label="Kind"
                                  name="kind"
                                  width="58" />
-                                <scroll_list.columns
+                                <pane_list.columns
                                  dynamic_width="true"
                                  label="File"
                                  name="name" />
-                                <scroll_list.columns
+                                <pane_list.columns
                                  label="L"
                                  name="lang"
                                  tool_tip="The chosen language has a file"
                                  width="20" />
-                                <scroll_list.columns
+                                <pane_list.columns
                                  label="S"
                                  name="skin"
                                  tool_tip="The chosen skin has a file"
                                  width="20" />
-                            </scroll_list>
+                            </pane_list>
                         </layout_panel>
                         <layout_panel
                          auto_resize="false"
@@ -997,7 +997,7 @@
                          min_dim="60"
                          name="find_results_area"
                          width="376">
-                            <scroll_list
+                            <pane_list
                              column_padding="0"
                              draw_heading="true"
                              multi_select="true"
@@ -1009,23 +1009,23 @@
                              tool_tip="Where the words were found, gathered by file. Choose a row to open that file and select the element it is in."
                              top="0"
                              width="376">
-                                <scroll_list.columns
+                                <pane_list.columns
                                  label="File"
                                  name="file"
                                  width="110" />
-                                <scroll_list.columns
+                                <pane_list.columns
                                  label="Line"
                                  name="line"
                                  width="36" />
-                                <scroll_list.columns
+                                <pane_list.columns
                                  label="Layer"
                                  name="layer"
                                  width="60" />
-                                <scroll_list.columns
+                                <pane_list.columns
                                  dynamic_width="true"
                                  label="Match"
                                  name="snippet" />
-                            </scroll_list>
+                            </pane_list>
                         </layout_panel>
                     </layout_stack>
                 </panel>
@@ -1054,7 +1054,7 @@
                          min_dim="80"
                          name="documents_area"
                          width="376">
-                            <scroll_list
+                            <pane_list
                              column_padding="0"
                              draw_heading="true"
                              follows="all"
@@ -1065,25 +1065,25 @@
                              tool_tip="Double-click to look at one; a dot means it has work the disk has not heard about"
                              top="0"
                              width="376">
-                                <scroll_list.columns
+                                <pane_list.columns
                                  label=""
                                  name="dirty"
                                  tool_tip="a dot means unsaved"
                                  width="16" />
-                                <scroll_list.columns
+                                <pane_list.columns
                                  dynamic_width="true"
                                  label="File"
                                  name="file" />
-                                <scroll_list.columns
+                                <pane_list.columns
                                  label="Layer"
                                  name="layer"
                                  width="90" />
-                                <scroll_list.columns
+                                <pane_list.columns
                                  label="Steps"
                                  name="steps"
                                  tool_tip="how many edits are in it to put back"
                                  width="46" />
-                            </scroll_list>
+                            </pane_list>
                         </layout_panel>
                         <layout_panel
                          auto_resize="false"
@@ -1203,7 +1203,7 @@
                              top="2"
                              use_ellipses="true"
                              word_wrap="true" />
-                            <scroll_list
+                            <pane_list
                              column_padding="0"
                              draw_heading="true"
                              follows="all"
@@ -1214,19 +1214,19 @@
                              tool_tip="What the chosen tag takes, and what it already carries: an attribute written as what it carries says nothing the widget does not say itself"
                              top_pad="2"
                              width="376">
-                                <scroll_list.columns
+                                <pane_list.columns
                                  dynamic_width="true"
                                  label="Attribute"
                                  name="attribute" />
-                                <scroll_list.columns
+                                <pane_list.columns
                                  label="Type"
                                  name="type"
                                  width="96" />
-                                <scroll_list.columns
+                                <pane_list.columns
                                  label="Carries"
                                  name="carries"
                                  width="96" />
-                            </scroll_list>
+                            </pane_list>
                         </layout_panel>
                         <layout_panel
                          auto_resize="false"
@@ -1666,7 +1666,7 @@
                              layout="topleft"
                              name="findings_list_panel"
                              width="742">
-                                <scroll_list
+                                <pane_list
                                  column_padding="0"
                                  draw_heading="true"
                                  multi_select="true"
@@ -1678,33 +1678,33 @@
                                  tool_tip="What the parser, the factory, the layer merge and the rules found; double-click selects the element"
                                  top="0"
                                  width="742">
-                                    <scroll_list.columns
+                                    <pane_list.columns
                                      label=""
                                      name="severity"
                                      tool_tip="How bad it is: an error means the element does not work, a warning that it probably does not do what the file says, and a note is worth a look and often on purpose"
                                      width="52" />
-                                    <scroll_list.columns
+                                    <pane_list.columns
                                      label="Rule"
                                      name="rule"
                                      width="110" />
-                                    <scroll_list.columns
+                                    <pane_list.columns
                                      label="Line"
                                      name="line"
                                      width="44" />
-                                    <scroll_list.columns
+                                    <pane_list.columns
                                      dynamic_width="true"
                                      label="Where"
                                      name="where" />
-                                    <scroll_list.columns
+                                    <pane_list.columns
                                      dynamic_width="true"
                                      label="What"
                                      name="message" />
-                                    <scroll_list.columns
+                                    <pane_list.columns
                                      dynamic_width="true"
                                      label="Fix"
                                      name="fix"
                                      tool_tip="What this tool would do about it, where it knows" />
-                                </scroll_list>
+                                </pane_list>
                             </layout_panel>
                             <layout_panel
                              auto_resize="false"
@@ -1845,7 +1845,7 @@
                              min_dim="48"
                              name="translate_table"
                              width="742">
-                                <scroll_list
+                                <pane_list
                                  column_padding="0"
                                  draw_heading="true"
                                  multi_select="true"
@@ -1857,33 +1857,33 @@
                                  tool_tip="One row per field a translator writes; double-click selects the element"
                                  top="0"
                                  width="742">
-                                    <scroll_list.columns
+                                    <pane_list.columns
                                      label="Where"
                                      name="path"
                                      width="160" />
-                                    <scroll_list.columns
+                                    <pane_list.columns
                                      label="Field"
                                      name="field"
                                      width="80" />
-                                    <scroll_list.columns
+                                    <pane_list.columns
                                      dynamic_width="true"
                                      label="English"
                                      name="english" />
-                                    <scroll_list.columns
+                                    <pane_list.columns
                                      dynamic_width="true"
                                      label="Translation"
                                      name="translation" />
-                                    <scroll_list.columns
+                                    <pane_list.columns
                                      label="State"
                                      name="state"
                                      tool_tip="Whether the language has this value, is missing it, or writes it at a path the base has moved on from"
                                      width="120" />
-                                    <scroll_list.columns
+                                    <pane_list.columns
                                      label="Fits"
                                      name="fits"
                                      tool_tip="Whether the translation fits its widget in the second variant"
                                      width="36" />
-                                </scroll_list>
+                                </pane_list>
                             </layout_panel>
                             <layout_panel
                              auto_resize="false"
@@ -1952,7 +1952,7 @@
                              min_dim="60"
                              name="notifications_area"
                              width="742">
-                                <scroll_list
+                                <pane_list
                                  column_padding="0"
                                  draw_heading="true"
                                  follows="all"
@@ -1963,23 +1963,23 @@
                                  tool_tip="Every template notifications.xml declares; select one to build the panel it would produce"
                                  top="0"
                                  width="742">
-                                    <scroll_list.columns
+                                    <pane_list.columns
                                      label="Name"
                                      name="name"
                                      width="240" />
-                                    <scroll_list.columns
+                                    <pane_list.columns
                                      label="Type"
                                      name="type"
                                      width="90" />
-                                    <scroll_list.columns
+                                    <pane_list.columns
                                      label="Buttons"
                                      name="buttons"
                                      width="60" />
-                                    <scroll_list.columns
+                                    <pane_list.columns
                                      dynamic_width="true"
                                      label="Message"
                                      name="message" />
-                                </scroll_list>
+                                </pane_list>
                             </layout_panel>
                             <layout_panel
                              auto_resize="false"
@@ -2102,7 +2102,7 @@
                              min_dim="60"
                              name="channels_area"
                              width="742">
-                                <scroll_list
+                                <pane_list
                                  column_padding="0"
                                  draw_heading="true"
                                  follows="all"
@@ -2113,23 +2113,23 @@
                                  tool_tip="Every notification through every channel since this floater opened, in the order the channels process them"
                                  top="0"
                                  width="742">
-                                    <scroll_list.columns
+                                    <pane_list.columns
                                      label="Channel"
                                      name="channel"
                                      width="140" />
-                                    <scroll_list.columns
+                                    <pane_list.columns
                                      label="Notification"
                                      name="name"
                                      width="200" />
-                                    <scroll_list.columns
+                                    <pane_list.columns
                                      label="Time"
                                      name="time"
                                      width="80" />
-                                    <scroll_list.columns
+                                    <pane_list.columns
                                      dynamic_width="true"
                                      label="Message"
                                      name="message" />
-                                </scroll_list>
+                                </pane_list>
                             </layout_panel>
                         </layout_stack>
                     </panel>
@@ -2223,7 +2223,7 @@
                  name="layout_tab"
                  tool_tip="Layout: where the element ended up, and which of its numbers decided that"
                  width="478">
-                    <scroll_list
+                    <pane_list
                      column_padding="0"
                      draw_heading="true"
                      multi_select="true"
@@ -2235,15 +2235,15 @@
                      tool_tip="What decides where this element is: its own numbers, the numbers the file writes, and what its parent does with them."
                      top="0"
                      width="478">
-                        <scroll_list.columns
+                        <pane_list.columns
                          label="Property"
                          name="property"
                          width="160" />
-                        <scroll_list.columns
+                        <pane_list.columns
                          dynamic_width="true"
                          label="Value"
                          name="value" />
-                    </scroll_list>
+                    </pane_list>
                 </panel>
                 <panel
                  label="Source"
@@ -2298,7 +2298,7 @@
                          min_dim="60"
                          name="source_layers_panel"
                          width="478">
-                            <scroll_list
+                            <pane_list
                              column_padding="0"
                              draw_heading="true"
                              follows="all"
@@ -2309,24 +2309,24 @@
                              tool_tip="Every layer of this file: what each says about the chosen field, and which one the merge takes"
                              top="0"
                              width="478">
-                                <scroll_list.columns
+                                <pane_list.columns
                                  label=""
                                  name="force"
                                  tool_tip="a dot marks the one in force"
                                  width="16" />
-                                <scroll_list.columns
+                                <pane_list.columns
                                  label="Layer"
                                  name="layer"
                                  width="110" />
-                                <scroll_list.columns
+                                <pane_list.columns
                                  dynamic_width="true"
                                  label="Says"
                                  name="value" />
-                                <scroll_list.columns
+                                <pane_list.columns
                                  label="Line"
                                  name="line"
                                  width="44" />
-                            </scroll_list>
+                            </pane_list>
                         </layout_panel>
                         <layout_panel
                          auto_resize="false"
@@ -2386,7 +2386,7 @@
                  name="bindings_tab"
                  tool_tip="Bindings: the callbacks the file names, and whether anything answers to them"
                  width="478">
-                    <scroll_list
+                    <pane_list
                      column_padding="0"
                      draw_heading="true"
                      multi_select="true"
@@ -2398,19 +2398,19 @@
                      tool_tip="The callbacks the file names, and whether anything is registered to answer to each name."
                      top="0"
                      width="478">
-                        <scroll_list.columns
+                        <pane_list.columns
                          label="Kind"
                          name="kind"
                          width="130" />
-                        <scroll_list.columns
+                        <pane_list.columns
                          dynamic_width="true"
                          label="Name"
                          name="name" />
-                        <scroll_list.columns
+                        <pane_list.columns
                          label="Status"
                          name="status"
                          width="120" />
-                    </scroll_list>
+                    </pane_list>
                 </panel>
                 <panel
                  label="State"
@@ -2420,7 +2420,7 @@
                  name="state_tab"
                  tool_tip="State: what the built widget says about itself right now"
                  width="478">
-                    <scroll_list
+                    <pane_list
                      column_padding="0"
                      draw_heading="true"
                      multi_select="true"
@@ -2432,15 +2432,15 @@
                      tool_tip="What the built widget says about itself as it is now, read again while this tab is showing."
                      top="0"
                      width="478">
-                        <scroll_list.columns
+                        <pane_list.columns
                          label="Property"
                          name="property"
                          width="130" />
-                        <scroll_list.columns
+                        <pane_list.columns
                          dynamic_width="true"
                          label="Value"
                          name="value" />
-                    </scroll_list>
+                    </pane_list>
                 </panel>
                 <panel
                  label="Findings"
@@ -2450,7 +2450,7 @@
                  name="findings_tab"
                  tool_tip="Findings: what the parser, the merge and the rules said about this element"
                  width="478">
-                    <scroll_list
+                    <pane_list
                      column_padding="0"
                      draw_heading="true"
                      multi_select="true"
@@ -2462,23 +2462,23 @@
                      tool_tip="The findings on the selected element and everything below it"
                      top="0"
                      width="478">
-                        <scroll_list.columns
+                        <pane_list.columns
                          label=""
                          name="severity"
                          width="52" />
-                        <scroll_list.columns
+                        <pane_list.columns
                          label="Rule"
                          name="rule"
                          width="90" />
-                        <scroll_list.columns
+                        <pane_list.columns
                          label="Where"
                          name="where"
                          width="110" />
-                        <scroll_list.columns
+                        <pane_list.columns
                          dynamic_width="true"
                          label="What"
                          name="message" />
-                    </scroll_list>
+                    </pane_list>
                 </panel>
             </tab_container>
         </layout_panel>
