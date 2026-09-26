@@ -24,19 +24,47 @@
 
 #include "llviewerprecompiledheaders.h"
 
-#include "alfloaterscriptstudio.h"
+#include "alscriptinspectorpane.h"
 
-#include "alscriptstudioplaces.h"
+#include "alcodeeditor.h"
+#include "alscriptstudioservices.h"
+#include "alscriptstudiowords.h"
 #include "altextview.h"
+#include "llfloater.h"
+
+#include <algorithm>
 
 using ALScriptPlaces::declaredOf;
 
-void ALFloaterScriptStudio::inspected(Doc& doc, const ALScriptAnalysis::Result& result, const ALTextPos& at)
+static LLPanelInjector<ALScriptInspectorPane> t_script_studio_inspector("script_studio_inspector");
+
+ALScriptInspectorPane::ALScriptInspectorPane(const LLPanel::Params& params) : LLPanel(params) {}
+
+bool ALScriptInspectorPane::postBuild()
+{
+    mSymbol = getChild<ALTextView>("symbol");
+    // The window this is a pane of, found through the view tree, as what
+    // the pane asks of it.
+    LLFloater* window = getParentByType<LLFloater>();
+    mServices         = dynamic_cast<ALScriptStudioServices*>(window);
+    mWindow           = dynamic_cast<Window*>(window);
+    if (!mServices || !mWindow)
+    {
+        LL_WARNS() << "The inspector is not in a Script Studio window" << LL_ENDL;
+        return true;
+    }
+    // The declaration, in the script the inspector is about or in the
+    // include it was declared in.
+    mSymbol->onLinkClicked([this](const ALTextView::Substitution& link) { mWindow->goToDeclared(link.value); });
+    return true;
+}
+
+void ALScriptInspectorPane::inspected(Doc& doc, const ALScriptAnalysis::Result& result, const ALTextPos& at)
 {
     // Still about the word the caret is on, and this script: by the
     // source's place it was asked about, which the result's is not where
     // the analyzer read the expansion.
-    if (&doc != active() || at != doc.inspectAt)
+    if (!mServices || &doc != mServices->frontDoc() || at != doc.inspectAt)
     {
         return;
     }
@@ -49,17 +77,17 @@ void ALFloaterScriptStudio::inspected(Doc& doc, const ALScriptAnalysis::Result& 
         text = result.hover.label;
         code_lines.push_back(0);
         LLStringUtil::format_map_t args;
-        declared = declaredOf(doc, result, preprocessed(doc));
+        declared = declaredOf(doc, result, mWindow->preprocessed(doc));
         if (declared.line >= 0)
         {
             args["[LINE]"] = std::to_string(declared.line + 1);
             args["[FILE]"] = declared.name;
-            text += "\n" + getString(declared.path.empty() ? "InspectDeclared" : "InspectDeclaredIn", args);
+            text += "\n" + mServices->words(declared.path.empty() ? "InspectDeclared" : "InspectDeclaredIn", args);
         }
         if (!result.hover.expected.empty())
         {
             args["[TYPE]"] = result.hover.expected;
-            text += "\n" + getString("HoverExpected", args);
+            text += "\n" + mServices->words("HoverExpected", args);
         }
         if (!result.hover.typeDetail.empty())
         {
@@ -75,8 +103,8 @@ void ALFloaterScriptStudio::inspected(Doc& doc, const ALScriptAnalysis::Result& 
         std::string link          = result.hover.link;
         // What the keyword file says, where the analyzer has no words of
         // its own: LSL's declarations come without any.
-        const std::string at_caret = doc.editor->document().text(doc.editor->identifierAtCaret());
-        const Vocab*      word     = documentation.empty() ? ALScriptStudioWords::word(doc.language.lua, at_caret) : nullptr;
+        const std::string                  at_caret = doc.editor->document().text(doc.editor->identifierAtCaret());
+        const ALScriptStudioWords::Vocab*  word = documentation.empty() ? ALScriptStudioWords::word(doc.language.lua, at_caret) : nullptr;
         if (word)
         {
             documentation = word->tooltip;
@@ -100,19 +128,23 @@ void ALFloaterScriptStudio::inspected(Doc& doc, const ALScriptAnalysis::Result& 
     {
         text += (text.empty() ? "" : "\n\n") + problems;
     }
-    showSymbol(text, declared, code_lines);
+    show(text, declared, code_lines);
 }
 
-void ALFloaterScriptStudio::showSymbol(const std::string& text, const Declared& declared, const std::vector<S32>& code_lines)
+void ALScriptInspectorPane::show(const std::string& text, const Declared& declared, const std::vector<S32>& code_lines)
 {
+    if (!mServices)
+    {
+        return;
+    }
     mSymbol->setText(text);
     std::vector<ALTextView::Style> styles;
-    if (Doc* doc = active(); doc && !code_lines.empty())
+    if (Doc* doc = mServices->frontDoc(); doc && !code_lines.empty())
     {
         // The declaration read as code: its words in the colours the
         // script's own text gives them.
-        const ALTextRange word = doc->editor->identifierAtCaret();
-        const std::string name = doc->editor->document().text(word);
+        const ALTextRange  word = doc->editor->identifierAtCaret();
+        const std::string  name = doc->editor->document().text(word);
         const ALSyntaxKind kind = word.empty() ? ALSyntaxKind::Text : doc->editor->semanticKindAt(word.begin);
         for (const S32 line : code_lines)
         {
@@ -132,15 +164,15 @@ void ALFloaterScriptStudio::showSymbol(const std::string& text, const Declared& 
     if (declared.line >= 0 && lines > 1 && mSymbol->document().lineLength(1) > 0)
     {
         ALTextView::Substitution to_line;
-        to_line.range           = ALTextRange(ALTextPos(1, 0), mSymbol->document().lineEnd(1));
-        to_line.link            = true;
-        to_line.tooltip         = getString("InspectDeclaredTip");
-        to_line.value           = declared.value();
+        to_line.range   = ALTextRange(ALTextPos(1, 0), mSymbol->document().lineEnd(1));
+        to_line.link    = true;
+        to_line.tooltip = mServices->words("InspectDeclaredTip");
+        to_line.value   = declared.value();
         mSymbol->addSubstitution(std::move(to_line));
     }
 }
 
-std::string ALFloaterScriptStudio::problemsAt(const Doc& doc, const ALTextPos& at) const
+std::string ALScriptInspectorPane::problemsAt(const Doc& doc, const ALTextPos& at) const
 {
     // From the checkers and the compiler alike: whatever is squiggled
     // under the position, with what it says.
@@ -151,8 +183,13 @@ std::string ALFloaterScriptStudio::problemsAt(const Doc& doc, const ALTextPos& a
         {
             LLStringUtil::format_map_t args;
             args["[MESSAGE]"] = decoration.message;
-            problems += (problems.empty() ? "" : "\n") + getString("InspectProblem", args);
+            problems += (problems.empty() ? "" : "\n") + mServices->words("InspectProblem", args);
         }
     }
     return problems;
+}
+
+void ALScriptInspectorPane::forget()
+{
+    mSymbol->setText(LLStringUtil::null);
 }

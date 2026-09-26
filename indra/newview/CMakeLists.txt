@@ -1001,6 +1001,7 @@ if(AL_BUILD_VIEWER)
     alscriptexplorertree.h
     alscriptexternaleditor.h
     alfloaterscriptpreferences.h
+    alscriptinspectorpane.h
     alscriptkeymap.h
     alscriptlookup.h
     alscriptnavigation.h
@@ -2622,6 +2623,22 @@ if(AL_BUILD_TESTS)
     PROJECT ${test_project}
     LIBRARIES llui alscript ${test_libs}
     SOURCES alscriptstudiodoc.cpp alscriptstudioplaces.cpp
+    DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
+  )
+
+  # Script Studio's inspector over the studio's own window, the window's
+  # side faked: a name's declaration, words and page, and the problems.
+  al_add_test(
+    alscriptinspectorpane
+    UNIT
+    PROJECT ${test_project}
+    LIBRARIES llui alscript ${test_libs}
+    SOURCES
+      alscriptnotecardtab.cpp
+      alscriptsaveflow.cpp
+      alscriptstudiodoc.cpp
+      alscriptstudioplaces.cpp
+      alscriptstudiowords.cpp
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
 

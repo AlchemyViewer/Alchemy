@@ -46,6 +46,7 @@
 #include "alscriptreferencespane.h"
 #include "alscriptoutlinepane.h"
 #include "alscriptcrumbsbar.h"
+#include "alscriptinspectorpane.h"
 #include "alscriptstudioplaces.h"
 #include "alfindings.h"
 #include "aloutputview.h"
@@ -114,7 +115,7 @@ class ALFloaterScriptStudio final : public ALStudioFloater, public ALScriptStudi
                                     public ALScriptStudioWeighing::Window, public ALScriptStudioOrphans::Window,
                                     public ALScriptNoticeBar::Window, public ALScriptNavigation::Window, public ALScriptLookup::Window,
                                     public ALScriptReferencesPane::Window, public ALScriptOutlinePane::Window,
-                                    public ALScriptCrumbsBar::Window
+                                    public ALScriptCrumbsBar::Window, public ALScriptInspectorPane::Window
 {
     friend class LLFloaterReg;
 
@@ -425,14 +426,9 @@ private:
     void becomeFile(Doc& doc, const std::string& path) override;
     LLMenuGL* recentMenu() override;
     void      recentChanged() override { saveState(); }
-    // The inspector's words about the symbol at the caret: the text, with
-    // every URL in it a link, and the line it says the symbol is
-    // declared on a link to the place, where it says one -- in the
-    // script, or in the include it was declared in. The lines given are
-    // code, styled as the active script's editor would colour them.
+    // Where the analyzer says a name is declared (ALScriptPlaces), as the
+    // hover card and the inspector say it.
     typedef ALScriptPlaces::Declared Declared;
-    void                          showSymbol(const std::string& text, const Declared& declared, const std::vector<S32>& code_lines);
-    void                          showSymbol(const std::string& text) { showSymbol(text, Declared(), {}); }
     // A line of an include as it reads -- in its tab where it is open,
     // else as the preprocessor last read it -- untrimmed; false where
     // neither has it.
@@ -476,7 +472,7 @@ private:
     const char* includeImage(const std::string& path, bool lua) const;
     // Where a hover or the inspector says a name was declared, gone to: in
     // the script, or in the include.
-    void goToDeclared(const LLSD& value);
+    void goToDeclared(const LLSD& value) override;
     // What is wrong at a place of a script, in the card the mouse would
     // bring up there.
     void showProblemCard(Doc& doc, const ALTextPos& at);
@@ -612,13 +608,9 @@ private:
     boost::signals2::scoped_connection mQuickModeConnection;
 
     // The outline and the breadcrumb, from what the check said the script
-    // declares; the inspector, from what is at the caret, a moment after
-    // it has settled.
+    // declares; the inspector (ALScriptInspectorPane), from what is at the
+    // caret, a moment after it has settled.
     void        pumpCaret();
-    void        inspected(Doc& doc, const ALScriptAnalysis::Result& result, const ALTextPos& at);
-    // What is squiggled under a position, from the checkers and the
-    // compiler, each with what it says; empty where nothing is.
-    std::string problemsAt(const Doc& doc, const ALTextPos& at) const;
     // The outline (ALScriptOutlinePane): shown, which the bar at the
     // bottom is told of; a symbol chosen, gone to; its sort kept.
     void        outlineShown(Doc& doc) override { mCrumbsBar->showPath(doc); }
@@ -947,7 +939,7 @@ private:
     ALScriptProblemsPane*              mProblemsPane = nullptr;
     ALScriptReferencesPane*            mReferencesPane = nullptr;
     ALScriptOutlinePane*               mOutlinePane    = nullptr;
-    ALTextView*                        mSymbol        = nullptr;
+    ALScriptInspectorPane*             mInspectorPane = nullptr;
     // Held while a pane's row is followed into a tab, so that the panes
     // go on listing what they were rather than the tab's.
     S32                                mHoldPanes       = 0;

@@ -562,10 +562,7 @@ bool ALFloaterScriptStudio::postBuild()
     mOutlinePane   = getChild<ALScriptOutlinePane>("outline_pane");
     mWeightsPane   = getChild<ALScriptWeightsPane>("weights_tab");
     mWeightsParts  = mWeightsPane->partsList();
-    mSymbol        = getChild<ALTextView>("symbol");
-    // The declaration, in the script the inspector is about or in the
-    // include it was declared in.
-    mSymbol->onLinkClicked([this](const ALTextView::Substitution& link) { goToDeclared(link.value); });
+    mInspectorPane = getChild<ALScriptInspectorPane>("inspector_pane");
     mExplorerPane  = getChild<ALScriptExplorerPane>("explorer_pane");
     mCompileTarget = getChild<LLComboBox>("compile_target");
     mRunning       = getChild<LLCheckBoxCtrl>("running");
@@ -2768,7 +2765,7 @@ void ALFloaterScriptStudio::answered(const ALScriptAnalysis::Result& result, U32
             symbolAnswered(doc, result, at);
             break;
         case ALScriptAnalysis::Kind::Inspect:
-            inspected(doc, result, at);
+            mInspectorPane->inspected(doc, result, at);
             break;
         case ALScriptAnalysis::Kind::Actions:
             actionsAnswered(doc, result, expansion);
@@ -2852,7 +2849,7 @@ void ALFloaterScriptStudio::activate(size_t index, bool focus)
     // the caret moves.
     mDocs[index]->caretSeen = ALTextPos(-1, -1);
     mDocs[index]->inspectAt = ALTextPos(-1, -1);
-    mSymbol->setText(LLStringUtil::null);
+    mInspectorPane->forget();
     mCrumbsBar->showPath(*mDocs[index]);
     refreshNotice();
 }
@@ -5469,11 +5466,11 @@ void ALFloaterScriptStudio::pumpCaret()
             // No name here: what is wrong here, where anything is, and
             // otherwise the last name's words stay, rather than the pane
             // blanking at every space and bracket the caret passes.
-            const std::string problems = problemsAt(*doc, caret);
+            const std::string problems = mInspectorPane->problemsAt(*doc, caret);
             if (!problems.empty())
             {
                 doc->inspectAt = ALTextPos(-1, -1);
-                showSymbol(problems);
+                mInspectorPane->show(problems);
             }
         }
         else if (word.begin != doc->inspectAt || version != doc->inspectVersion)
@@ -5490,7 +5487,7 @@ void ALFloaterScriptStudio::pumpCaret()
 void ALFloaterScriptStudio::showReference(const Vocab& word, bool lua)
 {
     mFolds.setCollapsed("inspector", false);
-    showSymbol(ALScriptStudioWords::referenceText(word, lua), Declared(), { 0 });
+    mInspectorPane->show(ALScriptStudioWords::referenceText(word, lua), Declared(), { 0 });
 }
 
 void ALFloaterScriptStudio::reference(Doc& doc)
@@ -7240,7 +7237,7 @@ void ALFloaterScriptStudio::letGoOf(size_t index, bool keep)
         mProblemsPane->fill(nullptr);
         mOutlinePane->forget();
         mCrumbsBar->forget();
-        mSymbol->setText(LLStringUtil::null);
+        mInspectorPane->forget();
     }
     else
     {
