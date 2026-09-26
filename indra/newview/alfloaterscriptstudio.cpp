@@ -1226,7 +1226,7 @@ void ALFloaterScriptStudio::draw()
     }
     pumpPreprocessor();
     pumpAnalysis();
-    pumpCaret();
+    mCaret.pump(LLTimer::getTotalSeconds());
     mExplorerPane->pump();
     mVim.pump();
     if (mVimMode)
@@ -2061,7 +2061,7 @@ void ALFloaterScriptStudio::showView(Doc& doc, Doc::View view, bool focus)
         focusShown(doc);
     }
     // The bars read the caret of the view in front, which is another caret
-    // now, wherever it stands: seen afresh on the next frame (pumpCaret).
+    // now, wherever it stands: seen afresh on the next frame (mCaret).
     doc.caret.seen = ALTextPos(-1, -1);
     refreshToolbar();
 }
@@ -2392,7 +2392,7 @@ void ALFloaterScriptStudio::teachEditor(Doc& doc)
     editor.setCompletionRequest([this, raw](const ALTextPos& at, std::string_view) { askAnalyzer(*raw, ALScriptAnalysis::Kind::Complete, at); });
     editor.setHoverRequest([this, raw](const ALTextPos& at, std::string_view) { askAnalyzer(*raw, ALScriptAnalysis::Kind::Hover, at); });
     editor.setSignatureRequest([this, raw](const ALTextPos& caret) { askAnalyzer(*raw, ALScriptAnalysis::Kind::Signature, caret); });
-    editor.setSymbolRequest([this, raw](ALEditorCommand command, const ALTextRange& word) { askSymbol(*raw, command, word); });
+    editor.setSymbolRequest([this, raw](ALEditorCommand command, const ALTextRange& word) { mCaret.ask(*raw, command, word); });
     // The script's functions and events, where the analyzer last found them:
     // what Next Function and Select Function go by, and vim's [[ and af.
     editor.setFunctionProvider([raw](std::vector<ALTextRange>& out) {
@@ -2762,7 +2762,7 @@ void ALFloaterScriptStudio::answered(const ALScriptAnalysis::Result& result, U32
             break;
         }
         case ALScriptAnalysis::Kind::References:
-            symbolAnswered(doc, result, at);
+            mCaret.answered(doc, result, at);
             break;
         case ALScriptAnalysis::Kind::Inspect:
             mInspectorPane->inspected(doc, result, at);
@@ -5430,6 +5430,24 @@ void ALFloaterScriptStudio::trailerChosen(const std::string& value)
     {
         toggleExpanded();
     }
+}
+
+void ALFloaterScriptStudio::goTo(Doc& doc, const ALTextRange& range)
+{
+    ALCodeEditor& source = sourceInFront(doc);
+    source.goTo(range);
+    source.setFocus(true);
+}
+
+bool ALFloaterScriptStudio::showProblemsAt(Doc& doc, const ALTextPos& at)
+{
+    const std::string problems = mInspectorPane->problemsAt(doc, at);
+    if (problems.empty())
+    {
+        return false;
+    }
+    mInspectorPane->show(problems);
+    return true;
 }
 
 void ALFloaterScriptStudio::showBottom(const char* tab, bool focus)

@@ -47,6 +47,7 @@
 #include "alscriptoutlinepane.h"
 #include "alscriptcrumbsbar.h"
 #include "alscriptinspectorpane.h"
+#include "alscriptstudiocaret.h"
 #include "alscriptstudioplaces.h"
 #include "alfindings.h"
 #include "aloutputview.h"
@@ -115,7 +116,8 @@ class ALFloaterScriptStudio final : public ALStudioFloater, public ALScriptStudi
                                     public ALScriptStudioWeighing::Window, public ALScriptStudioOrphans::Window,
                                     public ALScriptNoticeBar::Window, public ALScriptNavigation::Window, public ALScriptLookup::Window,
                                     public ALScriptReferencesPane::Window, public ALScriptOutlinePane::Window,
-                                    public ALScriptCrumbsBar::Window, public ALScriptInspectorPane::Window
+                                    public ALScriptCrumbsBar::Window, public ALScriptInspectorPane::Window,
+                                    public ALScriptStudioCaret::Window
 {
     friend class LLFloaterReg;
 
@@ -359,7 +361,7 @@ private:
     // The region's words for colouring and completing, and the analyzer
     // behind completion, hover and signature help.
     void                      teachEditor(Doc& doc);
-    void                      askAnalyzer(Doc& doc, ALScriptAnalysis::Kind kind, const ALTextPos& at) { askAnalyzer(doc, kind, at, at); }
+    void askAnalyzer(Doc& doc, ALScriptAnalysis::Kind kind, const ALTextPos& at) override { askAnalyzer(doc, kind, at, at); }
     // The refactors are asked about a stretch, from `at` to `to`.
     void                      askAnalyzer(Doc& doc, ALScriptAnalysis::Kind kind, const ALTextPos& at, const ALTextPos& to);
     // `expansion` is the expansion the question was asked over, or zero
@@ -521,13 +523,19 @@ private:
     void                 setLintLevel(bool lua, const std::string& id, ALScriptLints::Level level) override;
     void                 showLintSettings() override;
 
-    // The name at the caret: asked about on a key or a menu item, and
-    // answered by going there, lighting its places, or asking for a new
-    // name and putting it everywhere as one step.
-    void askSymbol(Doc& doc, ALEditorCommand command, const ALTextRange& word);
-    // `at` is where the question was about in the source, which the
-    // result's own place is not where the analyzer read the expansion.
-    void symbolAnswered(Doc& doc, const ALScriptAnalysis::Result& result, const ALTextPos& at);
+    // The name at the caret (ALScriptStudioCaret): a jump noted, a walk
+    // down a list over, a place gone to, the lookup started, the bar's
+    // path and the inspector's problems.
+    void noteJump() override { mNavigation.noteJump(); }
+    void keyboardInText() override { mNavigation.walked(); }
+    void goTo(Doc& doc, const ALTextRange& range) override;
+    void startLookup(Doc& doc, ALEditorCommand command, const ALScriptReferences& refs, bool has_definition, const std::string& home_path,
+                     const ALScriptSpan& definition, std::vector<Doc::Place> places, U32 version) override
+    {
+        mLookup.start(doc, command, refs, has_definition, home_path, definition, std::move(places), version);
+    }
+    void showPath(Doc& doc) override { mCrumbsBar->showPath(doc); }
+    bool showProblemsAt(Doc& doc, const ALTextPos& at) override;
     // A name looked for beyond the script (ALScriptLookup): the object's
     // other scripts in its language, read as the region has them and
     // expanded; the places found shown; the new name asked for in a
@@ -563,7 +571,7 @@ private:
     void onWeightChosen(bool to_editor);
     // A place in an include opened in a tab of its own where the include
     // is a script or a notecard in the world; one on disk is only named.
-    void openIncludeAt(const std::string& path, const std::string& name, S32 line, S32 column, S32 length);
+    void openIncludeAt(const std::string& path, const std::string& name, S32 line, S32 column, S32 length) override;
     // The file an include or a module the script names is, opened: the one
     // the last run of the preprocessor found, else one on disk where the
     // preprocessor would look. An include's, a module's, or either. False
@@ -607,10 +615,6 @@ private:
     std::vector<ALQuickOpen::Candidate> paletteScripts(std::vector<GoTo>& targets);
     boost::signals2::scoped_connection mQuickModeConnection;
 
-    // The outline and the breadcrumb, from what the check said the script
-    // declares; the inspector (ALScriptInspectorPane), from what is at the
-    // caret, a moment after it has settled.
-    void        pumpCaret();
     // The outline (ALScriptOutlinePane): shown, which the bar at the
     // bottom is told of; a symbol chosen, gone to; its sort kept.
     void        outlineShown(Doc& doc) override { mCrumbsBar->showPath(doc); }
@@ -680,7 +684,7 @@ private:
     // the vocabulary shown with its declaration, the keyword file's
     // words about it and a link to its wiki page; F1 for the word at the
     // caret, or any word picked by name.
-    void        showReference(const Vocab& word, bool lua);
+    void        showReference(const Vocab& word, bool lua) override;
     void        reference(Doc& doc);
     void        browseReference();
 
@@ -970,6 +974,8 @@ private:
     ALScriptNavigation                 mNavigation{ *this, *this };
     // Its names looked up across the object's scripts, and renamed.
     ALScriptLookup                     mLookup{ *this, *this };
+    // The name at its caret, and the caret watched.
+    ALScriptStudioCaret                mCaret{ *this, *this };
     LLHandle<LLContextMenu>            mTabMenuHandle;
     bool                               mMain = true;
     bool                               mClosingWindow = false;

@@ -1017,6 +1017,7 @@ if(AL_BUILD_VIEWER)
     alscriptsaveflow.h
     alscriptsearch.h
     alscriptsearchpane.h
+    alscriptstudiocaret.h
     alscriptstudiocommands.h
     alscriptstudiodoc.h
     alscriptstudiofileio.h
@@ -2631,6 +2632,22 @@ if(AL_BUILD_TESTS)
   # side faked: a name's declaration, words and page, and the problems.
   al_add_test(
     alscriptinspectorpane
+    UNIT
+    PROJECT ${test_project}
+    LIBRARIES llui alscript ${test_libs}
+    SOURCES
+      alscriptnotecardtab.cpp
+      alscriptsaveflow.cpp
+      alscriptstudiodoc.cpp
+      alscriptstudioplaces.cpp
+      alscriptstudiowords.cpp
+    DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
+  )
+
+  # Script Studio's name at the caret, the window's side faked: definitions
+  # gone to, references read back and asked for, the caret watched.
+  al_add_test(
+    alscriptstudiocaret
     UNIT
     PROJECT ${test_project}
     LIBRARIES llui alscript ${test_libs}

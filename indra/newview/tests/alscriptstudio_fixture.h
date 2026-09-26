@@ -117,7 +117,11 @@ namespace al_studio_test
         {
             reports.push_back({ text, failure, doc ? doc->id : std::string(), actions });
         }
-        void setStatus(const std::string& text, bool failure = false) override { statuses.push_back(text); }
+        void setStatus(const std::string& text, bool failure = false) override
+        {
+            statuses.push_back(text);
+            statusFailures.push_back(failure);
+        }
         std::string words(const std::string& name, const LLStringUtil::format_map_t& args = LLStringUtil::format_map_t()) const override
         {
             if (mStrings && mStrings->hasString(name))
@@ -189,6 +193,8 @@ namespace al_studio_test
         S32                                             front = -1;
         std::vector<Said>                               reports;
         std::vector<std::string>                        statuses;
+        // Whether each status said was a failure, in step with them.
+        std::vector<bool>                               statusFailures;
         std::vector<Opened>                             opened;
         std::vector<Went>                               went;
         std::vector<bool>                               reveals;

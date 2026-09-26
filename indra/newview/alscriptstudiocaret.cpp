@@ -24,31 +24,28 @@
 
 #include "llviewerprecompiledheaders.h"
 
-#include "alfloaterscriptstudio.h"
+#include "alscriptstudiocaret.h"
 
+#include "alcodeeditor.h"
 #include "alscriptstudioplaces.h"
-#include "lltimer.h"
+#include "alscriptstudioservices.h"
 
 using ALScriptPlaces::lineOf;
 using ALScriptPlaces::mapSpan;
 using ALScriptPlaces::placeText;
 using ALScriptPlaces::rangeOf;
 
-namespace
-{
-    // How long after the last keystroke the analyzers are asked.
-    const F64 ANALYSIS_DELAY = 0.35;
-}
+ALScriptStudioCaret::ALScriptStudioCaret(ALScriptStudioServices& services, Window& window) : mServices(services), mWindow(window) {}
 
-void ALFloaterScriptStudio::askSymbol(Doc& doc, ALEditorCommand command, const ALTextRange& word)
+void ALScriptStudioCaret::ask(Doc& doc, ALEditorCommand command, const ALTextRange& word)
 {
     doc.caret.symbolCommand = command;
     doc.caret.symbolVersion = doc.editor->document().version();
     doc.caret.symbolAt      = word.begin;
-    askAnalyzer(doc, ALScriptAnalysis::Kind::References, word.begin);
+    mWindow.askAnalyzer(doc, ALScriptAnalysis::Kind::References, word.begin);
 }
 
-void ALFloaterScriptStudio::symbolAnswered(Doc& doc, const ALScriptAnalysis::Result& result, const ALTextPos& at)
+void ALScriptStudioCaret::answered(Doc& doc, const ALScriptAnalysis::Result& result, const ALTextPos& at)
 {
     // Of another question, or of a text that has moved on. Where it was
     // asked is the source's place, which the result's own is not where
@@ -66,23 +63,23 @@ void ALFloaterScriptStudio::symbolAnswered(Doc& doc, const ALScriptAnalysis::Res
     // A word of the language has no definition in the script to go to --
     // where the script has not made one of its own: its reference is where
     // it is defined.
-    const Vocab* known = command == ALEditorCommand::GoToDefinition ? ALScriptStudioWords::word(doc.language.lua, name) : nullptr;
+    const ALScriptStudioWords::Vocab* known =
+        command == ALEditorCommand::GoToDefinition ? ALScriptStudioWords::word(doc.language.lua, name) : nullptr;
     if (known && (!refs.found || !refs.hasDefinition))
     {
-        mFolds.setCollapsed("inspector", false);
-        showReference(*known, doc.language.lua);
+        mWindow.showReference(*known, doc.language.lua);
         return;
     }
     if (!refs.found)
     {
         // Nothing known because nothing could be read, which the syntax
         // errors in the problems explain, or nothing known of this name.
-        setStatus(getString(result.understood ? "NothingKnown" : "NothingKnownBroken", args), !result.understood);
+        mServices.setStatus(mServices.words(result.understood ? "NothingKnown" : "NothingKnownBroken", args), !result.understood);
         return;
     }
     // Back to the source: the declaration and each place in this script
     // or in an include, which keeps the include's identity.
-    const bool         mapped        = preprocessed(doc) && doc.expanded.valid && doc.expanded.version == result.version;
+    const bool         mapped        = mWindow.preprocessed(doc) && doc.expanded.valid && doc.expanded.version == result.version;
     const ALSourceMap* map           = mapped ? &doc.expanded.map : nullptr;
     bool               hasDefinition = refs.hasDefinition;
     ALScriptSpan       definition    = refs.definition;
@@ -129,7 +126,7 @@ void ALFloaterScriptStudio::symbolAnswered(Doc& doc, const ALScriptAnalysis::Res
         {
             placeText(place, lineOf(doc.editor->document(), span.line));
         }
-        else if (sourceLine(place.file, span.line, line))
+        else if (mWindow.sourceLine(place.file, span.line, line))
         {
             placeText(place, line);
         }
@@ -143,37 +140,33 @@ void ALFloaterScriptStudio::symbolAnswered(Doc& doc, const ALScriptAnalysis::Res
     switch (command)
     {
         case ALEditorCommand::GoToDefinition:
-            if (hasDefinition)
-            {
-                mNavigation.noteJump();
-            }
             if (!hasDefinition)
             {
-                setStatus(getString("NoDefinition", args));
+                mServices.setStatus(mServices.words("NoDefinition", args));
+                break;
             }
-            else if (homePath.empty())
+            mWindow.noteJump();
+            if (homePath.empty())
             {
-                ALCodeEditor& source = sourceInFront(doc);
-                source.goTo(rangeOf(definition));
-                source.setFocus(true);
+                mWindow.goTo(doc, rangeOf(definition));
             }
             else
             {
-                openIncludeAt(homePath, homeName, definition.line, definition.column, definition.endColumn - definition.column);
+                mWindow.openIncludeAt(homePath, homeName, definition.line, definition.column, definition.endColumn - definition.column);
             }
             break;
         case ALEditorCommand::FindReferences:
         case ALEditorCommand::Rename:
-            mLookup.start(doc, command, refs, hasDefinition, homePath, definition, std::move(places), result.version);
+            mWindow.startLookup(doc, command, refs, hasDefinition, homePath, definition, std::move(places), result.version);
             break;
         default:
             break;
     }
 }
 
-void ALFloaterScriptStudio::pumpCaret()
+void ALScriptStudioCaret::pump(F64 now)
 {
-    Doc* doc = active();
+    Doc* doc = mServices.frontDoc();
     if (!doc || !doc->loaded || doc->notecard)
     {
         return;
@@ -184,16 +177,15 @@ void ALFloaterScriptStudio::pumpCaret()
     const ALCodeEditor& shown  = *doc->shownText();
     const bool          source = doc->shownView() == Doc::View::Source;
     const ALTextPos     caret  = shown.caret();
-    const F64           now    = LLTimer::getTotalSeconds();
-    if (mNavigation.walking() && shown.hasFocus())
+    if (shown.hasFocus())
     {
-        mNavigation.walked();
+        mWindow.keyboardInText();
     }
     if (caret != doc->caret.seen)
     {
         doc->caret.seen       = caret;
-        doc->caret.inspectDue = source ? now + ANALYSIS_DELAY : 0.0;
-        mCrumbsBar->showPath(*doc);
+        doc->caret.inspectDue = source ? now + SETTLE : 0.0;
+        mWindow.showPath(*doc);
         // The lit places go once the caret has left them all.
         if (source && !doc->editor->highlights().empty() && !doc->editor->highlighted(caret))
         {
@@ -210,18 +202,16 @@ void ALFloaterScriptStudio::pumpCaret()
             // No name here: what is wrong here, where anything is, and
             // otherwise the last name's words stay, rather than the pane
             // blanking at every space and bracket the caret passes.
-            const std::string problems = mInspectorPane->problemsAt(*doc, caret);
-            if (!problems.empty())
+            if (mWindow.showProblemsAt(*doc, caret))
             {
                 doc->caret.inspectAt = ALTextPos(-1, -1);
-                mInspectorPane->show(problems);
             }
         }
         else if (word.begin != doc->caret.inspectAt || version != doc->caret.inspectVersion)
         {
             doc->caret.inspectAt      = word.begin;
             doc->caret.inspectVersion = version;
-            askAnalyzer(*doc, ALScriptAnalysis::Kind::Inspect, word.begin);
+            mWindow.askAnalyzer(*doc, ALScriptAnalysis::Kind::Inspect, word.begin);
         }
     }
 }
