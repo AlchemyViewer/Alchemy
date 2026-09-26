@@ -189,6 +189,7 @@ if(AL_BUILD_VIEWER)
     alscriptstudiodoc.cpp
     alscriptstudiofileio.cpp
     alscriptstudiofiles.cpp
+    alscriptstudioorphans.cpp
     alscriptstudiorecovery.cpp
     alscriptstudiosaving.cpp
     alscriptstudiovim.cpp
