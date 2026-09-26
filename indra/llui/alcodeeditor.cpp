@@ -257,6 +257,9 @@ void ALCodeEditor::onEdit(const ALTextDocument::Edit& edit)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
     hideCard();
+    // Numbers and tints were for the text they were given with.
+    mLineNumbers.clear();
+    mLineTints.clear();
     const S32 first = llclamp(edit.range.begin.line, 0, static_cast<S32>(mMarks.size()));
     const S32 last  = llclamp(edit.range.end.line, first, static_cast<S32>(mMarks.size()) - 1);
     const S32 made  = 1 + edit.breaksInserted();
@@ -819,9 +822,14 @@ void ALCodeEditor::drawGutter(const LLRect& text, F32 alpha)
         {
             // The caret's line in the text's own ink, the rest quieter;
             // counted from the caret's line where that is asked for.
-            const S32 shown = mRelativeLineNumbers && line != caret_line ? std::abs(line - caret_line) : line + 1;
-            font->renderUTF8(std::to_string(shown), 0, static_cast<F32>(numbers_right), static_cast<F32>(screen_top - ascent),
-                             line == caret_line ? lit : ink, LLFontGL::RIGHT, LLFontGL::BASELINE, LLFontGL::NORMAL, LLFontGL::NO_SHADOW);
+            const S32 shown = !mLineNumbers.empty()                    ? (line < static_cast<S32>(mLineNumbers.size()) ? mLineNumbers[static_cast<size_t>(line)] : 0)
+                              : mRelativeLineNumbers && line != caret_line ? std::abs(line - caret_line)
+                                                                           : line + 1;
+            if (shown > 0)
+            {
+                font->renderUTF8(std::to_string(shown), 0, static_cast<F32>(numbers_right), static_cast<F32>(screen_top - ascent),
+                                 line == caret_line ? lit : ink, LLFontGL::RIGHT, LLFontGL::BASELINE, LLFontGL::NORMAL, LLFontGL::NO_SHADOW);
+            }
             const Mark mark = markAt(line);
             if (line == caret_line && fixableAt(line) && !isReadOnly())
             {
@@ -1380,6 +1388,17 @@ void ALCodeEditor::drawBeforeRows(const LLRect& text)
     {
         mBrackets.matched = false;
         mBrackets.caret   = ALTextPos(-1, -1);
+    }
+    // A tint behind each line that has one, under everything else.
+    if (!mLineTints.empty())
+    {
+        const S32 row_h = layout().rowHeight();
+        forEachVisibleRow(text, [&](S32 line, S32, S32 screen_top) {
+            if (line < static_cast<S32>(mLineTints.size()) && mLineTints[static_cast<size_t>(line)].mV[VALPHA] > 0.f)
+            {
+                gl_rect_2d(text.mLeft, screen_top, text.mRight, screen_top - row_h, mLineTints[static_cast<size_t>(line)] % alpha);
+            }
+        });
     }
     if (mHighlightCurrentLine && keyboardOnText() && !hasSelection())
     {

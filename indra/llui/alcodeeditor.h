@@ -242,6 +242,15 @@ public:
 
     void setShowLineNumbers(bool show);
     bool getShowLineNumbers() const { return mShowLineNumbers; }
+    // For a text shown rather than edited -- a side of a diff -- the
+    // number each line shows in the gutter, where its lines are not the
+    // ones counted: none, for a line of 0, which a diff pads with. And a
+    // tint behind each line, the width of the text, none where its alpha
+    // is 0. Each one a line, from the first; an edit clears both.
+    void                         setLineNumbers(std::vector<S32> numbers) { mLineNumbers = std::move(numbers); }
+    void                         setLineTints(std::vector<LLColor4> tints) { mLineTints = std::move(tints); }
+    const std::vector<S32>&      lineNumbers() const { return mLineNumbers; }
+    const std::vector<LLColor4>& lineTints() const { return mLineTints; }
     // Whether a line was changed since the text was last saved: the
     // gutter bars it, and a save clears them all.
     bool lineChanged(S32 line) const;
@@ -718,6 +727,8 @@ private:
     LLColor4 changedColor() const;
 
     bool mShowLineNumbers      = true;
+    std::vector<S32>      mLineNumbers;
+    std::vector<LLColor4> mLineTints;
     bool mShowFoldMarkers      = true;
     bool mHighlightCurrentLine = true;
     bool mMatchBrackets        = true;

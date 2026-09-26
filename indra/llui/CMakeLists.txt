@@ -120,6 +120,7 @@ target_sources(
     alcolortablepanel.cpp
     alcolorsheet.cpp
     aldeferredrebuild.cpp
+    aldiffview.cpp
     aldockpanel.cpp
     alemptystate.cpp
     alflagsfield.cpp
@@ -319,6 +320,7 @@ target_sources(
         alcolortablepanel.h
         alcolorsheet.h
         aldeferredrebuild.h
+        aldiffview.h
         aldockpanel.h
         alemptystate.h
         alflagsfield.h
@@ -561,6 +563,7 @@ if(AL_BUILD_TESTS)
     altextview
     alcodecards
     alcodeeditor
+    aldiffview
     alcompletionmodel
     alfixlistmodel
     alfoldmodel

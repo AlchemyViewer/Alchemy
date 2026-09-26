@@ -1,0 +1,149 @@
+/**
+ * @file aldiffview_test.cpp
+ * @brief Two texts compared, side by side or inline.
+ *
+ * $LicenseInfo:firstyear=2026&license=viewerlgpl$
+ * Alchemy Viewer Source Code
+ * Copyright (C) 2026, Rye <rye@alchemyviewer.org>
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation;
+ * version 2.1 of the License only.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * $/LicenseInfo$
+ */
+
+#include "linden_common.h"
+
+#include "../aldiffview.h"
+
+#include "../alcodeeditor.h"
+#include "../llfocusmgr.h"
+#include "../lluictrlfactory.h"
+
+#include "alheadlessui_fixture.h"
+
+#include "../test/lltut.h"
+
+#include <string>
+#include <vector>
+
+class LLAvatarName;
+const std::string gDiffTestAnonName("Anon");
+const std::string& rlvGetAnonym(const LLAvatarName& av_name)
+{
+    return gDiffTestAnonName;
+}
+
+namespace tut
+{
+    struct aldiffview_data
+    {
+        ll_test::HeadlessUI& ui   = ll_test::HeadlessUI::get();
+        ALDiffView*          view = nullptr;
+
+        ~aldiffview_data()
+        {
+            gFocusMgr.setKeyboardFocus(nullptr);
+            if (view)
+            {
+                view->die();
+            }
+        }
+
+        ALDiffView& make(const char* left, const char* right, bool inline_view = false)
+        {
+            if (!ui.ok())
+            {
+                skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            }
+            ALDiffView::Params p(LLUICtrlFactory::getDefaultParams<ALDiffView>());
+            p.name        = "diff";
+            p.rect        = LLRect(0, 300, 600, 0);
+            p.syntax      = "lsl";
+            p.inline_view = inline_view;
+            view          = LLUICtrlFactory::create<ALDiffView>(p);
+            view->setTexts(left, right);
+            return *view;
+        }
+
+        static bool tinted(const ALCodeEditor& side, S32 line)
+        {
+            return line < static_cast<S32>(side.lineTints().size()) && side.lineTints()[static_cast<size_t>(line)].mV[VALPHA] > 0.f;
+        }
+    };
+    typedef test_group<aldiffview_data> aldiffview_group;
+    typedef aldiffview_group::object    aldiffview_object;
+    aldiffview_group                    aldiffview_instance("aldiffview");
+
+    template<> template<>
+    void aldiffview_object::test<1>()
+    {
+        set_test_name("side by side: the lines lined up, a line one side has beside an empty one without a number, and each change tinted");
+        ALDiffView& d = make("a\nb\nc", "a\nx\nc\nd");
+        ensure_equals("the left, with a line to stand beside d", d.left()->text(), std::string("a\nb\nc\n"));
+        ensure_equals("the right as it is", d.right()->text(), std::string("a\nx\nc\nd"));
+        ensure("numbered as each text's own, the empty line none", d.left()->lineNumbers() == std::vector<S32>{ 1, 2, 3, 0 });
+        ensure("the right's", d.right()->lineNumbers() == std::vector<S32>{ 1, 2, 3, 4 });
+        ensure("what is the same untinted", !tinted(*d.left(), 0) && !tinted(*d.right(), 2));
+        ensure("what was taken out, and what was put in, tinted", tinted(*d.left(), 1) && tinted(*d.right(), 1) && tinted(*d.right(), 3));
+        ensure("the empty line too, quieter", tinted(*d.left(), 3));
+        ensure_equals("two changes", d.changeCount(), 2);
+        ensure("the word changed marked on each side", d.left()->decorations().size() == 1 && d.right()->decorations().size() == 1);
+        ensure("neither side can be changed", d.left()->isReadOnly() && d.right()->isReadOnly());
+    }
+
+    template<> template<>
+    void aldiffview_object::test<2>()
+    {
+        set_test_name("inline: what was taken out above what was put in, numbered as the right; and back side by side");
+        ALDiffView& d = make("a\nb\nc", "a\nx\nc\nd", true);
+        ensure_equals("one text", d.inlined()->text(), std::string("a\nb\nx\nc\nd"));
+        ensure("the line taken out without a number", d.inlined()->lineNumbers() == std::vector<S32>{ 1, 0, 2, 3, 4 });
+        ensure("tinted", tinted(*d.inlined(), 1) && tinted(*d.inlined(), 2) && !tinted(*d.inlined(), 3) && tinted(*d.inlined(), 4));
+        ensure("the one shown", d.shown() == d.inlined() && d.inlined()->getVisible() && !d.left()->getVisible());
+        d.setInline(false);
+        ensure("side by side again", d.left()->getVisible() && d.right()->getVisible() && !d.inlined()->getVisible());
+        ensure_equals("lined up as before", d.left()->text(), std::string("a\nb\nc\n"));
+    }
+
+    template<> template<>
+    void aldiffview_object::test<3>()
+    {
+        set_test_name("F7 goes to the next change, Shift-F7 to the one before; Escape tells whoever shows it");
+        ALDiffView& d = make("one\ntwo\nthree\nfour\nfive\nsix", "one\n2\nthree\nfour\nfive\nsix\nseven");
+        d.right()->setFocus(true);
+        ensure("taken", d.handleKey(KEY_F7, MASK_NONE, false));
+        ensure_equals("the first change", d.right()->caret().line, 1);
+        d.handleKey(KEY_F7, MASK_NONE, false);
+        ensure_equals("the next", d.right()->caret().line, 6);
+        ensure("none after", !d.goToChange(true));
+        d.handleKey(KEY_F7, MASK_SHIFT, false);
+        ensure_equals("back", d.right()->caret().line, 1);
+        ensure_equals("the other side lined up with it", d.left()->caret().line, 1);
+        bool told = false;
+        d.setOnEscape([&told]() { told = true; });
+        ensure("escape", d.handleKey(KEY_ESCAPE, MASK_NONE, false) && told);
+    }
+
+    template<> template<>
+    void aldiffview_object::test<4>()
+    {
+        set_test_name("the same texts: no change, nothing tinted; and titles over each side");
+        ALDiffView& d = make("same\ntext", "same\ntext");
+        ensure_equals("no changes", d.changeCount(), 0);
+        ensure("nothing tinted", !tinted(*d.left(), 0) && !tinted(*d.right(), 1));
+        d.setTitles("Compiled", "Made from the source");
+        ensure_equals("the left's", d.getChild<LLUICtrl>("left_title")->getValue().asString(), std::string("Compiled"));
+        ensure_equals("the right's", d.getChild<LLUICtrl>("right_title")->getValue().asString(), std::string("Made from the source"));
+    }
+}
