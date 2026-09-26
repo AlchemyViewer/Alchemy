@@ -55,7 +55,7 @@
 
 #include <boost/unordered_map.hpp>
 
-class ALXUILiveFile;
+class ALWatchedFile;
 class ALPropertyGrid;
 class ALDockPanel;
 class ALXUICanvas;
@@ -266,6 +266,9 @@ public:
 
     // A file of the primary preview changed on disk.
     void fileChanged();
+    // A write of the tool's own is no change from outside: every file
+    // watched is taken as it now stands.
+    void sawOwnWrites();
 
     // Read the catalog and the previews again, for the button that says so.
     void reloadAll();
@@ -293,7 +296,7 @@ private:
         ALXUILint                                   lint;
         std::string                                 skin;
         std::string                                 language;
-        std::vector<std::unique_ptr<ALXUILiveFile>> liveFiles;
+        std::vector<std::unique_ptr<ALWatchedFile>> liveFiles;
         std::vector<ALXUIDiagnostics::Entry>        diagnostics;
         S32                                         views = 0;
         F32                                         seconds = 0.f;

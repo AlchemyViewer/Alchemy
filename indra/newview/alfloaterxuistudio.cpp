@@ -26,6 +26,7 @@
 
 #include "alfloaterxuistudio.h"
 
+#include "alwatchedfile.h"
 #include "alxmldocument.h"
 #include "alxmllayermerge.h"
 #include "alcolorfield.h"
@@ -59,7 +60,6 @@
 #include "llkeyboard.h"
 #include "lllayoutstack.h"
 #include "lllineeditor.h"
-#include "lllivefile.h"
 #include "llmenugl.h"
 #include "lltooldraganddrop.h"
 #include "llnotificationsutil.h"
@@ -146,34 +146,6 @@ static std::string layerName(const ALXUICatalog::Layer& layer)
 {
     return layer.skin + "/" + layer.language;
 }
-
-// One file of the primary preview, watched for a change on disk. The
-// first check counts as reading it; only a change after that reloads.
-class ALXUILiveFile final : public LLLiveFile
-{
-public:
-    ALXUILiveFile(const std::string& path, ALFloaterXUIStudio* tool)
-    :   LLLiveFile(path, 1.f),
-        mTool(tool)
-    {
-    }
-
-protected:
-    bool loadFile() override
-    {
-        if (!mPrimed)
-        {
-            mPrimed = true;
-            return true;
-        }
-        mTool->fileChanged();
-        return true;
-    }
-
-private:
-    ALFloaterXUIStudio*   mTool;
-    bool                mPrimed = false;
-};
 
 namespace
 {
@@ -4440,6 +4412,7 @@ void ALFloaterXUIStudio::saveAndRepair()
         setStatus(document().error());
         return;
     }
+    sawOwnWrites();
     mCatalog.reload(mFile);
 
     S32 moved = 0;
@@ -4452,6 +4425,7 @@ void ALFloaterXUIStudio::saveAndRepair()
             moved += count;
         }
     }
+    sawOwnWrites();
     mCatalog.reload(mFile);
     repairing.close();
 
@@ -4473,8 +4447,7 @@ void ALFloaterXUIStudio::saveDocument()
         setStatus(document().error());
         return;
     }
-    // The watchers prime themselves on what they find when the rebuild
-    // makes them, so a write of the tool's own is not an outside change.
+    sawOwnWrites();
     LLStringUtil::format_map_t args;
     args["[FILE]"] = fileNameOf(documentPath());
     documentChanged(getString("EditSaved", args));
@@ -4493,6 +4466,7 @@ void ALFloaterXUIStudio::saveAllDocuments()
         return;
     }
     const S32 written = mDocuments.saveAll();
+    sawOwnWrites();
     LLStringUtil::format_map_t args;
     args["[COUNT]"] = std::to_string(written);
     if (written < unsaved)
@@ -4689,6 +4663,7 @@ void ALFloaterXUIStudio::onDocumentSave()
         setStatus(held->error());
         return;
     }
+    sawOwnWrites();
     LLStringUtil::format_map_t args;
     args["[FILE]"] = fileNameOf(path);
     documentChanged(getString("EditSaved", args));
@@ -4769,6 +4744,7 @@ void ALFloaterXUIStudio::closeDocumentAnswered(const std::string& path, S32 opti
             setStatus(held->error());
             return;
         }
+        sawOwnWrites();
         letGoOf(path);
         break;
     case 1:
@@ -5085,18 +5061,26 @@ void ALFloaterXUIStudio::watchFiles(const ALXUICatalog::Entry& entry)
     pv.liveFiles.clear();
     for (const ALXUICatalog::Layer* layer : mCatalog.layersFor(entry, pv.skin, pv.language))
     {
-        auto live = std::make_unique<ALXUILiveFile>(layer->path, this);
-        live->checkAndReload();
-        live->addToEventTimer();
+        // Watched from as it stands: only a change after this reloads.
+        auto live = std::make_unique<ALWatchedFile>(layer->path, [this](const std::string&) { fileChanged(); });
+        live->poll(1.f);
         pv.liveFiles.push_back(std::move(live));
+    }
+}
+
+void ALFloaterXUIStudio::sawOwnWrites()
+{
+    for (const std::unique_ptr<ALWatchedFile>& live : mPreviews[PRIMARY].liveFiles)
+    {
+        live->seen();
     }
 }
 
 // Only the layers of the previewed file are watched, so a change on disk
 // is a change to what is on screen: that one entry is read again rather
-// than the whole tree. The watchers are made afresh by the rebuild and
-// prime themselves on what they find, which is why the tool's own writes
-// need no special case here.
+// than the whole tree. The tool's own writes are marked seen as they are
+// made (sawOwnWrites), and the watchers are made afresh by the rebuild
+// that follows them.
 void ALFloaterXUIStudio::fileChanged()
 {
     // Not while there is work in hand. A rebuild reads the layers again,
@@ -6785,6 +6769,7 @@ void ALFloaterXUIStudio::onTranslationWrite()
         setStatus(held->error());
         return;
     }
+    sawOwnWrites();
     mDocuments.settle();
     fillDocuments();
     fillHistory();
@@ -6861,6 +6846,7 @@ void ALFloaterXUIStudio::onTranslationRemove()
         setStatus(held->error());
         return;
     }
+    sawOwnWrites();
     mDocuments.settle();
     fillDocuments();
     fillHistory();
@@ -7036,6 +7022,7 @@ void ALFloaterXUIStudio::onRepairRoots()
             setStatus(edit.error());
             return;
         }
+        sawOwnWrites();
         LL_INFOS("XUIStudio") << language << "/" << entry.name << ": root \"" << over_root
                             << "\" -> \"" << base_root << "\"" << LL_ENDL;
         ++named;
