@@ -192,6 +192,7 @@ if(AL_BUILD_VIEWER)
     alscriptstudiofileio.cpp
     alscriptstudiofiles.cpp
     alscriptstudioorphans.cpp
+    alscriptstudioplaces.cpp
     alscriptstudiorecovery.cpp
     alscriptstudiosaving.cpp
     alscriptstudiovim.cpp
@@ -1010,6 +1011,7 @@ if(AL_BUILD_VIEWER)
     alscriptstudiofileio.h
     alscriptstudiofiles.h
     alscriptstudioorphans.h
+    alscriptstudioplaces.h
     alscriptstudiorecovery.h
     alscriptstudiosaving.h
     alscriptstudiovim.h

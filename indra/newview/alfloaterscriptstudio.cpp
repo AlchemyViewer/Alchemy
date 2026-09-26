@@ -35,6 +35,7 @@
 #include "alscriptpreprocessor.h"
 #include "alscriptweightspane.h"
 #include "alscriptstudiofileio.h"
+#include "alscriptstudioplaces.h"
 #include "alscriptstudiovimrc.h"
 #include "alemptystate.h"
 #include "aljumpbar.h"
@@ -150,14 +151,14 @@ using ALScriptFileIO::fileTooLarge;
 using ALScriptFileIO::readWholeFile;
 using ALScriptFileIO::StudioLiveFile;
 using ALScriptFileIO::writeTempFile;
+using ALScriptPlaces::isIdentifier;
+using ALScriptPlaces::lineOf;
+using ALScriptPlaces::mapSpan;
+using ALScriptPlaces::placeText;
+using ALScriptPlaces::rangeOf;
 
 namespace
 {
-    ALTextRange rangeOf(const ALScriptSpan& span)
-    {
-        return ALTextRange(ALTextPos(span.line, span.column), ALTextPos(span.endLine, span.endColumn));
-    }
-
     // Whether a span holds a position, its ends included.
     bool holds(const ALScriptSpan& span, const ALTextPos& pos)
     {
@@ -228,24 +229,6 @@ namespace
         {
             column = static_cast<S32>(std::strtol(std::string(rest.substr(0, digits)).c_str(), nullptr, 10));
         }
-    }
-
-    // A name as both languages spell one: a letter or an underscore, then
-    // letters, digits and underscores.
-    bool isIdentifier(const std::string& text)
-    {
-        if (text.empty() || (!isalpha(static_cast<unsigned char>(text[0])) && text[0] != '_'))
-        {
-            return false;
-        }
-        for (const char c : text)
-        {
-            if (!isalnum(static_cast<unsigned char>(c)) && c != '_')
-            {
-                return false;
-            }
-        }
-        return true;
     }
 }
 
@@ -2299,30 +2282,6 @@ void ALFloaterScriptStudio::expandedAnswer(const std::string& id, U32 version, c
     {
         askAnalyzer(doc, question.kind, question.at, question.to);
     }
-}
-
-// static
-S32 ALFloaterScriptStudio::mapSpan(const ALSourceMap& map, ALScriptSpan& span)
-{
-    const ALSourceMap::Loc begin = map.toSource(span.line, span.column);
-    if (!begin.found())
-    {
-        return -1;
-    }
-    const ALSourceMap::Loc end = map.toSource(span.endLine, span.endColumn);
-    span.line                  = begin.line;
-    span.column                = begin.column;
-    if (end.found() && end.file == begin.file && (end.line > begin.line || (end.line == begin.line && end.column > begin.column)))
-    {
-        span.endLine   = end.line;
-        span.endColumn = end.column;
-    }
-    else
-    {
-        span.endLine   = begin.line;
-        span.endColumn = begin.column;
-    }
-    return begin.file;
 }
 
 std::string ALFloaterScriptStudio::includeName(const Doc& doc, const std::string& path) const
@@ -4600,59 +4559,6 @@ void ALFloaterScriptStudio::askSymbol(Doc& doc, ALEditorCommand command, const A
     doc.symbolVersion = doc.editor->document().version();
     doc.symbolAt      = word.begin;
     askAnalyzer(doc, ALScriptAnalysis::Kind::References, word.begin);
-}
-
-namespace
-{
-    // A line of a text, as it is, for a row of a pane.
-    std::string lineOf(const std::string& text, S32 line)
-    {
-        size_t begin = 0;
-        for (S32 l = 0; l < line && begin != std::string::npos; ++l)
-        {
-            begin = text.find('\n', begin);
-            if (begin != std::string::npos)
-            {
-                ++begin;
-            }
-        }
-        if (begin == std::string::npos)
-        {
-            return std::string();
-        }
-        size_t end = text.find('\n', begin);
-        if (end != std::string::npos && end > begin && text[end - 1] == '\r')
-        {
-            --end;
-        }
-        return text.substr(begin, end == std::string::npos ? std::string::npos : end - begin);
-    }
-
-    std::string lineOf(const ALTextDocument& text, S32 line)
-    {
-        if (line < 0 || line >= text.lineCount())
-        {
-            return std::string();
-        }
-        return text.line(line);
-    }
-}
-
-// static
-void ALFloaterScriptStudio::placeText(Doc::Place& place, const std::string& line)
-{
-    // Trimmed for the row, and the name's place moved with the trimming.
-    const size_t first = line.find_first_not_of(" \t");
-    if (first == std::string::npos)
-    {
-        place.text.clear();
-        place.at = -1;
-        return;
-    }
-    const size_t last = line.find_last_not_of(" \t\r");
-    place.text        = line.substr(first, last - first + 1);
-    const S32 at      = place.span.column - static_cast<S32>(first);
-    place.at          = at >= 0 && at < static_cast<S32>(place.text.size()) ? at : -1;
 }
 
 const char* ALFloaterScriptStudio::includeImage(const std::string& path, bool lua) const

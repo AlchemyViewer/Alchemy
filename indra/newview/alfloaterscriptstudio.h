@@ -392,7 +392,6 @@ private:
     // A run of it over the text as it stands, fetching its includes, for
     // saving (ALScriptStudioSaving::preprocess).
     void                          runPreprocessor(const Doc& doc, std::function<void(const ALPreprocessor::Result&)> answer) override;
-    static S32                    mapSpan(const ALSourceMap& map, ALScriptSpan& span);
     std::string                   includeName(const Doc& doc, const std::string& path) const override;
     void                          chooseIncludeFolder();
     // A file on disk opened in a tab of its own, or brought forward, at
@@ -443,9 +442,6 @@ private:
     // else as the preprocessor last read it -- untrimmed; false where
     // neither has it.
     bool                          sourceLine(const std::string& path, S32 line, std::string& out) const;
-    // A place's line as the pane lists it: trimmed, with where the name
-    // stands in what is left.
-    static void                   placeText(Doc::Place& place, const std::string& line);
 
     void loaded(const ALScriptWorkspace::Loaded& answer);
     // The caret to the line, or the stretch, asked for before the text had
