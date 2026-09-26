@@ -182,6 +182,7 @@ if(AL_BUILD_VIEWER)
     alscriptnoticebar.cpp
     alscriptnotecardtab.cpp
     alscriptnotecardworld.cpp
+    alscriptoutlinepane.cpp
     alscriptoutputpane.cpp
     alscriptpreprocessor.cpp
     alscriptproblemspane.cpp
