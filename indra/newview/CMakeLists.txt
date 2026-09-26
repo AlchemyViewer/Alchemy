@@ -178,6 +178,7 @@ if(AL_BUILD_VIEWER)
     alfloaterscriptpreferences.cpp
     alscriptinspectorpane.cpp
     alscriptkeymap.cpp
+    alpanelscriptkeymap.cpp
     alscriptlookup.cpp
     alscriptnavigation.cpp
     alscriptmodules.cpp
@@ -1005,6 +1006,7 @@ if(AL_BUILD_VIEWER)
     alfloaterscriptpreferences.h
     alscriptinspectorpane.h
     alscriptkeymap.h
+    alpanelscriptkeymap.h
     alscriptlookup.h
     alscriptnavigation.h
     alscriptmodules.h

@@ -26,17 +26,11 @@
 
 #include "alkeymap.h"
 #include "alstudiofloater.h"
-#include "llpanel.h"
-#include "llsetkeybinddialog.h"
 
 #include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
-
-class LLLineEditor;
-class LLScrollListCtrl;
-class LLTextBox;
 
 // The keymap every editor of the studio is given: the standard one, with
 // the commands a person rebound as the setting says. A rebound command
@@ -77,55 +71,3 @@ namespace ALScriptKeymap
     // joined.
     std::string describe(const keys_t& keys);
 }
-
-// The keyboard map: every command of the editor, and of the studio's
-// menus, with the keys it answers to, to read, to search, and to change --
-// a key pressed into the viewer's own key dialog -- or put back. A key
-// given to one command is taken from whatever had it, and the panel says
-// which. A tab of the studio's preferences.
-class ALPanelScriptKeymap final : public LLPanel, public LLKeyBindResponderInterface
-{
-public:
-    AL_VIEW_TYPE(ALPanelScriptKeymap, LLPanel);
-
-    ALPanelScriptKeymap();
-    ~ALPanelScriptKeymap() override;
-
-    bool postBuild() override;
-    // The list read from the keymap again: the setting changed under it.
-    void refresh() override { fill(); }
-
-    void onCancelKeyBind() override {}
-    void onDefaultKeyBind(bool all_modes) override;
-    bool onSetKeyBind(EMouseClickType click, KEY key, MASK mask, bool all_modes) override;
-
-private:
-    void fill();
-    void onChange();
-    void onAdd();
-    void onClear();
-    void onRestore();
-    void onRestoreAll();
-    void refreshButtons();
-    // The command of the row chosen: an editor's, or a menu item's by
-    // name; neither where nothing is chosen.
-    struct Chosen
-    {
-        ALEditorCommand command = ALEditorCommand::None;
-        std::string     menu;
-        bool            any() const { return command != ALEditorCommand::None || !menu.empty(); }
-    };
-    Chosen      chosen() const;
-    // What a command is called in the list.
-    std::string nameOf(const Chosen& which) const;
-    // The key taken from every command but this one that answered to it,
-    // and what those were called.
-    std::vector<std::string> takeKey(const Chosen& keeping, KEY key, MASK mask);
-
-    LLLineEditor*     mFilter  = nullptr;
-    LLScrollListCtrl* mList    = nullptr;
-    LLTextBox*        mSaid    = nullptr;
-    Chosen            mEditing;
-    // Whether the key dialog adds to the command's keys or replaces them.
-    bool              mAdding  = false;
-};

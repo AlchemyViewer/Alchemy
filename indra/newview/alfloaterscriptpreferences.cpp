@@ -35,7 +35,7 @@
 #include "alscriptstudiovimrc.h"
 #include "alscriptstudiowords.h"
 #include "alfontfield.h"
-#include "alscriptkeymap.h"
+#include "alpanelscriptkeymap.h"
 #include "llbutton.h"
 #include "llcallbacklist.h"
 #include "llcolorswatch.h"
