@@ -193,7 +193,11 @@ ALKeymap ALKeymap::standard()
     map.bind(KEY_F2, MASK_NONE, C::Rename);
     map.bind('F', MASK_CONTROL, C::Find);
     map.bind('H', MASK_CONTROL, C::Replace);
+#if LL_DARWIN
+    // Command-Option-F, as the Mac's editors have it. Control and Alt
+    // together elsewhere is AltGr on many a keyboard, which types.
     map.bind('F', MASK_CONTROL | MASK_ALT, C::Replace);
+#endif
     map.bind(KEY_F3, MASK_NONE, C::FindNext);
     map.bind(KEY_F3, MASK_SHIFT, C::FindPrevious);
     // Control-. as Visual Studio and VS Code have it -- Command-. on a Mac,

@@ -63,6 +63,43 @@ namespace
         return keys;
     }
 
+    // A menu item's key as the setting keeps it: the list's first, and
+    // the key pressed before it where it is two. None for an empty list.
+    ALKeyChord chordFrom(const LLSD& list)
+    {
+        if (!list.isArray() || list.size() == 0)
+        {
+            return {};
+        }
+        const LLSD& one   = list[0];
+        ALKeyChord  chord = { static_cast<KEY>(one["key"].asInteger()), static_cast<MASK>(one["mask"].asInteger()) };
+        if (one.has("lead_key"))
+        {
+            chord.leadKey  = static_cast<KEY>(one["lead_key"].asInteger());
+            chord.leadMask = static_cast<MASK>(one["lead_mask"].asInteger());
+        }
+        return chord;
+    }
+
+    LLSD chordTo(const ALKeyChord& chord)
+    {
+        LLSD list = LLSD::emptyArray();
+        if (chord.none())
+        {
+            return list;
+        }
+        LLSD one;
+        one["key"]  = static_cast<S32>(chord.key);
+        one["mask"] = static_cast<S32>(chord.mask);
+        if (chord.twoKeys())
+        {
+            one["lead_key"]  = static_cast<S32>(chord.leadKey);
+            one["lead_mask"] = static_cast<S32>(chord.leadMask);
+        }
+        list.append(one);
+        return list;
+    }
+
     LLSD keysTo(const ALScriptKeymap::keys_t& keys)
     {
         LLSD list = LLSD::emptyArray();
@@ -160,11 +197,15 @@ namespace ALScriptKeymap
 #else
         constexpr MASK REAL_CONTROL = MASK_CONTROL;
 #endif
+        // Control-K, then a key: for what would otherwise hold Control
+        // and Alt together, which is AltGr on many a keyboard -- a German
+        // } or a Polish s typed would fold a pane or save every script.
+        const auto after_k = [](const char* id, KEY key) { return MenuCommand{ id, key, MASK_NONE, true, 'K', MASK_CONTROL }; };
         static const std::vector<MenuCommand> commands{
             { "new_script", 'N', MASK_CONTROL },
             { "new_lua_script", KEY_NONE, MASK_NONE },
             { "save", 'S', MASK_CONTROL },
-            { "save_all", 'S', MASK_CONTROL | MASK_ALT },
+            after_k("save_all", 'S'),
             { "revert", KEY_NONE, MASK_NONE },
             { "open_file", KEY_NONE, MASK_NONE },
             { "close", 'W', MASK_CONTROL },
@@ -193,14 +234,14 @@ namespace ALScriptKeymap
             { "focus_tabs", KEY_NONE, MASK_NONE },
             { "command_palette", 'P', MASK_CONTROL | MASK_SHIFT },
             { "quick_open", 'P', MASK_CONTROL },
-            { "explorer", '0', MASK_CONTROL | MASK_ALT },
-            { "problems", '1', MASK_CONTROL | MASK_ALT },
-            { "references", '2', MASK_CONTROL | MASK_ALT },
-            { "output", '3', MASK_CONTROL | MASK_ALT },
-            { "inspector", '4', MASK_CONTROL | MASK_ALT },
-            { "search", '5', MASK_CONTROL | MASK_ALT },
-            { "weights", '6', MASK_CONTROL | MASK_ALT },
-            { "expanded", 'P', MASK_CONTROL | MASK_ALT },
+            after_k("explorer", '0'),
+            after_k("problems", '1'),
+            after_k("references", '2'),
+            after_k("output", '3'),
+            after_k("inspector", '4'),
+            after_k("search", '5'),
+            after_k("weights", '6'),
+            after_k("expanded", 'P'),
             { "preprocess", KEY_NONE, MASK_NONE },
             { "reference", KEY_F1, MASK_NONE },
         };
@@ -213,23 +254,22 @@ namespace ALScriptKeymap
         return std::any_of(all.begin(), all.end(), [item](const MenuCommand& one) { return item == one.id; });
     }
 
-    std::pair<KEY, MASK> menuKey(std::string_view item)
+    ALKeyChord menuKey(std::string_view item)
     {
         const LLSD bound = rebound();
         const std::string name = MENU_PREFIX + std::string(item);
         if (bound.isMap() && bound.has(name))
         {
-            const keys_t keys = keysFrom(bound[name]);
-            return keys.empty() ? std::make_pair(KEY_NONE, MASK_NONE) : keys.front();
+            return chordFrom(bound[name]);
         }
         for (const MenuCommand& one : menuCommands())
         {
             if (item == one.id)
             {
-                return { one.key, one.mask };
+                return one.chord();
             }
         }
-        return { KEY_NONE, MASK_NONE };
+        return {};
     }
 
     bool isMenuRebound(std::string_view item)
@@ -238,19 +278,14 @@ namespace ALScriptKeymap
         return bound.isMap() && bound.has(MENU_PREFIX + std::string(item));
     }
 
-    void rebindMenu(std::string_view item, KEY key, MASK mask)
+    void rebindMenu(std::string_view item, const ALKeyChord& chord)
     {
         LLSD bound = rebound();
         if (!bound.isMap())
         {
             bound = LLSD::emptyMap();
         }
-        keys_t keys;
-        if (key != KEY_NONE)
-        {
-            keys.emplace_back(key, mask);
-        }
-        bound[MENU_PREFIX + std::string(item)] = keysTo(keys);
+        bound[MENU_PREFIX + std::string(item)] = chordTo(chord);
         store(bound);
     }
 
@@ -344,15 +379,9 @@ void ALPanelScriptKeymap::fill()
     }
     for (const ALScriptKeymap::MenuCommand& one : ALScriptKeymap::menuCommands())
     {
-        const auto [key, mask] = ALScriptKeymap::menuKey(one.id);
-        ALScriptKeymap::keys_t keys;
-        if (key != KEY_NONE)
-        {
-            keys.emplace_back(key, mask);
-        }
         LLSD value;
         value["menu"] = one.id;
-        add(value, getString(std::string("menu_") + one.id), ALScriptKeymap::describe(keys), one.id, ALScriptKeymap::isMenuRebound(one.id),
+        add(value, getString(std::string("menu_") + one.id), ALScriptKeymap::menuKey(one.id).describe(), one.id, ALScriptKeymap::isMenuRebound(one.id),
             was.menu == one.id);
     }
     refreshButtons();
@@ -428,7 +457,7 @@ void ALPanelScriptKeymap::onClear()
     }
     else
     {
-        ALScriptKeymap::rebindMenu(which.menu, KEY_NONE, MASK_NONE);
+        ALScriptKeymap::rebindMenu(which.menu, {});
     }
     mSaid->setText(LLStringUtil::null);
     fill();
@@ -504,14 +533,17 @@ std::vector<std::string> ALPanelScriptKeymap::takeKey(const Chosen& keeping, KEY
         from.push_back(nameOf(was));
     }
     // A menu's: it has no key left. The editor has a key first, so a key
-    // both answered to was the editor's alone in the editor.
+    // both answered to was the editor's alone in the editor. One the key
+    // is the first of two of is left without too: the key now runs a
+    // command of its own, and the window would never wait for a second.
     for (const ALScriptKeymap::MenuCommand& one : ALScriptKeymap::menuCommands())
     {
-        if (keeping.menu == one.id || ALScriptKeymap::menuKey(one.id) != std::make_pair(key, mask))
+        const ALKeyChord had = ALScriptKeymap::menuKey(one.id);
+        if (keeping.menu == one.id || (had != ALKeyChord{ key, mask } && !had.ledBy(key, mask)))
         {
             continue;
         }
-        ALScriptKeymap::rebindMenu(one.id, KEY_NONE, MASK_NONE);
+        ALScriptKeymap::rebindMenu(one.id, {});
         Chosen was;
         was.menu = one.id;
         from.push_back(nameOf(was));
@@ -539,7 +571,7 @@ bool ALPanelScriptKeymap::onSetKeyBind(EMouseClickType click, KEY key, MASK mask
     }
     else
     {
-        ALScriptKeymap::rebindMenu(mEditing.menu, key, mask);
+        ALScriptKeymap::rebindMenu(mEditing.menu, ALKeyChord{ key, mask });
     }
     if (from.empty())
     {

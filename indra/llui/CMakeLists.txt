@@ -143,6 +143,7 @@ target_sources(
     alfoldmodel.cpp
     alsnippetsession.cpp
     alfindbar.cpp
+    alkeychord.cpp
     alkeymap.cpp
     alvimkeymap.cpp
     alvimmappings.cpp
@@ -349,6 +350,7 @@ target_sources(
         alsnippetsession.h
         alfindings.h
         alfindbar.h
+        alkeychord.h
         alkeymap.h
         alvimkeymap.h
         alvimmappings.h

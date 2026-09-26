@@ -43,7 +43,7 @@ class LLTextBox;
 // has only the keys the setting gives it; a command the setting does not
 // name keeps the standard's. The studio's own menu commands -- saving,
 // going to a line, the panes -- are rebound in the same setting, each to
-// one key, since a menu item answers to one.
+// one key or two in turn, since a menu item answers to one.
 namespace ALScriptKeymap
 {
     typedef std::vector<std::pair<KEY, MASK>> keys_t;
@@ -56,12 +56,13 @@ namespace ALScriptKeymap
     const std::vector<MenuCommand>& menuCommands();
     // Whether an item is one of them.
     bool                 isMenuCommand(std::string_view item);
-    // Its key: the person's, else the standard; KEY_NONE for none.
-    std::pair<KEY, MASK> menuKey(std::string_view item);
+    // Its key, or two in turn: the person's, else the standard; none for
+    // none.
+    ALKeyChord           menuKey(std::string_view item);
     bool                 isMenuRebound(std::string_view item);
-    // The item's key from now on, KEY_NONE for none; and the standard's
+    // The item's key from now on, none for none; and the standard's
     // again.
-    void                 rebindMenu(std::string_view item, KEY key, MASK mask);
+    void                 rebindMenu(std::string_view item, const ALKeyChord& chord);
     void                 restoreMenu(std::string_view item);
 
     ALKeymap current();

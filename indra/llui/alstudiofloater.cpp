@@ -38,6 +38,7 @@
 #include "lluicolortable.h"
 #include "lluictrlfactory.h"
 
+#include <algorithm>
 #include <memory>
 
 ALStudioFloater::ALStudioFloater(const LLSD& key, std::string state_setting)
@@ -69,14 +70,62 @@ bool ALStudioFloater::runCommandKey(KEY key, MASK mask)
     {
         return false;
     }
+    const ALKeyChord single{ key, mask };
     for (const Registered& one : mCommands)
     {
-        if (keyOf(one.command) == std::make_pair(key, mask) && one.run && one.run())
+        if (keyOf(one.command) == single && one.run && one.run())
         {
             return true;
         }
     }
-    return false;
+    // The first of two: the next key is this window's, wherever the
+    // keyboard is.
+    const bool leads = std::any_of(mCommands.begin(), mCommands.end(), [&](const Registered& one) { return keyOf(one.command).ledBy(key, mask); });
+    if (!leads)
+    {
+        return false;
+    }
+    const LLHandle<LLFloater> handle = getHandle();
+    ALKeyChords::wait(this, key, mask, [handle, key, mask](KEY second, MASK second_mask) {
+        if (ALStudioFloater* window = ALViewType::as<ALStudioFloater>(handle.get()))
+        {
+            window->finishChord(key, mask, second, second_mask);
+        }
+    });
+    if (hasString("ChordWaiting"))
+    {
+        setStatus(getString("ChordWaiting", LLStringUtil::format_map_t{ { "[KEYS]", ALKeyChord{ key, mask }.describe() } }));
+    }
+    return true;
+}
+
+void ALStudioFloater::finishChord(KEY lead_key, MASK lead_mask, KEY key, MASK mask)
+{
+    const auto run = [this](const ALKeyChord& chord) {
+        for (const Registered& one : mCommands)
+        {
+            if (keyOf(one.command) == chord && one.run && one.run())
+            {
+                return true;
+            }
+        }
+        return false;
+    };
+    // The wait said no longer, before the command says anything of its own.
+    if (hasString("ChordWaiting"))
+    {
+        setStatus(std::string());
+    }
+    const ALKeyChord chord{ key, mask, lead_key, lead_mask };
+    const MASK       held = lead_mask & (MASK_CONTROL | MASK_MAC_CONTROL);
+    if (run(chord) || (held != MASK_NONE && (mask & held) == held && run(ALKeyChord{ key, static_cast<MASK>(mask & ~held), lead_key, lead_mask })))
+    {
+        return;
+    }
+    if (hasString("ChordNone"))
+    {
+        setStatus(getString("ChordNone", LLStringUtil::format_map_t{ { "[KEYS]", chord.describe() } }), true);
+    }
 }
 
 bool ALStudioFloater::handleStudioKeys(KEY key, MASK mask)

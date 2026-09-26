@@ -144,6 +144,14 @@ public:
         mAcceleratorMask = mask;
         buildDrawLabel();
     }
+    // Keys drawn beside the item that it does not answer to itself -- two
+    // in turn, which the window it is in waits for -- or none. A key it
+    // answers to stands in their place.
+    void        setShownKeys(const std::string& keys)
+    {
+        mShownKeys = keys;
+        buildDrawLabel();
+    }
 
     // change the label
     void setLabel( const LLStringExplicit& label ) { mLabel = label; }
@@ -245,6 +253,7 @@ protected:
 protected:
     KEY mAcceleratorKey;
     MASK mAcceleratorMask;
+    std::string mShownKeys;
     // mLabel contains the actual label specified by the user.
     LLUIString mLabel;
 

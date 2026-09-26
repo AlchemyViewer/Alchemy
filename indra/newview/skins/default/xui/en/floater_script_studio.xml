@@ -442,6 +442,8 @@
     <floater.string name="MenuUndoWhat">Undo [WHAT]</floater.string>
     <floater.string name="MenuRedo">Redo</floater.string>
     <floater.string name="MenuRedoWhat">Redo [WHAT]</floater.string>
+    <floater.string name="ChordWaiting">[KEYS] pressed: waiting for the next key...</floater.string>
+    <floater.string name="ChordNone">[KEYS] is not a command.</floater.string>
     <floater.string name="PaletteOn">on</floater.string>
     <floater.string name="PaletteOff">off</floater.string>
     <floater.string name="UndoWhatRename">Rename</floater.string>
@@ -555,7 +557,7 @@
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="save" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="save" />
             </menu_item_call>
-            <menu_item_call label="Save All" layout="topleft" name="save_all" shortcut="control|alt|S">
+            <menu_item_call label="Save All" layout="topleft" name="save_all">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="save_all" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="save_all" />
             </menu_item_call>
@@ -1009,36 +1011,36 @@
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="unfold_all" />
             </menu_item_call>
             <menu_item_separator layout="topleft" />
-            <menu_item_check label="Explorer" layout="topleft" name="explorer" shortcut="control|alt|0">
+            <menu_item_check label="Explorer" layout="topleft" name="explorer">
                 <menu_item_check.on_check function="ScriptStudio.Check" parameter="explorer" />
                 <menu_item_check.on_click function="ScriptStudio.Menu" parameter="explorer" />
             </menu_item_check>
-            <menu_item_check label="Problems" layout="topleft" name="problems" shortcut="control|alt|1">
+            <menu_item_check label="Problems" layout="topleft" name="problems">
                 <menu_item_check.on_check function="ScriptStudio.Check" parameter="problems" />
                 <menu_item_check.on_click function="ScriptStudio.Menu" parameter="problems" />
             </menu_item_check>
-            <menu_item_check label="References" layout="topleft" name="references" shortcut="control|alt|2">
+            <menu_item_check label="References" layout="topleft" name="references">
                 <menu_item_check.on_check function="ScriptStudio.Check" parameter="references" />
                 <menu_item_check.on_click function="ScriptStudio.Menu" parameter="references" />
             </menu_item_check>
-            <menu_item_check label="Output" layout="topleft" name="output" shortcut="control|alt|3">
+            <menu_item_check label="Output" layout="topleft" name="output">
                 <menu_item_check.on_check function="ScriptStudio.Check" parameter="output" />
                 <menu_item_check.on_click function="ScriptStudio.Menu" parameter="output" />
             </menu_item_check>
-            <menu_item_check label="Search" layout="topleft" name="search" shortcut="control|alt|5">
+            <menu_item_check label="Search" layout="topleft" name="search">
                 <menu_item_check.on_check function="ScriptStudio.Check" parameter="search" />
                 <menu_item_check.on_click function="ScriptStudio.Menu" parameter="search" />
             </menu_item_check>
-            <menu_item_check label="Weights" layout="topleft" name="weights" shortcut="control|alt|6">
+            <menu_item_check label="Weights" layout="topleft" name="weights">
                 <menu_item_check.on_check function="ScriptStudio.Check" parameter="weights" />
                 <menu_item_check.on_click function="ScriptStudio.Menu" parameter="weights" />
             </menu_item_check>
-            <menu_item_check label="Inspector" layout="topleft" name="inspector" shortcut="control|alt|4">
+            <menu_item_check label="Inspector" layout="topleft" name="inspector">
                 <menu_item_check.on_check function="ScriptStudio.Check" parameter="inspector" />
                 <menu_item_check.on_click function="ScriptStudio.Menu" parameter="inspector" />
             </menu_item_check>
             <menu_item_separator layout="topleft" />
-            <menu_item_check label="Preprocessed Output" layout="topleft" name="expanded" shortcut="control|alt|P">
+            <menu_item_check label="Preprocessed Output" layout="topleft" name="expanded">
                 <menu_item_check.on_check function="ScriptStudio.Check" parameter="expanded" />
                 <menu_item_check.on_click function="ScriptStudio.Menu" parameter="expanded" />
                 <menu_item_check.on_enable function="ScriptStudio.Enable" parameter="expanded" />

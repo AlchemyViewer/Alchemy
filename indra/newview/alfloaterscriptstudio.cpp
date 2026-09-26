@@ -1266,7 +1266,7 @@ void ALFloaterScriptStudio::addKeys()
 #endif
 }
 
-std::pair<KEY, MASK> ALFloaterScriptStudio::keyOf(const KeyedCommand& command) const
+ALKeyChord ALFloaterScriptStudio::keyOf(const KeyedCommand& command) const
 {
     // The key a person gave a menu's command, kept in the keymap's setting.
     return command.rebindable ? ALScriptKeymap::menuKey(command.id) : ALStudioFloater::keyOf(command);
@@ -3105,8 +3105,11 @@ void ALFloaterScriptStudio::applyMenuKeys()
     {
         if (LLMenuItemGL* item = bar->findChild<LLMenuItemGL>(command.id, true))
         {
-            const auto [key, mask] = ALScriptKeymap::menuKey(command.id);
-            item->setShownAccelerator(key, mask);
+            // Two keys in turn are the window's to wait for (keyOf): the
+            // item shows them and answers to neither.
+            const ALKeyChord chord = ALScriptKeymap::menuKey(command.id);
+            item->setShownKeys(chord.twoKeys() ? chord.describe() : std::string());
+            item->setShownAccelerator(chord.twoKeys() ? KEY_NONE : chord.key, chord.twoKeys() ? MASK_NONE : chord.mask);
         }
     }
     // A menu item that gives an editor's command shows, and answers to, the

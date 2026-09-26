@@ -333,12 +333,12 @@ bool LLMenuItemGL::addToAcceleratorList(std::list <LLMenuKeyboardBinding*> *list
 // the current accelerator key and mask to the provided string.
 std::string LLMenuItemGL::getAcceleratorString() const
 {
-    return mAcceleratorKey == KEY_NONE ? std::string() : LLKeyboard::stringFromAccelerator(mAcceleratorMask, mAcceleratorKey);
+    return mAcceleratorKey == KEY_NONE ? mShownKeys : LLKeyboard::stringFromAccelerator(mAcceleratorMask, mAcceleratorKey);
 }
 
 void LLMenuItemGL::appendAcceleratorString( std::string& st ) const
 {
-    st = LLKeyboard::stringFromAccelerator( mAcceleratorMask, mAcceleratorKey );
+    st = mAcceleratorKey == KEY_NONE && !mShownKeys.empty() ? mShownKeys : LLKeyboard::stringFromAccelerator( mAcceleratorMask, mAcceleratorKey );
     LL_DEBUGS("HotKeys") << "appendAcceleratorString: " << st << LL_ENDL;
 }
 
@@ -396,7 +396,7 @@ U32 LLMenuItemGL::getNominalWidth( void ) const
         width = PLAIN_PAD_PIXELS;
     }
 
-    if( KEY_NONE != mAcceleratorKey )
+    if( KEY_NONE != mAcceleratorKey || !mShownKeys.empty() )
     {
         width += getMenu()->getShortcutPad();
         std::string temp;

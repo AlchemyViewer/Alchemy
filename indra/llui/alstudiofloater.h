@@ -25,6 +25,7 @@
 #pragma once
 
 #include "alhistorylist.h"
+#include "alkeychord.h"
 #include "alpanefolds.h"
 #include "alpopover.h"
 #include "alquickopen.h"
@@ -88,13 +89,18 @@ public:
     // A command the studio's keys reach: its name, the key it answers to
     // as standard, and whether a person may give it another -- a Keys tab
     // lists the ones they may. A second key for a command is another entry
-    // under the same name, one that may not be given another.
+    // under the same name, one that may not be given another. A key that
+    // is two in turn names the first last: Control-K, then S.
     struct KeyedCommand
     {
         const char* id         = "";
         KEY         key        = KEY_NONE;
         MASK        mask       = MASK_NONE;
         bool        rebindable = true;
+        KEY         leadKey    = KEY_NONE;
+        MASK        leadMask   = MASK_NONE;
+
+        ALKeyChord chord() const { return { key, mask, leadKey, leadMask }; }
     };
 
 protected:
@@ -123,9 +129,12 @@ protected:
     void addCommand(const KeyedCommand& command, std::function<bool()> run);
     // The key a command answers to now: its standard one, unless the
     // studio keeps the one a person gave it.
-    virtual std::pair<KEY, MASK> keyOf(const KeyedCommand& command) const { return { command.key, command.mask }; }
+    virtual ALKeyChord keyOf(const KeyedCommand& command) const { return command.chord(); }
     // The first command a key is the key of that runs: false where none
-    // did.
+    // did. A key that is the first of some command's two is taken, and
+    // the window waits for the second (ALKeyChords), whatever has the
+    // keyboard: the command that is both runs, and the status line says
+    // what the window waits for, or that the two are no command.
     bool runCommandKey(KEY key, MASK mask);
     // What every studio's keys are, in order: the menu bar's shortcuts,
     // undo and redo, then its commands. For a studio with keys of its own
@@ -194,6 +203,10 @@ private:
     void answerQuickOpen(ALPopover* popover, ALQuickOpen* quick, std::function<void(const std::string&)> chose,
                          std::function<void()> escaped, std::function<void(const std::string&)> hold,
                          std::function<void()> left);
+    // The second of two keys, the first `lead`: the command they are run,
+    // or, held with the first's modifiers and no command, the key alone --
+    // Control kept down through both.
+    void finishChord(KEY lead_key, MASK lead_mask, KEY key, MASK mask);
     // Cut, copy, paste and select all, to the text control with the
     // keyboard -- in this window, or in one of its own a key comes home
     // from. False where it is not one of them, or no text has the keyboard.

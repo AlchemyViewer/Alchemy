@@ -26,10 +26,15 @@
 
 #include "../alstudiofloater.h"
 
+#include "../alkeychord.h"
 #include "../alpopover.h"
 #include "../llfocusmgr.h"
 #include "../lllineeditor.h"
+#include "../llmenugl.h"
 #include "../lluictrlfactory.h"
+
+#include "llframetimer.h"
+#include "llkeyboard.h"
 
 #include "llcontrol.h"
 
@@ -67,11 +72,11 @@ namespace
         MASK        reboundMask = MASK_NONE;
 
     protected:
-        std::pair<KEY, MASK> keyOf(const KeyedCommand& command) const override
+        ALKeyChord keyOf(const KeyedCommand& command) const override
         {
             if (command.rebindable && rebound == command.id)
             {
-                return { reboundKey, reboundMask };
+                return ALKeyChord{ reboundKey, reboundMask };
             }
             return ALStudioFloater::keyOf(command);
         }
@@ -402,5 +407,80 @@ namespace tut
         ensure("paste here", typing->handleKey('V', MASK_CONTROL, false));
         ensure_equals("what was copied there", typing->getText(), std::string("world"));
         window->closeFloater();
+    }
+
+    template<> template<>
+    void alstudiofloater_object::test<9>()
+    {
+        set_test_name("two keys in turn: the first waits, the second goes to the window before the keyboard's, runs the two's command, and takes its character");
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        TestStudio* window = studio();
+        S32         saved  = 0;
+        S32         found  = 0;
+        window->addCommand({ "save_all", 'S', MASK_NONE, true, 'K', MASK_CONTROL }, [&]() { ++saved; return true; });
+        window->addCommand({ "find", 'F', MASK_CONTROL, false }, [&]() { ++found; return true; });
+        LLLineEditor* typing = field(window, "text");
+        ensure("nobody waits: a key goes where it goes", !ALKeyChords::takeKey('S', MASK_NONE) && !ALKeyChords::takeChar('s'));
+
+        ensure("the first taken", typing->handleKey('K', MASK_CONTROL, false));
+        ensure("and waited on", ALKeyChords::waiting());
+        ensure("a modifier on its own is no second key", !ALKeyChords::takeKey(KEY_CONTROL, MASK_CONTROL) && ALKeyChords::waiting());
+        ensure("the second taken", ALKeyChords::takeKey('S', MASK_NONE));
+        ensure_equals("the command the two are", saved, 1);
+        ensure("waiting no longer", !ALKeyChords::waiting());
+        ensure("its character taken with it", ALKeyChords::takeChar('s'));
+        ensure("and only its own", !ALKeyChords::takeChar('a'));
+        ensure_equals("nothing typed", typing->getText(), std::string("text"));
+
+        typing->handleKey('K', MASK_CONTROL, false);
+        ALKeyChords::takeKey('S', MASK_NONE);
+        LLFrameTimer::updateFrameCount();
+        ensure("a character a frame later is typing", !ALKeyChords::takeChar('s'));
+
+        typing->handleKey('K', MASK_CONTROL, false);
+        ensure("Control held down through both", ALKeyChords::takeKey('S', MASK_CONTROL) && saved == 3);
+        ensure("no character to take", !ALKeyChords::takeChar('s'));
+
+        typing->handleKey('K', MASK_CONTROL, false);
+        ensure("a second key the text or the window would take: the wait's", ALKeyChords::takeKey('F', MASK_CONTROL));
+        ensure("and no command", found == 0 && saved == 3 && !ALKeyChords::waiting());
+        typing->handleKey('K', MASK_CONTROL, false);
+        ensure("Escape: no command, the wait over", ALKeyChords::takeKey(KEY_ESCAPE, MASK_NONE) && !ALKeyChords::waiting() && saved == 3);
+
+        typing->handleKey('K', MASK_CONTROL, false);
+        LLLineEditor* other = field(window, "other");
+        ensure("the keyboard gone elsewhere: the wait is over", !ALKeyChords::waiting() && !ALKeyChords::takeKey('S', MASK_NONE));
+        ensure_equals("nothing run", saved, 3);
+        other->setFocus(false);
+        window->closeFloater();
+    }
+
+    template<> template<>
+    void alstudiofloater_object::test<10>()
+    {
+        set_test_name("two keys written apart; a menu item shows keys it does not answer to, and a key it answers to in their place");
+        LLKeyboard::setStringTranslatorFunc([](std::string_view name) { return std::string(name); });
+        const ALKeyChord two{ 'S', MASK_NONE, 'K', MASK_CONTROL };
+        ensure_equals("the two", two.describe(), LLKeyboard::stringFromAccelerator(MASK_CONTROL, 'K') + " " + LLKeyboard::stringFromAccelerator(MASK_NONE, 'S'));
+        ensure_equals("one", ALKeyChord{ 'S', MASK_CONTROL }.describe(), LLKeyboard::stringFromAccelerator(MASK_CONTROL, 'S'));
+        ensure("none", ALKeyChord{}.describe().empty());
+        ensure("led by the first", two.ledBy('K', MASK_CONTROL) && !two.ledBy('K', MASK_NONE) && !ALKeyChord{ 'K', MASK_CONTROL }.ledBy('K', MASK_CONTROL));
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        LLMenuItemCallGL::Params p;
+        p.name  = "save_all";
+        p.label = "Save All";
+        LLMenuItemCallGL* item = LLUICtrlFactory::create<LLMenuItemCallGL>(p);
+        item->setShownKeys(two.describe());
+        ensure_equals("shown", item->getAcceleratorString(), two.describe());
+        ensure("and answered to by nothing", item->getAcceleratorKey() == KEY_NONE);
+        item->setShownAccelerator('S', MASK_CONTROL);
+        ensure_equals("a key of its own in their place", item->getAcceleratorString(), LLKeyboard::stringFromAccelerator(MASK_CONTROL, 'S'));
+        item->die();
     }
 }

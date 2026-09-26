@@ -87,6 +87,7 @@
 // newview includes
 #include "alchatbar.h"
 #include "alfloaterprogressview.h"
+#include "alkeychord.h"
 #include "llaccordionctrl.h"
 // [SL:KB] - Patch: Build-DragNDrop | Checked: 2013-07-22 (Catznip-3.6)
 #include "llagentbenefits.h"
@@ -3207,6 +3208,13 @@ bool LLViewerWindow::handleKey(KEY key, MASK mask)
         return true;
     }
 
+    // The second of two keys, to the window waiting for it, before
+    // whatever has the keyboard would take it or type it.
+    if (ALKeyChords::takeKey(key, mask))
+    {
+        return true;
+    }
+
     LLFocusableElement* keyboard_focus = gFocusMgr.getKeyboardFocus();
 
     if (keyboard_focus
@@ -3498,6 +3506,12 @@ bool LLViewerWindow::handleKey(KEY key, MASK mask)
 
 bool LLViewerWindow::handleUnicodeChar(llwchar uni_char, MASK mask)
 {
+    // The character of a key taken as the second of two.
+    if (ALKeyChords::takeChar(uni_char))
+    {
+        return true;
+    }
+
     // HACK:  We delay processing of return keys until they arrive as a Unicode char,
     // so that if you're typing chat text at low frame rate, we don't send the chat
     // until all keystrokes have been entered. JC
