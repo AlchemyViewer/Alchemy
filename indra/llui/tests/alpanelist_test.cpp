@@ -431,7 +431,7 @@ namespace tut
         ALPaneList& l = make();
         ensure("nothing to say, nothing said", !l.saysEmpty());
         l.setEmpty("Nothing found.", "Try other words.");
-        ensure("no rows: said", l.saysEmpty());
+        ensure("no rows: said", l.saysEmpty() && l.emptyWords() == "Nothing found.");
         const ALEmptyState* empty = l.findChild<ALEmptyState>("empty");
         ensure("where the rows would be", empty && empty->getRect() == l.getItemListRect());
         add("one", 0);

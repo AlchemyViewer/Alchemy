@@ -326,6 +326,7 @@ namespace tut
         window.find<LLFilterEditor>("problems_filter")->setText(std::string("NOTE"));
         window.find<LLFilterEditor>("problems_filter")->onCommit();
         ensure_equals("the words, in either case", shown(), "|door note|#" + services.counted("ProblemsHidden", 2));
+        ensure("rows to show: nothing said over them", !out.list()->saysEmpty());
         window.find<LLFilterEditor>("problems_filter")->setText(std::string());
         window.find<LLFilterEditor>("problems_filter")->onCommit();
 
@@ -351,6 +352,13 @@ namespace tut
         LLSD state;
         out.saveState(state);
         ensure_equals("the scope kept", state["problem_scope"].asString(), std::string("this"));
+
+        // A script with nothing wrong with it says so where the rows would be.
+        Doc& clean = doc("clean");
+        gather(clean);
+        out.fill(&clean);
+        ensure("nothing listed, said", out.list()->saysEmpty()
+                                           && out.list()->emptyWords() == services.words("NoProblemsIn", { { "[NAME]", "clean.lsl" } }));
     }
 
     template <>

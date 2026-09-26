@@ -228,9 +228,10 @@ void ALScriptOutlinePane::show(Doc& doc)
         }
         mList->setScrollPos(scroll);
     }
-    mList->setCommentText(doc.outline.empty() ? mServices->words(doc.loaded ? "NoOutline" : "NoOutlineYet")
-                          : rows.empty()      ? mServices->words("OutlineNoMatch")
-                                              : LLStringUtil::null);
+    mList->setEmpty(doc.outline.empty() ? mServices->words(doc.loaded ? "NoOutline" : "NoOutlineYet")
+                    : rows.empty()      ? mServices->words("OutlineNoMatch")
+                                        : LLStringUtil::null,
+                    LLStringUtil::null);
     mWindow->outlineShown(doc);
     followCaret(doc);
 }

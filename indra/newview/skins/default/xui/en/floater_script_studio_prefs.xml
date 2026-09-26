@@ -811,7 +811,7 @@ end</floater.string>
              tool_tip="An #include or a require may name a file in the folders below, looked for from the top; a .luaurc at the top of each gives a script in the world its aliases and settings, an earlier folder's over a later one's. Nothing else on the disk is read, but where a .lslrc or .luaurc on disk points -- and only within its own folder or one below: to reach further, add that folder here. Off, nothing on the disk is read at all"
              top_delta="0"
              width="370" />
-            <scroll_list
+            <pane_list
              column_padding="0"
              draw_heading="false"
              follows="left|top"
@@ -823,8 +823,8 @@ end</floater.string>
              tool_tip="The folders on disk an #include or a require is read from, looked in from the top"
              top_pad="4"
              width="260">
-                <scroll_list.columns dynamic_width="true" name="folder" />
-            </scroll_list>
+                <pane_list.columns dynamic_width="true" name="folder" />
+            </pane_list>
             <button
              follows="left|top"
              height="22"

@@ -478,7 +478,7 @@ void ALScriptProblemsPane::fill(const Doc* doc)
     const bool same = doc && doc->id == mShownFor;
     mShownFor = doc ? doc->id : std::string();
     mList->deleteAllItems();
-    mList->setCommentText(LLStringUtil::null);
+    mList->setEmpty(LLStringUtil::null, LLStringUtil::null);
 
     // How many of each there are before the filters: what the level
     // boxes and the tab say.
@@ -722,11 +722,15 @@ void ALScriptProblemsPane::fill(const Doc* doc)
         }
         LLStringUtil::format_map_t named;
         named["[NAME]"] = doc->name;
-        mList->setCommentText(!current ? std::string() : all ? mServices->words("NoProblemsOpen") : elsewhere ? mServices->words("NoProblemsIn", named) : mServices->words("NoProblems"));
+        mList->setEmpty(!current     ? std::string()
+                        : all       ? mServices->words("NoProblemsOpen")
+                        : elsewhere ? mServices->words("NoProblemsIn", named)
+                                    : mServices->words("NoProblems"),
+                        LLStringUtil::null);
     }
     else if (listed == 0)
     {
-        mList->setCommentText(mServices->counted("ProblemsAllHidden", held));
+        mList->setEmpty(mServices->counted("ProblemsAllHidden", held), LLStringUtil::null);
     }
 }
 

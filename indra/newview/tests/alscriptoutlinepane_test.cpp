@@ -153,7 +153,8 @@ namespace tut
             const LLScrollListItem* item = pane()->list()->getFirstSelected();
             return item ? item->getValue().asInteger() : -1;
         }
-        std::string comment() { return pane()->list()->findChild<LLTextBox>("comment_text")->getText(); }
+        // What the list says over its rows, where it has none.
+        std::string comment() { return pane()->list()->saysEmpty() ? pane()->list()->emptyWords() : std::string(); }
     };
 
     typedef test_group<alscriptoutlinepane_data> alscriptoutlinepane_group;

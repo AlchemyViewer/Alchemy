@@ -32,6 +32,7 @@
 #include <string>
 #include <vector>
 
+class ALPaneList;
 class ALCodeEditor;
 class ALFontField;
 class LLTextEditor;
@@ -144,7 +145,7 @@ private:
     ALFontField*                                           mFont        = nullptr;
     LLPanel*                                               mSwatches    = nullptr;
     ALCodeEditor*                                          mPreview     = nullptr;
-    LLScrollListCtrl*                                      mFolders     = nullptr;
+    ALPaneList*                                            mFolders     = nullptr;
     ALCodeEditor*                                          mTemplateLSL  = nullptr;
     ALCodeEditor*                                          mTemplateSLua = nullptr;
     LLTextEditor*                                          mDefines      = nullptr;

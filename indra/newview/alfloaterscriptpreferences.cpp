@@ -25,6 +25,8 @@
 #include "llviewerprecompiledheaders.h"
 
 #include "alfloaterscriptpreferences.h"
+
+#include "alpanelist.h"
 #include "alsurface.h"
 
 #include "alcodeeditor.h"
@@ -106,7 +108,9 @@ bool ALFloaterScriptPreferences::postBuild()
     mFont        = getChild<ALFontField>("font");
     mSwatches    = getChild<LLPanel>("swatches");
     mPreview     = getChild<ALCodeEditor>("preview");
-    mFolders      = getChild<LLScrollListCtrl>("include_folders");
+    mFolders      = getChild<ALPaneList>("include_folders");
+    // With none, it says so where they would be.
+    mFolders->setEmpty(getString("NoFolder"), LLStringUtil::null);
     mOrder        = getChild<LLScrollListCtrl>("include_order");
     mOrderTip     = mOrder->getToolTip();
     mTemplateLSL  = getChild<ALCodeEditor>("template_lsl");
@@ -804,11 +808,7 @@ void ALFloaterScriptPreferences::refreshIncludeFolder()
         row["columns"][0]["tool_tip"] = folder;
         mFolders->addElement(row);
     }
-    if (mFolders->getItemCount() == 0)
-    {
-        mFolders->setCommentText(getString("NoFolder"));
-    }
-    else if (chosen >= 0)
+    if (chosen >= 0 && mFolders->getItemCount() > 0)
     {
         mFolders->selectNthItem(llmin(chosen, mFolders->getItemCount() - 1));
     }

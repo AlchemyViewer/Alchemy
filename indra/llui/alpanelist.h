@@ -78,8 +78,9 @@ public:
     // What the list says while it has no rows: a headline and a sentence
     // where the rows would be (ALEmptyState). Empty words, nothing.
     void setEmpty(const std::string& headline, const std::string& sentence);
-    // Whether it says so now: no rows, and words to say.
-    bool saysEmpty() const;
+    // Whether it says so now: no rows, and words to say; and its headline.
+    bool               saysEmpty() const;
+    const std::string& emptyWords() const { return mEmptyHeadline; }
 
     // Copying from the list, off unless asked for: a list with a menu of
     // its own would bring up both.
