@@ -34,6 +34,7 @@
 #include <boost/signals2.hpp>
 
 class ALEmptyState;
+class LLFontGL;
 class LLScrollContainer;
 class LLTextBox;
 
@@ -96,6 +97,11 @@ public:
         // Stretched across the cell, as chrome is drawn, rather than fitted
         // at its own proportions, as an icon is.
         bool        stretch = false;
+        // Or words in a face, shown beside the label in a row: the same
+        // sample on every row, so that what differs between two of them is
+        // the face -- which is recognised rather than read.
+        const LLFontGL* font = nullptr;
+        std::string     sample;
         // Carries the person's changes; drawn with a mark.
         bool        marked = false;
         // Does not resolve; its name drawn as a warning.
@@ -131,6 +137,13 @@ public:
     {
         return mChose.connect(cb);
     }
+    // A row double-clicked: chosen, and taken -- the choice and the yes
+    // together, for a caller that has a yes.
+    boost::signals2::connection onPicked(const chose_signal_t::slot_type& cb)
+    {
+        return mPicked.connect(cb);
+    }
+    void pick(const std::string& value);
 
     // In cells, control and a click adds an entry to the selection or
     // takes it out again, and shift and a click takes everything between
@@ -227,6 +240,7 @@ private:
     S32                     mCellHeight;
     size_t                  mShown = 0;
     chose_signal_t          mChose;
+    chose_signal_t          mPicked;
     selection_signal_t      mSelectionChanged;
     drag_fn_t               mDragStart;
 };

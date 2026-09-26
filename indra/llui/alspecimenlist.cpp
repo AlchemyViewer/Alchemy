@@ -104,6 +104,12 @@ public:
         return LLPanel::handleMouseUp(x, y, mask);
     }
 
+    bool handleDoubleClick(S32 x, S32 y, MASK mask) override
+    {
+        mList.pick(mValue);
+        return true;
+    }
+
     // A press that has moved far enough is a drag, and the row lets go of
     // the mouse so that the drag tool, which the caller starts, has it.
     bool handleHover(S32 x, S32 y, MASK mask) override
@@ -509,6 +515,17 @@ void ALSpecimenList::buildRows()
                                                 : (FOLLOWS_LEFT | FOLLOWS_TOP);
             row->addChild(LLUICtrlFactory::create<LLIconCtrl>(ip));
         }
+        else if (!specimen.view && specimen.font)
+        {
+            LLTextBox::Params sp(LLUICtrlFactory::getDefaultParams<LLTextBox>());
+            sp.name          = "sample";
+            sp.initial_value = specimen.sample;
+            sp.rect          = LLRect(INSET + mLabelWidth + 4, mRowHeight - 4, getRect().getWidth() - INSET, 4);
+            sp.font          = specimen.font;
+            sp.follows.flags = FOLLOWS_LEFT | FOLLOWS_TOP | FOLLOWS_RIGHT;
+            sp.mouse_opaque  = false;
+            row->addChild(LLUICtrlFactory::create<LLTextBox>(sp));
+        }
         mRowsPane->addChild(row);
         mRows.push_back(row);
     }
@@ -516,8 +533,11 @@ void ALSpecimenList::buildRows()
 
 bool ALSpecimenList::passes(const Specimen& specimen) const
 {
+    // By the words shown, the heading, or the name the caller knows it by:
+    // a font found by its family as well as by its label.
     return ALStringMatch::containsNoCase(specimen.label, mFilter)
-        || ALStringMatch::containsNoCase(specimen.group, mFilter);
+        || ALStringMatch::containsNoCase(specimen.group, mFilter)
+        || ALStringMatch::containsNoCase(specimen.value, mFilter);
 }
 
 void ALSpecimenList::filter(const std::string& text)
@@ -530,6 +550,12 @@ void ALSpecimenList::choose(const std::string& value)
 {
     setChosen(value);
     mChose(value);
+}
+
+void ALSpecimenList::pick(const std::string& value)
+{
+    choose(value);
+    mPicked(value);
 }
 
 void ALSpecimenList::setChosen(const std::string& value)

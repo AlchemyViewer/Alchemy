@@ -27,10 +27,12 @@
 #include "../alfontfield.h"
 
 #include "../alpopover.h"
+#include "../alspecimenlist.h"
 #include "../llcheckboxctrl.h"
 #include "../llcombobox.h"
 #include "../llfocusmgr.h"
 #include "../lllineeditor.h"
+#include "../lltextbox.h"
 #include "../lluictrlfactory.h"
 
 #include "llfontgl.h"
@@ -244,5 +246,65 @@ namespace tut
         ensure("the keyboard back where it was", gFocusMgr.getKeyboardFocus() == elsewhere);
         gFocusMgr.setKeyboardFocus(nullptr);
         elsewhere->die();
+    }
+
+    template<> template<>
+    void alfontfield_object::test<5>()
+    {
+        set_test_name("the popover lists the families each beside a specimen in its face; a click shows one, a double-click is it and the yes together");
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        LLMortician::updateClass();
+        ALFontField* field = make();
+        field->setValue("SansSerif");
+        std::vector<Said> said;
+        field->onPartCommit([&said](const std::string& part, const std::string& value) { said.push_back({ part, value }); });
+        field->handleMouseDown(4, 10, MASK_NONE);
+        ALPopover* popover = popoverOpen();
+        ensure("open", popover != nullptr);
+        ALSpecimenList* fonts = popover->findChild<ALSpecimenList>("fonts", true);
+        ensure("the families listed", fonts && fonts->count() > 1);
+        ensure_equals("the field's chosen", fonts->chosen(), std::string("SansSerif"));
+        ensure("each beside a specimen", popover->findChild<LLTextBox>("sample", true) != nullptr);
+        fonts->choose("Monospace");
+        ensure("a click shows it and writes nothing", said.empty() && popoverOpen() == popover);
+        LLView* row = fonts->findChild<LLView>("row_Monospace", true);
+        ensure("its row", row != nullptr);
+        row->handleDoubleClick(10, 10, MASK_NONE);
+        ensure("a double-click settles", popoverOpen() == nullptr);
+        ensure("and writes the name", said.size() == 1 && said[0].part.empty() && said[0].value == "Monospace");
+        field->die();
+    }
+
+    template<> template<>
+    void alfontfield_object::test<6>()
+    {
+        set_test_name("a field offering only some families lists them by their labels, keeps the name it has though it is not one, and the preview says the label");
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        LLMortician::updateClass();
+        ALFontField::Params p(LLUICtrlFactory::getDefaultParams<ALFontField>());
+        p.name     = "font";
+        p.rect     = LLRect(100, 322, 300, 300);
+        p.families = "monospace";
+        ALFontField* field = LLUICtrlFactory::create<ALFontField>(p);
+        gFloaterView->addChild(field);
+        field->setValue("Inter");
+        field->handleMouseDown(4, 10, MASK_NONE);
+        ALPopover* popover = popoverOpen();
+        ensure("open", popover != nullptr);
+        ALSpecimenList* fonts = popover->findChild<ALSpecimenList>("fonts", true);
+        ensure("the name it has, kept though it is not monospace", fonts && fonts->findChild<LLView>("row_Inter", true) != nullptr);
+        ensure("a monospace family listed", fonts->findChild<LLView>("row_CascadiaCode", true) != nullptr);
+        ensure("a proportional one not", fonts->findChild<LLView>("row_DejaVu", true) == nullptr);
+        fonts->choose("CascadiaCode");
+        const LLTextBox* preview = popover->findChild<LLTextBox>("preview", true);
+        ensure("the preview says its label", preview && preview->getText().rfind("Cascadia Code", 0) == 0);
+        popover->escape();
+        field->die();
     }
 }

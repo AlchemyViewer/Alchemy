@@ -25,6 +25,7 @@
 #include "linden_common.h"
 
 #include "../alspecimenlist.h"
+#include "llfontgl.h"
 
 #include "../llbutton.h"
 #include "../lluictrlfactory.h"
@@ -450,5 +451,48 @@ namespace tut
         ensure("the picture stayed with the row", tiles->findChild<LLView>("picture", true) == nullptr
                && row->findChild<LLView>("picture", true) != nullptr);
         delete list;
+    }
+
+    template<> template<>
+    void alspecimenlist_object::test<11>()
+    {
+        set_test_name("a row of words in a face shows its sample in that face beside the label; found by the name it is known by; a double-click picks it");
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        ALSpecimenList*                       list = make();
+        std::vector<ALSpecimenList::Specimen> fonts;
+        for (const char* name : { "SansSerif", "Monospace" })
+        {
+            ALSpecimenList::Specimen one;
+            one.label  = std::string(name) == "SansSerif" ? "Sans" : "Mono";
+            one.value  = name;
+            one.font   = std::string(name) == "SansSerif" ? LLFontGL::getFontSansSerif() : LLFontGL::getFontMonospace();
+            one.sample = "Aa Bb 0123";
+            fonts.push_back(one);
+        }
+        list->setSpecimens(fonts);
+        const LLView*    sans   = list->findChild<LLView>("row_SansSerif", true);
+        const LLTextBox* sample = sans ? sans->findChild<LLTextBox>("sample") : nullptr;
+        ensure("a sample beside the label", sample && sample->getText() == "Aa Bb 0123");
+        ensure("in the row's face", sample->getFont() == LLFontGL::getFontSansSerif());
+        ensure("the other row in its own",
+               list->findChild<LLView>("row_Monospace", true)->findChild<LLTextBox>("sample")->getFont() == LLFontGL::getFontMonospace());
+        ensure("past the label", sample->getRect().mLeft > sans->findChild<LLTextBox>("label")->getRect().mRight - 1);
+
+        list->filter("monospace");
+        ensure_equals("found by its name, not only its label", list->shown(), size_t(1));
+        list->filter(std::string());
+
+        std::vector<std::string> chose, picked;
+        list->onChose([&chose](const std::string& v) { chose.push_back(v); });
+        list->onPicked([&picked](const std::string& v) { picked.push_back(v); });
+        LLView* row = list->findChild<LLView>("row_Monospace", true);
+        ensure("the row", row != nullptr);
+        ensure("a double-click is taken", row->handleDoubleClick(10, 10, MASK_NONE));
+        ensure("chosen and picked", chose == std::vector<std::string>{ "Monospace" } && picked == std::vector<std::string>{ "Monospace" });
+        ensure_equals("the choice", list->chosen(), std::string("Monospace"));
+        list->die();
     }
 }
