@@ -867,6 +867,8 @@ private:
     // What the editors' vim keymaps share: the : and / lines entered in
     // any of them, and the settings a :set changes.
     bool                               mWordWrap    = false;
+    // A comparison shown inline rather than side by side.
+    bool mCompareInline = false;
     bool                               mLineNumbers = true;
     bool                               mIndentGuides    = true;
     // Where the blanks are drawn as marks; under the selection to begin

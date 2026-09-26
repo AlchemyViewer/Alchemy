@@ -1048,6 +1048,11 @@
                 <menu_item_check.on_click function="ScriptStudio.Menu" parameter="compare_saved" />
                 <menu_item_check.on_enable function="ScriptStudio.Enable" parameter="compare_saved" />
             </menu_item_check>
+            <menu_item_check label="Compare Inline" layout="topleft" name="compare_inline">
+                <menu_item_check.on_check function="ScriptStudio.Check" parameter="compare_inline" />
+                <menu_item_check.on_click function="ScriptStudio.Menu" parameter="compare_inline" />
+                <menu_item_check.on_enable function="ScriptStudio.Enable" parameter="compare_inline" />
+            </menu_item_check>
         </menu>
         <menu
          label="Build"

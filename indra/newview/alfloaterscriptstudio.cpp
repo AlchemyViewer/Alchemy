@@ -1492,6 +1492,7 @@ void ALFloaterScriptStudio::compare(Doc& doc, const std::string& left, const std
         mEditorHost->addChild(doc.compareView);
     }
     doc.compareView->setGrammar(doc.editor->highlighter().grammar());
+    doc.compareView->setInline(mCompareInline);
     doc.compareView->setTexts(left, right);
     doc.compareView->setTitles(left_title, right_title);
     showView(doc, Doc::View::Compare, true);
@@ -6510,6 +6511,24 @@ void ALFloaterScriptStudio::addViewCommands()
             const Doc* doc = active();
             return doc && doc->shownView() == Doc::View::Compare;
         });
+    // A comparison inline or side by side, as the last one was asked for.
+    mCommands.add(
+        "compare_inline",
+        [this]() {
+            mCompareInline = !mCompareInline;
+            for (const std::unique_ptr<Doc>& each : mDocs)
+            {
+                if (each->compareView)
+                {
+                    each->compareView->setInline(mCompareInline);
+                }
+            }
+        },
+        [this]() {
+            const Doc* doc = active();
+            return doc && doc->shownView() == Doc::View::Compare;
+        },
+        [this]() { return mCompareInline; });
     mCommands.add(
         "expanded", [this]() { toggleExpanded(); },
         [this]() {
