@@ -291,6 +291,28 @@ namespace al_studio_test
         PaneWindow   mNoPane;
     };
     using StudioWindow = StudioWindowOf<>;
+
+    // A loaded tab of `services` over a big script (albigscript.h), in a
+    // code editor made as the studio makes one and kept by `parent`: what
+    // a test measures a unit's or a pane's work over, with an
+    // ll_test::EditCount on its document to hold an operation to one
+    // change.
+    inline ALScriptStudioDoc& bigTab(FakeServices& services, LLView& parent, const std::string& id, int lines, bool lua = false)
+    {
+        ALScriptStudioDoc& doc = services.addDoc(id, ALScriptRef(), id + (lua ? ".luau" : ".lsl"));
+        doc.loaded             = true;
+        doc.modifiable         = true;
+        doc.language.lua       = lua;
+        ALCodeEditor::Params p(LLUICtrlFactory::getDefaultParams<ALCodeEditor>());
+        p.name     = "editor_" + id;
+        p.rect     = LLRect(0, 200, 400, 0);
+        p.syntax   = lua ? "slua" : "lsl";
+        doc.editor = LLUICtrlFactory::create<ALCodeEditor>(p);
+        doc.editor->setFont(LLFontGL::getFontMonospace());
+        parent.addChild(doc.editor);
+        doc.editor->setText(lua ? ll_test::bigSLua(lines) : ll_test::bigLSL(lines));
+        return doc;
+    }
 }
 
 #endif // AL_ALSCRIPTSTUDIO_FIXTURE_H

@@ -27,9 +27,12 @@
 
 #include "linden_common.h"
 
+#include "../altextdocument.h"
 #include "../llaccordionctrl.h"
 #include "../lllayoutstack.h"
 #include "../llui.h"
+
+#include "albigscript.h"
 
 #include "llcontrol.h"
 #include "lldir.h"
@@ -133,6 +136,27 @@ namespace ll_test
         UIDir mDir;
         LLControlGroup mConfig;
         bool mOk { false };
+    };
+
+    // How many times a document says it changed, from when this is made:
+    // what a test holds an operation to -- one notification for a
+    // change made in one go, not one for each line it touched. With the
+    // big scripts (albigscript.h), what keeps a whole-document operation
+    // from costing a pass over every listener per line.
+    class EditCount
+    {
+    public:
+        explicit EditCount(ALTextDocument& doc)
+        :   mConnection(doc.onChanged([this](const ALTextDocument::Edit&) { ++mCount; }))
+        {
+        }
+
+        S32  count() const { return mCount; }
+        void reset() { mCount = 0; }
+
+    private:
+        S32                                mCount = 0;
+        boost::signals2::scoped_connection mConnection;
     };
 
     // What a frame does to a layout, run until it stops changing.

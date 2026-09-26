@@ -579,4 +579,14 @@ if(AL_BUILD_TESTS)
       DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
     )
   endforeach()
+
+  # The code editor over 50,000-line scripts: what each change to the edit
+  # pipeline, the highlighter, the layout, the folds or find is measured by.
+  al_add_bench(
+    altextengine
+    PROJECT llui
+    LIBRARIES ${test_libs}
+    INCLUDES ${INDRA_SOURCE_DIR}/test
+    DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
+  )
 endif()

@@ -1806,4 +1806,32 @@ namespace tut
         ensure_equals("under the row, not over its text", list->getRect().mTop,
                       e.textRect().mTop - e.layout().lineTop(1) - e.layout().rowHeightOf(1, 0));
     }
+
+    template<> template<>
+    void alcodeeditor_object::test<48>()
+    {
+        set_test_name("in a script of 50,000 lines, a key typed at the top is one change, and the lines after it are not lexed again");
+        ALCodeEditor& e = make("");
+        e.setText(ll_test::bigLSL(50000));
+        ensure("the script is big", e.document().lineCount() > 49900);
+        const S32 last = e.document().lineCount() - 1;
+        e.highlighter().tokens(last);
+        ensure_equals("every line lexed at first", e.highlighter().lastLexed(), last + 1);
+
+        ll_test::EditCount edits(e.document());
+        e.setCaret(ALTextPos(0, 0));
+        type("x");
+        ensure_equals("one change", edits.count(), 1);
+        e.highlighter().tokens(last);
+        ensure("the lines after it are not lexed again", e.highlighter().lastLexed() <= 1);
+
+        edits.reset();
+        e.setCaret(ALTextPos(0, 0));
+        type("/*");
+        e.highlighter().tokens(last);
+        ensure_equals("a change for each key", edits.count(), 2);
+        // The script's first block comment is on its sixth line: what is
+        // after it lexes as it did.
+        ensure("a comment opened lexes on to where the next one ends, not to the end", e.highlighter().lastLexed() < 10);
+    }
 }

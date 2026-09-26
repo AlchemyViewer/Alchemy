@@ -136,4 +136,13 @@ if(AL_BUILD_TESTS)
     LIBRARIES alscript llcommon
     DEFINES ${definitions_defines} "AL_ALSCRIPT_TEST_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/tests\""
   )
+  # The preprocessor, the formatter, the optimizer and one analysis of each
+  # language over big scripts, with the grid's definitions loaded.
+  al_add_bench(
+    alscript
+    PROJECT alscript
+    LIBRARIES alscript llcommon
+    INCLUDES ${INDRA_SOURCE_DIR}/test
+    DEFINES ${definitions_defines}
+  )
 endif()

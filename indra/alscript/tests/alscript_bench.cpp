@@ -1,0 +1,245 @@
+/**
+ * @file alscript_bench.cpp
+ * @brief The script tools over big scripts: the preprocessor, the formatter,
+ *        the optimizer, and one analysis of each language.
+ *
+ * $LicenseInfo:firstyear=2026&license=viewerlgpl$
+ * Alchemy Viewer Source Code
+ * Copyright (C) 2026, Rye <rye@alchemyviewer.org>
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation;
+ * version 2.1 of the License only.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * $/LicenseInfo$
+ */
+
+// What the script studio's tools cost over a big script, LSL and SLua side
+// by side, with the grid's own definitions loaded: what the analysis thread
+// and the preprocessor's thread do each time a script changes. A number is
+// milliseconds per run: the median of five samples, each as many runs as
+// fit in fifty milliseconds (and at least one).
+//
+// Each run is over a text that differs from the run before it -- a comment
+// at its end comes and goes -- so that a tool that keeps what it made of
+// the same text is measured doing the work, as it does for every edit.
+//
+// The output is a table, not a verdict; a number is read against the same
+// row from another build, on the same quiet machine. An unoptimised build
+// exits 125, which CTest reads as skipped, since its numbers would say
+// nothing.
+
+#include "linden_common.h"
+
+#include "../allslservice.h"
+#include "../allsloptimizer.h"
+#include "../alluauservice.h"
+#include "../alpreprocessor.h"
+#include "../alscriptformatter.h"
+#include "../alscriptweight.h"
+
+#include "albigscript.h"
+#include "llfile.h"
+
+#include <algorithm>
+#include <chrono>
+#include <cmath>
+#include <cstdio>
+#include <functional>
+#include <sstream>
+#include <string>
+
+namespace
+{
+    using clock = std::chrono::steady_clock;
+
+    constexpr int LINES = 5000;
+
+    // Everything a row makes feeds this, so nothing is made for nothing.
+    volatile size_t g_sink = 0;
+
+    double ms_per_run(const std::function<void()>& run)
+    {
+        run();
+        double samples[5];
+        for (double& sample : samples)
+        {
+            size_t          runs  = 0;
+            const auto      start = clock::now();
+            clock::duration elapsed{};
+            do
+            {
+                run();
+                ++runs;
+                elapsed = clock::now() - start;
+            } while (elapsed < std::chrono::milliseconds(50));
+            sample = std::chrono::duration<double, std::milli>(elapsed).count() / double(runs);
+        }
+        std::sort(samples, samples + 5);
+        return samples[2];
+    }
+
+    // One language's script, in the two forms the runs go between.
+    struct Script
+    {
+        std::string texts[2];
+        size_t      next = 0;
+
+        Script(std::string text, const char* comment)
+        {
+            texts[0] = text;
+            texts[1] = std::move(text) + comment;
+        }
+
+        const std::string& text()
+        {
+            next ^= 1;
+            return texts[next];
+        }
+    };
+
+    void cell(double ms)
+    {
+        if (std::isnan(ms))
+        {
+            std::printf(" %10s", "-");
+        }
+        else
+        {
+            std::printf(" %10.3f", ms);
+        }
+    }
+
+    void row(const char* name, double lsl, double slua)
+    {
+        std::printf("  %-52s", name);
+        cell(lsl);
+        cell(slua);
+        std::printf("\n");
+    }
+
+    std::string readWhole(const std::string& path)
+    {
+        llifstream        in(path, std::ios::binary);
+        std::stringstream text;
+        text << in.rdbuf();
+        return text.str();
+    }
+
+    size_t errorsIn(const ALScriptProblems& problems)
+    {
+        return std::count_if(problems.begin(), problems.end(),
+                             [](const ALScriptProblem& p) { return p.severity == ALScriptProblem::Severity::Error; });
+    }
+
+    // The LSL script with a macro in every helper, for the preprocessor
+    // to expand: what a script written for it has.
+    std::string withMacros(std::string text)
+    {
+        const std::string plain = "total += llStringLength(b) * 2;";
+        const std::string macro = "total += TWICE(llStringLength(b));";
+        for (size_t at = text.find(plain); at != std::string::npos; at = text.find(plain, at + macro.size()))
+        {
+            text.replace(at, plain.size(), macro);
+        }
+        return "#define TWICE(x) ((x) * 2)\n" + text;
+    }
+}
+
+int main(int, char**)
+{
+#if !defined(LL_RELEASE)
+    std::printf("Skipped: an unoptimised build has no numbers worth reading\n");
+    return 125;
+#else
+    const double NONE = std::nan("");
+
+    // The grid's definitions: the builtins, which the optimizer reads
+    // through the LSL service, and SLua's declarations.
+    ALLSLService lsl;
+    std::string  error;
+    if (!lsl.loadBuiltins(std::string(AL_LSL_DEFINITIONS_DIR) + "/builtins.txt", error))
+    {
+        std::printf("Skipped: the builtins did not load: %s\n", error.c_str());
+        return 125;
+    }
+    ALLuauService luau;
+    if (!luau.loadDefinitions(readWhole(std::string(AL_LSL_DEFINITIONS_DIR) + "/secondlife.d.luau"), error))
+    {
+        std::printf("Skipped: the SLua definitions did not load: %s\n", error.c_str());
+        return 125;
+    }
+
+    Script lslScript(ll_test::bigLSL(LINES), "\n// again\n");
+    Script luaScript(ll_test::bigSLua(LINES), "\n-- again\n");
+    Script macroScript(withMacros(ll_test::bigLSL(LINES)), "\n// again\n");
+
+    std::printf("alscript_bench: the script tools over generated scripts of %d lines (ms per run)\n", LINES);
+    std::printf("\n  %-52s %10s %10s\n", "", "LSL", "SLua");
+    std::printf("  %-52s %10zu %10zu\n", "bytes", lslScript.texts[0].size(), luaScript.texts[0].size());
+    std::printf("  %-52s %10zu %10zu\n", "errors found (0 is right)", errorsIn(lsl.check(lslScript.texts[0], true)),
+                errorsIn(luau.check(luaScript.texts[0])));
+    std::printf("  %-52s %10d %10d\n", "the hover below finds its name (1 is right)",
+                lsl.hover(lslScript.texts[0], ll_test::big_script_detail::linesIn(lslScript.texts[0]) - 12, 20).found,
+                luau.hover(luaScript.texts[0], ll_test::big_script_detail::linesIn(luaScript.texts[0]) - 8, 16).found);
+
+    std::printf("\nThe analysis thread's work\n");
+    row("check", ms_per_run([&] { g_sink = g_sink + lsl.check(lslScript.text(), true).size(); }),
+        ms_per_run([&] { g_sink = g_sink + luau.check(luaScript.text()).size(); }));
+    row("a check job: check, outline, semantic tokens, hints",
+        ms_per_run([&] {
+            const std::string& text = lslScript.text();
+            g_sink = g_sink + lsl.check(text, true).size() + lsl.outline(text).size() + lsl.semanticTokens(text).size() +
+                     lsl.inlayHints(text, true).size();
+        }),
+        ms_per_run([&] {
+            const std::string& text = luaScript.text();
+            g_sink = g_sink + luau.check(text).size() + luau.outline(text).size() + luau.semanticTokens(text).size() +
+                     luau.inlayHints(text, true, true).size();
+        }));
+    row("hover at the last helper's call",
+        ms_per_run([&] {
+            const std::string& text = lslScript.text();
+            g_sink = g_sink + lsl.hover(text, ll_test::big_script_detail::linesIn(text) - 12, 20).label.size();
+        }),
+        ms_per_run([&] {
+            const std::string& text = luaScript.text();
+            g_sink = g_sink + luau.hover(text, ll_test::big_script_detail::linesIn(text) - 8, 16).label.size();
+        }));
+    row("weigh (Mono; SLua bytecode)", ms_per_run([&] { g_sink = g_sink + ALScriptWeigh::mono(lslScript.text()).total; }),
+        ms_per_run([&] { g_sink = g_sink + ALScriptWeigh::slua(luaScript.text()).total; }));
+
+    std::printf("\nThe preprocessor's thread's work\n");
+    ALPreprocessor::Options lslOptions;
+    ALPreprocessor::Options luaOptions;
+    luaOptions.lua = true;
+    row("expand: no directives",
+        ms_per_run([&] { g_sink = g_sink + ALPreprocessor::run(lslScript.text(), lslOptions).text.size(); }),
+        ms_per_run([&] { g_sink = g_sink + ALPreprocessor::run(luaScript.text(), luaOptions).text.size(); }));
+    row("expand: a macro in every helper",
+        ms_per_run([&] { g_sink = g_sink + ALPreprocessor::run(macroScript.text(), lslOptions).text.size(); }), NONE);
+    ALLSLOptimizer::Options optimizer;
+    optimizer.notes = false;
+    row("optimize (Mono)", ms_per_run([&] { g_sink = g_sink + ALLSLOptimizer::run(lslScript.text(), optimizer).text.size(); }),
+        NONE);
+
+    std::printf("\nTidying\n");
+    ALScriptFormatter::Options lslFormat;
+    ALScriptFormatter::Options luaFormat;
+    luaFormat.lua = true;
+    row("format the whole text", ms_per_run([&] { g_sink = g_sink + ALScriptFormatter::format(lslScript.text(), lslFormat).size(); }),
+        ms_per_run([&] { g_sink = g_sink + ALScriptFormatter::format(luaScript.text(), luaFormat).size(); }));
+
+    std::printf("\n(checksum %zu)\n", static_cast<size_t>(g_sink));
+    return 0;
+#endif
+}
