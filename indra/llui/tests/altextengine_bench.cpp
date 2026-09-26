@@ -39,6 +39,7 @@
 #include "linden_common.h"
 
 #include "../alcodeeditor.h"
+#include "../alfindbar.h"
 #include "../alfoldmodel.h"
 #include "../altextsearch.h"
 
@@ -228,6 +229,23 @@ int main(int, char**)
         g_sink               = g_sink + found[&s - subjects];
     });
     countRow("  matches", found[0], found[1]);
+
+    size_t replaced[2] = {};
+    both("Replace All: total for count, then undone", subjects, 1, [&](Subject& s, ALCodeEditor& e) {
+        if (!e.findShown())
+        {
+            e.showFind(true);
+            e.findBar()->setQuery("total");
+            e.findBar()->setReplacement("count");
+        }
+        replaced[&s - subjects] = e.replaceAllMatches();
+        e.undo();
+    });
+    countRow("  replaced", replaced[0], replaced[1]);
+    for (Subject& s : subjects)
+    {
+        s.editor->hideFind();
+    }
 
     std::printf("\nFolding\n");
     size_t regions[2] = {};

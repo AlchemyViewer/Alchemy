@@ -2902,7 +2902,21 @@ S32 ALTextView::replaceAllMatches()
         edits.emplace_back(match, ALTextSearch::replacement(mDocument, match, mFindBar->query(), mFindBar->options(), mFindBar->replacement()));
     }
     const S32 count = static_cast<S32>(edits.size());
-    return replaceAll(std::move(edits)) ? count : 0;
+    // The matches let go of before the edits rather than slid through each
+    // of them: every one is cut through by its own replacement, and the
+    // text is looked through again once the edits settle. Where nothing
+    // changed, they stay as they were.
+    std::vector<ALTextRange> matches = std::move(mMatches);
+    const S32                match   = mMatch;
+    mMatches.clear();
+    mMatch = -1;
+    if (replaceAll(std::move(edits)))
+    {
+        return count;
+    }
+    mMatches = std::move(matches);
+    mMatch   = match;
+    return 0;
 }
 
 // --- the bars ---------------------------------------------------------------------------

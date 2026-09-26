@@ -1322,4 +1322,24 @@ namespace tut
         ensure_equals("from the row's top", v.anchorOf(ALTextPos(0, 1)).mTop, text.mTop);
         ensure_equals("the next line's own", v.anchorOf(ALTextPos(1, 1)).getHeight(), v.layout().rowHeight());
     }
+
+    template<> template<>
+    void altextview_object::test<42>()
+    {
+        set_test_name("Replace All that changes nothing keeps its matches, and one that does finds them again once settled");
+        ALTextView& v = make("one two one\ntwo one\n");
+        v.showFind(true);
+        v.findBar()->setQuery("one");
+        v.findNext(true);
+        v.findBar()->setReplacement("one");
+        ensure_equals("nothing to change: nothing replaced", v.replaceAllMatches(), 0);
+        ensure_equals("the matches as they were", v.findMatches().size(), size_t(3));
+        ensure_equals("and the current one", v.findCurrent(), 0);
+        v.findBar()->setReplacement("on");
+        ensure_equals("all three", v.replaceAllMatches(), 3);
+        ensure_equals("replaced", v.text(), std::string("on two on\ntwo on\n"));
+        ensure_equals("the query no longer stands anywhere", v.findMatches().size(), size_t(0));
+        v.undo();
+        ensure_equals("undone, found again", v.findMatches().size(), size_t(3));
+    }
 }
