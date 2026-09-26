@@ -532,4 +532,25 @@ namespace tut
         saving.warnOverWeight(guessed);
         ensure("an estimate is not said", services.reports.size() == said);
     }
+
+    template<> template<>
+    void alscriptstudiosaving_object::test<9>()
+    {
+        set_test_name("a save the external editor made is not tidied, and one made here after it is");
+        ALScriptStudioSaving& saving = make();
+        studio.options.format        = true;
+        studio.options.trim          = true;
+        Doc& doc                     = tab("a", "default {}");
+        doc.save.fromExternal(doc.editor->document().version());
+        saving.save(doc);
+        ensure("not tidied", studio.tidied.empty());
+        ensure("sent as it came", studio.sent.size() == 1);
+        saving.compiled(answer(doc));
+        // Ended as the answer ends it where the editor is watched.
+        doc.save.endExternal();
+        doc.editor->setCaret(doc.editor->document().end());
+        doc.editor->insertText(" ");
+        saving.save(doc);
+        ensure_equals("tidied, made here", studio.tidied.size(), size_t(1));
+    }
 }

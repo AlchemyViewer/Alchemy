@@ -272,8 +272,12 @@ void ALScriptStudioSaving::save(Doc& doc)
     // step each to undo, and nothing where the text is tidy already. The
     // safe fixes first, while the text is still the one they were made
     // for.
+    // Not a save the external editor made: what it wrote is what the
+    // author is looking at there, and nothing here is written back to it,
+    // so a text tidied here would read as changed on both sides at the
+    // next save it made.
     const Options options = mWindow.saveOptions();
-    if (!doc.notecard)
+    if (!doc.notecard && !doc.save.external())
     {
         const bool fix = options.fix && doc.check.analysisVersion == doc.editor->document().version() && doc.save.fixOnce();
         mWindow.tidy(doc, fix, options.format, options.trim);
