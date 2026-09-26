@@ -151,6 +151,7 @@ using ALScriptFileIO::fileTooLarge;
 using ALScriptFileIO::readWholeFile;
 using ALScriptFileIO::StudioLiveFile;
 using ALScriptFileIO::writeTempFile;
+using ALScriptPlaces::declaredOf;
 using ALScriptPlaces::isIdentifier;
 using ALScriptPlaces::lineOf;
 using ALScriptPlaces::mapSpan;
@@ -2721,7 +2722,7 @@ void ALFloaterScriptStudio::answered(const ALScriptAnalysis::Result& result, U32
             std::string text = result.hover.label;
             // Where it was declared, as the inspector says it: a link there.
             std::vector<ALCodeEditor::CardLink> links;
-            const Declared                      declared = declaredOf(doc, result);
+            const Declared                      declared = declaredOf(doc, result, preprocessed(doc));
             if (declared.line >= 0)
             {
                 LLStringUtil::format_map_t args;
@@ -4339,42 +4340,6 @@ const char* ALFloaterScriptStudio::includeImage(const std::string& path, bool lu
     return lua ? "Inv_Script_Luau" : "Inv_Script";
 }
 
-LLSD ALFloaterScriptStudio::Declared::value() const
-{
-    LLSD out;
-    out["line"]   = line;
-    out["column"] = column;
-    out["path"]   = path;
-    out["name"]   = name;
-    return out;
-}
-
-ALFloaterScriptStudio::Declared ALFloaterScriptStudio::declaredOf(const Doc& doc, const ALScriptAnalysis::Result& result) const
-{
-    // Where the analyzer read it declared: in the expansion, where the
-    // preprocessor ran, and so back to the source -- this script's, or an
-    // include's.
-    Declared declared;
-    if (!result.hover.found || !result.hover.hasDefinition)
-    {
-        return declared;
-    }
-    declared.line   = result.hover.definitionLine;
-    declared.column = result.hover.definitionColumn;
-    if (preprocessed(doc))
-    {
-        const ALSourceMap::Loc loc = doc.expanded.map.toSource(declared.line, declared.column);
-        declared.line              = loc.found() ? loc.line : -1;
-        declared.column            = loc.found() ? loc.column : -1;
-        if (loc.found() && loc.file > 0)
-        {
-            declared.path = doc.expanded.map.files()[loc.file].path;
-            declared.name = doc.expanded.map.files()[loc.file].name;
-        }
-    }
-    return declared;
-}
-
 void ALFloaterScriptStudio::goToDeclared(const LLSD& value)
 {
     Doc* doc = active();
@@ -5538,7 +5503,7 @@ void ALFloaterScriptStudio::inspected(Doc& doc, const ALScriptAnalysis::Result& 
         text = result.hover.label;
         code_lines.push_back(0);
         LLStringUtil::format_map_t args;
-        declared = declaredOf(doc, result);
+        declared = declaredOf(doc, result, preprocessed(doc));
         if (declared.line >= 0)
         {
             args["[LINE]"] = std::to_string(declared.line + 1);

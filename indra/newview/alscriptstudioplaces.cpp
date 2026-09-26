@@ -167,4 +167,40 @@ namespace ALScriptPlaces
         }
         return NONE;
     }
+
+    LLSD Declared::value() const
+    {
+        LLSD out;
+        out["line"]   = line;
+        out["column"] = column;
+        out["path"]   = path;
+        out["name"]   = name;
+        return out;
+    }
+
+    Declared declaredOf(const ALScriptStudioDoc& doc, const ALScriptAnalysis::Result& result, bool preprocessed)
+    {
+        // Where the analyzer read it declared: in the expansion, where the
+        // preprocessor ran, and so back to the source -- this script's, or an
+        // include's.
+        Declared declared;
+        if (!result.hover.found || !result.hover.hasDefinition)
+        {
+            return declared;
+        }
+        declared.line   = result.hover.definitionLine;
+        declared.column = result.hover.definitionColumn;
+        if (preprocessed)
+        {
+            const ALSourceMap::Loc loc = doc.expanded.map.toSource(declared.line, declared.column);
+            declared.line              = loc.found() ? loc.line : -1;
+            declared.column            = loc.found() ? loc.column : -1;
+            if (loc.found() && loc.file > 0)
+            {
+                declared.path = doc.expanded.map.files()[loc.file].path;
+                declared.name = doc.expanded.map.files()[loc.file].name;
+            }
+        }
+        return declared;
+    }
 }

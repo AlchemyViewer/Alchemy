@@ -24,6 +24,7 @@
 
 #pragma once
 
+#include "alscriptanalysis.h"
 #include "alscriptstudiodoc.h"
 #include "alscriptworkspace.h"
 
@@ -32,7 +33,8 @@
 // What the studio's window and its units share of places in scripts: a
 // span as a range of a text, a line of a text, whether a word is a name,
 // a span read back from an expansion to the file it came from, a place's
-// line as a pane's row shows it, and an outline entry as a value.
+// line as a pane's row shows it, an outline entry as a value, and where a
+// name is declared.
 namespace ALScriptPlaces
 {
     ALTextRange rangeOf(const ALScriptSpan& span);
@@ -55,4 +57,20 @@ namespace ALScriptPlaces
     constexpr size_t NONE = static_cast<size_t>(-1);
     std::string      outlineValue(const ALScriptStudioDoc& doc, size_t index);
     size_t           outlineEntryOf(const ALScriptStudioDoc& doc, const std::string& value);
+    // Where the analyzer said a name at a place is declared, back in the
+    // source where the preprocessor made what it read: a line and column
+    // of the script, or of the include it is in; none where it said none
+    // or the place made no text of the source.
+    struct Declared
+    {
+        // As a link's value: where to go.
+        LLSD        value() const;
+        S32         line   = -1;
+        S32         column = -1;
+        // The include it is in, by identity and by name; empty for the
+        // script itself.
+        std::string path;
+        std::string name;
+    };
+    Declared declaredOf(const ALScriptStudioDoc& doc, const ALScriptAnalysis::Result& result, bool preprocessed);
 }

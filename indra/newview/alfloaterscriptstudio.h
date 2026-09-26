@@ -46,6 +46,7 @@
 #include "alscriptreferencespane.h"
 #include "alscriptoutlinepane.h"
 #include "alscriptcrumbsbar.h"
+#include "alscriptstudioplaces.h"
 #include "alfindings.h"
 #include "aloutputview.h"
 #include "alscriptanalysis.h"
@@ -429,20 +430,9 @@ private:
     // declared on a link to the place, where it says one -- in the
     // script, or in the include it was declared in. The lines given are
     // code, styled as the active script's editor would colour them.
-    struct Declared
-    {
-        // As a link's value: where to go.
-        LLSD        value() const;
-        S32         line   = -1;
-        S32         column = -1;
-        // The include it is in, by identity and by name; empty for the
-        // script itself.
-        std::string path;
-        std::string name;
-    };
+    typedef ALScriptPlaces::Declared Declared;
     void                          showSymbol(const std::string& text, const Declared& declared, const std::vector<S32>& code_lines);
     void                          showSymbol(const std::string& text) { showSymbol(text, Declared(), {}); }
-    Declared                      declaredOf(const Doc& doc, const ALScriptAnalysis::Result& result) const;
     // A line of an include as it reads -- in its tab where it is open,
     // else as the preprocessor last read it -- untrimmed; false where
     // neither has it.
