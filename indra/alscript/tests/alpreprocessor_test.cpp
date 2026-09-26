@@ -1246,4 +1246,53 @@ namespace tut
         ensure_equals("a module found, one not", lua.resolved.size(), size_t(1));
         ensure("as a require", lua.resolved[0].require && lua.resolved[0].name == "mod" && lua.resolved[0].path == "disk:/scripts/mod.luau");
     }
+
+    template<> template<>
+    void alpreprocessor_object::test<33>()
+    {
+        set_test_name("a parameter used over and over is spent as it goes in, and a token pasted or stringized to itself stops before it outgrows a script");
+        // A parameter used sixteen times, through arguments that each
+        // expand the last: sixteen to the seventh tokens by the end, which
+        // were made whole before they were counted.
+        const std::string many = "#define D(x) x x x x x x x x x x x x x x x x\nD(D(D(D(D(D(D(1)))))))\n";
+        ALPreprocessor::Result r = ALPreprocessor::run(many, options());
+        ensure("ran away: " + messages(r), r.overran && r.problems.back().key == std::string("PreprocTooMuch"));
+        ensure("and gave the source back", r.text == many);
+
+        // A token pasted to itself through an indirection doubles its text
+        // and not the tokens: two to the fortieth bytes by the end.
+        std::string call = "x";
+        for (int i = 0; i < 40; ++i)
+        {
+            call = "D(" + call + ")";
+        }
+        r = ALPreprocessor::run("#define CAT(a) a##a\n#define D(a) CAT(a)\n" + call + ";\n", options());
+        ensure("pasting stopped: " + messages(r), r.overran && r.problems.back().key == std::string("PreprocTokenTooLong"));
+
+        // A string stringized over and over, each level escaping the last.
+        call = "\"a\"";
+        for (int i = 0; i < 40; ++i)
+        {
+            call = "X(" + call + ")";
+        }
+        r = ALPreprocessor::run("#define S(x) #x\n#define X(x) S(x)\n" + call + ";\n", options());
+        ensure("stringizing stopped: " + messages(r), r.overran && r.problems.back().key == std::string("PreprocTokenTooLong"));
+
+        // The bytes stop what the tokens would not, and what fits is
+        // untouched.
+        ALPreprocessor::Options small = options();
+        small.byteBudget              = 1000;
+        r = ALPreprocessor::run("#define L \"" + std::string(600, 'a') + "\"\nL L\n", small);
+        ensure("the bytes: " + messages(r), r.overran && r.problems.back().key == std::string("PreprocTooMuch"));
+        r = ALPreprocessor::run("#define L \"" + std::string(100, 'a') + "\"\nL L\n", small);
+        ensure("within them: " + messages(r), !r.overran && r.text.find(std::string(100, 'a')) != std::string::npos);
+
+        // What a job answers when a run throws: as a run that ran away.
+        const ALPreprocessor::Result failed = ALPreprocessor::failed("integer x;\n", options(), "std::bad_alloc");
+        ensure("overran, with the source", failed.overran && failed.text == "integer x;\n");
+        ensure("and why", failed.problems.size() == 1 && failed.problems[0].key == std::string("PreprocFailed") &&
+                              failed.problems[0].message.find("std::bad_alloc") != std::string::npos &&
+                              failed.problems[0].severity == ALScriptProblem::Severity::Error);
+        ensure("mapped to itself", failed.map.toSource(0, 3).found() && failed.map.toSource(0, 3).line == 0);
+    }
 }

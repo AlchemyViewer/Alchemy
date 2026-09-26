@@ -26,6 +26,7 @@
 #pragma once
 
 #include "allsloptimizer.h"
+#include "alscriptenvelope.h"
 #include "alscriptproblem.h"
 #include "alsourcemap.h"
 
@@ -125,10 +126,15 @@ public:
         bool                    weigh = false;
         S32  includeDepth = 32;
         // What one run may make of a script -- every token of every file
-        // it opens counts, as well as every token a macro makes -- and how
-        // deep an `#if` expression may nest. A run that reaches either
-        // says so and stops.
+        // it opens counts, as well as every token a macro makes -- in
+        // tokens and in the bytes of their text, and how deep an `#if`
+        // expression may nest. A run that reaches any says so and stops.
+        // The bytes, since a macro that pastes a token to itself doubles
+        // its text and not the tokens: sixteen times what a script may be,
+        // which nothing that can be saved comes near. No one token may be
+        // longer than a script (ALScriptEnvelope::MAX_ASSET_BYTES).
         size_t tokenBudget     = 4u * 1000u * 1000u;
+        size_t byteBudget      = 16u * ALScriptEnvelope::MAX_ASSET_BYTES;
         S32    expressionDepth = 64;
         // How deep macros may be invoked inside the arguments of others,
         // each level of which is a level of the machine's own stack.
@@ -206,6 +212,10 @@ public:
     // here: the caller's resolver answers for every include, so a run
     // belongs on whatever thread the caller pleases.
     static Result run(std::string_view source, const Options& options);
+    // What a run that could not finish answers -- one that ran the machine
+    // out of memory, or threw anything else on the way: the source as it
+    // was, mapped to itself, as a run that ran away gives it, and why.
+    static Result failed(std::string_view source, const Options& options, std::string_view why);
 
     // What a run does once the expansion is done: the optimizer over the
     // expanded text, then the compression over whatever that left, each

@@ -502,6 +502,8 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="PreprocTooMuch">the macros expand to more than this preprocessor will make; nothing was preprocessed</string>
 	<string name="PreprocExpressionTooDeep">the expression nests too deeply for this preprocessor</string>
 	<string name="PreprocMacrosTooDeep">macros are invoked inside each other's arguments more deeply than this preprocessor follows; nothing was preprocessed</string>
+	<string name="PreprocTokenTooLong">the macros make a token longer than a script may be; nothing was preprocessed</string>
+	<string name="PreprocFailed">the preprocessor could not finish ([1]); nothing was preprocessed</string>
 	<string name="PreprocIncludeInWorld">could not find include file '[1]': one so named is in the object or the inventory, which includes are not taken from -- only folders on disk are, with Build &gt; Include from Disk on and a folder added</string>
 	<string name="PreprocIncludeNotOnDisk">could not find include file '[1]': the disk was not looked in -- it is only with Build &gt; Include from Disk on and a folder added</string>
 	<string name="PreprocModuleNotOnDisk">could not find module '[1]': the disk was not looked in -- it is only with Build &gt; Include from Disk on and a folder added</string>

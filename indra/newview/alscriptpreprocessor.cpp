@@ -1096,6 +1096,14 @@ ALScriptSnapshot ALScriptPreprocessor::snapshotFor(const std::shared_ptr<Job>& j
     // one arrives should not pay for either.
     snapshot.mOptions.compress = false;
     snapshot.mOptions.resolve  = nullptr;
+    // A check is asked for at every pause in typing, and nothing it makes
+    // is saved: held to a quarter of what a save may make, still far more
+    // than a script may be.
+    if (job->check)
+    {
+        snapshot.mOptions.byteBudget  = 4u * ALScriptEnvelope::MAX_ASSET_BYTES;
+        snapshot.mOptions.tokenBudget = 1000u * 1000u;
+    }
     for (const ALPreprocessor::Ask& ask : job->asks)
     {
         ALScriptSnapshot::Answer answer;
@@ -1244,10 +1252,21 @@ void ALScriptPreprocessor::attemptJob(const std::shared_ptr<Job>& job)
         LL_PROFILE_ZONE_NAMED_CATEGORY_SCRIPTDEV("preprocessor expand job");
         // On a stack as deep as a script needs: the expansion recurses on
         // how the script nests, and a pool's thread on a Mac has half a
-        // megabyte.
-        ALPreprocessor::Result result;
-        alScriptOnLargeStack([&]() { result = snapshot->run(job->request.source); });
-        std::vector<ALPreprocessor::Ask> missed = snapshot->missed();
+        // megabyte. Whatever it throws is answered here, as a run that ran
+        // away is: uncaught on this thread, it would be thrown again on
+        // the main one, and the job would never answer.
+        ALPreprocessor::Result           result;
+        std::vector<ALPreprocessor::Ask> missed;
+        try
+        {
+            alScriptOnLargeStack([&]() { result = snapshot->run(job->request.source); });
+            missed = snapshot->missed();
+        }
+        catch (const std::exception& e)
+        {
+            result = ALPreprocessor::failed(job->request.source, snapshot->mOptions, e.what());
+            missed.clear();
+        }
         LLAppViewer::instance()->postToMainCoro([this, job, result = std::move(result), missed = std::move(missed)]() mutable {
             expandedJob(job, std::move(result), std::move(missed));
         });
@@ -1296,7 +1315,21 @@ void ALScriptPreprocessor::nextWork()
     lane.pop_front();
     mWorking = true;
     mPool->getQueue().post([this, work = std::move(work)]() {
-        work();
+        // The next let start whatever this one does: a job that threw past
+        // its own answer would otherwise hold every later check and save
+        // for the session.
+        try
+        {
+            work();
+        }
+        catch (const std::exception& e)
+        {
+            LL_WARNS("ScriptPreprocessor") << "A preprocessor job failed: " << e.what() << LL_ENDL;
+        }
+        catch (...)
+        {
+            LL_WARNS("ScriptPreprocessor") << "A preprocessor job failed" << LL_ENDL;
+        }
         LLAppViewer::instance()->postToMainCoro([this]() {
             mWorking = false;
             nextWork();
@@ -1474,7 +1507,14 @@ void ALScriptPreprocessor::optimizeAndFinish(const std::shared_ptr<Job>& job, AL
     }
     toWorker(job, [this, job, result = std::make_shared<ALPreprocessor::Result>(std::move(result)), options]() {
         LL_PROFILE_ZONE_NAMED_CATEGORY_SCRIPTDEV("preprocessor optimize job");
-        alScriptOnLargeStack([&]() { ALPreprocessor::finish(*result, options); });
+        try
+        {
+            alScriptOnLargeStack([&]() { ALPreprocessor::finish(*result, options); });
+        }
+        catch (const std::exception& e)
+        {
+            *result = ALPreprocessor::failed(job->request.source, options, e.what());
+        }
         LLAppViewer::instance()->postToMainCoro([this, job, result]() { finish(job, std::move(*result)); });
     });
 }

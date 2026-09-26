@@ -857,11 +857,24 @@ namespace
         void unread(const Tokens& tokens);
         void emit(const Token& t) { mSink->push_back(t); }
         // What a run may make, against the budget: every token put back
-        // to be scanned again and every token given out is one more. A
-        // run that reaches the budget says so once and stops, since hide
-        // sets stop a macro expanding as itself but not one that
-        // doubles.
-        bool spend(size_t made, const Token& at);
+        // to be scanned again and every token given out is one more, and
+        // its text so many bytes more. A run that reaches the budget says
+        // so once and stops, since hide sets stop a macro expanding as
+        // itself but not one that doubles.
+        bool spend(size_t made, size_t bytes, const Token& at);
+        bool spend(const Tokens& made, const Token& at) { return spend(made.size(), bytesOf(made), at); }
+        static size_t bytesOf(const Tokens& tokens)
+        {
+            size_t bytes = 0;
+            for (const Token& t : tokens)
+            {
+                bytes += t.text.size();
+            }
+            return bytes;
+        }
+        // A token as long as a whole script, made by pasting or
+        // stringizing: the run stops there, before it is made.
+        bool tooLong(size_t bytes, const Token& at);
         bool overran() const { return mOverran; }
 
         // -- expansion --
@@ -871,7 +884,7 @@ namespace
         bool   expandFunction(const Token& t, const Macro& m);
         Tokens substitute(const Macro& m, const std::vector<Tokens>& args, const Token& site, const hide_set_ptr& hs);
         Tokens expandAll(const Tokens& in);
-        Token  stringize(const Tokens& arg, const Token& site) const;
+        Token  stringize(const Tokens& arg, const Token& site);
         bool   paste(const Token& left, const Token& right, const Token& site, Token& out);
         static S32 paramIndex(const Macro& m, const Token& t);
 
@@ -893,6 +906,7 @@ namespace
         boost::unordered_flat_set<std::string, ll::string_hash, std::equal_to<>>        mIncluded;
         // What the run has made so far, against the budget.
         size_t                                  mMade    = 0;
+        size_t                                  mBytes   = 0;
         bool                                    mOverran = false;
         // How deep argument expansion has gone.
         S32                                     mExpandDepth = 0;
@@ -967,7 +981,7 @@ namespace
             const FileState& asking = *mFiles.back();
             at = asking.tokens[std::min(asking.pos, asking.tokens.size()) - (asking.pos > 0 ? 1 : 0)];
         }
-        if (!spend(f->tokens.size(), at))
+        if (!spend(f->tokens.size(), text.size(), at))
         {
             return;
         }
@@ -1082,19 +1096,30 @@ namespace
         mPending.insert(mPending.begin(), tokens.begin(), tokens.end());
     }
 
-    bool Engine::spend(size_t made, const Token& at)
+    bool Engine::spend(size_t made, size_t bytes, const Token& at)
     {
         if (mOverran)
         {
             return false;
         }
         mMade += made;
-        if (mMade <= mOptions.tokenBudget)
+        mBytes += bytes;
+        if (mMade <= mOptions.tokenBudget && mBytes <= mOptions.byteBudget)
         {
             return true;
         }
         overrun("PreprocTooMuch", "the macros expand to more than this preprocessor will make; nothing was preprocessed", at);
         return false;
+    }
+
+    bool Engine::tooLong(size_t bytes, const Token& at)
+    {
+        if (bytes <= ALScriptEnvelope::MAX_ASSET_BYTES)
+        {
+            return false;
+        }
+        overrun("PreprocTokenTooLong", "the macros make a token longer than a script may be; nothing was preprocessed", at);
+        return true;
     }
 
     void Engine::overrun(const char* key, std::string_view text, const Token& at)
@@ -1185,7 +1210,7 @@ namespace
     {
         const hide_set_ptr hs  = hideUnion(t.hide, { m.name });
         Tokens             out = substitute(m, {}, t, hs);
-        if (!spend(out.size(), t))
+        if (mOverran)
         {
             return true;
         }
@@ -1303,7 +1328,7 @@ namespace
         }
         const hide_set_ptr hs  = hideUnion(hideIntersect(t.hide, rparen.hide), { m.name });
         Tokens             out = substitute(m, args, t, hs);
-        if (!spend(out.size(), t))
+        if (mOverran)
         {
             return true;
         }
@@ -1311,12 +1336,17 @@ namespace
         return true;
     }
 
-    Token Engine::stringize(const Tokens& arg, const Token& site) const
+    Token Engine::stringize(const Tokens& arg, const Token& site)
     {
         std::string text = "\"";
         bool        space = false;
         for (const Token& t : arg)
         {
+            // Twice a token's text at most goes in for it, escaped.
+            if (tooLong(text.size() + 2 * t.text.size() + 2, site))
+            {
+                return Token();
+            }
             if (t.blank())
             {
                 space = true;
@@ -1366,6 +1396,10 @@ namespace
             out = left;
             return true;
         }
+        if (tooLong(left.text.size() + right.text.size(), site))
+        {
+            return false;
+        }
         Tokens lexed = Lexer(mOptions.lua, site.file).run(left.text + right.text);
         if (lexed.size() != 1 || lexed[0].blank())
         {
@@ -1408,7 +1442,12 @@ namespace
                 const S32    idx = j < body.size() ? paramIndex(m, body[j]) : -1;
                 if (idx >= 0)
                 {
-                    out.push_back(stringize(args[idx], site));
+                    Token made = stringize(args[idx], site);
+                    if (mOverran || !spend(1, made.text.size(), site))
+                    {
+                        return Tokens();
+                    }
+                    out.push_back(std::move(made));
                     i = j;
                     continue;
                 }
@@ -1441,6 +1480,10 @@ namespace
                     }
                     else
                     {
+                        if (!spend(args[idx], site))
+                        {
+                            return Tokens();
+                        }
                         out.insert(out.end(), args[idx].begin(), args[idx].end());
                     }
                 }
@@ -1450,9 +1493,20 @@ namespace
                     {
                         expanded[idx] = expandAll(args[idx]);
                     }
+                    // Spent as it goes in, each time it does: a parameter
+                    // used many times over is that many copies, which is
+                    // what a macro that doubles makes.
+                    if (mOverran || !spend(*expanded[idx], site))
+                    {
+                        return Tokens();
+                    }
                     out.insert(out.end(), expanded[idx]->begin(), expanded[idx]->end());
                 }
                 continue;
+            }
+            if (!spend(1, b.text.size(), site))
+            {
+                return Tokens();
             }
             Token copy    = b;
             copy.file     = site.file;
@@ -1484,6 +1538,10 @@ namespace
             if (paste(pasted.back(), out[j], site, joined))
             {
                 pasted.back() = joined;
+            }
+            else if (mOverran)
+            {
+                return Tokens();
             }
             else
             {
@@ -3628,12 +3686,12 @@ bool ALPreprocessor::Result::hasErrors() const
     return false;
 }
 
-ALPreprocessor::Result ALPreprocessor::run(std::string_view source, const Options& options)
+namespace
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
     // Every line of a text mapped to itself: what the source is when
     // nothing was done to it.
-    const auto asItIs = [](const std::string& text, const std::string& name, ALSourceMap& map) {
+    void asItIs(const std::string& text, const std::string& name, ALSourceMap& map)
+    {
         map = ALSourceMap();
         map.addFile(name, std::string());
         S32    line  = 0;
@@ -3655,7 +3713,28 @@ ALPreprocessor::Result ALPreprocessor::run(std::string_view source, const Option
             start = end + 1;
         }
         map.finish();
-    };
+    }
+}
+
+ALPreprocessor::Result ALPreprocessor::failed(std::string_view source, const Options& options, std::string_view why)
+{
+    Result result;
+    result.overran = true;
+    result.text    = std::string(source);
+    asItIs(result.text, options.fileName, result.map);
+    ALScriptProblem problem;
+    problem.severity = ALScriptProblem::Severity::Error;
+    problem.source   = ALScriptProblem::Source::Preprocessor;
+    problem.key      = "PreprocFailed";
+    problem.args     = { std::string(why) };
+    problem.message  = ALScriptProblem::fill("the preprocessor could not finish ([1]); nothing was preprocessed", problem.args);
+    result.problems.push_back(std::move(problem));
+    return result;
+}
+
+ALPreprocessor::Result ALPreprocessor::run(std::string_view source, const Options& options)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
     Result result;
     if (source.find(options.lua ? "--fspreprocessor off" : "//fspreprocessor off") != std::string_view::npos)
     {
