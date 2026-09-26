@@ -358,6 +358,8 @@
     <floater.string name="NoticeCompiledDiffers">The compiled part of this script is not what its source makes: it was changed outside the preprocessor, or what the script includes has changed. Saving replaces it.</floater.string>
     <floater.string name="NoticeKeepSource">Keep Source</floater.string>
     <floater.string name="NoticeTakeCompiled">Use Compiled Text</floater.string>
+    <floater.string name="NoticeKeepSourceTip">Keep the source as it is; saving makes the compiled part from it again</floater.string>
+    <floater.string name="NoticeTakeCompiledTip">Make the compiled text the source, as one step to undo</floater.string>
     <floater.string name="NoticeDiscardTip">Let the kept changes go; File > Recover Unsaved Changes still has them for a week</floater.string>
     <floater.string name="NoticeCopy">Save a Copy</floater.string>
     <floater.string name="NoticeCopyTip">A new item in your inventory with what is here, saved; this tab closes once it is</floater.string>
