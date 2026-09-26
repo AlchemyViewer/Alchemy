@@ -8007,6 +8007,9 @@ void ALFloaterScriptStudio::letGoOf(size_t index, bool keep)
         refreshToolbar();
         mProblemsPane->fill(nullptr);
         mOutline->deleteAllItems();
+        // What the list says is nothing now: the next tab's is put in
+        // whatever it says, the same rows as the last one's or not.
+        mOutlineSaid.clear();
         mBreadcrumb->setPath({});
         mBreadcrumb->setTrailer(LLStringUtil::null);
         mCrumbsShownFor.clear();
