@@ -28,6 +28,7 @@
 
 #include "../test/lltut.h"
 
+#include <algorithm>
 #include <string>
 #include <vector>
 
@@ -171,5 +172,131 @@ namespace tut
         ensure("the last of the steps forward taken first", forward && forward->mNames.front() == "y");
         stack.note({ { "n" } }, "slider", 0.0, 1.0, join);
         ensure("a change after is a step of its own, and forgets the steps forward", stack.inForce() == 3 && !stack.canRedo());
+    }
+
+    template<> template<>
+    void alundostack_object::test<7>()
+    {
+        set_test_name("a group: everything noted in it one step whatever its keys, nested counting as the outermost, named by the outermost's label");
+        ALUndoStack<Step> stack;
+        stack.note({ { "before" } }, "slider", 0.0, 1.0, join);
+        stack.beginGroup("Reset Bloom");
+        ensure("open", stack.inGroup());
+        stack.note({ { "a" } }, "slider", 0.1, 1.0, join);
+        stack.beginGroup("inner");
+        stack.note({ { "b" } }, "other", 100.0, 1.0, join);
+        stack.endGroup();
+        ensure("still open", stack.inGroup());
+        stack.note({ { "c" } }, "", 500.0, 1.0, join);
+        stack.endGroup();
+        ensure("closed", !stack.inGroup());
+        ensure_equals("one step, not joined to the run before it", stack.inForce(), size_t(2));
+        ensure_equals("all of it", stack.undone().back().mNames.size(), size_t(3));
+        ensure_equals("the outermost's name", stack.undoLabel(), std::string("Reset Bloom"));
+        stack.label("typed");
+        ensure_equals("which a label after does not take", stack.undoLabel(), std::string("Reset Bloom"));
+        stack.note({ { "a" } }, "slider", 500.1, 1.0, join);
+        ensure_equals("a change after is its own step", stack.inForce(), size_t(3));
+
+        stack.beginGroup("empty");
+        stack.endGroup();
+        ensure_equals("a group of nothing leaves nothing", stack.inForce(), size_t(3));
+        stack.beginGroup();
+        stack.note({ { "d" } }, "", 0.0, 1.0, join);
+        stack.endGroup();
+        stack.label("named after");
+        ensure_equals("one with no name named by the first label after", stack.undoLabel(), std::string("named after"));
+        ensure("unmatched ends ignored", !stack.endGroup() && !stack.inGroup());
+        stack.beginGroup("outer");
+        stack.beginGroup("inner");
+        stack.note({ { "e" } }, "", 0.0, 1.0, join);
+        stack.endGroup();
+        stack.endGroup();
+        ensure_equals("the outermost's name though the inner opened first on a change", stack.undoLabel(), std::string("outer"));
+    }
+
+    template<> template<>
+    void alundostack_object::test<8>()
+    {
+        set_test_name("a run back where it began, or a group that undid itself, dropped; the steps forward it threw away stay thrown");
+        ALUndoStack<Step> stack;
+        const auto back_to_start = [](const Step& step) { return step.mNames.size() >= 2 && step.mNames.back() == "start"; };
+        stack.note({ { "one" } }, "", 0.0, 1.0, join);
+        stack.note({ { "two" } }, "", 5.0, 1.0, join);
+        stack.pushRedo(*stack.takeUndo());
+        stack.note({ { "drag" } }, "slider", 10.0, 1.0, join, back_to_start);
+        ensure_equals("a drag is a step", stack.inForce(), size_t(2));
+        stack.note({ { "start" } }, "slider", 10.2, 1.0, join, back_to_start);
+        ensure_equals("let go where it began: gone", stack.inForce(), size_t(1));
+        ensure("the way forward still gone", !stack.canRedo());
+        stack.note({ { "drag" } }, "slider", 10.3, 1.0, join, back_to_start);
+        ensure("a change after it is a step of its own", stack.inForce() == 2 && stack.undone().back().mNames.size() == 1);
+
+        const auto trim = [](Step& step) {
+            step.mNames.erase(std::remove(step.mNames.begin(), step.mNames.end(), "undone"), step.mNames.end());
+            return step.mNames.empty();
+        };
+        stack.beginGroup("Look");
+        stack.note({ { "undone" } }, "", 20.0, 1.0, join);
+        stack.note({ { "kept" } }, "", 20.0, 1.0, join);
+        stack.endGroup(trim);
+        ensure("trimmed, kept", stack.inForce() == 3 && stack.undone().back().mNames == std::vector<std::string>{ "kept" });
+        stack.beginGroup("Look");
+        stack.note({ { "undone" } }, "", 30.0, 1.0, join);
+        stack.endGroup(trim);
+        ensure_equals("nothing left: dropped", stack.inForce(), size_t(3));
+        ensure_equals("and the label with it", stack.undoLabel(), std::string("Look"));
+    }
+
+    template<> template<>
+    void alundostack_object::test<9>()
+    {
+        set_test_name("the oldest forgotten when a group closes, not while it is open; groups closed at once, or with everything cleared");
+        ALUndoStack<Step> stack(2);
+        stack.note({ { "1" } }, "", 0.0, 1.0, join);
+        stack.note({ { "2" } }, "", 5.0, 1.0, join);
+        stack.beginGroup();
+        ensure("not while open", !stack.note({ { "3" } }, "", 10.0, 1.0, join) && stack.inForce() == 3);
+        ensure("when it closes", stack.endGroup() && stack.inForce() == 2 && stack.undone().front().mNames.front() == "2");
+        stack.beginGroup();
+        stack.note({ { "4" } }, "", 20.0, 1.0, join);
+        ensure("an empty group closing forgets nothing", !stack.endGroup([](Step&) { return true; }) && stack.inForce() == 2);
+
+        stack.beginGroup();
+        stack.beginGroup();
+        stack.note({ { "5" } }, "", 30.0, 1.0, join);
+        ensure("closed at once", stack.closeGroups() && !stack.inGroup() && stack.inForce() == 2);
+        ensure("none open: nothing", !stack.closeGroups());
+        stack.beginGroup();
+        stack.note({ { "6" } }, "", 40.0, 1.0, join);
+        stack.pushRedo(*stack.takeUndo());
+        stack.note({ { "7" } }, "", 40.0, 1.0, join);
+        ensure("taken back while open: the next change a step of its own", stack.undone().back().mNames == std::vector<std::string>{ "7" });
+        stack.clear();
+        ensure("cleared, closed", !stack.inGroup());
+        stack.note({ { "8" } }, "", 50.0, 1.0, join);
+        stack.note({ { "9" } }, "", 60.0, 1.0, join);
+        ensure_equals("and its own steps again", stack.inForce(), size_t(2));
+    }
+
+    template<> template<>
+    void alundostack_object::test<10>()
+    {
+        set_test_name("a run broken while a group is open: the group goes on in a step of its own, both named by it, the oldest forgotten for each");
+        ALUndoStack<Step> stack(1);
+        stack.note({ { "0" } }, "", 0.0, 1.0, join);
+        stack.beginGroup("Insert");
+        stack.note({ { "a" } }, "", 1.0, 1.0, join);
+        stack.note({ { "b" } }, "", 1.0, 1.0, join);
+        stack.breakRun();
+        stack.note({ { "c" } }, "", 1.0, 1.0, join);
+        stack.note({ { "d" } }, "", 1.0, 1.0, join);
+        ensure("still open", stack.inGroup());
+        ensure_equals("nothing forgotten while it is", stack.inForce(), size_t(3));
+        ensure("each whole", stack.undone()[1].mNames == std::vector<std::string>{ "a", "b" } &&
+                                 stack.undone()[2].mNames == std::vector<std::string>{ "c", "d" });
+        ensure("each named by the group", stack.undone()[1].mLabel == "Insert" && stack.undone()[2].mLabel == "Insert");
+        ensure_equals("as many forgotten as it closes as are over", stack.endGroup(), size_t(2));
+        ensure("the newest kept", stack.inForce() == 1 && stack.undone()[0].mNames == std::vector<std::string>{ "c", "d" });
     }
 }

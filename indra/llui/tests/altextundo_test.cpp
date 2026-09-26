@@ -521,4 +521,24 @@ namespace tut
         ahead = again.redo();
         ensure("and after", ahead && *ahead == ALTextRange(ALTextPos(0, 4), ALTextPos(0, 5)));
     }
+
+    template<> template<>
+    void altextundo_object::test<17>()
+    {
+        set_test_name("a save while a group is open -- vim's insert mode -- ends the step there: typed on after is a change, and a step of its own");
+        undo.beginGroup();
+        ALTextPos at = type(ALTextPos(0, 0), "a");
+        at           = type(at, "b");
+        undo.markSaved();
+        ensure("saved", undo.isPristine());
+        at = type(at, "c");
+        ensure("typed on: changed", !undo.isPristine());
+        undo.endGroup();
+        undo.undo();
+        ensure_equals("the step after the save undone alone", doc.text(), std::string("ab"));
+        ensure("which is the saved text", undo.isPristine());
+        undo.undo();
+        ensure_equals("then the step before it", doc.text(), std::string());
+        ensure("nothing open", !undo.inGroup());
+    }
 }

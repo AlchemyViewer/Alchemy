@@ -261,52 +261,52 @@ void ALTextUndo::record(const ALTextDocument::Edit& edit, const ALTextRange& bef
     step.anchorAfter  = after;
     step.serial       = ++mNextSerial;
 
-    // The key a run is joined by: the open group, or the kind of change
-    // where it carries on the last step; anything else ends the run first.
-    std::string_view key = "group";
-    if (mGroupDepth == 0)
+    // The key a run is joined by: the kind of change, where it carries on
+    // the last step; anything else ends the run first. A group is one step
+    // however long it stays open, which the stack keeps; a run is one step
+    // while its changes come within the window.
+    const std::string_view key = keyOf(kindOf(edit));
+    if (!mSteps.inGroup() && (mSteps.undone().empty() || !carriesOn(mSteps.undone().back(), edit)))
     {
-        key = keyOf(kindOf(edit));
-        if (mSteps.undone().empty() || !carriesOn(mSteps.undone().back(), edit))
-        {
-            mSteps.breakRun();
-        }
+        mSteps.breakRun();
     }
-    // A group is one step however long it stays open; a run is one step
-    // while its changes come within the window. The oldest step forgotten
-    // past the depth takes the saved mark down with it -- or away, where
-    // the saved text was what that step led from, since no stepping
-    // back reaches it any more.
-    if (mSteps.note(std::move(step), key, now, mGroupDepth > 0 ? 1e9 : mWindow, join))
+    if (mSteps.note(std::move(step), key, now, mWindow, join))
     {
-        ++mEra;
-        if (mSavedInForce != NOWHERE)
-        {
-            mSavedInForce = mSavedInForce == 0 ? NOWHERE : mSavedInForce - 1;
-        }
+        forgotOldest();
+    }
+}
+
+void ALTextUndo::forgotOldest()
+{
+    // The oldest step forgotten past the depth takes the saved mark down
+    // with it -- or away, where the saved text was what that step led from,
+    // since no stepping back reaches it any more.
+    ++mEra;
+    if (mSavedInForce != NOWHERE)
+    {
+        mSavedInForce = mSavedInForce == 0 ? NOWHERE : mSavedInForce - 1;
     }
 }
 
 void ALTextUndo::beginGroup()
 {
-    if (mGroupDepth++ == 0)
-    {
-        mSteps.breakRun();
-    }
+    mSteps.beginGroup();
 }
 
 void ALTextUndo::endGroup()
 {
-    if (mGroupDepth > 0 && --mGroupDepth == 0)
+    for (size_t forgot = mSteps.endGroup(); forgot > 0; --forgot)
     {
-        mSteps.breakRun();
+        forgotOldest();
     }
 }
 
 void ALTextUndo::closeGroups()
 {
-    mGroupDepth = 0;
-    mSteps.breakRun();
+    for (size_t forgot = mSteps.closeGroups(); forgot > 0; --forgot)
+    {
+        forgotOldest();
+    }
 }
 
 std::optional<ALTextRange> ALTextUndo::undo()
@@ -347,7 +347,6 @@ std::optional<ALTextRange> ALTextUndo::redo()
 void ALTextUndo::clear()
 {
     mSteps.clear();
-    mGroupDepth   = 0;
     mSavedInForce = 0;
     mSettling     = false;
     ++mEra;
@@ -527,7 +526,6 @@ bool ALTextUndo::fromLLSD(const LLSD& sd)
     const size_t dropped = mSteps.restore(std::move(undo), std::move(redo));
     mNextSerial          = serial;
     ++mEra;
-    mGroupDepth   = 0;
     mSettling     = false;
     mSavedInForce = saved >= 0 && static_cast<size_t>(saved) <= steps && static_cast<size_t>(saved) >= dropped ? static_cast<size_t>(saved) - dropped : NOWHERE;
     return true;

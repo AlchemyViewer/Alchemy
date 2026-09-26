@@ -99,7 +99,7 @@ public:
     // A run of typing is over: the next change is a step of its own.
     void breakRun() { mSteps.breakRun(); }
     // Whether a group is open.
-    bool inGroup() const { return mGroupDepth > 0; }
+    bool inGroup() const { return mSteps.inGroup(); }
 
     // The step back and the step forward, applied. The selection it puts
     // back, anchor to caret, or nothing where there was nothing to do.
@@ -166,11 +166,12 @@ private:
     // and in the place the run had reached.
     static bool carriesOn(const Step& last, const ALTextDocument::Edit& next);
     static void join(Step& last, Step&& next);
+    // The oldest step forgotten: the saved mark and the era with it.
+    void        forgotOldest();
 
     ALTextDocument&   mDocument;
     ALUndoStack<Step> mSteps;
     F64               mWindow = 1.0;
-    S32               mGroupDepth = 0;
     // The mark: how many steps were in force when the text was saved.
     // Nowhere, once a change has thrown away the redo steps it was among.
     static constexpr size_t NOWHERE = static_cast<size_t>(-1);

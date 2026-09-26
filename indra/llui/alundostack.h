@@ -27,6 +27,7 @@
 #include "stdtypes.h"
 
 #include <optional>
+#include <utility>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -36,8 +37,10 @@
 // one change did, a colour. What a step is and how one is taken are the
 // caller's; this keeps them in order, joins a run of changes to one thing
 // within a moment of each other into one step -- a slider dragged is one
-// step, not one per pixel -- names each step by the first thing said
-// after it, and forgets the oldest past a depth.
+// step, not one per pixel -- makes everything done while a group is open
+// one step, drops a step that turns out to have changed nothing, names
+// each step by the first thing said after it, and forgets the oldest past
+// a depth.
 //
 // A step has a `mLabel` the stack writes; everything else in it is the
 // caller's.
@@ -54,9 +57,36 @@ public:
     // label given names the step, either way.
     // True where the oldest step was forgotten to make room: whoever
     // counts steps from the bottom -- a saved mark -- counts one fewer.
-    template <typename Join>
-    bool note(Step step, std::string_view key, F64 now, F64 window, Join&& join)
+    // While a group is open the key and the window do not matter: its first
+    // change makes its step and the rest join it, and the oldest is not
+    // forgotten until it closes. A run joined back to where it began --
+    // `nothing(step)` true of it, a slider let go where it was picked up --
+    // is dropped, as if it had never been noted; the steps forward it threw
+    // away stay thrown.
+    template <typename Join, typename Nothing>
+    bool note(Step step, std::string_view key, F64 now, F64 window, Join&& join, Nothing&& nothing)
     {
+        mRedo.clear();
+        mLabelPending = true;
+        if (mGroupDepth > 0)
+        {
+            if (mGroupStep)
+            {
+                join(mUndo.back(), std::move(step));
+            }
+            else
+            {
+                mUndo.push_back(std::move(step));
+                mGroupStep = true;
+                if (!mGroupLabel.empty())
+                {
+                    mUndo.back().mLabel = mGroupLabel;
+                }
+            }
+            // A group that gave its name keeps it.
+            mLabelPending = mGroupLabel.empty();
+            return false;
+        }
         const bool same_run = !key.empty() && key == mLastKey && now - mLastTime < window && !mUndo.empty();
         if (same_run)
         {
@@ -66,17 +96,66 @@ public:
         {
             mUndo.push_back(std::move(step));
         }
-        mRedo.clear();
-        mLabelPending = true;
         mLastKey = std::string(key);
         mLastTime = now;
-        if (mUndo.size() > mDepth)
+        if (nothing(mUndo.back()))
         {
-            mUndo.erase(mUndo.begin());
-            return true;
+            mUndo.pop_back();
+            mLastKey.clear();
+            mLabelPending = false;
+            return false;
         }
-        return false;
+        return forgetOverDepth() > 0;
     }
+    template <typename Join>
+    bool note(Step step, std::string_view key, F64 now, F64 window, Join&& join)
+    {
+        return note(std::move(step), key, now, window, std::forward<Join>(join), [](const Step&) { return false; });
+    }
+
+    // Everything noted until the matching endGroup() is one step, whatever
+    // its keys and however long it takes: a paste of several pieces, a
+    // section reset, a Look applied. Groups nest, and count as the
+    // outermost; the outermost's label, where it gives one, names the step.
+    // A group that noted nothing leaves no step. Closing the outermost may
+    // find its step changed nothing after all -- `nothing(step)`, which may
+    // also trim from the step what undid itself -- and drop it; and it
+    // forgets the oldest past the depth, which a group put off. How many it
+    // forgot.
+    void beginGroup(std::string_view label = std::string_view())
+    {
+        if (mGroupDepth++ == 0)
+        {
+            breakRun();
+            mGroupStep  = false;
+            mGroupLabel = std::string(label);
+        }
+    }
+    template <typename Nothing>
+    size_t endGroup(Nothing&& nothing)
+    {
+        if (mGroupDepth == 0 || --mGroupDepth > 0)
+        {
+            return 0;
+        }
+        return closeGroup(std::forward<Nothing>(nothing));
+    }
+    size_t endGroup()
+    {
+        return endGroup([](Step&) { return false; });
+    }
+    // Every group still open closed at once: whoever opened them is gone.
+    size_t closeGroups()
+    {
+        if (mGroupDepth == 0)
+        {
+            breakRun();
+            return 0;
+        }
+        mGroupDepth = 0;
+        return closeGroup([](Step&) { return false; });
+    }
+    bool inGroup() const { return mGroupDepth > 0; }
 
     // What the last change was called, said once: the first label after a
     // change names it, and later ones are about something else.
@@ -93,8 +172,13 @@ public:
 
     // The next change is a step of its own whatever its key: what a caller
     // says when it knows a run has ended -- the caret moved, a word was
-    // finished -- and the key and the window would not.
-    void breakRun() { mLastKey.clear(); }
+    // finished, the text was saved -- and the key and the window would not.
+    // Inside a group too: the group goes on, in a step of its own.
+    void breakRun()
+    {
+        mLastKey.clear();
+        mGroupStep = false;
+    }
 
     bool canUndo() const { return !mUndo.empty(); }
     bool canRedo() const { return !mRedo.empty(); }
@@ -109,6 +193,7 @@ public:
         }
         mLastKey.clear();
         closeLabel();
+        mGroupStep = false;
         Step step = std::move(mUndo.back());
         mUndo.pop_back();
         return step;
@@ -121,6 +206,7 @@ public:
         }
         mLastKey.clear();
         closeLabel();
+        mGroupStep = false;
         Step step = std::move(mRedo.back());
         mRedo.pop_back();
         return step;
@@ -145,12 +231,16 @@ public:
     std::string undoLabel() const { return mUndo.empty() ? std::string() : mUndo.back().mLabel; }
     std::string redoLabel() const { return mRedo.empty() ? std::string() : mRedo.back().mLabel; }
 
+    // Everything forgotten, the groups still open with it.
     void clear()
     {
         mUndo.clear();
         mRedo.clear();
         mLabelPending = false;
         mLastKey.clear();
+        mGroupDepth = 0;
+        mGroupStep  = false;
+        mGroupLabel.clear();
     }
 
     // Both stacks put back whole, as they were written somewhere: the
@@ -171,10 +261,38 @@ public:
     }
 
 private:
+    template <typename Nothing>
+    size_t closeGroup(Nothing&& nothing)
+    {
+        const bool made = mGroupStep;
+        breakRun();
+        mGroupLabel.clear();
+        if (made && !mUndo.empty() && nothing(mUndo.back()))
+        {
+            mUndo.pop_back();
+            mLabelPending = false;
+        }
+        return forgetOverDepth();
+    }
+    // The oldest forgotten past the depth: one as a change is noted, or as
+    // many as a group made, the run breaks inside it each a step.
+    size_t forgetOverDepth()
+    {
+        const size_t over = mUndo.size() > mDepth ? mUndo.size() - mDepth : 0;
+        mUndo.erase(mUndo.begin(), mUndo.begin() + static_cast<std::ptrdiff_t>(over));
+        return over;
+    }
+
     std::vector<Step>   mUndo;
     std::vector<Step>   mRedo;
     size_t              mDepth;
     bool                mLabelPending = false;
     std::string         mLastKey;
     F64                 mLastTime = 0.0;
+    // How deep the groups open are; whether the outermost has made the step
+    // it is filling, which is the newest; and what it asked its steps to be
+    // called.
+    S32                 mGroupDepth = 0;
+    bool                mGroupStep  = false;
+    std::string         mGroupLabel;
 };
