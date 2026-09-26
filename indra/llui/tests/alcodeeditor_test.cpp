@@ -1990,4 +1990,16 @@ namespace tut
         ensure("the mark on a line between kept", f.markAt(5) == ALCodeEditor::Mark::Warning);
         ensure("the fold between kept", f.isFolded(folded) && f.layout().hidden(3));
     }
+
+    template<> template<>
+    void alcodeeditor_object::test<54>()
+    {
+        set_test_name("a line typed with its pairs closed and typed over and ended with Return is one step to undo: one run of typing");
+        ALCodeEditor& e = make("");
+        type("llSay(0, \"hi\");\n");
+        ensure_equals("typed, the pairs closed and typed over", e.text(), std::string("llSay(0, \"hi\");\n"));
+        e.undo();
+        ensure_equals("one step takes all of it back", e.text(), std::string());
+        ensure("and there is nothing before it", !e.undoJournal().canUndo());
+    }
 }

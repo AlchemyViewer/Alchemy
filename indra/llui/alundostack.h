@@ -234,12 +234,12 @@ public:
             held += weigh(step);
         }
         size_t forgot = 0;
-        while (mUndo.size() > 1 && held > budget)
+        while (forgot + 1 < mUndo.size() && held > budget)
         {
-            held -= weigh(mUndo.front());
-            mUndo.erase(mUndo.begin());
+            held -= weigh(mUndo[forgot]);
             ++forgot;
         }
+        mUndo.erase(mUndo.begin(), mUndo.begin() + static_cast<std::ptrdiff_t>(forgot));
         return forgot;
     }
 

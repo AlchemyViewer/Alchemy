@@ -28,6 +28,7 @@
 #include "alundostack.h"
 #include "llsd.h"
 
+#include <limits>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -64,6 +65,23 @@ public:
         // Which step this is, for a save point to find it by; a run
         // joined to it keeps the number it began with.
         U64                               serial = 0;
+        // What it weighs against the budget: its edits' text and what each
+        // costs written beside it.
+        size_t                            bytes = 0;
+        // Made by keys typed (beginTyping), which the next key typed may
+        // carry on.
+        bool                              typed = false;
+    };
+    // What the steps back may weigh together, and the history written
+    // out: the oldest go first past it, the newest always kept.
+    static constexpr size_t BUDGET = 1024 * 1024;
+    // A history read and checked against a text, to be put back over it
+    // (restore): read and checked once, whoever puts it back.
+    struct History
+    {
+        std::vector<Step> undo;
+        std::vector<Step> redo;
+        S32               saved = -1;
     };
     // Where the journal stands, taken when a text is sent to be saved and
     // marked saved when the answer comes: the step it stood at, or none,
@@ -89,6 +107,15 @@ public:
     // a step has been taken back or forward since.
     void settle(const ALTextRange& selection);
     void setRunWindow(F64 seconds) { mWindow = seconds; }
+
+    // What one key typed does -- a character, a pair and its closer, a
+    // line broken and indented, an outdent -- is one with the typing run
+    // before it where the key was typed, nothing selected, where the run
+    // left the caret or its text, within the window; else it starts a
+    // run. Given the selection the key was typed at. Scopes nest, as a
+    // key's handlers do; a group open takes precedence.
+    void beginTyping(const ALTextRange& selection);
+    void endTyping();
 
     // Everything recorded until endGroup() is one step.
     void beginGroup();
@@ -134,11 +161,17 @@ public:
     // character. At most about this many bytes written: the oldest steps
     // back go first past it, and the steps forward all go where they alone
     // would pass a quarter of it.
-    LLSD asLLSD(size_t budget = 1024 * 1024) const;
-    // That history put back over the document as it stands, which must be
-    // the text it was written with: every step is tried first on copies,
-    // back from here and forward again, each edit's text standing where it
-    // says it stood. False, and the journal as it was, where one does not.
+    LLSD asLLSD(size_t budget = BUDGET) const;
+    // That history read for a text it must have been written with: every
+    // step tried on copies, back from the text and forward again, each
+    // edit's text standing where it says it stood. Nothing where one does
+    // not, or it is no history.
+    static std::optional<History> historyFrom(const LLSD& sd, std::string_view text);
+    // A history read for the text the document holds put back over it, in
+    // place of the journal's own.
+    void restore(History history);
+    // Both at once: false, and the journal as it was, where the history
+    // is not of the document as it stands.
     bool fromLLSD(const LLSD& sd);
     // The text the saved mark stands at, stepped to from the document as it
     // stands; nothing where no step reaches a saved text.
@@ -166,11 +199,19 @@ private:
     // and in the place the run had reached.
     static bool carriesOn(const Step& last, const ALTextDocument::Edit& next);
     static void join(Step& last, Step&& next);
+    // What a step weighs against the budget.
+    static size_t weigh(const Step& step) { return step.bytes; }
     // The oldest step forgotten: the saved mark and the era with it.
     void        forgotOldest();
+    // The oldest steps forgotten while the steps back weigh more than the
+    // budget: what noting a change or closing a group may leave.
+    void        forgetOverBudget();
+    // What the steps back weigh, summed afresh.
+    size_t      undoneBytes() const;
 
     ALTextDocument&   mDocument;
-    ALUndoStack<Step> mSteps;
+    // Held by what they weigh, not by how many (forgetOverBudget).
+    ALUndoStack<Step> mSteps{ std::numeric_limits<size_t>::max() };
     F64               mWindow = 1.0;
     // The mark: how many steps were in force when the text was saved.
     // Nowhere, once a change has thrown away the redo steps it was among.
@@ -181,4 +222,13 @@ private:
     // Whether the newest step is the change last recorded, which settle()
     // may still say where it left the selection.
     bool              mSettling     = false;
+    // How deep the typing scopes open are, and whether the key they are
+    // for has recorded an edit yet: the rest of what it does joins that.
+    S32               mTypingDepth  = 0;
+    bool              mTypingNoted  = false;
+    // The selection the key was typed at, anchor to caret.
+    ALTextRange       mTypingAt;
+    // What the steps back weigh together, kept as they change rather than
+    // summed at each.
+    size_t            mUndoneBytes  = 0;
 };

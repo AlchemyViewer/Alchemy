@@ -569,4 +569,119 @@ namespace tut
         ensure_equals("redone as one change", changes, 1);
         ensure_equals("redone", doc.text(), std::string("hello world"));
     }
+
+    template<> template<>
+    void altextundo_object::test<19>()
+    {
+        set_test_name("the steps back are held by what they weigh, not by how many: hundreds of small ones kept, the oldest of big ones let go, the saved mark with them");
+        ALTextPos at(0, 0);
+        for (S32 i = 0; i < 300; ++i)
+        {
+            // Each later than the window: a step of its own.
+            at = type(at, "x", 2.0);
+        }
+        S32 steps = 0;
+        while (undo.undo())
+        {
+            ++steps;
+        }
+        ensure_equals("every one of three hundred kept", steps, 300);
+        ensure_equals("back to nothing", doc.text(), std::string());
+
+        ALTextDocument big_doc;
+        ALTextUndo     big{ big_doc };
+        const std::string part(400 * 1024, 'a');
+        ALTextPos         end(0, 0);
+        const auto        put = [&](F64 when) {
+            ALTextDocument::Edit edit = big_doc.insert(end, part);
+            big.record(edit, end, edit.endAfter(), when);
+            end = edit.endAfter();
+        };
+        put(1.0);
+        big.markSaved();
+        put(3.0);
+        ensure("two of 400 KB kept", big.canUndo());
+        put(5.0);
+        ensure_equals("three written", big_doc.text().size(), part.size() * 3);
+        ensure_equals("past the budget, the oldest went: the saved text still reached", big.savedText().value_or(std::string()).size(), part.size());
+        big.undo();
+        big.undo();
+        ensure("two back, and no more", !big.canUndo());
+        ensure_equals("the first's text stands", big_doc.text().size(), part.size());
+        ensure("which is the saved one", big.isPristine());
+
+        const std::string huge(ALTextUndo::BUDGET * 2, 'b');
+        ALTextDocument::Edit edit = big_doc.insert(big_doc.end(), huge);
+        big.record(edit, big_doc.end(), edit.endAfter(), 9.0);
+        ensure("one step past the budget alone is kept, the newest always", big.canUndo());
+        big.undo();
+        ensure("and it alone", !big.canUndo());
+    }
+
+    template<> template<>
+    void altextundo_object::test<20>()
+    {
+        set_test_name("what one key typed does -- a pair with the caret between, a closer typed over, a line broken and indented, an outdent -- is one with the typing run");
+        // A key typed where `at` is: its text put in, the caret where the
+        // key leaves it.
+        const auto key = [&](ALTextPos at, const char* text, std::optional<ALTextPos> caret = std::nullopt) {
+            undo.beginTyping(ALTextRange(at, at));
+            ALTextPos after = type(at, text);
+            if (caret)
+            {
+                after = *caret;
+                undo.settle(ALTextRange(after, after));
+            }
+            undo.endTyping();
+            return after;
+        };
+        ALTextPos at = key(ALTextPos(0, 0), "f");
+        at           = key(at, "()", ALTextPos(0, 2));
+        at           = key(at, "x");
+        // ")" typed over the closer: nothing put in, the caret past it.
+        undo.beginTyping(ALTextRange(at, at));
+        at = ALTextPos(0, 4);
+        undo.settle(ALTextRange(at, at));
+        undo.endTyping();
+        at = key(at, "\n    ");
+        at = key(at, "y");
+        // "}" typed, and the line's indentation taken back by the same key.
+        undo.beginTyping(ALTextRange(at, at));
+        type(at, "}");
+        now += 0.01;
+        const ALTextDocument::Edit outdent = doc.remove(ALTextRange(ALTextPos(1, 0), ALTextPos(1, 4)));
+        undo.record(outdent, ALTextPos(1, 6), ALTextPos(1, 2), now);
+        undo.endTyping();
+        ensure_equals("typed", doc.text(), std::string("f(x)\ny}"));
+        undo.undo();
+        ensure_equals("one step takes all of it back", doc.text(), std::string());
+        ensure("nothing before it", !undo.canUndo());
+        undo.redo();
+        ensure_equals("and puts it back", doc.text(), std::string("f(x)\ny}"));
+
+        // A key typed somewhere else is a step of its own.
+        key(ALTextPos(0, 0), "z");
+        ensure_equals("typed at the start", doc.text(), std::string("zf(x)\ny}"));
+        undo.undo();
+        ensure_equals("undone alone", doc.text(), std::string("f(x)\ny}"));
+    }
+
+    template<> template<>
+    void altextundo_object::test<21>()
+    {
+        set_test_name("a history is read and checked against its text once, then put back as it was read");
+        ALTextPos at = type(ALTextPos(0, 0), "one", 2.0);
+        type(at, " two", 2.0);
+        const LLSD written = undo.asLLSD();
+        ensure("another text's is no history", !ALTextUndo::historyFrom(written, "one six").has_value());
+        std::optional<ALTextUndo::History> read = ALTextUndo::historyFrom(written, doc.text());
+        ensure("its own text's is", read.has_value());
+        ensure_equals("both steps back", read->undo.size(), size_t(2));
+        ALTextDocument again(doc.text());
+        ALTextUndo     journal{ again };
+        journal.restore(std::move(*read));
+        journal.undo();
+        journal.undo();
+        ensure_equals("stepped back through it", again.text(), std::string());
+    }
 }

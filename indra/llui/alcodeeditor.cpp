@@ -3714,8 +3714,13 @@ bool ALCodeEditor::handleUnicodeCharHere(llwchar uni_char)
 {
     const bool typing   = typingText();
     const bool was_open = completionOpen();
-    const bool paired   = typing && mAutoClose && uni_char < 0x80 && !isReadOnly() && typePair(static_cast<char>(uni_char));
-    if (!paired && !ALTextView::handleUnicodeCharHere(uni_char))
+    // The pair, the character and its outdent one key typed, one with the
+    // typing around it.
+    undoJournal().beginTyping(selection());
+    const bool paired = typing && mAutoClose && uni_char < 0x80 && !isReadOnly() && typePair(static_cast<char>(uni_char));
+    const bool typed  = paired || ALTextView::handleUnicodeCharHere(uni_char);
+    undoJournal().endTyping();
+    if (!typed)
     {
         return false;
     }
@@ -3773,8 +3778,10 @@ bool ALCodeEditor::typePair(char c)
             {
                 if (close == c)
                 {
+                    // Where the typing goes on from, for the key after.
                     mAutoClosed.erase(put);
                     setCaret(ALTextPos(at.line, at.column + 1));
+                    undoJournal().settle(selection());
                     return true;
                 }
             }
@@ -3794,6 +3801,7 @@ bool ALCodeEditor::typePair(char c)
             insertText(std::string(1, open) + inner + std::string(1, close));
             const ALTextPos end = caret();
             setSelection(ALTextRange(ALTextPos(sel.begin.line, sel.begin.column + 1), ALTextPos(end.line, end.column - 1)));
+            undoJournal().settle(selection());
             return true;
         }
         // Not in a comment or a string, where it is prose; and only before
@@ -3821,6 +3829,7 @@ bool ALCodeEditor::typePair(char c)
         insertText(std::string(1, open) + std::string(1, close));
         const ALTextPos inside(at.line, at.column + 1);
         setCaret(inside);
+        undoJournal().settle(selection());
         mAutoClosed.insert(inside);
         return true;
     }

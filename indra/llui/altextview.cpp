@@ -364,20 +364,18 @@ void ALTextView::setText(std::string_view text)
 
 bool ALTextView::setTextWithHistory(std::string_view text, const LLSD& history)
 {
-    // Tried against a copy of the text first: the journal can only be
-    // given a history over the text it is of, and putting the text in
-    // clears what this one had, which a history that does not fit would
-    // then have taken for nothing.
+    // Read against the text first, once: the journal can only be given a
+    // history over the text it is of, and putting the text in clears what
+    // this one had, which a history that does not fit would then have
+    // taken for nothing.
+    std::optional<ALTextUndo::History> read = ALTextUndo::historyFrom(history, text);
+    if (!read)
     {
-        ALTextDocument trial(text);
-        ALTextUndo     journal(trial);
-        if (!journal.fromLLSD(history))
-        {
-            return false;
-        }
+        return false;
     }
     setText(text);
-    return mUndo.fromLLSD(history);
+    mUndo.restore(std::move(*read));
+    return true;
 }
 
 void ALTextView::setValue(const LLSD& value)
@@ -1870,7 +1868,8 @@ std::string ALTextView::tabText(const ALTextPos& at) const
 void ALTextView::newLine()
 {
     const ALSyntaxGrammar* grammar = mHighlighter.grammar().get();
-    mUndo.beginGroup();
+    // A key typed, whatever it takes: one with the typing around it.
+    mUndo.beginTyping(selection());
     if (const std::optional<ALTextEditing::Replacement> closing =
             ALTextEditing::closingBeforeReturn(mDocument, mAnchor, mCaret, grammar, openerOf(), editingOptions()))
     {
@@ -1884,7 +1883,7 @@ void ALTextView::newLine()
         setCaret(*split.caret);
         mUndo.settle(selection());
     }
-    mUndo.endGroup();
+    mUndo.endTyping();
 }
 
 void ALTextView::outdentAsTyped(llwchar typed)
@@ -4095,8 +4094,10 @@ bool ALTextView::handleUnicodeCharHere(llwchar uni_char)
     {
         return false;
     }
+    mUndo.beginTyping(selection());
     insertText(utf8str_from_cp(uni_char));
     outdentAsTyped(uni_char);
+    mUndo.endTyping();
     if (LLWindow* window = getWindow())
     {
         window->hideCursorUntilMouseMove();
