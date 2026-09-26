@@ -640,4 +640,24 @@ namespace tut
         ensure_equals("not torn", torn.size(), size_t(1));
         ensure("moved along instead", !orders.empty() && orders.back() == std::vector<std::string>({ "a", "c", "b" }));
     }
+
+    // With no tab at all, an arrow walks nowhere and is still the strip's:
+    // passed on, it would walk the avatar.
+    template<> template<>
+    void altabstrip_object::test<13>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        ALTabStrip* strip = make();
+        strip->setTabs({}, "");
+        for (KEY key : { KEY_LEFT, KEY_RIGHT, KEY_HOME, KEY_END })
+        {
+            ensure("kept", strip->handleKeyHere(key, MASK_NONE));
+        }
+        ensure("another key not", !strip->handleKeyHere('X', MASK_NONE));
+        strip->setTabs(three(), "");
+        ensure("with tabs, the walk starts", strip->handleKeyHere(KEY_RIGHT, MASK_NONE) && strip->chosen() == "a");
+    }
 }

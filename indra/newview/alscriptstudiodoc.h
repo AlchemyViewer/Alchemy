@@ -131,6 +131,8 @@ struct ALScriptStudioDoc
             default:             return editor;
         }
     }
+    // Whether the keyboard is in one of its views, shown or not.
+    bool          hasKeyboard() const;
     // The map the text the region compiled and runs was expanded through:
     // what the compiler's lines and a run-time error's are read back by.
     // Null where the text went up as written.

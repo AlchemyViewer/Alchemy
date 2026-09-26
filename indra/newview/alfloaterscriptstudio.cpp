@@ -2091,8 +2091,7 @@ void ALFloaterScriptStudio::showView(Doc& doc, Doc::View view, bool focus)
     // Asked of whichever editor is on screen, which is not always the view
     // asked for until now: a tab brought back asking for its expansion
     // shows its source until the expansion comes.
-    const bool      had_keys = (doc.editor && doc.editor->hasFocus()) || (doc.expandedEditor && doc.expandedEditor->hasFocus()) ||
-                          (doc.compareView && gFocusMgr.childHasKeyboardFocus(doc.compareView));
+    const bool      had_keys = doc.hasKeyboard();
     const Doc::View was      = doc.shownView();
     doc.view                 = view;
     if (&doc != active())
@@ -5917,6 +5916,10 @@ void ALFloaterScriptStudio::letGoOf(size_t index, bool keep)
     {
         return;
     }
+    // The keyboard in the tab going goes to the one after it, or stays
+    // in the window: out of a view taken off the window, it would fall
+    // out into the world once the view has gone.
+    const bool had_keys = mDocs[index]->hasKeyboard();
     {
         Doc& doc = *mDocs[index];
         // Unsaved text thrown away -- Don't Save, a deletion, :q! -- is set
@@ -5979,10 +5982,16 @@ void ALFloaterScriptStudio::letGoOf(size_t index, bool keep)
         mOutlinePane->forget();
         mCrumbsBar->forget();
         mInspectorPane->forget();
+        if (had_keys)
+        {
+            // The strip, where the next tab will be: the window's own
+            // keys still answer, and the arrows go nowhere.
+            mTabs->setFocus(true);
+        }
     }
     else
     {
-        activate(llmin(index, mDocs.size() - 1));
+        activate(llmin(index, mDocs.size() - 1), had_keys);
     }
     mExplorerPane->relist();
 }

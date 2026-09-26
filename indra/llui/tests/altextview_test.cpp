@@ -1357,4 +1357,39 @@ namespace tut
         type("!");
         ensure_equals("after an edit, the text as it is", v.wholeText(), std::string("one\ntwo!"));
     }
+
+    template<> template<>
+    void altextview_object::test<44>()
+    {
+        set_test_name("Escape lets go of the selection and keeps the keyboard the panel around would take; one passing Escape on keeps it only while it had a selection");
+        ALTextView&      v = make("one two");
+        LLPanel::Params  pp;
+        pp.name          = "around";
+        pp.rect          = LLRect(0, 300, 500, 0);
+        LLPanel* around  = LLUICtrlFactory::create<LLPanel>(pp);
+        around->addChild(&v);
+        v.setFocus(true);
+        v.setSelection(ALTextRange(ALTextPos(0, 0), ALTextPos(0, 3)));
+        ensure("taken", v.handleKey(KEY_ESCAPE, MASK_NONE, false));
+        ensure("the selection let go of", !v.hasSelection());
+        ensure_equals("the caret where it was", v.caret().column, 3);
+        ensure("the keyboard kept", v.hasFocus());
+        ensure("again, with nothing to let go of: kept still", v.handleKey(KEY_ESCAPE, MASK_NONE, false) && v.hasFocus());
+
+        ALTextView::Params p(LLUICtrlFactory::getDefaultParams<ALTextView>());
+        p.name         = "passing";
+        p.rect         = LLRect(0, 100, 400, 0);
+        p.default_text = "three four";
+        p.pass_escape  = true;
+        ALTextView* passing = LLUICtrlFactory::create<ALTextView>(p);
+        around->addChild(passing);
+        passing->setFocus(true);
+        passing->setSelection(ALTextRange(ALTextPos(0, 0), ALTextPos(0, 5)));
+        ensure("a selection let go of first", passing->handleKey(KEY_ESCAPE, MASK_NONE, false) && !passing->hasSelection() && passing->hasFocus());
+        passing->handleKey(KEY_ESCAPE, MASK_NONE, false);
+        ensure("then on to the panel, which takes the keyboard away", !passing->hasFocus());
+
+        around->removeChild(&v);
+        around->die();
+    }
 }

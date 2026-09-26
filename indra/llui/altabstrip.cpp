@@ -206,10 +206,15 @@ bool ALTabStrip::handleKeyHere(KEY key, MASK mask)
     const S32 at = indexOf(mChosen);
     if (at < 0)
     {
-        // Nothing chosen: the first tab is where a walk starts.
-        if (!mTabs.empty() && mask == MASK_NONE && (key == KEY_RIGHT || key == KEY_LEFT || key == KEY_HOME || key == KEY_END))
+        // Nothing chosen: the first tab is where a walk starts. With no
+        // tab at all the walk goes nowhere, and the arrow is still the
+        // strip's -- passed on, it would walk the avatar.
+        if (mask == MASK_NONE && (key == KEY_RIGHT || key == KEY_LEFT || key == KEY_HOME || key == KEY_END))
         {
-            chooseKeyed(key == KEY_END || key == KEY_LEFT ? mTabs.size() - 1 : 0);
+            if (!mTabs.empty())
+            {
+                chooseKeyed(key == KEY_END || key == KEY_LEFT ? mTabs.size() - 1 : 0);
+            }
             return true;
         }
         return LLUICtrl::handleKeyHere(key, mask);

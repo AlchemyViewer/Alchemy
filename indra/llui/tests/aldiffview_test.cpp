@@ -146,4 +146,19 @@ namespace tut
         ensure_equals("the left's", d.getChild<LLUICtrl>("left_title")->getValue().asString(), std::string("Compiled"));
         ensure_equals("the right's", d.getChild<LLUICtrl>("right_title")->getValue().asString(), std::string("Made from the source"));
     }
+
+    template<> template<>
+    void aldiffview_object::test<5>()
+    {
+        set_test_name("Escape from a side: a selection let go of first, then the comparison's; kept with nobody to tell");
+        ALDiffView& d = make("one\ntwo", "one\n2");
+        S32         told = 0;
+        d.setOnEscape([&told]() { ++told; });
+        d.right()->setFocus(true);
+        d.right()->setSelection(ALTextRange(ALTextPos(0, 0), ALTextPos(0, 3)));
+        ensure("the selection first", d.right()->handleKey(KEY_ESCAPE, MASK_NONE, false) && !d.right()->hasSelection() && told == 0);
+        ensure("then the comparison's", d.right()->handleKey(KEY_ESCAPE, MASK_NONE, false) && told == 1);
+        d.setOnEscape(nullptr);
+        ensure("nobody to tell: kept, and the keyboard with it", d.right()->handleKey(KEY_ESCAPE, MASK_NONE, false) && d.right()->hasFocus());
+    }
 }

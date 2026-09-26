@@ -215,6 +215,7 @@ ALTextView::Params::Params()
     spellcheck("spellcheck", false),
     spell_error_color("spell_error_color"),
     takes_focus("takes_focus", true),
+    pass_escape("pass_escape", false),
     placeholder("placeholder")
 {
 }
@@ -267,6 +268,7 @@ ALTextView::ALTextView(const Params& p)
     mPlaceholder     = p.placeholder.isProvided() ? p.placeholder() : std::string();
     mSpellCheck      = p.spellcheck;
     mTakesFocus      = p.takes_focus;
+    mPassEscape      = p.pass_escape;
 
     mHighlighter.attach(&mDocument);
     mLayout.attach(&mDocument);
@@ -3998,6 +4000,19 @@ bool ALTextView::handleKeyHere(KEY key, MASK mask)
     const ALEditorCommand command = mKeymap.lookup(key, mask);
     if (command == ALEditorCommand::None)
     {
+        // Escape, once nothing else here took it -- the find bar, a list,
+        // a card, a modal keymap: the selection let go of, and the
+        // keyboard kept. Passed on, the panel the text is in would take
+        // the keyboard away, out into the world, where the arrows walk.
+        if (key == KEY_ESCAPE && mask == MASK_NONE)
+        {
+            const bool selected = hasSelection();
+            if (selected)
+            {
+                setCaret(mCaret);
+            }
+            return selected || !mPassEscape;
+        }
         return false;
     }
     if (mReadOnly && editsText(command))

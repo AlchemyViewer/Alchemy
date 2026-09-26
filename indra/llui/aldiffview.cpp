@@ -134,6 +134,8 @@ ALCodeEditor* ALDiffView::makeSide(const ALCodeEditor::Params& side, const std::
     // side and not the other says nothing.
     p.show_fold_markers      = false;
     p.highlight_current_line = false;
+    // Escape is the comparison's: back to what it was made from.
+    p.pass_escape            = true;
     ALCodeEditor* made       = LLUICtrlFactory::create<ALCodeEditor>(p);
     addChild(made);
     return made;
@@ -359,9 +361,14 @@ bool ALDiffView::handleKeyHere(KEY key, MASK mask)
         goToChange(mask == MASK_NONE);
         return true;
     }
-    if (key == KEY_ESCAPE && mask == MASK_NONE && mEscape)
+    if (key == KEY_ESCAPE && mask == MASK_NONE)
     {
-        mEscape();
+        // Kept either way: passed on, a panel would take the keyboard out
+        // into the world.
+        if (mEscape)
+        {
+            mEscape();
+        }
         return true;
     }
     return LLUICtrl::handleKeyHere(key, mask);

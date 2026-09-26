@@ -170,6 +170,11 @@ public:
         // Whether a click gives the view the keyboard; a card over an
         // editor leaves it where it was.
         Optional<bool>        takes_focus;
+        // Whether an Escape with nothing here to let go of goes on to the
+        // view it is in, for one that answers it -- a comparison going
+        // back to the text it was made from. Otherwise the view keeps it,
+        // and the keyboard with it.
+        Optional<bool>        pass_escape;
         // Said, dimly, in place of the text while there is none: what
         // will appear here, or what to type.
         Optional<std::string> placeholder;
@@ -895,6 +900,7 @@ private:
 
     bool mBgVisible  = true;
     bool mTakesFocus = true;
+    bool mPassEscape = false;
     bool mReadOnly   = false;
     // What the window was last told of the input method.
     bool mLanguageInput = false;

@@ -26,6 +26,8 @@
 
 #include "alscriptstudiodoc.h"
 
+#include "llfocusmgr.h"
+
 // static
 const char* ALScriptStudioDoc::levelName(Level level)
 {
@@ -46,6 +48,18 @@ ALScriptStudioDoc::Level ALScriptStudioDoc::levelOf(ALScriptProblem::Severity se
     return severity == ALScriptProblem::Severity::Error     ? Level::Error
            : severity == ALScriptProblem::Severity::Warning ? Level::Warning
                                                             : Level::Note;
+}
+
+bool ALScriptStudioDoc::hasKeyboard() const
+{
+    for (const LLView* view : { static_cast<const LLView*>(editor), static_cast<const LLView*>(expandedEditor), static_cast<const LLView*>(compareView) })
+    {
+        if (view && gFocusMgr.childHasKeyboardFocus(view))
+        {
+            return true;
+        }
+    }
+    return false;
 }
 
 const ALSourceMap* ALScriptStudioDoc::runningMap() const
