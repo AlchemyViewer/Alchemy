@@ -2175,4 +2175,25 @@ namespace tut
         keys("2Gcsbx");
         ensure_equals("no such pair: nothing", flat(e.text()), std::string("(a) b|bold and x|  (line text)  |{|one|two|}|"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<69>()
+    {
+        set_test_name("every way into insert mode one step to undo, and none left open once escape leaves it: i a I A o O c C s S R gi and visual c");
+        ALCodeEditor& e = make("one two\nthree four\nfive six\n");
+        for (const char* seq : { "ix<Esc>", "ay<Esc>", "Iz<Esc>", "Aw<Esc>", "onew<Esc>", "Oup<Esc>", "cwX<Esc>", "ccY<Esc>", "CZ<Esc>",
+                                 "sQ<Esc>", "SR<Esc>", "Rab<Esc>", "giT<Esc>", "vlcU<Esc>", "3ihi<Esc>" })
+        {
+            const std::string before = flat(e.text());
+            keys(seq);
+            ensure(std::string(seq) + ": none left open", !e.undoJournal().inGroup());
+            keys("u");
+            ensure_equals(std::string(seq) + ": one step", flat(e.text()), before);
+            keys(seq);
+        }
+        const std::string before_x = flat(e.text());
+        keys("x");
+        keys("u");
+        ensure_equals("a command after is a step of its own", flat(e.text()), before_x);
+    }
 }

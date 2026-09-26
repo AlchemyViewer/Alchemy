@@ -2282,7 +2282,7 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
                 view.insertText(indent + "\n");
                 view.setCaret(ALTextPos(line, static_cast<S32>(indent.size())));
             }
-            enterInsert(view, count);
+            enterInsert(view, count, true);
             return true;
         }
         case 'x':
@@ -3514,7 +3514,7 @@ void ALVimKeymap::applyOperator(ALTextView& view, llwchar op, const Span& span_i
                     mBlockColumn = pieces.front().begin.column;
                     mBlockAppend = false;
                 }
-                enterInsert(view, 1);
+                enterInsert(view, 1, true);
                 // The group closes when insert mode is left.
             }
             else
@@ -3743,9 +3743,9 @@ void ALVimKeymap::put(ALTextView& view, char name, bool after, S32 count, bool p
 
 // --- insert mode ------------------------------------------------------------------------
 
-void ALVimKeymap::enterInsert(ALTextView& view, S32 count)
+void ALVimKeymap::enterInsert(ALTextView& view, S32 count, bool grouped)
 {
-    if (mMode == Mode::Normal)
+    if (mMode == Mode::Normal && !grouped)
     {
         view.undoJournal().beginGroup();
     }

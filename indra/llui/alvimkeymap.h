@@ -313,8 +313,10 @@ private:
     void   finishCommand(bool changed);
     void   clearPending();
 
-    // Modes.
-    void enterInsert(ALTextView& view, S32 count);
+    // Modes. Insert mode is one step to undo, in a group it opens; or in
+    // one the caller opened already, `grouped`, where what it put in first
+    // -- the line `o` opens, what `c` took out -- is part of the step.
+    void enterInsert(ALTextView& view, S32 count, bool grouped = false);
     void leaveInsert(ALTextView& view);
     void enterVisual(ALTextView& view, Mode which);
     void leaveVisual(ALTextView& view);

@@ -98,6 +98,8 @@ public:
     void closeGroups();
     // A run of typing is over: the next change is a step of its own.
     void breakRun() { mSteps.breakRun(); }
+    // Whether a group is open.
+    bool inGroup() const { return mGroupDepth > 0; }
 
     // The step back and the step forward, applied. The selection it puts
     // back, anchor to caret, or nothing where there was nothing to do.
