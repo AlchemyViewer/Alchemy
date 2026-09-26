@@ -60,6 +60,43 @@ void ALScriptStudioSaving::preprocess(Doc& doc)
     });
 }
 
+namespace
+{
+    // Whether two //program_version lines are the same viewer's: by its
+    // name, the first word, whatever the channel's rest and the version.
+    bool sameProgram(const std::string& a, const std::string& b)
+    {
+        const std::string first = a.substr(0, a.find(' '));
+        return !first.empty() && first == b.substr(0, b.find(' '));
+    }
+}
+
+void ALScriptStudioSaving::compareCompiled(Doc& doc, U32 version, const ALPreprocessor::Result& result)
+{
+    if (!doc.compareCompiledAt)
+    {
+        return;
+    }
+    const bool as_loaded = *doc.compareCompiledAt == version;
+    doc.compareCompiledAt.reset();
+    // Only a whole run of the text as it came, which tells: where the
+    // source asks for what differs from one run to the next, or another
+    // viewer made the half with transforms whose names ours need not
+    // share, it cannot be told (ALScriptEnvelope::comparable).
+    if (!as_loaded || !doc.envelope || result.overran || result.disabled || result.hasErrors() || !result.pending.empty())
+    {
+        return;
+    }
+    const bool here        = sameProgram(doc.envelope->programVersion, mWindow.saveOptions().program);
+    const bool transformed = result.usedSwitches || result.usedLazyLists || result.usedExtensions;
+    if (ALScriptEnvelope::comparable(doc.editor->wholeText(), doc.language.lua, here, transformed) &&
+        !ALScriptEnvelope::compiledFrom(result.text, doc.envelope->expanded, doc.language.lua))
+    {
+        doc.compiledDiffers = doc.envelope->expanded;
+        mWindow.refreshNotice();
+    }
+}
+
 void ALScriptStudioSaving::preprocessedAnswer(const std::string& id, U32 version, const ALPreprocessor::Result& result)
 {
     Doc* found = mServices.findDoc(id);
@@ -83,6 +120,7 @@ void ALScriptStudioSaving::preprocessedAnswer(const std::string& id, U32 version
     doc.expanded.valid    = false;
     mWindow.showExpanded(doc, result.text);
     mWindow.refreshProblems(doc);
+    compareCompiled(doc, version, result);
     // And what it comes to for a save waiting on it.
     ALScriptSaveFlow::Run run;
     run.asked                             = version;

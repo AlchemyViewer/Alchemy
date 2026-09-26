@@ -191,6 +191,10 @@ public:
 
 private:
     void preprocessedAnswer(const std::string& id, U32 version, const ALPreprocessor::Result& result);
+    // A wrapped script's first run as it loaded, held up to the compiled
+    // half it came with: where the source could not have made that, the
+    // half is offered in the notice (Doc::compiledDiffers).
+    void compareCompiled(Doc& doc, U32 version, const ALPreprocessor::Result& result);
     // What a run made, uploaded: in the envelope with the source as
     // written, or as written alone where the run was switched off.
     void sendPreprocessed(Doc& doc, const Doc::Expanded& sent);

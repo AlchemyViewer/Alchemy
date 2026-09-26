@@ -1861,6 +1861,11 @@ void ALFloaterScriptStudio::loaded(const ALScriptWorkspace::Loaded& answer)
         // the author wrote, and what the server compiled goes in a tab
         // of its own.
         doc.envelope = ALScriptEnvelope::parse(answer.text);
+        doc.compareCompiledAt.reset();
+        doc.compiledDiffers.reset();
+        // Carried in -- recovered, or from another window -- the text is
+        // not the envelope's source, and nothing is to be held up to it.
+        const bool carrying = doc.carriedText.has_value();
         if (doc.envelope)
         {
             doc.editor->setText(doc.envelope->source);
@@ -1911,6 +1916,12 @@ void ALFloaterScriptStudio::loaded(const ALScriptWorkspace::Loaded& answer)
         setStatus(getString(answer.modifiable ? "Loaded" : "LoadedReadOnly", args));
         if (preprocessed(doc))
         {
+            // The first run over the source it came with held up to what
+            // was compiled from it last (ALScriptStudioSaving).
+            if (doc.envelope && !doc.envelope->expanded.empty() && !carrying)
+            {
+                doc.compareCompiledAt = doc.editor->document().version();
+            }
             // Its includes fetched now, so that the analyzers have them,
             // and the expanded code shown as it would be uploaded.
             mSaving.preprocess(doc);

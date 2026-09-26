@@ -233,7 +233,7 @@ ALScriptNoticeBar::Notice ALScriptStudioOrphans::noticeFor(const Doc* doc, const
         buttons[0]       = { "restore", "NoticeRestore" };
         buttons[1]       = { "discard_left", "NoticeDiscard" };
     }
-    else if (doc && !doc->orphan.noticeDismissed)
+    else if (doc && !doc->orphan.noticeDismissed && doc->orphan.kind != Orphan::None)
     {
         LLStringUtil::format_map_t args;
         args["[FILE]"] = doc->file;
@@ -278,6 +278,12 @@ ALScriptNoticeBar::Notice ALScriptStudioOrphans::noticeFor(const Doc* doc, const
                 break;
         }
     }
+    else if (doc && doc->compiledDiffers)
+    {
+        text       = services.words("NoticeCompiledDiffers");
+        buttons[0] = { "keep_source", "NoticeKeepSource" };
+        buttons[1] = { "take_compiled", "NoticeTakeCompiled" };
+    }
     return notice;
 }
 
@@ -316,6 +322,20 @@ void ALScriptStudioOrphans::noticeAction(const std::string& action)
         {
             mServices.report(mServices.words("RecoveryRestored", args), false, doc);
         }
+    }
+    else if (action == "keep_source" && doc->compiledDiffers)
+    {
+        // The next save replaces the compiled half, as it would have.
+        doc->compiledDiffers.reset();
+    }
+    else if (action == "take_compiled" && doc->compiledDiffers)
+    {
+        // What was compiled, the source now, as one step to undo; still
+        // wrapped, so that Firestorm opens it as its source.
+        doc->carriedText = *doc->compiledDiffers;
+        doc->compiledDiffers.reset();
+        mWindow.takeCarriedText(*doc);
+        mServices.report(mServices.words("CompiledTaken", args), false, doc);
     }
     else if (action == "discard_left" && doc->recoverable)
     {

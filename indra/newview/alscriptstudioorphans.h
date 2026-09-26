@@ -101,6 +101,8 @@ public:
         virtual void saveAgain(Doc& doc)                                                     = 0;
         virtual void takeUpRecovery(Doc& doc, const ALScriptRecoveryEntry& entry)            = 0;
         virtual void discardRecovery(const ALScriptRecoveryEntry& entry)                     = 0;
+        // What the tab carries put in over its text, as one step to undo.
+        virtual void takeCarriedText(Doc& doc)                                               = 0;
 
     protected:
         ~Window() = default;

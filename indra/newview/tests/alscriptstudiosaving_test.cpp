@@ -553,4 +553,48 @@ namespace tut
         saving.save(doc);
         ensure_equals("tidied, made here", studio.tidied.size(), size_t(1));
     }
+
+    template<> template<>
+    void alscriptstudiosaving_object::test<10>()
+    {
+        set_test_name("a wrapped script's first run as it loaded held up to its compiled half: offered where the source could not have made it");
+        ALScriptStudioSaving& saving = make();
+        studio.preprocessor          = true;
+        const std::string source     = "default { state_entry() { llSay(0, \"hi\"); } }";
+        const auto loaded = [&](const std::string& id, const std::string& compiled, const std::string& program) -> Doc& {
+            Doc&             doc = tab(id, source);
+            ALScriptEnvelope envelope;
+            envelope.source         = source;
+            envelope.expanded       = compiled;
+            envelope.programVersion = program;
+            doc.envelope            = envelope;
+            doc.compareCompiledAt   = doc.editor->document().version();
+            return doc;
+        };
+        const auto ran = [&](Doc& doc, bool transformed = false) {
+            saving.preprocess(doc);
+            ALPreprocessor::Result result;
+            result.text         = source;
+            result.usedSwitches = transformed;
+            studio.run(result);
+        };
+        const std::string edited = "default { state_entry() { llSay(0, \"bye\"); } }";
+
+        Doc& here = loaded("here", edited, "Alchemy Release 7.2.0");
+        ran(here);
+        ensure("ours, edited outside: offered", here.compiledDiffers && *here.compiledDiffers == edited && !here.compareCompiledAt);
+        Doc& same = loaded("same", "default{state_entry(){llSay(0,\"hi\");}}", "Alchemy Release 7.2.0");
+        ran(same);
+        ensure("what the source makes, spaced otherwise: nothing", !same.compiledDiffers);
+        Doc& firestorm = loaded("fs", edited, "Firestorm-Releasex64 7.1.11.76496");
+        ran(firestorm);
+        ensure("Firestorm's, untransformed: told", firestorm.compiledDiffers.has_value());
+        Doc& switched = loaded("sw", edited, "Firestorm-Releasex64 7.1.11.76496");
+        ran(switched, true);
+        ensure("Firestorm's, with a transform whose names ours need not share: not told", !switched.compiledDiffers);
+        Doc& typed = loaded("typed", edited, "Alchemy Release 7.2.0");
+        type(typed, " ");
+        ran(typed);
+        ensure("typed in before the run: not the text as it came", !typed.compiledDiffers && !typed.compareCompiledAt);
+    }
 }

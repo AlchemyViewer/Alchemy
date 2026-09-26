@@ -355,6 +355,9 @@
     <floater.string name="NoticeRestore">Restore Them</floater.string>
     <floater.string name="NoticeRestoreTip">The kept changes put in, as one step to undo</floater.string>
     <floater.string name="NoticeDiscard">Discard</floater.string>
+    <floater.string name="NoticeCompiledDiffers">The compiled part of this script is not what its source makes: it was changed outside the preprocessor, or what the script includes has changed. Saving replaces it.</floater.string>
+    <floater.string name="NoticeKeepSource">Keep Source</floater.string>
+    <floater.string name="NoticeTakeCompiled">Use Compiled Text</floater.string>
     <floater.string name="NoticeDiscardTip">Let the kept changes go; File > Recover Unsaved Changes still has them for a week</floater.string>
     <floater.string name="NoticeCopy">Save a Copy</floater.string>
     <floater.string name="NoticeCopyTip">A new item in your inventory with what is here, saved; this tab closes once it is</floater.string>
@@ -384,6 +387,7 @@
     <floater.string name="RecoveryReopenedA">1 script kept from last time opened again, with its unsaved changes.</floater.string>
     <floater.string name="RecoveryReopenedB">[COUNT] scripts kept from last time opened again, with their unsaved changes.</floater.string>
     <floater.string name="RecoveryRestored">[NAME]'s kept changes put in; undo takes them out again.</floater.string>
+    <floater.string name="CompiledTaken">[NAME]'s compiled text is its source now; undo takes it out again.</floater.string>
     <floater.string name="RecoveryStale">[NAME] was saved since its kept changes were made: saving them replaces what was saved then, and Revert to Saved brings that back.</floater.string>
     <floater.string name="RecoveryDiscarded">[NAME]'s kept changes let go of; File > Recover Unsaved Changes still has them for a week.</floater.string>
     <floater.string name="RecoveryGone">[NAME]'s kept changes let go of for good.</floater.string>

@@ -64,6 +64,11 @@ namespace
         void               saveAgain(Doc& doc) override { did.push_back("save " + doc.id); }
         void               takeUpRecovery(Doc& doc, const ALScriptRecoveryEntry& entry) override { did.push_back("restore " + doc.id); }
         void               discardRecovery(const ALScriptRecoveryEntry&) override { did.push_back("discard"); }
+        void               takeCarriedText(Doc& doc) override
+        {
+            did.push_back("carried " + doc.id + ": " + doc.carriedText.value_or(std::string()));
+            doc.carriedText.reset();
+        }
 
         std::map<std::string, Reach> reaches;
         Names                        placed, kept, did;
@@ -368,5 +373,29 @@ namespace tut
         a.orphan.kind = Orphan::None;
         unit.refreshNotice();
         ensure("hidden", !holder->getVisible());
+    }
+
+    template<> template<>
+    void alscriptstudioorphans_object::test<8>()
+    {
+        set_test_name("a compiled half the source could not have made: said after a kept text and a tab gone, kept as source or taken as it");
+        Orphans& unit = make();
+        const al_studio_test::FakeServices& words = services();
+        Doc& a            = tab("a");
+        services().front  = 0;
+        a.compiledDiffers = std::string("default { touch_start(integer n) { llDie(); } }");
+        ALScriptNoticeBar::Notice notice = Orphans::noticeFor(&a, words);
+        ensure("said, with its two ways", notice.text == said("NoticeCompiledDiffers") && notice.buttons[0].first == "keep_source" &&
+                                              notice.buttons[1].first == "take_compiled");
+        a.orphan.kind = Orphan::Away;
+        ensure("a tab gone first", Orphans::noticeFor(&a, words).text == said("NoticeAway"));
+        a.orphan.kind = Orphan::None;
+        unit.noticeAction("take_compiled");
+        ensure("taken as the source", studio.did.back() == "carried a: default { touch_start(integer n) { llDie(); } }" && !a.compiledDiffers);
+        ensure("and said", services().reports.back().text == said("CompiledTaken", "[NAME]", "a"));
+        a.compiledDiffers = std::string("x");
+        unit.noticeAction("keep_source");
+        ensure("kept: let go of, the next save replacing it", !a.compiledDiffers && studio.did.size() == 1);
+        ensure("nothing more to say", Orphans::noticeFor(&a, words).text.empty());
     }
 }

@@ -227,6 +227,14 @@ struct ALScriptStudioDoc
     // and whose expanded code the other editor shows; a save runs
     // the preprocessor over the source and wraps both again.
     std::optional<ALScriptEnvelope>            envelope;
+    // The version a wrapped script was loaded at, where the first run over
+    // its source is to be held up to its compiled half; none once it has
+    // been. And the compiled half, where the source could not have made
+    // it (ALScriptEnvelope::compiledFrom) -- changed outside the
+    // preprocessor, or what it includes changed since -- offered in the
+    // notice as the source, since the next save replaces it.
+    std::optional<U32>                         compareCompiledAt;
+    std::optional<std::string>                 compiledDiffers;
     // The preprocessor's run over the text at a version: what the
     // analyzers see, and what the last save uploaded, each with the
     // way back to the source and what the run said.
