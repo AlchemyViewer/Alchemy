@@ -435,6 +435,66 @@ namespace ALScriptKeymap
         }
     }
 
+    std::vector<Owner> takeKeys(const Owner& keeping, const ALKeyChord& chord, bool apply)
+    {
+        std::vector<Owner> from;
+        const KEY          first_key  = chord.twoKeys() ? chord.leadKey : chord.key;
+        const MASK         first_mask = chord.twoKeys() ? chord.leadMask : chord.mask;
+        // An editor's command: the key goes from its keys, the rest kept.
+        const ALKeymap        map   = current();
+        const ALEditorCommand other = map.lookup(first_key, first_mask);
+        if (other != ALEditorCommand::None && other != keeping.command)
+        {
+            if (apply)
+            {
+                keys_t rest;
+                for (const auto& bound : keysOf(map, other))
+                {
+                    if (bound.first != first_key || bound.second != first_mask)
+                    {
+                        rest.push_back(bound);
+                    }
+                }
+                rebind(other, rest);
+            }
+            Owner was;
+            was.command = other;
+            from.push_back(was);
+        }
+        // A menu's.
+        for (const std::string& id : menuIds())
+        {
+            if (keeping.menu == id)
+            {
+                continue;
+            }
+            const chords_t had = menuKeys(id);
+            chords_t       rest;
+            for (const ALKeyChord& one : had)
+            {
+                const bool same     = one == chord;
+                const bool led      = !chord.twoKeys() && one.ledBy(chord.key, chord.mask);
+                const bool leads_it = chord.twoKeys() && !one.twoKeys() && one.key == chord.leadKey && one.mask == chord.leadMask;
+                if (!same && !led && !leads_it)
+                {
+                    rest.push_back(one);
+                }
+            }
+            if (rest.size() == had.size())
+            {
+                continue;
+            }
+            if (apply)
+            {
+                rebindMenu(id, rest);
+            }
+            Owner was;
+            was.menu = id;
+            from.push_back(was);
+        }
+        return from;
+    }
+
     std::vector<MenuItem> menuItemsIn(const LLXMLNodePtr& root)
     {
         std::vector<MenuItem>                                         out;

@@ -12,6 +12,14 @@
     <panel.string name="NoKeys">(none)</panel.string>
     <panel.string name="Changed">changed</panel.string>
     <panel.string name="KeyTaken">[KEYS] was [WHOSE]'s; it is [WHAT]'s now.</panel.string>
+    <panel.string name="CaptureTitle">Keys for [WHAT]</panel.string>
+    <panel.string name="CapturePrompt">Press a key. Return gives it; Escape keeps what was.</panel.string>
+    <panel.string name="CapturePromptTwo">Press a key, or two in turn (Ctrl+K, then S). Return gives them; Escape keeps what was.</panel.string>
+    <panel.string name="CaptureNothing">Waiting for a key...</panel.string>
+    <panel.string name="CaptureSet">Set</panel.string>
+    <panel.string name="CaptureCancel">Cancel</panel.string>
+    <panel.string name="CaptureTakes">Now [WHOSE]'s, which will lose it.</panel.string>
+    <panel.string name="CaptureShadows">The viewer's menus have [KEYS] for [ITEM]; in the studio it will be the studio's.</panel.string>
     <panel.string name="cmd_move_left">Move left</panel.string>
     <panel.string name="cmd_move_right">Move right</panel.string>
     <panel.string name="cmd_move_up">Move up</panel.string>
@@ -118,7 +126,7 @@
      layout="topleft"
      left="8"
      name="change"
-     tool_tip="Press a key to answer for the chosen command, in place of its keys; whatever answered to it before lets it go"
+     tool_tip="Press keys to answer for the chosen command, in place of its keys; whatever answered to them before lets them go"
      top_pad="4"
      width="80" />
     <button

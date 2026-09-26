@@ -143,6 +143,7 @@ target_sources(
     alfoldmodel.cpp
     alsnippetsession.cpp
     alfindbar.cpp
+    alkeycapture.cpp
     alkeychord.cpp
     alkeymap.cpp
     alvimkeymap.cpp
@@ -350,6 +351,7 @@ target_sources(
         alsnippetsession.h
         alfindings.h
         alfindbar.h
+        alkeycapture.h
         alkeychord.h
         alkeymap.h
         alvimkeymap.h
@@ -540,6 +542,7 @@ if(AL_BUILD_TESTS)
     alhistorylist
     alplace
     alpopover
+    alkeycapture
     alscopebar
     aljumpbar
     alpanelist

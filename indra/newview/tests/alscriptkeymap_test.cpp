@@ -165,4 +165,50 @@ namespace tut
         const auto map = std::find_if(items.begin(), items.end(), [](const ALScriptKeymap::MenuItem& item) { return item.id == "map_left"; });
         ensure("as deep as it goes", map != items.end() && map->path == "View > Scrollbar > Map on the Left");
     }
+
+    template<> template<>
+    void alscriptkeymap_object::test<5>()
+    {
+        set_test_name("keys given take them from whatever had them: an editor's command by the first key, the menus' by the keys, their first, or the given's first");
+        ALScriptKeymap::Owner revert;
+        revert.menu = "revert";
+        const auto named = [](const std::vector<ALScriptKeymap::Owner>& owners, const std::string& menu, C command = C::None) {
+            return std::any_of(owners.begin(), owners.end(),
+                               [&](const ALScriptKeymap::Owner& one) { return menu.empty() ? one.command == command : one.menu == menu; });
+        };
+
+        std::vector<ALScriptKeymap::Owner> from = ALScriptKeymap::takeKeys(revert, ALKeyChord{ 'F', MASK_CONTROL }, false);
+        ensure("Find's, the editor's", from.size() == 1 && named(from, "", C::Find));
+        ensure("named, not taken", ALScriptKeymap::current().lookup('F', MASK_CONTROL) == C::Find);
+        ALScriptKeymap::takeKeys(revert, ALKeyChord{ 'F', MASK_CONTROL }, true);
+        ensure("taken", ALScriptKeymap::current().lookup('F', MASK_CONTROL) == C::None);
+        ALScriptKeymap::restoreAll();
+
+        from = ALScriptKeymap::takeKeys(revert, ALKeyChord{ 'K', MASK_CONTROL }, true);
+        ensure("every two keys it was the first of", named(from, "save_all") && named(from, "explorer") && named(from, "expanded"));
+        ensure("which have none now", ALScriptKeymap::menuKeys("save_all").empty() && ALScriptKeymap::menuKeys("explorer").empty());
+        ALScriptKeymap::restoreAll();
+
+        from = ALScriptKeymap::takeKeys(revert, ALKeyChord{ 'X', MASK_NONE, 'P', MASK_CONTROL }, true);
+        ensure("the key that is the first of the two given", from.size() == 1 && named(from, "quick_open"));
+        ensure("which it had alone", ALScriptKeymap::menuKeys("quick_open").empty());
+        ALScriptKeymap::restoreAll();
+
+#if LL_DARWIN
+        constexpr MASK REAL_CONTROL = MASK_MAC_CONTROL;
+#else
+        constexpr MASK REAL_CONTROL = MASK_CONTROL;
+#endif
+        from = ALScriptKeymap::takeKeys(revert, ALKeyChord{ KEY_TAB, REAL_CONTROL }, true);
+        ensure("one of several keys: the rest kept",
+               named(from, "next_tab") && ALScriptKeymap::menuKeys("next_tab") == ALScriptKeymap::chords_t({ ALKeyChord{ KEY_PAGE_DOWN, MASK_CONTROL } }));
+        ALScriptKeymap::restoreAll();
+
+        ALScriptKeymap::Owner save_all;
+        save_all.menu = "save_all";
+        ensure("its own keys given again: nobody's", ALScriptKeymap::takeKeys(save_all, ALKeyChord{ 'S', MASK_NONE, 'K', MASK_CONTROL }, false).empty());
+        ALScriptKeymap::Owner find;
+        find.command = C::Find;
+        ensure("nor an editor's own", ALScriptKeymap::takeKeys(find, ALKeyChord{ 'F', MASK_CONTROL }, false).empty());
+    }
 }

@@ -65,6 +65,22 @@ namespace ALScriptKeymap
     void                 rebindMenu(std::string_view item, const chords_t& keys);
     void                 restoreMenu(std::string_view item);
 
+    // A command keys are given to: an editor's, or a menu's by name.
+    struct Owner
+    {
+        ALEditorCommand command = ALEditorCommand::None;
+        std::string     menu;
+    };
+    // The commands but `keeping` whose keys a chord given to it takes:
+    // the editors' command that hears its first key -- the key pressed,
+    // or the first of two -- since the editor has a key before the studio
+    // would wait; and the menus' commands with the same keys, with keys
+    // whose first is the key given (it runs a command of its own now, and
+    // the studio would never wait for a second), or with the first of the
+    // two given as a key of its own. Taken from them where `apply`; named
+    // either way.
+    std::vector<Owner> takeKeys(const Owner& keeping, const ALKeyChord& chord, bool apply);
+
     // The items of the studio's menu bar as a file has them: each item's
     // name, and where it is, "View > Scrollbar > Map" -- the names the
     // Keys tab gives the menus' commands, which are the menus' own.

@@ -29,13 +29,14 @@
 #include "alstringmatch.h"
 
 #include "alfloaterscriptstudio.h"
+#include "alkeycapture.h"
 #include "llbutton.h"
-#include "llfloaterreg.h"
-#include "llviewerwindow.h"
 #include "llkeyboard.h"
 #include "lllineeditor.h"
+#include "llmenugl.h"
 #include "llscrolllistctrl.h"
 #include "lltextbox.h"
+#include "llviewermenu.h"
 
 static LLPanelInjector<ALPanelScriptKeymap> t_script_keymap("al_panel_script_keymap");
 
@@ -158,16 +159,30 @@ void ALPanelScriptKeymap::onChange()
     {
         return;
     }
-    if (LLSetKeyBindDialog* dialog = LLFloaterReg::getTypedInstance<LLSetKeyBindDialog>("keybind_dialog", LLSD()))
-    {
-        dialog->setParent(this, mList, ALLOW_KEYS | ALLOW_MASK_KEYS | ALLOW_MASKS);
-        if (LLFloater* root = gFloaterView->getParentFloater(this))
-        {
-            root->addDependentFloater(dialog);
-        }
-        dialog->openFloater();
-        dialog->setFocus(true);
-    }
+    // A menu's command may be two keys in turn, which the studio waits for;
+    // an editor's hears one.
+    const bool                 two_keys = !mEditing.menu.empty();
+    ALKeyCapture::Words        words;
+    LLStringUtil::format_map_t args;
+    args["[WHAT]"] = nameOf(mEditing);
+    words.title    = getString("CaptureTitle", args);
+    words.prompt   = getString(two_keys ? "CapturePromptTwo" : "CapturePrompt");
+    words.nothing  = getString("CaptureNothing");
+    words.set      = getString("CaptureSet");
+    words.cancel   = getString("CaptureCancel");
+    const LLHandle<LLPanel> handle = getHandle();
+    ALKeyCapture::show(
+        mList, words, two_keys,
+        [handle](const ALKeyChord& chord) {
+            const ALPanelScriptKeymap* panel = dynamic_cast<const ALPanelScriptKeymap*>(handle.get());
+            return panel ? panel->aboutKeys(chord) : std::string();
+        },
+        [handle](const ALKeyChord& chord) {
+            if (ALPanelScriptKeymap* panel = dynamic_cast<ALPanelScriptKeymap*>(handle.get()))
+            {
+                panel->setKeys(chord);
+            }
+        });
 }
 
 void ALPanelScriptKeymap::onAdd()
@@ -224,85 +239,90 @@ void ALPanelScriptKeymap::onRestoreAll()
     ALFloaterScriptStudio::refreshAll();
 }
 
-void ALPanelScriptKeymap::onDefaultKeyBind(bool)
+std::vector<std::string> ALPanelScriptKeymap::takeKey(const Chosen& keeping, const ALKeyChord& chord, bool apply) const
 {
-    if (!mEditing.any())
-    {
-        return;
-    }
-    if (mEditing.menu.empty())
-    {
-        ALScriptKeymap::restore(mEditing.command);
-    }
-    else
-    {
-        ALScriptKeymap::restoreMenu(mEditing.menu);
-    }
-    mSaid->setText(LLStringUtil::null);
-    fill();
-    ALFloaterScriptStudio::refreshAll();
-}
-
-std::vector<std::string> ALPanelScriptKeymap::takeKey(const Chosen& keeping, KEY key, MASK mask)
-{
+    ALScriptKeymap::Owner owner;
+    owner.command = keeping.command;
+    owner.menu    = keeping.menu;
     std::vector<std::string> from;
-    // An editor's command: the key goes from its keys, the rest kept.
-    const ALKeymap        map   = ALScriptKeymap::current();
-    const ALEditorCommand other = map.lookup(key, mask);
-    if (other != ALEditorCommand::None && other != keeping.command)
+    for (const ALScriptKeymap::Owner& other : ALScriptKeymap::takeKeys(owner, chord, apply))
     {
-        ALScriptKeymap::keys_t rest;
-        for (const auto& bound : ALScriptKeymap::keysOf(map, other))
-        {
-            if (bound.first != key || bound.second != mask)
-            {
-                rest.push_back(bound);
-            }
-        }
-        ALScriptKeymap::rebind(other, rest);
         Chosen was;
-        was.command = other;
-        from.push_back(nameOf(was));
-    }
-    // A menu's: it has no key left. The editor has a key first, so a key
-    // both answered to was the editor's alone in the editor. One the key
-    // is the first of two of is left without too: the key now runs a
-    // command of its own, and the window would never wait for a second.
-    for (const std::string& id : ALScriptKeymap::menuIds())
-    {
-        if (keeping.menu == id)
-        {
-            continue;
-        }
-        const ALScriptKeymap::chords_t had  = ALScriptKeymap::menuKeys(id);
-        ALScriptKeymap::chords_t       rest;
-        for (const ALKeyChord& chord : had)
-        {
-            if (chord != ALKeyChord{ key, mask } && !chord.ledBy(key, mask))
-            {
-                rest.push_back(chord);
-            }
-        }
-        if (rest.size() == had.size())
-        {
-            continue;
-        }
-        ALScriptKeymap::rebindMenu(id, rest);
-        Chosen was;
-        was.menu = id;
+        was.command = other.command;
+        was.menu    = other.menu;
         from.push_back(nameOf(was));
     }
     return from;
 }
 
-bool ALPanelScriptKeymap::onSetKeyBind(EMouseClickType click, KEY key, MASK mask, bool)
+namespace
 {
-    if (!mEditing.any() || click != CLICK_NONE || key == KEY_NONE)
+    // The viewer's menu item a key is the accelerator of, by its label, or
+    // nothing: the studio keeps its keys while it has the keyboard, so the
+    // item is out of reach from it then.
+    std::string viewerMenuItemOf(KEY key, MASK mask)
     {
-        return false;
+        std::string                        found;
+        const std::function<void(LLView*)> walk = [&](LLView* menu) {
+            for (LLView* child : *menu->getChildList())
+            {
+                if (!found.empty())
+                {
+                    return;
+                }
+                if (LLMenuItemBranchGL* branch = dynamic_cast<LLMenuItemBranchGL*>(child))
+                {
+                    if (LLMenuGL* under = branch->getBranch())
+                    {
+                        walk(under);
+                    }
+                }
+                else if (LLMenuItemGL* item = dynamic_cast<LLMenuItemGL*>(child);
+                         item && item->getAcceleratorKey() == key && (item->getAcceleratorMask() & MASK_MODIFIERS) == mask)
+                {
+                    found = item->getLabel();
+                }
+            }
+        };
+        if (gMenuBarView && key != KEY_NONE)
+        {
+            walk(gMenuBarView);
+        }
+        return found;
     }
-    // Whatever else answered to the key lets it go, and is named.
-    const std::vector<std::string> from = takeKey(mEditing, key, mask);
+}
+
+std::string ALPanelScriptKeymap::aboutKeys(const ALKeyChord& chord) const
+{
+    std::string said;
+    const auto  add = [&said](const std::string& line) { said += (said.empty() ? "" : "\n") + line; };
+    const std::vector<std::string> from = takeKey(mEditing, chord, false);
+    if (!from.empty())
+    {
+        std::string whose;
+        for (const std::string& name : from)
+        {
+            whose += (whose.empty() ? "" : ", ") + name;
+        }
+        add(getString("CaptureTakes", LLStringUtil::format_map_t{ { "[WHOSE]", whose } }));
+    }
+    const KEY  first_key  = chord.twoKeys() ? chord.leadKey : chord.key;
+    const MASK first_mask = chord.twoKeys() ? chord.leadMask : chord.mask;
+    if (const std::string item = viewerMenuItemOf(first_key, first_mask); !item.empty())
+    {
+        add(getString("CaptureShadows", LLStringUtil::format_map_t{ { "[KEYS]", ALKeyChord{ first_key, first_mask }.describe() }, { "[ITEM]", item } }));
+    }
+    return said;
+}
+
+void ALPanelScriptKeymap::setKeys(const ALKeyChord& chord)
+{
+    if (!mEditing.any() || chord.none() || (mEditing.menu.empty() && chord.twoKeys()))
+    {
+        return;
+    }
+    // Whatever else answered to the keys lets them go, and is named.
+    const std::vector<std::string> from = takeKey(mEditing, chord, true);
     if (mEditing.menu.empty())
     {
         ALScriptKeymap::keys_t keys;
@@ -310,7 +330,7 @@ bool ALPanelScriptKeymap::onSetKeyBind(EMouseClickType click, KEY key, MASK mask
         {
             keys = ALScriptKeymap::keysOf(ALScriptKeymap::current(), mEditing.command);
         }
-        keys.emplace_back(key, mask);
+        keys.emplace_back(chord.key, chord.mask);
         ALScriptKeymap::rebind(mEditing.command, keys);
     }
     else
@@ -320,7 +340,7 @@ bool ALPanelScriptKeymap::onSetKeyBind(EMouseClickType click, KEY key, MASK mask
         {
             keys = ALScriptKeymap::menuKeys(mEditing.menu);
         }
-        keys.push_back(ALKeyChord{ key, mask });
+        keys.push_back(chord);
         ALScriptKeymap::rebindMenu(mEditing.menu, keys);
     }
     if (from.empty())
@@ -335,12 +355,11 @@ bool ALPanelScriptKeymap::onSetKeyBind(EMouseClickType click, KEY key, MASK mask
             whose += (whose.empty() ? "" : ", ") + name;
         }
         LLStringUtil::format_map_t args;
-        args["[KEYS]"]  = LLKeyboard::stringFromAccelerator(mask, key);
+        args["[KEYS]"]  = chord.describe();
         args["[WHOSE]"] = whose;
         args["[WHAT]"]  = nameOf(mEditing);
         mSaid->setText(getString("KeyTaken", args));
     }
     fill();
     ALFloaterScriptStudio::refreshAll();
-    return false;
 }

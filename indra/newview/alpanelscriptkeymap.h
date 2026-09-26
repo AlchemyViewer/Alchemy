@@ -26,7 +26,6 @@
 
 #include "alscriptkeymap.h"
 #include "llpanel.h"
-#include "llsetkeybinddialog.h"
 
 #include <string>
 #include <vector>
@@ -37,10 +36,13 @@ class LLTextBox;
 
 // The keyboard map: every command of the editor, and of the studio's
 // menus, with the keys it answers to, to read, to search, and to change --
-// a key pressed into the viewer's own key dialog -- or put back. A key
-// given to one command is taken from whatever had it, and the panel says
-// which. A tab of the studio's preferences.
-class ALPanelScriptKeymap final : public LLPanel, public LLKeyBindResponderInterface
+// keys pressed into a popover of the studio's own (ALKeyCapture), which
+// takes any key, the viewer's menus' among them -- or put back. Keys given
+// to one command are taken from whatever had them, which the popover says
+// before and the panel after, and a key the viewer's menus have is said to
+// be the studio's while it has the keyboard. A tab of the studio's
+// preferences.
+class ALPanelScriptKeymap final : public LLPanel
 {
 public:
     AL_VIEW_TYPE(ALPanelScriptKeymap, LLPanel);
@@ -52,9 +54,6 @@ public:
     // The list read from the keymap again: the setting changed under it.
     void refresh() override { fill(); }
 
-    void onCancelKeyBind() override {}
-    void onDefaultKeyBind(bool all_modes) override;
-    bool onSetKeyBind(EMouseClickType click, KEY key, MASK mask, bool all_modes) override;
 
 private:
     void fill();
@@ -75,9 +74,15 @@ private:
     Chosen      chosen() const;
     // What a command is called in the list.
     std::string nameOf(const Chosen& which) const;
-    // The key taken from every command but this one that answered to it,
-    // and what those were called.
-    std::vector<std::string> takeKey(const Chosen& keeping, KEY key, MASK mask);
+    // The keys taken from every command but this one that answered to
+    // them, or to the first of them, or whose first they are, and what
+    // those were called; only named where `apply` is false.
+    std::vector<std::string> takeKey(const Chosen& keeping, const ALKeyChord& chord, bool apply) const;
+    // What giving the keys would mean, as the popover says it: whose they
+    // are now, and the viewer's menu item they would be the studio's over.
+    std::string aboutKeys(const ALKeyChord& chord) const;
+    // The keys pressed, given to the command being edited.
+    void setKeys(const ALKeyChord& chord);
 
     LLLineEditor*     mFilter  = nullptr;
     LLScrollListCtrl* mList    = nullptr;
