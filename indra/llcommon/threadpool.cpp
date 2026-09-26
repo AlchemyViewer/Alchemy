@@ -63,10 +63,11 @@ struct sleepy_robin: public boost::fibers::algo::round_robin
 LL::ThreadPoolBase::ThreadPoolBase(const std::string& name,
                                    size_t threads,
                                    WorkQueueBase* queue,
-                                   bool auto_shutdown):
+                                   bool auto_shutdown,
+                                   bool fixed_width):
     super(name),
     mName("ThreadPool:" + name),
-    mThreadCount(getConfiguredWidth(name, threads)),
+    mThreadCount(fixed_width ? threads : getConfiguredWidth(name, threads)),
     mQueue(queue),
     mAutomaticShutdown(auto_shutdown)
 {}

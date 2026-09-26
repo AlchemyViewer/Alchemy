@@ -18,6 +18,7 @@ target_sources(
   llcommon
   PRIVATE
     alfilewrite.cpp
+    alserialworker.cpp
     alparamtype.cpp
     alregex.cpp
     alwatchedfile.cpp
@@ -119,6 +120,7 @@ target_sources(
     FILE_SET HEADERS
       FILES
         alfilewrite.h
+        alserialworker.h
         alparamtype.h
         alregex.h
         alsimd.h
@@ -294,6 +296,7 @@ if(AL_BUILD_TESTS)
     test
     alfilewrite
     alregex
+    alserialworker
     alwatchedfile
     apply
     bitpack

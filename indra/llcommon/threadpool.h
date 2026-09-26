@@ -37,10 +37,12 @@ namespace LL
          * The number of threads you pass sets the compile-time default. But
          * if the user has overridden the LLSD map in the "ThreadPoolSizes"
          * setting with a key matching this ThreadPool name, that setting
-         * overrides this parameter.
+         * overrides this parameter -- unless fixed_width says the work is
+         * not safe on more threads than it was given.
          */
         ThreadPoolBase(const std::string& name, size_t threads,
-                       WorkQueueBase* queue, bool auto_shutdown = true);
+                       WorkQueueBase* queue, bool auto_shutdown = true,
+                       bool fixed_width = false);
         virtual ~ThreadPoolBase();
 
         /**
@@ -117,12 +119,16 @@ namespace LL
          * Pass an explicit capacity to limit the size of the queue.
          * Constraining the queue can cause a submitter to block. Do not
          * constrain any ThreadPool accepting work from the main thread.
+         *
+         * Pass fixed_width for work that is not safe on more threads than
+         * it was given: the "ThreadPoolSizes" setting is not read for it.
          */
         ThreadPoolUsing(const std::string& name,
                         size_t threads=1,
                         size_t capacity=1024*1024,
-                        bool auto_shutdown = true):
-            ThreadPoolBase(name, threads, new queue_t(name, capacity, false), auto_shutdown)
+                        bool auto_shutdown = true,
+                        bool fixed_width = false):
+            ThreadPoolBase(name, threads, new queue_t(name, capacity, false), auto_shutdown, fixed_width)
         {}
         ~ThreadPoolUsing() override {}
 
