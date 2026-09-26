@@ -71,7 +71,8 @@ public:
         std::string             badge;
     };
 
-    // The choices, replaced whole, with one of them chosen.
+    // The choices, replaced whole, with one of them chosen -- or none, for
+    // a list whose rows only say something, as a freeform question's.
     void                       setChoices(std::vector<Choice> choices, S32 chosen = 0);
     const std::vector<Choice>& choices() const { return mChoices; }
     S32                        count() const { return static_cast<S32>(mChoices.size()); }

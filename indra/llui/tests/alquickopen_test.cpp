@@ -25,6 +25,9 @@
 #include "linden_common.h"
 
 #include "../alquickopen.h"
+
+#include "../alchoicelist.h"
+#include "llfontgl.h"
 #include "../alpopover.h"
 
 #include "../lllineeditor.h"
@@ -277,16 +280,16 @@ namespace tut
         quick->onChose([&](const std::string& v) { chosen.push_back(v); });
         quick->setCandidates(files());
         quick->setHint("Type a line number.");
-        LLScrollListCtrl* list = quick->findChild<LLScrollListCtrl>("matches");
+        const ALChoiceList* list = quick->findChild<ALChoiceList>("matches");
         ensure("freeform", quick->freeform());
-        ensure("one row, the hint", list && list->getItemCount() == 1 && list->getFirstData()->getColumn(0)->getValue().asString() == "Type a line number.");
+        ensure("one row, the hint", list && list->count() == 1 && list->choices()[0].text == "Type a line number.");
         // Not chosen: return takes what was typed whatever the row says.
-        ensure("and not chosen", list->getFirstSelected() == nullptr);
+        ensure("and not chosen", quick->chosenRow() == -1);
         quick->setQuery("12");
         ensure("the query is told", typed.size() == 1 && typed[0] == "12");
-        ensure("the candidates stay aside", list->getItemCount() == 1);
+        ensure("the candidates stay aside", list->count() == 1);
         quick->setHint("Go to line 12.");
-        ensure_equals("the row says what return does now", list->getFirstData()->getColumn(0)->getValue().asString(), std::string("Go to line 12."));
+        ensure_equals("the row says what return does now", list->choices()[0].text, std::string("Go to line 12."));
         quick->findChild<LLLineEditor>("query")->onCommit();
         ensure("return sends what was typed", chosen.size() == 1 && chosen[0] == "12");
         quick->die();
@@ -314,16 +317,18 @@ namespace tut
             many.push_back(one);
         }
         quick->setCandidates(many);
-        LLScrollListCtrl* list = quick->findChild<LLScrollListCtrl>("matches");
-        ensure_equals("nothing typed: all of them", list->getItemCount(), 20);
+        const ALChoiceList* list = quick->findChild<ALChoiceList>("matches");
+        ensure_equals("nothing typed: all of them", list->count(), 20);
         quick->setQuery("func");
-        ensure_equals("typed: as many as were asked for", list->getItemCount(), 3);
+        ensure_equals("typed: as many as were asked for", list->count(), 3);
+        ensure("the best chosen", quick->chosenRow() == 0 && quick->listed().size() == 3);
+        ensure("and nothing to say about it", quick->findChild<ALChoiceList>("matches")->placeholder().empty());
         quick->setQuery("zzz");
-        ensure_equals("nothing answers", list->getItemCount(), 0);
-        const LLTextBox* comment = list->findChild<LLTextBox>("comment_text");
-        ensure("and the list says so", comment && !comment->getText().empty());
+        ensure_equals("nothing answers", list->count(), 0);
+        ensure("and the list says so", !list->placeholder().empty());
+        ensure("nothing chosen", quick->chosenRow() == -1);
         quick->setQuery(std::string());
-        ensure("the saying goes with a list to show", comment->getText().empty());
+        ensure("the saying goes with a list to show", list->placeholder().empty());
         quick->die();
     }
     template<> template<>
@@ -370,19 +375,18 @@ namespace tut
         gFloaterView->addChild(quick);
         quick->setCandidates(files());
         quick->setPrefix(">");
-        LLScrollListCtrl* list = quick->findChild<LLScrollListCtrl>("matches");
-        ensure("the list", list != nullptr);
-        const auto first = [list]() { return list->getFirstData() ? list->getFirstData()->getValue().asString() : std::string(); };
+        ensure("the list", quick->findChild<ALChoiceList>("matches") != nullptr);
+        const auto first = [quick]() { return quick->listed().empty() ? std::string() : quick->listed().front(); };
         quick->setQuery(">people");
         ensure_equals("matched without it", first(), std::string("panel_people.xml"));
         quick->setQuery("> people");
         ensure_equals("nor the blanks after it", first(), std::string("panel_people.xml"));
         quick->setQuery(">");
-        ensure_equals("alone, everything to browse", list->getItemCount(), S32(files().size()));
+        ensure_equals("alone, everything to browse", quick->listed().size(), files().size());
         quick->setQuery("people");
         ensure_equals("without it, the query whole", first(), std::string("panel_people.xml"));
         quick->setQuery(">>people");
-        ensure("with it twice, the second is matched", list->getItemCount() == 0 || first() != "panel_people.xml");
+        ensure("with it twice, the second is matched", quick->listed().empty() || first() != "panel_people.xml");
         quick->die();
     }
 
@@ -426,5 +430,40 @@ namespace tut
         ensure("the keyboard back where it was", gFocusMgr.getKeyboardFocus() == typed);
         gFocusMgr.setKeyboardFocus(nullptr);
         window->closeFloater();
+    }
+
+    template<> template<>
+    void alquickopen_object::test<13>()
+    {
+        set_test_name("the arrows move the choice and return takes it, a double-click picks the row under it; tall enough for so many rows");
+        if (!ll_test::HeadlessUI::get().ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        ALQuickOpen::Params p(LLUICtrlFactory::getDefaultParams<ALQuickOpen>());
+        p.name = "quick";
+        p.rect = LLRect(0, 200, 300, 0);
+        ALQuickOpen* quick = LLUICtrlFactory::create<ALQuickOpen>(p);
+        std::vector<std::string> chosen;
+        quick->onChose([&chosen](const std::string& v) { chosen.push_back(v); });
+        quick->setCandidates(files());
+        quick->setQuery("floater");
+        ensure("rows to move along", quick->listed().size() >= 3 && quick->chosenRow() == 0);
+        ensure("down", quick->handleKeyHere(KEY_DOWN, MASK_NONE) && quick->chosenRow() == 1);
+        ensure("down again", quick->handleKeyHere(KEY_DOWN, MASK_NONE) && quick->chosenRow() == 2);
+        ensure("up", quick->handleKeyHere(KEY_UP, MASK_NONE) && quick->chosenRow() == 1);
+        quick->findChild<LLLineEditor>("query")->onCommit();
+        ensure("return takes the one chosen", chosen.size() == 1 && chosen[0] == quick->listed()[1]);
+
+        ALChoiceList* list = quick->findChild<ALChoiceList>("matches");
+        const LLRect  text = list->textRect();
+        const S32     y    = text.mTop - list->layout().lineTop(2) - list->layout().rowHeightOf(2, 0) / 2 + list->scrollY();
+        ensure("a double-click is taken", list->handleDoubleClick(text.mLeft + 4, y, MASK_NONE));
+        ensure("the row under it picked", chosen.size() == 2 && chosen[1] == quick->listed()[2]);
+        quick->die();
+
+        ensure("taller for more rows", ALQuickOpen::heightForRows(3) > ALQuickOpen::heightForRows(1));
+        const S32 line = LLFontGL::getFontSansSerifSmall()->getLineHeight();
+        ensure("by the rows", ALQuickOpen::heightForRows(3) - ALQuickOpen::heightForRows(1) >= 2 * line);
     }
 }

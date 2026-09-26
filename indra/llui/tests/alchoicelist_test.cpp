@@ -121,6 +121,11 @@ namespace tut
         ensure_equals("stopped at the start", v.chosen(), 0);
         v.choose(7);
         ensure_equals("clamped", v.chosen(), 2);
+        v.setChoices({ choice("Type a line number.", "") }, -1);
+        ensure_equals("a list only saying something: none chosen", v.chosen(), -1);
+        v.moveChoice(1, false);
+        ensure_equals("an arrow chooses from the top", v.chosen(), 0);
+        v.setChoices({ choice("llSay", "(integer, string)"), choice("llShout", ""), choice("llOwnerSay", "(string)") }, 2);
         ensure("as tall as its rows and the padding", v.heightFor(2) > 2 * v.layout().rowHeight() && v.heightFor(2) < v.heightFor(3));
         v.setChoices({});
         ensure_equals("none: nothing chosen", v.chosen(), -1);

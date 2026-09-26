@@ -29,9 +29,10 @@
 #include "alsaid.h"
 #include "alsurface.h"
 
+#include "alchoicelist.h"
+#include "llfontgl.h"
 #include "lllineeditor.h"
 #include "llrender2dutils.h"
-#include "llscrolllistctrl.h"
 #include "lluictrlfactory.h"
 
 #include <algorithm>
@@ -44,8 +45,22 @@ namespace
     constexpr S32 GAP = 4;
     // The inset from the frame, once there is one.
     constexpr S32 INSET = 6;
-    // The list's own border, which LLScrollListCtrl keeps to itself.
-    constexpr S32 BORDER = 2;
+
+    // The list as every quick open has it: on the text engine, one line a
+    // choice in the reading face, its detail after it.
+    ALChoiceList* makeList(const LLRect& rect)
+    {
+        ALChoiceList::Params lp(LLUICtrlFactory::getDefaultParams<ALChoiceList>());
+        lp.name = "matches";
+        lp.rect = rect;
+        lp.follows.flags(FOLLOWS_ALL);
+        lp.mouse_opaque(true);
+        lp.font(LLFontGL::getFontSansSerifSmall());
+        lp.context_menu(std::string());
+        lp.h_pad(4);
+        lp.v_pad(2);
+        return LLUICtrlFactory::create<ALChoiceList>(lp);
+    }
 
     // What each degree of meaning it is worth. The gaps are wide because
     // these are kinds and not amounts: no number of scattered letters adds up
@@ -256,26 +271,9 @@ ALQuickOpen::ALQuickOpen(const Params& p)
     mField->setCommitCallback([this](LLUICtrl*, const LLSD&) { chooseSelected(); });
     addChild(mField);
 
-    LLScrollListCtrl::Params lp(LLUICtrlFactory::getDefaultParams<LLScrollListCtrl>());
-    lp.name = "matches";
-    lp.rect = LLRect(0, getRect().getHeight() - FIELD_HEIGHT - GAP, getRect().getWidth(), 0);
-    lp.follows.flags = FOLLOWS_ALL;
-    lp.draw_heading = false;
-    lp.multi_select = false;
-    lp.column_padding = 0;
-    mList = LLUICtrlFactory::create<LLScrollListCtrl>(lp);
+    mList = makeList(LLRect(0, getRect().getHeight() - FIELD_HEIGHT - GAP, getRect().getWidth(), 0));
     addChild(mList);
-
-    LLScrollListColumn::Params what;
-    what.name = "label";
-    what.width.dynamic_width = true;
-    mList->addColumn(what);
-    LLScrollListColumn::Params detail;
-    detail.name = "detail";
-    detail.width.relative_width = 0.4f;
-    mList->addColumn(detail);
-
-    mList->setDoubleClickCallback([this]() { chooseSelected(); });
+    mList->onPicked([this](S32) { chooseSelected(); });
     layout();
 }
 
@@ -326,16 +324,14 @@ void ALQuickOpen::fill()
     {
         // The one row, saying what return does; chosen, so return takes it.
         mRanked.clear();
-        mList->deleteAllItems();
-        mList->setCommentText(LLStringUtil::null);
-        LLSD row;
-        row["value"]                = mQuery;
-        row["columns"][0]["column"] = "label";
-        row["columns"][0]["value"]  = mHint;
-        mList->addElement(row);
+        mListed = { mQuery };
+        mList->setPlaceholder(LLStringUtil::null);
+        ALChoiceList::Choice hint;
+        hint.text = mHint;
         // Not chosen: return takes what was typed whatever the list says
         // (`chooseSelected`), and a chosen row draws a band inset within
         // the list, which is a box of its own width under the field's.
+        mList->setChoices({ hint }, -1);
         return;
     }
     const std::string_view asked = matched();
@@ -348,26 +344,26 @@ void ALQuickOpen::fill()
     {
         mRanked.resize((size_t)mRows);
     }
-    mList->deleteAllItems();
     // Nothing to choose says so, rather than being an empty box.
-    mList->setCommentText(mRanked.empty() && !asked.empty() ? alSaid("QuickOpenNone", "Nothing matches") : LLStringUtil::null);
+    mList->setPlaceholder(mRanked.empty() && !asked.empty() ? alSaid("QuickOpenNone", "Nothing matches") : LLStringUtil::null);
+    std::vector<ALChoiceList::Choice> choices;
+    mListed.clear();
     for (size_t at : mRanked)
     {
-        LLSD row;
-        row["value"] = mCandidates[at].value;
-        LLSD& columns = row["columns"];
-        columns[0]["column"] = "label";
-        columns[0]["value"] = mCandidates[at].label;
-        columns[1]["column"] = "detail";
-        columns[1]["value"] = mCandidates[at].detail;
-        mList->addElement(row);
+        ALChoiceList::Choice choice;
+        choice.text = mCandidates[at].label;
+        choice.note = mCandidates[at].detail;
+        choices.push_back(std::move(choice));
+        mListed.push_back(mCandidates[at].value);
     }
     // The best answer, chosen: return takes it without an arrow key first,
     // which is the whole gesture this widget is.
-    if (!mRanked.empty())
-    {
-        mList->selectFirstItem();
-    }
+    mList->setChoices(std::move(choices), mRanked.empty() ? -1 : 0);
+}
+
+S32 ALQuickOpen::chosenRow() const
+{
+    return mList ? mList->chosen() : -1;
 }
 
 void ALQuickOpen::chooseSelected(bool hold)
@@ -377,9 +373,9 @@ void ALQuickOpen::chooseSelected(bool hold)
     {
         signal(mQuery);
     }
-    else if (const LLScrollListItem* item = mList->getFirstSelected())
+    else if (const S32 at = chosenRow(); at >= 0 && at < static_cast<S32>(mListed.size()))
     {
-        signal(item->getValue().asString());
+        signal(mListed[at]);
     }
 }
 
@@ -389,7 +385,6 @@ void ALQuickOpen::setColors(const LLColor4& background, const LLColor4& ink)
     const LLColor4 ground = between(0.f);
     const LLColor4 faint  = between(0.45f);
     const LLColor4 lit    = between(0.2f);
-    const LLColor4 dim    = between(0.7f);
     mThemed = true;
     mGround = ALSurface::ground(background, ink);
     mInk    = ink;
@@ -401,17 +396,12 @@ void ALQuickOpen::setColors(const LLColor4& background, const LLColor4& ink)
     mField->setCursorColor(ink);
     mField->setTentativeFgColor(faint);
     mField->setHighlightColor(lit);
-    mList->setBackgroundVisible(true);
-    mList->setBgWriteableColor(ground);
-    mList->setReadOnlyBgColor(ground);
-    mList->setBgStripeColor(ground);
-    // The chosen row the band every list of ours chooses with.
-    mList->setBgSelectedColor(ALSurface::chosen(background, ink));
-    mList->setHighlightedColor(between(0.12f));
-    mList->setHoveredColor(between(0.12f));
-    mList->setFgUnselectedColor(ink);
-    mList->setFgSelectedColor(ink);
-    mList->setFgDisableColor(dim);
+    // The list on the same ground, in the same ink; its chosen row is the
+    // band every list of ours chooses with, drawn from these two.
+    mList->setBackgroundColor(LLUIColor(ground));
+    mList->setTextColor(LLUIColor(ink));
+    mList->setSelectionColor(LLUIColor(ALSurface::chosen(background, ink)));
+    mList->setBorderColor(LLUIColor(ALSurface::frame(ink)));
 }
 
 void ALQuickOpen::takeFocus()
@@ -444,12 +434,9 @@ bool ALQuickOpen::handleKeyHere(KEY key, MASK mask)
         chooseSelected(true);
         return true;
     }
-    if ((key == KEY_UP || key == KEY_DOWN) && mask == MASK_NONE && mList->getItemCount() > 0)
+    if ((key == KEY_UP || key == KEY_DOWN) && mask == MASK_NONE && mList->count() > 0)
     {
-        const S32 at = mList->getFirstSelectedIndex();
-        const S32 want = llclamp(at + (key == KEY_DOWN ? 1 : -1), 0, mList->getItemCount() - 1);
-        mList->selectNthItem(want);
-        mList->scrollToShowSelected();
+        mList->moveChoice(key == KEY_DOWN ? 1 : -1, false);
         return true;
     }
     return LLPanel::handleKeyHere(key, mask);
@@ -458,30 +445,16 @@ bool ALQuickOpen::handleKeyHere(KEY key, MASK mask)
 // static
 S32 ALQuickOpen::heightForRows(S32 rows)
 {
-    // A row is what a list made as this one's is makes of one text row:
-    // measured on such a list each time, since the faces change size
-    // under the UI's scale, so that whatever the skin gives the list --
-    // its face, its padding -- is what is counted. A list is cheap; a
-    // popover asks once.
-    S32 row = -1;
-    {
-        LLScrollListCtrl::Params lp(LLUICtrlFactory::getDefaultParams<LLScrollListCtrl>());
-        lp.name         = "measure";
-        lp.rect         = LLRect(0, 100, 100, 0);
-        lp.draw_heading = false;
-        LLScrollListCtrl* list = LLUICtrlFactory::create<LLScrollListCtrl>(lp);
-        LLScrollListColumn::Params column;
-        column.name = "label";
-        list->addColumn(column);
-        LLSD item;
-        item["columns"][0]["column"] = "label";
-        item["columns"][0]["value"]  = "Xg";
-        list->addElement(item);
-        // What one row needs, its border included.
-        row = llmax(8, list->getRequiredRect().getHeight() - 2 * BORDER);
-        delete list;
-    }
-    return 2 * INSET + FIELD_HEIGHT + GAP + 2 * BORDER + llmax(1, rows) * row;
+    // What a list made as this one's is makes of so many rows: measured on
+    // such a list each time, since the faces change size under the UI's
+    // scale, so that whatever the skin gives the list -- its face, its
+    // padding -- is what is counted. A list is cheap; a popover asks once.
+    rows                = llmax(1, rows);
+    ALChoiceList* list = makeList(LLRect(0, 100, 100, 0));
+    list->setChoices(std::vector<ALChoiceList::Choice>(static_cast<size_t>(rows), ALChoiceList::Choice{ "Xg" }), 0);
+    const S32 height = list->heightFor(rows);
+    delete list;
+    return 2 * INSET + FIELD_HEIGHT + GAP + height;
 }
 
 void ALQuickOpen::layout()

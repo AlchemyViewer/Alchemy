@@ -163,7 +163,7 @@ void ALChoiceList::setChoices(std::vector<Choice> choices, S32 chosen)
 
 void ALChoiceList::choose(S32 index)
 {
-    if (mChoices.empty())
+    if (mChoices.empty() || index < 0)
     {
         mChosen = -1;
         return;

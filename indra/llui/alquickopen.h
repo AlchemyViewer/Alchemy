@@ -31,8 +31,8 @@
 
 #include <boost/signals2.hpp>
 
+class ALChoiceList;
 class LLLineEditor;
-class LLScrollListCtrl;
 
 // Type a few letters, get the thing you were thinking of at the top, press
 // return.
@@ -97,6 +97,12 @@ public:
     // query changes, since what return will do has changed with it.
     void setHint(const std::string& hint);
     bool freeform() const { return mFreeform; }
+
+    // What the list shows, by the candidates' values in order -- the one
+    // row of a freeform question is what was typed -- and which of them is
+    // chosen, or -1.
+    const std::vector<std::string>& listed() const { return mListed; }
+    S32                             chosenRow() const;
 
     // The query, as it changes under the keys or by setQuery.
     typedef boost::signals2::signal<void(const std::string&)> query_signal_t;
@@ -177,7 +183,9 @@ private:
     LLColor4                mGround;
     LLColor4                mInk;
     LLLineEditor*           mField = nullptr;
-    LLScrollListCtrl*       mList = nullptr;
+    // The rows on the text engine, as the editor's completions are.
+    ALChoiceList*           mList = nullptr;
+    std::vector<std::string> mListed;
     chose_signal_t          mChose;
     chose_signal_t          mChoseToHold;
     query_signal_t          mQueryChanged;
