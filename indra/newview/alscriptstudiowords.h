@@ -115,4 +115,7 @@ public:
     // the outline -- by texture name, as a scroll list wants it.
     static const char* imageNameOf(const ALScriptStudioDoc& doc);
     static const char* imageNameOf(ALScriptSymbolKind kind);
+    // What a symbol's kind is called: the name of the window's word for
+    // it, or none.
+    static const char* kindWordOf(ALScriptSymbolKind kind);
 };

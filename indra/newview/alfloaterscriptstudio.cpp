@@ -5942,21 +5942,8 @@ void ALFloaterScriptStudio::browseReference()
 
 std::string ALFloaterScriptStudio::kindName(ALScriptSymbolKind kind) const
 {
-    switch (kind)
-    {
-        case ALScriptSymbolKind::Keyword:   return getString("KindKeyword");
-        case ALScriptSymbolKind::Variable:  return getString("KindVariable");
-        case ALScriptSymbolKind::Parameter: return getString("KindParameter");
-        case ALScriptSymbolKind::Function:  return getString("KindFunction");
-        case ALScriptSymbolKind::Field:     return getString("KindField");
-        case ALScriptSymbolKind::Type:      return getString("KindType");
-        case ALScriptSymbolKind::Constant:  return getString("KindConstant");
-        case ALScriptSymbolKind::Event:     return getString("KindEvent");
-        case ALScriptSymbolKind::State:     return getString("KindState");
-        case ALScriptSymbolKind::Label:     return getString("KindLabel");
-        case ALScriptSymbolKind::Module:    return getString("KindModule");
-    }
-    return std::string();
+    const char* word = ALScriptStudioWords::kindWordOf(kind);
+    return word ? getString(word) : std::string();
 }
 
 void ALFloaterScriptStudio::refreshOutline(Doc& doc)

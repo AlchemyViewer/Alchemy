@@ -30,6 +30,8 @@
 
 #include "../test/lltut.h"
 
+#include <set>
+
 namespace
 {
     typedef ALScriptStudioWords       Words;
@@ -268,5 +270,24 @@ namespace tut
         ensure_equals("a config", std::string(Words::imageNameOf(doc)), std::string("Studio_Config"));
         ensure_equals("a function", std::string(Words::imageNameOf(ALScriptSymbolKind::Function)), std::string("Symbol_Function"));
         ensure_equals("a state as a label", std::string(Words::imageNameOf(ALScriptSymbolKind::State)), std::string("Symbol_Label"));
+    }
+
+    template<> template<>
+    void alscriptstudiowords_object::test<9>()
+    {
+        set_test_name("each kind of symbol called by one of the window's words, a word of its own");
+        if (!window.floater)
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        std::set<std::string> said;
+        for (S32 kind = static_cast<S32>(ALScriptSymbolKind::Keyword); kind <= static_cast<S32>(ALScriptSymbolKind::Module); ++kind)
+        {
+            const char* word = Words::kindWordOf(static_cast<ALScriptSymbolKind>(kind));
+            ensure("a word for each", word != nullptr && window.floater->hasString(word));
+            said.insert(window.floater->getString(word));
+        }
+        ensure_equals("each its own", said.size(), size_t(static_cast<S32>(ALScriptSymbolKind::Module) + 1));
+        ensure_equals("a function", window.floater->getString(Words::kindWordOf(ALScriptSymbolKind::Function)), std::string("function"));
     }
 }

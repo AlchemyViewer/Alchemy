@@ -399,6 +399,26 @@ const char* ALScriptStudioWords::imageNameOf(ALScriptSymbolKind kind)
 }
 
 // static
+const char* ALScriptStudioWords::kindWordOf(ALScriptSymbolKind kind)
+{
+    switch (kind)
+    {
+        case ALScriptSymbolKind::Keyword:   return "KindKeyword";
+        case ALScriptSymbolKind::Variable:  return "KindVariable";
+        case ALScriptSymbolKind::Parameter: return "KindParameter";
+        case ALScriptSymbolKind::Function:  return "KindFunction";
+        case ALScriptSymbolKind::Field:     return "KindField";
+        case ALScriptSymbolKind::Type:      return "KindType";
+        case ALScriptSymbolKind::Constant:  return "KindConstant";
+        case ALScriptSymbolKind::Event:     return "KindEvent";
+        case ALScriptSymbolKind::State:     return "KindState";
+        case ALScriptSymbolKind::Label:     return "KindLabel";
+        case ALScriptSymbolKind::Module:    return "KindModule";
+    }
+    return nullptr;
+}
+
+// static
 bool ALScriptStudioWords::hoverText(bool lua, const ALTextDocument& text, const ALTextPos& at, std::string_view word, std::string& out)
 {
     // The word as the vocabulary knows it: `Say` under the mouse in
