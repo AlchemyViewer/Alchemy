@@ -63,6 +63,10 @@ namespace ALSurface
 
     // The band under the row a list is pointing at.
     inline LLColor4 chosen(const LLColor4& paper, const LLColor4& ink) { return shade(paper, ink, CHOSEN); }
+    // The same band for a list with no paper of its own, drawn over
+    // whatever it sits on: the ink at the same weight, which over the paper
+    // comes to the same mix.
+    inline LLColor4 chosenOver(const LLColor4& ink) { return LLColor4(ink.mV[VRED], ink.mV[VGREEN], ink.mV[VBLUE], CHOSEN); }
 
     // The line around it: the ink itself, thinned. A mix would tie the
     // frame to the ground it is drawn against; the ink thinned reads the

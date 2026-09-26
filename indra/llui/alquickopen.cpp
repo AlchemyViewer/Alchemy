@@ -405,7 +405,8 @@ void ALQuickOpen::setColors(const LLColor4& background, const LLColor4& ink)
     mList->setBgWriteableColor(ground);
     mList->setReadOnlyBgColor(ground);
     mList->setBgStripeColor(ground);
-    mList->setBgSelectedColor(lit);
+    // The chosen row the band every list of ours chooses with.
+    mList->setBgSelectedColor(ALSurface::chosen(background, ink));
     mList->setHighlightedColor(between(0.12f));
     mList->setHoveredColor(between(0.12f));
     mList->setFgUnselectedColor(ink);

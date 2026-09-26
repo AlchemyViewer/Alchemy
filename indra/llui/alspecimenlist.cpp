@@ -874,7 +874,10 @@ void ALSpecimenList::drawCell(const Cell& cell, bool hovered) const
 
     if (chosen || selected || hovered)
     {
-        gl_rect_2d(box, chosen ? selected_color.get() % 0.35f : selected ? selected_color.get() % 0.18f : hover_color.get(), true);
+        // The chosen one in the band every list of ours chooses with; the
+        // rest of a selection marked as it was.
+        const LLColor4 band = chosen ? ALSurface::chosenOver(heading_color.get()) : selected ? selected_color.get() % 0.18f : hover_color.get();
+        gl_rect_2d(box, band, true);
     }
 
     // The picture, over the strip the name sits in: stretched across the
