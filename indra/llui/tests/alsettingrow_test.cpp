@@ -217,13 +217,15 @@ namespace tut
         ensure("a scalar unless said otherwise", defaults.components().empty() && defaults.part() == -1);
 
         // A vector's letters and a part's index, by the names a row writes.
-        const std::string vector_source = "<setting_row name=\"v\" components=\"R G B\" part=\"1\"/>\n";
+        const std::string vector_source = "<setting_row name=\"v\" components=\"R G B\" part=\"1\" letter_width=\"18\"/>\n";
         LLXMLNodePtr      vector_node;
         ensure("a vector parses", LLXMLNode::parseBuffer(vector_source.data(), vector_source.size(), vector_node));
         ALSettingRow::Params vector_p;
         parser.readXUI(vector_node, vector_p, "setting_row_test.xml");
         ensure_equals("components", vector_p.components(), std::string("R G B"));
         ensure_equals("part", vector_p.part(), 1);
+        ensure_equals("letter_width", vector_p.letter_width(), 18);
+        ensure_equals("a letter's width unless said", defaults.letter_width(), 10);
     }
 
     // Bound both ways, and a commit is one write: the row writes the setting,
@@ -682,7 +684,14 @@ namespace tut
         ALSettingRow::Params p       = params("SettingRowTestCentre", -1.f, 1.f);
         p.name                       = "centre";
         p.components                 = "X Y";
+        p.letter_width               = 18;
         ALSettingRow* r              = LLUICtrlFactory::create<ALSettingRow>(p);
+        const LLTextBox* letter      = nullptr;
+        for (LLView* child : *r->findChild<LLSpinCtrl>("centre.X")->getChildList())
+        {
+            letter = letter ? letter : ALViewType::as<LLTextBox>(child);
+        }
+        ensure("the letters as wide as said", letter && letter->getRect().getWidth() == 18);
         ensure("hidden at the default", !r->getResetButton()->getVisible());
         control->set(LLSD().with(0, 0.0).with(1, 0.0).with(2, 0.4));
         ensure("a part it does not show is not its difference", !r->isModified() && !r->getResetButton()->getVisible());

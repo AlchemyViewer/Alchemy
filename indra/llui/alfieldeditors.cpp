@@ -55,9 +55,7 @@ namespace
     // Between the parts of a value that is several numbers, where there is
     // room for it.
     constexpr S32 GUTTER = 10;
-    // A lettered part: its letter, its box at the most, and the gap to the
-    // next.
-    constexpr S32 LETTER_WIDTH = 10;
+    // A lettered part: its box at the most, and the gap to the next.
     constexpr S32 LETTERED_WIDTH = 68;
     constexpr S32 LETTERED_GAP = 4;
     // A control narrower than its column sits at the column's left rather
@@ -265,7 +263,7 @@ void ALFieldEditors::makeComponents(const Field& field, const LLRect& box, LLVie
         if (field.lettered)
         {
             p.label = field.components[i];
-            p.label_width = LETTER_WIDTH;
+            p.label_width = field.letterWidth;
             p.scrub = true;
         }
         p.decimal_digits = decimalsOf(field, whole);

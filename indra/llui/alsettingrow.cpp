@@ -83,6 +83,7 @@ ALSettingRow::Params::Params()
     show_reset("show_reset", true),
     components("components"),
     part("part", -1),
+    letter_width("letter_width", 10),
     mouse_down_callback("mouse_down_callback"),
     mouse_up_callback("mouse_up_callback")
 {
@@ -125,6 +126,7 @@ ALSettingRow::ALSettingRow(const Params& p)
         field.kind = ALParamType::REAL;
         field.components = mLetters;
         field.lettered = true;
+        field.letterWidth = p.letter_width();
         field.authored = true;
         field.bounded = true;
         field.minimum = p.min_value();

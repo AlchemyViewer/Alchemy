@@ -86,6 +86,8 @@ public:
         // G B", "X Y". Or one part of one, by index.
         Optional<std::string> components;
         Optional<S32>         part;
+        // How wide each of a vector's letters is: "P1" takes more than "R".
+        Optional<S32>         letter_width;
         // The slider's press and release, by the names a slider writes them. A
         // setting that is dear to apply can be told a drag has begun and ended
         // and leave its work for the release; the commits in between still

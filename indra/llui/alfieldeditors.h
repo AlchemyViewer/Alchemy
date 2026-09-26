@@ -140,6 +140,8 @@ public:
         // letter scrubs, rather than by a caption under it: a row one
         // line tall, its boxes as wide as a number needs.
         bool                        lettered = false;
+        // How wide a letter is given, where one is wider than a letter.
+        S32                         letterWidth = 10;
         // Four names, in the order left, bottom, right, top: a field whose
         // value is which edges of its parent a thing is tied to, which is a
         // picture rather than four words. The row it gets is as tall as the
