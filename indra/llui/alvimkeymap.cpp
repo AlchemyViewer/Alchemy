@@ -626,6 +626,7 @@ void ALVimKeymap::say(const std::string& message, bool error)
 {
     mMessage      = message;
     mMessageError = error;
+    mFailed       = mFailed || error;
     bump();
 }
 
@@ -647,6 +648,10 @@ namespace
     // the last without a key of their own fed between, before the chain
     // is taken to be a loop: vim's maxmapdepth.
     constexpr S32 MAX_MAP_DEPTH = 1000;
+    // How many keys one draining may feed, however they came: a mapping
+    // that feeds itself a key at a time, each doing something and none
+    // failing, never trips the depth, which a key fed puts back to none.
+    constexpr S32 MAX_DRAINED = 10000;
 }
 
 bool ALVimKeymap::type(ALTextView& view, const Input& input)
@@ -689,6 +694,7 @@ bool ALVimKeymap::typeThrough(ALTextView& view, const Input& input)
 void ALVimKeymap::drain(ALTextView& view, std::deque<Held>& queue, bool final, bool stop_on_error, std::optional<bool>* taken)
 {
     S32 depth = 0;
+    S32 fed   = 0;
     while (!queue.empty())
     {
         // The keys at the front that may be mapped, in the mode as it is
@@ -743,6 +749,12 @@ void ALVimKeymap::drain(ALTextView& view, std::deque<Held>& queue, bool final, b
         // No mapping: the first key as it is, and what follows it looked
         // at again.
         depth              = 0;
+        if (++fed > MAX_DRAINED)
+        {
+            queue.clear();
+            say(said("VimRecursiveMapping", "E223: Recursive mapping"), true);
+            return;
+        }
         const Held first = queue.front();
         queue.pop_front();
         if (first.typed && queue.empty() && taken)
@@ -753,10 +765,16 @@ void ALVimKeymap::drain(ALTextView& view, std::deque<Held>& queue, bool final, b
             return;
         }
         feedMapped(view, first.input);
-        if (stop_on_error && mMessageError)
+        if (mFailed || mMessageError)
         {
-            queue.clear();
-            return;
+            if (stop_on_error)
+            {
+                queue.clear();
+                return;
+            }
+            // The rest of a mapping goes where a key of it failed, as in
+            // vim; what was typed stays, to be fed as it came.
+            queue.erase(std::remove_if(queue.begin(), queue.end(), [](const Held& held) { return !held.typed; }), queue.end());
         }
     }
 }
@@ -863,14 +881,19 @@ bool ALVimKeymap::feed(ALTextView& view, const Input& input)
     {
         mMessage.clear();
         mMessageError = false;
+        mFailed       = false;
         // A command starts where nothing is pending in normal mode; what
         // it is typed as is kept until it is done, for `.`.
         if (mMode == Mode::Normal && mCount == 0 && !mRegister && !mOperator && !mPending)
         {
             mCommandInputs.clear();
-            // Each command is a step of its own to undo, however close on
-            // the last it came.
-            view.undoJournal().breakRun();
+            // Each command typed is a step of its own to undo, however
+            // close on the last it came; what a macro or :normal plays is
+            // one step, the group play holds open.
+            if (mPlaying == 0)
+            {
+                view.undoJournal().breakRun();
+            }
         }
         mCommandInputs.push_back(input);
     }
@@ -979,6 +1002,13 @@ bool ALVimKeymap::play(ALTextView& view, const std::vector<Input>& inputs, bool 
         say(said("VimTooRecursive", "E169: Command too recursive"), true);
         return false;
     }
+    // From the top, one step to undo, whatever it does: a group holds
+    // what is played inside it as one.
+    const bool top = mPlaying == 0;
+    if (top)
+    {
+        view.undoJournal().beginGroup();
+    }
     ++mPlaying;
     bool ok = true;
     if (remap && !mShared->mappings.empty())
@@ -993,14 +1023,14 @@ bool ALVimKeymap::play(ALTextView& view, const std::vector<Input>& inputs, bool 
             queue.push_back(held);
         }
         drain(view, queue, true, true, nullptr);
-        ok = !mMessageError;
+        ok = !mMessageError && !mFailed;
     }
     else
     {
         for (const Input& in : inputs)
         {
             feed(view, in);
-            if (mMessageError)
+            if (mMessageError || mFailed)
             {
                 ok = false;
                 break;
@@ -1008,6 +1038,10 @@ bool ALVimKeymap::play(ALTextView& view, const std::vector<Input>& inputs, bool 
         }
     }
     --mPlaying;
+    if (top)
+    {
+        view.undoJournal().endGroup();
+    }
     return ok;
 }
 
@@ -1306,7 +1340,17 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
                         // The host's window of them; what is picked comes
                         // back onto the line.
                         const llwchar kind = ch;
-                        mHooks.historyWindow(view, kind, history, [this, &view, kind](const std::string& line, bool run) { takeLine(view, kind, line, run); });
+                        // Picked later: the tab, or vim in it, may have gone
+                        // meanwhile, and both are looked for again.
+                        const LLHandle<LLUICtrl> handle = view.getHandle();
+                        mHooks.historyWindow(view, kind, history, [handle, kind](const std::string& line, bool run) {
+                            ALTextView*  again = dynamic_cast<ALTextView*>(handle.get());
+                            ALVimKeymap* vim   = again ? dynamic_cast<ALVimKeymap*>(again->modalKeymap()) : nullptr;
+                            if (vim)
+                            {
+                                vim->takeLine(*again, kind, line, run);
+                            }
+                        });
                         return true;
                     }
                     mMode     = ch == ':' ? Mode::Command : Mode::Search;
@@ -1339,6 +1383,7 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
                         say(said("VimNoPreviousCommand", "E30: No previous command line"), true);
                         return true;
                     }
+                    view.undoJournal().beginGroup();
                     for (S32 n = 0; n < count; ++n)
                     {
                         runCommand(view, history.back());
@@ -1347,6 +1392,7 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
                             break;
                         }
                     }
+                    view.undoJournal().endGroup();
                     return true;
                 }
                 if (!((name >= 'a' && name <= 'z') || (name >= 'A' && name <= 'Z') || name == '"' || name == '0'))
@@ -1357,6 +1403,9 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
                 const std::vector<Input> inputs = decodeInputs(fetch(static_cast<char>(std::tolower(name))).text);
                 mLastPlayed                     = static_cast<char>(std::tolower(name));
                 clearPending();
+                // The count's plays one step to undo, and the first to fail
+                // the last, as in vim.
+                view.undoJournal().beginGroup();
                 for (S32 n = 0; n < count; ++n)
                 {
                     if (!play(view, inputs, true))
@@ -1364,6 +1413,7 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
                         break;
                     }
                 }
+                view.undoJournal().endGroup();
                 return true;
             }
             case 'r':
@@ -1858,6 +1908,7 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
             {
                 // f, F, t, T, ` and ': motions with an argument.
                 Motion m = motion(view, pending, count, ch);
+                mFailed  = mFailed || (m.ok && !m.moved);
                 if (!m.ok)
                 {
                     clearPending();
@@ -1971,6 +2022,7 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
         Motion m = motion(view, m_ch, countTimes(countOr(mOperatorCount), count), 0);
         if (!m.ok || !m.moved)
         {
+            mFailed = mFailed || m.ok;
             clearPending();
             return m.ok;
         }
@@ -2579,8 +2631,10 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
             break;
     }
 
-    // A motion on its own; one of vim's jumps notes where it began.
+    // A motion on its own; one of vim's jumps notes where it began. One
+    // that could not move failed, as vim has it.
     Motion m = motion(view, ch, count, 0);
+    mFailed  = mFailed || (m.ok && !m.moved);
     if (m.ok)
     {
         const ALTextPos from = cursor(view);
@@ -5780,7 +5834,11 @@ void ALVimKeymap::runCommand(ALTextView& view, const std::string& line_in)
         // The keys as if typed in normal mode, on each line of the range
         // in turn, from the line's first character; whatever mode they
         // leave behind is left.
+        // One step to undo over the whole range. A line whose keys fail --
+        // f with no such character there -- stops only that line's, as in
+        // vim; an error stops the range.
         const std::vector<Input> inputs = decodeInputs(args);
+        view.undoJournal().beginGroup();
         for (S32 line = first; line <= last && line < d.lineCount(); ++line)
         {
             if (mMode != Mode::Normal)
@@ -5791,7 +5849,7 @@ void ALVimKeymap::runCommand(ALTextView& view, const std::string& line_in)
             }
             view.setCaret(ALTextPos(line, 0));
             moveTo(view, view.caret());
-            if (!play(view, inputs, name.back() != '!'))
+            if (!play(view, inputs, name.back() != '!') && mMessageError)
             {
                 break;
             }
@@ -5802,6 +5860,7 @@ void ALVimKeymap::runCommand(ALTextView& view, const std::string& line_in)
             escape.key = KEY_ESCAPE;
             feed(view, escape);
         }
+        view.undoJournal().endGroup();
         return;
     }
     if (name == "j" || name == "join" || name == "j!" || name == "join!")

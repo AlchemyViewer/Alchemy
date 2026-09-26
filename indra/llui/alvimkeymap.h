@@ -402,7 +402,8 @@ private:
     bool global(ALTextView& view, S32 first, S32 last, bool ranged, const std::string& spec, bool invert);
     // Keys fed as typed, for :normal and for a macro, through the mappings
     // where `remap` says -- as a macro's and :normal's are, and :normal!'s
-    // are not; false where they ended in an error message.
+    // are not; false where one failed or said an error, and the rest were
+    // not fed. Played from the top, one step to undo.
     bool play(ALTextView& view, const std::vector<Input>& inputs, bool remap);
     // The number at or after the caret on its line, changed by so much;
     // false where there is none.
@@ -609,4 +610,9 @@ private:
 
     std::string mMessage;
     bool        mMessageError = false;
+    // The last key's command failed: said an error, or was a motion that
+    // could not move -- f with no such character, j on the last line --
+    // which vim treats as one. What stops a macro, :normal's keys, the
+    // rest of a mapping and @'s count, as it does in vim.
+    bool        mFailed = false;
 };

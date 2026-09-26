@@ -2196,4 +2196,93 @@ namespace tut
         keys("u");
         ensure_equals("a command after is a step of its own", flat(e.text()), before_x);
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<70>()
+    {
+        set_test_name("a mapping that feeds itself ends where a key of it fails, or at the keys one draining may feed, with E223");
+        ALCodeEditor& e = make("a\nb\nc\nd\n");
+        ex("nmap j jj");
+        keys("j");
+        ensure_equals("down until j fails on the last line, and back", caretText(), std::string("4:0"));
+        ensure("which is no error", !vim->messageIsError());
+        // One that never fails: an A put in, and itself again.
+        ex("nmap Q iA<Esc>Q");
+        keys("ggQ");
+        ensure("stopped: " + vim->message(), vim->messageIsError() && vim->message().find("E223") != std::string::npos);
+        ensure("having done what it did meanwhile", e.document().line(0).size() > 100);
+        // Stopped wherever the mapping was -- here in insert mode, as vim
+        // leaves it -- and a key typed after goes as typed.
+        keys("<Esc>");
+        ensure("vim takes keys again", vim->mode() == ALVimKeymap::Mode::Normal);
+    }
+
+    template<> template<>
+    void alvimkeymap_object::test<71>()
+    {
+        set_test_name("a count of a macro stops at the first play whose f fails, and is one step to undo");
+        ALCodeEditor& e = make("a,b\nc,d\ne f\ng,h\n");
+        keys("qa0f,xxjq");
+        ensure_equals("recorded, done once", flat(e.text()), std::string("a|c,d|e f|g,h|"));
+        keys("100@a");
+        ensure_equals("the second play's f found no comma: it and the rest stopped", flat(e.text()), std::string("a|c|e f|g,h|"));
+        keys("u");
+        ensure_equals("undone as one step", flat(e.text()), std::string("a|c,d|e f|g,h|"));
+    }
+
+    template<> template<>
+    void alvimkeymap_object::test<72>()
+    {
+        set_test_name("a macro of two hundred commands is one step to undo, and so is :normal over a range");
+        ALCodeEditor& e     = make((std::string(250, 'x') + "\none\ntwo\nthree\n").c_str());
+        std::string   macro = "qa";
+        for (int i = 0; i < 200; ++i)
+        {
+            macro += i % 2 ? "x" : "~";
+        }
+        macro += "q";
+        keys(macro.c_str());
+        const std::string recorded = e.text();
+        keys("0@a");
+        ensure("played", e.text() != recorded);
+        keys("u");
+        ensure_equals("one step back", e.text(), recorded);
+
+        ex("2,4normal Ax");
+        ensure_equals("each line", flat(e.text()).substr(recorded.find('\n')), std::string("|onex|twox|threex|"));
+        keys("u");
+        ensure_equals("one step back", e.text(), recorded);
+    }
+
+    template<> template<>
+    void alvimkeymap_object::test<73>()
+    {
+        set_test_name("a line picked from q:'s window after vim went, or the tab, does nothing");
+        ALCodeEditor& e = make("one\n");
+        keys(":set number<CR>");
+        std::function<void(const std::string&, bool)> later;
+        const auto hold = [&later](ALTextView&, llwchar, const std::vector<std::string>&, std::function<void(const std::string&, bool)> chosen) {
+            later = std::move(chosen);
+        };
+        vim->hooks().historyWindow = hold;
+        keys("q:");
+        ensure("the window holds the pick", static_cast<bool>(later));
+        e.setModalKeymap(nullptr);
+        vim = nullptr;
+        later("set nonumber", true);
+        ensure("vim gone: nothing", !e.modalKeymap());
+
+        auto keymap = std::make_unique<ALVimKeymap>();
+        vim         = keymap.get();
+        e.setModalKeymap(std::move(keymap));
+        vim->hooks().historyWindow = hold;
+        later                      = nullptr;
+        keys(":set number<CR>q:");
+        ensure("held again", static_cast<bool>(later));
+        editor->die();
+        editor = nullptr;
+        LLMortician::updateClass();
+        later("set nonumber", true);
+        ensure("the tab gone: nothing", true);
+    }
 }
