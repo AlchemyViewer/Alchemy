@@ -318,6 +318,7 @@ target_sources(
         alemptystate.h
         alflagsfield.h
         alhistorylist.h
+        alkeyshome.h
         alimagefield.h
         aljumpbar.h
         alpanelist.h

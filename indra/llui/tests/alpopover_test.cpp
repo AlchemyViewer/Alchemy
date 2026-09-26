@@ -261,6 +261,7 @@ namespace tut
         ALPopover* alone = ALPopover::show(loose, content());
         ensure("no home", alone->home() == nullptr);
         ensure("no claim", !alone->hasAccelerators());
+        ensure("and a key it does not take is declined", !alone->handleKeyHere('Q', MASK_CONTROL));
         alone->closeFloater();
         loose->die();
         home->die();

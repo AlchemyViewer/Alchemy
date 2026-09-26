@@ -26,6 +26,7 @@
 
 #include "alpopover.h"
 
+#include "alkeyshome.h"
 #include "alplace.h"
 #include "llpanel.h"
 #include "lluictrlfactory.h"
@@ -289,15 +290,7 @@ bool ALPopover::handleKeyHere(KEY key, MASK mask)
         settle();
         return true;
     }
-    if (LLFloater::handleKeyHere(key, mask))
-    {
-        return true;
-    }
-    if (LLFloater* home = mHome.get())
-    {
-        return home->handleKeyHere(key, mask);
-    }
-    return false;
+    return ALKeysHome::handle(*this, mHome.get(), key, mask);
 }
 
 // --- the slot ---------------------------------------------------------------------

@@ -38,6 +38,8 @@
 
 #include "../test/lltut.h"
 
+#include <vector>
+
 #include <string>
 
 // llui reaches the viewer for this one, and linking any of the library pulls
@@ -58,6 +60,19 @@ namespace tut
         // A window with a stack of two panes across it, the way a tool is
         // laid out: a side pane of a fixed width and a middle that takes
         // whatever is left.
+        // A window that says which keys it was asked about, and takes only
+        // Control-F.
+        struct Home : public LLFloater
+        {
+            Home(const LLFloater::Params& p) : LLFloater(LLSD(), p) {}
+            bool handleKeyHere(KEY key, MASK mask) override
+            {
+                heard.push_back(key);
+                return key == 'F' && mask == MASK_CONTROL;
+            }
+            std::vector<KEY> heard;
+        };
+
         struct Window
         {
             LLFloater*      floater = nullptr;
@@ -75,7 +90,7 @@ namespace tut
             fp.rect = LLRect(0, height, width, 0);
             fp.save_rect = false;
             fp.save_visibility = false;
-            w.floater = new LLFloater(LLSD(), fp);
+            w.floater = new Home(fp);
 
             LLLayoutStack::Params sp(LLUICtrlFactory::getDefaultParams<LLLayoutStack>());
             sp.name = "stack";
@@ -232,6 +247,13 @@ namespace tut
         ensure("there is a window", window != nullptr);
         ensure_equals("and it knows where home is", window->home(), w.floater);
         ensure("it asks before the viewer's own menu does", window->hasAccelerators());
+        const std::vector<KEY>& heard = static_cast<Home*>(w.floater)->heard;
+        ensure("a key home takes is taken", window->handleKeyHere('F', MASK_CONTROL));
+        ensure("home heard it", heard == std::vector<KEY>{ 'F' });
+        ensure("a key home declines is declined", !window->handleKeyHere('Q', MASK_CONTROL));
+        ensure("having been asked", heard == std::vector<KEY>{ 'F', 'Q' });
+        ensure("a key the window takes itself is taken", window->handleKeyHere(KEY_ESCAPE, MASK_NONE));
+        ensure("and never reaches home", heard == std::vector<KEY>{ 'F', 'Q' });
         w.floater->die();
     }
 

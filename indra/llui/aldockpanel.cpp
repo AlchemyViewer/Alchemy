@@ -26,6 +26,7 @@
 
 #include "aldockpanel.h"
 
+#include "alkeyshome.h"
 #include "llfocusmgr.h"
 #include "lllayoutstack.h"
 #include "lluictrlfactory.h"
@@ -65,15 +66,7 @@ void ALPanelFloater::onClose(bool app_quitting)
 
 bool ALPanelFloater::handleKeyHere(KEY key, MASK mask)
 {
-    if (LLFloater::handleKeyHere(key, mask))
-    {
-        return true;
-    }
-    if (LLFloater* home = mHome.get())
-    {
-        return home->handleKeyHere(key, mask);
-    }
-    return false;
+    return ALKeysHome::handle(*this, mHome.get(), key, mask);
 }
 
 ALDockPanel::Params::Params()
