@@ -24,22 +24,25 @@
 
 #include "llviewerprecompiledheaders.h"
 
-#include "alfloaterscriptstudio.h"
+#include "alscriptstudioweighing.h"
 
 #include "alscriptenvelope.h"
 #include "alscriptfixes.h"
+#include "alscriptstudioservices.h"
 #include "alscriptweightspane.h"
 #include "lldate.h"
-#include "llversioninfo.h"
-#include "llviewercontrol.h"
 
 #include <algorithm>
 #include <cmath>
 #include <map>
 
-std::optional<ALScriptWeight::Target> ALFloaterScriptStudio::weightTarget(const Doc& doc) const
+ALScriptStudioWeighing::ALScriptStudioWeighing(ALScriptStudioServices& services, Window& window) : mServices(services), mWindow(window)
 {
-    if (!doc.loaded || doc.notecard || lslFragment(doc))
+}
+
+std::optional<ALScriptWeight::Target> ALScriptStudioWeighing::target(const Doc& doc) const
+{
+    if (!doc.loaded || doc.notecard || mWindow.lslFragment(doc))
     {
         return std::nullopt;
     }
@@ -54,57 +57,57 @@ std::optional<ALScriptWeight::Target> ALFloaterScriptStudio::weightTarget(const 
                                                 : std::nullopt;
 }
 
-void ALFloaterScriptStudio::weigh(Doc& doc)
+void ALScriptStudioWeighing::weigh(Doc& doc)
 {
-    if (!weightTarget(doc))
+    if (!target(doc))
     {
-        doc.weight.reset();
+        doc.weighing.weight.reset();
         return;
     }
-    doc.weighing = true;
-    askAnalyzer(doc, ALScriptAnalysis::Kind::Weigh, ALTextPos());
+    doc.weighing.asking = true;
+    mWindow.askWeights(doc);
 }
 
-void ALFloaterScriptStudio::weighed(Doc& doc, const ALScriptAnalysis::Result& result)
+void ALScriptStudioWeighing::weighed(Doc& doc, const ALScriptAnalysis::Result& result)
 {
-    doc.weighing = false;
+    doc.weighing.asking = false;
     if (result.version != doc.editor->document().version() || result.weights.empty())
     {
         return;
     }
     // In the source's places, through the expansion the question was
     // asked over -- which answered() has made sure is the one there is.
-    doc.weights.clear();
+    doc.weighing.all.clear();
     for (const ALScriptWeight& weight : result.weights)
     {
-        doc.weights.push_back(preprocessed(doc) && doc.expanded.valid ? weight.inSource(doc.expanded.map) : weight);
+        doc.weighing.all.push_back(mWindow.preprocessed(doc) && doc.expanded.valid ? weight.inSource(doc.expanded.map) : weight);
     }
-    doc.weightsVersion = result.version;
-    keepSavedWeights(doc);
-    if (&doc == active())
+    doc.weighing.allVersion = result.version;
+    keepSaved(doc);
+    if (&doc == mServices.frontDoc())
     {
-        mWeightsStale = true;
+        mStale = true;
     }
     // What a preprocessor's run made to be sent, weighed, says more of the
     // same text than its check does: it stands until the text changes.
-    if (!doc.weightSent || doc.weightVersion != result.version)
+    if (!doc.weighing.sent || doc.weighing.version != result.version)
     {
-        doc.weight        = doc.weights.front();
-        doc.weightVersion = result.version;
-        doc.weightSent    = false;
+        doc.weighing.weight        = doc.weighing.all.front();
+        doc.weighing.version = result.version;
+        doc.weighing.sent    = false;
         // What was weighed is what a save compiles where the preprocessor
         // does not run, or runs without the optimizer, which comes after
         // the check's expansion: SLua's is never optimized.
-        doc.weightExact = !preprocessed(doc) || doc.language.lua || !gSavedSettings.getBOOL("ALScriptPreprocOptimizer");
-        refreshProblems(doc);
-        showWeightsInEditor(doc);
+        doc.weighing.exact = !mWindow.preprocessed(doc) || doc.language.lua || !mWindow.optimizing();
+        mWindow.refreshProblems(doc);
+        showInEditor(doc);
     }
-    mSaving.warnOverWeight(doc);
+    mWindow.warnOverWeight(doc);
 }
 
-void ALFloaterScriptStudio::weighSent(Doc& doc)
+void ALScriptStudioWeighing::weighSent(Doc& doc)
 {
-    const std::optional<ALScriptWeight::Target> target = weightTarget(doc);
+    const std::optional<ALScriptWeight::Target> target = this->target(doc);
     if (!target || !doc.uploaded.valid || doc.uploaded.version != doc.editor->document().version())
     {
         return;
@@ -119,18 +122,16 @@ void ALFloaterScriptStudio::weighSent(Doc& doc)
     // What was weighed kept with the question, its map for the places: a
     // run since -- a setting changed while it was weighed -- is of another
     // text, and weighs its own.
-    const LLHandle<LLFloater> handle = getHandle();
-    ALScriptAnalysis::instance().ask(std::move(request), [handle, sent = doc.uploaded](const ALScriptAnalysis::Result& result) {
-        ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get());
-        const size_t           index  = studio ? studio->indexOf(result.id) : NONE;
-        if (index != NONE)
+    const std::weak_ptr<bool> alive = mAlive;
+    mWindow.askAnalysis(std::move(request), [this, alive, sent = doc.uploaded](const ALScriptAnalysis::Result& result) {
+        if (Doc* doc = alive.lock() ? mServices.findDoc(result.id) : nullptr)
         {
-            studio->weighedSent(*studio->mDocs[index], result, sent);
+            weighedSent(*doc, result, sent);
         }
     });
 }
 
-void ALFloaterScriptStudio::weighedSent(Doc& doc, const ALScriptAnalysis::Result& result, const Doc::Expanded& sent)
+void ALScriptStudioWeighing::weighedSent(Doc& doc, const ALScriptAnalysis::Result& result, const Doc::Expanded& sent)
 {
     const U32 version = doc.editor->document().version();
     if (result.version != version)
@@ -141,23 +142,23 @@ void ALFloaterScriptStudio::weighedSent(Doc& doc, const ALScriptAnalysis::Result
     const ALScriptWeight* weight = result.weights.empty() ? nullptr : &result.weights.front();
     if (weight)
     {
-        doc.weight        = weight->inSource(sent.map);
-        doc.weightVersion = result.version;
-        doc.weightExact   = true;
-        doc.weightSent    = true;
-        refreshProblems(doc);
-        showWeightsInEditor(doc);
-        if (&doc == active())
+        doc.weighing.weight        = weight->inSource(sent.map);
+        doc.weighing.version = result.version;
+        doc.weighing.exact   = true;
+        doc.weighing.sent    = true;
+        mWindow.refreshProblems(doc);
+        showInEditor(doc);
+        if (&doc == mServices.frontDoc())
         {
-            mWeightsStale = true;
+            mStale = true;
         }
     }
-    mSaving.warnOverWeight(doc);
+    mWindow.warnOverWeight(doc);
 }
 
-std::vector<ALScriptWeight::Target> ALFloaterScriptStudio::weighedTargets(const Doc& doc) const
+std::vector<ALScriptWeight::Target> ALScriptStudioWeighing::targets(const Doc& doc) const
 {
-    const std::optional<ALScriptWeight::Target> own = weightTarget(doc);
+    const std::optional<ALScriptWeight::Target> own = this->target(doc);
     if (!own)
     {
         return {};
@@ -166,10 +167,11 @@ std::vector<ALScriptWeight::Target> ALFloaterScriptStudio::weighedTargets(const 
     // Three compiles where one would do are the analyzer's time that a
     // completion waits behind: the other two only while they are looked
     // at.
-    const bool in_front = mActive < mDocs.size() && mDocs[mActive].get() == &doc;
-    if (!doc.language.lua && in_front && weightsShown())
+    const bool in_front = mServices.frontDoc() == &doc;
+    if (!doc.language.lua && in_front && mWindow.weightsShown())
     {
-        for (const ALScriptWeight::Target other : { ALScriptWeight::Target::LSO, ALScriptWeight::Target::Mono, ALScriptWeight::Target::LSLLuau })
+        for (const ALScriptWeight::Target other :
+             { ALScriptWeight::Target::LSO, ALScriptWeight::Target::Mono, ALScriptWeight::Target::LSLLuau })
         {
             if (other != *own)
             {
@@ -180,59 +182,64 @@ std::vector<ALScriptWeight::Target> ALFloaterScriptStudio::weighedTargets(const 
     return targets;
 }
 
-void ALFloaterScriptStudio::keepSavedWeights(Doc& doc)
+void ALScriptStudioWeighing::keepSaved(Doc& doc)
 {
-    if (doc.editor->isDirty() || doc.weightsVersion != doc.editor->document().version())
+    if (doc.editor->isDirty() || doc.weighing.allVersion != doc.editor->document().version())
     {
         return;
     }
     // Each target's in place of what it weighed before, the others kept: a
     // target weighed only while the tab was looked at is counted from what
     // it was then.
-    for (const ALScriptWeight& weight : doc.weights)
+    for (const ALScriptWeight& weight : doc.weighing.all)
     {
-        auto held = std::find_if(doc.weightsSaved.begin(), doc.weightsSaved.end(), [&weight](const ALScriptWeight& w) { return w.target == weight.target; });
-        if (held != doc.weightsSaved.end())
+        const auto same = [&weight](const ALScriptWeight& w) { return w.target == weight.target; };
+        auto       held = std::find_if(doc.weighing.saved.begin(), doc.weighing.saved.end(), same);
+        if (held != doc.weighing.saved.end())
         {
             *held = weight;
         }
         else
         {
-            doc.weightsSaved.push_back(weight);
+            doc.weighing.saved.push_back(weight);
         }
     }
-    if (&doc == active())
+    if (&doc == mServices.frontDoc())
     {
-        mWeightsStale = true;
+        mStale = true;
     }
 }
 
-void ALFloaterScriptStudio::showWeightsInEditor(Doc& doc)
+void ALScriptStudioWeighing::showInEditor(Doc& doc)
 {
     if (!doc.editor)
     {
         return;
     }
-    if (!mWeightNotes)
+    const bool notes_shown = mWindow.weightNotes();
+    const bool heat_shown  = mWindow.weightHeat();
+    if (!notes_shown)
     {
         doc.editor->setLineNotes({});
     }
-    if (!mWeightHeat)
+    if (!heat_shown)
     {
         doc.editor->setLineHeat({});
     }
-    if ((!mWeightNotes && !mWeightHeat) || !doc.weight || doc.weightVersion != doc.editor->document().version())
+    if ((!notes_shown && !heat_shown) || !doc.weighing.weight || doc.weighing.version != doc.editor->document().version())
     {
         return;
     }
-    const ALScriptWeight&      weight = *doc.weight;
+    const ALScriptWeight&      weight = *doc.weighing.weight;
     LLStringUtil::format_map_t args;
     args["[TARGET]"] = ALScriptWeight::nameOf(weight.target);
     args["[LIMIT]"]  = std::to_string(weight.limit / 1024);
-    const auto share = [&weight](size_t bytes) { return weight.limit ? llformat("%.1f%%", (F64)bytes * 100.0 / (F64)weight.limit) : std::string(); };
+    const auto share = [&weight](size_t bytes) {
+        return weight.limit ? llformat("%.1f%%", (F64)bytes * 100.0 / (F64)weight.limit) : std::string();
+    };
     // Said as weighed before the optimizer, where it was.
-    const std::string before = doc.weightExact ? std::string() : " " + getString("WeightsHeadBefore");
-    if (mWeightNotes)
+    const std::string before = doc.weighing.exact ? std::string() : " " + mServices.words("WeightsHeadBefore");
+    if (notes_shown)
     {
         // Each function, handler, state and global of the script's own, by
         // the line it is declared on; more than one on a line each by name.
@@ -258,34 +265,35 @@ void ALFloaterScriptStudio::showWeightsInEditor(Doc& doc)
                 said["[SHARE]"]                 = share(part->bytes);
                 if (part->name.empty())
                 {
-                    said["[NAME]"] = getString("WeightsPartUnnamed");
+                    said["[NAME]"] = mServices.words("WeightsPartUnnamed");
                 }
                 else if (!part->within.empty())
                 {
                     LLStringUtil::format_map_t handler;
                     handler["[EVENT]"] = part->name;
                     handler["[STATE]"] = part->within;
-                    said["[NAME]"]     = getString("WeightsPartHandler", handler);
+                    said["[NAME]"]     = mServices.words("WeightsPartHandler", handler);
                 }
                 else
                 {
                     said["[NAME]"] = part->name;
                 }
-                std::string bytes = getString(weight.estimate ? "WeightNoteEstimate" : "WeightNote", said);
+                std::string bytes = mServices.words(weight.estimate ? "WeightNoteEstimate" : "WeightNote", said);
                 if (parts.size() > 1)
                 {
                     said["[NOTE]"] = bytes;
-                    bytes          = getString("WeightNoteNamed", said);
+                    bytes          = mServices.words("WeightNoteNamed", said);
                 }
                 note.text += (note.text.empty() ? "" : "  \xC2\xB7  ") + bytes;
-                note.tip += (note.tip.empty() ? "" : "\n") + getString(weight.estimate ? "WeightNoteEstimateTip" : "WeightNoteTip", said);
+                note.tip += (note.tip.empty() ? "" : "\n") +
+                            mServices.words(weight.estimate ? "WeightNoteEstimateTip" : "WeightNoteTip", said);
             }
             note.tip += before;
             notes.push_back(std::move(note));
         }
         doc.editor->setLineNotes(notes);
     }
-    if (mWeightHeat)
+    if (heat_shown)
     {
         // Each of the script's own lines by the most any line came to, so
         // that the warmest is the heat's own colour; by its square root,
@@ -307,13 +315,14 @@ void ALFloaterScriptStudio::showWeightsInEditor(Doc& doc)
             said["[BYTES]"]                 = std::to_string(line.bytes);
             said["[SHARE]"]                 = share(line.bytes);
             heat.push_back({ line.line, std::sqrt(static_cast<F32>(line.bytes) / static_cast<F32>(most)),
-                             getString(weight.estimate ? "WeightHeatEstimateTip" : "WeightHeatTip", said) + before });
+                             mServices.words(weight.estimate ? "WeightHeatEstimateTip" : "WeightHeatTip", said) + before });
         }
         doc.editor->setLineHeat(heat);
     }
 }
 
-bool ALFloaterScriptStudio::editedCopy(const Doc& doc, const std::vector<std::pair<ALTextRange, std::string>>& edits, std::string& out) const
+bool ALScriptStudioWeighing::editedCopy(const Doc& doc, const std::vector<std::pair<ALTextRange, std::string>>& edits,
+                                        std::string& out) const
 {
     ALScriptFix fix;
     for (const auto& [range, text] : edits)
@@ -321,11 +330,11 @@ bool ALFloaterScriptStudio::editedCopy(const Doc& doc, const std::vector<std::pa
         const ALTextRange at = range.normalised();
         fix.edits.push_back({ at.begin.line, at.begin.column, at.end.line, at.end.column, text });
     }
-    if (preprocessed(doc) && !ALScriptFixes::intoExpansion(doc.expanded.map, fix))
+    if (mWindow.preprocessed(doc) && !ALScriptFixes::intoExpansion(doc.expanded.map, fix))
     {
         return false;
     }
-    const std::optional<std::string> made = ALScriptFixes::apply(preprocessed(doc) ? doc.expanded.text : doc.editor->text(), fix);
+    const std::optional<std::string> made = ALScriptFixes::apply(mWindow.preprocessed(doc) ? doc.expanded.text : doc.editor->text(), fix);
     if (!made)
     {
         return false;
@@ -334,11 +343,11 @@ bool ALFloaterScriptStudio::editedCopy(const Doc& doc, const std::vector<std::pa
     return true;
 }
 
-void ALFloaterScriptStudio::weighFixes(Doc& doc, U32 shown, const std::vector<ALCodeEditor::Fix>& fixes)
+void ALScriptStudioWeighing::weighFixes(Doc& doc, U32 shown, const std::vector<ALCodeEditor::Fix>& fixes)
 {
-    const std::optional<ALScriptWeight::Target> target = weightTarget(doc);
+    const std::optional<ALScriptWeight::Target> target = this->target(doc);
     const U32                                   version = doc.editor->document().version();
-    if (!target || (preprocessed(doc) && (!doc.expanded.valid || doc.expanded.version != version)))
+    if (!target || (mWindow.preprocessed(doc) && (!doc.expanded.valid || doc.expanded.version != version)))
     {
         return;
     }
@@ -350,7 +359,7 @@ void ALFloaterScriptStudio::weighFixes(Doc& doc, U32 shown, const std::vector<AL
     request.targets = { *target };
     // What the analyzers read as it stands first, weighed with the rest so
     // that each is measured against the same weigher at the same moment.
-    request.variants.push_back(preprocessed(doc) ? doc.expanded.text : doc.editor->text());
+    request.variants.push_back(mWindow.preprocessed(doc) ? doc.expanded.text : doc.editor->text());
     std::vector<S32> variant_of(fixes.size(), -1);
     for (size_t i = 0; i < fixes.size(); ++i)
     {
@@ -365,16 +374,15 @@ void ALFloaterScriptStudio::weighFixes(Doc& doc, U32 shown, const std::vector<AL
     {
         return;
     }
-    const LLHandle<LLFloater> handle = getHandle();
+    const std::weak_ptr<bool>    alive       = mAlive;
     const ALScriptWeight::Target weighed_for = *target;
-    ALScriptAnalysis::instance().ask(std::move(request), [handle, shown, variant_of, weighed_for](const ALScriptAnalysis::Result& result) {
-        ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get());
-        const size_t           index  = studio ? studio->indexOf(result.id) : NONE;
-        if (index == NONE)
+    mWindow.askAnalysis(std::move(request), [this, alive, shown, variant_of, weighed_for](const ALScriptAnalysis::Result& result) {
+        Doc* found = alive.lock() ? mServices.findDoc(result.id) : nullptr;
+        if (!found)
         {
             return;
         }
-        Doc& doc = *studio->mDocs[index];
+        Doc& doc = *found;
         if (result.version != doc.editor->document().version() || result.variantTotals.empty() || result.variantTotals.front() == 0)
         {
             return;
@@ -399,22 +407,24 @@ void ALFloaterScriptStudio::weighFixes(Doc& doc, U32 shown, const std::vector<AL
                 continue;
             }
             args["[BYTES]"] = std::to_string(std::abs(change));
-            notes[i]        = studio->getString(change < 0 ? (estimate ? "FixLighterEstimate" : "FixLighter") : (estimate ? "FixHeavierEstimate" : "FixHeavier"), args);
+            const char* said = change < 0 ? (estimate ? "FixLighterEstimate" : "FixLighter")
+                                          : (estimate ? "FixHeavierEstimate" : "FixHeavier");
+            notes[i]         = mServices.words(said, args);
         }
         doc.editor->noteFixes(shown, notes);
     });
 }
 
-void ALFloaterScriptStudio::measureAsset(Doc& doc)
+void ALScriptStudioWeighing::measureAsset(Doc& doc)
 {
     const U32 version   = doc.editor->document().version();
     const U32 expansion = doc.expanded.valid ? doc.expanded.generation : 0;
-    if (doc.assetMeasured == std::make_pair(version, expansion))
+    if (doc.weighing.assetMeasured == std::make_pair(version, expansion))
     {
         return;
     }
-    doc.assetMeasured = std::make_pair(version, expansion);
-    doc.assetBytes    = 0;
+    doc.weighing.assetMeasured = std::make_pair(version, expansion);
+    doc.weighing.assetBytes    = 0;
     // A file on disk is saved to the disk, which has no limit.
     if (!doc.loaded || !doc.file.empty())
     {
@@ -423,66 +433,126 @@ void ALFloaterScriptStudio::measureAsset(Doc& doc)
     // A notecard's text against the notecard's own limit.
     if (doc.notecard)
     {
-        doc.assetBytes = doc.editor->document().byteCount();
+        doc.weighing.assetBytes = doc.editor->document().byteCount();
         return;
     }
     const std::string text = doc.editor->text();
-    doc.assetBytes         = text.size();
-    if (preprocessed(doc) && doc.expanded.valid && doc.expanded.version == version && !doc.expanded.disabled)
+    doc.weighing.assetBytes         = text.size();
+    if (mWindow.preprocessed(doc) && doc.expanded.valid && doc.expanded.version == version && !doc.expanded.disabled)
     {
         ALScriptEnvelope envelope = doc.envelope ? *doc.envelope : ALScriptEnvelope();
         envelope.lua              = doc.language.lua;
         envelope.source           = text;
         envelope.expanded         = doc.expanded.text;
         envelope.compileTarget    = doc.language.compileTarget;
-        envelope.programVersion   = LLVersionInfo::instance().getChannelAndVersion();
+        envelope.programVersion   = mWindow.programVersion();
         envelope.lastCompiled     = LLDate::now().asString();
-        doc.assetBytes            = envelope.wrap().size();
+        doc.weighing.assetBytes            = envelope.wrap().size();
     }
 }
 
-void ALFloaterScriptStudio::refreshWeights()
+void ALScriptStudioWeighing::refreshPane()
 {
-    Doc* doc = active();
+    ALScriptWeightsPane* pane = mWindow.weightsPane();
+    if (!pane)
+    {
+        return;
+    }
+    Doc* doc = mServices.frontDoc();
     LLStringUtil::format_map_t args;
     args["[NAME]"] = doc ? doc->name : std::string();
     if (!doc)
     {
-        mWeightsPane->showNothing(getString("WeightsNoScript"));
+        pane->showNothing(mServices.words("WeightsNoScript"));
         return;
     }
-    if (doc->loaded && !weightTarget(*doc))
+    if (doc->loaded && !target(*doc))
     {
-        mWeightsPane->showNothing(getString("WeightsNoTarget", args));
+        pane->showNothing(mServices.words("WeightsNoTarget", args));
         return;
     }
-    if (!doc->loaded || doc->weights.empty())
+    if (!doc->loaded || doc->weighing.all.empty())
     {
-        mWeightsPane->showNothing(getString("WeightsNotYet", args));
+        pane->showNothing(mServices.words("WeightsNotYet", args));
         return;
     }
     ALScriptWeightsPane::Shown shown;
     shown.id      = doc->id;
     shown.name    = doc->name;
-    shown.weights = doc->weights;
-    shown.saved   = doc->weightsSaved;
+    shown.weights = doc->weighing.all;
+    shown.saved   = doc->weighing.saved;
     // Weighed as the check has the text, which is before the optimizer
     // where one runs; what a save sends beside it, where it has been
     // weighed of the text as it stands.
-    shown.beforeOptimizer = preprocessed(*doc) && !doc->language.lua && gSavedSettings.getBOOL("ALScriptPreprocOptimizer");
-    if (doc->weight && doc->weightSent && doc->weightVersion == doc->weightsVersion)
+    shown.beforeOptimizer = mWindow.preprocessed(*doc) && !doc->language.lua && mWindow.optimizing();
+    if (doc->weighing.weight && doc->weighing.sent && doc->weighing.version == doc->weighing.allVersion)
     {
-        shown.sent = doc->weight->total;
+        shown.sent = doc->weighing.weight->total;
     }
-    for (const ALScriptWeight& weight : doc->weights)
+    for (const ALScriptWeight& weight : doc->weighing.all)
     {
         for (const ALScriptWeight::Part& part : weight.parts)
         {
             if (!part.file.empty() && !shown.fileNames.contains(part.file))
             {
-                shown.fileNames[part.file] = includeName(*doc, part.file);
+                shown.fileNames[part.file] = mWindow.includeName(*doc, part.file);
             }
         }
     }
-    mWeightsPane->show(std::move(shown));
+    pane->show(std::move(shown));
+}
+
+void ALScriptStudioWeighing::fixesShown(const std::string& id, U32 shown, const std::vector<ALCodeEditor::Fix>& fixes)
+{
+    mFixesToWeigh = FixesToWeigh{ id, shown, fixes };
+}
+
+void ALScriptStudioWeighing::pump()
+{
+    // The fix list last shown, weighed once nothing more is coming to it;
+    // dropped once it has closed.
+    if (mFixesToWeigh)
+    {
+        Doc* doc = mServices.findDoc(mFixesToWeigh->id);
+        if (!doc || !doc->editor->fixesOpen())
+        {
+            mFixesToWeigh.reset();
+        }
+        else if (!doc->editor->actionsAwaited())
+        {
+            const FixesToWeigh asked = std::move(*mFixesToWeigh);
+            mFixesToWeigh.reset();
+            weighFixes(*doc, asked.shown, asked.fixes);
+        }
+    }
+    // The Weights tab, filled while it is looked at: with what came since,
+    // or with the script now in front; and that script weighed for the
+    // targets beside its own, which the tab alone asks for.
+    const bool shown = mWindow.weightsShown();
+    if (shown)
+    {
+        Doc*                 doc  = mServices.frontDoc();
+        ALScriptWeightsPane* pane = mWindow.weightsPane();
+        if (mStale || !mWasShown || (pane && (doc ? doc->id : std::string()) != pane->shownId()))
+        {
+            mStale = false;
+            refreshPane();
+        }
+        if (doc && !doc->weighing.asking && doc->analysisVersion == doc->editor->document().version())
+        {
+            const U32 version = doc->editor->document().version();
+            for (const ALScriptWeight::Target each : targets(*doc))
+            {
+                const auto same = [each](const ALScriptWeight& w) { return w.target == each; };
+                const bool held =
+                    doc->weighing.allVersion == version && std::any_of(doc->weighing.all.begin(), doc->weighing.all.end(), same);
+                if (!held)
+                {
+                    weigh(*doc);
+                    break;
+                }
+            }
+        }
+    }
+    mWasShown = shown;
 }

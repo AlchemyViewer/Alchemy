@@ -335,33 +335,39 @@ struct ALScriptStudioDoc
     // A Fix All asked before the text as it stands was checked, made
     // once it is: of the problems of one kind, or of all where empty.
     std::optional<std::string>                 fixAllAfterCheck;
-    // What the script weighs for its target, as the last weighing said
-    // of the text at weightVersion; whether what was weighed is what a
-    // save compiles -- not where the optimizer changes it after -- and
-    // whether it is what a preprocessor's run made to be sent, which a
-    // check's weighing of the same text, before the optimizer, does not
-    // replace; and a weighing on its way.
-    std::optional<ALScriptWeight>              weight;
-    U32                                        weightVersion     = 0;
-    bool                                       weightExact       = false;
-    bool                                       weightSent        = false;
-    bool                                       weighing          = false;
-    // What the Weights tab lists: each target the last check's text was
-    // weighed for, its own first, in the source's places; and each
-    // target's as the text was last saved, where it was weighed while
-    // it was that text -- what "since the save" counts from.
-    std::vector<ALScriptWeight>                weights;
-    U32                                        weightsVersion    = 0;
-    std::vector<ALScriptWeight>                weightsSaved;
+    // What the script weighs (ALScriptStudioWeighing).
+    struct Weighing
+    {
+        // For its target, as the last weighing said of the text at
+        // `version`; whether what was weighed is what a save compiles --
+        // not where the optimizer changes it after -- and whether it is
+        // what a preprocessor's run made to be sent, which a check's
+        // weighing of the same text, before the optimizer, does not
+        // replace; and a weighing on its way.
+        std::optional<ALScriptWeight> weight;
+        U32                           version = 0;
+        bool                          exact   = false;
+        bool                          sent    = false;
+        bool                          asking  = false;
+        // What the Weights tab lists: each target the last check's text
+        // was weighed for, its own first, in the source's places, of the
+        // text at `allVersion`; and each target's as the text was last
+        // saved, where it was weighed while it was that text -- what
+        // "since the save" counts from.
+        std::vector<ALScriptWeight> all;
+        U32                         allVersion = 0;
+        std::vector<ALScriptWeight> saved;
+        // What a save would send, in bytes, as the last check measured
+        // it, and the text and the expansion it was measured of: what the
+        // trailer says once it is past half of what a script may be.
+        size_t                             assetBytes = 0;
+        std::optional<std::pair<U32, U32>> assetMeasured;
+    };
+    Weighing                                   weighing;
     // What the analyzer said of the text at analysisVersion; when the
     // next check is due, or zero; the version last asked about.
     ALScriptProblems                           analysis;
     U32                                        analysisVersion  = 0;
-    // What a save would send, in bytes, as the last check measured it,
-    // and the text and the expansion it was measured of: what the
-    // trailer says once it is past half of what a script may be.
-    size_t                                     assetBytes       = 0;
-    std::optional<std::pair<U32, U32>>         assetMeasured;
     U32                                        requestedVersion = 0;
     F64                                        analysisDue      = 0.0;
     std::string                                definitionsError;

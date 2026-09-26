@@ -1310,50 +1310,8 @@ void ALFloaterScriptStudio::draw()
         fillReferences();
     }
     mOutputPane->pump();
-    // The fix list last shown, weighed once nothing more is coming to it;
-    // dropped once it has closed.
-    if (mFixesToWeigh)
-    {
-        const size_t index = indexOf(mFixesToWeigh->id);
-        Doc*         doc   = index != NONE ? mDocs[index].get() : nullptr;
-        if (!doc || !doc->editor->fixesOpen())
-        {
-            mFixesToWeigh.reset();
-        }
-        else if (!doc->editor->actionsAwaited())
-        {
-            const FixesToWeigh asked = std::move(*mFixesToWeigh);
-            mFixesToWeigh.reset();
-            weighFixes(*doc, asked.shown, asked.fixes);
-        }
-    }
-    // The Weights tab, filled while it is looked at: with what came since,
-    // or with the script now in front; and that script weighed for the
-    // targets beside its own, which the tab alone asks for.
-    const bool weights_shown = weightsShown();
-    if (weights_shown)
-    {
-        Doc* doc = active();
-        if (mWeightsStale || !mWeightsWereShown || (doc ? doc->id : std::string()) != mWeightsPane->shownId())
-        {
-            mWeightsStale = false;
-            refreshWeights();
-        }
-        if (doc && !doc->weighing && doc->analysisVersion == doc->editor->document().version())
-        {
-            for (const ALScriptWeight::Target target : weighedTargets(*doc))
-            {
-                const bool held = doc->weightsVersion == doc->editor->document().version() &&
-                                  std::any_of(doc->weights.begin(), doc->weights.end(), [target](const ALScriptWeight& w) { return w.target == target; });
-                if (!held)
-                {
-                    weigh(*doc);
-                    break;
-                }
-            }
-        }
-    }
-    mWeightsWereShown = weights_shown;
+    // The fixes shown weighed, and the Weights tab kept filled.
+    mWeighing.pump();
     ALStudioFloater::draw();
 }
 
@@ -2766,7 +2724,8 @@ void ALFloaterScriptStudio::teachEditor(Doc& doc)
     // and the gutter offer them; the one taken made here, where it is known
     // whether the text is still the one the fixes were made for.
     editor.setFixProvider([this, raw](S32 line, std::vector<ALCodeEditor::Fix>& out) { fixesOn(*raw, line, out); });
-    editor.setFixesShown([this, raw](U32 shown, const std::vector<ALCodeEditor::Fix>& fixes) { mFixesToWeigh = FixesToWeigh{ raw->id, shown, fixes }; });
+    editor.setFixesShown(
+        [this, raw](U32 shown, const std::vector<ALCodeEditor::Fix>& fixes) { mWeighing.fixesShown(raw->id, shown, fixes); });
     editor.setActionRequest([this, raw](const ALTextRange& at) {
         raw->actionsAsked = at;
         askAnalyzer(*raw, ALScriptAnalysis::Kind::Actions, at.begin, at.end);
@@ -3131,7 +3090,7 @@ void ALFloaterScriptStudio::askAnalyzer(Doc& doc, ALScriptAnalysis::Kind kind, c
     }
     if (kind == ALScriptAnalysis::Kind::Weigh)
     {
-        request.targets = weighedTargets(doc);
+        request.targets = mWeighing.targets(doc);
         if (request.targets.empty())
         {
             return;
@@ -3310,7 +3269,7 @@ void ALFloaterScriptStudio::answered(const ALScriptAnalysis::Result& result, U32
             actionsAnswered(doc, result, expansion);
             break;
         case ALScriptAnalysis::Kind::Weigh:
-            weighed(doc, result);
+            mWeighing.weighed(doc, result);
             break;
     }
 }
@@ -3562,9 +3521,9 @@ void ALFloaterScriptStudio::refreshTrailer(Doc& doc)
     }
     // What its code weighs for its target, against what the target runs
     // it in: in the warning colour past four fifths, the error's past it.
-    if (!optimized && doc.weight && doc.weight->total > 0)
+    if (!optimized && doc.weighing.weight && doc.weighing.weight->total > 0)
     {
-        const ALScriptWeight&      weight = *doc.weight;
+        const ALScriptWeight&      weight = *doc.weighing.weight;
         LLStringUtil::format_map_t args;
         args["[TARGET]"] = ALScriptWeight::nameOf(weight.target);
         args["[SIZE]"]   = llformat("%.1f", (F64)weight.total / 1024.0);
@@ -3572,11 +3531,11 @@ void ALFloaterScriptStudio::refreshTrailer(Doc& doc)
         args["[BYTES]"]  = std::to_string(weight.total);
         args["[MAX]"]    = std::to_string(weight.limit);
         std::string tip  = getString(weight.estimate ? "TrailerWeightEstimateTip" : "TrailerWeightTip", args);
-        if (!doc.weightExact)
+        if (!doc.weighing.exact)
         {
             tip += " " + getString("TrailerWeightBeforeTip");
         }
-        else if (doc.weightSent)
+        else if (doc.weighing.sent)
         {
             tip += " " + getString("TrailerWeightSentTip");
         }
@@ -3595,22 +3554,23 @@ void ALFloaterScriptStudio::refreshTrailer(Doc& doc)
     // a notecard's text -- may be: in the warning colour past nine tenths,
     // the error's past the whole, where a save is refused.
     const size_t LIMIT = doc.notecard ? static_cast<size_t>(LLNotecard::MAX_SIZE) : ALScriptEnvelope::MAX_ASSET_BYTES;
-    if (doc.assetBytes * 2 > LIMIT)
+    if (doc.weighing.assetBytes * 2 > LIMIT)
     {
         LLStringUtil::format_map_t size;
-        size["[SIZE]"]  = std::to_string((doc.assetBytes + 1023) / 1024);
+        size["[SIZE]"]  = std::to_string((doc.weighing.assetBytes + 1023) / 1024);
         size["[LIMIT]"] = std::to_string(LIMIT / 1024);
-        size["[BYTES]"] = std::to_string(doc.assetBytes);
+        size["[BYTES]"] = std::to_string(doc.weighing.assetBytes);
         size["[MAX]"]   = std::to_string(LIMIT);
-        size["[OVER]"]  = std::to_string(doc.assetBytes > LIMIT ? doc.assetBytes - LIMIT : 0);
-        const char*            tip = doc.notecard ? (doc.assetBytes > LIMIT ? "TrailerNotecardSizeOverTip" : "TrailerNotecardSizeTip")
-                                                      : (doc.assetBytes > LIMIT ? "TrailerSizeOverTip" : "TrailerSizeTip");
+        size["[OVER]"]  = std::to_string(doc.weighing.assetBytes > LIMIT ? doc.weighing.assetBytes - LIMIT : 0);
+        const bool             over = doc.weighing.assetBytes > LIMIT;
+        const char*            tip  = doc.notecard ? (over ? "TrailerNotecardSizeOverTip" : "TrailerNotecardSizeTip")
+                                                   : (over ? "TrailerSizeOverTip" : "TrailerSizeTip");
         ALJumpBar::TrailerPart part{ getString("TrailerSize", size), std::string(), getString(tip, size) };
-        if (doc.assetBytes > LIMIT)
+        if (doc.weighing.assetBytes > LIMIT)
         {
             part.color = doc.editor->markColor(ALCodeEditor::Mark::Error);
         }
-        else if (doc.assetBytes * 10 > LIMIT * 9)
+        else if (doc.weighing.assetBytes * 10 > LIMIT * 9)
         {
             part.color = doc.editor->markColor(ALCodeEditor::Mark::Warning);
         }
@@ -3958,7 +3918,7 @@ void ALFloaterScriptStudio::pumpPreprocessor()
         doc->expanded.valid = false;
         // What a run made to be sent is made differently now: the check
         // weighs the text again, and the run that follows as it is sent.
-        doc->weightSent = false;
+        doc->weighing.sent = false;
         if (words && !doc->notecard && !doc->language.lua)
         {
             teachWords(*doc->editor, false);
@@ -4476,7 +4436,7 @@ void ALFloaterScriptStudio::refreshProblems(Doc& doc)
     }
     doc.editor->setDecorations(std::move(made.decorations));
     mProblemsPane->changed(doc);
-    measureAsset(doc);
+    mWeighing.measureAsset(doc);
     if (&doc == active())
     {
         refreshTrailer(doc);
@@ -6449,6 +6409,21 @@ void ALFloaterScriptStudio::onReferenceChosen(bool to_editor)
     }
     --mHoldPanes;
     revealed(mReferences, to_editor);
+}
+
+void ALFloaterScriptStudio::askAnalysis(ALScriptAnalysis::Request request, std::function<void(const ALScriptAnalysis::Result&)> answered)
+{
+    ALScriptAnalysis::instance().ask(std::move(request), std::move(answered));
+}
+
+bool ALFloaterScriptStudio::optimizing() const
+{
+    return gSavedSettings.getBOOL("ALScriptPreprocOptimizer");
+}
+
+std::string ALFloaterScriptStudio::programVersion() const
+{
+    return LLVersionInfo::instance().getChannelAndVersion();
 }
 
 bool ALFloaterScriptStudio::weightsShown() const
@@ -10252,7 +10227,7 @@ void ALFloaterScriptStudio::addViewCommands()
                 applyEditorOptions();
                 for (std::unique_ptr<Doc>& each : mDocs)
                 {
-                    showWeightsInEditor(*each);
+                    mWeighing.showInEditor(*each);
                 }
                 saveState();
             },

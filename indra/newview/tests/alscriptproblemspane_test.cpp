@@ -258,8 +258,8 @@ namespace tut
         weight.total    = 70000;
         weight.limit    = 65536;
         weight.estimate = true;
-        d.weight        = weight;
-        d.weightVersion = d.editor->document().version();
+        d.weighing.weight        = weight;
+        d.weighing.version = d.editor->document().version();
 
         ALScriptProblemsPane::Made made = gather(d);
         std::vector<std::string> messages;

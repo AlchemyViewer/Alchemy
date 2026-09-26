@@ -1007,6 +1007,7 @@ if(AL_BUILD_VIEWER)
     alscriptstudiosaving.h
     alscriptstudiovim.h
     alscriptstudiovimrc.h
+    alscriptstudioweighing.h
     alscriptstudioservices.h
     alscriptweightspane.h
     alscriptworkspace.h
@@ -2538,6 +2539,21 @@ if(AL_BUILD_TESTS)
       alscriptsaveflow.cpp
       alscriptstudiodoc.cpp
       alscriptstudiofileio.cpp
+    DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
+  )
+
+  # Script Studio's weighing, over the window's side and the analyzers
+  # faked: targets, answers, what a save sends, notes and heat, fixes.
+  al_add_test(
+    alscriptstudioweighing
+    UNIT
+    PROJECT ${test_project}
+    LIBRARIES llui alscript ${test_libs}
+    SOURCES
+      alscriptnotecardtab.cpp
+      alscriptsaveflow.cpp
+      alscriptstudiodoc.cpp
+      alscriptweightspane.cpp
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
 

@@ -194,7 +194,7 @@ void ALScriptStudioSaving::weighForSave(Doc& doc)
         // What the run made to be sent, which is what goes.
         mWindow.weighSent(doc);
     }
-    else if (doc.weight && doc.weightVersion == doc.save.warnWeightFor())
+    else if (doc.weighing.weight && doc.weighing.version == doc.save.warnWeightFor())
     {
         warnOverWeight(doc);
     }
@@ -206,7 +206,7 @@ void ALScriptStudioSaving::weighForSave(Doc& doc)
 
 void ALScriptStudioSaving::warnOverWeight(Doc& doc)
 {
-    if (doc.save.warnWeightFor() < 0 || !doc.weight || doc.weightVersion != doc.save.warnWeightFor())
+    if (doc.save.warnWeightFor() < 0 || !doc.weighing.weight || doc.weighing.version != doc.save.warnWeightFor())
     {
         return;
     }
@@ -214,8 +214,8 @@ void ALScriptStudioSaving::warnOverWeight(Doc& doc)
     // Over the limit of a target counted as exact, as nearly as the studio
     // can tell: Mono's is an estimate at the best of times, and its
     // Problems row says so.
-    const ALScriptWeight& weight = *doc.weight;
-    if (doc.weightExact && !weight.estimate && weight.total > weight.limit)
+    const ALScriptWeight& weight = *doc.weighing.weight;
+    if (doc.weighing.exact && !weight.estimate && weight.total > weight.limit)
     {
         reportOverWeight(doc, weight);
     }
@@ -408,7 +408,7 @@ void ALScriptStudioSaving::upload(Doc& doc, const std::string& text, const ALSou
                              : !doc.language.lua && !mWindow.saveOptions().compress ? "SaveTooLargeCompress"
                                                                                     : "SaveTooLargeWrapped";
         mServices.report(mServices.words("SaveTooLarge", args) + " " + mServices.words(shrink), true, &doc);
-        doc.assetBytes = text.size();
+        doc.weighing.assetBytes = text.size();
         stopped(doc);
         if (&doc == mServices.frontDoc())
         {

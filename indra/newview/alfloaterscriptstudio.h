@@ -38,6 +38,7 @@
 #include "alscriptstudiovim.h"
 #include "alscriptexternaleditor.h"
 #include "alscriptstudiofiles.h"
+#include "alscriptstudioweighing.h"
 #include "alfindings.h"
 #include "aloutputview.h"
 #include "alscriptanalysis.h"
@@ -101,7 +102,8 @@ class LLViewerObject;
 class ALFloaterScriptStudio final : public ALStudioFloater, public ALScriptStudioServices, public ALScriptOutputPane::Window, public ALScriptProblemsPane::Window,
                                     public ALScriptSearchPane::Window, public ALScriptExplorerPane::Window, public ALScriptStudioRecovery::Window,
                                     public ALScriptStudioSaving::Window, public ALScriptStudioVim::Window,
-                                    public ALScriptExternalEditor::Window, public ALScriptStudioFiles::Window
+                                    public ALScriptExternalEditor::Window, public ALScriptStudioFiles::Window,
+                                    public ALScriptStudioWeighing::Window
 {
     friend class LLFloaterReg;
 
@@ -309,12 +311,6 @@ private:
     // The strip under the editor's right-hand words: the caret's place,
     // what is selected, and how many problems the script has.
     void   refreshTrailer(Doc& doc) override;
-    // What a save of a script would send, measured again where the text or
-    // its expansion has changed since: the text as it stands, or wrapped
-    // with the analyzers' expansion where the preprocessor runs -- before
-    // the optimizer and the compression a save adds, near enough to say
-    // how near the limit it is. The save measures what it sends exactly.
-    void   measureAsset(Doc& doc);
     // What vim (ALScriptStudioVim) asks of the window: an entry in the
     // Output tab and the tab in sight, and a line picked from a list over
     // the editors.
@@ -381,39 +377,20 @@ private:
     // The refactors at the caret, kept on the Doc and handed to the editor
     // to join the fixes it lists.
     void                      actionsAnswered(Doc& doc, const ALScriptAnalysis::Result& result, U32 expansion);
-    // What a script is weighed for: its compile target's, where there is a
-    // weigher for it; nothing for a notecard or an include.
-    std::optional<ALScriptWeight::Target> weightTarget(const Doc& doc) const override;
-    // The script weighed a moment after its check, of what a save would
-    // compile as nearly as the check has it; and the answer kept.
-    void                      weigh(Doc& doc) override;
-    void                      weighed(Doc& doc, const ALScriptAnalysis::Result& result);
-    // What a preprocessor's run made to be sent -- optimized, compressed,
-    // every include in; or the text as written where it is off -- weighed
-    // as it is, after every run: `sent` is what was weighed, however many
-    // runs have come since.
-    void                      weighSent(Doc& doc) override;
-    void                      weighedSent(Doc& doc, const ALScriptAnalysis::Result& result, const Doc::Expanded& sent);
-    // The targets a script is weighed for: its own; and for an LSL script
-    // in front while the Weights tab is looked at, the other two beside it.
-    std::vector<ALScriptWeight::Target> weighedTargets(const Doc& doc) const;
-    // What the text weighs while it is the text saved, kept for the Weights
-    // tab to count from.
-    void                      keepSavedWeights(Doc& doc) override;
-    // What the script's own target's code weighs, put beside its text as
-    // the view asks: each part's bytes after the line it is declared on,
-    // and each line's heat in the gutter. Only of a weight of the text as
-    // it stands; what is there already slides with the edits until then.
-    void                      showWeightsInEditor(Doc& doc);
-    // What each fix and refactor listed would make the script weigh, said
-    // after it in the list: its edits made to a copy of what the analyzers
-    // read, and the copies weighed beside that for the script's own target
-    // on the analyzer's thread, the words put in when they come. A copy is
-    // of the expansion where the preprocessor runs, a fix's edits taken
-    // into it (ALScriptFixes::intoExpansion); false for a fix whose edits
-    // cannot be, or overlap.
-    void                      weighFixes(Doc& doc, U32 shown, const std::vector<ALCodeEditor::Fix>& fixes);
-    bool                      editedCopy(const Doc& doc, const std::vector<std::pair<ALTextRange, std::string>>& edits, std::string& out) const;
+    // Weighing (ALScriptStudioWeighing): saving's calls to it, and what
+    // it asks of the window.
+    std::optional<ALScriptWeight::Target> weightTarget(const Doc& doc) const override { return mWeighing.target(doc); }
+    void                                  weigh(Doc& doc) override { mWeighing.weigh(doc); }
+    void                                  weighSent(Doc& doc) override { mWeighing.weighSent(doc); }
+    void                                  keepSavedWeights(Doc& doc) override { mWeighing.keepSaved(doc); }
+    void                                  askWeights(Doc& doc) override { askAnalyzer(doc, ALScriptAnalysis::Kind::Weigh, ALTextPos()); }
+    void askAnalysis(ALScriptAnalysis::Request request, std::function<void(const ALScriptAnalysis::Result&)> answered) override;
+    bool optimizing() const override;
+    std::string programVersion() const override;
+    bool        weightNotes() const override { return mWeightNotes; }
+    bool        weightHeat() const override { return mWeightHeat; }
+    void        warnOverWeight(Doc& doc) override { mSaving.warnOverWeight(doc); }
+    ALScriptWeightsPane* weightsPane() override { return mWeightsPane; }
 
     // The preprocessor: whether it applies to a script; its run over the
     // text as it stands, for the analyzers, with the way back; and its
@@ -432,7 +409,7 @@ private:
     // saving (ALScriptStudioSaving::preprocess).
     void                          runPreprocessor(const Doc& doc, std::function<void(const ALPreprocessor::Result&)> answer) override;
     static S32                    mapSpan(const ALSourceMap& map, ALScriptSpan& span);
-    std::string                   includeName(const Doc& doc, const std::string& path) const;
+    std::string                   includeName(const Doc& doc, const std::string& path) const override;
     void                          chooseIncludeFolder();
     // A file on disk opened in a tab of its own, or brought forward, at
     // a place in it where one is given; read as the language its
@@ -550,7 +527,7 @@ private:
     // An LSL file on disk with no default state: an include's functions
     // and globals, which the parser takes for no script at all until a
     // state is put after them, and whose declarations are for others.
-    bool lslFragment(const Doc& doc) const;
+    bool lslFragment(const Doc& doc) const override;
     void pumpAnalysis();
     // The preprocessor's settings changed, here or in the preferences:
     // every script expanded and checked again, a moment after the last.
@@ -622,10 +599,9 @@ private:
     // opens other scripts, and the list stays what it was.
     void fillReferences();
     void onReferenceChosen(bool to_editor);
-    // The Weights tab: whether it is looked at; the script in front's
-    // weights put in it; and a part chosen there, gone to.
-    bool weightsShown() const;
-    void refreshWeights();
+    // The Weights tab: whether it is looked at; and a part chosen there,
+    // gone to.
+    bool weightsShown() const override;
     void onWeightChosen(bool to_editor);
     // A place in an include opened in a tab of its own where the include
     // is a script or a notecard in the world; one on disk is only named.
@@ -1086,23 +1062,9 @@ private:
     std::string                        mTrailerExpandedTip;
     ALScriptOutputPane*                mOutputPane = nullptr;
     ALScriptSearchPane*                mSearchPane    = nullptr;
-    // The Weights tab, and whether it was looked at last frame and has
-    // been told of everything since: it is filled while it is looked at.
-    // The fix list last shown, to be weighed a frame later -- once the
-    // refactors a quick fix asked for have joined it, where they are coming,
-    // so that the weighing does not keep them waiting on the analyzer's
-    // thread.
-    struct FixesToWeigh
-    {
-        std::string                    id;
-        U32                            shown = 0;
-        std::vector<ALCodeEditor::Fix> fixes;
-    };
-    std::optional<FixesToWeigh>        mFixesToWeigh;
+    // The Weights tab, and its list of parts.
     ALScriptWeightsPane*               mWeightsPane = nullptr;
     ALPaneList*                        mWeightsParts      = nullptr;
-    bool                               mWeightsWereShown  = false;
-    bool                               mWeightsStale      = true;
     // Which lookup across scripts the answers arriving belong to.
     U32                                mLookupGeneration = 0;
     ALScriptExplorerPane*              mExplorerPane  = nullptr;
@@ -1119,6 +1081,8 @@ private:
     ALScriptExternalEditor             mExternal{ *this, *this };
     // Its files on disk, and the recent lists.
     ALScriptStudioFiles                mFiles{ *this, *this };
+    // What its scripts weigh.
+    ALScriptStudioWeighing             mWeighing{ *this, *this };
     LLHandle<LLContextMenu>            mTabMenuHandle;
     bool                               mMain = true;
     // Whose path the bar at the bottom shows, so that a tab come to the

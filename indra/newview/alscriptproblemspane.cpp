@@ -214,9 +214,10 @@ ALScriptProblemsPane::Made ALScriptProblemsPane::make(const Doc& doc, const ALSc
     // the number is the studio's reckoning of what the region compiles --
     // an estimate for Mono, and of the text before the optimizer where it
     // runs after -- and not the region's word.
-    if (doc.weight && doc.weightVersion == doc.editor->document().version() && doc.weight->total > doc.weight->limit)
+    const std::optional<ALScriptWeight>& weighed = doc.weighing.weight;
+    if (weighed && doc.weighing.version == doc.editor->document().version() && weighed->total > weighed->limit)
     {
-        const ALScriptWeight&      weight = *doc.weight;
+        const ALScriptWeight&      weight = *doc.weighing.weight;
         LLStringUtil::format_map_t args;
         args["[SIZE]"]   = llformat("%.1f", (F64)weight.total / 1024.0);
         args["[LIMIT]"]  = std::to_string(weight.limit / 1024);
@@ -224,7 +225,8 @@ ALScriptProblemsPane::Made ALScriptProblemsPane::make(const Doc& doc, const ALSc
         Doc::Shown row;
         row.level   = Doc::Level::Warning;
         row.origin  = services.words("OriginWeight");
-        row.message = services.words(weight.estimate ? "WeightOverEstimate" : !doc.weightExact ? "WeightOverBefore" : "WeightOver", args);
+        const char* said = weight.estimate ? "WeightOverEstimate" : !doc.weighing.exact ? "WeightOverBefore" : "WeightOver";
+        row.message      = services.words(said, args);
         made.rows.push_back(std::move(row));
     }
     std::stable_sort(made.rows.begin(), made.rows.end(), [](const Doc::Shown& a, const Doc::Shown& b) {

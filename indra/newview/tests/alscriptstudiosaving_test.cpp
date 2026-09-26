@@ -359,7 +359,7 @@ namespace tut
         ensure_equals("too large: said", lastSaid(), std::string("SaveTooLarge"));
         ensure("with what would shrink it", services.reports.back().text.find("SaveTooLargePlain") != std::string::npos);
         ensure("its size kept, nothing sent, stopped",
-               big.assetBytes == too_much.size() && studio.sent.size() == 2 && !big.save.underway() && studio.stops == 1);
+               big.weighing.assetBytes == too_much.size() && studio.sent.size() == 2 && !big.save.underway() && studio.stops == 1);
 
         studio.refuse = "no region";
         Doc& refused  = tab("refused", "default {}");
@@ -512,9 +512,9 @@ namespace tut
         weight.target     = ALScriptWeight::Target::Mono;
         weight.total      = 70000;
         weight.limit      = 65536;
-        doc.weight        = weight;
-        doc.weightVersion = doc.editor->document().version();
-        doc.weightExact   = true;
+        doc.weighing.weight        = weight;
+        doc.weighing.version = doc.editor->document().version();
+        doc.weighing.exact   = true;
         saving.warnOverWeight(doc);
         ensure_equals("over: said", lastSaid(), std::string("SaveOverWeight"));
         ensure("as a failure", services.reports.back().failure);
@@ -526,9 +526,9 @@ namespace tut
         type(guessed, " ");
         saving.save(guessed);
         weight.estimate       = true;
-        guessed.weight        = weight;
-        guessed.weightVersion = guessed.editor->document().version();
-        guessed.weightExact   = true;
+        guessed.weighing.weight        = weight;
+        guessed.weighing.version = guessed.editor->document().version();
+        guessed.weighing.exact   = true;
         saving.warnOverWeight(guessed);
         ensure("an estimate is not said", services.reports.size() == said);
     }
