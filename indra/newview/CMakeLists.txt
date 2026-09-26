@@ -185,6 +185,7 @@ if(AL_BUILD_VIEWER)
     alscriptoutputpane.cpp
     alscriptpreprocessor.cpp
     alscriptproblemspane.cpp
+    alscriptreferencespane.cpp
     alscriptsaveflow.cpp
     alscriptsearch.cpp
     alscriptsearchpane.cpp
@@ -997,6 +998,7 @@ if(AL_BUILD_VIEWER)
     alscriptexternaleditor.h
     alfloaterscriptpreferences.h
     alscriptkeymap.h
+    alscriptlookup.h
     alscriptnavigation.h
     alscriptmodules.h
     alscriptnoticebar.h
@@ -1004,6 +1006,7 @@ if(AL_BUILD_VIEWER)
     alscriptoutputpane.h
     alscriptpreprocessor.h
     alscriptproblemspane.h
+    alscriptreferencespane.h
     alscriptsaveflow.h
     alscriptsearch.h
     alscriptsearchpane.h
@@ -2561,6 +2564,33 @@ if(AL_BUILD_TESTS)
     PROJECT ${test_project}
     LIBRARIES llui alscript ${test_libs}
     SOURCES alscriptnotecardtab.cpp alscriptsaveflow.cpp alscriptstudiodoc.cpp
+    DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
+  )
+
+  # Script Studio's lookups across scripts, the window's side and the
+  # preprocessor's names faked: the fan-out, answers dropped, renames.
+  al_add_test(
+    alscriptlookup
+    UNIT
+    PROJECT ${test_project}
+    LIBRARIES llui alscript ${test_libs}
+    SOURCES
+      alscriptnotecardtab.cpp
+      alscriptsaveflow.cpp
+      alscriptstudiodoc.cpp
+      alscriptstudioplaces.cpp
+      alscriptstudiowords.cpp
+    DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
+  )
+
+  # The Script Studio's References tab over the studio's own window, the
+  # window's side faked: listed, slid with edits, chosen, sorted.
+  al_add_test(
+    alscriptreferencespane
+    UNIT
+    PROJECT ${test_project}
+    LIBRARIES llui alscript ${test_libs}
+    SOURCES alscriptstudiodoc.cpp alscriptstudioplaces.cpp
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
 

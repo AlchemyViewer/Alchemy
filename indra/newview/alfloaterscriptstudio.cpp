@@ -569,7 +569,7 @@ bool ALFloaterScriptStudio::postBuild()
     mBreadcrumb    = getChild<ALJumpBar>("breadcrumb");
     mNoticeBar     = findChild<ALScriptNoticeBar>("notice");
     mBottomTabs    = getChild<LLTabContainer>("bottom_tabs");
-    mReferences    = getChild<ALPaneList>("references");
+    mReferencesPane = getChild<ALScriptReferencesPane>("references_tab");
     mOutline       = getChild<ALPaneList>("outline");
     mWeightsPane   = getChild<ALScriptWeightsPane>("weights_tab");
     mWeightsParts  = mWeightsPane->partsList();
@@ -577,7 +577,6 @@ bool ALFloaterScriptStudio::postBuild()
     // The declaration, in the script the inspector is about or in the
     // include it was declared in.
     mSymbol->onLinkClicked([this](const ALTextView::Substitution& link) { goToDeclared(link.value); });
-    mReferencesHead = getChild<LLTextBox>("references_head");
     mOutlineFilter  = getChild<LLFilterEditor>("outline_filter");
     mOutlineFilter->setCommitCallback([this](LLUICtrl*, const LLSD&) {
         if (Doc* doc = active())
@@ -619,8 +618,6 @@ bool ALFloaterScriptStudio::postBuild()
     mBreadcrumb->onChose(boost::bind(&ALFloaterScriptStudio::onCrumbChosen, this, _1, _2));
     mBreadcrumb->onTrailerChosen([this](const std::string& value) { onTrailerChosen(value); });
     mProblemsPane = getChild<ALScriptProblemsPane>("problems_tab");
-    mReferences->setCommitCallback([this](LLUICtrl*, const LLSD&) { onReferenceChosen(false); });
-    mReferences->setDoubleClickCallback([this]() { onReferenceChosen(true); });
     mWeightsParts->setCommitCallback([this](LLUICtrl*, const LLSD&) { onWeightChosen(false); });
     mWeightsParts->setDoubleClickCallback([this]() { onWeightChosen(true); });
     mOutline->setCommitCallback([this](LLUICtrl*, const LLSD&) { onOutlineChosen(false); });
@@ -638,11 +635,13 @@ bool ALFloaterScriptStudio::postBuild()
     // escape goes back to the script without going anywhere -- asked of
     // the list first, since the panel it is in takes escape to mean
     // nothing is to have the keyboard.
-    const std::pair<ALPaneList*, std::function<void()>> lists[] = { { mProblemsPane->list(), [this]() { mProblemsPane->choose(true); } },
-                                                                          { mReferences, [this]() { onReferenceChosen(true); } },
-                                                                          { mOutline, [this]() { onOutlineChosen(true); } },
-                                                                          { mSearchPane->list(), [this]() { mSearchPane->choose(true); } },
-                                                                          { mWeightsParts, [this]() { onWeightChosen(true); } } };
+    const std::pair<ALPaneList*, std::function<void()>> lists[] = {
+        { mProblemsPane->list(), [this]() { mProblemsPane->choose(true); } },
+        { mReferencesPane->list(), [this]() { mReferencesPane->choose(true); } },
+        { mOutline, [this]() { onOutlineChosen(true); } },
+        { mSearchPane->list(), [this]() { mSearchPane->choose(true); } },
+        { mWeightsParts, [this]() { onWeightChosen(true); } }
+    };
     for (const auto& [list, go] : lists)
     {
         list->setKeyHandler([this, list, go](KEY key, MASK mask) {
@@ -673,30 +672,6 @@ bool ALFloaterScriptStudio::postBuild()
             return true;
         });
     }
-    mReferences->setComparison([this](S32 column, const LLScrollListItem* a, const LLScrollListItem* b) {
-        const size_t i = static_cast<size_t>(a->getValue().asInteger());
-        const size_t j = static_cast<size_t>(b->getValue().asInteger());
-        if (i >= mFound.places.size() || j >= mFound.places.size())
-        {
-            return 0;
-        }
-        const Doc::Place& x    = mFound.places[i];
-        const Doc::Place& y    = mFound.places[j];
-        const auto        cell = [](const LLScrollListItem* item, S32 at) { return item->getColumn(at) ? item->getColumn(at)->getValue().asString() : std::string(); };
-        S32               said = 0;
-        switch (column)
-        {
-            case 0: said = LLStringUtil::compareDict(cell(a, 0), cell(b, 0)); break;
-            case 2: said = cell(b, 2).size() < cell(a, 2).size() ? -1 : cell(b, 2).size() > cell(a, 2).size() ? 1 : 0; break;
-            case 3: said = LLStringUtil::compareDict(x.text, y.text); break;
-            default: break;
-        }
-        if (said == 0 && column != 1 && x.file != y.file)
-        {
-            said = LLStringUtil::compareDict(cell(a, 0), cell(b, 0));
-        }
-        return said != 0 ? said : x.span < y.span ? -1 : y.span < x.span ? 1 : 0;
-    });
     mOutlineSort = getChild<LLComboBox>("outline_sort");
     mOutlineSort->selectFirstItem();
     mOutlineSort->setCommitCallback([this](LLUICtrl*, const LLSD&) {
@@ -710,7 +685,8 @@ bool ALFloaterScriptStudio::postBuild()
     // Copy from the lists with no menu of their own; the problems' has
     // its own copying, and a right-click there would bring up both, the
     // copy menu over it.
-    for (LLScrollListCtrl* list : { static_cast<LLScrollListCtrl*>(mReferences), static_cast<LLScrollListCtrl*>(mSearchPane->list()) })
+    for (LLScrollListCtrl* list :
+         { static_cast<LLScrollListCtrl*>(mReferencesPane->list()), static_cast<LLScrollListCtrl*>(mSearchPane->list()) })
     {
         listMenuFor(list);
     }
@@ -1307,10 +1283,7 @@ void ALFloaterScriptStudio::draw()
     mSearchPane->pump();
     mNavigation.pumpSettle();
     refreshUndoLabels();
-    if (mPlacesStale)
-    {
-        fillReferences();
-    }
+    mReferencesPane->pump();
     mOutputPane->pump();
     // The fixes shown weighed, and the Weights tab kept filled.
     mWeighing.pump();
@@ -1471,7 +1444,7 @@ void ALFloaterScriptStudio::rekeyDoc(Doc& doc, const std::string& id)
         }
     };
     mProblemsPane->rekey(was, id);
-    follow(mFound.from);
+    mReferencesPane->rekey(was, id);
     mNavigation.rekey(was, id);
     mSearchPane->rekey(was, id);
     for (const std::unique_ptr<Doc>& other : mDocs)
@@ -1739,7 +1712,7 @@ void ALFloaterScriptStudio::wireDoc(Doc& doc)
     });
     doc.placedEdits = doc.editor->document().onChanged([this, raw](const ALTextDocument::Edit& edit) {
         slideProblems(*raw, edit);
-        slidePlaces(*raw, edit);
+        mReferencesPane->slide(*raw, raw->file.empty() ? ALScriptPreprocessor::pathOf(raw->ref) : raw->id, edit);
         slideOutline(*raw, edit);
     });
 }
@@ -4076,8 +4049,9 @@ void ALFloaterScriptStudio::refreshBottomTabs()
     const S32 held  = mProblemsPane ? mProblemsPane->held() : 0;
     args["[COUNT]"] = std::to_string(held);
     title("problems_tab", getString(held > 0 ? "TabProblemsCount" : "TabProblems", args));
-    args["[COUNT]"] = std::to_string(mFound.places.size());
-    title("references_tab", getString(mFound.places.empty() ? "TabReferences" : "TabReferencesCount", args));
+    const size_t found = mReferencesPane ? mReferencesPane->found().places.size() : 0;
+    args["[COUNT]"]    = std::to_string(found);
+    title("references_tab", getString(found == 0 ? "TabReferences" : "TabReferencesCount", args));
     title("output_tab", getString(mOutputPane && mOutputPane->unread() ? "TabOutputUnread" : "TabOutput"));
 }
 
@@ -4776,7 +4750,7 @@ void ALFloaterScriptStudio::symbolAnswered(Doc& doc, const ALScriptAnalysis::Res
             break;
         case ALEditorCommand::FindReferences:
         case ALEditorCommand::Rename:
-            startLookup(doc, command, refs, hasDefinition, homePath, definition, std::move(places), result.version);
+            mLookup.start(doc, command, refs, hasDefinition, homePath, definition, std::move(places), result.version);
             break;
         default:
             break;
@@ -4784,6 +4758,115 @@ void ALFloaterScriptStudio::symbolAnswered(Doc& doc, const ALScriptAnalysis::Res
 }
 
 // --- across the object's scripts ------------------------------------------------------
+
+std::vector<ALScriptLookup::Candidate> ALFloaterScriptStudio::candidates(const Doc& doc)
+{
+    std::vector<ALScriptLookup::Candidate> found;
+    if (doc.ref.inInventory())
+    {
+        return found;
+    }
+    for (const ALScriptExplorerModel::Object& object : mExplorerPane->model().objects())
+    {
+        bool ours = false;
+        for (const ALScriptExplorerModel::Prim& prim : object.prims)
+        {
+            ours = ours || prim.id == doc.ref.object;
+        }
+        if (!ours || !object.present)
+        {
+            continue;
+        }
+        for (const ALScriptExplorerModel::Prim& prim : object.prims)
+        {
+            for (const ALScriptWorkspace::Item& item : prim.items)
+            {
+                const ALScriptRef ref(prim.id, item.id);
+                if (item.script && item.lua == doc.language.lua && ref != doc.ref)
+                {
+                    found.push_back({ ref, item.name });
+                }
+            }
+        }
+    }
+    return found;
+}
+
+void ALFloaterScriptStudio::loadSource(const ALScriptRef& ref, std::function<void(const LLUUID& asset, const std::string& source)> loaded)
+{
+    ALScriptWorkspace::instance().load(ref, [loaded = std::move(loaded)](const ALScriptWorkspace::Loaded& answer) {
+        loaded(answer.assetId, sourceOf(answer));
+    });
+}
+
+void ALFloaterScriptStudio::expand(ALScriptPreprocessor::Request request, std::function<void(const ALPreprocessor::Result&)> expanded)
+{
+    ALScriptPreprocessor::instance().run(request, std::move(expanded));
+}
+
+void ALFloaterScriptStudio::showFound(Doc& doc, const ALScriptLookup::Found& found)
+{
+    std::vector<ALTextRange> lit;
+    for (const Doc::Place& place : found.places)
+    {
+        if (place.file.empty())
+        {
+            lit.push_back(rangeOf(place.span));
+        }
+    }
+    doc.editor->setHighlights(std::move(lit));
+    mReferencesPane->show(found);
+    showBottom("references_tab");
+}
+
+void ALFloaterScriptStudio::askNewName(Doc& doc, std::function<std::string(const std::string& typed)> hint,
+                                       std::function<void(const std::string& name)> chosen)
+{
+    ALQuickOpen* quick = quickOpen({}, getString("RenamePlaceholder"), getString("RenameTitle"), std::move(chosen), mEditorHost, 420, 56);
+    if (!quick)
+    {
+        return;
+    }
+    // The row under the field says what return will do with what is typed.
+    quick->onQueryChanged([quick, hint = std::move(hint)](const std::string& typed) {
+        if (const std::string said = hint(typed); !said.empty())
+        {
+            quick->setHint(said);
+        }
+    });
+    quick->setQuery(doc.lookup.name);
+    quick->takeFocus();
+}
+
+void ALFloaterScriptStudio::referenceChosen(const ALScriptReferencesPane::Found& found, const Doc::Place& place, bool to_editor)
+{
+    ALPaneList* list = mReferencesPane->list();
+    if (!to_editor && mNavigation.deferOpen(list, place.file))
+    {
+        return;
+    }
+    mNavigation.noteJump(!to_editor);
+    ++mHoldPanes;
+    if (place.file.empty())
+    {
+        // The script it was looked up from, whichever tab is in front.
+        const size_t from = indexOf(found.from);
+        if (from != NONE)
+        {
+            if (from != mActive)
+            {
+                activate(from);
+            }
+            sourceInFront(*mDocs[from]).goTo(rangeOf(place.span));
+        }
+    }
+    else
+    {
+        openIncludeAt(place.file, place.fileName, place.span.line, place.span.column, place.span.endColumn - place.span.column);
+    }
+    --mHoldPanes;
+    revealed(list, to_editor);
+}
 
 void ALFloaterScriptStudio::save(Doc& doc)
 {
@@ -5057,9 +5140,9 @@ void ALFloaterScriptStudio::choosePreview(ALPaneList* list)
     {
         mProblemsPane->choose(false);
     }
-    else if (list == mReferences)
+    else if (list == mReferencesPane->list())
     {
-        onReferenceChosen(false);
+        mReferencesPane->choose(false);
     }
     else if (list == mSearchPane->list())
     {
@@ -5073,7 +5156,7 @@ void ALFloaterScriptStudio::choosePreview(ALPaneList* list)
 
 bool ALFloaterScriptStudio::workedFrom(const Doc& doc) const
 {
-    return doc.id == mProblemsPane->listedId() || doc.id == mFound.from;
+    return doc.id == mProblemsPane->listedId() || doc.id == mReferencesPane->found().from;
 }
 
 void ALFloaterScriptStudio::openIncludeAt(const std::string& path, const std::string& name, S32 line, S32 column, S32 length)
@@ -6317,7 +6400,7 @@ void ALFloaterScriptStudio::showBottom(const char* tab, bool focus)
     // Asked for by its key: the keyboard to the list, to walk it.
     const std::string name(tab);
     LLUICtrl* list = name == "problems_tab" ? static_cast<LLUICtrl*>(mProblemsPane->list())
-                     : name == "references_tab" ? static_cast<LLUICtrl*>(mReferences)
+                     : name == "references_tab" ? static_cast<LLUICtrl*>(mReferencesPane->list())
                      : name == "output_tab"     ? static_cast<LLUICtrl*>(mOutputPane->view())
                      : name == "weights_tab"    ? static_cast<LLUICtrl*>(mWeightsParts)
                                                 : nullptr;
@@ -7897,11 +7980,10 @@ void ALFloaterScriptStudio::letGoOf(size_t index, bool keep)
         }
         mExternal.stop(doc);
         mProblemsPane->closed(doc.id);
-        if (doc.id == mFound.from)
+        if (doc.id == mReferencesPane->found().from)
         {
             // Its own places cannot be gone to with it closed.
-            mFound = References();
-            fillReferences();
+            mReferencesPane->forget();
         }
         // Off the editor now: it is deleted with the frame, after the Doc
         // this callback points at has gone. A connection lets go safely
@@ -8886,7 +8968,9 @@ void ALFloaterScriptStudio::writeState(LLSD& state) const
         state["bottom_tab"] = mBottomTabs->getCurrentPanel()->getName();
     }
     // How each list was sorted, by a column's title, and the outline.
-    for (auto [name, list] : { std::make_pair("problems", mProblemsPane ? mProblemsPane->list() : nullptr), std::make_pair("references", mReferences), std::make_pair("search", mSearchPane ? mSearchPane->list() : nullptr) })
+    for (auto [name, list] : { std::make_pair("problems", mProblemsPane ? mProblemsPane->list() : nullptr),
+                               std::make_pair("references", mReferencesPane ? mReferencesPane->list() : nullptr),
+                               std::make_pair("search", mSearchPane ? mSearchPane->list() : nullptr) })
     {
         if (list && !list->getSortColumnName().empty())
         {
@@ -9035,7 +9119,9 @@ void ALFloaterScriptStudio::readState(const LLSD& state)
     {
         mBottomTabs->selectTabByName(state["bottom_tab"].asString());
     }
-    for (auto [name, list] : { std::make_pair("problems", mProblemsPane ? mProblemsPane->list() : nullptr), std::make_pair("references", mReferences), std::make_pair("search", mSearchPane ? mSearchPane->list() : nullptr) })
+    for (auto [name, list] : { std::make_pair("problems", mProblemsPane ? mProblemsPane->list() : nullptr),
+                               std::make_pair("references", mReferencesPane ? mReferencesPane->list() : nullptr),
+                               std::make_pair("search", mSearchPane ? mSearchPane->list() : nullptr) })
     {
         if (list && state["sort"].has(name))
         {

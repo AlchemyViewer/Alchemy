@@ -1742,6 +1742,7 @@
                             </layout_stack>
                         </panel>
                         <panel
+                         class="script_studio_references"
                          follows="all"
                          height="168"
                          label="References"

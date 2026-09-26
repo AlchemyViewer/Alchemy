@@ -42,6 +42,8 @@
 #include "alscriptstudiowords.h"
 #include "alscriptstudioorphans.h"
 #include "alscriptnavigation.h"
+#include "alscriptlookup.h"
+#include "alscriptreferencespane.h"
 #include "alfindings.h"
 #include "aloutputview.h"
 #include "alscriptanalysis.h"
@@ -107,7 +109,8 @@ class ALFloaterScriptStudio final : public ALStudioFloater, public ALScriptStudi
                                     public ALScriptStudioSaving::Window, public ALScriptStudioVim::Window,
                                     public ALScriptExternalEditor::Window, public ALScriptStudioFiles::Window,
                                     public ALScriptStudioWeighing::Window, public ALScriptStudioOrphans::Window,
-                                    public ALScriptNoticeBar::Window, public ALScriptNavigation::Window
+                                    public ALScriptNoticeBar::Window, public ALScriptNavigation::Window, public ALScriptLookup::Window,
+                                    public ALScriptReferencesPane::Window
 {
     friend class LLFloaterReg;
 
@@ -441,7 +444,7 @@ private:
     // A line of an include as it reads -- in its tab where it is open,
     // else as the preprocessor last read it -- untrimmed; false where
     // neither has it.
-    bool                          sourceLine(const std::string& path, S32 line, std::string& out) const;
+    bool                          sourceLine(const std::string& path, S32 line, std::string& out) const override;
 
     void loaded(const ALScriptWorkspace::Loaded& answer);
     // The caret to the line, or the stretch, asked for before the text had
@@ -477,9 +480,6 @@ private:
     void choosePreview(ALPaneList* list) override;
     bool workedFrom(const Doc& doc) const override;
     void focusDoc(Doc& doc) override { focusShown(doc); }
-    // The places found moved with an edit to the script they are in, as the
-    // problems are; gone where the edit touched the name.
-    void slidePlaces(Doc& doc, const ALTextDocument::Edit& edit);
     // What an include is, as a mark: a file on disk, a notecard, a script.
     const char* includeImage(const std::string& path, bool lua) const;
     // Where a hover or the inspector says a name was declared, gone to: in
@@ -540,28 +540,18 @@ private:
     // `at` is where the question was about in the source, which the
     // result's own place is not where the analyzer read the expansion.
     void symbolAnswered(Doc& doc, const ALScriptAnalysis::Result& result, const ALTextPos& at);
-    // A name looked for beyond the script: in every other script of the
-    // object that includes the script declaring it, or is that script,
-    // each expanded as the compiler would see it and asked where the
-    // name stands, then answered together -- the places listed, or the
-    // new name asked for and put in every script, the ones not open
-    // opened with the change unsaved.
-    void startLookup(Doc& doc, ALEditorCommand command, const ALScriptReferences& refs, bool has_definition, const std::string& home_path,
-                     const ALScriptSpan& definition, std::vector<Doc::Place> places, U32 version);
-    void lookupCandidate(const std::string& id, U32 generation, const ALScriptRef& ref, const std::string& name, const LLUUID& asset_id,
-                         const std::string& text);
-    void lookupExpanded(const std::string& id, U32 generation, const ALScriptRef& ref, const std::string& name, const std::string& source,
-                        const ALPreprocessor::Result& result);
-    void lookupAnswered(const std::string& id, U32 generation, const ALScriptRef& ref, const std::string& name, const ALSourceMap& map,
-                        const std::string& source, const std::string& expanded, const ALScriptAnalysis::Result& result);
-    void lookupSettled(Doc& doc);
-    static void addPlace(Doc::Lookup& lookup, Doc::Place place);
-    // The new name asked for in a popover over the window, with a row
-    // saying what return will do as it is typed, and put everywhere as
-    // one step if the text has not moved on.
-    void askNewName(Doc& doc);
-    void renameTo(const std::string& id, U32 generation, const std::string& new_name);
-    void applyPendingEdits(Doc& doc) override;
+    // A name looked for beyond the script (ALScriptLookup): the object's
+    // other scripts in its language, read as the region has them and
+    // expanded; the places found shown; the new name asked for in a
+    // popover over the window, with a row saying what return will do as
+    // it is typed.
+    std::vector<ALScriptLookup::Candidate> candidates(const Doc& doc) override;
+    void loadSource(const ALScriptRef& ref, std::function<void(const LLUUID& asset, const std::string& source)> loaded) override;
+    void expand(ALScriptPreprocessor::Request request, std::function<void(const ALPreprocessor::Result&)> expanded) override;
+    void showFound(Doc& doc, const ALScriptLookup::Found& found) override;
+    void askNewName(Doc& doc, std::function<std::string(const std::string& typed)> hint,
+                    std::function<void(const std::string& name)> chosen) override;
+    void applyPendingEdits(Doc& doc) override { mLookup.applyPendingEdits(doc); }
     // The script handed to an external editor (ALScriptExternalEditor):
     // saving's calls to it, a save from outside run here, and the bridge
     // and the editor's launch, which are the window's -- VS Code itself
@@ -574,10 +564,11 @@ private:
     bool        subscribe(Doc& doc) override;
     void        unsubscribe(const Doc& doc) override;
     void        startEditor(Doc& doc, const std::string& file, bool on_disk) override;
-    // The places last found, whichever tab is in front: following them
-    // opens other scripts, and the list stays what it was.
-    void fillReferences();
-    void onReferenceChosen(bool to_editor);
+    // The places last found, whichever tab is in front (the References
+    // tab): following them opens other scripts, and the list stays what
+    // it was.
+    void referenceChosen(const ALScriptReferencesPane::Found& found, const Doc::Place& place, bool to_editor) override;
+    void referencesCounted() override { refreshBottomTabs(); }
     // The Weights tab: whether it is looked at; and a part chosen there,
     // gone to.
     bool weightsShown() const override;
@@ -818,8 +809,6 @@ private:
     void refreshKeyTips();
     // Edit > Undo and Redo named for the step they take, where it has one.
     void refreshUndoLabels();
-    // A name that a rename may not take: one of the language's own.
-    bool reservedName(const Doc& doc, const std::string& name) const;
     // The window's own commands in the table, by the menu that gives them;
     // a unit split out of the window registers its own. An editor's own
     // command, on the view in front: `changes` for one that changes the
@@ -971,28 +960,12 @@ private:
     ALJumpBar*                         mBreadcrumb    = nullptr;
     LLTabContainer*                    mBottomTabs    = nullptr;
     ALScriptProblemsPane*              mProblemsPane = nullptr;
-    ALPaneList*                        mReferences    = nullptr;
+    ALScriptReferencesPane*            mReferencesPane = nullptr;
     ALPaneList*                        mOutline       = nullptr;
     ALTextView*                        mSymbol        = nullptr;
     // Held while a pane's row is followed into a tab, so that the panes
     // go on listing what they were rather than the tab's.
     S32                                mHoldPanes       = 0;
-    // The places the last Find References found, and what was looked up
-    // from where: the script's own places are its, whichever is in front.
-    struct References
-    {
-        std::string             from;
-        std::string             fromName;
-        std::string             name;
-        std::vector<Doc::Place> places;
-        bool                    hasDefinition = false;
-        std::string             home;
-        ALScriptSpan            definition;
-    };
-    References                         mFound;
-    // Whether an edit has moved the places since the list was filled.
-    bool                               mPlacesStale    = false;
-    LLTextBox*                         mReferencesHead = nullptr;
     LLFilterEditor*                    mOutlineFilter  = nullptr;
     // What the outline's rows last said, and whose they were: a check
     // that changes none of it leaves the list as it is.
@@ -1011,8 +984,6 @@ private:
     // The Weights tab, and its list of parts.
     ALScriptWeightsPane*               mWeightsPane = nullptr;
     ALPaneList*                        mWeightsParts      = nullptr;
-    // Which lookup across scripts the answers arriving belong to.
-    U32                                mLookupGeneration = 0;
     ALScriptExplorerPane*              mExplorerPane  = nullptr;
     // What each of the menus' items does, whether it can, and whether it
     // is on, by the item's name.
@@ -1033,6 +1004,8 @@ private:
     ALScriptStudioOrphans              mOrphans{ *this, *this };
     // The places gone from, and the previews a list opens as it is walked.
     ALScriptNavigation                 mNavigation{ *this, *this };
+    // Its names looked up across the object's scripts, and renamed.
+    ALScriptLookup                     mLookup{ *this, *this };
     LLHandle<LLContextMenu>            mTabMenuHandle;
     bool                               mMain = true;
     // Whose path the bar at the bottom shows, so that a tab come to the
