@@ -109,13 +109,13 @@ namespace
         }
         bool readFile(const std::string& path, std::string& text) override
         {
-            std::ifstream in(fsyspath(path), std::ios::binary);
+            llifstream in(path, std::ios::binary);
             text.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
             return bool(in) || in.eof();
         }
         bool writeFile(const std::string& path, const std::string& text) override
         {
-            std::ofstream out(fsyspath(path), std::ios::binary);
+            llofstream out(path, std::ios::binary);
             out << text;
             return bool(out);
         }
@@ -198,14 +198,14 @@ namespace tut
             for (const auto& [name, text] : { std::pair{ "main.lsl", "default {}\n" }, std::pair{ "notes.txt", "a note" },
                                               std::pair{ "lib/util.luau", "local x = 1\nreturn x\n" }, std::pair{ ".hidden", "" } })
             {
-                std::ofstream(fsyspath(folder + "/" + name), std::ios::binary) << text;
+                llofstream(folder + "/" + name, std::ios::binary) << text;
             }
             studio.folders = { folder };
         }
         std::string in(const std::string& name) const { return fsyspath((fsyspath(folder) / fsyspath(name)).lexically_normal()).string(); }
         static std::string contents(const std::string& path)
         {
-            std::ifstream in(fsyspath(path), std::ios::binary);
+            llifstream in(path, std::ios::binary);
             return std::string(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
         }
         // What vim over a tab's editor says, where one is put over it.

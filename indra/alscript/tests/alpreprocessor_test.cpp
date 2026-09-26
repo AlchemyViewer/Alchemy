@@ -558,7 +558,7 @@ namespace tut
     {
         set_test_name("every golden file comes out as its expected text");
         namespace fs = std::filesystem;
-        const fs::path dir = fs::path(AL_ALSCRIPT_TEST_DIR) / "preprocessor";
+        const fs::path dir = fsyspath(AL_ALSCRIPT_TEST_DIR) / "preprocessor";
         S32            checked = 0;
         for (const fs::directory_entry& entry : fs::directory_iterator(dir))
         {
@@ -570,7 +570,7 @@ namespace tut
             const std::string stem     = entry.path().stem().string();
             const fs::path    expected = dir / (stem + "_expected" + entry.path().extension().string());
             const auto        read     = [](const fs::path& path) {
-                std::ifstream     in(path, std::ios::binary);
+                llifstream        in(path, std::ios::binary);
                 std::stringstream buffer;
                 buffer << in.rdbuf();
                 return buffer.str();
@@ -607,7 +607,7 @@ namespace tut
             // before it is kept.
             if (const char* write = std::getenv("AL_PREPROCESSOR_WRITE_EXPECTED"); write && *write)
             {
-                std::ofstream out(expected, std::ios::binary);
+                llofstream out(expected, std::ios::binary);
                 out << r.text;
                 continue;
             }
@@ -1139,7 +1139,7 @@ namespace tut
         }
         // Nexii's library, whose ObjectLinksetSittingAvatars has a parameter
         // without its type, included as a save would include it.
-        std::ifstream     in(std::string(AL_ALSCRIPT_TEST_DIR) + "/preprocessor/include/linkset.lsl", std::ios::binary);
+        llifstream        in(std::string(AL_ALSCRIPT_TEST_DIR) + "/preprocessor/include/linkset.lsl", std::ios::binary);
         std::stringstream library;
         library << in.rdbuf();
         add("linkset.lsl", library.str());

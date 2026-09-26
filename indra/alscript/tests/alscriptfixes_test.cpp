@@ -57,7 +57,7 @@ namespace tut
         alscriptfixes_data()
         {
             lslLoaded = lsl.loadBuiltins(std::string(AL_LSL_DEFINITIONS_DIR) + "/builtins.txt", error);
-            std::ifstream     in(std::string(AL_LSL_DEFINITIONS_DIR) + "/secondlife.d.luau", std::ios::binary);
+            llifstream        in(std::string(AL_LSL_DEFINITIONS_DIR) + "/secondlife.d.luau", std::ios::binary);
             std::stringstream text;
             text << in.rdbuf();
             luau.setNewSolver(newSolver, error);

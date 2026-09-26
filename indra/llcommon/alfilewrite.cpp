@@ -46,7 +46,7 @@ namespace
     // the file closes, and is the likeliest not to go.
     Wrote writeAll(const std::filesystem::path& file, std::string_view text)
     {
-        std::ofstream out(file, std::ios::binary | std::ios::trunc);
+        llofstream out(file, std::ios::binary | std::ios::trunc);
         if (!out.is_open())
         {
             return Wrote::NotOpened;
@@ -89,13 +89,13 @@ bool whole(const std::string& path, std::string_view text)
     const bool                         exists = !ec && std::filesystem::exists(was);
     if (exists)
     {
-        std::ofstream probe(target, std::ios::binary | std::ios::app);
+        llofstream probe(target, std::ios::binary | std::ios::app);
         if (!probe.is_open())
         {
             return false;
         }
     }
-    const fsyspath beside(besideOf(target.string()));
+    const fsyspath beside(besideOf(fsyspath(target).string()));
     const Wrote    wrote = writeAll(beside, text);
     if (wrote == Wrote::Done)
     {

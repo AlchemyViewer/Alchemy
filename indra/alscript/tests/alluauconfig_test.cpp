@@ -146,8 +146,8 @@ namespace tut
                                    "\"aliases\": { \"lib\": \"./rootlib\", \"root\": \"./r\" } }";
         const std::string broken = "{ not a configuration";
         const std::string middle = "{ \"globals\": [\"b\"], \"lint\": { \"FunctionUnused\": false }, \"aliases\": { \"lib\": \"./midlib\" } }";
-        const std::string near   = "{ \"languageMode\": \"nonstrict\", \"globals\": [\"c\"], \"lint\": { \"LocalUnused\": true } }";
-        const std::vector<std::string_view> chain{ near, middle, broken, root };
+        const std::string nearby = "{ \"languageMode\": \"nonstrict\", \"globals\": [\"c\"], \"lint\": { \"LocalUnused\": true } }";
+        const std::vector<std::string_view> chain{ nearby, middle, broken, root };
 
         ALLuauConfig merged;
         ensure("parsed", ALLuauConfig::parseChain(chain, merged));

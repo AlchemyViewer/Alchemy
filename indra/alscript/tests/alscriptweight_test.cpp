@@ -243,6 +243,24 @@ namespace tut
         ensure("a script that does not parse", !broken.compiled && !broken.error.empty());
     }
 
+    // A long list parses on every platform: each element nests the parse two
+    // states deeper, and the parser's limit is the same everywhere.
+    template<> template<>
+    void alscriptweight_object::test<10>()
+    {
+        ensure("builtins: " + error, lslLoaded);
+        std::string script = "list gNumbers = [";
+        for (int i = 0; i < 3000; ++i)
+        {
+            script += (i ? ", " : "") + std::to_string(i);
+        }
+        script += "];\ndefault\n{\n    state_entry()\n    {\n        llOwnerSay((string)llGetListLength(gNumbers));\n    }\n}\n";
+        lsl.check(script);
+        ensure("it parses", lsl.parsed());
+        const ALScriptWeight weight = ALScriptWeigh::lso(script);
+        ensure("and is weighed: " + weight.error, weight.total > 0);
+    }
+
     // Mono is an estimate: the IL sized by the opcode table with what it
     // declares, over what an assembly costs; each function and handler a
     // part where it is, and the parts are the whole.

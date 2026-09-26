@@ -46,7 +46,7 @@ namespace tut
 
         alluauservice_data()
         {
-            std::ifstream in(std::string(AL_LSL_DEFINITIONS_DIR) + "/secondlife.d.luau", std::ios::binary);
+            llifstream in(std::string(AL_LSL_DEFINITIONS_DIR) + "/secondlife.d.luau", std::ios::binary);
             std::stringstream text;
             text << in.rdbuf();
             definitions = text.str();
@@ -252,7 +252,7 @@ namespace tut
     {
         set_test_name("hover says what a name is, with its documentation, and where a local was bound");
         ensure("definitions loaded: " + error, loaded);
-        std::ifstream in(std::string(AL_LSL_DEFINITIONS_DIR) + "/secondlife.docs.json", std::ios::binary);
+        llifstream in(std::string(AL_LSL_DEFINITIONS_DIR) + "/secondlife.docs.json", std::ios::binary);
         std::stringstream json;
         json << in.rdbuf();
         std::string docs_error;

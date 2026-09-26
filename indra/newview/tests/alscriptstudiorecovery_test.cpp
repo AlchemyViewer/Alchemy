@@ -265,7 +265,7 @@ namespace tut
         Doc&                    doc     = tab("a", "x\n");
         const std::string       blocked = folder + "/blocked";
         {
-            std::ofstream file(blocked);
+            llofstream file(blocked);
             file << "a file where a folder would be";
         }
         ALScriptRecoveryStore nowhere(blocked, "this-session");
@@ -345,7 +345,7 @@ namespace tut
         r.recover(file);
         ensure("a file gone, a tab of its own", studio().orphans.size() == 1 && studio().orphans[0].second == Doc::Orphan::FileGone);
         {
-            std::ofstream there(folder + "/here.lsl");
+            llofstream there(folder + "/here.lsl");
             there << "on disk\n";
         }
         file.file         = folder + "/here.lsl";

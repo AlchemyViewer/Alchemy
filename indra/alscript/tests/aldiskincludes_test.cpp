@@ -70,7 +70,7 @@ namespace
         {
             const fs::path path = under(relative);
             fs::create_directories(path.parent_path());
-            std::ofstream out(path, std::ios::binary);
+            llofstream out(path, std::ios::binary);
             out << text;
             return fsyspath(path).string();
         }

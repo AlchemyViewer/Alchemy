@@ -325,7 +325,7 @@ namespace tut
     {
         set_test_name("every golden file comes out as its expected text");
         namespace fs = std::filesystem;
-        const fs::path dir     = fs::path(AL_ALSCRIPT_TEST_DIR) / "optimizer";
+        const fs::path dir     = fsyspath(AL_ALSCRIPT_TEST_DIR) / "optimizer";
         S32            checked = 0;
         for (const fs::directory_entry& entry : fs::directory_iterator(dir))
         {
@@ -337,7 +337,7 @@ namespace tut
             const std::string stem     = entry.path().stem().string();
             const fs::path    expected = dir / (stem + "_expected.lsl");
             const auto        read     = [](const fs::path& path) {
-                std::ifstream     in(path, std::ios::binary);
+                llifstream        in(path, std::ios::binary);
                 std::stringstream buffer;
                 buffer << in.rdbuf();
                 return buffer.str();
@@ -352,7 +352,7 @@ namespace tut
             ensure("optimized " + name + ": " + notes(r), r.optimized);
             if (const char* write = std::getenv("AL_OPTIMIZER_WRITE_EXPECTED"); write && *write)
             {
-                std::ofstream out(expected, std::ios::binary);
+                llofstream out(expected, std::ios::binary);
                 out << r.text;
                 continue;
             }

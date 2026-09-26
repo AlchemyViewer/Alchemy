@@ -181,10 +181,10 @@ namespace tut
         }
         static std::string contents(const std::string& path)
         {
-            std::ifstream in(fsyspath(path), std::ios::binary);
+            llifstream in(fsyspath(path), std::ios::binary);
             return std::string(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
         }
-        static void write(const std::string& path, const std::string& text) { std::ofstream(fsyspath(path), std::ios::binary) << text; }
+        static void write(const std::string& path, const std::string& text) { llofstream(fsyspath(path), std::ios::binary) << text; }
         const al_studio_test::FakeServices::Said& said() const { return services.reports.back(); }
     };
 

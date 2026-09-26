@@ -61,7 +61,7 @@ namespace tut
         std::string write(const std::string& name, const std::string& text) const
         {
             const std::string path = gDirUtilp->add(mDir, name);
-            std::ofstream out(path, std::ios::binary | std::ios::trunc);
+            llofstream out(path, std::ios::binary | std::ios::trunc);
             out << text;
             return path;
         }

@@ -568,7 +568,7 @@ namespace tut
         // Where the folder cannot be written, said by key.
         const std::string blocked = folder + "/blocked";
         {
-            std::ofstream file(blocked);
+            llofstream file(blocked);
             file << "a file where a folder would be";
         }
         ALScriptRecoveryStore nowhere(blocked, "session-a");

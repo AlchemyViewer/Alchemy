@@ -95,7 +95,7 @@ namespace ll_test
             mConfig("config")
         {
             const std::string fonts_xml = mDir.add(std::string(LLUI_TEST_APP_DIR), "skins/default/xui/en/fonts.xml");
-            if (std::string(LLUI_TEST_APP_DIR).empty() || !fileExists(fonts_xml))
+            if (std::string(LLUI_TEST_APP_DIR).empty() || !LLFile::isfile(fonts_xml))
             {
                 return;
             }
@@ -128,16 +128,6 @@ namespace ll_test
             gFloaterView = LLUICtrlFactory::create<LLFloaterView>(fvp);
 
             mOk = true;
-        }
-
-        static bool fileExists(const std::string& path)
-        {
-            if (FILE* f = std::fopen(path.c_str(), "rb"))
-            {
-                std::fclose(f);
-                return true;
-            }
-            return false;
         }
 
         UIDir mDir;

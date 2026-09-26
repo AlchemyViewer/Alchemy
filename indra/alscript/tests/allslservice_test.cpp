@@ -603,9 +603,9 @@ namespace tut
         // What a grid newer than this viewer may send: a type the engine does
         // not know, a constant it cannot read, blank lines of CR LF and of
         // blanks -- each of which ended the process before.
-        const std::string path = (std::filesystem::temp_directory_path() / ("al_builtins_" + LLUUID::generateNewID().asString() + ".txt")).string();
+        const std::string path = fsyspath(std::filesystem::temp_directory_path() / ("al_builtins_" + LLUUID::generateNewID().asString() + ".txt")).string();
         {
-            std::ofstream out(path, std::ios::binary);
+            llofstream out(path, std::ios::binary);
             out << "// the grid's definitions, as a newer grid might send them\n"
                    "integer llAlchemyProbe(integer a)\n"
                    "\r\n"
@@ -619,7 +619,7 @@ namespace tut
         std::string   why;
         const bool    read = service.loadBuiltins(path, why);
         std::error_code gone;
-        std::filesystem::remove(path, gone);
+        std::filesystem::remove(fsyspath(path), gone);
         ensure("loaded: " + why, read);
         const std::string head = "default\n{\n    state_entry()\n    {\n";
         const std::string tail = "    }\n}\n";
@@ -627,5 +627,30 @@ namespace tut
         ensure_equals("the lines it could read are known: " + said(kept), errors(kept), size_t(0));
         const ALScriptProblems left = service.check(head + "        llAlchemyBadReturn();\n" + tail, true);
         ensure("a line it could not read is not: " + said(left), errors(left) > 0);
+    }
+
+    template<> template<>
+    void allslservice_object::test<18>()
+    {
+        set_test_name("a definitions file under a folder named outside the ANSI code page loads");
+        // The grid's definitions are kept in the cache, under the user's
+        // profile, whose name may be in any script: the path is UTF-8, and
+        // on Windows the engine opened it as the ANSI code page read it.
+        const fsyspath dir = std::filesystem::temp_directory_path() / fsyspath("al_builtins_\xc3\xa9\xe6\x97\xa5_" + LLUUID::generateNewID().asString());
+        std::error_code made;
+        std::filesystem::create_directories(dir, made);
+        ensure("folder made: " + made.message(), !made);
+        const std::string path = fsyspath(dir / "builtins.txt").string();
+        {
+            llofstream out(path, std::ios::binary);
+            out << "integer llAlchemyWide(integer a)\n";
+        }
+        std::string why;
+        const bool  read = service.loadBuiltins(path, why);
+        std::error_code gone;
+        std::filesystem::remove_all(dir, gone);
+        ensure("loaded: " + why, read);
+        const ALScriptProblems kept = service.check("default\n{\n    state_entry()\n    {\n        llOwnerSay((string)llAlchemyWide(1));\n    }\n}\n", true);
+        ensure_equals("what it defines is known: " + said(kept), errors(kept), size_t(0));
     }
 }

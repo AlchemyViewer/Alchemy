@@ -248,7 +248,7 @@ bool ALDiskIncludes::readOrdinary(const std::string& file, std::string& out)
     {
         return false;
     }
-    std::ifstream in(path, std::ios::binary);
+    llifstream in(path, std::ios::binary);
     if (!in)
     {
         return false;
