@@ -135,8 +135,36 @@ namespace
         return true;
     }();
 
-    // How long after the last keystroke the analyzers are asked.
-    const F64 ANALYSIS_DELAY = 0.35;
+    // What checking reads of the viewer's: the preprocessor, its settings,
+    // and the modules index.
+    const bool CHECKING_SOURCES = [] {
+        ALScriptStudioChecking::Sources& sources = ALScriptStudioChecking::sources();
+        sources.preprocessing                    = [] { return ALScriptPreprocessor::enabled(); };
+        sources.transformOn                      = [](ALPreprocessor::Transform transform) {
+            static LLCachedControl<bool> switches(gSavedSettings, "ALScriptPreprocSwitch", false);
+            static LLCachedControl<bool> extensions(gSavedSettings, "ALScriptPreprocExtensions", false);
+            return transform == ALPreprocessor::Transform::Switch ? switches() : extensions();
+        };
+        sources.expand = [](ALScriptPreprocessor::Request request, std::function<void(const ALPreprocessor::Result&)> answer) {
+            ALScriptPreprocessor::instance().expand(request, std::move(answer));
+        };
+        sources.configOf = [](const ALScriptPreprocessor::Request& request, ALLuauConfig& config, const ALLuauConfig* base) {
+            return ALScriptPreprocessor::instance().configOf(request, config, base);
+        };
+        sources.fetchConfig = [](const ALScriptPreprocessor::Request& request, std::function<void()> fetched) {
+            ALScriptPreprocessor::instance().fetchConfig(request, std::move(fetched));
+        };
+        sources.lookUp = [](const ALScriptPreprocessor::Request& request, const ALPreprocessor::Ask& ask, ALPreprocessor::Include& found) {
+            return ALScriptPreprocessor::instance().lookUp(request, ask, found);
+        };
+        sources.modules = [](const ALScriptPreprocessor::Request& request, std::function<std::vector<ALScriptModules::Open>()> open,
+                             const std::vector<std::string>& names) { return ALScriptModules::instance().giving(request, open, names); };
+        sources.fetchNearby = [](const ALScriptPreprocessor::Request& request, std::function<void()> fetched) {
+            ALScriptModules::instance().fetchNearby(request, std::move(fetched));
+        };
+        return true;
+    }();
+
     // How long a tab to be restored waits for its object or its item to be
     // in hand after the window is built: long enough for what is near to
     // come into view after a login.
@@ -725,8 +753,7 @@ bool ALFloaterScriptStudio::postBuild()
         {
             const bool words = std::string_view(setting) == "ALScriptPreprocSwitch" || std::string_view(setting) == "ALScriptPreprocExtensions";
             mSettingConnections.emplace_back(control->getSignal()->connect([this, words](LLControlVariable*, const LLSD&, const LLSD&) {
-                mPreprocessorDue   = LLTimer::getTotalSeconds() + ANALYSIS_DELAY;
-                mPreprocessorWords = mPreprocessorWords || words;
+                mChecking.settingsChanged(words, LLTimer::getTotalSeconds());
             }));
         }
     }
@@ -1147,7 +1174,7 @@ void ALFloaterScriptStudio::tidy(Doc& doc, bool fix, bool format_it, bool trim)
     // for.
     if (fix)
     {
-        fixAll(doc, FixPick{ std::string(), true });
+        mChecking.fixAll(doc, FixPick{ std::string(), true });
     }
     if (format_it)
     {
@@ -1172,7 +1199,7 @@ bool ALFloaterScriptStudio::sendNotecard(const Doc& doc, const std::string& text
 
 void ALFloaterScriptStudio::runPreprocessor(const Doc& doc, std::function<void(const ALPreprocessor::Result&)> answer)
 {
-    ALScriptPreprocessor::instance().run(preprocessRequest(doc), std::move(answer));
+    ALScriptPreprocessor::instance().run(mChecking.preprocessRequest(doc), std::move(answer));
 }
 
 void ALFloaterScriptStudio::keepForRecovery(Doc& doc)
@@ -1220,8 +1247,7 @@ void ALFloaterScriptStudio::draw()
     {
         sLastWorkedIn = getHandle();
     }
-    pumpPreprocessor();
-    pumpAnalysis();
+    mChecking.pump(LLTimer::getTotalSeconds());
     mCaret.pump(LLTimer::getTotalSeconds());
     mExplorerPane->pump();
     mVim.pump();
@@ -1660,9 +1686,9 @@ void ALFloaterScriptStudio::wireDoc(Doc& doc)
         mRecovery.schedule(*raw);
     });
     doc.placedEdits = doc.editor->document().onChanged([this, raw](const ALTextDocument::Edit& edit) {
-        slideProblems(*raw, edit);
+        mChecking.slideProblems(*raw, edit);
         mReferencesPane->slide(*raw, raw->file.empty() ? ALScriptPreprocessor::pathOf(raw->ref) : raw->id, edit);
-        slideOutline(*raw, edit);
+        mChecking.slideOutline(*raw, edit);
     });
 }
 
@@ -2111,7 +2137,7 @@ void ALFloaterScriptStudio::showEditors()
     }
 }
 
-// --- the preprocessor ---------------------------------------------------------------
+// --- files on disk ----------------------------------------------------------------
 
 void ALFloaterScriptStudio::openFile(const std::string& path, bool lua, S32 line, S32 column, S32 length)
 {
@@ -2311,12 +2337,12 @@ void ALFloaterScriptStudio::teachEditor(Doc& doc)
     // What would put right the problems on a line, as the list, the card
     // and the gutter offer them; the one taken made here, where it is known
     // whether the text is still the one the fixes were made for.
-    editor.setFixProvider([this, raw](S32 line, std::vector<ALCodeEditor::Fix>& out) { fixesOn(*raw, line, out); });
+    editor.setFixProvider([this, raw](S32 line, std::vector<ALCodeEditor::Fix>& out) { mChecking.fixesOn(*raw, line, out); });
     editor.setFixesShown(
         [this, raw](U32 shown, const std::vector<ALCodeEditor::Fix>& fixes) { mWeighing.fixesShown(raw->id, shown, fixes); });
     editor.setActionRequest([this, raw](const ALTextRange& at) {
         raw->check.actionsAsked = at;
-        askAnalyzer(*raw, ALScriptAnalysis::Kind::Actions, at.begin, at.end);
+        mChecking.ask(*raw, ALScriptAnalysis::Kind::Actions, at.begin, at.end);
     });
     editor.setFixHandler([this, raw](const LLSD& value) {
         if (value.has("action"))
@@ -2329,7 +2355,7 @@ void ALFloaterScriptStudio::teachEditor(Doc& doc)
             }
             return;
         }
-        const Doc::Shown* shown = shownOf(value);
+        const Doc::Shown* shown = mChecking.shownOf(value);
         const size_t      n     = static_cast<size_t>(value["fix"].asInteger());
         if (shown && n < shown->fixes.size())
         {
@@ -2760,9 +2786,44 @@ void ALFloaterScriptStudio::onTabChosen(const std::string& value)
     activate(indexOf(value));
 }
 
-// --- saving and compiling ------------------------------------------------------
-
 // --- the analyzers -------------------------------------------------------------
+
+void ALFloaterScriptStudio::askingOptions(ALScriptAnalysis::Request& request) const
+{
+    request.semantics      = mSemanticColors;
+    request.hintParameters = mInlayParameters;
+    request.hintTypes      = mInlayTypes;
+}
+
+void ALFloaterScriptStudio::answeredElsewhere(Doc& doc, const ALScriptAnalysis::Result& result, const ALTextPos& at)
+{
+    switch (result.kind)
+    {
+        case ALScriptAnalysis::Kind::References:
+            mCaret.answered(doc, result, at);
+            break;
+        case ALScriptAnalysis::Kind::Inspect:
+            mInspectorPane->inspected(doc, result, at);
+            break;
+        case ALScriptAnalysis::Kind::Weigh:
+            mWeighing.weighed(doc, result);
+            break;
+        default:
+            break;
+    }
+}
+
+void ALFloaterScriptStudio::confirmFixAll(const LLSD& args, std::function<void()> yes)
+{
+    // Asked first, as Replace All asks: many changes at once, said as many.
+    const LLHandle<LLFloater> handle = getHandle();
+    LLNotificationsUtil::add("ScriptStudioFixAll", args, LLSD(), [handle, yes](const LLSD& notification, const LLSD& response) {
+        if (handle.get() && LLNotificationsUtil::getSelectedOption(notification, response) == 0)
+        {
+            yes();
+        }
+    });
+}
 
 void ALFloaterScriptStudio::refreshProblems(Doc& doc)
 {
@@ -2802,7 +2863,7 @@ std::string ALFloaterScriptStudio::problemIcon(const Doc& doc, const std::string
 
 void ALFloaterScriptStudio::fixAllOfKind(Doc& doc, const std::string& key)
 {
-    askFixAll(doc, FixPick{ key });
+    mChecking.askFixAll(doc, FixPick{ key });
 }
 
 bool ALFloaterScriptStudio::isLint(bool lua, const std::string& id) const
@@ -6172,7 +6233,7 @@ void ALFloaterScriptStudio::addEditCommands()
         [this]() {
             if (Doc* doc = active())
             {
-                askFixAll(*doc, FixPick{});
+                mChecking.askFixAll(*doc, FixPick{});
             }
         },
         [this]() {

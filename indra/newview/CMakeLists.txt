@@ -1019,6 +1019,7 @@ if(AL_BUILD_VIEWER)
     alscriptsearch.h
     alscriptsearchpane.h
     alscriptstudiocaret.h
+    alscriptstudiochecking.h
     alscriptstudiocommands.h
     alscriptstudiodoc.h
     alscriptstudiofileio.h
@@ -2649,6 +2650,22 @@ if(AL_BUILD_TESTS)
   # gone to, references read back and asked for, the caret watched.
   al_add_test(
     alscriptstudiocaret
+    UNIT
+    PROJECT ${test_project}
+    LIBRARIES llui alscript ${test_libs}
+    SOURCES
+      alscriptnotecardtab.cpp
+      alscriptsaveflow.cpp
+      alscriptstudiodoc.cpp
+      alscriptstudioplaces.cpp
+      alscriptstudiowords.cpp
+    DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
+  )
+
+  # Script Studio's checking, the window's side and the viewer's sources
+  # faked: checks due and answered, expansions, imports, lints, fixes.
+  al_add_test(
+    alscriptstudiochecking
     UNIT
     PROJECT ${test_project}
     LIBRARIES llui alscript ${test_libs}

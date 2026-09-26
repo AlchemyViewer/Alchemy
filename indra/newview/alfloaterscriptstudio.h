@@ -48,6 +48,7 @@
 #include "alscriptcrumbsbar.h"
 #include "alscriptinspectorpane.h"
 #include "alscriptstudiocaret.h"
+#include "alscriptstudiochecking.h"
 #include "alscriptstudioplaces.h"
 #include "alfindings.h"
 #include "aloutputview.h"
@@ -117,7 +118,7 @@ class ALFloaterScriptStudio final : public ALStudioFloater, public ALScriptStudi
                                     public ALScriptNoticeBar::Window, public ALScriptNavigation::Window, public ALScriptLookup::Window,
                                     public ALScriptReferencesPane::Window, public ALScriptOutlinePane::Window,
                                     public ALScriptCrumbsBar::Window, public ALScriptInspectorPane::Window,
-                                    public ALScriptStudioCaret::Window
+                                    public ALScriptStudioCaret::Window, public ALScriptStudioChecking::Window
 {
     friend class LLFloaterReg;
 
@@ -217,10 +218,6 @@ private:
     // The problems of every open script, in the store all the studios'
     // findings live in, keyed by the script's id; the pane lists the
     // active script's through its filters.
-    // The compiler's and the run's problems moved along with an edit; and
-    // the outline, until the next check says it again.
-    void                slideProblems(Doc& doc, const ALTextDocument::Edit& edit);
-    void                slideOutline(Doc& doc, const ALTextDocument::Edit& edit);
     // The caret to the next problem of the script after it, or the one
     // before, round past the ends, with what it says in a card.
     void                goToProblem(Doc& doc, S32 direction);
@@ -229,31 +226,9 @@ private:
     std::vector<ALTextPos> problemPlaces(const Doc& doc) const;
     void                   goToProblemAt(Doc& doc, const ALTextPos& to);
     bool                   goToProblemNumber(Doc& doc, S32 number) override;
-    // What a comment says is wanted dropped from the script's problems,
-    // and a comment that would say so offered for every lint left.
-    void                noLint(Doc& doc);
-    // A name the script does not know given what a module in reach gives:
-    // a SLua global a require, where a module is so named or exports it;
-    // an LSL name an `#include`, where an include declares it
-    // (ALScriptModules). Put in at the top; preferred where it is the one
-    // offered.
-    void                offerImports(Doc& doc);
-    // A fix made, as one step to undo, and the script checked again at
-    // once; refused where the text has moved on since `version`, the one
-    // it was made over, whose places it is in.
-    bool                applyFix(Doc& doc, const ALScriptFix& fix, U32 version) override;
+    // A fix made, the script checked again (ALScriptStudioChecking).
+    bool                applyFix(Doc& doc, const ALScriptFix& fix, U32 version) override { return mChecking.applyFix(doc, fix, version); }
     using FixPick = Doc::FixPick;
-    // The preferred fix of every problem picked, made as one step, once
-    // asked; and made, the asking done. True where anything was made.
-    void                askFixAll(Doc& doc, const FixPick& pick);
-    bool                fixAll(Doc& doc, const FixPick& pick);
-    // The problem a row of the pane is, in its script's list, where its
-    // fixes are.
-    const Doc::Shown*   shownOf(const LLSD& value) const;
-    // The fixes of the problems on a line, as the editor lists them, each
-    // with the value that finds it again; none where the text has moved on
-    // since the check they were made in.
-    void                fixesOn(const Doc& doc, S32 line, std::vector<ALCodeEditor::Fix>& out) const;
     // The keymap's keys beside the menu's editor commands that have none.
     void                showEditorKeys();
 
@@ -361,15 +336,18 @@ private:
     // The region's words for colouring and completing, and the analyzer
     // behind completion, hover and signature help.
     void                      teachEditor(Doc& doc);
-    void askAnalyzer(Doc& doc, ALScriptAnalysis::Kind kind, const ALTextPos& at) override { askAnalyzer(doc, kind, at, at); }
-    // The refactors are asked about a stretch, from `at` to `to`.
-    void                      askAnalyzer(Doc& doc, ALScriptAnalysis::Kind kind, const ALTextPos& at, const ALTextPos& to);
-    // `expansion` is the expansion the question was asked over, or zero
-    // for the text as it stands.
-    void                      answered(const ALScriptAnalysis::Result& result, U32 expansion);
-    // The refactors at the caret, kept on the Doc and handed to the editor
-    // to join the fixes it lists.
-    void                      actionsAnswered(Doc& doc, const ALScriptAnalysis::Result& result, U32 expansion);
+    void askAnalyzer(Doc& doc, ALScriptAnalysis::Kind kind, const ALTextPos& at) override { mChecking.ask(doc, kind, at, at); }
+    // What checking asks of the window (ALScriptStudioChecking::Window):
+    // the settings every question carries, an answer that is another
+    // unit's, the outline shown, the targets weighed for, a run for a
+    // save, the editor in front, and whether to make many fixes at once.
+    void askingOptions(ALScriptAnalysis::Request& request) const override;
+    void answeredElsewhere(Doc& doc, const ALScriptAnalysis::Result& result, const ALTextPos& at) override;
+    void showOutline(Doc& doc) override { mOutlinePane->show(doc); }
+    std::vector<ALScriptWeight::Target> weightTargets(const Doc& doc) override { return mWeighing.targets(doc); }
+    void                                preprocessForSave(Doc& doc) override { mSaving.preprocess(doc); }
+    ALCodeEditor&                       editorInFront(Doc& doc) override { return sourceInFront(doc); }
+    void                                confirmFixAll(const LLSD& args, std::function<void()> yes) override;
     // Weighing (ALScriptStudioWeighing): saving's calls to it, and what
     // it asks of the window.
     std::optional<ALScriptWeight::Target> weightTarget(const Doc& doc) const override { return mWeighing.target(doc); }
@@ -390,18 +368,11 @@ private:
     // run ahead of a save, fetching includes, then the upload in the
     // envelope. Positions the analyzers answer with are mapped back to
     // the source, and what falls in an include is listed by its file.
-    bool                          preprocessed(const Doc& doc) const override;
-    // The expansion of the text as it stands, asked for where it is not
-    // in hand: it is a thread's work now, so a question that needs it
-    // waits on the Doc and is asked again when it comes.
-    void                          expandFor(Doc& doc, ALScriptAnalysis::Kind kind, const ALTextPos& at, const ALTextPos& to);
-    void                          expandedAnswer(const std::string& id, U32 version, const ALPreprocessor::Result& result);
-    // Without the source where only where the script is matters.
-    ALScriptPreprocessor::Request preprocessRequest(const Doc& doc, bool with_source = true) const;
+    bool                          preprocessed(const Doc& doc) const override { return mChecking.preprocessed(doc); }
     // A run of it over the text as it stands, fetching its includes, for
     // saving (ALScriptStudioSaving::preprocess).
     void                          runPreprocessor(const Doc& doc, std::function<void(const ALPreprocessor::Result&)> answer) override;
-    std::string                   includeName(const Doc& doc, const std::string& path) const override;
+    std::string includeName(const Doc& doc, const std::string& path) const override { return mChecking.includeName(doc, path); }
     void                          chooseIncludeFolder();
     // A file on disk opened in a tab of its own, or brought forward, at
     // a place in it where one is given; read as the language its
@@ -489,26 +460,11 @@ private:
     // try again, save a copy, export.
     void report(const std::string& text, bool failure = false, const Doc* doc = nullptr, const std::vector<std::string>& actions = {}) override;
 
-    // The analyzers: a check is due a moment after the last keystroke,
-    // sent from draw, answered whenever the worker gets to it, and kept
-    // only if the text has not moved on.
-    void scheduleAnalysis(Doc& doc, bool now = false) override;
-    // An LSL file on disk with no default state: an include's functions
-    // and globals, which the parser takes for no script at all until a
-    // state is put after them, and whose declarations are for others.
-    bool lslFragment(const Doc& doc) const override;
-    void pumpAnalysis();
-    // The preprocessor's settings changed, here or in the preferences:
-    // every script expanded and checked again, a moment after the last.
-    void pumpPreprocessor();
-    void requestAnalysis(Doc& doc);
-    void analysed(const ALScriptAnalysis::Result& result);
-    // A parse error on a preprocessor's word, with its transform off, told
-    // so: over the problems in the source's places.
-    void explainTransformWords(Doc& doc);
-    // A require in a script of SLua the preprocessor does not run over,
-    // warned of: it goes up as written, and the grid has no require.
-    void explainRequires(Doc& doc);
+    // The analyzers (ALScriptStudioChecking): a check is due a moment
+    // after the last keystroke, sent from draw, answered whenever the
+    // worker gets to it, and kept only if the text has not moved on.
+    void scheduleAnalysis(Doc& doc, bool now = false) override { mChecking.schedule(doc, now); }
+    bool lslFragment(const Doc& doc) const override { return mChecking.lslFragment(doc); }
     // The marks, the squiggles and the pane, from the compiler's problems
     // and the analyzer's together.
     void refreshProblems(Doc& doc) override;
@@ -976,6 +932,8 @@ private:
     ALScriptLookup                     mLookup{ *this, *this };
     // The name at its caret, and the caret watched.
     ALScriptStudioCaret                mCaret{ *this, *this };
+    // Its checking: the analyzers asked and answered, and fixes.
+    ALScriptStudioChecking             mChecking{ *this, *this };
     LLHandle<LLContextMenu>            mTabMenuHandle;
     bool                               mMain = true;
     bool                               mClosingWindow = false;
@@ -1004,11 +962,6 @@ private:
     // The settings the window follows as they change: the lints and the
     // Luau mode, the preprocessor's, vim's clipboard.
     std::vector<boost::signals2::scoped_connection> mSettingConnections;
-    // When every script is expanded and checked again after the
-    // preprocessor's settings changed, or zero; and whether the
-    // transforms' words are coloured again with it.
-    F64                                mPreprocessorDue   = 0.0;
-    bool                               mPreprocessorWords = false;
     boost::signals2::scoped_connection mRuntimeConnection;
     boost::signals2::scoped_connection mRunningConnection;
 };

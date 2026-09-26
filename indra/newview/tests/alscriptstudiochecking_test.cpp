@@ -1,0 +1,804 @@
+/**
+ * @file alscriptstudiochecking_test.cpp
+ * @brief Script Studio's checking, the window's side and the viewer's sources faked: answers, expansions, imports, fixes.
+ *
+ * $LicenseInfo:firstyear=2026&license=viewerlgpl$
+ * Alchemy Viewer Source Code
+ * Copyright (C) 2026, Rye <rye@alchemyviewer.org>
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation;
+ * version 2.1 of the License only.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * $/LicenseInfo$
+ */
+
+#include "linden_common.h"
+
+// The preprocessor's header reaches the inventory model's, which does not
+// include what it uses.
+#include <boost/unordered_map.hpp>
+
+#include "../alscriptstudiochecking.h"
+
+#include "../alscriptstudiowords.h"
+#include "alcodeeditor.h"
+#include "alscriptstudio_fixture.h"
+#include "llfocusmgr.h"
+
+#include "../test/lltut.h"
+
+// The lints as a scripter chose them, and the skin's words for a key, are
+// the viewer's settings.
+namespace
+{
+    S32 gLintsApplied = 0;
+}
+void ALScriptLints::apply(ALScriptProblems&)
+{
+    ++gLintsApplied;
+}
+ALLuauConfig ALScriptLints::luauBase()
+{
+    return ALLuauConfig();
+}
+std::string alScriptKeyedWords(const std::string&, const std::vector<std::string>&, const std::string& english)
+{
+    return english;
+}
+// What the preprocessor and the modules index call a script and a file,
+// as they spell them; both are the viewer's.
+bool ALScriptPreprocessor::fileOf(const std::string& path, std::string& file)
+{
+    if (path.rfind("disk:", 0) != 0)
+    {
+        return false;
+    }
+    file = path.substr(5);
+    return !file.empty();
+}
+std::string ALScriptPreprocessor::pathOf(const ALScriptRef& ref)
+{
+    return "object:" + ref.object.asString() + ":" + ref.item.asString();
+}
+std::string ALScriptModules::identity(const std::string& path)
+{
+    return path;
+}
+
+namespace
+{
+    typedef ALScriptStudioDoc        Doc;
+    typedef ALScriptAnalysis::Kind   Kind;
+    typedef std::vector<std::string> Names;
+
+    std::string at(const ALTextPos& pos) { return std::to_string(pos.line) + ":" + std::to_string(pos.column); }
+    std::string kindOf(Kind kind)
+    {
+        switch (kind)
+        {
+            case Kind::Check:      return "check";
+            case Kind::Complete:   return "complete";
+            case Kind::Hover:      return "hover";
+            case Kind::Signature:  return "signature";
+            case Kind::References: return "references";
+            case Kind::Inspect:    return "inspect";
+            case Kind::Actions:    return "actions";
+            case Kind::Weigh:      return "weigh";
+        }
+        return "?";
+    }
+
+    // The window, faked: its answers held for the test to give, and what it
+    // was told. Its problems made as the Problems pane makes them.
+    struct FakeCheckingWindow : public ALScriptStudioChecking::Window
+    {
+        struct Ask
+        {
+            ALScriptAnalysis::Request                            request;
+            std::function<void(const ALScriptAnalysis::Result&)> answered;
+        };
+        void askAnalysis(ALScriptAnalysis::Request request, std::function<void(const ALScriptAnalysis::Result&)> answered) override
+        {
+            asks.push_back({ std::move(request), std::move(answered) });
+        }
+        void askingOptions(ALScriptAnalysis::Request& request) const override { request.hintTypes = true; }
+        void answeredElsewhere(Doc& doc, const ALScriptAnalysis::Result& result, const ALTextPos& pos) override
+        {
+            told.push_back(kindOf(result.kind) + " " + doc.id + " " + at(pos));
+        }
+        void refreshProblems(Doc& doc) override
+        {
+            told.push_back("problems " + doc.id);
+            doc.shown.clear();
+            for (const ALScriptProblem& problem : doc.check.analysis)
+            {
+                Doc::Shown shown;
+                shown.line     = problem.line;
+                shown.column   = problem.column;
+                shown.message  = problem.message;
+                shown.file     = problem.file;
+                shown.key      = problem.key;
+                shown.fixes    = problem.fixes;
+                shown.fixesFor = doc.check.analysisVersion;
+                doc.shown.push_back(std::move(shown));
+            }
+        }
+        void showOutline(Doc& doc) override { told.push_back("outline " + doc.id); }
+        void weigh(Doc& doc) override { told.push_back("weigh " + doc.id); }
+        std::vector<ALScriptWeight::Target> weightTargets(const Doc&) override { return targets; }
+        void                                save(Doc& doc) override { told.push_back("save " + doc.id); }
+        void                                preprocessForSave(Doc& doc) override { told.push_back("run " + doc.id); }
+        ALCodeEditor&                       editorInFront(Doc& doc) override { return *doc.editor; }
+        void                                confirmFixAll(const LLSD& args, std::function<void()> yes) override
+        {
+            confirmed = args;
+            confirm   = std::move(yes);
+        }
+
+        std::vector<Ask>                    asks;
+        Names                               told;
+        std::vector<ALScriptWeight::Target> targets;
+        LLSD                                confirmed;
+        std::function<void()>               confirm;
+    };
+
+    ALScriptProblem problem(S32 line, const std::string& message, ALScriptProblem::Severity severity = ALScriptProblem::Severity::Error)
+    {
+        ALScriptProblem out;
+        out.severity  = severity;
+        out.line      = line;
+        out.column    = 0;
+        out.endLine   = line;
+        out.endColumn = 3;
+        out.message   = message;
+        return out;
+    }
+    ALScriptFix fix(const std::string& title, S32 line, S32 column, S32 end, const std::string& text, bool safe = true)
+    {
+        ALScriptFix out;
+        out.title     = title;
+        out.preferred = true;
+        out.safe      = safe;
+        ALScriptEdit edit;
+        edit.line      = line;
+        edit.column    = column;
+        edit.endLine   = line;
+        edit.endColumn = end;
+        edit.text      = text;
+        out.edits      = { edit };
+        return out;
+    }
+    std::string joined(const Names& names)
+    {
+        std::string out;
+        for (const std::string& name : names)
+        {
+            out += (out.empty() ? "" : ", ") + name;
+        }
+        return out;
+    }
+    const std::string SCRIPT = "integer count;\ndefault\n{\n    state_entry() { count = 1; }\n}\n";
+}
+
+namespace tut
+{
+    struct alscriptstudiochecking_data
+    {
+        al_studio_test::StudioWindow            window;
+        al_studio_test::FakeServices            services;
+        FakeCheckingWindow                      studio;
+        std::unique_ptr<ALScriptStudioChecking> unit;
+        // The viewer's side: whether the preprocessor runs, and its answers
+        // held for the test to give.
+        bool                                    preprocessing = false;
+        bool                                    switches      = false;
+        std::vector<std::pair<ALScriptPreprocessor::Request, std::function<void(const ALPreprocessor::Result&)>>> expansions;
+        std::vector<ALScriptModules::Module>    modules;
+        std::vector<std::function<void()>>      nearby;
+
+        alscriptstudiochecking_data()
+        {
+            ALScriptStudioChecking::Sources& sources = ALScriptStudioChecking::sources();
+            sources.preprocessing                    = [this] { return preprocessing; };
+            sources.transformOn = [this](ALPreprocessor::Transform transform) {
+                return transform == ALPreprocessor::Transform::Switch && switches;
+            };
+            sources.expand = [this](ALScriptPreprocessor::Request request, std::function<void(const ALPreprocessor::Result&)> answer) {
+                expansions.emplace_back(std::move(request), std::move(answer));
+            };
+            sources.configOf    = [](const ALScriptPreprocessor::Request&, ALLuauConfig&, const ALLuauConfig*) { return true; };
+            sources.fetchConfig = [](const ALScriptPreprocessor::Request&, std::function<void()>) {};
+            sources.lookUp      = [](const ALScriptPreprocessor::Request&, const ALPreprocessor::Ask&, ALPreprocessor::Include&) {
+                return ALPreprocessor::Found::No;
+            };
+            sources.modules = [this](const ALScriptPreprocessor::Request&, std::function<std::vector<ALScriptModules::Open>()>,
+                                     const std::vector<std::string>&) { return modules; };
+            sources.fetchNearby = [this](const ALScriptPreprocessor::Request&, std::function<void()> fetched) {
+                nearby.push_back(fetched);
+            };
+            gLintsApplied       = 0;
+        }
+        ~alscriptstudiochecking_data()
+        {
+            ALScriptStudioChecking::sources() = ALScriptStudioChecking::Sources();
+            gFocusMgr.setKeyboardFocus(nullptr);
+        }
+        ALScriptStudioChecking& make()
+        {
+            if (!window.floater)
+            {
+                skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+            }
+            unit = std::make_unique<ALScriptStudioChecking>(services, studio);
+            return *unit;
+        }
+        ALCodeEditor* editor(const std::string& name, const std::string& text)
+        {
+            ALCodeEditor::Params p(LLUICtrlFactory::getDefaultParams<ALCodeEditor>());
+            p.name             = name;
+            p.rect             = LLRect(0, 200, 400, 0);
+            ALCodeEditor* made = LLUICtrlFactory::create<ALCodeEditor>(p);
+            window.floater->addChild(made);
+            made->setText(text);
+            return made;
+        }
+        Doc& tab(const std::string& id, const std::string& text = SCRIPT)
+        {
+            Doc& doc       = services.addDoc(id);
+            doc.loaded     = true;
+            doc.modifiable = true;
+            doc.editor     = editor("editor_" + id, text);
+            return doc;
+        }
+        U32 version(const Doc& doc) { return doc.editor->document().version(); }
+        // The check answered for a tab, of the text as it stands.
+        ALScriptAnalysis::Result answer(const Doc& doc, ALScriptProblems problems = {}, bool understood = true)
+        {
+            ALScriptAnalysis::Result result;
+            result.kind       = Kind::Check;
+            result.id         = doc.id;
+            result.version    = version(doc);
+            result.understood = understood;
+            result.problems   = std::move(problems);
+            return result;
+        }
+        // An expansion as the preprocessor makes one: an include's line,
+        // then the script's own, each where it stood.
+        ALPreprocessor::Result expansion(const std::string& source)
+        {
+            ALPreprocessor::Result result;
+            result.map.addFile("a", "object:a");
+            result.map.addFile("lib.lsl", "disk:/lib.lsl");
+            result.text = "integer helper;\n" + source;
+            ALSourceMap::Segment inc;
+            inc.outLine = 0;
+            inc.length  = 15;
+            inc.file    = 1;
+            inc.line    = 2;
+            result.map.add(inc);
+            S32 out = 1, line = 0;
+            for (size_t from = 0; from < source.size(); ++line, ++out)
+            {
+                const size_t end = source.find('\n', from);
+                ALSourceMap::Segment own;
+                own.outLine = out;
+                own.length  = static_cast<S32>((end == std::string::npos ? source.size() : end) - from);
+                own.file    = 0;
+                own.line    = line;
+                if (own.length > 0)
+                {
+                    result.map.add(own);
+                }
+                from = end == std::string::npos ? source.size() : end + 1;
+            }
+            result.map.finish();
+            return result;
+        }
+    };
+
+    typedef test_group<alscriptstudiochecking_data> alscriptstudiochecking_group;
+    typedef alscriptstudiochecking_group::object    alscriptstudiochecking_object;
+    alscriptstudiochecking_group                    alscriptstudiochecking_instance("alscriptstudiochecking");
+
+    template<> template<>
+    void alscriptstudiochecking_object::test<1>()
+    {
+        set_test_name("a check waits while typing goes on and is asked once it rests, of the text as it stands, with the window's settings");
+        ALScriptStudioChecking& checking = make();
+        Doc&                    doc      = tab("a");
+        checking.schedule(doc);
+        const F64 due = doc.check.analysisDue;
+        ensure("due a moment on", due > 1.0);
+        checking.pump(due - 0.1);
+        ensure("not yet", studio.asks.empty());
+        doc.editor->insertText("x");
+        checking.schedule(doc);
+        checking.pump(due);
+        ensure("typed again: waits again", studio.asks.empty() && doc.check.analysisDue > due);
+        checking.pump(doc.check.analysisDue);
+        ensure_equals("asked once", studio.asks.size(), size_t(1));
+        const ALScriptAnalysis::Request& asked = studio.asks[0].request;
+        ensure("a check of the text as it stands",
+               asked.kind == Kind::Check && asked.id == "a" && asked.version == version(doc) && asked.text == doc.editor->text());
+        ensure("with the window's settings", asked.hintTypes);
+        ensure("remembered", doc.check.requestedVersion == version(doc) && doc.check.analysisDue == 0.0);
+        checking.pump(1e9);
+        ensure_equals("once", studio.asks.size(), size_t(1));
+        checking.schedule(doc, true);
+        checking.pump(1.0);
+        ensure_equals("at once", studio.asks.size(), size_t(2));
+        doc.notecard = true;
+        checking.schedule(doc, true);
+        doc.notecard = false;
+        doc.loaded   = false;
+        checking.schedule(doc, true);
+        doc.loaded = true;
+        checking.pump(1e9);
+        ensure_equals("a notecard, or a tab not loaded: never", studio.asks.size(), size_t(2));
+        doc.notecard = true;
+        checking.ask(doc, Kind::Hover, ALTextPos(0, 8), ALTextPos(0, 8));
+        ensure_equals("a notecard not asked about", studio.asks.size(), size_t(2));
+        preprocessing = true;
+        ensure("nor preprocessed", !checking.preprocessed(doc));
+        doc.notecard = false;
+        ensure("a script is", checking.preprocessed(doc));
+    }
+
+    template<> template<>
+    void alscriptstudiochecking_object::test<2>()
+    {
+        set_test_name("a check's answer taken -- problems, outline, the window told -- one of a text since typed in dropped");
+        ALScriptStudioChecking& checking = make();
+        Doc&                    doc      = tab("a");
+        checking.schedule(doc, true);
+        checking.pump(1.0);
+        ALScriptAnalysis::Result result = answer(doc, { problem(0, "wrong") });
+        ALScriptOutlineEntry     entry;
+        entry.name     = "count";
+        result.outline = { entry };
+        doc.editor->insertText("x");
+        studio.asks[0].answered(result);
+        ensure("of another text: dropped", doc.check.analysis.empty() && studio.told.empty());
+        result.version = version(doc);
+        studio.asks[0].answered(result);
+        ensure("taken", doc.check.analysis.size() == 1 && doc.check.analysisVersion == version(doc) && doc.outline.size() == 1);
+        ensure_equals("LSL's lints as chosen", gLintsApplied, 1);
+        ensure_equals("told", joined(studio.told), std::string("problems a, outline a, weigh a"));
+        result.understood = false;
+        result.outline.clear();
+        result.problems.clear();
+        studio.asks[0].answered(result);
+        ensure("past mending: the outline kept", doc.check.analysis.empty() && doc.outline.size() == 1);
+        doc.language.lua = true;
+        studio.asks[0].answered(result);
+        ensure_equals("Luau's chosen by its configuration", gLintsApplied, 2);
+        unit.reset();
+        result.problems = { problem(1, "late") };
+        studio.asks[0].answered(result);
+        ensure("gone: nothing taken", doc.check.analysis.empty());
+    }
+
+    template<> template<>
+    void alscriptstudiochecking_object::test<3>()
+    {
+        set_test_name("preprocessed: the question waits on the expansion, one of a kind replacing the last; the answer read back to the source");
+        ALScriptStudioChecking& checking = make();
+        Doc&                    doc      = tab("a");
+        preprocessing                    = true;
+        checking.ask(doc, Kind::Inspect, ALTextPos(0, 8), ALTextPos(0, 8));
+        checking.ask(doc, Kind::Inspect, ALTextPos(3, 20), ALTextPos(3, 20));
+        checking.ask(doc, Kind::Check, ALTextPos(), ALTextPos());
+        ensure("expanded once", expansions.size() == 1 && studio.asks.empty() && doc.check.waiting.size() == 2);
+        ensure("the last of a kind", doc.check.waiting[0].at == ALTextPos(3, 20));
+        doc.editor->insertText("//");
+        expansions[0].second(expansion(SCRIPT));
+        ensure("of another text: the questions go", doc.check.waiting.empty() && studio.asks.empty() && !doc.expanded.valid);
+        doc.editor->undoJournal().undo();
+        doc.editor->setText(SCRIPT);
+        checking.ask(doc, Kind::Inspect, ALTextPos(3, 20), ALTextPos(3, 20));
+        expansions.back().second(expansion(SCRIPT));
+        ensure("taken", doc.expanded.valid && doc.expanded.version == version(doc) && doc.check.expansions == 1);
+        ensure_equals("then asked", studio.asks.size(), size_t(1));
+        ensure("of the expansion, at its place", studio.asks[0].request.text == doc.expanded.text && studio.asks[0].request.line == 4);
+        ensure_equals("the problems shown with it", joined(studio.told), std::string("problems a"));
+        ALScriptAnalysis::Result result;
+        result.kind    = Kind::Inspect;
+        result.id      = "a";
+        result.version = version(doc);
+        result.line    = 4;
+        result.column  = 20;
+        studio.asks[0].answered(result);
+        ensure_equals("at the source's place", studio.told.back(), std::string("inspect a 3:20"));
+        result.line = 0;
+        const size_t told = studio.told.size();
+        studio.asks[0].answered(result);
+        ensure("in the include: nowhere of the script's", studio.told.size() == told);
+        checking.ask(doc, Kind::Inspect, ALTextPos(0, 0), ALTextPos(0, 0));
+        checking.ask(doc, Kind::Check, ALTextPos(), ALTextPos());
+        doc.check.expansions += 1;
+        doc.expanded.generation += 1;
+        studio.asks[2].answered(answer(doc));
+        ensure("an answer of an expansion since replaced: the check asked again", doc.check.analysisDue == 1.0 &&
+               doc.check.analysis.empty());
+        preprocessing = false;
+        studio.asks[1].answered(result);
+        ensure("read plain now: dropped", studio.told.size() == told);
+        checking.ask(doc, Kind::Inspect, ALTextPos(3, 20), ALTextPos(3, 20));
+        preprocessing = true;
+        result.line   = 3;
+        studio.asks.back().answered(result);
+        ensure("asked plain, read expanded now: dropped", studio.told.size() == told);
+
+        // An expansion of an older text is expanded again; a place a
+        // directive holds is asked nothing; a stretch it carries as it
+        // stands keeps its end.
+        const size_t expanded = expansions.size();
+        doc.editor->insertText(" ");
+        checking.ask(doc, Kind::Inspect, ALTextPos(3, 20), ALTextPos(3, 20));
+        ensure("an older expansion: expanded again", expansions.size() == expanded + 1);
+        doc.editor->setText("#define X\n" + SCRIPT);
+        checking.ask(doc, Kind::Check, ALTextPos(), ALTextPos());
+        ALPreprocessor::Result directive = expansion(SCRIPT);
+        directive.map                    = ALSourceMap();
+        directive.map.addFile("a", "object:a");
+        for (S32 line = 1; line <= 5; ++line)
+        {
+            ALSourceMap::Segment own;
+            own.outLine = line - 1;
+            own.length  = 30;
+            own.line    = line;
+            directive.map.add(own);
+        }
+        directive.map.finish();
+        directive.text = SCRIPT;
+        expansions.back().second(directive);
+        const size_t asks = studio.asks.size();
+        checking.ask(doc, Kind::Hover, ALTextPos(0, 3), ALTextPos(0, 3));
+        ensure("on the directive: nothing asked", studio.asks.size() == asks);
+        checking.ask(doc, Kind::Actions, ALTextPos(1, 8), ALTextPos(1, 13));
+        ensure("a stretch kept", studio.asks.size() == asks + 1 && studio.asks.back().request.line == 0 &&
+                                     studio.asks.back().request.endColumn == 13);
+        unit.reset();
+        doc.editor->insertText(" ");
+        make();
+        const size_t stale_expansions = expansions.size();
+        unit->ask(doc, Kind::Hover, ALTextPos(1, 8), ALTextPos(1, 8));
+        ALScriptStudioChecking* gone = unit.release();
+        delete gone;
+        expansions.back().second(expansion(SCRIPT));
+        ensure("gone before its expansion came: nothing", expansions.size() == stale_expansions + 1 && studio.asks.size() == asks + 1);
+    }
+
+    template<> template<>
+    void alscriptstudiochecking_object::test<4>()
+    {
+        set_test_name("a check of an expansion: problems back in the source, an include's kept by its file without fixes, its unused not said");
+        ALScriptStudioChecking& checking = make();
+        Doc&                    doc      = tab("a");
+        preprocessing                    = true;
+        checking.ask(doc, Kind::Check, ALTextPos(), ALTextPos());
+        expansions[0].second(expansion(SCRIPT));
+        ALScriptProblem own = problem(4, "own");
+        own.fixes           = { fix("Put right", 4, 0, 3, "abc") };
+        ALScriptProblem inc = problem(0, "in the include");
+        inc.fixes           = { fix("Put right", 0, 0, 3, "abc") };
+        ALScriptProblem unused = problem(0, "helper unused", ALScriptProblem::Severity::Warning);
+        unused.code            = "20009";
+        ALScriptProblem loud = problem(0, "an error with that code");
+        loud.code            = "20009";
+        ALScriptProblem nowhere = problem(9, "past the end");
+        nowhere.fixes           = { fix("Put right", 9, 0, 3, "abc") };
+        ALScriptAnalysis::Result result = answer(doc, { own, inc, unused, loud, nowhere });
+        ALScriptOutlineEntry     mine, theirs;
+        mine.name              = "count";
+        mine.nameSpan.line     = 1;
+        mine.nameSpan.endLine  = 1;
+        mine.span.line         = 1;
+        mine.span.endLine      = 1;
+        theirs.name            = "helper";
+        result.outline         = { mine, theirs };
+        studio.asks[0].answered(result);
+        const ALScriptProblems& got = doc.check.analysis;
+        ensure_equals("the include's unused dropped", got.size(), size_t(4));
+        ensure("not an error of that code", got[2].message == "an error with that code");
+        ensure("own: in the source, its fix too", got[0].line == 3 && got[0].file.empty() && got[0].fixes.size() == 1 &&
+               got[0].fixes[0].edits[0].line == 3);
+        ensure("the include's: by its file, no fixes", got[1].file == "disk:/lib.lsl" && got[1].line == 2 && got[1].fixes.empty());
+        ensure("nowhere: no fixes", got[3].fixes.empty());
+        ensure("the include's symbol not outlined", doc.outline.size() == 1 && doc.outline[0].name == "count" &&
+               doc.outline[0].nameSpan.line == 0);
+    }
+
+    template<> template<>
+    void alscriptstudiochecking_object::test<5>()
+    {
+        set_test_name("an include's file, checked with a state after it: what is said of the state, and of its unused, not the include's");
+        ALScriptStudioChecking& checking = make();
+        Doc&                    doc      = tab("disk:/lib.lsl", "integer helper;\nhelp() { }\n");
+        doc.file                         = "/lib.lsl";
+        doc.editor->setSyntax("lsl");
+        ensure("a fragment", checking.lslFragment(doc));
+        checking.ask(doc, Kind::Check, ALTextPos(), ALTextPos());
+        ensure("a state put after it", studio.asks[0].request.text == doc.editor->text() + "\ndefault{state_entry(){}}\n");
+        ALScriptProblem unused = problem(0, "helper unused", ALScriptProblem::Severity::Warning);
+        unused.code            = "LocalUnused";
+        ALScriptOutlineEntry state;
+        state.name          = "default";
+        state.nameSpan.line = 4;
+        studio.asks[0].answered(answer(doc, { problem(1, "own"), problem(4, "in the state"), unused }));
+        ensure("only its own", doc.check.analysis.size() == 1 && doc.check.analysis[0].message == "own");
+        ALScriptAnalysis::Result outlined = answer(doc);
+        outlined.outline                  = { state };
+        studio.asks[0].answered(outlined);
+        ensure("nor the state outlined", doc.outline.empty());
+        doc.editor->setText("integer helper;\ndefault\n{\n}\n");
+        ensure("with a state: a script", !checking.lslFragment(doc));
+        doc.file.clear();
+        doc.editor->setText("integer helper;\n");
+        ensure("not a file: a script", !checking.lslFragment(doc));
+    }
+
+    template<> template<>
+    void alscriptstudiochecking_object::test<6>()
+    {
+        set_test_name("a name nothing declares offered an include that declares it; one nothing in hand gives fetched from what is near");
+        ALScriptStudioChecking& checking = make();
+        Doc&                    doc      = tab("a");
+        preprocessing                    = true;
+        ALScriptModules::Module lib;
+        lib.name                  = "lib";
+        lib.require               = "lib.lsl";
+        lib.exports               = { "helper" };
+        modules                   = { lib };
+        ALScriptProblem undeclared = problem(3, "helper undeclared");
+        undeclared.key             = "LSLUndeclared";
+        undeclared.args            = { "helper" };
+        ALScriptProblem other      = undeclared;
+        other.args                 = { "nothing" };
+        doc.expanded.valid         = true;
+        doc.expanded.version       = version(doc);
+        doc.expanded.generation    = 1;
+        doc.check.expansions       = 1;
+        checking.ask(doc, Kind::Check, ALTextPos(), ALTextPos());
+        doc.expanded.map = expansion(SCRIPT).map;
+        ALScriptAnalysis::Result result = answer(doc, { undeclared, other });
+        result.problems[0].line = 4;
+        result.problems[1].line = 4;
+        studio.asks[0].answered(result);
+        const ALScriptProblem& given = doc.check.analysis[0];
+        ensure_equals("offered", given.fixes.size(), size_t(1));
+        ensure("the include put in, preferred", given.fixes[0].preferred &&
+               given.fixes[0].edits[0].text.find("#include \"lib.lsl\"") != std::string::npos);
+        ensure("nothing gives the other", doc.check.analysis[1].fixes.empty());
+        ensure_equals("what is near fetched", nearby.size(), size_t(1));
+        const size_t asks = studio.asks.size();
+        nearby[0]();
+        checking.pump(1.0);
+        ensure_equals("and checked again once it is in", studio.asks.size(), asks + 1);
+        preprocessing = false;
+        doc.check.analysisDue = 0.0;
+        checking.ask(doc, Kind::Check, ALTextPos(), ALTextPos());
+        studio.asks.back().answered(answer(doc, { undeclared }));
+        ensure("not preprocessed: nothing to include with", doc.check.analysis[0].fixes.empty() && nearby.size() == 1);
+        preprocessing = true;
+        checking.ask(doc, Kind::Check, ALTextPos(), ALTextPos());
+        ALScriptAnalysis::Result given_all = answer(doc, { undeclared });
+        given_all.problems[0].line         = 4;
+        studio.asks.back().answered(given_all);
+        ensure("all given: nothing fetched", !doc.check.analysis[0].fixes.empty() && nearby.size() == 1);
+        doc.check.analysisDue = 0.0;
+        unit.reset();
+        nearby[0]();
+        ensure("gone: nothing asked", doc.check.analysisDue == 0.0);
+    }
+
+    template<> template<>
+    void alscriptstudiochecking_object::test<7>()
+    {
+        set_test_name("what a comment says is not wanted dropped, a comment offered for the rest; the preprocessor's words and a require explained");
+        ALScriptStudioChecking& checking = make();
+        Doc&                    doc      = tab("a", "integer a; // NOLINT\ninteger b;\nswitch (a) { }\n");
+        ALScriptProblem         quiet    = problem(0, "a unused", ALScriptProblem::Severity::Warning);
+        quiet.source                     = ALScriptProblem::Source::Lint;
+        quiet.key                        = "LSLUnusedVariable";
+        ALScriptProblem said             = quiet;
+        said.line                        = 1;
+        said.message                     = "b unused";
+        ALScriptProblem parse            = problem(2, "syntax error");
+        ALScriptProblem theirs           = parse;
+        theirs.file                      = "disk:/lib.lsl";
+        checking.ask(doc, Kind::Check, ALTextPos(), ALTextPos());
+        studio.asks[0].answered(answer(doc, { quiet, said, parse, theirs }));
+        ensure_equals("the one a comment quiets dropped", doc.check.analysis.size(), size_t(3));
+        ensure_equals("an include's not explained here", doc.check.analysis[2].message, std::string("syntax error"));
+        ensure("the other offered a comment", doc.check.analysis[0].fixes.size() == 1 &&
+                                                  doc.check.analysis[0].fixes[0].kind == ALScriptFix::Kind::Suppress);
+        ensure("the switch explained", doc.check.analysis[1].message.find("syntax error PreprocHintSwitch [WORD]=switch") == 0);
+        preprocessing = true;
+        switches      = true;
+        doc.expanded.valid = false;
+        checking.ask(doc, Kind::Check, ALTextPos(), ALTextPos());
+        ALPreprocessor::Result plain;
+        plain.text = doc.editor->text();
+        plain.map.addFile("a", "object:a");
+        plain.map.finish();
+        expansions.back().second(plain);
+        studio.asks.back().answered(answer(doc, { parse }));
+        ensure_equals("its transform on: not", doc.check.analysis[0].message, std::string("syntax error"));
+
+        preprocessing       = false;
+        Doc& lua            = tab("b", "local x = require(\"lib\")\n");
+        lua.language.lua    = true;
+        checking.ask(lua, Kind::Check, ALTextPos(), ALTextPos());
+        studio.asks.back().answered(answer(lua));
+        ensure("a require the preprocessor does not run over, warned of",
+               lua.check.analysis.size() == 1 && lua.check.analysis[0].message == "RequireNotPreprocessed [NAME]=lib");
+        preprocessing = true;
+        checking.ask(lua, Kind::Check, ALTextPos(), ALTextPos());
+        expansions.back().second(plain);
+        studio.asks.back().answered(answer(lua));
+        ensure("preprocessed: not", lua.check.analysis.empty());
+    }
+
+    template<> template<>
+    void alscriptstudiochecking_object::test<8>()
+    {
+        set_test_name("a fix made as one step and checked again; refused where the text has moved on or its places are past the end");
+        ALScriptStudioChecking& checking = make();
+        Doc&                    doc      = tab("a");
+        const U32               v        = version(doc);
+        ensure("made", checking.applyFix(doc, fix("Rename it", 0, 8, 13, "total"), v));
+        ensure_equals("in the text", doc.editor->document().line(0), std::string("integer total;"));
+        ensure_equals("one step", doc.editor->undoJournal().undoLabel(), std::string("fix"));
+        ensure("said, checked again", services.statuses.back() == "Rename it" && doc.check.analysisDue == 1.0);
+        doc.check.analysisDue = 0.0;
+        ensure("moved on: refused", !checking.applyFix(doc, fix("Again", 0, 8, 13, "sum"), v));
+        ensure("said, checked again", services.statuses.back() == "FixStale" && services.statusFailures.back() &&
+               doc.check.analysisDue == 1.0);
+        ensure("past the end: refused", !checking.applyFix(doc, fix("Far", 40, 0, 1, "x"), version(doc)));
+        ALScriptFix refactor = fix("Extract", 0, 0, 7, "float");
+        refactor.kind        = ALScriptFix::Kind::Refactor;
+        ensure("a refactor", checking.applyFix(doc, refactor, version(doc)) && doc.editor->undoJournal().undoLabel() == "refactor");
+        doc.modifiable = false;
+        ensure("not to be changed: refused", !checking.applyFix(doc, fix("No", 0, 0, 1, "x"), version(doc)));
+    }
+
+    template<> template<>
+    void alscriptstudiochecking_object::test<9>()
+    {
+        set_test_name("Fix All: after the check where the text is not checked yet, one made at once, many asked first and made as one step");
+        ALScriptStudioChecking& checking = make();
+        Doc&                    doc      = tab("a");
+        checking.askFixAll(doc, Doc::FixPick{});
+        ensure("not checked: checked first", doc.check.fixAllAfterCheck.has_value() && services.statuses.back() == "FixChecking [NAME]=a");
+        checking.pump(1.0);
+        ALScriptProblem one = problem(0, "one");
+        one.fixes           = { fix("First", 0, 0, 7, "float") };
+        studio.asks[0].answered(answer(doc, { one }));
+        ensure("then made", doc.editor->document().line(0) == "float count;" && !doc.check.fixAllAfterCheck);
+
+        checking.pump(1.0);
+        ALScriptProblem two = problem(3, "two");
+        two.fixes           = { fix("Second", 3, 4, 15, "touch_start") };
+        ALScriptProblem risky = problem(0, "risky");
+        risky.fixes           = { fix("Risky", 0, 6, 11, "total", false) };
+        one.fixes             = { fix("First", 0, 0, 5, "integer") };
+        studio.asks.back().answered(answer(doc, { one, two, risky }));
+        checking.askFixAll(doc, Doc::FixPick{});
+        ensure("asked", (bool)studio.confirm && studio.confirmed["FIXES"].asString() == "Fixes [COUNT]=2");
+        ensure("with what is left", studio.confirmed["LEFT"].asString() == " FixesLeft [COUNT]=1");
+        studio.confirm();
+        ensure("made", doc.editor->document().line(0) == "integer count;" &&
+               doc.editor->document().line(3) == "    touch_start() { count = 1; }");
+        ensure("as one step", doc.editor->undoJournal().undoLabel() == "fix" && services.statuses.back() == "FixesMade [COUNT]=2");
+        checking.pump(1.0);
+        studio.asks.back().answered(answer(doc));
+        checking.askFixAll(doc, Doc::FixPick{});
+        ensure_equals("none", services.statuses.back(), std::string("FixNone"));
+        unit.reset();
+        studio.confirm();
+        ensure("gone: nothing", doc.editor->document().line(0) == "integer count;");
+    }
+
+    template<> template<>
+    void alscriptstudiochecking_object::test<10>()
+    {
+        set_test_name("a line's fixes as the editor lists them, of the text they were made in; and the problem a value is");
+        ALScriptStudioChecking& checking = make();
+        Doc&                    doc      = tab("a");
+        ALScriptProblem         one      = problem(0, "one");
+        one.fixes                        = { fix("First", 0, 0, 7, "float") };
+        checking.ask(doc, Kind::Check, ALTextPos(), ALTextPos());
+        studio.asks[0].answered(answer(doc, { one, problem(2, "two") }));
+        std::vector<ALCodeEditor::Fix> fixes;
+        checking.fixesOn(doc, 0, fixes);
+        ensure("one", fixes.size() == 1 && fixes[0].title == "First" && fixes[0].edits[0].second == "float");
+        const Doc::Shown* shown = checking.shownOf(fixes[0].value);
+        ensure("its problem", shown && shown->message == "one");
+        fixes.clear();
+        checking.fixesOn(doc, 2, fixes);
+        ensure("none on another line", fixes.empty());
+        doc.editor->insertText("x");
+        checking.fixesOn(doc, 0, fixes);
+        ensure("typed in since: none", fixes.empty());
+        LLSD gone;
+        gone["doc"] = "b";
+        ensure("another tab's: none", !checking.shownOf(gone));
+    }
+
+    template<> template<>
+    void alscriptstudiochecking_object::test<11>()
+    {
+        set_test_name("the preprocessor's settings changed: a moment on, every tab expanded afresh, run for a save, taught its words, checked");
+        ALScriptStudioChecking& checking = make();
+        Doc&                    doc      = tab("a");
+        Doc&                    lua      = tab("b");
+        lua.language.lua                 = true;
+        doc.expanded.valid               = true;
+        doc.weighing.sent                = true;
+        preprocessing                    = true;
+        checking.settingsChanged(false, 10.0);
+        checking.settingsChanged(true, 10.1);
+        checking.pump(10.2);
+        ensure("not yet", doc.expanded.valid);
+        checking.pump(10.1 + 0.35);
+        ensure("afresh", !doc.expanded.valid && !doc.weighing.sent);
+        ensure_equals("run for a save", joined(studio.told), std::string("run a, run b"));
+        ensure("checked", doc.check.analysisDue == 0.0 && expansions.size() == 2);
+        studio.told.clear();
+        checking.pump(20.0);
+        ensure("once", studio.told.empty());
+    }
+
+    template<> template<>
+    void alscriptstudiochecking_object::test<12>()
+    {
+        set_test_name("refactors offered at the caret, those reaching past the text dropped; other answers handed on or given the editor");
+        ALScriptStudioChecking& checking = make();
+        Doc&                    doc      = tab("a");
+        checking.ask(doc, Kind::Actions, ALTextPos(0, 8), ALTextPos(0, 13));
+        ensure("a stretch", studio.asks[0].request.endColumn == 13);
+        ALScriptAnalysis::Result result;
+        result.kind    = Kind::Actions;
+        result.id      = "a";
+        result.version = version(doc);
+        ALScriptFix inside = fix("Rename", 0, 8, 13, "total");
+        inside.kind        = ALScriptFix::Kind::Refactor;
+        ALScriptFix beyond   = fix("Beyond", 9, 0, 1, "x");
+        ALScriptFix straddle = fix("Straddle", 4, 0, 1, "x");
+        straddle.edits[0].endLine = 9;
+        result.actions       = { inside, beyond, straddle };
+        studio.asks[0].answered(result);
+        ensure("kept", doc.check.actions.size() == 1 && doc.check.actions[0].title == "Rename" && doc.check.actionsVersion == version(doc));
+        result.version = version(doc) + 1;
+        result.actions = { beyond };
+        studio.asks[0].answered(result);
+        ensure("of another text: dropped", doc.check.actions.size() == 1);
+        checking.ask(doc, Kind::References, ALTextPos(0, 8), ALTextPos(0, 8));
+        ALScriptAnalysis::Result refs;
+        refs.kind    = Kind::References;
+        refs.id      = "a";
+        refs.version = version(doc);
+        refs.line    = 0;
+        refs.column  = 8;
+        studio.asks.back().answered(refs);
+        ensure_equals("handed on", studio.told.back(), std::string("references a 0:8"));
+        studio.targets.clear();
+        const size_t asks = studio.asks.size();
+        checking.ask(doc, Kind::Weigh, ALTextPos(), ALTextPos());
+        ensure("nothing to weigh for: not asked", studio.asks.size() == asks);
+        studio.targets = { ALScriptWeight::Target::Mono };
+        checking.ask(doc, Kind::Weigh, ALTextPos(), ALTextPos());
+        ensure("weighed for its targets", studio.asks.size() == asks + 1 && studio.asks.back().request.targets.size() == 1);
+    }
+}
