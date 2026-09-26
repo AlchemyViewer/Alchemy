@@ -82,4 +82,19 @@ struct ALScriptEnvelope
     // The compile target a text asks for with a `//mono`, `//lsl2` or
     // `//luau` line of its own (`--luau` in Lua), or nothing.
     static std::string directiveOf(std::string_view text, bool lua);
+
+    // Whether the compiled half could have come of the source as it
+    // expands now: the same tokens, spacing and comments aside -- in LSL,
+    // with whole globals, functions or states of the expansion left out,
+    // as an optimizer leaves out what is not used, and every other one
+    // the same to the token. False where it could not: changed outside
+    // the preprocessor, or what the source includes has changed since.
+    static bool compiledFrom(std::string_view expansion, std::string_view compiled, bool lua);
+    // Whether that can be told at all. Where this viewer compiled it, it
+    // can. Where another did -- Firestorm -- only where the expansion used
+    // none of the transforms whose made names differ from one
+    // preprocessor to another: switch, lazy lists, the extensions. And
+    // never where the source asks for what differs from one expansion to
+    // the next: the date, the time, who compiled it, the asset, the file.
+    static bool comparable(std::string_view source, bool lua, bool compiled_here, bool transformed);
 };

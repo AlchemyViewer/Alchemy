@@ -202,4 +202,37 @@ namespace tut
             ensure_equals(c.name + ": the expanded code", back->expanded, envelope.expanded);
         }
     }
+
+    template<> template<>
+    void alscriptenvelope_object::test<7>()
+    {
+        set_test_name("a compiled half the source makes now, spacing, comments and an optimizer's leavings aside; and one it does not");
+        const std::string made = "integer g = 3;\nfloat unused = 1.0;\nhelper() { llSay(0, \"a\"); }\n"
+                                 "default\n{\n    state_entry()\n    {\n        g = 4;\n        llSay(0, (string)g);\n    }\n}\n";
+        ensure("itself", ALScriptEnvelope::compiledFrom(made, made, false));
+        ensure("spaced and commented otherwise",
+               ALScriptEnvelope::compiledFrom(made, "// made here\ninteger g=3;float unused=1.0;helper(){llSay(0,\"a\");}"
+                                                    "default{state_entry(){g=4;llSay(0,(string)g);}}", false));
+        ensure("an unused global and function left out",
+               ALScriptEnvelope::compiledFrom(made, "integer g = 3;\ndefault { state_entry() { g = 4; llSay(0, (string)g); } }", false));
+        // 3 is a token the script has elsewhere: changed here, it is
+        // still not what the source makes.
+        ensure("a number changed", !ALScriptEnvelope::compiledFrom(made, "integer g = 3;\ndefault { state_entry() { g = 3; llSay(0, (string)g); } }", false));
+        ensure("a line added",
+               !ALScriptEnvelope::compiledFrom(made, "integer g = 3;\ndefault { state_entry() { g = 4; llSay(0, (string)g); llDie(); } }", false));
+        ensure("a part added", !ALScriptEnvelope::compiledFrom(made, made + "extra() { }\n", false));
+        ensure("in another order", !ALScriptEnvelope::compiledFrom(made, "default { state_entry() { g = 4; llSay(0, (string)g); } }\ninteger g = 3;", false));
+
+        const std::string lua = "local n = 1\nprint(n)\n";
+        ensure("SLua: the same tokens", ALScriptEnvelope::compiledFrom(lua, "local n=1 -- one\nprint(n)", true));
+        ensure("SLua: not", !ALScriptEnvelope::compiledFrom(lua, "local n = 2\nprint(n)\n", true));
+        ensure("SLua: nothing left out", !ALScriptEnvelope::compiledFrom(lua, "local n = 1\n", true));
+
+        ensure("compiled here: told, transformed or not", ALScriptEnvelope::comparable(made, false, true, true));
+        ensure("elsewhere, untransformed: told", ALScriptEnvelope::comparable(made, false, false, false));
+        ensure("elsewhere, transformed: not", !ALScriptEnvelope::comparable(made, false, false, true));
+        ensure("the time asked for: not", !ALScriptEnvelope::comparable("string t = __TIME__;", false, true, false));
+        ensure("who compiled it: not", !ALScriptEnvelope::comparable("local a = __AGENTNAME__", true, true, false));
+        ensure("named in a comment only: told", ALScriptEnvelope::comparable("// built __DATE__\ninteger x;", false, true, false));
+    }
 }

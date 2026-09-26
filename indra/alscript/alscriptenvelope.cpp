@@ -26,6 +26,11 @@
 
 #include "alscriptenvelope.h"
 
+#include "alpreprocessor.h"
+
+#include <algorithm>
+#include <vector>
+
 namespace
 {
     // Firestorm's, byte for byte.
@@ -253,4 +258,117 @@ std::string ALScriptEnvelope::wrap() const
     }
     out += expanded;
     return out;
+}
+
+namespace
+{
+    typedef std::vector<ALPreprocessor::Token> Tokens;
+
+    // The tokens that say something: spacing and comments aside.
+    Tokens meaningful(std::string_view text, bool lua)
+    {
+        Tokens out;
+        for (ALPreprocessor::Token& t : ALPreprocessor::tokenize(text, lua))
+        {
+            if (t.kind != ALPreprocessor::Token::Kind::Space && t.kind != ALPreprocessor::Token::Kind::Newline &&
+                t.kind != ALPreprocessor::Token::Kind::Comment)
+            {
+                out.push_back(std::move(t));
+            }
+        }
+        return out;
+    }
+
+    bool same(const ALPreprocessor::Token& a, const ALPreprocessor::Token& b) { return a.kind == b.kind && a.text == b.text; }
+
+    // An LSL script's top-level parts -- a global, a function, a state --
+    // each as the tokens it runs over: to a `;` at the top, or to the `}`
+    // that brings the braces back to none.
+    std::vector<std::pair<size_t, size_t>> parts(const Tokens& tokens)
+    {
+        std::vector<std::pair<size_t, size_t>> out;
+        size_t                                 begin = 0;
+        S32                                    depth = 0;
+        for (size_t i = 0; i < tokens.size(); ++i)
+        {
+            const ALPreprocessor::Token& t = tokens[i];
+            if (t.kind != ALPreprocessor::Token::Kind::Punct)
+            {
+                continue;
+            }
+            if (t.text == "{")
+            {
+                ++depth;
+            }
+            else if (t.text == "}")
+            {
+                if (--depth == 0)
+                {
+                    out.emplace_back(begin, i + 1);
+                    begin = i + 1;
+                }
+            }
+            else if (t.text == ";" && depth == 0)
+            {
+                out.emplace_back(begin, i + 1);
+                begin = i + 1;
+            }
+        }
+        if (begin < tokens.size())
+        {
+            out.emplace_back(begin, tokens.size());
+        }
+        return out;
+    }
+}
+
+// static
+bool ALScriptEnvelope::compiledFrom(std::string_view expansion, std::string_view compiled, bool lua)
+{
+    const Tokens made = meaningful(expansion, lua);
+    const Tokens kept = meaningful(compiled, lua);
+    if (lua)
+    {
+        // Nothing optimizes SLua: the same tokens, or not.
+        return std::equal(made.begin(), made.end(), kept.begin(), kept.end(), same);
+    }
+    // Each part kept is the next of the expansion's that is the same to the
+    // token; the ones passed over are what an optimizer left out.
+    const auto made_parts = parts(made);
+    const auto kept_parts = parts(kept);
+    size_t     next       = 0;
+    for (const auto& [kept_begin, kept_end] : kept_parts)
+    {
+        bool found = false;
+        for (; next < made_parts.size() && !found; ++next)
+        {
+            const auto& [made_begin, made_end] = made_parts[next];
+            found = std::equal(made.begin() + made_begin, made.begin() + made_end, kept.begin() + kept_begin, kept.begin() + kept_end, same);
+        }
+        if (!found)
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
+// static
+bool ALScriptEnvelope::comparable(std::string_view source, bool lua, bool compiled_here, bool transformed)
+{
+    if (!compiled_here && transformed)
+    {
+        return false;
+    }
+    static const char* const DIFFERS[] = { "__DATE__",   "__TIME__",      "__UNIXTIME__", "__AGENTKEY__",  "__AGENTID__",
+                                           "__AGENTIDRAW__", "__AGENTNAME__", "__ASSETID__", "__FILE__", "__SHORTFILE__" };
+    for (const ALPreprocessor::Token& t : ALPreprocessor::tokenize(source, lua))
+    {
+        if (t.kind == ALPreprocessor::Token::Kind::Ident &&
+            std::find(std::begin(DIFFERS), std::end(DIFFERS), t.text) != std::end(DIFFERS))
+        {
+            return false;
+        }
+    }
+    return true;
 }
