@@ -213,6 +213,31 @@ int main(int, char**)
     });
     countRow("  lines relexed (the first comment's end stops it)", relexed[0], relexed[1]);
 
+    // Only the undo timed: a hundred characters typed at the top as a run,
+    // then taken back in one step.
+    {
+        double ms[2];
+        for (int i = 0; i < 2; ++i)
+        {
+            ALCodeEditor& e = *subjects[i].editor;
+            double        samples[5];
+            for (double& sample : samples)
+            {
+                e.setCaret(ALTextPos(0, 0));
+                for (int c = 0; c < 100; ++c)
+                {
+                    e.handleUnicodeCharHere(static_cast<llwchar>('a' + c % 26));
+                }
+                const auto start = clock::now();
+                e.undo();
+                sample = std::chrono::duration<double, std::milli>(clock::now() - start).count();
+            }
+            std::sort(samples, samples + 5);
+            ms[i] = samples[2];
+        }
+        row("undo of a 100-character typing run", ms[0], ms[1]);
+    }
+
     std::printf("\nFinding\n");
     size_t found[2] = {};
     both("regex find-all: every call, \\w+\\s*\\(", subjects, 1, [&](Subject& s, ALCodeEditor& e) {
