@@ -3156,9 +3156,13 @@ namespace
     class LazyLists
     {
     public:
+        explicit LazyLists(Engine& engine) : mEngine(engine) {}
+
         Tokens run(const Tokens& in)
         {
-            Tokens out = reads(assignments(in));
+            const Tokens assigned = assignments(in);
+            Tokens       out;
+            reads(assigned, 0, assigned.size(), out);
             if (!mAny)
             {
                 return out;
@@ -3271,37 +3275,53 @@ namespace
             return nullptr;
         }
 
-        Tokens reads(const Tokens& in)
+        // The reads between `from` and `to`, each made a call, into `out`;
+        // a read inside the brackets of another a level down, as deep as
+        // blocks may nest -- a macro can nest them without end -- and each
+        // level over the same tokens rather than a copy of its part.
+        void reads(const Tokens& in, size_t from, size_t to, Tokens& out)
         {
-            Tokens out;
-            size_t i = 0;
-            while (i < in.size())
+            const Nesting level(mNested);
+            if (mStopped || !mEngine.nest(mNested, from < to ? in[from] : Token()))
+            {
+                // The run has overrun, and what it made goes unread.
+                mStopped = true;
+                return;
+            }
+            size_t i = from;
+            while (i < to)
             {
                 const Token& t = in[i];
                 if (t.is(Kind::Punct, "("))
                 {
                     const size_t a      = skipBlank(in, i + 1);
-                    const char*  reader = a < in.size() && in[a].kind == Kind::Ident ? readerFor(in[a].text) : nullptr;
-                    const size_t b      = reader ? skipBlank(in, a + 1) : in.size();
-                    if (reader && b < in.size() && in[b].is(Kind::Punct, ")"))
+                    const char*  reader = a < to && in[a].kind == Kind::Ident ? readerFor(in[a].text) : nullptr;
+                    const size_t b      = reader ? skipBlank(in, a + 1) : to;
+                    if (reader && b < to && in[b].is(Kind::Punct, ")"))
                     {
                         size_t     c     = skipBlank(in, b + 1);
-                        const bool paren = c < in.size() && in[c].is(Kind::Punct, "(");
+                        const bool paren = c < to && in[c].is(Kind::Punct, "(");
                         if (paren)
                         {
                             c = skipBlank(in, c + 1);
                         }
-                        if (c < in.size() && in[c].kind == Kind::Ident)
+                        if (c < to && in[c].kind == Kind::Ident)
                         {
                             const size_t d = skipBlank(in, c + 1);
-                            if (d < in.size() && in[d].is(Kind::Punct, "["))
+                            if (d < to && in[d].is(Kind::Punct, "["))
                             {
-                                const size_t e = matching(in, d, "[", "]");
-                                size_t       after = e == std::string::npos ? e : e + 1;
+                                // A bracket closed past `to` is not closed
+                                // within it.
+                                size_t e = matching(in, d, "[", "]");
+                                if (e != std::string::npos && e >= to)
+                                {
+                                    e = std::string::npos;
+                                }
+                                size_t after = e == std::string::npos ? e : e + 1;
                                 if (paren && after != std::string::npos)
                                 {
                                     const size_t f = skipBlank(in, after);
-                                    after          = f < in.size() && in[f].is(Kind::Punct, ")") ? f + 1 : std::string::npos;
+                                    after          = f < to && in[f].is(Kind::Punct, ")") ? f + 1 : std::string::npos;
                                 }
                                 if (after != std::string::npos)
                                 {
@@ -3311,7 +3331,11 @@ namespace
                                     out.push_back(in[c]);
                                     out.push_back(synth(Kind::Punct, ",", t));
                                     out.push_back(synth(Kind::Space, " ", t));
-                                    append(out, reads(slice(in, d + 1, e)));
+                                    reads(in, d + 1, e, out);
+                                    if (mStopped)
+                                    {
+                                        return;
+                                    }
                                     out.push_back(synth(Kind::Punct, ")", t));
                                     i = after;
                                     continue;
@@ -3323,10 +3347,12 @@ namespace
                 out.push_back(t);
                 ++i;
             }
-            return out;
         }
 
-        bool mAny = false;
+        Engine& mEngine;
+        S32     mNested  = 0;
+        bool    mStopped = false;
+        bool    mAny     = false;
     };
 
     // Comments gone, each run of blanks one space or one newline, and no
@@ -3810,7 +3836,7 @@ ALPreprocessor::Result ALPreprocessor::run(std::string_view source, const Option
     {
         if (options.lazyLists || engine.usedLazyLists())
         {
-            LazyLists lazy;
+            LazyLists lazy(engine);
             tokens               = lazy.run(tokens);
             result.usedLazyLists = lazy.any();
         }

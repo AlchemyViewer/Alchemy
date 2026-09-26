@@ -1295,4 +1295,28 @@ namespace tut
                               failed.problems[0].severity == ALScriptProblem::Severity::Error);
         ensure("mapped to itself", failed.map.toSource(0, 3).found() && failed.map.toSource(0, 3).line == 0);
     }
+
+    template<> template<>
+    void alpreprocessor_object::test<34>()
+    {
+        set_test_name("lazy lists' reads nested by macros stop at the depth blocks may nest, and within it each is made a call");
+        // A read inside a read's brackets, a thousand deep, made by macros
+        // each expanding the last -- rescanned, so the expansion itself is
+        // flat, and only the rewrite descends.
+        std::string deep = "#define N0 0\n";
+        for (int i = 1; i <= 1000; ++i)
+        {
+            deep += "#define N" + std::to_string(i) + " (integer)l[N" + std::to_string(i - 1) + "]\n";
+        }
+        deep += "list l;\ninteger x = N1000;\n";
+        ALPreprocessor::Options o = options();
+        o.lazyLists               = true;
+        ALPreprocessor::Result r  = ALPreprocessor::run(deep, o);
+        ensure("stopped at the depth: " + messages(r), r.overran && r.problems.back().key == std::string("PreprocNestsTooDeep"));
+
+        // Within it, each read is a call, the inner in the outer's place.
+        r = ALPreprocessor::run("#define N0 0\n#define N1 (integer)l[N0]\n#define N2 (integer)l[N1]\n#define N3 (integer)l[N2]\nlist l;\ninteger x = N3;\n", o);
+        ensure("nested reads each a call: " + r.text,
+               !r.overran && r.text.find("integer x = llList2Integer(l, llList2Integer(l, llList2Integer(l, 0)));") != std::string::npos);
+    }
 }
