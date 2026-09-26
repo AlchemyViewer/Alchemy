@@ -325,7 +325,8 @@ const ALOutputView::Decor& ALOutputView::decorOf(size_t index, const Laid& laid)
     }
     for (size_t l = 0; l < lines.size(); ++l)
     {
-        for (Substitution& url : urlLinks(std::string(lines[l]), static_cast<S32>(l), l == 0 ? laid.textBegin : 0))
+        for (Substitution& url : urlLinks(std::string(lines[l]), static_cast<S32>(l), l == 0 ? laid.textBegin : 0,
+                                          [this](const std::string& url, const std::string& label) { urlLabelled(url, label); }))
         {
             addInOrder(decor.links, std::move(url));
         }
@@ -367,9 +368,7 @@ void ALOutputView::show(size_t index)
 
 void ALOutputView::urlLabelled(const std::string& url, const std::string& label)
 {
-    ALTextView::urlLabelled(url, label);
-    // And the links kept to lay again, so that an entry the filter shows
-    // again shows the name.
+    // So that an entry the filter shows again shows the name.
     for (Decor& decor : mDecor)
     {
         for (Substitution& link : decor.links)

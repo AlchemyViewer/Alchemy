@@ -830,7 +830,7 @@ S32 ALTextView::linkUrlsOn(S32 line, S32 from)
     return static_cast<S32>(links.size());
 }
 
-std::vector<ALTextView::Substitution> ALTextView::urlLinks(const std::string& text, S32 line, S32 from)
+std::vector<ALTextView::Substitution> ALTextView::urlLinks(const std::string& text, S32 line, S32 from, labelled_t labelled)
 {
     std::vector<Substitution> out;
     if (from < 0 || from >= static_cast<S32>(text.size()))
@@ -838,11 +838,24 @@ std::vector<ALTextView::Substitution> ALTextView::urlLinks(const std::string& te
         return out;
     }
     const LLHandle<ALTextView> self = getDerivedHandle<ALTextView>();
-    // A name that arrives later goes to every link of the URL it is for.
-    const auto relabelled = [self](const std::string& url, const std::string& label, const std::string&) {
-        if (ALTextView* view = self.get())
+    // A name that arrives later goes to every link of the URL it is for,
+    // and to whoever keeps them.
+    const auto relabelled = [self, labelled](const std::string& url, const std::string& label, const std::string&) {
+        ALTextView* view = self.get();
+        if (!view)
         {
-            view->urlLabelled(url, label);
+            return;
+        }
+        for (const Substitution& sub : view->mSubstitutions)
+        {
+            if (sub.link && sub.url == url)
+            {
+                view->relabel(sub.range, label);
+            }
+        }
+        if (labelled)
+        {
+            labelled(url, label);
         }
     };
     std::string rest = text.substr(static_cast<size_t>(from));
@@ -874,17 +887,6 @@ std::vector<ALTextView::Substitution> ALTextView::urlLinks(const std::string& te
         at   = end;
     }
     return out;
-}
-
-void ALTextView::urlLabelled(const std::string& url, const std::string& label)
-{
-    for (const Substitution& sub : mSubstitutions)
-    {
-        if (sub.link && sub.url == url)
-        {
-            relabel(sub.range, label);
-        }
-    }
 }
 
 // --- styles ----------------------------------------------------------------------

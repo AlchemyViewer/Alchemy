@@ -364,8 +364,10 @@ public:
     S32 linkUrlsOn(S32 line, S32 from = 0);
     // The links linkUrlsOn would make of a line's text, found but not
     // added, for whoever keeps them to lay again: at `line`, from a
-    // column on. A name that arrives later goes through urlLabelled.
-    std::vector<Substitution> urlLinks(const std::string& text, S32 line, S32 from = 0);
+    // column on. A name that arrives later relabels the view's links to
+    // the URL, and is told to `labelled` where one is given.
+    typedef std::function<void(const std::string& url, const std::string& label)> labelled_t;
+    std::vector<Substitution> urlLinks(const std::string& text, S32 line, S32 from = 0, labelled_t labelled = labelled_t());
 
     // --- styles ----------------------------------------------------------------
 
@@ -705,10 +707,6 @@ protected:
     // is brought into sight: whatever a subclass left for after its edits,
     // done once rather than at each.
     virtual void editsDone() {}
-    // A name arrived for a URL a link was made of: every link to it on the
-    // text shows the name. A subclass that keeps links to lay again keeps
-    // the name with them.
-    virtual void urlLabelled(const std::string& url, const std::string& label);
     // The text changed other than by an edit command -- a log laid out
     // again -- so that the find bar looks for its query again.
     void         findChanged();

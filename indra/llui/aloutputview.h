@@ -159,7 +159,6 @@ protected:
     ALOutputView(const Params& p);
 
     void tintRow(S32 line, const ALTextLayout::Line& laid, const ALTextLayout::Row& row, F32 alpha, std::vector<LLColor4U>& colors) override;
-    void urlLabelled(const std::string& url, const std::string& label) override;
 
 private:
     // An entry's lines as shown: the text, and where the pieces of its
@@ -188,6 +187,8 @@ private:
         std::vector<Substitution> links;
     };
     const Decor& decorOf(size_t index, const Laid& laid);
+    // A name arrived for a URL: the links kept to lay again show it too.
+    void         urlLabelled(const std::string& url, const std::string& label);
     // One entry as shown: which, by serial, and over how many lines.
     struct Shown
     {
