@@ -31,8 +31,7 @@
 
 #include <boost/signals2.hpp>
 
-class ALEmptyState;
-class LLScrollListCtrl;
+class ALPaneList;
 
 // Everything done to a document, oldest first, with a line drawn where the
 // present is. Control-Z is a keystroke somebody hopes worked; this is the
@@ -96,11 +95,10 @@ public:
     }
 
     // The step now selected, asked for as the present: what a double click
-    // does, what Return does while the list has the keyboard, and what a
-    // caller with another key bound to it calls.
+    // does, what Return does while the list has the keyboard -- its list is
+    // a pane list, and this is where it goes -- and what a caller with
+    // another key bound to it calls.
     void goToSelected();
-
-    bool handleKeyHere(KEY key, MASK mask) override;
 
     // A row selected, by its index into the steps: for a caller that shows
     // the element a step was about while it is pointed at.
@@ -119,12 +117,9 @@ private:
     void fill();
     void onRowChosen();
 
-    LLScrollListCtrl*   mList = nullptr;
-    ALEmptyState*       mEmpty = nullptr;
+    ALPaneList*         mList = nullptr;
     std::vector<Step>   mSteps;
     size_t              mInForce = 0;
-    std::string         mEmptyHeadline;
-    std::string         mEmptySentence;
     std::string         mStartLabel;
     goto_signal_t       mGoTo;
     chose_signal_t      mChose;

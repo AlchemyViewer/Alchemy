@@ -25,6 +25,8 @@
 
 #include "alpanelist.h"
 
+#include "alemptystate.h"
+
 #include "llclipboard.h"
 #include "llmenugl.h"
 #include "llscrolllistcell.h"
@@ -106,6 +108,29 @@ ALPaneList::~ALPaneList()
     {
         menu->die();
     }
+}
+
+void ALPaneList::setEmpty(const std::string& headline, const std::string& sentence)
+{
+    if (!mEmpty)
+    {
+        ALEmptyState::Params ep(LLUICtrlFactory::getDefaultParams<ALEmptyState>());
+        ep.name               = "empty";
+        ep.rect               = getItemListRect();
+        ep.follows.flags      = FOLLOWS_ALL;
+        ep.background_visible = false;
+        ep.mouse_opaque       = false;
+        mEmpty                = LLUICtrlFactory::create<ALEmptyState>(ep);
+        addChild(mEmpty);
+    }
+    mEmptyHeadline = headline;
+    mEmpty->say(headline, sentence);
+    mEmpty->setVisible(saysEmpty());
+}
+
+bool ALPaneList::saysEmpty() const
+{
+    return mEmpty && !mEmptyHeadline.empty() && getItemCount() == 0;
 }
 
 void ALPaneList::setGo(std::function<void()> go)
@@ -499,6 +524,11 @@ bool ALPaneList::handleToolTip(S32 x, S32 y, MASK mask)
 
 void ALPaneList::draw()
 {
+    // Shown while there is nothing, whatever emptied the list.
+    if (mEmpty)
+    {
+        mEmpty->setVisible(saysEmpty());
+    }
     // A drag gone elsewhere tells the list nothing: its light goes when
     // the pointer is no longer over it.
     if (mDropLit)

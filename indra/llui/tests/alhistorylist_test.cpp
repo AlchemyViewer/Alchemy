@@ -25,6 +25,7 @@
 #include "linden_common.h"
 
 #include "../alhistorylist.h"
+#include "../alpanelist.h"
 
 #include "../llscrolllistcolumn.h"
 #include "../llscrolllistctrl.h"
@@ -187,10 +188,15 @@ namespace tut
         ALHistoryList* history = make();
         history->setSteps({}, 0);
         ensure_equals("nothing listed", listOf(history)->getItemCount(), 0);
-        ensure("the list is out of the way", !listOf(history)->getVisible());
+        ALPaneList* pane = history->getChild<ALPaneList>("steps");
+        ensure("the list says so", pane->saysEmpty());
 
         history->setSteps(three(), 3);
-        ensure("and back once there is something", listOf(history)->getVisible());
+        ensure("and not once there is something", !pane->saysEmpty());
+        std::vector<size_t> asked;
+        history->onGoTo([&asked](size_t want) { asked.push_back(want); });
+        pane->setSelectedByValue(LLSD(0), true);
+        ensure("return goes to the step chosen", pane->handleKeyHere(KEY_RETURN, MASK_NONE) && asked == std::vector<size_t>{ 1 });
 
         LLScrollListCtrl* list = listOf(history);
         list->setSelectedByValue(LLSD(1), true);

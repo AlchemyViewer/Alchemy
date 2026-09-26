@@ -46,6 +46,8 @@
 // Rows in groups, under a heading each: a sort by a column sorts within
 // each group, the headings staying over their own, where the caller says
 // which group a row is of.
+class ALEmptyState;
+
 class ALPaneList : public LLScrollListCtrl
 {
 public:
@@ -72,6 +74,12 @@ public:
     // where the typing was: escape. Unset, those keys are the list's own.
     void setGo(std::function<void()> go);
     void setBack(std::function<void()> back) { mBack = std::move(back); }
+
+    // What the list says while it has no rows: a headline and a sentence
+    // where the rows would be (ALEmptyState). Empty words, nothing.
+    void setEmpty(const std::string& headline, const std::string& sentence);
+    // Whether it says so now: no rows, and words to say.
+    bool saysEmpty() const;
 
     // Copying from the list, off unless asked for: a list with a menu of
     // its own would bring up both.
@@ -157,6 +165,8 @@ private:
 
     void copyRows(const std::vector<LLScrollListItem*>& rows);
 
+    ALEmptyState*               mEmpty = nullptr;
+    std::string                 mEmptyHeadline;
     fold_t                      mFold;
     arrow_t                     mArrowAt;
     std::function<void()>       mGo;

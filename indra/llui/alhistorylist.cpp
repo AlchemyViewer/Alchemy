@@ -27,9 +27,8 @@
 #include "alhistorylist.h"
 
 #include "alsurface.h"
-#include "alemptystate.h"
+#include "alpanelist.h"
 #include "llscrolllistcolumn.h"
-#include "llscrolllistctrl.h"
 #include "lluicolortable.h"
 #include "lluictrlfactory.h"
 
@@ -54,18 +53,16 @@ ALHistoryList::Params::Params()
 
 ALHistoryList::ALHistoryList(const Params& p)
 :   LLPanel(p),
-    mEmptyHeadline(p.empty_headline),
-    mEmptySentence(p.empty_sentence),
     mStartLabel(p.start_label)
 {
-    LLScrollListCtrl::Params lp(LLUICtrlFactory::getDefaultParams<LLScrollListCtrl>());
+    ALPaneList::Params lp(LLUICtrlFactory::getDefaultParams<ALPaneList>());
     lp.name = "steps";
     lp.rect = getLocalRect();
     lp.follows.flags = FOLLOWS_ALL;
     lp.draw_heading = false;
     lp.multi_select = false;
     lp.column_padding = 0;
-    mList = LLUICtrlFactory::create<LLScrollListCtrl>(lp);
+    mList = LLUICtrlFactory::create<ALPaneList>(lp);
     addChild(mList);
 
     // The mark is a column of its own so that the text of every step starts
@@ -86,16 +83,10 @@ ALHistoryList::ALHistoryList(const Params& p)
 
     mList->setCommitOnSelectionChange(true);
     mList->setCommitCallback(boost::bind(&ALHistoryList::onRowChosen, this));
-    mList->setDoubleClickCallback(boost::bind(&ALHistoryList::goToSelected, this));
-
-    ALEmptyState::Params ep(LLUICtrlFactory::getDefaultParams<ALEmptyState>());
-    ep.name = "empty";
-    ep.rect = getLocalRect();
-    ep.follows.flags = FOLLOWS_ALL;
-    ep.background_visible = false;
-    mEmpty = LLUICtrlFactory::create<ALEmptyState>(ep);
-    addChild(mEmpty);
-    mEmpty->say(mEmptyHeadline, mEmptySentence);
+    // Return and a double-click go to the step chosen; with nothing done,
+    // the list says so where the steps would be.
+    mList->setGo([this]() { goToSelected(); });
+    mList->setEmpty(p.empty_headline, p.empty_sentence);
 }
 
 void ALHistoryList::setSteps(std::vector<Step> steps, size_t in_force)
@@ -188,10 +179,6 @@ void ALHistoryList::fill()
         mList->setSelectedByValue(LLSD(kept), true);
         mList->setCommitOnSelectionChange(true);
     }
-
-    const bool anything = !mSteps.empty();
-    mList->setVisible(anything);
-    mEmpty->setVisible(!anything);
 }
 
 void ALHistoryList::onRowChosen()
@@ -207,18 +194,6 @@ void ALHistoryList::onRowChosen()
 // Choosing a step is asking for the document to be as it was just after that
 // step: the count in force is one more than its index. Choosing the one that
 // is already the present asks for nothing.
-bool ALHistoryList::handleKeyHere(KEY key, MASK mask)
-{
-    // Return is the double click by keyboard. Reached after the list has
-    // declined it, which a scroll list does.
-    if (key == KEY_RETURN && mask == MASK_NONE && mList && !mSteps.empty())
-    {
-        goToSelected();
-        return true;
-    }
-    return LLPanel::handleKeyHere(key, mask);
-}
-
 void ALHistoryList::goToSelected()
 {
     const LLScrollListItem* item = mList->getFirstSelected();

@@ -25,6 +25,8 @@
 
 #include "../alpanelist.h"
 
+#include "../alemptystate.h"
+
 #include "../llclipboard.h"
 #include "../llscrolllistitem.h"
 #include "../lluictrlfactory.h"
@@ -420,5 +422,23 @@ namespace tut
         const LLRect rows = l.getItemListRect();
         l.handleRightMouseDown(rows.getCenterX(), rows.mBottom + 2, MASK_NONE);
         ensure("off the rows, no cell to copy", !l.copyActionEnabled("copy_cell"));
+    }
+
+    template<> template<>
+    void alpanelist_object::test<10>()
+    {
+        set_test_name("a list with no rows says so where the rows would be, in its owner's words; with rows, or nothing to say, it does not");
+        ALPaneList& l = make();
+        ensure("nothing to say, nothing said", !l.saysEmpty());
+        l.setEmpty("Nothing found.", "Try other words.");
+        ensure("no rows: said", l.saysEmpty());
+        const ALEmptyState* empty = l.findChild<ALEmptyState>("empty");
+        ensure("where the rows would be", empty && empty->getRect() == l.getItemListRect());
+        add("one", 0);
+        ensure("a row: not", !l.saysEmpty());
+        l.deleteAllItems();
+        ensure("emptied again: said", l.saysEmpty());
+        l.setEmpty("", "");
+        ensure("no words: not", !l.saysEmpty());
     }
 }
