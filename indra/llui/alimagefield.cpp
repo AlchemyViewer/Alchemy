@@ -184,7 +184,8 @@ ALImageField::ALImageField(const Params& p)
 
 ALImageField::~ALImageField()
 {
-    closePopover();
+    // Escaped: nothing picked in it is taken by a field going away.
+    mPopover.close();
 }
 
 void ALImageField::setValue(const LLSD& value)
@@ -269,29 +270,18 @@ void ALImageField::chose(const std::string& name)
 
 void ALImageField::openPopover()
 {
-    closePopover();
-
     LLFloater::Params p(ALPopover::paramsFor(sWidth, sHeight, mName, /*resizable=*/true));
     p.min_width = MIN_WIDTH;
     p.min_height = MIN_HEIGHT;
     ALImagePopover* popover = new ALImagePopover(p, mName, mChoices ? mChoices() : std::vector<Choice>(), mEdit, mEditLabel);
-    mPopover = popover->getDerivedHandle<ALPopover>();
-    popover->onClosed([this, held = popover->getDerivedHandle<ALImagePopover>()](bool escaped)
+    // Held before it opens, so the one up is escaped from this side first:
+    // whatever was picked in it is dropped.
+    mPopover.hold(popover, [this, held = popover->getDerivedHandle<ALImagePopover>()](bool escaped)
     {
         if (ALImagePopover* said = held.get(); said && !escaped)
         {
             chose(said->value());
         }
-        mPopover.markDead();
     });
     popover->openBeside(this);
-}
-
-void ALImageField::closePopover()
-{
-    if (ALPopover* popover = mPopover.get())
-    {
-        popover->escape();
-    }
-    mPopover.markDead();
 }

@@ -234,12 +234,9 @@ ALFloaterLightBox::ALFloaterLightBox(const LLSD& key)
 ALFloaterLightBox::~ALFloaterLightBox()
 {
     // onClose has settled any popover already; this is for a floater that
-    // dies without closing. die() and not a close, so nothing it holds calls
+    // dies without closing. Dropped and not closed, so nothing it holds calls
     // back into a floater half torn down.
-    if (ALPopover* popover = mPopover.get())
-    {
-        popover->die();
-    }
+    mPopover.drop();
     // onClose has put every page back; this is for a floater that dies
     // without closing, which would otherwise leave a page in a window of its
     // own wired to callbacks on a floater that is gone.
@@ -882,19 +879,11 @@ void ALFloaterLightBox::adoptPopover(PopoverKind kind, ALPopover* popover, LLVie
 {
     closePopover(true);
 
-    mPopover = popover->getDerivedHandle<ALPopover>();
+    // The popover is a top-level window and can outlive this floater by a
+    // frame, and this floater can be closed under it: the slot lets go of
+    // the one as the other goes.
+    mPopover.hold(popover, [this](bool escaped) { onPopoverClosed(escaped); });
     mPopoverKind = kind;
-    // Handles both ways: the popover is a top-level window and can outlive
-    // this floater by a frame, and this floater can be closed under it.
-    LLHandle<ALFloaterLightBox> self = getDerivedHandle<ALFloaterLightBox>();
-    LLHandle<ALPopover> which = mPopover;
-    popover->onClosed([self, which](bool escaped)
-    {
-        if (ALFloaterLightBox* floater = self.get())
-        {
-            floater->onPopoverClosed(which.get(), escaped);
-        }
-    });
 
     if (anchor)
     {
@@ -904,29 +893,12 @@ void ALFloaterLightBox::adoptPopover(PopoverKind kind, ALPopover* popover, LLVie
 
 void ALFloaterLightBox::closePopover(bool escape)
 {
-    if (ALPopover* popover = mPopover.get())
-    {
-        if (escape)
-        {
-            popover->escape();
-        }
-        else
-        {
-            popover->settle();
-        }
-    }
+    mPopover.close(escape);
 }
 
-void ALFloaterLightBox::onPopoverClosed(const LLView* which, bool escaped)
+void ALFloaterLightBox::onPopoverClosed(bool escaped)
 {
-    // One that was replaced before it finished closing has nothing to say
-    // about the one up now.
-    if (!which || which != mPopover.get())
-    {
-        return;
-    }
     const PopoverKind kind = mPopoverKind;
-    mPopover.markDead();
     mPopoverKind = PopoverKind::None;
     mHistoryList.markDead();
 

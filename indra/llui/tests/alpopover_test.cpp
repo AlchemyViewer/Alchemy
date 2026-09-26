@@ -66,6 +66,12 @@ namespace tut
             return view;
         }
 
+        // One made and not yet opened, as a field makes its own.
+        struct TestPopover : public ALPopover
+        {
+            TestPopover() : ALPopover(ALPopover::paramsFor(120, 60)) {}
+        };
+
         static LLPanel* content(S32 width = 160, S32 height = 90)
         {
             LLPanel::Params p(LLUICtrlFactory::getDefaultParams<LLPanel>());
@@ -439,5 +445,114 @@ namespace tut
         }
         gFocusMgr.setKeyboardFocus(nullptr);
         window->closeFloater();
+    }
+
+    template<> template<>
+    void alpopover_object::test<12>()
+    {
+        set_test_name("a slot holds one popover: told of it as it goes, escaped or settled, and empty then; another held escapes it first");
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        LLPanel*                          over = anchor();
+        ALPopoverSlot                     slot;
+        std::vector<std::pair<int, bool>> said;
+        const auto                        tell = [&said](int which) {
+            return [&said, which](bool escaped) { said.emplace_back(which, escaped); };
+        };
+        ensure("empty", !slot.isOpen() && slot.get() == nullptr);
+
+        ALPopover* first = ALPopover::show(over, content());
+        slot.hold(first, tell(1));
+        ensure("holds it", slot.isOpen() && slot.get() == first);
+        slot.close(false);
+        ensure("settled, and told so", said == std::vector<std::pair<int, bool>>{ { 1, false } });
+        ensure("empty again", !slot.isOpen() && slot.get() == nullptr);
+        slot.close();
+        ensure_equals("nothing to close, nobody told", said.size(), 1u);
+
+        slot.hold(ALPopover::show(over, content()), tell(2));
+        slot.close();
+        ensure("escaped, and told so", said.size() == 2 && said[1] == std::make_pair(2, true));
+
+        slot.hold(ALPopover::show(over, content()), tell(3));
+        TestPopover* fourth = new TestPopover();
+        slot.hold(fourth, tell(4));
+        ensure("the one it held escaped for the next", said.size() == 3 && said[2] == std::make_pair(3, true));
+        ensure("and the next held", slot.get() == fourth);
+        fourth->openBeside(over);
+        fourth->onFocusLost();
+        ensure("one looked away from is settled, and told so", said.size() == 4 && said[3] == std::make_pair(4, false));
+        ensure("and the slot empty", !slot.isOpen());
+        over->die();
+    }
+
+    template<> template<>
+    void alpopover_object::test<13>()
+    {
+        set_test_name("a popover held again is told of to the new listener only; one dropped, or in a slot that goes, dies without a word");
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        LLPanel*         over = anchor();
+        ALPopoverSlot    slot;
+        std::vector<int> said;
+        ALPopover*       popover = ALPopover::show(over, content());
+        slot.hold(popover, [&said](bool) { said.push_back(1); });
+        slot.hold(popover, [&said](bool) { said.push_back(2); });
+        ensure("still up, held", slot.get() == popover && popover->getVisible() && said.empty());
+        slot.close();
+        ensure("the new listener told, the old not", said == std::vector<int>{ 2 });
+
+        const auto dead = [](const LLHandle<ALPopover>& handle) { return !handle.get() || handle.get()->isDead(); };
+        said.clear();
+        ALPopover*                dropped = ALPopover::show(over, content());
+        const LLHandle<ALPopover> handle  = dropped->getDerivedHandle<ALPopover>();
+        slot.hold(dropped, [&said](bool) { said.push_back(3); });
+        slot.drop();
+        ensure("dropped: it dies", dead(handle));
+        ensure("and the slot is empty", !slot.isOpen());
+        if (ALPopover* late = handle.get())
+        {
+            late->closeFloater();
+        }
+        ensure("nobody told, even as it closes after", said.empty());
+
+        LLHandle<ALPopover> scoped;
+        {
+            ALPopoverSlot gone;
+            ALPopover*    held = ALPopover::show(over, content());
+            scoped             = held->getDerivedHandle<ALPopover>();
+            gone.hold(held, [&said](bool) { said.push_back(4); });
+        }
+        ensure("a slot that goes: it dies", dead(scoped));
+        ensure("nobody told", said.empty());
+        over->die();
+    }
+
+    template<> template<>
+    void alpopover_object::test<14>()
+    {
+        set_test_name("one told its popover went may open the next from there, and the slot holds that one");
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        LLPanel*      over = anchor();
+        ALPopoverSlot slot;
+        TestPopover*  next = nullptr;
+        bool          next_told = false;
+        slot.hold(ALPopover::show(over, content()), [&](bool) {
+            next = new TestPopover();
+            slot.hold(next, [&next_told](bool) { next_told = true; });
+        });
+        slot.close();
+        ensure("the next held", next != nullptr && slot.get() == next);
+        next->openBeside(over);
+        slot.close();
+        ensure("and told of as it goes", next_told && !slot.isOpen());
+        over->die();
     }
 }

@@ -299,3 +299,67 @@ bool ALPopover::handleKeyHere(KEY key, MASK mask)
     }
     return false;
 }
+
+// --- the slot ---------------------------------------------------------------------
+
+ALPopoverSlot::~ALPopoverSlot()
+{
+    drop();
+}
+
+void ALPopoverSlot::hold(ALPopover* popover, closed_t closed)
+{
+    if (popover != mHeld.get())
+    {
+        close(true);
+    }
+    mClosed.disconnect();
+    mHeld = popover ? popover->getDerivedHandle<ALPopover>() : LLHandle<ALPopover>();
+    if (!popover)
+    {
+        return;
+    }
+    mClosed = popover->onClosed([this, closed = std::move(closed)](bool escaped) {
+        // Empty before whoever is told hears it, so that one who opens the
+        // next from here finds nothing up.
+        mHeld.markDead();
+        if (closed)
+        {
+            closed(escaped);
+        }
+    });
+}
+
+void ALPopoverSlot::close(bool escape)
+{
+    ALPopover* popover = mHeld.get();
+    if (!popover)
+    {
+        return;
+    }
+    if (escape)
+    {
+        popover->escape();
+    }
+    else
+    {
+        popover->settle();
+    }
+    // Emptied as it said so; one that had said so already is let go of
+    // here. Not one the telling opened in its place.
+    if (mHeld.get() == popover)
+    {
+        mClosed.disconnect();
+        mHeld.markDead();
+    }
+}
+
+void ALPopoverSlot::drop()
+{
+    mClosed.disconnect();
+    if (ALPopover* popover = mHeld.get())
+    {
+        popover->die();
+    }
+    mHeld.markDead();
+}

@@ -24,14 +24,13 @@
 
 #pragma once
 
+#include "alpopover.h"
 #include "lluictrl.h"
 #include "lluiimage.h"
 
 #include <functional>
 #include <string>
 #include <vector>
-
-class ALPopover;
 class LLLineEditor;
 
 // What a XUI file writes for a picture is the name of a UI image, a file
@@ -87,7 +86,6 @@ protected:
 
 private:
     void openPopover();
-    void closePopover();
     void chose(const std::string& name);
     void onTextCommit();
     void setName(const std::string& name);
@@ -96,7 +94,7 @@ private:
     LLPointer<LLUIImage>    mImage;
     S32                     mSwatchWidth;
     LLLineEditor*           mEditor = nullptr;
-    LLHandle<ALPopover>     mPopover;
+    ALPopoverSlot           mPopover;
     choices_t               mChoices;
     edit_t                  mEdit;
     std::string             mEditLabel;

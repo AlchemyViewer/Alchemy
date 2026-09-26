@@ -29,8 +29,11 @@
 #include "../alpopover.h"
 #include "../alspecimenlist.h"
 #include "../llfloater.h"
+#include "../llfocusmgr.h"
 #include "../lllineeditor.h"
 #include "../lluictrlfactory.h"
+
+#include "llmortician.h"
 
 #include "alheadlessui_fixture.h"
 
@@ -147,5 +150,52 @@ namespace tut
         edit->onCommit();
         ensure_equals("which is given the name", edited, std::string("Icon_Close"));
         field->die();
+    }
+
+    template<> template<>
+    void alimagefield_object::test<4>()
+    {
+        set_test_name("a picture chosen in the popover is the field's once it settles, not where it is escaped; a field going with it up escapes it");
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        LLLineEditor::Params lp(LLUICtrlFactory::getDefaultParams<LLLineEditor>());
+        lp.name                 = "elsewhere";
+        lp.rect                 = LLRect(400, 322, 500, 300);
+        LLLineEditor* elsewhere = LLUICtrlFactory::create<LLLineEditor>(lp);
+        gFloaterView->addChild(elsewhere);
+        ALImageField* field = make();
+        field->setChoices(&alimagefield_data::choices);
+        field->setValue("PushButton_Off");
+        S32 commits = 0;
+        field->setCommitCallback([&](LLUICtrl*, const LLSD&) { ++commits; });
+        const auto open = [field]() {
+            LLMortician::updateClass();
+            field->handleMouseDown(4, 10, MASK_NONE);
+            return gFloaterView->findChild<ALSpecimenList>("images", true);
+        };
+
+        ALSpecimenList* gallery = open();
+        ensure("open", gallery != nullptr);
+        gallery->choose("Icon_Close");
+        gallery->getParentByType<ALPopover>()->escape();
+        ensure("escaped: no change, no commit", commits == 0 && field->getValue().asString() == "PushButton_Off");
+
+        gallery = open();
+        gallery->choose("Icon_Close");
+        gallery->getParentByType<ALPopover>()->settle();
+        ensure("settled: the one chosen, committed", commits == 1 && field->getValue().asString() == "Icon_Close");
+
+        elsewhere->setFocus(true);
+        gallery = open();
+        ensure("the popover has the keyboard", gFocusMgr.getKeyboardFocus() != elsewhere);
+        gallery->choose("PushButton_Over");
+        field->die();
+        LLMortician::updateClass();
+        ensure("the field gone: the popover escaped, the keyboard back where it was", gFocusMgr.getKeyboardFocus() == elsewhere);
+        ensure_equals("and nothing more committed", commits, 1);
+        gFocusMgr.setKeyboardFocus(nullptr);
+        elsewhere->die();
     }
 }

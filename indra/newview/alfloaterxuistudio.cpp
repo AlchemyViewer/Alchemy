@@ -9012,11 +9012,7 @@ void ALFloaterXUIStudio::goToFile(const std::string& file)
 // the question was asked by pointing at that row.
 void ALFloaterXUIStudio::openGutterPopover(const std::string& field)
 {
-    if (LLView* up = mGutterPopover.get())
-    {
-        up->die();
-    }
-    mGutterPopover.markDead();
+    mGutterPopover.close();
     mGutterList = nullptr;
 
     LLView* mark = mAttributeGrid ? mAttributeGrid->gutterFor(field) : nullptr;
@@ -9090,23 +9086,14 @@ void ALFloaterXUIStudio::openGutterPopover(const std::string& field)
         mGutterList = nullptr;
         return;
     }
-    mGutterPopover = popover->getHandle();
+    mGutterPopover.hold(popover, [this](bool) { mGutterList = nullptr; });
 
     // Chosen and gone: the popover is a question about one row, and it has
     // been answered.
     write->setClickedCallback([this](LLUICtrl*, const LLSD&)
     {
         onWriteOverride();
-        if (LLView* up = mGutterPopover.get())
-        {
-            up->die();
-        }
-        mGutterPopover.markDead();
-        mGutterList = nullptr;
-    });
-    popover->onClosed([this](bool)
-    {
-        mGutterPopover.markDead();
+        mGutterPopover.close(false);
         mGutterList = nullptr;
     });
 }

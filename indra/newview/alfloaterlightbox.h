@@ -104,8 +104,8 @@ public:
     /// Close the popover that is up, keeping what it chose or, escaping,
     /// keeping nothing.
     void closePopover(bool escape);
-    /// Told once per popover, as it closes.
-    void onPopoverClosed(const LLView* which, bool escaped);
+    /// Told once per popover, as it closes, while it is the one up.
+    void onPopoverClosed(bool escaped);
 
     /// Find a setting or section by name (Ctrl+F): every section and every
     /// setting, ranked against what is typed, and Return goes to it. The
@@ -278,7 +278,7 @@ public:
     std::vector<LLPanel*> mTabPages;
     /// What popovers hang from.
     LLPanel* mTopBar = nullptr;
-    LLHandle<ALPopover> mPopover;
+    ALPopoverSlot mPopover;
     PopoverKind mPopoverKind = PopoverKind::None;
     /// The caption a jump lit, and how long ago; draw() puts it out.
     LLHandle<LLView> mLitCaption;

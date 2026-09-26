@@ -24,13 +24,12 @@
 
 #pragma once
 
+#include "alpopover.h"
 #include "lluictrl.h"
 
 #include <string>
 
 #include <boost/signals2.hpp>
-
-class ALPopover;
 class LLFontGL;
 class LLLineEditor;
 
@@ -108,7 +107,6 @@ protected:
 
 private:
     void openPopover();
-    void closePopover();
     // What the popover settled on, written as the three attributes it is.
     void apply(const std::string& name, const std::string& size, const std::string& style);
     void onTextCommit();
@@ -126,5 +124,5 @@ private:
     const LLFontGL*         mFont = nullptr;
     LLLineEditor*           mEditor = nullptr;
     part_signal_t           mPartCommit;
-    LLHandle<ALPopover>     mPopover;
+    ALPopoverSlot           mPopover;
 };

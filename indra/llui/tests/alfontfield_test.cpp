@@ -29,10 +29,12 @@
 #include "../alpopover.h"
 #include "../llcheckboxctrl.h"
 #include "../llcombobox.h"
+#include "../llfocusmgr.h"
 #include "../lllineeditor.h"
 #include "../lluictrlfactory.h"
 
 #include "llfontgl.h"
+#include "llmortician.h"
 
 #include "alheadlessui_fixture.h"
 
@@ -209,5 +211,38 @@ namespace tut
                       field->getValue().asString(), std::string("SansSerif"));
         ensure_equals("and the field committed once for the answer", commits, 1);
         field->die();
+    }
+
+    template<> template<>
+    void alfontfield_object::test<4>()
+    {
+        set_test_name("a field going with its popover up escapes it: nothing picked is written, and the keyboard goes back where it was");
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        LLLineEditor::Params lp(LLUICtrlFactory::getDefaultParams<LLLineEditor>());
+        lp.name                 = "elsewhere";
+        lp.rect                 = LLRect(400, 322, 500, 300);
+        LLLineEditor* elsewhere = LLUICtrlFactory::create<LLLineEditor>(lp);
+        gFloaterView->addChild(elsewhere);
+        LLMortician::updateClass();
+        ALFontField* field = make();
+        field->setValue("SansSerif");
+        bool written = false;
+        field->onPartCommit([&written](const std::string&, const std::string&) { written = true; });
+        elsewhere->setFocus(true);
+        field->handleMouseDown(4, 10, MASK_NONE);
+        ALPopover* popover = popoverOpen();
+        ensure("the popover opened, with the keyboard", popover != nullptr && gFocusMgr.getKeyboardFocus() != elsewhere);
+        LLCheckBoxCtrl* bold = popover->findChild<LLCheckBoxCtrl>("bold", true);
+        bold->setValue(true);
+        bold->onCommit();
+        field->die();
+        LLMortician::updateClass();
+        ensure("nothing written", !written);
+        ensure("the keyboard back where it was", gFocusMgr.getKeyboardFocus() == elsewhere);
+        gFocusMgr.setKeyboardFocus(nullptr);
+        elsewhere->die();
     }
 }

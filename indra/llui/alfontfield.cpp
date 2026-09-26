@@ -461,7 +461,8 @@ ALFontField::ALFontField(const Params& p)
 
 ALFontField::~ALFontField()
 {
-    closePopover();
+    // Escaped: nothing picked in it is taken by a field going away.
+    mPopover.close();
 }
 
 void ALFontField::setValue(const LLSD& value)
@@ -593,34 +594,20 @@ void ALFontField::apply(const std::string& name, const std::string& size, const 
 
 void ALFontField::openPopover()
 {
-    closePopover();
-
     static constexpr S32 POPOVER_HEIGHT = 4 + ROW + 4 + LIST_HEIGHT + 6 + ROW + 4 + ROW + 4 + PREVIEW_HEIGHT + 6 + ROW + 4;
     ALFontPopover* popover = new ALFontPopover(ALPopover::paramsFor(POPOVER_WIDTH, POPOVER_HEIGHT),
                                                mFamilies, mName, mSize, mStyle);
-    mPopover = popover->getDerivedHandle<ALPopover>();
     // Told as it goes, while it still holds what was picked; only OK, or
     // a double-click on a font, is a yes -- escape, cancel and looking
-    // away keep what the field had.
-    popover->onClosed([this, held = popover->getDerivedHandle<ALFontPopover>()](bool)
+    // away keep what the field had. Held before it opens, so the one up is
+    // escaped from this side first: whatever was picked in it is dropped,
+    // since a popover closing itself is the path that keeps a choice.
+    mPopover.hold(popover, [this, held = popover->getDerivedHandle<ALFontPopover>()](bool)
     {
         if (ALFontPopover* said = held.get(); said && said->settled())
         {
             apply(said->name(), said->size(), said->style());
         }
-        mPopover.markDead();
     });
     popover->openBeside(this);
-}
-
-// Closed from this side rather than from its own: whatever was picked is
-// dropped, because this is either about to open another one or about to be
-// deleted, and a popover closing itself is the path that keeps a choice.
-void ALFontField::closePopover()
-{
-    if (ALPopover* popover = mPopover.get())
-    {
-        popover->escape();
-    }
-    mPopover.markDead();
 }

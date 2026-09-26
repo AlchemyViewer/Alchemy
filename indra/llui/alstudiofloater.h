@@ -26,6 +26,7 @@
 
 #include "alhistorylist.h"
 #include "alpanefolds.h"
+#include "alpopover.h"
 #include "alquickopen.h"
 #include "llfloater.h"
 
@@ -33,7 +34,6 @@
 #include <string>
 #include <vector>
 
-class ALPopover;
 class LLMenuBarGL;
 class LLMenuItemGL;
 class LLTextBox;
@@ -173,10 +173,9 @@ private:
     LLRect              mRestoredRect;
     LLRect              mShapeRect;
     std::vector<S32>    mShapeDims;
-    LLHandle<LLView>    mQuickPopover;
+    ALPopoverSlot       mQuickPopover;
     // The question the quick open up asks, and what carries its answer.
     std::string                        mQuickQuestion;
     boost::signals2::scoped_connection mQuickChose;
     boost::signals2::scoped_connection mQuickHold;
-    boost::signals2::scoped_connection mQuickClosed;
 };

@@ -150,27 +150,18 @@ ALQuickOpen* ALStudioFloater::quickOpen(std::vector<ALQuickOpen::Candidate> cand
     // of symbols is a jump to the first symbol. A freeform one is another
     // question whatever it asks.
     const std::string question = title + "\n" + placeholder;
-    if (LLView* up = mQuickPopover.get())
+    if (ALPopover* popover = mQuickPopover.get())
     {
-        ALQuickOpen* quick   = up->findChild<ALQuickOpen>("quick_open");
-        ALPopover*   popover = ALViewType::as<ALPopover>(up);
-        if (quick && popover && !quick->freeform() && question == mQuickQuestion)
+        ALQuickOpen* quick = popover->findChild<ALQuickOpen>("quick_open");
+        if (quick && !quick->freeform() && question == mQuickQuestion)
         {
             quick->setCandidates(std::move(candidates));
             answerQuickOpen(popover, quick, std::move(chose), std::move(escaped), std::move(hold), std::move(left));
             quick->takeFocus();
             return quick;
         }
-        if (popover)
-        {
-            popover->escape();
-        }
-        else
-        {
-            up->die();
-        }
     }
-    mQuickPopover.markDead();
+    mQuickPopover.close();
 
     constexpr S32 WIDTH = 460;
     constexpr S32 HEIGHT = 300;
@@ -190,7 +181,6 @@ ALQuickOpen* ALStudioFloater::quickOpen(std::vector<ALQuickOpen::Candidate> cand
     {
         return nullptr;
     }
-    mQuickPopover  = popover->getHandle();
     mQuickQuestion = question;
     answerQuickOpen(popover, quick, std::move(chose), std::move(escaped), std::move(hold), std::move(left));
     quick->takeFocus();
@@ -232,12 +222,7 @@ void ALStudioFloater::answerQuickOpen(ALPopover* popover, ALQuickOpen* quick, st
             hold(value);
         });
     }
-    const LLHandle<LLFloater> home = getHandle();
-    mQuickClosed = popover->onClosed([home, answered, escaped = std::move(escaped), left = std::move(left)](bool was_escaped) {
-        if (ALStudioFloater* studio = ALViewType::as<ALStudioFloater>(home.get()))
-        {
-            studio->mQuickPopover.markDead();
-        }
+    mQuickPopover.hold(popover, [answered, escaped = std::move(escaped), left = std::move(left)](bool was_escaped) {
         if (was_escaped && escaped)
         {
             escaped();
