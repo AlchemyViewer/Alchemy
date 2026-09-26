@@ -995,6 +995,7 @@ if(AL_BUILD_VIEWER)
     alscriptexternaleditor.h
     alfloaterscriptpreferences.h
     alscriptkeymap.h
+    alscriptnavigation.h
     alscriptmodules.h
     alscriptnoticebar.h
     alscriptnotecardtab.h
@@ -2546,6 +2547,17 @@ if(AL_BUILD_TESTS)
       alscriptsaveflow.cpp
       alscriptstudiodoc.cpp
       alscriptstudiofileio.cpp
+    DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
+  )
+
+  # Script Studio's navigation: the history of places, back and forward,
+  # and previews opened as a list is walked.
+  al_add_test(
+    alscriptnavigation
+    UNIT
+    PROJECT ${test_project}
+    LIBRARIES llui alscript ${test_libs}
+    SOURCES alscriptnotecardtab.cpp alscriptsaveflow.cpp alscriptstudiodoc.cpp
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
 

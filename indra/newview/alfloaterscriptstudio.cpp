@@ -1194,7 +1194,7 @@ bool ALFloaterScriptStudio::writeFile(const std::string& path, const std::string
 
 void ALFloaterScriptStudio::jumpedFrom(Doc& doc, const ALTextView& view, const ALTextPos& from)
 {
-    rememberPlace(NavPlace{ doc.id, from, &view == doc.expandedEditor ? Doc::View::Expanded : Doc::View::Source });
+    mNavigation.remember(NavPlace{ doc.id, from, &view == doc.expandedEditor ? Doc::View::Expanded : Doc::View::Source });
 }
 
 std::vector<std::string> ALFloaterScriptStudio::fileFolders(const Doc& doc) const
@@ -1321,7 +1321,7 @@ void ALFloaterScriptStudio::draw()
         ALScriptStudioVimrc::instance().check();
     }
     mSearchPane->pump();
-    pumpSettle();
+    mNavigation.pumpSettle();
     refreshUndoLabels();
     if (mPlacesStale)
     {
@@ -1488,13 +1488,7 @@ void ALFloaterScriptStudio::rekeyDoc(Doc& doc, const std::string& id)
     };
     mProblemsPane->rekey(was, id);
     follow(mFound.from);
-    for (std::vector<NavPlace>* places : { &mBack, &mForward })
-    {
-        for (NavPlace& place : *places)
-        {
-            follow(place.doc);
-        }
-    }
+    mNavigation.rekey(was, id);
     mSearchPane->rekey(was, id);
     for (const std::unique_ptr<Doc>& other : mDocs)
     {
@@ -1674,7 +1668,7 @@ void ALFloaterScriptStudio::openScript(const ALScriptRef& ref, const std::string
     {
         // Asked for outright, a preview is held; and called what it is
         // called now, renamed since it was opened.
-        if (mOpenPreview == 0)
+        if (!mNavigation.openingPreview())
         {
             holdPreview(*mDocs[already]);
         }
@@ -1682,10 +1676,10 @@ void ALFloaterScriptStudio::openScript(const ALScriptRef& ref, const std::string
         renameDoc(*mDocs[already], name);
         return;
     }
-    const bool preview = mOpenPreview > 0;
+    const bool preview = mNavigation.openingPreview();
     if (preview)
     {
-        closePreview();
+        mNavigation.closePreview();
     }
 
     auto doc         = std::make_unique<Doc>();
@@ -2365,7 +2359,7 @@ void ALFloaterScriptStudio::openFileHere(const std::string& path, bool lua, S32 
 {
     const std::string id      = "disk:" + path;
     size_t            already = indexOf(id);
-    if (already != NONE && mOpenPreview == 0)
+    if (already != NONE && !mNavigation.openingPreview())
     {
         holdPreview(*mDocs[already]);
     }
@@ -2380,10 +2374,10 @@ void ALFloaterScriptStudio::openFileHere(const std::string& path, bool lua, S32 
             return;
         }
 
-        const bool preview = mOpenPreview > 0;
+        const bool preview = mNavigation.openingPreview();
         if (preview)
         {
-            closePreview();
+            mNavigation.closePreview();
         }
         auto doc     = std::make_unique<Doc>();
         doc->preview = preview;
@@ -4147,7 +4141,7 @@ std::vector<ALTextPos> ALFloaterScriptStudio::problemPlaces(const Doc& doc) cons
 
 void ALFloaterScriptStudio::goToProblemAt(Doc& doc, const ALTextPos& to)
 {
-    noteJump();
+    mNavigation.noteJump();
     ALCodeEditor& source = sourceInFront(doc);
     source.goTo(ALTextRange(to, to));
     source.setFocus(true);
@@ -4563,11 +4557,11 @@ void ALFloaterScriptStudio::problemChosen(const ALScriptProblemsPane::Place& pla
     const S32  line       = place.line;
     const S32  column     = place.column;
     const bool has_column = place.hasColumn;
-    if (!to_editor && deferOpen(mProblemsPane->list(), place.file))
+    if (!to_editor && mNavigation.deferOpen(mProblemsPane->list(), place.file))
     {
         return;
     }
-    noteJump(!to_editor);
+    mNavigation.noteJump(!to_editor);
     ++mHoldPanes;
     if (!place.file.empty())
     {
@@ -4724,7 +4718,7 @@ void ALFloaterScriptStudio::goToDeclared(const LLSD& value)
     }
     const S32 line   = value["line"].asInteger();
     const S32 column = value["column"].asInteger();
-    noteJump();
+    mNavigation.noteJump();
     if (!value["path"].asString().empty())
     {
         openIncludeAt(value["path"].asString(), value["name"].asString(), line, column, 0);
@@ -4856,7 +4850,7 @@ void ALFloaterScriptStudio::symbolAnswered(Doc& doc, const ALScriptAnalysis::Res
         case ALEditorCommand::GoToDefinition:
             if (hasDefinition)
             {
-                noteJump();
+                mNavigation.noteJump();
             }
             if (!hasDefinition)
             {
@@ -5895,11 +5889,11 @@ void ALFloaterScriptStudio::onReferenceChosen(bool to_editor)
         return;
     }
     const Doc::Place place = mFound.places[index];
-    if (!to_editor && deferOpen(mReferences, place.file))
+    if (!to_editor && mNavigation.deferOpen(mReferences, place.file))
     {
         return;
     }
-    noteJump(!to_editor);
+    mNavigation.noteJump(!to_editor);
     ++mHoldPanes;
     if (place.file.empty())
     {
@@ -5950,11 +5944,11 @@ void ALFloaterScriptStudio::onWeightChosen(bool to_editor)
     {
         return;
     }
-    if (!to_editor && deferOpen(mWeightsParts, place->file))
+    if (!to_editor && mNavigation.deferOpen(mWeightsParts, place->file))
     {
         return;
     }
-    noteJump(!to_editor);
+    mNavigation.noteJump(!to_editor);
     ++mHoldPanes;
     if (place->file.empty())
     {
@@ -5975,6 +5969,52 @@ void ALFloaterScriptStudio::onWeightChosen(bool to_editor)
     }
     --mHoldPanes;
     revealed(mWeightsParts, to_editor);
+}
+
+void ALFloaterScriptStudio::showPlace(Doc& doc, Doc::View view, const ALTextPos& at)
+{
+    if (const size_t index = indexOf(doc.id); index != NONE && index != mActive)
+    {
+        activate(index);
+    }
+    showView(doc, view);
+    ALCodeEditor& text = *doc.shownText();
+    text.goTo(text.document().clamp(at));
+    text.setFocus(true);
+}
+
+bool ALFloaterScriptStudio::pathOpen(const std::string& path) const
+{
+    ALScriptRef ref;
+    std::string file;
+    return ALScriptPreprocessor::refOf(path, ref)    ? indexOf(ref) != NONE
+           : ALScriptPreprocessor::fileOf(path, file) ? indexOf("disk:" + file) != NONE
+                                                       : true;
+}
+
+void ALFloaterScriptStudio::choosePreview(ALPaneList* list)
+{
+    if (list == mProblemsPane->list())
+    {
+        mProblemsPane->choose(false);
+    }
+    else if (list == mReferences)
+    {
+        onReferenceChosen(false);
+    }
+    else if (list == mSearchPane->list())
+    {
+        mSearchPane->choose(false);
+    }
+    else if (list == mWeightsParts)
+    {
+        onWeightChosen(false);
+    }
+}
+
+bool ALFloaterScriptStudio::workedFrom(const Doc& doc) const
+{
+    return doc.id == mProblemsPane->listedId() || doc.id == mFound.from;
 }
 
 void ALFloaterScriptStudio::openIncludeAt(const std::string& path, const std::string& name, S32 line, S32 column, S32 length)
@@ -6008,7 +6048,7 @@ bool ALFloaterScriptStudio::openIncluded(Doc& doc, const std::string& name, std:
     // As the last run of the preprocessor over the script found it.
     if (const std::string path = doc.foundAs(name, require); !path.empty())
     {
-        noteJump();
+        mNavigation.noteJump();
         openIncludeAt(path, name, 0, 0, 0);
         return true;
     }
@@ -6026,7 +6066,7 @@ bool ALFloaterScriptStudio::openIncluded(Doc& doc, const std::string& name, std:
                 std::error_code ec;
                 if (std::filesystem::is_regular_file(path, ec))
                 {
-                    noteJump();
+                    mNavigation.noteJump();
                     openFile(path.string(), doc.language.lua);
                     return true;
                 }
@@ -6077,7 +6117,7 @@ void ALFloaterScriptStudio::goToLine()
                 // which the preview has moved it from since.
                 if (ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get()))
                 {
-                    studio->rememberPlace(NavPlace{ doc->id, was, view });
+                    studio->mNavigation.remember(NavPlace{ doc->id, was, view });
                 }
                 text.goTo(column > 0 ? text.document().posAtDisplayColumn(line - 1, column - 1, text.getTabWidth()) : ALTextPos(line - 1, 0));
             }
@@ -6103,7 +6143,7 @@ void ALFloaterScriptStudio::goToLine()
             Doc*                   doc    = docOf();
             if (studio && doc && doc->shownText()->caret() != was)
             {
-                studio->rememberPlace(NavPlace{ doc->id, was, view });
+                studio->mNavigation.remember(NavPlace{ doc->id, was, view });
             }
         });
     if (!quick)
@@ -6484,7 +6524,7 @@ void ALFloaterScriptStudio::goToSymbol()
         const size_t           index  = doc ? outlineEntryOf(*doc, value) : NONE;
         if (index != NONE)
         {
-            studio->noteJump();
+            studio->mNavigation.noteJump();
             if (at != studio->mActive)
             {
                 studio->activate(at);
@@ -6512,9 +6552,9 @@ void ALFloaterScriptStudio::pumpCaret()
     const bool          source = doc->shownView() == Doc::View::Source;
     const ALTextPos     caret  = shown.caret();
     const F64           now    = LLTimer::getTotalSeconds();
-    if (mWalking && shown.hasFocus())
+    if (mNavigation.walking() && shown.hasFocus())
     {
-        mWalking = false;
+        mNavigation.walked();
     }
     if (caret != doc->caretSeen)
     {
@@ -7149,7 +7189,7 @@ void ALFloaterScriptStudio::onCrumbChosen(size_t, const std::string& value)
     {
         return;
     }
-    noteJump();
+    mNavigation.noteJump();
     ALCodeEditor& source = sourceInFront(*doc);
     if (value == "top")
     {
@@ -7201,7 +7241,7 @@ void ALFloaterScriptStudio::onOutlineChosen(bool to_editor)
     const size_t index = static_cast<size_t>(item->getValue().asInteger());
     if (index < doc->outline.size())
     {
-        noteJump(!to_editor);
+        mNavigation.noteJump(!to_editor);
         sourceInFront(*doc).goTo(rangeOf(doc->outline[index].nameSpan));
         revealed(mOutline, to_editor);
     }
@@ -7386,11 +7426,11 @@ void ALFloaterScriptStudio::searchResultChosen(const ALScriptSearch::Found& one,
             return;
         }
     }
-    if (!to_editor && (one.doc.empty() || gone) && deferOpen(mSearchPane->list(), ALScriptPreprocessor::pathOf(one.ref)))
+    if (!to_editor && (one.doc.empty() || gone) && mNavigation.deferOpen(mSearchPane->list(), ALScriptPreprocessor::pathOf(one.ref)))
     {
         return;
     }
-    noteJump(!to_editor);
+    mNavigation.noteJump(!to_editor);
     ++mHoldPanes;
     // A script open when it was searched -- a file on disk among them,
     // which has no item to open it by -- is gone to in its tab.
@@ -8461,7 +8501,7 @@ void ALFloaterScriptStudio::outputShowDoc(Doc& doc, bool problems)
 
 void ALFloaterScriptStudio::outputGoTo(const ALScriptRef& ref, const std::string& name, S32 line, S32 column)
 {
-    noteJump();
+    mNavigation.noteJump();
     size_t index = indexOf(ref);
     if (index == NONE)
     {
@@ -8485,7 +8525,7 @@ void ALFloaterScriptStudio::outputGoTo(const ALScriptRef& ref, const std::string
 
 void ALFloaterScriptStudio::outputGoToInclude(const std::string& file, const std::string& file_name, S32 line, S32 column)
 {
-    noteJump();
+    mNavigation.noteJump();
     openIncludeAt(file, file_name, line, column, 0);
 }
 
@@ -9156,8 +9196,8 @@ void ALFloaterScriptStudio::addInsertCommands()
 
 void ALFloaterScriptStudio::addGoCommands()
 {
-    mCommands.add("back", [this]() { goBack(false); }, [this]() { return !mBack.empty(); });
-    mCommands.add("forward", [this]() { goBack(true); }, [this]() { return !mForward.empty(); });
+    mCommands.add("back", [this]() { mNavigation.goBack(false); }, [this]() { return mNavigation.canGo(false); });
+    mCommands.add("forward", [this]() { mNavigation.goBack(true); }, [this]() { return mNavigation.canGo(true); });
     mCommands.add("quick_open", [this]() { showQuickOpen(false); });
     mCommands.add(
         "go_to_line",

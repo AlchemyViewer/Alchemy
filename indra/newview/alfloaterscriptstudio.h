@@ -41,6 +41,7 @@
 #include "alscriptstudioweighing.h"
 #include "alscriptstudiowords.h"
 #include "alscriptstudioorphans.h"
+#include "alscriptnavigation.h"
 #include "alfindings.h"
 #include "aloutputview.h"
 #include "alscriptanalysis.h"
@@ -106,7 +107,7 @@ class ALFloaterScriptStudio final : public ALStudioFloater, public ALScriptStudi
                                     public ALScriptStudioSaving::Window, public ALScriptStudioVim::Window,
                                     public ALScriptExternalEditor::Window, public ALScriptStudioFiles::Window,
                                     public ALScriptStudioWeighing::Window, public ALScriptStudioOrphans::Window,
-                                    public ALScriptNoticeBar::Window
+                                    public ALScriptNoticeBar::Window, public ALScriptNavigation::Window
 {
     friend class LLFloaterReg;
 
@@ -471,16 +472,15 @@ private:
     // to the script to type there. Tabs opened on the way leave the panes
     // on what they were listing.
     void problemChosen(const ALScriptProblemsPane::Place& place, bool to_editor) override;
-    void revealed(LLUICtrl* list, bool to_editor) override;
-    // A place, by the identity of the script or file it is in, in one that
-    // is not open, chosen by walking the list: opened a moment later as a
-    // preview, if the list is still on it, rather than a tab for every row
-    // passed -- each fetched from the region. True where it is put off.
-    bool deferOpen(ALPaneList* list, const std::string& path);
-    void pumpSettle();
-    // The preview in hand let go of, for the next; and one held.
-    void closePreview();
-    void holdPreview(Doc& doc) override;
+    // Navigation (ALScriptNavigation): the services' and saving's calls to
+    // it, and what it asks of the window.
+    void revealed(LLUICtrl* list, bool to_editor) override { mNavigation.revealed(list, to_editor); }
+    void holdPreview(Doc& doc) override { mNavigation.holdPreview(doc); }
+    void showPlace(Doc& doc, Doc::View view, const ALTextPos& at) override;
+    bool pathOpen(const std::string& path) const override;
+    void choosePreview(ALPaneList* list) override;
+    bool workedFrom(const Doc& doc) const override;
+    void focusDoc(Doc& doc) override { focusShown(doc); }
     // The places found moved with an edit to the script they are in, as the
     // problems are; gone where the edit touched the name.
     void slidePlaces(Doc& doc, const ALTextDocument::Edit& edit);
@@ -813,22 +813,8 @@ private:
     // whether there is anything to read again.
     void askRevert(Doc& doc);
     bool revertible(const Doc& doc) const override;
-    // The places jumped from, to go back to and forward again: a place in
-    // a tab by its id. Walking a pane's list is one jump, from where the
-    // caret was before the walk began.
-    struct NavPlace
-    {
-        std::string doc;
-        ALTextPos   at;
-        // Which of the tab's views the place is in: a line gone to in
-        // the expansion is gone back to there.
-        Doc::View   view = Doc::View::Source;
-    };
-    void noteJump(bool walking = false);
-    // A place to go back to, the way forward from it gone: once for a line,
-    // and the fifty latest.
-    void rememberPlace(const NavPlace& place);
-    void goBack(bool forward);
+    // A place jumped from, to go back to and forward again (ALNavHistory).
+    typedef ALNavHistory::Place NavPlace;
     // The editor commands' keys as the keymap has them, and the menus'
     // own as a person rebound them, on the menus and the tips that say
     // them.
@@ -933,11 +919,6 @@ private:
     void                               restoreTabs(const LLSD& open);
     void                               restoreWindows(const LLSD& windows);
     void                               reopenKept();
-    // The places jumped from and back from, and whether a pane's list is
-    // being walked, which is one jump however many rows it passes.
-    std::vector<NavPlace>              mBack;
-    std::vector<NavPlace>              mForward;
-    bool                               mWalking = false;
     // The tips that say a menu item's keys, as the skin wrote them, to be
     // said again when a key is rebound.
     std::vector<std::pair<std::string, std::vector<std::string>>> mKeyTips;
@@ -1025,13 +1006,6 @@ private:
     // holds others, as the rows were last made.
     std::vector<std::string>           mOutlineKeys;
     std::vector<bool>                  mOutlineParents;
-    // A preview being opened, and a place chosen in a list that is to be
-    // opened as one once the list has stayed on it.
-    S32                                mOpenPreview = 0;
-    bool                               mSettled     = false;
-    ALPaneList*                        mSettleList  = nullptr;
-    LLSD                               mSettleValue;
-    F64                                mSettleDue   = 0.0;
     std::string                        mTrailerLineTip;
     std::string                        mTrailerProblemsTip;
     std::string                        mTrailerSourceTip;
@@ -1061,6 +1035,8 @@ private:
     ALScriptStudioWeighing             mWeighing{ *this, *this };
     // Its tabs whose script is gone or out of reach, and the notice.
     ALScriptStudioOrphans              mOrphans{ *this, *this };
+    // The places gone from, and the previews a list opens as it is walked.
+    ALScriptNavigation                 mNavigation{ *this, *this };
     LLHandle<LLContextMenu>            mTabMenuHandle;
     bool                               mMain = true;
     // Whose path the bar at the bottom shows, so that a tab come to the
