@@ -334,7 +334,7 @@ bool ALScriptStudioWeighing::editedCopy(const Doc& doc, const std::vector<std::p
     {
         return false;
     }
-    const std::optional<std::string> made = ALScriptFixes::apply(mWindow.preprocessed(doc) ? doc.expanded.text : doc.editor->text(), fix);
+    const std::optional<std::string> made = ALScriptFixes::apply(mWindow.preprocessed(doc) ? doc.expanded.text : doc.editor->wholeText(), fix);
     if (!made)
     {
         return false;
@@ -436,7 +436,7 @@ void ALScriptStudioWeighing::measureAsset(Doc& doc)
         doc.weighing.assetBytes = doc.editor->document().byteCount();
         return;
     }
-    const std::string text = doc.editor->text();
+    const std::string& text = doc.editor->wholeText();
     doc.weighing.assetBytes         = text.size();
     if (mWindow.preprocessed(doc) && doc.expanded.valid && doc.expanded.version == version && !doc.expanded.disabled)
     {

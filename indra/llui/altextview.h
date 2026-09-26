@@ -187,6 +187,10 @@ public:
     // text, its steps, its saved mark -- where the history is not of it.
     bool        setTextWithHistory(std::string_view text, const LLSD& history);
     std::string text() const { return mDocument.text(); }
+    // The whole text without a copy, kept by the document until the next
+    // edit: for a caller that only reads it, and reads it before anything
+    // is changed.
+    const std::string& wholeText() const { return mDocument.wholeText(); }
     void        setValue(const LLSD& value) override;
     LLSD        getValue() const override;
 

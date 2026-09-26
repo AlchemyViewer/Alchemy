@@ -1691,7 +1691,7 @@ void ALFloaterScriptStudio::takeCarriedText(Doc& doc)
         doc.carriedText.reset();
         return;
     }
-    if (*doc.carriedText != doc.editor->text())
+    if (*doc.carriedText != doc.editor->wholeText())
     {
         doc.editor->setReadOnly(false);
         doc.editor->setSelection(ALTextRange(doc.editor->document().start(), doc.editor->document().end()));

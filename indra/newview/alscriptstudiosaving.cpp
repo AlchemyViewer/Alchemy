@@ -162,7 +162,7 @@ void ALScriptStudioSaving::sendPreprocessed(Doc& doc, const Doc::Expanded& sent)
     {
         // `//fspreprocessor off`: the text goes up as it is, as
         // Firestorm sends it.
-        upload(doc, doc.editor->text());
+        upload(doc, doc.editor->wholeText());
         return;
     }
     // In the envelope, with the source as written, so Firestorm opens
@@ -370,7 +370,7 @@ void ALScriptStudioSaving::save(Doc& doc)
     }
     doc.uploaded.valid = false;
     weighForSave(doc);
-    upload(doc, doc.editor->text());
+    upload(doc, doc.editor->wholeText());
 }
 
 S32 ALScriptStudioSaving::checkerErrors(const Doc& doc)

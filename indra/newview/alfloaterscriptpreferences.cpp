@@ -898,7 +898,7 @@ void ALFloaterScriptPreferences::refreshTemplates()
     {
         ALCodeEditor*     editor = lua ? mTemplateSLua : mTemplateLSL;
         const std::string text   = gSavedSettings.getString(lua ? "ALScriptTemplateSLua" : "ALScriptTemplateLSL");
-        if (editor->text() != text)
+        if (editor->wholeText() != text)
         {
             editor->setText(text);
         }

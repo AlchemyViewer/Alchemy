@@ -80,14 +80,14 @@ void ALScriptExternalEditor::edit(Doc& doc)
     // old one -- and watched. A file on disk is edited where it is.
     const bool        on_disk  = !doc.file.empty();
     const std::string filename = on_disk ? doc.file : fileName(doc);
-    if (!on_disk && !writeWhole(filename, doc.editor->text()))
+    if (!on_disk && !writeWhole(filename, doc.editor->wholeText()))
     {
         args["[FILE]"] = filename;
         mServices.report(mServices.words("ExternalWriteFailed", args), true, &doc);
         return;
     }
     Doc::External& external = doc.external;
-    external.written        = doc.editor->text();
+    external.written        = doc.editor->wholeText();
     external.waiting.reset();
     if (on_disk)
     {
@@ -158,7 +158,7 @@ void ALScriptExternalEditor::changed(const std::string& id, const std::string& f
         // heard and taken since: nothing more to take, nor to save again.
         return;
     }
-    if (text.empty() && !settled && !doc.editor->text().empty())
+    if (text.empty() && !settled && !doc.editor->document().empty())
     {
         // Emptied -- or caught between an editor's two steps: taken only
         // if it is still empty a moment later, which a save in two steps
@@ -178,7 +178,8 @@ void ALScriptExternalEditor::changed(const std::string& id, const std::string& f
     // Changed here since the copy was written, and changed there too: one
     // of them would be lost, so the author is asked which, rather than
     // what was typed here left a step back in the undo.
-    if (text != doc.editor->text() && doc.editor->text() != doc.external.written && text != doc.external.written)
+    const std::string& here = doc.editor->wholeText();
+    if (text != here && here != doc.external.written && text != doc.external.written)
     {
         doc.external.waiting = text;
         LLStringUtil::format_map_t args;
@@ -193,7 +194,7 @@ void ALScriptExternalEditor::take(Doc& doc, const std::string& text)
 {
     doc.external.waiting.reset();
     doc.external.written = text;
-    if (text != doc.editor->text())
+    if (text != doc.editor->wholeText())
     {
         // The editor's text, as one step to undo; then saved from here,
         // over whatever a check finds, since the editor outside is where
@@ -223,9 +224,9 @@ void ALScriptExternalEditor::sync(Doc& doc)
     // Only where it holds something else: the editor's own save is what
     // was sent, and a file written again under an editor that has it open
     // reads to that editor as changed.
-    const std::string text = doc.editor->text();
-    doc.external.written   = text;
-    std::string       held;
+    const std::string& text = doc.editor->wholeText();
+    doc.external.written    = text;
+    std::string        held;
     if (readWholeFile(filename, held) && (held == text || (text.empty() && held == " ")))
     {
         return;

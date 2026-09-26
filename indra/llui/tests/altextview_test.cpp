@@ -1342,4 +1342,17 @@ namespace tut
         v.undo();
         ensure_equals("undone, found again", v.findMatches().size(), size_t(3));
     }
+
+    template<> template<>
+    void altextview_object::test<43>()
+    {
+        set_test_name("the whole text is read without a copy, the same text until an edit, and the new one after");
+        ALTextView& v = make("one\ntwo");
+        const std::string& whole = v.wholeText();
+        ensure_equals("the text", whole, v.text());
+        ensure("the same kept text read again", &v.wholeText() == &whole && v.wholeText() == "one\ntwo");
+        v.setCaret(ALTextPos(1, 3));
+        type("!");
+        ensure_equals("after an edit, the text as it is", v.wholeText(), std::string("one\ntwo!"));
+    }
 }

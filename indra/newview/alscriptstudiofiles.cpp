@@ -141,7 +141,7 @@ void ALScriptStudioFiles::changedOutside(const std::string& id, const std::strin
         });
         return;
     }
-    if (text == doc.editor->text())
+    if (text == doc.editor->wholeText())
     {
         return;
     }
@@ -157,7 +157,7 @@ void ALScriptStudioFiles::write(Doc& doc)
     doc.save.done();
     LLStringUtil::format_map_t args;
     args["[PATH]"] = doc.file;
-    if (!ALFileWrite::whole(doc.file, doc.editor->text()))
+    if (!ALFileWrite::whole(doc.file, doc.editor->wholeText()))
     {
         mServices.report(mServices.words("SaveToFileFailed", args), true, &doc);
         mWindow.saveStopped(doc);
@@ -265,7 +265,7 @@ void ALScriptStudioFiles::chosenToSave(const std::string& id, const std::vector<
     {
         return;
     }
-    const bool                 written = ALFileWrite::whole(files.front(), doc->editor->text());
+    const bool                 written = ALFileWrite::whole(files.front(), doc->editor->wholeText());
     LLStringUtil::format_map_t args;
     args["[PATH]"] = files.front();
     mServices.report(mServices.words(written ? "SavedToFile" : "SaveToFileFailed", args), !written, doc);
@@ -309,7 +309,7 @@ void ALScriptStudioFiles::chosenToSaveAs(const std::string& id, const std::vecto
         mServices.setStatus(mServices.words("FileOpenElsewhere", args), true);
         return;
     }
-    if (!ALFileWrite::whole(path, doc->editor->text()))
+    if (!ALFileWrite::whole(path, doc->editor->wholeText()))
     {
         mServices.report(mServices.words("SaveToFileFailed", args), true, doc);
         return;

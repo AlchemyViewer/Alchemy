@@ -820,7 +820,7 @@ void ALScriptStudioChecking::offerImports(Doc& doc)
     }
     const ALScriptPreprocessor::Request request = preprocessRequest(doc, /*with_source*/ false);
     const std::string self = ALScriptModules::identity(request.path.empty() ? ALScriptPreprocessor::pathOf(request.ref) : request.path);
-    const std::string                   text = doc.editor->text();
+    const std::string&                  text = doc.editor->wholeText();
     // The texts of the script's language open here, as they are being
     // written.
     const auto open = [this, &doc, lua]() {
@@ -966,7 +966,7 @@ void ALScriptStudioChecking::explainRequires(Doc& doc)
     {
         return;
     }
-    for (const ALPreprocessor::Required& required : ALPreprocessor::requiresIn(doc.editor->text()))
+    for (const ALPreprocessor::Required& required : ALPreprocessor::requiresIn(doc.editor->wholeText()))
     {
         ALScriptProblem problem;
         problem.severity  = ALScriptProblem::Severity::Warning;

@@ -158,9 +158,9 @@ void ALScriptLookup::start(Doc& doc, ALEditorCommand command, const ALScriptRefe
             ++lookup.pending;
             if (const Doc* other = mServices.findDoc(ref); other && other->loaded)
             {
-                const std::string name  = other->name;
-                const LLUUID      asset = other->assetId;
-                const std::string text  = other->editor->text();
+                const std::string  name  = other->name;
+                const LLUUID       asset = other->assetId;
+                const std::string& text  = other->editor->wholeText();
                 this->candidate(id, generation, ref, name, asset, text);
                 continue;
             }
