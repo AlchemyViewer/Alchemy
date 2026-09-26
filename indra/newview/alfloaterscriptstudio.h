@@ -44,6 +44,7 @@
 #include "alscriptnavigation.h"
 #include "alscriptlookup.h"
 #include "alscriptreferencespane.h"
+#include "alscriptoutlinepane.h"
 #include "alfindings.h"
 #include "aloutputview.h"
 #include "alscriptanalysis.h"
@@ -110,7 +111,7 @@ class ALFloaterScriptStudio final : public ALStudioFloater, public ALScriptStudi
                                     public ALScriptExternalEditor::Window, public ALScriptStudioFiles::Window,
                                     public ALScriptStudioWeighing::Window, public ALScriptStudioOrphans::Window,
                                     public ALScriptNoticeBar::Window, public ALScriptNavigation::Window, public ALScriptLookup::Window,
-                                    public ALScriptReferencesPane::Window
+                                    public ALScriptReferencesPane::Window, public ALScriptOutlinePane::Window
 {
     friend class LLFloaterReg;
 
@@ -166,7 +167,6 @@ public:
     void onClose(bool app_quitting) override;
     void draw() override;
     bool handleKeyHere(KEY key, MASK mask) override;
-    bool handleMouseDown(S32 x, S32 y, MASK mask) override;
     bool undo() override;
     bool redo() override;
 
@@ -627,14 +627,11 @@ private:
     // What is squiggled under a position, from the checkers and the
     // compiler, each with what it says; empty where nothing is.
     std::string problemsAt(const Doc& doc, const ALTextPos& at) const;
-    void        refreshOutline(Doc& doc);
-    // The outline's row for the innermost symbol the caret is in, chosen
-    // without going anywhere, and scrolled to where it is out of sight.
-    void        followCaretInOutline(Doc& doc);
-    // An outline row's arrow, under a point of the list; and a symbol
-    // folded shut or opened, by its row.
-    bool        outlineArrowAt(S32 x, S32 y, size_t& index);
-    void        foldOutline(size_t index, std::optional<bool> folded = std::nullopt);
+    // The outline (ALScriptOutlinePane): shown, which the bar at the
+    // bottom is told of; a symbol chosen, gone to; its sort kept.
+    void        outlineShown(Doc& doc) override { refreshBreadcrumb(doc); }
+    void        outlineChosen(Doc& doc, const ALScriptOutlineEntry& entry, bool to_editor) override;
+    void        outlineSortChanged() override { saveState(); }
     void        refreshBreadcrumb(Doc& doc);
     // A script's tab, its window's title and the bar called what it is now
     // called: renamed here, in the inventory, or found so when opened again.
@@ -647,7 +644,6 @@ private:
     // the counts the problems.
     void        onTrailerChosen(const std::string& value);
     void        onCrumbChosen(size_t at, const std::string& value);
-    void        onOutlineChosen(bool to_editor);
     // A bottom tab shown; and the keyboard put in its list, where asked.
     void        showBottom(const char* tab, bool focus = false);
     std::string kindName(ALScriptSymbolKind kind) const;
@@ -956,20 +952,11 @@ private:
     LLTabContainer*                    mBottomTabs    = nullptr;
     ALScriptProblemsPane*              mProblemsPane = nullptr;
     ALScriptReferencesPane*            mReferencesPane = nullptr;
-    ALPaneList*                        mOutline       = nullptr;
+    ALScriptOutlinePane*               mOutlinePane    = nullptr;
     ALTextView*                        mSymbol        = nullptr;
     // Held while a pane's row is followed into a tab, so that the panes
     // go on listing what they were rather than the tab's.
     S32                                mHoldPanes       = 0;
-    LLFilterEditor*                    mOutlineFilter  = nullptr;
-    // What the outline's rows last said, and whose they were: a check
-    // that changes none of it leaves the list as it is.
-    std::vector<std::string>           mOutlineSaid;
-    LLComboBox*                        mOutlineSort    = nullptr;
-    // Each outline entry's key -- the names down to it -- and whether it
-    // holds others, as the rows were last made.
-    std::vector<std::string>           mOutlineKeys;
-    std::vector<bool>                  mOutlineParents;
     std::string                        mTrailerLineTip;
     std::string                        mTrailerProblemsTip;
     std::string                        mTrailerSourceTip;

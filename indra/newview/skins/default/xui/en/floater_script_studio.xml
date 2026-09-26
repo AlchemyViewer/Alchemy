@@ -2023,53 +2023,63 @@
                  name="outline_panel"
                  user_resize="true"
                  width="250">
-                    <text
-                     follows="left|top"
-                     font="SansSerifSmall"
-                     font.style="BOLD"
-                     height="16"
-                     layout="topleft"
-                     left="6"
-                     name="outline_head"
-                     top="5"
-                     width="56">
-                        OUTLINE
-                    </text>
-                    <combo_box
-                     follows="left|top"
-                     height="20"
-                     layout="topleft"
-                     left_pad="2"
-                     name="outline_sort"
-                     tool_tip="How the symbols are ordered under what holds them: as the script has them, by name, or by kind"
-                     top="2"
-                     width="64">
-                        <combo_box.item label="Order" name="outline_sort_order" value="order" />
-                        <combo_box.item label="Name" name="outline_sort_name" value="name" />
-                        <combo_box.item label="Kind" name="outline_sort_kind" value="kind" />
-                    </combo_box>
-                    <filter_editor
-                     follows="left|top|right"
-                     height="20"
-                     label="Filter"
-                     layout="topleft"
-                     left_pad="4"
-                     name="outline_filter"
-                     tool_tip="Only the symbols with these letters in their names"
-                     top="2"
-                     width="112" />
-                    <pane_list
+                    <panel
+                     class="script_studio_outline"
                      follows="all"
-                     height="274"
+                     height="300"
                      layout="topleft"
                      left="0"
-                     name="outline"
-                     tool_tip="What the script declares, the one the caret is in chosen; the arrow before a symbol folds what it holds. Choosing one shows it, and the arrow keys walk the list, left and right folding; return or a double-click goes there to type."
-                     top="26"
+                     name="outline_pane"
+                     top="0"
                      width="250">
-                        <pane_list.columns label="" name="icon" width="20" />
-                        <pane_list.columns dynamic_width="true" label="Symbol" name="symbol" />
-                    </pane_list>
+                        <text
+                         follows="left|top"
+                         font="SansSerifSmall"
+                         font.style="BOLD"
+                         height="16"
+                         layout="topleft"
+                         left="6"
+                         name="outline_head"
+                         top="5"
+                         width="56">
+                            OUTLINE
+                        </text>
+                        <combo_box
+                         follows="left|top"
+                         height="20"
+                         layout="topleft"
+                         left_pad="2"
+                         name="outline_sort"
+                         tool_tip="How the symbols are ordered under what holds them: as the script has them, by name, or by kind"
+                         top="2"
+                         width="64">
+                            <combo_box.item label="Order" name="outline_sort_order" value="order" />
+                            <combo_box.item label="Name" name="outline_sort_name" value="name" />
+                            <combo_box.item label="Kind" name="outline_sort_kind" value="kind" />
+                        </combo_box>
+                        <filter_editor
+                         follows="left|top|right"
+                         height="20"
+                         label="Filter"
+                         layout="topleft"
+                         left_pad="4"
+                         name="outline_filter"
+                         tool_tip="Only the symbols with these letters in their names"
+                         top="2"
+                         width="112" />
+                        <pane_list
+                         follows="all"
+                         height="274"
+                         layout="topleft"
+                         left="0"
+                         name="outline"
+                         tool_tip="What the script declares, the one the caret is in chosen; the arrow before a symbol folds what it holds. Choosing one shows it, and the arrow keys walk the list, left and right folding; return or a double-click goes there to type."
+                         top="26"
+                         width="250">
+                            <pane_list.columns label="" name="icon" width="20" />
+                            <pane_list.columns dynamic_width="true" label="Symbol" name="symbol" />
+                        </pane_list>
+                    </panel>
                 </layout_panel>
                 <layout_panel
                  auto_resize="false"

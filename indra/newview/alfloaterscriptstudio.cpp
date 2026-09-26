@@ -572,20 +572,13 @@ bool ALFloaterScriptStudio::postBuild()
     mNoticeBar     = findChild<ALScriptNoticeBar>("notice");
     mBottomTabs    = getChild<LLTabContainer>("bottom_tabs");
     mReferencesPane = getChild<ALScriptReferencesPane>("references_tab");
-    mOutline       = getChild<ALPaneList>("outline");
+    mOutlinePane   = getChild<ALScriptOutlinePane>("outline_pane");
     mWeightsPane   = getChild<ALScriptWeightsPane>("weights_tab");
     mWeightsParts  = mWeightsPane->partsList();
     mSymbol        = getChild<ALTextView>("symbol");
     // The declaration, in the script the inspector is about or in the
     // include it was declared in.
     mSymbol->onLinkClicked([this](const ALTextView::Substitution& link) { goToDeclared(link.value); });
-    mOutlineFilter  = getChild<LLFilterEditor>("outline_filter");
-    mOutlineFilter->setCommitCallback([this](LLUICtrl*, const LLSD&) {
-        if (Doc* doc = active())
-        {
-            refreshOutline(*doc);
-        }
-    });
     mExplorerPane  = getChild<ALScriptExplorerPane>("explorer_pane");
     mCompileTarget = getChild<LLComboBox>("compile_target");
     mRunning       = getChild<LLCheckBoxCtrl>("running");
@@ -622,8 +615,6 @@ bool ALFloaterScriptStudio::postBuild()
     mProblemsPane = getChild<ALScriptProblemsPane>("problems_tab");
     mWeightsParts->setCommitCallback([this](LLUICtrl*, const LLSD&) { onWeightChosen(false); });
     mWeightsParts->setDoubleClickCallback([this]() { onWeightChosen(true); });
-    mOutline->setCommitCallback([this](LLUICtrl*, const LLSD&) { onOutlineChosen(false); });
-    mOutline->setDoubleClickCallback([this]() { onOutlineChosen(true); });
     mOutputPane = getChild<ALScriptOutputPane>("output_tab");
     // What was said before the window opened, then everything after.
     for (const ALScriptWorkspace::RuntimeEvent& event : ALScriptWorkspace::instance().recentRuntime())
@@ -640,25 +631,12 @@ bool ALFloaterScriptStudio::postBuild()
     const std::pair<ALPaneList*, std::function<void()>> lists[] = {
         { mProblemsPane->list(), [this]() { mProblemsPane->choose(true); } },
         { mReferencesPane->list(), [this]() { mReferencesPane->choose(true); } },
-        { mOutline, [this]() { onOutlineChosen(true); } },
         { mSearchPane->list(), [this]() { mSearchPane->choose(true); } },
         { mWeightsParts, [this]() { onWeightChosen(true); } }
     };
     for (const auto& [list, go] : lists)
     {
         list->setKeyHandler([this, list, go](KEY key, MASK mask) {
-            // The outline's left and right fold and open, as a tree's do.
-            if (list == mOutline && mask == MASK_NONE && (key == KEY_LEFT || key == KEY_RIGHT))
-            {
-                LLScrollListItem* item = mOutline->getFirstSelected();
-                if (!item)
-                {
-                    return false;
-                }
-                const size_t index = static_cast<size_t>(item->getValue().asInteger());
-                foldOutline(index, key == KEY_LEFT);
-                return true;
-            }
             if (mask != MASK_NONE || (key != KEY_RETURN && key != KEY_ESCAPE))
             {
                 return false;
@@ -674,15 +652,6 @@ bool ALFloaterScriptStudio::postBuild()
             return true;
         });
     }
-    mOutlineSort = getChild<LLComboBox>("outline_sort");
-    mOutlineSort->selectFirstItem();
-    mOutlineSort->setCommitCallback([this](LLUICtrl*, const LLSD&) {
-        if (Doc* doc = active())
-        {
-            refreshOutline(*doc);
-        }
-        saveState();
-    });
     mRunningConnection = ALScriptWorkspace::instance().onRunningState([this](const ALScriptWorkspace::RunningState& state) { runningState(state); });
     // Copy from the lists with no menu of their own; the problems' has
     // its own copying, and a right-click there would bring up both, the
@@ -2891,7 +2860,7 @@ void ALFloaterScriptStudio::activate(size_t index, bool focus)
     {
         mProblemsPane->fill(mDocs[index].get());
     }
-    refreshOutline(*mDocs[index]);
+    mOutlinePane->show(*mDocs[index]);
     // The inspector is about this script now: told again once the caret
     // is seen. The bar at the bottom says so now -- a notecard's too, whose
     // caret is not watched -- rather than keep the last tab's path until
@@ -3705,7 +3674,7 @@ void ALFloaterScriptStudio::analysed(const ALScriptAnalysis::Result& result)
         explainTransformWords(doc);
     }
     refreshProblems(doc);
-    refreshOutline(doc);
+    mOutlinePane->show(doc);
     // Weighed a moment after, of the same text.
     weigh(doc);
     if (doc.fixAllAfterCheck && doc.analysisVersion == doc.editor->document().version())
@@ -5992,7 +5961,7 @@ void ALFloaterScriptStudio::refreshBreadcrumb(Doc& doc)
     doc.crumbsOf  = doc.analysisVersion;
     doc.crumbPath = path;
     doc.crumbName = doc.name;
-    followCaretInOutline(doc);
+    mOutlinePane->followCaret(doc);
 
     std::vector<ALJumpBar::Crumb> crumbs;
     LLStringUtil::format_map_t    args;
@@ -6072,6 +6041,12 @@ void ALFloaterScriptStudio::onCrumbChosen(size_t, const std::string& value)
         source.goTo(rangeOf(doc->outline[index].nameSpan));
     }
     source.setFocus(true);
+}
+
+void ALFloaterScriptStudio::outlineChosen(Doc& doc, const ALScriptOutlineEntry& entry, bool to_editor)
+{
+    mNavigation.noteJump(!to_editor);
+    sourceInFront(doc).goTo(rangeOf(entry.nameSpan));
 }
 
 void ALFloaterScriptStudio::showBottom(const char* tab, bool focus)
@@ -7691,10 +7666,7 @@ void ALFloaterScriptStudio::letGoOf(size_t index, bool keep)
         fillTabs();
         refreshToolbar();
         mProblemsPane->fill(nullptr);
-        mOutline->deleteAllItems();
-        // What the list says is nothing now: the next tab's is put in
-        // whatever it says, the same rows as the last one's or not.
-        mOutlineSaid.clear();
+        mOutlinePane->forget();
         mBreadcrumb->setPath({});
         mBreadcrumb->setTrailer(LLStringUtil::null);
         mCrumbsShownFor.clear();
@@ -8666,9 +8638,9 @@ void ALFloaterScriptStudio::writeState(LLSD& state) const
             state["sort"][name]["up"]     = list->getSortAscending();
         }
     }
-    if (mOutlineSort)
+    if (mOutlinePane)
     {
-        state["outline_sort"] = mOutlineSort->getValue().asString();
+        state["outline_sort"] = mOutlinePane->sortOrder();
     }
 }
 
@@ -8816,9 +8788,9 @@ void ALFloaterScriptStudio::readState(const LLSD& state)
             list->sortByColumn(state["sort"][name]["column"].asString(), state["sort"][name]["up"].asBoolean());
         }
     }
-    if (state.has("outline_sort") && mOutlineSort)
+    if (state.has("outline_sort") && mOutlinePane)
     {
-        mOutlineSort->selectByValue(state["outline_sort"]);
+        mOutlinePane->setSortOrder(state["outline_sort"].asString());
     }
     if (state.has("open"))
     {
