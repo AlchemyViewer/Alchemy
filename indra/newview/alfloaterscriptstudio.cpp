@@ -479,9 +479,6 @@ ALFloaterScriptStudio::ALFloaterScriptStudio(const LLSD& key)
 :   ALStudioFloater(key, key.asString().empty() ? std::string("ALScriptStudioState") : std::string()),
     mMain(key.asString().empty())
 {
-    // The main window is one and stays; a popped-out one is as many as
-    // are wanted and goes when closed.
-    setIsSingleInstance(mMain);
     // The menus' items by name, in the table of what each does.
     addCommands();
     addKeys();
@@ -526,6 +523,11 @@ bool ALFloaterScriptStudio::matchesKey(const LLSD& key)
 
 bool ALFloaterScriptStudio::postBuild()
 {
+    // The main window is one and stays -- its X hides it, its tabs and
+    // what they hold unsaved kept -- and a popped-out one is as many as are
+    // wanted and goes when closed. Said here, since building from the
+    // skin sets both from the file, which cannot say which this is.
+    setIsSingleInstance(mMain);
     if (!mMain)
     {
         // No saved rect: a popped-out window is placed beside the one it
