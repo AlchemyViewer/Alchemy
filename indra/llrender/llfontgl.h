@@ -350,6 +350,13 @@ public:
     static LLFontGL* getFontSansSerifHuge();
     static LLFontGL* getFontSansSerifBold();
     static LLFontGL* getFont(const LLFontDescriptor& desc);
+    // The points a size name is for a family, as fonts.xml says; 0 where
+    // it says none.
+    static F32       pointsOf(const std::string& family, const std::string& size_name);
+    // A family and style at a size in points of its own, not one of the
+    // names fonts.xml gives: a text zoomed. Null where there is no such
+    // family.
+    static LLFontGL* getFontAtPoints(const std::string& family, F32 points, U8 style);
     // Use with legacy names like "SANSSERIF_SMALL" or "OCRA"
     static LLFontGL* getFontByName(const std::string& name);
     static LLFontGL* getFontDefault(); // default fallback font

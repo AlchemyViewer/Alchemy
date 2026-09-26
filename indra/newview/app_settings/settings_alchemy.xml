@@ -431,6 +431,17 @@
             <key>Value</key>
             <string />
         </map>
+        <key>ALScriptStudioFontZoom</key>
+        <map>
+            <key>Comment</key>
+            <string>Points added to the size of Script Studio's editors' text by zooming it (Control-= and Control-minus, Control and the wheel); 0 for the size as chosen.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
         <key>ALScriptStudioFontStyle</key>
         <map>
             <key>Comment</key>

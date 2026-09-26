@@ -622,6 +622,10 @@ public:
     bool handleHover(S32 x, S32 y, MASK mask) override;
     bool handleDoubleClick(S32 x, S32 y, MASK mask) override;
     bool handleScrollWheel(S32 x, S32 y, LLScrollDelta delta) override;
+    // Told of the wheel turned with Control held -- Command on a Mac --
+    // by so many steps, up positive: whoever holds the view zooms its
+    // text. Without it, Control and the wheel scroll.
+    void setOnZoomWheel(std::function<void(S32 steps)> zoom) { mZoomWheel = std::move(zoom); }
     bool handleScrollHWheel(S32 x, S32 y, LLScrollDelta delta) override;
     bool handleToolTip(S32 x, S32 y, MASK mask) override;
     bool handleDragAndDrop(S32 x, S32 y, MASK mask, bool drop, EDragAndDropType cargo_type, void* cargo_data, EAcceptance* accept,
@@ -922,6 +926,8 @@ private:
     F32          mScrollX  = 0.f;
     // What a wheel moved that did not make a whole pixel yet.
     F32          mWheelRemainder = 0.f;
+    std::function<void(S32)> mZoomWheel;
+    F32          mZoomRemainder = 0.f;
     bool         mSelecting = false;
     // What is selected becomes the primary selection: at once, or, while a
     // drag goes on, once it is let go of.

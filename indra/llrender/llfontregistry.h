@@ -37,6 +37,8 @@
 
 #include <boost/unordered_map.hpp>
 
+#include <set>
+
 class LLFontGL;
 class LLFontFreetype;
 
@@ -292,6 +294,15 @@ public:
     // to skip the per-family lookup and consult only the global table.
     bool nameToSize(const std::string& family, const std::string& size_name, F32& size);
     bool nameToSize(const std::string& size_name, F32& size);
+    // A size fonts.xml did not name -- a text zoomed to a size of its own
+    // -- named from now on, until the registry reads fonts.xml again.
+    // Not among the names a file may write (getDeclaredSizeNames): the
+    // next session has not got it.
+    void declareSize(const std::string& size_name, F32 size)
+    {
+        mFontSizes[size_name] = size;
+        mDeclaredLater.insert(size_name);
+    }
 
     void dump();
     void dumpTextures();
@@ -387,6 +398,8 @@ private:
     font_reg_map_t mFontMap;
     // Given a size name, look up the point size.
     font_size_map_t mFontSizes;
+    // The size names declareSize gave, which fonts.xml does not.
+    std::set<std::string> mDeclaredLater;
     // Per-family size overrides: mFamilySizes[family][size_name] = pt size.
     // Consulted before mFontSizes when a family declares its own <size>.
     family_size_map_t mFamilySizes;

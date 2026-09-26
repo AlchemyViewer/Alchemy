@@ -2101,7 +2101,10 @@ std::vector<std::string> LLFontRegistry::getDeclaredSizeNames() const
     std::set<std::string> uniq;
     for (const auto& kv : mFontSizes)
     {
-        uniq.insert(kv.first);
+        if (!mDeclaredLater.count(kv.first))
+        {
+            uniq.insert(kv.first);
+        }
     }
     return std::vector<std::string>(uniq.begin(), uniq.end());
 }

@@ -212,4 +212,24 @@ namespace tut
         find.command = C::Find;
         ensure("nor an editor's own", ALScriptKeymap::takeKeys(find, ALKeyChord{ 'F', MASK_CONTROL }, false).empty());
     }
+
+    template<> template<>
+    void alscriptkeymap_object::test<6>()
+    {
+        set_test_name("the text's size on Control-=, Control-minus and Control-0, as everywhere; back and forward off them");
+        const auto has = [](const char* id, const ALKeyChord& chord) {
+            const ALScriptKeymap::chords_t keys = ALScriptKeymap::menuKeys(id);
+            return std::find(keys.begin(), keys.end(), chord) != keys.end();
+        };
+        ensure("zoom in, the '=' key as Windows and SDL say it", has("zoom_in", ALKeyChord{ '=', MASK_CONTROL }) && has("zoom_in", ALKeyChord{ KEY_EQUALS, MASK_CONTROL }));
+        ensure("and Control-plus", has("zoom_in", ALKeyChord{ '=', MASK_CONTROL | MASK_SHIFT }) && has("zoom_in", ALKeyChord{ KEY_ADD, MASK_CONTROL }));
+        ensure("zoom out", has("zoom_out", ALKeyChord{ '-', MASK_CONTROL }));
+        ensure("the size chosen", has("zoom_reset", ALKeyChord{ '0', MASK_CONTROL }));
+        ensure("back not on Control-minus", !has("back", ALKeyChord{ '-', MASK_CONTROL }));
+#if LL_DARWIN
+        ensure("back on the Mac's Control-minus", has("back", ALKeyChord{ '-', MASK_MAC_CONTROL }));
+#else
+        ensure("back on Alt-Left", has("back", ALKeyChord{ KEY_LEFT, MASK_ALT }) && has("forward", ALKeyChord{ KEY_RIGHT, MASK_ALT }));
+#endif
+    }
 }

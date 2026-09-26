@@ -2026,6 +2026,31 @@ std::vector<std::string> LLFontGL::getDeclaredFontNames()
 }
 
 // static
+F32 LLFontGL::pointsOf(const std::string& family, const std::string& size_name)
+{
+    F32 points = 0.f;
+    return sFontRegistry && sFontRegistry->nameToSize(family, size_name, points) ? points : 0.f;
+}
+
+// static
+LLFontGL* LLFontGL::getFontAtPoints(const std::string& family, F32 points, U8 style)
+{
+    if (!sFontRegistry || points <= 0.f)
+    {
+        return nullptr;
+    }
+    // Named for its points, so that each size is made once and every text
+    // at it shares the font.
+    const std::string name = llformat("%.1fpt", points);
+    F32               known = 0.f;
+    if (!sFontRegistry->nameToSize(name, known))
+    {
+        sFontRegistry->declareSize(name, points);
+    }
+    return getFont(LLFontDescriptor(family, name, style));
+}
+
+// static
 std::vector<std::string> LLFontGL::getDeclaredSizeNames()
 {
     if (!sFontRegistry)

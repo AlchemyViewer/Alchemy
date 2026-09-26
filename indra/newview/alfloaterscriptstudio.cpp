@@ -1525,10 +1525,40 @@ const LLFontGL* ALFloaterScriptStudio::editorFont()
     static LLCachedControl<std::string> family(gSavedSettings, "ALScriptStudioFontFamily", "");
     static LLCachedControl<std::string> size(gSavedSettings, "ALScriptStudioFontSize", "");
     static LLCachedControl<std::string> style(gSavedSettings, "ALScriptStudioFontStyle", "");
+    static LLCachedControl<S32>         zoom(gSavedSettings, "ALScriptStudioFontZoom", 0);
     const std::string                   name = family().empty() ? std::string("Monospace") : family();
     const std::string                   how  = size().empty() ? std::string("Monospace") : size();
-    const LLFontGL*                     font = LLFontGL::getFont(LLFontDescriptor(name, how, LLFontGL::getStyleFromString(style())));
+    const U8                            look = LLFontGL::getStyleFromString(style());
+    // Zoomed: the size chosen, so many points larger or smaller.
+    if (const F32 base = LLFontGL::pointsOf(name, how); zoom() != 0 && base > 0.f)
+    {
+        if (const LLFontGL* zoomed = LLFontGL::getFontAtPoints(name, llclamp(base + static_cast<F32>(zoom()), MIN_TEXT_POINTS, MAX_TEXT_POINTS), look))
+        {
+            return zoomed;
+        }
+    }
+    const LLFontGL* font = LLFontGL::getFont(LLFontDescriptor(name, how, look));
     return font ? font : LLFontGL::getFontMonospace();
+}
+
+void ALFloaterScriptStudio::zoomText(S32 steps)
+{
+    // A point a step, kept within what can still be read and what still
+    // fits a line or two on the screen.
+    const std::string family = gSavedSettings.getString("ALScriptStudioFontFamily");
+    const std::string size   = gSavedSettings.getString("ALScriptStudioFontSize");
+    const F32         base   = LLFontGL::pointsOf(family.empty() ? std::string("Monospace") : family, size.empty() ? std::string("Monospace") : size);
+    S32               zoom   = steps == 0 ? 0 : gSavedSettings.getS32("ALScriptStudioFontZoom") + steps;
+    if (base > 0.f)
+    {
+        zoom = llclamp(zoom, static_cast<S32>(MIN_TEXT_POINTS - base), static_cast<S32>(MAX_TEXT_POINTS - base));
+    }
+    gSavedSettings.setS32("ALScriptStudioFontZoom", zoom);
+    refreshAll();
+    if (base > 0.f)
+    {
+        setStatus(getString("TextSize", LLStringUtil::format_map_t{ { "[POINTS]", llformat("%g", base + static_cast<F32>(zoom)) } }));
+    }
 }
 
 // static
@@ -1562,6 +1592,7 @@ void ALFloaterScriptStudio::applyTypingOptions(ALCodeEditor& editor)
 void ALFloaterScriptStudio::applyEditorOptions(ALCodeEditor& editor)
 {
     editor.setFont(editorFont());
+    editor.setOnZoomWheel([this](S32 steps) { zoomText(steps); });
     editor.keymap() = ALScriptKeymap::current();
     // Vim put over the editor, or taken away; one already there keeps
     // its marks and registers. The vimrc is read before the first.
@@ -6508,6 +6539,10 @@ void ALFloaterScriptStudio::addGoCommands()
             },
             [list, usable]() { return usable(*list); });
     }
+    // The text a step larger or smaller, every window's, or the size chosen.
+    mCommands.add("zoom_in", [this]() { zoomText(1); });
+    mCommands.add("zoom_out", [this]() { zoomText(-1); });
+    mCommands.add("zoom_reset", [this]() { zoomText(0); });
     // F6 round the window's regions, as it goes between panes in most
     // editors, and Shift-F6 back.
     mCommands.add("next_pane", [this]() { cycleRegion(1); });

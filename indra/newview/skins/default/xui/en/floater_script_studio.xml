@@ -442,6 +442,7 @@
     <floater.string name="MenuUndoWhat">Undo [WHAT]</floater.string>
     <floater.string name="MenuRedo">Redo</floater.string>
     <floater.string name="MenuRedoWhat">Redo [WHAT]</floater.string>
+    <floater.string name="TextSize">Text [POINTS] pt</floater.string>
     <floater.string name="ChordWaiting">[KEYS] pressed: waiting for the next key...</floater.string>
     <floater.string name="ChordNone">[KEYS] is not a command.</floater.string>
     <floater.string name="PaletteOn">on</floater.string>
@@ -1062,6 +1063,16 @@
                 <menu_item_check.on_click function="ScriptStudio.Menu" parameter="compare_inline" />
                 <menu_item_check.on_enable function="ScriptStudio.Enable" parameter="compare_inline" />
             </menu_item_check>
+            <menu_item_separator layout="topleft" />
+            <menu_item_call label="Zoom In" layout="topleft" name="zoom_in">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="zoom_in" />
+            </menu_item_call>
+            <menu_item_call label="Zoom Out" layout="topleft" name="zoom_out">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="zoom_out" />
+            </menu_item_call>
+            <menu_item_call label="Actual Size" layout="topleft" name="zoom_reset">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="zoom_reset" />
+            </menu_item_call>
         </menu>
         <menu
          label="Build"

@@ -232,9 +232,7 @@ namespace ALScriptKeymap
         // As the studio's menus give them, which this table overrides, so
         // that the two cannot drift: the menus are told these at every
         // open. A command named again has another key as standard: the
-        // menu shows the first. Back and forward are the Control key's on a Mac too, as
-        // an editor of code has them there, Command-minus being the
-        // view's zoom elsewhere.
+        // menu shows the first.
 #if LL_DARWIN
         constexpr MASK REAL_CONTROL = MASK_MAC_CONTROL;
 #else
@@ -279,8 +277,17 @@ namespace ALScriptKeymap
             { "insert_event", KEY_NONE, MASK_NONE },
             { "insert_constant", KEY_NONE, MASK_NONE },
             // Go
-            { "back", '-', REAL_CONTROL },
-            { "forward", '-', REAL_CONTROL | MASK_SHIFT },
+#if LL_DARWIN
+            // The Control key's on a Mac, as an editor of code has them
+            // there: Command-minus is the text's size.
+            { "back", '-', MASK_MAC_CONTROL },
+            { "forward", '-', MASK_MAC_CONTROL | MASK_SHIFT },
+#else
+            // Alt with an arrow, as VS Code has them: Control-minus is the
+            // text's size.
+            { "back", KEY_LEFT, MASK_ALT },
+            { "forward", KEY_RIGHT, MASK_ALT },
+#endif
             { "quick_open", 'P', MASK_CONTROL },
 #if LL_DARWIN
             // The Mac's own Control-G, as its editors go to a line:
@@ -357,6 +364,18 @@ namespace ALScriptKeymap
             after_k("expanded", 'P'),
             { "compare_saved", KEY_NONE, MASK_NONE },
             { "compare_inline", KEY_NONE, MASK_NONE },
+            // The text's size: Control-= and Control-minus, Shift or not,
+            // the keypad's too, as everywhere -- Command on a Mac -- and
+            // Control-0 back to the size chosen. The '=' key is '=' from
+            // Windows and KEY_EQUALS from SDL.
+            { "zoom_in", '=', MASK_CONTROL },
+            { "zoom_in", KEY_EQUALS, MASK_CONTROL },
+            { "zoom_in", '=', MASK_CONTROL | MASK_SHIFT },
+            { "zoom_in", KEY_EQUALS, MASK_CONTROL | MASK_SHIFT },
+            { "zoom_in", KEY_ADD, MASK_CONTROL },
+            { "zoom_out", '-', MASK_CONTROL },
+            { "zoom_out", KEY_SUBTRACT, MASK_CONTROL },
+            { "zoom_reset", '0', MASK_CONTROL },
             // Build
             { "preprocess", KEY_NONE, MASK_NONE },
             { "running", KEY_NONE, MASK_NONE },

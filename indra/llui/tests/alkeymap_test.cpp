@@ -124,7 +124,9 @@ namespace tut
         ensure("a definition shown as Control-Command-J", map.keysFor(C::GoToDefinition, key, mask) && key == 'J' && mask == (MASK_CONTROL | MASK_MAC_CONTROL));
         ensure("F12 still", map.lookup(KEY_F12, MASK_NONE) == C::GoToDefinition);
         ensure("Command-semicolon the next misspelling", map.lookup(';', MASK_CONTROL) == C::NextMisspelling);
+        ensure("Option with an arrow a word", map.lookup(KEY_LEFT, MASK_ALT) == C::MoveWordLeft);
 #else
+        ensure("Alt with an arrow left to whoever holds the editor, for back", map.lookup(KEY_LEFT, MASK_ALT) == C::None);
         ensure("Control-H replaces", map.lookup('H', MASK_CONTROL) == C::Replace);
         ensure("Control-Shift-[ folds", map.lookup('[', MASK_CONTROL | MASK_SHIFT) == C::Fold);
         ensure("F3 the next match, shown", map.keysFor(C::FindNext, key, mask) && key == KEY_F3);

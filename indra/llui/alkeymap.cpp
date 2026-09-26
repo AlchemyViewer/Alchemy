@@ -135,8 +135,13 @@ ALKeymap ALKeymap::standard()
     map.bind(KEY_DOWN, MASK_NONE, C::MoveDown);
     map.bind(KEY_LEFT, word, C::MoveWordLeft);
     map.bind(KEY_RIGHT, word, C::MoveWordRight);
+#if LL_DARWIN
+    // Option with an arrow is a word on a Mac; elsewhere Alt with one goes
+    // back and forward, as VS Code has it, which is whoever holds the
+    // editor's to say.
     map.bind(KEY_LEFT, MASK_ALT, C::MoveWordLeft);
     map.bind(KEY_RIGHT, MASK_ALT, C::MoveWordRight);
+#endif
     map.bind(KEY_HOME, MASK_NONE, C::MoveLineStart);
     map.bind(KEY_END, MASK_NONE, C::MoveLineEnd);
     map.bind(KEY_HOME, MASK_CONTROL, C::MoveDocStart);
@@ -150,8 +155,10 @@ ALKeymap ALKeymap::standard()
     map.bind(KEY_DOWN, MASK_SHIFT, C::SelectDown);
     map.bind(KEY_LEFT, word | MASK_SHIFT, C::SelectWordLeft);
     map.bind(KEY_RIGHT, word | MASK_SHIFT, C::SelectWordRight);
+#if LL_DARWIN
     map.bind(KEY_LEFT, MASK_ALT | MASK_SHIFT, C::SelectWordLeft);
     map.bind(KEY_RIGHT, MASK_ALT | MASK_SHIFT, C::SelectWordRight);
+#endif
     map.bind(KEY_HOME, MASK_SHIFT, C::SelectLineStart);
     map.bind(KEY_END, MASK_SHIFT, C::SelectLineEnd);
     map.bind(KEY_HOME, MASK_CONTROL | MASK_SHIFT, C::SelectDocStart);

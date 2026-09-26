@@ -205,8 +205,14 @@ public:
     // caret, the hover card. The studio's editors and the preferences'
     // preview share them.
     static void applyTypingOptions(ALCodeEditor& editor);
-    // The font the settings name, or the monospace default.
+    // The font the settings name, or the monospace default, zoomed as the
+    // text has been, within MIN_TEXT_POINTS and MAX_TEXT_POINTS.
     static const LLFontGL* editorFont();
+    static constexpr F32   MIN_TEXT_POINTS = 6.f;
+    static constexpr F32   MAX_TEXT_POINTS = 48.f;
+    // The text a step larger, or smaller, every window's; none, as the
+    // size chosen. Said in points.
+    void zoomText(S32 steps);
 
 private:
     ALFloaterScriptStudio(const LLSD& key);

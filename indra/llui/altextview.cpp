@@ -4409,6 +4409,19 @@ void ALTextView::armTripleClick()
 
 bool ALTextView::handleScrollWheel(S32 x, S32 y, LLScrollDelta delta)
 {
+    // Control zooms, a step a notch, a trackpad's glide gathered into
+    // steps: the wheel down is away from the reader, smaller.
+    if (mZoomWheel && gKeyboard && (gKeyboard->currentMask(true) & MASK_CONTROL))
+    {
+        mZoomRemainder -= delta.mPrecise;
+        const S32 steps = static_cast<S32>(mZoomRemainder);
+        mZoomRemainder -= static_cast<F32>(steps);
+        if (steps != 0)
+        {
+            mZoomWheel(steps);
+        }
+        return true;
+    }
     // Shift turns the wheel sideways, where there is a sideways to go.
     if (!mWordWrap && gKeyboard && (gKeyboard->currentMask(true) & MASK_SHIFT))
     {

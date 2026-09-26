@@ -1430,4 +1430,24 @@ namespace tut
         ensure("no menu: left", !bare->handleKeyHere(KEY_F10, MASK_SHIFT));
         bare->die();
     }
+
+    template<> template<>
+    void altextview_object::test<47>()
+    {
+        set_test_name("a family at a size in points of its own, made once and shared; larger as asked; the points a size name is");
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        const F32 base = LLFontGL::pointsOf("Monospace", "Monospace");
+        ensure("the size fonts.xml gives", base > 0.f);
+        ensure("none for a size never named", LLFontGL::pointsOf("Monospace", "NoSuchSize") == 0.f);
+        const LLFontGL* bigger = LLFontGL::getFontAtPoints("Monospace", base + 4.f, LLFontGL::NORMAL);
+        const LLFontGL* same   = LLFontGL::getFontAtPoints("Monospace", base + 4.f, LLFontGL::NORMAL);
+        const LLFontGL* smaller = LLFontGL::getFontAtPoints("Monospace", base - 2.f, LLFontGL::NORMAL);
+        ensure("made", bigger && smaller);
+        ensure("once", bigger == same);
+        ensure("larger", bigger->getLineHeight() > smaller->getLineHeight());
+        ensure("named for its points", LLFontGL::pointsOf("Monospace", llformat("%.1fpt", base + 4.f)) == base + 4.f);
+    }
 }
