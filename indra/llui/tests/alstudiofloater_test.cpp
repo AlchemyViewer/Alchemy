@@ -228,4 +228,49 @@ namespace tut
         window->setMinimized(false);
         window->closeFloater();
     }
+
+    template<> template<>
+    void alstudiofloater_object::test<5>()
+    {
+        set_test_name("a step chosen in a history gone to a step at a time either way, stopped where a step will not go or at the bound");
+        size_t      in_force = 5;
+        size_t      refuse   = 0;
+        std::string taken;
+        const auto  count    = [&]() { return in_force; };
+        S32         refused  = 0;
+        const auto  back     = [&]() {
+            if (in_force == refuse)
+            {
+                ++refused;
+                return false;
+            }
+            --in_force;
+            taken += "u";
+            return true;
+        };
+        const auto forward = [&]() {
+            ++in_force;
+            taken += "r";
+            return true;
+        };
+        ALStudioFloater::goToStep(2, count, back, forward, 100);
+        ensure("back three", in_force == 2 && taken == "uuu");
+        taken.clear();
+        ALStudioFloater::goToStep(4, count, back, forward, 100);
+        ensure("forward two", in_force == 4 && taken == "rr");
+        taken.clear();
+        ALStudioFloater::goToStep(4, count, back, forward, 100);
+        ensure("there already: nothing", taken.empty());
+        refuse = 3;
+        ALStudioFloater::goToStep(0, count, back, forward, 100);
+        ensure("a step that will not go: stopped, and not turned round", in_force == 3 && taken == "u");
+        ensure_equals("asked once", refused, 1);
+        taken.clear();
+        refuse = 99;
+        ALStudioFloater::goToStep(0, count, back, forward, 2);
+        ensure("the bound", in_force == 1 && taken == "uu");
+        taken.clear();
+        ALStudioFloater::goToStep(9, count, back, forward, 3);
+        ensure("the bound forward too", in_force == 4 && taken == "rrr");
+    }
 }

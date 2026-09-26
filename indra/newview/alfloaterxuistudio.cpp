@@ -4561,21 +4561,10 @@ void ALFloaterXUIStudio::fillHistory()
 // to say how far.
 void ALFloaterXUIStudio::onHistoryGoTo(size_t in_force)
 {
-    // A bound, so that a set that stops answering does not spin here.
-    for (S32 guard = 0; guard < 1024 && mDocuments.inForce() > in_force; ++guard)
-    {
-        if (!mDocuments.undo())
-        {
-            break;
-        }
-    }
-    for (S32 guard = 0; guard < 1024 && mDocuments.inForce() < in_force; ++guard)
-    {
-        if (!mDocuments.redo())
-        {
-            break;
-        }
-    }
+    // Bounded by the history, so that a set that stops answering does not
+    // spin here.
+    goToStep(in_force, [this]() { return mDocuments.inForce(); }, [this]() { return mDocuments.undo(); },
+             [this]() { return mDocuments.redo(); }, mDocuments.history().size() + 1);
     LLStringUtil::format_map_t args;
     args["[COUNT]"] = std::to_string((S32)mDocuments.inForce());
     replayChange(getString("HistoryWentTo", args));

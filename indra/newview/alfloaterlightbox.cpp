@@ -1234,23 +1234,10 @@ void ALFloaterLightBox::fillHistoryList()
 void ALFloaterLightBox::goToHistory(size_t cursor)
 {
     // A step at a time through applyHistory, so every step is written back
-    // exactly the way Ctrl+Z and Ctrl+Y write it. The guard is for a stack
-    // that stops moving, which applyHistory reports rather than loops on.
-    size_t guard = mHistory.depth() + 1;
-    while (mHistory.cursor() > cursor && guard-- > 0)
-    {
-        if (!applyHistory(false))
-        {
-            break;
-        }
-    }
-    while (mHistory.cursor() < cursor && guard-- > 0)
-    {
-        if (!applyHistory(true))
-        {
-            break;
-        }
-    }
+    // exactly the way Ctrl+Z and Ctrl+Y write it; bounded by the stack, for
+    // one that stops moving, which applyHistory reports rather than loops on.
+    goToStep(cursor, [this]() { return mHistory.cursor(); }, [this]() { return applyHistory(false); },
+             [this]() { return applyHistory(true); }, mHistory.depth() + 1);
 }
 
 std::string ALFloaterLightBox::pageLabel(size_t page) const

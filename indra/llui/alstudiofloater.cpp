@@ -107,6 +107,26 @@ void ALStudioFloater::sayUndoRedo(const std::string& undo_what, const std::strin
     }
 }
 
+// static
+void ALStudioFloater::goToStep(size_t target, const std::function<size_t()>& in_force, const std::function<bool()>& back,
+                               const std::function<bool()>& forward, size_t bound)
+{
+    while (in_force() > target && bound-- > 0)
+    {
+        if (!back())
+        {
+            return;
+        }
+    }
+    while (in_force() < target && bound-- > 0)
+    {
+        if (!forward())
+        {
+            return;
+        }
+    }
+}
+
 void ALStudioFloater::showHistory(ALHistoryList* list, std::vector<ALHistoryList::Step> steps, size_t in_force)
 {
     const std::string undo_what = in_force > 0 && in_force <= steps.size() ? steps[in_force - 1].what : std::string();

@@ -59,6 +59,13 @@ class ALStudioFloater : public LLFloater
 public:
     AL_VIEW_TYPE(ALStudioFloater, LLFloater);
 
+    // A step chosen in the history gone to: undone or redone one step at a
+    // time, each the way the studio takes a step, until `target` are in
+    // force -- `in_force()` says how many are -- and stopped where a step
+    // will not go or after `bound` steps, for a history that stops moving.
+    static void goToStep(size_t target, const std::function<size_t()>& in_force, const std::function<bool()>& back,
+                         const std::function<bool()>& forward, size_t bound);
+
     bool hasAccelerators() const override { return true; }
     void onClose(bool app_quitting) override;
     void draw() override;
