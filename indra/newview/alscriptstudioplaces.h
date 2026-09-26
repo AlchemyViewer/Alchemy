@@ -25,6 +25,7 @@
 #pragma once
 
 #include "alscriptstudiodoc.h"
+#include "alscriptworkspace.h"
 
 #include <string>
 
@@ -44,4 +45,8 @@ namespace ALScriptPlaces
     // A place's line, trimmed for a pane's row, and where the name is in
     // it.
     void        placeText(ALScriptStudioDoc::Place& place, const std::string& line);
+    // What a loaded script's author wrote: the source out of the envelope
+    // where one wrapped it, the text as it came otherwise, and nothing
+    // where it could not be read.
+    std::string sourceOf(const ALScriptWorkspace::Loaded& loaded);
 }

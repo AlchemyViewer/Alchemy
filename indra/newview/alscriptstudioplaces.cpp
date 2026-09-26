@@ -26,6 +26,8 @@
 
 #include "alscriptstudioplaces.h"
 
+#include "alscriptenvelope.h"
+
 namespace ALScriptPlaces
 {
     ALTextRange rangeOf(const ALScriptSpan& span)
@@ -121,5 +123,22 @@ namespace ALScriptPlaces
         place.text        = line.substr(first, last - first + 1);
         const S32 at      = place.span.column - static_cast<S32>(first);
         place.at          = at >= 0 && at < static_cast<S32>(place.text.size()) ? at : -1;
+    }
+
+    // What a loaded script's author wrote: the source out of the
+    // envelope where one wrapped it, the text as it came otherwise, and
+    // nothing where it could not be read.
+    std::string sourceOf(const ALScriptWorkspace::Loaded& loaded)
+    {
+        if (!loaded.error.empty() || loaded.notecard)
+        {
+            return std::string();
+        }
+        std::string text = loaded.text;
+        if (std::optional<ALScriptEnvelope> envelope = ALScriptEnvelope::parse(text))
+        {
+            text = envelope->source;
+        }
+        return text;
     }
 }
