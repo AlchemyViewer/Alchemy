@@ -30,6 +30,7 @@
 #include "alfloaterscriptstudio.h"
 #include "alscriptanalysis.h"
 #include "alscriptstudiovimrc.h"
+#include "alscriptstudiowords.h"
 #include "alfontfield.h"
 #include "alscriptkeymap.h"
 #include "llbutton.h"
@@ -148,8 +149,8 @@ bool ALFloaterScriptPreferences::postBuild()
     mDefines->setCommitCallback([this](LLUICtrl*, const LLSD&) { storeDefines(); });
     mTemplateLSLChanged  = mTemplateLSL->onTextChanged([this]() { storeTemplate(false); });
     mTemplateSLuaChanged = mTemplateSLua->onTextChanged([this]() { storeTemplate(true); });
-    ALFloaterScriptStudio::teachWords(*mTemplateLSL, false);
-    ALFloaterScriptStudio::teachWords(*mTemplateSLua, true);
+    ALScriptStudioWords::teach(*mTemplateLSL, false);
+    ALScriptStudioWords::teach(*mTemplateSLua, true);
     mOrder->setCommitCallback([this](LLUICtrl*, const LLSD&) { storeIncludeOrder(); });
     getChild<LLButton>("order_up")->setCommitCallback([this](LLUICtrl*, const LLSD&) { moveIncludePlace(-1); });
     getChild<LLButton>("order_down")->setCommitCallback([this](LLUICtrl*, const LLSD&) { moveIncludePlace(1); });
@@ -755,7 +756,7 @@ void ALFloaterScriptPreferences::refreshPreview()
 {
     const bool lua = mPreviewLang->getValue().asString() == "slua";
     mPreview->setSyntax(lua ? "slua" : "lsl");
-    ALFloaterScriptStudio::teachWords(*mPreview, lua);
+    ALScriptStudioWords::teach(*mPreview, lua);
     mPreview->setText(getString(lua ? "PreviewSLua" : "PreviewLSL"));
     mPreview->setFont(ALFloaterScriptStudio::editorFont());
 }
@@ -1118,7 +1119,7 @@ void ALFloaterScriptPreferences::fillSnippets(bool reread)
     }
     mSnippetList->setScrollPos(scrolled);
     mSnippetBody->setSyntax(lua ? "slua" : "lsl");
-    ALFloaterScriptStudio::teachWords(*mSnippetBody, lua);
+    ALScriptStudioWords::teach(*mSnippetBody, lua);
     showSnippet();
 }
 

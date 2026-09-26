@@ -39,6 +39,7 @@
 #include "alscriptexternaleditor.h"
 #include "alscriptstudiofiles.h"
 #include "alscriptstudioweighing.h"
+#include "alscriptstudiowords.h"
 #include "alfindings.h"
 #include "aloutputview.h"
 #include "alscriptanalysis.h"
@@ -185,22 +186,8 @@ public:
     void        applyEditorOptions();
     static void refreshAll();
 
-    // A word of the language, as the region defines it: what colours and
-    // completes.
-    struct Vocab
-    {
-        std::string  text;
-        std::string  detail;
-        std::string  tooltip;
-        ALSyntaxKind kind = ALSyntaxKind::Text;
-        bool         deprecated = false;
-    };
-    static const std::vector<Vocab>& vocabulary(bool lua);
-    // Built again on the next ask: the definitions changed.
-    static void forgetVocabulary();
-    // The region's words put in an editor's tables, so that they colour:
-    // what the studio's editors and the preferences' preview share.
-    static void teachWords(ALCodeEditor& editor, bool lua);
+    // A word of the language, as the region defines it (ALScriptStudioWords).
+    typedef ALScriptStudioWords::Vocab Vocab;
     // The typing settings put on an editor: tabs, completion, pairs, the
     // caret, the hover card. The studio's editors and the preferences'
     // preview share them.
@@ -265,12 +252,6 @@ private:
     // the scripter's own (ALScriptSnippets).
     typedef ALScriptSnippets::Snippet Snippet;
     static const std::vector<Snippet>& snippets(bool lua) { return ALScriptSnippets::all(lua); }
-    // Whether a position of an LSL script is straight inside a state,
-    // where an event's handler goes.
-    static bool                 inStateBody(ALCodeEditor& editor, const ALTextPos& at);
-    // A word of the vocabulary as a completion: a function with its
-    // call, an event as a handler to fill in, a constant as itself.
-    ALCodeEditor::Completion completionFor(const Vocab& word, bool lua) const;
     // The Insert menu: snippets, functions, events or constants picked
     // by name and put in at the caret.
     void insertFromLibrary(const std::string& what);
@@ -736,8 +717,6 @@ private:
     void        showReference(const Vocab& word, bool lua);
     void        reference(Doc& doc);
     void        browseReference();
-    static const Vocab* vocabWord(bool lua, std::string_view name);
-    static std::string helpUrl(bool lua, const std::string& word);
 
     // The formatter over the text as it stands, or the lines selected:
     // every line put right as one step to undo, the caret keeping its
@@ -880,10 +859,6 @@ private:
     // document's language set by it, the editor taught or untaught.
     typedef ALScriptStudioFiles::Language FileLanguage;
     void                                  speakFileLanguage(Doc& doc, const FileLanguage& language);
-    // The marks: what a document is, on its tab; what a symbol's kind
-    // is, in the outline -- by texture name, as a scroll list wants it.
-    static const char* imageNameOf(const Doc& doc);
-    static const char* imageNameOf(ALScriptSymbolKind kind);
 
     // The tabs open, as the state keeps them: an item by its object and
     // id, a file by its path, and which is in front.

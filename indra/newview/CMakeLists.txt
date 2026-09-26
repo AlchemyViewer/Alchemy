@@ -1009,6 +1009,7 @@ if(AL_BUILD_VIEWER)
     alscriptstudiovim.h
     alscriptstudiovimrc.h
     alscriptstudioweighing.h
+    alscriptstudiowords.h
     alscriptstudioservices.h
     alscriptweightspane.h
     alscriptworkspace.h
@@ -2540,6 +2541,17 @@ if(AL_BUILD_TESTS)
       alscriptsaveflow.cpp
       alscriptstudiodoc.cpp
       alscriptstudiofileio.cpp
+    DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
+  )
+
+  # Script Studio's words: the vocabulary from definitions a test gives,
+  # editors taught it, hovers, completions, the Insert menu, the reference.
+  al_add_test(
+    alscriptstudiowords
+    UNIT
+    PROJECT ${test_project}
+    LIBRARIES llui alscript ${test_libs}
+    SOURCES alscriptnotecardtab.cpp alscriptsaveflow.cpp alscriptstudiodoc.cpp
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
 

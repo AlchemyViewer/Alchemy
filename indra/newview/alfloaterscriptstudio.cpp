@@ -110,6 +110,30 @@
 
 namespace
 {
+    // Where the studio's words come from, in the viewer: the grid's
+    // definitions, the preprocessor's words while its transforms are on,
+    // and the LSL wiki.
+    const bool WORD_SOURCES = [] {
+        ALScriptStudioWords::Sources& sources = ALScriptStudioWords::sources();
+        sources.keywords = [](bool lua) {
+            return lua ? LLSyntaxDefCache::instance().getLuaKeywords() : LLSyntaxDefCache::instance().getLSLKeywords();
+        };
+        sources.preprocessorWords = [] {
+            std::vector<std::string> words;
+            if (gSavedSettings.getBOOL("ALScriptPreprocSwitch"))
+            {
+                words.insert(words.end(), { "switch", "case" });
+            }
+            if (gSavedSettings.getBOOL("ALScriptPreprocExtensions"))
+            {
+                words.insert(words.end(), { "break", "continue", "inline" });
+            }
+            return words;
+        };
+        sources.lslHelpUrl = [] { return gSavedSettings.getString("LSLHelpURL"); };
+        return true;
+    }();
+
     // How long after the last keystroke the analyzers are asked.
     const F64 ANALYSIS_DELAY = 0.35;
     // What makes an include's functions and globals a script to the
@@ -756,7 +780,7 @@ bool ALFloaterScriptStudio::postBuild()
     // are rebuilt, and every script is checked again.
     mDefinitionsConnection = LLSyntaxDefCache::instance().addSyntaxIDCallback([this]() {
         ALScriptAnalysis::instance().definitionsChanged();
-        forgetVocabulary();
+        ALScriptStudioWords::forget();
         for (std::unique_ptr<Doc>& doc : mDocs)
         {
             if (doc->loaded)
@@ -2058,7 +2082,7 @@ void ALFloaterScriptStudio::showExpanded(Doc& doc, const std::string& text)
         doc.expandedEditor->setVisible(false);
     }
     doc.expandedEditor->setSyntax(doc.language.lua ? "slua" : "lsl");
-    teachWords(*doc.expandedEditor, doc.language.lua);
+    ALScriptStudioWords::teach(*doc.expandedEditor, doc.language.lua);
     doc.expandedEditor->setText(text);
     if (&doc != active())
     {
@@ -2486,7 +2510,7 @@ void ALFloaterScriptStudio::teachEditor(Doc& doc)
 {
     ALCodeEditor& editor = *doc.editor;
     const bool    lua    = doc.language.lua;
-    teachWords(editor, lua);
+    ALScriptStudioWords::teach(editor, lua);
 
     // The analyzer answers what the vocabulary cannot: the script's own
     // symbols, the types of things, what a call takes.
@@ -2553,94 +2577,10 @@ void ALFloaterScriptStudio::teachEditor(Doc& doc)
         }
     });
     editor.setHoverProvider([lua, raw](const ALTextPos& at, std::string_view word, std::string& text) {
-        // The word as the vocabulary knows it: `Say` under the mouse in
-        // `ll.Say` is asked about as `ll.Say`, and `pi` in `math.pi` as
-        // `math.pi`. A local, a parameter or a member the definitions do
-        // not name is the analyzer's to explain.
-        std::string        name(word);
-        const std::string& line = raw->editor->document().line(at.line);
-        S32                from = at.column;
-        while (from > 0 && line[from - 1] != '.' && (isalnum(static_cast<unsigned char>(line[from - 1])) || line[from - 1] == '_'))
-        {
-            --from;
-        }
-        while (from > 0 && line[from - 1] == '.')
-        {
-            S32 head = from - 1;
-            while (head > 0 && (isalnum(static_cast<unsigned char>(line[head - 1])) || line[head - 1] == '_'))
-            {
-                --head;
-            }
-            if (head == from - 1)
-            {
-                break;
-            }
-            name = line.substr(head, from - 1 - head) + "." + name;
-            from = head;
-        }
-        const Vocab* known = vocabWord(lua, name);
-        if (!known)
-        {
-            known = vocabWord(lua, word);
-        }
-        if (!known)
-        {
-            return false;
-        }
-        text = known->detail.empty() ? known->text : known->detail;
-        if (!known->tooltip.empty())
-        {
-            text += "\n" + known->tooltip;
-        }
-        if (known->deprecated)
-        {
-            text += "\n" + ALCodeEditor::deprecatedNote();
-        }
-        return true;
+        return ALScriptStudioWords::hoverText(lua, raw->editor->document(), at, word, text);
     });
     editor.setCompletionProvider([this, lua, raw](const ALTextPos& at, std::string_view prefix, std::vector<ALCodeEditor::Completion>& out) {
-        auto begins = [&prefix](const std::string& word) { return ALCodeEditor::matchTier(word, prefix) >= 0; };
-        // An LSL event's handler goes straight inside a state and nowhere
-        // else, so a handler is offered only there; asked once, and only
-        // if one matches.
-        std::optional<bool> in_state;
-        for (const Vocab& word : vocabulary(lua))
-        {
-            if (!begins(word.text))
-            {
-                continue;
-            }
-            if (!lua && word.kind == ALSyntaxKind::Event)
-            {
-                if (!in_state)
-                {
-                    in_state = inStateBody(*raw->editor, at);
-                }
-                if (!*in_state)
-                {
-                    continue;
-                }
-            }
-            out.push_back(completionFor(word, lua));
-        }
-        // A snippet by its prefix, where a bare word is being typed
-        // rather than a member.
-        if (prefix.find('.') == std::string_view::npos)
-        {
-            for (const Snippet& snippet : snippets(lua))
-            {
-                if (begins(snippet.prefix))
-                {
-                    ALCodeEditor::Completion c;
-                    c.text          = snippet.prefix;
-                    c.detail        = getString("SnippetDetail") + "  " + snippet.name;
-                    c.kind          = ALSyntaxKind::Control;
-                    c.snippet       = snippet.body;
-                    c.documentation = snippet.detail;
-                    out.push_back(std::move(c));
-                }
-            }
-        }
+        ALScriptStudioWords::complete(lua, *raw->editor, at, prefix, snippets(lua), getString("SnippetDetail"), out);
     });
 }
 
@@ -2652,46 +2592,8 @@ void ALFloaterScriptStudio::insertFromLibrary(const std::string& what)
     {
         return;
     }
-    const bool                          lua = doc->language.lua;
-    std::vector<ALQuickOpen::Candidate> candidates;
-    auto                                firstLine = [](const std::string& text) {
-        const size_t end = text.find('\n');
-        return end == std::string::npos ? text : text.substr(0, end);
-    };
-    if (what == "snippet")
-    {
-        const std::vector<Snippet>& list = snippets(lua);
-        for (size_t i = 0; i < list.size(); ++i)
-        {
-            ALQuickOpen::Candidate one;
-            one.label  = list[i].name;
-            one.detail = list[i].detail;
-            one.also   = list[i].prefix;
-            // By what it is rather than where it stands in a list that
-            // may be made again while the picker is up -- the scripter's
-            // own saved meanwhile, new definitions from a region.
-            one.value  = list[i].name + '\n' + list[i].prefix;
-            candidates.push_back(std::move(one));
-        }
-    }
-    else
-    {
-        const ALSyntaxKind         kind  = what == "function" ? ALSyntaxKind::Function : what == "event" ? ALSyntaxKind::Event : ALSyntaxKind::Constant;
-        const std::vector<Vocab>&  words = vocabulary(lua);
-        for (size_t i = 0; i < words.size(); ++i)
-        {
-            if (words[i].kind != kind)
-            {
-                continue;
-            }
-            ALQuickOpen::Candidate one;
-            one.label  = words[i].text;
-            one.detail = words[i].deprecated ? getString("Deprecated") : firstLine(words[i].tooltip);
-            one.also   = words[i].detail;
-            one.value  = words[i].text;
-            candidates.push_back(std::move(one));
-        }
-    }
+    const bool                          lua        = doc->language.lua;
+    std::vector<ALQuickOpen::Candidate> candidates = ALScriptStudioWords::library(lua, what, snippets(lua), getString("Deprecated"));
     if (candidates.empty())
     {
         return;
@@ -2720,12 +2622,12 @@ void ALFloaterScriptStudio::insertFromLibrary(const std::string& what)
         }
         else
         {
-            const Vocab* word = vocabWord(lua, value);
+            const Vocab* word = ALScriptStudioWords::word(lua, value);
             if (!word)
             {
                 return;
             }
-            chosen = studio->completionFor(*word, lua);
+            chosen = ALScriptStudioWords::completionFor(*word, lua);
         }
         // In place of the selection, or at the caret.
         const ALTextRange selection = doc->editor->selection();
@@ -3149,7 +3051,7 @@ ALFloaterScriptStudio::TabFacts ALFloaterScriptStudio::tabFactsOf(const Doc& doc
     facts.dirty    = doc.unsaved();
     facts.preview  = doc.preview;
     facts.readOnly = doc.loaded && !doc.modifiable;
-    facts.image    = imageNameOf(doc);
+    facts.image    = ALScriptStudioWords::imageNameOf(doc);
     problemCounts(doc, facts.errors, facts.warnings);
     return facts;
 }
@@ -3647,7 +3549,7 @@ void ALFloaterScriptStudio::pumpPreprocessor()
         doc->weighing.sent = false;
         if (words && !doc->notecard && !doc->language.lua)
         {
-            teachWords(*doc->editor, false);
+            ALScriptStudioWords::teach(*doc->editor, false);
         }
         if (preprocessed(*doc))
         {
@@ -4172,7 +4074,7 @@ void ALFloaterScriptStudio::refreshProblems(Doc& doc)
 
 std::string ALFloaterScriptStudio::problemIcon(const Doc& doc, const std::string& include) const
 {
-    return include.empty() ? imageNameOf(doc) : includeImage(include, doc.language.lua);
+    return include.empty() ? ALScriptStudioWords::imageNameOf(doc) : includeImage(include, doc.language.lua);
 }
 
 void ALFloaterScriptStudio::fixAllOfKind(Doc& doc, const std::string& key)
@@ -4992,7 +4894,7 @@ void ALFloaterScriptStudio::symbolAnswered(Doc& doc, const ALScriptAnalysis::Res
     // A word of the language has no definition in the script to go to --
     // where the script has not made one of its own: its reference is where
     // it is defined.
-    const Vocab* known = command == ALEditorCommand::GoToDefinition ? vocabWord(doc.language.lua, name) : nullptr;
+    const Vocab* known = command == ALEditorCommand::GoToDefinition ? ALScriptStudioWords::word(doc.language.lua, name) : nullptr;
     if (known && (!refs.found || !refs.hasDefinition))
     {
         mFolds.setCollapsed("inspector", false);
@@ -5542,7 +5444,7 @@ bool ALFloaterScriptStudio::reservedName(const Doc& doc, const std::string& name
             return true;
         }
     }
-    return vocabWord(doc.language.lua, name) != nullptr;
+    return ALScriptStudioWords::word(doc.language.lua, name) != nullptr;
 }
 
 void ALFloaterScriptStudio::renameTo(const std::string& id, U32 generation, const std::string& new_name)
@@ -6878,13 +6780,14 @@ void ALFloaterScriptStudio::inspected(Doc& doc, const ALScriptAnalysis::Result& 
         std::string link          = result.hover.link;
         // What the keyword file says, where the analyzer has no words of
         // its own: LSL's declarations come without any.
-        const Vocab* word = documentation.empty() ? vocabWord(doc.language.lua, doc.editor->document().text(doc.editor->identifierAtCaret())) : nullptr;
+        const std::string at_caret = doc.editor->document().text(doc.editor->identifierAtCaret());
+        const Vocab*      word     = documentation.empty() ? ALScriptStudioWords::word(doc.language.lua, at_caret) : nullptr;
         if (word)
         {
             documentation = word->tooltip;
             if (link.empty())
             {
-                link = helpUrl(doc.language.lua, word->text);
+                link = ALScriptStudioWords::helpUrl(doc.language.lua, word->text);
             }
         }
         if (!documentation.empty())
@@ -6964,17 +6867,7 @@ std::string ALFloaterScriptStudio::problemsAt(const Doc& doc, const ALTextPos& a
 void ALFloaterScriptStudio::showReference(const Vocab& word, bool lua)
 {
     mFolds.setCollapsed("inspector", false);
-    std::string text = word.detail.empty() ? word.text : word.detail;
-    if (word.deprecated)
-    {
-        text += "\n" + ALCodeEditor::deprecatedNote();
-    }
-    if (!word.tooltip.empty())
-    {
-        text += "\n\n" + word.tooltip;
-    }
-    text += "\n" + helpUrl(lua, word.text);
-    showSymbol(text, Declared(), { 0 });
+    showSymbol(ALScriptStudioWords::referenceText(word, lua), Declared(), { 0 });
 }
 
 void ALFloaterScriptStudio::reference(Doc& doc)
@@ -6985,7 +6878,7 @@ void ALFloaterScriptStudio::reference(Doc& doc)
     const ALCodeEditor& shown = *doc.shownText();
     const ALTextRange   word  = shown.identifierAtCaret();
     const std::string   name  = shown.document().text(word);
-    if (const Vocab* known = vocabWord(doc.language.lua, name))
+    if (const Vocab* known = ALScriptStudioWords::word(doc.language.lua, name))
     {
         showReference(*known, doc.language.lua);
         return;
@@ -7011,7 +6904,7 @@ void ALFloaterScriptStudio::browseReference()
     Doc*       doc = active();
     const bool lua = doc ? doc->language.lua : false;
     std::vector<ALQuickOpen::Candidate> candidates;
-    const std::vector<Vocab>&           words = vocabulary(lua);
+    const std::vector<Vocab>&           words = ALScriptStudioWords::vocabulary(lua);
     for (size_t i = 0; i < words.size(); ++i)
     {
         if (words[i].kind != ALSyntaxKind::Function && words[i].kind != ALSyntaxKind::Event && words[i].kind != ALSyntaxKind::Constant)
@@ -7039,7 +6932,7 @@ void ALFloaterScriptStudio::browseReference()
         {
             return;
         }
-        if (const Vocab* word = vocabWord(lua, value))
+        if (const Vocab* word = ALScriptStudioWords::word(lua, value))
         {
             studio->showReference(*word, lua);
         }
@@ -7192,7 +7085,7 @@ void ALFloaterScriptStudio::refreshOutline(Doc& doc)
             row["value"]                = static_cast<S32>(rows[r].index);
             row["columns"][0]["column"] = "icon";
             row["columns"][0]["type"]   = "icon";
-            row["columns"][0]["value"]  = imageNameOf(entry.kind);
+            row["columns"][0]["value"]  = ALScriptStudioWords::imageNameOf(entry.kind);
             row["columns"][0]["tool_tip"] = kindName(entry.kind);
             row["columns"][1]["column"] = "symbol";
             // Nested under what holds it, with the arrow that folds what
@@ -10000,7 +9893,7 @@ void ALFloaterScriptStudio::addHelpCommands()
             // opening a page that is not there. No word at all is the portal.
             const ALCodeEditor& shown = *doc->shownText();
             const std::string   word  = shown.document().text(shown.identifierAtCaret());
-            if (!word.empty() && !vocabWord(doc->language.lua, word))
+            if (!word.empty() && !ALScriptStudioWords::word(doc->language.lua, word))
             {
                 LLStringUtil::format_map_t args;
                 args["[NAME]"] = word;
@@ -10008,7 +9901,7 @@ void ALFloaterScriptStudio::addHelpCommands()
             }
             else
             {
-                LLWeb::loadURL(helpUrl(doc->language.lua, word));
+                LLWeb::loadURL(ALScriptStudioWords::helpUrl(doc->language.lua, word));
             }
         },
         script);
