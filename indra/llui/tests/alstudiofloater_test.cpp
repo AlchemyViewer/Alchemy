@@ -57,6 +57,23 @@ namespace
 
         using ALStudioFloater::quickOpen;
         using ALStudioFloater::saveState;
+        using ALStudioFloater::addCommand;
+        using ALStudioFloater::runCommandKey;
+
+        // A person's key for a command, as a studio with a keymap keeps it.
+        std::string rebound;
+        KEY         reboundKey = KEY_NONE;
+        MASK        reboundMask = MASK_NONE;
+
+    protected:
+        std::pair<KEY, MASK> keyOf(const KeyedCommand& command) const override
+        {
+            if (command.rebindable && rebound == command.id)
+            {
+                return { reboundKey, reboundMask };
+            }
+            return ALStudioFloater::keyOf(command);
+        }
     };
 
     std::vector<ALQuickOpen::Candidate> candidates(const std::vector<std::string>& values)
@@ -272,5 +289,42 @@ namespace tut
         taken.clear();
         ALStudioFloater::goToStep(9, count, back, forward, 3);
         ensure("the bound forward too", in_force == 4 && taken == "rrr");
+    }
+
+    template<> template<>
+    void alstudiofloater_object::test<6>()
+    {
+        set_test_name("a key runs the first command it is the key of that can run; one that cannot passes it on; a person's key stands for the standard");
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        TestStudio*              window = studio();
+        std::vector<std::string> ran;
+        bool                     can    = false;
+        window->addCommand({ "find", 'F', MASK_CONTROL, false }, [&]() { ran.push_back("find"); return can; });
+        window->addCommand({ "filter", 'F', MASK_CONTROL, false }, [&]() { ran.push_back("filter"); return true; });
+        window->addCommand({ "save", 'S', MASK_CONTROL }, [&]() { ran.push_back("save"); return true; });
+        window->addCommand({ "save", 'S', MASK_CONTROL | MASK_SHIFT, false }, [&]() { ran.push_back("save again"); return true; });
+
+        ensure("a key none has is not taken", !window->runCommandKey('Q', MASK_CONTROL) && ran.empty());
+        window->addCommand({ "unbound", KEY_NONE, MASK_NONE }, [&]() { ran.push_back("unbound"); return true; });
+        ensure("nor no key at all, a command with none", !window->runCommandKey(KEY_NONE, MASK_NONE) && ran.empty());
+        ensure("taken", window->handleKeyHere('F', MASK_CONTROL));
+        ensure("by the second, the first unable", ran == std::vector<std::string>({ "find", "filter" }));
+        ran.clear();
+        can = true;
+        ensure("taken", window->runCommandKey('F', MASK_CONTROL));
+        ensure("by the first, able now", ran == std::vector<std::string>({ "find" }));
+
+        ran.clear();
+        window->rebound     = "save";
+        window->reboundKey  = 'K';
+        window->reboundMask = MASK_ALT;
+        ensure("a person's key stands for the standard", window->runCommandKey('K', MASK_ALT) && ran == std::vector<std::string>({ "save" }));
+        ensure("which it no longer answers to", !window->runCommandKey('S', MASK_CONTROL));
+        ensure("a second key, not theirs to give, still does",
+               window->runCommandKey('S', MASK_CONTROL | MASK_SHIFT) && ran.back() == "save again");
+        window->closeFloater();
     }
 }

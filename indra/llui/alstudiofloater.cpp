@@ -57,6 +57,37 @@ bool ALStudioFloater::handleMenuAccelerator(KEY key, MASK mask)
     return mMenuBar && mMenuBar->handleAcceleratorKey(key, mask);
 }
 
+void ALStudioFloater::addCommand(const KeyedCommand& command, std::function<bool()> run)
+{
+    mCommands.push_back({ command, std::move(run) });
+}
+
+bool ALStudioFloater::runCommandKey(KEY key, MASK mask)
+{
+    if (key == KEY_NONE)
+    {
+        return false;
+    }
+    for (const Registered& one : mCommands)
+    {
+        if (keyOf(one.command) == std::make_pair(key, mask) && one.run && one.run())
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool ALStudioFloater::handleStudioKeys(KEY key, MASK mask)
+{
+    return handleMenuAccelerator(key, mask) || handleUndoKeys(key, mask) || runCommandKey(key, mask);
+}
+
+bool ALStudioFloater::handleKeyHere(KEY key, MASK mask)
+{
+    return handleStudioKeys(key, mask) || LLFloater::handleKeyHere(key, mask);
+}
+
 bool ALStudioFloater::handleUndoKeys(KEY key, MASK mask)
 {
     const bool undo_key = (key == 'Z' && mask == MASK_CONTROL);

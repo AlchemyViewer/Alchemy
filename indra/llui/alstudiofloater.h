@@ -67,6 +67,8 @@ public:
                          const std::function<bool()>& forward, size_t bound);
 
     bool hasAccelerators() const override { return true; }
+    // The studio's keys (handleStudioKeys), then the floater's.
+    bool handleKeyHere(KEY key, MASK mask) override;
     void onClose(bool app_quitting) override;
     void draw() override;
     bool applyRectControl() override;
@@ -81,6 +83,18 @@ public:
     // nothing to do.
     virtual bool undo() { return false; }
     virtual bool redo() { return false; }
+
+    // A command the studio's keys reach: its name, the key it answers to
+    // as standard, and whether a person may give it another -- a Keys tab
+    // lists the ones they may. A second key for a command is another entry
+    // under the same name, one that may not be given another.
+    struct KeyedCommand
+    {
+        const char* id         = "";
+        KEY         key        = KEY_NONE;
+        MASK        mask       = MASK_NONE;
+        bool        rebindable = true;
+    };
 
 protected:
     // The setting the state is kept under, which a subclass declares;
@@ -103,6 +117,19 @@ protected:
     // they arrive before the Edit menu's own undo, which is what it would
     // have got from them -- and only a key it declines reaches undo().
     bool handleUndoKeys(KEY key, MASK mask);
+    // A command the keys reach, with what it does: false where it cannot
+    // be done now, and the key goes on to whatever else would take it.
+    void addCommand(const KeyedCommand& command, std::function<bool()> run);
+    // The key a command answers to now: its standard one, unless the
+    // studio keeps the one a person gave it.
+    virtual std::pair<KEY, MASK> keyOf(const KeyedCommand& command) const { return { command.key, command.mask }; }
+    // The first command a key is the key of that runs: false where none
+    // did.
+    bool runCommandKey(KEY key, MASK mask);
+    // What every studio's keys are, in order: the menu bar's shortcuts,
+    // undo and redo, then its commands. For a studio with keys of its own
+    // to try once these have not taken one.
+    bool handleStudioKeys(KEY key, MASK mask);
 
     // "Undo" on its own is a promise about nothing in particular. The
     // two menu items say the next step back and the next step forward,
@@ -178,4 +205,11 @@ private:
     std::string                        mQuickQuestion;
     boost::signals2::scoped_connection mQuickChose;
     boost::signals2::scoped_connection mQuickHold;
+    // The commands the keys reach, in the order they were added.
+    struct Registered
+    {
+        KeyedCommand          command;
+        std::function<bool()> run;
+    };
+    std::vector<Registered> mCommands;
 };
