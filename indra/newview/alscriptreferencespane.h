@@ -93,6 +93,9 @@ public:
 
 private:
     void fill();
+    // Where in the places the one with this number is; the end where it is
+    // gone, or with `or_after` the first after it, else the last.
+    size_t placeWith(U32 id, bool or_after) const;
 
     ALScriptStudioServices* mServices = nullptr;
     Window*                 mWindow   = nullptr;

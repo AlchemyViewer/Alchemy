@@ -461,6 +461,10 @@ struct ALScriptStudioDoc
         // Where the name is in the text as listed, in bytes, or -1
         // where the text is not the line the place is on.
         S32          at = -1;
+        // What a list of places knows this one by while it is shown,
+        // counted from one as it is shown; kept as the places slide with
+        // edits and some go, where a place in the list would not be.
+        U32          id = 0;
     };
     // The name being looked up across the object's scripts: what
     // was asked, the script that declares it (this one, or the

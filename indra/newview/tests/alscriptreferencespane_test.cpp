@@ -234,14 +234,15 @@ namespace tut
         refs->show(found());
         refs->choose(false);
         ensure("nothing chosen, nothing gone to", window.pane().chosen.empty());
-        refs->list()->selectByValue(LLSD(2));
+        // A row is known by its place's number, counted from one.
+        refs->list()->selectByValue(LLSD(3));
         refs->list()->onCommit();
         refs->choose(true);
         ensure_equals("gone to", joined(window.pane().chosen), joined(Names{ "a|" + B + "|0", "a|" + B + "|0 editor" }));
         refs->rekey("elsewhere", "z");
         ensure_equals("another's id", refs->found().from, std::string("a"));
         refs->rekey("a", "a2");
-        refs->list()->selectByValue(LLSD(0));
+        refs->list()->selectByValue(LLSD(1));
         refs->choose(false);
         ensure_equals("followed", window.pane().chosen.back(), std::string("a2||0"));
 
@@ -277,5 +278,28 @@ namespace tut
         list->sortByColumn("role", true);
         list->updateSort();
         ensure_equals("the declaration first, then by script", lines(), joined(Names{ "B 1:9", "A 1:9", "A 2:5", "A 3:1" }));
+    }
+
+    template<> template<>
+    void alscriptreferencespane_object::test<5>()
+    {
+        set_test_name("a row picked between an edit that took a place away and the listing again is still its own place");
+        ALScriptReferencesPane* refs = pane();
+        Doc&                    a    = tab("a", "integer count;\nx = count;\n");
+        refs->show(found());
+        boost::signals2::scoped_connection in_a(a.editor->document().onChanged(
+            [refs, &a](const ALTextDocument::Edit& edit) { refs->slide(a, "object:1:a", edit); }));
+        refs->list()->selectFirstItem();
+        refs->list()->selectNextItem(false);
+        ensure_equals("A's second chosen", cell(refs->list()->getFirstSelected(), 1), std::string("2:5"));
+        // The declaration's name edited: the first place goes, not listed
+        // again until the frame is drawn.
+        a.editor->replaceAll({ { ALTextRange(ALTextPos(0, 8), ALTextPos(0, 13)), "total" } });
+        ensure_equals("one place fewer", refs->found().places.size(), size_t(2));
+        window.pane().chosen.clear();
+        refs->choose(false);
+        ensure_equals("A's second, not what took its index", joined(window.pane().chosen), std::string("a||1"));
+        refs->pump();
+        ensure_equals("listed again, the row still chosen", cell(refs->list()->getFirstSelected(), 1), std::string("2:5"));
     }
 }

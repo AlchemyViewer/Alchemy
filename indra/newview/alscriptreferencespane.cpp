@@ -62,8 +62,8 @@ bool ALScriptReferencesPane::postBuild()
     mList->setBack([this]() { mServices->revealed(mList, true); });
     mList->setCopyable(true);
     mList->setComparison([this](S32 column, const LLScrollListItem* a, const LLScrollListItem* b) {
-        const size_t i = static_cast<size_t>(a->getValue().asInteger());
-        const size_t j = static_cast<size_t>(b->getValue().asInteger());
+        const size_t i = placeWith(static_cast<U32>(a->getValue().asInteger()), false);
+        const size_t j = placeWith(static_cast<U32>(b->getValue().asInteger()), false);
         if (i >= mFound.places.size() || j >= mFound.places.size())
         {
             return 0;
@@ -93,6 +93,11 @@ bool ALScriptReferencesPane::postBuild()
 void ALScriptReferencesPane::show(Found found)
 {
     mFound = std::move(found);
+    U32 id = 0;
+    for (Doc::Place& place : mFound.places)
+    {
+        place.id = ++id;
+    }
     fill();
 }
 
@@ -107,7 +112,7 @@ void ALScriptReferencesPane::fill()
     // moving the places asks for.
     mStale             = false;
     const S32 scrolled = mList->getScrollPos();
-    const S32 chosen   = mList->getFirstSelected() ? mList->getFirstSelected()->getValue().asInteger() : -1;
+    const S32 chosen   = mList->getFirstSelected() ? mList->getFirstSelected()->getValue().asInteger() : 0;
     mList->deleteAllItems();
     mWindow->referencesCounted();
     if (mFound.places.empty())
@@ -143,7 +148,7 @@ void ALScriptReferencesPane::fill()
         const bool         declaration = mFound.hasDefinition && place.span.line == mFound.definition.line &&
                                  place.span.column == mFound.definition.column && in_file == mFound.home;
         LLSD row;
-        row["value"]                = static_cast<S32>(i);
+        row["value"]                = static_cast<S32>(place.id);
         row["columns"][0]["column"] = "where";
         row["columns"][0]["value"]  = place.file.empty() ? mFound.fromName : place.fileName;
         row["columns"][1]["column"] = "line";
@@ -170,9 +175,12 @@ void ALScriptReferencesPane::fill()
             }
         }
     }
-    if (chosen >= 0)
+    // The row chosen, where its place is still listed; else the one now
+    // at its place in the list.
+    if (chosen > 0 && !mList->selectByValue(LLSD(chosen)))
     {
-        mList->selectByValue(LLSD(llmin(chosen, static_cast<S32>(mFound.places.size()) - 1)));
+        const size_t at = placeWith(static_cast<U32>(chosen), true);
+        mList->selectByValue(LLSD(static_cast<S32>(mFound.places[llmin(at, mFound.places.size() - 1)].id)));
     }
     mList->setScrollPos(scrolled);
 }
@@ -235,6 +243,17 @@ void ALScriptReferencesPane::slide(Doc& doc, const std::string& path, const ALTe
     mStale = mStale || changed || mFound.places.size() != before;
 }
 
+size_t ALScriptReferencesPane::placeWith(U32 id, bool or_after) const
+{
+    // The places keep the order they were numbered in, some gone.
+    const auto it = std::lower_bound(mFound.places.begin(), mFound.places.end(), id, [](const Doc::Place& p, U32 v) { return p.id < v; });
+    if (it != mFound.places.end() && (or_after || it->id == id))
+    {
+        return static_cast<size_t>(it - mFound.places.begin());
+    }
+    return or_after && !mFound.places.empty() ? mFound.places.size() - 1 : mFound.places.size();
+}
+
 void ALScriptReferencesPane::pump()
 {
     if (mStale)
@@ -258,7 +277,9 @@ void ALScriptReferencesPane::choose(bool to_editor)
     {
         return;
     }
-    const size_t index = static_cast<size_t>(item->getValue().asInteger());
+    // By the place's own number: an edit since the rows were made may
+    // have taken places out before it, and the place itself.
+    const size_t index = placeWith(static_cast<U32>(item->getValue().asInteger()), false);
     if (index >= mFound.places.size())
     {
         return;
