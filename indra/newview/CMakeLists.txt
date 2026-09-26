@@ -176,6 +176,7 @@ if(AL_BUILD_VIEWER)
     alscriptexplorertree.cpp
     alscriptexternaleditor.cpp
     alfloaterscriptpreferences.cpp
+    alscriptinspectorpane.cpp
     alscriptkeymap.cpp
     alscriptlookup.cpp
     alscriptnavigation.cpp
