@@ -38,11 +38,7 @@
 #include <mutex>
 #include <string>
 
-namespace LL
-{
-    template <class T> struct ThreadPoolUsing;
-    class WorkQueue;
-}
+class ALSerialWorker;
 namespace Luau
 {
     struct FrontendCancellationToken;
@@ -217,7 +213,10 @@ private:
     void ensureStarted();
 
     struct Worker;
-    std::unique_ptr<LL::ThreadPoolUsing<LL::WorkQueue>> mPool;
+    // The one thread the services run on. Closed at cleanup, or as the
+    // viewer starts to quit, and kept closed: an ask after is answered
+    // with nothing rather than starting another.
+    std::unique_ptr<ALSerialWorker>                     mThread;
     // Touched only from the worker's own tasks, which one thread runs one
     // after another.
     std::unique_ptr<Worker>                             mWorker;

@@ -33,11 +33,7 @@
 #include "llsingleton.h"
 #include "llstl.h"
 
-namespace LL
-{
-    template <class QUEUE> struct ThreadPoolUsing;
-    class WorkQueue;
-}
+class ALSerialWorker;
 
 #include <boost/unordered/unordered_flat_map.hpp>
 #include <boost/unordered/unordered_flat_set.hpp>
@@ -372,7 +368,8 @@ private:
     boost::unordered_flat_map<std::string, std::vector<ALPreprocessor::Ask>, ll::string_hash, std::equal_to<>> mAsked;
     // Where a run happens: one thread, so that two scripts saved at
     // once are expanded one after another rather than fighting over the
-    // builtins.
-    std::unique_ptr<LL::ThreadPoolUsing<LL::WorkQueue>>                              mPool;
+    // builtins. Closed at cleanup, or as the viewer starts to quit, and
+    // kept closed: nothing starts another.
+    std::unique_ptr<ALSerialWorker>                                                  mThread;
     void                                                                            cleanupSingleton() override;
 };

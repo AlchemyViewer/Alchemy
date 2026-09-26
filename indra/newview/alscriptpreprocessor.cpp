@@ -28,8 +28,7 @@
 #include "alscriptpreprocessor.h"
 
 #include "llappviewer.h"
-#include "threadpool.h"
-#include "workqueue.h"
+#include "alserialworker.h"
 
 #include "aldiskincludes.h"
 #include "allslservice.h"
@@ -1302,7 +1301,7 @@ void ALScriptPreprocessor::toWorker(const std::shared_ptr<Job>& job, std::functi
 
 void ALScriptPreprocessor::nextWork()
 {
-    if (mWorking || !mPool)
+    if (mWorking || !mThread)
     {
         return;
     }
@@ -1314,7 +1313,7 @@ void ALScriptPreprocessor::nextWork()
     std::function<void()> work = std::move(lane.front().work);
     lane.pop_front();
     mWorking = true;
-    mPool->getQueue().post([this, work = std::move(work)]() {
+    const bool posted = mThread->post([this, work = std::move(work)]() {
         // The next let start whatever this one does: a job that threw past
         // its own answer would otherwise hold every later check and save
         // for the session.
@@ -1335,6 +1334,14 @@ void ALScriptPreprocessor::nextWork()
             nextWork();
         });
     });
+    if (!posted)
+    {
+        // Closed -- the viewer going -- and what waits goes with it, as
+        // cleanup lets it go.
+        mWorking = false;
+        mRunsWaiting.clear();
+        mChecksWaiting.clear();
+    }
 }
 
 void ALScriptPreprocessor::expandedJob(const std::shared_ptr<Job>& job, ALPreprocessor::Result result, std::vector<ALPreprocessor::Ask> missed)
@@ -1371,10 +1378,9 @@ void ALScriptPreprocessor::expandedJob(const std::shared_ptr<Job>& job, ALPrepro
 
 void ALScriptPreprocessor::ensureWorker()
 {
-    if (!mPool)
+    if (!mThread)
     {
-        mPool = std::make_unique<LL::ThreadPool>("ScriptPreproc", 1);
-        mPool->start();
+        mThread = std::make_unique<ALSerialWorker>("ScriptPreproc");
     }
 }
 
@@ -1382,10 +1388,9 @@ void ALScriptPreprocessor::cleanupSingleton()
 {
     mRunsWaiting.clear();
     mChecksWaiting.clear();
-    if (mPool)
+    if (mThread)
     {
-        mPool->close();
-        mPool.reset();
+        mThread->close();
     }
 }
 

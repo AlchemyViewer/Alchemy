@@ -35,8 +35,7 @@
 #include "llsyntaxid.h"
 #include "alsaid.h"
 #include "lltrans.h"
-#include "threadpool.h"
-#include "workqueue.h"
+#include "alserialworker.h"
 
 #include <algorithm>
 #include <sstream>
@@ -150,24 +149,22 @@ ALScriptAnalysis::~ALScriptAnalysis() = default;
 
 void ALScriptAnalysis::cleanupSingleton()
 {
+    if (mThread)
     {
-        // A check still running is stopped rather than waited for.
-        const std::lock_guard<std::mutex> lock(mLatestMutex);
-        ALLuauService::cancel(mRunningStop);
-    }
-    if (mPool)
-    {
-        mPool->close();
-        mPool.reset();
+        mThread->close();
     }
 }
 
 void ALScriptAnalysis::ensureStarted()
 {
-    if (!mPool)
+    if (!mThread)
     {
-        mPool = std::make_unique<LL::ThreadPool>("ScriptAnalysis", 1);
-        mPool->start();
+        // Closing, a check still running is stopped rather than waited
+        // for, and what waits is passed over.
+        mThread = std::make_unique<ALSerialWorker>("ScriptAnalysis", [this]() {
+            const std::lock_guard<std::mutex> lock(mLatestMutex);
+            ALLuauService::cancel(mRunningStop);
+        });
     }
 }
 
@@ -208,8 +205,18 @@ void ALScriptAnalysis::ask(Request request, callback_t callback)
             ALLuauService::cancel(mRunningStop);
         }
     }
-    mPool->getQueue().post([this, request = std::move(request), callback = std::move(callback), luau_path, docs_path, lsl_path, generation, serial,
-                            new_solver, seconds]() {
+    // What is answered where the thread will not take the job -- the viewer
+    // going -- so that nothing waits on it: nothing found.
+    Result refused;
+    refused.kind    = request.kind;
+    refused.id      = request.id;
+    refused.version = request.version;
+    refused.lua     = request.lua;
+    refused.line    = request.line;
+    refused.column  = request.column;
+    const auto answer = std::make_shared<callback_t>(std::move(callback));
+    const bool posted = mThread->post([this, request = std::move(request), callback = answer, luau_path, docs_path, lsl_path, generation, serial,
+                                       new_solver, seconds]() {
         // The job as a whole, its definitions loaded included; what it
         // asked of the service is the zone inside.
         LL_PROFILE_ZONE_NAMED_CATEGORY_SCRIPTDEV("script analysis job");
@@ -414,9 +421,13 @@ void ALScriptAnalysis::ask(Request request, callback_t callback)
                     result.definitionsError = LLTrans::getString(result.definitionsError.substr(1, end - 1), args);
                 }
             }
-            callback(result);
+            (*callback)(result);
         });
     });
+    if (!posted)
+    {
+        LLAppViewer::instance()->postToMainCoro([refused = std::move(refused), answer]() { (*answer)(refused); });
+    }
 }
 
 std::string alScriptKeyedWords(const std::string& key, const std::vector<std::string>& args, const std::string& english)
