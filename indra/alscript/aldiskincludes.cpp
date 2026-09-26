@@ -244,7 +244,12 @@ bool ALDiskIncludes::readOrdinary(const std::string& file, std::string& out)
     const std::filesystem::path path = fsyspath(file);
     // What a stat says it is, links followed: a device or a pipe would be
     // read for ever, and a folder not at all.
-    if (!fs::is_regular_file(path, ec) || fs::file_size(path, ec) > MAX_BYTES || ec)
+    if (!fs::is_regular_file(path, ec) || ec)
+    {
+        return false;
+    }
+    const std::uintmax_t size = fs::file_size(path, ec);
+    if (ec || size > MAX_BYTES)
     {
         return false;
     }
@@ -253,16 +258,32 @@ bool ALDiskIncludes::readOrdinary(const std::string& file, std::string& out)
     {
         return false;
     }
-    // Read to one past the limit: a file that grew since the stat is not
-    // read on without end.
-    std::string text(static_cast<size_t>(MAX_BYTES) + 1, '\0');
-    in.read(text.data(), static_cast<std::streamsize>(text.size()));
-    const std::streamsize got = in.gcount();
-    if (got < 0 || static_cast<std::uintmax_t>(got) > MAX_BYTES)
+    // As much as the stat said and a byte more, to see a file that grew
+    // since: one that did is read on, a piece at a time, but never past
+    // the limit.
+    std::string text;
+    size_t      want = static_cast<size_t>(size) + 1;
+    for (;;)
     {
-        return false;
+        const size_t at = text.size();
+        text.resize(at + want);
+        in.read(text.data() + at, static_cast<std::streamsize>(want));
+        const std::streamsize got = in.gcount();
+        if (got < 0)
+        {
+            return false;
+        }
+        text.resize(at + static_cast<size_t>(got));
+        if (text.size() > MAX_BYTES)
+        {
+            return false;
+        }
+        if (static_cast<size_t>(got) < want)
+        {
+            break;
+        }
+        want = std::min<size_t>(64 * 1024, static_cast<size_t>(MAX_BYTES) + 1 - text.size());
     }
-    text.resize(static_cast<size_t>(got));
     out = std::move(text);
     return true;
 }

@@ -144,6 +144,13 @@ namespace tut
         ensure("nor read by the reader", !ALDiskIncludes::readOrdinary(big, text) && text.empty());
         ensure("a folder is not read", !ALDiskIncludes::readOrdinary(s.at("lib"), text));
         ensure("an ordinary one is", ALDiskIncludes::readOrdinary(s.at("lib/util.lsl"), text) && text == "x\n");
+        ensure("and held at its own size, not the limit's", text.capacity() < 1024);
+        const std::string whole(100000, 'y');
+        const std::string mid = s.write("lib/mid.lsl", whole);
+        ensure("one of some size, whole", ALDiskIncludes::readOrdinary(mid, text) && text == whole);
+        ensure("held at about its size", text.capacity() < whole.size() + 1024);
+        const std::string at_limit = s.write("lib/limit.lsl", std::string(static_cast<size_t>(ALDiskIncludes::MAX_BYTES), 'z'));
+        ensure("one at the limit, whole", ALDiskIncludes::readOrdinary(at_limit, text) && text.size() == ALDiskIncludes::MAX_BYTES);
 
 #if LL_DARWIN || LL_LINUX
         // What would be read for ever, or never answer: refused at once.
