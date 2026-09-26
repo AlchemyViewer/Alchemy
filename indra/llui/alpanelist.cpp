@@ -25,6 +25,8 @@
 
 #include "alpanelist.h"
 
+#include "alkeychord.h"
+
 #include "alemptystate.h"
 
 #include "llclipboard.h"
@@ -147,6 +149,18 @@ void ALPaneList::setGo(std::function<void()> go)
 
 bool ALPaneList::handleKeyHere(KEY key, MASK mask)
 {
+    // Shift-F10 or the Menu key: what a right click on the row chosen
+    // would do -- a menu of the list's, or its owner's.
+    if (ALKeyChords::isContextMenuKey(key, mask))
+    {
+        if (LLScrollListItem* item = getFirstSelected())
+        {
+            scrollToShowSelected();
+            const LLRect cell = getCellRect(getItemIndex(item), 0);
+            handleRightMouseDown(cell.mLeft + 4, cell.getCenterY(), MASK_NONE);
+            return true;
+        }
+    }
     if (mask == MASK_NONE && (key == KEY_LEFT || key == KEY_RIGHT) && mFold)
     {
         if (const LLScrollListItem* item = getFirstSelected())

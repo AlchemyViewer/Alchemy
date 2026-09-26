@@ -312,6 +312,19 @@ bool ALScriptExplorerTree::handleRightMouseDown(S32 x, S32 y, MASK mask)
     return true;
 }
 
+void ALScriptExplorerTree::showMenuAtChoice()
+{
+    S32 x = 8;
+    S32 y = 8;
+    if (LLFolderViewItem* item = mFolderView ? mFolderView->getCurSelectedItem() : nullptr)
+    {
+        mFolderView->scrollToShowSelection();
+        // A folder's own row, at the top of the room its children take.
+        item->localPointToOtherView(8, item->getRect().getHeight() - item->getItemHeight() / 2, &x, &y, this);
+    }
+    handleRightMouseDown(x, y, MASK_NONE);
+}
+
 LLFolderViewItem* ALScriptExplorerTree::itemAt(S32 x, S32 y) const
 {
     S32 lx = 0, ly = 0;

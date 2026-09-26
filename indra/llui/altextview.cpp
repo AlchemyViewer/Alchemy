@@ -26,6 +26,8 @@
 
 #include "altextview.h"
 
+#include "alkeychord.h"
+
 #include "altextchars.h"
 #include "alsurface.h"
 #include "alviewtype.h"
@@ -3964,6 +3966,22 @@ void ALTextView::drawBand(F32 alpha)
 
 bool ALTextView::handleKeyHere(KEY key, MASK mask)
 {
+    // Shift-F10 or the Menu key: the menu a right click at the caret would
+    // open, the caret brought into sight first.
+    if (ALKeyChords::isContextMenuKey(key, mask) && !mContextMenuFile.empty())
+    {
+        scrollToCaret();
+        const LLRect text  = textRect();
+        const S32    row_h = llmax(1, mLayout.rowHeight());
+        S32          row   = 0;
+        const F32    cx    = lay().xOf(mCaret.line, mCaret.column, &row);
+        const S32    top   = text.mTop - (lay().lineTop(mCaret.line) + lay().rowTop(mCaret.line, row) - mScrollY);
+        const S32    x     = llclamp(text.mLeft + static_cast<S32>(cx - mScrollX), text.mLeft, text.mRight - 1);
+        const S32    y     = llclamp(top - row_h, text.mBottom, text.mTop - 1);
+        refreshSuggestions();
+        showContextMenu(x, y);
+        return true;
+    }
     // Escape closes the find bar, but for a modal keymap's inserting
     // mode, which it leaves first; the next Escape closes the bar.
     const bool inserting = mModal && mModal->inserting();

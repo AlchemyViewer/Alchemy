@@ -101,6 +101,8 @@ constexpr KEY KEY_ADD =     0x95;
 constexpr KEY KEY_SUBTRACT =0x96;
 constexpr KEY KEY_MULTIPLY =0x97;
 constexpr KEY KEY_DIVIDE =  0x98;
+// The Menu key beside the right Windows key, which opens a context menu.
+constexpr KEY KEY_CONTEXT_MENU = 0x99;
 constexpr KEY KEY_F1        = 0xA1;
 constexpr KEY KEY_F2        = 0xA2;
 constexpr KEY KEY_F3        = 0xA3;

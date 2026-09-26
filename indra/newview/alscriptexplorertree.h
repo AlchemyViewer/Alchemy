@@ -93,6 +93,9 @@ public:
     void draw() override;
     bool handleKeyHere(KEY key, MASK mask) override { return false; }
     bool handleRightMouseDown(S32 x, S32 y, MASK mask) override;
+    // The menu a right click on the row chosen would open, or on the space
+    // below the rows where none is: Shift-F10 and the Menu key's.
+    void showMenuAtChoice();
     // The Edit menu's commands are the tree's while it has the keyboard:
     // else they are whatever last took them, which may delete a prim.
     void onFocusReceived() override;

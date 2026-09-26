@@ -90,6 +90,7 @@ LLKeyboard::LLKeyboard() : mCallbacks(NULL), mNumpadDistinct(ND_NUMLOCK_OFF)
     addKeyName(KEY_F11, "F11" );
     addKeyName(KEY_F12, "F12" );
     addKeyName(KEY_TAB, "Tab" );
+    addKeyName(KEY_CONTEXT_MENU, "Menu" );
     addKeyName(KEY_ADD, "Add" );
     addKeyName(KEY_SUBTRACT, "Subtract" );
     addKeyName(KEY_MULTIPLY, "Multiply" );

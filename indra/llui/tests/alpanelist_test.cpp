@@ -441,4 +441,25 @@ namespace tut
         l.setEmpty("", "");
         ensure("no words: not", !l.saysEmpty());
     }
+
+    template<> template<>
+    void alpanelist_object::test<11>()
+    {
+        set_test_name("Shift-F10 and the Menu key do what a right click on the row chosen would; with none chosen, nothing");
+        ALPaneList& l = make();
+        add("one", 0);
+        add("two", 0);
+        add("three", 0);
+        std::vector<std::string> clicked;
+        l.setRightMouseDownCallback([&](LLUICtrl*, S32 x, S32 y, MASK) {
+            const LLScrollListItem* hit = l.hitItem(x, y);
+            clicked.push_back(hit ? hit->getColumn(0)->getValue().asString() : std::string());
+        });
+        ensure("none chosen: left", !l.handleKeyHere(KEY_F10, MASK_SHIFT) && clicked.empty());
+        l.selectNthItem(1);
+        ensure("Shift-F10", l.handleKeyHere(KEY_F10, MASK_SHIFT));
+        ensure("the Menu key", l.handleKeyHere(KEY_CONTEXT_MENU, MASK_NONE));
+        ensure("each on the row chosen", clicked == std::vector<std::string>({ "two", "two" }));
+        ensure("which stays chosen", l.getFirstSelectedIndex() == 1);
+    }
 }

@@ -74,6 +74,12 @@ namespace ALKeyChords
     // with it: the next one, where it comes the same frame (takeChar).
     bool takeKey(KEY key, MASK mask);
     bool takeChar(llwchar uni_char);
+    // Shift-F10, or the Menu key: what opens the menu a right click would,
+    // where the keyboard is.
+    inline bool isContextMenuKey(KEY key, MASK mask)
+    {
+        return (key == KEY_F10 && mask == MASK_SHIFT) || (key == KEY_CONTEXT_MENU && mask == MASK_NONE);
+    }
 }
 
 #endif // AL_ALKEYCHORD_H

@@ -1405,4 +1405,29 @@ namespace tut
         ensure_equals("a new line", v.text(), std::string("CONS\n"));
         ensure_equals("the caret on it", v.caret().line, 1);
     }
+
+    template<> template<>
+    void altextview_object::test<46>()
+    {
+        set_test_name("Shift-F10 and the Menu key open the menu at the caret, brought into sight; a view with no menu leaves them");
+        std::string many;
+        for (S32 i = 0; i < 200; ++i)
+        {
+            many += "line " + std::to_string(i) + "\n";
+        }
+        ALTextView& v = make(many.c_str());
+        v.setCaret(ALTextPos(190, 2));
+        v.setScrollY(0);
+        ensure("Shift-F10 taken", v.handleKeyHere(KEY_F10, MASK_SHIFT));
+        ensure("the caret brought into sight", v.scrollY() > 0);
+        ensure("the Menu key too", v.handleKeyHere(KEY_CONTEXT_MENU, MASK_NONE));
+        ensure("not F10 alone", !v.handleKeyHere(KEY_F10, MASK_NONE));
+        ALTextView::Params p(LLUICtrlFactory::getDefaultParams<ALTextView>());
+        p.name         = "no_menu";
+        p.rect         = LLRect(0, 100, 200, 0);
+        p.context_menu = std::string();
+        ALTextView* bare = LLUICtrlFactory::create<ALTextView>(p);
+        ensure("no menu: left", !bare->handleKeyHere(KEY_F10, MASK_SHIFT));
+        bare->die();
+    }
 }

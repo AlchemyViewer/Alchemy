@@ -121,6 +121,8 @@ LLKeyboardSDL::LLKeyboardSDL()
     mTranslateKeyMap[SDLK_F10] = KEY_F10;
     mTranslateKeyMap[SDLK_F11] = KEY_F11;
     mTranslateKeyMap[SDLK_F12] = KEY_F12;
+    mTranslateKeyMap[SDLK_APPLICATION] = KEY_CONTEXT_MENU;
+    mTranslateKeyMap[SDLK_MENU] = KEY_CONTEXT_MENU;
     mTranslateKeyMap[SDLK_PLUS]   = '=';
     mTranslateKeyMap[SDLK_COMMA]  = ',';
     mTranslateKeyMap[SDLK_MINUS]  = '-';

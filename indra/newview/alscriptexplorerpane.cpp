@@ -26,6 +26,8 @@
 
 #include "alscriptexplorerpane.h"
 
+#include "alkeychord.h"
+
 #include "alobjectproperties.h"
 #include "alscriptexplorertree.h"
 #include "alscriptstudiodoc.h"
@@ -198,6 +200,11 @@ bool ALScriptExplorerPane::postBuild()
 
 bool ALScriptExplorerPane::handleKeyHere(KEY key, MASK mask)
 {
+    if (ALKeyChords::isContextMenuKey(key, mask) && mTree && mTree->hasFocus())
+    {
+        mTree->showMenuAtChoice();
+        return true;
+    }
     if (key == KEY_ESCAPE && mask == MASK_NONE && mServices)
     {
         mServices->revealed(mTree, true);
