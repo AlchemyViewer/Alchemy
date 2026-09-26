@@ -544,6 +544,25 @@ bool ALFloaterScriptStudio::postBuild()
         mSaveRect = false;
     }
     setMenuBar(getChild<LLMenuBarGL>("studio_menu"));
+    // Each item by its name, found once: the keys are told to them at
+    // every change of the options.
+    const std::function<void(LLView*)> resolve = [&](LLView* menu) {
+        for (LLView* child : *menu->getChildList())
+        {
+            if (LLMenuItemBranchGL* branch = dynamic_cast<LLMenuItemBranchGL*>(child))
+            {
+                if (LLMenuGL* under = branch->getBranch())
+                {
+                    resolve(under);
+                }
+            }
+            else if (LLMenuItemGL* item = dynamic_cast<LLMenuItemGL*>(child); item && !dynamic_cast<LLMenuItemSeparatorGL*>(item))
+            {
+                mMenuItems.emplace(item->getName(), item);
+            }
+        }
+    };
+    resolve(menuBar());
     // The toolbar's tips say their keys as the menus have them, in the
     // platform's own spelling: Ctrl+S here, the Command symbol on a Mac --
     // kept as the skin wrote them, since a key rebound says them again.
@@ -1260,6 +1279,14 @@ std::vector<ALKeyChord> ALFloaterScriptStudio::keysOf(const KeyedCommand& comman
 {
     // The keys a person gave a menu's command, kept in the keymap's setting.
     return command.rebindable ? ALScriptKeymap::menuKeys(command.id) : ALStudioFloater::keysOf(command);
+}
+
+ALStudioFloater::UndoKey ALFloaterScriptStudio::undoKeyOf(KEY key, MASK mask) const
+{
+    // The editors' undo and redo, wherever in the window the keyboard is:
+    // a key given them in the Keys tab is theirs outside the text too.
+    const ALEditorCommand command = ALScriptKeymap::current().lookup(key, mask);
+    return command == ALEditorCommand::Undo ? UndoKey::Undo : command == ALEditorCommand::Redo ? UndoKey::Redo : UndoKey::None;
 }
 
 bool ALFloaterScriptStudio::undo()
@@ -3084,61 +3111,41 @@ void ALFloaterScriptStudio::showEditorKeys()
 
 void ALFloaterScriptStudio::applyMenuKeys()
 {
-    LLMenuBarGL* bar = menuBar();
-    if (!bar)
+    const ALKeymap& keymap = ALScriptKeymap::current();
+    for (const auto& [id, item] : mMenuItems)
     {
-        return;
-    }
-    // The menus' own commands answer to the keys a person gave them, or
-    // the standard's.
-    for (const std::string& id : ALScriptKeymap::menuIds())
-    {
-        if (LLMenuItemGL* item = bar->findChild<LLMenuItemGL>(id, true))
+        if (ALScriptKeymap::isMenuCommand(id))
         {
-            // Two keys in turn are the window's to wait for (keysOf): the
-            // item shows them and answers to neither.
+            // The menus' own commands answer to the keys a person gave
+            // them, or the standard's. Two keys in turn are the window's
+            // to wait for (keysOf): the item shows them and answers to
+            // neither.
             const ALKeyChord chord = ALScriptKeymap::menuKey(id);
             item->setShownKeys(chord.twoKeys() ? chord.describe() : std::string());
             item->setShownAccelerator(chord.twoKeys() ? KEY_NONE : chord.key, chord.twoKeys() ? MASK_NONE : chord.mask);
         }
-    }
-    // A menu item that gives an editor's command shows, and answers to, the
-    // keymap's first key for it, or none: the editor has a key before the
-    // menus do, so a key the keymap took elsewhere is not the menu's.
-    const ALKeymap keymap = ALScriptKeymap::current();
-    const std::function<void(LLView*)> walk = [&](LLView* menu) {
-        for (LLView* child : *menu->getChildList())
+        else if (const std::optional<ALEditorCommand> command = alEditorCommandFromName(id))
         {
-            if (LLMenuItemBranchGL* branch = dynamic_cast<LLMenuItemBranchGL*>(child))
-            {
-                if (LLMenuGL* under = branch->getBranch())
-                {
-                    walk(under);
-                }
-                continue;
-            }
-            LLMenuItemGL* item = dynamic_cast<LLMenuItemGL*>(child);
-            const std::optional<ALEditorCommand> command = item ? alEditorCommandFromName(item->getName()) : std::nullopt;
-            if (!command)
-            {
-                continue;
-            }
+            // An editor's command shows, and answers to, the keymap's
+            // first key for it, or none: the editor has a key before the
+            // menus do, so a key the keymap took elsewhere is not the
+            // menu's.
             KEY  key  = KEY_NONE;
             MASK mask = MASK_NONE;
             keymap.keysFor(*command, key, mask);
             item->setShownAccelerator(key, mask);
         }
-    };
-    walk(bar);
+    }
+}
+
+LLMenuItemGL* ALFloaterScriptStudio::menuItem(std::string_view id) const
+{
+    const auto found = mMenuItems.find(id);
+    return found == mMenuItems.end() ? nullptr : found->second;
 }
 
 void ALFloaterScriptStudio::refreshKeyTips()
 {
-    LLMenuBarGL* bar = menuBar();
-    if (!bar)
-    {
-        return;
-    }
     // Each tip as the skin wrote it, its keys said as the menus have them
     // now; a command with none loses the brackets that would hold them.
     for (const auto& [control, items] : mKeyTips)
@@ -3154,7 +3161,7 @@ void ALFloaterScriptStudio::refreshKeyTips()
         for (const std::string& name : items)
         {
             ++n;
-            const LLMenuItemGL* item  = bar->findChild<LLMenuItemGL>(name, true);
+            const LLMenuItemGL* item  = menuItem(name);
             const std::string   keys  = item ? item->getAcceleratorString() : std::string();
             const std::string   field = n == 1 ? std::string("[KEYS]") : "[KEYS" + std::to_string(n) + "]";
             if (keys.empty())
@@ -3177,7 +3184,7 @@ void ALFloaterScriptStudio::refreshKeyTips()
     };
     for (auto [item_name, tip, keyless, out] : said)
     {
-        const LLMenuItemGL*        item = bar->findChild<LLMenuItemGL>(item_name, true);
+        const LLMenuItemGL*        item = menuItem(item_name);
         const std::string          keys = item ? item->getAcceleratorString() : std::string();
         LLStringUtil::format_map_t args;
         args["[KEYS]"] = keys;
@@ -4101,8 +4108,7 @@ void ALFloaterScriptStudio::showQuickOpen(bool commands)
         }
         if (value.compare(0, 4, "cmd:") == 0)
         {
-            LLMenuBarGL* bar = studio->menuBar();
-            if (LLMenuItemGL* item = bar ? bar->findChild<LLMenuItemGL>(value.substr(4), true) : nullptr)
+            if (LLMenuItemGL* item = studio->menuItem(value.substr(4)))
             {
                 if (Doc* doc = studio->active())
                 {

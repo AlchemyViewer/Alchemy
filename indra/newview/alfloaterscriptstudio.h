@@ -88,6 +88,7 @@ class LLComboBox;
 class LLFilterEditor;
 class LLLayoutPanel;
 class LLLineEditor;
+class LLMenuItemGL;
 class LLPanel;
 class LLScrollListCtrl;
 class LLContextMenu;
@@ -761,6 +762,7 @@ private:
     void addKeys();
     // The menus' commands at the keys a person gave them.
     std::vector<ALKeyChord> keysOf(const KeyedCommand& command) const override;
+    UndoKey                 undoKeyOf(KEY key, MASK mask) const override;
     void addFileCommands();
     void addEditCommands();
     void addInsertCommands();
@@ -859,6 +861,9 @@ private:
     void                               reopenKept();
     // The tips that say a menu item's keys, as the skin wrote them, to be
     // said again when a key is rebound.
+    // The menu bar's items by name, found once.
+    boost::unordered_flat_map<std::string, LLMenuItemGL*, ll::string_hash, std::equal_to<>> mMenuItems;
+    LLMenuItemGL*                                                                           menuItem(std::string_view id) const;
     std::vector<std::pair<std::string, std::vector<std::string>>> mKeyTips;
     std::map<std::string, std::string> mKeyTipTexts;
     // What Edit > Undo and Redo were last named for.

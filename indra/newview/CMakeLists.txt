@@ -2540,7 +2540,13 @@ if(AL_BUILD_TESTS)
 
   # Script Studio's keys: the editors' keymap and the menus' keys, with a
   # person's changes over them in a setting of the test's.
-  al_add_test(alscriptkeymap UNIT PROJECT ${test_project} LIBRARIES llui ${test_libs})
+  al_add_test(
+    alscriptkeymap
+    UNIT
+    PROJECT ${test_project}
+    LIBRARIES llui ${test_libs}
+    DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
+  )
 
   # Whole saves of a Script Studio tab through where they stand and where
   # they go, with nothing of the viewer.

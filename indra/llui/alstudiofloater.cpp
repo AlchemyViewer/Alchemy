@@ -208,10 +208,20 @@ bool ALStudioFloater::handleEditKeys(KEY key, MASK mask)
     }
 }
 
+ALStudioFloater::UndoKey ALStudioFloater::undoKeyOf(KEY key, MASK mask) const
+{
+    if (key == 'Z' && mask == MASK_CONTROL)
+    {
+        return UndoKey::Undo;
+    }
+    return (key == 'Y' && mask == MASK_CONTROL) || (key == 'Z' && mask == (MASK_CONTROL | MASK_SHIFT)) ? UndoKey::Redo : UndoKey::None;
+}
+
 bool ALStudioFloater::handleUndoKeys(KEY key, MASK mask)
 {
-    const bool undo_key = (key == 'Z' && mask == MASK_CONTROL);
-    const bool redo_key = (key == 'Y' && mask == MASK_CONTROL) || (key == 'Z' && mask == (MASK_CONTROL | MASK_SHIFT));
+    const UndoKey which    = undoKeyOf(key, mask);
+    const bool    undo_key = which == UndoKey::Undo;
+    const bool    redo_key = which == UndoKey::Redo;
     if (!undo_key && !redo_key)
     {
         return false;

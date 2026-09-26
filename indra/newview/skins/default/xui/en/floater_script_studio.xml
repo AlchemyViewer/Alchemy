@@ -545,7 +545,7 @@
          name="file"
          tear_off="false"
          width="200">
-            <menu_item_call label="New Script..." layout="topleft" name="new_script" shortcut="control|N">
+            <menu_item_call label="New Script..." layout="topleft" name="new_script">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="new_script" />
             </menu_item_call>
             <menu_item_call label="New SLua Script..." layout="topleft" name="new_lua_script">
@@ -553,7 +553,7 @@
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="new_lua_script" />
             </menu_item_call>
             <menu_item_separator layout="topleft" />
-            <menu_item_call label="Save" layout="topleft" name="save" shortcut="control|S">
+            <menu_item_call label="Save" layout="topleft" name="save">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="save" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="save" />
             </menu_item_call>
@@ -609,7 +609,7 @@
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="pop_out" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="pop_out" />
             </menu_item_call>
-            <menu_item_call label="Close Script" layout="topleft" name="close" shortcut="control|W">
+            <menu_item_call label="Close Script" layout="topleft" name="close">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="close" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="close" />
             </menu_item_call>
@@ -633,28 +633,28 @@
          name="edit"
          tear_off="false"
          width="200">
-            <menu_item_call label="Undo" layout="topleft" name="undo" shortcut="control|Z">
+            <menu_item_call label="Undo" layout="topleft" name="undo">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="undo" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="undo" />
             </menu_item_call>
-            <menu_item_call label="Redo" layout="topleft" name="redo" shortcut="control|Y">
+            <menu_item_call label="Redo" layout="topleft" name="redo">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="redo" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="redo" />
             </menu_item_call>
             <menu_item_separator layout="topleft" />
-            <menu_item_call label="Cut" layout="topleft" name="cut" shortcut="control|X">
+            <menu_item_call label="Cut" layout="topleft" name="cut">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="cut" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="cut" />
             </menu_item_call>
-            <menu_item_call label="Copy" layout="topleft" name="copy" shortcut="control|C">
+            <menu_item_call label="Copy" layout="topleft" name="copy">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="copy" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="copy" />
             </menu_item_call>
-            <menu_item_call label="Paste" layout="topleft" name="paste" shortcut="control|V">
+            <menu_item_call label="Paste" layout="topleft" name="paste">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="paste" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="paste" />
             </menu_item_call>
-            <menu_item_call label="Select All" layout="topleft" name="select_all" shortcut="control|A">
+            <menu_item_call label="Select All" layout="topleft" name="select_all">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="select_all" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="select_all" />
             </menu_item_call>
@@ -663,27 +663,27 @@
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="select_function" />
             </menu_item_call>
             <menu_item_separator layout="topleft" />
-            <menu_item_call label="Toggle Comment" layout="topleft" name="toggle_comment" shortcut="control|/">
+            <menu_item_call label="Toggle Comment" layout="topleft" name="toggle_comment">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="toggle_comment" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="toggle_comment" />
             </menu_item_call>
-            <menu_item_call label="Duplicate Line" layout="topleft" name="duplicate_line" shortcut="control|shift|D">
+            <menu_item_call label="Duplicate Line" layout="topleft" name="duplicate_line">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="duplicate_line" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="duplicate_line" />
             </menu_item_call>
-            <menu_item_call label="Delete Line" layout="topleft" name="delete_line" shortcut="control|shift|K">
+            <menu_item_call label="Delete Line" layout="topleft" name="delete_line">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="delete_line" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="delete_line" />
             </menu_item_call>
-            <menu_item_call label="Move Line Up" layout="topleft" name="move_line_up" shortcut="alt|UP">
+            <menu_item_call label="Move Line Up" layout="topleft" name="move_line_up">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="move_line_up" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="move_line_up" />
             </menu_item_call>
-            <menu_item_call label="Move Line Down" layout="topleft" name="move_line_down" shortcut="alt|DOWN">
+            <menu_item_call label="Move Line Down" layout="topleft" name="move_line_down">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="move_line_down" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="move_line_down" />
             </menu_item_call>
-            <menu_item_call label="Join Lines" layout="topleft" name="join_lines" shortcut="control|J">
+            <menu_item_call label="Join Lines" layout="topleft" name="join_lines">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="join_lines" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="join_lines" />
             </menu_item_call>
@@ -695,7 +695,7 @@
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="signature_help" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="signature_help" />
             </menu_item_call>
-            <menu_item_call label="Rename Symbol..." layout="topleft" name="rename" shortcut="F2">
+            <menu_item_call label="Rename Symbol..." layout="topleft" name="rename">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="rename" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="rename" />
             </menu_item_call>
@@ -707,16 +707,16 @@
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="fix_all" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="fix_all" />
             </menu_item_call>
-            <menu_item_call label="Next Misspelling" layout="topleft" name="next_misspelling" shortcut="F7">
+            <menu_item_call label="Next Misspelling" layout="topleft" name="next_misspelling">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="next_misspelling" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="next_misspelling" />
             </menu_item_call>
-            <menu_item_call label="Previous Misspelling" layout="topleft" name="previous_misspelling" shortcut="shift|F7">
+            <menu_item_call label="Previous Misspelling" layout="topleft" name="previous_misspelling">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="previous_misspelling" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="previous_misspelling" />
             </menu_item_call>
             <menu_item_separator layout="topleft" />
-            <menu_item_call label="Format Document" layout="topleft" name="format" shortcut="shift|alt|F">
+            <menu_item_call label="Format Document" layout="topleft" name="format">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="format" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="format" />
             </menu_item_call>
@@ -733,23 +733,23 @@
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="indent_tabs" />
             </menu_item_call>
             <menu_item_separator layout="topleft" />
-            <menu_item_call label="Find..." layout="topleft" name="find" shortcut="control|F">
+            <menu_item_call label="Find..." layout="topleft" name="find">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="find" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="find" />
             </menu_item_call>
-            <menu_item_call label="Replace..." layout="topleft" name="replace" shortcut="control|H">
+            <menu_item_call label="Replace..." layout="topleft" name="replace">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="replace" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="replace" />
             </menu_item_call>
-            <menu_item_call label="Find Next" layout="topleft" name="find_next" shortcut="F3">
+            <menu_item_call label="Find Next" layout="topleft" name="find_next">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="find_next" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="find_next" />
             </menu_item_call>
-            <menu_item_call label="Find Previous" layout="topleft" name="find_previous" shortcut="shift|F3">
+            <menu_item_call label="Find Previous" layout="topleft" name="find_previous">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="find_previous" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="find_previous" />
             </menu_item_call>
-            <menu_item_call label="Find in Files..." layout="topleft" name="find_in_files" shortcut="control|shift|F">
+            <menu_item_call label="Find in Files..." layout="topleft" name="find_in_files">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="find_in_files" />
             </menu_item_call>
         </menu>
@@ -760,7 +760,7 @@
          name="insert"
          tear_off="false"
          width="200">
-            <menu_item_call label="Snippet..." layout="topleft" name="insert_snippet" shortcut="control|shift|I">
+            <menu_item_call label="Snippet..." layout="topleft" name="insert_snippet">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="insert_snippet" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="insert_snippet" />
             </menu_item_call>
@@ -784,15 +784,15 @@
          name="go"
          tear_off="false"
          width="200">
-            <menu_item_call label="Back" layout="topleft" name="back" shortcut="control|-" use_mac_ctrl="true">
+            <menu_item_call label="Back" layout="topleft" name="back" use_mac_ctrl="true">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="back" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="back" />
             </menu_item_call>
-            <menu_item_call label="Forward" layout="topleft" name="forward" shortcut="control|shift|-" use_mac_ctrl="true">
+            <menu_item_call label="Forward" layout="topleft" name="forward" use_mac_ctrl="true">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="forward" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="forward" />
             </menu_item_call>
-            <menu_item_call label="Last Edit Location" layout="topleft" name="previous_change" shortcut="control|shift|Backsp">
+            <menu_item_call label="Last Edit Location" layout="topleft" name="previous_change">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="previous_change" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="previous_change" />
             </menu_item_call>
@@ -801,61 +801,61 @@
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="next_change" />
             </menu_item_call>
             <menu_item_separator layout="topleft" />
-            <menu_item_call label="Go to Script..." layout="topleft" name="quick_open" shortcut="control|P">
+            <menu_item_call label="Go to Script..." layout="topleft" name="quick_open">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="quick_open" />
             </menu_item_call>
-            <menu_item_call label="Go to Line..." layout="topleft" name="go_to_line" shortcut="control|G">
+            <menu_item_call label="Go to Line..." layout="topleft" name="go_to_line">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="go_to_line" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="go_to_line" />
             </menu_item_call>
-            <menu_item_call label="Go to Symbol..." layout="topleft" name="go_to_symbol" shortcut="control|shift|O">
+            <menu_item_call label="Go to Symbol..." layout="topleft" name="go_to_symbol">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="go_to_symbol" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="go_to_symbol" />
             </menu_item_call>
-            <menu_item_call label="Next Function" layout="topleft" name="next_function" shortcut="alt|PGDN">
+            <menu_item_call label="Next Function" layout="topleft" name="next_function">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="next_function" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="next_function" />
             </menu_item_call>
-            <menu_item_call label="Previous Function" layout="topleft" name="previous_function" shortcut="alt|PGUP">
+            <menu_item_call label="Previous Function" layout="topleft" name="previous_function">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="previous_function" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="previous_function" />
             </menu_item_call>
             <menu_item_separator layout="topleft" />
-            <menu_item_call label="Go to Definition" layout="topleft" name="go_to_definition" shortcut="F12">
+            <menu_item_call label="Go to Definition" layout="topleft" name="go_to_definition">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="go_to_definition" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="go_to_definition" />
             </menu_item_call>
-            <menu_item_call label="Find References" layout="topleft" name="find_references" shortcut="shift|F12">
+            <menu_item_call label="Find References" layout="topleft" name="find_references">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="find_references" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="find_references" />
             </menu_item_call>
             <menu_item_separator layout="topleft" />
-            <menu_item_call label="Next Problem" layout="topleft" name="next_problem" shortcut="F8">
+            <menu_item_call label="Next Problem" layout="topleft" name="next_problem">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="next_problem" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="next_problem" />
             </menu_item_call>
-            <menu_item_call label="Previous Problem" layout="topleft" name="previous_problem" shortcut="shift|F8">
+            <menu_item_call label="Previous Problem" layout="topleft" name="previous_problem">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="previous_problem" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="previous_problem" />
             </menu_item_call>
             <menu_item_separator layout="topleft" />
-            <menu_item_call label="Next Tab" layout="topleft" name="next_tab" shortcut="control|PGDN">
+            <menu_item_call label="Next Tab" layout="topleft" name="next_tab">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="next_tab" />
             </menu_item_call>
-            <menu_item_call label="Previous Tab" layout="topleft" name="previous_tab" shortcut="control|PGUP">
+            <menu_item_call label="Previous Tab" layout="topleft" name="previous_tab">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="previous_tab" />
             </menu_item_call>
-            <menu_item_call label="Last Used Tab" layout="topleft" name="last_tab" shortcut="control|6" use_mac_ctrl="true">
+            <menu_item_call label="Last Used Tab" layout="topleft" name="last_tab" use_mac_ctrl="true">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="last_tab" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="last_tab" />
             </menu_item_call>
             <menu_item_call label="All Tabs..." layout="topleft" name="all_tabs">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="all_tabs" />
             </menu_item_call>
-            <menu_item_call label="Move Tab Left" layout="topleft" name="move_tab_left" shortcut="control|shift|PGUP">
+            <menu_item_call label="Move Tab Left" layout="topleft" name="move_tab_left">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="move_tab_left" />
             </menu_item_call>
-            <menu_item_call label="Move Tab Right" layout="topleft" name="move_tab_right" shortcut="control|shift|PGDN">
+            <menu_item_call label="Move Tab Right" layout="topleft" name="move_tab_right">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="move_tab_right" />
             </menu_item_call>
             <!-- The code editor takes Tab for itself, so the strip is
@@ -872,7 +872,7 @@
          name="view"
          tear_off="false"
          width="200">
-            <menu_item_call label="Command Palette..." layout="topleft" name="command_palette" shortcut="control|shift|P">
+            <menu_item_call label="Command Palette..." layout="topleft" name="command_palette">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="command_palette" />
             </menu_item_call>
             <menu_item_separator layout="topleft" />
@@ -994,11 +994,11 @@
                 </menu_item_check>
             </menu>
             <menu_item_separator layout="topleft" />
-            <menu_item_call label="Fold" layout="topleft" name="fold" shortcut="control|shift|[">
+            <menu_item_call label="Fold" layout="topleft" name="fold">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="fold" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="fold" />
             </menu_item_call>
-            <menu_item_call label="Unfold" layout="topleft" name="unfold" shortcut="control|shift|]">
+            <menu_item_call label="Unfold" layout="topleft" name="unfold">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="unfold" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="unfold" />
             </menu_item_call>
@@ -1149,7 +1149,7 @@
          name="help"
          tear_off="false"
          width="200">
-            <menu_item_call label="Reference for the Word at the Caret" layout="topleft" name="reference" shortcut="F1">
+            <menu_item_call label="Reference for the Word at the Caret" layout="topleft" name="reference">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="reference" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="reference" />
             </menu_item_call>

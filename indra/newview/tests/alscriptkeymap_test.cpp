@@ -142,4 +142,27 @@ namespace tut
             }
         }
     }
+
+    template<> template<>
+    void alscriptkeymap_object::test<4>()
+    {
+        set_test_name("every item of the studio's menu bar can take keys: the editors' command, or one of the table's; named by where it is");
+        LLXMLNodePtr root;
+        ensure("the studio's file", LLXMLNode::parseFile(std::string(LLUI_TEST_APP_DIR) + "/skins/default/xui/en/floater_script_studio.xml", root));
+        const std::vector<ALScriptKeymap::MenuItem> items = ALScriptKeymap::menuItemsIn(root);
+        ensure("its menus", items.size() > 50);
+        std::set<std::string> ids;
+        for (const ALScriptKeymap::MenuItem& item : items)
+        {
+            ids.insert(item.id);
+            ensure("can take keys: " + item.id, alEditorCommandFromName(item.id).has_value() || ALScriptKeymap::isMenuCommand(item.id));
+            ensure("named by its menus: " + item.id, item.path.find(" > ") != std::string::npos);
+        }
+        for (const std::string& id : ALScriptKeymap::menuIds())
+        {
+            ensure("the table's commands are the menus': " + id, ids.count(id) == 1);
+        }
+        const auto map = std::find_if(items.begin(), items.end(), [](const ALScriptKeymap::MenuItem& item) { return item.id == "map_left"; });
+        ensure("as deep as it goes", map != items.end() && map->path == "View > Scrollbar > Map on the Left");
+    }
 }

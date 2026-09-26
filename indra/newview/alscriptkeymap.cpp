@@ -27,6 +27,7 @@
 #include "alscriptkeymap.h"
 
 #include "llkeyboard.h"
+#include "lluictrlfactory.h"
 #include "llviewercontrol.h"
 
 #include <algorithm>
@@ -243,26 +244,44 @@ namespace ALScriptKeymap
         // and Alt together, which is AltGr on many a keyboard -- a German
         // } or a Polish s typed would fold a pane or save every script.
         const auto after_k = [](const char* id, KEY key) { return MenuCommand{ id, key, MASK_NONE, true, 'K', MASK_CONTROL }; };
+        // Every command of the menus that is not the editors' own (those are
+        // ALKeymap's), in the menus' order, so that each can be given keys.
         static const std::vector<MenuCommand> commands{
+            // File
             { "new_script", 'N', MASK_CONTROL },
             { "new_lua_script", KEY_NONE, MASK_NONE },
             { "save", 'S', MASK_CONTROL },
             after_k("save_all", 'S'),
             { "revert", KEY_NONE, MASK_NONE },
             { "open_file", KEY_NONE, MASK_NONE },
+            { "recover", KEY_NONE, MASK_NONE },
+            { "insert_file", KEY_NONE, MASK_NONE },
+            { "load_file", KEY_NONE, MASK_NONE },
+            { "save_file", KEY_NONE, MASK_NONE },
+            { "save_as", KEY_NONE, MASK_NONE },
+            { "external_editor", KEY_NONE, MASK_NONE },
+            { "preferences", KEY_NONE, MASK_NONE },
+            { "pop_out", KEY_NONE, MASK_NONE },
             { "close", 'W', MASK_CONTROL },
             { "close_others", KEY_NONE, MASK_NONE },
             { "close_saved", KEY_NONE, MASK_NONE },
             { "close_all", KEY_NONE, MASK_NONE },
-            { "insert_file", KEY_NONE, MASK_NONE },
-            { "preferences", KEY_NONE, MASK_NONE },
+            // Edit
+            { "fix_all", KEY_NONE, MASK_NONE },
             { "format", 'F', MASK_SHIFT | MASK_ALT },
+            { "format_selection", KEY_NONE, MASK_NONE },
             { "indent_spaces", KEY_NONE, MASK_NONE },
             { "indent_tabs", KEY_NONE, MASK_NONE },
             { "find_in_files", 'F', MASK_CONTROL | MASK_SHIFT },
+            // Insert
             { "insert_snippet", 'I', MASK_CONTROL | MASK_SHIFT },
+            { "insert_function", KEY_NONE, MASK_NONE },
+            { "insert_event", KEY_NONE, MASK_NONE },
+            { "insert_constant", KEY_NONE, MASK_NONE },
+            // Go
             { "back", '-', REAL_CONTROL },
             { "forward", '-', REAL_CONTROL | MASK_SHIFT },
+            { "quick_open", 'P', MASK_CONTROL },
             { "go_to_line", 'G', MASK_CONTROL },
 #if LL_DARWIN
             // The Mac's own Control-G, which it answered to before
@@ -283,18 +302,60 @@ namespace ALScriptKeymap
             { "move_tab_left", KEY_PAGE_UP, MASK_CONTROL | MASK_SHIFT },
             { "move_tab_right", KEY_PAGE_DOWN, MASK_CONTROL | MASK_SHIFT },
             { "focus_tabs", KEY_NONE, MASK_NONE },
+            // View
             { "command_palette", 'P', MASK_CONTROL | MASK_SHIFT },
-            { "quick_open", 'P', MASK_CONTROL },
+            { "word_wrap", KEY_NONE, MASK_NONE },
+            { "line_numbers", KEY_NONE, MASK_NONE },
+            { "relative_numbers", KEY_NONE, MASK_NONE },
+            { "indent_guides", KEY_NONE, MASK_NONE },
+            { "blanks_none", KEY_NONE, MASK_NONE },
+            { "blanks_selection", KEY_NONE, MASK_NONE },
+            { "blanks_trailing", KEY_NONE, MASK_NONE },
+            { "blanks_all", KEY_NONE, MASK_NONE },
+            { "rainbow_brackets", KEY_NONE, MASK_NONE },
+            { "sticky_headers", KEY_NONE, MASK_NONE },
+            { "vim_mode", KEY_NONE, MASK_NONE },
+            { "semantic_colors", KEY_NONE, MASK_NONE },
+            { "inlay_parameters", KEY_NONE, MASK_NONE },
+            { "inlay_types", KEY_NONE, MASK_NONE },
+            { "weight_notes", KEY_NONE, MASK_NONE },
+            { "weight_heat", KEY_NONE, MASK_NONE },
+            { "spell_check", KEY_NONE, MASK_NONE },
+            { "scroll_bar", KEY_NONE, MASK_NONE },
+            { "scroll_map", KEY_NONE, MASK_NONE },
+            { "map_narrow", KEY_NONE, MASK_NONE },
+            { "map_medium", KEY_NONE, MASK_NONE },
+            { "map_wide", KEY_NONE, MASK_NONE },
+            { "map_preview", KEY_NONE, MASK_NONE },
+            { "map_left", KEY_NONE, MASK_NONE },
             after_k("explorer", '0'),
             after_k("problems", '1'),
             after_k("references", '2'),
             after_k("output", '3'),
-            after_k("inspector", '4'),
             after_k("search", '5'),
             after_k("weights", '6'),
+            after_k("inspector", '4'),
             after_k("expanded", 'P'),
+            { "compare_saved", KEY_NONE, MASK_NONE },
+            { "compare_inline", KEY_NONE, MASK_NONE },
+            // Build
             { "preprocess", KEY_NONE, MASK_NONE },
+            { "preflight", KEY_NONE, MASK_NONE },
+            { "preproc_enabled", KEY_NONE, MASK_NONE },
+            { "preproc_disk", KEY_NONE, MASK_NONE },
+            { "preproc_folder", KEY_NONE, MASK_NONE },
+            { "preproc_switch", KEY_NONE, MASK_NONE },
+            { "preproc_lazy", KEY_NONE, MASK_NONE },
+            { "preproc_compress", KEY_NONE, MASK_NONE },
+            { "preproc_extensions", KEY_NONE, MASK_NONE },
+            { "preproc_optimize", KEY_NONE, MASK_NONE },
+            { "preproc_shrink", KEY_NONE, MASK_NONE },
+            { "preproc_addstrings", KEY_NONE, MASK_NONE },
+            { "preproc_inline", KEY_NONE, MASK_NONE },
+            // Help
             { "reference", KEY_F1, MASK_NONE },
+            { "browse_reference", KEY_NONE, MASK_NONE },
+            { "wiki", KEY_NONE, MASK_NONE },
         };
         return commands;
     }
@@ -372,6 +433,50 @@ namespace ALScriptKeymap
             bound.erase(name);
             store(bound);
         }
+    }
+
+    std::vector<MenuItem> menuItemsIn(const LLXMLNodePtr& root)
+    {
+        std::vector<MenuItem>                                         out;
+        const std::function<void(const LLXMLNodePtr&, const std::string&)> walk = [&](const LLXMLNodePtr& node, const std::string& path) {
+            for (LLXMLNodePtr child = node->getFirstChild(); child.notNull(); child = child->getNextSibling())
+            {
+                std::string name;
+                std::string label;
+                child->getAttributeString("name", name);
+                child->getAttributeString("label", label);
+                const std::string here = path.empty() ? label : path + " > " + label;
+                if (child->hasName("menu"))
+                {
+                    walk(child, here);
+                }
+                else if ((child->hasName("menu_item_call") || child->hasName("menu_item_check")) && !name.empty())
+                {
+                    out.push_back({ name, here });
+                }
+                else if (child->hasName("menu_bar") || child->hasName("floater") || child->hasName("panel") || child->hasName("layout_stack") ||
+                         child->hasName("layout_panel"))
+                {
+                    // The bar, wherever in the window it is.
+                    if (child->hasName("menu_bar") && name != "studio_menu")
+                    {
+                        continue;
+                    }
+                    walk(child, child->hasName("menu_bar") ? std::string() : path);
+                }
+            }
+        };
+        walk(root, std::string());
+        return out;
+    }
+
+    const std::vector<MenuItem>& studioMenuItems()
+    {
+        static const std::vector<MenuItem> items = []() {
+            LLXMLNodePtr root;
+            return LLUICtrlFactory::getLayeredXMLNode("floater_script_studio.xml", root) ? menuItemsIn(root) : std::vector<MenuItem>();
+        }();
+        return items;
     }
 
     std::string describe(const chords_t& keys)

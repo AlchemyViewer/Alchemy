@@ -63,7 +63,19 @@ bool ALPanelScriptKeymap::postBuild()
 
 std::string ALPanelScriptKeymap::nameOf(const Chosen& which) const
 {
-    return which.menu.empty() ? getString(std::string("cmd_") + alEditorCommandName(which.command)) : getString("menu_" + which.menu);
+    if (which.menu.empty())
+    {
+        return getString(std::string("cmd_") + alEditorCommandName(which.command));
+    }
+    // A menu's command by where it is in the menus, in their own words.
+    for (const ALScriptKeymap::MenuItem& item : ALScriptKeymap::studioMenuItems())
+    {
+        if (item.id == which.menu)
+        {
+            return item.path;
+        }
+    }
+    return which.menu;
 }
 
 void ALPanelScriptKeymap::fill()
@@ -101,7 +113,9 @@ void ALPanelScriptKeymap::fill()
     {
         LLSD value;
         value["menu"] = id;
-        add(value, getString("menu_" + id), ALScriptKeymap::describe(ALScriptKeymap::menuKeys(id)), id, ALScriptKeymap::isMenuRebound(id), was.menu == id);
+        Chosen which;
+        which.menu = id;
+        add(value, nameOf(which), ALScriptKeymap::describe(ALScriptKeymap::menuKeys(id)), id, ALScriptKeymap::isMenuRebound(id), was.menu == id);
     }
     refreshButtons();
 }

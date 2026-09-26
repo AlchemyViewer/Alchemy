@@ -118,12 +118,21 @@ protected:
     // The menu bar's own shortcut for a key, taken: what a subclass asks
     // first in handleKeyHere, before its own keys.
     bool handleMenuAccelerator(KEY key, MASK mask);
-    // Control and Z, Y, and shift and Z, which the menu bar may not bind:
+    // Undo and redo's keys (undoKeyOf), which the menu bar may not bind:
     // what a subclass asks next. A text control in this window with an
     // edit history of its own keeps them for it -- with hasAccelerators
     // they arrive before the Edit menu's own undo, which is what it would
     // have got from them -- and only a key it declines reaches undo().
     bool handleUndoKeys(KEY key, MASK mask);
+    // Whether a key is undo's or redo's: Control and Z, and Control and Y
+    // or Shift and Z, unless the studio keeps others.
+    enum class UndoKey : U8
+    {
+        None,
+        Undo,
+        Redo
+    };
+    virtual UndoKey undoKeyOf(KEY key, MASK mask) const;
     // A command the keys reach, with what it does: false where it cannot
     // be done now, and the key goes on to whatever else would take it.
     void addCommand(const KeyedCommand& command, std::function<bool()> run);

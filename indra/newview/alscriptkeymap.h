@@ -26,6 +26,7 @@
 
 #include "alkeymap.h"
 #include "alstudiofloater.h"
+#include "llxmlnode.h"
 
 #include <string>
 #include <string_view>
@@ -63,6 +64,18 @@ namespace ALScriptKeymap
     // again.
     void                 rebindMenu(std::string_view item, const chords_t& keys);
     void                 restoreMenu(std::string_view item);
+
+    // The items of the studio's menu bar as a file has them: each item's
+    // name, and where it is, "View > Scrollbar > Map" -- the names the
+    // Keys tab gives the menus' commands, which are the menus' own.
+    struct MenuItem
+    {
+        std::string id;
+        std::string path;
+    };
+    std::vector<MenuItem> menuItemsIn(const LLXMLNodePtr& root);
+    // The skin's, and its language's, as the studio is built from them.
+    const std::vector<MenuItem>& studioMenuItems();
 
     // The editors' keymap, built once for each change of the setting.
     const ALKeymap& current();
