@@ -26,6 +26,8 @@
 
 #include "alscriptexplorertree.h"
 
+#include "alfolderfilter.h"
+
 #include "llclipboard.h"
 #include "llfolderview.h"
 #include "llfolderviewitem.h"
@@ -43,11 +45,11 @@ static LLPanelInjector<ALScriptExplorerTree> t_script_studio_explorer_tree("scri
 
 // --- a row, as the folder view holds it --------------------------------------------------
 
-class ALScriptExplorerTree::Node final : public LLFolderViewModelItemCommon
+class ALScriptExplorerTree::Node final : public ALFilteredItem
 {
 public:
     Node(ALScriptExplorerTree& tree, LLFolderViewModelInterface& model, std::string key, bool folder)
-    :   LLFolderViewModelItemCommon(model),
+    :   ALFilteredItem(model),
         mTree(tree),
         mKey(std::move(key)),
         mFolder(folder)
@@ -141,28 +143,6 @@ public:
         return mTree.mHooks.drop && mTree.mHooks.drop(mValue, mask, drop, cargo_type, cargo_data, tooltip_msg);
     }
 
-    // Every row passes: what is shown is what the rows say. What the filter
-    // looks for is lit in each.
-    bool filter(LLFolderViewFilter& filter) override
-    {
-        const S32 generation = filter.getCurrentGeneration();
-        for (const LLPointer<LLFolderViewModelItem>& child : mChildren)
-        {
-            if (child->getLastFilterGeneration() < generation)
-            {
-                child->filter(filter);
-            }
-        }
-        const LLFolderViewFilter::Match match = filter.getFilterMatch(this);
-        setPassedFilter(true, generation, match.mOffset, match.mLength);
-        setPassedFolderFilter(true, generation);
-        for (Node* up = this; up && up->mMostFilteredDescendantGeneration < generation; up = static_cast<Node*>(up->mParent))
-        {
-            up->mMostFilteredDescendantGeneration = generation;
-        }
-        return true;
-    }
-
 private:
     ALScriptExplorerTree& mTree;
     const std::string     mKey;
@@ -180,79 +160,14 @@ private:
 
 // Every row passes; the filter's words are only lit. Its generation moves
 // when the words do, so that each row is lit again.
-class ALScriptExplorerTree::Filter final : public LLFolderViewFilter
+class ALScriptExplorerTree::Filter final : public ALFolderFilter
 {
 public:
-    void setText(const std::string& text)
-    {
-        std::string lower = text;
-        LLStringUtil::toLower(lower);
-        if (lower != mText)
-        {
-            mText = std::move(lower);
-            setModified();
-        }
-    }
+    Filter() : ALFolderFilter("script_studio_explorer") {}
 
-    bool        check(const LLFolderViewModelItem* item) override { return true; }
-    bool        checkFolder(const LLFolderViewModelItem* folder) const override { return true; }
-    void        setEmptyLookupMessage(const std::string& message) override { mEmpty = message; }
-    std::string getEmptyLookupMessage(bool is_empty_folder = false) const override { return mEmpty; }
-    bool        showAllResults() const override { return false; }
-    Match       getFilterMatch(LLFolderViewModelItem* item) const override
-    {
-        Match match;
-        if (mText.empty() || !item)
-        {
-            return match;
-        }
-        const std::string& label = item->getDisplayName();
-        std::string        lower = label;
-        LLStringUtil::toLower(lower);
-        const std::string::size_type at = lower.find(mText);
-        if (at == std::string::npos)
-        {
-            return match;
-        }
-        // Lowercasing moves no byte of plain ASCII; of anything else, the
-        // offset is found again in the words as they stand.
-        if (utf8str_is_ascii(label))
-        {
-            match.mOffset = at;
-            match.mLength = mText.size();
-            return match;
-        }
-        match.mOffset    = utf8str_bytes_from_cased_bytes(label, at, false);
-        const size_t end = utf8str_bytes_from_cased_bytes(label, at + mText.size(), false);
-        match.mLength    = end > match.mOffset ? end - match.mOffset : 0;
-        return match;
-    }
-    bool               isActive() const override { return false; }
-    bool               isModified() const override { return mModified; }
-    void               clearModified() override { mModified = false; }
-    const std::string& getName() const override { return mName; }
-    const std::string& getFilterText() override { return mText; }
-    void               setModified(EFilterModified behavior = FILTER_RESTART) override
-    {
-        mModified = true;
-        ++mGeneration;
-    }
-    void resetTime(S32 timeout) override {}
-    bool isTimedOut() override { return false; }
-    bool isDefault() const override { return true; }
-    bool isNotDefault() const override { return false; }
-    void markDefault() override {}
-    void resetDefault() override {}
-    S32  getCurrentGeneration() const override { return mGeneration; }
-    S32  getFirstSuccessGeneration() const override { return mGeneration; }
-    S32  getFirstRequiredGeneration() const override { return mGeneration; }
-
-private:
-    std::string mText;
-    std::string mEmpty;
-    std::string mName     = "script_studio_explorer";
-    bool        mModified = false;
-    S32         mGeneration = 1;
+    bool check(const LLFolderViewModelItem* item) override { return true; }
+    // Nothing hidden, whatever is lit: the tree is as it would be.
+    bool isActive() const override { return false; }
 };
 
 // The rows' own order: the pinned first, a linkset's prims as they are
@@ -524,7 +439,7 @@ void ALScriptExplorerTree::show(const std::vector<Row>& rows, const std::functio
     }
     mShowing = true;
     Filter& lit = static_cast<Filter&>(mViewModel->getFilter());
-    lit.setText(filter);
+    lit.setWords(filter);
     lit.setEmptyLookupMessage(empty);
 
     // Each row's node, and what holds it: an object at the top; a prim in

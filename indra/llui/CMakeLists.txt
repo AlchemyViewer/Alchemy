@@ -164,6 +164,7 @@ target_sources(
     alscripttheme.cpp
     alscriptsnippets.cpp
     alfieldeditors.cpp
+    alfolderfilter.cpp
     alfollowscontrol.cpp
     alfontfield.cpp
     alcolorpicker.cpp
@@ -367,6 +368,7 @@ target_sources(
         alscripttheme.h
         alscriptsnippets.h
         alfieldeditors.h
+        alfolderfilter.h
         alfollowscontrol.h
         alfontfield.h
         alcolorpicker.h
@@ -526,6 +528,7 @@ if(AL_BUILD_TESTS)
     alxuilint
     alxuiedit
     alfindbar
+    alfolderfilter
     alhistorylist
     alplace
     alpopover

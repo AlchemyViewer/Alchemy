@@ -26,6 +26,7 @@
 
 #include "alxuiselection.h"
 #include "llfolderviewitem.h"
+#include "alfolderfilter.h"
 #include "llfolderviewmodel.h"
 #include "llpointer.h"
 #include "lltimer.h"
@@ -48,55 +49,19 @@ public:
 
 // Type-to-filter over a row's name and tag, and the switch that hides the
 // views the file did not create.
-class ALXUITreeFilter final : public LLFolderViewFilter
+class ALXUITreeFilter final : public ALFolderFilter
 {
 public:
     ALXUITreeFilter();
-    ~ALXUITreeFilter() override = default;
 
-    void setFilterSubString(const std::string& text);
     void setShowCodeBuilt(bool show);
     bool getShowCodeBuilt() const { return mShowCodeBuilt; }
 
     bool check(const LLFolderViewModelItem* item) override;
-    bool checkFolder(const LLFolderViewModelItem* folder) const override { return true; }
-
-    void setEmptyLookupMessage(const std::string& message) override { mEmptyLookupMessage = message; }
-    std::string getEmptyLookupMessage(bool is_empty_folder = false) const override { return mEmptyLookupMessage; }
-    bool showAllResults() const override { return false; }
-    Match getFilterMatch(LLFolderViewModelItem* item) const override;
-
-    bool isActive() const override { return !mSubString.empty() || !mShowCodeBuilt; }
-    bool isModified() const override { return mModified; }
-    void clearModified() override { mModified = false; }
-    const std::string& getName() const override { return mName; }
-    const std::string& getFilterText() override { return mSubString; }
-    void setModified(EFilterModified behavior = FILTER_RESTART) override;
-
-    void resetTime(S32 timeout) override
-    {
-        mFilterTime.reset();
-        mFilterTime.setTimerExpirySec((F32)timeout / 1000.f);
-    }
-    bool isTimedOut() override { return mFilterTime.hasExpired(); }
-
-    bool isDefault() const override { return !isActive(); }
-    bool isNotDefault() const override { return isActive(); }
-    void markDefault() override {}
-    void resetDefault() override {}
-
-    S32 getCurrentGeneration() const override { return mGeneration; }
-    S32 getFirstSuccessGeneration() const override { return mGeneration; }
-    S32 getFirstRequiredGeneration() const override { return mGeneration; }
+    bool isActive() const override { return ALFolderFilter::isActive() || !mShowCodeBuilt; }
 
 private:
-    std::string mName;
-    std::string mEmptyLookupMessage;
-    std::string mSubString;         // lowercased
-    LLTimer     mFilterTime;
-    S32         mGeneration = 1;
-    bool        mModified = false;
-    bool        mShowCodeBuilt = true;
+    bool mShowCodeBuilt = true;
 };
 
 class ALXUITreeModel final
@@ -198,7 +163,7 @@ private:
 // A row: the view, the tag it was built as, whether the file created it,
 // and the view's visibility as authored so a session-only flip can be told
 // from what the file says.
-class ALXUITreeItem final : public LLFolderViewModelItemCommon
+class ALXUITreeItem final : public ALFilteredItem
 {
 public:
     ALXUITreeItem(LLView* view, std::string tag, bool from_xml, S32 order,
@@ -263,7 +228,6 @@ public:
     bool dragOrDrop(MASK mask, bool drop, EDragAndDropType cargo_type,
                     void* cargo_data, std::string& tooltip_msg) override { return false; }
 
-    bool filter(LLFolderViewFilter& filter) override;
     void setPassedFilter(bool passed, S32 filter_generation,
                          std::string::size_type string_offset = std::string::npos,
                          std::string::size_type string_size = 0) override;

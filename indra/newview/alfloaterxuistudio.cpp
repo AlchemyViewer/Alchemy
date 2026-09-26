@@ -5512,7 +5512,7 @@ void ALFloaterXUIStudio::createRows(ALXUITreeItem* item, LLFolderViewFolder* par
 
 void ALFloaterXUIStudio::onTreeFilter()
 {
-    mModel.getFilter().setFilterSubString(mTreeFilter->getText());
+    mModel.getFilter().setWords(mTreeFilter->getText());
 }
 
 void ALFloaterXUIStudio::onTreeSelection(const std::deque<LLFolderViewItem*>& items, bool user_action)

@@ -46,19 +46,8 @@ bool ALXUITreeSort::operator()(const ALXUITreeItem* a, const ALXUITreeItem* b) c
 // ALXUITreeFilter
 // ---------------------------------------------------------------------------
 ALXUITreeFilter::ALXUITreeFilter()
-:   mName("xui_tree")
+:   ALFolderFilter("xui_tree")
 {
-}
-
-void ALXUITreeFilter::setFilterSubString(const std::string& text)
-{
-    const std::string lower = utf8str_tolower(text);
-    if (lower == mSubString)
-    {
-        return;
-    }
-    mSubString = lower;
-    setModified();
 }
 
 void ALXUITreeFilter::setShowCodeBuilt(bool show)
@@ -71,13 +60,6 @@ void ALXUITreeFilter::setShowCodeBuilt(bool show)
     setModified();
 }
 
-void ALXUITreeFilter::setModified(EFilterModified behavior)
-{
-    // The tree is a few hundred rows: every change starts over.
-    ++mGeneration;
-    mModified = true;
-}
-
 bool ALXUITreeFilter::check(const LLFolderViewModelItem* item)
 {
     const ALXUITreeItem* row = static_cast<const ALXUITreeItem*>(item);
@@ -85,33 +67,7 @@ bool ALXUITreeFilter::check(const LLFolderViewModelItem* item)
     {
         return false;
     }
-    return mSubString.empty() || row->getSearchableName().find(mSubString) != std::string::npos;
-}
-
-LLFolderViewFilter::Match ALXUITreeFilter::getFilterMatch(LLFolderViewModelItem* item) const
-{
-    Match match;
-    if (mSubString.empty())
-    {
-        return match;
-    }
-    const std::string& label = item->getDisplayName();
-    const std::string lower = utf8str_tolower(label);
-    const std::string::size_type at = lower.find(mSubString);
-    if (at == std::string::npos)
-    {
-        return match;
-    }
-    if (utf8str_is_ascii(label) && utf8str_is_ascii(mSubString))
-    {
-        match.mOffset = at;
-        match.mLength = mSubString.size();
-        return match;
-    }
-    match.mOffset = utf8str_bytes_from_cased_bytes(label, at, false);
-    const size_t end = utf8str_bytes_from_cased_bytes(label, at + mSubString.size(), false);
-    match.mLength = end > match.mOffset ? end - match.mOffset : 0;
-    return match;
+    return words().empty() || row->getSearchableName().find(words()) != std::string::npos;
 }
 
 // ---------------------------------------------------------------------------
@@ -276,7 +232,7 @@ void ALXUITreeModel::rowHovered(const ALXUITreeItem* item)
 // ---------------------------------------------------------------------------
 ALXUITreeItem::ALXUITreeItem(LLView* view, std::string tag, bool from_xml, S32 order,
                              ALXUISelection::path_t path, ALXUITreeModel& model)
-:   LLFolderViewModelItemCommon(model),
+:   ALFilteredItem(model),
     mView(view),
     mTag(std::move(tag)),
     mName(view->getName()),
@@ -334,60 +290,6 @@ std::string ALXUITreeItem::getLabelSuffix() const
 void ALXUITreeItem::buildContextMenu(LLMenuGL& menu, U32 flags)
 {
     mModel.buildContextMenu(*this, menu, flags);
-}
-
-bool ALXUITreeItem::filter(LLFolderViewFilter& filter)
-{
-    const S32 generation = filter.getCurrentGeneration();
-    const S32 required = filter.getFirstRequiredGeneration();
-
-    if (getLastFilterGeneration() >= required
-        && getLastFolderFilterGeneration() >= required
-        && !passedFilter(required))
-    {
-        setPassedFilter(false, generation);
-        setPassedFolderFilter(false, generation);
-        return true;
-    }
-
-    setPassedFolderFilter(true, generation);
-
-    bool keep_going = true;
-    if (!mChildren.empty()
-        && (getLastFilterGeneration() < required || descendantsPassedFilter(required)))
-    {
-        for (auto& childp : mChildren)
-        {
-            ALXUITreeItem* child = static_cast<ALXUITreeItem*>(childp.get());
-            if (child->getLastFilterGeneration() < generation)
-            {
-                keep_going = child->filter(filter);
-            }
-            if (child->passedFilter())
-            {
-                ALXUITreeItem* up = this;
-                while (up && up->mMostFilteredDescendantGeneration < generation)
-                {
-                    up->mMostFilteredDescendantGeneration = generation;
-                    up = static_cast<ALXUITreeItem*>(up->mParent);
-                }
-            }
-            if (!keep_going)
-            {
-                return false;
-            }
-        }
-    }
-
-    if (filter.isTimedOut())
-    {
-        return false;
-    }
-
-    const bool passed = filter.check(this);
-    const LLFolderViewFilter::Match match = filter.getFilterMatch(this);
-    setPassedFilter(passed, generation, match.mOffset, match.mLength);
-    return true;
 }
 
 void ALXUITreeItem::setPassedFilter(bool passed, S32 filter_generation,

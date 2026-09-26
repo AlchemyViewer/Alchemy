@@ -112,7 +112,7 @@ static_assert((U32)ALSceneExplorerFilter::SCOPE_PARCEL == (U32)ALSceneExplorerPr
 static_assert((U32)ALSceneExplorerFilter::SCOPE_RADIUS == (U32)ALSceneExplorerPredicate::SCOPE_RADIUS);
 
 ALSceneExplorerFilter::ALSceneExplorerFilter()
-:   mName("scene_explorer")
+:   ALFolderFilter("scene_explorer")
 {
 }
 
@@ -327,22 +327,7 @@ LLFolderViewFilter::Match ALSceneExplorerFilter::getFilterMatch(LLFolderViewMode
     if (at == std::string::npos)
         return match;
 
-    const std::string& label = item->getDisplayName();
-
-    // All-ASCII means lowercasing moved nothing, so the offset already indexes
-    // the label as it stands.
-    if (utf8str_is_ascii(label) && utf8str_is_ascii(mConstraints.mFilterSubString))
-    {
-        match.mOffset = at;
-        match.mLength = mConstraints.mFilterSubString.size();
-        return match;
-    }
-
-    match.mOffset = utf8str_bytes_from_cased_bytes(label, at, false);
-    const size_t end = utf8str_bytes_from_cased_bytes(
-        label, at + mConstraints.mFilterSubString.size(), false);
-    match.mLength = (end > match.mOffset) ? end - match.mOffset : 0;
-    return match;
+    return spanIn(item->getDisplayName(), at, mConstraints.mFilterSubString);
 }
 
 bool ALSceneExplorerFilter::check(const LLFolderViewModelItem* item)
@@ -378,7 +363,7 @@ bool ALSceneExplorerFilter::check(const LLFolderViewModelItem* item)
 // ============================================================================
 ALSceneExplorerItem::ALSceneExplorerItem(EItemType type, const LLUUID& id, const std::string& name,
         LLFolderViewModelInterface& root_view_model, ALFloaterSceneExplorer* floater)
-:   LLFolderViewModelItemCommon(root_view_model),
+:   ALFilteredItem(root_view_model),
     mItemType(type),
     mUUID(id),
     mName(name),
@@ -595,66 +580,6 @@ void ALSceneExplorerItem::setPassedFilter(bool passed, S32 filter_generation,
             parent_folder->requestArrange();
         }
     }
-}
-
-bool ALSceneExplorerItem::filter(LLFolderViewFilter& filter)
-{
-    const S32 filter_generation = filter.getCurrentGeneration();
-    const S32 must_pass_generation = filter.getFirstRequiredGeneration();
-
-    if (getLastFilterGeneration() >= must_pass_generation
-        && getLastFolderFilterGeneration() >= must_pass_generation
-        && !passedFilter(must_pass_generation))
-    {
-        // Already failed a filter at least as strict as this one.
-        setPassedFilter(false, filter_generation);
-        setPassedFolderFilter(false, filter_generation);
-        return true;
-    }
-
-    const bool passed_filter_folder = isFolderType() ? filter.checkFolder(this) : true;
-    setPassedFolderFilter(passed_filter_folder, filter_generation);
-
-    bool continue_filtering = true;
-    if (!mChildren.empty()
-        && (getLastFilterGeneration() < must_pass_generation
-            || descendantsPassedFilter(must_pass_generation)))
-    {
-        for (auto& childp : mChildren)
-        {
-            ALSceneExplorerItem* child = static_cast<ALSceneExplorerItem*>(childp.get());
-            if (child->getLastFilterGeneration() < filter_generation)
-            {
-                // Child returns false when the per-pass time budget is spent;
-                // stop here and resume from this child on the next idle.
-                continue_filtering = child->filter(filter);
-            }
-            if (child->passedFilter())
-            {
-                ALSceneExplorerItem* vm = this;
-                while (vm && vm->mMostFilteredDescendantGeneration < filter_generation)
-                {
-                    vm->mMostFilteredDescendantGeneration = filter_generation;
-                    vm = static_cast<ALSceneExplorerItem*>(vm->mParent);
-                }
-            }
-            if (!continue_filtering)
-                break;
-        }
-    }
-
-    if (continue_filtering)
-    {
-        const bool passed = filter.check(this);
-        // The match span makes the folder view draw the standard
-        // inventory-style highlight over the matched substring.
-        const LLFolderViewFilter::Match match = filter.getFilterMatch(this);
-        setPassedFilter(passed, filter_generation,
-                        match.mOffset, match.mLength);
-        continue_filtering = !filter.isTimedOut();
-    }
-
-    return continue_filtering;
 }
 
 // ============================================================================

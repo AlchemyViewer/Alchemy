@@ -17,6 +17,7 @@
 #include "../llui/llfolderviewitem.h"
 #include "../llui/llfolderviewmodel.h"
 
+#include "alfolderfilter.h"
 #include "alobjectproperties.h"
 #include "alsceneexplorerpredicate.h"
 #include "lltimer.h"
@@ -55,7 +56,7 @@ private:
 // ============================================================================
 // Filter
 // ============================================================================
-class ALSceneExplorerFilter final : public LLFolderViewFilter
+class ALSceneExplorerFilter final : public ALFolderFilter
 {
 public:
     enum EOwnerMode : U32
@@ -106,14 +107,10 @@ public:
         return mConstraints.mScope != (U32)ALSceneExplorerPredicate::SCOPE_REGION;
     }
 
-    // LLFolderViewFilter
+    // LLFolderViewFilter, the rest as every folder tree of ours has it
+    // (ALFolderFilter): its words are the constraints', and its generations
+    // the finer scheme below.
     bool check(const LLFolderViewModelItem* item) override;
-    bool checkFolder(const LLFolderViewModelItem* folder) const override { return true; }
-
-    void setEmptyLookupMessage(const std::string& message) override { mEmptyLookupMessage = message; }
-    std::string getEmptyLookupMessage(bool is_empty_folder = false) const override { return mEmptyLookupMessage; }
-
-    bool showAllResults() const override { return false; }
 
     // Span of the text match within the item's display name, in bytes (empty
     // when the match landed in another field), so the folder view draws the
@@ -121,33 +118,14 @@ public:
     Match getFilterMatch(LLFolderViewModelItem* item) const override;
 
     bool isActive() const override;
-    bool isModified() const override { return mModified; }
     void clearModified() override
     {
         mModified = false;
         // The pending refilter is done; the next change starts a new batch.
         mFilterModified = FILTER_NONE;
     }
-    const std::string& getName() const override { return mName; }
     const std::string& getFilterText() override { return mConstraints.mFilterSubString; }
     void setModified(EFilterModified behavior = FILTER_RESTART) override;
-
-    // Time-slice filtering the way LLInventoryFilter does: each pass gets a few
-    // ms, then bails and resumes next idle, so filtering a 60k-node tree stays
-    // responsive instead of stalling on one frame. Must be a real-time LLTimer:
-    // an LLFrameTimer's clock only advances once per frame, so it could never
-    // expire inside a single pass and the budget would be a no-op.
-    void resetTime(S32 timeout) override
-    {
-        mFilterTime.reset();
-        mFilterTime.setTimerExpirySec((F32)timeout / 1000.f);
-    }
-    bool isTimedOut() override { return mFilterTime.hasExpired(); }
-
-    bool isDefault() const override { return !isActive(); }
-    bool isNotDefault() const override { return isActive(); }
-    void markDefault() override {}
-    void resetDefault() override {}
 
     // Multi-generation scheme (the LLInventoryFilter model): current bumps on
     // every change; items that PASSED at >= first-success still pass (so they
@@ -163,19 +141,15 @@ private:
     // (CHANGE_NONE is a no-op).
     void applyChange(ALSceneExplorerPredicate::EFilterChange change);
 
-    std::string mName;
-    std::string mEmptyLookupMessage;
     // The predicate state itself lives in the pure, unit-tested constraint
     // set; this class is the LLFolderViewFilter adapter around it. The
     // setters above keep writing through, and check() supplies the impure
     // facts (agent id, parcel containment) per item.
     ALSceneExplorerPredicate::Constraints mConstraints;
-    bool            mModified   = false;
     EFilterModified mFilterModified = FILTER_NONE; // merged kind of the pending batch
     S32         mCurrentGeneration       = 1;
     S32         mFirstSuccessGeneration  = 1;
     S32         mFirstRequiredGeneration = 1;
-    LLTimer     mFilterTime;        // per-pass time budget for filter()
 };
 
 // ============================================================================
@@ -195,7 +169,7 @@ public:
 // ============================================================================
 // Model item
 // ============================================================================
-class ALSceneExplorerItem final : public LLFolderViewModelItemCommon
+class ALSceneExplorerItem final : public ALFilteredItem
 {
 public:
     enum EItemType : U8
@@ -340,8 +314,6 @@ public:
     bool dragOrDrop(MASK mask, bool drop, EDragAndDropType cargo_type,
                     void* cargo_data, std::string& tooltip_msg) override { return false; }
 
-    // Real filtering (mirrors LLFolderViewModelItemInventory::filter).
-    bool filter(LLFolderViewFilter& filter) override;
     // Requests a re-arrange when this item's filtered state changes — the
     // framework has no other filter->arrange link, so without this a filter
     // toggle only becomes visible when something else happens to arrange
