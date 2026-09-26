@@ -419,24 +419,34 @@ void ALScriptRecoveryStore::forget(const std::string& key)
 
 bool ALScriptRecoveryStore::setAside(ALScriptRecoveryEntry entry)
 {
+    return !setAsideAt(std::move(entry), /*keep_when*/ false).empty();
+}
+
+std::string ALScriptRecoveryStore::setAsideAt(ALScriptRecoveryEntry entry, bool keep_when)
+{
     flush();
     if (entry.key.empty())
     {
-        return false;
+        return std::string();
     }
     if (entry.session.empty())
     {
         entry.session = mSession;
     }
-    entry.state = ALScriptRecoveryEntry::State::Discarded;
-    entry.when  = LLDate::now();
+    const LLDate now = LLDate::now();
+    entry.state      = ALScriptRecoveryEntry::State::Discarded;
+    if (!keep_when)
+    {
+        entry.when = now;
+    }
     LLFile::mkdir(mDirectory);
     LLFile::mkdir(mDiscarded);
-    // Named by when to the millisecond, which prune reads without opening
-    // it, and which two set aside in a moment do not share.
+    // Named by when it was set aside, to the millisecond, which prune
+    // reads without opening it, and which two set aside in a moment do not
+    // share.
     const std::string target = mDiscarded + fileOf(entry.key) + "." + entry.session + "." +
-                               std::to_string(static_cast<S64>(entry.when.secondsSinceEpoch() * 1000.0)) + EXTENSION;
-    return writeWhole(target, entry.asLLSD());
+                               std::to_string(static_cast<S64>(now.secondsSinceEpoch() * 1000.0)) + EXTENSION;
+    return writeWhole(target, entry.asLLSD()) ? target : std::string();
 }
 
 bool ALScriptRecoveryStore::discard(const ALScriptRecoveryEntry& entry)
@@ -565,6 +575,30 @@ std::optional<ALScriptRecoveryEntry> ALScriptRecoveryStore::leftFor(const std::s
         }
     }
     return newest;
+}
+
+std::optional<ALScriptRecoveryEntry> ALScriptRecoveryStore::reclaim(const std::string& key)
+{
+    flush();
+    if (key.empty())
+    {
+        return std::nullopt;
+    }
+    const std::string     own = pathOf(key, mSession);
+    ALScriptRecoveryEntry entry;
+    if (!readEntry(own, entry) || entry.key != key || entry.state == ALScriptRecoveryEntry::State::Discarded)
+    {
+        return std::nullopt;
+    }
+    const std::string aside = setAsideAt(entry, /*keep_when*/ true);
+    if (aside.empty())
+    {
+        return std::nullopt;
+    }
+    LLFile::remove(own, ENOENT);
+    entry.state = ALScriptRecoveryEntry::State::Discarded;
+    entry.path  = aside;
+    return entry;
 }
 
 bool ALScriptRecoveryStore::hasOffers() const

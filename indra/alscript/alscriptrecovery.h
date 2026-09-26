@@ -193,6 +193,14 @@ public:
     std::vector<ALScriptRecoveryEntry> left() const;
     // The newest of those for one key.
     std::optional<ALScriptRecoveryEntry> leftFor(const std::string& key) const;
+    // This session's own entry for a key, where no tab holds the key any
+    // more -- what a window that went wrote of its tabs as it went --
+    // set aside among the discarded, and answered as set aside: offered
+    // as another session's is, and under Recover Unsaved Changes until it
+    // is taken up. Set aside, it is out of the way of the forget that a
+    // tab opened clean does. It keeps when it was written. None where
+    // there is none, or it could not be set aside.
+    std::optional<ALScriptRecoveryEntry> reclaim(const std::string& key);
     // Whether there is anything to offer: another session's entry, or a
     // discarded one. By the files' names, without reading them.
     bool hasOffers() const;
@@ -209,6 +217,9 @@ private:
     // survive the machine going down, then put in its place.
     static bool writeWhole(const std::string& path, const LLSD& sd, bool durable = true);
     static bool readEntry(const std::string& path, ALScriptRecoveryEntry& out);
+    // setAside's writing, which says where it wrote: empty where it could
+    // not. Marked when it is set aside unless told to keep its own.
+    std::string setAsideAt(ALScriptRecoveryEntry entry, bool keep_when);
     void        listIn(const std::string& folder, std::vector<ALScriptRecoveryEntry>& out) const;
 
     std::string mDirectory;

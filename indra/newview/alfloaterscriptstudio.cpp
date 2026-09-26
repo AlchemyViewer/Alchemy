@@ -1603,12 +1603,9 @@ void ALFloaterScriptStudio::openScript(const ALScriptRef& ref, const std::string
     doc->editor->setPlaceholder(getString("Loading"));
     wireDoc(*doc);
     // Kept against a crash under this; and what an earlier session left of
-    // it, offered in the notice.
+    // it, or a window of this one that went, offered in the notice.
     doc->recoveryKey = ALScriptRecoveryStore::keyOf(ref.object, ref.item, std::string());
-    if (ALScriptRecoveryStore* store = ALScriptStudioRecovery::store())
-    {
-        doc->recoverable = store->leftFor(doc->recoveryKey);
-    }
+    mRecovery.offerFor(*doc, holderOf(ref, std::string()) != nullptr);
 
     mDocs.push_back(std::move(doc));
     reindexDocs();
@@ -2173,10 +2170,7 @@ void ALFloaterScriptStudio::openFileHere(const std::string& path, bool lua, S32 
         doc->modifiable = true;
         wireDoc(*doc);
         doc->recoveryKey = ALScriptRecoveryStore::keyOf(LLUUID::null, LLUUID::null, path);
-        if (ALScriptRecoveryStore* store = ALScriptStudioRecovery::store())
-        {
-            doc->recoverable = store->leftFor(doc->recoveryKey);
-        }
+        mRecovery.offerFor(*doc, holderOf(ALScriptRef(), path) != nullptr);
         mDocs.push_back(std::move(doc));
         reindexDocs();
         already = mDocs.size() - 1;

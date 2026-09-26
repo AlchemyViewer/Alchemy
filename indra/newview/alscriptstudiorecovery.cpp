@@ -248,6 +248,25 @@ void ALScriptStudioRecovery::pump()
 
 // --- a kept text taken up ----------------------------------------------------------------
 
+void ALScriptStudioRecovery::offerFor(Doc& doc, bool held_elsewhere)
+{
+    ALScriptRecoveryStore* kept = store();
+    if (!kept || doc.recoveryKey.empty())
+    {
+        return;
+    }
+    // Where another tab holds the script -- a tab on its way here from
+    // another window -- this session's entry is that tab's, and stays.
+    if (!held_elsewhere)
+    {
+        doc.recoverable = kept->reclaim(doc.recoveryKey);
+    }
+    if (!doc.recoverable)
+    {
+        doc.recoverable = kept->leftFor(doc.recoveryKey);
+    }
+}
+
 void ALScriptStudioRecovery::takeUp(Doc& doc, const Entry& entry)
 {
     // The kept text put in over what is there, as one step to undo; its

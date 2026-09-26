@@ -126,6 +126,11 @@ public:
 
     // --- a kept text taken up --------------------------------------------------------
 
+    // What is kept of a tab's script, for its notice to offer as the tab
+    // opens: where no tab holds the script elsewhere, this session's own --
+    // what a window that went wrote of the tab as it went -- set aside;
+    // else, or failing that, what an earlier session left.
+    void offerFor(Doc& doc, bool held_elsewhere);
     // Put in over its tab, as one step to undo, once the tab has loaded; a
     // notecard's items with it. Over a tab nothing can be saved from, the
     // tab holds it on its own.

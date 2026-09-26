@@ -447,4 +447,35 @@ namespace tut
         r.schedule(doc);
         ensure("clean: forgotten at once", keptFor(doc.recoveryKey) == 0);
     }
+
+    template<> template<>
+    void alscriptstudiorecovery_object::test<8>()
+    {
+        set_test_name("a tab whose window went with it unsaved is offered back as its script opens again this session, and not while another tab holds it");
+        ALScriptStudioRecovery& r = make();
+        const ALScriptRef       ref(LLUUID::generateNewID(), LLUUID::generateNewID());
+        Doc&                    was = tab("a", "x\n", ref);
+        type(was, "typed");
+        // Its window going: its tabs written as they stand, as the window
+        // does as it goes.
+        store->write(ALScriptStudioRecovery::entryOf(was));
+
+        // Held by a tab on its way here from another window: that tab's.
+        Doc& moving = tab("b", "x\n", ref);
+        r.offerFor(moving, /*held_elsewhere*/ true);
+        ensure("not offered while another tab holds it", !moving.recoverable && keptFor(was.recoveryKey) == 1);
+
+        Doc& again = tab("c", "x\n", ref);
+        r.offerFor(again, false);
+        ensure("offered back", again.recoverable && again.recoverable->text == "x\ntyped");
+        ensure("set aside, out of the way", keptFor(again.recoveryKey) == 0);
+        // Loaded clean, as a tab opened again is: what it keeps of its own
+        // forgets nothing of that.
+        r.keep(again);
+        ensure("still there to take", std::filesystem::exists(fsyspath(again.recoverable->path)));
+        const Entry offered = *again.recoverable;
+        r.takeUp(again, offered);
+        ensure_equals("taken up", again.editor->text(), std::string("x\ntyped"));
+        ensure("its own from here, the set-aside one let go of", keptFor(again.recoveryKey) == 1 && !std::filesystem::exists(fsyspath(offered.path)));
+    }
 }

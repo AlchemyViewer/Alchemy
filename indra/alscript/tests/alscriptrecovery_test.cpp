@@ -591,4 +591,35 @@ namespace tut
         ensure("dashes and a colon: " + said, said[4] == '-' && said[7] == '-' && said[10] == ' ' && said[13] == ':');
         ensure("the year: " + said, said.starts_with("2025-09-2"));
     }
+
+    template<> template<>
+    void alscriptrecovery_object::test<18>()
+    {
+        set_test_name("this session's own entry, reclaimed where no tab holds it, is set aside keeping when it was written, and out of the way of forget");
+        ALScriptRecoveryStore store(folder, "now");
+        ALScriptRecoveryEntry went = entry("task:a:b", "typed, then its window went");
+        store.write(went);
+        const LLDate written = store.list().front().when;
+        ensure("not left by another session", !store.leftFor("task:a:b"));
+
+        const std::optional<ALScriptRecoveryEntry> back = store.reclaim("task:a:b");
+        ensure("reclaimed", back.has_value());
+        ensure_equals("its text", back->text, went.text);
+        ensure("set aside", back->state == ALScriptRecoveryEntry::State::Discarded);
+        ensure_equals("when it was written, not when it was set aside", back->when.secondsSinceEpoch(), written.secondsSinceEpoch());
+        ensure("its own file gone, and it among the discarded", files().empty() && files("/discarded").size() == 1);
+        ensure("where it is now", back->path.find("discarded") != std::string::npos);
+
+        store.forget("task:a:b");
+        ensure("a tab opened clean forgets nothing of it", files("/discarded").size() == 1);
+        const std::vector<ALScriptRecoveryEntry> listed = store.list();
+        ensure("offered under Recover Unsaved Changes", listed.size() == 1 && listed.front().text == went.text);
+        ensure("reclaimed once", !store.reclaim("task:a:b"));
+
+        ALScriptRecoveryStore other(folder, "earlier");
+        other.write(entry("task:c:d", "another session's"));
+        ensure("another session's is not this one's to reclaim", !store.reclaim("task:c:d") && store.leftFor("task:c:d"));
+        store.remove(*back);
+        ensure("taken up, gone", files("/discarded").empty());
+    }
 }
