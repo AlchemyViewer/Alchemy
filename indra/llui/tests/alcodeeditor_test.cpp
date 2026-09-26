@@ -1834,4 +1834,31 @@ namespace tut
         // after it lexes as it did.
         ensure("a comment opened lexes on to where the next one ends, not to the end", e.highlighter().lastLexed() < 10);
     }
+
+    template<> template<>
+    void alcodeeditor_object::test<49>()
+    {
+        set_test_name("an edit lets go of refactors still awaited while nothing is listed, and of a list that is open");
+        ALCodeEditor& e = make("integer x;\ninteger y;\n");
+        std::vector<ALTextRange> asked;
+        e.setFixHandler([](const LLSD&) {});
+        e.setActionRequest([&asked](const ALTextRange& at) { asked.push_back(at); });
+        ALCodeEditor::Fix extract;
+        extract.title = "Put it in a local";
+        extract.value = "extract";
+        extract.edits.emplace_back(ALTextRange(ALTextPos(0, 8), ALTextPos(0, 9)), "value");
+
+        e.setCaret(ALTextPos(0, 8));
+        e.handleKeyHere('.', MASK_CONTROL);
+        ensure("asked, and nothing listed yet", asked.size() == 1 && !e.fixesOpen());
+        e.document().insert(ALTextPos(1, 0), "// ");
+        e.supplyActions(asked.back(), { extract });
+        ensure("an edit elsewhere, the caret where it was: the answer is for a text that is gone", !e.fixesOpen());
+
+        e.handleKeyHere('.', MASK_CONTROL);
+        e.supplyActions(asked.back(), { extract });
+        ensure("listed", e.fixesOpen());
+        e.document().insert(ALTextPos(1, 0), "// ");
+        ensure("an edit closes it", !e.fixesOpen());
+    }
 }

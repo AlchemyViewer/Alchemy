@@ -2270,6 +2270,12 @@ bool ALCodeEditor::fixesOpen() const
 void ALCodeEditor::closeFixes()
 {
     const bool was = fixesOpen();
+    // Nothing shown, listed or awaited: nothing to close, which is what
+    // nearly every edit finds.
+    if (!was && !mFixListModel.awaited() && mFixListModel.line() < 0 && mFixListModel.fixes().empty())
+    {
+        return;
+    }
     if (mFixList)
     {
         mFixList->setVisible(false);
