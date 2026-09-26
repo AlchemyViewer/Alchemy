@@ -193,6 +193,7 @@ if(AL_BUILD_VIEWER)
     alscriptsearch.cpp
     alscriptsearchpane.cpp
     alscriptstudiocaret.cpp
+    alscriptstudiochecking.cpp
     alscriptstudiocommands.cpp
     alscriptstudiodoc.cpp
     alscriptstudiofileio.cpp
