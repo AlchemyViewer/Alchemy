@@ -994,6 +994,7 @@ if(AL_BUILD_VIEWER)
     alsceneexplorerpredicate.h
     alscopedata.h
     alscriptanalysis.h
+    alscriptcrumbsbar.h
     alscriptexplorermodel.h
     alscriptexplorerpane.h
     alscriptexplorertree.h
@@ -2609,6 +2610,17 @@ if(AL_BUILD_TESTS)
       alscriptsaveflow.cpp
       alscriptstudiodoc.cpp
       alscriptstudiowords.cpp
+    DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
+  )
+
+  # Script Studio's bar under the editor over the studio's own window, the
+  # window's side faked: the path of symbols, the trailer's parts, a step.
+  al_add_test(
+    alscriptcrumbsbar
+    UNIT
+    PROJECT ${test_project}
+    LIBRARIES llui alscript ${test_libs}
+    SOURCES alscriptstudiodoc.cpp alscriptstudioplaces.cpp
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
 

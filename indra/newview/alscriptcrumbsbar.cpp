@@ -24,13 +24,16 @@
 
 #include "llviewerprecompiledheaders.h"
 
-#include "alfloaterscriptstudio.h"
+#include "alscriptcrumbsbar.h"
 
-#include "aljumpbar.h"
+#include "alcodeeditor.h"
 #include "alscriptenvelope.h"
 #include "alscriptstudioplaces.h"
+#include "alscriptstudioservices.h"
+#include "llfloater.h"
 #include "llnotecard.h"
 
+using ALScriptPlaces::NONE;
 using ALScriptPlaces::outlineEntryOf;
 using ALScriptPlaces::outlineValue;
 using ALScriptPlaces::rangeOf;
@@ -52,77 +55,141 @@ namespace
     }
 }
 
-void ALFloaterScriptStudio::refreshTrailer(Doc& doc)
+static LLPanelInjector<ALScriptCrumbsBar> t_script_studio_crumbs("script_studio_crumbs");
+
+ALScriptCrumbsBar::ALScriptCrumbsBar(const LLPanel::Params& params) : LLPanel(params) {}
+
+bool ALScriptCrumbsBar::postBuild()
 {
-    // The view in front's caret: the expansion's own line, while it is
-    // the one being read.
-    const ALCodeEditor&         shown = *doc.shownText();
-    const ALTextPos             caret = shown.caret();
-    const ALTextDocument&       text  = shown.document();
-    LLStringUtil::format_map_t args;
-    args["[LINE]"]  = std::to_string(caret.line + 1);
-    // Where the caret is as it is seen -- a character a column, a tab to
-    // its stop -- rather than its byte in the line.
-    args["[COL]"]   = std::to_string(text.displayColumn(caret, shown.getTabWidth()) + 1);
-    std::vector<ALJumpBar::TrailerPart> parts;
+    mBar = getChild<ALJumpBar>("breadcrumb");
+    // The window this is the bar of, found through the view tree, as what
+    // the bar asks of it.
+    LLFloater* window = getParentByType<LLFloater>();
+    mServices         = dynamic_cast<ALScriptStudioServices*>(window);
+    mWindow           = dynamic_cast<Window*>(window);
+    if (!mServices || !mWindow)
+    {
+        LL_WARNS() << "The bar under the editor is not in a Script Studio window" << LL_ENDL;
+        return true;
+    }
+    mBar->onChose([this](size_t, const std::string& value) { choose(value); });
+    mBar->onTrailerChosen([this](const std::string& value) { mWindow->trailerChosen(value); });
+    return true;
+}
+
+void ALScriptCrumbsBar::showTrailer(Doc& doc)
+{
+    if (!mServices)
+    {
+        return;
+    }
+    std::vector<Part> parts;
+    place(doc, parts);
+    selection(doc, parts);
+    problems(doc, parts);
+    weight(doc, parts);
+    sending(doc, parts);
+    views(doc, parts);
+    // Joined by a middle dot with air around it; in code, since a
+    // string of the skin's is trimmed of its spaces.
+    std::vector<Part> said;
+    for (Part& part : parts)
+    {
+        if (!said.empty())
+        {
+            said.push_back({ "   \xC2\xB7   ", std::string(), std::string() });
+        }
+        said.push_back(std::move(part));
+    }
+    mBar->setTrailer(std::move(said));
+}
+
+void ALScriptCrumbsBar::place(Doc& doc, std::vector<Part>& parts) const
+{
     // A script that may be read and not changed says so for as long as it
     // is in front, not only in the status line as it arrives.
     if (doc.loaded && !doc.modifiable)
     {
-        parts.push_back({ getString("TrailerReadOnly"), std::string(), getString("TrailerReadOnlyTip") });
+        parts.push_back({ mServices->words("TrailerReadOnly"), std::string(), mServices->words("TrailerReadOnlyTip") });
     }
-    if (!mVim.banner().empty())
+    const std::string banner = mWindow->vimBanner();
+    if (!banner.empty())
     {
-        parts.push_back({ mVim.banner(), std::string(), std::string() });
+        parts.push_back({ banner, std::string(), std::string() });
     }
-    parts.push_back({ getString("CaretPosition", args), "line", mTrailerLineTip });
+    // The view in front's caret: the expansion's own line, while it is
+    // the one being read.
+    const ALCodeEditor&        shown = *doc.shownText();
+    const ALTextPos            caret = shown.caret();
+    LLStringUtil::format_map_t args;
+    args["[LINE]"] = std::to_string(caret.line + 1);
+    // Where the caret is as it is seen -- a character a column, a tab to
+    // its stop -- rather than its byte in the line.
+    args["[COL]"]  = std::to_string(shown.document().displayColumn(caret, shown.getTabWidth()) + 1);
+    parts.push_back({ mServices->words("CaretPosition", args), "line", mTips.line });
+}
+
+void ALScriptCrumbsBar::selection(Doc& doc, std::vector<Part>& parts) const
+{
     // What is selected: lines across lines, characters within one.
-    const ALTextRange selection = shown.selection().normalised();
-    if (!selection.empty())
+    const ALCodeEditor&   shown    = *doc.shownText();
+    const ALTextDocument& text     = shown.document();
+    const ALTextRange     selected = shown.selection().normalised();
+    if (selected.empty())
     {
-        if (selection.begin.line != selection.end.line)
-        {
-            const S32 lines = selection.end.line - selection.begin.line + (selection.end.column > 0 ? 1 : 0);
-            parts.push_back({ counted("SelectedLines", lines), std::string(), std::string() });
-        }
-        else
-        {
-            // Characters as they are seen, not the bytes they are
-            // written in; a tab is one.
-            parts.push_back({ counted("SelectedChars", text.displayColumn(selection.end, 1) - text.displayColumn(selection.begin, 1)), std::string(),
-                              std::string() });
-        }
+        return;
     }
+    if (selected.begin.line != selected.end.line)
+    {
+        const S32 lines = selected.end.line - selected.begin.line + (selected.end.column > 0 ? 1 : 0);
+        parts.push_back({ mServices->counted("SelectedLines", lines), std::string(), std::string() });
+    }
+    else
+    {
+        // Characters as they are seen, not the bytes they are
+        // written in; a tab is one.
+        const S32 chars = text.displayColumn(selected.end, 1) - text.displayColumn(selected.begin, 1);
+        parts.push_back({ mServices->counted("SelectedChars", chars), std::string(), std::string() });
+    }
+}
+
+void ALScriptCrumbsBar::problems(Doc& doc, std::vector<Part>& parts) const
+{
     S32 errors = 0, warnings = 0;
-    problemCounts(doc, errors, warnings);
+    mWindow->problemCounts(doc, errors, warnings);
     if (errors > 0)
     {
-        parts.push_back({ counted("ProblemErrors", errors), "problems", mTrailerProblemsTip });
+        parts.push_back({ mServices->counted("ProblemErrors", errors), "problems", mTips.problems });
     }
     if (warnings > 0)
     {
-        parts.push_back({ counted("ProblemWarnings", warnings), "problems", mTrailerProblemsTip });
+        parts.push_back({ mServices->counted("ProblemWarnings", warnings), "problems", mTips.problems });
     }
+}
+
+void ALScriptCrumbsBar::weight(Doc& doc, std::vector<Part>& parts) const
+{
     // While the Preprocessed view is in front, where the optimizer ran over
     // the text as it stands: what its code weighed before the optimizer and
     // after, the whole of what that view shows it did.
-    const bool optimized = doc.shownView() == Doc::View::Expanded && doc.uploaded.valid && doc.uploaded.version == doc.editor->document().version() &&
-                           doc.uploaded.codeBefore > 0 && doc.uploaded.codeAfter > 0 && weightTarget(doc);
+    const std::optional<ALScriptWeight::Target> target = mWindow->weightTarget(doc);
+    const bool optimized = doc.shownView() == Doc::View::Expanded && doc.uploaded.valid &&
+                           doc.uploaded.version == doc.editor->document().version() && doc.uploaded.codeBefore > 0 &&
+                           doc.uploaded.codeAfter > 0 && target;
     if (optimized)
     {
-        const ALScriptWeight::Target target = *weightTarget(doc);
-        const size_t                 limit  = ALScriptWeight::limitOf(target);
-        LLStringUtil::format_map_t   args;
-        args["[TARGET]"]      = ALScriptWeight::nameOf(target);
+        const size_t               limit = ALScriptWeight::limitOf(*target);
+        LLStringUtil::format_map_t args;
+        args["[TARGET]"]      = ALScriptWeight::nameOf(*target);
         args["[BEFORE]"]      = llformat("%.1f", (F64)doc.uploaded.codeBefore / 1024.0);
         args["[AFTER]"]       = llformat("%.1f", (F64)doc.uploaded.codeAfter / 1024.0);
         args["[LIMIT]"]       = std::to_string(limit / 1024);
         args["[BYTESBEFORE]"] = std::to_string(doc.uploaded.codeBefore);
         args["[BYTESAFTER]"]  = std::to_string(doc.uploaded.codeAfter);
         args["[MAX]"]         = std::to_string(limit);
-        const bool estimate   = target == ALScriptWeight::Target::Mono;
-        ALJumpBar::TrailerPart part{ getString(estimate ? "TrailerOptimizedEstimate" : "TrailerOptimized", args), std::string(),
-                                     getString(estimate ? "TrailerOptimizedEstimateTip" : "TrailerOptimizedTip", args) };
+        const bool estimate   = *target == ALScriptWeight::Target::Mono;
+        Part       part{ mServices->words(estimate ? "TrailerOptimizedEstimate" : "TrailerOptimized", args), std::string(),
+                   mServices->words(estimate ? "TrailerOptimizedEstimateTip" : "TrailerOptimizedTip", args) };
         if (doc.uploaded.codeAfter > limit)
         {
             part.color = doc.editor->markColor(ALCodeEditor::Mark::Error);
@@ -132,108 +199,92 @@ void ALFloaterScriptStudio::refreshTrailer(Doc& doc)
             part.color = doc.editor->markColor(ALCodeEditor::Mark::Warning);
         }
         parts.push_back(std::move(part));
+        return;
     }
     // What its code weighs for its target, against what the target runs
     // it in: in the warning colour past four fifths, the error's past it.
-    if (!optimized && doc.weighing.weight && doc.weighing.weight->total > 0)
+    if (!doc.weighing.weight || doc.weighing.weight->total <= 0)
     {
-        const ALScriptWeight&      weight = *doc.weighing.weight;
-        LLStringUtil::format_map_t args;
-        args["[TARGET]"] = ALScriptWeight::nameOf(weight.target);
-        args["[SIZE]"]   = llformat("%.1f", (F64)weight.total / 1024.0);
-        args["[LIMIT]"]  = std::to_string(weight.limit / 1024);
-        args["[BYTES]"]  = std::to_string(weight.total);
-        args["[MAX]"]    = std::to_string(weight.limit);
-        std::string tip  = getString(weight.estimate ? "TrailerWeightEstimateTip" : "TrailerWeightTip", args);
-        if (!doc.weighing.exact)
-        {
-            tip += " " + getString("TrailerWeightBeforeTip");
-        }
-        else if (doc.weighing.sent)
-        {
-            tip += " " + getString("TrailerWeightSentTip");
-        }
-        ALJumpBar::TrailerPart part{ getString(weight.estimate ? "TrailerWeightEstimate" : "TrailerWeight", args), std::string(), tip };
-        if (weight.total > weight.limit)
-        {
-            part.color = doc.editor->markColor(ALCodeEditor::Mark::Error);
-        }
-        else if (weight.total * 5 > weight.limit * 4)
-        {
-            part.color = doc.editor->markColor(ALCodeEditor::Mark::Warning);
-        }
-        parts.push_back(std::move(part));
+        return;
     }
+    const ALScriptWeight&      weighed = *doc.weighing.weight;
+    LLStringUtil::format_map_t args;
+    args["[TARGET]"] = ALScriptWeight::nameOf(weighed.target);
+    args["[SIZE]"]   = llformat("%.1f", (F64)weighed.total / 1024.0);
+    args["[LIMIT]"]  = std::to_string(weighed.limit / 1024);
+    args["[BYTES]"]  = std::to_string(weighed.total);
+    args["[MAX]"]    = std::to_string(weighed.limit);
+    std::string tip  = mServices->words(weighed.estimate ? "TrailerWeightEstimateTip" : "TrailerWeightTip", args);
+    if (!doc.weighing.exact)
+    {
+        tip += " " + mServices->words("TrailerWeightBeforeTip");
+    }
+    else if (doc.weighing.sent)
+    {
+        tip += " " + mServices->words("TrailerWeightSentTip");
+    }
+    Part part{ mServices->words(weighed.estimate ? "TrailerWeightEstimate" : "TrailerWeight", args), std::string(), tip };
+    if (weighed.total > weighed.limit)
+    {
+        part.color = doc.editor->markColor(ALCodeEditor::Mark::Error);
+    }
+    else if (weighed.total * 5 > weighed.limit * 4)
+    {
+        part.color = doc.editor->markColor(ALCodeEditor::Mark::Warning);
+    }
+    parts.push_back(std::move(part));
+}
+
+void ALScriptCrumbsBar::sending(Doc& doc, std::vector<Part>& parts) const
+{
     // What a save would send, once it is past half of what a script -- or
     // a notecard's text -- may be: in the warning colour past nine tenths,
     // the error's past the whole, where a save is refused.
     const size_t LIMIT = doc.notecard ? static_cast<size_t>(LLNotecard::MAX_SIZE) : ALScriptEnvelope::MAX_ASSET_BYTES;
-    if (doc.weighing.assetBytes * 2 > LIMIT)
+    if (doc.weighing.assetBytes * 2 <= LIMIT)
     {
-        LLStringUtil::format_map_t size;
-        size["[SIZE]"]  = std::to_string((doc.weighing.assetBytes + 1023) / 1024);
-        size["[LIMIT]"] = std::to_string(LIMIT / 1024);
-        size["[BYTES]"] = std::to_string(doc.weighing.assetBytes);
-        size["[MAX]"]   = std::to_string(LIMIT);
-        size["[OVER]"]  = std::to_string(doc.weighing.assetBytes > LIMIT ? doc.weighing.assetBytes - LIMIT : 0);
-        const bool             over = doc.weighing.assetBytes > LIMIT;
-        const char*            tip  = doc.notecard ? (over ? "TrailerNotecardSizeOverTip" : "TrailerNotecardSizeTip")
-                                                   : (over ? "TrailerSizeOverTip" : "TrailerSizeTip");
-        ALJumpBar::TrailerPart part{ getString("TrailerSize", size), std::string(), getString(tip, size) };
-        if (doc.weighing.assetBytes > LIMIT)
-        {
-            part.color = doc.editor->markColor(ALCodeEditor::Mark::Error);
-        }
-        else if (doc.weighing.assetBytes * 10 > LIMIT * 9)
-        {
-            part.color = doc.editor->markColor(ALCodeEditor::Mark::Warning);
-        }
-        parts.push_back(std::move(part));
+        return;
     }
+    LLStringUtil::format_map_t size;
+    size["[SIZE]"]  = std::to_string((doc.weighing.assetBytes + 1023) / 1024);
+    size["[LIMIT]"] = std::to_string(LIMIT / 1024);
+    size["[BYTES]"] = std::to_string(doc.weighing.assetBytes);
+    size["[MAX]"]   = std::to_string(LIMIT);
+    size["[OVER]"]  = std::to_string(doc.weighing.assetBytes > LIMIT ? doc.weighing.assetBytes - LIMIT : 0);
+    const bool  over = doc.weighing.assetBytes > LIMIT;
+    const char* tip  = doc.notecard ? (over ? "TrailerNotecardSizeOverTip" : "TrailerNotecardSizeTip")
+                                    : (over ? "TrailerSizeOverTip" : "TrailerSizeTip");
+    Part        part{ mServices->words("TrailerSize", size), std::string(), mServices->words(tip, size) };
+    if (over)
+    {
+        part.color = doc.editor->markColor(ALCodeEditor::Mark::Error);
+    }
+    else if (doc.weighing.assetBytes * 10 > LIMIT * 9)
+    {
+        part.color = doc.editor->markColor(ALCodeEditor::Mark::Warning);
+    }
+    parts.push_back(std::move(part));
+}
+
+void ALScriptCrumbsBar::views(Doc& doc, std::vector<Part>& parts) const
+{
     // Which of the two it is, where the script has an expansion to show:
     // pressed, the other.
     if (doc.expandedEditor)
     {
         const bool expanded = doc.shownView() == Doc::View::Expanded;
-        parts.push_back({ getString(expanded ? "TrailerExpanded" : "TrailerSource"), "expanded", expanded ? mTrailerExpandedTip : mTrailerSourceTip });
-    }
-    // Joined by a middle dot with air around it; in code, since a
-    // string of the skin's is trimmed of its spaces.
-    std::vector<ALJumpBar::TrailerPart> said;
-    for (ALJumpBar::TrailerPart& part : parts)
-    {
-        if (!said.empty())
-        {
-            said.push_back({ "   \xC2\xB7   ", std::string(), std::string() });
-        }
-        said.push_back(std::move(part));
-    }
-    mBreadcrumb->setTrailer(std::move(said));
-}
-
-void ALFloaterScriptStudio::onTrailerChosen(const std::string& value)
-{
-    if (value == "line")
-    {
-        goToLine();
-    }
-    else if (value == "problems")
-    {
-        showBottom("problems_tab", true);
-    }
-    else if (value == "expanded")
-    {
-        toggleExpanded();
+        parts.push_back(
+            { mServices->words(expanded ? "TrailerExpanded" : "TrailerSource"), "expanded", expanded ? mTips.expanded : mTips.source });
     }
 }
 
-void ALFloaterScriptStudio::refreshBreadcrumb(Doc& doc)
+void ALScriptCrumbsBar::showPath(Doc& doc)
 {
-    if (&doc != active())
+    if (!mServices || &doc != mServices->frontDoc())
     {
         return;
     }
-    const ALTextPos               caret = doc.editor->caret();
+    const ALTextPos caret = doc.editor->caret();
     // The path the caret is in: which outline entry at each depth holds
     // it. The crumbs are built from the outline, which a caret move
     // does not touch, so the bar is told only where the path itself has
@@ -263,17 +314,17 @@ void ALFloaterScriptStudio::refreshBreadcrumb(Doc& doc)
             parent = found;
         }
     }
-    if (mCrumbsShownFor == doc.id && doc.crumbsOf == doc.analysisVersion && doc.crumbPath == path && doc.crumbName == doc.name)
+    if (mShownFor == doc.id && doc.crumbsOf == doc.analysisVersion && doc.crumbPath == path && doc.crumbName == doc.name)
     {
         // The same steps over the same outline: only the trailer, which
         // says where the caret is.
-        refreshTrailer(doc);
+        showTrailer(doc);
         return;
     }
     doc.crumbsOf  = doc.analysisVersion;
     doc.crumbPath = path;
     doc.crumbName = doc.name;
-    mOutlinePane->followCaret(doc);
+    mWindow->pathChanged(doc);
 
     std::vector<ALJumpBar::Crumb> crumbs;
     LLStringUtil::format_map_t    args;
@@ -283,7 +334,7 @@ void ALFloaterScriptStudio::refreshBreadcrumb(Doc& doc)
     root.label     = doc.name;
     root.value     = "top";
     args["[NAME]"] = doc.name;
-    root.toolTip   = getString("CrumbRootTip", args);
+    root.toolTip   = mServices->words("CrumbRootTip", args);
     for (size_t i = 0; i < doc.outline.size(); ++i)
     {
         if (doc.outline[i].depth == 0)
@@ -298,12 +349,12 @@ void ALFloaterScriptStudio::refreshBreadcrumb(Doc& doc)
     size_t parent = NONE;
     for (S32 depth = 0; depth < static_cast<S32>(path.size()); ++depth)
     {
-        const size_t found = path[static_cast<size_t>(depth)];
+        const size_t     found = path[static_cast<size_t>(depth)];
         ALJumpBar::Crumb crumb;
         crumb.label    = doc.outline[found].name;
         crumb.value    = outlineValue(doc, found);
         args["[NAME]"] = crumb.label;
-        crumb.toolTip  = getString("CrumbTip", args);
+        crumb.toolTip  = mServices->words("CrumbTip", args);
         for (size_t i = 0; i < doc.outline.size(); ++i)
         {
             const ALScriptOutlineEntry& entry = doc.outline[i];
@@ -319,27 +370,35 @@ void ALFloaterScriptStudio::refreshBreadcrumb(Doc& doc)
         crumbs.push_back(std::move(crumb));
         parent = found;
     }
-    mBreadcrumb->setPath(std::move(crumbs));
-    mCrumbsShownFor = doc.id;
-    refreshTrailer(doc);
+    mBar->setPath(std::move(crumbs));
+    mShownFor = doc.id;
+    showTrailer(doc);
 }
 
-void ALFloaterScriptStudio::onCrumbChosen(size_t, const std::string& value)
+void ALScriptCrumbsBar::choose(const std::string& value)
 {
-    Doc* doc = active();
+    Doc* doc = mServices ? mServices->frontDoc() : nullptr;
     if (!doc)
     {
         return;
     }
-    mNavigation.noteJump();
-    ALCodeEditor& source = sourceInFront(*doc);
+    // The script's top, or the symbol by where it was and what it is
+    // called; nothing, where it is gone.
+    std::optional<ALTextRange> at;
     if (value == "top")
     {
-        source.goTo(ALTextPos(0, 0));
+        at = ALTextRange(ALTextPos(0, 0), ALTextPos(0, 0));
     }
     else if (const size_t index = outlineEntryOf(*doc, value); index != NONE)
     {
-        source.goTo(rangeOf(doc->outline[index].nameSpan));
+        at = rangeOf(doc->outline[index].nameSpan);
     }
-    source.setFocus(true);
+    mWindow->crumbChosen(*doc, at);
+}
+
+void ALScriptCrumbsBar::forget()
+{
+    mBar->setPath({});
+    mBar->setTrailer(LLStringUtil::null);
+    mShownFor.clear();
 }

@@ -554,7 +554,7 @@ bool ALFloaterScriptStudio::postBuild()
         mNoDocs->onSecondAction([this]() { mCommands.run("new_script"); });
     }
     mTabs          = getChild<ALTabStrip>("tabs");
-    mBreadcrumb    = getChild<ALJumpBar>("breadcrumb");
+    mCrumbsBar     = getChild<ALScriptCrumbsBar>("crumbs");
     mNoticeBar     = findChild<ALScriptNoticeBar>("notice");
     mBottomTabs    = getChild<LLTabContainer>("bottom_tabs");
     mReferencesPane = getChild<ALScriptReferencesPane>("references_tab");
@@ -596,8 +596,6 @@ bool ALFloaterScriptStudio::postBuild()
             holdPreview(*mDocs[index]);
         }
     });
-    mBreadcrumb->onChose(boost::bind(&ALFloaterScriptStudio::onCrumbChosen, this, _1, _2));
-    mBreadcrumb->onTrailerChosen([this](const std::string& value) { onTrailerChosen(value); });
     mProblemsPane = getChild<ALScriptProblemsPane>("problems_tab");
     mWeightsParts->setCommitCallback([this](LLUICtrl*, const LLSD&) { onWeightChosen(false); });
     mWeightsParts->setDoubleClickCallback([this]() { onWeightChosen(true); });
@@ -2854,7 +2852,7 @@ void ALFloaterScriptStudio::activate(size_t index, bool focus)
     mDocs[index]->caretSeen = ALTextPos(-1, -1);
     mDocs[index]->inspectAt = ALTextPos(-1, -1);
     mSymbol->setText(LLStringUtil::null);
-    refreshBreadcrumb(*mDocs[index]);
+    mCrumbsBar->showPath(*mDocs[index]);
     refreshNotice();
 }
 
@@ -3165,18 +3163,18 @@ void ALFloaterScriptStudio::refreshToolbar()
     // The breadcrumb runs up to whatever of the script's own controls are
     // showing at the strip's right, and no further: where none are, it has
     // the strip.
-    if (mBreadcrumb)
+    if (mCrumbsBar)
     {
         const LLView* first = task && mExperience->getVisible() ? static_cast<const LLView*>(mExperience)
                               : task                            ? static_cast<const LLView*>(mResetButton)
                               : script                          ? static_cast<const LLView*>(mCompileTarget)
                                                                 : nullptr;
-        const S32     right = first ? first->getRect().mLeft - 6 : mBreadcrumb->getParent()->getRect().getWidth();
-        const LLRect  crumbs = mBreadcrumb->getRect();
+        const S32     right = first ? first->getRect().mLeft - 6 : mCrumbsBar->getParent()->getRect().getWidth();
+        const LLRect  crumbs = mCrumbsBar->getRect();
         if (crumbs.mRight != right && right > crumbs.mLeft)
         {
-            mBreadcrumb->reshape(right - crumbs.mLeft, crumbs.getHeight());
-            mBreadcrumb->setOrigin(crumbs.mLeft, crumbs.mBottom);
+            mCrumbsBar->reshape(right - crumbs.mLeft, crumbs.getHeight());
+            mCrumbsBar->setOrigin(crumbs.mLeft, crumbs.mBottom);
         }
     }
 }
@@ -4220,10 +4218,14 @@ void ALFloaterScriptStudio::refreshKeyTips()
     }
     // What the words past the breadcrumb do when pressed, with the keys
     // that do the same; asked on every move of the caret, so said here.
-    for (auto [item_name, tip, keyless, out] : { std::make_tuple("go_to_line", "TrailerLineTip", "TrailerLineTipNoKeys", &mTrailerLineTip),
-                                                std::make_tuple("problems", "TrailerProblemsTip", "TrailerProblemsTipNoKeys", &mTrailerProblemsTip),
-                                                std::make_tuple("expanded", "TrailerSourceTip", "TrailerSourceTipNoKeys", &mTrailerSourceTip),
-                                                std::make_tuple("expanded", "TrailerExpandedTip", "TrailerExpandedTipNoKeys", &mTrailerExpandedTip) })
+    ALScriptCrumbsBar::Tips tips;
+    const std::tuple<const char*, const char*, const char*, std::string*> said[] = {
+        { "go_to_line", "TrailerLineTip", "TrailerLineTipNoKeys", &tips.line },
+        { "problems", "TrailerProblemsTip", "TrailerProblemsTipNoKeys", &tips.problems },
+        { "expanded", "TrailerSourceTip", "TrailerSourceTipNoKeys", &tips.source },
+        { "expanded", "TrailerExpandedTip", "TrailerExpandedTipNoKeys", &tips.expanded }
+    };
+    for (auto [item_name, tip, keyless, out] : said)
     {
         const LLMenuItemGL*        item = bar->findChild<LLMenuItemGL>(item_name, true);
         const std::string          keys = item ? item->getAcceleratorString() : std::string();
@@ -4231,6 +4233,7 @@ void ALFloaterScriptStudio::refreshKeyTips()
         args["[KEYS]"] = keys;
         *out           = getString(keys.empty() ? keyless : tip, args);
     }
+    mCrumbsBar->setTips(std::move(tips));
     if (Doc* doc = active())
     {
         refreshTrailer(*doc);
@@ -5484,7 +5487,7 @@ void ALFloaterScriptStudio::pumpCaret()
     {
         doc->caretSeen  = caret;
         doc->inspectDue = source ? now + ANALYSIS_DELAY : 0.0;
-        refreshBreadcrumb(*doc);
+        mCrumbsBar->showPath(*doc);
         // The lit places go once the caret has left them all.
         if (source && !doc->editor->highlights().empty() && !doc->editor->highlighted(caret))
         {
@@ -5734,13 +5737,49 @@ void ALFloaterScriptStudio::renameDoc(Doc& doc, const std::string& name)
     }
     doc.name = name;
     fillTabs();
-    refreshBreadcrumb(doc);
+    mCrumbsBar->showPath(doc);
 }
 
 void ALFloaterScriptStudio::outlineChosen(Doc& doc, const ALScriptOutlineEntry& entry, bool to_editor)
 {
     mNavigation.noteJump(!to_editor);
     sourceInFront(doc).goTo(rangeOf(entry.nameSpan));
+}
+
+void ALFloaterScriptStudio::crumbChosen(Doc& doc, std::optional<ALTextRange> at)
+{
+    mNavigation.noteJump();
+    ALCodeEditor& source = sourceInFront(doc);
+    if (at)
+    {
+        // The script's top as a place for the caret; a symbol's name as
+        // what is selected.
+        if (at->empty())
+        {
+            source.goTo(at->begin);
+        }
+        else
+        {
+            source.goTo(*at);
+        }
+    }
+    source.setFocus(true);
+}
+
+void ALFloaterScriptStudio::trailerChosen(const std::string& value)
+{
+    if (value == "line")
+    {
+        goToLine();
+    }
+    else if (value == "problems")
+    {
+        showBottom("problems_tab", true);
+    }
+    else if (value == "expanded")
+    {
+        toggleExpanded();
+    }
 }
 
 void ALFloaterScriptStudio::showBottom(const char* tab, bool focus)
@@ -7361,9 +7400,7 @@ void ALFloaterScriptStudio::letGoOf(size_t index, bool keep)
         refreshToolbar();
         mProblemsPane->fill(nullptr);
         mOutlinePane->forget();
-        mBreadcrumb->setPath({});
-        mBreadcrumb->setTrailer(LLStringUtil::null);
-        mCrumbsShownFor.clear();
+        mCrumbsBar->forget();
         mSymbol->setText(LLStringUtil::null);
     }
     else

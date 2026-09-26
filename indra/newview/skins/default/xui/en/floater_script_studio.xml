@@ -1522,15 +1522,25 @@
                  background_visible="true"
                  background_opaque="true"
                  bg_opaque_color="MouseGray">
-                    <jump_bar
+                    <panel
+                     class="script_studio_crumbs"
                      follows="left|top|right"
-                     height="22"
+                     height="23"
                      layout="topleft"
                      left="0"
-                     name="breadcrumb"
+                     name="crumbs"
                      right="-290"
-                     tool_tip="Where the caret is: the line and column at the right, and from the script down to the symbol around it at the left. Press a step to go there; press its arrow to pick one of the symbols beside it instead."
-                     top="1" />
+                     top="0">
+                        <jump_bar
+                         follows="all"
+                         height="22"
+                         layout="topleft"
+                         left="0"
+                         name="breadcrumb"
+                         tool_tip="Where the caret is: the line and column at the right, and from the script down to the symbol around it at the left. Press a step to go there; press its arrow to pick one of the symbols beside it instead."
+                         top="1"
+                         width="284" />
+                    </panel>
                     <!-- The script's own state, at the right end of its strip:
                          what it compiles for, whether it runs, and reset. -->
                     <combo_box

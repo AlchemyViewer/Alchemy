@@ -45,6 +45,7 @@
 #include "alscriptlookup.h"
 #include "alscriptreferencespane.h"
 #include "alscriptoutlinepane.h"
+#include "alscriptcrumbsbar.h"
 #include "alfindings.h"
 #include "aloutputview.h"
 #include "alscriptanalysis.h"
@@ -111,7 +112,8 @@ class ALFloaterScriptStudio final : public ALStudioFloater, public ALScriptStudi
                                     public ALScriptExternalEditor::Window, public ALScriptStudioFiles::Window,
                                     public ALScriptStudioWeighing::Window, public ALScriptStudioOrphans::Window,
                                     public ALScriptNoticeBar::Window, public ALScriptNavigation::Window, public ALScriptLookup::Window,
-                                    public ALScriptReferencesPane::Window, public ALScriptOutlinePane::Window
+                                    public ALScriptReferencesPane::Window, public ALScriptOutlinePane::Window,
+                                    public ALScriptCrumbsBar::Window
 {
     friend class LLFloaterReg;
 
@@ -297,7 +299,7 @@ private:
     void   refreshToolbar() override;
     // The strip under the editor's right-hand words: the caret's place,
     // what is selected, and how many problems the script has.
-    void   refreshTrailer(Doc& doc) override;
+    void   refreshTrailer(Doc& doc) override { mCrumbsBar->showTrailer(doc); }
     // What vim (ALScriptStudioVim) asks of the window: an entry in the
     // Output tab and the tab in sight, and a line picked from a list over
     // the editors.
@@ -325,7 +327,7 @@ private:
     // The documents in the order the tabs were dragged into.
     void   onTabsReordered(const std::vector<std::string>& order);
     // How many errors and warnings a script shows.
-    void   problemCounts(const Doc& doc, S32& errors, S32& warnings) const;
+    void   problemCounts(const Doc& doc, S32& errors, S32& warnings) const override;
 
     ALCodeEditor*             makeEditor(const std::string& id, bool read_only);
     // The options every editor shares, put on one.
@@ -629,21 +631,23 @@ private:
     std::string problemsAt(const Doc& doc, const ALTextPos& at) const;
     // The outline (ALScriptOutlinePane): shown, which the bar at the
     // bottom is told of; a symbol chosen, gone to; its sort kept.
-    void        outlineShown(Doc& doc) override { refreshBreadcrumb(doc); }
+    void        outlineShown(Doc& doc) override { mCrumbsBar->showPath(doc); }
     void        outlineChosen(Doc& doc, const ALScriptOutlineEntry& entry, bool to_editor) override;
     void        outlineSortChanged() override { saveState(); }
-    void        refreshBreadcrumb(Doc& doc);
+    // The bar under the editor (ALScriptCrumbsBar): its path moved, which
+    // the outline follows; a step chosen, gone to; a word past the path
+    // pressed -- the caret's place opens Go to Line, the counts the
+    // problems, the view the other view; and vim's word.
+    void        pathChanged(Doc& doc) override { mOutlinePane->followCaret(doc); }
+    void        crumbChosen(Doc& doc, std::optional<ALTextRange> at) override;
+    void        trailerChosen(const std::string& value) override;
+    std::string vimBanner() const override { return mVim.banner(); }
     // A script's tab, its window's title and the bar called what it is now
     // called: renamed here, in the inventory, or found so when opened again.
     void        renameDoc(Doc& doc, const std::string& name);
     // Whether a script may move between windows now: not while a save of it
     // is on its way, which is said.
     bool        movable(const Doc& doc);
-    // The words past the breadcrumb: where the caret is, what is
-    // selected, how many problems; the caret's place opens Go to Line and
-    // the counts the problems.
-    void        onTrailerChosen(const std::string& value);
-    void        onCrumbChosen(size_t at, const std::string& value);
     // A bottom tab shown; and the keyboard put in its list, where asked.
     void        showBottom(const char* tab, bool focus = false);
     std::string kindName(ALScriptSymbolKind kind) const;
@@ -948,7 +952,7 @@ private:
     // carry a sentence, and it was the one showing nothing at all.
     ALEmptyState*                      mNoDocs        = nullptr;
     ALTabStrip*                        mTabs          = nullptr;
-    ALJumpBar*                         mBreadcrumb    = nullptr;
+    ALScriptCrumbsBar*                 mCrumbsBar     = nullptr;
     LLTabContainer*                    mBottomTabs    = nullptr;
     ALScriptProblemsPane*              mProblemsPane = nullptr;
     ALScriptReferencesPane*            mReferencesPane = nullptr;
@@ -957,10 +961,6 @@ private:
     // Held while a pane's row is followed into a tab, so that the panes
     // go on listing what they were rather than the tab's.
     S32                                mHoldPanes       = 0;
-    std::string                        mTrailerLineTip;
-    std::string                        mTrailerProblemsTip;
-    std::string                        mTrailerSourceTip;
-    std::string                        mTrailerExpandedTip;
     ALScriptOutputPane*                mOutputPane = nullptr;
     ALScriptSearchPane*                mSearchPane    = nullptr;
     // The Weights tab, and its list of parts.
@@ -990,9 +990,6 @@ private:
     ALScriptLookup                     mLookup{ *this, *this };
     LLHandle<LLContextMenu>            mTabMenuHandle;
     bool                               mMain = true;
-    // Whose path the bar at the bottom shows, so that a tab come to the
-    // front is shown there whatever its own path was when last shown.
-    std::string                        mCrumbsShownFor;
     bool                               mClosingWindow = false;
     LLHandle<LLContextMenu>            mListMenuHandle;
     LLScrollListCtrl*                  mListMenuFor   = nullptr;

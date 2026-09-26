@@ -109,6 +109,7 @@ public:
         }
     };
     void setTrailer(std::vector<TrailerPart> parts);
+    const std::vector<TrailerPart>& trailer() const { return mTrailerParts; }
 
     typedef boost::signals2::signal<void(const std::string&)> trailer_signal_t;
     boost::signals2::connection onTrailerChosen(const trailer_signal_t::slot_type& cb)
