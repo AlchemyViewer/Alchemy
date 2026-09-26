@@ -159,8 +159,35 @@ protected:
     ALOutputView(const Params& p);
 
     void tintRow(S32 line, const ALTextLayout::Line& laid, const ALTextLayout::Row& row, F32 alpha, std::vector<LLColor4U>& colors) override;
+    void urlLabelled(const std::string& url, const std::string& label) override;
 
 private:
+    // An entry's lines as shown: the text, and where the pieces of its
+    // first line lie, as byte offsets -- the time stamp up to `stamp`, the
+    // source, the kind in its brackets, and what was said from `textBegin`.
+    struct Laid
+    {
+        std::string text;
+        S32         lines       = 1;
+        S32         stamp       = 0;
+        S32         sourceBegin = 0;
+        S32         sourceEnd   = 0;
+        S32         kindBegin   = 0;
+        S32         kindEnd     = 0;
+        S32         textBegin   = 0;
+    };
+    static Laid lay(const Entry& entry);
+    // What lies on an entry's lines -- the stamp's face, the source bold,
+    // its links, the URLs in what was said -- by its lines from its first:
+    // worked out the first time it is shown and kept beside it, so that a
+    // filter lays it again without reading it for URLs again.
+    struct Decor
+    {
+        bool                      made = false;
+        std::vector<Style>        styles;
+        std::vector<Substitution> links;
+    };
+    const Decor& decorOf(size_t index, const Laid& laid);
     // One entry as shown: which, by serial, and over how many lines.
     struct Shown
     {
@@ -181,17 +208,17 @@ private:
         mutable F32             prefix   = -1.f;
         mutable const LLFontGL* measured = nullptr;
     };
+    static Shown shownOf(const Laid& laid, U32 serial, Hang hang);
+    // What the filter takes, laid out again as one text in one edit.
     void refill();
-    // The oldest of a lane let go of, past its fill, with its lines.
+    // The oldest of a lane let go of, past its fill, with their lines.
     void trim(U8 lane);
-    void removeAt(size_t index);
-    void show(const Entry& entry, U32 serial);
-    // An entry's lines put into the text at a line -- before what is
-    // there, or after the last, or as the whole where nothing is shown
-    // -- with its links, and what was shown; and so many lines from a
-    // line taken out again.
-    Shown showAt(const Entry& entry, U32 serial, S32 line, bool among_others);
-    void  hideAt(S32 line, S32 lines);
+    // Entries let go of, by their places in the log in order, with their
+    // lines in one edit.
+    void removeEntries(const std::vector<size_t>& going);
+    // The last entry's lines put after what is shown, with what lies on
+    // them.
+    void show(size_t index);
     bool passes(const Entry& entry) const { return !mFilter || mFilter(entry); }
     // Whether the last row is in sight, which is when a new one should be.
     bool atTail();
@@ -211,6 +238,8 @@ private:
 
     std::deque<Entry> mEntries;
     std::deque<U32>   mSerials;
+    // Beside each entry, what lies on it once it has been shown.
+    std::deque<Decor> mDecor;
     std::deque<Shown> mShown;
     // Where each shown entry's first line is, summed up once after the
     // shown change and kept: what a row asks for as it is drawn and a

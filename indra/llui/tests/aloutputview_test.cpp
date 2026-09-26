@@ -173,7 +173,7 @@ namespace tut
     template<> template<>
     void aloutputview_object::test<3>()
     {
-        set_test_name("a filter changing edits only the entries it takes in or drops: the rest keep their lines and their links");
+        set_test_name("a filter changing lays the log out again in one edit, each entry with the links it had");
         ALOutputView& v = make(10);
         ALOutputView::Entry linked = entry("", "at http://example.com/a");
         linked.link                = true;
@@ -187,12 +187,12 @@ namespace tut
         boost::signals2::scoped_connection counting = v.document().onChanged([&edits](const ALTextDocument::Edit&) { ++edits; });
         v.setFilter([](const ALOutputView::Entry& e) { return e.kind == "error"; });
         ensure_equals("the errors alone", v.text(), std::string("[12:00:00] Thing (error): two\nmore\n[12:00:00] Thing (error): four"));
-        ensure_equals("two edits: the two dropped", edits, U32(2));
+        ensure_equals("one edit for the two dropped", edits, U32(1));
         ensure("the first's links went with it", v.substitutions().empty());
         edits = 0;
         v.setFilter([](const ALOutputView::Entry& e) { return e.kind == "error" || e.text.find("http") != std::string::npos; });
         ensure_equals("the linked one back at the top", v.document().line(0), std::string("[12:00:00] Thing: at http://example.com/a"));
-        ensure_equals("one edit: the one taken in", edits, U32(1));
+        ensure_equals("one edit for the one taken in", edits, U32(1));
         ensure_equals("with its links again", v.substitutions().size(), size_t(2));
         ensure("the URL where it is", v.substitutions()[1].url == "http://example.com/a" && v.substitutions()[1].range.begin == ALTextPos(0, 21));
         v.setFilter(nullptr);
@@ -303,18 +303,69 @@ namespace tut
         {
             v.append(entry("", llformat("line %02d", i).c_str()));
         }
-        ensure_equals("five of the oldest gone", v.entries().front().text, std::string("line 05"));
+        ensure_equals("the oldest gone at once, down to seven eighths of the fill", v.entries().front().text, std::string("line 06"));
+        ensure_equals("and no more until it is full again", v.entries().size(), size_t(39));
         ensure_equals("and the line read is where it was", top_line(), std::string("[12:00:00] Thing: line 10"));
 
         // Read back past the oldest: the view keeps what is left of it.
         v.setScrollY(0);
         v.append(entry("", "line 45"));
-        ensure_equals("at the top, the top is the oldest left", top_line(), std::string("[12:00:00] Thing: line 06"));
+        v.append(entry("", "line 46"));
+        ensure_equals("at the top, the top is the oldest left", top_line(), std::string("[12:00:00] Thing: line 12"));
 
         // Following the end, it still follows.
         v.setScrollY(v.layout().totalHeight());
-        v.append(entry("", "line 46"));
+        v.append(entry("", "line 47"));
         ensure("the last line in sight",
                v.scrollY() + v.textRect().getHeight() >= v.layout().totalHeight() - v.layout().rowHeight());
+    }
+
+    template<> template<>
+    void aloutputview_object::test<7>()
+    {
+        set_test_name("a lane past its fill lets go of its oldest from among another's in one edit, what is in sight staying in sight");
+        ALOutputView& v = make(24);
+        const auto in_lane = [](const std::string& text, U8 lane) {
+            ALOutputView::Entry one = aloutputview_data::entry("", text.c_str());
+            one.lane                = lane;
+            return one;
+        };
+        for (S32 i = 0; i < 24; ++i)
+        {
+            v.append(in_lane(llformat("a%d", i), 0));
+            v.append(in_lane(llformat("b%d", i), 1));
+        }
+        ensure_equals("both lanes full", v.entries().size(), size_t(48));
+        v.setScrollY(v.layout().lineTop(10));
+        const auto top_line = [&v]() { return v.document().line(v.layout().lineAtY(v.scrollY())); };
+        ensure_equals("reading from the eleventh", top_line(), std::string("[12:00:00] Thing: a5"));
+        U32 edits = 0;
+        boost::signals2::scoped_connection counting = v.document().onChanged([&edits](const ALTextDocument::Edit&) { ++edits; });
+        v.append(in_lane("a24", 0));
+        ensure_equals("the lane's four oldest gone, the other's between them kept", v.document().line(0), std::string("[12:00:00] Thing: b0"));
+        ensure_equals("", v.document().line(3), std::string("[12:00:00] Thing: b3"));
+        ensure_equals("", v.document().line(4), std::string("[12:00:00] Thing: a4"));
+        ensure_equals("twenty-one of the lane and twenty-four of the other", v.entries().size(), size_t(45));
+        ensure_equals("one edit to take them out, one to put the new one in", edits, U32(2));
+        ensure_equals("and the line read is where it was", top_line(), std::string("[12:00:00] Thing: a5"));
+    }
+
+    template<> template<>
+    void aloutputview_object::test<8>()
+    {
+        set_test_name("a filter that shows what was shown already edits nothing; one that changes it keeps a selection on an entry it still shows");
+        ALOutputView& v = make(10);
+        v.append(entry("", "one"));
+        v.append(entry("error", "two"));
+        v.append(entry("", "three"));
+        U32 edits = 0;
+        boost::signals2::scoped_connection counting = v.document().onChanged([&edits](const ALTextDocument::Edit&) { ++edits; });
+        v.setFilter([](const ALOutputView::Entry&) { return true; });
+        ensure_equals("nothing to change", edits, U32(0));
+        v.setSelection(ALTextRange(ALTextPos(2, 18), ALTextPos(2, 23)));
+        v.setFilter([](const ALOutputView::Entry& one) { return one.kind != "error"; });
+        ensure_equals("one edit", edits, U32(1));
+        ensure("the selection on the same words, a line up", v.selection() == ALTextRange(ALTextPos(1, 18), ALTextPos(1, 23)));
+        ensure_equals("which are", v.document().text(v.selection()), std::string("three"));
     }
 }

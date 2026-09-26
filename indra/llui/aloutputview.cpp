@@ -31,64 +31,78 @@
 #include "lluicolortable.h"
 
 #include <algorithm>
+#include <string_view>
 
 static LLDefaultChildRegistry::Register<ALOutputView> r("output_view");
 
 namespace
 {
-    // An entry's first line, piece by piece: where the source starts and
-    // ends, and where what was said starts, as byte offsets of the line.
-    struct Laid
+    // One more link kept in order, as the view adds one: within a line,
+    // and left out where it would lie over one already there.
+    void addInOrder(std::vector<ALTextView::Substitution>& links, ALTextView::Substitution link)
     {
-        std::string text;
-        S32         stamp       = 0;
-        S32         sourceBegin = 0;
-        S32         sourceEnd   = 0;
-        S32         kindBegin   = 0;
-        S32         kindEnd     = 0;
-        S32         textBegin   = 0;
-    };
-
-    Laid layEntry(const ALOutputView::Entry& entry)
-    {
-        Laid laid;
-        if (!entry.time.empty())
+        link.range = link.range.normalised();
+        if (link.range.begin.line != link.range.end.line || link.range.empty())
         {
-            laid.text = "[" + entry.time + "] ";
+            return;
         }
-        laid.stamp       = static_cast<S32>(laid.text.size());
-        laid.sourceBegin = laid.stamp;
-        laid.text += entry.source;
-        laid.sourceEnd = static_cast<S32>(laid.text.size());
-        laid.kindBegin = laid.sourceEnd;
-        laid.kindEnd   = laid.sourceEnd;
-        if (!entry.kind.empty())
+        const auto at = std::lower_bound(links.begin(), links.end(), link.range.begin,
+                                         [](const ALTextView::Substitution& s, const ALTextPos& p) { return s.range.begin < p; });
+        if ((at != links.end() && at->range.begin < link.range.end) || (at != links.begin() && link.range.begin < (at - 1)->range.end))
         {
-            laid.text += " ";
-            laid.kindBegin = static_cast<S32>(laid.text.size());
-            laid.text += "(" + entry.kind + ")";
-            laid.kindEnd = static_cast<S32>(laid.text.size());
+            return;
         }
-        if (!entry.source.empty() || !entry.kind.empty())
-        {
-            laid.text += ": ";
-        }
-        laid.textBegin = static_cast<S32>(laid.text.size());
-        // What was said, its lines after the first indented under it.
-        size_t from = 0;
-        while (true)
-        {
-            const size_t nl = entry.text.find('\n', from);
-            laid.text.append(entry.text, from, nl == std::string::npos ? std::string::npos : nl - from);
-            if (nl == std::string::npos)
-            {
-                break;
-            }
-            laid.text += '\n';
-            from = nl + 1;
-        }
-        return laid;
+        links.insert(at, std::move(link));
     }
+
+    // A range laid on an entry's lines, moved down to where its first is.
+    ALTextRange below(const ALTextRange& range, S32 first)
+    {
+        return ALTextRange(ALTextPos(range.begin.line + first, range.begin.column), ALTextPos(range.end.line + first, range.end.column));
+    }
+}
+
+// static
+ALOutputView::Laid ALOutputView::lay(const Entry& entry)
+{
+    Laid laid;
+    if (!entry.time.empty())
+    {
+        laid.text = "[" + entry.time + "] ";
+    }
+    laid.stamp       = static_cast<S32>(laid.text.size());
+    laid.sourceBegin = laid.stamp;
+    laid.text += entry.source;
+    laid.sourceEnd = static_cast<S32>(laid.text.size());
+    laid.kindBegin = laid.sourceEnd;
+    laid.kindEnd   = laid.sourceEnd;
+    if (!entry.kind.empty())
+    {
+        laid.text += " ";
+        laid.kindBegin = static_cast<S32>(laid.text.size());
+        laid.text += "(" + entry.kind + ")";
+        laid.kindEnd = static_cast<S32>(laid.text.size());
+    }
+    if (!entry.source.empty() || !entry.kind.empty())
+    {
+        laid.text += ": ";
+    }
+    laid.textBegin = static_cast<S32>(laid.text.size());
+    // What was said, its lines after the first indented under it.
+    size_t from = 0;
+    while (true)
+    {
+        const size_t nl = entry.text.find('\n', from);
+        laid.text.append(entry.text, from, nl == std::string::npos ? std::string::npos : nl - from);
+        if (nl == std::string::npos)
+        {
+            break;
+        }
+        laid.text += '\n';
+        ++laid.lines;
+        from = nl + 1;
+    }
+    return laid;
 }
 
 ALOutputView::Params::Params()
@@ -197,7 +211,7 @@ F32 ALOutputView::prefixWidth(const Shown& shown, S32 first) const
 // static
 std::string ALOutputView::format(const Entry& entry)
 {
-    return layEntry(entry).text;
+    return lay(entry).text;
 }
 
 bool ALOutputView::atTail()
@@ -211,85 +225,84 @@ void ALOutputView::followTail()
     setScrollY(layout().totalHeight());
 }
 
-void ALOutputView::show(const Entry& entry, U32 serial)
+// static
+ALOutputView::Shown ALOutputView::shownOf(const Laid& laid, U32 serial, Hang hang)
 {
-    mShown.push_back(showAt(entry, serial, document().lineCount(), !mShown.empty()));
-    ++mShownGeneration;
-}
-
-ALOutputView::Shown ALOutputView::showAt(const Entry& entry, U32 serial, S32 line, bool among_others)
-{
-    const Laid laid  = layEntry(entry);
-    S32        first = line;
-    const S32  lines = 1 + static_cast<S32>(std::count(laid.text.begin(), laid.text.end(), '\n'));
-    if (!among_others)
-    {
-        // The first: the text whole, in place of the one empty line.
-        document().replace(ALTextRange(document().start(), document().end()), laid.text);
-        first = 0;
-    }
-    else if (line < document().lineCount())
-    {
-        // Before another: its lines and the break after them.
-        document().insert(document().lineStart(first), laid.text + "\n");
-    }
-    else
-    {
-        document().append("\n" + laid.text);
-        first = document().lineCount() - lines;
-    }
     Shown shown;
     shown.serial      = serial;
-    shown.lines       = lines;
+    shown.lines       = laid.lines;
     shown.stamp       = laid.stamp;
     shown.sourceBegin = laid.sourceBegin;
     shown.sourceEnd   = laid.sourceEnd;
     shown.kindBegin   = laid.kindBegin;
     shown.kindEnd     = laid.kindEnd;
     shown.text        = laid.textBegin;
-    shown.hang        = entry.hang;
+    shown.hang        = hang;
+    return shown;
+}
 
+const ALOutputView::Decor& ALOutputView::decorOf(size_t index, const Laid& laid)
+{
+    Decor& decor = mDecor[index];
+    if (decor.made)
+    {
+        return decor;
+    }
+    decor.made         = true;
+    const Entry& entry = mEntries[index];
     // The stamp in its smaller face, the source bold; the colours are
     // laid on as the rows are drawn.
     if (laid.stamp > 0 && mTimeFont && mTimeFont != getFont())
     {
         Style stamp;
-        stamp.range = ALTextRange(ALTextPos(first, 0), ALTextPos(first, laid.stamp));
+        stamp.range = ALTextRange(ALTextPos(0, 0), ALTextPos(0, laid.stamp));
         stamp.font  = mTimeFont;
-        addStyle(std::move(stamp));
+        decor.styles.push_back(std::move(stamp));
     }
     if (laid.sourceEnd > laid.sourceBegin)
     {
         Style source;
-        source.range = ALTextRange(ALTextPos(first, laid.sourceBegin), ALTextPos(first, laid.sourceEnd));
+        source.range = ALTextRange(ALTextPos(0, laid.sourceBegin), ALTextPos(0, laid.sourceEnd));
         source.flags = LLFontGL::BOLD;
-        addStyle(std::move(source));
+        decor.styles.push_back(std::move(source));
     }
 
     if (entry.link && laid.sourceEnd > laid.sourceBegin)
     {
         Substitution source;
-        source.range   = ALTextRange(ALTextPos(first, laid.sourceBegin), ALTextPos(first, laid.sourceEnd));
+        source.range   = ALTextRange(ALTextPos(0, laid.sourceBegin), ALTextPos(0, laid.sourceEnd));
         source.link    = true;
         source.tooltip = entry.tooltip;
-        source.value   = LLSD(static_cast<S32>(serial));
-        addSubstitution(std::move(source));
+        source.value   = LLSD(static_cast<S32>(mSerials[index]));
+        addInOrder(decor.links, std::move(source));
+    }
+    // The lines as shown, for the links on them.
+    std::vector<std::string_view> lines;
+    lines.reserve(static_cast<size_t>(laid.lines));
+    for (size_t from = 0;;)
+    {
+        const size_t nl = laid.text.find('\n', from);
+        lines.emplace_back(laid.text.data() + from, (nl == std::string::npos ? laid.text.size() : nl) - from);
+        if (nl == std::string::npos)
+        {
+            break;
+        }
+        from = nl + 1;
     }
     // The entry's own links within what was said: a line's bytes as the
-    // entry has them are the document's, but for the first line's, which
+    // entry has them are the text's, but for the first line's, which
     // start after the stamp and the source.
     for (size_t i = 0; i < entry.links.size(); ++i)
     {
         const Entry::Link& link = entry.links[i];
-        if (link.line < 0 || link.line >= shown.lines)
+        if (link.line < 0 || link.line >= static_cast<S32>(lines.size()))
         {
             continue;
         }
-        const S32          at     = first + link.line;
-        const S32          offset = link.line == 0 ? laid.textBegin : 0;
-        const S32          length = document().lineLength(at);
-        const std::string& text   = document().line(at);
-        S32                begin  = link.begin >= 0 ? offset + link.begin : offset;
+        const std::string_view text   = lines[static_cast<size_t>(link.line)];
+        const S32              offset = link.line == 0 ? laid.textBegin : 0;
+        const S32              length = static_cast<S32>(text.size());
+        S32                    begin  = link.begin >= 0 ? offset + link.begin : offset;
         if (link.begin < 0)
         {
             while (begin < length && (text[begin] == ' ' || text[begin] == '\t'))
@@ -303,19 +316,70 @@ ALOutputView::Shown ALOutputView::showAt(const Entry& entry, U32 serial, S32 lin
             continue;
         }
         Substitution own;
-        own.range          = ALTextRange(ALTextPos(at, begin), ALTextPos(at, end));
+        own.range          = ALTextRange(ALTextPos(link.line, begin), ALTextPos(link.line, end));
         own.link           = true;
         own.tooltip        = link.tooltip;
-        own.value["entry"] = static_cast<S32>(serial);
+        own.value["entry"] = static_cast<S32>(mSerials[index]);
         own.value["link"]  = static_cast<S32>(i);
-        addSubstitution(std::move(own));
+        addInOrder(decor.links, std::move(own));
     }
-    linkUrlsOn(first, laid.textBegin);
-    for (S32 l = first + 1; l < first + shown.lines; ++l)
+    for (size_t l = 0; l < lines.size(); ++l)
     {
-        linkUrlsOn(l);
+        for (Substitution& url : urlLinks(std::string(lines[l]), static_cast<S32>(l), l == 0 ? laid.textBegin : 0))
+        {
+            addInOrder(decor.links, std::move(url));
+        }
     }
-    return shown;
+    return decor;
+}
+
+void ALOutputView::show(size_t index)
+{
+    const Laid   laid  = lay(mEntries[index]);
+    const Decor& decor = decorOf(index, laid);
+    const bool   alone = mShown.empty();
+    const S32    first = alone ? 0 : document().lineCount();
+    // Known before its lines go in, for the rows laid out as they do.
+    mShown.push_back(shownOf(laid, mSerials[index], mEntries[index].hang));
+    ++mShownGeneration;
+    if (alone)
+    {
+        // The first: the text whole, in place of the one empty line.
+        document().replace(ALTextRange(document().start(), document().end()), laid.text);
+    }
+    else
+    {
+        document().append("\n" + laid.text);
+    }
+    for (const Style& style : decor.styles)
+    {
+        Style at = style;
+        at.range = below(style.range, first);
+        addStyle(std::move(at));
+    }
+    for (const Substitution& link : decor.links)
+    {
+        Substitution at = link;
+        at.range        = below(link.range, first);
+        addSubstitution(std::move(at));
+    }
+}
+
+void ALOutputView::urlLabelled(const std::string& url, const std::string& label)
+{
+    ALTextView::urlLabelled(url, label);
+    // And the links kept to lay again, so that an entry the filter shows
+    // again shows the name.
+    for (Decor& decor : mDecor)
+    {
+        for (Substitution& link : decor.links)
+        {
+            if (link.link && link.url == url)
+            {
+                link.shown = label;
+            }
+        }
+    }
 }
 
 void ALOutputView::followed(const Substitution& link)
@@ -372,11 +436,12 @@ void ALOutputView::append(Entry entry)
     const U8 lane     = entry.lane;
     mEntries.push_back(std::move(entry));
     mSerials.push_back(serial);
+    mDecor.emplace_back();
     ++mLaneCount[lane];
     trim(lane);
     if (!mEntries.empty() && mSerials.back() == serial && passes(mEntries.back()))
     {
-        show(mEntries.back(), serial);
+        show(mEntries.size() - 1);
         if (follow)
         {
             followTail();
@@ -388,6 +453,7 @@ void ALOutputView::clearEntries()
 {
     mEntries.clear();
     mSerials.clear();
+    mDecor.clear();
     mShown.clear();
     for (S32& count : mLaneCount)
     {
@@ -425,65 +491,139 @@ void ALOutputView::setCapacity(S32 capacity, U8 lane)
 void ALOutputView::trim(U8 lane)
 {
     const S32 fill = capacity(lane);
-    while (mLaneCount[lane] > fill)
+    if (mLaneCount[lane] <= fill)
     {
-        // The lane's oldest: the log's oldest, most of the time, whose
-        // lines are the text's first.
-        size_t oldest = 0;
-        while (oldest < mEntries.size() && mEntries[oldest].lane != lane)
+        return;
+    }
+    // Past its fill, a lane lets go of its oldest down to seven eighths of
+    // it at once: the text's front taken out once in so many entries, not
+    // once for each that comes, each time moving every line below it.
+    S32                 drop = mLaneCount[lane] - (fill - fill / 8);
+    std::vector<size_t> going;
+    for (size_t i = 0; i < mEntries.size() && drop > 0; ++i)
+    {
+        if (mEntries[i].lane == lane)
         {
-            ++oldest;
+            going.push_back(i);
+            --drop;
         }
-        if (oldest == mEntries.size())
-        {
-            mLaneCount[lane] = 0;
-            return;
-        }
-        removeAt(oldest);
+    }
+    removeEntries(going);
+    if (drop > 0)
+    {
+        // Fewer than it counted: none of it is left.
+        mLaneCount[lane] = 0;
     }
 }
 
-void ALOutputView::removeAt(size_t index)
+void ALOutputView::removeEntries(const std::vector<size_t>& going)
 {
-    const U32 serial = mSerials[index];
-    --mLaneCount[mEntries[index].lane];
-    mEntries.erase(mEntries.begin() + static_cast<std::ptrdiff_t>(index));
-    mSerials.erase(mSerials.begin() + static_cast<std::ptrdiff_t>(index));
-    // Its lines, where it is shown: at the top, as the oldest is, or
-    // wherever the lines before it end.
-    S32 line = 0;
-    for (size_t i = 0; i < mShown.size(); ++i)
+    if (going.empty())
     {
-        if (mShown[i].serial == serial)
+        return;
+    }
+    // The lines of those shown, in runs, and how much of them lies above
+    // the top of the view -- the oldest are the text's first lines, most
+    // of the time, but a lane's may lie anywhere.
+    std::vector<std::pair<S32, S32>> runs;
+    std::vector<bool>                hidden(mShown.size(), false);
+    S32                              above = 0;
+    {
+        size_t g    = 0;
+        S32    line = 0;
+        for (size_t i = 0; i < mShown.size() && g < going.size(); ++i)
         {
-            // What is in sight stays in sight: lines let go of above the
-            // top of the view take their height off the scroll, or the
-            // text a reader has scrolled back to crawls up by an entry for
-            // every entry that comes in.
-            const S32 top    = layout().lineTop(line);
-            const S32 height = layout().lineTop(line + mShown[i].lines) - top;
-            const S32 above  = llclamp(scrollY() - top, 0, height);
-            if (i == 0)
+            const U32 serial = mShown[i].serial;
+            while (g < going.size() && mSerials[going[g]] < serial)
             {
-                document().removeFirstLines(mShown.front().lines);
+                ++g;
             }
-            else
+            const S32 lines = mShown[i].lines;
+            if (g < going.size() && mSerials[going[g]] == serial)
             {
-                hideAt(line, mShown[i].lines);
+                // What is in sight stays in sight: lines let go of above
+                // the top of the view take their height off the scroll, or
+                // the text a reader has scrolled back to crawls up by an
+                // entry for every entry that comes in.
+                const S32 top    = layout().lineTop(line);
+                const S32 height = layout().lineTop(line + lines) - top;
+                above += llclamp(scrollY() - top, 0, height);
+                if (!runs.empty() && runs.back().second == line)
+                {
+                    runs.back().second += lines;
+                }
+                else
+                {
+                    runs.emplace_back(line, line + lines);
+                }
+                hidden[i] = true;
             }
-            mShown.erase(mShown.begin() + static_cast<std::ptrdiff_t>(i));
-            ++mShownGeneration;
-            if (above > 0)
-            {
-                setScrollY(scrollY() - above);
-            }
-            return;
+            line += lines;
         }
-        if (mShown[i].serial > serial)
+    }
+    // The log without them, in one pass over each list.
+    {
+        size_t g    = 0;
+        size_t kept = 0;
+        for (size_t i = 0; i < mEntries.size(); ++i)
         {
-            return;
+            if (g < going.size() && going[g] == i)
+            {
+                --mLaneCount[mEntries[i].lane];
+                ++g;
+                continue;
+            }
+            if (kept != i)
+            {
+                mEntries[kept] = std::move(mEntries[i]);
+                mSerials[kept] = mSerials[i];
+                mDecor[kept]   = std::move(mDecor[i]);
+            }
+            ++kept;
         }
-        line += mShown[i].lines;
+        mEntries.resize(kept);
+        mSerials.resize(kept);
+        mDecor.resize(kept);
+    }
+    if (runs.empty())
+    {
+        return;
+    }
+    {
+        std::deque<Shown> left;
+        for (size_t i = 0; i < mShown.size(); ++i)
+        {
+            if (!hidden[i])
+            {
+                left.push_back(mShown[i]);
+            }
+        }
+        mShown.swap(left);
+        ++mShownGeneration;
+    }
+    // Each run its lines and the break after them; the last, the break
+    // before it; all of them, the whole.
+    const S32                                        count = document().lineCount();
+    std::vector<std::pair<ALTextRange, std::string>> cuts;
+    for (const auto& [first, end] : runs)
+    {
+        if (end < count)
+        {
+            cuts.emplace_back(ALTextRange(document().lineStart(first), document().lineStart(end)), std::string());
+        }
+        else if (first > 0)
+        {
+            cuts.emplace_back(ALTextRange(document().lineEnd(first - 1), document().end()), std::string());
+        }
+        else
+        {
+            cuts.emplace_back(ALTextRange(document().start(), document().end()), std::string());
+        }
+    }
+    document().replaceMany(std::move(cuts));
+    if (above > 0)
+    {
+        setScrollY(scrollY() - above);
     }
 }
 
@@ -493,63 +633,104 @@ void ALOutputView::setFilter(filter_t filter)
     refill();
 }
 
-void ALOutputView::hideAt(S32 line, S32 lines)
-{
-    if (lines >= document().lineCount())
-    {
-        document().replace(ALTextRange(document().start(), document().end()), std::string());
-    }
-    else if (line + lines < document().lineCount())
-    {
-        // Its lines and the break after them.
-        document().remove(ALTextRange(document().lineStart(line), document().lineStart(line + lines)));
-    }
-    else
-    {
-        // The last: the break before it and its lines.
-        document().remove(ALTextRange(document().lineEnd(line - 1), document().end()));
-    }
-}
-
 void ALOutputView::refill()
 {
-    // What is shown brought to what the filter takes now, entry by
-    // entry against what was shown: the ones that stay keep their lines
-    // and their links, the ones the filter drops lose them, the ones it
-    // takes in get theirs -- rather than the whole text again, which a
-    // long log would feel. The shown are gathered anew in one pass.
-    const bool        follow = atTail();
-    std::deque<Shown> next;
-    size_t            old  = 0;
-    S32               line = 0;
+    // What the filter takes now, laid out as one text and put in as one
+    // edit: each entry with what lies on it as it was worked out the
+    // first time it was shown, moved to where it lies now -- rather than
+    // an edit for each entry the filter takes in or drops, each sliding
+    // everything below it, and each taken in read for URLs again.
+    const bool          follow = atTail();
+    std::vector<size_t> taken;
     for (size_t i = 0; i < mEntries.size(); ++i)
     {
-        const bool was = old < mShown.size() && mShown[old].serial == mSerials[i];
-        const bool now = passes(mEntries[i]);
-        if (was && now)
+        if (passes(mEntries[i]))
         {
-            next.push_back(mShown[old]);
-            line += mShown[old++].lines;
-        }
-        else if (was)
-        {
-            hideAt(line, mShown[old++].lines);
-        }
-        else if (now)
-        {
-            // Among others where any are shown before it, or any of the
-            // old are still ahead of it in the text.
-            next.push_back(showAt(mEntries[i], mSerials[i], line, !next.empty() || old < mShown.size()));
-            line += next.back().lines;
+            taken.push_back(i);
         }
     }
-    while (old < mShown.size())
+    const bool same = taken.size() == mShown.size() &&
+                      std::equal(taken.begin(), taken.end(), mShown.begin(), [this](size_t i, const Shown& shown) { return mSerials[i] == shown.serial; });
+    if (same)
     {
-        // Shown, but no entry's any more.
-        hideAt(line, mShown[old++].lines);
+        return;
     }
+    // The selection, by the entry each end is in, to stay on what it was
+    // on where that is still shown.
+    struct Held
+    {
+        U32 serial = 0;
+        S32 line   = 0;
+        S32 column = 0;
+    };
+    const auto hold = [this](const ALTextPos& pos) {
+        S32          first = 0;
+        const Shown* shown = shownAt(pos.line, &first);
+        return shown ? Held{ shown->serial, pos.line - first, pos.column } : Held{};
+    };
+    const ALTextRange was_selected = selection();
+    const Held        anchor       = hold(was_selected.begin);
+    const Held        caret        = hold(was_selected.end);
+    std::optional<ALTextPos> anchor_at, caret_at;
+
+    std::string               text;
+    std::deque<Shown>         next;
+    std::vector<Style>        styles;
+    std::vector<Substitution> links;
+    size_t                    old  = 0;
+    S32                       line = 0;
+    for (const size_t i : taken)
+    {
+        const Laid   laid  = lay(mEntries[i]);
+        const Decor& decor = decorOf(i, laid);
+        if (!next.empty())
+        {
+            text += '\n';
+        }
+        text += laid.text;
+        Shown shown = shownOf(laid, mSerials[i], mEntries[i].hang);
+        // One shown before keeps what was measured of it.
+        while (old < mShown.size() && mShown[old].serial < mSerials[i])
+        {
+            ++old;
+        }
+        if (old < mShown.size() && mShown[old].serial == mSerials[i])
+        {
+            shown.prefix   = mShown[old].prefix;
+            shown.measured = mShown[old].measured;
+        }
+        if (anchor.serial == mSerials[i])
+        {
+            anchor_at = ALTextPos(line + anchor.line, anchor.column);
+        }
+        if (caret.serial == mSerials[i])
+        {
+            caret_at = ALTextPos(line + caret.line, caret.column);
+        }
+        for (const Style& style : decor.styles)
+        {
+            styles.push_back(style);
+            styles.back().range = below(style.range, line);
+        }
+        for (const Substitution& link : decor.links)
+        {
+            links.push_back(link);
+            links.back().range = below(link.range, line);
+        }
+        line += shown.lines;
+        next.push_back(shown);
+    }
+    // Known before the lines go in, for the rows laid out as they do.
     mShown.swap(next);
     ++mShownGeneration;
+    document().replace(ALTextRange(document().start(), document().end()), text);
+    setStyles(std::move(styles));
+    setSubstitutions(std::move(links));
+    if (!was_selected.empty() && anchor_at && caret_at)
+    {
+        placeSelection(document().clamp(*anchor_at), document().clamp(*caret_at));
+    }
+    findChanged();
     if (follow)
     {
         followTail();

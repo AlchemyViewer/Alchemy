@@ -41,6 +41,7 @@
 #include "../alcodeeditor.h"
 #include "../alfindbar.h"
 #include "../alfoldmodel.h"
+#include "../aloutputview.h"
 #include "../altextsearch.h"
 #include "../alvimkeymap.h"
 
@@ -151,6 +152,12 @@ namespace
     void row(const char* name, double lsl, double slua, const char* note = "")
     {
         std::printf("  %-52s %10.3f %10.3f  %s\n", name, lsl, slua, note);
+    }
+
+    // A row with one number, not one for each language.
+    void rowOne(const char* name, double ms)
+    {
+        std::printf("  %-52s %10.3f\n", name, ms);
     }
 
     void countRow(const char* name, size_t lsl, size_t slua)
@@ -394,6 +401,47 @@ int main(int, char**)
     for (Subject& s : subjects)
     {
         s.editor->die();
+    }
+
+    // The Output pane's log, full: four lanes of 500 entries, every other
+    // one an error and every fourth with a URL in it.
+    std::printf("\nThe Output log (2,000 entries)\n");
+    {
+        ALOutputView::Params p(LLUICtrlFactory::getDefaultParams<ALOutputView>());
+        p.name              = "output";
+        p.rect              = LLRect(0, 800, 1000, 0);
+        p.capacity          = 500;
+        ALOutputView* log   = LLUICtrlFactory::create<ALOutputView>(p);
+        log->setFont(LLFontGL::getFontMonospace());
+        S32        serial   = 0;
+        const auto next_one = [&serial]() {
+            ALOutputView::Entry entry;
+            entry.time   = "12:00:00";
+            entry.source = "Object";
+            entry.kind   = serial % 2 ? "error" : "";
+            entry.lane   = static_cast<U8>(serial % 4);
+            entry.text   = serial % 4 == 0 ? llformat("message %d, see http://example.com/page/%d", serial, serial)
+                                           : llformat("message %d: the quick brown fox jumps over the lazy dog", serial);
+            ++serial;
+            return entry;
+        };
+        for (S32 i = 0; i < 2000; ++i)
+        {
+            log->append(next_one());
+        }
+        rowOne("a filter typed: the errors alone, then all again", ms_per_item(1, [&] {
+                   log->setFilter([](const ALOutputView::Entry& entry) { return entry.kind == "error"; });
+                   log->setFilter(nullptr);
+                   g_sink = g_sink + log->document().lineCount();
+               }));
+        rowOne("an entry past the fill, the oldest let go of", ms_per_item(100, [&] {
+                   for (S32 i = 0; i < 100; ++i)
+                   {
+                       log->append(next_one());
+                   }
+                   g_sink = g_sink + log->document().lineCount();
+               }));
+        log->die();
     }
     std::printf("\n(checksum %zu)\n", static_cast<size_t>(g_sink));
     return 0;

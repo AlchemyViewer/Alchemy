@@ -822,28 +822,29 @@ S32 ALTextView::linkUrlsOn(S32 line, S32 from)
     {
         return 0;
     }
-    const std::string& text = mDocument.line(line);
+    std::vector<Substitution> links = urlLinks(mDocument.line(line), line, from);
+    for (Substitution& link : links)
+    {
+        addSubstitution(std::move(link));
+    }
+    return static_cast<S32>(links.size());
+}
+
+std::vector<ALTextView::Substitution> ALTextView::urlLinks(const std::string& text, S32 line, S32 from)
+{
+    std::vector<Substitution> out;
     if (from < 0 || from >= static_cast<S32>(text.size()))
     {
-        return 0;
+        return out;
     }
     const LLHandle<ALTextView> self = getDerivedHandle<ALTextView>();
     // A name that arrives later goes to every link of the URL it is for.
     const auto relabelled = [self](const std::string& url, const std::string& label, const std::string&) {
-        ALTextView* view = self.get();
-        if (!view)
+        if (ALTextView* view = self.get())
         {
-            return;
-        }
-        for (const Substitution& sub : view->mSubstitutions)
-        {
-            if (sub.link && sub.url == url)
-            {
-                view->relabel(sub.range, label);
-            }
+            view->urlLabelled(url, label);
         }
     };
-    S32         made = 0;
     std::string rest = text.substr(static_cast<size_t>(from));
     S32         at   = from;
     LLUrlMatch  match;
@@ -868,12 +869,22 @@ S32 ALTextView::linkUrlsOn(S32 line, S32 from)
         {
             link.shown = match.getLabel();
         }
-        addSubstitution(std::move(link));
-        ++made;
+        out.push_back(std::move(link));
         rest = rest.substr(match.getEnd() + 1);
         at   = end;
     }
-    return made;
+    return out;
+}
+
+void ALTextView::urlLabelled(const std::string& url, const std::string& label)
+{
+    for (const Substitution& sub : mSubstitutions)
+    {
+        if (sub.link && sub.url == url)
+        {
+            relabel(sub.range, label);
+        }
+    }
 }
 
 // --- styles ----------------------------------------------------------------------
@@ -2817,6 +2828,15 @@ void ALTextView::placeFindBar()
     const S32    right  = text.mRight - 6;
     mFindBar->setShape(LLRect(right - width, local.mTop - 4, right, local.mTop - 4 - height));
     mFindBar->setColors(backgroundColor(), textColor());
+}
+
+void ALTextView::findChanged()
+{
+    if (findShown())
+    {
+        mFindStale = true;
+        mFindSettle.reset();
+    }
 }
 
 void ALTextView::refreshFind()
