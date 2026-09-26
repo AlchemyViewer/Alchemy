@@ -214,7 +214,7 @@ namespace tut
         crumbs->showPath(doc);
         const std::string top = "Script a [default, f, g, h, other]";
         ensure_equals("the path", path(), top + ", default [default, f, g, h, other], state_entry [state_entry, touch_start]");
-        ensure_equals("kept", doc.crumbPath.size(), size_t(2));
+        ensure_equals("kept", doc.caret.crumbPath.size(), size_t(2));
         ensure_equals("the outline told", joined(told().paths), std::string("a"));
         ensure_equals("the script's step", jump()->path()[0].value, std::string("top"));
         ensure_equals("said", jump()->path()[0].toolTip,

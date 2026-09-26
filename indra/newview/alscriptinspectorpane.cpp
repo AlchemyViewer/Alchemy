@@ -64,7 +64,7 @@ void ALScriptInspectorPane::inspected(Doc& doc, const ALScriptAnalysis::Result& 
     // Still about the word the caret is on, and this script: by the
     // source's place it was asked about, which the result's is not where
     // the analyzer read the expansion.
-    if (!mServices || &doc != mServices->frontDoc() || at != doc.inspectAt)
+    if (!mServices || &doc != mServices->frontDoc() || at != doc.caret.inspectAt)
     {
         return;
     }
@@ -123,7 +123,7 @@ void ALScriptInspectorPane::inspected(Doc& doc, const ALScriptAnalysis::Result& 
         }
     }
     // What is wrong where the caret is, said under the name.
-    const std::string problems = problemsAt(doc, doc.inspectAt);
+    const std::string problems = problemsAt(doc, doc.caret.inspectAt);
     if (!problems.empty())
     {
         text += (text.empty() ? "" : "\n\n") + problems;

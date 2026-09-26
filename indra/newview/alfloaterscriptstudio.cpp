@@ -2062,7 +2062,7 @@ void ALFloaterScriptStudio::showView(Doc& doc, Doc::View view, bool focus)
     }
     // The bars read the caret of the view in front, which is another caret
     // now, wherever it stands: seen afresh on the next frame (pumpCaret).
-    doc.caretSeen = ALTextPos(-1, -1);
+    doc.caret.seen = ALTextPos(-1, -1);
     refreshToolbar();
 }
 
@@ -2847,8 +2847,8 @@ void ALFloaterScriptStudio::activate(size_t index, bool focus)
     // is seen. The bar at the bottom says so now -- a notecard's too, whose
     // caret is not watched -- rather than keep the last tab's path until
     // the caret moves.
-    mDocs[index]->caretSeen = ALTextPos(-1, -1);
-    mDocs[index]->inspectAt = ALTextPos(-1, -1);
+    mDocs[index]->caret.seen      = ALTextPos(-1, -1);
+    mDocs[index]->caret.inspectAt = ALTextPos(-1, -1);
     mInspectorPane->forget();
     mCrumbsBar->showPath(*mDocs[index]);
     refreshNotice();
@@ -4313,9 +4313,9 @@ void ALFloaterScriptStudio::problemChosen(const ALScriptProblemsPane::Place& pla
 
 void ALFloaterScriptStudio::askSymbol(Doc& doc, ALEditorCommand command, const ALTextRange& word)
 {
-    doc.symbolCommand = command;
-    doc.symbolVersion = doc.editor->document().version();
-    doc.symbolAt      = word.begin;
+    doc.caret.symbolCommand = command;
+    doc.caret.symbolVersion = doc.editor->document().version();
+    doc.caret.symbolAt      = word.begin;
     askAnalyzer(doc, ALScriptAnalysis::Kind::References, word.begin);
 }
 
@@ -4386,15 +4386,15 @@ void ALFloaterScriptStudio::symbolAnswered(Doc& doc, const ALScriptAnalysis::Res
     // Of another question, or of a text that has moved on. Where it was
     // asked is the source's place, which the result's own is not where
     // the preprocessor ran and an include moved the lines.
-    if (result.version != doc.symbolVersion || at != doc.symbolAt || doc.symbolCommand == ALEditorCommand::None)
+    if (result.version != doc.caret.symbolVersion || at != doc.caret.symbolAt || doc.caret.symbolCommand == ALEditorCommand::None)
     {
         return;
     }
-    const ALEditorCommand     command = doc.symbolCommand;
+    const ALEditorCommand     command = doc.caret.symbolCommand;
     const ALScriptReferences& refs    = result.references;
-    doc.symbolCommand                 = ALEditorCommand::None;
+    doc.caret.symbolCommand           = ALEditorCommand::None;
     LLStringUtil::format_map_t args;
-    const std::string          name = refs.found ? refs.name : doc.editor->document().text(doc.editor->identifierAt(doc.symbolAt));
+    const std::string          name = refs.found ? refs.name : doc.editor->document().text(doc.editor->identifierAt(doc.caret.symbolAt));
     args["[NAME]"]                  = name;
     // A word of the language has no definition in the script to go to --
     // where the script has not made one of its own: its reference is where
@@ -5445,10 +5445,10 @@ void ALFloaterScriptStudio::pumpCaret()
     {
         mNavigation.walked();
     }
-    if (caret != doc->caretSeen)
+    if (caret != doc->caret.seen)
     {
-        doc->caretSeen  = caret;
-        doc->inspectDue = source ? now + ANALYSIS_DELAY : 0.0;
+        doc->caret.seen       = caret;
+        doc->caret.inspectDue = source ? now + ANALYSIS_DELAY : 0.0;
         mCrumbsBar->showPath(*doc);
         // The lit places go once the caret has left them all.
         if (source && !doc->editor->highlights().empty() && !doc->editor->highlighted(caret))
@@ -5456,9 +5456,9 @@ void ALFloaterScriptStudio::pumpCaret()
             doc->editor->clearHighlights();
         }
     }
-    if (source && doc->inspectDue > 0.0 && now >= doc->inspectDue)
+    if (source && doc->caret.inspectDue > 0.0 && now >= doc->caret.inspectDue)
     {
-        doc->inspectDue = 0.0;
+        doc->caret.inspectDue = 0.0;
         const ALTextRange word    = doc->editor->identifierAtCaret();
         const U32         version = doc->editor->document().version();
         if (word.empty())
@@ -5469,14 +5469,14 @@ void ALFloaterScriptStudio::pumpCaret()
             const std::string problems = mInspectorPane->problemsAt(*doc, caret);
             if (!problems.empty())
             {
-                doc->inspectAt = ALTextPos(-1, -1);
+                doc->caret.inspectAt = ALTextPos(-1, -1);
                 mInspectorPane->show(problems);
             }
         }
-        else if (word.begin != doc->inspectAt || version != doc->inspectVersion)
+        else if (word.begin != doc->caret.inspectAt || version != doc->caret.inspectVersion)
         {
-            doc->inspectAt      = word.begin;
-            doc->inspectVersion = version;
+            doc->caret.inspectAt      = word.begin;
+            doc->caret.inspectVersion = version;
             askAnalyzer(*doc, ALScriptAnalysis::Kind::Inspect, word.begin);
         }
     }
@@ -5508,9 +5508,9 @@ void ALFloaterScriptStudio::reference(Doc& doc)
     // source, whose places the analyzer answers in.
     if (!word.empty() && doc.shownView() == Doc::View::Source)
     {
-        doc.inspectAt      = word.begin;
-        doc.inspectVersion = doc.editor->document().version();
-        doc.inspectDue     = 0.0;
+        doc.caret.inspectAt      = word.begin;
+        doc.caret.inspectVersion = doc.editor->document().version();
+        doc.caret.inspectDue     = 0.0;
         askAnalyzer(doc, ALScriptAnalysis::Kind::Inspect, word.begin);
     }
     else

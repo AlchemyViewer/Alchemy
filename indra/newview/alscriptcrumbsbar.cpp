@@ -314,16 +314,16 @@ void ALScriptCrumbsBar::showPath(Doc& doc)
             parent = found;
         }
     }
-    if (mShownFor == doc.id && doc.crumbsOf == doc.analysisVersion && doc.crumbPath == path && doc.crumbName == doc.name)
+    if (mShownFor == doc.id && doc.caret.crumbsOf == doc.analysisVersion && doc.caret.crumbPath == path && doc.caret.crumbName == doc.name)
     {
         // The same steps over the same outline: only the trailer, which
         // says where the caret is.
         showTrailer(doc);
         return;
     }
-    doc.crumbsOf  = doc.analysisVersion;
-    doc.crumbPath = path;
-    doc.crumbName = doc.name;
+    doc.caret.crumbsOf  = doc.analysisVersion;
+    doc.caret.crumbPath = path;
+    doc.caret.crumbName = doc.name;
     mWindow->pathChanged(doc);
 
     std::vector<ALJumpBar::Crumb> crumbs;

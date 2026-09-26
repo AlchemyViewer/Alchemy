@@ -219,9 +219,6 @@ struct ALScriptStudioDoc
     // a line of -1 for none.
     ALTextPos                                  keepCaret{ -1, -1 };
     S32                                        keepScroll = 0;
-    // The outline's symbols folded shut, each by the names from the
-    // outermost down to it.
-    boost::unordered_flat_set<std::string, ll::string_hash, std::equal_to<>> outlineFolded;
     // A notecard's items (ALScriptNotecardTab), from the moment it is
     // loaded or kept as one; none for a script or a text file. Shared so
     // that an answer coming after the tab has gone finds nothing.
@@ -440,11 +437,6 @@ struct ALScriptStudioDoc
     ALTextRange                                actionsAsked;
     // What the analyzer said the script declares, at analysisVersion.
     std::vector<ALScriptOutlineEntry>          outline;
-    // The name last asked about -- its definition, its references, a
-    // new name -- where, and of which text.
-    ALEditorCommand                            symbolCommand = ALEditorCommand::None;
-    U32                                        symbolVersion = 0;
-    ALTextPos                                  symbolAt;
     // A place a name stands: in this script, or in another -- an
     // include of it, or a script that includes it -- named by the
     // identity the source map gives the other and what to call it,
@@ -515,18 +507,33 @@ struct ALScriptStudioDoc
         std::optional<std::string>     waiting;
     };
     External                                   external;
-    // The crumb path the bar was last told, by the outline it was
-    // read from: a caret that stays within the same symbols asks for
-    // no new crumbs, and it is asked on every key.
-    std::vector<size_t>                        crumbPath;
-    U32                                        crumbsOf = 0;
-    std::string                                crumbName;
-    // Where the caret was last seen; when the inspector is due to be
-    // told what it is on, or zero; and what it was last told about.
-    ALTextPos                                  caretSeen{ -1, -1 };
-    F64                                        inspectDue     = 0.0;
-    ALTextPos                                  inspectAt{ -1, -1 };
-    U32                                        inspectVersion = 0;
+    // The tab's part of what is said of its caret: the outline's folds,
+    // the name asked about, the path the bar shows, and the inspector's
+    // question about where the caret is.
+    struct Caret
+    {
+        // The outline's symbols folded shut, each by the names from the
+        // outermost down to it.
+        boost::unordered_flat_set<std::string, ll::string_hash, std::equal_to<>> outlineFolded;
+        // The name last asked about -- its definition, its references, a
+        // new name -- where, and of which text.
+        ALEditorCommand symbolCommand = ALEditorCommand::None;
+        U32             symbolVersion = 0;
+        ALTextPos       symbolAt;
+        // The crumb path the bar was last told, by the outline it was
+        // read from: a caret that stays within the same symbols asks for
+        // no new crumbs, and it is asked on every key.
+        std::vector<size_t> crumbPath;
+        U32                 crumbsOf = 0;
+        std::string         crumbName;
+        // Where the caret was last seen; when the inspector is due to be
+        // told what it is on, or zero; and what it was last told about.
+        ALTextPos seen{ -1, -1 };
+        F64       inspectDue = 0.0;
+        ALTextPos inspectAt{ -1, -1 };
+        U32       inspectVersion = 0;
+    };
+    Caret                                      caret;
     boost::signals2::scoped_connection         changed;
 
     // What the Problems pane's rows say a level is, and what the compiler's
