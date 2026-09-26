@@ -24,7 +24,7 @@
 
 #pragma once
 
-#include "lluictrl.h"
+#include "alpicturefield.h"
 
 #include <array>
 
@@ -36,10 +36,10 @@ class LLSpinCtrl;
 // agree, a change to any corner is a change to all four; unlinked, each is
 // its own. The value is the four numbers clockwise from the top left with
 // spaces between.
-class ALCornerField : public LLUICtrl
+class ALCornerField : public ALPictureField
 {
 public:
-    AL_VIEW_TYPE(ALCornerField, LLUICtrl);
+    AL_VIEW_TYPE(ALCornerField, ALPictureField);
 
     static constexpr S32 HEIGHT = 74;
 
@@ -48,25 +48,23 @@ public:
         Params();
     };
 
-    void setValue(const LLSD& value) override;
-    LLSD getValue() const override;
     void setRange(F32 minimum, F32 maximum, F32 step, S32 decimals);
-
-    void draw() override;
-    void reshape(S32 width, S32 height, bool called_from_parent = true) override;
 
 protected:
     friend class LLUICtrlFactory;
     ALCornerField(const Params& p);
 
-private:
-    void layout();
-    void onSpin(size_t corner);
-    void showRadii();
+    LLRect      pictureIn(S32 width, S32 height) const override;
+    void        placeBoxes(const LLRect& picture, S32 width, S32 height) override;
+    void        take(const std::vector<F32>& numbers) override;
+    std::string say() const override;
+    void        showNumbers() override;
+    void        boxTyped(size_t corner) override;
+    void        drawPicture() override;
 
+private:
     std::array<LLSpinCtrl*, 4> mSpin{};
     LLCheckBoxCtrl* mLink = nullptr;
     // Top left, top right, bottom right, bottom left.
     std::array<F32, 4> mRadii{};
-    LLRect mPicture;
 };

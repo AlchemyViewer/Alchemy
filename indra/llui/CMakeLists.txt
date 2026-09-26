@@ -9,6 +9,7 @@ target_sources(
     aldraggesture.cpp
     alcornerfield.cpp
     aloffsetpad.cpp
+    alpicturefield.cpp
     alpanefolds.cpp
     fsvirtualtrackpad.cpp
     llaccordionctrl.cpp
@@ -188,6 +189,7 @@ target_sources(
         aldraggesture.h
         alcornerfield.h
         aloffsetpad.h
+        alpicturefield.h
         alpanefolds.h
         altextcaret.h
         alviewtype.h
@@ -510,6 +512,7 @@ if(AL_BUILD_TESTS)
     aldockpanel
     alpanefolds
     alangledial
+    alcornerfield
     aldraggesture
     aloffsetpad
     alemptystate

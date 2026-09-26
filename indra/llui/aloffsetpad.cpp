@@ -25,7 +25,6 @@
 #include "linden_common.h"
 #include "aloffsetpad.h"
 
-#include "llfocusmgr.h"
 #include "llrender.h"
 #include "llrender2dutils.h"
 #include "llspinctrl.h"
@@ -33,7 +32,6 @@
 #include "lluictrlfactory.h"
 
 #include <fmt/format.h>
-#include <sstream>
 
 static LLDefaultChildRegistry::Register<ALOffsetPad> r("offset_pad");
 
@@ -48,7 +46,7 @@ ALOffsetPad::Params::Params()
 {
 }
 
-ALOffsetPad::ALOffsetPad(const Params& p) : LLUICtrl(p)
+ALOffsetPad::ALOffsetPad(const Params& p) : ALPictureField(p)
 {
     for (LLSpinCtrl** spin : { &mX, &mY })
     {
@@ -62,37 +60,25 @@ ALOffsetPad::ALOffsetPad(const Params& p) : LLUICtrl(p)
         sp.increment = 0.5f;
         sp.min_value = -512.f;
         sp.max_value = 512.f;
-        *spin = LLUICtrlFactory::create<LLSpinCtrl>(sp);
-        (*spin)->setCommitCallback([this](LLUICtrl*, const LLSD&)
-            {
-                mOffset[0] = (F32)mX->getValue().asReal();
-                mOffset[1] = (F32)mY->getValue().asReal();
-                onCommit();
-            });
-        addChild(*spin);
+        *spin = adoptBox(LLUICtrlFactory::create<LLSpinCtrl>(sp));
     }
 
     layout();
 }
 
-void ALOffsetPad::layout()
+void ALOffsetPad::placeBoxes(const LLRect& picture, S32 width, S32 height)
 {
-    const S32 height = getRect().getHeight();
-    const S32 side = llmax(24, height - 4);
-
-    mPad = LLRect(2, height - 2, 2 + side, height - 2 - side);
-
-    const S32 left = mPad.mRight + GAP;
+    const S32 left = picture.mRight + GAP;
     const S32 top = height - 2;
 
     mX->setShape(LLRect(left, top, left + BOX_WIDTH, top - BOX_HEIGHT));
     mY->setShape(LLRect(left, top - BOX_HEIGHT - GAP, left + BOX_WIDTH, top - 2 * BOX_HEIGHT - GAP));
 }
 
-void ALOffsetPad::reshape(S32 width, S32 height, bool called_from_parent)
+void ALOffsetPad::boxTyped(size_t box)
 {
-    LLUICtrl::reshape(width, height, called_from_parent);
-    layout();
+    mOffset[0] = (F32)mX->getValue().asReal();
+    mOffset[1] = (F32)mY->getValue().asReal();
 }
 
 void ALOffsetPad::setRange(F32 reach, F32 step, S32 decimals)
@@ -108,19 +94,13 @@ void ALOffsetPad::setRange(F32 reach, F32 step, S32 decimals)
     }
 }
 
-void ALOffsetPad::setValue(const LLSD& value)
+void ALOffsetPad::take(const std::vector<F32>& numbers)
 {
-    std::istringstream in(value.asString());
-    F32 x = 0.f;
-    F32 y = 0.f;
-
-    in >> x >> y;
-    mOffset[0] = x;
-    mOffset[1] = y;
-    showNumbers();
+    mOffset[0] = numbers.size() > 0 ? numbers[0] : 0.f;
+    mOffset[1] = numbers.size() > 1 ? numbers[1] : 0.f;
 }
 
-LLSD ALOffsetPad::getValue() const
+std::string ALOffsetPad::say() const
 {
     return fmt::format("{} {}", mOffset[0], mOffset[1]);
 }
@@ -133,11 +113,12 @@ void ALOffsetPad::showNumbers()
 
 // Where the pointer is, as an offset: the pad's centre is none and its
 // edge is the reach, in both directions.
-void ALOffsetPad::place(S32 x, S32 y)
+void ALOffsetPad::pointAt(S32 x, S32 y)
 {
-    const F32 half = llmax(1.f, F32(mPad.getWidth()) * 0.5f);
-    const F32 cx = F32(mPad.mLeft + mPad.mRight) * 0.5f;
-    const F32 cy = F32(mPad.mTop + mPad.mBottom) * 0.5f;
+    const LLRect& pad = picture();
+    const F32 half = llmax(1.f, F32(pad.getWidth()) * 0.5f);
+    const F32 cx = F32(pad.mLeft + pad.mRight) * 0.5f;
+    const F32 cy = F32(pad.mTop + pad.mBottom) * 0.5f;
 
     mOffset[0] = llclamp((x - cx) / half * mReach, -mReach, mReach);
     mOffset[1] = llclamp((y - cy) / half * mReach, -mReach, mReach);
@@ -147,78 +128,26 @@ void ALOffsetPad::place(S32 x, S32 y)
     showNumbers();
 }
 
-void ALOffsetPad::draw()
+void ALOffsetPad::drawPicture()
 {
     static const LLUIColor well = LLUIColorTable::instance().getColor("DefaultShadowLight", LLColor4::black);
     static const LLUIColor grid = LLUIColorTable::instance().getColor("LabelDisabledColor", LLColor4::grey);
     static const LLUIColor dot = LLUIColorTable::instance().getColor("EmphasisColor", LLColor4::yellow);
 
-    gl_rect_2d(mPad, well.get() % 0.6f, true);
-    gl_rect_2d(mPad, grid.get() % 0.6f, false);
+    const LLRect& pad = picture();
+    gl_rect_2d(pad, well.get() % 0.6f, true);
+    gl_rect_2d(pad, grid.get() % 0.6f, false);
 
-    const S32 cx = (mPad.mLeft + mPad.mRight) / 2;
-    const S32 cy = (mPad.mTop + mPad.mBottom) / 2;
+    const S32 cx = (pad.mLeft + pad.mRight) / 2;
+    const S32 cy = (pad.mTop + pad.mBottom) / 2;
 
-    gl_line_2d(mPad.mLeft, cy, mPad.mRight, cy, grid.get() % 0.4f);
-    gl_line_2d(cx, mPad.mBottom, cx, mPad.mTop, grid.get() % 0.4f);
+    gl_line_2d(pad.mLeft, cy, pad.mRight, cy, grid.get() % 0.4f);
+    gl_line_2d(cx, pad.mBottom, cx, pad.mTop, grid.get() % 0.4f);
 
-    const F32 half = F32(mPad.getWidth()) * 0.5f;
+    const F32 half = F32(pad.getWidth()) * 0.5f;
     const S32 x = cx + ll_round(mOffset[0] / mReach * half);
     const S32 y = cy + ll_round(mOffset[1] / mReach * half);
 
     gl_line_2d(cx, cy, x, y, dot.get() % 0.6f);
     gl_rect_2d(LLRect(x - 3, y + 3, x + 3, y - 3), dot.get(), true);
-
-    LLUICtrl::draw();
-}
-
-bool ALOffsetPad::handleMouseDown(S32 x, S32 y, MASK mask)
-{
-    if (!mPad.pointInRect(x, y))
-    {
-        return LLUICtrl::handleMouseDown(x, y, mask);
-    }
-
-    mDrag.press(x, y);
-    gFocusMgr.setMouseCapture(this);
-    place(x, y);
-
-    return true;
-}
-
-bool ALOffsetPad::handleHover(S32 x, S32 y, MASK mask)
-{
-    if (mDrag.pressed())
-    {
-        // Followed only where the pointer went somewhere: the captor is
-        // hovered on every frame, moved or not.
-        if (mDrag.moved(x, y))
-        {
-            place(x, y);
-        }
-
-        return true;
-    }
-
-    return LLUICtrl::handleHover(x, y, mask);
-}
-
-void ALOffsetPad::onMouseCaptureLost()
-{
-    mDrag.cancel();
-    LLUICtrl::onMouseCaptureLost();
-}
-
-bool ALOffsetPad::handleMouseUp(S32 x, S32 y, MASK mask)
-{
-    if (!mDrag.release())
-    {
-        return LLUICtrl::handleMouseUp(x, y, mask);
-    }
-
-    gFocusMgr.setMouseCapture(nullptr);
-    place(x, y);
-    onCommit();
-
-    return true;
 }

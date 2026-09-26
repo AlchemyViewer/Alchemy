@@ -34,7 +34,6 @@
 
 #include <cmath>
 #include <fmt/format.h>
-#include <sstream>
 
 static LLDefaultChildRegistry::Register<ALCornerField> r("corner_field");
 
@@ -51,7 +50,7 @@ ALCornerField::Params::Params()
 {
 }
 
-ALCornerField::ALCornerField(const Params& p) : LLUICtrl(p)
+ALCornerField::ALCornerField(const Params& p) : ALPictureField(p)
 {
     // Top left and top right on the top row, bottom left and bottom right
     // under them: the boxes sit where the corners are.
@@ -68,9 +67,7 @@ ALCornerField::ALCornerField(const Params& p) : LLUICtrl(p)
         sp.increment = 0.5f;
         sp.min_value = 0.f;
         sp.max_value = 512.f;
-        mSpin[i] = LLUICtrlFactory::create<LLSpinCtrl>(sp);
-        mSpin[i]->setCommitCallback([this, i](LLUICtrl*, const LLSD&) { onSpin(i); });
-        addChild(mSpin[i]);
+        mSpin[i] = adoptBox(LLUICtrlFactory::create<LLSpinCtrl>(sp));
     }
 
     LLCheckBoxCtrl::Params cp;
@@ -84,14 +81,14 @@ ALCornerField::ALCornerField(const Params& p) : LLUICtrl(p)
     layout();
 }
 
-void ALCornerField::layout()
+LLRect ALCornerField::pictureIn(S32 width, S32 height) const
 {
-    const S32 height = getRect().getHeight();
-    const S32 width = getRect().getWidth();
+    return LLRect(0, height, llmin(PICTURE_WIDTH, width), 0);
+}
 
-    mPicture = LLRect(0, height, llmin(PICTURE_WIDTH, width), 0);
-
-    const S32 left = mPicture.mRight + GAP;
+void ALCornerField::placeBoxes(const LLRect& picture, S32 width, S32 height)
+{
+    const S32 left = picture.mRight + GAP;
     const S32 top = height - 2;
     const S32 bottom_row = top - BOX_HEIGHT - GAP;
 
@@ -106,12 +103,6 @@ void ALCornerField::layout()
     mLink->setVisible(link_left + 40 <= width);
 }
 
-void ALCornerField::reshape(S32 width, S32 height, bool called_from_parent)
-{
-    LLUICtrl::reshape(width, height, called_from_parent);
-    layout();
-}
-
 void ALCornerField::setRange(F32 minimum, F32 maximum, F32 step, S32 decimals)
 {
     for (LLSpinCtrl* spin : mSpin)
@@ -123,16 +114,12 @@ void ALCornerField::setRange(F32 minimum, F32 maximum, F32 step, S32 decimals)
     }
 }
 
-void ALCornerField::setValue(const LLSD& value)
+void ALCornerField::take(const std::vector<F32>& numbers)
 {
-    std::istringstream in(value.asString());
     std::array<F32, 4> radii{};
-    size_t count = 0;
+    const size_t count = llmin(numbers.size(), radii.size());
 
-    for (F32 number; count < 4 && in >> number; ++count)
-    {
-        radii[count] = number;
-    }
+    std::copy_n(numbers.begin(), count, radii.begin());
 
     switch (count)
     {
@@ -144,15 +131,14 @@ void ALCornerField::setValue(const LLSD& value)
     const bool same = mRadii[0] == mRadii[1] && mRadii[1] == mRadii[2] && mRadii[2] == mRadii[3];
 
     mLink->set(same);
-    showRadii();
 }
 
-LLSD ALCornerField::getValue() const
+std::string ALCornerField::say() const
 {
     return fmt::format("{} {} {} {}", mRadii[0], mRadii[1], mRadii[2], mRadii[3]);
 }
 
-void ALCornerField::showRadii()
+void ALCornerField::showNumbers()
 {
     for (size_t i = 0; i < 4; ++i)
     {
@@ -160,38 +146,37 @@ void ALCornerField::showRadii()
     }
 }
 
-void ALCornerField::onSpin(size_t corner)
+void ALCornerField::boxTyped(size_t corner)
 {
     const F32 value = (F32)mSpin[corner]->getValue().asReal();
 
     if (mLink->get())
     {
         mRadii.fill(value);
-        showRadii();
+        showNumbers();
     }
     else
     {
         mRadii[corner] = value;
     }
-
-    onCommit();
 }
 
 // The rectangle with its corners rounded as the numbers say, scaled so the
 // largest radius is a quarter of the picture: what is being chosen is the
 // proportion, and the picture says it before the number does.
-void ALCornerField::draw()
+void ALCornerField::drawPicture()
 {
     static const LLUIColor ink = LLUIColorTable::instance().getColor("LabelTextColor", LLColor4::white);
     static const LLUIColor edge = LLUIColorTable::instance().getColor("DefaultShadowLight", LLColor4::black);
 
-    const LLRect box(mPicture.mLeft + 6, mPicture.mTop - 6, mPicture.mRight - 6, mPicture.mBottom + 6);
+    const LLRect& shown = picture();
+    const LLRect  box(shown.mLeft + 6, shown.mTop - 6, shown.mRight - 6, shown.mBottom + 6);
     const F32 largest = llmax(1.f, *std::max_element(mRadii.begin(), mRadii.end()));
     const F32 scale = llmin(F32(box.getWidth()), F32(box.getHeight())) * 0.45f / largest;
     const std::array<F32, 4> r = { llmin(mRadii[0] * scale, box.getHeight() * 0.5f), llmin(mRadii[1] * scale, box.getHeight() * 0.5f),
                                    llmin(mRadii[2] * scale, box.getHeight() * 0.5f), llmin(mRadii[3] * scale, box.getHeight() * 0.5f) };
 
-    gl_rect_2d(mPicture, edge.get() % 0.5f, true);
+    gl_rect_2d(shown, edge.get() % 0.5f, true);
 
     // Each corner is an arc from one straight edge to the next; the four
     // arcs and the straights between them are one outline.
@@ -222,6 +207,4 @@ void ALCornerField::draw()
     gl_line_2d(box.mRight, ll_round(box.mTop - r[1]), box.mRight, ll_round(box.mBottom + r[2]), ink.get());
     gl_line_2d(ll_round(box.mRight - r[2]), box.mBottom, ll_round(box.mLeft + r[3]), box.mBottom, ink.get());
     gl_line_2d(box.mLeft, ll_round(box.mBottom + r[3]), box.mLeft, ll_round(box.mTop - r[0]), ink.get());
-
-    LLUICtrl::draw();
 }

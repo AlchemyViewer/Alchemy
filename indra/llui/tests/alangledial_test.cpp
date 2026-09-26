@@ -27,6 +27,7 @@
 #include "../alangledial.h"
 
 #include "../llfocusmgr.h"
+#include "../llspinctrl.h"
 #include "../lluictrlfactory.h"
 
 #include "alheadlessui_fixture.h"
@@ -104,6 +105,27 @@ namespace tut
         gFocusMgr.setMouseCapture(nullptr);
         d->handleHover(35, 60, MASK_NONE);
         ensure_equals("a hover after the loss turns nothing", d->getValue().asString(), std::string("1 0"));
+        d->die();
+    }
+
+    template<> template<>
+    void alangledial_object::test<3>()
+    {
+        set_test_name("degrees typed in the box turn the dial, committed once, and a value turns the box");
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        ALAngleDial* d       = dial();
+        S32          commits = 0;
+        d->setCommitCallback([&commits](LLUICtrl*, const LLSD&) { ++commits; });
+        LLSpinCtrl* degrees = d->getChild<LLSpinCtrl>("degrees");
+        degrees->setValue(LLSD(0.0));
+        degrees->onCommit();
+        ensure_equals("typed: it points right", d->getValue().asString(), std::string("1 0"));
+        ensure_equals("committed once", commits, 1);
+        d->setValue("0 1");
+        ensure_equals("a value pointing up is ninety degrees", degrees->getValue().asInteger(), 90);
         d->die();
     }
 }

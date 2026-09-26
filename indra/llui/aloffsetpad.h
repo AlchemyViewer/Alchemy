@@ -24,18 +24,17 @@
 
 #pragma once
 
-#include "aldraggesture.h"
-#include "lluictrl.h"
+#include "alpicturefield.h"
 
 class LLSpinCtrl;
 
 // A square pad with a dot where the offset is, dragged to move it, and the
 // two numbers beside it for anyone who knows the number they want. The
 // value is x and y with a space between; a drag commits when it ends.
-class ALOffsetPad : public LLUICtrl
+class ALOffsetPad : public ALPictureField
 {
 public:
-    AL_VIEW_TYPE(ALOffsetPad, LLUICtrl);
+    AL_VIEW_TYPE(ALOffsetPad, ALPictureField);
 
     static constexpr S32 HEIGHT = 70;
 
@@ -44,34 +43,25 @@ public:
         Params();
     };
 
-    void setValue(const LLSD& value) override;
-    LLSD getValue() const override;
     // How far the pad reaches from its centre, in the value's units.
     void setRange(F32 reach, F32 step, S32 decimals);
-
-    void draw() override;
-    void reshape(S32 width, S32 height, bool called_from_parent = true) override;
-    bool handleMouseDown(S32 x, S32 y, MASK mask) override;
-    bool handleMouseUp(S32 x, S32 y, MASK mask) override;
-    bool handleHover(S32 x, S32 y, MASK mask) override;
-    // A drag ends with the button, or with the mouse taken away: either
-    // way the pointer stops moving the dot.
-    void onMouseCaptureLost() override;
 
 protected:
     friend class LLUICtrlFactory;
     ALOffsetPad(const Params& p);
 
-private:
-    void layout();
-    void place(S32 x, S32 y);
-    void showNumbers();
+    void        placeBoxes(const LLRect& picture, S32 width, S32 height) override;
+    void        take(const std::vector<F32>& numbers) override;
+    std::string say() const override;
+    void        showNumbers() override;
+    void        boxTyped(size_t box) override;
+    bool        pointable() const override { return true; }
+    void        pointAt(S32 x, S32 y) override;
+    void        drawPicture() override;
 
+private:
     LLSpinCtrl* mX = nullptr;
     LLSpinCtrl* mY = nullptr;
-    LLRect mPad;
     F32 mOffset[2] = { 0.f, 0.f };
     F32 mReach = 32.f;
-    // Moved at once, taken on release.
-    ALDragGesture mDrag;
 };

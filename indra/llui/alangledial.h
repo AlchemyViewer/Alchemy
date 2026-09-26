@@ -24,18 +24,17 @@
 
 #pragma once
 
-#include "aldraggesture.h"
-#include "lluictrl.h"
+#include "alpicturefield.h"
 
 class LLSpinCtrl;
 
 // A circle with a handle on its rim where the direction points, turned by
 // dragging, and the angle in degrees beside it. The value is the unit
 // vector, x and y with a space between; a drag commits when it ends.
-class ALAngleDial : public LLUICtrl
+class ALAngleDial : public ALPictureField
 {
 public:
-    AL_VIEW_TYPE(ALAngleDial, LLUICtrl);
+    AL_VIEW_TYPE(ALAngleDial, ALPictureField);
 
     static constexpr S32 HEIGHT = 64;
 
@@ -44,31 +43,21 @@ public:
         Params();
     };
 
-    void setValue(const LLSD& value) override;
-    LLSD getValue() const override;
-
-    void draw() override;
-    void reshape(S32 width, S32 height, bool called_from_parent = true) override;
-    bool handleMouseDown(S32 x, S32 y, MASK mask) override;
-    bool handleMouseUp(S32 x, S32 y, MASK mask) override;
-    bool handleHover(S32 x, S32 y, MASK mask) override;
-    // A drag ends with the button, or with the mouse taken away: either
-    // way the pointer stops turning the dial.
-    void onMouseCaptureLost() override;
-
 protected:
     friend class LLUICtrlFactory;
     ALAngleDial(const Params& p);
 
-private:
-    void layout();
-    void turn(S32 x, S32 y);
-    void showDegrees();
+    void        placeBoxes(const LLRect& picture, S32 width, S32 height) override;
+    void        take(const std::vector<F32>& numbers) override;
+    std::string say() const override;
+    void        showNumbers() override;
+    void        boxTyped(size_t box) override;
+    bool        pointable() const override { return true; }
+    void        pointAt(S32 x, S32 y) override;
+    void        drawPicture() override;
 
+private:
     LLSpinCtrl* mDegrees = nullptr;
-    LLRect mDial;
     // Degrees anticlockwise from the right, as the value's x and y say.
     F32 mAngle = 135.f;
-    // Moved at once, taken on release.
-    ALDragGesture mDrag;
 };

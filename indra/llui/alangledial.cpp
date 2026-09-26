@@ -25,7 +25,6 @@
 #include "linden_common.h"
 #include "alangledial.h"
 
-#include "llfocusmgr.h"
 #include "llrender.h"
 #include "llrender2dutils.h"
 #include "llspinctrl.h"
@@ -34,7 +33,6 @@
 
 #include <cmath>
 #include <fmt/format.h>
-#include <sstream>
 
 static LLDefaultChildRegistry::Register<ALAngleDial> r("angle_dial");
 
@@ -50,7 +48,7 @@ ALAngleDial::Params::Params()
 {
 }
 
-ALAngleDial::ALAngleDial(const Params& p) : LLUICtrl(p)
+ALAngleDial::ALAngleDial(const Params& p) : ALPictureField(p)
 {
     LLSpinCtrl::Params sp;
 
@@ -62,42 +60,27 @@ ALAngleDial::ALAngleDial(const Params& p) : LLUICtrl(p)
     sp.increment = 5.f;
     sp.min_value = 0.f;
     sp.max_value = 360.f;
-    mDegrees = LLUICtrlFactory::create<LLSpinCtrl>(sp);
-    mDegrees->setCommitCallback([this](LLUICtrl*, const LLSD&)
-        {
-            mAngle = (F32)mDegrees->getValue().asReal();
-            onCommit();
-        });
-    addChild(mDegrees);
+    mDegrees = adoptBox(LLUICtrlFactory::create<LLSpinCtrl>(sp));
     layout();
 }
 
-void ALAngleDial::layout()
+void ALAngleDial::placeBoxes(const LLRect& picture, S32 width, S32 height)
 {
-    const S32 height = getRect().getHeight();
-    const S32 side = llmax(24, height - 4);
-
-    mDial = LLRect(2, height - 2, 2 + side, height - 2 - side);
-
-    const S32 left = mDial.mRight + GAP;
+    const S32 left = picture.mRight + GAP;
     const S32 top = height - 2;
 
     mDegrees->setShape(LLRect(left, top, left + BOX_WIDTH, top - BOX_HEIGHT));
 }
 
-void ALAngleDial::reshape(S32 width, S32 height, bool called_from_parent)
+void ALAngleDial::boxTyped(size_t box)
 {
-    LLUICtrl::reshape(width, height, called_from_parent);
-    layout();
+    mAngle = (F32)mDegrees->getValue().asReal();
 }
 
-void ALAngleDial::setValue(const LLSD& value)
+void ALAngleDial::take(const std::vector<F32>& numbers)
 {
-    std::istringstream in(value.asString());
-    F32 x = -1.f;
-    F32 y = 1.f;
-
-    in >> x >> y;
+    const F32 x = numbers.size() > 0 ? numbers[0] : -1.f;
+    const F32 y = numbers.size() > 1 ? numbers[1] : 1.f;
 
     if (x != 0.f || y != 0.f)
     {
@@ -108,24 +91,23 @@ void ALAngleDial::setValue(const LLSD& value)
             mAngle += 360.f;
         }
     }
-
-    showDegrees();
 }
 
-LLSD ALAngleDial::getValue() const
+std::string ALAngleDial::say() const
 {
     return fmt::format("{:.4g} {:.4g}", std::cos(mAngle * DEG), std::sin(mAngle * DEG));
 }
 
-void ALAngleDial::showDegrees()
+void ALAngleDial::showNumbers()
 {
     mDegrees->setValue(LLSD(ll_round(mAngle)));
 }
 
-void ALAngleDial::turn(S32 x, S32 y)
+void ALAngleDial::pointAt(S32 x, S32 y)
 {
-    const F32 cx = F32(mDial.mLeft + mDial.mRight) * 0.5f;
-    const F32 cy = F32(mDial.mTop + mDial.mBottom) * 0.5f;
+    const LLRect& dial = picture();
+    const F32 cx = F32(dial.mLeft + dial.mRight) * 0.5f;
+    const F32 cy = F32(dial.mTop + dial.mBottom) * 0.5f;
 
     if (x == cx && y == cy)
     {
@@ -148,18 +130,19 @@ void ALAngleDial::turn(S32 x, S32 y)
         mAngle -= 360.f;
     }
 
-    showDegrees();
+    showNumbers();
 }
 
-void ALAngleDial::draw()
+void ALAngleDial::drawPicture()
 {
     static const LLUIColor well = LLUIColorTable::instance().getColor("DefaultShadowLight", LLColor4::black);
     static const LLUIColor rim = LLUIColorTable::instance().getColor("LabelDisabledColor", LLColor4::grey);
     static const LLUIColor handle = LLUIColorTable::instance().getColor("EmphasisColor", LLColor4::yellow);
 
-    const F32 cx = F32(mDial.mLeft + mDial.mRight) * 0.5f;
-    const F32 cy = F32(mDial.mTop + mDial.mBottom) * 0.5f;
-    const F32 radius = F32(mDial.getWidth()) * 0.5f - 2.f;
+    const LLRect& dial = picture();
+    const F32 cx = F32(dial.mLeft + dial.mRight) * 0.5f;
+    const F32 cy = F32(dial.mTop + dial.mBottom) * 0.5f;
+    const F32 radius = F32(dial.getWidth()) * 0.5f - 2.f;
 
     gGL.color4fv((well.get() % 0.6f).mV);
     gl_circle_2d(cx, cy, radius, 32, true);
@@ -171,57 +154,4 @@ void ALAngleDial::draw()
 
     gl_line_2d(ll_round(cx), ll_round(cy), hx, hy, handle.get() % 0.7f);
     gl_rect_2d(LLRect(hx - 3, hy + 3, hx + 3, hy - 3), handle.get(), true);
-
-    LLUICtrl::draw();
-}
-
-bool ALAngleDial::handleMouseDown(S32 x, S32 y, MASK mask)
-{
-    if (!mDial.pointInRect(x, y))
-    {
-        return LLUICtrl::handleMouseDown(x, y, mask);
-    }
-
-    mDrag.press(x, y);
-    gFocusMgr.setMouseCapture(this);
-    turn(x, y);
-
-    return true;
-}
-
-bool ALAngleDial::handleHover(S32 x, S32 y, MASK mask)
-{
-    if (mDrag.pressed())
-    {
-        // Followed only where the pointer went somewhere: the captor is
-        // hovered on every frame, moved or not.
-        if (mDrag.moved(x, y))
-        {
-            turn(x, y);
-        }
-
-        return true;
-    }
-
-    return LLUICtrl::handleHover(x, y, mask);
-}
-
-void ALAngleDial::onMouseCaptureLost()
-{
-    mDrag.cancel();
-    LLUICtrl::onMouseCaptureLost();
-}
-
-bool ALAngleDial::handleMouseUp(S32 x, S32 y, MASK mask)
-{
-    if (!mDrag.release())
-    {
-        return LLUICtrl::handleMouseUp(x, y, mask);
-    }
-
-    gFocusMgr.setMouseCapture(nullptr);
-    turn(x, y);
-    onCommit();
-
-    return true;
 }
