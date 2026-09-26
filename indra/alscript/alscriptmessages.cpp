@@ -126,6 +126,20 @@ namespace ALScriptMessages
         return out.line >= 0;
     }
 
+    bool continuesRuntimeError(const std::string& line)
+    {
+        const size_t first = line.find_first_not_of(" \t");
+        if (first == std::string::npos)
+        {
+            return false;
+        }
+        const std::string_view text = std::string_view(line).substr(first);
+        Frame                  frame;
+        // `... (+4 frames)` is a deep stack's middle, folded.
+        return text.starts_with("stack traceback:") || text.starts_with("[C]") || text.starts_with("... (+") || readStackFrame(line, frame) ||
+               LUAU_LOCATION.match(line) || LSL_LOCATION.search(line);
+    }
+
     bool readRuntimeLocation(const std::vector<std::string>& lines, bool lua, Location& out)
     {
         for (const std::string& line : lines)

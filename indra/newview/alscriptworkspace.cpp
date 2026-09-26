@@ -78,10 +78,12 @@
 
 namespace
 {
-    // How long after a line the lines that belong with it may still come,
-    // and how often that is looked at.
-    const F32    BURST_TIMEOUT      = 1.0f;
-    const F32    BURST_FLUSH_PERIOD = 0.25f;
+    // How long after a run-time error's first line the lines that belong
+    // with it may still come, and how many of them at most: a stack is
+    // deep, but a script that also chatters on the channel is not to hold
+    // its error back, gathering the chatter.
+    const F32    BURST_WINDOW       = 1.0f;
+    const size_t BURST_MOST_LINES   = 64;
     const size_t RECENT_RUNTIME     = 500;
     // How long a prim's contents are waited for before they are answered
     // as not fetched.
@@ -229,7 +231,7 @@ struct ALScriptWorkspace::Burst
     bool                     lua = false;
     RuntimeEvent::Channel    channel = RuntimeEvent::Channel::Debug;
     std::vector<std::string> texts;
-    LLTimer                  timer;
+    size_t                   lines = 0;
 };
 
 // --- ALScriptRef -------------------------------------------------------------
@@ -1140,6 +1142,11 @@ void ALScriptWorkspace::transferEnd(const std::shared_ptr<Transfer>& one)
 
 ALScriptWorkspace::~ALScriptWorkspace()
 {
+    if (mBurstTimer)
+    {
+        delete mBurstTimer;
+        mBurstTimer = nullptr;
+    }
     // A transfer still waiting on its items is heard of no more.
     for (const std::shared_ptr<Transfer>& one : mTransfers)
     {
@@ -1729,9 +1736,21 @@ void ALScriptWorkspace::ingestChat(const LLChat& chat)
     ALScriptMessages::Header        named;
     const bool                      header = !lines.empty() && ALScriptMessages::readRuntimeHeader(lines.front(), named);
 
-    // A line that is not the start of an error, with nothing being
-    // joined, is an event by itself.
-    if (!header && !mBurst)
+    // What goes on with the error being gathered: from its script, on its
+    // channel, the words straight after its first line, and after them
+    // only what an error goes on with -- a place, a stack -- to a cap.
+    if (mBurst && !header && mBurst->fromId == chat.mFromID && mBurst->fromName == chat.mFromName && mBurst->channel == channel &&
+        mBurst->lines + lines.size() <= BURST_MOST_LINES &&
+        (mBurst->texts.size() == 1 || std::all_of(lines.begin(), lines.end(), ALScriptMessages::continuesRuntimeError)))
+    {
+        mBurst->texts.push_back(chat.mText);
+        mBurst->lines += lines.size();
+        return;
+    }
+    // Anything else ends it; and a line that is not the start of another
+    // error is an event by itself.
+    flushRuntime();
+    if (!header)
     {
         Burst alone;
         alone.fromId   = chat.mFromID;
@@ -1742,50 +1761,37 @@ void ALScriptWorkspace::ingestChat(const LLChat& chat)
         return;
     }
 
-    // Which VM the script runs on, which its item says.
-    bool lua = mBurst ? mBurst->lua : false;
-    if (header)
+    // An error's start: which VM the script runs on, which its item says,
+    // and what follows gathered for a moment from now, and no longer.
+    bool lua = false;
+    if (LLViewerObject* prim = gObjectList.findObject(chat.mFromID))
     {
-        if (LLViewerObject* prim = gObjectList.findObject(chat.mFromID))
+        if (LLInventoryItem* item = scriptNamed(prim, named.script))
         {
-            if (LLInventoryItem* item = scriptNamed(prim, named.script))
-            {
-                lua = item->getRuntime() == "luau";
-            }
+            lua = item->getRuntime() == "luau";
         }
     }
-    // Another script's line, or another channel's, ends what was being
-    // joined; so does a new error's start.
-    if (mBurst && (header || mBurst->fromId != chat.mFromID || mBurst->fromName != chat.mFromName || mBurst->channel != channel))
-    {
-        flushRuntime();
-    }
-    if (!mBurst)
-    {
-        mBurst           = std::make_unique<Burst>();
-        mBurst->fromId   = chat.mFromID;
-        mBurst->fromName = chat.mFromName;
-        mBurst->lua      = lua;
-        mBurst->channel  = channel;
-    }
+    mBurst           = std::make_unique<Burst>();
+    mBurst->fromId   = chat.mFromID;
+    mBurst->fromName = chat.mFromName;
+    mBurst->lua      = lua;
+    mBurst->channel  = channel;
     mBurst->texts.push_back(chat.mText);
-    mBurst->timer.setTimerExpirySec(BURST_TIMEOUT);
-    if (!mBurstTimer)
-    {
-        mBurstTimer.reset(LLEventTimer::run_every(BURST_FLUSH_PERIOD, [this]() { flushExpiredBurst(); }));
-    }
-}
-
-void ALScriptWorkspace::flushExpiredBurst()
-{
-    if (mBurst && mBurst->timer.hasExpired())
-    {
+    mBurst->lines    = lines.size();
+    mBurstTimer      = LLEventTimer::run_after(BURST_WINDOW, [this]() {
+        // It lets itself go as this returns.
+        mBurstTimer = nullptr;
         flushRuntime();
-    }
+    });
 }
 
 void ALScriptWorkspace::flushRuntime()
 {
+    if (mBurstTimer)
+    {
+        delete mBurstTimer;
+        mBurstTimer = nullptr;
+    }
     if (!mBurst)
     {
         return;

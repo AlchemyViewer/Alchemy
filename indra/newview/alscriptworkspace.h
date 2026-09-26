@@ -455,7 +455,6 @@ private:
     void startTransfer(const std::shared_ptr<Transfer>& transfer);
     void transferArrived(const std::shared_ptr<Transfer>& transfer);
     void transferEnd(const std::shared_ptr<Transfer>& transfer);
-    void flushExpiredBurst();
     void deliverRuntime(const Burst& burst);
     void sweepListeners();
 
@@ -470,7 +469,10 @@ private:
     // tell whether it is still here.
     std::vector<std::shared_ptr<ContentsListener>> mListeners;
     std::unique_ptr<Burst>        mBurst;
-    std::unique_ptr<LLEventTimer> mBurstTimer;
+    // The one look a gathered error gets, a moment after its first line;
+    // there only while one is being gathered. It lets itself go once it
+    // has looked, and is let go of here where the error goes first.
+    LLEventTimer*                 mBurstTimer = nullptr;
     std::deque<RuntimeEvent>      mRecent;
     runtime_signal_t              mRuntime;
     // The one in front is under way; the rest wait for it to end.

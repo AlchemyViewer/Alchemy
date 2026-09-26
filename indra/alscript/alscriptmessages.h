@@ -98,4 +98,11 @@ namespace ALScriptMessages
         S32         line = -1;
     };
     bool readStackFrame(const std::string& line, Frame& out);
+
+    // Whether a line said after a run-time error's words goes on with
+    // them: a place the error names -- Luau's `chunk:12: words`, LSL's
+    // `(12, 3) : ERROR : words` -- `stack traceback:`, or a frame of the
+    // stack, a C function's and a folded middle's among them. Anything
+    // else a script says after is its own.
+    bool continuesRuntimeError(const std::string& line);
 }

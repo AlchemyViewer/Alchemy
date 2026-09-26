@@ -191,4 +191,19 @@ namespace tut
         ensure_equals("the function's", frames[0], 11);
         ensure_equals("the one that called it", frames[1], 29);
     }
+
+    template<> template<>
+    void alscriptmessages_object::test<9>()
+    {
+        set_test_name("what goes on with a run-time error after its words, and what a script says besides");
+        for (const char* goes_on : { "lua_script:12: attempt to index nil with 'field'", "stack traceback:", "[C] function error",
+                                     "lua_script:12 function tick", "  lua_script:30", "... (+4 frames)", "(12, 3) : ERROR : Stack-Heap Collision" })
+        {
+            ensure(std::string("goes on: ") + goes_on, ALScriptMessages::continuesRuntimeError(goes_on));
+        }
+        for (const char* besides : { "hello", "Counter: 12 visitors", "", "   ", "Object [script:Counter] Script run-time error" })
+        {
+            ensure(std::string("its own: ") + besides, !ALScriptMessages::continuesRuntimeError(besides));
+        }
+    }
 }
