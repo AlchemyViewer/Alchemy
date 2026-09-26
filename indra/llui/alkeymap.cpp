@@ -161,12 +161,16 @@ ALKeymap ALKeymap::standard()
     map.bind('A', MASK_CONTROL, C::SelectAll);
 
     map.bind(KEY_BACKSPACE, MASK_NONE, C::DeleteLeft);
+    // Shift is down half the time in code -- capitals, braces, brackets --
+    // and a Backspace or a Return pressed under it is still one.
+    map.bind(KEY_BACKSPACE, MASK_SHIFT, C::DeleteLeft);
     map.bind(KEY_DELETE, MASK_NONE, C::DeleteRight);
     map.bind(KEY_BACKSPACE, word, C::DeleteWordLeft);
     map.bind(KEY_DELETE, word, C::DeleteWordRight);
     map.bind(KEY_BACKSPACE, MASK_ALT, C::DeleteWordLeft);
     map.bind(KEY_DELETE, MASK_ALT, C::DeleteWordRight);
     map.bind(KEY_RETURN, MASK_NONE, C::NewLine);
+    map.bind(KEY_RETURN, MASK_SHIFT, C::NewLine);
     map.bind(KEY_TAB, MASK_NONE, C::Indent);
     map.bind(KEY_TAB, MASK_SHIFT, C::Unindent);
 

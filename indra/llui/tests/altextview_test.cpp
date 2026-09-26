@@ -1392,4 +1392,17 @@ namespace tut
         around->removeChild(&v);
         around->die();
     }
+
+    template<> template<>
+    void altextview_object::test<45>()
+    {
+        set_test_name("Backspace and Return held with Shift, as they are half the time in code, still delete and break the line");
+        ALTextView& v = make("CONST");
+        v.setCaret(ALTextPos(0, 5));
+        key(KEY_BACKSPACE, MASK_SHIFT);
+        ensure_equals("deleted", v.text(), std::string("CONS"));
+        key(KEY_RETURN, MASK_SHIFT);
+        ensure_equals("a new line", v.text(), std::string("CONS\n"));
+        ensure_equals("the caret on it", v.caret().line, 1);
+    }
 }
