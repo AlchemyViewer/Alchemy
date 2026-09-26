@@ -448,6 +448,26 @@ bool ALFontField::handleMouseDown(S32 x, S32 y, MASK mask)
     return LLUICtrl::handleMouseDown(x, y, mask);
 }
 
+bool ALFontField::handleKeyHere(KEY key, MASK mask)
+{
+    if ((key == KEY_DOWN && mask == MASK_ALT) || (key == KEY_F4 && mask == MASK_NONE) || (!mEditable && key == KEY_RETURN && mask == MASK_NONE))
+    {
+        openPopover();
+        return true;
+    }
+    return LLUICtrl::handleKeyHere(key, mask);
+}
+
+bool ALFontField::handleUnicodeCharHere(llwchar uni_char)
+{
+    if (!mEditable && uni_char == ' ')
+    {
+        openPopover();
+        return true;
+    }
+    return LLUICtrl::handleUnicodeCharHere(uni_char);
+}
+
 void ALFontField::onTextCommit()
 {
     const std::string was = mName;

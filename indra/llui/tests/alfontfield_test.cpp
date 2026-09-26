@@ -307,4 +307,23 @@ namespace tut
         popover->escape();
         field->die();
     }
+
+    template<> template<>
+    void alfontfield_object::test<7>()
+    {
+        set_test_name("the popover from the keyboard: Alt-Down and F4, as a combo box's list; Down alone is not it");
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        ALFontField* field = make();
+        ensure("Down alone: not taken, nothing opened", !field->handleKeyHere(KEY_DOWN, MASK_NONE) && !popoverOpen());
+        ensure("Alt-Down", field->handleKeyHere(KEY_DOWN, MASK_ALT));
+        ALPopover* up = popoverOpen();
+        ensure("opened", up != nullptr);
+        up->escape();
+        ensure("F4", field->handleKeyHere(KEY_F4, MASK_NONE) && popoverOpen() != nullptr);
+        popoverOpen()->escape();
+        field->die();
+    }
 }
