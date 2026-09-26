@@ -3421,7 +3421,7 @@ void ALFloaterScriptStudio::showFound(Doc& doc, const ALScriptLookup::Found& fou
             lit.push_back(rangeOf(place.span));
         }
     }
-    doc.editor->setHighlights(std::move(lit));
+    doc.editor->setHighlights(ALCodeEditor::Highlight::References, std::move(lit));
     mReferencesPane->show(found);
     showBottom("references_tab");
 }

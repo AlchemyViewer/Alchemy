@@ -308,7 +308,7 @@ namespace tut
         caret.pump(10.0);
         Doc& doc = tab("a");
         doc.editor->setCaret(ALTextPos(0, 10));
-        doc.editor->setHighlights({ ALTextRange(ALTextPos(0, 8), ALTextPos(0, 13)), ALTextRange(ALTextPos(1, 26), ALTextPos(1, 31)) });
+        doc.editor->setHighlights(ALCodeEditor::Highlight::References, { ALTextRange(ALTextPos(0, 8), ALTextPos(0, 13)), ALTextRange(ALTextPos(1, 26), ALTextPos(1, 31)) });
         caret.pump(10.0);
         ensure_equals("told", joined(studio.said), std::string("path 0:10"));
         ensure("the places kept while it is on one", doc.editor->highlights().size() == 2);

@@ -350,9 +350,11 @@ namespace tut
         ensure("not on a name", !e.canPerform(ALEditorCommand::FindReferences));
         ensure("and no request is made", !e.handleKeyHere(KEY_F2, MASK_NONE) && asked.size() == 2);
 
-        e.setHighlights({ ALTextRange(ALTextPos(0, 8), ALTextPos(0, 13)), ALTextRange(ALTextPos(1, 0), ALTextPos(1, 5)), ALTextRange(ALTextPos(1, 8), ALTextPos(1, 13)) });
-        ensure("lit where a name stands", e.highlighted(ALTextPos(1, 2)) && e.highlighted(ALTextPos(1, 5)));
-        ensure("not elsewhere", !e.highlighted(ALTextPos(1, 6)));
+        e.setHighlights(ALCodeEditor::Highlight::References, { ALTextRange(ALTextPos(0, 8), ALTextPos(0, 13)), ALTextRange(ALTextPos(1, 0), ALTextPos(1, 5)), ALTextRange(ALTextPos(1, 8), ALTextPos(1, 13)) });
+        constexpr ALCodeEditor::Highlight refs = ALCodeEditor::Highlight::References;
+        ensure("lit where a name stands", e.highlighted(refs, ALTextPos(1, 2)) && e.highlighted(refs, ALTextPos(1, 5)));
+        ensure("not elsewhere", !e.highlighted(refs, ALTextPos(1, 6)));
+        ensure("nor in another layer", !e.highlighted(ALCodeEditor::Highlight::Search, ALTextPos(1, 2)));
         e.setCaret(ALTextPos(0, 0));
         type("\n");
         ensure("a line above slides them all", e.highlights().size() == 3 && e.highlights()[0] == ALTextRange(ALTextPos(1, 8), ALTextPos(1, 13)) && e.highlights()[2].begin.line == 2);
@@ -1922,5 +1924,34 @@ namespace tut
         ensure("nothing offered once let go of", !e.canPerform(ALEditorCommand::QuickFix));
         e.handleKeyHere('.', MASK_CONTROL);
         ensure_equals("and nothing asked", asked, 0);
+    }
+
+    template<> template<>
+    void alcodeeditor_object::test<52>()
+    {
+        set_test_name("highlights by what lit them: one layer cleared leaves the others; an edit slides each; decorations listed as given, drawn as they lie");
+        ALCodeEditor& e = make("integer count = 1;\ncount = count + 1;\n");
+        typedef ALCodeEditor::Highlight H;
+        e.setHighlights(H::References, { ALTextRange(ALTextPos(0, 8), ALTextPos(0, 13)) });
+        e.setHighlights(H::Search, { ALTextRange(ALTextPos(1, 0), ALTextPos(1, 5)) });
+        e.clearHighlights(H::Search);
+        ensure("the search's gone, the name's kept", e.highlights(H::Search).empty() && e.highlights(H::References).size() == 1);
+        e.setHighlights(H::Block, { ALTextRange(ALTextPos(1, 8), ALTextPos(1, 13)) });
+        e.setCaret(ALTextPos(0, 0));
+        type("\n");
+        ensure("each slid", e.highlights(H::References)[0].begin == ALTextPos(1, 8) && e.highlights(H::Block)[0].begin == ALTextPos(2, 8));
+        e.clearHighlights();
+        ensure("all cleared", e.highlights().empty());
+
+        ALCodeEditor::Decoration worst, later;
+        worst.range   = ALTextRange(ALTextPos(1, 8), ALTextPos(1, 13));
+        worst.message = "worst";
+        later.range   = ALTextRange(ALTextPos(1, 0), ALTextPos(1, 13));
+        later.message = "later";
+        e.setDecorations({ worst, later });
+        ensure("as they lie", e.decorations()[0].message == "later");
+        const std::vector<const ALCodeEditor::Decoration*> listed = e.decorationsOn(1);
+        ensure("as given", listed.size() == 2 && listed[0]->message == "worst" && listed[1]->message == "later");
+        ensure("none on another line", e.decorationsOn(2).empty());
     }
 }

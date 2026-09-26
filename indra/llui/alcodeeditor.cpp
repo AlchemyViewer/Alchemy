@@ -276,49 +276,53 @@ void ALCodeEditor::onEdit(const ALTextDocument::Edit& edit)
 
     // Decorations and highlights after the edit move along with the text;
     // the ones it cut into go.
-    const S32         delta   = made - (last - first + 1);
     const ALTextRange removed = edit.range.normalised();
-    mDecorations.erase(std::remove_if(mDecorations.begin(), mDecorations.end(), [&](Decoration& d) { return !edit.slide(d.range); }), mDecorations.end());
-    mHighlights.erase(std::remove_if(mHighlights.begin(), mHighlights.end(), [&](ALTextRange& r) { return !edit.slide(r); }), mHighlights.end());
-    mSemantics.erase(std::remove_if(mSemantics.begin(), mSemantics.end(), [&](SemanticToken& t) { return !edit.slide(t.range); }), mSemantics.end());
+    mDecorations.apply(edit);
+    for (auto& layer : mHighlights)
+    {
+        layer.apply(edit);
+    }
+    mSemantics.apply(edit);
     // An inlay moves with the text it stands by: one before the text at
     // its position stays put when something is typed there, since what
     // is typed is the start of that text; one after the text before it
     // moves along, since what is typed extends that text. An edit that
     // takes the position with it takes the inlay.
-    mInlays.erase(std::remove_if(mInlays.begin(), mInlays.end(),
-                                 [&](InlayHint& h) {
-                                     if (removed.empty())
-                                     {
-                                         if (removed.begin < h.at || (removed.begin == h.at && !h.before))
-                                         {
-                                             h.at = edit.slidPast(h.at);
-                                         }
-                                         return false;
-                                     }
-                                     if (removed.end <= h.at)
-                                     {
-                                         h.at = edit.slidPast(h.at);
-                                         return false;
-                                     }
-                                     return !(h.at <= removed.begin);
-                                 }),
-                  mInlays.end());
+    mInlays.apply(
+        edit,
+        [&removed](InlayHint& h, const ALTextDocument::Edit& e) {
+            if (removed.empty())
+            {
+                if (removed.begin < h.at || (removed.begin == h.at && !h.before))
+                {
+                    h.at = e.slidPast(h.at);
+                }
+                return true;
+            }
+            if (removed.end <= h.at)
+            {
+                h.at = e.slidPast(h.at);
+                return true;
+            }
+            return h.at <= removed.begin;
+        },
+        [](InlayHint&) {});
     // The stops of a snippet or a call being filled in move with the text.
     mSnippet.slide(edit);
 
     // A closer typing put in moves with the text before it, and goes with
     // an edit that takes it.
-    mAutoClosed.erase(std::remove_if(mAutoClosed.begin(), mAutoClosed.end(),
-                                     [&](ALTextPos& at) {
-                                         if (removed.end <= at)
-                                         {
-                                             at = edit.slidPast(at);
-                                             return false;
-                                         }
-                                         return !(at < removed.begin);
-                                     }),
-                      mAutoClosed.end());
+    mAutoClosed.apply(
+        edit,
+        [&removed](ALTextPos& at, const ALTextDocument::Edit& e) {
+            if (removed.end <= at)
+            {
+                at = e.slidPast(at);
+                return true;
+            }
+            return at < removed.begin;
+        },
+        [](ALTextPos&) {});
 
     // Folds slide the same way (ALFoldModel::edited).
     mFolds.edited(edit, first, last, made);
@@ -448,23 +452,58 @@ bool ALCodeEditor::changesAt(S32 line) const
 
 void ALCodeEditor::setDecorations(std::vector<Decoration> decorations)
 {
-    mDecorations = std::move(decorations);
+    for (size_t i = 0; i < decorations.size(); ++i)
+    {
+        decorations[i].order = static_cast<U32>(i);
+    }
+    mDecorations.assign(std::move(decorations));
 }
 
-void ALCodeEditor::setHighlights(std::vector<ALTextRange> ranges)
+std::vector<const ALCodeEditor::Decoration*> ALCodeEditor::decorationsOn(S32 line) const
 {
-    mHighlights = std::move(ranges);
-    for (ALTextRange& range : mHighlights)
+    std::vector<const Decoration*> out;
+    const auto                     on = mDecorations.onLine(line);
+    for (auto it = on.first; it != on.second; ++it)
+    {
+        out.push_back(&*it);
+    }
+    std::sort(out.begin(), out.end(), [](const Decoration* a, const Decoration* b) { return a->order < b->order; });
+    return out;
+}
+
+void ALCodeEditor::setHighlights(Highlight layer, std::vector<ALTextRange> ranges)
+{
+    for (ALTextRange& range : ranges)
     {
         range = range.normalised();
     }
+    mHighlights[static_cast<size_t>(layer)].assign(std::move(ranges));
 }
 
-bool ALCodeEditor::highlighted(const ALTextPos& at) const
+void ALCodeEditor::clearHighlights()
 {
-    for (const ALTextRange& range : mHighlights)
+    for (auto& layer : mHighlights)
     {
-        if (range.begin <= at && at <= range.end)
+        layer.clear();
+    }
+}
+
+std::vector<ALTextRange> ALCodeEditor::highlights() const
+{
+    std::vector<ALTextRange> out;
+    for (const auto& layer : mHighlights)
+    {
+        out.insert(out.end(), layer.begin(), layer.end());
+    }
+    return out;
+}
+
+bool ALCodeEditor::highlighted(Highlight layer, const ALTextPos& at) const
+{
+    const auto on = mHighlights[static_cast<size_t>(layer)].onLine(at.line);
+    for (auto it = on.first; it != on.second; ++it)
+    {
+        if (it->begin <= at && at <= it->end)
         {
             return true;
         }
@@ -955,7 +994,7 @@ void ALCodeEditor::tintRow(S32 line, const ALTextLayout::Line& laid, const ALTex
     // one is not that name.
     if (!mSemantics.empty())
     {
-        auto first = std::lower_bound(mSemantics.begin(), mSemantics.end(), line, [](const SemanticToken& t, S32 l) { return t.range.end.line < l; });
+        auto first = mSemantics.onLine(line).first;
         if (first != mSemantics.end() && first->range.begin.line <= line)
         {
             const std::vector<ALSyntaxToken>& grammar = highlighter().tokens(line);
@@ -1049,8 +1088,7 @@ void ALCodeEditor::tintRow(S32 line, const ALTextLayout::Line& laid, const ALTex
 
 void ALCodeEditor::setSemanticTokens(std::vector<SemanticToken> tokens)
 {
-    std::stable_sort(tokens.begin(), tokens.end(), [](const SemanticToken& a, const SemanticToken& b) { return a.range.begin < b.range.begin; });
-    mSemantics = std::move(tokens);
+    mSemantics.assign(std::move(tokens));
 }
 
 void ALCodeEditor::setInlayHints(std::vector<InlayHint> hints)
@@ -1070,7 +1108,7 @@ void ALCodeEditor::setInlayHints(std::vector<InlayHint> hints)
     while (was < mInlays.size() || now < hints.size())
     {
         const S32 line = llmin(was < mInlays.size() ? mInlays[was].at.line : S32_MAX, now < hints.size() ? hints[now].at.line : S32_MAX);
-        same_line(mInlays, was, line, old_line);
+        same_line(mInlays.items(), was, line, old_line);
         same_line(hints, now, line, new_line);
         bool changed = old_line.size() != new_line.size();
         for (size_t k = 0; !changed && k < old_line.size(); ++k)
@@ -1082,7 +1120,7 @@ void ALCodeEditor::setInlayHints(std::vector<InlayHint> hints)
             layout().invalidateLine(line);
         }
     }
-    mInlays = std::move(hints);
+    mInlays.assign(std::move(hints));
 }
 
 namespace
@@ -1283,12 +1321,12 @@ bool ALCodeEditor::writeInlay(S32 index)
     }
     // The text says it now, so the hint goes; an insertion at a hint's
     // place would only slide it along.
-    std::vector<InlayHint> kept = mInlays;
+    std::vector<InlayHint> kept = mInlays.items();
     mInlays.erase(mInlays.begin() + index);
     layout().invalidateLine(hint.at.line);
     if (!replaceAll({ { ALTextRange(hint.at, hint.at), hint.insert } }))
     {
-        mInlays = std::move(kept);
+        mInlays.assign(std::move(kept));
         layout().invalidateLine(hint.at.line);
         return false;
     }
@@ -1665,13 +1703,14 @@ void ALCodeEditor::drawRowExtras(S32 line, S32 row, const LLRect& text, S32 scre
             }
         }
     }
-    if (!mHighlights.empty())
+    const LLColor4 wash = highlightColor() % alpha;
+    for (const auto& layer : mHighlights)
     {
-        const LLColor4 wash = highlightColor() % alpha;
-        for (const ALTextRange& range : mHighlights)
+        const auto on = layer.onLine(line);
+        for (auto it = on.first; it != on.second; ++it)
         {
             F32 x0, x1;
-            if (spanOnRow(line, row, range, x0, x1))
+            if (spanOnRow(line, row, *it, x0, x1))
             {
                 gl_rect_2d(static_cast<S32>(left + x0), screen_top, static_cast<S32>(left + x1), screen_top - row_h, wash);
             }
@@ -1722,8 +1761,8 @@ void ALCodeEditor::drawRowExtras(S32 line, S32 row, const LLRect& text, S32 scre
     // A line through what is deprecated.
     if (!mSemantics.empty())
     {
-        auto first = std::lower_bound(mSemantics.begin(), mSemantics.end(), line, [](const SemanticToken& t, S32 l) { return t.range.end.line < l; });
-        for (auto it = first; it != mSemantics.end() && it->range.begin.line <= line; ++it)
+        const auto on = mSemantics.onLine(line);
+        for (auto it = on.first; it != on.second; ++it)
         {
             F32 x0, x1;
             if (it->strike && spanOnRow(line, row, it->range, x0, x1))
@@ -1733,9 +1772,11 @@ void ALCodeEditor::drawRowExtras(S32 line, S32 row, const LLRect& text, S32 scre
             }
         }
     }
-    for (const Decoration& d : mDecorations)
+    const auto decorated = mDecorations.onLine(line);
+    for (auto it = decorated.first; it != decorated.second; ++it)
     {
-        F32 x0, x1;
+        const Decoration& d = *it;
+        F32               x0, x1;
         if (!spanOnRow(line, row, d.range, x0, x1))
         {
             continue;
@@ -3131,8 +3172,9 @@ bool ALCodeEditor::hoverCardAt(S32 x, S32 y)
 std::vector<ALCodeEditor::CardProblem> ALCodeEditor::problemsUnder(const ALTextPos& at, ALTextRange& about) const
 {
     std::vector<CardProblem> problems;
-    for (const Decoration& d : mDecorations)
+    for (const Decoration* each : decorationsOn(at.line))
     {
+        const Decoration& d     = *each;
         const ALTextRange range = d.range.normalised();
         if (!d.message.empty() && range.begin <= at && at < range.end)
         {
@@ -3758,7 +3800,7 @@ bool ALCodeEditor::typePair(char c)
         insertText(std::string(1, open) + std::string(1, close));
         const ALTextPos inside(at.line, at.column + 1);
         setCaret(inside);
-        mAutoClosed.push_back(inside);
+        mAutoClosed.insert(inside);
         return true;
     }
     return false;
@@ -3926,8 +3968,9 @@ bool ALCodeEditor::handleToolTip(S32 x, S32 y, MASK mask)
             return ALTextView::handleToolTip(x, y, mask);
         }
         std::vector<CardProblem> problems;
-        for (const Decoration& d : mDecorations)
+        for (const Decoration* each : decorationsOn(line))
         {
+            const Decoration& d     = *each;
             const ALTextRange range = d.range.normalised();
             if (!d.message.empty() && range.begin.line <= line && line <= range.end.line)
             {
@@ -4110,8 +4153,7 @@ void ALCodeEditor::draw()
         hideSignature();
     }
     // A closer put in is typed over only on its own line.
-    mAutoClosed.erase(std::remove_if(mAutoClosed.begin(), mAutoClosed.end(), [this](const ALTextPos& at) { return at.line != caret().line; }),
-                      mAutoClosed.end());
+    mAutoClosed.eraseIf([this](const ALTextPos& at) { return at.line != caret().line; });
     // The mouse rested long enough on the text: its card, once.
     if (mHoverCards && mHoverDelay >= 0.f && !mHoverTried && !mWheeled && mMouseX >= 0 && mMouseRest.getElapsedTimeF32() >= mHoverDelay && !cardShown() &&
         textRect().pointInRect(mMouseX, mMouseY) && !(mCompletionList && mCompletionList->getVisible() && mCompletionList->getRect().pointInRect(mMouseX, mMouseY)))

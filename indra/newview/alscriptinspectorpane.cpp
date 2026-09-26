@@ -178,8 +178,9 @@ std::string ALScriptInspectorPane::problemsAt(const Doc& doc, const ALTextPos& a
     // From the checkers and the compiler alike: whatever is squiggled
     // under the position, with what it says.
     std::string problems;
-    for (const ALCodeEditor::Decoration& decoration : doc.editor->decorations())
+    for (const ALCodeEditor::Decoration* each : doc.editor->decorationsOn(at.line))
     {
+        const ALCodeEditor::Decoration& decoration = *each;
         if (decoration.style == ALCodeEditor::Decoration::Style::Squiggle && !decoration.message.empty() && decoration.range.contains(at))
         {
             LLStringUtil::format_map_t args;

@@ -571,7 +571,7 @@ void ALVimKeymap::mouseChanged(ALTextView& view)
             mMode = Mode::Visual;
             if (ALCodeEditor* editor = ALViewType::as<ALCodeEditor>(&view))
             {
-                editor->clearHighlights();
+                editor->clearHighlights(ALCodeEditor::Highlight::Block);
             }
         }
     }
@@ -586,7 +586,7 @@ void ALVimKeymap::mouseChanged(ALTextView& view)
             mMode             = Mode::Normal;
             if (ALCodeEditor* editor = ALViewType::as<ALCodeEditor>(&view))
             {
-                editor->clearHighlights();
+                editor->clearHighlights(ALCodeEditor::Highlight::Block);
             }
         }
         // The character pressed, whichever half of it, rather than the
@@ -4424,7 +4424,7 @@ void ALVimKeymap::leaveVisual(ALTextView& view)
     mMode                 = Mode::Normal;
     if (ALCodeEditor* editor = ALViewType::as<ALCodeEditor>(&view))
     {
-        editor->clearHighlights();
+        editor->clearHighlights(ALCodeEditor::Highlight::Block);
     }
     view.setCaret(caret);
     moveTo(view, caret);
@@ -4489,7 +4489,7 @@ void ALVimKeymap::showVisual(ALTextView& view)
                 const S32 length = d.lineLength(line);
                 lit.emplace_back(ALTextPos(line, llmin(c0, length)), ALTextPos(line, llmin(c1, length)));
             }
-            editor->setHighlights(std::move(lit));
+            editor->setHighlights(ALCodeEditor::Highlight::Block, std::move(lit));
         }
         view.setCaret(caret);
     }
@@ -4508,7 +4508,7 @@ void ALVimKeymap::showVisual(ALTextView& view)
     {
         if (ALCodeEditor* editor = ALViewType::as<ALCodeEditor>(&view))
         {
-            editor->clearHighlights();
+            editor->clearHighlights(ALCodeEditor::Highlight::Block);
         }
     }
 }
@@ -4562,7 +4562,7 @@ bool ALVimKeymap::search(ALTextView& view, const std::string& pattern, bool forw
     // leaves them.
     if (ALCodeEditor* editor = ALViewType::as<ALCodeEditor>(&view); editor && !isVisual() && mShared->highlightSearch)
     {
-        editor->setHighlights(matches);
+        editor->setHighlights(ALCodeEditor::Highlight::Search, matches);
     }
     if (!mOperator && from != start)
     {
@@ -5014,7 +5014,7 @@ void ALVimKeymap::askNext(ALTextView& view)
         {
             left.push_back(mConfirming.edits[k].first);
         }
-        editor->setHighlights(std::move(left));
+        editor->setHighlights(ALCodeEditor::Highlight::Confirm, std::move(left));
     }
     bump();
 }
@@ -5127,7 +5127,7 @@ void ALVimKeymap::endConfirming(ALTextView& view)
     mConfirming        = Confirming();
     if (ALCodeEditor* editor = ALViewType::as<ALCodeEditor>(&view))
     {
-        editor->clearHighlights();
+        editor->clearHighlights(ALCodeEditor::Highlight::Confirm);
     }
     finishCommand(changed);
     bump();
@@ -6090,7 +6090,7 @@ void ALVimKeymap::runCommand(ALTextView& view, const std::string& line_in)
     {
         if (ALCodeEditor* editor = ALViewType::as<ALCodeEditor>(&view))
         {
-            editor->clearHighlights();
+            editor->clearHighlights(ALCodeEditor::Highlight::Search);
         }
         return;
     }
@@ -6158,7 +6158,7 @@ void ALVimKeymap::runCommand(ALTextView& view, const std::string& line_in)
         {
             if (ALCodeEditor* editor = ALViewType::as<ALCodeEditor>(&view))
             {
-                editor->clearHighlights();
+                editor->clearHighlights(ALCodeEditor::Highlight::Search);
             }
         }
         if (!shown_all.empty())
@@ -7182,7 +7182,7 @@ void ALVimKeymap::incrementalSearch(ALTextView& view)
     mIncrementalShown = true;
     if (pattern.empty())
     {
-        editor->clearHighlights();
+        editor->clearHighlights(ALCodeEditor::Highlight::Search);
         view.scrollToCaret();
         return;
     }
@@ -7196,7 +7196,7 @@ void ALVimKeymap::incrementalSearch(ALTextView& view)
     std::vector<ALTextRange> matches = matchesOf(view, parsed, options, nullptr, error, wholes);
     if (!error.empty() || matches.empty())
     {
-        editor->clearHighlights();
+        editor->clearHighlights(ALCodeEditor::Highlight::Search);
         view.scrollToCaret();
         return;
     }
@@ -7204,7 +7204,7 @@ void ALVimKeymap::incrementalSearch(ALTextView& view)
     const S32  index   = ALTextSearch::nearest(matches, forward ? view.document().nextCluster(cursor(view)) : cursor(view), forward);
     const ALTextRange next = matches[static_cast<size_t>(index < 0 ? 0 : index)];
     // Every match lit where hlsearch has them, else the next alone.
-    editor->setHighlights(mShared->highlightSearch ? matches : std::vector<ALTextRange>{ next });
+    editor->setHighlights(ALCodeEditor::Highlight::Search, mShared->highlightSearch ? matches : std::vector<ALTextRange>{ next });
     view.scrollToLine(next.begin.line);
 }
 
@@ -7217,7 +7217,7 @@ void ALVimKeymap::endIncremental(ALTextView& view)
     mIncrementalShown = false;
     if (ALCodeEditor* editor = ALViewType::as<ALCodeEditor>(&view))
     {
-        editor->clearHighlights();
+        editor->clearHighlights(ALCodeEditor::Highlight::Search);
     }
     view.scrollToCaret();
 }

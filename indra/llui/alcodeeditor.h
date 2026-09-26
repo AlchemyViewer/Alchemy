@@ -24,6 +24,7 @@
 
 #pragma once
 
+#include "alanchoredranges.h"
 #include "alcodecards.h"
 #include "alcompletionmodel.h"
 #include "alfixlistmodel.h"
@@ -149,9 +150,17 @@ public:
         LLColor4    color;
         // Shown when the mouse rests on it, where there is something to say.
         std::string message;
+        // Where it came among those given, which is the order they are
+        // listed in -- the worst first, as a checker gives them --
+        // whatever order they lie in. Set by setDecorations.
+        U32         order = 0;
     };
     void                           setDecorations(std::vector<Decoration> decorations);
-    const std::vector<Decoration>& decorations() const { return mDecorations; }
+    // In the order they lie in.
+    const std::vector<Decoration>& decorations() const { return mDecorations.items(); }
+    // Those that may lie on a line, in the order they were given: a
+    // caller still asks each whether it does.
+    std::vector<const Decoration*> decorationsOn(S32 line) const;
 
     // A stretch coloured by what an analyzer knows it to be, over what
     // the grammar coloured it: a parameter, a local, a field, a type, a
@@ -164,7 +173,7 @@ public:
         bool         strike = false;
     };
     void                              setSemanticTokens(std::vector<SemanticToken> tokens);
-    const std::vector<SemanticToken>& semanticTokens() const { return mSemantics; }
+    const std::vector<SemanticToken>& semanticTokens() const { return mSemantics.items(); }
 
     // A word shown beside the text without being in it -- a parameter's
     // name before the argument it is given, a type after a name declared
@@ -184,7 +193,7 @@ public:
         std::string insert;
     };
     void                          setInlayHints(std::vector<InlayHint> hints);
-    const std::vector<InlayHint>& inlayHints() const { return mInlays; }
+    const std::vector<InlayHint>& inlayHints() const { return mInlays.items(); }
     // The inlay drawn under a point of the view, by its place among the
     // hints, or -1.
     S32                           inlayAtLocal(S32 x, S32 y);
@@ -224,14 +233,27 @@ public:
     // The line whose note is drawn under a point of the view, or -1.
     S32         noteAtLocal(S32 x, S32 y);
 
-    // The places a name stands, washed over until they are cleared or
-    // the caret leaves them all; an edit slides them as it does the
-    // decorations.
-    void                            setHighlights(std::vector<ALTextRange> ranges);
-    void                            clearHighlights() { mHighlights.clear(); }
-    const std::vector<ALTextRange>& highlights() const { return mHighlights; }
-    // Whether a position is on one of them.
-    bool                            highlighted(const ALTextPos& at) const;
+    // Stretches washed over, each by what lit it, so that one does not
+    // put out another: a search's matches, vim's visual block, the places
+    // a substitution asks about, the places a name stands. Each until it
+    // is cleared -- the references also as the caret leaves them all; an
+    // edit slides them as it does the decorations.
+    enum class Highlight : U8
+    {
+        Search,
+        Block,
+        Confirm,
+        References,
+        COUNT
+    };
+    void                            setHighlights(Highlight layer, std::vector<ALTextRange> ranges);
+    void                            clearHighlights(Highlight layer) { mHighlights[static_cast<size_t>(layer)].clear(); }
+    void                            clearHighlights();
+    const std::vector<ALTextRange>& highlights(Highlight layer) const { return mHighlights[static_cast<size_t>(layer)].items(); }
+    // Every layer's, in the layers' order.
+    std::vector<ALTextRange>        highlights() const;
+    // Whether a position is on one of a layer's.
+    bool                            highlighted(Highlight layer, const ALTextPos& at) const;
 
     // The bracket the caret is at -- just before it, or under it -- and
     // its match, skipping what is inside strings and comments. False where
@@ -740,7 +762,7 @@ private:
     // The closers typing put in, which a closer typed goes over and a
     // Backspace takes with its opener; they move with the edits, and go
     // when the caret leaves their line.
-    std::vector<ALTextPos> mAutoClosed;
+    ALAnchoredRanges<ALTextPos> mAutoClosed;
     bool     mHoverCards = true;
     F32      mHoverDelay = -1.f;
     // How long the mouse has rested, and whether the card was asked for
@@ -797,10 +819,15 @@ private:
     // shows its extent.
     bool                               mGutterHover     = false;
     S32                                mGutterHoverLine = -1;
-    std::vector<Decoration>            mDecorations;
-    std::vector<ALTextRange>           mHighlights;
-    std::vector<SemanticToken>         mSemantics;
-    std::vector<InlayHint>             mInlays;
+    ALAnchoredRanges<Decoration>       mDecorations;
+    std::array<ALAnchoredRanges<ALTextRange>, static_cast<size_t>(Highlight::COUNT)> mHighlights;
+    ALAnchoredRanges<SemanticToken>    mSemantics;
+    // An inlay is at a place, not over a range.
+    struct InlayAt
+    {
+        ALTextRange operator()(const InlayHint& hint) const { return ALTextRange(hint.at, hint.at); }
+    };
+    ALAnchoredRanges<InlayHint, InlayAt> mInlays;
     // Beside each line: its heat and its note, and what they say to the
     // mouse; empty until either is set.
     struct Aside

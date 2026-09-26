@@ -2350,4 +2350,24 @@ namespace tut
         ensure_equals("nothing changed", flat(e.text()), std::string("one two|"));
 #endif
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<77>()
+    {
+        set_test_name("vim's search and block lit apart from a name's references: :noh and leaving visual block leave those");
+        ALCodeEditor& e = make("count count\ncount\n");
+        typedef ALCodeEditor::Highlight H;
+        e.setHighlights(H::References, { ALTextRange(ALTextPos(1, 0), ALTextPos(1, 5)) });
+        keys(":set hls<CR>");
+        keys("/count<CR>");
+        ensure("the search lit", !e.highlights(H::Search).empty());
+        keys(":noh<CR>");
+        ensure("put out", e.highlights(H::Search).empty());
+        ensure("the references kept", e.highlights(H::References).size() == 1);
+        keys("gg<C-V>jl");
+        ensure("the block lit", !e.highlights(H::Block).empty());
+        keys("<Esc>");
+        ensure("put out", e.highlights(H::Block).empty());
+        ensure("the references kept still", e.highlights(H::References).size() == 1);
+    }
 }

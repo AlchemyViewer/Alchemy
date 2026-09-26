@@ -186,10 +186,15 @@ void ALScriptStudioCaret::pump(F64 now)
         doc->caret.seen       = caret;
         doc->caret.inspectDue = source ? now + SETTLE : 0.0;
         mWindow.showPath(*doc);
-        // The lit places go once the caret has left them all.
-        if (source && !doc->editor->highlights().empty() && !doc->editor->highlighted(caret))
+        // A search's lit places, and a name's, each go once the caret has
+        // left them all; vim's visual block and the places a substitution
+        // asks about are vim's to put out.
+        for (const ALCodeEditor::Highlight layer : { ALCodeEditor::Highlight::Search, ALCodeEditor::Highlight::References })
         {
-            doc->editor->clearHighlights();
+            if (source && !doc->editor->highlights(layer).empty() && !doc->editor->highlighted(layer, caret))
+            {
+                doc->editor->clearHighlights(layer);
+            }
         }
     }
     if (source && doc->caret.inspectDue > 0.0 && now >= doc->caret.inspectDue)
