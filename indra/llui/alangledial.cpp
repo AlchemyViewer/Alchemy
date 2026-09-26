@@ -25,6 +25,7 @@
 #include "linden_common.h"
 #include "alangledial.h"
 
+#include "alsurface.h"
 #include "llrender.h"
 #include "llrender2dutils.h"
 #include "llspinctrl.h"
@@ -135,9 +136,9 @@ void ALAngleDial::pointAt(S32 x, S32 y)
 
 void ALAngleDial::drawPicture()
 {
-    static const LLUIColor well = LLUIColorTable::instance().getColor("DefaultShadowLight", LLColor4::black);
-    static const LLUIColor rim = LLUIColorTable::instance().getColor("LabelDisabledColor", LLColor4::grey);
-    static const LLUIColor handle = LLUIColorTable::instance().getColor("EmphasisColor", LLColor4::yellow);
+    const LLUIColor& well = ALSurface::well();
+    const LLUIColor& rim = ALSurface::rim();
+    const LLUIColor& handle = ALSurface::handle();
 
     const LLRect& dial = picture();
     const F32 cx = F32(dial.mLeft + dial.mRight) * 0.5f;

@@ -26,6 +26,7 @@
 
 #include "alhistorylist.h"
 
+#include "alsurface.h"
 #include "alemptystate.h"
 #include "llscrolllistcolumn.h"
 #include "llscrolllistctrl.h"
@@ -153,8 +154,7 @@ void ALHistoryList::fill()
         LLScrollListItem* item = mList->addElement(row);
         if (item && !done)
         {
-            static const LLUIColor undone =
-                LLUIColorTable::instance().getColor("LabelDisabledColor", LLColor4::grey);
+            const LLUIColor& undone = ALSurface::quiet();
             for (S32 cell = 0; cell < item->getNumColumns(); ++cell)
             {
                 if (LLScrollListCell* text = item->getColumn(cell))

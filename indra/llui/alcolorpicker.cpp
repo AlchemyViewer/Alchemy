@@ -26,6 +26,7 @@
 
 #include "alcolorpicker.h"
 
+#include "alsurface.h"
 #include "llfontgl.h"
 #include "llrender.h"
 #include "llrender2dutils.h"
@@ -326,7 +327,7 @@ void ALColorPicker::drawHarmonies() const
 void ALColorPicker::drawSlider(const LLRect& track, F32 fraction, const LLColor4& from,
                                const LLColor4& to, bool hue_track, const std::string& label) const
 {
-    static const LLUIColor ink = LLUIColorTable::instance().getColor("LabelTextColor", LLColor4::white);
+    const LLUIColor& ink = ALSurface::text();
     const LLFontGL* font = LLFontGL::getFontSansSerifSmall();
     font->renderUTF8(label, 0, track.mLeft - LABEL_WIDTH, track.mBottom + 4, ink.get(),
                      LLFontGL::LEFT, LLFontGL::BOTTOM);
@@ -393,7 +394,7 @@ void ALColorPicker::drawChannels() const
         top -= mSliderHeight + SLIDER_GAP;
     }
 
-    static const LLUIColor ink = LLUIColorTable::instance().getColor("LabelTextColor", LLColor4::white);
+    const LLUIColor& ink = ALSurface::text();
     const LLFontGL* font = LLFontGL::getFontMonospace();
     hex_buf_t hex;
     font->renderUTF8(hexOf(hex, mColor), 0, mChannels.mRight, mChannels.mBottom + 2, ink.get(),

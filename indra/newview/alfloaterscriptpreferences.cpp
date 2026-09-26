@@ -25,6 +25,7 @@
 #include "llviewerprecompiledheaders.h"
 
 #include "alfloaterscriptpreferences.h"
+#include "alsurface.h"
 
 #include "alcodeeditor.h"
 #include "alfloaterscriptstudio.h"
@@ -1084,8 +1085,8 @@ void ALFloaterScriptPreferences::fillSnippets(bool reread)
     const LLSD chosen   = mSnippetList->getFirstSelected() ? mSnippetList->getFirstSelected()->getValue() : LLSD();
     const S32  scrolled = mSnippetList->getScrollPos();
     mSnippetList->deleteAllItems();
-    static const LLUIColor theirs = LLUIColorTable::instance().getColor("LabelDisabledColor", LLColor4::grey);
-    const auto add = [this](const ALScriptSnippets::Snippet& one, bool own, S32 index) {
+    const LLUIColor& theirs = ALSurface::quiet();
+    const auto add = [this, &theirs](const ALScriptSnippets::Snippet& one, bool own, S32 index) {
         LLSD row;
         row["value"]                  = (own ? "own:" : "builtin:") + std::to_string(index);
         row["columns"][0]["column"]   = "name";

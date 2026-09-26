@@ -26,6 +26,7 @@
 
 #include "alfontfield.h"
 
+#include "alsurface.h"
 #include "llbutton.h"
 #include "llcheckboxctrl.h"
 #include "alpopover.h"
@@ -162,7 +163,7 @@ namespace
         void draw() override
         {
             LLPanel::draw();
-            static const LLUIColor ink = LLUIColorTable::instance().getColor("LabelTextColor", LLColor4::white);
+            const LLUIColor& ink = ALSurface::text();
             static const LLUIColor picked = LLUIColorTable::instance().getColor("MenuItemHighlightBgColor", LLColor4::grey4);
             const LLFontGL* label_font = LLFontGL::getFontSansSerifSmall();
             for (size_t i = 0; i < mShown.size(); ++i)
@@ -532,8 +533,8 @@ std::string ALFontField::describe() const
 
 void ALFontField::draw()
 {
-    static const LLUIColor ink = LLUIColorTable::instance().getColor("LabelTextColor", LLColor4::white);
-    static const LLUIColor edge = LLUIColorTable::instance().getColor("DefaultShadowLight", LLColor4::black);
+    const LLUIColor& ink = ALSurface::text();
+    const LLUIColor& edge = ALSurface::well();
     const LLRect sample(0, getRect().getHeight() - 2, mSampleWidth, 2);
     gl_rect_2d(sample, edge.get(), false);
     font()->renderUTF8(SAMPLE, 0, sample.mLeft + 3, sample.mBottom + 2,

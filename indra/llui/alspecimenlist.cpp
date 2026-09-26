@@ -26,6 +26,7 @@
 
 #include "alspecimenlist.h"
 
+#include "alsurface.h"
 #include "aldraggesture.h"
 
 #include "alemptystate.h"
@@ -849,11 +850,11 @@ S32 ALSpecimenList::chosenCell() const
 
 void ALSpecimenList::drawCell(const Cell& cell, bool hovered) const
 {
-    static const LLUIColor heading_color = LLUIColorTable::instance().getColor("LabelTextColor", LLColor4::white);
-    static const LLUIColor caption_color = LLUIColorTable::instance().getColor("LabelDisabledColor", LLColor4::grey);
-    static const LLUIColor selected_color = LLUIColorTable::instance().getColor("EmphasisColor", LLColor4::yellow);
+    const LLUIColor& heading_color = ALSurface::text();
+    const LLUIColor& caption_color = ALSurface::quiet();
+    const LLUIColor& selected_color = ALSurface::handle();
     static const LLUIColor hover_color = LLUIColorTable::instance().getColor("DkGray", LLColor4::grey);
-    static const LLUIColor mark_color = LLUIColorTable::instance().getColor("EmphasisColor", LLColor4::yellow);
+    const LLUIColor& mark_color = ALSurface::handle();
     static const LLUIColor broken_color = LLUIColorTable::instance().getColor("LtOrange", LLColor4::red);
 
     const LLFontGL* small = LLFontGL::getFontSansSerifSmall();

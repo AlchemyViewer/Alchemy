@@ -26,6 +26,7 @@
 
 #include "alimagefield.h"
 
+#include "alsurface.h"
 #include "alpopover.h"
 #include "alspecimenlist.h"
 #include "alstringmatch.h"
@@ -225,7 +226,7 @@ void ALImageField::setEditor(edit_t editor, std::string label)
 // checkerboard, so an edge that is transparent reads as one.
 void ALImageField::draw()
 {
-    static const LLUIColor edge = LLUIColorTable::instance().getColor("DefaultShadowLight", LLColor4::black);
+    const LLUIColor& edge = ALSurface::well();
     const LLRect swatch(0, getRect().getHeight() - 2, mSwatchWidth, 2);
 
     gl_rect_2d_checkerboard(swatch, 1.f);

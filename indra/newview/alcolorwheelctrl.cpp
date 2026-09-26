@@ -25,6 +25,7 @@
 #include "llviewerprecompiledheaders.h"
 
 #include "alcolorwheelctrl.h"
+#include "alsurface.h"
 
 #include "llbutton.h"
 #include "llfocusmgr.h"
@@ -90,7 +91,7 @@ ALColorWheelCtrl::Params::Params()
     ring_steps("ring_steps", 72),
     puck_radius("puck_radius", 4),
     decimal_digits("decimal_digits", 2),
-    border_color("border_color", LLUIColorTable::instance().getColor("DefaultShadowLight")),
+    border_color("border_color", ALSurface::well()),
     face_color("face_color", LLUIColorTable::instance().getColor("MenuDefaultBgColor")),
     crosshair_color("crosshair_color", LLUIColorTable::instance().getColor("DefaultShadowDark"))
 {

@@ -25,6 +25,7 @@
 #include "linden_common.h"
 #include "aloffsetpad.h"
 
+#include "alsurface.h"
 #include "llrender.h"
 #include "llrender2dutils.h"
 #include "llspinctrl.h"
@@ -130,9 +131,9 @@ void ALOffsetPad::pointAt(S32 x, S32 y)
 
 void ALOffsetPad::drawPicture()
 {
-    static const LLUIColor well = LLUIColorTable::instance().getColor("DefaultShadowLight", LLColor4::black);
-    static const LLUIColor grid = LLUIColorTable::instance().getColor("LabelDisabledColor", LLColor4::grey);
-    static const LLUIColor dot = LLUIColorTable::instance().getColor("EmphasisColor", LLColor4::yellow);
+    const LLUIColor& well = ALSurface::well();
+    const LLUIColor& grid = ALSurface::rim();
+    const LLUIColor& dot = ALSurface::handle();
 
     const LLRect& pad = picture();
     gl_rect_2d(pad, well.get() % 0.6f, true);

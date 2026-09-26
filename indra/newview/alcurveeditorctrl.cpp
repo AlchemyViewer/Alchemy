@@ -25,6 +25,7 @@
 #include "llviewerprecompiledheaders.h"
 
 #include "alcurveeditorctrl.h"
+#include "alsurface.h"
 
 #include "llfocusmgr.h"
 #include "lllocalcliprect.h"
@@ -46,7 +47,7 @@ constexpr S32 GRAB_SLOP = 4;
 
 ALCurveEditorCtrl::Params::Params()
 :   background_color("background_color", LLUIColorTable::instance().getColor("PanelDefaultBackgroundColor")),
-    border_color("border_color", LLUIColorTable::instance().getColor("DefaultShadowLight")),
+    border_color("border_color", ALSurface::well()),
     grid_color("grid_color", LLUIColorTable::instance().getColor("DefaultShadowDark")),
     curve_color("curve_color", LLUIColorTable::instance().getColor("White")),
     handle_color("handle_color", LLUIColorTable::instance().getColor("White")),

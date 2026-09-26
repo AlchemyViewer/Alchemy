@@ -26,6 +26,7 @@
 
 #include "altabstrip.h"
 
+#include "alsurface.h"
 #include "llfocusmgr.h"
 
 #include "alsaid.h"
@@ -537,9 +538,9 @@ void ALTabStrip::draw()
 {
     static const LLUIColor shown = LLUIColorTable::instance().getColor("PanelDefaultBackgroundColor", LLColor4::grey4);
     static const LLUIColor rest = LLUIColorTable::instance().getColor("DkGray", LLColor4::grey3);
-    static const LLUIColor edge = LLUIColorTable::instance().getColor("DefaultShadowLight", LLColor4::black);
-    static const LLUIColor ink = LLUIColorTable::instance().getColor("LabelTextColor", LLColor4::white);
-    static const LLUIColor quiet = LLUIColorTable::instance().getColor("LabelDisabledColor", LLColor4::grey);
+    const LLUIColor& edge = ALSurface::well();
+    const LLUIColor& ink = ALSurface::text();
+    const LLUIColor& quiet = ALSurface::quiet();
 
     const S32 height = getRect().getHeight();
     const F32 alpha = getDrawContext().mAlpha;

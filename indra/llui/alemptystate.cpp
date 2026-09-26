@@ -26,6 +26,7 @@
 
 #include "alemptystate.h"
 
+#include "alsurface.h"
 #include "llbutton.h"
 #include "lliconctrl.h"
 #include "lltextbox.h"
@@ -61,8 +62,8 @@ ALEmptyState::ALEmptyState(const Params& p)
     mSentence(p.sentence),
     mActionLabel(p.action)
 {
-    static const LLUIColor ink = LLUIColorTable::instance().getColor("LabelTextColor", LLColor4::white);
-    static const LLUIColor quiet = LLUIColorTable::instance().getColor("LabelDisabledColor", LLColor4::grey);
+    const LLUIColor& ink = ALSurface::text();
+    const LLUIColor& quiet = ALSurface::quiet();
 
     {
         LLIconCtrl::Params ip;

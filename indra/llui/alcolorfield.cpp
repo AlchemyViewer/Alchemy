@@ -26,6 +26,7 @@
 
 #include "alcolorfield.h"
 
+#include "alsurface.h"
 #include "alcolorpicker.h"
 #include "alpopover.h"
 #include "alstringmatch.h"
@@ -185,7 +186,7 @@ namespace
         void draw() override
         {
             LLPanel::draw();
-            static const LLUIColor edge = LLUIColorTable::instance().getColor("DefaultShadowLight", LLColor4::black);
+            const LLUIColor& edge = ALSurface::well();
             for (size_t i = 0; i < mShown.size(); ++i)
             {
                 const LLRect cell = rectOf((S32)i);
@@ -365,7 +366,7 @@ namespace
             ALPopover::draw();
             // What would be written, drawn where it can be compared with
             // what is under the pointer.
-            static const LLUIColor edge = LLUIColorTable::instance().getColor("DefaultShadowLight", LLColor4::black);
+            const LLUIColor& edge = ALSurface::well();
             const S32 top = getRect().getHeight() - getHeaderHeight();
             const LLRect swatch(4, top - 4, 4 + HEADER - 8, top - 4 - (ROW - 2));
             LLColor4 color;
@@ -499,7 +500,7 @@ bool ALColorField::resolved(LLColor4& color) const
 
 void ALColorField::draw()
 {
-    static const LLUIColor edge = LLUIColorTable::instance().getColor("DefaultShadowLight", LLColor4::black);
+    const LLUIColor& edge = ALSurface::well();
     const LLRect swatch(0, getRect().getHeight() - 2, mSwatchWidth, 2);
 
     LLColor4 color;

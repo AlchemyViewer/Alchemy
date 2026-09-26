@@ -15,6 +15,7 @@
 #include "llviewerprecompiledheaders.h"
 
 #include "alfloatersceneexplorer.h"
+#include "alsurface.h"
 
 #include "message.h"
 
@@ -249,7 +250,7 @@ namespace
     // and reads near-black on dark skins.)
     const LLColor4& heatColor(F32 value, F32 caution, F32 alert)
     {
-        static const LLUIColor normal = LLUIColorTable::instance().getColor("LabelTextColor", LLColor4::white);
+        const LLUIColor& normal = ALSurface::text();
         static const LLUIColor warn   = LLUIColorTable::instance().getColor("AlertCautionTextColor", LLColor4::yellow);
         static const LLUIColor danger = LLUIColorTable::instance().getColor("Red", LLColor4::red);
         if (value >= alert)
@@ -269,7 +270,7 @@ namespace
 
     const LLColor4& labelColor()
     {
-        static const LLUIColor label = LLUIColorTable::instance().getColor("LabelTextColor", LLColor4::white);
+        const LLUIColor& label = ALSurface::text();
         return label.get();
     }
 

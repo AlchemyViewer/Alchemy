@@ -25,6 +25,7 @@
 #include "linden_common.h"
 #include "alcornerfield.h"
 
+#include "alsurface.h"
 #include "llcheckboxctrl.h"
 #include "llrender.h"
 #include "llrender2dutils.h"
@@ -166,8 +167,8 @@ void ALCornerField::boxTyped(size_t corner)
 // proportion, and the picture says it before the number does.
 void ALCornerField::drawPicture()
 {
-    static const LLUIColor ink = LLUIColorTable::instance().getColor("LabelTextColor", LLColor4::white);
-    static const LLUIColor edge = LLUIColorTable::instance().getColor("DefaultShadowLight", LLColor4::black);
+    const LLUIColor& ink = ALSurface::text();
+    const LLUIColor& edge = ALSurface::well();
 
     const LLRect& shown = picture();
     const LLRect  box(shown.mLeft + 6, shown.mTop - 6, shown.mRight - 6, shown.mBottom + 6);

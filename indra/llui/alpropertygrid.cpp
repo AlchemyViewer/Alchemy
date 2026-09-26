@@ -26,6 +26,7 @@
 
 #include "alpropertygrid.h"
 
+#include "alsurface.h"
 #include "alstringmatch.h"
 
 #include "llui.h"
@@ -80,8 +81,8 @@ namespace
     // widget is doing, not what the file says.
     const LLUIColor& inkFor(const ALPropertyGrid::Field& field)
     {
-        static const LLUIColor written = LLUIColorTable::instance().getColor("LabelTextColor", LLColor4::white);
-        static const LLUIColor unwritten = LLUIColorTable::instance().getColor("LabelDisabledColor", LLColor4::grey);
+        const LLUIColor& written = ALSurface::text();
+        const LLUIColor& unwritten = ALSurface::quiet();
         return (field.authored && !field.ignored) ? written : unwritten;
     }
 
@@ -120,7 +121,7 @@ public:
 
     void draw() override
     {
-        static const LLUIColor ink = LLUIColorTable::instance().getColor("EmphasisColor", LLColor4::yellow);
+        const LLUIColor& ink = ALSurface::handle();
         gl_rect_2d(getLocalRect(), ink.get(), true);
         LLUICtrl::draw();
     }

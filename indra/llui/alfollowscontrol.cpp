@@ -26,6 +26,7 @@
 
 #include "alfollowscontrol.h"
 
+#include "alsurface.h"
 #include "alflagsfield.h"
 
 #include "llrender2dutils.h"
@@ -306,8 +307,8 @@ bool ALFollowsControl::handleToolTip(S32 x, S32 y, MASK mask)
 
 void ALFollowsControl::drawFrame(const LLRect& parent, const LLRect& child, bool live) const
 {
-    static const LLUIColor frame = LLUIColorTable::instance().getColor("LabelDisabledColor", LLColor4::grey);
-    static const LLUIColor ink = LLUIColorTable::instance().getColor("LabelTextColor", LLColor4::white);
+    const LLUIColor& frame = ALSurface::rim();
+    const LLUIColor& ink = ALSurface::text();
 
     LLColor4 fill(ink.get());
     fill.mV[VALPHA] = live ? 0.22f : 0.12f;
@@ -321,8 +322,8 @@ void ALFollowsControl::drawFrame(const LLRect& parent, const LLRect& child, bool
 // drawn as the thing that is holding it.
 void ALFollowsControl::drawStrut(const LLRect& parent, const LLRect& child, S32 edge) const
 {
-    static const LLUIColor set = LLUIColorTable::instance().getColor("EmphasisColor", LLColor4::yellow);
-    static const LLUIColor unset = LLUIColorTable::instance().getColor("LabelDisabledColor", LLColor4::grey);
+    const LLUIColor& set = ALSurface::handle();
+    const LLUIColor& unset = ALSurface::rim();
 
     const bool on = mSet[edge];
     const LLColor4 colour = on ? set.get() : unset.get();
@@ -356,8 +357,8 @@ void ALFollowsControl::drawStrut(const LLRect& parent, const LLRect& child, S32 
 // that has to give.
 void ALFollowsControl::drawSpring(S32 x0, S32 y0, S32 x1, S32 y1, bool on) const
 {
-    static const LLUIColor set = LLUIColorTable::instance().getColor("EmphasisColor", LLColor4::yellow);
-    static const LLUIColor unset = LLUIColorTable::instance().getColor("LabelDisabledColor", LLColor4::grey);
+    const LLUIColor& set = ALSurface::handle();
+    const LLUIColor& unset = ALSurface::rim();
 
     const F32 dx = (F32)(x1 - x0);
     const F32 dy = (F32)(y1 - y0);

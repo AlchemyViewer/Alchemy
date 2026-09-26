@@ -26,6 +26,7 @@
 
 #include "alstudiofloater.h"
 
+#include "alsurface.h"
 #include "alpopover.h"
 #include "llcontrol.h"
 #include "lleditmenuhandler.h"
@@ -269,7 +270,7 @@ void ALStudioFloater::setStatus(const std::string& text, bool failure)
 {
     // The text box's own ink: the field's, TextFgColor, is black in a skin
     // whose fields are light, and the status line is on the panel.
-    static const LLUIColor normal = LLUIColorTable::instance().getColor("LabelTextColor", LLColor4::white);
+    const LLUIColor& normal = ALSurface::text();
     static const LLUIColor alarm = LLUIColorTable::instance().getColor("LtOrange", LLColor4::yellow);
 
     if (mStatus)
@@ -300,7 +301,7 @@ void ALStudioFloater::draw()
     constexpr F64 FAILURE_SECONDS = 60.0;
     if (mStatus && !mStatusQuiet && LLTimer::getTotalSeconds() - mStatusSaidAt > (mStatusFailure ? FAILURE_SECONDS : NEWS_SECONDS))
     {
-        static const LLUIColor quiet = LLUIColorTable::instance().getColor("LabelDisabledColor", LLColor4::grey);
+        const LLUIColor& quiet = ALSurface::quiet();
         mStatus->setColor(quiet);
         mStatusQuiet = true;
     }

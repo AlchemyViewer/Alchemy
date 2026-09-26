@@ -26,6 +26,7 @@
 
 #include "alfieldeditors.h"
 
+#include "alsurface.h"
 #include "alangledial.h"
 #include "alcolorfield.h"
 #include "alcornerfield.h"
@@ -233,8 +234,7 @@ void ALFieldEditors::makeComponents(const Field& field, const LLRect& box, LLVie
     {
         return;
     }
-    static const LLUIColor caption =
-        LLUIColorTable::instance().getColor("LabelDisabledColor", LLColor4::grey);
+    const LLUIColor& caption = ALSurface::quiet();
 
     const std::vector<std::string> parts = numbersOf(field.value);
     const bool whole = field.kind != ALParamType::REAL;

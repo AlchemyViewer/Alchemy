@@ -27,6 +27,7 @@
 #include "alsurface.h"
 
 #include "llrender2dutils.h"
+#include "lluicolortable.h"
 
 namespace ALSurface
 {
@@ -52,5 +53,35 @@ namespace ALSurface
     {
         gl_rect_2d(rect, ground(paper, ink) % alpha, true);
         gl_rect_2d(rect, frame(ink, alpha), false);
+    }
+
+    const LLUIColor& well()
+    {
+        static const LLUIColor color = LLUIColorTable::instance().getColor("DefaultShadowLight", LLColor4::black);
+        return color;
+    }
+
+    const LLUIColor& rim()
+    {
+        static const LLUIColor color = LLUIColorTable::instance().getColor("LabelDisabledColor", LLColor4::grey);
+        return color;
+    }
+
+    const LLUIColor& handle()
+    {
+        static const LLUIColor color = LLUIColorTable::instance().getColor("EmphasisColor", LLColor4::yellow);
+        return color;
+    }
+
+    const LLUIColor& text()
+    {
+        static const LLUIColor color = LLUIColorTable::instance().getColor("LabelTextColor", LLColor4::white);
+        return color;
+    }
+
+    const LLUIColor& quiet()
+    {
+        static const LLUIColor color = LLUIColorTable::instance().getColor("LabelDisabledColor", LLColor4::grey);
+        return color;
     }
 }
