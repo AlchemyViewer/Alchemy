@@ -99,9 +99,25 @@ public:
         ALTextRange range;
         std::string removed;
         std::string inserted;
+        // Where the inserted text ends, worked out once where the edit is
+        // made -- by the document, before any listener hears of it --
+        // rather than again by every listener and for every range it
+        // slides. Kept only while `endKept`: whoever changes the edit
+        // afterwards keeps it again. An edit made by hand works it out
+        // each time it is asked.
+        ALTextPos   keptEnd;
+        bool        endKept = false;
 
         // Where the inserted text ends, in the text as it is after.
-        ALTextPos   endAfter() const;
+        ALTextPos   endAfter() const { return endKept ? keptEnd : workOutEnd(); }
+        void        keepEnd() { keepEnd(workOutEnd()); }
+        void        keepEnd(const ALTextPos& end)
+        {
+            keptEnd = end;
+            endKept = true;
+        }
+        // How many line breaks went in: the lines the edit made, less one.
+        S32         breaksInserted() const { return endAfter().line - range.begin.line; }
         ALTextRange rangeAfter() const { return ALTextRange(range.begin, endAfter()); }
         Edit        inverse() const;
         bool        nothing() const { return removed.empty() && inserted.empty(); }
@@ -121,6 +137,9 @@ public:
         // range's start, or past what went in, for its end. Text put right
         // at the range's start is within it; right at its end, not.
         ALTextRange stretched(const ALTextRange& range) const;
+
+    private:
+        ALTextPos workOutEnd() const;
     };
 
     typedef boost::signals2::signal<void(const Edit&)> changed_signal_t;

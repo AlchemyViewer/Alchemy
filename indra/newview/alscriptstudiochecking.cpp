@@ -991,7 +991,7 @@ void ALScriptStudioChecking::slideProblems(Doc& doc, const ALTextDocument::Edit&
     const ALTextRange range = edit.range.normalised();
     const S32         first = range.begin.line;
     const S32         last  = range.end.line;
-    const S32         delta = static_cast<S32>(std::count(edit.inserted.begin(), edit.inserted.end(), '\n')) - (last - first);
+    const S32         delta = edit.breaksInserted() - (last - first);
     auto              slide = [&](auto& list) {
         list.erase(std::remove_if(list.begin(), list.end(),
                                   [&](auto& problem) {

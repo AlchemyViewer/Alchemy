@@ -132,7 +132,7 @@ void ALTextLayout::onEdit(const ALTextDocument::Edit& edit)
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
     const S32 first = llclamp(edit.range.begin.line, 0, static_cast<S32>(mLines.size()));
     const S32 last  = llclamp(edit.range.end.line, first, static_cast<S32>(mLines.size()) - 1);
-    const S32 made  = 1 + static_cast<S32>(std::count(edit.inserted.begin(), edit.inserted.end(), '\n'));
+    const S32 made  = 1 + edit.breaksInserted();
     if (first < static_cast<S32>(mLines.size()))
     {
         mLines.erase(mLines.begin() + first, mLines.begin() + last + 1);

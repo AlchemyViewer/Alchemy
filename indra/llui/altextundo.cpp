@@ -129,7 +129,9 @@ namespace
     {
         if (first.removed.empty() && next.removed.empty() && next.range.begin == next.range.end && next.range.begin == first.endAfter())
         {
+            // Both end where the second does.
             first.inserted += next.inserted;
+            first.keepEnd(next.endAfter());
             return true;
         }
         if (!first.inserted.empty() || !next.inserted.empty())
@@ -141,6 +143,7 @@ namespace
             // Backspaced: what it took stood right before what the first took.
             first.range   = ALTextRange(next.range.begin, first.range.end);
             first.removed = next.removed + first.removed;
+            first.keepEnd(first.range.begin);
             return true;
         }
         if (next.range.begin == first.range.begin)
@@ -152,6 +155,7 @@ namespace
             reach.range    = ALTextRange(first.range.begin, first.range.begin);
             reach.inserted = first.removed;
             first.range    = ALTextRange(first.range.begin, reach.endAfter());
+            first.keepEnd(first.range.begin);
             return true;
         }
         return false;

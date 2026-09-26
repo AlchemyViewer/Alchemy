@@ -181,7 +181,7 @@ void ALTextSpelling::edited(const ALTextDocument::Edit& edit, S32 line_count)
     const S32 count = static_cast<S32>(mLines.size());
     const S32 first = llclamp(edit.range.begin.line, 0, count);
     const S32 last  = llclamp(edit.range.end.line, first, count - 1);
-    const S32 made  = 1 + static_cast<S32>(std::count(edit.inserted.begin(), edit.inserted.end(), '\n'));
+    const S32 made  = 1 + edit.breaksInserted();
     if (first < count)
     {
         mLines.erase(mLines.begin() + first, mLines.begin() + last + 1);

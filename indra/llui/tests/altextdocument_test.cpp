@@ -295,4 +295,28 @@ namespace tut
         ensure_equals("mixed stays as written", alInCaseOf("wOrLd", "Hello"), std::string("Hello"));
         ensure_equals("no letters stays as written", alInCaseOf("123", "Hello"), std::string("Hello"));
     }
+
+    template<> template<>
+    void altextdocument_object::test<15>()
+    {
+        set_test_name("an edit knows where it ends as it is made, and where it is told of it says the same as one worked out");
+        ALTextDocument doc("ab\ncd");
+        listen(doc);
+        doc.replace(ALTextRange(ALTextPos(0, 1), ALTextPos(1, 1)), "x\r\nyz\r\n");
+        doc.insert(ALTextPos(0, 0), "q");
+        doc.replace(ALTextRange(ALTextPos(0, 0), ALTextPos(0, 1)), std::string_view());
+        ensure_equals("three heard", heard.size(), size_t(3));
+        for (const ALTextDocument::Edit& edit : heard)
+        {
+            ensure("kept as it was made", edit.endKept);
+            ALTextDocument::Edit by_hand{ edit.range, edit.removed, edit.inserted };
+            ensure("by hand, not", !by_hand.endKept);
+            ensure("the same end", edit.endAfter() == by_hand.endAfter());
+            ensure_equals("the same breaks", edit.breaksInserted(), by_hand.breaksInserted());
+        }
+        ensure("across the line endings put in, as LF", heard[0].endAfter() == ALTextPos(2, 0));
+        ensure_equals("two breaks", heard[0].breaksInserted(), 2);
+        ensure("one character on", heard[1].endAfter() == ALTextPos(0, 1));
+        ensure("nothing put in ends where it began", heard[2].endAfter() == ALTextPos(0, 0));
+    }
 }

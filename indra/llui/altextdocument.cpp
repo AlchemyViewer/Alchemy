@@ -88,7 +88,7 @@ namespace
 
 // --- Edit --------------------------------------------------------------------
 
-ALTextPos ALTextDocument::Edit::endAfter() const
+ALTextPos ALTextDocument::Edit::workOutEnd() const
 {
     const size_t last_break = inserted.rfind('\n');
     if (last_break == std::string::npos)
@@ -278,6 +278,8 @@ ALTextDocument::Edit ALTextDocument::replace(ALTextRange range, std::string_view
         none.range = ALTextRange(range.begin, range.begin);
         return none;
     }
+
+    edit.keepEnd();
 
     // The line the range starts in keeps what came before it, the line it
     // ends in keeps what comes after, and the pieces go between.
