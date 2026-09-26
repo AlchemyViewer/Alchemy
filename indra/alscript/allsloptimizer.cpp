@@ -3187,7 +3187,11 @@ namespace
             ALSourceMap       out;
             out.addFile(name, std::string());
             const std::string text = mStream.str();
-            std::sort(mMarks.begin(), mMarks.end(), [](const Mark& a, const Mark& b) { return a.offset < b.offset; });
+            // Marks that start together -- a statement and the name it
+            // begins with -- kept in the order they were printed, so that
+            // the map, which answers with the last at a place, answers the
+            // same for the same script every time.
+            std::stable_sort(mMarks.begin(), mMarks.end(), [](const Mark& a, const Mark& b) { return a.offset < b.offset; });
             S32    line = 0, column = 0;
             size_t pos  = 0;
             for (const Mark& mark : mMarks)
