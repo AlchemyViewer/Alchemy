@@ -1075,6 +1075,24 @@
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="preprocess" />
             </menu_item_call>
             <menu_item_separator layout="topleft" />
+            <menu_item_check label="Running" layout="topleft" name="running">
+                <menu_item_check.on_check function="ScriptStudio.Check" parameter="running" />
+                <menu_item_check.on_click function="ScriptStudio.Menu" parameter="running" />
+                <menu_item_check.on_enable function="ScriptStudio.Enable" parameter="running" />
+            </menu_item_check>
+            <menu_item_call label="Reset Script" layout="topleft" name="reset_script">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="reset_script" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="reset_script" />
+            </menu_item_call>
+            <menu_item_call label="Compile Target..." layout="topleft" name="choose_target">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="choose_target" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="choose_target" />
+            </menu_item_call>
+            <menu_item_call label="Experience..." layout="topleft" name="choose_experience">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="choose_experience" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="choose_experience" />
+            </menu_item_call>
+            <menu_item_separator layout="topleft" />
             <menu_item_check label="Hold Saves on Errors" layout="topleft" name="preflight">
                 <menu_item_check.on_check function="ScriptStudio.Check" parameter="preflight" />
                 <menu_item_check.on_click function="ScriptStudio.Menu" parameter="preflight" />

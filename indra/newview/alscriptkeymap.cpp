@@ -342,6 +342,10 @@ namespace ALScriptKeymap
             { "compare_inline", KEY_NONE, MASK_NONE },
             // Build
             { "preprocess", KEY_NONE, MASK_NONE },
+            { "running", KEY_NONE, MASK_NONE },
+            { "reset_script", KEY_NONE, MASK_NONE },
+            { "choose_target", KEY_NONE, MASK_NONE },
+            { "choose_experience", KEY_NONE, MASK_NONE },
             { "preflight", KEY_NONE, MASK_NONE },
             { "preproc_enabled", KEY_NONE, MASK_NONE },
             { "preproc_disk", KEY_NONE, MASK_NONE },

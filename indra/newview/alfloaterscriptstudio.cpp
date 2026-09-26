@@ -6485,6 +6485,28 @@ void ALFloaterScriptStudio::addGoCommands()
     mCommands.add("move_tab_left", [this]() { moveTab(-1); });
     mCommands.add("move_tab_right", [this]() { moveTab(1); });
     mCommands.add("focus_tabs", [this]() { mTabs->setFocus(true); });
+    // What the strip under the editor sets, from the menu, the palette and
+    // a key as well: whether the script runs, a reset, and the lists of
+    // compile targets and experiences opened with the keyboard in them.
+    const auto usable = [](const LLUICtrl* control) { return control && control->getVisible() && control->getEnabled(); };
+    mCommands.add(
+        "running",
+        [this]() {
+            mRunning->set(!mRunning->get());
+            onRunning();
+        },
+        [this, usable]() { return usable(mRunning); }, [this]() { return mRunning && mRunning->get(); });
+    mCommands.add("reset_script", [this]() { onReset(); }, [this, usable]() { return usable(mResetButton); });
+    for (const auto& [name, list] : { std::pair{ "choose_target", &mCompileTarget }, std::pair{ "choose_experience", &mExperience } })
+    {
+        mCommands.add(
+            name,
+            [list]() {
+                (*list)->setFocus(true);
+                (*list)->showList();
+            },
+            [list, usable]() { return usable(*list); });
+    }
     // F6 round the window's regions, as it goes between panes in most
     // editors, and Shift-F6 back.
     mCommands.add("next_pane", [this]() { cycleRegion(1); });
