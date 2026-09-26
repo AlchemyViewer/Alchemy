@@ -202,6 +202,8 @@ namespace
     constexpr llwchar DELETE_SURROUND    = 0xE004;
     constexpr llwchar CHANGE_SURROUND    = 0xE005;
     constexpr llwchar CHANGE_SURROUND_TO = 0xE006;
+    // Control-W, waiting for the window command after it.
+    constexpr llwchar WINDOW_PREFIX      = 0xE007;
     std::string shownKey(llwchar key)
     {
         switch (key)
@@ -213,6 +215,7 @@ namespace
             case DELETE_SURROUND:    return "ds";
             case CHANGE_SURROUND:
             case CHANGE_SURROUND_TO: return "cs";
+            case WINDOW_PREFIX:      return "^W";
             default:                 return utf8Of(key);
         }
     }
@@ -1135,6 +1138,23 @@ bool ALVimKeymap::normal(ALTextView& view, const Input& input)
         // Keys: the ones vim gives a meaning, and the rest left to the
         // view's own keymap.
         const bool ctrl = (input.mask & CONTROL) != 0;
+        // Back in the jump list, or forward again, the count times: the
+        // host's, which goes between its tabs as well.
+        const auto jump = [&](bool back) {
+            const S32 times = countOr(mCount);
+            clearPending();
+            for (S32 n = 0; n < times && mHooks.command; ++n)
+            {
+                mHooks.command(view, back ? "back" : "forward", std::string());
+            }
+            return true;
+        };
+        // Control-W's command held with Control, as vim takes it too:
+        // ^W^W is ^Ww.
+        if (mPending == WINDOW_PREFIX && ctrl && !(input.mask & MASK_ALT) && input.key >= 'A' && input.key <= 'Z')
+        {
+            return command(view, static_cast<llwchar>(input.key - 'A' + 'a'));
+        }
         switch (input.key)
         {
             case KEY_ESCAPE:
@@ -1155,6 +1175,20 @@ bool ALVimKeymap::normal(ALTextView& view, const Input& input)
             case KEY_DELETE:    return command(view, 'x');
             case KEY_PAGE_DOWN: view.perform(ALEditorCommand::MovePageDown); moveTo(view, view.caret()); clearPending(); return true;
             case KEY_PAGE_UP:   view.perform(ALEditorCommand::MovePageUp); moveTo(view, view.caret()); clearPending(); return true;
+            case KEY_TAB:
+                // Tab is Control-I, forward in the jump list; it indents
+                // nothing out of insert mode. Shift-Tab is nothing. Held
+                // with Control it goes round the host's tabs.
+                if ((input.mask & ~MASK_SHIFT) == MASK_NONE)
+                {
+                    if (input.mask == MASK_NONE)
+                    {
+                        return jump(false);
+                    }
+                    clearPending();
+                    return true;
+                }
+                break;
             default:
                 break;
         }
@@ -1164,17 +1198,30 @@ bool ALVimKeymap::normal(ALTextView& view, const Input& input)
             {
                 case 'O':
                 case 'I':
-                {
-                    // The jump list is the host's, which goes between its
-                    // tabs as well: back, or forward again, the count times.
-                    const S32 times = countOr(mCount);
+                    return jump(input.key == 'O');
+                // Vim's motions under Control, which would otherwise be
+                // the host's keys -- a new script, its quick open, the
+                // editor's join -- or the world's.
+                case 'H':
+                    return command(view, 'h');
+                case 'J':
+                case 'N':
+                    return command(view, 'j');
+                case 'P':
+                    return command(view, 'k');
+                case 'M':
+                    return command(view, '+');
+                case 'W':
+                    // The window commands, the next key: the host's tabs
+                    // stand for vim's windows.
                     clearPending();
-                    for (S32 n = 0; n < times && mHooks.command; ++n)
-                    {
-                        mHooks.command(view, input.key == 'O' ? "back" : "forward", std::string());
-                    }
+                    mPending = WINDOW_PREFIX;
                     return true;
-                }
+                case 'L':
+                    // Redraw, which drawing does: nothing to do, and not the
+                    // host's either.
+                    clearPending();
+                    return true;
                 case ']':
                     clearPending();
                     runCommand(view, "tag");
@@ -1250,6 +1297,19 @@ bool ALVimKeymap::normal(ALTextView& view, const Input& input)
                 default:
                     break;
             }
+#if LL_DARWIN
+            // On the Mac vim's Control is the Control key, and the
+            // window's keys are Command's: a letter vim has no use for is
+            // nobody's -- the editor's own under it, ^K deleting to the
+            // line's end, would edit the text. Elsewhere Control is the
+            // window's too, and one vim leaves -- ^S saving, ^K before a
+            // second key -- goes on to it.
+            if (input.key >= 'A' && input.key <= 'Z')
+            {
+                clearPending();
+                return true;
+            }
+#endif
         }
         return false;
     }
@@ -1880,6 +1940,30 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
                 }
                 clearPending();
                 return true;
+            case WINDOW_PREFIX:
+            {
+                // A tab for each of vim's windows: closed, the others
+                // closed, a new one, the next, the one before, the one
+                // last in front. There are no splits to go between.
+                const char* const line = ch == 'q' ? "quit"
+                                         : ch == 'c' ? "close"
+                                         : ch == 'o' ? "tabonly"
+                                         : ch == 'n' ? "tabnew"
+                                         : ch == 'w' ? "tabnext"
+                                         : ch == 'W' ? "tabprevious"
+                                         : ch == 'p' ? "buffer #"
+                                                     : nullptr;
+                clearPending();
+                if (line)
+                {
+                    runCommand(view, line);
+                }
+                else
+                {
+                    mFailed = true;
+                }
+                return true;
+            }
             case 'i':
             case 'a':
             {

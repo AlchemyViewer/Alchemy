@@ -2285,4 +2285,69 @@ namespace tut
         later("set nonumber", true);
         ensure("the tab gone: nothing", true);
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<74>()
+    {
+        set_test_name("vim's Control motions: ^H left, ^J and ^N down, ^P up, ^M to the next line's first; ^L nothing; Tab forward in the jumps, indenting nothing");
+        ALCodeEditor&            e = make("one\n  two\nthree\nfour\n");
+        std::vector<std::string> heard;
+        vim->hooks().command = [&heard](ALTextView&, const std::string& name, const std::string& args) {
+            heard.push_back(name + "|" + args);
+            return true;
+        };
+        keys("gg<C-N>");
+        ensure_equals("^N down", e.caret().line, 1);
+        keys("<C-J>");
+        ensure_equals("^J down", e.caret().line, 2);
+        keys("<C-P>");
+        ensure_equals("^P up", e.caret().line, 1);
+        keys("$<C-H>");
+        ensure_equals("^H left", caretText(), std::string("1:3"));
+        keys("gg<C-M>");
+        ensure_equals("^M to the next line's first character", caretText(), std::string("1:2"));
+        keys("<C-L>");
+        keys("<Tab>");
+        ensure("Tab forward in the jump list", heard.size() == 1 && heard[0] == "forward|");
+        ensure_equals("and nothing indented, nothing changed", flat(e.text()), std::string("one|  two|three|four|"));
+        keys("ggd<C-N>");
+        ensure_equals("an operator takes them as it takes j", flat(e.text()), std::string("three|four|"));
+    }
+
+    template<> template<>
+    void alvimkeymap_object::test<75>()
+    {
+        set_test_name("^W and a window command, as the host's tabs; ^W^W as ^Ww; one there is none of taken, and failed");
+        ALCodeEditor&            e = make("a\n");
+        std::vector<std::string> heard;
+        vim->hooks().command = [&heard](ALTextView&, const std::string& name, const std::string& args) {
+            heard.push_back(name + "|" + args);
+            return true;
+        };
+        keys("<C-W>q<C-W><C-W><C-W>W<C-W>o<C-W>n<C-W>p<C-W>c");
+        ensure("each the host's", heard == std::vector<std::string>({ "quit|", "tabnext|", "tabprevious|", "tabonly|", "tabnew|", "buffer|#", "close|" }));
+        heard.clear();
+        keys("<C-W>x");
+        ensure("a split there is none of: nothing asked", heard.empty());
+        ensure("and x not deleting", flat(e.text()) == "a|");
+        keys("<C-W><Esc>x");
+        ensure("Escape lets it go; x is x again", flat(e.text()) == "|" && heard.empty());
+    }
+
+    template<> template<>
+    void alvimkeymap_object::test<76>()
+    {
+        set_test_name("a Control letter vim has no use for: on the Mac nobody's, the editor's own under it too; elsewhere the window's");
+        ALCodeEditor& e = make("one two\n");
+        keys("w");
+#if LL_DARWIN
+        ensure("taken", e.handleKeyHere('K', ALVimKeymap::CONTROL));
+        ensure_equals("and the editor's ^K, to the line's end, not done", flat(e.text()), std::string("one two|"));
+        ensure("^S too", e.handleKeyHere('S', ALVimKeymap::CONTROL));
+#else
+        ensure("^S on to the window, which saves", !e.handleKeyHere('S', ALVimKeymap::CONTROL));
+        ensure("^K on to it, before a second key", !e.handleKeyHere('K', ALVimKeymap::CONTROL));
+        ensure_equals("nothing changed", flat(e.text()), std::string("one two|"));
+#endif
+    }
 }
