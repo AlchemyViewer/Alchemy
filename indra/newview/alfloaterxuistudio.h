@@ -379,7 +379,7 @@ private:
     void onTreeHover(const ALXUITreeItem* item);
     // Find, said as a sentence. Built here rather than in the file because
     // two of its dropdowns name the skin and language in force.
-    void buildFindBar();
+    void buildScopeBar();
     void onFindScope();
 
     void runLint();
@@ -778,7 +778,7 @@ private:
     ALTabStrip*         mCanvasTabs = nullptr;
     LLButton*           mCanvasShown = nullptr;
     LLButton*           mCanvasPinned = nullptr;
-    ALScopeBar*         mFindBar = nullptr;
+    ALScopeBar*         mScopeBar = nullptr;
     LLTextBox*          mFindCount = nullptr;
     LLScrollListCtrl*   mFindResults = nullptr;
     LLFilterEditor*     mTreeFilter = nullptr;

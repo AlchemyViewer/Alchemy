@@ -985,7 +985,7 @@
                              height="30"
                              layout="topleft"
                              left="0"
-                             name="find_bar"
+                             name="scope_bar"
                              tool_tip="A search said as a sentence: what kind of thing to look for, how the words have to match, the words, and which layers to look in. Return runs it, and changing a word runs it again."
                              top="0"
                              width="376" />
