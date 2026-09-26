@@ -26,6 +26,7 @@
 
 #include "alcolorfield.h"
 #include "aldeferredrebuild.h"
+#include "alfieldeditors.h"
 #include "alimagefield.h"
 #include "alparamtype.h"
 #include "llpanel.h"
@@ -77,117 +78,9 @@ public:
         Params();
     };
 
-    struct Field
-    {
-        // As a file writes it, dots and all.
-        std::string                 name;
-        // What the row calls it, where that is not the name: a caller with
-        // the name said once already, over the pane, says something else
-        // here rather than the same word smaller. Empty says the name.
-        std::string                 label;
-        // What is in force, whoever wrote it.
-        std::string                 value;
-        // Which layer wrote it, or where else it came from: shown as it is
-        // given, since only the caller knows what its layers are called.
-        std::string                 source;
-        // True when the file under edit is the one that wrote it, which is
-        // the only case an edit changes in place rather than adds to.
-        bool                        authored = false;
-        ALParamType::EValue         kind = ALParamType::OTHER;
-        // An enumeration's names. A field with any becomes a list.
-        std::vector<std::string>    values;
-        // What the list shows for each of them, where a file's word is not
-        // the one a person would choose by. One per value, in order, or
-        // none and the values are shown as they are.
-        std::vector<std::string>    valueLabels;
-        // A number's range, where the vocabulary knows one: the box refuses
-        // what is outside it, and with `slider` the row is a slider over it
-        // with the number beside, which is how an opacity or a blur is
-        // chosen rather than typed.
-        bool                        bounded = false;
-        F32                         minimum = 0.f;
-        F32                         maximum = 0.f;
-        bool                        slider = false;
-        // How a number steps and how many decimals it shows. Unset, a whole
-        // number steps by one and shows none, and a real steps by a tenth
-        // and shows three.
-        F32                         step = 0.f;
-        S32                         decimals = -1;
-        // A value that is a picture as much as numbers, and gets the editor
-        // that draws it: four corner radii around a rounded rectangle, an
-        // offset as a dot on a pad, a direction as a handle on a dial. The
-        // value is still the numbers with spaces between, as a file writes
-        // them; the row is as tall as the picture.
-        bool                        corners = false;
-        bool                        pad = false;
-        bool                        dial = false;
-        // The C++ type: it decides the colour editor, and it is the rest
-        // of the row's tool tip.
-        std::string                 type;
-        // The value is a set of names with bars between them rather than
-        // one name: `values` are the flags, and these two words are what a
-        // file writes for all of them and for none.
-        bool                        flags = false;
-        std::string                 allWord;
-        std::string                 noneWord;
-        // Which heading the row sits under, as an index into the names
-        // given to setGroups. Out of range is the last heading.
-        S32                         group = 0;
-        // Declared only so a file may write it and be quiet about it: the
-        // row is shown, because a file writes it, and shown as doing
-        // nothing, because it does nothing.
-        bool                        ignored = false;
-        // Written by the file and declared by nothing.
-        bool                        unknown = false;
-        // A name that exists, works, and should not be used: the row is
-        // shown because the file writes it, and says so. `instead` is the
-        // name to write, where there is one.
-        bool                        deprecated = false;
-        std::string                 instead;
-        // The field that shares this one's row. Left and top are a position
-        // and width and height are a size: read on one line each, they are
-        // the two rows anybody actually thinks in rather than four. Only the
-        // first of a pair names the other, and the named one gets no row of
-        // its own.
-        std::string                 pairWith;
-        // A value that is several numbers rather than one: a vector, a
-        // rectangle, a colour written as its parts. One box each, captioned,
-        // on the row the field would otherwise have had -- which is what
-        // makes a rect readable as a rect instead of as four numbers in a
-        // string somebody has to count.
-        //
-        // The captions are the caller's, because what the parts are called
-        // is a fact about the value and not about how many there are: a
-        // vector has an X, a Y and a Z, and a rect has a left, a top, a
-        // right and a bottom.
-        //
-        // The value is the parts joined by a space, which is how a XUI file
-        // writes one; it is read back split on spaces or commas, and it is
-        // committed joined by a space again. One field, one value, whatever
-        // the arity.
-        std::vector<std::string>    components;
-        // Four names, in the order left, bottom, right, top: a field whose
-        // value is which edges of its parent a thing is tied to, which is a
-        // picture rather than four words. The row it gets is as tall as the
-        // picture. Any other count is not one, and the field is edited the
-        // way its type says.
-        std::vector<std::string>    edges;
-        // What the picture is a picture of: the element and the thing it is
-        // in. Left empty it draws the rule rather than this element, which
-        // is what a caller with nothing on screen to point at should do.
-        LLRect                      subject;
-        LLRect                      subjectParent;
-        // What this field is, in the caller's own words: a sentence about the
-        // thing rather than about its type. Said under the row's own tip,
-        // because a name repeated from the heading above the pane is a tip
-        // that tells nobody anything.
-        std::string                 description;
-        // Where else this value is written, one line each, as the caller
-        // names them. A row with any is marked in the gutter beside its
-        // label and this is what the mark says; a row with none leaves the
-        // gutter clear, which is what makes a marked one worth looking at.
-        std::vector<std::string>    alsoWritten;
-    };
+    // What a row is about: the field, its value and what the vocabulary
+    // says of it. The editors' own, since they are made from it.
+    using Field = ALFieldEditors::Field;
 
     // name and the value committed, as the file would write it.
     typedef boost::signals2::signal<void(const std::string&, const std::string&)> commit_signal_t;
@@ -262,7 +155,7 @@ public:
 
     // Asked first what a colour's text comes to, on every colour row, for
     // a caller whose files write colours colors.xml knows nothing about.
-    typedef std::function<bool(const std::string&, LLColor4&)> color_resolver_t;
+    using color_resolver_t = ALFieldEditors::color_resolver_t;
     void setColorResolver(color_resolver_t resolver);
     // The caller's own colour names, offered first by every colour row's
     // popover: a theme value, with the colour it comes to.
@@ -367,8 +260,6 @@ private:
     static bool sameRow(const Field& a, const Field& b);
     // The row's ink and tips for what the field says about itself now.
     void refreshAuthored(const Field& field);
-    // The editor showing what the field says now, unless it is being used.
-    void refreshEditor(const Field& field);
     void addRow(Rows* host, const Field& field, const Field* partner, bool shaded);
     // The way back, at the right end of the row; shown on the rows the
     // file writes.
@@ -377,9 +268,11 @@ private:
     // that names it as a partner.
     LLPanel* rowOf(const std::string& name) const;
     const Field* fieldNamed(const std::string& name) const;
+    // The row's editor, from the editors, with the row's tip.
     LLUICtrl* makeEditor(const Field& field, const LLRect& box, LLPanel* row);
-    // A box per part, captioned, all of them committing the whole value.
-    void makeComponents(const Field& field, const LLRect& box, LLPanel* row);
+    // What an editor commits through: the field committed, once whatever
+    // it set going has finished.
+    ALFieldEditors::commit_t commit();
     // The field this one shares its row with, where it names one that is
     // shown, in the same section, and not filtered away.
     const Field* partnerOf(const Field& field) const;
@@ -409,17 +302,12 @@ private:
 
     std::vector<Field>          mFields;
     std::vector<std::string>    mGroups;
-    color_resolver_t            mColorResolver;
-    ALColorField::choices_t     mColorChoices;
-    ALImageField::choices_t     mImageChoices;
-    ALImageField::edit_t        mImageEditor;
-    std::string                 mImageEditLabel;
+    ALFieldEditors              mEditors;
     std::vector<Section>        mSections;
     LLAccordionCtrl*            mAccordion = nullptr;
     ALEmptyState*               mEmpty = nullptr;
     std::string                 mFilter;
     Tips                        mTips;
-    std::vector<std::string>    mEdgeTips;
     Notice                      mNothingSelected;
     Notice                      mNothingWritten;
     Notice                      mNoMatch;

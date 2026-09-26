@@ -163,6 +163,7 @@ target_sources(
     alnotecarditems.cpp
     alscripttheme.cpp
     alscriptsnippets.cpp
+    alfieldeditors.cpp
     alfollowscontrol.cpp
     alfontfield.cpp
     alcolorpicker.cpp
@@ -365,6 +366,7 @@ target_sources(
         alnotecarditems.h
         alscripttheme.h
         alscriptsnippets.h
+        alfieldeditors.h
         alfollowscontrol.h
         alfontfield.h
         alcolorpicker.h
