@@ -67,7 +67,8 @@ public:
                          const std::function<bool()>& forward, size_t bound);
 
     bool hasAccelerators() const override { return true; }
-    // The studio's keys (handleStudioKeys), then the floater's.
+    // The studio's keys (handleStudioKeys), then the floater's, then the
+    // chords it keeps (keepChords).
     bool handleKeyHere(KEY key, MASK mask) override;
     void onClose(bool app_quitting) override;
     void draw() override;
@@ -130,6 +131,15 @@ protected:
     // undo and redo, then its commands. For a studio with keys of its own
     // to try once these have not taken one.
     bool handleStudioKeys(KEY key, MASK mask);
+    // A window that keeps its chords takes every Control, Command or Alt
+    // chord that nothing in it had a use for, rather than letting it go on
+    // to the viewer's menus and the world -- where Control-D duplicates
+    // whatever is selected in the world, and Control-Shift-H goes home
+    // without asking. Only Quit, and Control-Tab, the viewer's key for
+    // moving between windows, go on. Cut, copy, paste and select all,
+    // which the viewer's hidden Edit menu took to the text control with
+    // the keyboard, are taken to it here instead. In handleKeyHere, last.
+    void keepChords(bool keep) { mKeepChords = keep; }
 
     // "Undo" on its own is a promise about nothing in particular. The
     // two menu items say the next step back and the next step forward,
@@ -184,6 +194,10 @@ private:
     void answerQuickOpen(ALPopover* popover, ALQuickOpen* quick, std::function<void(const std::string&)> chose,
                          std::function<void()> escaped, std::function<void(const std::string&)> hold,
                          std::function<void()> left);
+    // Cut, copy, paste and select all, to the text control with the
+    // keyboard -- in this window, or in one of its own a key comes home
+    // from. False where it is not one of them, or no text has the keyboard.
+    bool handleEditKeys(KEY key, MASK mask);
 
     std::string         mStateSetting;
     LLMenuBarGL*        mMenuBar = nullptr;
@@ -194,6 +208,7 @@ private:
     F64                 mStatusSaidAt  = 0.0;
     bool                mStatusFailure = false;
     bool                mStatusQuiet   = true;
+    bool                mKeepChords    = false;
     // What the state said the window's rect was, applied when it opens;
     // and what was last written, so a frame can tell whether anything
     // moved.

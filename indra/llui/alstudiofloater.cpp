@@ -84,9 +84,76 @@ bool ALStudioFloater::handleStudioKeys(KEY key, MASK mask)
     return handleMenuAccelerator(key, mask) || handleUndoKeys(key, mask) || runCommandKey(key, mask);
 }
 
+namespace
+{
+    // Held with Control, Command or Alt: not the modifier on its own, which
+    // is no chord yet.
+    bool isChord(KEY key, MASK mask)
+    {
+        return (mask & (MASK_CONTROL | MASK_ALT | MASK_MAC_CONTROL)) != 0 && key != KEY_CONTROL && key != KEY_ALT && key != KEY_SHIFT;
+    }
+
+    // What a window keeping its chords lets go on: Quit, and moving between
+    // windows, with the Mac's own Control key as the viewer takes it.
+    bool passesOn(KEY key, MASK mask)
+    {
+        return (key == 'Q' && mask == MASK_CONTROL) || (key == KEY_TAB && (mask & (MASK_CONTROL | MASK_MAC_CONTROL)) != 0);
+    }
+}
+
 bool ALStudioFloater::handleKeyHere(KEY key, MASK mask)
 {
-    return handleStudioKeys(key, mask) || LLFloater::handleKeyHere(key, mask);
+    if (handleStudioKeys(key, mask) || LLFloater::handleKeyHere(key, mask))
+    {
+        return true;
+    }
+    if (!mKeepChords || !isChord(key, mask) || passesOn(key, mask))
+    {
+        return false;
+    }
+    handleEditKeys(key, mask);
+    return true;
+}
+
+bool ALStudioFloater::handleEditKeys(KEY key, MASK mask)
+{
+    // The one the keyboard is in, wherever that window is: the key came
+    // from it, up through this window or home to it.
+    LLEditMenuHandler* text = LLEditMenuHandler::gEditMenuHandler;
+    LLView*            view = text ? text->asView() : nullptr;
+    if (mask != MASK_CONTROL || !view || !gFocusMgr.childHasKeyboardFocus(view))
+    {
+        return false;
+    }
+    switch (key)
+    {
+        case 'X':
+            if (text->canCut())
+            {
+                text->cut();
+            }
+            return true;
+        case 'C':
+            if (text->canCopy())
+            {
+                text->copy();
+            }
+            return true;
+        case 'V':
+            if (text->canPaste())
+            {
+                text->paste();
+            }
+            return true;
+        case 'A':
+            if (text->canSelectAll())
+            {
+                text->selectAll();
+            }
+            return true;
+        default:
+            return false;
+    }
 }
 
 bool ALStudioFloater::handleUndoKeys(KEY key, MASK mask)

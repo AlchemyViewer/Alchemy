@@ -482,6 +482,9 @@ ALFloaterScriptStudio::ALFloaterScriptStudio(const LLSD& key)
     // The menus' items by name, in the table of what each does.
     addCommands();
     addKeys();
+    // A chord the studio has no use for stops here: out in the world it
+    // duplicates, links, or takes the avatar home.
+    keepChords(true);
     mCommitCallbackRegistrar.add("ScriptStudio.Menu", [this](LLUICtrl*, const LLSD& name) { mCommands.run(name.asString()); });
     mEnableCallbackRegistrar.add("ScriptStudio.Enable", [this](LLUICtrl*, const LLSD& name) { return mCommands.enabled(name.asString()); });
     mEnableCallbackRegistrar.add("ScriptStudio.Check", [this](LLUICtrl*, const LLSD& name) { return mCommands.checked(name.asString()); });

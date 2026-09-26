@@ -59,6 +59,7 @@ namespace
         using ALStudioFloater::saveState;
         using ALStudioFloater::addCommand;
         using ALStudioFloater::runCommandKey;
+        using ALStudioFloater::keepChords;
 
         // A person's key for a command, as a studio with a keymap keeps it.
         std::string rebound;
@@ -87,6 +88,19 @@ namespace
             out.push_back(one);
         }
         return out;
+    }
+
+    // A field in the window, with the keyboard.
+    LLLineEditor* field(LLFloater* window, const std::string& text)
+    {
+        LLLineEditor::Params p;
+        p.name = "field";
+        p.rect = LLRect(10, 40, 300, 20);
+        LLLineEditor* made = LLUICtrlFactory::create<LLLineEditor>(p);
+        window->addChild(made);
+        made->setText(text);
+        made->setFocus(true);
+        return made;
     }
 
     // Return, as the field gives it: the best answer taken.
@@ -325,6 +339,68 @@ namespace tut
         ensure("which it no longer answers to", !window->runCommandKey('S', MASK_CONTROL));
         ensure("a second key, not theirs to give, still does",
                window->runCommandKey('S', MASK_CONTROL | MASK_SHIFT) && ran.back() == "save again");
+        window->closeFloater();
+    }
+
+    template<> template<>
+    void alstudiofloater_object::test<7>()
+    {
+        set_test_name("a window keeping its chords takes those nothing in it had a use for; Quit and Control-Tab go on; one that does not keep them lets them go");
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        TestStudio*   window = studio();
+        LLLineEditor* typing = field(window, "text");
+        S32           found  = 0;
+        window->addCommand({ "find", 'F', MASK_CONTROL, false }, [&]() { ++found; return true; });
+        ensure("not kept, Control-D goes on to the viewer", !typing->handleKey('D', MASK_CONTROL, false));
+
+        window->keepChords(true);
+        ensure("Control-D, which duplicates what is selected in the world", typing->handleKey('D', MASK_CONTROL, false));
+        ensure("Control-L, which links it", typing->handleKey('L', MASK_CONTROL, false));
+        ensure("Control-Shift-H, which goes home", typing->handleKey('H', MASK_CONTROL | MASK_SHIFT, false));
+        ensure("an Alt chord", typing->handleKey('R', MASK_ALT, false));
+        ensure("the Mac's own Control key", typing->handleKey('D', MASK_MAC_CONTROL, false));
+        ensure("the window's own key still its own", typing->handleKey('F', MASK_CONTROL, false) && found == 1);
+        ensure("Quit goes on", !typing->handleKey('Q', MASK_CONTROL, false));
+        ensure("and moving between windows",
+               !typing->handleKey(KEY_TAB, MASK_CONTROL, false) && !typing->handleKey(KEY_TAB, MASK_CONTROL | MASK_SHIFT, false));
+        ensure("a key held with nothing goes on", !typing->handleKey(KEY_F2, MASK_NONE, false));
+        ensure("and a modifier on its own", !typing->handleKey(KEY_ALT, MASK_ALT, false));
+        ensure_equals("what was typed untouched", typing->getText(), std::string("text"));
+        window->closeFloater();
+    }
+
+    template<> template<>
+    void alstudiofloater_object::test<8>()
+    {
+        set_test_name("kept chords: cut, copy, paste and select all go to the text with the keyboard, here or in a window of its own");
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        TestStudio* window = studio();
+        window->keepChords(true);
+        LLLineEditor* typing = field(window, "hello");
+        ensure("select all", typing->handleKey('A', MASK_CONTROL, false) && typing->hasSelection());
+        ensure("cut", typing->handleKey('X', MASK_CONTROL, false));
+        ensure_equals("gone", typing->getText(), std::string());
+        ensure("paste", typing->handleKey('V', MASK_CONTROL, false));
+        ensure_equals("back", typing->getText(), std::string("hello"));
+
+        // A popover's field, whose keys come home to the window.
+        ALQuickOpen* quick = window->quickOpen(candidates({ "one" }), "Type", "Popover", [](const std::string&) {});
+        LLLineEditor* query = quick->findChild<LLLineEditor>("query");
+        query->setFocus(true);
+        quick->setQuery("world");
+        ensure("select all there", query->handleKey('A', MASK_CONTROL, false) && query->hasSelection());
+        ensure("copy there", query->handleKey('C', MASK_CONTROL, false));
+        ensure("a chord from there kept too", query->handleKey('D', MASK_CONTROL, false));
+        typing->setFocus(true);
+        typing->setText(LLStringUtil::null);
+        ensure("paste here", typing->handleKey('V', MASK_CONTROL, false));
+        ensure_equals("what was copied there", typing->getText(), std::string("world"));
         window->closeFloater();
     }
 }
