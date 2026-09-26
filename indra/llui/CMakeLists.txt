@@ -153,6 +153,7 @@ target_sources(
     alsyntaxgrammar.cpp
     alsyntaxhighlighter.cpp
     altabstrip.cpp
+    altextdiff.cpp
     altextdocument.cpp
     altextediting.cpp
     altextlayout.cpp
@@ -357,6 +358,7 @@ target_sources(
         alsyntaxgrammar.h
         alsyntaxhighlighter.h
         altabstrip.h
+        altextdiff.h
         altextdocument.h
         altextediting.h
         altextlayout.h
@@ -460,6 +462,7 @@ if(AL_BUILD_TESTS)
   )
   al_add_test(llchatautocompletemodel UNIT PROJECT llui LIBRARIES ${test_libs})
   al_add_test(llurlmatch UNIT PROJECT llui LIBRARIES ${test_libs})
+  al_add_test(altextdiff UNIT PROJECT llui LIBRARIES ${test_libs})
   al_add_test(altextdocument UNIT PROJECT llui LIBRARIES ${test_libs})
   al_add_test(altextundo UNIT PROJECT llui SOURCES altextdocument.cpp LIBRARIES ${test_libs})
   al_add_test(alnotecarditems UNIT PROJECT llui LIBRARIES ${test_libs})
