@@ -877,6 +877,7 @@ void ALFloaterScriptStudio::restoreWindows(const LLSD& windows)
         {
             continue;
         }
+        window->takeViewOptions(*this);
         const bool auto_focus = window->getAutoFocus();
         window->setAutoFocus(false);
         window->openFloater(key);
@@ -4818,6 +4819,7 @@ void ALFloaterScriptStudio::popOut(std::optional<LLCoordGL> screen)
     {
         return;
     }
+    window->takeViewOptions(*this);
     window->openFloater(window->getKey());
     LLRect rect = getRect();
     if (screen)
@@ -6921,7 +6923,9 @@ void ALFloaterScriptStudio::revert(Doc& doc)
 
 // --- state ---------------------------------------------------------------------
 
-void ALFloaterScriptStudio::writeState(LLSD& state) const
+// The View menu's options, which a window popped out of another takes
+// from it (takeViewOptions) as well as the state keeping them.
+void ALFloaterScriptStudio::writeViewOptions(LLSD& state) const
 {
     state["word_wrap"]    = mWordWrap;
     state["line_numbers"] = mLineNumbers;
@@ -6941,6 +6945,96 @@ void ALFloaterScriptStudio::writeState(LLSD& state) const
     state["map_width"]    = mScrollMapWidth;
     state["map_preview"]  = mScrollMapPreview;
     state["map_left"]     = mScrollMapLeft;
+}
+
+void ALFloaterScriptStudio::readViewOptions(const LLSD& state)
+{
+    if (state.has("word_wrap"))
+    {
+        mWordWrap = state["word_wrap"].asBoolean();
+    }
+    if (state.has("line_numbers"))
+    {
+        mLineNumbers = state["line_numbers"].asBoolean();
+    }
+    if (state.has("indent_guides"))
+    {
+        mIndentGuides = state["indent_guides"].asBoolean();
+    }
+    if (state.has("whitespace"))
+    {
+        mWhitespace = static_cast<ALCodeEditor::Whitespace>(
+            llclamp(state["whitespace"].asInteger(), static_cast<S32>(ALCodeEditor::Whitespace::None), static_cast<S32>(ALCodeEditor::Whitespace::All)));
+    }
+    if (state.has("relative_numbers"))
+    {
+        mRelativeNumbers = state["relative_numbers"].asBoolean();
+    }
+    if (state.has("rainbow_brackets"))
+    {
+        mRainbowBrackets = state["rainbow_brackets"].asBoolean();
+    }
+    if (state.has("sticky_headers"))
+    {
+        mStickyHeaders = state["sticky_headers"].asBoolean();
+    }
+    if (state.has("vim_mode"))
+    {
+        mVimMode = state["vim_mode"].asBoolean();
+    }
+    if (state.has("spell_check"))
+    {
+        mSpellCheck = state["spell_check"].asBoolean();
+    }
+    if (state.has("semantic_colors"))
+    {
+        mSemanticColors = state["semantic_colors"].asBoolean();
+    }
+    if (state.has("inlay_parameters"))
+    {
+        mInlayParameters = state["inlay_parameters"].asBoolean();
+    }
+    if (state.has("inlay_types"))
+    {
+        mInlayTypes = state["inlay_types"].asBoolean();
+    }
+    if (state.has("weight_notes"))
+    {
+        mWeightNotes = state["weight_notes"].asBoolean();
+    }
+    if (state.has("weight_heat"))
+    {
+        mWeightHeat = state["weight_heat"].asBoolean();
+    }
+    if (state.has("scroll_map"))
+    {
+        mScrollMap = state["scroll_map"].asBoolean();
+    }
+    if (state.has("map_width"))
+    {
+        mScrollMapWidth = llmax(20, state["map_width"].asInteger());
+    }
+    if (state.has("map_preview"))
+    {
+        mScrollMapPreview = state["map_preview"].asBoolean();
+    }
+    if (state.has("map_left"))
+    {
+        mScrollMapLeft = state["map_left"].asBoolean();
+    }
+}
+
+void ALFloaterScriptStudio::takeViewOptions(const ALFloaterScriptStudio& from)
+{
+    LLSD options;
+    from.writeViewOptions(options);
+    readViewOptions(options);
+    applyEditorOptions();
+}
+
+void ALFloaterScriptStudio::writeState(LLSD& state) const
+{
+    writeViewOptions(state);
     if (mExplorerPane)
     {
         mExplorerPane->saveState(state);
@@ -7034,79 +7128,7 @@ LLSD ALFloaterScriptStudio::openTabs() const
 
 void ALFloaterScriptStudio::readState(const LLSD& state)
 {
-    if (state.has("word_wrap"))
-    {
-        mWordWrap = state["word_wrap"].asBoolean();
-    }
-    if (state.has("line_numbers"))
-    {
-        mLineNumbers = state["line_numbers"].asBoolean();
-    }
-    if (state.has("indent_guides"))
-    {
-        mIndentGuides = state["indent_guides"].asBoolean();
-    }
-    if (state.has("whitespace"))
-    {
-        mWhitespace = static_cast<ALCodeEditor::Whitespace>(
-            llclamp(state["whitespace"].asInteger(), static_cast<S32>(ALCodeEditor::Whitespace::None), static_cast<S32>(ALCodeEditor::Whitespace::All)));
-    }
-    if (state.has("relative_numbers"))
-    {
-        mRelativeNumbers = state["relative_numbers"].asBoolean();
-    }
-    if (state.has("rainbow_brackets"))
-    {
-        mRainbowBrackets = state["rainbow_brackets"].asBoolean();
-    }
-    if (state.has("sticky_headers"))
-    {
-        mStickyHeaders = state["sticky_headers"].asBoolean();
-    }
-    if (state.has("vim_mode"))
-    {
-        mVimMode = state["vim_mode"].asBoolean();
-    }
-    if (state.has("spell_check"))
-    {
-        mSpellCheck = state["spell_check"].asBoolean();
-    }
-    if (state.has("semantic_colors"))
-    {
-        mSemanticColors = state["semantic_colors"].asBoolean();
-    }
-    if (state.has("inlay_parameters"))
-    {
-        mInlayParameters = state["inlay_parameters"].asBoolean();
-    }
-    if (state.has("inlay_types"))
-    {
-        mInlayTypes = state["inlay_types"].asBoolean();
-    }
-    if (state.has("weight_notes"))
-    {
-        mWeightNotes = state["weight_notes"].asBoolean();
-    }
-    if (state.has("weight_heat"))
-    {
-        mWeightHeat = state["weight_heat"].asBoolean();
-    }
-    if (state.has("scroll_map"))
-    {
-        mScrollMap = state["scroll_map"].asBoolean();
-    }
-    if (state.has("map_width"))
-    {
-        mScrollMapWidth = llmax(20, state["map_width"].asInteger());
-    }
-    if (state.has("map_preview"))
-    {
-        mScrollMapPreview = state["map_preview"].asBoolean();
-    }
-    if (state.has("map_left"))
-    {
-        mScrollMapLeft = state["map_left"].asBoolean();
-    }
+    readViewOptions(state);
     if (mExplorerPane)
     {
         mExplorerPane->readState(state);

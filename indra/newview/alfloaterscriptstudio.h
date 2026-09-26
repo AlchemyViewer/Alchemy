@@ -788,6 +788,12 @@ private:
     LLSD openTabs() const;
     void writeState(LLSD& state) const override;
     void readState(const LLSD& state) override;
+    // The View menu's options, vim's among them: kept in the state, and
+    // taken by a window popped out of another -- which keeps no state of
+    // its own -- from the one it came out of, before its first tab.
+    void writeViewOptions(LLSD& state) const;
+    void readViewOptions(const LLSD& state);
+    void takeViewOptions(const ALFloaterScriptStudio& from);
 
     std::vector<std::unique_ptr<Doc>>  mDocs;
     size_t                             mActive = NONE;
