@@ -541,4 +541,32 @@ namespace tut
         ensure_equals("then the step before it", doc.text(), std::string());
         ensure("nothing open", !undo.inGroup());
     }
+
+    template<> template<>
+    void altextundo_object::test<18>()
+    {
+        set_test_name("a run is kept as the one edit it amounts to as it joins: undone and redone as one change, however long");
+        S32 changes = 0;
+        doc.onChanged([&changes](const ALTextDocument::Edit&) { ++changes; });
+        ALTextPos at(0, 0);
+        for (const char* c : { "h", "e", "l", "l", "o", " ", "w", "o", "r", "l", "d" })
+        {
+            at = type(at, c);
+        }
+        at = backspace(at);
+        at = backspace(at);
+        ensure_equals("typed, and two taken back", doc.text(), std::string("hello wor"));
+        changes = 0;
+        undo.undo();
+        ensure_equals("the erasing, as one change", changes, 1);
+        ensure_equals("both back", doc.text(), std::string("hello world"));
+        changes = 0;
+        undo.undo();
+        ensure_equals("the typing, as one change", changes, 1);
+        ensure_equals("all of it", doc.text(), std::string());
+        changes = 0;
+        undo.redo();
+        ensure_equals("redone as one change", changes, 1);
+        ensure_equals("redone", doc.text(), std::string("hello world"));
+    }
 }

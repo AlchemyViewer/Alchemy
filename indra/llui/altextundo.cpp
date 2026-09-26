@@ -196,9 +196,16 @@ bool ALTextUndo::carriesOn(const Step& last, const ALTextDocument::Edit& next)
     {
         return false;
     }
+    // The tail told by what it does rather than by how much: a run's edits
+    // are folded into one as they join, so a run of typing ends in an edit
+    // of many characters. A step that is not a run has another key, which
+    // is what keeps the next edit from joining it.
     const ALTextDocument::Edit& tail = last.edits.back();
     const Kind                  kind = kindOf(next);
-    if (kind != kindOf(tail))
+    const Kind                  was  = tail.removed.empty() && !tail.inserted.empty() ? Kind::Typing
+                                       : tail.inserted.empty() && !tail.removed.empty() ? Kind::Erasing
+                                                                                        : Kind::Other;
+    if (kind != was)
     {
         return false;
     }
@@ -218,9 +225,15 @@ bool ALTextUndo::carriesOn(const Step& last, const ALTextDocument::Edit& next)
 
 void ALTextUndo::join(Step& last, Step&& next)
 {
+    // Each edit folded into the one before it where it carries straight on
+    // from it -- a run of typing kept as the one edit it amounts to, and
+    // undone and redone as one -- and kept after it otherwise.
     for (ALTextDocument::Edit& edit : next.edits)
     {
-        last.edits.push_back(std::move(edit));
+        if (last.edits.empty() || !fold(last.edits.back(), edit))
+        {
+            last.edits.push_back(std::move(edit));
+        }
     }
     last.caretAfter  = next.caretAfter;
     last.anchorAfter = next.anchorAfter;
