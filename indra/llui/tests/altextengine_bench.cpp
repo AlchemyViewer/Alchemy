@@ -42,6 +42,7 @@
 #include "../alfindbar.h"
 #include "../alfoldmodel.h"
 #include "../altextsearch.h"
+#include "../alvimkeymap.h"
 
 #include "alheadlessui_fixture.h"
 #include "albigscript.h"
@@ -128,6 +129,23 @@ namespace
         e.setCaret(ALTextPos(0, 0));
         e.insertText(what);
         e.deleteRange(ALTextRange(ALTextPos(0, 0), ALTextPos(0, static_cast<S32>(what.size()))));
+    }
+
+    // Keys typed as vim sees them: the key, then its character where the
+    // key was not taken; an escape character is Escape.
+    void typeKeys(ALCodeEditor& e, const char* keys)
+    {
+        for (const char* c = keys; *c; ++c)
+        {
+            if (*c == '\x1b')
+            {
+                e.handleKeyHere(KEY_ESCAPE, MASK_NONE);
+            }
+            else if (!e.handleKeyHere(static_cast<KEY>(toupper(static_cast<unsigned char>(*c))), MASK_NONE))
+            {
+                e.handleUnicodeCharHere(static_cast<llwchar>(static_cast<unsigned char>(*c)));
+            }
+        }
     }
 
     void row(const char* name, double lsl, double slua, const char* note = "")
@@ -339,6 +357,38 @@ int main(int, char**)
             g_sink = g_sink + layout.rowCount(line);
         }
         g_sink = g_sink + layout.totalHeight();
+    });
+
+    // Vim's commands over the lines a :g picks, each line's change one
+    // edit or all of them one; and text typed again by `.`.
+    std::printf("\nVim over every line\n");
+    ALVimKeymap* vims[2] = {};
+    for (Subject& s : subjects)
+    {
+        auto keymap         = std::make_unique<ALVimKeymap>();
+        vims[&s - subjects] = keymap.get();
+        s.editor->setModalKeymap(std::move(keymap));
+    }
+    both(":g/total/s//count/, then undone", subjects, 1, [&](Subject& s, ALCodeEditor& e) {
+        vims[&s - subjects]->takeLine(e, ':', "g/total/s//count/", true);
+        e.undo();
+    });
+    both(":g/total/>, then undone", subjects, 1, [&](Subject& s, ALCodeEditor& e) {
+        vims[&s - subjects]->takeLine(e, ':', "g/total/>", true);
+        e.undo();
+    });
+    both(":g/total/d, then undone", subjects, 1, [&](Subject& s, ALCodeEditor& e) {
+        vims[&s - subjects]->takeLine(e, ':', "g/total/d", true);
+        e.undo();
+    });
+    for (Subject& s : subjects)
+    {
+        s.editor->setCaret(ALTextPos(0, 0));
+        typeKeys(*s.editor, "Athe quick brown fox jumps over the lazy dog, the quick brown fox jumps over the lazy dog, and again.\x1b");
+    }
+    both("`.`: a 100-character insert typed again, then undone", subjects, 1, [](Subject&, ALCodeEditor& e) {
+        typeKeys(e, ".");
+        e.undo();
     });
 
     for (Subject& s : subjects)

@@ -28,6 +28,7 @@
 
 #include "altextchars.h"
 
+#include "alanchoredranges.h"
 #include "alcodeeditor.h"
 #include "alsaid.h"
 #include "altextsearch.h"
@@ -690,6 +691,7 @@ bool ALVimKeymap::typeThrough(ALTextView& view, const Input& input)
     mTypeaheadSince.reset();
     std::optional<bool> taken;
     drain(view, mTypeahead, false, false, &taken);
+    flushHeld(view);
     bump();
     return taken.value_or(true);
 }
@@ -799,6 +801,21 @@ void ALVimKeymap::feedMapped(ALTextView& view, const Input& input)
     }
 }
 
+bool ALVimKeymap::holds(const Input& input) const
+{
+    return input.isChar && mMode == Mode::Insert && !mLiteral && !mInsertRegister && (mReplaying || mPlaying > 0 || mMapped > 0);
+}
+
+void ALVimKeymap::flushHeld(ALTextView& view)
+{
+    if (!mHeldTyped.empty())
+    {
+        const std::string text = std::move(mHeldTyped);
+        mHeldTyped.clear();
+        view.insertText(text);
+    }
+}
+
 U8 ALVimKeymap::mapMode() const
 {
     switch (mMode)
@@ -870,6 +887,7 @@ void ALVimKeymap::idle(ALTextView& view)
     // Waited long enough: the longest mapping the keys make whole, or the
     // first as it is and the rest looked at again.
     drain(view, mTypeahead, true, false, nullptr);
+    flushHeld(view);
     bump();
 }
 
@@ -877,6 +895,10 @@ void ALVimKeymap::idle(ALTextView& view)
 
 bool ALVimKeymap::feed(ALTextView& view, const Input& input)
 {
+    if (!holds(input))
+    {
+        flushHeld(view);
+    }
     followDocument(view);
     mTypedByView = false;
     mVerticalMove = false;
@@ -1033,6 +1055,7 @@ bool ALVimKeymap::play(ALTextView& view, const std::vector<Input>& inputs, bool 
             }
         }
     }
+    flushHeld(view);
     --mPlaying;
     if (top)
     {
@@ -2590,6 +2613,7 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
             {
                 feed(view, change[i]);
             }
+            flushHeld(view);
             mReplaying = false;
             return true;
         }
@@ -3622,6 +3646,15 @@ void ALVimKeymap::applyOperator(ALTextView& view, llwchar op, const Span& span_i
                     {
                         whole = ALTextRange(d.lineStart(first), d.lineEnd(last));
                     }
+                    if (mGlobalBatch)
+                    {
+                        mGlobalBatch->edits.emplace_back(whole, std::string());
+                        mGlobalBatch->landing      = whole.begin;
+                        mGlobalBatch->landingBelow = 0;
+                        mGlobalBatch->landed       = true;
+                        mGlobalBatch->deletedLines += last - first + 1;
+                        return;
+                    }
                     view.deleteRange(whole);
                     const S32 line = llmin(first, d.lineCount() - 1);
                     view.setCaret(ALTextPos(line, firstNonBlankColumn(d, line)));
@@ -3710,6 +3743,17 @@ void ALVimKeymap::applyOperator(ALTextView& view, llwchar op, const Span& span_i
                         edits.emplace_back(ALTextRange(d.lineStart(line), ALTextPos(line, cut)), std::string());
                     }
                 }
+            }
+            if (mGlobalBatch)
+            {
+                for (auto& edit : edits)
+                {
+                    mGlobalBatch->edits.push_back(std::move(edit));
+                }
+                mGlobalBatch->landing      = ALTextPos(first, 0);
+                mGlobalBatch->landingBelow = 0;
+                mGlobalBatch->landed       = true;
+                return;
             }
             if (!edits.empty())
             {
@@ -4233,8 +4277,8 @@ bool ALVimKeymap::insert(ALTextView& view, const Input& input)
     if (mReplaying || mPlaying > 0 || mMapped > 0)
     {
         // Fed by hand -- `.`, a macro, :normal, a mapping -- so nobody
-        // else will.
-        view.insertText(utf8Of(input.ch));
+        // else will: held, with those that follow it, to go in as one.
+        mHeldTyped += utf8Of(input.ch);
         return true;
     }
     // The view puts the character in.
@@ -5050,6 +5094,45 @@ void ALVimKeymap::applyConfirmed(ALTextView& view, size_t index)
     }
 }
 
+void ALVimKeymap::applyRest(ALTextView& view)
+{
+    if (mConfirming.at >= mConfirming.edits.size())
+    {
+        return;
+    }
+    std::vector<std::pair<ALTextRange, std::string>> rest(std::make_move_iterator(mConfirming.edits.begin() + static_cast<std::ptrdiff_t>(mConfirming.at)),
+                                                          std::make_move_iterator(mConfirming.edits.end()));
+    mConfirming.at = mConfirming.edits.size();
+    for (auto& [range, text] : rest)
+    {
+        range = range.normalised();
+    }
+    // Counted before they go in, as one at a time counts them: each on the
+    // line it lies on once those before it are made.
+    S32 made      = mConfirming.made;
+    S32 lines     = mConfirming.lines;
+    S32 last_line = mConfirming.lastLine;
+    S32 shift     = 0;
+    for (const auto& [range, text] : rest)
+    {
+        const S32 line = range.begin.line + shift;
+        if (line != last_line)
+        {
+            ++lines;
+        }
+        last_line = line;
+        ++made;
+        shift += static_cast<S32>(std::count(text.begin(), text.end(), '\n')) - (range.end.line - range.begin.line);
+    }
+    if (!view.replaceAll(std::move(rest)))
+    {
+        return;
+    }
+    mConfirming.made     = made;
+    mConfirming.lines    = lines;
+    mConfirming.lastLine = last_line;
+}
+
 bool ALVimKeymap::confirmKey(ALTextView& view, const Input& input)
 {
     if (!input.isChar)
@@ -5084,10 +5167,7 @@ bool ALVimKeymap::confirmKey(ALTextView& view, const Input& input)
             endConfirming(view);
             return true;
         case 'a':
-            while (mConfirming.at < mConfirming.edits.size())
-            {
-                applyConfirmed(view, mConfirming.at++);
-            }
+            applyRest(view);
             endConfirming(view);
             return true;
         case 'q':
@@ -6303,12 +6383,109 @@ bool ALVimKeymap::addToNumber(ALTextView& view, S64 by)
     return true;
 }
 
+// static
+bool ALVimKeymap::globalBatches(const std::string& command)
+{
+    // No lines of its own -- no address before it, no count after it --
+    // and it changes only the line it is put on.
+    if (command.empty())
+    {
+        return false;
+    }
+    const char first = command[0];
+    if (first == '>' || first == '<')
+    {
+        return command.find_first_not_of(first) == std::string::npos;
+    }
+    if (first == '&' || first == '~')
+    {
+        return true;
+    }
+    size_t name_end = 0;
+    while (name_end < command.size() && isNameChar(command[name_end]))
+    {
+        ++name_end;
+    }
+    const std::string name = command.substr(0, name_end);
+    if (name == "s" || name == "substitute")
+    {
+        return true;
+    }
+    if (name == "d" || name == "delete")
+    {
+        return command.find_first_not_of(" \t", name_end) == std::string::npos;
+    }
+    return false;
+}
+
+void ALVimKeymap::applyGlobalBatch(ALTextView& view, GlobalBatch& batch)
+{
+    auto& edits = batch.edits;
+    std::stable_sort(edits.begin(), edits.end(), [](const auto& a, const auto& b) { return a.first.begin < b.first.begin; });
+    // Lines taken out one after another are one stretch: the last line's,
+    // which goes with the break before it, reaches into the one above's.
+    std::vector<std::pair<ALTextRange, std::string>> merged;
+    merged.reserve(edits.size());
+    for (auto& edit : edits)
+    {
+        if (!merged.empty() && edit.second.empty() && merged.back().second.empty() && !merged.back().first.empty() &&
+            !(merged.back().first.end < edit.first.begin))
+        {
+            merged.back().first.end = std::max(merged.back().first.end, edit.first.end);
+            continue;
+        }
+        merged.push_back(std::move(edit));
+    }
+    // Where the caret lands once they are in: moved by the lines those
+    // before it added or took; inside one, where that one began.
+    S32 landing = -1;
+    if (batch.landed)
+    {
+        const ALTextPos at    = batch.landing;
+        S32             shift = 0;
+        S32             line  = at.line;
+        for (const auto& [range, text] : merged)
+        {
+            if (range.end < at || (range.end == at && range.begin < at))
+            {
+                shift += static_cast<S32>(std::count(text.begin(), text.end(), '\n')) - (range.end.line - range.begin.line);
+            }
+            else
+            {
+                if (range.begin < at)
+                {
+                    line = range.begin.line;
+                }
+                break;
+            }
+        }
+        landing = line + shift + batch.landingBelow;
+    }
+    if (!merged.empty() && !view.replaceAll(std::move(merged)))
+    {
+        return;
+    }
+    const ALTextDocument& d = view.document();
+    if (landing >= 0)
+    {
+        landing = llclamp(landing, 0, d.lineCount() - 1);
+        moveTo(view, ALTextPos(landing, firstNonBlankColumn(d, landing)));
+    }
+    if (batch.substitutions > 1)
+    {
+        say(substitutionsSaid(batch.substitutions, batch.substitutedLines));
+    }
+    else if (batch.deletedLines > 1)
+    {
+        say(alSaidCount("VimFewerLines", batch.deletedLines, "1 fewer line", "[COUNT] fewer lines"));
+    }
+}
+
 bool ALVimKeymap::global(ALTextView& view, S32 first, S32 last, bool ranged, const std::string& spec, bool invert)
 {
     // g/pattern/command over the whole text unless a range was given;
     // the command the : line's own, run on each line the pattern picks
-    // out, from the last up so that a deletion moves nothing still to
-    // come.
+    // out, from the top down.
     if (spec.empty())
     {
         say(said("VimNoPreviousPattern", "E35: No previous regular expression"), true);
@@ -6404,17 +6581,86 @@ bool ALVimKeymap::global(ALTextView& view, S32 first, S32 last, bool ranged, con
     mConfirming           = Confirming();
     mConfirming.gathering = true;
     mInGlobal             = true;
-    for (auto it = lines.rbegin(); it != lines.rend(); ++it)
+    if (globalBatches(command))
     {
-        const S32 line = *it;
-        if (line >= d.lineCount())
+        // Each line changed only where it is, in the text as it was: the
+        // edits gathered from the top down and put in at once. Those of
+        // the lines before an error go in, as they would have one by one.
+        GlobalBatch batch;
+        mGlobalBatch = &batch;
+        for (const S32 line : lines)
         {
-            continue;
+            runCommand(view, std::to_string(line + 1) + command);
+            if (mMessageError)
+            {
+                break;
+            }
         }
-        runCommand(view, std::to_string(line + 1) + command);
-        if (mMessageError)
+        mGlobalBatch = nullptr;
+        applyGlobalBatch(view, batch);
+    }
+    else
+    {
+        // The lines marked, as vim marks them, and visited from the top
+        // down, the topmost left each time: a mark moves with the text,
+        // so that :g/^/m0 turns the lines over, and goes with its line --
+        // taken out with its break, or joined onto the one above -- so
+        // that :g/^/j joins them in pairs.
+        std::vector<ALTextPos> starts;
+        starts.reserve(lines.size());
+        for (const S32 line : lines)
         {
-            break;
+            starts.emplace_back(line, 0);
+        }
+        ALAnchoredRanges<ALTextPos> marks;
+        marks.assign(std::move(starts));
+        const auto slide = [](ALTextPos& mark, const ALTextDocument::Edit& edit) {
+            const ALTextPos start(mark.line, 0);
+            const ALTextPos next(mark.line + 1, 0);
+            const auto      takes = [&](const ALTextRange& removed) {
+                return !removed.empty() && ((removed.begin <= start && next <= removed.end) ||
+                                            (removed.begin < start && (start < removed.end || (start == removed.end && removed.begin.column > 0))));
+            };
+            if (edit.parts.empty())
+            {
+                if (takes(edit.range.normalised()))
+                {
+                    return false;
+                }
+            }
+            else
+            {
+                for (auto it = std::lower_bound(edit.parts.begin(), edit.parts.end(), start,
+                                                [](const ALTextDocument::Edit::Part& part, const ALTextPos& p) { return part.before.end < p; });
+                     it != edit.parts.end() && it->before.begin <= start; ++it)
+                {
+                    if (takes(it->before))
+                    {
+                        return false;
+                    }
+                }
+            }
+            mark = edit.placed(mark);
+            return true;
+        };
+        boost::signals2::scoped_connection following =
+            view.document().onChanged([&marks, &slide](const ALTextDocument::Edit& edit) { marks.apply(edit, slide, [](ALTextPos&) {}); });
+        while (!marks.empty())
+        {
+            const S32 line = marks.front().line;
+            marks.erase(marks.begin());
+            if (line >= d.lineCount())
+            {
+                continue;
+            }
+            // On the line, as vim puts the cursor there: `.` in the
+            // command is the line.
+            view.setCaret(ALTextPos(line, 0));
+            runCommand(view, std::to_string(line + 1) + command);
+            if (mMessageError)
+            {
+                break;
+            }
         }
     }
     mInGlobal             = false;
@@ -6656,6 +6902,19 @@ bool ALVimKeymap::substitute(ALTextView& view, S32 first, S32 last, const std::s
         landing += static_cast<S32>(std::count(edits[i].second.begin(), edits[i].second.end(), '\n')) - (match.end.line - match.begin.line);
     }
     landing += static_cast<S32>(std::count(edits.back().second.begin(), edits.back().second.end(), '\n'));
+    if (mGlobalBatch && !view.isReadOnly())
+    {
+        mGlobalBatch->landing      = edits.back().first.normalised().begin;
+        mGlobalBatch->landingBelow = static_cast<S32>(std::count(edits.back().second.begin(), edits.back().second.end(), '\n'));
+        mGlobalBatch->landed       = true;
+        mGlobalBatch->substitutions += count;
+        mGlobalBatch->substitutedLines += lines;
+        for (auto& edit : edits)
+        {
+            mGlobalBatch->edits.push_back(std::move(edit));
+        }
+        return true;
+    }
     if (view.isReadOnly() || !view.replaceAll(std::move(edits)))
     {
         return false;

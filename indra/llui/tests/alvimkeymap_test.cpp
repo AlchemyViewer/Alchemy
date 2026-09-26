@@ -850,11 +850,11 @@ namespace tut
         keys(":%s/x\\nb/Q/c<CR>");
         ensure_equals("the question says how many lines", vim->status(), std::string("replace with Q (over 2 lines) (y/n/a/q/l)?"));
         keys("q");
-        // The lines are run from the last up: the last gathers its edit,
-        // the one before errors.
-        keys(":g/a/s/z/Z/c<CR>");
+        // The lines are run from the top down: the first gathers its
+        // edit, the next errors.
+        keys(":g/a/s/x/X/c<CR>");
         ensure("not asking", vim->mode() == ALVimKeymap::Mode::Normal);
-        ensure_equals("the error, and that nothing was done", vim->message(), std::string("E486: Pattern not found: z -- nothing substituted"));
+        ensure_equals("the error, and that nothing was done", vim->message(), std::string("E486: Pattern not found: x -- nothing substituted"));
         ensure_equals("nothing was", flat(e.text()), std::string("a x|b|a y|a z|"));
     }
     template<> template<>
@@ -2369,5 +2369,88 @@ namespace tut
         keys("<Esc>");
         ensure("put out", e.highlights(H::Block).empty());
         ensure("the references kept still", e.highlights(H::References).size() == 1);
+    }
+
+    template<> template<>
+    void alvimkeymap_object::test<78>()
+    {
+        set_test_name(":g visits its lines from the top down, a line's mark gone with it; its d, s, > and < go in as one edit, as :s///c's a does and "
+                      "what `.`, a macro and a mapping type");
+        ALCodeEditor& e     = make("a\nb\nc\nd\n");
+        S32           edits = 0;
+        boost::signals2::scoped_connection counting = e.document().onChanged([&edits](const ALTextDocument::Edit&) { ++edits; });
+        keys(":g/^/m0<CR>");
+        ensure_equals("turned over, each line moved to the top in turn", flat(e.text()), std::string("d|c|b|a|"));
+        keys("u");
+        ensure_equals("one step to undo", flat(e.text()), std::string("a|b|c|d|"));
+        keys(":g/^/j<CR>");
+        ensure_equals("joined in pairs: a line joined onto the one above is not visited", flat(e.text()), std::string("a b|c d|"));
+        keys(":g/^/t.<CR>");
+        ensure_equals("each copied below itself once, the copy not visited", flat(e.text()), std::string("a b|a b|c d|c d|"));
+
+        e.setText("x 1\ny\nx 2\nx 3\n");
+        edits = 0;
+        keys(":g/x/d<CR>");
+        ensure_equals("the lines taken out", flat(e.text()), std::string("y|"));
+        ensure_equals("in one edit", edits, 1);
+        ensure_equals("the register holds the last, as one at a time leaves it", vim->registerText('"'), std::string("x 3"));
+        ensure_equals("the one before it in 2", vim->registerText('2'), std::string("x 2"));
+        ensure_equals("said once for the lot", vim->message(), std::string("3 fewer lines"));
+        ensure_equals("the caret where the last went", e.caret().line, 1);
+        keys("u");
+        ensure_equals("one step to undo", flat(e.text()), std::string("x 1|y|x 2|x 3|"));
+
+        e.setText("a\nb\nc");
+        keys(":g/^/d<CR>");
+        ensure_equals("every line, the last with the break before it", flat(e.text()), std::string(""));
+
+        e.setText("x a a\ny a\nx a\n");
+        edits = 0;
+        keys(":g/x/s/a/b/g<CR>");
+        ensure_equals("substituted", flat(e.text()), std::string("x b b|y a|x b|"));
+        ensure_equals("in one edit", edits, 1);
+        ensure_equals("said once for the lot", vim->message(), std::string("3 substitutions on 2 lines"));
+        ensure_equals("the caret on the last line substituted on", e.caret().line, 2);
+        edits = 0;
+        keys(":g/x/s/b/1\\r2/<CR>");
+        ensure_equals("a break put in on each", flat(e.text()), std::string("x 1|2 b|y a|x 1|2|"));
+        ensure_equals("the caret on the last line of the last put in", e.caret().line, 4);
+
+        e.setText("x\ny\nx\n");
+        e.setSoftTabs(true);
+        e.setTabWidth(2);
+        edits = 0;
+        keys(":g/x/><CR>");
+        ensure_equals("shifted in", flat(e.text()), std::string("  x|y|  x|"));
+        ensure_equals("in one edit", edits, 1);
+        edits = 0;
+        keys(":g/x/<<CR>");
+        ensure_equals("and out", flat(e.text()), std::string("x|y|x|"));
+        ensure_equals("in one edit", edits, 1);
+
+        e.setText("a a a\n");
+        keys("gg:s/a/b/gc<CR>");
+        edits = 0;
+        keys("ya");
+        ensure_equals("the rest said yes to at once", flat(e.text()), std::string("b b b|"));
+        ensure_equals("the first, then the rest in one edit", edits, 2);
+        ensure_equals("said", vim->message(), std::string("3 substitutions on 1 line"));
+
+        e.setText("one\ntwo\nthree\n");
+        keys("ggAhello<Esc>j");
+        edits = 0;
+        keys(".");
+        ensure_equals("typed again", flat(e.text()), std::string("onehello|twohello|three|"));
+        ensure_equals("in one edit", edits, 1);
+        keys("ggqaAxyz<Esc>q");
+        edits = 0;
+        keys("jj@a");
+        ensure_equals("played", flat(e.text()), std::string("onehelloxyz|twohello|threexyz|"));
+        ensure_equals("in one edit", edits, 1);
+        ex("inoremap ;h hi there");
+        edits = 0;
+        keys("A;h<Esc>");
+        ensure_equals("mapped", flat(e.text()), std::string("onehelloxyz|twohello|threexyzhi there|"));
+        ensure_equals("in one edit", edits, 1);
     }
 }

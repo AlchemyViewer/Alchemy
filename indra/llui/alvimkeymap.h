@@ -262,6 +262,12 @@ private:
     // this rather than left to the view, and a key vim gives no meaning
     // done as the view's keymap would do it.
     void feedMapped(ALTextView& view, const Input& input);
+    // What insert mode types of the keys fed by hand -- by `.`, a macro,
+    // :normal, a mapping -- is held while more characters follow, and put
+    // in at once when anything else comes or the keys run out: one edit
+    // for the text, as the view hears of a paste, not one a character.
+    bool holds(const Input& input) const;
+    void flushHeld(ALTextView& view);
     // The mapping mode keys are looked up in now: none while a command
     // waits for a character of its own -- f's, r's, the second of g's.
     U8   mapMode() const;
@@ -389,9 +395,33 @@ private:
     // Whether a :g is running its command over lines, which another :g
     // may not do, as vim has it (E147).
     bool       mInGlobal = false;
+    // While a :g runs a command that changes only the line it is on --
+    // :d, :s, :> and :< with no lines of their own -- the command puts its
+    // edits here, measured in the text as it was, and they go in at once
+    // when the :g is through: one edit, heard of once, for the lot. The
+    // place the caret lands is kept likewise, and what is said is added up.
+    struct GlobalBatch
+    {
+        std::vector<std::pair<ALTextRange, std::string>> edits;
+        // Where the caret goes, in the text as it was, and how many lines
+        // below that once the edits are in.
+        ALTextPos                                        landing;
+        S32                                              landingBelow = 0;
+        bool                                             landed       = false;
+        S32                                              substitutions = 0;
+        S32                                              substitutedLines = 0;
+        S32                                              deletedLines = 0;
+    };
+    GlobalBatch* mGlobalBatch = nullptr;
+    // Whether a :g's command is one it batches.
+    static bool globalBatches(const std::string& command);
+    void        applyGlobalBatch(ALTextView& view, GlobalBatch& batch);
     bool       confirmKey(ALTextView& view, const Input& input);
     // One of the edits made, the ones after it moved by what it changed.
     void       applyConfirmed(ALTextView& view, size_t index);
+    // All the rest, from the one asked about on, made as one edit, as :s
+    // makes them without asking.
+    void       applyRest(ALTextView& view);
     void       askNext(ALTextView& view);
     void       endConfirming(ALTextView& view);
     // The history of a line kind, and the line entered into it.
@@ -587,6 +617,8 @@ private:
     // The key being fed was left to the view to type, in insert mode: part
     // of what was typed, for `.` and a macro, though nobody here took it.
     bool               mTypedByView = false;
+    // The characters held to put in at once (holds).
+    std::string        mHeldTyped;
     // The last change, where it was an operator over a visual
     // selection: `.` selects as much again from the caret and does
     // the operator over it.
