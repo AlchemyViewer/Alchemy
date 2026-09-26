@@ -230,8 +230,9 @@ ALScriptNoticeBar::Notice ALScriptStudioOrphans::noticeFor(const Doc* doc, const
         args["[WHEN]"]   = doc->recoverable->whenSaid();
         const bool stale = doc->recoverable->baseAsset.notNull() && doc->assetId.notNull() && doc->recoverable->baseAsset != doc->assetId;
         text             = services.words(stale ? "NoticeRecoverableStale" : "NoticeRecoverable", args);
-        buttons[0]       = { "restore", "NoticeRestore" };
-        buttons[1]       = { "discard_left", "NoticeDiscard" };
+        buttons[0]       = { "compare_kept", "NoticeCompare" };
+        buttons[1]       = { "restore", "NoticeRestore" };
+        buttons[2]       = { "discard_left", "NoticeDiscard" };
     }
     else if (doc && !doc->orphan.noticeDismissed && doc->orphan.kind != Orphan::None)
     {
@@ -281,8 +282,9 @@ ALScriptNoticeBar::Notice ALScriptStudioOrphans::noticeFor(const Doc* doc, const
     else if (doc && doc->compiledDiffers)
     {
         text       = services.words("NoticeCompiledDiffers");
-        buttons[0] = { "keep_source", "NoticeKeepSource" };
-        buttons[1] = { "take_compiled", "NoticeTakeCompiled" };
+        buttons[0] = { "compare_compiled", "NoticeCompare" };
+        buttons[1] = { "keep_source", "NoticeKeepSource" };
+        buttons[2] = { "take_compiled", "NoticeTakeCompiled" };
     }
     return notice;
 }
@@ -316,6 +318,7 @@ void ALScriptStudioOrphans::noticeAction(const std::string& action)
     {
         const ALScriptRecoveryEntry entry = *doc->recoverable;
         doc->recoverable.reset();
+        mWindow.endCompare(*doc);
         mWindow.takeUpRecovery(*doc, entry);
         // A tab left holding it on its own has said why instead.
         if (doc->orphan.kind == Orphan::None)
@@ -323,10 +326,23 @@ void ALScriptStudioOrphans::noticeAction(const std::string& action)
             mServices.report(mServices.words("RecoveryRestored", args), false, doc);
         }
     }
+    else if (action == "compare_kept" && doc->recoverable)
+    {
+        // What the tab holds now beside what was kept; the notice stays,
+        // to restore or let go of it after looking.
+        LLStringUtil::format_map_t when;
+        when["[WHEN]"] = doc->recoverable->whenSaid();
+        mWindow.compare(*doc, doc->editor->wholeText(), doc->recoverable->text, mServices.words("CompareNow"), mServices.words("CompareKept", when));
+    }
+    else if (action == "compare_compiled" && doc->compiledDiffers)
+    {
+        mWindow.compare(*doc, *doc->compiledDiffers, doc->uploaded.text, mServices.words("CompareCompiled"), mServices.words("CompareMade"));
+    }
     else if (action == "keep_source" && doc->compiledDiffers)
     {
         // The next save replaces the compiled half, as it would have.
         doc->compiledDiffers.reset();
+        mWindow.endCompare(*doc);
     }
     else if (action == "take_compiled" && doc->compiledDiffers)
     {
@@ -334,11 +350,13 @@ void ALScriptStudioOrphans::noticeAction(const std::string& action)
         // wrapped, so that Firestorm opens it as its source.
         doc->carriedText = *doc->compiledDiffers;
         doc->compiledDiffers.reset();
+        mWindow.endCompare(*doc);
         mWindow.takeCarriedText(*doc);
         mServices.report(mServices.words("CompiledTaken", args), false, doc);
     }
     else if (action == "discard_left" && doc->recoverable)
     {
+        mWindow.endCompare(*doc);
         mWindow.discardRecovery(*doc->recoverable);
         doc->recoverable.reset();
         mServices.report(mServices.words("RecoveryDiscarded", args), false, doc);

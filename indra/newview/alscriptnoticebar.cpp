@@ -39,6 +39,7 @@ bool ALScriptNoticeBar::postBuild()
     mText       = getChild<LLTextBox>("notice_text");
     mButtons[0] = getChild<LLButton>("notice_first");
     mButtons[1] = getChild<LLButton>("notice_second");
+    mButtons[2] = getChild<LLButton>("notice_third");
     // The window this is over, found through the view tree, as what the
     // buttons ask of it.
     LLFloater* window = getParentByType<LLFloater>();
@@ -49,7 +50,7 @@ bool ALScriptNoticeBar::postBuild()
         LL_WARNS() << "The notice is not in a Script Studio window" << LL_ENDL;
         return true;
     }
-    for (size_t i = 0; i < 2; ++i)
+    for (size_t i = 0; i < BUTTONS; ++i)
     {
         mButtons[i]->setCommitCallback([this, i](LLUICtrl*, const LLSD&) { mWindow->noticeAction(mActions[i]); });
     }
@@ -67,8 +68,10 @@ void ALScriptNoticeBar::show(const Notice& notice)
     }
     if (notice.text.empty() || !mServices)
     {
-        mActions[0].clear();
-        mActions[1].clear();
+        for (std::string& action : mActions)
+        {
+            action.clear();
+        }
         return;
     }
     mText->setText(notice.text);
@@ -77,7 +80,7 @@ void ALScriptNoticeBar::show(const Notice& notice)
     // last; the words have what is left.
     const LLFontGL* font  = LLFontGL::getFontSansSerifSmall();
     S32             right = getRect().getWidth() - 4 - 22 - 6;
-    for (S32 i = 1; i >= 0; --i)
+    for (S32 i = static_cast<S32>(BUTTONS) - 1; i >= 0; --i)
     {
         LLButton*   button      = mButtons[i];
         const auto& [id, label] = notice.buttons[i];

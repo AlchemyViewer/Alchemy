@@ -36,7 +36,7 @@ class LLTextBox;
 // The strip over a Script Studio window's editor that says what the tab in
 // front has to reckon with -- a text kept from an earlier session, its
 // object out of sight, its item gone, the connection lost, the file gone
-// from disk -- with up to two things to be done about it and a way to hide
+// from disk -- with up to three things to be done about it and a way to hide
 // it. Its layout panel is shown while it has something to say. What it
 // says is ALScriptStudioOrphans's; what its buttons do is the window's.
 class ALScriptNoticeBar : public LLPanel
@@ -56,25 +56,26 @@ public:
         ~Window() = default;
     };
 
-    // What it says, and up to two things to be done about it, the first
+    // What it says, and up to three things to be done about it, the first
     // leftmost: each an action and the name of the window's words for its
     // label, whose tip is the same name with Tip after it; none where the
     // action is empty. Nothing to say hides it.
+    static constexpr size_t BUTTONS = 3;
     struct Notice
     {
         std::string                         text;
-        std::pair<std::string, std::string> buttons[2];
+        std::pair<std::string, std::string> buttons[BUTTONS];
     };
 
     bool postBuild() override;
     void show(const Notice& notice);
-    // What each button does now, first and second.
-    const std::string& action(size_t which) const { return mActions[which < 2 ? which : 0]; }
+    // What each button does now, from the first.
+    const std::string& action(size_t which) const { return mActions[which < BUTTONS ? which : 0]; }
 
 private:
     ALScriptStudioServices* mServices = nullptr;
     Window*                 mWindow   = nullptr;
     LLTextBox*              mText     = nullptr;
-    LLButton*               mButtons[2] = { nullptr, nullptr };
-    std::string             mActions[2];
+    LLButton*               mButtons[BUTTONS] = { nullptr, nullptr, nullptr };
+    std::string             mActions[BUTTONS];
 };

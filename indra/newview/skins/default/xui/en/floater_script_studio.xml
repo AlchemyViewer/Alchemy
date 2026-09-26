@@ -358,6 +358,14 @@
     <floater.string name="NoticeCompiledDiffers">The compiled part of this script is not what its source makes: it was changed outside the preprocessor, or what the script includes has changed. Saving replaces it.</floater.string>
     <floater.string name="NoticeKeepSource">Keep Source</floater.string>
     <floater.string name="NoticeTakeCompiled">Use Compiled Text</floater.string>
+    <floater.string name="NoticeCompare">Compare</floater.string>
+    <floater.string name="NoticeCompareTip">The two texts side by side, the changes marked; Escape goes back</floater.string>
+    <floater.string name="CompareNow">This tab now</floater.string>
+    <floater.string name="CompareSaved">As last saved</floater.string>
+    <floater.string name="CompareNothingSaved">There is no saved text to compare with: a change made after an undo went past it.</floater.string>
+    <floater.string name="CompareKept">Kept, [WHEN]</floater.string>
+    <floater.string name="CompareCompiled">The compiled part, as saved</floater.string>
+    <floater.string name="CompareMade">What the source makes now</floater.string>
     <floater.string name="NoticeKeepSourceTip">Keep the source as it is; saving makes the compiled part from it again</floater.string>
     <floater.string name="NoticeTakeCompiledTip">Make the compiled text the source, as one step to undo</floater.string>
     <floater.string name="NoticeDiscardTip">Let the kept changes go; File > Recover Unsaved Changes still has them for a week</floater.string>
@@ -1035,6 +1043,11 @@
                 <menu_item_check.on_click function="ScriptStudio.Menu" parameter="expanded" />
                 <menu_item_check.on_enable function="ScriptStudio.Enable" parameter="expanded" />
             </menu_item_check>
+            <menu_item_check label="Compare with Saved" layout="topleft" name="compare_saved">
+                <menu_item_check.on_check function="ScriptStudio.Check" parameter="compare_saved" />
+                <menu_item_check.on_click function="ScriptStudio.Menu" parameter="compare_saved" />
+                <menu_item_check.on_enable function="ScriptStudio.Enable" parameter="compare_saved" />
+            </menu_item_check>
         </menu>
         <menu
          label="Build"
@@ -1489,6 +1502,15 @@
                          name="notice_second"
                          right="-30"
                          top="3"
+                         width="86" />
+                        <button
+                         follows="right|top"
+                         height="22"
+                         layout="topleft"
+                         name="notice_third"
+                         right="-30"
+                         top="3"
+                         visible="false"
                          width="86" />
                         <button
                          follows="right|top"

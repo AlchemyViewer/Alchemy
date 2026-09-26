@@ -88,7 +88,8 @@ namespace
 
 ALDiffView::Params::Params()
 :   syntax("syntax"),
-    inline_view("inline_view", false)
+    inline_view("inline_view", false),
+    side("side")
 {
 }
 
@@ -108,9 +109,10 @@ ALDiffView::ALDiffView(const Params& p)
     mRightHead = LLUICtrlFactory::create<LLTextBox>(head);
     addChild(mRightHead);
 
-    mLeft    = makeSide("left");
-    mRight   = makeSide("right");
-    mInlined = makeSide("inline");
+    const ALCodeEditor::Params side = p.side.isProvided() ? p.side() : LLUICtrlFactory::getDefaultParams<ALCodeEditor>();
+    mLeft    = makeSide(side, "left");
+    mRight   = makeSide(side, "right");
+    mInlined = makeSide(side, "inline");
     if (p.syntax.isProvided())
     {
         setSyntax(p.syntax());
@@ -121,9 +123,9 @@ ALDiffView::ALDiffView(const Params& p)
 
 ALDiffView::~ALDiffView() = default;
 
-ALCodeEditor* ALDiffView::makeSide(const std::string& name)
+ALCodeEditor* ALDiffView::makeSide(const ALCodeEditor::Params& side, const std::string& name)
 {
-    ALCodeEditor::Params p(LLUICtrlFactory::getDefaultParams<ALCodeEditor>());
+    ALCodeEditor::Params p(side);
     p.name                   = name;
     p.rect                   = LLRect(0, 10, 10, 0);
     p.follows.flags          = FOLLOWS_NONE;
@@ -132,9 +134,9 @@ ALCodeEditor* ALDiffView::makeSide(const std::string& name)
     // side and not the other says nothing.
     p.show_fold_markers      = false;
     p.highlight_current_line = false;
-    ALCodeEditor* side       = LLUICtrlFactory::create<ALCodeEditor>(p);
-    addChild(side);
-    return side;
+    ALCodeEditor* made       = LLUICtrlFactory::create<ALCodeEditor>(p);
+    addChild(made);
+    return made;
 }
 
 void ALDiffView::setTexts(std::string_view left, std::string_view right)
@@ -156,6 +158,14 @@ void ALDiffView::setSyntax(const std::string& syntax)
     for (ALCodeEditor* side : { mLeft, mRight, mInlined })
     {
         side->setSyntax(syntax);
+    }
+}
+
+void ALDiffView::setGrammar(std::shared_ptr<const ALSyntaxGrammar> grammar)
+{
+    for (ALCodeEditor* side : { mLeft, mRight, mInlined })
+    {
+        side->setGrammar(grammar);
     }
 }
 

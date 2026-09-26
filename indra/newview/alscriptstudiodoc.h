@@ -25,6 +25,7 @@
 #pragma once
 
 #include "alcodeeditor.h"
+#include "aldiffview.h"
 #include "alfindings.h"
 #include "alpreprocessor.h"
 #include "alscriptanalysis.h"
@@ -91,16 +92,27 @@ struct ALScriptStudioDoc
     // What was asked for stands through a reload, into a window of its
     // own and across sessions; while it has nothing to show, the
     // source is shown in its place.
+    // Compare is two texts compared (ALDiffView) -- the text against one
+    // kept, a compiled half against what the source makes -- shown until
+    // Escape, and never kept across sessions.
     enum class View : U8
     {
         Source,
-        Expanded
+        Expanded,
+        Compare
     };
     View                                       view = View::Source;
+    // The comparison, made the first time one is asked for.
+    ALDiffView*                                compareView = nullptr;
     // The view in front, and its text: what the view's own commands --
     // find, go to a line, fold, copy, undo -- act on, and whose caret
-    // the trailer reads.
-    View          shownView() const { return view == View::Expanded && expandedEditor ? View::Expanded : View::Source; }
+    // the trailer reads. A comparison's is the side with the keyboard.
+    View shownView() const
+    {
+        return view == View::Compare && compareView     ? View::Compare
+               : view == View::Expanded && expandedEditor ? View::Expanded
+                                                        : View::Source;
+    }
     // Whether a save has anything to send: the text changed, or a
     // compile target or an experience picked for the next save to set --
     // what the tab's dot, Save All and a close all go by. What is kept
@@ -110,7 +122,15 @@ struct ALScriptStudioDoc
     // check -- or the preprocessor busy with the tab for any reason,
     // whose answer a save may yet wait on.
     bool          saveUnderway() const { return save.underway() || preprocessing; }
-    ALCodeEditor* shownText() const { return shownView() == View::Expanded ? expandedEditor : editor; }
+    ALCodeEditor* shownText() const
+    {
+        switch (shownView())
+        {
+            case View::Compare:  return compareView->shown();
+            case View::Expanded: return expandedEditor;
+            default:             return editor;
+        }
+    }
     // The map the text the region compiled and runs was expanded through:
     // what the compiler's lines and a run-time error's are read back by.
     // Null where the text went up as written.

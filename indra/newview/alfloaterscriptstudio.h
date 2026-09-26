@@ -308,6 +308,9 @@ private:
     void   problemCounts(const Doc& doc, S32& errors, S32& warnings) const override;
 
     ALCodeEditor*             makeEditor(const std::string& id, bool read_only);
+    // What an editor of the studio's is made with: its colours by the
+    // table's names, the studio's settings.
+    ALCodeEditor::Params      editorParams(const std::string& id, bool read_only) const;
     // The options every editor shares, put on one.
     void                      applyEditorOptions(ALCodeEditor& editor);
     // The expanded text put in the document's other editor, which is shown
@@ -411,6 +414,12 @@ private:
     // loaded, once it has.
     void goToPending(Doc& doc);
     void takeCarriedText(Doc& doc) override;
+    void compare(Doc& doc, const std::string& left, const std::string& right, const std::string& left_title,
+                 const std::string& right_title) override;
+    void endCompare(Doc& doc) override;
+    // The tab's text against the text it was last saved as; asked again,
+    // the source back.
+    void compareWithSaved();
     // A notecard's items (ALScriptNotecardTab), made for a tab loaded or
     // kept as a notecard, afresh where `fresh`.
     ALScriptNotecardTab& notecardItems(Doc& doc, bool fresh = false);

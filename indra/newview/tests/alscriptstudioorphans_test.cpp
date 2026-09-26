@@ -69,6 +69,12 @@ namespace
             did.push_back("carried " + doc.id + ": " + doc.carriedText.value_or(std::string()));
             doc.carriedText.reset();
         }
+        void compare(Doc& doc, const std::string& left, const std::string& right, const std::string& left_title,
+                     const std::string& right_title) override
+        {
+            did.push_back("compare " + doc.id + ": " + left + " | " + right + " (" + left_title + " | " + right_title + ")");
+        }
+        void endCompare(Doc& doc) override { did.push_back("source " + doc.id); }
 
         std::map<std::string, Reach> reaches;
         Names                        placed, kept, did;
@@ -285,8 +291,9 @@ namespace tut
         a.orphan.kind  = Orphan::Away;
         ALScriptNoticeBar::Notice notice = Orphans::noticeFor(&a, words);
         const std::string when = kept.whenSaid();
-        ensure("a kept text first", notice.text == said("NoticeRecoverable", "[WHEN]", when) && notice.buttons[0].first == "restore" &&
-                                        notice.buttons[1] == std::make_pair(std::string("discard_left"), std::string("NoticeDiscard")));
+        ensure("a kept text first", notice.text == said("NoticeRecoverable", "[WHEN]", when) && notice.buttons[0].first == "compare_kept" &&
+                                        notice.buttons[1].first == "restore" &&
+                                        notice.buttons[2] == std::make_pair(std::string("discard_left"), std::string("NoticeDiscard")));
         a.assetId = LLUUID::generateNewID();
         ensure("stale where saved since", Orphans::noticeFor(&a, words).text == said("NoticeRecoverableStale", "[WHEN]", when));
         a.recoverable.reset();
@@ -323,7 +330,7 @@ namespace tut
         services().front = 0;
         a.recoverable    = ALScriptRecoveryEntry();
         unit.noticeAction("restore");
-        ensure("restored", studio.did == Names{ "restore a" } && !a.recoverable &&
+        ensure("restored, the source in front", studio.did == Names{ "source a", "restore a" } && !a.recoverable &&
                                services().reports.back().text == said("RecoveryRestored", "[NAME]", "a"));
         a.recoverable = ALScriptRecoveryEntry();
         unit.noticeAction("discard_left");
@@ -334,7 +341,7 @@ namespace tut
         unit.noticeAction("copy");
         unit.noticeAction("export");
         unit.noticeAction("save");
-        ensure("a copy, a file, a save", studio.did == Names{ "restore a", "discard", "copy a", "export", "save a" });
+        ensure("a copy, a file, a save", studio.did == Names{ "source a", "restore a", "source a", "discard", "copy a", "export", "save a" });
         a.orphan.reattachTries = 3;
         unit.noticeAction("retry_load");
         ensure("not detached: nothing to try", studio.loads.empty());
@@ -385,17 +392,42 @@ namespace tut
         services().front  = 0;
         a.compiledDiffers = std::string("default { touch_start(integer n) { llDie(); } }");
         ALScriptNoticeBar::Notice notice = Orphans::noticeFor(&a, words);
-        ensure("said, with its two ways", notice.text == said("NoticeCompiledDiffers") && notice.buttons[0].first == "keep_source" &&
-                                              notice.buttons[1].first == "take_compiled");
+        ensure("said, with its ways", notice.text == said("NoticeCompiledDiffers") && notice.buttons[0].first == "compare_compiled" &&
+                                          notice.buttons[1].first == "keep_source" && notice.buttons[2].first == "take_compiled");
+        a.uploaded.text = "default { }";
+        unit.noticeAction("compare_compiled");
+        ensure_equals("compared: as saved, beside what the source makes", studio.did.back(),
+                      "compare a: default { touch_start(integer n) { llDie(); } } | default { } (" + said("CompareCompiled") + " | " + said("CompareMade") + ")");
+        ensure("the notice stays, to act on after looking", a.compiledDiffers.has_value());
+        studio.did.clear();
         a.orphan.kind = Orphan::Away;
         ensure("a tab gone first", Orphans::noticeFor(&a, words).text == said("NoticeAway"));
         a.orphan.kind = Orphan::None;
         unit.noticeAction("take_compiled");
-        ensure("taken as the source", studio.did.back() == "carried a: default { touch_start(integer n) { llDie(); } }" && !a.compiledDiffers);
+        ensure("the source back in front, then taken as the source",
+               studio.did == Names{ "source a", "carried a: default { touch_start(integer n) { llDie(); } }" } && !a.compiledDiffers);
         ensure("and said", services().reports.back().text == said("CompiledTaken", "[NAME]", "a"));
         a.compiledDiffers = std::string("x");
         unit.noticeAction("keep_source");
-        ensure("kept: let go of, the next save replacing it", !a.compiledDiffers && studio.did.size() == 1);
+        ensure("kept: let go of, the next save replacing it", !a.compiledDiffers && studio.did.back() == "source a");
         ensure("nothing more to say", Orphans::noticeFor(&a, words).text.empty());
+    }
+
+    template<> template<>
+    void alscriptstudioorphans_object::test<9>()
+    {
+        set_test_name("a kept text compared with what the tab holds now, the notice staying; restoring puts the source back in front");
+        Orphans& unit    = make();
+        Doc&     a       = tab("a");
+        services().front = 0;
+        ALScriptRecoveryEntry kept;
+        kept.text     = "default { state_entry() { } }";
+        a.recoverable = kept;
+        unit.noticeAction("compare_kept");
+        ensure_equals("now beside kept", studio.did.back(),
+                      "compare a: default {} | default { state_entry() { } } (" + said("CompareNow") + " | " + said("CompareKept", "[WHEN]", kept.whenSaid()) + ")");
+        ensure("still offered", a.recoverable.has_value());
+        unit.noticeAction("restore");
+        ensure("the source in front first", studio.did[studio.did.size() - 2] == "source a" && studio.did.back() == "restore a");
     }
 }

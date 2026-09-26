@@ -1416,6 +1416,18 @@ size_t ALFloaterScriptStudio::indexOf(std::string_view id) const
 
 ALCodeEditor* ALFloaterScriptStudio::makeEditor(const std::string& id, bool read_only)
 {
+    ALCodeEditor::Params p      = editorParams(id, read_only);
+    ALCodeEditor*        editor = LLUICtrlFactory::create<ALCodeEditor>(p);
+    editor->setVisible(false);
+    // Where a hover card says a name was declared, gone to when pressed.
+    editor->setCardLinkHandler([this](const LLSD& value) { goToDeclared(value); });
+    applyEditorOptions(*editor);
+    mEditorHost->addChild(editor);
+    return editor;
+}
+
+ALCodeEditor::Params ALFloaterScriptStudio::editorParams(const std::string& id, bool read_only) const
+{
     ALCodeEditor::Params p(LLUICtrlFactory::getDefaultParams<ALCodeEditor>());
     p.name = "editor_" + id;
     p.rect = mEditorHost->getLocalRect();
@@ -1450,13 +1462,39 @@ ALCodeEditor* ALFloaterScriptStudio::makeEditor(const std::string& id, bool read
     p.bracket_color_1.control    = "ScriptBracket1Color";
     p.bracket_color_2.control    = "ScriptBracket2Color";
     p.bracket_color_3.control    = "ScriptBracket3Color";
-    ALCodeEditor* editor = LLUICtrlFactory::create<ALCodeEditor>(p);
-    editor->setVisible(false);
-    // Where a hover card says a name was declared, gone to when pressed.
-    editor->setCardLinkHandler([this](const LLSD& value) { goToDeclared(value); });
-    applyEditorOptions(*editor);
-    mEditorHost->addChild(editor);
-    return editor;
+    return p;
+}
+
+void ALFloaterScriptStudio::compare(Doc& doc, const std::string& left, const std::string& right, const std::string& left_title,
+                                    const std::string& right_title)
+{
+    if (!doc.compareView)
+    {
+        // In the editors' place, in their colours and face; unwrapped, since
+        // a line wrapped on one side and not the other would part the sides.
+        ALDiffView::Params p(LLUICtrlFactory::getDefaultParams<ALDiffView>());
+        p.name = "compare_" + doc.id;
+        p.rect = mEditorHost->getLocalRect();
+        p.follows.flags(FOLLOWS_ALL);
+        ALCodeEditor::Params side = editorParams(doc.id + ":compare", true);
+        side.word_wrap            = false;
+        p.side                    = side;
+        doc.compareView           = LLUICtrlFactory::create<ALDiffView>(p);
+        doc.compareView->setVisible(false);
+        doc.compareView->setFont(editorFont());
+        const std::string id = doc.id;
+        doc.compareView->setOnEscape([this, id]() {
+            if (Doc* found = findDoc(id))
+            {
+                showView(*found, Doc::View::Source, true);
+            }
+        });
+        mEditorHost->addChild(doc.compareView);
+    }
+    doc.compareView->setGrammar(doc.editor->highlighter().grammar());
+    doc.compareView->setTexts(left, right);
+    doc.compareView->setTitles(left_title, right_title);
+    showView(doc, Doc::View::Compare, true);
 }
 
 // static
@@ -2049,7 +2087,8 @@ void ALFloaterScriptStudio::showView(Doc& doc, Doc::View view, bool focus)
     // Asked of whichever editor is on screen, which is not always the view
     // asked for until now: a tab brought back asking for its expansion
     // shows its source until the expansion comes.
-    const bool      had_keys = (doc.editor && doc.editor->hasFocus()) || (doc.expandedEditor && doc.expandedEditor->hasFocus());
+    const bool      had_keys = (doc.editor && doc.editor->hasFocus()) || (doc.expandedEditor && doc.expandedEditor->hasFocus()) ||
+                          (doc.compareView && gFocusMgr.childHasKeyboardFocus(doc.compareView));
     const Doc::View was      = doc.shownView();
     doc.view                 = view;
     if (&doc != active())
@@ -2086,6 +2125,38 @@ ALCodeEditor& ALFloaterScriptStudio::sourceInFront(Doc& doc)
     return *doc.editor;
 }
 
+void ALFloaterScriptStudio::compareWithSaved()
+{
+    Doc* doc = active();
+    if (!doc || !doc->loaded)
+    {
+        return;
+    }
+    // Asked again, the source back.
+    if (doc->shownView() == Doc::View::Compare)
+    {
+        showView(*doc, Doc::View::Source, true);
+        return;
+    }
+    // The text as it was last saved, stepped back to through the journal;
+    // none where no step reaches it -- a change after an undo went past it.
+    const std::optional<std::string> saved = doc->editor->undoJournal().savedText();
+    if (!saved)
+    {
+        setStatus(getString("CompareNothingSaved"), true);
+        return;
+    }
+    compare(*doc, *saved, doc->editor->wholeText(), getString("CompareSaved"), getString("CompareNow"));
+}
+
+void ALFloaterScriptStudio::endCompare(Doc& doc)
+{
+    if (doc.shownView() == Doc::View::Compare)
+    {
+        showView(doc, Doc::View::Source, true);
+    }
+}
+
 // static
 void ALFloaterScriptStudio::focusShown(Doc& doc)
 {
@@ -2098,6 +2169,7 @@ void ALFloaterScriptStudio::focusShown(Doc& doc)
 // static
 const char* ALFloaterScriptStudio::viewName(Doc::View view)
 {
+    // A comparison is not kept: the tab comes back as its source.
     return view == Doc::View::Expanded ? "expanded" : "source";
 }
 
@@ -2122,6 +2194,10 @@ void ALFloaterScriptStudio::showEditors()
         if (doc.expandedEditor)
         {
             doc.expandedEditor->setVisible(here && shown == Doc::View::Expanded);
+        }
+        if (doc.compareView)
+        {
+            doc.compareView->setVisible(here && shown == Doc::View::Compare);
         }
     }
 }
@@ -5881,6 +5957,11 @@ void ALFloaterScriptStudio::letGoOf(size_t index, bool keep)
             mEditorHost->removeChild(doc.expandedEditor);
             doc.expandedEditor->die();
         }
+        if (doc.compareView)
+        {
+            mEditorHost->removeChild(doc.compareView);
+            doc.compareView->die();
+        }
         mDocs.erase(mDocs.begin() + index);
         reindexDocs();
     }
@@ -6419,6 +6500,16 @@ void ALFloaterScriptStudio::addViewCommands()
                 return !mFolds.collapsed("bottom") && current && current->getName() == tab;
             });
     }
+    mCommands.add(
+        "compare_saved", [this]() { compareWithSaved(); },
+        [this]() {
+            const Doc* doc = active();
+            return doc && doc->loaded && (doc->editor->isDirty() || doc->shownView() == Doc::View::Compare);
+        },
+        [this]() {
+            const Doc* doc = active();
+            return doc && doc->shownView() == Doc::View::Compare;
+        });
     mCommands.add(
         "expanded", [this]() { toggleExpanded(); },
         [this]() {

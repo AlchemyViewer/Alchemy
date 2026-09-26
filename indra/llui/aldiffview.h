@@ -25,15 +25,16 @@
 #ifndef AL_ALDIFFVIEW_H
 #define AL_ALDIFFVIEW_H
 
+#include "alcodeeditor.h"
 #include "alviewtype.h"
 #include "lluictrl.h"
 
 #include <functional>
+#include <memory>
 #include <string>
 #include <string_view>
 #include <vector>
 
-class ALCodeEditor;
 class LLTextBox;
 
 // Two texts compared (ALTextDiff). Side by side, each in a code editor of
@@ -54,8 +55,11 @@ public:
     struct Params : public LLInitParam::Block<Params, LLUICtrl::Params>
     {
         // The grammar both sides are coloured by.
-        Optional<std::string> syntax;
-        Optional<bool>        inline_view;
+        Optional<std::string>          syntax;
+        Optional<bool>                 inline_view;
+        // What each side's editor is made with -- a host's colours and
+        // font -- but for its name, its place, and its being read only.
+        Optional<ALCodeEditor::Params> side;
         Params();
     };
 
@@ -66,6 +70,8 @@ public:
     void setTexts(std::string_view left, std::string_view right);
     void setTitles(const std::string& left, const std::string& right);
     void setSyntax(const std::string& syntax);
+    // The grammar both sides are coloured by, as another view has it.
+    void setGrammar(std::shared_ptr<const ALSyntaxGrammar> grammar);
     void setFont(const LLFontGL* font);
     void setInline(bool inline_view);
     bool isInline() const { return mInline; }
@@ -96,7 +102,7 @@ protected:
     explicit ALDiffView(const Params& p);
 
 private:
-    ALCodeEditor* makeSide(const std::string& name);
+    ALCodeEditor* makeSide(const ALCodeEditor::Params& side, const std::string& name);
     void          rebuild();
     void          arrange();
 

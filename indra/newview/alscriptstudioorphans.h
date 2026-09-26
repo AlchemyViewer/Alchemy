@@ -103,6 +103,11 @@ public:
         virtual void discardRecovery(const ALScriptRecoveryEntry& entry)                     = 0;
         // What the tab carries put in over its text, as one step to undo.
         virtual void takeCarriedText(Doc& doc)                                               = 0;
+        // Two texts compared in the tab's place, each with what it is; and
+        // the tab's source back in front where it shows a comparison.
+        virtual void compare(Doc& doc, const std::string& left, const std::string& right, const std::string& left_title,
+                             const std::string& right_title)                                  = 0;
+        virtual void endCompare(Doc& doc)                                                    = 0;
 
     protected:
         ~Window() = default;
