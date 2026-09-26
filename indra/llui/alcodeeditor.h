@@ -799,6 +799,9 @@ private:
     void slideAsides(const ALTextDocument::Edit& edit, S32 made);
     // What the layout is told about a line's inlays.
     void provideInlays(S32 line, std::vector<ALTextLayout::Inlay>& out) const;
+    // The hint a line's glyph stands for, by the id provideInlays gave it,
+    // as its place among all the hints; -1 where the line has no such.
+    S32  inlayIndexOf(S32 line, S32 id) const;
     F32  inlayWidth(const InlayHint& hint) const;
 
     // The blocks that fold, and which are folded.

@@ -1093,9 +1093,22 @@ void ALCodeEditor::provideInlays(S32 line, std::vector<ALTextLayout::Inlay>& out
         inlay.column = it->at.column;
         inlay.width  = inlayWidth(*it);
         inlay.before = it->before;
-        inlay.id     = static_cast<S32>(it - mInlays.begin());
+        // Which of the line's own it is: what stays true while the line's
+        // layout does (see ALTextLayout::Inlay).
+        inlay.id     = static_cast<S32>(it - first);
         out.push_back(inlay);
     }
+}
+
+S32 ALCodeEditor::inlayIndexOf(S32 line, S32 id) const
+{
+    if (id < 0)
+    {
+        return -1;
+    }
+    const auto first = std::lower_bound(mInlays.begin(), mInlays.end(), line, [](const InlayHint& h, S32 l) { return h.at.line < l; });
+    const auto it    = first + std::min<std::ptrdiff_t>(id, mInlays.end() - first);
+    return it != mInlays.end() && it->at.line == line ? static_cast<S32>(it - mInlays.begin()) : -1;
 }
 
 S32 ALCodeEditor::inlayAtLocal(S32 x, S32 y)
@@ -1126,7 +1139,8 @@ S32 ALCodeEditor::inlayAtLocal(S32 x, S32 y)
     for (size_t k = r.glyphBegin; k < r.glyphEnd; ++k)
     {
         const ALTextLayout::Glyph& glyph = laid.glyphs[k];
-        if (glyph.inlay < 0 || glyph.inlay >= static_cast<S32>(mInlays.size()))
+        const S32                  index = inlayIndexOf(line, glyph.inlay);
+        if (index < 0)
         {
             continue;
         }
@@ -1134,7 +1148,7 @@ S32 ALCodeEditor::inlayAtLocal(S32 x, S32 y)
         const F32 x1 = glyph.pen - r.xStart + glyph.advance - INLAY_GAP;
         if (x_rel >= x0 && x_rel < x1)
         {
-            return glyph.inlay;
+            return index;
         }
     }
     return -1;
@@ -1656,11 +1670,12 @@ void ALCodeEditor::drawRowExtras(S32 line, S32 row, const LLRect& text, S32 scre
             for (size_t k = r.glyphBegin; k < r.glyphEnd && font; ++k)
             {
                 const ALTextLayout::Glyph& glyph = laid.glyphs[k];
-                if (glyph.inlay < 0 || glyph.inlay >= static_cast<S32>(mInlays.size()))
+                const S32                  index = inlayIndexOf(line, glyph.inlay);
+                if (index < 0)
                 {
                     continue;
                 }
-                const InlayHint& hint = mInlays[static_cast<size_t>(glyph.inlay)];
+                const InlayHint& hint = mInlays[static_cast<size_t>(index)];
                 const F32        x0   = left + glyph.pen - r.xStart + INLAY_GAP;
                 const F32        x1   = left + glyph.pen - r.xStart + glyph.advance - INLAY_GAP;
                 if (x1 <= static_cast<F32>(text.mLeft) || x0 >= static_cast<F32>(text.mRight))

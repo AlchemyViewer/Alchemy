@@ -1863,4 +1863,41 @@ namespace tut
         e.document().insert(ALTextPos(1, 0), "// ");
         ensure("an edit closes it", !e.fixesOpen());
     }
+
+    template<> template<>
+    void alcodeeditor_object::test<50>()
+    {
+        set_test_name("a hint added above others leaves each pill below its own: found, drawn and written as itself");
+        ALCodeEditor& e = make("local a = 1\nlocal b = 2\nlocal c = 3\n", "slua");
+        const auto hint = [](S32 line, const char* type) {
+            ALCodeEditor::InlayHint h;
+            h.at     = ALTextPos(line, 7);
+            h.text   = type;
+            h.before = false;
+            h.insert = type;
+            return h;
+        };
+        const LLRect text  = e.textRect();
+        const S32    row_h = e.layout().rowHeight();
+        const auto   rowY  = [&](S32 line) { return text.mTop - row_h * line - row_h / 2; };
+        const auto   pill  = [&](S32 line) {
+            for (S32 x = text.mLeft; x < text.mRight; ++x)
+            {
+                if (e.inlayAtLocal(x, rowY(line)) >= 0)
+                {
+                    return x;
+                }
+            }
+            return -1;
+        };
+        e.setInlayHints({ hint(1, ": two"), hint(2, ": three") });
+        // The lines laid out with their pills, as drawing them does.
+        ensure("the second line's", pill(1) >= 0 && e.inlayAtLocal(pill(1) + 2, rowY(1)) == 0);
+        ensure("the third's", pill(2) >= 0 && e.inlayAtLocal(pill(2) + 2, rowY(2)) == 1);
+        // One more, above both: their lines are not laid out again.
+        e.setInlayHints({ hint(0, ": one"), hint(1, ": two"), hint(2, ": three") });
+        ensure_equals("the third line's pill is the third hint", e.inlayAtLocal(pill(2) + 2, rowY(2)), 2);
+        ensure("taken with Control", e.handleDoubleClick(pill(2) + 2, rowY(2), MASK_CONTROL));
+        ensure_equals("its own text written, on its own line", e.text(), std::string("local a = 1\nlocal b = 2\nlocal c: three = 3\n"));
+    }
 }
