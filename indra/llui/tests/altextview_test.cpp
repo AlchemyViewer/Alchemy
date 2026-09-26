@@ -108,7 +108,9 @@ namespace tut
         }
     };
 
-    typedef test_group<altextview_data> altextview_group;
+    // More than TUT's fifty a group holds by default, which runs the first
+    // fifty and says nothing of the rest: keep this above the highest test.
+    typedef test_group<altextview_data, 100> altextview_group;
     typedef altextview_group::object    altextview_object;
     altextview_group                    altextview_instance("altextview");
 

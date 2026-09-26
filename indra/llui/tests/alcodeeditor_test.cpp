@@ -98,7 +98,9 @@ namespace tut
         }
     };
 
-    typedef test_group<alcodeeditor_data> alcodeeditor_group;
+    // More than TUT's fifty a group holds by default, which runs the first
+    // fifty and says nothing of the rest: keep this above the highest test.
+    typedef test_group<alcodeeditor_data, 100> alcodeeditor_group;
     typedef alcodeeditor_group::object    alcodeeditor_object;
     alcodeeditor_group                    alcodeeditor_instance("alcodeeditor");
 
