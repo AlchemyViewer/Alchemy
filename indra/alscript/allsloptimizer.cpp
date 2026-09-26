@@ -3456,6 +3456,7 @@ namespace
 
 ALLSLOptimizer::Result ALLSLOptimizer::run(std::string_view source, const Options& options)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
     Result result;
     result.text       = std::string(source);
     result.sizeBefore = source.size();

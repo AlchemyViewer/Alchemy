@@ -427,6 +427,7 @@ void ALScriptOutputPane::offerObject(const LLUUID& root, const std::string& name
 
 void ALScriptOutputPane::filter()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
     const std::string whose = mWhose->getValue().asString();
     const std::string kind  = mKind->getValue().asString();
     std::string       words = mFind->getText();

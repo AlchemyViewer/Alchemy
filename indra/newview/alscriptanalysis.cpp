@@ -210,6 +210,9 @@ void ALScriptAnalysis::ask(Request request, callback_t callback)
     }
     mPool->getQueue().post([this, request = std::move(request), callback = std::move(callback), luau_path, docs_path, lsl_path, generation, serial,
                             new_solver, seconds]() {
+        // The job as a whole, its definitions loaded included; what it
+        // asked of the service is the zone inside.
+        LL_PROFILE_ZONE_NAMED_CATEGORY_SCRIPTDEV("script analysis job");
         // What stops this one, where it is an SLua check.
         ALLuauService::Stop stop;
         if (serial != 0)

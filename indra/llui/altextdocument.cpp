@@ -252,6 +252,7 @@ size_t ALTextDocument::byteCount() const
 
 ALTextDocument::Edit ALTextDocument::replace(ALTextRange range, std::string_view text)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
     range = clampBytes(range.normalised());
 
     Edit edit;

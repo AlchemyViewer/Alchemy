@@ -79,6 +79,7 @@ void ALSyntaxHighlighter::reset()
 
 void ALSyntaxHighlighter::onEdit(const ALTextDocument::Edit& edit)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
     // The lines the edit replaced go, and the lines it made come in, dirty;
     // what follows keeps its tokens until the state it starts in is seen
     // to have changed.
@@ -99,6 +100,7 @@ void ALSyntaxHighlighter::onEdit(const ALTextDocument::Edit& edit)
 
 void ALSyntaxHighlighter::ensure(S32 line)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
     mLastLexed = 0;
     if (!mDocument || !mGrammar || mLines.empty())
     {

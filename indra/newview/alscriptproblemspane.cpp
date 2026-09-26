@@ -466,6 +466,7 @@ void ALScriptProblemsPane::readState(const LLSD& state)
 
 void ALScriptProblemsPane::fill(const Doc* doc)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
     // The row chosen and how far the list was scrolled are kept through a
     // refill of the same script's: a check comes at every pause in
     // typing, and whoever is working down the list keeps their place.

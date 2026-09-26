@@ -123,6 +123,7 @@ ALScriptStudioRecovery::Entry ALScriptStudioRecovery::entryOf(const Doc& doc)
 
 bool ALScriptStudioRecovery::keep(Doc& doc, Entry::State state)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
     doc.recoveryDue             = 0.0;
     ALScriptRecoveryStore* kept = store();
     if (!kept)
@@ -172,6 +173,7 @@ bool ALScriptStudioRecovery::keep(Doc& doc, Entry::State state)
 
 void ALScriptStudioRecovery::keepSoon(Doc& doc)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
     ALScriptRecoveryStore* kept = store();
     // What the last of these could not write, said once, as a write here
     // says it.

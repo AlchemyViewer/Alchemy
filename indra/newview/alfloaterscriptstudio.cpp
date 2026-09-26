@@ -1634,6 +1634,7 @@ void ALFloaterScriptStudio::wireDoc(Doc& doc)
 {
     Doc* raw    = &doc;
     doc.changed = doc.editor->onTextChanged([this, raw]() {
+        LL_PROFILE_ZONE_NAMED_CATEGORY_SCRIPTDEV("studio text changed");
         // Typed in, a preview is held.
         if (raw->preview && raw->editor->isDirty())
         {
@@ -1658,6 +1659,7 @@ void ALFloaterScriptStudio::wireDoc(Doc& doc)
         mRecovery.schedule(*raw);
     });
     doc.placedEdits = doc.editor->document().onChanged([this, raw](const ALTextDocument::Edit& edit) {
+        LL_PROFILE_ZONE_NAMED_CATEGORY_SCRIPTDEV("studio places slid");
         mChecking.slideProblems(*raw, edit);
         mReferencesPane->slide(*raw, raw->file.empty() ? ALScriptPreprocessor::pathOf(raw->ref) : raw->id, edit);
         mChecking.slideOutline(*raw, edit);
@@ -2432,6 +2434,7 @@ void ALFloaterScriptStudio::activate(size_t index, bool focus)
 
 void ALFloaterScriptStudio::fillTabs()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
     // What the strip would say now: the facts a tab is drawn from. The
     // strip is filled only where one of them moved, since a keystroke
     // asks for this and a keystroke changes none of them but the dirty
@@ -2799,6 +2802,7 @@ void ALFloaterScriptStudio::confirmFixAll(const LLSD& args, std::function<void()
 
 void ALFloaterScriptStudio::refreshProblems(Doc& doc)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
     ALScriptProblemsPane::Making making;
     making.target      = weightTarget(doc);
     making.includeName = [this, &doc](const std::string& path) { return includeName(doc, path); };

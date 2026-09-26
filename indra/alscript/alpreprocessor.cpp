@@ -3630,6 +3630,7 @@ bool ALPreprocessor::Result::hasErrors() const
 
 ALPreprocessor::Result ALPreprocessor::run(std::string_view source, const Options& options)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
     // Every line of a text mapped to itself: what the source is when
     // nothing was done to it.
     const auto asItIs = [](const std::string& text, const std::string& name, ALSourceMap& map) {
@@ -3765,6 +3766,7 @@ ALPreprocessor::Result ALPreprocessor::run(std::string_view source, const Option
 
 void ALPreprocessor::finish(Result& result, const Options& options)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
     if (options.lua || result.overran || result.text.empty())
     {
         return;

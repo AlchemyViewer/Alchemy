@@ -1087,6 +1087,7 @@ std::string ALScriptPreprocessor::keyOf(const Request& request)
 
 ALScriptSnapshot ALScriptPreprocessor::snapshotFor(const std::shared_ptr<Job>& job, wanted_t& wanted)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
     const Request&   request  = job->request;
     ALScriptSnapshot snapshot;
     snapshot.mOptions = optionsFor(request, /*optimize*/ false);
@@ -1240,6 +1241,7 @@ void ALScriptPreprocessor::attemptJob(const std::shared_ptr<Job>& job)
     // whole script and rescans what its macros make, which is the one
     // thing here that has nothing of the viewer in it.
     toWorker(job, [this, job, snapshot = std::make_shared<ALScriptSnapshot>(std::move(snapshot))]() {
+        LL_PROFILE_ZONE_NAMED_CATEGORY_SCRIPTDEV("preprocessor expand job");
         // On a stack as deep as a script needs: the expansion recurses on
         // how the script nests, and a pool's thread on a Mac has half a
         // megabyte.
@@ -1471,6 +1473,7 @@ void ALScriptPreprocessor::optimizeAndFinish(const std::shared_ptr<Job>& job, AL
         return;
     }
     toWorker(job, [this, job, result = std::make_shared<ALPreprocessor::Result>(std::move(result)), options]() {
+        LL_PROFILE_ZONE_NAMED_CATEGORY_SCRIPTDEV("preprocessor optimize job");
         alScriptOnLargeStack([&]() { ALPreprocessor::finish(*result, options); });
         LLAppViewer::instance()->postToMainCoro([this, job, result]() { finish(job, std::move(*result)); });
     });

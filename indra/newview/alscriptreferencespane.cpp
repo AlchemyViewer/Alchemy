@@ -98,6 +98,7 @@ void ALScriptReferencesPane::show(Found found)
 
 void ALScriptReferencesPane::fill()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
     if (!mServices)
     {
         return;

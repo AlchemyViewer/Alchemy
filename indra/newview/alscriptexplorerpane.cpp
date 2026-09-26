@@ -272,6 +272,7 @@ void ALScriptExplorerPane::pump()
 
 void ALScriptExplorerPane::relist(bool refetch)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
     if (!mServices)
     {
         return;
@@ -407,6 +408,7 @@ std::string ALScriptExplorerPane::nameGivenTo(const LLUUID& root) const
 
 void ALScriptExplorerPane::fill()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
     mStale  = false;
     mFilled = LLTimer::getTotalSeconds();
     std::string filter = mFilter->getText();

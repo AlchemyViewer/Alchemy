@@ -79,6 +79,7 @@ bool ALScriptCrumbsBar::postBuild()
 
 void ALScriptCrumbsBar::showTrailer(Doc& doc)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
     if (!mServices)
     {
         return;
@@ -280,6 +281,7 @@ void ALScriptCrumbsBar::views(Doc& doc, std::vector<Part>& parts) const
 
 void ALScriptCrumbsBar::showPath(Doc& doc)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
     if (!mServices || &doc != mServices->frontDoc())
     {
         return;

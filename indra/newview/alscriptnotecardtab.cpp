@@ -73,6 +73,7 @@ void ALScriptNotecardTab::wire()
     });
     // The view has slid its own atoms by the time the edit is heard.
     mEdits = mDoc.editor->document().onChanged([this](const ALTextDocument::Edit& edit) {
+        LL_PROFILE_ZONE_NAMED_CATEGORY_SCRIPTDEV("notecard items placed");
         if (edit.inserted.find('\xF4') != std::string::npos)
         {
             place(edit.range.begin.line, edit.endAfter().line);

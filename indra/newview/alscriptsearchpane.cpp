@@ -324,6 +324,7 @@ void ALScriptSearchPane::searched(const ALScriptRef& ref, const std::string& nam
 
 void ALScriptSearchPane::addRows(size_t index)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
     const ALScriptSearch::Found& found = mSearch.found()[index];
     for (size_t i = 0; i < found.places.size(); ++i)
     {
@@ -361,6 +362,7 @@ void ALScriptSearchPane::addRows(size_t index)
 
 void ALScriptSearchPane::refill()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
     // The row chosen and the scroll kept, by where the row's place is.
     const S32 scrolled = mResults->getScrollPos();
     // The row chosen, by whose place it is: the numbers a row carries are

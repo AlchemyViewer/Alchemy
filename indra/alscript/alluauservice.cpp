@@ -1237,6 +1237,7 @@ void ALLuauService::setConfig(const ALLuauConfig& config)
 
 ALScriptProblems ALLuauService::check(std::string_view source)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
     Impl& impl = *mImpl;
     impl.wasStopped = false;
     impl.files.text.assign(source);
@@ -1422,6 +1423,7 @@ ALScriptProblems ALLuauService::check(std::string_view source)
 
 std::vector<ALScriptCompletion> ALLuauService::complete(std::string_view source, S32 line, S32 column)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
     Impl& impl = *mImpl;
     impl.checked(source, /*for_autocomplete*/ true);
     Luau::AutocompleteResult found = Luau::autocomplete(
@@ -1486,6 +1488,7 @@ std::vector<ALScriptCompletion> ALLuauService::complete(std::string_view source,
 
 ALScriptHover ALLuauService::hover(std::string_view source, S32 line, S32 column)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
     Impl& impl = *mImpl;
     impl.checked(source, /*for_autocomplete*/ false);
     ALScriptHover           answer;
@@ -1640,6 +1643,7 @@ ALScriptHover ALLuauService::hover(std::string_view source, S32 line, S32 column
 
 ALScriptSignature ALLuauService::signature(std::string_view source, S32 line, S32 column)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
     Impl& impl = *mImpl;
     impl.checked(source, /*for_autocomplete*/ false);
     ALScriptSignature         answer;
@@ -1738,6 +1742,7 @@ ALScriptSignature ALLuauService::signature(std::string_view source, S32 line, S3
 
 ALScriptReferences ALLuauService::references(std::string_view source, S32 line, S32 column)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
     Impl& impl = *mImpl;
     impl.checked(source, /*for_autocomplete*/ false);
     ALScriptReferences        answer;
@@ -1799,6 +1804,7 @@ ALScriptReferences ALLuauService::references(std::string_view source, S32 line, 
 
 std::vector<ALScriptOutlineEntry> ALLuauService::outline(std::string_view source)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
     Impl& impl = *mImpl;
     // The types beside the names come from a query's check, as a hover's
     // do, whatever came before: a check in the script's own mode works out
@@ -1819,6 +1825,7 @@ std::vector<ALScriptOutlineEntry> ALLuauService::outline(std::string_view source
 
 std::vector<ALScriptSemanticToken> ALLuauService::semanticTokens(std::string_view source)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
     Impl& impl = *mImpl;
     impl.checked(source, /*for_autocomplete*/ false);
     const Luau::SourceModule* module_source = impl.frontend->getSourceModule(SCRIPT_MODULE);
@@ -1840,6 +1847,7 @@ std::vector<ALScriptSemanticToken> ALLuauService::semanticTokens(std::string_vie
 
 std::vector<ALScriptInlayHint> ALLuauService::inlayHints(std::string_view source, bool parameters, bool types)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
     Impl& impl = *mImpl;
     if (!parameters && !types)
     {
@@ -1992,6 +2000,7 @@ namespace
 
 std::vector<ALScriptFix> ALLuauService::actions(std::string_view source, S32 line, S32 column, S32 endLine, S32 endColumn)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
     std::vector<ALScriptFix> out;
     // The type a local was given without saying, where the caret is on its
     // name: the hint the editor shows beside it, written in.

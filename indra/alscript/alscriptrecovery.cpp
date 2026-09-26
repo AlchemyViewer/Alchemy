@@ -271,6 +271,7 @@ ALScriptRecoveryStore::~ALScriptRecoveryStore()
 
 void ALScriptRecoveryStore::writeSoon(ALScriptRecoveryEntry entry)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
     if (entry.key.empty())
     {
         return;
@@ -344,6 +345,7 @@ std::string ALScriptRecoveryStore::pathOf(const std::string& key, const std::str
 // static
 bool ALScriptRecoveryStore::writeWhole(const std::string& path, const LLSD& sd, bool durable)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
     // As notation: a person can still read it, and it is a fraction of
     // what XML makes of a history's many small edits.
     std::ostringstream text;
@@ -397,6 +399,7 @@ bool ALScriptRecoveryStore::readEntry(const std::string& path, ALScriptRecoveryE
 
 bool ALScriptRecoveryStore::write(ALScriptRecoveryEntry entry)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
     flush();
     if (entry.key.empty())
     {

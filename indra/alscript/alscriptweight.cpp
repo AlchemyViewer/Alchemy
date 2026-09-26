@@ -426,6 +426,7 @@ namespace ALScriptWeigh
 {
     ALScriptWeight slua(std::string_view source)
     {
+        LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
         ALScriptWeight weight;
         weight.target = ALScriptWeight::Target::SLua;
         weight.limit  = ALScriptWeight::limitOf(weight.target);
@@ -448,6 +449,7 @@ namespace ALScriptWeigh
 
     ALScriptWeight lslLuau(std::string_view source)
     {
+        LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
         ALScriptWeight weight;
         weight.target = ALScriptWeight::Target::LSLLuau;
         weight.limit  = ALScriptWeight::limitOf(weight.target);
@@ -771,6 +773,7 @@ namespace ALScriptWeigh
 {
     ALScriptWeight lso(std::string_view source)
     {
+        LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
         ALScriptWeight weight;
         weight.target = ALScriptWeight::Target::LSO;
         weight.limit  = ALScriptWeight::limitOf(weight.target);
@@ -956,6 +959,7 @@ namespace ALScriptWeigh
 {
     ALScriptWeight mono(std::string_view source)
     {
+        LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
         ALScriptWeight weight;
         weight.target   = ALScriptWeight::Target::Mono;
         weight.limit    = ALScriptWeight::limitOf(weight.target);

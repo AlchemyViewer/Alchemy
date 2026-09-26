@@ -1075,6 +1075,7 @@ namespace
 // static
 ALLSLInliner::Result ALLSLInliner::run(std::string_view source, const std::vector<std::string>& marked)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
     AL_SCRIPT_ENGINE_HELD;
     Result result;
     result.text = std::string(source);

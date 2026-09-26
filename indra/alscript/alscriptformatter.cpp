@@ -759,6 +759,7 @@ namespace
 // static
 std::string ALScriptFormatter::format(std::string_view text, const Options& options)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
     bool              endsWithNewline = false;
     std::vector<Line> lines           = linesOf(text, options.lua, endsWithNewline);
     decide(lines, options.lua);
@@ -768,6 +769,7 @@ std::string ALScriptFormatter::format(std::string_view text, const Options& opti
 // static
 std::string ALScriptFormatter::formatLines(std::string_view text, const Options& options, S32 first, S32 last)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
     bool              endsWithNewline = false;
     std::vector<Line> lines           = linesOf(text, options.lua, endsWithNewline);
     decide(lines, options.lua);

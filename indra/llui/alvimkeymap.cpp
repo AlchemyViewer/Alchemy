@@ -944,6 +944,7 @@ void ALVimKeymap::followDocument(ALTextView& view)
 
 void ALVimKeymap::slideMarks(const ALTextDocument::Edit& edit)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
     // A mark past the edit moves with the text; one inside what was
     // taken out lands where that began.
     const ALTextRange removed = edit.range.normalised();

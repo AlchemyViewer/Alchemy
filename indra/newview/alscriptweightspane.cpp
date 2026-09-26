@@ -209,6 +209,7 @@ std::string ALScriptWeightsPane::changeText(const std::optional<S64>& change, bo
 
 void ALScriptWeightsPane::fillTargets()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
     mTargets->deleteAllItems();
     // Side by side, the script's own first and in bold: what each would
     // cost it, which is how to choose.
@@ -256,6 +257,7 @@ void ALScriptWeightsPane::fillTargets()
 
 void ALScriptWeightsPane::fillParts()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
     const S32 scrolled = mParts->getScrollPos();
     const S32 was      = mParts->getFirstSelected() ? mParts->getFirstSelected()->getValue().asInteger() : -1;
     // What was chosen, by which part it is, since the rows are numbered

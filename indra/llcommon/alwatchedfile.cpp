@@ -67,6 +67,7 @@ void ALWatchedFile::poll(F32 period)
 
 bool ALWatchedFile::check()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
     const Stamp now = stamp();
     const bool  still = now == mLooked;
     mLooked           = now;

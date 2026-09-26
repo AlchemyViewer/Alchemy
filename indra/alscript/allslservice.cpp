@@ -1137,6 +1137,7 @@ bool ALLSLService::builtinsLoaded()
 
 ALScriptProblems ALLSLService::check(std::string_view source, bool mono)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
     AL_SCRIPT_ENGINE_HELD;
     // The passes in the order Tailslide's own tool runs them. The tree is
     // checked even after errors: the messages are the point here, and the
@@ -1264,6 +1265,7 @@ ALScriptProblems ALLSLService::check(std::string_view source, bool mono)
 
 std::vector<ALScriptCompletion> ALLSLService::symbols(std::string_view source, S32 line, S32 column)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
     AL_SCRIPT_ENGINE_HELD;
     Tailslide::LSLScript* script = mImpl->understand(source, line, column);
     std::vector<ALScriptCompletion> out;
@@ -1309,6 +1311,7 @@ std::vector<ALScriptCompletion> ALLSLService::symbols(std::string_view source, S
 
 ALScriptHover ALLSLService::hover(std::string_view source, S32 line, S32 column)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
     AL_SCRIPT_ENGINE_HELD;
     Tailslide::LSLScript* script = mImpl->understand(source);
     ALScriptHover                 answer;
@@ -1347,6 +1350,7 @@ ALScriptHover ALLSLService::hover(std::string_view source, S32 line, S32 column)
 
 ALScriptSignature ALLSLService::signature(std::string_view source, S32 line, S32 column)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
     AL_SCRIPT_ENGINE_HELD;
     Tailslide::LSLScript* script = mImpl->understand(source, line, column);
     ALScriptSignature             answer;
@@ -1402,6 +1406,7 @@ ALScriptSignature ALLSLService::signature(std::string_view source, S32 line, S32
 
 ALScriptReferences ALLSLService::references(std::string_view source, S32 line, S32 column)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
     AL_SCRIPT_ENGINE_HELD;
     Tailslide::LSLScript* script = mImpl->understand(source);
     ALScriptReferences            answer;
@@ -1438,6 +1443,7 @@ ALScriptReferences ALLSLService::references(std::string_view source, S32 line, S
 
 std::vector<ALScriptOutlineEntry> ALLSLService::outline(std::string_view source)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
     AL_SCRIPT_ENGINE_HELD;
     Tailslide::LSLScript* script = mImpl->understand(source);
     std::vector<ALScriptOutlineEntry> out;
@@ -1503,6 +1509,7 @@ std::vector<ALScriptOutlineEntry> ALLSLService::outline(std::string_view source)
 
 std::vector<ALScriptSemanticToken> ALLSLService::semanticTokens(std::string_view source)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
     AL_SCRIPT_ENGINE_HELD;
     Tailslide::LSLScript* script = mImpl->understand(source);
     if (!script)
@@ -1522,6 +1529,7 @@ std::vector<ALScriptSemanticToken> ALLSLService::semanticTokens(std::string_view
 
 std::vector<ALScriptInlayHint> ALLSLService::inlayHints(std::string_view source, bool parameters)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
     AL_SCRIPT_ENGINE_HELD;
     if (!parameters)
     {
@@ -1841,6 +1849,7 @@ namespace
 
 std::vector<ALScriptFix> ALLSLService::actions(std::string_view source, S32 line, S32 column, S32 endLine, S32 endColumn)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
     AL_SCRIPT_ENGINE_HELD;
     std::vector<ALScriptFix> out;
     Tailslide::LSLScript*    script = mImpl->resolve(source);

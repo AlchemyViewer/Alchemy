@@ -61,6 +61,7 @@ bool ALScriptInspectorPane::postBuild()
 
 void ALScriptInspectorPane::inspected(Doc& doc, const ALScriptAnalysis::Result& result, const ALTextPos& at)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
     // Still about the word the caret is on, and this script: by the
     // source's place it was asked about, which the result's is not where
     // the analyzer read the expansion.

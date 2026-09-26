@@ -92,6 +92,7 @@ std::string ALScriptOutlinePane::kindName(ALScriptSymbolKind kind) const
 
 void ALScriptOutlinePane::show(Doc& doc)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
     if (!mServices || &doc != mServices->frontDoc())
     {
         return;

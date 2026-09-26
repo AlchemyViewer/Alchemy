@@ -231,6 +231,7 @@ ALCodeEditor::~ALCodeEditor() = default;
 
 void ALCodeEditor::onEdit(const ALTextDocument::Edit& edit)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
     hideCard();
     const S32 first = llclamp(edit.range.begin.line, 0, static_cast<S32>(mMarks.size()));
     const S32 last  = llclamp(edit.range.end.line, first, static_cast<S32>(mMarks.size()) - 1);
@@ -4050,6 +4051,7 @@ void ALCodeEditor::onMouseLeave(S32 x, S32 y, MASK mask)
 
 void ALCodeEditor::draw()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
     // A signature is about a call on the caret's line; anywhere else it
     // is stale. (The placeholders are let go of as the caret leaves their
     // lines, where it moves: dropPlaceholdersLeft.)

@@ -128,6 +128,7 @@ void ALScriptStudioOrphans::reattach(Doc& doc)
 
 void ALScriptStudioOrphans::check()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
     bool changed = false;
     for (Doc* each : mServices.openDocs())
     {

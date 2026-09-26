@@ -1472,6 +1472,7 @@ bool ALTextView::canAddToIgnore() const
 
 void ALTextView::onDocumentEdit(const ALTextDocument::Edit& edit)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
     // The change list: what it holds slides with the text, a place the edit
     // took some of to where it began; and the edit's own place joins it, in
     // the place of the last where that was on the same line.
@@ -3626,6 +3627,7 @@ void ALTextView::drawPreedit(S32 line, const ALTextLayout::Row& row, S32 screen_
 
 void ALTextView::drawRows(const LLRect& text)
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
     const S32 row_h = mLayout.rowHeight();
     if (row_h <= 0 || !mFont)
     {
@@ -3792,6 +3794,7 @@ void ALTextView::dragSelectTo(S32 x, S32 y)
 
 void ALTextView::draw()
 {
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
     // A modal keymap's keys that wait on time; then its mode, moved by
     // something other than a key -- the mouse dragging vim into visual
     // mode, the time run out on keys held.
