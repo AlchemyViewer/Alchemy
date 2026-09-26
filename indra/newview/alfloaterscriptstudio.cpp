@@ -489,6 +489,11 @@ ALFloaterScriptStudio::ALFloaterScriptStudio(const LLSD& key)
 
 ALFloaterScriptStudio::~ALFloaterScriptStudio()
 {
+    // The keyboard, the mouse and a top control let go of now, while the
+    // tabs and the units are here: LLFloater's destructor would let go of
+    // them after, and a filter losing the keyboard commits into a pane,
+    // which calls into what has gone.
+    gFocusMgr.releaseFocusIfNeeded(this);
     // A menu still open calls into this window, which is going: it goes
     // first. The menus live in the viewer's menu holder, not here.
     for (LLHandle<LLContextMenu>* menu : { &mTabMenuHandle })
@@ -5852,13 +5857,16 @@ void ALFloaterScriptStudio::letGoOf(size_t index, bool keep)
             mReferencesPane->forget();
         }
         // Off the editor now: it is deleted with the frame, after the Doc
-        // this callback points at has gone. A connection lets go safely
-        // even of a signal gone before it.
+        // its callbacks and hooks point at has gone. A connection lets go
+        // safely even of a signal gone before it.
         doc.changed.disconnect();
+        doc.placedEdits.disconnect();
+        doc.editor->clearHandlers();
         mEditorHost->removeChild(doc.editor);
         doc.editor->die();
         if (doc.expandedEditor)
         {
+            doc.expandedEditor->clearHandlers();
             mEditorHost->removeChild(doc.expandedEditor);
             doc.expandedEditor->die();
         }
