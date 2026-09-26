@@ -106,4 +106,28 @@ namespace tut
 #endif
         }
     }
+
+    template<> template<>
+    void alkeymap_object::test<4>()
+    {
+        set_test_name("the Mac's conventions there, and the others' elsewhere: find next, replace, folding, and keys that need no Fn shown first");
+        const ALKeymap map = ALKeymap::standard();
+        KEY            key  = KEY_NONE;
+        MASK           mask = MASK_NONE;
+#if LL_DARWIN
+        ensure("Command-G the next match", map.lookup('G', MASK_CONTROL) == C::FindNext);
+        ensure("Shift-Command-G the one before", map.lookup('G', MASK_CONTROL | MASK_SHIFT) == C::FindPrevious);
+        ensure("Command-H left to the system", map.lookup('H', MASK_CONTROL) == C::None);
+        ensure("Command-Option-F replaces", map.lookup('F', MASK_CONTROL | MASK_ALT) == C::Replace);
+        ensure("Command-Option-[ folds", map.lookup('[', MASK_CONTROL | MASK_ALT) == C::Fold);
+        ensure("Command-Shift-[ left to the tabs", map.lookup('[', MASK_CONTROL | MASK_SHIFT) == C::None);
+        ensure("a definition shown as Control-Command-J", map.keysFor(C::GoToDefinition, key, mask) && key == 'J' && mask == (MASK_CONTROL | MASK_MAC_CONTROL));
+        ensure("F12 still", map.lookup(KEY_F12, MASK_NONE) == C::GoToDefinition);
+        ensure("Command-semicolon the next misspelling", map.lookup(';', MASK_CONTROL) == C::NextMisspelling);
+#else
+        ensure("Control-H replaces", map.lookup('H', MASK_CONTROL) == C::Replace);
+        ensure("Control-Shift-[ folds", map.lookup('[', MASK_CONTROL | MASK_SHIFT) == C::Fold);
+        ensure("F3 the next match, shown", map.keysFor(C::FindNext, key, mask) && key == KEY_F3);
+#endif
+    }
 }

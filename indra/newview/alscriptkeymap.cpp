@@ -282,13 +282,20 @@ namespace ALScriptKeymap
             { "back", '-', REAL_CONTROL },
             { "forward", '-', REAL_CONTROL | MASK_SHIFT },
             { "quick_open", 'P', MASK_CONTROL },
-            { "go_to_line", 'G', MASK_CONTROL },
 #if LL_DARWIN
-            // The Mac's own Control-G, which it answered to before
-            // Command-G did.
+            // The Mac's own Control-G, as its editors go to a line:
+            // Command-G is the next match there.
             { "go_to_line", 'G', MASK_MAC_CONTROL },
+#else
+            { "go_to_line", 'G', MASK_CONTROL },
 #endif
             { "go_to_symbol", 'O', MASK_CONTROL | MASK_SHIFT },
+#if LL_DARWIN
+            // Xcode's next and previous issue, first, the function keys
+            // needing Fn on most Macs.
+            { "next_problem", '\'', MASK_CONTROL },
+            { "previous_problem", '\'', MASK_CONTROL | MASK_SHIFT },
+#endif
             { "next_problem", KEY_F8, MASK_NONE },
             { "previous_problem", KEY_F8, MASK_SHIFT },
             { "next_tab", KEY_PAGE_DOWN, MASK_CONTROL },
@@ -297,11 +304,21 @@ namespace ALScriptKeymap
             { "next_tab", KEY_TAB, REAL_CONTROL },
             { "previous_tab", KEY_PAGE_UP, MASK_CONTROL },
             { "previous_tab", KEY_TAB, REAL_CONTROL | MASK_SHIFT },
+#if LL_DARWIN
+            // And Command-Shift with a bracket, as the Mac's own go
+            // between tabs.
+            { "next_tab", ']', MASK_CONTROL | MASK_SHIFT },
+            { "previous_tab", '[', MASK_CONTROL | MASK_SHIFT },
+#endif
             { "last_tab", '6', REAL_CONTROL },
             { "all_tabs", KEY_NONE, MASK_NONE },
             { "move_tab_left", KEY_PAGE_UP, MASK_CONTROL | MASK_SHIFT },
             { "move_tab_right", KEY_PAGE_DOWN, MASK_CONTROL | MASK_SHIFT },
             { "focus_tabs", KEY_NONE, MASK_NONE },
+#if LL_DARWIN
+            { "next_pane", ']', MASK_CONTROL | MASK_MAC_CONTROL },
+            { "previous_pane", '[', MASK_CONTROL | MASK_MAC_CONTROL },
+#endif
             { "next_pane", KEY_F6, MASK_NONE },
             { "previous_pane", KEY_F6, MASK_SHIFT },
             // View
@@ -359,6 +376,10 @@ namespace ALScriptKeymap
             { "preproc_addstrings", KEY_NONE, MASK_NONE },
             { "preproc_inline", KEY_NONE, MASK_NONE },
             // Help
+#if LL_DARWIN
+            // Xcode's documentation, first, F1 needing Fn.
+            { "reference", '0', MASK_CONTROL | MASK_SHIFT },
+#endif
             { "reference", KEY_F1, MASK_NONE },
             { "browse_reference", KEY_NONE, MASK_NONE },
             { "wiki", KEY_NONE, MASK_NONE },

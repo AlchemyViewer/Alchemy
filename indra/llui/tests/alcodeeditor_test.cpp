@@ -214,11 +214,17 @@ namespace tut
         e.unfoldAll();
         ensure("everything open", !e.layout().anyHidden());
 
+        // Command-Option with a bracket on the Mac, Control-Shift elsewhere.
+#if LL_DARWIN
+        constexpr MASK FOLD = MASK_CONTROL | MASK_ALT;
+#else
+        constexpr MASK FOLD = MASK_CONTROL | MASK_SHIFT;
+#endif
         e.setCaret(ALTextPos(4, 0));
-        key('[', MASK_CONTROL | MASK_SHIFT);
+        key('[', FOLD);
         ensure("the key folds the block around the caret", e.isFolded(2) && !e.isFolded(0));
         ensure("and moves the caret to its header", e.caret().line == 2);
-        key(']', MASK_CONTROL | MASK_SHIFT);
+        key(']', FOLD);
         ensure("the key opens it", !e.isFolded(2));
 
         ensure("folds again", e.foldAt(2));

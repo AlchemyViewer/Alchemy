@@ -575,7 +575,8 @@ bool ALFloaterScriptStudio::postBuild()
                  { "expanded_btn", { "expanded" } },
                  { "fold_explorer", { "explorer" } },
                  { "fold_bottom", { "problems", "references", "output", "search" } },
-                 { "fold_inspector", { "inspector" } } };
+                 { "fold_inspector", { "inspector" } },
+                 { "problems_fixable", { "quick_fix" } } };
     for (const auto& [control, items] : mKeyTips)
     {
         if (LLView* view = findChild<LLView>(control))

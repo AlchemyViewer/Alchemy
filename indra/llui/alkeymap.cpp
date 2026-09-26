@@ -188,19 +188,44 @@ ALKeymap ALKeymap::standard()
     map.bind(KEY_DOWN, MASK_ALT, C::MoveLineDown);
     map.bind('D', MASK_CONTROL | MASK_SHIFT, C::DuplicateLine);
     map.bind('K', MASK_CONTROL | MASK_SHIFT, C::DeleteLine);
+#if LL_DARWIN
+    // Command-Option with a bracket, as the Mac's editors fold: Command-
+    // Shift with one goes between tabs there.
+    map.bind('[', MASK_CONTROL | MASK_ALT, C::Fold);
+    map.bind(']', MASK_CONTROL | MASK_ALT, C::Unfold);
+#else
     map.bind('[', MASK_CONTROL | MASK_SHIFT, C::Fold);
     map.bind(']', MASK_CONTROL | MASK_SHIFT, C::Unfold);
+#endif
     map.bind(' ', MASK_CONTROL, C::Complete);
     map.bind(' ', MASK_CONTROL | MASK_SHIFT, C::SignatureHelp);
+#if LL_DARWIN
+    // The function keys need Fn on most Macs: first, and so shown in the
+    // menus, the keys Xcode and the text system have for the same --
+    // Control-Command-J to a definition, Control-Command-E to rename every
+    // use, Control-Shift-Command-F for the uses, Command-G and Shift-
+    // Command-G for the next match and the one before, Command-semicolon
+    // for the next misspelling.
+    constexpr MASK CONTROL_COMMAND = MASK_CONTROL | MASK_MAC_CONTROL;
+    map.bind('J', CONTROL_COMMAND, C::GoToDefinition);
+    map.bind('F', CONTROL_COMMAND | MASK_SHIFT, C::FindReferences);
+    map.bind('E', CONTROL_COMMAND, C::Rename);
+    map.bind('G', MASK_CONTROL, C::FindNext);
+    map.bind('G', MASK_CONTROL | MASK_SHIFT, C::FindPrevious);
+    map.bind(';', MASK_CONTROL, C::NextMisspelling);
+    map.bind(';', MASK_CONTROL | MASK_SHIFT, C::PreviousMisspelling);
+#endif
     map.bind(KEY_F12, MASK_NONE, C::GoToDefinition);
     map.bind(KEY_F12, MASK_SHIFT, C::FindReferences);
     map.bind(KEY_F2, MASK_NONE, C::Rename);
     map.bind('F', MASK_CONTROL, C::Find);
-    map.bind('H', MASK_CONTROL, C::Replace);
 #if LL_DARWIN
-    // Command-Option-F, as the Mac's editors have it. Control and Alt
-    // together elsewhere is AltGr on many a keyboard, which types.
+    // Command-Option-F, as the Mac's editors have it: Command-H hides the
+    // application there. Control and Alt together elsewhere is AltGr on
+    // many a keyboard, which types.
     map.bind('F', MASK_CONTROL | MASK_ALT, C::Replace);
+#else
+    map.bind('H', MASK_CONTROL, C::Replace);
 #endif
     map.bind(KEY_F3, MASK_NONE, C::FindNext);
     map.bind(KEY_F3, MASK_SHIFT, C::FindPrevious);
@@ -218,7 +243,6 @@ ALKeymap ALKeymap::standard()
     // The Mac's own, where MASK_CONTROL is Command: Command with an arrow
     // goes to the ends of the line and of the text, Option with one by
     // words (above), and Command-Backspace back to the line's start.
-    // Command-G is left to whoever holds the editor, to go to a line.
     map.bind(KEY_LEFT, MASK_CONTROL, C::MoveLineStart);
     map.bind(KEY_RIGHT, MASK_CONTROL, C::MoveLineEnd);
     map.bind(KEY_UP, MASK_CONTROL, C::MoveDocStart);

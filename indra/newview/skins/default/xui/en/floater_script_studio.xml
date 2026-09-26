@@ -1750,7 +1750,7 @@
                                      layout="topleft"
                                      left_pad="6"
                                      name="problems_fixable"
-                                     tool_tip="Show only the problems that offer a fix, which the right-click menu, Control-. and the lightbulb make"
+                                     tool_tip="Show only the problems that offer a fix, which the right-click menu and the lightbulb make, as does Quick Fix ([KEYS])"
                                      top_delta="0"
                                      width="62" />
                                     <combo_box

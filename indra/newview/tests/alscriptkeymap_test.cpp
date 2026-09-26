@@ -199,9 +199,10 @@ namespace tut
 #else
         constexpr MASK REAL_CONTROL = MASK_CONTROL;
 #endif
+        ALScriptKeymap::chords_t rest = ALScriptKeymap::menuKeys("next_tab");
+        rest.erase(std::remove(rest.begin(), rest.end(), ALKeyChord{ KEY_TAB, REAL_CONTROL }), rest.end());
         from = ALScriptKeymap::takeKeys(revert, ALKeyChord{ KEY_TAB, REAL_CONTROL }, true);
-        ensure("one of several keys: the rest kept",
-               named(from, "next_tab") && ALScriptKeymap::menuKeys("next_tab") == ALScriptKeymap::chords_t({ ALKeyChord{ KEY_PAGE_DOWN, MASK_CONTROL } }));
+        ensure("one of several keys: the rest kept", named(from, "next_tab") && !rest.empty() && ALScriptKeymap::menuKeys("next_tab") == rest);
         ALScriptKeymap::restoreAll();
 
         ALScriptKeymap::Owner save_all;
