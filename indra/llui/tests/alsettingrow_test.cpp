@@ -28,15 +28,19 @@
 
 #include "../llbutton.h"
 #include "../llfloater.h"
+#include "../llfocusmgr.h"
 #include "../lllineeditor.h"
 #include "../llslider.h"
 #include "../llsliderctrl.h"
+#include "../llspinctrl.h"
 #include "../lltextbox.h"
+#include "../lltrans.h"
 #include "../llui.h"
 #include "../lluictrlfactory.h"
 #include "../llxuiparser.h"
 #include "llcontrol.h"
 #include "llxmlnode.h"
+#include "v3math.h"
 
 #include "alheadlessui_fixture.h"
 
@@ -101,6 +105,36 @@ namespace tut
         {
             ALSettingRow::Params p = params(control_name, min_value, max_value, decimal_digits);
             return LLUICtrlFactory::create<ALSettingRow>(p);
+        }
+
+        // What the reset button says, as the viewer's strings have it:
+        // nothing here loads them.
+        static void resetWords()
+        {
+            static bool given = false;
+            if (!given)
+            {
+                const std::string source = "<strings><string name=\"SettingRowReset\">Reset to [VALUE]</string></strings>";
+                LLXMLNodePtr      node;
+                given = LLXMLNode::parseBuffer(source.data(), source.size(), node) && LLTrans::parseStrings(node, {});
+            }
+        }
+
+        // A vector setting, put back to its default.
+        static LLControlVariable* vector(const std::string& name, const LLVector3& value)
+        {
+            LLControlVariable* control = config().getControl(name).get();
+            if (!control)
+            {
+                control = config().declareVec3(name, value, std::string("A setting row test vector"));
+            }
+            control->resetToDefault(false);
+            return control;
+        }
+
+        static bool sameParts(const LLSD& value, F64 x, F64 y, F64 z)
+        {
+            return closeTo(value[0].asReal(), x) && closeTo(value[1].asReal(), y) && closeTo(value[2].asReal(), z);
         }
 
         // Every view under @a root that is bound to a setting.
@@ -180,6 +214,16 @@ namespace tut
         ensure("can_edit_text defaults on", defaults.can_edit_text());
         ensure("show_reset defaults on", defaults.show_reset());
         ensure("text_width is not said unless said", !defaults.text_width.isProvided());
+        ensure("a scalar unless said otherwise", defaults.components().empty() && defaults.part() == -1);
+
+        // A vector's letters and a part's index, by the names a row writes.
+        const std::string vector_source = "<setting_row name=\"v\" components=\"R G B\" part=\"1\"/>\n";
+        LLXMLNodePtr      vector_node;
+        ensure("a vector parses", LLXMLNode::parseBuffer(vector_source.data(), vector_source.size(), vector_node));
+        ALSettingRow::Params vector_p;
+        parser.readXUI(vector_node, vector_p, "setting_row_test.xml");
+        ensure_equals("components", vector_p.components(), std::string("R G B"));
+        ensure_equals("part", vector_p.part(), 1);
     }
 
     // Bound both ways, and a commit is one write: the row writes the setting,
@@ -561,6 +605,122 @@ namespace tut
         ALSettingRow* plain = row("SettingRowTestHeld");
         ensure("no press asked for", !params("SettingRowTestHeld").mouse_down_callback.isProvided());
         plain->die();
+        r->die();
+    }
+
+    template<> template<>
+    void alsettingrow_object::test<14>()
+    {
+        set_test_name("a vector's row: its caption and a lettered box per part showing the setting; a box typed in writes its part and keeps the rest");
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        LLControlVariable*   control = vector("SettingRowTestWeights", LLVector3(1.f, 0.5f, 0.7f));
+        ALSettingRow::Params p       = params("SettingRowTestWeights");
+        p.name                       = "weights";
+        p.label                      = "Lum weights";
+        p.label_width                = 110;
+        p.components                 = "R G";
+        ALSettingRow* r              = LLUICtrlFactory::create<ALSettingRow>(p);
+        ensure("no slider", r->getSlider() == nullptr);
+        ensure("its caption, which names it", r->getLabelBox() && r->getLabelBox()->getText() == "Lum weights");
+        LLSpinCtrl* red   = r->findChild<LLSpinCtrl>("weights.R");
+        LLSpinCtrl* green = r->findChild<LLSpinCtrl>("weights.G");
+        ensure("a box per letter", red && green && !r->findChild<LLSpinCtrl>("weights.B"));
+        ensure("after the caption, as wide as a number", red->getRect().mLeft == 110 && red->getRect().getWidth() == 68);
+        ensure_equals("side by side", green->getRect().mLeft, red->getRect().mRight + 4);
+        ensure("the setting in them", closeTo(red->getValue().asReal(), 1.0) && closeTo(green->getValue().asReal(), 0.5));
+        bool lettered = false;
+        for (LLView* child : *red->getChildList())
+        {
+            const LLTextBox* letter = ALViewType::as<LLTextBox>(child);
+            lettered                = lettered || (letter && letter->getText() == "R");
+        }
+        ensure("each named by its letter beside it, which scrubs", lettered && red->getScrub());
+        ensure("with no caption under it", !r->findChild<LLTextBox>("weights.R_caption"));
+        r->setFocus(true);
+        ensure("the keyboard to the first box", red->hasFocus() || gFocusMgr.childHasKeyboardFocus(red));
+        r->setFocus(false);
+        r->setHighlighted(true);
+        ensure("lit, its caption is", r->getLabelBox()->ll::ui::SearchableControl::getHighlighted());
+        r->setHighlighted(false);
+        ensure("the row's value is its parts", closeTo(r->getValue()[1].asReal(), 0.5));
+
+        S32 writes = 0;
+        boost::signals2::scoped_connection watching = control->getSignal()->connect(
+            [&writes](LLControlVariable*, const LLSD&, const LLSD&) { ++writes; });
+        S32 commits = 0;
+        r->setCommitCallback([&commits](LLUICtrl*, const LLSD&) { ++commits; });
+        green->setValue(LLSD(0.25));
+        green->onCommit();
+        ensure("its part written, the rest as they stood", sameParts(control->getValue(), 1.0, 0.25, 0.7));
+        ensure_equals("written once", writes, 1);
+        ensure_equals("committed once", commits, 1);
+
+        control->set(LLSD().with(0, 0.5).with(1, 0.25).with(2, 0.3));
+        ensure("a change from elsewhere shown", closeTo(red->getValue().asReal(), 0.5));
+        green->setValue(LLSD(0.5));
+        green->onCommit();
+        ensure("a part no box shows kept", sameParts(control->getValue(), 0.5, 0.5, 0.3));
+
+        r->setEnabled(false);
+        ensure("disabled with the row", !red->getEnabled() && !green->getEnabled());
+        r->die();
+    }
+
+    template<> template<>
+    void alsettingrow_object::test<15>()
+    {
+        set_test_name("a vector's row resets while a part it shows differs, and says the default's parts; the whole setting goes back");
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        resetWords();
+        LLControlVariable*   control = vector("SettingRowTestCentre", LLVector3(0.f, 0.f, 0.f));
+        ALSettingRow::Params p       = params("SettingRowTestCentre", -1.f, 1.f);
+        p.name                       = "centre";
+        p.components                 = "X Y";
+        ALSettingRow* r              = LLUICtrlFactory::create<ALSettingRow>(p);
+        ensure("hidden at the default", !r->getResetButton()->getVisible());
+        control->set(LLSD().with(0, 0.0).with(1, 0.0).with(2, 0.4));
+        ensure("a part it does not show is not its difference", !r->isModified() && !r->getResetButton()->getVisible());
+        control->set(LLSD().with(0, 0.0).with(1, 0.3).with(2, 0.4));
+        ensure("shown once a part it shows differs", r->isModified() && r->getResetButton()->getVisible());
+        ensure("saying the default's parts", r->getResetButton()->getToolTip().find("0.00, 0.00") != std::string::npos);
+        r->getResetButton()->onCommit();
+        ensure("the whole setting back", sameParts(control->getValue(), 0.0, 0.0, 0.0));
+        ensure("the boxes show it", closeTo(r->findChild<LLSpinCtrl>("centre.Y")->getValue().asReal(), 0.0));
+        r->die();
+    }
+
+    template<> template<>
+    void alsettingrow_object::test<16>()
+    {
+        set_test_name("one part's row is a slider over its part: it writes, compares and resets that part and leaves the others");
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        resetWords();
+        LLControlVariable*   control = vector("SettingRowTestEffect", LLVector3(0.8f, 1.f, 0.f));
+        ALSettingRow::Params p       = params("SettingRowTestEffect", 0.f, 2.f);
+        p.part                       = 1;
+        ALSettingRow* r              = LLUICtrlFactory::create<ALSettingRow>(p);
+        ensure("a slider", r->getSlider() != nullptr);
+        ensure("over its part", closeTo(r->getSlider()->getValueF32(), 1.0));
+        r->getSlider()->setValue(0.5f);
+        r->getSlider()->onCommit();
+        ensure("its part written, the others kept", sameParts(control->getValue(), 0.8, 0.5, 0.0));
+        ensure("its part differs", r->isModified() && r->getResetButton()->getVisible());
+        ensure("saying its default", r->getResetButton()->getToolTip().find("1.00") != std::string::npos);
+
+        control->set(LLSD().with(0, 0.2).with(1, 1.0).with(2, 0.0));
+        ensure("another part differing is not its difference", !r->isModified());
+        control->set(LLSD().with(0, 0.2).with(1, 0.5).with(2, 0.0));
+        r->getResetButton()->onCommit();
+        ensure("its part back, the other part left", sameParts(control->getValue(), 0.2, 1.0, 0.0));
         r->die();
     }
 }

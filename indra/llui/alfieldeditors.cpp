@@ -55,6 +55,11 @@ namespace
     // Between the parts of a value that is several numbers, where there is
     // room for it.
     constexpr S32 GUTTER = 10;
+    // A lettered part: its letter, its box at the most, and the gap to the
+    // next.
+    constexpr S32 LETTER_WIDTH = 10;
+    constexpr S32 LETTERED_WIDTH = 68;
+    constexpr S32 LETTERED_GAP = 4;
     // A control narrower than its column sits at the column's left rather
     // than being stretched across it: a number is as wide as a number.
     constexpr S32 NUMBER_WIDTH = 120;
@@ -223,7 +228,7 @@ void ALFieldEditors::refresh(LLView* within, const Field& field)
     }
 }
 
-void ALFieldEditors::makeComponents(const Field& field, const LLRect& box, LLPanel* row, const commit_t& commit) const
+void ALFieldEditors::makeComponents(const Field& field, const LLRect& box, LLView* row, const commit_t& commit) const
 {
     const size_t count = field.components.size();
     if (count == 0)
@@ -240,9 +245,10 @@ void ALFieldEditors::makeComponents(const Field& field, const LLRect& box, LLPan
     // reads as a row with nothing on it -- so the gutter closes up first,
     // and then the boxes take what is left however narrow that is.
     const S32 room = box.getWidth();
-    const S32 gutter = (room - GUTTER * (S32)(count - 1)) / (S32)count >= NUMBER_MIN_WIDTH
-                     ? GUTTER : 2;
-    const S32 each = llmax(1, (room - gutter * (S32)(count - 1)) / (S32)count);
+    const S32 gutter = field.lettered ? LETTERED_GAP
+                     : (room - GUTTER * (S32)(count - 1)) / (S32)count >= NUMBER_MIN_WIDTH ? GUTTER : 2;
+    const S32 share = llmax(1, (room - gutter * (S32)(count - 1)) / (S32)count);
+    const S32 each = field.lettered ? llmin(share, LETTERED_WIDTH) : share;
 
     // Held so that any one of them can read all of them: a part committed on
     // its own would say nothing about the other three.
@@ -254,8 +260,14 @@ void ALFieldEditors::makeComponents(const Field& field, const LLRect& box, LLPan
 
         LLSpinCtrl::Params p;
         p.name = field.name + "." + field.components[i];
-        p.rect = LLRect(left, box.mTop - 1, left + each, box.mBottom + 1 + CAPTION_HEIGHT);
+        p.rect = LLRect(left, box.mTop - 1, left + each, box.mBottom + 1 + (field.lettered ? 0 : CAPTION_HEIGHT));
         p.label_width = 0;
+        if (field.lettered)
+        {
+            p.label = field.components[i];
+            p.label_width = LETTER_WIDTH;
+            p.scrub = true;
+        }
         p.decimal_digits = decimalsOf(field, whole);
         p.increment = stepOf(field, whole);
         p.min_value = minimumOf(field);
@@ -265,6 +277,10 @@ void ALFieldEditors::makeComponents(const Field& field, const LLRect& box, LLPan
         spin->setUnset(!field.authored);
         row->addChild(spin);
         boxes->push_back(spin);
+        if (field.lettered)
+        {
+            continue;
+        }
 
         // What the part is called, under it: X and Y over two boxes is the
         // difference between a position and two numbers.

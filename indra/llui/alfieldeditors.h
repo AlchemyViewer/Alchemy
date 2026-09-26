@@ -136,6 +136,10 @@ public:
         // committed joined by a space again. One field, one value, whatever
         // the arity.
         std::vector<std::string>    components;
+        // The parts named by a letter beside each box, which a drag on the
+        // letter scrubs, rather than by a caption under it: a row one
+        // line tall, its boxes as wide as a number needs.
+        bool                        lettered = false;
         // Four names, in the order left, bottom, right, top: a field whose
         // value is which edges of its parent a thing is tied to, which is a
         // picture rather than four words. The row it gets is as tall as the
@@ -184,7 +188,7 @@ public:
     LLUICtrl* make(const Field& field, const LLRect& box, LLPanel* row, const std::string& tip, const commit_t& commit,
                    const value_of_t& value_of) const;
     // A box per part, captioned, all of them committing the whole value.
-    void makeComponents(const Field& field, const LLRect& box, LLPanel* row, const commit_t& commit) const;
+    void makeComponents(const Field& field, const LLRect& box, LLView* row, const commit_t& commit) const;
     // The editor under `within` showing what the field says now, unless it
     // is being used.
     static void refresh(LLView* within, const Field& field);
