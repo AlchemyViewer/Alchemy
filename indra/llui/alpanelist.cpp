@@ -122,9 +122,13 @@ void ALPaneList::setGo(std::function<void()> go)
 
 bool ALPaneList::handleKeyHere(KEY key, MASK mask)
 {
-    if (mKeyHandler && mKeyHandler(key, mask))
+    if (mask == MASK_NONE && (key == KEY_LEFT || key == KEY_RIGHT) && mFold)
     {
-        return true;
+        if (const LLScrollListItem* item = getFirstSelected())
+        {
+            mFold(item->getValue(), key == KEY_LEFT);
+            return true;
+        }
     }
     if (mask == MASK_NONE && key == KEY_RETURN && mGo)
     {
@@ -372,6 +376,16 @@ void ALPaneList::onFocusLost()
 
 bool ALPaneList::handleMouseDown(S32 x, S32 y, MASK mask)
 {
+    // An arrow pressed turns its row's fold, before the list takes the
+    // press as a choice.
+    if (mask == MASK_NONE && mFold && mArrowAt)
+    {
+        if (const LLScrollListItem* hit = hitItem(x, y); hit && mArrowAt(hit, x))
+        {
+            mFold(hit->getValue(), std::nullopt);
+            return true;
+        }
+    }
     mPressed.clear();
     // One of several chosen, pressed plainly: all of them stay chosen,
     // held for a drag, and the release chooses the row alone where no drag

@@ -68,9 +68,6 @@ public:
 
     explicit ALScriptOutlinePane(const LLPanel::Params& params = getDefaultParams());
     bool postBuild() override;
-    // An arrow in the list folds its symbol, before the list takes the
-    // click as choosing the row.
-    bool handleMouseDown(S32 x, S32 y, MASK mask) override;
 
     // The tab's outline listed, where it is the tab in front: made again
     // only where what the rows say changed, and then with its scroll kept.
@@ -92,8 +89,8 @@ public:
     void        setSortOrder(const std::string& order);
 
 private:
-    // Whether a point of the list is on a row's arrow, and whose.
-    bool        arrowAt(S32 x, S32 y, size_t& index);
+    // Whether a point across a row is on its arrow.
+    bool        arrowAt(const LLScrollListItem* item, S32 x) const;
     std::string kindName(ALScriptSymbolKind kind) const;
 
     ALScriptStudioServices*  mServices = nullptr;

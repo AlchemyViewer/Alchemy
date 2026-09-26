@@ -33,6 +33,10 @@
 
 #include "../test/lltut.h"
 
+#include <optional>
+#include <string>
+#include <vector>
+
 class LLAvatarName;
 const std::string gPaneListTestAnonName("Anon");
 const std::string& rlvGetAnonym(const LLAvatarName& av_name)
@@ -99,22 +103,36 @@ namespace tut
     template<> template<>
     void alpanelist_object::test<1>()
     {
-        set_test_name("the keys a pane's list means something by are its owner's first, and the rest are the list's");
+        set_test_name("left and right fold and open the row chosen, a press on its arrow turns it, by the owner's rule; other keys are the list's");
         ALPaneList& l = make();
         add("one", 0);
         add("two", 0);
-        std::vector<KEY> heard;
-        l.setKeyHandler([&heard](KEY key, MASK) {
-            heard.push_back(key);
-            return key == KEY_RETURN || key == KEY_ESCAPE;
-        });
-        l.selectFirstItem();
+        std::vector<std::string> asked;
+        const auto               said = [](const LLSD& value, std::optional<bool> folded) {
+            return value["group"].asString() + (folded ? (*folded ? " shut" : " open") : " turned");
+        };
         l.setFocus(true);
-        ensure("return taken", l.handleKeyHere(KEY_RETURN, MASK_NONE));
-        ensure("escape taken", l.handleKeyHere(KEY_ESCAPE, MASK_NONE));
+        ensure("no fold: left is the list's", !l.handleKeyHere(KEY_LEFT, MASK_NONE) || asked.empty());
+        l.setFold([&](const LLSD& value, std::optional<bool> folded) { asked.push_back(said(value, folded)); },
+                  [](const LLScrollListItem*, S32 x) { return x < 20; });
+        l.deselectAllItems();
+        l.handleKeyHere(KEY_LEFT, MASK_NONE);
+        ensure("nothing chosen: nothing asked", asked.empty());
+        l.selectFirstItem();
+        ensure("left shuts", l.handleKeyHere(KEY_LEFT, MASK_NONE) && asked.back() == "0 shut");
+        ensure("right opens", l.handleKeyHere(KEY_RIGHT, MASK_NONE) && asked.back() == "0 open");
+        l.handleKeyHere(KEY_LEFT, MASK_SHIFT);
+        ensure_equals("with a key held, the list's", asked.size(), size_t(2));
         l.handleKeyHere(KEY_DOWN, MASK_NONE);
-        ensure_equals("each offered", heard.size(), size_t(3));
-        ensure_equals("one not taken is the list's: it moved on", l.getFirstSelected()->getColumn(0)->getValue().asString(), std::string("two"));
+        ensure_equals("another key is the list's: it moved on", l.getFirstSelected()->getColumn(0)->getValue().asString(),
+                      std::string("two"));
+        const LLRect first = l.getCellRect(0, 0);
+        ensure("a press on the arrow turns its row",
+               l.handleMouseDown(first.mLeft + 5, first.getCenterY(), MASK_NONE) && asked.back() == "0 turned");
+        ensure_equals("and chooses nothing", l.getFirstSelected()->getColumn(0)->getValue().asString(), std::string("two"));
+        l.handleMouseDown(first.mLeft + 40, first.getCenterY(), MASK_NONE);
+        l.handleMouseUp(first.mLeft + 40, first.getCenterY(), MASK_NONE);
+        ensure("a press past it chooses the row", asked.size() == 3 && l.getFirstSelectedIndex() == 0);
         l.setFocus(false);
     }
 

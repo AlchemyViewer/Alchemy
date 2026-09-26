@@ -28,6 +28,7 @@
 #include "llscrolllistctrl.h"
 
 #include <functional>
+#include <optional>
 
 // A studio pane's list -- problems, references, places found, an outline --
 // whose rows are places to go. Choosing a row shows its place and the arrow
@@ -55,9 +56,17 @@ public:
         Params();
     };
 
-    // A key offered before the list does anything with it; true takes it.
-    typedef std::function<bool(KEY, MASK)> key_t;
-    void setKeyHandler(key_t handler) { mKeyHandler = std::move(handler); }
+    // Rows that hold others fold, by the owner's rule, since the tree is
+    // the owner's to lay out: left on the row chosen asks it folded, right
+    // asks it open, and a press on its arrow -- wherever the owner says a
+    // row's arrow is -- asks it turned.
+    typedef std::function<void(const LLSD& value, std::optional<bool> folded)> fold_t;
+    typedef std::function<bool(const LLScrollListItem* row, S32 x)>         arrow_t;
+    void setFold(fold_t fold, arrow_t arrow_at)
+    {
+        mFold    = std::move(fold);
+        mArrowAt = std::move(arrow_at);
+    }
 
     // Where the row chosen goes: return and a double-click; and back to
     // where the typing was: escape. Unset, those keys are the list's own.
@@ -148,7 +157,8 @@ private:
 
     void copyRows(const std::vector<LLScrollListItem*>& rows);
 
-    key_t                       mKeyHandler;
+    fold_t                      mFold;
+    arrow_t                     mArrowAt;
     std::function<void()>       mGo;
     std::function<void()>       mBack;
     bool                        mCopyable = false;

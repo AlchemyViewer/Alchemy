@@ -79,23 +79,8 @@ bool ALScriptOutlinePane::postBuild()
     // list; left and right fold and open, as a tree's do.
     mList->setGo([this]() { choose(true); });
     mList->setBack([this]() { mServices->revealed(mList, true); });
-    mList->setKeyHandler([this](KEY key, MASK mask) {
-        if (mask != MASK_NONE)
-        {
-            return false;
-        }
-        if (key == KEY_LEFT || key == KEY_RIGHT)
-        {
-            LLScrollListItem* item = mList->getFirstSelected();
-            if (!item)
-            {
-                return false;
-            }
-            fold(static_cast<size_t>(item->getValue().asInteger()), key == KEY_LEFT);
-            return true;
-        }
-        return false;
-    });
+    mList->setFold([this](const LLSD& value, std::optional<bool> folded) { fold(static_cast<size_t>(value.asInteger()), folded); },
+                   [this](const LLScrollListItem* item, S32 x) { return arrowAt(item, x); });
     return true;
 }
 
@@ -250,31 +235,9 @@ void ALScriptOutlinePane::show(Doc& doc)
     followCaret(doc);
 }
 
-bool ALScriptOutlinePane::handleMouseDown(S32 x, S32 y, MASK mask)
+bool ALScriptOutlinePane::arrowAt(const LLScrollListItem* item, S32 x) const
 {
-    // An arrow in the outline folds its symbol.
-    if (mask == MASK_NONE && mList && mList->isInVisibleChain())
-    {
-        S32 lx = 0, ly = 0;
-        localPointToOtherView(x, y, &lx, &ly, mList);
-        size_t index = 0;
-        if (mList->pointInView(lx, ly) && arrowAt(lx, ly, index))
-        {
-            fold(index);
-            return true;
-        }
-    }
-    return LLPanel::handleMouseDown(x, y, mask);
-}
-
-bool ALScriptOutlinePane::arrowAt(S32 x, S32 y, size_t& index)
-{
-    LLScrollListItem* item = mList->hitItem(x, y);
-    if (!item)
-    {
-        return false;
-    }
-    index = static_cast<size_t>(item->getValue().asInteger());
+    const size_t index = static_cast<size_t>(item->getValue().asInteger());
     if (index >= mParents.size() || !mParents[index])
     {
         return false;
