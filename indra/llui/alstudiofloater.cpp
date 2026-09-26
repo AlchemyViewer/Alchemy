@@ -70,17 +70,16 @@ bool ALStudioFloater::runCommandKey(KEY key, MASK mask)
     {
         return false;
     }
-    const ALKeyChord single{ key, mask };
-    for (const Registered& one : mCommands)
+    if (runChord(ALKeyChord{ key, mask }))
     {
-        if (keyOf(one.command) == single && one.run && one.run())
-        {
-            return true;
-        }
+        return true;
     }
     // The first of two: the next key is this window's, wherever the
     // keyboard is.
-    const bool leads = std::any_of(mCommands.begin(), mCommands.end(), [&](const Registered& one) { return keyOf(one.command).ledBy(key, mask); });
+    const bool leads = std::any_of(mCommands.begin(), mCommands.end(), [&](const Registered& one) {
+        const std::vector<ALKeyChord> keys = keysOf(one.command);
+        return std::any_of(keys.begin(), keys.end(), [&](const ALKeyChord& chord) { return chord.ledBy(key, mask); });
+    });
     if (!leads)
     {
         return false;
@@ -99,18 +98,22 @@ bool ALStudioFloater::runCommandKey(KEY key, MASK mask)
     return true;
 }
 
+bool ALStudioFloater::runChord(const ALKeyChord& chord)
+{
+    for (const Registered& one : mCommands)
+    {
+        const std::vector<ALKeyChord> keys = keysOf(one.command);
+        if (std::find(keys.begin(), keys.end(), chord) != keys.end() && one.run && one.run())
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
 void ALStudioFloater::finishChord(KEY lead_key, MASK lead_mask, KEY key, MASK mask)
 {
-    const auto run = [this](const ALKeyChord& chord) {
-        for (const Registered& one : mCommands)
-        {
-            if (keyOf(one.command) == chord && one.run && one.run())
-            {
-                return true;
-            }
-        }
-        return false;
-    };
+    const auto run = [this](const ALKeyChord& chord) { return runChord(chord); };
     // The wait said no longer, before the command says anything of its own.
     if (hasString("ChordWaiting"))
     {

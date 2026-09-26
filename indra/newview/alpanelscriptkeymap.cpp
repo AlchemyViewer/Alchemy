@@ -97,12 +97,11 @@ void ALPanelScriptKeymap::fill()
         add(value, getString(std::string("cmd_") + alEditorCommandName(command)), ALScriptKeymap::describe(ALScriptKeymap::keysOf(map, command)),
             alEditorCommandName(command), ALScriptKeymap::isRebound(command), command == was.command);
     }
-    for (const ALScriptKeymap::MenuCommand& one : ALScriptKeymap::menuCommands())
+    for (const std::string& id : ALScriptKeymap::menuIds())
     {
         LLSD value;
-        value["menu"] = one.id;
-        add(value, getString(std::string("menu_") + one.id), ALScriptKeymap::menuKey(one.id).describe(), one.id, ALScriptKeymap::isMenuRebound(one.id),
-            was.menu == one.id);
+        value["menu"] = id;
+        add(value, getString("menu_" + id), ALScriptKeymap::describe(ALScriptKeymap::menuKeys(id)), id, ALScriptKeymap::isMenuRebound(id), was.menu == id);
     }
     refreshButtons();
 }
@@ -132,8 +131,7 @@ void ALPanelScriptKeymap::refreshButtons()
     const Chosen which = chosen();
     const bool   some  = which.any();
     getChild<LLButton>("change")->setEnabled(some);
-    // A menu item answers to one key.
-    getChild<LLButton>("add")->setEnabled(some && which.menu.empty());
+    getChild<LLButton>("add")->setEnabled(some);
     getChild<LLButton>("clear")->setEnabled(some);
     getChild<LLButton>("restore")->setEnabled(some && (which.menu.empty() ? ALScriptKeymap::isRebound(which.command) : ALScriptKeymap::isMenuRebound(which.menu)));
 }
@@ -161,7 +159,7 @@ void ALPanelScriptKeymap::onChange()
 void ALPanelScriptKeymap::onAdd()
 {
     onChange();
-    mAdding = mEditing.menu.empty();
+    mAdding = true;
 }
 
 void ALPanelScriptKeymap::onClear()
@@ -256,16 +254,28 @@ std::vector<std::string> ALPanelScriptKeymap::takeKey(const Chosen& keeping, KEY
     // both answered to was the editor's alone in the editor. One the key
     // is the first of two of is left without too: the key now runs a
     // command of its own, and the window would never wait for a second.
-    for (const ALScriptKeymap::MenuCommand& one : ALScriptKeymap::menuCommands())
+    for (const std::string& id : ALScriptKeymap::menuIds())
     {
-        const ALKeyChord had = ALScriptKeymap::menuKey(one.id);
-        if (keeping.menu == one.id || (had != ALKeyChord{ key, mask } && !had.ledBy(key, mask)))
+        if (keeping.menu == id)
         {
             continue;
         }
-        ALScriptKeymap::rebindMenu(one.id, {});
+        const ALScriptKeymap::chords_t had  = ALScriptKeymap::menuKeys(id);
+        ALScriptKeymap::chords_t       rest;
+        for (const ALKeyChord& chord : had)
+        {
+            if (chord != ALKeyChord{ key, mask } && !chord.ledBy(key, mask))
+            {
+                rest.push_back(chord);
+            }
+        }
+        if (rest.size() == had.size())
+        {
+            continue;
+        }
+        ALScriptKeymap::rebindMenu(id, rest);
         Chosen was;
-        was.menu = one.id;
+        was.menu = id;
         from.push_back(nameOf(was));
     }
     return from;
@@ -291,7 +301,13 @@ bool ALPanelScriptKeymap::onSetKeyBind(EMouseClickType click, KEY key, MASK mask
     }
     else
     {
-        ALScriptKeymap::rebindMenu(mEditing.menu, ALKeyChord{ key, mask });
+        ALScriptKeymap::chords_t keys;
+        if (mAdding)
+        {
+            keys = ALScriptKeymap::menuKeys(mEditing.menu);
+        }
+        keys.push_back(ALKeyChord{ key, mask });
+        ALScriptKeymap::rebindMenu(mEditing.menu, keys);
     }
     if (from.empty())
     {

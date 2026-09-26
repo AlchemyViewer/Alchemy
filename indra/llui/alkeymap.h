@@ -141,9 +141,10 @@ public:
     // control-shift-D duplicates one and control-shift-K deletes one,
     // control-shift with a square bracket folds and unfolds,
     // control-space completes, F12 goes to a definition, shift-F12 finds
-    // the references, F2 renames, control-F finds, control-H (and
-    // control-alt-F, since a Mac keeps command-H) replaces, and F3 and
-    // shift-F3 go to the next and the previous match.
+    // the references, F2 renames, control-F finds, control-H (and on a
+    // Mac, which keeps command-H, command-option-F) replaces, and F3 and
+    // shift-F3 go to the next and the previous match. Backspace and Return
+    // held with shift are still Backspace and Return.
     static ALKeymap standard();
 
 private:

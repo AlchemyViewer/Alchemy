@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <!-- Script Studio's keyboard map, a tab of its preferences: every
      command of the editor, and of the studio's menus, with the keys it
-     answers to, to read, to search, and to change. A menu item answers to
-     one key; an editor's command to as many as it is given. -->
+     answers to, to read, to search, and to change. A command answers to
+     as many keys as it is given; a menu item shows the first. -->
 <panel
  follows="all"
  height="440"

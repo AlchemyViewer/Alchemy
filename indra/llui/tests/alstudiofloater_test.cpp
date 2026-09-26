@@ -72,13 +72,13 @@ namespace
         MASK        reboundMask = MASK_NONE;
 
     protected:
-        ALKeyChord keyOf(const KeyedCommand& command) const override
+        std::vector<ALKeyChord> keysOf(const KeyedCommand& command) const override
         {
             if (command.rebindable && rebound == command.id)
             {
-                return ALKeyChord{ reboundKey, reboundMask };
+                return { ALKeyChord{ reboundKey, reboundMask } };
             }
-            return ALStudioFloater::keyOf(command);
+            return ALStudioFloater::keysOf(command);
         }
     };
 

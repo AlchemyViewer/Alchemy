@@ -1246,31 +1246,20 @@ void ALFloaterScriptStudio::draw()
 
 void ALFloaterScriptStudio::addKeys()
 {
-    // The menus' commands, each at the key a person gave it or the
-    // standard's (keyOf): the menu bar answers to them first, and one it
-    // did not take -- an item not enabled -- is tried here.
-    for (const ALScriptKeymap::MenuCommand& command : ALScriptKeymap::menuCommands())
+    // The menus' commands, each at the keys a person gave it or the
+    // standard's (keysOf): the menu bar answers to its first key first,
+    // and one it did not take -- an item not enabled, a second key, two
+    // keys in turn -- is tried here.
+    for (const std::string& id : ALScriptKeymap::menuIds())
     {
-        addCommand(command, [this, id = std::string(command.id)]() { return mCommands.runIfEnabled(id); });
+        addCommand({ id.c_str() }, [this, id]() { return mCommands.runIfEnabled(id); });
     }
-    // Control-tab and control-shift-tab go round the tabs, as everywhere --
-    // the Mac's own Control key there, Command-Tab being the system's.
-    for (const MASK control : { MASK_CONTROL, MASK_MAC_CONTROL })
-    {
-        addCommand({ "next_tab", KEY_TAB, control, false }, [this]() { cycleTab(1); return true; });
-        addCommand({ "previous_tab", KEY_TAB, control | MASK_SHIFT, false }, [this]() { cycleTab(-1); return true; });
-    }
-#if LL_DARWIN
-    // Command-G goes to a line through the menu, and the Mac's Control-G,
-    // which it answered to before, still does.
-    addCommand({ "go_to_line", 'G', MASK_MAC_CONTROL, false }, [this]() { goToLine(); return true; });
-#endif
 }
 
-ALKeyChord ALFloaterScriptStudio::keyOf(const KeyedCommand& command) const
+std::vector<ALKeyChord> ALFloaterScriptStudio::keysOf(const KeyedCommand& command) const
 {
-    // The key a person gave a menu's command, kept in the keymap's setting.
-    return command.rebindable ? ALScriptKeymap::menuKey(command.id) : ALStudioFloater::keyOf(command);
+    // The keys a person gave a menu's command, kept in the keymap's setting.
+    return command.rebindable ? ALScriptKeymap::menuKeys(command.id) : ALStudioFloater::keysOf(command);
 }
 
 bool ALFloaterScriptStudio::undo()
@@ -3102,13 +3091,13 @@ void ALFloaterScriptStudio::applyMenuKeys()
     }
     // The menus' own commands answer to the keys a person gave them, or
     // the standard's.
-    for (const ALScriptKeymap::MenuCommand& command : ALScriptKeymap::menuCommands())
+    for (const std::string& id : ALScriptKeymap::menuIds())
     {
-        if (LLMenuItemGL* item = bar->findChild<LLMenuItemGL>(command.id, true))
+        if (LLMenuItemGL* item = bar->findChild<LLMenuItemGL>(id, true))
         {
-            // Two keys in turn are the window's to wait for (keyOf): the
+            // Two keys in turn are the window's to wait for (keysOf): the
             // item shows them and answers to neither.
-            const ALKeyChord chord = ALScriptKeymap::menuKey(command.id);
+            const ALKeyChord chord = ALScriptKeymap::menuKey(id);
             item->setShownKeys(chord.twoKeys() ? chord.describe() : std::string());
             item->setShownAccelerator(chord.twoKeys() ? KEY_NONE : chord.key, chord.twoKeys() ? MASK_NONE : chord.mask);
         }

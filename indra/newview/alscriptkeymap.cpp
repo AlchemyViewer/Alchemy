@@ -39,10 +39,10 @@ namespace
     const std::string MENU_PREFIX = "menu:";
 
     // The setting: a map from a command's name to its keys, each a map
-    // of key and mask.
-    LLSD rebound() { return gSavedSettings.getLLSD(SETTING); }
+    // of key and mask, and of the key before it for two.
+    const LLSD& rebound();
 
-    void store(const LLSD& map) { gSavedSettings.setLLSD(SETTING, map); }
+    void store(const LLSD& map);
 
     ALScriptKeymap::keys_t keysFrom(const LLSD& list)
     {
@@ -54,42 +54,82 @@ namespace
         return keys;
     }
 
-    // A menu item's key as the setting keeps it: the list's first, and
-    // the key pressed before it where it is two. None for an empty list.
-    ALKeyChord chordFrom(const LLSD& list)
+    // A menu item's keys as the setting keeps them, each with the key
+    // pressed before it where it is two.
+    ALScriptKeymap::chords_t chordsFrom(const LLSD& list)
     {
-        if (!list.isArray() || list.size() == 0)
+        ALScriptKeymap::chords_t chords;
+        for (LLSD::array_const_iterator it = list.beginArray(); it != list.endArray(); ++it)
         {
-            return {};
+            ALKeyChord chord = { static_cast<KEY>((*it)["key"].asInteger()), static_cast<MASK>((*it)["mask"].asInteger()) };
+            if (it->has("lead_key"))
+            {
+                chord.leadKey  = static_cast<KEY>((*it)["lead_key"].asInteger());
+                chord.leadMask = static_cast<MASK>((*it)["lead_mask"].asInteger());
+            }
+            if (!chord.none())
+            {
+                chords.push_back(chord);
+            }
         }
-        const LLSD& one   = list[0];
-        ALKeyChord  chord = { static_cast<KEY>(one["key"].asInteger()), static_cast<MASK>(one["mask"].asInteger()) };
-        if (one.has("lead_key"))
-        {
-            chord.leadKey  = static_cast<KEY>(one["lead_key"].asInteger());
-            chord.leadMask = static_cast<MASK>(one["lead_mask"].asInteger());
-        }
-        return chord;
+        return chords;
     }
 
-    LLSD chordTo(const ALKeyChord& chord)
+    LLSD chordsTo(const ALScriptKeymap::chords_t& chords)
     {
         LLSD list = LLSD::emptyArray();
-        if (chord.none())
+        for (const ALKeyChord& chord : chords)
         {
-            return list;
+            if (chord.none())
+            {
+                continue;
+            }
+            LLSD one;
+            one["key"]  = static_cast<S32>(chord.key);
+            one["mask"] = static_cast<S32>(chord.mask);
+            if (chord.twoKeys())
+            {
+                one["lead_key"]  = static_cast<S32>(chord.leadKey);
+                one["lead_mask"] = static_cast<S32>(chord.leadMask);
+            }
+            list.append(one);
         }
-        LLSD one;
-        one["key"]  = static_cast<S32>(chord.key);
-        one["mask"] = static_cast<S32>(chord.mask);
-        if (chord.twoKeys())
-        {
-            one["lead_key"]  = static_cast<S32>(chord.leadKey);
-            one["lead_mask"] = static_cast<S32>(chord.leadMask);
-        }
-        list.append(one);
         return list;
     }
+
+    ALKeymap build(const LLSD& bound);
+
+    // The setting, and the keymap it makes, read again only once the
+    // setting has changed -- by a key given here, or by anything else that
+    // sets it. Every editor is given the keymap, and the menus ask each of
+    // their commands for its keys at every key pressed.
+    struct Built
+    {
+        LLSD                               bound;
+        ALKeymap                           map;
+        bool                               stale = true;
+        boost::signals2::scoped_connection listening;
+    };
+    Built& built()
+    {
+        static Built one;
+        if (!one.listening.connected())
+        {
+            if (LLControlVariable* control = gSavedSettings.getControl(SETTING))
+            {
+                one.listening = control->getSignal()->connect([](LLControlVariable*, const LLSD&, const LLSD&) { built().stale = true; });
+            }
+        }
+        if (one.stale)
+        {
+            one.bound = gSavedSettings.getLLSD(SETTING);
+            one.map   = build(one.bound);
+            one.stale = false;
+        }
+        return one;
+    }
+
+    const LLSD& rebound() { return built().bound; }
 
     LLSD keysTo(const ALScriptKeymap::keys_t& keys)
     {
@@ -105,12 +145,17 @@ namespace
     }
 }
 
-namespace ALScriptKeymap
+namespace
 {
-    ALKeymap current()
+    void store(const LLSD& map)
     {
-        ALKeymap   map   = ALKeymap::standard();
-        const LLSD bound = rebound();
+        gSavedSettings.setLLSD(SETTING, map);
+        built().stale = true;
+    }
+
+    ALKeymap build(const LLSD& bound)
+    {
+        ALKeymap map = ALKeymap::standard();
         if (!bound.isMap())
         {
             return map;
@@ -122,7 +167,7 @@ namespace ALScriptKeymap
             {
                 continue;
             }
-            for (const auto& [key, mask] : keysOf(map, *command))
+            for (const auto& [key, mask] : ALScriptKeymap::keysOf(map, *command))
             {
                 map.unbind(key, mask);
             }
@@ -133,6 +178,11 @@ namespace ALScriptKeymap
         }
         return map;
     }
+}
+
+namespace ALScriptKeymap
+{
+    const ALKeymap& current() { return built().map; }
 
     keys_t keysOf(const ALKeymap& map, ALEditorCommand command)
     {
@@ -180,7 +230,8 @@ namespace ALScriptKeymap
     {
         // As the studio's menus give them, which this table overrides, so
         // that the two cannot drift: the menus are told these at every
-        // open. Back and forward are the Control key's on a Mac too, as
+        // open. A command named again has another key as standard: the
+        // menu shows the first. Back and forward are the Control key's on a Mac too, as
         // an editor of code has them there, Command-minus being the
         // view's zoom elsewhere.
 #if LL_DARWIN
@@ -213,11 +264,20 @@ namespace ALScriptKeymap
             { "back", '-', REAL_CONTROL },
             { "forward", '-', REAL_CONTROL | MASK_SHIFT },
             { "go_to_line", 'G', MASK_CONTROL },
+#if LL_DARWIN
+            // The Mac's own Control-G, which it answered to before
+            // Command-G did.
+            { "go_to_line", 'G', MASK_MAC_CONTROL },
+#endif
             { "go_to_symbol", 'O', MASK_CONTROL | MASK_SHIFT },
             { "next_problem", KEY_F8, MASK_NONE },
             { "previous_problem", KEY_F8, MASK_SHIFT },
             { "next_tab", KEY_PAGE_DOWN, MASK_CONTROL },
+            // Control-Tab too, as everywhere: the Mac's own Control key,
+            // Command-Tab being the system's.
+            { "next_tab", KEY_TAB, REAL_CONTROL },
             { "previous_tab", KEY_PAGE_UP, MASK_CONTROL },
+            { "previous_tab", KEY_TAB, REAL_CONTROL | MASK_SHIFT },
             { "last_tab", '6', REAL_CONTROL },
             { "all_tabs", KEY_NONE, MASK_NONE },
             { "move_tab_left", KEY_PAGE_UP, MASK_CONTROL | MASK_SHIFT },
@@ -239,56 +299,93 @@ namespace ALScriptKeymap
         return commands;
     }
 
+    const std::vector<std::string>& menuIds()
+    {
+        static const std::vector<std::string> ids = []() {
+            std::vector<std::string> out;
+            for (const MenuCommand& one : menuCommands())
+            {
+                if (std::find(out.begin(), out.end(), one.id) == out.end())
+                {
+                    out.emplace_back(one.id);
+                }
+            }
+            return out;
+        }();
+        return ids;
+    }
+
     bool isMenuCommand(std::string_view item)
     {
-        const std::vector<MenuCommand>& all = menuCommands();
-        return std::any_of(all.begin(), all.end(), [item](const MenuCommand& one) { return item == one.id; });
+        const std::vector<std::string>& all = menuIds();
+        return std::find(all.begin(), all.end(), item) != all.end();
+    }
+
+    chords_t menuKeys(std::string_view item)
+    {
+        const LLSD&       bound = rebound();
+        const std::string name  = MENU_PREFIX + std::string(item);
+        if (bound.isMap() && bound.has(name))
+        {
+            return chordsFrom(bound[name]);
+        }
+        chords_t keys;
+        for (const MenuCommand& one : menuCommands())
+        {
+            if (item == one.id && !one.chord().none())
+            {
+                keys.push_back(one.chord());
+            }
+        }
+        return keys;
     }
 
     ALKeyChord menuKey(std::string_view item)
     {
-        const LLSD bound = rebound();
-        const std::string name = MENU_PREFIX + std::string(item);
-        if (bound.isMap() && bound.has(name))
-        {
-            return chordFrom(bound[name]);
-        }
-        for (const MenuCommand& one : menuCommands())
-        {
-            if (item == one.id)
-            {
-                return one.chord();
-            }
-        }
-        return {};
+        const chords_t keys = menuKeys(item);
+        return keys.empty() ? ALKeyChord{} : keys.front();
     }
 
     bool isMenuRebound(std::string_view item)
     {
-        const LLSD bound = rebound();
+        const LLSD& bound = rebound();
         return bound.isMap() && bound.has(MENU_PREFIX + std::string(item));
     }
 
-    void rebindMenu(std::string_view item, const ALKeyChord& chord)
+    void rebindMenu(std::string_view item, const chords_t& keys)
     {
         LLSD bound = rebound();
         if (!bound.isMap())
         {
             bound = LLSD::emptyMap();
         }
-        bound[MENU_PREFIX + std::string(item)] = chordTo(chord);
+        bound[MENU_PREFIX + std::string(item)] = chordsTo(keys);
         store(bound);
     }
 
     void restoreMenu(std::string_view item)
     {
-        LLSD bound = rebound();
-        const std::string name = MENU_PREFIX + std::string(item);
+        LLSD              bound = rebound();
+        const std::string name  = MENU_PREFIX + std::string(item);
         if (bound.isMap() && bound.has(name))
         {
             bound.erase(name);
             store(bound);
         }
+    }
+
+    std::string describe(const chords_t& keys)
+    {
+        std::string text;
+        for (const ALKeyChord& chord : keys)
+        {
+            if (!text.empty())
+            {
+                text += ", ";
+            }
+            text += chord.describe();
+        }
+        return text;
     }
 
     std::string describe(const keys_t& keys)

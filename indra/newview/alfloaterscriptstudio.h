@@ -760,7 +760,7 @@ private:
     // line keys no menu shows.
     void addKeys();
     // The menus' commands at the keys a person gave them.
-    ALKeyChord keyOf(const KeyedCommand& command) const override;
+    std::vector<ALKeyChord> keysOf(const KeyedCommand& command) const override;
     void addFileCommands();
     void addEditCommands();
     void addInsertCommands();

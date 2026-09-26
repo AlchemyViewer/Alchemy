@@ -2538,6 +2538,10 @@ if(AL_BUILD_TESTS)
   # The Script Studio's commands by name, with nothing of the window.
   al_add_test(alscriptstudiocommands UNIT PROJECT ${test_project} LIBRARIES ${test_libs})
 
+  # Script Studio's keys: the editors' keymap and the menus' keys, with a
+  # person's changes over them in a setting of the test's.
+  al_add_test(alscriptkeymap UNIT PROJECT ${test_project} LIBRARIES llui ${test_libs})
+
   # Whole saves of a Script Studio tab through where they stand and where
   # they go, with nothing of the viewer.
   al_add_test(alscriptsaveflow UNIT PROJECT ${test_project} LIBRARIES llui alscript ${test_libs})

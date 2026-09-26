@@ -127,9 +127,9 @@ protected:
     // A command the keys reach, with what it does: false where it cannot
     // be done now, and the key goes on to whatever else would take it.
     void addCommand(const KeyedCommand& command, std::function<bool()> run);
-    // The key a command answers to now: its standard one, unless the
-    // studio keeps the one a person gave it.
-    virtual ALKeyChord keyOf(const KeyedCommand& command) const { return command.chord(); }
+    // The keys a command answers to now: its standard one, unless the
+    // studio keeps the ones a person gave it.
+    virtual std::vector<ALKeyChord> keysOf(const KeyedCommand& command) const { return { command.chord() }; }
     // The first command a key is the key of that runs: false where none
     // did. A key that is the first of some command's two is taken, and
     // the window waits for the second (ALKeyChords), whatever has the
@@ -203,6 +203,8 @@ private:
     void answerQuickOpen(ALPopover* popover, ALQuickOpen* quick, std::function<void(const std::string&)> chose,
                          std::function<void()> escaped, std::function<void(const std::string&)> hold,
                          std::function<void()> left);
+    // The first command a key, or two, are one of the keys of that runs.
+    bool runChord(const ALKeyChord& chord);
     // The second of two keys, the first `lead`: the command they are run,
     // or, held with the first's modifiers and no command, the key alone --
     // Control kept down through both.
