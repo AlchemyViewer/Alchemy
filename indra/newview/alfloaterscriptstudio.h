@@ -650,11 +650,8 @@ private:
     // The blanks at every line's end taken away, as one step to undo.
     void trimTrailing(Doc& doc);
 
-    // Copy, from whichever list or editor has the keyboard; and a
-    // right-click menu on a list for the same.
+    // Copy, from whichever list or editor has the keyboard.
     static LLEditMenuHandler* focusedEditHandler();
-    void                      listMenuFor(LLScrollListCtrl* list);
-    void                      showListMenu(LLScrollListCtrl* list, S32 x, S32 y);
 
     void closeDocument(std::string_view id) override;
     void closeDocumentAnswered(const std::string& id, S32 option);
@@ -941,8 +938,6 @@ private:
     LLHandle<LLContextMenu>            mTabMenuHandle;
     bool                               mMain = true;
     bool                               mClosingWindow = false;
-    LLHandle<LLContextMenu>            mListMenuHandle;
-    LLScrollListCtrl*                  mListMenuFor   = nullptr;
     LLComboBox*                        mCompileTarget = nullptr;
     LLCheckBoxCtrl*                    mRunning       = nullptr;
     LLComboBox*                        mExperience    = nullptr;

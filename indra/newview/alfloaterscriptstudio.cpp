@@ -494,7 +494,7 @@ ALFloaterScriptStudio::~ALFloaterScriptStudio()
 {
     // A menu still open calls into this window, which is going: it goes
     // first. The menus live in the viewer's menu holder, not here.
-    for (LLHandle<LLContextMenu>* menu : { &mTabMenuHandle, &mListMenuHandle })
+    for (LLHandle<LLContextMenu>* menu : { &mTabMenuHandle })
     {
         if (LLContextMenu* open = menu->get())
         {
@@ -621,7 +621,10 @@ bool ALFloaterScriptStudio::postBuild()
     });
     mProblemsPane = getChild<ALScriptProblemsPane>("problems_tab");
     mWeightsParts->setCommitCallback([this](LLUICtrl*, const LLSD&) { onWeightChosen(false); });
-    mWeightsParts->setDoubleClickCallback([this]() { onWeightChosen(true); });
+    // Return and a double-click go to the part chosen; escape back to the
+    // script.
+    mWeightsParts->setGo([this]() { onWeightChosen(true); });
+    mWeightsParts->setBack([this]() { revealed(mWeightsParts, true); });
     mOutputPane = getChild<ALScriptOutputPane>("output_tab");
     // What was said before the window opened, then everything after.
     for (const ALScriptWorkspace::RuntimeEvent& event : ALScriptWorkspace::instance().recentRuntime())
@@ -631,43 +634,7 @@ bool ALFloaterScriptStudio::postBuild()
     mRuntimeConnection = ALScriptWorkspace::instance().onRuntime([this](const ALScriptWorkspace::RuntimeEvent& event) { runtimeEvent(event); });
 
     mSearchPane = getChild<ALScriptSearchPane>("search_tab");
-    // In a pane's list, return goes to the place chosen, to type there, and
-    // escape goes back to the script without going anywhere -- asked of
-    // the list first, since the panel it is in takes escape to mean
-    // nothing is to have the keyboard.
-    const std::pair<ALPaneList*, std::function<void()>> lists[] = {
-        { mProblemsPane->list(), [this]() { mProblemsPane->choose(true); } },
-        { mReferencesPane->list(), [this]() { mReferencesPane->choose(true); } },
-        { mSearchPane->list(), [this]() { mSearchPane->choose(true); } },
-        { mWeightsParts, [this]() { onWeightChosen(true); } }
-    };
-    for (const auto& [list, go] : lists)
-    {
-        list->setKeyHandler([this, list, go](KEY key, MASK mask) {
-            if (mask != MASK_NONE || (key != KEY_RETURN && key != KEY_ESCAPE))
-            {
-                return false;
-            }
-            if (key == KEY_RETURN)
-            {
-                go();
-            }
-            else
-            {
-                revealed(list, true);
-            }
-            return true;
-        });
-    }
     mRunningConnection = ALScriptWorkspace::instance().onRunningState([this](const ALScriptWorkspace::RunningState& state) { runningState(state); });
-    // Copy from the lists with no menu of their own; the problems' has
-    // its own copying, and a right-click there would bring up both, the
-    // copy menu over it.
-    for (LLScrollListCtrl* list :
-         { static_cast<LLScrollListCtrl*>(mReferencesPane->list()), static_cast<LLScrollListCtrl*>(mSearchPane->list()) })
-    {
-        listMenuFor(list);
-    }
     mCompileTarget->setCommitCallback(boost::bind(&ALFloaterScriptStudio::onCompileTarget, this));
     mRunning->setCommitCallback(boost::bind(&ALFloaterScriptStudio::onRunning, this));
     mExperience->setCommitCallback(boost::bind(&ALFloaterScriptStudio::onExperience, this));
@@ -5737,65 +5704,6 @@ void ALFloaterScriptStudio::newInventoryScript(bool lua)
 LLEditMenuHandler* ALFloaterScriptStudio::focusedEditHandler()
 {
     return dynamic_cast<LLEditMenuHandler*>(gFocusMgr.getKeyboardFocus());
-}
-
-void ALFloaterScriptStudio::listMenuFor(LLScrollListCtrl* list)
-{
-    list->setRightMouseDownCallback([this, list](LLUICtrl*, S32 x, S32 y, MASK) { showListMenu(list, x, y); });
-}
-
-void ALFloaterScriptStudio::showListMenu(LLScrollListCtrl* list, S32 x, S32 y)
-{
-    if (!LLMenuGL::sMenuContainer)
-    {
-        return;
-    }
-    if (LLContextMenu* old = mListMenuHandle.get())
-    {
-        old->die();
-        mListMenuHandle.markDead();
-    }
-    mListMenuFor = list;
-    LLUICtrl::CommitCallbackRegistry::ScopedRegistrar commit;
-    LLUICtrl::EnableCallbackRegistry::ScopedRegistrar enable;
-    commit.add("List.Copy", [this](LLUICtrl*, const LLSD&) {
-        if (mListMenuFor)
-        {
-            mListMenuFor->copy();
-        }
-    });
-    commit.add("List.CopyAll", [this](LLUICtrl*, const LLSD&) {
-        if (!mListMenuFor)
-        {
-            return;
-        }
-        // The rows, not what is said over or under them: a heading, or how
-        // many more were not listed, is a row nobody can choose.
-        std::string text;
-        for (LLScrollListItem* item : mListMenuFor->getAllData())
-        {
-            if (item->getEnabled())
-            {
-                text += item->getContentsCSV() + "\n";
-            }
-        }
-        LLClipboard::instance().copyToClipboard(text, 0, static_cast<S32>(text.size()));
-    });
-    enable.add("List.Enable", [this](LLUICtrl*, const LLSD& param) {
-        if (!mListMenuFor)
-        {
-            return false;
-        }
-        return param.asString() == "copy" ? mListMenuFor->canCopy() : mListMenuFor->getItemCount() > 0;
-    });
-    LLContextMenu* menu = LLUICtrlFactory::createFromFile<LLContextMenu>("menu_list_copy.xml", LLMenuGL::sMenuContainer, LLMenuHolderGL::child_registry_t::instance());
-    if (!menu)
-    {
-        return;
-    }
-    mListMenuHandle = menu->getHandle();
-    menu->show(x, y);
-    LLMenuGL::showPopup(list, menu, x, y);
 }
 
 // --- closing ---------------------------------------------------------------------

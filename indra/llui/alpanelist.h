@@ -31,11 +31,16 @@
 
 // A studio pane's list -- problems, references, places found, an outline --
 // whose rows are places to go. Choosing a row shows its place and the arrow
-// keys walk on through them; these are the keys past that: return goes to
-// the place chosen, escape goes back to where the typing was, and left and
-// right fold and open a row that holds others. A panel above the list takes
-// escape to mean nothing is to have the keyboard before its window hears
-// of it, so the list is asked first.
+// keys walk on through them; these are the keys past that: return and a
+// double-click go to the place chosen (setGo), escape goes back to where the
+// typing was (setBack), and left and right fold and open a row that holds
+// others. A panel above the list takes escape to mean nothing is to have
+// the keyboard before its window hears of it, so the list is asked first.
+//
+// And what is in it can be taken away (setCopyable): a right-click's menu
+// copies the cell under the pointer, the rows chosen or every row, and
+// Control-C the rows chosen -- as a table to read, the columns lined up
+// under their headings.
 //
 // Rows in groups, under a heading each: a sort by a column sorts within
 // each group, the headings staying over their own, where the caller says
@@ -53,6 +58,27 @@ public:
     // A key offered before the list does anything with it; true takes it.
     typedef std::function<bool(KEY, MASK)> key_t;
     void setKeyHandler(key_t handler) { mKeyHandler = std::move(handler); }
+
+    // Where the row chosen goes: return and a double-click; and back to
+    // where the typing was: escape. Unset, those keys are the list's own.
+    void setGo(std::function<void()> go);
+    void setBack(std::function<void()> back) { mBack = std::move(back); }
+
+    // Copying from the list, off unless asked for: a list with a menu of
+    // its own would bring up both.
+    void setCopyable(bool copyable) { mCopyable = copyable; }
+    // What the rows are, said over them as they are copied: asked then,
+    // since what the list shows may have changed since it was set.
+    void setCopyCaption(std::function<std::string()> caption) { mCopyCaption = std::move(caption); }
+    // The rows as the copy has them: a line each, the columns lined up
+    // under their headings, a column nothing is in left out; rows nobody
+    // can choose -- a heading, a count of more -- left out too.
+    std::string asText(const std::vector<LLScrollListItem*>& rows);
+    // What the menu's items do, by name: "copy_cell" the cell last
+    // right-clicked, "copy" the rows chosen, "copy_all" every row,
+    // "select_all"; and whether each can be done now.
+    void copyAction(const std::string& action);
+    bool copyActionEnabled(const std::string& action) const;
 
     // Which group a row is of, and whether it is the group's heading, for
     // a sort that keeps them together; nothing, and the list sorts as any
@@ -88,7 +114,12 @@ public:
         drop_t;
     void setDropHandler(drop_t handler) { mDropHandler = std::move(handler); }
 
+    ~ALPaneList() override;
+
     bool handleKeyHere(KEY key, MASK mask) override;
+    // Copyable, the row under the pointer is chosen, unless the click is in
+    // a choice already made, and the copying menu opens.
+    bool handleRightMouseDown(S32 x, S32 y, MASK mask) override;
     // The Edit menu's commands are the list's while it has the keyboard,
     // as they are a text's: else they are whatever last took them, and
     // with a prim chosen in the build tools that is the world's selection,
@@ -115,7 +146,17 @@ private:
     S32 compare(S32 column, const LLScrollListItem* a, const LLScrollListItem* b);
     void connectSort();
 
+    void copyRows(const std::vector<LLScrollListItem*>& rows);
+
     key_t                       mKeyHandler;
+    std::function<void()>       mGo;
+    std::function<void()>       mBack;
+    bool                        mCopyable = false;
+    std::function<std::string()> mCopyCaption;
+    // The cell last right-clicked, for the copy meant to be pasted into a
+    // line of code rather than read; and the menu that copies it.
+    std::string                 mMenuCell;
+    LLHandle<LLView>            mCopyMenu;
     group_t                     mGrouping;
     compare_t                   mComparison;
     boost::signals2::connection mSortConnection;

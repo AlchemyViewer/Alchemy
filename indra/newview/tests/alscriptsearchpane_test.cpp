@@ -188,6 +188,12 @@ namespace tut
         ensure_equals("one script", out.search().found().size(), size_t(1));
         ensure_equals("two places", out.search().found()[0].places.size(), size_t(2));
         ensure_equals("a row each", out.list()->getItemCount(), 2);
+        // The list's keys: return goes to the place chosen, to type there,
+        // escape back to the script; and the rows copy.
+        out.list()->selectFirstItem();
+        ensure("return", out.list()->handleKeyHere(KEY_RETURN, MASK_NONE) && !studio.chosen.empty() && studio.chosen.back().toEditor);
+        ensure("escape", out.list()->handleKeyHere(KEY_ESCAPE, MASK_NONE) && services.reveals.back());
+        ensure("copied", out.list()->handleKeyHere('C', MASK_CONTROL));
         ensure_equals("the line as listed, trimmed", out.search().found()[0].lines[1], std::string("timer two"));
         ensure_equals("counted", counted(), services.words("SearchCount", { { "[HITS]", services.counted("Matches", 2) },
                                                                             { "[FILES]", services.counted("Files", 1) },

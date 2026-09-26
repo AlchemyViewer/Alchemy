@@ -244,6 +244,14 @@ namespace tut
         refs->list()->selectByValue(LLSD(0));
         refs->choose(false);
         ensure_equals("followed", window.pane().chosen.back(), std::string("a2||0"));
+
+        // The list's keys: return goes to the place chosen, to type there,
+        // escape back to the script; and the rows copy.
+        ensure("return", refs->list()->handleKeyHere(KEY_RETURN, MASK_NONE) && window.pane().chosen.back() == "a2||0 editor");
+        const size_t gone = window.pane().chosen.size();
+        ensure("escape", refs->list()->handleKeyHere(KEY_ESCAPE, MASK_NONE) && window.services().reveals.back()
+                             && window.pane().chosen.size() == gone);
+        ensure("copied", refs->list()->handleKeyHere('C', MASK_CONTROL));
     }
 
     template<> template<>

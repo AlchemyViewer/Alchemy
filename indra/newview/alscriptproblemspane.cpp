@@ -267,7 +267,11 @@ bool ALScriptProblemsPane::postBuild()
     // A row chosen shows its place and keeps the keyboard in the list, so
     // that the arrows walk on through them; a double-click goes there.
     mList->setCommitCallback([this](LLUICtrl*, const LLSD&) { choose(false); });
-    mList->setDoubleClickCallback([this]() { choose(true); });
+    // Return and a double-click go to the place chosen, to type there, and
+    // escape goes back to the script without going anywhere. Its copying is
+    // its own menu's.
+    mList->setGo([this]() { choose(true); });
+    mList->setBack([this]() { mServices->revealed(mList, true); });
     mList->setRightMouseDownCallback([this](LLUICtrl*, S32 x, S32 y, MASK) { showMenu(x, y); });
     // The pane's filters: whose, which levels, which source, which words.
     mOrigin->add(mServices->words("OriginAny"), LLSD(""));

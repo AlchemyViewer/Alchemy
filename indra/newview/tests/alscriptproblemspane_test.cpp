@@ -377,6 +377,12 @@ namespace tut
         ensure_equals("a row walked to", studio.chosen.back().line, 0);
         ensure("the keyboard left in the list", !studio.toEditor.back());
         ensure_equals("whose it is", studio.chosen.back().doc, std::string("door"));
+
+        // The list's keys: return goes there to type, escape back to the
+        // script without going.
+        ensure("return", out.list()->handleKeyHere(KEY_RETURN, MASK_NONE) && studio.chosen.back().line == 0 && studio.toEditor.back());
+        const size_t gone = studio.chosen.size();
+        ensure("escape", out.list()->handleKeyHere(KEY_ESCAPE, MASK_NONE) && services.reveals.back() && studio.chosen.size() == gone);
     }
 
     template <>

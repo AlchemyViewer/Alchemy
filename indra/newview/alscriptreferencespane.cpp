@@ -56,7 +56,11 @@ bool ALScriptReferencesPane::postBuild()
         return true;
     }
     mList->setCommitCallback([this](LLUICtrl*, const LLSD&) { choose(false); });
-    mList->setDoubleClickCallback([this]() { choose(true); });
+    // Return and a double-click go to the place chosen, to type there, and
+    // escape goes back to the script without going anywhere.
+    mList->setGo([this]() { choose(true); });
+    mList->setBack([this]() { mServices->revealed(mList, true); });
+    mList->setCopyable(true);
     mList->setComparison([this](S32 column, const LLScrollListItem* a, const LLScrollListItem* b) {
         const size_t i = static_cast<size_t>(a->getValue().asInteger());
         const size_t j = static_cast<size_t>(b->getValue().asInteger());

@@ -87,7 +87,11 @@ bool ALScriptSearchPane::postBuild()
     mReplacement->setCommitCallback([this](LLUICtrl*, const LLSD&) { askReplaceAll(); });
     mBar->onChanged([this]() { onChanged(); });
     mResults->setCommitCallback([this](LLUICtrl*, const LLSD&) { choose(false); });
-    mResults->setDoubleClickCallback([this]() { choose(true); });
+    // Return and a double-click go to the place chosen, to type there, and
+    // escape goes back to the script without going anywhere.
+    mResults->setGo([this]() { choose(true); });
+    mResults->setBack([this]() { mServices->revealed(mResults, true); });
+    mResults->setCopyable(true);
     // Sorted by a column's title: a script's places by where they are, and
     // the scripts in the order they were found.
     mResults->setComparison([this](S32 column, const LLScrollListItem* a, const LLScrollListItem* b) {

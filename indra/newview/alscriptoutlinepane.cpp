@@ -74,10 +74,11 @@ bool ALScriptOutlinePane::postBuild()
         mWindow->outlineSortChanged();
     });
     mList->setCommitCallback([this](LLUICtrl*, const LLSD&) { choose(false); });
-    mList->setDoubleClickCallback([this]() { choose(true); });
-    // Return goes to the symbol chosen, to type there, and escape back to
-    // the script without going anywhere, as in every pane's list; left and
-    // right fold and open, as a tree's do.
+    // Return and a double-click go to the symbol chosen, to type there, and
+    // escape back to the script without going anywhere, as in every pane's
+    // list; left and right fold and open, as a tree's do.
+    mList->setGo([this]() { choose(true); });
+    mList->setBack([this]() { mServices->revealed(mList, true); });
     mList->setKeyHandler([this](KEY key, MASK mask) {
         if (mask != MASK_NONE)
         {
@@ -91,16 +92,6 @@ bool ALScriptOutlinePane::postBuild()
                 return false;
             }
             fold(static_cast<size_t>(item->getValue().asInteger()), key == KEY_LEFT);
-            return true;
-        }
-        if (key == KEY_RETURN)
-        {
-            choose(true);
-            return true;
-        }
-        if (key == KEY_ESCAPE)
-        {
-            mServices->revealed(mList, true);
             return true;
         }
         return false;
