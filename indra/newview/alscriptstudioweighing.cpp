@@ -538,7 +538,7 @@ void ALScriptStudioWeighing::pump()
             mStale = false;
             refreshPane();
         }
-        if (doc && !doc->weighing.asking && doc->analysisVersion == doc->editor->document().version())
+        if (doc && !doc->weighing.asking && doc->check.analysisVersion == doc->editor->document().version())
         {
             const U32 version = doc->editor->document().version();
             for (const ALScriptWeight::Target each : targets(*doc))

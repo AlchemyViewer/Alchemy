@@ -94,9 +94,9 @@ ALScriptProblemsPane::Made ALScriptProblemsPane::make(const Doc& doc, const ALSc
 
     // The analyzer's word on a line as it is now over the compiler's on
     // the text last saved: a syntax error both found is said once.
-    const bool analysis_current = doc.analysisVersion == doc.editor->document().version();
+    const bool analysis_current = doc.check.analysisVersion == doc.editor->document().version();
     auto       analysed_error_on = [&](S32 line) {
-        for (const ALScriptProblem& problem : doc.analysis)
+        for (const ALScriptProblem& problem : doc.check.analysis)
         {
             if (problem.severity == ALScriptProblem::Severity::Error && problem.file.empty() && problem.line == line)
             {
@@ -163,7 +163,7 @@ ALScriptProblemsPane::Made ALScriptProblemsPane::make(const Doc& doc, const ALSc
             }
         }
     }
-    for (const ALScriptProblem& problem : doc.analysis)
+    for (const ALScriptProblem& problem : doc.check.analysis)
     {
         const Doc::Level  level  = Doc::levelOf(problem.severity);
         const std::string origin = problem.source == ALScriptProblem::Source::Parser  ? services.words("OriginParser")
@@ -177,7 +177,7 @@ ALScriptProblemsPane::Made ALScriptProblemsPane::make(const Doc& doc, const ALSc
             problem.source == ALScriptProblem::Source::Lint ? problem.code : std::string());
         made.rows.back().key      = problem.key;
         made.rows.back().fixes    = problem.fixes;
-        made.rows.back().fixesFor = doc.analysisVersion;
+        made.rows.back().fixesFor = doc.check.analysisVersion;
         // The gutter's word on what the line offers: a lightbulb where the
         // caret is, a round mark where a fix changes the script.
         if (analysis_current && problem.file.empty() && !problem.fixes.empty())
@@ -202,12 +202,12 @@ ALScriptProblemsPane::Made ALScriptProblemsPane::make(const Doc& doc, const ALSc
         add(line, column, problem.column >= 0, line, column, ALCodeEditor::Mark::Runtime, Doc::Level::Error, services.words("OriginRuntime"), message,
             problem.file);
     }
-    if (!doc.definitionsError.empty())
+    if (!doc.check.definitionsError.empty())
     {
         Doc::Shown row;
         row.level   = Doc::Level::Note;
         row.origin  = services.words("OriginDefinitions");
-        row.message = doc.definitionsError;
+        row.message = doc.check.definitionsError;
         made.rows.push_back(std::move(row));
     }
     // Code heavier than its target runs a script in: a warning, since
@@ -714,7 +714,7 @@ void ALScriptProblemsPane::fill(const Doc* doc)
         bool current = true;
         for (const Doc* each : docs)
         {
-            current = current && each->loaded && each->analysisVersion == each->editor->document().version();
+            current = current && each->loaded && each->check.analysisVersion == each->editor->document().version();
         }
         LLStringUtil::format_map_t named;
         named["[NAME]"] = doc->name;

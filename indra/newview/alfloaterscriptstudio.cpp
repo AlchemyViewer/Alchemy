@@ -2145,23 +2145,24 @@ void ALFloaterScriptStudio::expandFor(Doc& doc, ALScriptAnalysis::Kind kind, con
     // The question waits for the text it is about: one of its kind that
     // was already waiting is somewhere the caret or the mouse has since
     // left.
-    const auto same = std::find_if(doc.waiting.begin(), doc.waiting.end(), [kind](const Doc::Waiting& was) { return was.kind == kind; });
-    if (same != doc.waiting.end())
+    const auto same =
+        std::find_if(doc.check.waiting.begin(), doc.check.waiting.end(), [kind](const Doc::Waiting& was) { return was.kind == kind; });
+    if (same != doc.check.waiting.end())
     {
         same->at = at;
         same->to = to;
     }
     else
     {
-        doc.waiting.push_back(Doc::Waiting{ kind, at, to });
+        doc.check.waiting.push_back(Doc::Waiting{ kind, at, to });
     }
     const U32 version = doc.editor->document().version();
-    if (doc.expanding && *doc.expanding == version)
+    if (doc.check.expanding && *doc.check.expanding == version)
     {
         // Already on its way; every question waiting takes the one answer.
         return;
     }
-    doc.expanding                    = version;
+    doc.check.expanding              = version;
     const LLHandle<LLFloater> handle = getHandle();
     const std::string         id     = doc.id;
     ALScriptPreprocessor::instance().expand(preprocessRequest(doc), [handle, id, version](const ALPreprocessor::Result& result) {
@@ -2180,9 +2181,9 @@ void ALFloaterScriptStudio::expandedAnswer(const std::string& id, U32 version, c
         return;
     }
     Doc& doc = *mDocs[index];
-    if (doc.expanding && *doc.expanding == version)
+    if (doc.check.expanding && *doc.check.expanding == version)
     {
-        doc.expanding.reset();
+        doc.check.expanding.reset();
     }
     if (version != doc.editor->document().version())
     {
@@ -2190,13 +2191,13 @@ void ALFloaterScriptStudio::expandedAnswer(const std::string& id, U32 version, c
         // the text as it was -- a hover over a word the edit may have
         // moved -- and the edit has scheduled a check of its own, so
         // the questions go rather than being asked of the wrong text.
-        doc.waiting.clear();
+        doc.check.waiting.clear();
         return;
     }
     doc.expanded.valid      = true;
     doc.expanded.disabled   = result.disabled;
     doc.expanded.version    = version;
-    doc.expanded.generation = ++doc.expansions;
+    doc.expanded.generation = ++doc.check.expansions;
     doc.expanded.text     = result.text;
     doc.expanded.map      = result.map;
     doc.expanded.problems = result.problems;
@@ -2204,7 +2205,7 @@ void ALFloaterScriptStudio::expandedAnswer(const std::string& id, U32 version, c
     // What the preprocessor found is shown with what the analyzers found.
     refreshProblems(doc);
     std::vector<Doc::Waiting> waiting;
-    waiting.swap(doc.waiting);
+    waiting.swap(doc.check.waiting);
     for (const Doc::Waiting& question : waiting)
     {
         askAnalyzer(doc, question.kind, question.at, question.to);
@@ -2427,17 +2428,17 @@ void ALFloaterScriptStudio::teachEditor(Doc& doc)
     editor.setFixesShown(
         [this, raw](U32 shown, const std::vector<ALCodeEditor::Fix>& fixes) { mWeighing.fixesShown(raw->id, shown, fixes); });
     editor.setActionRequest([this, raw](const ALTextRange& at) {
-        raw->actionsAsked = at;
+        raw->check.actionsAsked = at;
         askAnalyzer(*raw, ALScriptAnalysis::Kind::Actions, at.begin, at.end);
     });
     editor.setFixHandler([this, raw](const LLSD& value) {
         if (value.has("action"))
         {
             const size_t n = static_cast<size_t>(value["action"].asInteger());
-            if (n < raw->actions.size())
+            if (n < raw->check.actions.size())
             {
-                const ALScriptFix action = raw->actions[n];
-                applyFix(*raw, action, raw->actionsVersion);
+                const ALScriptFix action = raw->check.actions[n];
+                applyFix(*raw, action, raw->check.actionsVersion);
             }
             return;
         }
@@ -2542,9 +2543,9 @@ void ALFloaterScriptStudio::askAnalyzer(Doc& doc, ALScriptAnalysis::Kind kind, c
         {
             request.config = base;
         }
-        if (!found && kind == ALScriptAnalysis::Kind::Check && !doc.configAsked)
+        if (!found && kind == ALScriptAnalysis::Kind::Check && !doc.check.configAsked)
         {
-            doc.configAsked                  = true;
+            doc.check.configAsked            = true;
             const LLHandle<LLFloater> handle = getHandle();
             const std::string         id     = doc.id;
             ALScriptPreprocessor::instance().fetchConfig(root, [handle, id]() {
@@ -2799,12 +2800,12 @@ void ALFloaterScriptStudio::actionsAnswered(Doc& doc, const ALScriptAnalysis::Re
             return text.clamp(begin) != begin || text.clamp(end) != end;
         });
     });
-    doc.actions        = std::move(held.fixes);
-    doc.actionsVersion = result.version;
+    doc.check.actions        = std::move(held.fixes);
+    doc.check.actionsVersion = result.version;
     std::vector<ALCodeEditor::Fix> offered;
-    for (size_t i = 0; i < doc.actions.size(); ++i)
+    for (size_t i = 0; i < doc.check.actions.size(); ++i)
     {
-        const ALScriptFix& action = doc.actions[i];
+        const ALScriptFix& action = doc.check.actions[i];
         ALCodeEditor::Fix  one;
         one.title    = action.title;
         one.refactor = true;
@@ -2816,7 +2817,7 @@ void ALFloaterScriptStudio::actionsAnswered(Doc& doc, const ALScriptAnalysis::Re
         one.value["action"] = static_cast<S32>(i);
         offered.push_back(std::move(one));
     }
-    doc.editor->supplyActions(doc.actionsAsked, std::move(offered));
+    doc.editor->supplyActions(doc.check.actionsAsked, std::move(offered));
 }
 
 void ALFloaterScriptStudio::activate(size_t index, bool focus)
@@ -3226,7 +3227,7 @@ void ALFloaterScriptStudio::scheduleAnalysis(Doc& doc, bool now)
     {
         return;
     }
-    doc.analysisDue = now ? 1.0 : static_cast<F64>(LLTimer::getTotalSeconds()) + ANALYSIS_DELAY;
+    doc.check.analysisDue = now ? 1.0 : static_cast<F64>(LLTimer::getTotalSeconds()) + ANALYSIS_DELAY;
 }
 
 void ALFloaterScriptStudio::pumpPreprocessor()
@@ -3263,9 +3264,9 @@ void ALFloaterScriptStudio::pumpAnalysis()
     const F64 now = LLTimer::getTotalSeconds();
     for (std::unique_ptr<Doc>& doc : mDocs)
     {
-        if (doc->analysisDue > 0.0 && now >= doc->analysisDue)
+        if (doc->check.analysisDue > 0.0 && now >= doc->check.analysisDue)
         {
-            doc->analysisDue = 0.0;
+            doc->check.analysisDue = 0.0;
             requestAnalysis(*doc);
         }
     }
@@ -3273,7 +3274,7 @@ void ALFloaterScriptStudio::pumpAnalysis()
 
 void ALFloaterScriptStudio::requestAnalysis(Doc& doc)
 {
-    doc.requestedVersion = doc.editor->document().version();
+    doc.check.requestedVersion = doc.editor->document().version();
     askAnalyzer(doc, ALScriptAnalysis::Kind::Check, ALTextPos());
 }
 
@@ -3301,15 +3302,15 @@ void ALFloaterScriptStudio::analysed(const ALScriptAnalysis::Result& result)
     {
         return;
     }
-    doc.analysis         = result.problems;
-    doc.analysisVersion  = result.version;
+    doc.check.analysis         = result.problems;
+    doc.check.analysisVersion  = result.version;
     // LSL's warnings as the scripter chose them; Luau's lints were chosen
     // in the configuration the check ran with.
     if (!doc.language.lua)
     {
-        ALScriptLints::apply(doc.analysis);
+        ALScriptLints::apply(doc.check.analysis);
     }
-    doc.definitionsError = result.definitionsError;
+    doc.check.definitionsError = result.definitionsError;
     // A script mid-edit is answered from a copy mended to parse; one past
     // mending answers nothing, and what it declares, what its names are
     // and what goes beside them are then not nothing but what they last
@@ -3328,9 +3329,9 @@ void ALFloaterScriptStudio::analysed(const ALScriptAnalysis::Result& result)
         const bool mapped_now = preprocessed(doc) && doc.expanded.valid && doc.expanded.version == result.version;
         const S32  own_lines  = mapped_now ? static_cast<S32>(std::count(doc.expanded.text.begin(), doc.expanded.text.end(), '\n')) + 1
                                            : doc.editor->document().lineCount();
-        doc.analysis.erase(std::remove_if(doc.analysis.begin(), doc.analysis.end(),
+        doc.check.analysis.erase(std::remove_if(doc.check.analysis.begin(), doc.check.analysis.end(),
                                           [own_lines](const ALScriptProblem& problem) { return problem.line >= own_lines || unusedWarning(problem); }),
-                           doc.analysis.end());
+                           doc.check.analysis.end());
         if (result.understood)
         {
             doc.outline.erase(std::remove_if(doc.outline.begin(), doc.outline.end(),
@@ -3420,7 +3421,7 @@ void ALFloaterScriptStudio::analysed(const ALScriptAnalysis::Result& result)
         // this script's: a library is meant to hold more than any one
         // script calls, and every script including it would be told so.
         const ALSourceMap& map = doc.expanded.map;
-        doc.analysis.erase(std::remove_if(doc.analysis.begin(), doc.analysis.end(),
+        doc.check.analysis.erase(std::remove_if(doc.check.analysis.begin(), doc.check.analysis.end(),
                                           [&map](const ALScriptProblem& problem) {
                                               if (!unusedWarning(problem))
                                               {
@@ -3429,8 +3430,8 @@ void ALFloaterScriptStudio::analysed(const ALScriptAnalysis::Result& result)
                                               const ALSourceMap::Loc loc = map.toSource(problem.line, problem.column);
                                               return loc.found() && loc.file > 0;
                                           }),
-                           doc.analysis.end());
-        for (ALScriptProblem& problem : doc.analysis)
+                           doc.check.analysis.end());
+        for (ALScriptProblem& problem : doc.check.analysis)
         {
             ALScriptSpan span;
             span.line      = problem.line;
@@ -3484,11 +3485,11 @@ void ALFloaterScriptStudio::analysed(const ALScriptAnalysis::Result& result)
     mOutlinePane->show(doc);
     // Weighed a moment after, of the same text.
     weigh(doc);
-    if (doc.fixAllAfterCheck && doc.analysisVersion == doc.editor->document().version())
+    if (doc.check.fixAllAfterCheck && doc.check.analysisVersion == doc.editor->document().version())
     {
         FixPick pick;
-        pick.key = *doc.fixAllAfterCheck;
-        doc.fixAllAfterCheck.reset();
+        pick.key = *doc.check.fixAllAfterCheck;
+        doc.check.fixAllAfterCheck.reset();
         askFixAll(doc, pick);
     }
     if (doc.save.checked())
@@ -3514,7 +3515,7 @@ void ALFloaterScriptStudio::offerImports(Doc& doc)
         }
         return lua ? problem.key == "LuauUnknownGlobal" || problem.key == "LuauLintUnknownGlobal" : problem.key == "LSLUndeclared";
     };
-    if (std::none_of(doc.analysis.begin(), doc.analysis.end(), unknown))
+    if (std::none_of(doc.check.analysis.begin(), doc.check.analysis.end(), unknown))
     {
         return;
     }
@@ -3548,7 +3549,7 @@ void ALFloaterScriptStudio::offerImports(Doc& doc)
     // What the index knows of the names asked for: each module so named,
     // or that exports or declares one of them.
     std::vector<std::string> names;
-    for (const ALScriptProblem& problem : doc.analysis)
+    for (const ALScriptProblem& problem : doc.check.analysis)
     {
         if (unknown(problem) && std::find(names.begin(), names.end(), problem.args[0]) == names.end())
         {
@@ -3557,7 +3558,7 @@ void ALFloaterScriptStudio::offerImports(Doc& doc)
     }
     const std::vector<ALScriptModules::Module> modules = ALScriptModules::instance().giving(request, open, names);
     bool                                       given_all = true;
-    for (ALScriptProblem& problem : doc.analysis)
+    for (ALScriptProblem& problem : doc.check.analysis)
     {
         if (!unknown(problem))
         {
@@ -3642,7 +3643,7 @@ void ALFloaterScriptStudio::explainTransformWords(Doc& doc)
     const bool            preprocessing = ALScriptPreprocessor::enabled();
     const ALTextDocument& text          = doc.editor->document();
     const auto            line          = [&text](S32 index) { return std::string_view(text.line(index)); };
-    for (ALScriptProblem& problem : doc.analysis)
+    for (ALScriptProblem& problem : doc.check.analysis)
     {
         if (problem.severity != ALScriptProblem::Severity::Error || !problem.file.empty())
         {
@@ -3682,7 +3683,7 @@ void ALFloaterScriptStudio::explainRequires(Doc& doc)
         LLStringUtil::format_map_t args;
         args["[NAME]"]  = required.name;
         problem.message = getString("RequireNotPreprocessed", args);
-        doc.analysis.push_back(std::move(problem));
+        doc.check.analysis.push_back(std::move(problem));
     }
 }
 
@@ -3943,14 +3944,14 @@ void ALFloaterScriptStudio::noLint(Doc& doc)
     const auto            ours     = [&text](const ALScriptProblem& problem) {
         return problem.file.empty() && problem.line >= 0 && problem.line < text.lineCount();
     };
-    doc.analysis.erase(std::remove_if(doc.analysis.begin(), doc.analysis.end(),
+    doc.check.analysis.erase(std::remove_if(doc.check.analysis.begin(), doc.check.analysis.end(),
                                       [&](const ALScriptProblem& problem) {
                                           return ours(problem) && ALScriptFixes::suppressed(problem, text.line(problem.line),
                                                                                             problem.line > 0 ? std::string_view(text.line(problem.line - 1)) : std::string_view(),
                                                                                             lua);
                                       }),
-                       doc.analysis.end());
-    for (ALScriptProblem& problem : doc.analysis)
+                       doc.check.analysis.end());
+    for (ALScriptProblem& problem : doc.check.analysis)
     {
         if (!ours(problem))
         {
@@ -4008,9 +4009,9 @@ void ALFloaterScriptStudio::askFixAll(Doc& doc, const FixPick& pick)
     // Asked of a text not checked yet -- typed in a moment ago -- whose
     // problems are not known: checked first, and asked again then, rather
     // than said to have nothing to fix.
-    if (!pick.forSave && doc.loaded && !doc.notecard && doc.analysisVersion != doc.editor->document().version())
+    if (!pick.forSave && doc.loaded && !doc.notecard && doc.check.analysisVersion != doc.editor->document().version())
     {
-        doc.fixAllAfterCheck = pick.key;
+        doc.check.fixAllAfterCheck = pick.key;
         scheduleAnalysis(doc, true);
         LLStringUtil::format_map_t args;
         args["[NAME]"] = doc.name;

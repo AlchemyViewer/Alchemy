@@ -253,18 +253,13 @@ struct ALScriptStudioDoc
     };
     Expanded                                   expanded;
     Expanded                                   uploaded;
-    U32                                        expansions = 0;
     // The source's require calls, of the text at requiresOf (namedAt).
     mutable std::vector<ALPreprocessor::Required> requiresFound;
     mutable std::optional<U32>                    requiresOf;
-    // The version an expansion has been asked for, or none -- not a
-    // zero, which an empty text's version is: the preprocessor answers
-    // on the main thread a moment later, and one text is expanded once
-    // however many questions wait on it.
-    std::optional<U32>                         expanding;
-    // The questions held until it comes. A question of a kind
-    // replaces the one of that kind still waiting: a second hover
-    // is a hover of somewhere else, and only the last is wanted.
+    // A question held until the expansion it asks about comes
+    // (Check::waiting). A question of a kind replaces the one of that
+    // kind still waiting: a second hover is a hover of somewhere else,
+    // and only the last is wanted.
     struct Waiting
     {
         ALScriptAnalysis::Kind kind = ALScriptAnalysis::Kind::Check;
@@ -272,13 +267,9 @@ struct ALScriptStudioDoc
         // Where a stretch chosen from `at` ends: the refactors'.
         ALTextPos              to;
     };
-    std::vector<Waiting>                       waiting;
     // A run of the preprocessor on its way, for a save or not: a save
     // asked for meanwhile waits on it rather than starting another.
     bool                                       preprocessing       = false;
-    // Whether the script's `.luaurc` was asked for once, so that a
-    // script with none is not asked for it at every check.
-    bool                                       configAsked = false;
     // What the compiler said of the last save, in the source's places
     // -- back through the preprocessor's map, where it ran -- or an
     // include's, by its path.
@@ -334,9 +325,6 @@ struct ALScriptStudioDoc
     bool                                       experienceKnown  = false;
     bool                                       experienceChosen = false;
     bool                                       experienceAsking = false;
-    // A Fix All asked before the text as it stands was checked, made
-    // once it is: of the problems of one kind, or of all where empty.
-    std::optional<std::string>                 fixAllAfterCheck;
     // What the script weighs (ALScriptStudioWeighing).
     struct Weighing
     {
@@ -366,13 +354,41 @@ struct ALScriptStudioDoc
         std::optional<std::pair<U32, U32>> assetMeasured;
     };
     Weighing                                   weighing;
-    // What the analyzer said of the text at analysisVersion; when the
-    // next check is due, or zero; the version last asked about.
-    ALScriptProblems                           analysis;
-    U32                                        analysisVersion  = 0;
-    U32                                        requestedVersion = 0;
-    F64                                        analysisDue      = 0.0;
-    std::string                                definitionsError;
+    // The tab's part of checking (ALScriptStudioChecking): what the
+    // analyzers said and when they are next asked, the expansion asked for
+    // them and the questions waiting on it, the refactors offered at the
+    // caret, and a Fix All waiting on a check.
+    struct Check
+    {
+        // What the analyzer said of the text at analysisVersion; when the
+        // next check is due, or zero; the version last asked about.
+        ALScriptProblems analysis;
+        U32              analysisVersion  = 0;
+        U32              requestedVersion = 0;
+        F64              analysisDue      = 0.0;
+        std::string      definitionsError;
+        // How many expansions were taken, which is how an answer about one
+        // names it; the version one has been asked for, or none -- not a
+        // zero, which an empty text's version is: the preprocessor answers
+        // on the main thread a moment later, and one text is expanded once
+        // however many questions wait on it.
+        U32                expansions = 0;
+        std::optional<U32> expanding;
+        // The questions held until it comes.
+        std::vector<Waiting> waiting;
+        // Whether the script's `.luaurc` was asked for once, so that a
+        // script with none is not asked for it at every check.
+        bool configAsked = false;
+        // The refactors last offered at the caret, in the source's places
+        // at actionsVersion, and the stretch they were asked about.
+        std::vector<ALScriptFix> actions;
+        U32                      actionsVersion = 0;
+        ALTextRange              actionsAsked;
+        // A Fix All asked before the text as it stands was checked, made
+        // once it is: of the problems of one kind, or of all where empty.
+        std::optional<std::string> fixAllAfterCheck;
+    };
+    Check                                      check;
     // How bad a problem is: what the marks, the counts, the filters
     // and the compiler's own words all go by, rather than a word
     // compared as text in six places.
@@ -430,11 +446,6 @@ struct ALScriptStudioDoc
     // counted in `left` and left to be made one by one. Of one kind, asked
     // for by it, every preferred one.
     std::vector<const ALScriptFix*> pickFixes(const FixPick& pick, size_t* left = nullptr) const;
-    // The refactors last offered at the caret, in the source's places
-    // at actionsVersion, and the stretch they were asked about.
-    std::vector<ALScriptFix>                   actions;
-    U32                                        actionsVersion = 0;
-    ALTextRange                                actionsAsked;
     // What the analyzer said the script declares, at analysisVersion.
     std::vector<ALScriptOutlineEntry>          outline;
     // A place a name stands: in this script, or in another -- an

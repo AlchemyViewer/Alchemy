@@ -246,7 +246,7 @@ namespace tut
         doc.name = "Renamed";
         crumbs->showPath(doc);
         ensure("a new name: again", told().paths.size() == 7 && jump()->path()[0].label == "Renamed");
-        ++doc.analysisVersion;
+        ++doc.check.analysisVersion;
         crumbs->showPath(doc);
         ensure_equals("a new outline: again", told().paths.size(), size_t(8));
         Doc& other = tab("b");

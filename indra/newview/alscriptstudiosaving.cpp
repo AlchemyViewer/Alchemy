@@ -275,7 +275,7 @@ void ALScriptStudioSaving::save(Doc& doc)
     const Options options = mWindow.saveOptions();
     if (!doc.notecard)
     {
-        const bool fix = options.fix && doc.analysisVersion == doc.editor->document().version() && doc.save.fixOnce();
+        const bool fix = options.fix && doc.check.analysisVersion == doc.editor->document().version() && doc.save.fixOnce();
         mWindow.tidy(doc, fix, options.format, options.trim);
     }
     ALScriptSaveFlow::Tab tab;
@@ -285,7 +285,7 @@ void ALScriptStudioSaving::save(Doc& doc)
     tab.preprocessed     = !tab.file && !tab.notecard && mWindow.preprocessed(doc);
     tab.preprocessorBusy = doc.preprocessing;
     tab.holdOnErrors     = options.holdOnErrors;
-    tab.checked          = doc.analysisVersion == tab.version;
+    tab.checked          = doc.check.analysisVersion == tab.version;
     tab.checkerErrors    = checkerErrors(doc);
     const ALScriptSaveFlow::Route route = doc.save.route(tab);
     switch (route)
@@ -351,7 +351,7 @@ void ALScriptStudioSaving::save(Doc& doc)
     // the check of this text found said, where it is in.
     if (!options.holdOnErrors && tab.checked)
     {
-        const S32 errors = static_cast<S32>(std::count_if(doc.analysis.begin(), doc.analysis.end(),
+        const S32 errors = static_cast<S32>(std::count_if(doc.check.analysis.begin(), doc.check.analysis.end(),
                                                           [](const ALScriptProblem& p) { return p.severity == ALScriptProblem::Severity::Error; }));
         if (errors > 0)
         {
@@ -378,11 +378,11 @@ S32 ALScriptStudioSaving::checkerErrors(const Doc& doc)
     // The analyzers' errors, and the preprocessor's in the expansion they
     // read.
     S32 errors = 0;
-    for (const ALScriptProblem& problem : doc.analysis)
+    for (const ALScriptProblem& problem : doc.check.analysis)
     {
         errors += problem.severity == ALScriptProblem::Severity::Error ? 1 : 0;
     }
-    if (doc.expanded.valid && doc.expanded.version == doc.analysisVersion)
+    if (doc.expanded.valid && doc.expanded.version == doc.check.analysisVersion)
     {
         for (const ALScriptProblem& problem : doc.expanded.problems)
         {

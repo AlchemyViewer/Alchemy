@@ -350,7 +350,7 @@ namespace tut
         Doc&                    a    = tab("a", "default {}");
         services.front               = 0;
         studio.shown                 = true;
-        a.analysisVersion            = versionOf(a);
+        a.check.analysisVersion      = versionOf(a);
         a.weighing.all               = { weightOf(Target::Mono, 1) };
         a.weighing.allVersion        = versionOf(a);
         unit.pump();

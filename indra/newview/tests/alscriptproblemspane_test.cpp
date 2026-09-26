@@ -164,7 +164,7 @@ namespace tut
                 text += "line " + std::to_string(i) + "\n";
             }
             d.editor->setText(text);
-            d.analysisVersion = d.editor->document().version();
+            d.check.analysisVersion = d.editor->document().version();
             return d;
         }
 
@@ -244,13 +244,13 @@ namespace tut
         d.problems.push_back({ 2, 0, true, std::string(), "ERROR", "the compiler's own" });
         // The analyzers, of the text as it stands: that error, a lint with
         // a fix, and a note in an include.
-        d.analysis.push_back(problem(S::Parser, V::Error, 6, "syntax error, unexpected"));
+        d.check.analysis.push_back(problem(S::Parser, V::Error, 6, "syntax error, unexpected"));
         ALScriptProblem lint = problem(S::Lint, V::Warning, 4, "a local shadows another");
         lint.code            = "LocalShadow";
         lint.key             = "shadow";
         lint.fixes.push_back(fix("Rename it", true, true, 4));
-        d.analysis.push_back(lint);
-        d.analysis.push_back(problem(S::Lint, V::Note, 1, "in the include", "disk:/scripts/lib.lsl"));
+        d.check.analysis.push_back(lint);
+        d.check.analysis.push_back(problem(S::Lint, V::Note, 1, "in the include", "disk:/scripts/lib.lsl"));
         // What it said as it ran, three times; and the weight, over.
         d.runtime.push_back({ 8, -1, std::string(), "Math Error", 3 });
         ALScriptWeight weight;
@@ -303,9 +303,9 @@ namespace tut
         using V                   = ALScriptProblem::Severity;
         Doc& door                 = doc("door");
         Doc& lamp                 = doc("lamp");
-        door.analysis             = { problem(S::Parser, V::Error, 1, "door error"), problem(S::Lint, V::Warning, 3, "door warning"),
+        door.check.analysis       = { problem(S::Parser, V::Error, 1, "door error"), problem(S::Lint, V::Warning, 3, "door warning"),
                                       problem(S::Lint, V::Note, 5, "door note") };
-        lamp.analysis             = { problem(S::Parser, V::Error, 2, "lamp error") };
+        lamp.check.analysis       = { problem(S::Parser, V::Error, 2, "lamp error") };
         gather(lamp);
         gather(door);
         out.fill(&door);
@@ -337,7 +337,7 @@ namespace tut
         ensure_equals("four to list", out.held(), 4);
         // Another script's problems gathered again: listed, since every
         // one's are.
-        lamp.analysis.push_back(problem(S::Lint, V::Warning, 7, "lamp warning"));
+        lamp.check.analysis.push_back(problem(S::Lint, V::Warning, 7, "lamp warning"));
         gather(lamp);
         ensure("the new one listed", shown().find("lamp warning") != std::string::npos);
         pick("problems_scope", "this");
@@ -361,7 +361,7 @@ namespace tut
         ALScriptProblemsPane& out = make();
         Doc&                  d   = doc("door");
         d.problems.push_back({ 1, 0, true, std::string(), "ERROR", "compiler first" });
-        d.analysis = { problem(ALScriptProblem::Source::Lint, ALScriptProblem::Severity::Warning, 0, "a warning before"),
+        d.check.analysis = { problem(ALScriptProblem::Source::Lint, ALScriptProblem::Severity::Warning, 0, "a warning before"),
                        problem(ALScriptProblem::Source::Parser, ALScriptProblem::Severity::Error, 5, "parser later") };
         gather(d);
         out.fill(&d);
@@ -397,7 +397,7 @@ namespace tut
         two.message         = "shadowed twice";
         two.fixes           = { fix("Rename", true, true, 6) };
         ALScriptProblem plain = problem(ALScriptProblem::Source::Parser, ALScriptProblem::Severity::Error, 8, "no lint");
-        d.analysis            = { one, two, plain };
+        d.check.analysis      = { one, two, plain };
         gather(d);
         out.fill(&d);
 

@@ -195,8 +195,8 @@ namespace tut
         // The analyzers' check of the text as it stands.
         static void checked(Doc& doc, ALScriptProblems problems = {})
         {
-            doc.analysis        = std::move(problems);
-            doc.analysisVersion = doc.editor->document().version();
+            doc.check.analysis        = std::move(problems);
+            doc.check.analysisVersion = doc.editor->document().version();
         }
         static CompileResult answer(const Doc& doc, bool success = true)
         {
