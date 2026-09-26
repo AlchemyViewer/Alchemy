@@ -26,6 +26,7 @@
 
 #include "alcodecards.h"
 
+#include "alplace.h"
 #include "alsaid.h"
 #include "llstring.h"
 
@@ -140,13 +141,7 @@ S32 ALCodeCards::height(S32 content_height)
 // static
 LLRect ALCodeCards::place(const LLRect& anchor, const LLRect& text, S32 width, S32 height)
 {
-    S32 x = llclamp(anchor.mLeft, text.mLeft, llmax(text.mLeft, text.mRight - width));
-    S32 y = anchor.mBottom - 2;
-    if (y - height < text.mBottom && anchor.mTop + 2 + height <= text.mTop)
-    {
-        y = anchor.mTop + 2 + height;
-    }
-    return LLRect(x, y, x + width, y - height);
+    return ALPlace::under(anchor, width, height, text, 2);
 }
 
 // --- what the analyzer says of a word ---------------------------------------
@@ -184,16 +179,13 @@ bool ALCodeCards::signatureFor(const ALTextPos& caret) const
 }
 
 // static
-LLRect ALCodeCards::signatureBox(S32 wanted_width, S32 height, S32 left, S32 row_top, S32 row_h, const LLRect& view)
+LLRect ALCodeCards::signatureBox(S32 wanted_width, S32 height, const LLRect& anchor, const LLRect& view)
 {
     // No wider than the view. A box sized to a signature longer than the
     // window ran off the right edge and was cut there by the view's own
     // rect, silently -- and a call with a long list of parameters is the
     // one whose signature was worth reading.
-    const S32 width = llmin(wanted_width, llmax(4 * SIGNATURE_PAD, view.getWidth()));
-    const S32 x     = llclamp(left, view.mLeft, llmax(view.mLeft, view.mRight - width));
-    return (row_top + height <= view.mTop) ? LLRect(x, row_top + height, x + width, row_top)
-                                           : LLRect(x, row_top - row_h, x + width, row_top - row_h - height);
+    return ALPlace::over(anchor, llmin(wanted_width, llmax(4 * SIGNATURE_PAD, view.getWidth())), height, view);
 }
 
 // static

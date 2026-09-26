@@ -2182,6 +2182,33 @@ S32 ALTextView::screenTopOf(const LLRect& text, S32 line, S32 row)
     return text.mTop - (mLayout.lineTop(line) + mLayout.rowTop(line, row) - mScrollY);
 }
 
+LLRect ALTextView::anchorOf(const ALTextPos& at)
+{
+    const LLRect text = textRect();
+    S32          row;
+    const F32    x    = mLayout.xOf(at.line, at.column, &row);
+    const S32    top  = screenTopOf(text, at.line, row);
+    const S32    left = static_cast<S32>(static_cast<F32>(text.mLeft) - mScrollX + x);
+    return LLRect(left, top, left, top - mLayout.rowHeightOf(at.line, row));
+}
+
+LLRect ALTextView::anchorOf(const ALTextRange& range)
+{
+    const LLRect text = textRect();
+    S32          row;
+    mLayout.xOf(range.begin.line, range.begin.column, &row);
+    const S32 top = screenTopOf(text, range.begin.line, row);
+    LLRect    anchor(text.mLeft, top, text.mRight, top - mLayout.rowHeightOf(range.begin.line, row));
+    F32       x0, x1;
+    if (!range.empty() && spanOnRow(range.begin.line, row, range, x0, x1))
+    {
+        const F32 left = static_cast<F32>(text.mLeft) - mScrollX;
+        anchor.mLeft   = static_cast<S32>(left + x0);
+        anchor.mRight  = static_cast<S32>(left + x1);
+    }
+    return anchor;
+}
+
 void ALTextView::forEachVisibleRow(const LLRect& text, const std::function<void(S32, S32, S32)>& visit)
 {
     const S32 row_h = mLayout.rowHeight();
@@ -4391,19 +4418,8 @@ bool ALTextView::handleToolTip(S32 x, S32 y, MASK mask)
     }
     if (!says.empty())
     {
-        const LLRect text = textRect();
-        S32          row;
-        mLayout.xOf(about.begin.line, about.begin.column, &row);
-        const S32 top = screenTopOf(text, about.begin.line, row);
-        F32       x0, x1;
-        LLRect    local(text.mLeft, top, text.mRight, top - mLayout.rowHeightOf(about.begin.line, row));
-        if (spanOnRow(about.begin.line, row, about, x0, x1))
-        {
-            local.mLeft  = static_cast<S32>(static_cast<F32>(text.mLeft) - mScrollX + x0);
-            local.mRight = static_cast<S32>(static_cast<F32>(text.mLeft) - mScrollX + x1);
-        }
         LLRect sticky;
-        localRectToScreen(local, &sticky);
+        localRectToScreen(anchorOf(about), &sticky);
         LLToolTip::Params tip;
         tip.message     = says;
         tip.sticky_rect = sticky;

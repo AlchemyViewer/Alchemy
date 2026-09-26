@@ -65,8 +65,9 @@ public:
     AL_VIEW_TYPE(ALPopover, LLFloater);
 
     // Under `anchor` and left-aligned with it, or above it where under would
-    // be off the bottom of the screen. The popover takes `content`, and takes
-    // its size from it. Null where there is nothing to put it beside.
+    // be off the bottom of the screen and above would not. The popover takes
+    // `content`, and takes its size from it. Null where there is nothing to
+    // put it beside.
     //
     // A title is drawn where one is given; where none is, the panel is the
     // whole of it and there is no bar to drag it by.
@@ -100,9 +101,10 @@ public:
                                               const std::string& title = LLStringUtil::null,
                                               bool resizable = true);
 
-    // Opened beside the anchor: under it with their left edges together,
-    // above it where under would run off the bottom, and shoved back on
-    // screen where a side would run off, then shown and given the keyboard.
+    // Opened beside the anchor as ALPlace::under() puts it -- under it with
+    // their left edges together, above it where under would run off the
+    // bottom and above would not, kept on screen across -- then shown and
+    // given the keyboard.
     void openBeside(const LLView* anchor);
     // The same beside a rect of the screen, for the anchor.
     void openBeside(const LLRect& screen, const LLView* anchor);

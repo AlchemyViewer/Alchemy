@@ -645,6 +645,13 @@ public:
     S32    bandHeight() const;
     // The position under a point of the view, on a cluster boundary.
     ALTextPos posAtLocal(S32 x, S32 y, bool round);
+    // And back: where a place in the text is, local to the view -- its
+    // row, top to bottom, and across, the place itself, as wide as
+    // nothing. For a stretch, its span on the row it begins on, or the
+    // whole of that row where it shows nothing there. What a list, a card
+    // or a tip is put beside.
+    LLRect anchorOf(const ALTextPos& at);
+    LLRect anchorOf(const ALTextRange& range);
     // A drag of the mouse under way -- from its press, or a shift-press
     // from the anchor -- and the characters under its two ends: what a
     // keymap whose caret stands on a character, not between two, takes a

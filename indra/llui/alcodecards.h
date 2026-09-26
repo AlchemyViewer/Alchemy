@@ -95,9 +95,9 @@ public:
     static S32 widthLimit(S32 text_width);
     static S32 width(S32 content_width, S32 limit);
     static S32 height(S32 content_height);
-    // Where it goes: under what it is about, at its start; above it where
-    // under would run off the text's bottom and above would not; within
-    // the text's width.
+    // Where it goes: under what it is about, at its start and two pixels
+    // clear; above it where under would run off the text's bottom and
+    // above would not; within the text's width.
     static LLRect place(const LLRect& anchor, const LLRect& text, S32 width, S32 height);
 
     // --- what the analyzer says of a word ---------------------------------------
@@ -135,10 +135,10 @@ public:
 
     static constexpr S32 SIGNATURE_PAD = 6;
     // A signature's box, so wide and tall, for a call whose column is at
-    // `left` on a row from `row_top` down `row_h`: above the row, kept
-    // inside the view -- no wider than it -- and under the row where above
-    // would run off the view's top.
-    static LLRect signatureBox(S32 wanted_width, S32 height, S32 left, S32 row_top, S32 row_h, const LLRect& view);
+    // the anchor's left on its row: above the row, kept inside the view --
+    // no wider than it -- and under the row where above would run off the
+    // view's top and under would not.
+    static LLRect signatureBox(S32 wanted_width, S32 height, const LLRect& anchor, const LLRect& view);
     // How far a label longer than the room is scrolled: so that it reads
     // through the parameter being filled in, whose end is `through` from
     // its start -- the head, already typed, being the part to give up.

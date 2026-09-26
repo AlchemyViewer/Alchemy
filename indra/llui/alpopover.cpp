@@ -26,6 +26,7 @@
 
 #include "alpopover.h"
 
+#include "alplace.h"
 #include "llpanel.h"
 #include "lluictrlfactory.h"
 
@@ -143,10 +144,10 @@ LLFloater::Params ALPopover::paramsRemembered(const std::string& kind, S32 width
 }
 
 // Under the control, its left edge with the control's, and flipped above it
-// where under would put it off the bottom: a panel a person cannot see the
-// whole of is a panel that has not opened. A side off the screen is put
-// back on it for the same reason, which is what the floater view does for
-// every window it holds.
+// where under would put it off the bottom and above would not (ALPlace): a
+// panel a person cannot see the whole of is a panel that has not opened. A
+// side off the screen is put back on it for the same reason, which is what
+// the floater view does for every window it holds.
 void ALPopover::adopt(const LLView* anchor)
 {
     // Where keys go: the window the anchor is in, or the anchor itself
@@ -197,17 +198,14 @@ void ALPopover::openBeside(const LLView* anchor)
 
 void ALPopover::openBeside(const LLRect& screen, const LLView* anchor)
 {
-    LLRect where = getRect();
     if (anchor)
     {
         adopt(anchor);
     }
-    where.setLeftTopAndSize(screen.mLeft, screen.mBottom, where.getWidth(), where.getHeight());
-    if (where.mBottom < 0)
-    {
-        where.translate(0, screen.getHeight() + where.getHeight());
-    }
-    openAt(where);
+    // The floater view is the screen a popover has; without one, only the
+    // screen's bottom is known.
+    const LLRect bounds = gFloaterView ? gFloaterView->getLocalRect() : LLRect(S32_MIN / 2, S32_MAX / 2, S32_MAX / 2, 0);
+    openAt(ALPlace::under(screen, getRect().getWidth(), getRect().getHeight(), bounds));
 }
 
 void ALPopover::openOver(const LLView* anchor)

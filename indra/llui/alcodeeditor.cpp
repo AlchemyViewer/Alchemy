@@ -26,6 +26,7 @@
 
 #include "alcodeeditor.h"
 
+#include "alplace.h"
 #include "alsaid.h"
 #include "alsurface.h"
 
@@ -2193,33 +2194,7 @@ void ALCodeEditor::placeSideBox(const LLRect& list)
         box.layout().line(line);
     }
     const S32 height = llmin(box.layout().totalHeight() + 2 * (SIDE_PAD - 2) + 2, llmax(list.getHeight(), 200));
-    LLRect    rect;
-    if (list.mRight + 2 + width <= local.mRight)
-    {
-        rect = LLRect(list.mRight + 2, list.mTop, list.mRight + 2 + width, list.mTop - height);
-    }
-    else if (list.mLeft - 2 - width >= local.mLeft)
-    {
-        rect = LLRect(list.mLeft - 2 - width, list.mTop, list.mLeft - 2, list.mTop - height);
-    }
-    else if (list.mBottom - 2 - height >= local.mBottom)
-    {
-        rect = LLRect(list.mLeft, list.mBottom - 2, list.mLeft + width, list.mBottom - 2 - height);
-    }
-    else
-    {
-        rect = LLRect(list.mLeft, list.mTop + 2 + height, list.mLeft + width, list.mTop + 2);
-    }
-    // Kept within the view, top and bottom.
-    if (rect.mBottom < local.mBottom)
-    {
-        rect.translate(0, local.mBottom - rect.mBottom);
-    }
-    if (rect.mTop > local.mTop)
-    {
-        rect.translate(0, local.mTop - rect.mTop);
-    }
-    box.setShape(rect);
+    box.setShape(ALPlace::beside(list, width, height, local, 2));
     box.setVisible(true);
 }
 
@@ -2279,26 +2254,9 @@ void ALCodeEditor::placeCompletion()
 
 void ALCodeEditor::placeListAt(ALChoiceList& list, const ALTextPos& at, S32 rows, S32 width)
 {
-    const LLRect text   = textRect();
-    const LLRect local  = getLocalRect();
-    S32          row;
-    const F32    x      = layout().xOf(at.line, at.column, &row);
-    const S32    top    = screenTopOf(text, at.line, row);
-    const S32    row_h  = layout().rowHeightOf(at.line, row);
-    const S32    height = list.heightFor(rows);
-    S32          left   = static_cast<S32>(static_cast<F32>(text.mLeft) - scrollX() + x);
-    left                = llclamp(left, local.mLeft, llmax(local.mLeft, local.mRight - width));
-    LLRect rect;
-    if (top - row_h - height >= local.mBottom || top + height > local.mTop)
-    {
-        // Under the row, or over it where under would run off the bottom.
-        rect = LLRect(left, top - row_h, left + width, top - row_h - height);
-    }
-    else
-    {
-        rect = LLRect(left, top + height, left + width, top);
-    }
-    list.setShape(rect);
+    // Under the row, or over it where under would run off the bottom;
+    // across, within the view.
+    list.setShape(ALPlace::under(anchorOf(at), width, list.heightFor(rows), getLocalRect()));
 }
 
 // --- quick fixes -----------------------------------------------------------------
@@ -3339,18 +3297,7 @@ void ALCodeEditor::showCard(const ALTextRange& about, const std::string& says, c
     const S32 height = ALCodeCards::height(mCard->layout().totalHeight());
     // Where: under the row of what it is about, at its start; above it
     // where under would run off the bottom; within the text's width.
-    S32       row;
-    layout().xOf(about.begin.line, about.begin.column, &row);
-    const S32 top   = screenTopOf(text, about.begin.line, row);
-    const S32 row_h = layout().rowHeightOf(about.begin.line, row);
-    F32       x0, x1;
-    mCardAnchor = LLRect(text.mLeft, top, text.mRight, top - row_h);
-    if (spanOnRow(about.begin.line, row, about, x0, x1) && !about.empty())
-    {
-        const F32 left     = static_cast<F32>(text.mLeft) - scrollX();
-        mCardAnchor.mLeft  = static_cast<S32>(left + x0);
-        mCardAnchor.mRight = static_cast<S32>(left + x1);
-    }
+    mCardAnchor = anchorOf(about);
     mCard->setShape(ALCodeCards::place(mCardAnchor, text, width, height));
     mCard->setVisible(true);
 }
@@ -3428,13 +3375,8 @@ void ALCodeEditor::drawSignature(const LLRect& text)
 
     // Above the caret's row, left with the call's column, kept inside the
     // view; under the row where above would run off the top.
-    S32       row;
-    const ALTextPos at   = mCards.signatureAt();
-    const F32       x    = layout().xOf(at.line, at.column, &row);
-    const S32       top  = screenTopOf(text, at.line, row);
-    const S32       row_h = layout().rowHeightOf(at.line, row);
-    const LLRect    box  = ALCodeCards::signatureBox(wanted, height, static_cast<S32>(static_cast<F32>(text.mLeft) - scrollX() + x), top, row_h, getLocalRect());
-    const S32       room = box.getWidth() - 2 * SIGNATURE_PAD;
+    const LLRect box  = ALCodeCards::signatureBox(wanted, height, anchorOf(mCards.signatureAt()), getLocalRect());
+    const S32    room = box.getWidth() - 2 * SIGNATURE_PAD;
 
     const LLColor4 ink    = textColor() % alpha;
     const LLColor4 active = mBracketMatchColor.get() % alpha;

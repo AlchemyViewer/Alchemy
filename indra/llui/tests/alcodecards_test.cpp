@@ -129,9 +129,10 @@ namespace tut
         ensure("gone", !cards.signature() && !cards.signatureFor(ALTextPos(3, 12)));
 
         const LLRect view(0, 300, 400, 0);
-        ensure("above the row", ALCodeCards::signatureBox(200, 40, 50, 200, 16, view) == LLRect(50, 240, 250, 200));
-        ensure("under it where above runs off the top", ALCodeCards::signatureBox(200, 40, 50, 280, 16, view) == LLRect(50, 264, 250, 224));
-        const LLRect wide = ALCodeCards::signatureBox(900, 40, 300, 200, 16, view);
+        ensure("above the row", ALCodeCards::signatureBox(200, 40, LLRect(50, 200, 50, 184), view) == LLRect(50, 240, 250, 200));
+        ensure("under it where above runs off the top",
+               ALCodeCards::signatureBox(200, 40, LLRect(50, 280, 50, 264), view) == LLRect(50, 264, 250, 224));
+        const LLRect wide = ALCodeCards::signatureBox(900, 40, LLRect(300, 200, 300, 184), view);
         ensure("no wider than the view, and inside it", wide.mLeft == 0 && wide.getWidth() == 400);
 
         ensure_equals("a label that fits is not scrolled", ALCodeCards::labelShift(100.f, 80.f, 150.f), 0.f);

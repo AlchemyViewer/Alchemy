@@ -1279,4 +1279,47 @@ namespace tut
         v.setText("fresh");
         ensure("a new text, none", v.changes().empty());
     }
+
+    template<> template<>
+    void altextview_object::test<40>()
+    {
+        set_test_name("a place in the text is anchored on its row at its x, as scrolled; a stretch across its span on its first row, or the whole row where it is empty");
+        ALTextView&  v     = make(("ab\n" + std::string(200, 'x')).c_str(), 200, 100);
+        const LLRect text  = v.textRect();
+        const S32    row_h = v.layout().rowHeight();
+        auto         at    = [&](S32 line, S32 column, F32 scroll) {
+            return static_cast<S32>(static_cast<F32>(text.mLeft) - scroll + v.layout().xOf(line, column));
+        };
+        const S32 second = text.mTop - v.layout().lineTop(1);
+        ensure("at the place, as wide as nothing, on its row",
+               v.anchorOf(ALTextPos(0, 1)) == LLRect(at(0, 1, 0.f), text.mTop, at(0, 1, 0.f), text.mTop - row_h));
+        ensure("on its own line's row", v.anchorOf(ALTextPos(1, 5)) == LLRect(at(1, 5, 0.f), second, at(1, 5, 0.f), second - row_h));
+        ensure("a stretch across its span",
+               v.anchorOf(ALTextRange(ALTextPos(1, 2), ALTextPos(1, 6))) == LLRect(at(1, 2, 0.f), second, at(1, 6, 0.f), second - row_h));
+        ensure("the whole row for an empty one",
+               v.anchorOf(ALTextRange(ALTextPos(1, 2), ALTextPos(1, 2))) == LLRect(text.mLeft, second, text.mRight, second - row_h));
+        v.setScrollX(30.f);
+        ensure_equals("scrolled", v.scrollX(), 30.f);
+        ensure_equals("the place, as scrolled", v.anchorOf(ALTextPos(1, 5)).mLeft, at(1, 5, 30.f));
+        const LLRect span = v.anchorOf(ALTextRange(ALTextPos(1, 2), ALTextPos(1, 6)));
+        ensure("the stretch, as scrolled", span.mLeft == at(1, 2, 30.f) && span.mRight == at(1, 6, 30.f));
+    }
+
+    template<> template<>
+    void altextview_object::test<41>()
+    {
+        set_test_name("a place on a row a box has made taller is anchored on the whole of the row");
+        ALTextView&      v = make("#b\ncd");
+        ALTextView::Atom tall;
+        tall.at     = ALTextPos(0, 0);
+        tall.length = 1;
+        tall.width  = 10;
+        tall.height = 3 * v.layout().rowHeight();
+        v.addAtom(tall);
+        const LLRect text = v.textRect();
+        ensure_equals("the place", v.anchorOf(ALTextPos(0, 1)).getHeight(), 3 * v.layout().rowHeight());
+        ensure_equals("the stretch", v.anchorOf(ALTextRange(ALTextPos(0, 1), ALTextPos(0, 2))).getHeight(), 3 * v.layout().rowHeight());
+        ensure_equals("from the row's top", v.anchorOf(ALTextPos(0, 1)).mTop, text.mTop);
+        ensure_equals("the next line's own", v.anchorOf(ALTextPos(1, 1)).getHeight(), v.layout().rowHeight());
+    }
 }

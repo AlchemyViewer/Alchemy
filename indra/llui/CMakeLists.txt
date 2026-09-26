@@ -126,6 +126,7 @@ target_sources(
     alimagefield.cpp
     aljumpbar.cpp
     alpanelist.cpp
+    alplace.cpp
     alpopover.cpp
     alquickopen.cpp
     alscopebar.cpp
@@ -320,6 +321,7 @@ target_sources(
         alimagefield.h
         aljumpbar.h
         alpanelist.h
+        alplace.h
         alpopover.h
         alquickopen.h
         alsaid.h
@@ -519,6 +521,7 @@ if(AL_BUILD_TESTS)
     alxuiedit
     alfindbar
     alhistorylist
+    alplace
     alpopover
     alscopebar
     aljumpbar
