@@ -77,7 +77,6 @@ public:
     /// key: a global Ctrl+Z would fire while the user is typing anywhere in
     /// the viewer. The studio base answers Ctrl+Z and Ctrl+Y/Ctrl+Shift+Z
     /// through undo() and redo(), and Ctrl+F is this floater's own.
-    bool handleKeyHere(KEY key, MASK mask) override;
     bool undo() override { return applyHistory(false); }
     bool redo() override { return applyHistory(true); }
     /// Only to notice the reference still appearing or going away, which is

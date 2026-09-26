@@ -278,6 +278,16 @@ public:
     const ALXUICatalog& catalog() const { return mCatalog; }
 
 private:
+    // The keys the window answers to by name (the studio's table): find,
+    // open, the documents round, the panes, and the way out of a selection.
+    void addKeys();
+    // Control-F: the source's find where the source is in front, else the
+    // tree's filter.
+    void findInFront();
+    // The next document or the one before, round the canvas's tabs.
+    void cycleDocument(S32 direction);
+    // Between the outline and the canvas.
+    void switchPane();
     ALFloaterXUIStudio(const LLSD& key);
     ~ALFloaterXUIStudio() override;
 

@@ -173,7 +173,6 @@ public:
     void closeFloater(bool app_quitting = false) override;
     void onClose(bool app_quitting) override;
     void draw() override;
-    bool handleKeyHere(KEY key, MASK mask) override;
     bool undo() override;
     bool redo() override;
 
@@ -751,6 +750,11 @@ private:
     // command, on the view in front: `changes` for one that changes the
     // text, which a tab that may not be changed cannot do.
     void addCommands();
+    // The keys the window answers to: the menus' commands, and the tab and
+    // line keys no menu shows.
+    void addKeys();
+    // The menus' commands at the keys a person gave them.
+    std::pair<KEY, MASK> keyOf(const KeyedCommand& command) const override;
     void addFileCommands();
     void addEditCommands();
     void addInsertCommands();

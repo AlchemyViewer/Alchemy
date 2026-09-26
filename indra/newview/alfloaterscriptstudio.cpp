@@ -484,6 +484,7 @@ ALFloaterScriptStudio::ALFloaterScriptStudio(const LLSD& key)
     setIsSingleInstance(mMain);
     // The menus' items by name, in the table of what each does.
     addCommands();
+    addKeys();
     mCommitCallbackRegistrar.add("ScriptStudio.Menu", [this](LLUICtrl*, const LLSD& name) { mCommands.run(name.asString()); });
     mEnableCallbackRegistrar.add("ScriptStudio.Enable", [this](LLUICtrl*, const LLSD& name) { return mCommands.enabled(name.asString()); });
     mEnableCallbackRegistrar.add("ScriptStudio.Check", [this](LLUICtrl*, const LLSD& name) { return mCommands.checked(name.asString()); });
@@ -1265,29 +1266,33 @@ void ALFloaterScriptStudio::draw()
     ALStudioFloater::draw();
 }
 
-bool ALFloaterScriptStudio::handleKeyHere(KEY key, MASK mask)
+void ALFloaterScriptStudio::addKeys()
 {
+    // The menus' commands, each at the key a person gave it or the
+    // standard's (keyOf): the menu bar answers to them first, and one it
+    // did not take -- an item not enabled -- is tried here.
+    for (const ALScriptKeymap::MenuCommand& command : ALScriptKeymap::menuCommands())
+    {
+        addCommand(command, [this, id = std::string(command.id)]() { return mCommands.runIfEnabled(id); });
+    }
     // Control-tab and control-shift-tab go round the tabs, as everywhere --
     // the Mac's own Control key there, Command-Tab being the system's.
-    if (key == KEY_TAB && ((mask & ~MASK_SHIFT) == MASK_CONTROL || (mask & ~MASK_SHIFT) == MASK_MAC_CONTROL))
+    for (const MASK control : { MASK_CONTROL, MASK_MAC_CONTROL })
     {
-        cycleTab(mask & MASK_SHIFT ? -1 : 1);
-        return true;
+        addCommand({ "next_tab", KEY_TAB, control, false }, [this]() { cycleTab(1); return true; });
+        addCommand({ "previous_tab", KEY_TAB, control | MASK_SHIFT, false }, [this]() { cycleTab(-1); return true; });
     }
 #if LL_DARWIN
     // Command-G goes to a line through the menu, and the Mac's Control-G,
     // which it answered to before, still does.
-    if (key == 'G' && mask == MASK_MAC_CONTROL)
-    {
-        goToLine();
-        return true;
-    }
+    addCommand({ "go_to_line", 'G', MASK_MAC_CONTROL, false }, [this]() { goToLine(); return true; });
 #endif
-    if (handleMenuAccelerator(key, mask) || handleUndoKeys(key, mask))
-    {
-        return true;
-    }
-    return ALStudioFloater::handleKeyHere(key, mask);
+}
+
+std::pair<KEY, MASK> ALFloaterScriptStudio::keyOf(const KeyedCommand& command) const
+{
+    // The key a person gave a menu's command, kept in the keymap's setting.
+    return command.rebindable ? ALScriptKeymap::menuKey(command.id) : ALStudioFloater::keyOf(command);
 }
 
 bool ALFloaterScriptStudio::undo()
@@ -3036,9 +3041,9 @@ void ALFloaterScriptStudio::applyMenuKeys()
     // the standard's.
     for (const ALScriptKeymap::MenuCommand& command : ALScriptKeymap::menuCommands())
     {
-        if (LLMenuItemGL* item = bar->findChild<LLMenuItemGL>(command.item, true))
+        if (LLMenuItemGL* item = bar->findChild<LLMenuItemGL>(command.id, true))
         {
-            const auto [key, mask] = ALScriptKeymap::menuKey(command.item);
+            const auto [key, mask] = ALScriptKeymap::menuKey(command.id);
             item->setShownAccelerator(key, mask);
         }
     }

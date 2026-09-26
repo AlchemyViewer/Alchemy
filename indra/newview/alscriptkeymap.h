@@ -25,6 +25,7 @@
 #pragma once
 
 #include "alkeymap.h"
+#include "alstudiofloater.h"
 #include "llpanel.h"
 #include "llsetkeybinddialog.h"
 
@@ -48,13 +49,10 @@ namespace ALScriptKeymap
     typedef std::vector<std::pair<KEY, MASK>> keys_t;
 
     // A command of the studio's menus a person may give a key to: the
-    // item's name in the menus, and the key it answers to as standard.
-    struct MenuCommand
-    {
-        const char* item;
-        KEY         key;
-        MASK        mask;
-    };
+    // item's name in the menus, and the key it answers to as standard --
+    // the studio's own table of keyed commands (ALStudioFloater), which
+    // Script Studio gives its window as well.
+    using MenuCommand = ALStudioFloater::KeyedCommand;
     const std::vector<MenuCommand>& menuCommands();
     // Whether an item is one of them.
     bool                 isMenuCommand(std::string_view item);

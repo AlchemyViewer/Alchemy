@@ -208,7 +208,7 @@ namespace ALScriptKeymap
     bool isMenuCommand(std::string_view item)
     {
         const std::vector<MenuCommand>& all = menuCommands();
-        return std::any_of(all.begin(), all.end(), [item](const MenuCommand& one) { return item == one.item; });
+        return std::any_of(all.begin(), all.end(), [item](const MenuCommand& one) { return item == one.id; });
     }
 
     std::pair<KEY, MASK> menuKey(std::string_view item)
@@ -222,7 +222,7 @@ namespace ALScriptKeymap
         }
         for (const MenuCommand& one : menuCommands())
         {
-            if (item == one.item)
+            if (item == one.id)
             {
                 return { one.key, one.mask };
             }
@@ -348,16 +348,16 @@ void ALPanelScriptKeymap::fill()
     }
     for (const ALScriptKeymap::MenuCommand& one : ALScriptKeymap::menuCommands())
     {
-        const auto [key, mask] = ALScriptKeymap::menuKey(one.item);
+        const auto [key, mask] = ALScriptKeymap::menuKey(one.id);
         ALScriptKeymap::keys_t keys;
         if (key != KEY_NONE)
         {
             keys.emplace_back(key, mask);
         }
         LLSD value;
-        value["menu"] = one.item;
-        add(value, getString(std::string("menu_") + one.item), ALScriptKeymap::describe(keys), one.item, ALScriptKeymap::isMenuRebound(one.item),
-            was.menu == one.item);
+        value["menu"] = one.id;
+        add(value, getString(std::string("menu_") + one.id), ALScriptKeymap::describe(keys), one.id, ALScriptKeymap::isMenuRebound(one.id),
+            was.menu == one.id);
     }
     refreshButtons();
 }
@@ -511,13 +511,13 @@ std::vector<std::string> ALPanelScriptKeymap::takeKey(const Chosen& keeping, KEY
     // both answered to was the editor's alone in the editor.
     for (const ALScriptKeymap::MenuCommand& one : ALScriptKeymap::menuCommands())
     {
-        if (keeping.menu == one.item || ALScriptKeymap::menuKey(one.item) != std::make_pair(key, mask))
+        if (keeping.menu == one.id || ALScriptKeymap::menuKey(one.id) != std::make_pair(key, mask))
         {
             continue;
         }
-        ALScriptKeymap::rebindMenu(one.item, KEY_NONE, MASK_NONE);
+        ALScriptKeymap::rebindMenu(one.id, KEY_NONE, MASK_NONE);
         Chosen was;
-        was.menu = one.item;
+        was.menu = one.id;
         from.push_back(nameOf(was));
     }
     return from;

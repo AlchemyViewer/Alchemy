@@ -226,6 +226,7 @@ ALFloaterLightBox::ALFloaterLightBox(const LLSD& key)
     mCommitCallbackRegistrar.add("LightBox.LookDelete", std::bind(&ALFloaterLightBox::onClickLookDelete, this));
     mCommitCallbackRegistrar.add("LightBox.LookRevert", std::bind(&ALFloaterLightBox::onClickLookRevert, this));
     mCommitCallbackRegistrar.add("LightBox.Find", std::bind(&ALFloaterLightBox::openFind, this));
+    addCommand({ "find", 'F', MASK_CONTROL, false }, [this]() { openFind(); return true; });
     mCommitCallbackRegistrar.add("LightBox.History", std::bind(&ALFloaterLightBox::openHistory, this));
     mCommitCallbackRegistrar.add("LightBox.PopOut", std::bind(&ALFloaterLightBox::togglePane, this));
 }
@@ -1732,19 +1733,6 @@ bool ALFloaterLightBox::applyHistory(bool redo_direction)
     return true;
 }
 
-bool ALFloaterLightBox::handleKeyHere(KEY key, MASK mask)
-{
-    if (key == 'F' && mask == MASK_CONTROL)
-    {
-        openFind();
-        return true;
-    }
-    if (handleUndoKeys(key, mask))
-    {
-        return true;
-    }
-    return ALStudioFloater::handleKeyHere(key, mask);
-}
 
 namespace
 {

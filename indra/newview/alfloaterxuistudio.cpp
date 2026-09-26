@@ -1286,6 +1286,7 @@ ALFloaterXUIStudio::~ALFloaterXUIStudio()
 
 bool ALFloaterXUIStudio::postBuild()
 {
+    addKeys();
     mCatalogFilter = getChild<LLFilterEditor>("catalog_filter");
     mFileList = getChild<LLScrollListCtrl>("file_list");
     mSkinCombo = getChild<LLComboBox>("skin_combo");
@@ -1837,18 +1838,10 @@ void ALFloaterXUIStudio::draw()
     ALStudioFloater::draw();
 }
 
-bool ALFloaterXUIStudio::handleKeyHere(KEY key, MASK mask)
+void ALFloaterXUIStudio::addKeys()
 {
-    if (handleMenuAccelerator(key, mask) || handleUndoKeys(key, mask))
-    {
-        return true;
-    }
-    if (key == 'F' && mask == MASK_CONTROL)
-    {
-        mTreeFilter->setFocus(true);
-        return true;
-    }
-    if (key == 'O' && mask == MASK_CONTROL)
+    addCommand({ "find", 'F', MASK_CONTROL, false }, [this]() { findInFront(); return true; });
+    addCommand({ "open_file", 'O', MASK_CONTROL, false }, [this]()
     {
         if (mModes)
         {
@@ -1856,39 +1849,96 @@ bool ALFloaterXUIStudio::handleKeyHere(KEY key, MASK mask)
         }
         mCatalogFilter->setFocus(true);
         return true;
-    }
-    // Between the two places an element is worked on: the outline, where it
-    // is found and moved in the tree, and the canvas, where it is dragged
-    // and its handles are. Control and tab rather than tab, because tab
-    // belongs to the field the developer is typing in; the Mac's own
-    // Control key there, Command-Tab being the system's.
-    if (key == KEY_TAB && (mask == MASK_CONTROL || mask == MASK_MAC_CONTROL))
+    });
+    // Control-tab and control-shift-tab go round the documents, as they go
+    // round Script Studio's -- the Mac's own Control key there, Command-Tab
+    // being the system's.
+    for (const MASK control : { MASK_CONTROL, MASK_MAC_CONTROL })
     {
-        ALXUICanvas* canvas = mCanvases[PRIMARY];
-        const bool on_canvas = canvas && canvas->getVisible() && gFocusMgr.childHasKeyboardFocus(canvas);
-        if (on_canvas || !mTree)
-        {
-            if (mModes)
-            {
-                mModes->selectTabByName("outline_mode");
-            }
-            if (mTree)
-            {
-                mTree->setFocus(true);
-            }
-        }
-        else if (canvas && canvas->getVisible())
-        {
-            canvas->setFocus(true);
-        }
-        return true;
+        addCommand({ "next_document", KEY_TAB, control, false }, [this]() { cycleDocument(1); return true; });
+        addCommand({ "previous_document", KEY_TAB, control | MASK_SHIFT, false }, [this]() { cycleDocument(-1); return true; });
     }
+    // F6 between the outline and the canvas, as it goes between panes in
+    // most editors.
+    addCommand({ "switch_pane", KEY_F6, MASK_NONE, false }, [this]() { switchPane(); return true; });
     // Nothing selected, which is the way out of a selection rather than a
     // way to another one -- and the way to see the whole of a preview with
     // no marks over it.
-    if (key == KEY_ESCAPE && mask == MASK_NONE && mSelection.hasSelection())
+    addCommand({ "clear_selection", KEY_ESCAPE, MASK_NONE, false }, [this]()
     {
+        if (!mSelection.hasSelection())
+        {
+            return false;
+        }
         mSelection.clearSelection();
+        return true;
+    });
+}
+
+// Control-F finds in what is in front: the source's text where the source
+// is the inspector's tab showing, and otherwise the tree's filter.
+void ALFloaterXUIStudio::findInFront()
+{
+    const LLPanel* shown = mInspectors ? mInspectors->getCurrentPanel() : nullptr;
+    if (mSourceText && shown && shown->getName() == "source_tab" && !mFolds.collapsed("inspector_panel"))
+    {
+        mSourceText->setFocus(true);
+        mSourceText->perform(ALEditorCommand::Find);
+        return;
+    }
+    mTreeFilter->setFocus(true);
+}
+
+// The next document or the one before, round the canvas's tabs; a tab
+// waiting on a pin is a file, not a document, and is passed over.
+void ALFloaterXUIStudio::cycleDocument(S32 direction)
+{
+    std::vector<std::string> documents;
+    for (const ALTabStrip::Tab& tab : mCanvasTabs->tabs())
+    {
+        if (mDocuments.find(tab.value))
+        {
+            documents.push_back(tab.value);
+        }
+    }
+    if (documents.size() < 2)
+    {
+        return;
+    }
+    const auto   here  = std::find(documents.begin(), documents.end(), mCanvasTabs->chosen());
+    const size_t count = documents.size();
+    const size_t at    = here == documents.end() ? 0 : static_cast<size_t>(here - documents.begin());
+    onTabChosen(documents[(at + count + (direction > 0 ? 1 : count - 1)) % count]);
+}
+
+// Between the two places an element is worked on: the outline, where it is
+// found and moved in the tree, and the canvas, where it is dragged and its
+// handles are.
+void ALFloaterXUIStudio::switchPane()
+{
+    ALXUICanvas* canvas    = mCanvases[PRIMARY];
+    const bool   on_canvas = canvas && canvas->getVisible() && gFocusMgr.childHasKeyboardFocus(canvas);
+    if (on_canvas || !mTree)
+    {
+        if (mModes)
+        {
+            mModes->selectTabByName("outline_mode");
+        }
+        if (mTree)
+        {
+            mTree->setFocus(true);
+        }
+    }
+    else if (canvas && canvas->getVisible())
+    {
+        canvas->setFocus(true);
+    }
+}
+
+bool ALFloaterXUIStudio::handleKeyHere(KEY key, MASK mask)
+{
+    if (handleStudioKeys(key, mask))
+    {
         return true;
     }
     // A developer who works in one region reaches it without the mouse, and
