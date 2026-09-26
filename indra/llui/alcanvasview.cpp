@@ -658,11 +658,6 @@ void ALCanvasView::drawChrome()
     const LLRect seen = viewportRect();
     if (empty())
     {
-        if (!mHint.empty())
-        {
-            LLFontGL::getFontSansSerif()->renderUTF8(mHint, 0, seen.getCenterX(), seen.getCenterY(), inkColor(true),
-                                                     LLFontGL::HCENTER, LLFontGL::VCENTER, LLFontGL::NORMAL, inkShadow());
-        }
         return;
     }
     const std::string words = legend();

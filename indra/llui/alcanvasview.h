@@ -207,9 +207,6 @@ public:
     // container that scrolls it, or failing that the parent.
     LLRect roomRect() const;
 
-    // What is said in the middle while there is nothing on the surface,
-    // in the canvas's own words and size.
-    void setHint(std::string hint) { mHint = std::move(hint); }
     // Whether there is anything on the surface to draw. A surface shows a
     // view tree unless a subclass shows something else.
     virtual bool empty() const { return !mRoot; }
@@ -335,8 +332,8 @@ protected:
     // What is drawn at its own size whatever the zoom, because it is the
     // canvas's own furniture rather than a part of what is shown: a rule
     // along the edge of what can be seen, and its like. Unless a subclass
-    // has furniture of its own, it is the hint while the surface is empty
-    // and the legend in the corner while it is not.
+    // has furniture of its own, it is the legend in the corner while there
+    // is anything on the surface.
     virtual void drawChrome();
 
     // The chosen backdrop over an area, in drawn pixels.
@@ -373,7 +370,6 @@ private:
     S32     mNeedWidth = 0;         // to the far side of what it draws,
     S32     mNeedHeight = 0;        // from that same corner
     bool    mPlaced = false;        // something has been put on it
-    std::string mHint;
     Backdrop mBackdrop = Backdrop::None;
     bool mPixelGrid = false;
     bool mRulers = false;
