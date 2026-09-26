@@ -647,11 +647,6 @@ private:
     // the counts the problems.
     void        onTrailerChosen(const std::string& value);
     void        onCrumbChosen(size_t at, const std::string& value);
-    // An outline entry as a picker's value, and back: by where it was and
-    // what it is called, so that an outline made again while a list is up
-    // -- a check answering -- still finds it, or nothing.
-    static std::string outlineValue(const Doc& doc, size_t index);
-    static size_t      outlineEntryOf(const Doc& doc, const std::string& value);
     void        onOutlineChosen(bool to_editor);
     // A bottom tab shown; and the keyboard put in its list, where asked.
     void        showBottom(const char* tab, bool focus = false);

@@ -154,6 +154,8 @@ using ALScriptFileIO::writeTempFile;
 using ALScriptPlaces::isIdentifier;
 using ALScriptPlaces::lineOf;
 using ALScriptPlaces::mapSpan;
+using ALScriptPlaces::outlineEntryOf;
+using ALScriptPlaces::outlineValue;
 using ALScriptPlaces::placeText;
 using ALScriptPlaces::rangeOf;
 using ALScriptPlaces::sourceOf;
@@ -6342,34 +6344,6 @@ void ALFloaterScriptStudio::onCrumbChosen(size_t, const std::string& value)
         source.goTo(rangeOf(doc->outline[index].nameSpan));
     }
     source.setFocus(true);
-}
-
-// static
-std::string ALFloaterScriptStudio::outlineValue(const Doc& doc, size_t index)
-{
-    return std::to_string(index) + '\n' + doc.outline[index].name;
-}
-
-// static
-size_t ALFloaterScriptStudio::outlineEntryOf(const Doc& doc, const std::string& value)
-{
-    // Where it was, if what is there now has its name; else the first of
-    // its name; else nothing.
-    const size_t      cut   = value.find('\n');
-    const std::string name  = cut == std::string::npos ? std::string() : value.substr(cut + 1);
-    const size_t      index = static_cast<size_t>(atoi(value.c_str()));
-    if (index < doc.outline.size() && doc.outline[index].name == name)
-    {
-        return index;
-    }
-    for (size_t i = 0; i < doc.outline.size(); ++i)
-    {
-        if (doc.outline[i].name == name)
-        {
-            return i;
-        }
-    }
-    return NONE;
 }
 
 void ALFloaterScriptStudio::onOutlineChosen(bool to_editor)

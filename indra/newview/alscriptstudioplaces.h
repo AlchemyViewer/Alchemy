@@ -31,8 +31,8 @@
 
 // What the studio's window and its units share of places in scripts: a
 // span as a range of a text, a line of a text, whether a word is a name,
-// a span read back from an expansion to the file it came from, and a
-// place's line as a pane's row shows it.
+// a span read back from an expansion to the file it came from, a place's
+// line as a pane's row shows it, and an outline entry as a value.
 namespace ALScriptPlaces
 {
     ALTextRange rangeOf(const ALScriptSpan& span);
@@ -49,4 +49,10 @@ namespace ALScriptPlaces
     // where one wrapped it, the text as it came otherwise, and nothing
     // where it could not be read.
     std::string sourceOf(const ALScriptWorkspace::Loaded& loaded);
+    // An outline entry as a picker's value, and back: by where it was and
+    // what it is called, so that an outline made again while a list is up
+    // -- a check answering -- still finds it, or nothing.
+    constexpr size_t NONE = static_cast<size_t>(-1);
+    std::string      outlineValue(const ALScriptStudioDoc& doc, size_t index);
+    size_t           outlineEntryOf(const ALScriptStudioDoc& doc, const std::string& value);
 }
