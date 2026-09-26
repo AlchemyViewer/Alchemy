@@ -24,6 +24,7 @@
 
 #pragma once
 
+#include "alanchoredranges.h"
 #include "alkeymap.h"
 #include "alsyntaxhighlighter.h"
 #include "altextdocument.h"
@@ -348,7 +349,7 @@ public:
     void                             setSubstitutions(std::vector<Substitution> substitutions);
     void                             addSubstitution(Substitution substitution);
     void                             clearSubstitutions() { setSubstitutions({}); }
-    const std::vector<Substitution>& substitutions() const { return mSubstitutions; }
+    const std::vector<Substitution>& substitutions() const { return mSubstitutions.items(); }
     // The one over a position, or null.
     const Substitution*              substitutionAt(const ALTextPos& pos) const;
     // What the stretch at a range shows, changed: a name that arrived.
@@ -386,7 +387,7 @@ public:
     // would overlap one. What a log adds as it grows, a line at a time.
     void                      addStyle(Style style);
     void                      clearStyles() { setStyles({}); }
-    const std::vector<Style>& styles() const { return mStyles; }
+    const std::vector<Style>& styles() const { return mStyles.items(); }
 
     // --- atoms ---------------------------------------------------------------
 
@@ -417,7 +418,7 @@ public:
     void                     setAtoms(std::vector<Atom> atoms);
     void                     addAtom(Atom atom);
     void                     clearAtoms() { setAtoms({}); }
-    const std::vector<Atom>& atoms() const { return mAtoms; }
+    const std::vector<Atom>& atoms() const { return mAtoms.items(); }
     const Atom*              atomAt(const ALTextPos& pos) const;
     ALTextRange              atomRange(const Atom& atom) const { return ALTextRange(atom.at, ALTextPos(atom.at.line, atom.at.column + atom.length)); }
     typedef boost::signals2::signal<void(const Atom&)> atom_signal_t;
@@ -552,7 +553,7 @@ public:
     const std::vector<ALTextRange>& findMatches()
     {
         settleFind();
-        return mMatches;
+        return mMatches.items();
     }
     S32 findCurrent()
     {
@@ -977,7 +978,7 @@ private:
     LLHandle<LLContextMenu> mUrlMenuHandle;
 
     ALFindBar*               mFindBar = nullptr;
-    std::vector<ALTextRange> mMatches;
+    ALAnchoredRanges<ALTextRange> mMatches;
     S32                      mMatch = -1;
     bool                     mFindStale = false;
     LLFrameTimer             mFindSettle;
@@ -1010,9 +1011,14 @@ private:
 
     boost::signals2::scoped_connection mDocumentConnection;
     // In order of where they start, none over another.
-    std::vector<Substitution>          mSubstitutions;
-    std::vector<Atom>                  mAtoms;
-    std::vector<Style>                 mStyles;
+    ALAnchoredRanges<Substitution>     mSubstitutions;
+    // An atom is at a place, and over its placeholder's bytes.
+    struct AtomRange
+    {
+        ALTextRange operator()(const Atom& atom) const { return ALTextRange(atom.at, ALTextPos(atom.at.line, atom.at.column + atom.length)); }
+    };
+    ALAnchoredRanges<Atom, AtomRange>  mAtoms;
+    ALAnchoredRanges<Style>            mStyles;
     LLUIColor                          mLinkColor;
     link_signal_t                      mLinkClicked;
     drop_handler_t                     mDropHandler;

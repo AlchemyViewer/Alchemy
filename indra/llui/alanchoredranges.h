@@ -89,10 +89,29 @@ public:
         widen(item);
         mItems.insert(at, std::move(item));
     }
+    // One more after all of them, which the caller keeps in order.
+    void push_back(T item)
+    {
+        widen(item);
+        mItems.push_back(std::move(item));
+    }
+    // One more at a place the caller found, which keeps the order.
+    iterator insert(const_iterator at, T item)
+    {
+        widen(item);
+        return mItems.insert(at, std::move(item));
+    }
     void clear()
     {
         mItems.clear();
         mSpan = 0;
+    }
+    // All of them, handed over, the container left empty.
+    items_t take()
+    {
+        items_t out = std::move(mItems);
+        clear();
+        return out;
     }
     iterator erase(const_iterator at) { return mItems.erase(at); }
     template <typename Pred>
@@ -104,6 +123,9 @@ public:
     }
 
     const items_t& items() const { return mItems; }
+    const T*       data() const { return mItems.data(); }
+    const T&       front() const { return mItems.front(); }
+    const T&       back() const { return mItems.back(); }
     size_t         size() const { return mItems.size(); }
     bool           empty() const { return mItems.empty(); }
     const T&       operator[](size_t i) const { return mItems[i]; }
@@ -124,15 +146,17 @@ public:
     }
 
     // An edit applied: the text's own rule, those it cut through let go.
-    size_t apply(const ALTextDocument::Edit& edit)
+    // Where `follow` is given, the element at that index is followed to
+    // where it is after, or -1 where it went: a current match.
+    size_t apply(const ALTextDocument::Edit& edit, S32* follow = nullptr)
     {
-        return apply(edit, [](T& item, const ALTextDocument::Edit& e) { return slideRange(item, e); }, [](T&) {});
+        return apply(edit, [](T& item, const ALTextDocument::Edit& e) { return slideRange(item, e); }, [](T&) {}, follow);
     }
     // With a rule of the caller's: `slide` moves an element along and
     // says whether it stays; `dropped` is told of each let go, before it
     // goes. How many went.
     template <typename Slide, typename Dropped>
-    size_t apply(const ALTextDocument::Edit& edit, Slide slide, Dropped dropped)
+    size_t apply(const ALTextDocument::Edit& edit, Slide slide, Dropped dropped, S32* follow = nullptr)
     {
         if (mItems.empty())
         {
@@ -154,8 +178,13 @@ public:
                 // Past its last line, the lines keeping their numbers.
                 break;
             }
+            const bool followed = follow && *follow == static_cast<S32>(i);
             if (slide(item, edit))
             {
+                if (followed)
+                {
+                    *follow = static_cast<S32>(kept);
+                }
                 if (kept != i)
                 {
                     mItems[kept] = std::move(item);
@@ -164,10 +193,18 @@ public:
             }
             else
             {
+                if (followed)
+                {
+                    *follow = -1;
+                }
                 dropped(item);
             }
         }
         const size_t gone = i - kept;
+        if (follow && *follow >= static_cast<S32>(i))
+        {
+            *follow -= static_cast<S32>(gone);
+        }
         if (gone > 0)
         {
             std::move(mItems.begin() + static_cast<std::ptrdiff_t>(i), mItems.end(), mItems.begin() + static_cast<std::ptrdiff_t>(kept));
@@ -175,7 +212,8 @@ public:
         }
         // A rule of a caller's may part two that began together -- one
         // left before what is typed at it, one moved past -- so the order
-        // is looked at where anything moved.
+        // is looked at where anything moved. (An element followed is then
+        // followed only where the order held, as the text's rule keeps it.)
         const auto moved_begin = mItems.begin() + static_cast<std::ptrdiff_t>(start);
         const auto moved_end   = mItems.begin() + static_cast<std::ptrdiff_t>(kept);
         const auto by_begin    = [](const T& a, const T& b) { return RangeOf()(a).begin < RangeOf()(b).begin; };

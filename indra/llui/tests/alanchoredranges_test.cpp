@@ -145,4 +145,24 @@ namespace tut
             [&gone](Hint& h) { gone.push_back(h.name); });
         ensure("what went, told of", gone == std::vector<std::string>({ "inside" }));
     }
+
+    template<> template<>
+    void alanchoredranges_object::test<5>()
+    {
+        set_test_name("one followed through an edit: to where it is after, or none where it went");
+        ALTextDocument                doc("aa bb cc\ndd ee");
+        ALAnchoredRanges<ALTextRange> matches;
+        matches.assign({ on(0, 0, 2), on(0, 3, 5), on(0, 6, 8), on(1, 0, 2), on(1, 3, 5) });
+        S32 current = 2;
+        matches.apply(doc.replace(on(0, 3, 5), "B"), &current);
+        ensure("the one before it gone, the current a place back", current == 1 && matches.size() == 4 && matches[1] == on(0, 5, 7));
+        current = 3;
+        matches.apply(doc.replace(on(0, 0, 0), "x"), &current);
+        ensure("past the edit's line, not looked at, and where it was", current == 3 && matches[3] == on(1, 3, 5));
+        matches.apply(doc.replace(on(1, 3, 5), "E"), &current);
+        ensure("the current one cut through: none", current == -1 && matches.size() == 3);
+        current = 2;
+        matches.apply(doc.replace(on(0, 1, 2), ""), &current);
+        ensure("the one before it gone, below the edit's line: a place back", current == 1);
+    }
 }

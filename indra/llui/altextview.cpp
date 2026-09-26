@@ -1510,56 +1510,39 @@ void ALTextView::onDocumentEdit(const ALTextDocument::Edit& edit)
     }
     // Its matches slide with the text, those the edit cut through going,
     // until the text is looked through again.
-    if (!mMatches.empty())
-    {
-        S32 kept    = 0;
-        S32 current = -1;
-        for (S32 i = 0; i < static_cast<S32>(mMatches.size()); ++i)
-        {
-            ALTextRange range = mMatches[i];
-            if (edit.slide(range))
-            {
-                current          = i == mMatch ? kept : current;
-                mMatches[kept++] = range;
-            }
-        }
-        mMatches.resize(kept);
-        mMatch = current;
-    }
+    mMatches.apply(edit, &mMatch);
 
     // The layers: what is after the edit slides with the text, what it
     // cut through goes.
     if (!mSubstitutions.empty())
     {
-        mSubstitutions.erase(std::remove_if(mSubstitutions.begin(), mSubstitutions.end(), [&](Substitution& s) { return !edit.slide(s.range); }), mSubstitutions.end());
+        mSubstitutions.apply(edit);
         mHoverLink   = -1;
         mPressedLink = -1;
     }
-    if (!mStyles.empty())
-    {
-        mStyles.erase(std::remove_if(mStyles.begin(), mStyles.end(), [&](Style& s) { return !edit.slide(s.range); }), mStyles.end());
-    }
+    mStyles.apply(edit);
     if (!mAtoms.empty())
     {
-        for (size_t i = 0; i < mAtoms.size();)
-        {
-            ALTextRange range = atomRange(mAtoms[i]);
-            if (edit.slide(range))
-            {
-                mAtoms[i].at = range.begin;
-                ++i;
-            }
-            else
-            {
-                if (mAtoms[i].view)
+        // An atom cut through takes its view with it.
+        mAtoms.apply(
+            edit,
+            [this](Atom& atom, const ALTextDocument::Edit& e) {
+                ALTextRange range = atomRange(atom);
+                if (!e.slide(range))
                 {
-                    letGoOfAtomView(mAtoms[i].view);
-                    removeChild(mAtoms[i].view);
-                    mAtoms[i].view->die();
+                    return false;
                 }
-                mAtoms.erase(mAtoms.begin() + static_cast<std::ptrdiff_t>(i));
-            }
-        }
+                atom.at = range.begin;
+                return true;
+            },
+            [this](Atom& atom) {
+                if (atom.view)
+                {
+                    letGoOfAtomView(atom.view);
+                    removeChild(atom.view);
+                    atom.view->die();
+                }
+            });
         mHoverAtom   = -1;
         mPressedAtom = -1;
     }
@@ -2834,7 +2817,7 @@ void ALTextView::refreshFind()
     {
         mFindInSelection = false;
     }
-    mMatches = ALTextSearch::matches(mDocument, mFindBar->query(), mFindBar->options(), mFindInSelection ? &mFindScope : nullptr, &mFindError);
+    mMatches.assign(ALTextSearch::matches(mDocument, mFindBar->query(), mFindBar->options(), mFindInSelection ? &mFindScope : nullptr, &mFindError));
     // The current one is the match the selection is.
     mMatch                = -1;
     const ALTextRange sel = selection().normalised();
@@ -2862,7 +2845,7 @@ bool ALTextView::findNext(bool forward)
     }
     const ALTextRange sel  = selection().normalised();
     const ALTextPos   from = hasSelection() ? (forward ? sel.end : sel.begin) : mCaret;
-    const S32         index = ALTextSearch::nearest(mMatches, from, forward);
+    const S32         index = ALTextSearch::nearest(mMatches.items(), from, forward);
     if (index < 0)
     {
         return false;
@@ -2910,7 +2893,7 @@ S32 ALTextView::replaceAllMatches()
     // of them: every one is cut through by its own replacement, and the
     // text is looked through again once the edits settle. Where nothing
     // changed, they stay as they were.
-    std::vector<ALTextRange> matches = std::move(mMatches);
+    std::vector<ALTextRange> matches = mMatches.take();
     const S32                match   = mMatch;
     mMatches.clear();
     mMatch = -1;
@@ -2918,7 +2901,7 @@ S32 ALTextView::replaceAllMatches()
     {
         return count;
     }
-    mMatches = std::move(matches);
+    mMatches.assign(std::move(matches));
     mMatch   = match;
     return 0;
 }

@@ -267,9 +267,33 @@ int main(int, char**)
         e.undo();
     });
     countRow("  replaced", replaced[0], replaced[1]);
+
+    // What lies over the text slides with each edit: every match found,
+    // a squiggle on every other line.
+    std::printf("\nLayers over the text\n");
+    size_t lit[2] = {};
+    for (Subject& s : subjects)
+    {
+        lit[&s - subjects] = s.editor->findMatches().size();
+    }
+    both("an edit at the top, every match of \"total\" lit", subjects, 2, [](Subject&, ALCodeEditor& e) { editAtTop(e, "x"); });
+    countRow("  matches lit", lit[0], lit[1]);
     for (Subject& s : subjects)
     {
         s.editor->hideFind();
+        std::vector<ALCodeEditor::Decoration> squiggles;
+        for (S32 line = 0; line < s.editor->document().lineCount(); line += 2)
+        {
+            ALCodeEditor::Decoration d;
+            d.range = ALTextRange(ALTextPos(line, 0), ALTextPos(line, llmin(4, s.editor->document().lineLength(line))));
+            squiggles.push_back(d);
+        }
+        s.editor->setDecorations(std::move(squiggles));
+    }
+    both("an edit at the top, a squiggle on every other line", subjects, 2, [](Subject&, ALCodeEditor& e) { editAtTop(e, "x"); });
+    for (Subject& s : subjects)
+    {
+        s.editor->setDecorations({});
     }
 
     std::printf("\nFolding\n");
