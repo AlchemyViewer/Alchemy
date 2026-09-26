@@ -26,6 +26,8 @@
 
 #include "alflagsfield.h"
 
+#include "alstringmatch.h"
+
 #include "llcheckboxctrl.h"
 #include "lluictrlfactory.h"
 
@@ -37,13 +39,6 @@ namespace
 {
     // As many names as the bits of the word they are read into.
     constexpr size_t MOST_NAMES = 32;
-
-    bool sameWord(std::string_view a, std::string_view b)
-    {
-        return a.size() == b.size()
-            && std::equal(a.begin(), a.end(), b.begin(),
-                          [](char x, char y) { return LLStringOps::toLower(x) == LLStringOps::toLower(y); });
-    }
 }
 
 // static
@@ -56,7 +51,7 @@ U32 ALFlagsField::read(std::string_view text, std::span<const std::string> names
     {
         const size_t bar = text.find('|', start);
         const std::string_view token = text.substr(start, bar == std::string_view::npos ? std::string_view::npos : bar - start);
-        if (!all_word.empty() && sameWord(token, all_word))
+        if (!all_word.empty() && ALStringMatch::equalsNoCase(token, all_word))
         {
             bits = every;
         }
@@ -64,7 +59,7 @@ U32 ALFlagsField::read(std::string_view text, std::span<const std::string> names
         {
             for (size_t i = 0; i < count; ++i)
             {
-                if (!names[i].empty() && sameWord(token, names[i]))
+                if (!names[i].empty() && ALStringMatch::equalsNoCase(token, names[i]))
                 {
                     bits |= 1u << i;
                 }

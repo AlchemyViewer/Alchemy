@@ -26,6 +26,8 @@
 
 #include "alscriptkeymap.h"
 
+#include "alstringmatch.h"
+
 #include "alfloaterscriptstudio.h"
 #include "llbutton.h"
 #include "llfloaterreg.h"
@@ -312,19 +314,13 @@ std::string ALPanelScriptKeymap::nameOf(const Chosen& which) const
 void ALPanelScriptKeymap::fill()
 {
     const Chosen was    = chosen();
-    std::string  filter = mFilter->getText();
-    LLStringUtil::toLower(filter);
+    const std::string filter = mFilter->getText();
     const ALKeymap map = ALScriptKeymap::current();
     mList->deleteAllItems();
     const auto add = [&](const LLSD& value, const std::string& about, const std::string& keys, const std::string& name, bool changed, bool selected) {
-        if (!filter.empty())
+        if (!ALStringMatch::containsNoCase(about + " " + keys + " " + name, filter))
         {
-            std::string haystack = about + " " + keys + " " + name;
-            LLStringUtil::toLower(haystack);
-            if (haystack.find(filter) == std::string::npos)
-            {
-                return;
-            }
+            return;
         }
         LLSD row;
         row["value"]                = value;

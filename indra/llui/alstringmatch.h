@@ -30,8 +30,9 @@
 #include <string_view>
 
 // What a filter typed over a list asks of each row: whether the words are
-// in there, whatever case either was written in. Nothing is copied, since
-// this is asked of every row on every letter typed.
+// in there, whatever case either was written in -- or begin it, or are it.
+// Nothing is copied, since this is asked of every row on every letter
+// typed.
 struct ALStringMatch
 {
     static bool containsNoCase(std::string_view haystack, std::string_view needle)
@@ -46,5 +47,21 @@ struct ALStringMatch
         };
         return std::search(haystack.begin(), haystack.end(),
                            needle.begin(), needle.end(), same) != haystack.end();
+    }
+
+    // Whether the text begins with the words, as a completion's prefix
+    // does, whatever case either was written in.
+    static bool startsWithNoCase(std::string_view text, std::string_view prefix)
+    {
+        return prefix.size() <= text.size() && equalsNoCase(text.substr(0, prefix.size()), prefix);
+    }
+
+    // Whether two words are the same word, as a flag's name read back is.
+    static bool equalsNoCase(std::string_view a, std::string_view b)
+    {
+        return a.size() == b.size() && std::equal(a.begin(), a.end(), b.begin(), [](char x, char y)
+        {
+            return LLStringOps::toLower(x) == LLStringOps::toLower(y);
+        });
     }
 };

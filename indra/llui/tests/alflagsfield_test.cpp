@@ -78,6 +78,8 @@ namespace tut
         ensure_equals("two with a bar", ALFlagsField::read("left|top", edges, "all"), 1u | 8u);
         ensure_equals("the word for all", ALFlagsField::read("all", edges, "all"), 15u);
         ensure_equals("and it may be spelt how it likes", ALFlagsField::read("ALL", edges, "all"), 15u);
+        ensure_equals("a word with a name in it is not the name", ALFlagsField::read("lefty|top", edges, "all"), 8u);
+        ensure_equals("nor with the word for all in it", ALFlagsField::read("allow", edges, "all"), 0u);
         ensure_equals("as may a name", ALFlagsField::read("Left|TOP", edges, "all"), 1u | 8u);
         ensure_equals("a name not carried is passed over", ALFlagsField::read("left|middle", edges, "all"), 1u);
         ensure_equals("nothing is nothing", ALFlagsField::read("", edges, "all"), 0u);

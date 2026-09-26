@@ -26,6 +26,8 @@
 
 #include "alxuiservice.h"
 
+#include "alstringmatch.h"
+
 #include "alxuischema.h"
 
 #include <pugixml.hpp>
@@ -62,21 +64,6 @@ namespace
         return p;
     }
 
-    bool matchesPrefix(std::string_view word, std::string_view prefix)
-    {
-        if (prefix.size() > word.size())
-        {
-            return false;
-        }
-        for (size_t i = 0; i < prefix.size(); ++i)
-        {
-            if (LLStringOps::toLower(word[i]) != LLStringOps::toLower(prefix[i]))
-            {
-                return false;
-            }
-        }
-        return true;
-    }
 }
 
 ALXUIService::Context ALXUIService::contextAt(const ALTextDocument& doc, const ALTextPos& at)
@@ -320,7 +307,7 @@ void ALXUIService::complete(const ALTextDocument& doc, const ALTextPos& at, std:
     const ALXUISchema& schema  = ALXUISchema::get();
     const Context      context = contextAt(doc, at);
     auto add = [&](const std::string& text, const std::string& detail, ALSyntaxKind kind, const std::string& snippet = std::string()) {
-        if (!matchesPrefix(text, prefix))
+        if (!ALStringMatch::startsWithNoCase(text, prefix))
         {
             return;
         }

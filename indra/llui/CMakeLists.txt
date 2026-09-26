@@ -545,6 +545,7 @@ if(AL_BUILD_TESTS)
     alxuisourcemap
     alxuitreemodel
     alsettingrow
+    alstringmatch
     alsurface
     alcolorsheet
     lluicolortable

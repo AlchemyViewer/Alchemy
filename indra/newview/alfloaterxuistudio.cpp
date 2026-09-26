@@ -2117,15 +2117,13 @@ LLSD ALFloaterXUIStudio::row(const LLSD& id, std::initializer_list<std::pair<con
 
 void ALFloaterXUIStudio::fillCatalog()
 {
-    const std::string filter = utf8str_tolower(mCatalogFilter->getText());
+    const std::string filter = mCatalogFilter->getText();
     mFileList->deleteAllItems();
     for (const ALXUICatalog::Entry& e : mCatalog.entries())
     {
         const char* kind = ALXUICatalog::kindName(e.kind);
-        if (!filter.empty()
-            && utf8str_tolower(e.name).find(filter) == std::string::npos
-            && utf8str_tolower(e.title).find(filter) == std::string::npos
-            && filter != kind)
+        if (!ALStringMatch::containsNoCase(e.name, filter) && !ALStringMatch::containsNoCase(e.title, filter)
+            && !ALStringMatch::equalsNoCase(filter, kind))
         {
             continue;
         }

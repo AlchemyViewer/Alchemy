@@ -26,6 +26,8 @@
 
 #include "alsyntaxgrammar.h"
 
+#include "alstringmatch.h"
+
 #include "alregex.h"
 #include "lldir.h"
 #include "llsdserialize.h"
@@ -157,25 +159,11 @@ bool ALSyntaxWords::has(std::string_view table, std::string_view word) const
 
 void ALSyntaxWords::collect(std::string_view prefix, std::vector<std::pair<std::string, std::string>>& out) const
 {
-    auto begins = [&](const std::string& word) {
-        if (word.size() < prefix.size())
-        {
-            return false;
-        }
-        for (size_t i = 0; i < prefix.size(); ++i)
-        {
-            if (LLStringOps::toLower(word[i]) != LLStringOps::toLower(prefix[i]))
-            {
-                return false;
-            }
-        }
-        return true;
-    };
     for (const auto& [table, words] : mTables)
     {
         for (const std::string& word : words)
         {
-            if (begins(word))
+            if (ALStringMatch::startsWithNoCase(word, prefix))
             {
                 out.emplace_back(word, table);
             }
