@@ -601,6 +601,28 @@ private:
     bool        movable(const Doc& doc);
     // A bottom tab shown; and the keyboard put in its list, where asked.
     void        showBottom(const char* tab, bool focus = false);
+    // The window's regions, in the order F6 goes round them: whether each
+    // is shown (in the window or out of it), whether the keyboard is in it,
+    // and the keyboard given to it -- its list, the text in front, the
+    // tab's own control.
+    enum class Region : U8
+    {
+        Explorer,
+        Editor,
+        Bottom,
+        Inspector,
+        COUNT
+    };
+    bool        regionShown(Region region) const;
+    bool        regionHasKeys(Region region) const;
+    void        focusRegion(Region region);
+    // The next region shown after the one with the keyboard, or the one
+    // before; from none, the text.
+    void        cycleRegion(S32 direction);
+    // What a region's key does: shown and given the keyboard, or, from its
+    // key when it has the keyboard already, folded, the keyboard back to
+    // the text. From the menu, with the mouse, the check mark folds it.
+    void        regionKey(bool showing, bool has_keys, const std::function<void()>& show, const std::function<void()>& fold);
     std::string kindName(ALScriptSymbolKind kind) const;
 
     // What scripts say, from the workspace: listed in the Output tab, and

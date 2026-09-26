@@ -4444,6 +4444,120 @@ void ALFloaterScriptStudio::showBottom(const char* tab, bool focus)
     }
 }
 
+bool ALFloaterScriptStudio::regionShown(Region region) const
+{
+    switch (region)
+    {
+        case Region::Explorer:  return !mFolds.collapsed("explorer");
+        case Region::Bottom:    return !mFolds.collapsed("bottom");
+        case Region::Inspector: return !mFolds.collapsed("inspector");
+        default:                return true;
+    }
+}
+
+bool ALFloaterScriptStudio::regionHasKeys(Region region) const
+{
+    // By the panes themselves, which may be out in windows of their own.
+    switch (region)
+    {
+        case Region::Explorer:  return gFocusMgr.childHasKeyboardFocus(mExplorerPane);
+        case Region::Editor:    return gFocusMgr.childHasKeyboardFocus(mEditorHost) || gFocusMgr.childHasKeyboardFocus(mTabs);
+        case Region::Bottom:    return gFocusMgr.childHasKeyboardFocus(mBottomTabs);
+        case Region::Inspector: return gFocusMgr.childHasKeyboardFocus(mOutlinePane) || gFocusMgr.childHasKeyboardFocus(mInspectorPane);
+        default:                return false;
+    }
+}
+
+void ALFloaterScriptStudio::focusRegion(Region region)
+{
+    switch (region)
+    {
+        case Region::Explorer:
+            mFolds.setCollapsed("explorer", false);
+            mExplorerPane->takeKeyboard();
+            break;
+        case Region::Editor:
+            if (Doc* doc = active())
+            {
+                focusShown(*doc);
+            }
+            else
+            {
+                mTabs->setFocus(true);
+            }
+            break;
+        case Region::Bottom:
+        {
+            // The tab in front, as its key has it; Search's query, which
+            // is what is typed into there.
+            const LLPanel*    current = mBottomTabs->getCurrentPanel();
+            const std::string tab     = current ? current->getName() : std::string("problems_tab");
+            if (tab == "search_tab")
+            {
+                showBottom("search_tab");
+                mSearchPane->focusQuery(nullptr);
+            }
+            else
+            {
+                showBottom(tab.c_str(), true);
+            }
+            break;
+        }
+        case Region::Inspector:
+            mFolds.setCollapsed("inspector", false);
+            mOutlinePane->list()->setFocus(true);
+            break;
+        default:
+            break;
+    }
+}
+
+void ALFloaterScriptStudio::cycleRegion(S32 direction)
+{
+    constexpr S32 COUNT = static_cast<S32>(Region::COUNT);
+    S32           at    = static_cast<S32>(Region::Editor);
+    bool          found = false;
+    for (S32 i = 0; i < COUNT && !found; ++i)
+    {
+        if (regionHasKeys(static_cast<Region>(i)))
+        {
+            at    = i;
+            found = true;
+        }
+    }
+    if (!found)
+    {
+        focusRegion(Region::Editor);
+        return;
+    }
+    for (S32 step = 1; step < COUNT; ++step)
+    {
+        const Region next = static_cast<Region>(((at + direction * step) % COUNT + COUNT) % COUNT);
+        if (regionShown(next))
+        {
+            focusRegion(next);
+            return;
+        }
+    }
+}
+
+void ALFloaterScriptStudio::regionKey(bool showing, bool has_keys, const std::function<void()>& show, const std::function<void()>& fold)
+{
+    // From the menu with the mouse, the check mark: showing, it folds. From
+    // its key, it folds only once the keyboard is in it, which goes back to
+    // the text; otherwise it is shown and given the keyboard.
+    if (showing && (!byKeys() || has_keys))
+    {
+        fold();
+        if (has_keys)
+        {
+            focusRegion(Region::Editor);
+        }
+        return;
+    }
+    show();
+}
+
 void ALFloaterScriptStudio::report(const std::string& text, bool failure, const Doc* doc, const std::vector<std::string>& actions)
 {
     setStatus(text, failure);
@@ -6371,6 +6485,10 @@ void ALFloaterScriptStudio::addGoCommands()
     mCommands.add("move_tab_left", [this]() { moveTab(-1); });
     mCommands.add("move_tab_right", [this]() { moveTab(1); });
     mCommands.add("focus_tabs", [this]() { mTabs->setFocus(true); });
+    // F6 round the window's regions, as it goes between panes in most
+    // editors, and Shift-F6 back.
+    mCommands.add("next_pane", [this]() { cycleRegion(1); });
+    mCommands.add("previous_pane", [this]() { cycleRegion(-1); });
 }
 
 void ALFloaterScriptStudio::addViewCommands()
@@ -6481,31 +6599,32 @@ void ALFloaterScriptStudio::addViewCommands()
     addEditorCommand("unfold", ALEditorCommand::Unfold, false);
     addEditorCommand("fold_all", ALEditorCommand::FoldAll, false);
     addEditorCommand("unfold_all", ALEditorCommand::UnfoldAll, false);
-    for (const char* region : { "explorer", "inspector" })
+    for (const auto& [name, region] : { std::pair{ "explorer", Region::Explorer }, std::pair{ "inspector", Region::Inspector } })
     {
         mCommands.add(
-            region, [this, region]() { mFolds.toggle(region); }, nullptr, [this, region]() { return !mFolds.collapsed(region); });
+            name,
+            [this, name, region]() {
+                regionKey(regionShown(region), regionHasKeys(region), [this, region]() { focusRegion(region); },
+                          [this, name]() { mFolds.setCollapsed(name, true); });
+            },
+            nullptr, [this, name]() { return !mFolds.collapsed(name); });
     }
-    // The panel under the editor's tabs: shown; or the panel folded when
-    // it is the tab showing.
+    // The panel under the editor's tabs: the tab shown and given the
+    // keyboard -- Search's query -- or the panel folded when it is the tab
+    // showing.
     for (const auto& [name, tab] : { std::pair{ "problems", "problems_tab" }, std::pair{ "references", "references_tab" },
                                      std::pair{ "output", "output_tab" }, std::pair{ "search", "search_tab" }, std::pair{ "weights", "weights_tab" } })
     {
         mCommands.add(
             name,
             [this, name, tab]() {
-                if (mCommands.checked(name))
-                {
-                    mFolds.setCollapsed("bottom", true);
-                }
-                else if (std::string_view(name) == "search")
-                {
-                    showBottom(tab);
-                }
-                else
-                {
-                    showBottom(tab, true);
-                }
+                regionKey(
+                    mCommands.checked(name), regionHasKeys(Region::Bottom),
+                    [this, tab]() {
+                        mBottomTabs->selectTabByName(tab);
+                        focusRegion(Region::Bottom);
+                    },
+                    [this]() { mFolds.setCollapsed("bottom", true); });
             },
             nullptr,
             [this, tab]() {

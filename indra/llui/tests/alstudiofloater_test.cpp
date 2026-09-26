@@ -65,6 +65,7 @@ namespace
         using ALStudioFloater::addCommand;
         using ALStudioFloater::runCommandKey;
         using ALStudioFloater::keepChords;
+        using ALStudioFloater::byKeys;
 
         // A person's key for a command, as a studio with a keymap keeps it.
         std::string rebound;
@@ -482,5 +483,28 @@ namespace tut
         item->setShownAccelerator('S', MASK_CONTROL);
         ensure_equals("a key of its own in their place", item->getAcceleratorString(), LLKeyboard::stringFromAccelerator(MASK_CONTROL, 'S'));
         item->die();
+    }
+
+    template<> template<>
+    void alstudiofloater_object::test<11>()
+    {
+        set_test_name("a command knows it was run by its keys -- one, or two in turn -- and not chosen with the mouse");
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        TestStudio*       window = studio();
+        std::vector<bool> heard;
+        const auto        run    = [&]() { heard.push_back(window->byKeys()); return true; };
+        window->addCommand({ "one", KEY_F6, MASK_NONE }, run);
+        window->addCommand({ "two", 'S', MASK_NONE, true, 'K', MASK_CONTROL }, run);
+        window->handleKeyHere(KEY_F6, MASK_NONE);
+        window->handleKeyHere('K', MASK_CONTROL);
+        ALKeyChords::takeKey('S', MASK_NONE);
+        ALKeyChords::takeChar('s');
+        run();
+        ensure("by its key, by two, and not by a menu", heard == std::vector<bool>({ true, true, false }));
+        ensure("and not after", !window->byKeys());
+        window->closeFloater();
     }
 }

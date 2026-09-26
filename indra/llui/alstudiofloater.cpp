@@ -40,6 +40,7 @@
 
 #include <algorithm>
 #include <memory>
+#include <utility>
 
 ALStudioFloater::ALStudioFloater(const LLSD& key, std::string state_setting)
 :   LLFloater(key),
@@ -113,7 +114,6 @@ bool ALStudioFloater::runChord(const ALKeyChord& chord)
 
 void ALStudioFloater::finishChord(KEY lead_key, MASK lead_mask, KEY key, MASK mask)
 {
-    const auto run = [this](const ALKeyChord& chord) { return runChord(chord); };
     // The wait said no longer, before the command says anything of its own.
     if (hasString("ChordWaiting"))
     {
@@ -121,7 +121,10 @@ void ALStudioFloater::finishChord(KEY lead_key, MASK lead_mask, KEY key, MASK ma
     }
     const ALKeyChord chord{ key, mask, lead_key, lead_mask };
     const MASK       held = lead_mask & (MASK_CONTROL | MASK_MAC_CONTROL);
-    if (run(chord) || (held != MASK_NONE && (mask & held) == held && run(ALKeyChord{ key, static_cast<MASK>(mask & ~held), lead_key, lead_mask })))
+    const bool       was  = std::exchange(mByKeys, true);
+    const bool       ran  = runChord(chord) || (held != MASK_NONE && (mask & held) == held && runChord(ALKeyChord{ key, static_cast<MASK>(mask & ~held), lead_key, lead_mask }));
+    mByKeys               = was;
+    if (ran)
     {
         return;
     }
@@ -133,7 +136,10 @@ void ALStudioFloater::finishChord(KEY lead_key, MASK lead_mask, KEY key, MASK ma
 
 bool ALStudioFloater::handleStudioKeys(KEY key, MASK mask)
 {
-    return handleMenuAccelerator(key, mask) || handleUndoKeys(key, mask) || runCommandKey(key, mask);
+    const bool was = std::exchange(mByKeys, true);
+    const bool taken = handleMenuAccelerator(key, mask) || handleUndoKeys(key, mask) || runCommandKey(key, mask);
+    mByKeys = was;
+    return taken;
 }
 
 namespace

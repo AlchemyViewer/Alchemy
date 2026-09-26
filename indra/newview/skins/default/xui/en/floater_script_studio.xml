@@ -864,6 +864,13 @@
             <menu_item_call label="Go to Tabs" layout="topleft" name="focus_tabs">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="focus_tabs" />
             </menu_item_call>
+            <menu_item_separator layout="topleft" />
+            <menu_item_call label="Next Pane" layout="topleft" name="next_pane">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="next_pane" />
+            </menu_item_call>
+            <menu_item_call label="Previous Pane" layout="topleft" name="previous_pane">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="previous_pane" />
+            </menu_item_call>
         </menu>
         <menu
          label="View"

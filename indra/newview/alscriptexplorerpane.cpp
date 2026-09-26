@@ -505,6 +505,14 @@ std::optional<bool> ALScriptExplorerPane::knownRunning(const ALScriptRef& ref) c
     return mModel.knownRunning(ref);
 }
 
+void ALScriptExplorerPane::takeKeyboard()
+{
+    if (mTree)
+    {
+        mTree->setFocus(true);
+    }
+}
+
 void ALScriptExplorerPane::onChosen()
 {
     // A script or notecard opened; an object, a prim or a linkset's row of

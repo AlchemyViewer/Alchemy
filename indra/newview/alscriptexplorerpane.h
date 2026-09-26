@@ -104,6 +104,8 @@ public:
     // An object pinned, so that it stays listed once it is no longer
     // selected in world; in sight; and chosen, so that the buttons act on it.
     void explore(const LLUUID& root);
+    // The keyboard to the list, to walk it: the Explorer's key, and F6.
+    void takeKeyboard();
 
     // The rows chosen, in the tree's order.
     std::vector<Choice>   choice() const;

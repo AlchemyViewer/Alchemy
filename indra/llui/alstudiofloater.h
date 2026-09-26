@@ -149,6 +149,11 @@ protected:
     // undo and redo, then its commands. For a studio with keys of its own
     // to try once these have not taken one.
     bool handleStudioKeys(KEY key, MASK mask);
+    // Whether the command running now was run by its keys -- a menu's
+    // shortcut, a command's key, two keys in turn -- rather than chosen
+    // from a menu with the mouse: a key that goes to a pane goes there
+    // first, where a menu's check mark folds it.
+    bool byKeys() const { return mByKeys; }
     // A window that keeps its chords takes every Control, Command or Alt
     // chord that nothing in it had a use for, rather than letting it go on
     // to the viewer's menus and the world -- where Control-D duplicates
@@ -233,6 +238,7 @@ private:
     bool                mStatusFailure = false;
     bool                mStatusQuiet   = true;
     bool                mKeepChords    = false;
+    bool                mByKeys        = false;
     // What the state said the window's rect was, applied when it opens;
     // and what was last written, so a frame can tell whether anything
     // moved.

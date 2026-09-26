@@ -302,6 +302,8 @@ namespace ALScriptKeymap
             { "move_tab_left", KEY_PAGE_UP, MASK_CONTROL | MASK_SHIFT },
             { "move_tab_right", KEY_PAGE_DOWN, MASK_CONTROL | MASK_SHIFT },
             { "focus_tabs", KEY_NONE, MASK_NONE },
+            { "next_pane", KEY_F6, MASK_NONE },
+            { "previous_pane", KEY_F6, MASK_SHIFT },
             // View
             { "command_palette", 'P', MASK_CONTROL | MASK_SHIFT },
             { "word_wrap", KEY_NONE, MASK_NONE },
