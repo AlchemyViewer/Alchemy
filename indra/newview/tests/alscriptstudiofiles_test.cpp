@@ -25,6 +25,7 @@
 #include "linden_common.h"
 
 #include "../alscriptstudiofiles.h"
+#include "../alscriptstudiofileio.h"
 
 #include "alscriptstudio_fixture.h"
 #include "llmenugl.h"
@@ -398,5 +399,22 @@ namespace tut
         ensure("a file another tab has: said, and nothing written", !services.statuses.empty() &&
                                                                         services.statuses.back().find("FileOpenElsewhere") == 0 &&
                                                                         contents(other.file) == "o" && studio.became.size() == 1);
+    }
+
+    template<> template<>
+    void alscriptstudiofiles_object::test<8>()
+    {
+        set_test_name("a file whose name and folder go past ASCII is written and read back, its line endings as an editor keeps them");
+        make();
+        // A user's folder and a script's name as a German speaker might
+        // have them: on Windows, read in the ANSI code page, no such file.
+        const fsyspath    folder_path = fsyspath(in("J\xC3\xBCrgen"));
+        std::filesystem::create_directories(folder_path);
+        const std::string path = fsyspath(folder_path / fsyspath("\xC3\x9C" "berpr\xC3\xBC" "fung.lsl")).string();
+        ensure("written", ALScriptFileIO::writeTempFile(path, "default\r\n{\r\n}\r\n"));
+        std::string text;
+        ensure("read back", ALScriptFileIO::readWholeFile(path, text));
+        ensure_equals("as an editor keeps it", text, std::string("default\n{\n}\n"));
+        ensure("and where it was asked to be", std::filesystem::exists(fsyspath(path)));
     }
 }

@@ -26,7 +26,7 @@
 
 #include "alscriptstudiofileio.h"
 
-#include <fstream>
+#include "fsyspath.h"
 
 #if !LL_WINDOWS
 #include <cerrno>
@@ -61,7 +61,10 @@ namespace ALScriptFileIO
         {
             return false;
         }
-        std::ifstream in(path, std::ios::binary);
+        // By the path as the system spells it: a name past ASCII -- a
+        // user's folder, a script's name -- read in the ANSI code page on
+        // Windows is another name, or none.
+        llifstream in(fsyspath(path), std::ios::binary);
         if (!in)
         {
             return false;
@@ -98,7 +101,7 @@ namespace ALScriptFileIO
     bool writeTempFile(const std::string& path, std::string_view text)
     {
 #if LL_WINDOWS
-        std::ofstream out(path, std::ios::binary);
+        llofstream out(fsyspath(path), std::ios::binary);
         out.write(text.data(), static_cast<std::streamsize>(text.size()));
         out.close();
         return !out.fail();
