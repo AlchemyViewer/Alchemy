@@ -24,6 +24,7 @@
 
 #pragma once
 
+#include "allinetable.h"
 #include "altextdocument.h"
 
 #include <functional>
@@ -102,7 +103,7 @@ private:
         U32     revision = 0;
         words_t words;
     };
-    std::vector<Line>        mLines;
+    ALLineTable<Line>        mLines;
     std::vector<std::string> mSuggestions;
     ALTextRange              mSuggestedFor;
 };

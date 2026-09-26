@@ -402,4 +402,24 @@ namespace tut
         doc.insert(ALTextPos(0, 0), "x\n");
         ensure("lines made: moved", layout.hiddenRevision() != hidden);
     }
+
+    template<> template<>
+    void altextlayout_object::test<10>()
+    {
+        set_test_name("which lines are hidden changes only when a hidden one goes or they move: not for a line typed in, nor with none hidden");
+        ready("zero\none\ntwo\nthree\nfour\n");
+        U32 was = layout.hiddenRevision();
+        doc.replace(ALTextRange(ALTextPos(0, 4), ALTextPos(0, 4)), "\nnew");
+        ensure("none hidden, a line made: no change", layout.hiddenRevision() == was);
+        layout.setHidden(3, 4, true);
+        ensure("hidden", layout.hiddenRevision() != was && layout.hidden(3) && layout.hidden(4));
+        was = layout.hiddenRevision();
+        doc.replace(ALTextRange(ALTextPos(1, 0), ALTextPos(1, 0)), "N");
+        ensure("typed in a shown line: no change", layout.hiddenRevision() == was);
+        doc.replace(ALTextRange(ALTextPos(0, 0), ALTextPos(0, 0)), "above\n");
+        ensure("a line made above them: they moved", layout.hiddenRevision() != was && layout.hidden(4) && layout.hidden(5) && !layout.hidden(3));
+        was = layout.hiddenRevision();
+        doc.replace(ALTextRange(ALTextPos(4, 0), ALTextPos(4, 3)), "X");
+        ensure("typed over a hidden line, which is shown", layout.hiddenRevision() != was && !layout.hidden(4) && layout.hidden(5));
+    }
 }

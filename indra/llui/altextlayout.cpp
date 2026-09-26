@@ -130,27 +130,30 @@ void ALTextLayout::invalidateAll()
 void ALTextLayout::onEdit(const ALTextDocument::Edit& edit)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
-    const S32 first = llclamp(edit.range.begin.line, 0, static_cast<S32>(mLines.size()));
-    const S32 last  = llclamp(edit.range.end.line, first, static_cast<S32>(mLines.size()) - 1);
-    const S32 made  = 1 + edit.breaksInserted();
-    if (first < static_cast<S32>(mLines.size()))
+    const S32 made       = 1 + edit.breaksInserted();
+    const S32 line_count = mDocument ? mDocument->lineCount() : -1;
+    // The hidden lines among those the edit replaced go with them.
+    S32 hidden_gone = 0;
+    if (mHiddenCount > 0)
     {
-        mLines.erase(mLines.begin() + first, mLines.begin() + last + 1);
-        for (S32 l = first; l <= last; ++l)
+        const S32 size  = static_cast<S32>(mHidden.size());
+        const S32 first = llclamp(edit.range.begin.line, 0, size);
+        const S32 last  = llclamp(edit.range.end.line, first, size - 1);
+        for (S32 l = first; l <= last && l < size; ++l)
         {
-            mHiddenCount -= mHidden[l] ? 1 : 0;
+            hidden_gone += mHidden[l] ? 1 : 0;
         }
-        mHidden.erase(mHidden.begin() + first, mHidden.begin() + last + 1);
     }
-    mLines.insert(mLines.begin() + first, made, Line());
+    const auto replaced = mLines.apply(edit.range.begin.line, edit.range.end.line, made, line_count, Line());
     // The lines an edit makes are in sight: somebody is typing there.
-    mHidden.insert(mHidden.begin() + first, made, 0);
-    if (mDocument)
+    mHidden.apply(edit.range.begin.line, edit.range.end.line, made, line_count, 0, 0);
+    mHiddenCount -= hidden_gone;
+    // Which lines are hidden changed only where a hidden one went, or the
+    // hidden ones moved: not for a line typed in with none folded.
+    if (hidden_gone > 0 || (mHiddenCount > 0 && replaced.made != replaced.count))
     {
-        mLines.resize(mDocument->lineCount());
-        mHidden.resize(mDocument->lineCount(), 0);
+        ++mHiddenRevision;
     }
-    ++mHiddenRevision;
     mTopsDirty    = true;
     mContentWidth = -1.f;
 }

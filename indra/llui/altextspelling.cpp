@@ -178,16 +178,7 @@ void ALTextSpelling::edited(const ALTextDocument::Edit& edit, S32 line_count)
 {
     // The lines the edit touched are checked again when they are next
     // asked about; the ones below slide.
-    const S32 count = static_cast<S32>(mLines.size());
-    const S32 first = llclamp(edit.range.begin.line, 0, count);
-    const S32 last  = llclamp(edit.range.end.line, first, count - 1);
-    const S32 made  = 1 + edit.breaksInserted();
-    if (first < count)
-    {
-        mLines.erase(mLines.begin() + first, mLines.begin() + last + 1);
-    }
-    mLines.insert(mLines.begin() + llmin(first, static_cast<S32>(mLines.size())), made, Line());
-    mLines.resize(static_cast<size_t>(line_count));
+    mLines.apply(edit.range.begin.line, edit.range.end.line, 1 + edit.breaksInserted(), line_count, Line());
     mSuggestions.clear();
     mSuggestedFor = ALTextRange();
 }

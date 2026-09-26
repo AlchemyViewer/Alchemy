@@ -24,6 +24,7 @@
 
 #pragma once
 
+#include "allinetable.h"
 #include "stdtypes.h"
 
 #include <boost/signals2.hpp>
@@ -224,7 +225,7 @@ private:
     ALTextPos   clampBytes(ALTextPos pos) const;
     ALTextRange clampBytes(const ALTextRange& range) const;
 
-    std::vector<std::string> mLines;
+    ALLineTable<std::string> mLines;
     U32                      mVersion = 0;
     changed_signal_t         mChanged;
     // The whole text and its line starts as of a version; good while

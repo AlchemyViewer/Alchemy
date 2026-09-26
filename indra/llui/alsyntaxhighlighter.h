@@ -24,6 +24,7 @@
 
 #pragma once
 
+#include "allinetable.h"
 #include "alsyntaxgrammar.h"
 #include "altextdocument.h"
 
@@ -84,7 +85,7 @@ private:
     boost::signals2::scoped_connection     mConnection;
     std::shared_ptr<const ALSyntaxGrammar> mGrammar;
     ALSyntaxWords                          mWords;
-    std::vector<Line>                      mLines;
+    ALLineTable<Line>                      mLines;
     S32                                    mFirstDirty = 0;
     S32                                    mLastLexed  = 0;
 };

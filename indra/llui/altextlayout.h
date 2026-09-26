@@ -25,6 +25,7 @@
 #pragma once
 
 #include "alfontshaping.h"
+#include "allinetable.h"
 #include "altextdocument.h"
 #include "llfontgl.h"
 
@@ -280,8 +281,8 @@ private:
     const LLFontGL*                    mFont      = nullptr;
     S32                                mWrapWidth = 0;
     S32                                mTabWidth  = 4;
-    std::vector<Line>                  mLines;
-    std::vector<U8>                    mHidden;
+    ALLineTable<Line>                  mLines;
+    ALLineTable<U8>                    mHidden;
     S32                                mHiddenCount = 0;
     // mTops[i] is the top of line i; mTops[count] the whole height.
     std::vector<S32>                   mTops;

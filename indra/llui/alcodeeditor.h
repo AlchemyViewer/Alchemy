@@ -28,6 +28,7 @@
 #include "alcompletionmodel.h"
 #include "alfixlistmodel.h"
 #include "alfoldmodel.h"
+#include "allinetable.h"
 #include "alsnippetsession.h"
 #include "altextview.h"
 
@@ -786,11 +787,11 @@ private:
 
     boost::signals2::scoped_connection mEditConnection;
     boost::signals2::scoped_connection mChangedConnection;
-    std::vector<Mark>                  mMarks;
+    ALLineTable<Mark>                  mMarks;
     // Moves on as marks are set or cleared, for the ruler's list of them.
     U32                                mMarksRevision = 0;
     // One per line: changed since the last save.
-    std::vector<U8>                    mChanged;
+    ALLineTable<U8>                    mChanged;
     // The mouse over the gutter, and the line it is on there: the fold
     // markers of open blocks show while it is, and the block under it
     // shows its extent.
@@ -809,7 +810,7 @@ private:
         std::string note;
         std::string noteTip;
     };
-    std::vector<Aside>                 mAsides;
+    ALLineTable<Aside>                 mAsides;
     bool                               mHeatShown = false;
     void slideAsides(const ALTextDocument::Edit& edit, S32 made);
     // What the layout is told about a line's inlays.
@@ -841,7 +842,7 @@ private:
     fixes_shown_t           mFixesShown;
     action_request_t        mActionRequest;
     // One per line, as the marks are: what its problems offer.
-    std::vector<U8>         mFixable;
+    ALLineTable<U8>         mFixable;
     // What the list offers, as it narrows (ALCompletionModel).
     ALCompletionModel       mCompletionModel;
     // The stops of a snippet or a call being filled in (ALSnippetSession).

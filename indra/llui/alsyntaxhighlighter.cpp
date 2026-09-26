@@ -85,19 +85,9 @@ void ALSyntaxHighlighter::onEdit(const ALTextDocument::Edit& edit)
     // The lines the edit replaced go, and the lines it made come in, dirty;
     // what follows keeps its tokens until the state it starts in is seen
     // to have changed.
-    const S32 first = llclamp(edit.range.begin.line, 0, static_cast<S32>(mLines.size()));
-    const S32 last  = llclamp(edit.range.end.line, first, static_cast<S32>(mLines.size()) - 1);
-    const S32 made  = 1 + edit.breaksInserted();
-    if (first < static_cast<S32>(mLines.size()))
-    {
-        mLines.erase(mLines.begin() + first, mLines.begin() + last + 1);
-    }
-    mLines.insert(mLines.begin() + first, made, Line());
-    if (mDocument)
-    {
-        mLines.resize(mDocument->lineCount());
-    }
-    mFirstDirty = llmin(mFirstDirty, first);
+    const auto replaced =
+        mLines.apply(edit.range.begin.line, edit.range.end.line, 1 + edit.breaksInserted(), mDocument ? mDocument->lineCount() : -1, Line());
+    mFirstDirty = llmin(mFirstDirty, replaced.first);
 }
 
 void ALSyntaxHighlighter::ensure(S32 line)

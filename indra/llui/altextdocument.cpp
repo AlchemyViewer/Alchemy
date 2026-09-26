@@ -165,7 +165,9 @@ ALTextDocument::ALTextDocument()
 
 ALTextDocument::ALTextDocument(std::string_view text)
 {
-    splitLines(text, mLines);
+    std::vector<std::string> lines;
+    splitLines(text, lines);
+    mLines.swap(lines);
 }
 
 ALTextDocument::Edit ALTextDocument::setText(std::string_view text)
@@ -175,7 +177,7 @@ ALTextDocument::Edit ALTextDocument::setText(std::string_view text)
 
 std::string ALTextDocument::text() const
 {
-    return joinLines(mLines);
+    return joinLines(mLines.rows());
 }
 
 const std::string& ALTextDocument::wholeText() const
@@ -282,13 +284,12 @@ ALTextDocument::Edit ALTextDocument::replace(ALTextRange range, std::string_view
     edit.keepEnd();
 
     // The line the range starts in keeps what came before it, the line it
-    // ends in keeps what comes after, and the pieces go between.
+    // ends in keeps what comes after, and the pieces go between: in place
+    // where there are as many as the lines they replace.
     pieces.front().insert(0, mLines[range.begin.line], 0, range.begin.column);
     pieces.back().append(mLines[range.end.line], range.end.column, std::string::npos);
-    mLines.erase(mLines.begin() + range.begin.line, mLines.begin() + range.end.line + 1);
-    mLines.insert(mLines.begin() + range.begin.line,
-                  std::make_move_iterator(pieces.begin()),
-                  std::make_move_iterator(pieces.end()));
+    mLines.replace(static_cast<size_t>(range.begin.line), static_cast<size_t>(range.end.line - range.begin.line + 1),
+                   std::make_move_iterator(pieces.begin()), std::make_move_iterator(pieces.end()));
 
     ++mVersion;
     // The whole text kept, if it was, is made again when next asked

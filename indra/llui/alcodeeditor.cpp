@@ -260,31 +260,18 @@ void ALCodeEditor::onEdit(const ALTextDocument::Edit& edit)
     // Numbers and tints were for the text they were given with.
     mLineNumbers.clear();
     mLineTints.clear();
-    const S32 first = llclamp(edit.range.begin.line, 0, static_cast<S32>(mMarks.size()));
-    const S32 last  = llclamp(edit.range.end.line, first, static_cast<S32>(mMarks.size()) - 1);
-    const S32 made  = 1 + edit.breaksInserted();
-    if (first < static_cast<S32>(mMarks.size()))
-    {
-        mMarks.erase(mMarks.begin() + first, mMarks.begin() + last + 1);
-    }
-    mMarks.insert(mMarks.begin() + first, made, Mark::None);
-    mMarks.resize(document().lineCount(), Mark::None);
+    const S32  lines    = document().lineCount();
+    const S32  made     = 1 + edit.breaksInserted();
+    const auto replaced = mMarks.apply(edit.range.begin.line, edit.range.end.line, made, lines, Mark::None, Mark::None);
+    const S32  first    = replaced.first;
+    const S32  last     = llmax(first, edit.range.end.line);
     // What the problems there offered goes with them: a check says again.
-    mFixable.resize(llmax(mFixable.size(), static_cast<size_t>(last + 1)), 0);
-    if (first < static_cast<S32>(mFixable.size()))
-    {
-        mFixable.erase(mFixable.begin() + first, mFixable.begin() + last + 1);
-    }
-    mFixable.insert(mFixable.begin() + first, made, 0);
-    mFixable.resize(document().lineCount(), 0);
+    mFixable.apply(edit.range.begin.line, edit.range.end.line, made, lines, 0, 0);
     closeFixes();
     // What is known of bracket depth below the edit is known no more.
     mDepthValid = llmin(mDepthValid, first);
     // The lines the edit touched are changed until the next save.
-    mChanged.resize(llmax(mChanged.size(), static_cast<size_t>(last + 1)), 0);
-    mChanged.erase(mChanged.begin() + first, mChanged.begin() + last + 1);
-    mChanged.insert(mChanged.begin() + first, made, 1);
-    mChanged.resize(document().lineCount(), 0);
+    mChanged.apply(edit.range.begin.line, edit.range.end.line, made, lines, 1, 0);
     slideAsides(edit, made);
 
     // Decorations and highlights after the edit move along with the text;
@@ -1267,8 +1254,7 @@ void ALCodeEditor::slideAsides(const ALTextDocument::Edit& edit, S32 made)
     mAsides.resize(llmax(mAsides.size(), static_cast<size_t>(last + 1)));
     const Aside from_first = mAsides[static_cast<size_t>(first)];
     const Aside from_last  = mAsides[static_cast<size_t>(last)];
-    mAsides.erase(mAsides.begin() + first, mAsides.begin() + last + 1);
-    mAsides.insert(mAsides.begin() + first, static_cast<size_t>(made), Aside());
+    mAsides.replace(static_cast<size_t>(first), static_cast<size_t>(last - first + 1), static_cast<size_t>(made), Aside());
     // What is left of a line keeps its heat and its note: the line the
     // edit begins inside -- typed in, or broken in two -- or, where the
     // edit begins at a line's start, the line it ends in, pushed down by
