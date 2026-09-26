@@ -1900,4 +1900,21 @@ namespace tut
         ensure("taken with Control", e.handleDoubleClick(pill(2) + 2, rowY(2), MASK_CONTROL));
         ensure_equals("its own text written, on its own line", e.text(), std::string("local a = 1\nlocal b = 2\nlocal c: three = 3\n"));
     }
+
+    template<> template<>
+    void alcodeeditor_object::test<51>()
+    {
+        set_test_name("handlers cleared: nothing a host gave the editor is called on the way out");
+        ALCodeEditor& e     = make("integer x;\n");
+        S32           asked = 0;
+        e.setFixProvider([&asked](S32, std::vector<ALCodeEditor::Fix>&) { ++asked; });
+        e.setFixHandler([&asked](const LLSD&) { ++asked; });
+        e.setActionRequest([&asked](const ALTextRange&) { ++asked; });
+        e.setFixable(0, true, true);
+        ensure("offered while held", e.canPerform(ALEditorCommand::QuickFix));
+        e.clearHandlers();
+        ensure("nothing offered once let go of", !e.canPerform(ALEditorCommand::QuickFix));
+        e.handleKeyHere('.', MASK_CONTROL);
+        ensure_equals("and nothing asked", asked, 0);
+    }
 }

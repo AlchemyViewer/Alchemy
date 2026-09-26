@@ -29,6 +29,7 @@
 #include "alkeyshome.h"
 #include "alplace.h"
 #include "llpanel.h"
+#include "llstl.h"
 #include "lluictrlfactory.h"
 
 #include <boost/unordered/unordered_flat_map.hpp>
@@ -36,9 +37,9 @@
 namespace
 {
 // The size each kind of popover was last left at, for the session.
-boost::unordered_flat_map<std::string, std::pair<S32, S32>>& rememberedSizes()
+boost::unordered_flat_map<std::string, std::pair<S32, S32>, ll::string_hash, std::equal_to<>>& rememberedSizes()
 {
-    static boost::unordered_flat_map<std::string, std::pair<S32, S32>> sizes;
+    static boost::unordered_flat_map<std::string, std::pair<S32, S32>, ll::string_hash, std::equal_to<>> sizes;
     return sizes;
 }
 } // namespace
@@ -330,6 +331,9 @@ void ALPopoverSlot::close(bool escape)
     {
         return;
     }
+    // The owner told may go, and this slot with it: nothing of it is read
+    // after unless it is still here.
+    const std::weak_ptr<bool> alive = mAlive;
     if (escape)
     {
         popover->escape();
@@ -337,6 +341,10 @@ void ALPopoverSlot::close(bool escape)
     else
     {
         popover->settle();
+    }
+    if (alive.expired())
+    {
+        return;
     }
     // Emptied as it said so; one that had said so already is let go of
     // here. Not one the telling opened in its place.

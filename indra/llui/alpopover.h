@@ -27,6 +27,7 @@
 #include "llfloater.h"
 
 #include <functional>
+#include <memory>
 #include <string>
 
 #include <boost/signals2.hpp>
@@ -198,4 +199,6 @@ public:
 private:
     LLHandle<ALPopover>                mHeld;
     boost::signals2::scoped_connection mClosed;
+    // Whether the slot is still here after an owner, told, went with it.
+    std::shared_ptr<bool>              mAlive = std::make_shared<bool>(true);
 };

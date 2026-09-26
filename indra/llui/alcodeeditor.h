@@ -585,6 +585,10 @@ public:
     // comes through showSignature, or hideSignature for none.
     typedef std::function<void(const ALTextPos& caret)> signature_request_t;
     void setSignatureRequest(signature_request_t request) { mSignatureRequest = std::move(request); }
+    // Every handler, provider and request a host gave it let go of: for a
+    // host done with it before it goes -- a tab closed, whose editor dies
+    // with the frame -- so that nothing reaches what they held on the way.
+    void clearHandlers();
     void showSignature(const ALTextPos& caret, Signature signature);
     void hideSignature();
     // Shown, and still about the call the caret is in: on its line, and

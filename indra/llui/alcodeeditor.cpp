@@ -225,7 +225,31 @@ ALCodeEditor::ALCodeEditor(const Params& p)
     addChild(mFixList);
 }
 
-ALCodeEditor::~ALCodeEditor() = default;
+ALCodeEditor::~ALCodeEditor()
+{
+    // The layout outlives this part of the editor, and asks the provider
+    // about this part's inlays.
+    layout().setInlayProvider(nullptr);
+    clearHandlers();
+}
+
+void ALCodeEditor::clearHandlers()
+{
+    mProvider          = nullptr;
+    mCompletionRequest = nullptr;
+    mHover             = nullptr;
+    mHoverRequest      = nullptr;
+    mSignatureRequest  = nullptr;
+    mSymbolRequest     = nullptr;
+    mLinkRequest       = nullptr;
+    mFixProvider       = nullptr;
+    mFunctionProvider  = nullptr;
+    mFixHandler        = nullptr;
+    mFixesShown        = nullptr;
+    mActionRequest     = nullptr;
+    mCardLinkHandler   = nullptr;
+    setDropHandler(nullptr);
+}
 
 // --- marks and decorations ---------------------------------------------------
 

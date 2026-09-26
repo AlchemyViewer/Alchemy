@@ -294,4 +294,23 @@ namespace tut
         highlighter.wordsChanged();
         ensure_equals("a function now", said(doc.line(0), highlighter.tokens(0)), std::string("text:foo |function:bar"));
     }
+
+    template<> template<>
+    void alsyntaxhighlighter_object::test<8>()
+    {
+        set_test_name("attached to another document, the one it followed before is heard no more");
+        ALTextDocument      first("a\nb\nc");
+        ALTextDocument      second("x\ny\nz");
+        ALSyntaxHighlighter highlighter;
+        highlighter.setGrammar(loaded(mini()));
+        highlighter.attach(&first);
+        highlighter.tokens(2);
+        highlighter.attach(&second);
+        highlighter.tokens(2);
+        ensure_equals("the second lexed", highlighter.lastLexed(), 3);
+        first.insert(ALTextPos(0, 0), "/* one\ntwo\n");
+        highlighter.tokens(2);
+        ensure_equals("the first's edit reached nothing", highlighter.lastLexed(), 0);
+        ensure_equals("and the second reads as it did", said(second.line(1), highlighter.tokens(1)), std::string("text:y"));
+    }
 }

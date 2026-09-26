@@ -556,4 +556,25 @@ namespace tut
         ensure("and told of as it goes", next_told && !slot.isOpen());
         over->die();
     }
+
+    template<> template<>
+    void alpopover_object::test<15>()
+    {
+        set_test_name("an owner told its popover went may go, its slot with it, and the closing reads nothing of the slot after");
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        LLPanel* over  = anchor();
+        auto*    owner = new ALPopoverSlot();
+        bool     told  = false;
+        owner->hold(ALPopover::show(over, content()), [&owner, &told](bool) {
+            told = true;
+            delete owner;
+            owner = nullptr;
+        });
+        owner->close();
+        ensure("told, and gone", told && owner == nullptr);
+        over->die();
+    }
 }

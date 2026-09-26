@@ -50,7 +50,9 @@ void ALSyntaxHighlighter::wordsChanged()
 
 void ALSyntaxHighlighter::attach(ALTextDocument* document)
 {
-    mConnection.release();
+    // Off the document it followed: release() would only forget the
+    // connection, and the old text's edits would still come here.
+    mConnection.disconnect();
     mDocument = document;
     if (mDocument)
     {
