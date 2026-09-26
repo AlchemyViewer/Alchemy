@@ -51,17 +51,18 @@ namespace ALTextEditing
         bool softTabs = false;
     };
 
-    // One stretch and what goes in its place, measured on the text as the
-    // replacements before it in the same change left it.
+    // One stretch and what goes in its place, measured on the text as it is
+    // before any replacement of the same change is made.
     struct Replacement
     {
         ALTextRange range;
         std::string text;
     };
 
-    // What a command does: its replacements, in the order they are made,
-    // and the selection after -- anchor to caret where `selects`, the caret
-    // alone otherwise, which takes the anchor with it. Positions are the
+    // What a command does: its replacements, none over another, made as one
+    // edit (ALTextView::apply); and the selection after, in the text as it
+    // is then -- anchor to caret where `selects`, the caret alone
+    // otherwise, which takes the anchor with it. Positions are the
     // document's to clamp, as the view clamps whatever it is handed.
     struct Change
     {

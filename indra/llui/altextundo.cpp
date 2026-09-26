@@ -127,6 +127,12 @@ namespace
     // the one edit it amounts to.
     bool fold(ALTextDocument::Edit& first, const ALTextDocument::Edit& next)
     {
+        // A batch's stretches say where each of its parts is: nothing
+        // folds into one, nor one into anything.
+        if (!first.parts.empty() || !next.parts.empty())
+        {
+            return false;
+        }
         if (first.removed.empty() && next.removed.empty() && next.range.begin == next.range.end && next.range.begin == first.endAfter())
         {
             // Both end where the second does.
@@ -337,7 +343,7 @@ std::optional<ALTextRange> ALTextUndo::undo()
     for (auto it = step->edits.rbegin(); it != step->edits.rend(); ++it)
     {
         const ALTextDocument::Edit back = it->inverse();
-        mDocument.replace(back.range, back.inserted);
+        mDocument.replace(back.range, back.inserted, back.parts);
     }
     const ALTextRange selection(step->anchorBefore, step->caretBefore);
     mSteps.pushRedo(std::move(*step));
@@ -354,7 +360,7 @@ std::optional<ALTextRange> ALTextUndo::redo()
     mSettling = false;
     for (const ALTextDocument::Edit& edit : step->edits)
     {
-        mDocument.replace(edit.range, edit.inserted);
+        mDocument.replace(edit.range, edit.inserted, edit.parts);
     }
     const ALTextRange selection(step->anchorAfter, step->caretAfter);
     mSteps.pushUndo(std::move(*step));

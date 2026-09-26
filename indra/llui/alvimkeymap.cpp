@@ -973,14 +973,7 @@ void ALVimKeymap::slideMarks(const ALTextDocument::Edit& edit)
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
     // A mark past the edit moves with the text; one inside what was
     // taken out lands where that began.
-    const ALTextRange removed = edit.range.normalised();
-    auto              slide   = [&](ALTextPos& pos) {
-        if (pos < removed.begin)
-        {
-            return;
-        }
-        pos = removed.end <= pos ? edit.slidPast(pos) : removed.begin;
-    };
+    auto slide = [&edit](ALTextPos& pos) { pos = edit.placed(pos); };
     for (auto& [name, pos] : mMarks)
     {
         slide(pos);

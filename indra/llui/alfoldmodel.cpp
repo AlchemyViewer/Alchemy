@@ -273,21 +273,35 @@ std::vector<std::pair<S32, S32>> ALFoldModel::hidden(const ALTextDocument& doc, 
     return out;
 }
 
-void ALFoldModel::edited(const ALTextDocument::Edit& edit, S32 first, S32 last, S32 made)
+void ALFoldModel::edited(const ALTextDocument::Edit& edit)
 {
-    const S32         delta   = made - (last - first + 1);
-    const ALTextRange removed = edit.range.normalised();
-    const bool last_kept = last > first && removed.end.column == 0 &&
-                           (edit.inserted.empty() ? removed.begin.column == 0 : edit.inserted.back() == '\n');
-    mFolded.erase(std::remove_if(mFolded.begin(), mFolded.end(),
-                                 [&](S32 start) { return start > first && (start < last || (start == last && !last_kept)); }),
-                  mFolded.end());
-    for (S32& start : mFolded)
+    const std::vector<ALTextDocument::Edit::LineSpan>& spans = edit.lineSpans();
+    std::vector<S32>                                  kept;
+    kept.reserve(mFolded.size());
+    for (const S32 start : mFolded)
     {
-        if (start > last || (start == last && last_kept))
+        // Moved along by every run before it; gone where one is over it.
+        S32  shift = 0;
+        bool gone  = false;
+        for (const ALTextDocument::Edit::LineSpan& span : spans)
         {
-            start += delta;
+            if (start > span.first && (start < span.last || (start == span.last && !span.lastKept)))
+            {
+                gone = true;
+                break;
+            }
+            if (start > span.last || (start == span.last && span.lastKept))
+            {
+                shift += span.made - (span.last - span.first + 1);
+                continue;
+            }
+            break;
+        }
+        if (!gone)
+        {
+            kept.push_back(start + shift);
         }
     }
+    mFolded.swap(kept);
     mValid = false;
 }

@@ -697,6 +697,10 @@ protected:
     // a list, a card, a view the text holds -- which has the mouse before
     // the text does; or nothing.
     LLView*      overlayAt(S32 x, S32 y) { return childFromPoint(x, y); }
+    // An edit command done -- typed, replaced, undone -- before the caret
+    // is brought into sight: whatever a subclass left for after its edits,
+    // done once rather than at each.
+    virtual void editsDone() {}
     virtual void drawBeforeRows(const LLRect& text) {}
     virtual void drawRowExtras(S32 line, S32 row, const LLRect& text, S32 screen_top, F32 left, F32 alpha) {}
     // Over every row, still clipped to the text: what floats above the
@@ -759,6 +763,11 @@ protected:
     // Every change goes through here: the document, the journal, the
     // caret, and whoever is listening.
     ALTextDocument::Edit edit(const ALTextRange& range, std::string_view text);
+    // Several stretches replaced as one edit (ALTextDocument::replaceMany),
+    // each at a place of the text as it is, none over another: one
+    // notification to every listener, one edit for the journal, and the
+    // caret put once, at `caret` in the text as it is after.
+    ALTextDocument::Edit editMany(std::vector<std::pair<ALTextRange, std::string>> edits, const ALTextPos& caret);
     void                 afterEdit();
     void                 placeCaret(const ALTextPos& pos, bool extend);
     // The selection put somewhere, anchor and caret at once, told to

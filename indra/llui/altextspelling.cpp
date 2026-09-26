@@ -178,7 +178,7 @@ void ALTextSpelling::edited(const ALTextDocument::Edit& edit, S32 line_count)
 {
     // The lines the edit touched are checked again when they are next
     // asked about; the ones below slide.
-    mLines.apply(edit.range.begin.line, edit.range.end.line, 1 + edit.breaksInserted(), line_count, Line());
+    mLines.applySpans(edit.lineSpans(), line_count, Line());
     mSuggestions.clear();
     mSuggestedFor = ALTextRange();
 }

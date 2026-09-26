@@ -103,7 +103,11 @@ public:
     // The mirror being brought up, which the edit that does it puts in
     // whole; -1 for none.
     void syncing(S32 mirror) { mSyncing = mirror; }
-    bool syncing() const { return mSyncing >= 0; }
+    // Every mirror being made again at once, as one batch (ALTextView::
+    // editMany): each a stretch replaced is grows to what went in.
+    void syncingAll() { mSyncing = SYNCING_ALL; }
+    bool syncing() const { return mSyncing != -1; }
+    static constexpr S32 SYNCING_ALL = -2;
 
 private:
     std::vector<ALTextRange> mStops;

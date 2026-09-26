@@ -82,6 +82,58 @@ public:
         return out;
     }
 
+    // Several runs of lines replaced at once, in order and apart, each its
+    // `first` and `last` line as they were and the lines it `made` -- a
+    // batch's (ALTextDocument::Edit::lineSpans) -- in one pass: the rows
+    // between them kept, the rows each made `fill`. In place where every
+    // run makes as many as it replaced; otherwise the table made again once.
+    template <typename Spans>
+    void applySpans(const Spans& spans, S32 line_count, const T& fill, const T& other = T())
+    {
+        if (spans.empty())
+        {
+            return;
+        }
+        if (spans.size() == 1)
+        {
+            apply(spans.front().first, spans.front().last, spans.front().made, line_count, fill, other);
+            return;
+        }
+        // A table kept only as far as it was told of lines, as far as the
+        // last run reaches.
+        if (static_cast<S32>(mRows.size()) <= spans.back().last)
+        {
+            mRows.resize(static_cast<size_t>(spans.back().last + 1), other);
+        }
+        const bool same = std::all_of(spans.begin(), spans.end(), [](const auto& s) { return s.made == s.last - s.first + 1; });
+        if (same)
+        {
+            for (const auto& s : spans)
+            {
+                std::fill(mRows.begin() + s.first, mRows.begin() + s.last + 1, fill);
+            }
+        }
+        else
+        {
+            rows_t out;
+            out.reserve(line_count >= 0 ? static_cast<size_t>(line_count) : mRows.size());
+            size_t from = 0;
+            for (const auto& s : spans)
+            {
+                out.insert(out.end(), std::make_move_iterator(mRows.begin() + static_cast<std::ptrdiff_t>(from)),
+                           std::make_move_iterator(mRows.begin() + s.first));
+                out.insert(out.end(), static_cast<size_t>(std::max(s.made, 0)), fill);
+                from = static_cast<size_t>(s.last + 1);
+            }
+            out.insert(out.end(), std::make_move_iterator(mRows.begin() + static_cast<std::ptrdiff_t>(from)), std::make_move_iterator(mRows.end()));
+            mRows.swap(out);
+        }
+        if (line_count >= 0)
+        {
+            mRows.resize(static_cast<size_t>(line_count), other);
+        }
+    }
+
     // `count` rows from `first` replaced by `made` rows of `fill`.
     void replace(size_t first, size_t count, size_t made, const T& fill)
     {

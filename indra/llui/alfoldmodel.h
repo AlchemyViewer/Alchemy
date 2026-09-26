@@ -89,7 +89,8 @@ public:
     // ended at that line's start and left it a line of its own -- whole
     // lines taken from above a folded block -- and moves with it; the rest
     // inside go, and those after move along. The blocks are found again.
-    void edited(const ALTextDocument::Edit& edit, S32 first, S32 last, S32 made);
+    // A batch's runs of lines each so, one after another.
+    void edited(const ALTextDocument::Edit& edit);
 
 private:
     std::vector<Region> mRegions;

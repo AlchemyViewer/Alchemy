@@ -118,29 +118,29 @@ namespace tut
 
         // Two lines put in above: both move down.
         ALTextDocument::Edit edit = doc.replace(ALTextRange(ALTextPos(0, 1), ALTextPos(0, 1)), "\nb\nc");
-        model.edited(edit, 0, 0, 3);
+        model.edited(edit);
         ensure("slid", model.folded() == std::vector<S32>{ 3, 6 });
         ensure_equals("hiding what they did", lines(model.hidden(doc, 4)), std::string("4-5 7-7"));
 
         // Typing on a block's first line is not opening it.
         edit = doc.replace(ALTextRange(ALTextPos(3, 3), ALTextPos(3, 3)), " -- note");
-        model.edited(edit, 3, 3, 1);
+        model.edited(edit);
         ensure("kept", model.isFolded(3));
 
         // Whole lines taken from above a folded block: it moves up with them.
         edit = doc.replace(ALTextRange(ALTextPos(1, 0), ALTextPos(3, 0)), "");
-        model.edited(edit, 1, 3, 1);
+        model.edited(edit);
         ensure("moved up with the lines", model.folded() == std::vector<S32>{ 1, 4 });
 
         // An edit through a folded block's first line takes the fold.
         edit = doc.replace(ALTextRange(ALTextPos(0, 1), ALTextPos(1, 3)), "");
-        model.edited(edit, 0, 1, 1);
+        model.edited(edit);
         ensure("gone", model.folded() == std::vector<S32>{ 3 });
 
         // Its block gone -- the line under it outdented -- the fold goes.
         ensure_equals("the text now", doc.text(), std::string("a -- note\n    x\n    y\ng()\n    z"));
         edit = doc.replace(ALTextRange(ALTextPos(4, 0), ALTextPos(4, 4)), "");
-        model.edited(edit, 4, 4, 1);
+        model.edited(edit);
         ensure("folded still", model.isFolded(3));
         ensure("nothing hidden once its block is gone", model.hidden(doc, 4).empty() && model.folded().empty());
     }

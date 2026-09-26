@@ -988,22 +988,21 @@ void ALScriptStudioChecking::slideProblems(Doc& doc, const ALTextDocument::Edit&
     {
         return;
     }
-    const ALTextRange range = edit.range.normalised();
-    const S32         first = range.begin.line;
-    const S32         last  = range.end.line;
-    const S32         delta = edit.breaksInserted() - (last - first);
-    auto              slide = [&](auto& list) {
+    // A problem on a line the edit replaced goes; one after moves along,
+    // by each of a batch's runs before it.
+    auto slide = [&edit](auto& list) {
         list.erase(std::remove_if(list.begin(), list.end(),
-                                  [&](auto& problem) {
-                                      if (!problem.file.empty() || problem.line < first)
+                                  [&edit](auto& problem) {
+                                      if (!problem.file.empty())
                                       {
                                           return false;
                                       }
-                                      if (problem.line <= last)
+                                      const S32 after = edit.lineAfter(problem.line);
+                                      if (after < 0)
                                       {
                                           return true;
                                       }
-                                      problem.line += delta;
+                                      problem.line = after;
                                       return false;
                                   }),
                    list.end());

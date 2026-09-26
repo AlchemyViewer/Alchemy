@@ -308,12 +308,28 @@ void ALSnippetSession::slide(const ALTextDocument::Edit& edit)
         return;
     }
     const ALTextRange removed = edit.range.normalised();
+    // What a stretch the edit replaced whole became, where one was.
+    const auto replaced = [&edit, &removed](const ALTextRange& range) -> std::optional<ALTextRange> {
+        if (edit.parts.empty())
+        {
+            return removed == range ? std::optional<ALTextRange>(edit.rangeAfter()) : std::nullopt;
+        }
+        const auto part = std::lower_bound(edit.parts.begin(), edit.parts.end(), range.begin,
+                                           [](const ALTextDocument::Edit::Part& p, const ALTextPos& at) { return p.before.begin < at; });
+        return part != edit.parts.end() && part->before == range ? std::optional<ALTextRange>(part->after) : std::nullopt;
+    };
     for (S32 k = 0; k < static_cast<S32>(mMirrors.size());)
     {
-        Mirror& mirror = mMirrors[static_cast<size_t>(k)];
+        Mirror&                          mirror = mMirrors[static_cast<size_t>(k)];
+        const std::optional<ALTextRange> made   = mSyncing == SYNCING_ALL ? replaced(mirror.range) : std::nullopt;
         if (k == mSyncing)
         {
             mirror.range = edit.rangeAfter();
+            ++k;
+        }
+        else if (made)
+        {
+            mirror.range = *made;
             ++k;
         }
         else if (edit.slide(mirror.range))
@@ -332,7 +348,9 @@ void ALSnippetSession::slide(const ALTextDocument::Edit& edit)
     for (S32 i = 0; i < static_cast<S32>(mStops.size());)
     {
         ALTextRange& r = mStops[i];
-        if (i == mAt && r.begin <= removed.begin && removed.end <= r.end)
+        // Typed within the stop being filled in: it grows. (A batch's
+        // stretches are elsewhere: the mirrors made again.)
+        if (edit.parts.empty() && i == mAt && r.begin <= removed.begin && removed.end <= r.end)
         {
             r.end = edit.slidPast(r.end);
             ++i;
@@ -362,7 +380,11 @@ void ALSnippetSession::slide(const ALTextDocument::Edit& edit)
             }
         }
     }
-    if (mAfter.line == removed.end.line || mAfter.line > removed.end.line)
+    if (!edit.parts.empty())
+    {
+        mAfter = edit.slidPast(mAfter);
+    }
+    else if (mAfter.line == removed.end.line || mAfter.line > removed.end.line)
     {
         if (removed.end <= mAfter)
         {

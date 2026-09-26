@@ -1954,4 +1954,40 @@ namespace tut
         ensure("as given", listed.size() == 2 && listed[0]->message == "worst" && listed[1]->message == "later");
         ensure("none on another line", e.decorationsOn(2).empty());
     }
+
+    template<> template<>
+    void alcodeeditor_object::test<53>()
+    {
+        set_test_name("in a script of 50,000 lines, Select All and Tab is one change and its undo another; what lies between a batch's stretches stays");
+        ALCodeEditor& e = make("");
+        e.setText(ll_test::bigLSL(50000));
+        const std::string  was = e.document().line(1);
+        ll_test::EditCount edits(e.document());
+        e.perform(ALEditorCommand::SelectAll);
+        ensure("taken", e.handleKeyHere(KEY_TAB, MASK_NONE));
+        ensure_equals("one change", edits.count(), 1);
+        const std::string& now = e.document().line(1);
+        ensure("a line indented", !was.empty() && now.size() > was.size() && now.compare(now.size() - was.size(), was.size(), was) == 0);
+        edits.reset();
+        e.undo();
+        ensure_equals("undone as one", edits.count(), 1);
+
+        ALCodeEditor& f = make("integer total;\nf()\n{\n    total = 1;\n}\n// a note\ntotal = total + 1;\n");
+        f.setMark(5, ALCodeEditor::Mark::Warning);
+        S32 folded = -1;
+        for (S32 line = 0; line < 5 && folded < 0; ++line)
+        {
+            folded = f.foldAt(line) ? line : -1;
+        }
+        ensure("a block folded", folded >= 0);
+        std::vector<std::pair<ALTextRange, std::string>> renames = { { ALTextRange(ALTextPos(0, 8), ALTextPos(0, 13)), "count" },
+                                                                     { ALTextRange(ALTextPos(6, 0), ALTextPos(6, 5)), "count" },
+                                                                     { ALTextRange(ALTextPos(6, 8), ALTextPos(6, 13)), "count" } };
+        ll_test::EditCount renamed(f.document());
+        ensure("replaced", f.replaceAll(std::move(renames)));
+        ensure_equals("as one change", renamed.count(), 1);
+        ensure_equals("the text", f.text(), std::string("integer count;\nf()\n{\n    total = 1;\n}\n// a note\ncount = count + 1;\n"));
+        ensure("the mark on a line between kept", f.markAt(5) == ALCodeEditor::Mark::Warning);
+        ensure("the fold between kept", f.isFolded(folded) && f.layout().hidden(3));
+    }
 }

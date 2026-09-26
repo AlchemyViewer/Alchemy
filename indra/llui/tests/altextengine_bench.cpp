@@ -296,6 +296,13 @@ int main(int, char**)
         s.editor->setDecorations({});
     }
 
+    std::printf("\nEvery line at once\n");
+    both("Select All and Tab, then undone", subjects, 1, [](Subject&, ALCodeEditor& e) {
+        e.perform(ALEditorCommand::SelectAll);
+        e.handleKeyHere(KEY_TAB, MASK_NONE);
+        e.undo();
+    });
+
     std::printf("\nFolding\n");
     size_t regions[2] = {};
     both("fold regions rebuilt", subjects, 1, [&](Subject& s, ALCodeEditor& e) {

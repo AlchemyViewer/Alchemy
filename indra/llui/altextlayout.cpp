@@ -130,27 +130,32 @@ void ALTextLayout::invalidateAll()
 void ALTextLayout::onEdit(const ALTextDocument::Edit& edit)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
-    const S32 made       = 1 + edit.breaksInserted();
-    const S32 line_count = mDocument ? mDocument->lineCount() : -1;
+    const std::vector<ALTextDocument::Edit::LineSpan>& spans      = edit.lineSpans();
+    const S32                                         line_count = mDocument ? mDocument->lineCount() : -1;
     // The hidden lines among those the edit replaced go with them.
-    S32 hidden_gone = 0;
-    if (mHiddenCount > 0)
+    S32  hidden_gone = 0;
+    bool moved       = false;
+    for (const ALTextDocument::Edit::LineSpan& span : spans)
     {
-        const S32 size  = static_cast<S32>(mHidden.size());
-        const S32 first = llclamp(edit.range.begin.line, 0, size);
-        const S32 last  = llclamp(edit.range.end.line, first, size - 1);
-        for (S32 l = first; l <= last && l < size; ++l)
+        moved = moved || span.made != span.last - span.first + 1;
+        if (mHiddenCount > 0)
         {
-            hidden_gone += mHidden[l] ? 1 : 0;
+            const S32 size  = static_cast<S32>(mHidden.size());
+            const S32 first = llclamp(span.first, 0, size);
+            const S32 last  = llclamp(span.last, first, size - 1);
+            for (S32 l = first; l <= last && l < size; ++l)
+            {
+                hidden_gone += mHidden[l] ? 1 : 0;
+            }
         }
     }
-    const auto replaced = mLines.apply(edit.range.begin.line, edit.range.end.line, made, line_count, Line());
+    mLines.applySpans(spans, line_count, Line());
     // The lines an edit makes are in sight: somebody is typing there.
-    mHidden.apply(edit.range.begin.line, edit.range.end.line, made, line_count, 0, 0);
+    mHidden.applySpans(spans, line_count, 0, 0);
     mHiddenCount -= hidden_gone;
     // Which lines are hidden changed only where a hidden one went, or the
     // hidden ones moved: not for a line typed in with none folded.
-    if (hidden_gone > 0 || (mHiddenCount > 0 && replaced.made != replaced.count))
+    if (hidden_gone > 0 || (mHiddenCount > 0 && moved))
     {
         ++mHiddenRevision;
     }

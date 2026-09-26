@@ -682,6 +682,11 @@ private:
 
     void              ensureRegions();
     void              applyFolds();
+    // The folds hidden again once, after an edit command or before a draw,
+    // rather than inside every edit.
+    void              settleFolds();
+    void              editsDone() override { settleFolds(); }
+    bool              mFoldsDirty = false;
     const FoldRegion* regionStartingAt(S32 line);
     const FoldRegion* regionAround(S32 line);
     // The box drawn after a folded block's first line, in local
@@ -839,7 +844,7 @@ private:
     };
     ALLineTable<Aside>                 mAsides;
     bool                               mHeatShown = false;
-    void slideAsides(const ALTextDocument::Edit& edit, S32 made);
+    void slideAsides(const std::vector<ALTextDocument::Edit::LineSpan>& spans);
     // What the layout is told about a line's inlays.
     void provideInlays(S32 line, std::vector<ALTextLayout::Inlay>& out) const;
     // The hint a line's glyph stands for, by the id provideInlays gave it,

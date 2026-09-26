@@ -85,9 +85,9 @@ void ALSyntaxHighlighter::onEdit(const ALTextDocument::Edit& edit)
     // The lines the edit replaced go, and the lines it made come in, dirty;
     // what follows keeps its tokens until the state it starts in is seen
     // to have changed.
-    const auto replaced =
-        mLines.apply(edit.range.begin.line, edit.range.end.line, 1 + edit.breaksInserted(), mDocument ? mDocument->lineCount() : -1, Line());
-    mFirstDirty = llmin(mFirstDirty, replaced.first);
+    const std::vector<ALTextDocument::Edit::LineSpan>& spans = edit.lineSpans();
+    mLines.applySpans(spans, mDocument ? mDocument->lineCount() : -1, Line());
+    mFirstDirty = llmin(mFirstDirty, llclamp(spans.front().first, 0, static_cast<S32>(mLines.size())));
 }
 
 void ALSyntaxHighlighter::ensure(S32 line)

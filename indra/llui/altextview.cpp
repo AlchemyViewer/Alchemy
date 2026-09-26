@@ -1483,7 +1483,7 @@ void ALTextView::onDocumentEdit(const ALTextDocument::Edit& edit)
     const ALTextRange removed = edit.range.normalised();
     for (ALTextPos& at : mChanges)
     {
-        at = at < removed.begin ? at : at < removed.end ? removed.begin : edit.slidPast(at);
+        at = edit.placed(at);
     }
     if (!mChanges.empty() && mChanges.back().line == removed.begin.line)
     {
@@ -1649,8 +1649,31 @@ ALTextDocument::Edit ALTextView::edit(const ALTextRange& range_in, std::string_v
     return done;
 }
 
+ALTextDocument::Edit ALTextView::editMany(std::vector<std::pair<ALTextRange, std::string>> edits, const ALTextPos& caret)
+{
+    if (hasPreedit())
+    {
+        for (auto& one : edits)
+        {
+            one.first = withoutComposition(one.first.normalised());
+        }
+        resetPreedit();
+    }
+    const ALTextRange    before = selection();
+    ALTextDocument::Edit done   = mDocument.replaceMany(std::move(edits));
+    if (done.nothing())
+    {
+        return done;
+    }
+    const ALTextPos after = mDocument.clamp(caret);
+    mUndo.record(done, before, after, LLTimer::getElapsedSeconds());
+    placeCaret(after, false);
+    return done;
+}
+
 void ALTextView::afterEdit()
 {
+    editsDone();
     // Where the change left the selection, for a redo to put it back
     // there; nothing once a step has been taken back or forward.
     mUndo.settle(selection());
@@ -1752,16 +1775,9 @@ bool ALTextView::replaceAll(std::vector<std::pair<ALTextRange, std::string>> edi
         }
     }
 
-    // From the last to the first, so no replacement moves another.
+    // As one edit, which every listener hears once.
     mUndo.beginGroup();
-    bool any = false;
-    for (auto it = edits.rbegin(); it != edits.rend(); ++it)
-    {
-        if (!edit(it->first, it->second).nothing())
-        {
-            any = true;
-        }
-    }
+    const bool any = !editMany(std::move(edits), caret).nothing();
     mUndo.endGroup();
     if (!any)
     {
@@ -1811,11 +1827,16 @@ ALTextEditing::opener_t ALTextView::openerOf()
 
 void ALTextView::apply(const ALTextEditing::Change& change)
 {
-    mUndo.beginGroup();
+    // One edit however many lines it touches: an indent of every line is
+    // one notification, not one a line.
+    std::vector<std::pair<ALTextRange, std::string>> edits;
+    edits.reserve(change.replacements.size());
     for (const ALTextEditing::Replacement& one : change.replacements)
     {
-        edit(one.range, one.text);
+        edits.emplace_back(one.range, one.text);
     }
+    mUndo.beginGroup();
+    editMany(std::move(edits), change.caret);
     mUndo.endGroup();
     if (change.selects)
     {

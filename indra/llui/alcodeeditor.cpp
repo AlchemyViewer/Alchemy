@@ -260,19 +260,18 @@ void ALCodeEditor::onEdit(const ALTextDocument::Edit& edit)
     // Numbers and tints were for the text they were given with.
     mLineNumbers.clear();
     mLineTints.clear();
-    const S32  lines    = document().lineCount();
-    const S32  made     = 1 + edit.breaksInserted();
-    const auto replaced = mMarks.apply(edit.range.begin.line, edit.range.end.line, made, lines, Mark::None, Mark::None);
-    const S32  first    = replaced.first;
-    const S32  last     = llmax(first, edit.range.end.line);
+    // Each run of lines an edit replaced -- one, or a batch's several.
+    const std::vector<ALTextDocument::Edit::LineSpan>& spans = edit.lineSpans();
+    const S32                                         lines = document().lineCount();
+    mMarks.applySpans(spans, lines, Mark::None, Mark::None);
     // What the problems there offered goes with them: a check says again.
-    mFixable.apply(edit.range.begin.line, edit.range.end.line, made, lines, 0, 0);
+    mFixable.applySpans(spans, lines, 0, 0);
     closeFixes();
     // What is known of bracket depth below the edit is known no more.
-    mDepthValid = llmin(mDepthValid, first);
+    mDepthValid = llmin(mDepthValid, llclamp(spans.front().first, 0, lines));
     // The lines the edit touched are changed until the next save.
-    mChanged.apply(edit.range.begin.line, edit.range.end.line, made, lines, 1, 0);
-    slideAsides(edit, made);
+    mChanged.applySpans(spans, lines, 1, 0);
+    slideAsides(spans);
 
     // Decorations and highlights after the edit move along with the text;
     // the ones it cut into go.
@@ -324,12 +323,11 @@ void ALCodeEditor::onEdit(const ALTextDocument::Edit& edit)
         },
         [](ALTextPos&) {});
 
-    // Folds slide the same way (ALFoldModel::edited).
-    mFolds.edited(edit, first, last, made);
-    if (!mFolds.folded().empty())
-    {
-        applyFolds();
-    }
+    // Folds slide the same way (ALFoldModel::edited), and are hidden again
+    // once the command is done.
+    const bool folded = !mFolds.folded().empty();
+    mFolds.edited(edit);
+    mFoldsDirty = mFoldsDirty || folded || !mFolds.folded().empty();
 }
 
 void ALCodeEditor::setMark(S32 line, Mark mark)
@@ -1280,32 +1278,43 @@ S32 ALCodeEditor::noteAtLocal(S32 x, S32 y)
     return noteBoxOf(line, text).pointInRect(x, y) ? line : -1;
 }
 
-void ALCodeEditor::slideAsides(const ALTextDocument::Edit& edit, S32 made)
+void ALCodeEditor::slideAsides(const std::vector<ALTextDocument::Edit::LineSpan>& spans)
 {
     if (mAsides.empty())
     {
         return;
     }
-    const ALTextRange range = edit.range.normalised();
-    const S32         first = llmax(0, range.begin.line);
-    const S32         last  = llmax(first, range.end.line);
-    mAsides.resize(llmax(mAsides.size(), static_cast<size_t>(last + 1)));
-    const Aside from_first = mAsides[static_cast<size_t>(first)];
-    const Aside from_last  = mAsides[static_cast<size_t>(last)];
-    mAsides.replace(static_cast<size_t>(first), static_cast<size_t>(last - first + 1), static_cast<size_t>(made), Aside());
-    // What is left of a line keeps its heat and its note: the line the
-    // edit begins inside -- typed in, or broken in two -- or, where the
-    // edit begins at a line's start, the line it ends in, pushed down by
-    // the lines made above it or pulled up over the lines taken.
-    if (range.begin.column > 0)
+    mAsides.resize(llmax(mAsides.size(), static_cast<size_t>(llmax(spans.back().last, 0) + 1)));
+    // What is left of a line keeps its heat and its note: the line a run
+    // begins inside -- typed in, or broken in two -- or, where it begins
+    // at a line's start, the line it ends in, pushed down by the lines
+    // made above it or pulled up over the lines taken; each where it is
+    // once the runs before it have moved it.
+    std::vector<std::pair<S32, Aside>> keep;
+    keep.reserve(spans.size());
+    S32 shift = 0;
+    for (const ALTextDocument::Edit::LineSpan& span : spans)
     {
-        mAsides[static_cast<size_t>(first)] = from_first;
+        const S32 first = llmax(0, span.first);
+        const S32 last  = llmax(first, span.last);
+        if (span.firstColumn > 0)
+        {
+            keep.emplace_back(first + shift, mAsides[static_cast<size_t>(first)]);
+        }
+        else
+        {
+            keep.emplace_back(first + shift + span.made - 1, mAsides[static_cast<size_t>(last)]);
+        }
+        shift += span.made - (last - first + 1);
     }
-    else
+    mAsides.applySpans(spans, llmax(document().lineCount(), 0), Aside(), Aside());
+    for (const auto& [row, aside] : keep)
     {
-        mAsides[static_cast<size_t>(first + made - 1)] = from_last;
+        if (row >= 0 && row < static_cast<S32>(mAsides.size()))
+        {
+            mAsides[static_cast<size_t>(row)] = aside;
+        }
     }
-    mAsides.resize(static_cast<size_t>(llmax(document().lineCount(), 0)));
 }
 
 bool ALCodeEditor::writeInlay(S32 index)
@@ -1853,8 +1862,17 @@ bool ALCodeEditor::isFolded(S32 line) const
     return mFolds.isFolded(line);
 }
 
+void ALCodeEditor::settleFolds()
+{
+    if (mFoldsDirty)
+    {
+        applyFolds();
+    }
+}
+
 void ALCodeEditor::applyFolds()
 {
+    mFoldsDirty = false;
     layout().setHidden(0, document().lineCount() - 1, false);
     for (const auto& [first, last] : mFolds.hidden(document(), getTabWidth()))
     {
@@ -3027,21 +3045,24 @@ void ALCodeEditor::insertSnippet(std::string_view body)
 
 void ALCodeEditor::syncMirrors(S32 index)
 {
-    // From the last to the first, so that none moves one still to do; one
-    // step to undo, and the selection as it was.
+    // As one edit, one step to undo, and the selection as it was.
     std::string            wanted;
     const std::vector<S32> order = mSnippet.staleMirrors(index, document(), wanted);
     if (order.empty())
     {
         return;
     }
-    const ALTextRange was = selection();
-    undoJournal().beginGroup();
+    const ALTextRange                                was = selection();
+    std::vector<std::pair<ALTextRange, std::string>> edits;
+    edits.reserve(order.size());
     for (const S32 k : order)
     {
-        mSnippet.syncing(k);
-        edit(mSnippet.mirrors()[static_cast<size_t>(k)].range, wanted);
+        edits.emplace_back(mSnippet.mirrors()[static_cast<size_t>(k)].range, wanted);
     }
+    // All of them as one edit.
+    undoJournal().beginGroup();
+    mSnippet.syncingAll();
+    editMany(std::move(edits), was.end);
     mSnippet.syncing(-1);
     undoJournal().endGroup();
     placeSelection(document().clamp(was.begin), document().clamp(was.end));
@@ -4145,6 +4166,8 @@ void ALCodeEditor::onMouseLeave(S32 x, S32 y, MASK mask)
 void ALCodeEditor::draw()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+    // Edits made outside a command -- the whole text set -- fold again here.
+    settleFolds();
     // A signature is about a call on the caret's line; anywhere else it
     // is stale. (The placeholders are let go of as the caret leaves their
     // lines, where it moves: dropPlaceholdersLeft.)

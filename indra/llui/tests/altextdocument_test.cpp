@@ -319,4 +319,46 @@ namespace tut
         ensure("one character on", heard[1].endAfter() == ALTextPos(0, 1));
         ensure("nothing put in ends where it began", heard[2].endAfter() == ALTextPos(0, 0));
     }
+
+    template<> template<>
+    void altextdocument_object::test<16>()
+    {
+        set_test_name("several stretches replaced as one edit: one notification carrying each, positions between them moved, and back again");
+        ALTextDocument doc("one two\nthree four\nfive six\nseven");
+        listen(doc);
+        typedef ALTextRange R;
+        typedef ALTextPos   P;
+        const ALTextDocument::Edit edit =
+            doc.replaceMany({ { R(P(0, 4), P(0, 7)), "2" }, { R(P(1, 0), P(1, 5)), "3\nTHREE" }, { R(P(2, 5), P(2, 8)), "6" }, { R(P(2, 0), P(2, 4)), "5" } });
+        ensure_equals("the text", doc.text(), std::string("one 2\n3\nTHREE four\n5 6\nseven"));
+        ensure("one notification", heard.size() == 1);
+        ensure("from the first to the last", edit.range == R(P(0, 4), P(2, 8)));
+        const std::vector<ALTextDocument::Edit::Part>& parts = edit.parts;
+        ensure("each in order", parts.size() == 4 && parts[2].before == R(P(2, 0), P(2, 4)));
+        ensure("each as it is after", parts[0].after == R(P(0, 4), P(0, 5)) && parts[1].after == R(P(1, 0), P(2, 5)) && parts[2].after == R(P(3, 0), P(3, 1)) &&
+                                          parts[3].after == R(P(3, 2), P(3, 3)));
+        const std::vector<ALTextDocument::Edit::LineSpan> spans = edit.lineSpans();
+        ensure("a run of lines each, the two sharing one line as one", spans.size() == 3 && spans[1].first == 1 && spans[1].made == 2 && spans[2].first == 2 &&
+                                                                          spans[2].last == 2 && spans[2].made == 1);
+        ensure("a position between them moved", edit.slidPast(P(1, 6)) == P(2, 6));
+        R between(P(2, 4), P(2, 5));
+        ensure("a range between two on one line kept, and moved", edit.slide(between) && between == R(P(3, 1), P(3, 2)));
+        R cut(P(0, 3), P(0, 5));
+        ensure("one a stretch cut through goes", !edit.slide(cut));
+        ensure("the find scope stretched round them", edit.stretched(R(P(0, 5), P(3, 2))) == R(P(0, 4), P(4, 2)));
+        ensure("a mark inside a stretch where it began", edit.placed(P(1, 2)) == P(1, 0) && edit.placed(P(2, 6)) == P(3, 2));
+        ensure("one after them all moved along", edit.placed(P(3, 2)) == P(4, 2));
+        ensure("a line replaced gone, one after them moved", edit.lineAfter(0) == -1 && edit.lineAfter(2) == -1 && edit.lineAfter(3) == 4);
+
+        const ALTextDocument::Edit back = edit.inverse();
+        doc.replace(back.range, back.inserted, back.parts);
+        ensure_equals("put back", doc.text(), std::string("one two\nthree four\nfive six\nseven"));
+        ensure("the stretches with it, the other way round", heard.size() == 2 && heard[1].parts.size() == 4 && heard[1].parts[1].after == R(P(1, 0), P(1, 5)));
+
+        doc.replaceMany({ { R(P(0, 0), P(0, 3)), "a" }, { R(P(0, 2), P(0, 4)), "b" } });
+        ensure_equals("one over another left out", doc.text(), std::string("a two\nthree four\nfive six\nseven"));
+        heard.clear();
+        doc.replaceMany({ { R(P(3, 0), P(3, 0)), "x" } });
+        ensure("one stretch is a plain edit", heard.size() == 1 && heard[0].parts.empty());
+    }
 }
