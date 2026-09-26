@@ -1785,4 +1785,25 @@ namespace tut
         ensure("then the one around it",
                e.perform(ALEditorCommand::SelectFunction) && e.selection() == ALTextRange(ALTextPos(4, 0), ALTextPos(14, 1)));
     }
+
+    template<> template<>
+    void alcodeeditor_object::test<47>()
+    {
+        set_test_name("the completion list stands under the whole of the caret's row where a box has made it taller than the font's line");
+        ALCodeEditor&    e = make("integer count;\n#co");
+        ALTextView::Atom tall;
+        tall.at     = ALTextPos(1, 0);
+        tall.length = 1;
+        tall.width  = 10;
+        tall.height = 3 * e.layout().rowHeight();
+        e.addAtom(tall);
+        e.setCaret(e.document().end());
+        key(' ', MASK_CONTROL);
+        ensure("open", e.completionOpen());
+        ensure_equals("the row is taller", e.layout().rowHeightOf(1, 0), 3 * e.layout().rowHeight());
+        const LLView* list = e.findChild<LLView>("completions", false);
+        ensure("the list", list != nullptr);
+        ensure_equals("under the row, not over its text", list->getRect().mTop,
+                      e.textRect().mTop - e.layout().lineTop(1) - e.layout().rowHeightOf(1, 0));
+    }
 }

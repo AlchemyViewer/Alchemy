@@ -2281,10 +2281,10 @@ void ALCodeEditor::placeListAt(ALChoiceList& list, const ALTextPos& at, S32 rows
 {
     const LLRect text   = textRect();
     const LLRect local  = getLocalRect();
-    const S32    row_h  = layout().rowHeight();
     S32          row;
     const F32    x      = layout().xOf(at.line, at.column, &row);
     const S32    top    = screenTopOf(text, at.line, row);
+    const S32    row_h  = layout().rowHeightOf(at.line, row);
     const S32    height = list.heightFor(rows);
     S32          left   = static_cast<S32>(static_cast<F32>(text.mLeft) - scrollX() + x);
     left                = llclamp(left, local.mLeft, llmax(local.mLeft, local.mRight - width));
@@ -3420,7 +3420,6 @@ void ALCodeEditor::drawSignature(const LLRect& text)
     const Signature& sig   = *shown;
     const LLFontGL*  font  = getFont();
     const F32        alpha = getDrawContext().mAlpha;
-    const S32        row_h = layout().rowHeight();
     const S32        line_h = font->getLineHeight();
     const bool       docs  = !sig.documentation.empty();
     const std::string doc_line = docs ? sig.documentation.substr(0, sig.documentation.find('\n')) : std::string();
@@ -3433,6 +3432,7 @@ void ALCodeEditor::drawSignature(const LLRect& text)
     const ALTextPos at   = mCards.signatureAt();
     const F32       x    = layout().xOf(at.line, at.column, &row);
     const S32       top  = screenTopOf(text, at.line, row);
+    const S32       row_h = layout().rowHeightOf(at.line, row);
     const LLRect    box  = ALCodeCards::signatureBox(wanted, height, static_cast<S32>(static_cast<F32>(text.mLeft) - scrollX() + x), top, row_h, getLocalRect());
     const S32       room = box.getWidth() - 2 * SIGNATURE_PAD;
 
