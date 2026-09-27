@@ -792,4 +792,26 @@ namespace tut
         ensure("the same", loose_hints[0].text == strict_hints[0].text && loose_hints[1].text == strict_hints[1].text);
         ensure("the problems of each told apart", said(service.check(loose)) == first && said(service.check(strict)) == strict_first);
     }
+
+    template<> template<>
+    void alluauservice_object::test<27>()
+    {
+        set_test_name("the same definitions and docs again are the ones in hand: nothing loaded over, and what was checked stands");
+        ensure("definitions loaded: " + error, loaded);
+        const std::string script = "local n: number = 1\nprint(n)\n";
+        service.check(script);
+        const size_t checked = service.typeChecks();
+        std::string  why;
+        ensure("the same again: loaded", service.loadDefinitions(definitions, why) && why.empty());
+        service.check(script);
+        ensure_equals("what was checked stands", service.typeChecks(), checked);
+        const std::string docs = "{\"@sl-slua/global/ll.Say\": {\"documentation\": \"Says it.\", \"learn_more_link\": \"x\"}}";
+        ensure("docs loaded", service.loadDocs(docs, why) && service.hasDocs());
+        ensure("and the same again", service.loadDocs(docs, why) && service.hasDocs());
+        // Other definitions are loaded over, and the script checked again.
+        ensure("others loaded", service.loadDefinitions(definitions + "\ndeclare function extraThing(): number\n", why));
+        service.check(script);
+        ensure("checked again against them", service.typeChecks() > checked);
+        service.loadDefinitions(definitions, why);
+    }
 }

@@ -1086,6 +1086,8 @@ struct ALLuauService::Impl
         std::string link;
     };
     boost::unordered_flat_map<std::string, Doc, ll::string_hash, std::equal_to<>> docs;
+    // What the docs were loaded from, by length and hash.
+    std::pair<size_t, size_t> docsHash{ 0, 0 };
 
     // How many times a script has been type checked, for a test that
     // says a question asked again is not.
@@ -1248,6 +1250,14 @@ ALLuauService::~ALLuauService() = default;
 
 bool ALLuauService::loadDefinitions(std::string_view source, std::string& error)
 {
+    // The same definitions again -- a region change that changed none of
+    // them -- are the ones in hand: nothing is checked twice over, and
+    // what was checked of the scripts stands.
+    if (mImpl->definitions && source == mImpl->definitionsSource)
+    {
+        error.clear();
+        return true;
+    }
     std::unique_ptr<Luau::Frontend> frontend = Impl::plainFrontend(mImpl->files, mImpl->configs, mImpl->solver);
     Luau::LoadDefinitionFileResult loaded = frontend->loadDefinitionFile(
         frontend->globals, frontend->globals.globalScope, source, DEFINITIONS_PACKAGE, /*captureComments*/ false);
@@ -1299,6 +1309,8 @@ bool ALLuauService::setNewSolver(bool use, std::string& error)
     }
     mImpl->solver = solver;
     const std::string source = mImpl->definitionsSource;
+    // Loaded again whatever they are: into a front end for this solver.
+    mImpl->definitions = false;
     if (!source.empty() && loadDefinitions(source, error))
     {
         return true;
@@ -1359,6 +1371,14 @@ bool ALLuauService::hasDefinitions() const
 
 bool ALLuauService::loadDocs(std::string_view json, std::string& error)
 {
+    // The same documentation again is not parsed again: by its length and
+    // its hash, rather than half a megabyte kept to compare with.
+    const size_t hash = std::hash<std::string_view>()(json);
+    if (!mImpl->docs.empty() && mImpl->docsHash == std::make_pair(json.size(), hash))
+    {
+        error.clear();
+        return true;
+    }
     LLSD parsed;
     if (!LlsdFromJsonString(json, parsed, &error) || !parsed.isMap())
     {
@@ -1376,6 +1396,7 @@ bool ALLuauService::loadDocs(std::string_view json, std::string& error)
         doc.link          = it->second.get("learn_more_link").asString();
         mImpl->docs.emplace(it->first, std::move(doc));
     }
+    mImpl->docsHash = std::make_pair(json.size(), hash);
     error.clear();
     return true;
 }
