@@ -317,6 +317,21 @@ int main(int, char**)
     luaFormat.lua = true;
     row("format the whole text", ms_per_run([&] { g_sink = g_sink + ALScriptFormatter::format(lslScript.text(), lslFormat).size(); }),
         ms_per_run([&] { g_sink = g_sink + ALScriptFormatter::format(luaScript.text(), luaFormat).size(); }));
+    // One long line: a table or a list of a few thousand terms, which a
+    // generated script can have.
+    {
+        std::string lsl_line = "default { state_entry() { integer n = 0";
+        std::string lua_line = "local n = 0";
+        for (int i = 0; i < 3000; ++i)
+        {
+            lsl_line += " + " + std::to_string(i) + "*-" + std::to_string(i);
+            lua_line += " + " + std::to_string(i) + "*-" + std::to_string(i);
+        }
+        lsl_line += "; } }\n";
+        lua_line += "\n";
+        row("format one line of 6,000 operators", ms_per_run([&] { g_sink = g_sink + ALScriptFormatter::format(lsl_line, lslFormat).size(); }),
+            ms_per_run([&] { g_sink = g_sink + ALScriptFormatter::format(lua_line, luaFormat).size(); }));
+    }
 
     // A check's messages put into the viewer's words: a thousand, of the
     // kinds a script mid-edit has, most matching a row late or none.

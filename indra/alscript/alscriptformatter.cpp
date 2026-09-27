@@ -152,6 +152,10 @@ namespace
     {
         std::string  out;
         const Token* prev      = nullptr;
+        // The last token before prev that is neither blank nor a comment:
+        // what a sign after prev has to operate on, kept as the line goes
+        // rather than looked for from its start at every sign.
+        const Token* earlier   = nullptr;
         std::string  gap;       // the whitespace written between prev and the next token
         S32          vector    = 0;
         // The brackets open on the line, and whether each is a
@@ -324,19 +328,7 @@ namespace
                     // After a unary sign, nothing; after a binary one, a
                     // space. Unary where nothing to operate on stood
                     // before the sign.
-                    const Token* before = nullptr;
-                    for (size_t i = 0; i < line.tokens.size(); ++i)
-                    {
-                        if (&line.tokens[i] == &a)
-                        {
-                            break;
-                        }
-                        if (significant(line.tokens[i]))
-                        {
-                            before = &line.tokens[i];
-                        }
-                    }
-                    say(!(isUnary(lua, p) && (!before || !operand(lua, *before))));
+                    say(!(isUnary(lua, p) && (!earlier || !operand(lua, *earlier))));
                 }
                 else if (p == ")" || p == "]")
                 {
@@ -358,6 +350,10 @@ namespace
             }
             out += between;
             out += t.text;
+            if (significant(*prev))
+            {
+                earlier = prev;
+            }
             prev = &t;
             gap.clear();
         }
