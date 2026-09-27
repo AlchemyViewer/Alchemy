@@ -25,9 +25,11 @@ target_sources(
     alscriptfixes.cpp
     alscriptformatter.cpp
     alscriptmessages.cpp
+    alscriptnameindex.cpp
     alscriptrecovery.cpp
     alscriptweight.cpp
     alscriptstack.cpp
+    alscripttextcache.cpp
     alselenefilters.cpp
     alsourcemap.cpp
 )
@@ -54,11 +56,14 @@ target_sources(
         alscriptenvelope.h
         alscriptfixes.h
         alscriptformatter.h
+        alscriptjoblane.h
         alscriptmessages.h
+        alscriptnameindex.h
         alscriptrecovery.h
         alscriptproblem.h
         alscriptstack.h
         alscriptsymbol.h
+        alscripttextcache.h
         alscriptweight.h
         alselenefilters.h
         alsourcemap.h
@@ -118,6 +123,9 @@ if(AL_BUILD_TESTS)
   )
   al_add_test(aldiskincludes PROJECT alscript LIBRARIES alscript llcommon)
   al_add_test(aldiskcache PROJECT alscript LIBRARIES alscript llcommon)
+  al_add_test(alscriptjoblane PROJECT alscript LIBRARIES alscript llcommon)
+  al_add_test(alscriptnameindex PROJECT alscript LIBRARIES alscript llcommon)
+  al_add_test(alscripttextcache PROJECT alscript LIBRARIES alscript llcommon)
   al_add_test(alscriptstack PROJECT alscript LIBRARIES alscript llcommon)
   al_add_test(alscriptenvelope PROJECT alscript LIBRARIES alscript llcommon)
   al_add_test(almessagemap PROJECT alscript LIBRARIES alscript llcommon)
