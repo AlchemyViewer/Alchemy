@@ -245,6 +245,7 @@ ALTextView::ALTextView(const Params& p)
 {
     const S32 tab_width = p.tab_width;
     mTabWidth           = llmax(1, tab_width);
+    mIndentDefaults     = { mTabWidth, mSoftTabs };
     mFindMatchColor     = p.find_match_color.isProvided() ? p.find_match_color() : LLUIColorTable::instance().getColor("TextFindMatchColor", LLColor4(1.f, 0.7f, 0.2f, 0.4f));
     mScrollMap          = p.scroll_map;
     mScrollMapWidth     = llmax(20, static_cast<S32>(p.scroll_map_width));
@@ -359,6 +360,10 @@ void ALTextView::setText(std::string_view text)
     mScrollY          = 0;
     mScrollX          = 0.f;
     mChangedSinceFocus = false;
+    if (mIndentFrom != IndentFrom::Chosen)
+    {
+        readIndentation();
+    }
     syncScrollbar();
     mChanged();
 }
@@ -438,8 +443,54 @@ void ALTextView::setWordWrap(bool wrap)
 
 void ALTextView::setTabWidth(S32 spaces)
 {
-    mTabWidth = llmax(1, spaces);
-    mLayout.setTabWidth(mTabWidth);
+    useIndentation({ spaces, mSoftTabs }, IndentFrom::Chosen);
+}
+
+void ALTextView::setSoftTabs(bool soft)
+{
+    useIndentation({ mTabWidth, soft }, IndentFrom::Chosen);
+}
+
+void ALTextView::setIndentDefaults(S32 tab_width, bool soft_tabs)
+{
+    mIndentDefaults = { llmax(1, tab_width), soft_tabs };
+    // A text of tabs takes their width from the defaults too.
+    if (mIndentFrom != IndentFrom::Chosen)
+    {
+        readIndentation();
+    }
+}
+
+void ALTextView::setReadsIndentation(bool reads)
+{
+    if (mReadsIndentation == reads)
+    {
+        return;
+    }
+    mReadsIndentation = reads;
+    if (mIndentFrom != IndentFrom::Chosen)
+    {
+        readIndentation();
+    }
+}
+
+void ALTextView::readIndentation()
+{
+    const std::optional<ALTextIndent::Options> own =
+        mReadsIndentation ? ALTextIndent::detect(mDocument, mIndentDefaults.tabWidth) : std::nullopt;
+    useIndentation(own ? *own : mIndentDefaults, own ? IndentFrom::Text : IndentFrom::Defaults);
+}
+
+void ALTextView::useIndentation(const ALTextIndent::Options& options, IndentFrom from)
+{
+    mIndentFrom = from;
+    mSoftTabs   = options.softTabs;
+    const S32 width = llmax(1, options.tabWidth);
+    if (width != mTabWidth)
+    {
+        mTabWidth = width;
+        mLayout.setTabWidth(mTabWidth);
+    }
 }
 
 // --- geometry ----------------------------------------------------------------

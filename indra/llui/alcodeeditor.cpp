@@ -2946,7 +2946,7 @@ void ALCodeEditor::insertSnippet(std::string_view body)
     const ALTextPos             at        = std::min(selection.begin, selection.end);
     const std::string&          line      = document().line(at.line);
     const std::string           indent    = line.substr(0, std::min(line.size(), line.find_first_not_of(" \t")));
-    ALSnippetSession::Expansion expanded  = ALSnippetSession::expand(body, at, indent);
+    ALSnippetSession::Expansion expanded  = ALSnippetSession::expand(body, at, indent, ALTextIndent::indentUnit(indent, { getTabWidth(), getSoftTabs() }));
     insertText(expanded.text);
     const ALTextRange landing = expanded.landing;
     if (expanded.stops.empty())

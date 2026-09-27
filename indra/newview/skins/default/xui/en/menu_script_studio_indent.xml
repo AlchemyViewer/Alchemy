@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<!-- What the indentation word in the strip under Script Studio's editor
+     offers: the script in front indented by spaces or by tabs, and how
+     wide a level or a tab is, for that script alone; what it says of
+     itself read again, or the default taken back; or the whole script
+     converted, and indented alike from then on. -->
+<context_menu
+ name="Script studio indentation menu">
+  <menu_item_check label="Indent Using Spaces" layout="topleft" name="spaces">
+    <menu_item_check.on_click function="Indent.Action" parameter="spaces" />
+    <menu_item_check.on_check function="Indent.Check" parameter="spaces" />
+  </menu_item_check>
+  <menu_item_check label="Indent Using Tabs" layout="topleft" name="tabs">
+    <menu_item_check.on_click function="Indent.Action" parameter="tabs" />
+    <menu_item_check.on_check function="Indent.Check" parameter="tabs" />
+  </menu_item_check>
+  <menu_item_separator layout="topleft" />
+  <menu_item_check label="Width 2" layout="topleft" name="width_2">
+    <menu_item_check.on_click function="Indent.Action" parameter="width_2" />
+    <menu_item_check.on_check function="Indent.Check" parameter="width_2" />
+  </menu_item_check>
+  <menu_item_check label="Width 3" layout="topleft" name="width_3">
+    <menu_item_check.on_click function="Indent.Action" parameter="width_3" />
+    <menu_item_check.on_check function="Indent.Check" parameter="width_3" />
+  </menu_item_check>
+  <menu_item_check label="Width 4" layout="topleft" name="width_4">
+    <menu_item_check.on_click function="Indent.Action" parameter="width_4" />
+    <menu_item_check.on_check function="Indent.Check" parameter="width_4" />
+  </menu_item_check>
+  <menu_item_check label="Width 8" layout="topleft" name="width_8">
+    <menu_item_check.on_click function="Indent.Action" parameter="width_8" />
+    <menu_item_check.on_check function="Indent.Check" parameter="width_8" />
+  </menu_item_check>
+  <menu_item_separator layout="topleft" />
+  <menu_item_call label="Read from the Script Again" layout="topleft" name="read">
+    <menu_item_call.on_click function="Indent.Action" parameter="read" />
+    <menu_item_call.on_enable function="Indent.Enable" parameter="read" />
+  </menu_item_call>
+  <menu_item_separator layout="topleft" />
+  <menu_item_call label="Convert Indentation to Spaces" layout="topleft" name="convert_spaces">
+    <menu_item_call.on_click function="Indent.Action" parameter="convert_spaces" />
+    <menu_item_call.on_enable function="Indent.Enable" parameter="convert_spaces" />
+  </menu_item_call>
+  <menu_item_call label="Convert Indentation to Tabs" layout="topleft" name="convert_tabs">
+    <menu_item_call.on_click function="Indent.Action" parameter="convert_tabs" />
+    <menu_item_call.on_enable function="Indent.Enable" parameter="convert_tabs" />
+  </menu_item_call>
+</context_menu>

@@ -358,8 +358,19 @@ end</floater.string>
              layout="topleft"
              left="12"
              name="insert_spaces"
-             tool_tip="Tab, a new line and the formatter put spaces to the next stop in; off, a tab character"
+             tool_tip="Tab, a new line and the formatter put spaces to the next stop in; off, a tab character. For a script that does not say its own, where scripts are read for it."
              top_pad="6"
+             width="370" />
+            <check_box
+             control_name="ALScriptStudioDetectIndentation"
+             follows="left|top"
+             height="20"
+             label="Indent each script as it is already indented"
+             layout="topleft"
+             left="12"
+             name="detect_indentation"
+             tool_tip="Tabs or spaces, and how many a level, read from each script's own lines as it opens; the two above are for a script that does not say. The strip under the editor shows what a script is indented by, and changes it for that script alone."
+             top_pad="4"
              width="370" />
             <check_box
              control_name="ALScriptStudioAutoClose"

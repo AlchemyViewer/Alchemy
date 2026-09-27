@@ -267,7 +267,7 @@ namespace tut
         crumbs->setTips({ "line tip", "problems tip", "source tip", "expanded tip" });
         doc.editor->setCaret(ALTextPos(2, 6));
         crumbs->showTrailer(doc);
-        ensure_equals("the caret alone", trailer(), std::string("Ln 3, Col 7"));
+        ensure_equals("the caret and the indentation", trailer(), std::string("Ln 3, Col 7, Tab Size: 4"));
         ensure("pressed for a line", part("Ln")->value == "line" && part("Ln")->toolTip == "line tip");
 
         doc.modifiable  = false;
@@ -276,10 +276,10 @@ namespace tut
         told().warnings = 1;
         doc.editor->setSelection(ALTextRange(ALTextPos(2, 0), ALTextPos(4, 0)));
         crumbs->showTrailer(doc);
-        ensure_equals("in order", trailer(), std::string("Read-only, -- INSERT --, Ln 5, Col 1, 2 lines selected, 2 errors, 1 warning"));
+        ensure_equals("in order", trailer(), std::string("Read-only, -- INSERT --, Ln 5, Col 1, 2 lines selected, Tab Size: 4, 2 errors, 1 warning"));
         const std::vector<Part>& raw = jump()->trailer();
-        ensure("a dot between each", raw.size() == 11 && raw[1].text == "   \xC2\xB7   " && raw[9].text == raw[1].text);
-        ensure_equals("the last a part", raw[10].text, std::string("1 warning"));
+        ensure("a dot between each", raw.size() == 13 && raw[1].text == "   \xC2\xB7   " && raw[11].text == raw[1].text);
+        ensure_equals("the last a part", raw[12].text, std::string("1 warning"));
         ensure_equals("read only, said", part("Read")->toolTip, std::string("You may read this script and not change it"));
         ensure("the problems pressable", part("2 errors")->value == "problems" && part("1 warning")->toolTip == "problems tip");
         doc.editor->setSelection(ALTextRange(ALTextPos(2, 0), ALTextPos(4, 2)));
@@ -295,7 +295,7 @@ namespace tut
                       "Ln 1, Col " + std::to_string(doc.editor->getTabWidth() + 1));
         doc.loaded = false;
         crumbs->showTrailer(doc);
-        ensure("not loaded: not said read only", part("Read") == nullptr);
+        ensure("not loaded: not said read only, nor how it is indented", part("Read") == nullptr && part("Tab") == nullptr);
     }
 
     template<> template<>
@@ -332,7 +332,7 @@ namespace tut
         const size_t LIMIT      = ALScriptEnvelope::MAX_ASSET_BYTES;
         doc.weighing.assetBytes = LIMIT / 2;
         crumbs->showTrailer(doc);
-        ensure("half: nothing", parts().size() == 1);
+        ensure("half: nothing", parts().size() == 2);
         doc.weighing.assetBytes = LIMIT / 2 + 1;
         crumbs->showTrailer(doc);
         ensure("past half", part(std::to_string((LIMIT / 2 + 1 + 1023) / 1024) + " KB") != nullptr);
@@ -383,7 +383,7 @@ namespace tut
         told().target           = ALScriptWeight::Target::Mono;
         crumbs->showTrailer(doc);
         ensure_equals("before and after", part("Mono")->text, std::string("Mono ~20.0 \xE2\x86\x92 ~10.0 of 64 KB"));
-        ensure_equals("once", parts().size(), size_t(3));
+        ensure_equals("once", parts().size(), size_t(4));
         doc.uploaded.codeAfter = 60000;
         crumbs->showTrailer(doc);
         ensure("near: the warning's", part("Mono")->color == doc.editor->markColor(ALCodeEditor::Mark::Warning));
@@ -415,5 +415,40 @@ namespace tut
         doc.outline.erase(doc.outline.begin());
         crumbs->choose("1\ntouch_start");
         ensure_equals("each", joined(told().chosen), std::string("a 0:0-0:0, a 2:4-2:15, a nowhere, a 5:4-5:15"));
+    }
+
+    template<> template<>
+    void alscriptcrumbsbar_object::test<6>()
+    {
+        set_test_name("how the script is indented: a tab's width or a level's spaces, pressable, the tip saying where it was said; the menu's choices for that script alone");
+        ALScriptCrumbsBar* crumbs = bar();
+        Doc&               doc    = tab("a");
+        crumbs->showTrailer(doc);
+        ensure("tabs, by default", part("Tab Size: 4") && part("Tab Size")->value == "indent");
+        ensure("the default's tip", part("Tab Size")->toolTip.find("default in Preferences") != std::string::npos);
+        ensure("checked as it is", crumbs->indentChecked("tabs") && crumbs->indentChecked("width_4") && !crumbs->indentChecked("spaces"));
+        ensure("nothing chosen to forget", !crumbs->indentEnabled("read"));
+        doc.editor->setReadsIndentation(true);
+        doc.editor->setText("a\n  b\n");
+        crumbs->showTrailer(doc);
+        ensure("read from the script", part("Spaces: 2") && part("Spaces")->toolTip.find("read from its own lines") != std::string::npos);
+
+        crumbs->indentAct("width_4");
+        ensure("a width chosen", part("Spaces: 4") && part("Spaces")->toolTip.find("as chosen for it") != std::string::npos);
+        ensure("and checked", crumbs->indentChecked("width_4") && !crumbs->indentChecked("width_2"));
+        ensure("the text untouched", doc.editor->text() == "a\n  b\n");
+        crumbs->indentAct("tabs");
+        ensure("tabs chosen", part("Tab Size: 4") != nullptr && crumbs->indentChecked("tabs"));
+        ensure("to be forgotten", crumbs->indentEnabled("read"));
+        crumbs->indentAct("read");
+        ensure("the script's own again", part("Spaces: 2") != nullptr);
+
+        crumbs->indentAct("convert_tabs");
+        ensure_equals("converted, a tab of the width", doc.editor->text(), std::string("a\n\tb\n"));
+        ensure("and tabs from here on", part("Tab Size: 2") != nullptr);
+        doc.modifiable = false;
+        ensure("not a script that may only be read", !crumbs->indentEnabled("convert_spaces"));
+        crumbs->indentAct("convert_spaces");
+        ensure_equals("left as it was", doc.editor->text(), std::string("a\n\tb\n"));
     }
 }

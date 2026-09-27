@@ -114,4 +114,17 @@ namespace tut
         session.clear();
         ensure("cleared", !session.active() && session.mirrors().empty() && session.landing() == 0);
     }
+
+    template<> template<>
+    void alsnippetsession_object::test<5>()
+    {
+        set_test_name("a body's own levels, four spaces or a tab, made again in the text's unit; what is left over as spaces; the first line as it is");
+        const ALSnippetSession::Expansion tabs = ALSnippetSession::expand("f()\n{\n    a;\n        b;\n\tc;\n      d;\n}", ALTextPos(0, 1), "\t", "\t");
+        ensure_equals("tabs a level, under the line's own", tabs.text, std::string("f()\n\t{\n\t\ta;\n\t\t\tb;\n\t\tc;\n\t\t  d;\n\t}"));
+        const ALSnippetSession::Expansion two = ALSnippetSession::expand("if x then\n    $0\nend", ALTextPos(0, 0), "", "  ");
+        ensure_equals("two spaces a level", two.text, std::string("if x then\n  \nend"));
+        ensure("$0 where its level is now", two.landing == range(1, 2, 2));
+        const ALSnippetSession::Expansion same = ALSnippetSession::expand("    lead\n    x", ALTextPos(0, 0), "");
+        ensure_equals("no unit: as written", same.text, std::string("    lead\n    x"));
+    }
 }

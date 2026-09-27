@@ -239,4 +239,22 @@ namespace tut
         ensure_equals("measured as the tabs were: a tab of two, two spaces at four",
                       applied("\ta", *convertIndentation(ALTextDocument("\ta"), 0, 0, false, 4, 2)), std::string("  a"));
     }
+
+    template<> template<>
+    void altextindent_object::test<7>()
+    {
+        set_test_name("a text's own indentation read: tabs or spaces by which more lines begin with, a level's spaces by the step seen most, nothing where it does not say");
+        const auto read = [](const char* text, S32 lines = 10000) {
+            const std::optional<Options> own = detect(ALTextDocument(text), 4, lines);
+            return own ? llformat("%s %d", own->softTabs ? "spaces" : "tabs", own->tabWidth) : std::string("none");
+        };
+        ensure_equals("four spaces a level", read("default\n{\n    state_entry()\n    {\n        llSay(0, \"hi\");\n    }\n}"), std::string("spaces 4"));
+        ensure_equals("two", read("if x then\n  y()\n  if z then\n    w()\n  end\nend"), std::string("spaces 2"));
+        ensure_equals("tabs, a tab as wide as the default", read("a\n\tb\n\t\tc\n\td"), std::string("tabs 4"));
+        ensure_equals("nothing indented", read("a\nb\n\nc"), std::string("none"));
+        ensure_equals("as many each way", read("\ta\n    b"), std::string("none"));
+        ensure_equals("a block comment's stars are not a level", read("/**\n * one\n * two\n */\nf()\n{\n  x;\n}"), std::string("spaces 2"));
+        ensure_equals("only the lines asked about", read("a\nb\n\tc", 2), std::string("none"));
+        ensure_equals("closing two levels at once is still steps of four", read("a\n    b\n        c\nd\n    e\n        f\ng"), std::string("spaces 4"));
+    }
 }

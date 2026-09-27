@@ -6,7 +6,9 @@
   ${1:text} is a placeholder to tab through (numbered in the order
   they are visited, with text to type over or none), $0 is where the
   caret lands past the last, and $$ is a dollar. The lines after the
-  first are indented as the line the snippet goes into is.
+  first are indented as the line the snippet goes into is, and each
+  level of their own, four spaces or a tab, becomes a level of the
+  script's own indentation, tabs or spaces.
 
   A file of the same name under the settings folder's snippets/ adds a
   person's own.

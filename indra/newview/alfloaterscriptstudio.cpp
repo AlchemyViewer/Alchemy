@@ -1582,8 +1582,10 @@ void ALFloaterScriptStudio::refreshAll()
 // static
 void ALFloaterScriptStudio::applyTypingOptions(ALCodeEditor& editor)
 {
-    editor.setSoftTabs(gSavedSettings.getBOOL("ALScriptStudioInsertSpaces"));
-    editor.setTabWidth(llclamp(gSavedSettings.getS32("ALScriptStudioTabWidth"), 1, 16));
+    // What a script is indented by where it does not say, and whether it
+    // is asked; one given its own for its tab keeps that.
+    editor.setIndentDefaults(llclamp(gSavedSettings.getS32("ALScriptStudioTabWidth"), 1, 16), gSavedSettings.getBOOL("ALScriptStudioInsertSpaces"));
+    editor.setReadsIndentation(gSavedSettings.getBOOL("ALScriptStudioDetectIndentation"));
     editor.setAutoComplete(gSavedSettings.getBOOL("ALScriptStudioAutoComplete"));
     editor.setCompleteAfter(gSavedSettings.getS32("ALScriptStudioCompleteAfter"));
     editor.setAcceptOnEnter(gSavedSettings.getBOOL("ALScriptStudioAcceptOnEnter"));
@@ -5588,8 +5590,9 @@ void ALFloaterScriptStudio::format(Doc& doc, bool selection_only)
     }
     ALScriptFormatter::Options options;
     options.lua           = doc.language.lua;
-    options.indent        = llclamp(gSavedSettings.getS32("ALScriptStudioTabWidth"), 1, 16);
-    options.tabs          = !gSavedSettings.getBOOL("ALScriptStudioInsertSpaces");
+    // Indented as the script is, which is what its editor types.
+    options.indent        = doc.editor->getTabWidth();
+    options.tabs          = !doc.editor->getSoftTabs();
     options.maxBlankLines = llclamp(gSavedSettings.getS32("ALScriptFormatBlankLines"), 0, 10);
     options.spacing       = gSavedSettings.getBOOL("ALScriptFormatSpacing");
     const std::string text      = document.text();
@@ -6386,9 +6389,11 @@ void ALFloaterScriptStudio::addEditCommands()
         mCommands.add(
             name,
             [this, spaces]() {
+                // And indented alike from here on.
                 if (Doc* doc = active())
                 {
                     doc->editor->convertIndentation(0, doc->editor->document().lineCount() - 1, spaces);
+                    doc->editor->setSoftTabs(spaces);
                 }
             },
             [this]() {

@@ -62,7 +62,7 @@ namespace
 
 const std::vector<ALFoldModel::Region>& ALFoldModel::regions(const ALTextDocument& doc, S32 tab_width)
 {
-    if (mValid && mVersion == doc.version())
+    if (mValid && mVersion == doc.version() && mTabWidth == tab_width)
     {
         return mRegions;
     }
@@ -141,8 +141,9 @@ const std::vector<ALFoldModel::Region>& ALFoldModel::regions(const ALTextDocumen
             mRegions.push_back(Region{ l, end_of[l] });
         }
     }
-    mVersion = doc.version();
-    mValid   = true;
+    mVersion  = doc.version();
+    mTabWidth = tab_width;
+    mValid    = true;
     return mRegions;
 }
 

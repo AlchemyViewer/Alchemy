@@ -27,6 +27,7 @@
 #include "alscriptstudiodoc.h"
 #include "alscriptweight.h"
 #include "aljumpbar.h"
+#include "llmenugl.h"
 #include "llpanel.h"
 
 #include <optional>
@@ -39,10 +40,11 @@ class ALScriptStudioServices;
 // caret is in -- the script, then each symbol holding it, outermost first,
 // each offering the others beside it -- and past it the trailer, what is
 // true of the tab in front: that it may only be read, vim's word, where the
-// caret is, what is selected, how many problems it has, what it weighs or
-// its optimizer made it, what a save would send, and which of its views is
-// in front. A step chosen, or a word of the trailer pressed, is the
-// window's to do.
+// caret is, what is selected, how it is indented, how many problems it
+// has, what it weighs or its optimizer made it, what a save would send,
+// and which of its views is in front. A step chosen, or a word of the
+// trailer pressed, is the window's to do -- but for the indentation,
+// whose menu is the bar's: it changes nothing but the tab's editor.
 class ALScriptCrumbsBar : public LLPanel
 {
 public:
@@ -82,6 +84,7 @@ public:
     };
 
     explicit ALScriptCrumbsBar(const LLPanel::Params& params = getDefaultParams());
+    ~ALScriptCrumbsBar() override;
     bool postBuild() override;
 
     // The path of the tab in front's caret, and its trailer: the bar told
@@ -94,6 +97,13 @@ public:
     void choose(const std::string& value);
     // No tab: nothing on the bar.
     void forget();
+    // A choice from the indentation's menu, for the tab in front's script:
+    // spaces or tabs, width_N, what the script says read again (or the
+    // default), or the whole script converted to spaces or tabs; whether
+    // it can be made, and whether it is what the script is indented by.
+    void indentAct(const std::string& action);
+    bool indentEnabled(const std::string& action) const;
+    bool indentChecked(const std::string& action) const;
     void setTips(Tips tips) { mTips = std::move(tips); }
 
 private:
@@ -103,14 +113,19 @@ private:
     // save would send; and the view.
     void place(Doc& doc, std::vector<Part>& parts) const;
     void selection(Doc& doc, std::vector<Part>& parts) const;
+    void indentation(Doc& doc, std::vector<Part>& parts) const;
     void problems(Doc& doc, std::vector<Part>& parts) const;
     void weight(Doc& doc, std::vector<Part>& parts) const;
     void sending(Doc& doc, std::vector<Part>& parts) const;
     void views(Doc& doc, std::vector<Part>& parts) const;
 
+    // The indentation pressed: its menu.
+    void showIndentMenu();
+
     ALScriptStudioServices* mServices = nullptr;
     Window*                 mWindow   = nullptr;
     ALJumpBar*              mBar      = nullptr;
+    LLHandle<LLContextMenu> mIndentMenu;
     Tips                    mTips;
     // Whose path the bar shows, so that a tab come to the front is shown
     // there whatever its own path was when last shown.

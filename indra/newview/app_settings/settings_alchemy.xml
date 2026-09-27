@@ -717,10 +717,21 @@
             <key>Value</key>
             <string />
         </map>
+        <key>ALScriptStudioDetectIndentation</key>
+        <map>
+            <key>Comment</key>
+            <string>Script Studio reads how each script is indented -- tabs or spaces, and how many a level -- from its own lines, and types, formats and inserts snippets alike; the tab width and spaces settings are for a script that does not say.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
         <key>ALScriptStudioInsertSpaces</key>
         <map>
             <key>Comment</key>
-            <string>Script Studio's editors indent with spaces to the next tab stop rather than with a tab character, and the formatter indents alike.</string>
+            <string>Script Studio's editors indent with spaces to the next tab stop rather than with a tab character, and the formatter indents alike, where a script does not say its own.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>

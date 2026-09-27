@@ -500,7 +500,7 @@ namespace tut
         type("fo");
         ensure("offered", f.completionOpen());
         key(KEY_TAB);
-        ensure_equals("the snippet in place of the prefix", f.text(), std::string("for (i = 0; i < n; ++i)\n{\n    \n}"));
+        ensure_equals("the snippet in place of the prefix, a level of it a tab as the editor types", f.text(), std::string("for (i = 0; i < n; ++i)\n{\n\t\n}"));
         ensure_equals("its first placeholder selected", f.selectedText(), std::string("i = 0"));
     }
 

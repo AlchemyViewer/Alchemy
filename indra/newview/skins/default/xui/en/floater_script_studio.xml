@@ -321,6 +321,13 @@
     <floater.string name="TabNotecardTip">A notecard, as plain text</floater.string>
     <floater.string name="TabReadOnlyTip">Read-only: you may read it and not change it</floater.string>
     <floater.string name="TrailerReadOnly">Read-only</floater.string>
+    <floater.string name="TrailerIndentSpaces">Spaces: [WIDTH]</floater.string>
+    <floater.string name="TrailerIndentTabs">Tab Size: [WIDTH]</floater.string>
+    <floater.string name="TrailerIndentTipText">How this script is indented, read from its own lines. Press to indent it otherwise, or to convert it</floater.string>
+    <floater.string name="TrailerIndentTipDefaults">How this script is indented: the default in Preferences, since the script does not say. Press to indent it otherwise, or to convert it</floater.string>
+    <floater.string name="TrailerIndentTipChosen">How this script is indented, as chosen for it. Press to indent it otherwise, or to convert it</floater.string>
+    <floater.string name="IndentReadAgain">Read from the Script Again</floater.string>
+    <floater.string name="IndentToDefault">Back to the Default</floater.string>
     <floater.string name="TrailerReadOnlyTip">You may read this script and not change it</floater.string>
     <floater.string name="OriginPreprocessor">Preprocessor</floater.string>
     <floater.string name="OriginOptimizer">Optimizer</floater.string>

@@ -31,6 +31,8 @@
 #include "alscriptstudioplaces.h"
 #include "alscriptstudioservices.h"
 #include "llfloater.h"
+#include "llmenugl.h"
+#include "lluictrlfactory.h"
 #include "llnotecard.h"
 
 using ALScriptPlaces::NONE;
@@ -59,6 +61,17 @@ static LLPanelInjector<ALScriptCrumbsBar> t_script_studio_crumbs("script_studio_
 
 ALScriptCrumbsBar::ALScriptCrumbsBar(const LLPanel::Params& params) : LLPanel(params) {}
 
+ALScriptCrumbsBar::~ALScriptCrumbsBar()
+{
+    // A menu still open calls into this bar, which is going: it goes
+    // first. The menus live in the viewer's menu holder, not here.
+    if (LLContextMenu* open = mIndentMenu.get())
+    {
+        open->hide();
+        open->die();
+    }
+}
+
 bool ALScriptCrumbsBar::postBuild()
 {
     mBar = getChild<ALJumpBar>("breadcrumb");
@@ -73,7 +86,14 @@ bool ALScriptCrumbsBar::postBuild()
         return true;
     }
     mBar->onChose([this](size_t, const std::string& value) { choose(value); });
-    mBar->onTrailerChosen([this](const std::string& value) { mWindow->trailerChosen(value); });
+    mBar->onTrailerChosen([this](const std::string& value) {
+        if (value == "indent")
+        {
+            showIndentMenu();
+            return;
+        }
+        mWindow->trailerChosen(value);
+    });
     return true;
 }
 
@@ -87,6 +107,7 @@ void ALScriptCrumbsBar::showTrailer(Doc& doc)
     std::vector<Part> parts;
     place(doc, parts);
     selection(doc, parts);
+    indentation(doc, parts);
     problems(doc, parts);
     weight(doc, parts);
     sending(doc, parts);
@@ -265,6 +286,126 @@ void ALScriptCrumbsBar::sending(Doc& doc, std::vector<Part>& parts) const
         part.color = doc.editor->markColor(ALCodeEditor::Mark::Warning);
     }
     parts.push_back(std::move(part));
+}
+
+void ALScriptCrumbsBar::indentation(Doc& doc, std::vector<Part>& parts) const
+{
+    // How the script is indented -- a tab's width, or a level's spaces --
+    // and, on the tip, where that was said.
+    if (!doc.loaded)
+    {
+        return;
+    }
+    const ALCodeEditor&        editor = *doc.editor;
+    LLStringUtil::format_map_t args;
+    args["[WIDTH]"] = std::to_string(editor.getTabWidth());
+    const ALTextView::IndentFrom from = editor.indentFrom();
+    const char* tip = from == ALTextView::IndentFrom::Text ? "TrailerIndentTipText" : from == ALTextView::IndentFrom::Chosen ? "TrailerIndentTipChosen" : "TrailerIndentTipDefaults";
+    parts.push_back({ mServices->words(editor.getSoftTabs() ? "TrailerIndentSpaces" : "TrailerIndentTabs", args), "indent", mServices->words(tip) });
+}
+
+void ALScriptCrumbsBar::showIndentMenu()
+{
+    if (!LLMenuGL::sMenuContainer || !mServices || !mServices->frontDoc())
+    {
+        return;
+    }
+    if (LLContextMenu* old = mIndentMenu.get())
+    {
+        old->die();
+        mIndentMenu.markDead();
+    }
+    LLUICtrl::CommitCallbackRegistry::ScopedRegistrar commit;
+    LLUICtrl::EnableCallbackRegistry::ScopedRegistrar enable;
+    commit.add("Indent.Action", [this](LLUICtrl*, const LLSD& param) { indentAct(param.asString()); });
+    enable.add("Indent.Enable", [this](LLUICtrl*, const LLSD& param) { return indentEnabled(param.asString()); });
+    enable.add("Indent.Check", [this](LLUICtrl*, const LLSD& param) { return indentChecked(param.asString()); });
+    LLContextMenu* menu = LLUICtrlFactory::createFromFile<LLContextMenu>("menu_script_studio_indent.xml", LLMenuGL::sMenuContainer,
+                                                                          LLMenuHolderGL::child_registry_t::instance());
+    if (!menu)
+    {
+        return;
+    }
+    // Back to the script's own, where scripts are read for it, or to the
+    // default.
+    if (LLMenuItemGL* read = menu->findChild<LLMenuItemGL>("read"))
+    {
+        read->setLabel(mServices->words(mServices->frontDoc()->editor->readsIndentation() ? "IndentReadAgain" : "IndentToDefault"));
+    }
+    // Where the bar was pressed.
+    S32 x = 0;
+    S32 y = 0;
+    LLUI::getInstance()->getMousePositionLocal(mBar, &x, &y);
+    mIndentMenu = menu->getHandle();
+    menu->show(x, y);
+    LLMenuGL::showPopup(mBar, menu, x, y);
+}
+
+void ALScriptCrumbsBar::indentAct(const std::string& action)
+{
+    Doc* doc = mServices ? mServices->frontDoc() : nullptr;
+    if (!doc || !doc->loaded)
+    {
+        return;
+    }
+    ALCodeEditor& editor = *doc->editor;
+    if (action == "spaces" || action == "tabs")
+    {
+        editor.setSoftTabs(action == "spaces");
+    }
+    else if (action.rfind("width_", 0) == 0)
+    {
+        editor.setTabWidth(std::stoi(action.substr(6)));
+    }
+    else if (action == "read")
+    {
+        editor.readIndentation();
+    }
+    else if ((action == "convert_spaces" || action == "convert_tabs") && indentEnabled(action))
+    {
+        // The whole script, and what it is indented by from here on.
+        const bool spaces = action == "convert_spaces";
+        editor.convertIndentation(0, editor.document().lineCount() - 1, spaces);
+        editor.setSoftTabs(spaces);
+    }
+    showTrailer(*doc);
+}
+
+bool ALScriptCrumbsBar::indentEnabled(const std::string& action) const
+{
+    const Doc* doc = mServices ? mServices->frontDoc() : nullptr;
+    if (!doc || !doc->loaded)
+    {
+        return false;
+    }
+    if (action == "read")
+    {
+        return doc->editor->indentFrom() == ALTextView::IndentFrom::Chosen;
+    }
+    if (action == "convert_spaces" || action == "convert_tabs")
+    {
+        return doc->modifiable && doc->shownView() == Doc::View::Source;
+    }
+    return true;
+}
+
+bool ALScriptCrumbsBar::indentChecked(const std::string& action) const
+{
+    const Doc* doc = mServices ? mServices->frontDoc() : nullptr;
+    if (!doc)
+    {
+        return false;
+    }
+    const ALCodeEditor& editor = *doc->editor;
+    if (action == "spaces" || action == "tabs")
+    {
+        return editor.getSoftTabs() == (action == "spaces");
+    }
+    if (action.rfind("width_", 0) == 0)
+    {
+        return std::to_string(editor.getTabWidth()) == action.substr(6);
+    }
+    return false;
 }
 
 void ALScriptCrumbsBar::views(Doc& doc, std::vector<Part>& parts) const

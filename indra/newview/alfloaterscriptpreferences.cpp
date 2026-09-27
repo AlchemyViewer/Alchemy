@@ -74,7 +74,7 @@ namespace
         "ALScriptPreprocOptimizerShrinkNames", "ALScriptPreprocOptimizerAddStrings",
         "ALScriptPreprocOptimizerInlining",     "ALScriptPreprocExtensions",
         "ALScriptPreprocDiskIncludes", "ALScriptPreprocDiskIncludeFolder", "ALScriptPreprocIncludeOrder", "ALScriptPreprocWorldIncludes",
-        "ALScriptStudioTabWidth",    "ALScriptStudioInsertSpaces",
+        "ALScriptStudioTabWidth",    "ALScriptStudioInsertSpaces", "ALScriptStudioDetectIndentation",
         "ALScriptLintLevels",        "ALScriptLuauMode",           "ALScriptLuauSolver",
         "ALScriptStudioAutoComplete", "ALScriptStudioCompleteAfter", "ALScriptStudioAcceptOnEnter", "ALScriptStudioAutoClose",
         "ALScriptStudioCaretStyle",  "ALScriptStudioCaretBlink",   "ALScriptStudioHoverCards",  "ALScriptStudioHoverDelay",
@@ -162,9 +162,9 @@ bool ALFloaterScriptPreferences::postBuild()
     // The editors open, and the ones here, take the typing settings as
     // they change -- by the settings' own signals, so a Cancel reaches
     // them as a click does.
-    for (const char* setting : { "ALScriptStudioTabWidth", "ALScriptStudioInsertSpaces", "ALScriptStudioAutoComplete", "ALScriptStudioCompleteAfter",
-                                 "ALScriptStudioAcceptOnEnter", "ALScriptStudioAutoClose", "ALScriptStudioCaretStyle", "ALScriptStudioCaretBlink",
-                                 "ALScriptStudioHoverCards", "ALScriptStudioHoverDelay" })
+    for (const char* setting : { "ALScriptStudioTabWidth", "ALScriptStudioInsertSpaces", "ALScriptStudioDetectIndentation", "ALScriptStudioAutoComplete",
+                                 "ALScriptStudioCompleteAfter", "ALScriptStudioAcceptOnEnter", "ALScriptStudioAutoClose", "ALScriptStudioCaretStyle",
+                                 "ALScriptStudioCaretBlink", "ALScriptStudioHoverCards", "ALScriptStudioHoverDelay" })
     {
         if (LLControlVariable* control = gSavedSettings.getControl(setting))
         {

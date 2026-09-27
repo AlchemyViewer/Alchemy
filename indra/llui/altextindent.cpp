@@ -30,6 +30,9 @@
 #include "altextchars.h"
 #include "alsyntaxgrammar.h"
 
+#include <array>
+#include <cstdlib>
+
 namespace
 {
     bool isBlank(char c)
@@ -49,6 +52,75 @@ namespace
 
 namespace ALTextIndent
 {
+// --- the text's own ------------------------------------------------------------
+
+std::optional<Options> detect(const ALTextDocument& doc, S32 tab_width, S32 lines)
+{
+    // How many lines begin with a tab, and with a space; and how often
+    // a line steps in or out from the last line with anything on it by
+    // each number of spaces.
+    S32                  by_tabs   = 0;
+    S32                  by_spaces = 0;
+    std::array<S32, 9>   steps{};
+    S32                  previous  = 0;
+    const S32            count     = llmin(doc.lineCount(), llmax(0, lines));
+    for (S32 l = 0; l < count; ++l)
+    {
+        const std::string& text = doc.line(l);
+        size_t             lead = 0;
+        alBlanksWidth(text, 1, &lead);
+        if (lead == text.size() || (text[lead] == '*' && lead > 0 && text[lead - 1] == ' '))
+        {
+            continue;
+        }
+        if (text[0] == '\t')
+        {
+            ++by_tabs;
+            previous = -1;
+            continue;
+        }
+        const S32 spaces = text.find_first_not_of(' ') < lead ? -1 : static_cast<S32>(lead);
+        if (spaces > 0)
+        {
+            ++by_spaces;
+        }
+        if (spaces >= 0 && previous >= 0)
+        {
+            const S32 step = std::abs(spaces - previous);
+            if (step >= 2 && step < static_cast<S32>(steps.size()))
+            {
+                ++steps[static_cast<size_t>(step)];
+            }
+        }
+        previous = spaces;
+    }
+    if (by_tabs == by_spaces)
+    {
+        return std::nullopt;
+    }
+    Options out;
+    out.tabWidth = llmax(1, tab_width);
+    out.softTabs = by_spaces > by_tabs;
+    if (out.softTabs)
+    {
+        // The step seen most, four before two before eight before the
+        // rest where they are seen as often.
+        S32 best = 0;
+        for (const S32 step : { 4, 2, 8, 3, 6, 5, 7 })
+        {
+            if (steps[static_cast<size_t>(step)] > (best ? steps[static_cast<size_t>(best)] : 0))
+            {
+                best = step;
+            }
+        }
+        if (best)
+        {
+            out.tabWidth = best;
+        }
+    }
+    return out;
+}
+
 // --- as it is typed ------------------------------------------------------------
 
 std::string tabText(const ALTextDocument& doc, const ALTextPos& at, const Options& options)

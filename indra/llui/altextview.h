@@ -220,10 +220,28 @@ public:
     bool            isReadOnly() const { return mReadOnly; }
     void            setWordWrap(bool wrap);
     bool            getWordWrap() const { return mWordWrap; }
+    // How the text is indented -- by tabs or by spaces, and how wide a
+    // tab or a level is -- and where that was said: the defaults the view
+    // was given; the text itself, as it was put in whole, where the view
+    // reads it; or chosen for this text -- vim's :set, a pick from the
+    // strip -- which a new text put in keeps.
+    enum class IndentFrom : U8
+    {
+        Defaults,
+        Text,
+        Chosen,
+    };
+    void            setIndentDefaults(S32 tab_width, bool soft_tabs);
+    void            setReadsIndentation(bool reads);
+    bool            readsIndentation() const { return mReadsIndentation; }
     void            setTabWidth(S32 spaces);
     S32             getTabWidth() const { return mTabWidth; }
-    void            setSoftTabs(bool soft) { mSoftTabs = soft; }
+    void            setSoftTabs(bool soft);
     bool            getSoftTabs() const { return mSoftTabs; }
+    IndentFrom      indentFrom() const { return mIndentFrom; }
+    // What was chosen forgotten: the text's own again, where it says and
+    // the view reads it, else the defaults.
+    void            readIndentation();
     // What is behind the text now -- read-only, focused or neither -- and
     // what the text is drawn in, for whatever draws beside them.
     const LLColor4& backgroundColor() const;
@@ -936,6 +954,12 @@ private:
     ALTextIndent::AutoOutdent mAutoOutdent;
     bool mSoftTabs  = false;
     S32  mTabWidth  = 4;
+    // What the text is indented by where it says nothing of its own, and
+    // whether a text put in whole is asked.
+    ALTextIndent::Options mIndentDefaults;
+    IndentFrom            mIndentFrom         = IndentFrom::Defaults;
+    bool                  mReadsIndentation   = false;
+    void                  useIndentation(const ALTextIndent::Options& options, IndentFrom from);
     S32  mHPad      = 4;
     S32  mVPad      = 2;
 

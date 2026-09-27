@@ -1450,4 +1450,30 @@ namespace tut
         ensure("larger", bigger->getLineHeight() > smaller->getLineHeight());
         ensure("named for its points", LLFontGL::pointsOf("Monospace", llformat("%.1fpt", base + 4.f)) == base + 4.f);
     }
+
+    template<> template<>
+    void altextview_object::test<48>()
+    {
+        set_test_name("indentation read from a text put in whole where the view reads it; chosen for the text, kept through a new one; the defaults where it says nothing");
+        ALTextView& v = make("");
+        ensure("the defaults at first", v.indentFrom() == ALTextView::IndentFrom::Defaults && v.getSoftTabs() && v.getTabWidth() == 4);
+        v.setText("a\n\tb");
+        ensure("not read unless asked", v.indentFrom() == ALTextView::IndentFrom::Defaults && v.getSoftTabs());
+        v.setReadsIndentation(true);
+        ensure("read once asked", v.indentFrom() == ALTextView::IndentFrom::Text && !v.getSoftTabs() && v.getTabWidth() == 4);
+        v.setText("a\n  b\n    c");
+        ensure("a new text read again", v.indentFrom() == ALTextView::IndentFrom::Text && v.getSoftTabs() && v.getTabWidth() == 2);
+        v.setText("a\nb");
+        ensure("saying nothing: the defaults", v.indentFrom() == ALTextView::IndentFrom::Defaults && v.getSoftTabs() && v.getTabWidth() == 4);
+        v.setIndentDefaults(8, false);
+        ensure("new defaults taken", !v.getSoftTabs() && v.getTabWidth() == 8);
+        v.setText("a\n\tb");
+        ensure("a text of tabs takes their width from the defaults", !v.getSoftTabs() && v.getTabWidth() == 8);
+        v.setTabWidth(3);
+        ensure("chosen", v.indentFrom() == ALTextView::IndentFrom::Chosen && v.getTabWidth() == 3);
+        v.setText("a\n  b");
+        ensure("kept through a new text", v.indentFrom() == ALTextView::IndentFrom::Chosen && v.getTabWidth() == 3 && !v.getSoftTabs());
+        v.readIndentation();
+        ensure("forgotten: the text's own again", v.indentFrom() == ALTextView::IndentFrom::Text && v.getSoftTabs() && v.getTabWidth() == 2);
+    }
 }

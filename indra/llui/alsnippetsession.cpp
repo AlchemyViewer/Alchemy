@@ -26,6 +26,8 @@
 
 #include "alsnippetsession.h"
 
+#include "altextchars.h"
+
 #include "llstl.h"
 
 #include <boost/unordered/unordered_flat_map.hpp>
@@ -139,8 +141,42 @@ std::vector<std::string> ALSnippetSession::parameterNames(std::string_view detai
 }
 
 // static
-ALSnippetSession::Expansion ALSnippetSession::expand(std::string_view body, const ALTextPos& at, const std::string& indent)
+ALSnippetSession::Expansion ALSnippetSession::expand(std::string_view body, const ALTextPos& at, const std::string& indent, std::string_view unit)
 {
+    // Each line's own indentation after the first made again in the
+    // text's unit, so that a script indented by tabs gets tabs.
+    std::string own;
+    if (!unit.empty())
+    {
+        own.reserve(body.size());
+        for (size_t from = 0;;)
+        {
+            const size_t           nl   = body.find('\n', from);
+            const std::string_view line = body.substr(from, nl == std::string_view::npos ? std::string_view::npos : nl - from);
+            if (from == 0)
+            {
+                own += line;
+            }
+            else
+            {
+                size_t    lead  = 0;
+                const S32 width = alBlanksWidth(line, BODY_LEVEL, &lead);
+                for (S32 level = 0; level < width / BODY_LEVEL; ++level)
+                {
+                    own += unit;
+                }
+                own.append(static_cast<size_t>(width % BODY_LEVEL), ' ');
+                own += line.substr(lead);
+            }
+            if (nl == std::string_view::npos)
+            {
+                break;
+            }
+            own += '\n';
+            from = nl + 1;
+        }
+        body = own;
+    }
     // Each placeholder's place in the text, by number, with what it held
     // as written.
     struct Place

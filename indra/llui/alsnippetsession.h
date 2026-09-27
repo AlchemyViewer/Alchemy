@@ -47,11 +47,13 @@ public:
     };
 
     // A snippet's body read, to go in at `at`: its lines after the first
-    // indented by `indent`; `${1:text}`, `${1}` and `$1` its placeholders,
-    // in order of their numbers -- one inside another's text as well,
-    // `${1:a ${2:b}}` -- and `$0`, or `${0:text}`, where the caret lands
-    // past the last. A number that comes again is a mirror of the first,
-    // written as it holds. `$$` or `\$` a dollar, `\}` a brace.
+    // indented by `indent`, and their own indentation -- four spaces or a
+    // tab a level, as bodies are written -- made again of `unit` a level,
+    // where one is given: the text's own. `${1:text}`, `${1}` and `$1` its
+    // placeholders, in order of their numbers -- one inside another's text
+    // as well, `${1:a ${2:b}}` -- and `$0`, or `${0:text}`, where the caret
+    // lands past the last. A number that comes again is a mirror of the
+    // first, written as it holds. `$$` or `\$` a dollar, `\}` a brace.
     struct Expansion
     {
         // The text as it will stand.
@@ -63,7 +65,8 @@ public:
         // Where $0 is, with its text; else the end of the text.
         ALTextRange              landing;
     };
-    static Expansion expand(std::string_view body, const ALTextPos& at, const std::string& indent);
+    static Expansion expand(std::string_view body, const ALTextPos& at, const std::string& indent, std::string_view unit = {});
+    static constexpr S32 BODY_LEVEL = 4;
 
     // The names of a signature's parameters, from how a completion's
     // detail reads: "integer llSay(integer channel, string msg)" or

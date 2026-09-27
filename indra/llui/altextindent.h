@@ -49,11 +49,22 @@ namespace ALTextIndent
         S32  tabWidth = 4;
         // Spaces to the next stop where a tab is typed.
         bool softTabs = false;
+        friend bool operator==(const Options& a, const Options& b) { return a.tabWidth == b.tabWidth && a.softTabs == b.softTabs; }
     };
 
     // The bracket a closing one at a place closes, where whoever asks can
     // match brackets; false where it cannot, or there is none.
     typedef std::function<bool(const ALTextPos& closer, ALTextPos& opener)> opener_t;
+
+    // --- the text's own ------------------------------------------------------------
+
+    // How a text is indented, as its lines say: by tabs, a tab `tab_width`
+    // wide since tabs do not say, or by spaces, as many a level as the
+    // lines step in by most often. Nothing where it does not say -- no line
+    // indented, or as many by tabs as by spaces. The first so many lines
+    // are enough, and a block comment's lines that begin with a star, a
+    // space in, are not indentation.
+    std::optional<Options> detect(const ALTextDocument& doc, S32 tab_width, S32 lines = 10000);
 
     // --- as it is typed ------------------------------------------------------------
 

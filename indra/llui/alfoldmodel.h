@@ -94,7 +94,9 @@ public:
 
 private:
     std::vector<Region> mRegions;
-    U32                 mVersion = 0;
-    bool                mValid   = false;
+    U32                 mVersion  = 0;
+    // Tabs are measured by it where a line mixes them with spaces.
+    S32                 mTabWidth = 0;
+    bool                mValid    = false;
     std::vector<S32>    mFolded;
 };
