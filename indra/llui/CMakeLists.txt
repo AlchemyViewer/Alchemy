@@ -162,6 +162,7 @@ target_sources(
     altextdiff.cpp
     altextdocument.cpp
     altextediting.cpp
+    altextfind.cpp
     altextindent.cpp
     altextlayout.cpp
     altextsearch.cpp
@@ -376,6 +377,7 @@ target_sources(
         altextdiff.h
         altextdocument.h
         altextediting.h
+        altextfind.h
         altextindent.h
         altextlayout.h
         altextsearch.h

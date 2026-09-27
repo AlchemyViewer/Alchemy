@@ -29,6 +29,7 @@
 #include "alsyntaxhighlighter.h"
 #include "altextdocument.h"
 #include "altextediting.h"
+#include "altextfind.h"
 #include "altextindent.h"
 #include "altextspelling.h"
 #include "altextlayout.h"
@@ -585,12 +586,12 @@ public:
     const std::vector<ALTextRange>& findMatches()
     {
         settleFind();
-        return mMatches.items();
+        return mFind.matches();
     }
     S32 findCurrent()
     {
         settleFind();
-        return mMatch;
+        return mFind.current();
     }
     // The next match selected and brought into view, or the one before;
     // round the ends. False with none.
@@ -872,7 +873,7 @@ private:
     void refreshFind();
     void settleFind()
     {
-        if (mFindStale)
+        if (mFind.isStale())
         {
             refreshFind();
         }
@@ -1038,14 +1039,8 @@ private:
     LLHandle<LLContextMenu> mUrlMenuHandle;
 
     ALFindBar*               mFindBar = nullptr;
-    ALAnchoredRanges<ALTextRange> mMatches;
-    S32                      mMatch = -1;
-    bool                     mFindStale = false;
-    LLFrameTimer             mFindSettle;
-    // The selection the bar was told to stay within, while it is.
-    bool                     mFindInSelection = false;
-    ALTextRange              mFindScope;
-    std::string              mFindError;
+    // What the bar's query found, kept in step with the text.
+    ALTextFind               mFind;
     LLUIColor                mFindMatchColor;
 
     bool             mScrollMap        = false;
