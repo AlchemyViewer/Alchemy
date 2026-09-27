@@ -177,6 +177,11 @@ void ALScriptCrumbsBar::selection(Doc& doc, std::vector<Part>& parts) const
 
 void ALScriptCrumbsBar::problems(Doc& doc, std::vector<Part>& parts) const
 {
+    // A check out a while, whose answer the counts are still to take.
+    if (doc.checkRunning(LLTimer::getTotalSeconds()))
+    {
+        parts.push_back({ mServices->words("TrailerChecking"), "problems", mServices->words("TrailerCheckingTip") });
+    }
     S32 errors = 0, warnings = 0;
     mWindow->problemCounts(doc, errors, warnings);
     if (errors > 0)

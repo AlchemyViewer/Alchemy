@@ -69,6 +69,12 @@ bool ALScriptStudioDoc::hasKeyboard() const
     return false;
 }
 
+bool ALScriptStudioDoc::checkRunning(F64 now) const
+{
+    constexpr F64 SAID_AFTER = 0.4;
+    return loaded && !notecard && check.requestedVersion != check.analysisVersion && check.askedAt > 0.0 && now - check.askedAt >= SAID_AFTER;
+}
+
 const ALSourceMap* ALScriptStudioDoc::runningMap() const
 {
     // What the region compiled and runs is the expanded text that went up

@@ -1286,6 +1286,13 @@ void ALFloaterScriptStudio::draw()
         sLastWorkedIn = getHandle();
     }
     mChecking.pump(LLTimer::getTotalSeconds());
+    // The trailer says a check is out once it has been a while, and stops
+    // once it is answered.
+    if (Doc* front = active(); front && front->checkRunning(LLTimer::getTotalSeconds()) != mTrailerChecking)
+    {
+        mTrailerChecking = !mTrailerChecking;
+        refreshTrailer(*front);
+    }
     mCaret.pump(LLTimer::getTotalSeconds());
     mExplorerPane->pump();
     mVim.pump();

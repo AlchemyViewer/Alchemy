@@ -651,6 +651,7 @@ void ALScriptStudioChecking::pump(F64 now)
         {
             doc->check.analysisDue      = 0.0;
             doc->check.requestedVersion = doc->editor->document().version();
+            doc->check.askedAt          = now;
             ask(*doc, ALScriptAnalysis::Kind::Check, ALTextPos(), ALTextPos());
         }
     }

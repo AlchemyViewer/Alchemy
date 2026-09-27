@@ -33,6 +33,7 @@
 #include "alscriptstudio_fixture.h"
 #include "llfocusmgr.h"
 #include "llnotecard.h"
+#include "lltimer.h"
 #include "lluicolortable.h"
 
 #include "../test/lltut.h"
@@ -450,5 +451,27 @@ namespace tut
         ensure("not a script that may only be read", !crumbs->indentEnabled("convert_spaces"));
         crumbs->indentAct("convert_spaces");
         ensure_equals("left as it was", doc.editor->text(), std::string("a\n\tb\n"));
+    }
+
+    template<> template<>
+    void alscriptcrumbsbar_object::test<7>()
+    {
+        set_test_name("a check out a while is said, and pressed shows the problems; one just asked, or answered, is not");
+        ALScriptCrumbsBar* crumbs = bar();
+        Doc&               doc    = tab("a");
+        doc.loaded                 = true;
+        const F64 now              = LLTimer::getTotalSeconds();
+        doc.check.requestedVersion = doc.editor->document().version();
+        doc.check.analysisVersion  = doc.check.requestedVersion + 1;
+        doc.check.askedAt          = now;
+        crumbs->showTrailer(doc);
+        ensure("just asked: nothing", part("Checking") == nullptr);
+        doc.check.askedAt = now - 1.0;
+        crumbs->showTrailer(doc);
+        const Part* checking = part("Checking");
+        ensure("out a while: said", checking != nullptr && checking->value == "problems");
+        doc.check.analysisVersion = doc.check.requestedVersion;
+        crumbs->showTrailer(doc);
+        ensure("answered: gone", part("Checking") == nullptr);
     }
 }

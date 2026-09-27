@@ -302,6 +302,8 @@
     <floater.string name="TrailerLineTip">Go to a line ([KEYS])</floater.string>
     <floater.string name="TrailerLineTipNoKeys">Go to a line</floater.string>
     <floater.string name="TrailerProblemsTip">Show the problems ([KEYS])</floater.string>
+    <floater.string name="TrailerChecking">Checking…</floater.string>
+    <floater.string name="TrailerCheckingTip">The analyzers are checking the script as it stands. The problems listed are of the text before.</floater.string>
     <floater.string name="TrailerProblemsTipNoKeys">Show the problems</floater.string>
     <floater.string name="TrailerSource">Source</floater.string>
     <floater.string name="TrailerExpanded">Preprocessed</floater.string>

@@ -970,6 +970,8 @@ private:
     // Held while a pane's row is followed into a tab, so that the panes
     // go on listing what they were rather than the tab's.
     S32                                mHoldPanes       = 0;
+    // Whether the trailer last said a check is out, for the tab in front.
+    bool                               mTrailerChecking = false;
     ALScriptOutputPane*                mOutputPane = nullptr;
     ALScriptSearchPane*                mSearchPane    = nullptr;
     // The Weights tab, and its list of parts.

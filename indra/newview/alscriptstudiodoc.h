@@ -133,6 +133,9 @@ struct ALScriptStudioDoc
     }
     // Whether the keyboard is in one of its views, shown or not.
     bool          hasKeyboard() const;
+    // Whether a check asked about is still unanswered at `now`, a while
+    // after it was asked: one that answers as a key is typed is not said.
+    bool          checkRunning(F64 now) const;
     // The map the text the region compiled and runs was expanded through:
     // what the compiler's lines and a run-time error's are read back by.
     // Null where the text went up as written.
@@ -478,6 +481,8 @@ struct ALScriptStudioDoc
         U32              analysisVersion  = 0;
         U32              requestedVersion = 0;
         F64              analysisDue      = 0.0;
+        // When the version last asked about was asked.
+        F64              askedAt          = 0.0;
         std::string      definitionsError;
         // How many expansions were taken, which is how an answer about one
         // names it; the version one has been asked for, or none -- not a
