@@ -1382,4 +1382,32 @@ namespace tut
         ensure("nothing said of it", std::none_of(stopped.problems.begin(), stopped.problems.end(),
                                                   [](const ALScriptProblem& p) { return p.severity == ALScriptProblem::Severity::Error; }));
     }
+
+    template<> template<>
+    void alpreprocessor_object::test<37>()
+    {
+        set_test_name("a header behind a classic include guard: expanded once however often included, listed once in the map; again once undefined; an #else or code after it no guard");
+        add("guarded.lsl", "// the helpers\n#ifndef GUARDED\n#define GUARDED\ninteger helper() { return 1; }\n#endif\n");
+        const ALPreprocessor::Result r = ALPreprocessor::run(
+            "#include \"guarded.lsl\"\n#include \"guarded.lsl\"\n#include \"guarded.lsl\"\ndefault { state_entry() { helper(); } }\n", options());
+        ensure_equals("problems", messages(r), std::string());
+        size_t count = 0;
+        for (size_t at = r.text.find("integer helper()"); at != std::string::npos; at = r.text.find("integer helper()", at + 1))
+        {
+            ++count;
+        }
+        ensure_equals("once", count, size_t(1));
+        ensure_equals("listed once", r.map.files().size(), size_t(2));
+
+        const ALPreprocessor::Result undone = ALPreprocessor::run(
+            "#include \"guarded.lsl\"\n#undef GUARDED\n#include \"guarded.lsl\"\ndefault { state_entry() { } }\n", options());
+        ensure("undefined: again", undone.text.find("integer helper()") != undone.text.rfind("integer helper()"));
+
+        add("elsed.lsl", "#ifndef ELSED\n#define ELSED\ninteger a;\n#else\ninteger b;\n#endif\n");
+        const ALPreprocessor::Result elsed = ALPreprocessor::run("#include \"elsed.lsl\"\n#include \"elsed.lsl\"\n", options());
+        ensure("an #else: no guard, the other branch made", elsed.text.find("integer b;") != std::string::npos);
+        add("after.lsl", "#ifndef AFTER\n#define AFTER\n#endif\ninteger after;\n");
+        const ALPreprocessor::Result after = ALPreprocessor::run("#include \"after.lsl\"\n#include \"after.lsl\"\n", options());
+        ensure("code after the #endif: no guard, made twice", after.text.find("integer after;") != after.text.rfind("integer after;"));
+    }
 }

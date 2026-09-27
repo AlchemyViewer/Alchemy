@@ -741,6 +741,102 @@ namespace
         return i;
     }
 
+    // The macro a file's classic include guard is on -- `#ifndef X`, then
+    // `#define X`, before all but blanks, and the `#endif` that closes the
+    // first the last of everything but blanks, with no `#else` or `#elif`
+    // of it between -- or nothing. Such a file is wanted once: included
+    // again while X is defined, it makes nothing.
+    std::string guardOf(const Tokens& tokens)
+    {
+        // Each directive's word, where it stands at the start of a line.
+        struct Directive
+        {
+            size_t      at;
+            std::string word;
+        };
+        std::vector<Directive> directives;
+        bool                   line_start = true;
+        for (size_t i = 0; i < tokens.size(); ++i)
+        {
+            const Token& t = tokens[i];
+            if (t.kind == Kind::Newline)
+            {
+                line_start = true;
+                continue;
+            }
+            if (t.blank())
+            {
+                continue;
+            }
+            if (line_start && t.is(Kind::Punct, "#"))
+            {
+                const size_t word = skipSpace(tokens, i + 1);
+                directives.push_back({ i, word < tokens.size() && tokens[word].kind == Kind::Ident ? tokens[word].text : std::string() });
+            }
+            line_start = false;
+        }
+        if (directives.size() < 3 || directives[0].word != "ifndef" || directives[1].word != "define" || directives.back().word != "endif")
+        {
+            return std::string();
+        }
+        // Nothing but blanks before the first, and between the first two.
+        if (skipBlank(tokens, 0) != directives[0].at)
+        {
+            return std::string();
+        }
+        const size_t name_at = skipSpace(tokens, skipSpace(tokens, directives[0].at + 1) + 1);
+        if (name_at >= tokens.size() || tokens[name_at].kind != Kind::Ident)
+        {
+            return std::string();
+        }
+        const std::string name = tokens[name_at].text;
+        if (skipBlank(tokens, name_at + 1) != directives[1].at)
+        {
+            return std::string();
+        }
+        const size_t defined_at = skipSpace(tokens, skipSpace(tokens, directives[1].at + 1) + 1);
+        if (defined_at >= tokens.size() || tokens[defined_at].text != name)
+        {
+            return std::string();
+        }
+        // The first closed by the last, and by nothing before it.
+        int depth = 0;
+        for (size_t d = 0; d < directives.size(); ++d)
+        {
+            const std::string& word = directives[d].word;
+            if (word == "if" || word == "ifdef" || word == "ifndef")
+            {
+                ++depth;
+            }
+            else if (word == "endif")
+            {
+                if (--depth == 0 && d + 1 != directives.size())
+                {
+                    return std::string();
+                }
+            }
+            else if ((word == "else" || word == "elif") && depth == 1)
+            {
+                return std::string();
+            }
+        }
+        if (depth != 0)
+        {
+            return std::string();
+        }
+        // Nothing but blanks after the `#endif` line.
+        size_t end = skipSpace(tokens, skipSpace(tokens, directives.back().at + 1) + 1);
+        while (end < tokens.size() && tokens[end].kind != Kind::Newline)
+        {
+            if (!tokens[end].blank())
+            {
+                return std::string();
+            }
+            ++end;
+        }
+        return skipBlank(tokens, end) == tokens.size() ? name : std::string();
+    }
+
     // ---- the engine ------------------------------------------------------------
 
     struct Macro
@@ -902,6 +998,16 @@ namespace
         // Looked up for every identifier of the whole script, so flat.
         boost::unordered_flat_map<std::string, Macro, ll::string_hash, std::equal_to<>> mMacros;
         boost::unordered_flat_set<std::string, ll::string_hash, std::equal_to<>>        mOnce;
+        // Each file opened, by identity: its tokens and its place in the
+        // map, lexed once however often it is included; and the macro its
+        // include guard is on, where it has one.
+        struct Lexed
+        {
+            S32    index = 0;
+            Tokens tokens;
+        };
+        boost::unordered_flat_map<std::string, Lexed, ll::string_hash, std::equal_to<>>       mLexed;
+        boost::unordered_flat_map<std::string, std::string, ll::string_hash, std::equal_to<>> mGuards;
         boost::unordered_flat_set<std::string, ll::string_hash, std::equal_to<>>        mPendingNames;
         boost::unordered_flat_set<std::string, ll::string_hash, std::equal_to<>>        mIncluded;
         // What the run has made so far, against the budget.
@@ -969,11 +1075,29 @@ namespace
     void Engine::pushFile(std::string_view text, const std::string& path, const std::string& name, const std::string& assetId)
     {
         auto f     = std::make_unique<FileState>();
-        f->index   = mResult.map.addFile(name, path);
         f->path    = path;
         f->name    = name;
         f->assetId = assetId;
-        f->tokens  = Lexer(mOptions.lua, f->index).run(text);
+        // A file opened before is not lexed again, nor listed again in the
+        // map: its tokens are where they were.
+        if (const auto lexed = path.empty() ? mLexed.end() : mLexed.find(path); lexed != mLexed.end())
+        {
+            f->index  = lexed->second.index;
+            f->tokens = lexed->second.tokens;
+        }
+        else
+        {
+            f->index  = mResult.map.addFile(name, path);
+            f->tokens = Lexer(mOptions.lua, f->index).run(text);
+            if (!path.empty())
+            {
+                mLexed[path] = Lexed{ f->index, f->tokens };
+                if (std::string guard = guardOf(f->tokens); !guard.empty())
+                {
+                    mGuards[path] = std::move(guard);
+                }
+            }
+        }
         // A file opened is tokens made, against the budget like any
         // other: a file that includes itself twice, as many levels down as
         // the include depth allows, is more files than there are.
@@ -2173,6 +2297,12 @@ namespace
         const std::string identity = found.path.empty() ? ask.name : found.path;
         mResult.resolved.push_back({ ask.from, ask.name, false, identity });
         if (mOnce.count(identity))
+        {
+            return;
+        }
+        // A file behind an include guard already defined makes nothing:
+        // not opened, lexed, mapped or charged again.
+        if (const auto guard = mGuards.find(identity); guard != mGuards.end() && mMacros.contains(guard->second))
         {
             return;
         }
