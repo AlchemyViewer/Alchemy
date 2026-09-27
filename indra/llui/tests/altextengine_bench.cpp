@@ -437,6 +437,10 @@ int main(int, char**)
         g_sink                 = g_sink + regions[&s - subjects];
     });
     countRow("  regions", regions[0], regions[1]);
+    both("an edit at the top, then the editor's fold regions", subjects, 1, [&](Subject&, ALCodeEditor& e) {
+        editAtTop(e, "x");
+        g_sink = g_sink + e.foldRegions().size();
+    });
 
     std::printf("\nLaying out every line\n");
     const S32 tab   = subjects[0].editor->layout().tabWidth();

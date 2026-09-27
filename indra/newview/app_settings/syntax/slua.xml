@@ -34,6 +34,10 @@
   continues, how a comment goes on to a new line: each a regex matched
   at the start of the line's text, what the new line begins with, and
   unless, what ends the comment.
+
+  folds: the words blocks are made of, which fold as brackets do: opens,
+  closes, middles that close one and open the next, and joined, the
+  middles whose own opener follows on the line and makes no second block.
   pairs: the brackets and quotes typed in pairs, each its opener and
   its closer, which the editor closes as the opener is typed.
 
@@ -91,6 +95,30 @@
           </map>
         </array>
       </map>
+    </map>
+    <key>folds</key>
+    <map>
+      <key>opens</key>
+      <array>
+        <string>function</string>
+        <string>do</string>
+        <string>then</string>
+        <string>repeat</string>
+      </array>
+      <key>closes</key>
+      <array>
+        <string>end</string>
+        <string>until</string>
+      </array>
+      <key>middles</key>
+      <array>
+        <string>else</string>
+        <string>elseif</string>
+      </array>
+      <key>joined</key>
+      <array>
+        <string>elseif</string>
+      </array>
     </map>
     <key>words</key>
     <map>

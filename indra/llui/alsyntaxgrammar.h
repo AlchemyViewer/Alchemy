@@ -209,6 +209,18 @@ public:
     const std::string& commentContinues(std::string_view text) const;
     // Whether text ends such a comment, as one of their `unless` says.
     bool               endsComment(std::string_view text) const;
+    // The words a block is made of, where the language makes blocks of
+    // words (`folds`): what opens one, what closes one, what closes one and
+    // opens the next -- `else` -- and of those, the ones whose own opener
+    // follows on the line, and is no second block (`elseif ... then`).
+    struct FoldWords
+    {
+        std::vector<std::string> opens;
+        std::vector<std::string> closes;
+        std::vector<std::string> middles;
+        std::vector<std::string> joined;
+    };
+    const FoldWords&   foldWords() const;
     // The words the grammar itself declares that begin with the prefix,
     // as the word and its table.
     void collectWords(std::string_view prefix, std::vector<std::pair<std::string, std::string>>& out) const;

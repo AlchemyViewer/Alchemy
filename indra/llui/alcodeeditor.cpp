@@ -368,7 +368,7 @@ void ALCodeEditor::onEdit(const ALTextDocument::Edit& edit)
     // Folds slide the same way (ALFoldModel::edited), and are hidden again
     // once the command is done.
     const bool folded = !mFolds.folded().empty();
-    mFolds.edited(edit);
+    mFolds.edited(edit, document().lineCount());
     mFoldsDirty = mFoldsDirty || folded || !mFolds.folded().empty();
 }
 
@@ -936,7 +936,7 @@ void ALCodeEditor::drawGutter(const LLRect& text, F32 alpha)
     }
     // The headers pinned over the text have their numbers pinned over
     // the gutter, on the same band.
-    const std::vector<S32> pinned = stickyLines();
+    const std::vector<S32> pinned = stickyLines(true);
     if (!pinned.empty() && mShowLineNumbers)
     {
         const S32    rows = static_cast<S32>(pinned.size());
@@ -1303,7 +1303,7 @@ bool ALCodeEditor::writeInlay(S32 index)
 
 // --- headers pinned at the top ------------------------------------------------------
 
-std::vector<S32> ALCodeEditor::stickyLines()
+std::vector<S32> ALCodeEditor::stickyLines(bool fresh)
 {
     std::vector<S32> lines;
     if (!mStickyHeaders)
@@ -1311,13 +1311,24 @@ std::vector<S32> ALCodeEditor::stickyLines()
         return lines;
     }
     // The first row on screen, and the blocks around its line that start
-    // above it: their first lines, outermost first, the innermost few.
-    const S32 top_line = posAtLocal(textRect().mLeft, textRect().mTop - 1, false).line;
-    for (const FoldRegion& region : foldRegions())
+    // above it: their first lines, outermost first, the innermost few --
+    // kept for as long as the text, the top line and the folds are.
+    if (mStickyValid && !fresh)
     {
-        if (region.start < top_line && region.end >= top_line && !isFolded(region.start))
+        return mSticky;
+    }
+    const S32 top_line = posAtLocal(textRect().mLeft, textRect().mTop - 1, false).line;
+    if (mStickyValid && mStickyVersion == document().version() && mStickyTop == top_line && mStickyFolded == mFolds.folded())
+    {
+        return mSticky;
+    }
+    // The blocks open there, walked back from it: nothing below the top
+    // line is read for them.
+    for (const S32 start : folds().openAt(document(), getTabWidth(), top_line, 8))
+    {
+        if (!isFolded(start))
         {
-            lines.push_back(region.start);
+            lines.push_back(start);
         }
     }
     // Nested blocks start later: the list is already outer to inner; the
@@ -1326,6 +1337,11 @@ std::vector<S32> ALCodeEditor::stickyLines()
     {
         lines.erase(lines.begin(), lines.end() - 3);
     }
+    mSticky        = lines;
+    mStickyVersion = document().version();
+    mStickyTop     = top_line;
+    mStickyFolded  = mFolds.folded();
+    mStickyValid   = true;
     return lines;
 }
 
@@ -1341,7 +1357,7 @@ S32 ALCodeEditor::coveredAbove(S32 local_x)
 
 void ALCodeEditor::drawAfterRows(const LLRect& text)
 {
-    const std::vector<S32> lines = stickyLines();
+    const std::vector<S32> lines = stickyLines(true);
     if (lines.empty())
     {
         return;
@@ -1452,20 +1468,9 @@ std::string ALCodeEditor::foldBoxText(S32 line)
     return hidden > 0 ? "... " + std::to_string(hidden) : std::string("...");
 }
 
-S32 ALCodeEditor::indentOf(S32 line) const
+S32 ALCodeEditor::indentOf(S32 line)
 {
-    const S32 count = document().lineCount();
-    for (S32 l = line; l < count && l < line + 200; ++l)
-    {
-        const std::string& text    = document().line(l);
-        size_t             lead    = 0;
-        const S32          columns = alBlanksWidth(text, getTabWidth(), &lead);
-        if (lead < text.size())
-        {
-            return columns;
-        }
-    }
-    return 0;
+    return folds().indentOf(document(), getTabWidth(), line);
 }
 
 std::vector<ALCodeEditor::Blank> ALCodeEditor::blanksOn(S32 line, S32 within_from, S32 within_to) const
@@ -1797,22 +1802,22 @@ void ALCodeEditor::drawRowExtras(S32 line, S32 row, const LLRect& text, S32 scre
 
 void ALCodeEditor::ensureRegions()
 {
-    mFolds.regions(document(), getTabWidth());
+    folds().regions(document(), getTabWidth());
 }
 
 const std::vector<ALCodeEditor::FoldRegion>& ALCodeEditor::foldRegions()
 {
-    return mFolds.regions(document(), getTabWidth());
+    return folds().regions(document(), getTabWidth());
 }
 
 const ALCodeEditor::FoldRegion* ALCodeEditor::regionStartingAt(S32 line)
 {
-    return mFolds.startingAt(document(), getTabWidth(), line);
+    return folds().startingAt(document(), getTabWidth(), line);
 }
 
 const ALCodeEditor::FoldRegion* ALCodeEditor::regionAround(S32 line)
 {
-    return mFolds.around(document(), getTabWidth(), line);
+    return folds().around(document(), getTabWidth(), line);
 }
 
 bool ALCodeEditor::isFolded(S32 line) const
@@ -1831,16 +1836,102 @@ void ALCodeEditor::settleFolds()
 void ALCodeEditor::applyFolds()
 {
     mFoldsDirty = false;
-    layout().setHidden(0, document().lineCount() - 1, false);
-    for (const auto& [first, last] : mFolds.hidden(document(), getTabWidth()))
+    // Only what changed: the lines no longer folded away shown, the lines
+    // folded away now hidden.
+    std::vector<std::pair<S32, S32>> hidden = folds().hidden(document(), getTabWidth());
+    if (hidden == mHiddenByFolds && !mHiddenByFolds.empty())
+    {
+        return;
+    }
+    const S32 last_line = document().lineCount() - 1;
+    for (const auto& [first, last] : mHiddenByFolds)
+    {
+        if (first <= last_line)
+        {
+            layout().setHidden(first, llmin(last, last_line), false);
+        }
+    }
+    for (const auto& [first, last] : hidden)
     {
         layout().setHidden(first, last, true);
     }
+    mHiddenByFolds.swap(hidden);
+}
+
+ALFoldModel& ALCodeEditor::folds()
+{
+    // Told the grammar's syntax again where the grammar has changed: code
+    // by its brackets and its block words; prose, and no grammar, by
+    // indentation.
+    const ALSyntaxGrammar* grammar = highlighter().grammar().get();
+    if (grammar != mFoldGrammar)
+    {
+        mFoldGrammar = grammar;
+        mFolds.setLineComment(grammar ? grammar->lineComment() : std::string());
+        if (grammar && !grammar->prose())
+        {
+            mFolds.setSyntax([this](S32 line, std::vector<ALFoldModel::Block>& out) { foldBlocksOn(line, out); },
+                             [this](S32 line) { return highlighter().revision(line); });
+        }
+        else
+        {
+            mFolds.setSyntax(nullptr, nullptr);
+        }
+    }
+    return mFolds;
+}
+
+void ALCodeEditor::foldBlocksOn(S32 line, std::vector<ALFoldModel::Block>& out)
+{
+    typedef ALFoldModel::Event Event;
+    // The brackets that are code.
+    for (const auto& [column, c] : mBracketIndex.bracketsOn(line))
+    {
+        out.push_back({ column, (c == '(' || c == '[' || c == '{') ? Event::Open : Event::Close });
+    }
+    // And the grammar's block words, where it has them, as code.
+    const ALSyntaxGrammar* grammar = highlighter().grammar().get();
+    if (!grammar || (grammar->foldWords().opens.empty() && grammar->foldWords().closes.empty()))
+    {
+        return;
+    }
+    const ALSyntaxGrammar::FoldWords& words = grammar->foldWords();
+    const std::string&                text  = document().line(line);
+    const auto in = [](const std::vector<std::string>& list, std::string_view word) { return std::find(list.begin(), list.end(), word) != list.end(); };
+    bool joined = false;
+    for (const ALSyntaxToken& token : highlighter().tokens(line))
+    {
+        if (token.kind == ALSyntaxKind::String || token.kind == ALSyntaxKind::Comment || token.kind == ALSyntaxKind::DocComment ||
+            token.end > static_cast<S32>(text.size()))
+        {
+            continue;
+        }
+        const std::string_view word(text.data() + token.begin, static_cast<size_t>(token.end - token.begin));
+        if (in(words.middles, word))
+        {
+            out.push_back({ token.begin, Event::Middle });
+            joined = in(words.joined, word);
+        }
+        else if (in(words.opens, word))
+        {
+            // `elseif x then`: the elseif opened it.
+            if (!joined)
+            {
+                out.push_back({ token.begin, Event::Open });
+            }
+            joined = false;
+        }
+        else if (in(words.closes, word))
+        {
+            out.push_back({ token.begin, Event::Close });
+        }
+    }
+    std::stable_sort(out.begin(), out.end(), [](const ALFoldModel::Block& a, const ALFoldModel::Block& b) { return a.column < b.column; });
 }
 
 bool ALCodeEditor::foldAt(S32 line)
 {
-    const std::optional<FoldRegion> chosen = mFolds.fold(document(), getTabWidth(), line);
+    const std::optional<FoldRegion> chosen = folds().fold(document(), getTabWidth(), line);
     if (!chosen)
     {
         return false;
@@ -1857,7 +1948,7 @@ bool ALCodeEditor::foldAt(S32 line)
 
 bool ALCodeEditor::unfoldAt(S32 line)
 {
-    if (!mFolds.unfold(document(), getTabWidth(), line))
+    if (!folds().unfold(document(), getTabWidth(), line))
     {
         return false;
     }
@@ -1867,7 +1958,7 @@ bool ALCodeEditor::unfoldAt(S32 line)
 
 void ALCodeEditor::foldAll()
 {
-    mFolds.foldAll(document(), getTabWidth());
+    folds().foldAll(document(), getTabWidth());
     applyFolds();
     if (layout().hidden(caret().line))
     {
@@ -1883,7 +1974,7 @@ void ALCodeEditor::unfoldAll()
 
 void ALCodeEditor::revealLine(S32 line)
 {
-    if (mFolds.reveal(document(), getTabWidth(), line))
+    if (folds().reveal(document(), getTabWidth(), line))
     {
         applyFolds();
     }

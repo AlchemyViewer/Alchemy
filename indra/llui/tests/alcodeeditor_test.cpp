@@ -2356,4 +2356,23 @@ namespace tut
         key(KEY_DOWN);
         ensure_equals("round to the first", e.signature()->label, sig.label);
     }
+
+    template<> template<>
+    void alcodeeditor_object::test<67>()
+    {
+        set_test_name("folding follows the syntax: LSL's braces, a brace alone its header's; SLua's words, each arm of an if; a region the comments mark");
+        const auto regions = [](ALCodeEditor& e) {
+            std::string out;
+            for (const ALFoldModel::Region& region : e.foldRegions())
+            {
+                out += (out.empty() ? "" : " ") + std::to_string(region.start) + "-" + std::to_string(region.end);
+            }
+            return out;
+        };
+        ALCodeEditor& lsl = make("default\n{\n    touch_start(integer n) {\n        llSay(0, \"{\"); // }\n    }\n}\n", "lsl");
+        ensure_equals("braces that are code, from the header", regions(lsl), std::string("0-5 2-4"));
+        ALCodeEditor& lua = make("local function f()\n  if a then\n    x()\n  elseif b then\n    y()\n  else\n    z()\n  end\nend\n-- #region notes\nlocal t = {\n  1,\n}\n-- #endregion\n",
+                                 "slua");
+        ensure_equals("the function, each arm, the table, the region", regions(lua), std::string("0-8 1-2 3-4 5-7 9-13 10-12"));
+    }
 }

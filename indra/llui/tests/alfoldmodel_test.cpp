@@ -144,4 +144,66 @@ namespace tut
         ensure("folded still", model.isFolded(3));
         ensure("nothing hidden once its block is gone", model.hidden(doc, 4).empty() && model.folded().empty());
     }
+
+    template<> template<>
+    void alfoldmodel_object::test<4>()
+    {
+        set_test_name("by syntax: what opens and closes, across lines; a brace alone its header's; a line that opens again after its close starts; a middle word; a comment's regions");
+        const ALTextDocument doc("default\n{\n    if (a) {\n        x;\n    } else {\n        y;\n    }\n}\n// #region setup\nz;\n// #endregion\n");
+        ALFoldModel folds;
+        // Braces as the syntax, a word `else` a middle where it stands alone.
+        folds.setSyntax(
+            [&doc](S32 line, std::vector<ALFoldModel::Block>& out) {
+                const std::string& text = doc.line(line);
+                for (S32 i = 0; i < static_cast<S32>(text.size()); ++i)
+                {
+                    if (text[static_cast<size_t>(i)] == '{')
+                    {
+                        out.push_back({ i, ALFoldModel::Event::Open });
+                    }
+                    else if (text[static_cast<size_t>(i)] == '}')
+                    {
+                        out.push_back({ i, ALFoldModel::Event::Close });
+                    }
+                }
+            },
+            [](S32) { return 1u; });
+        folds.setLineComment("//");
+        std::string out;
+        for (const ALFoldModel::Region& region : folds.regions(doc, 4))
+        {
+            out += (out.empty() ? "" : " ") + std::to_string(region.start) + "-" + std::to_string(region.end);
+        }
+        ensure_equals("the state from its header, the if to before its else, the else to its close, the region", out, std::string("0-7 2-3 4-6 8-10"));
+        ensure_equals("a blank line's indent is the next's", folds.indentOf(doc, 4, 3), 8);
+        const std::vector<S32> open = folds.openAt(doc, 4, 5, 3);
+        ensure("open at the else's line: the state, from its header, and the else", open.size() == 2 && open[0] == 0 && open[1] == 4);
+        ensure("none at the region's line", folds.openAt(doc, 4, 9, 3).empty());
+
+        const ALTextDocument lua("if a then\n  x()\nelseif b then\n  y()\nelse\n  z()\nend\n");
+        ALFoldModel words;
+        words.setSyntax(
+            [&lua](S32 line, std::vector<ALFoldModel::Block>& out) {
+                const std::string& text = lua.line(line);
+                if (text.rfind("if", 0) == 0)
+                {
+                    out.push_back({ 7, ALFoldModel::Event::Open });
+                }
+                else if (text.rfind("else", 0) == 0)
+                {
+                    out.push_back({ 0, ALFoldModel::Event::Middle });
+                }
+                else if (text == "end")
+                {
+                    out.push_back({ 0, ALFoldModel::Event::Close });
+                }
+            },
+            [](S32) { return 1u; });
+        out.clear();
+        for (const ALFoldModel::Region& region : words.regions(lua, 4))
+        {
+            out += (out.empty() ? "" : " ") + std::to_string(region.start) + "-" + std::to_string(region.end);
+        }
+        ensure_equals("each arm a block of its own, the last through the end", out, std::string("0-1 2-3 4-6"));
+    }
 }

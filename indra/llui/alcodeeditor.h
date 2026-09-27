@@ -720,7 +720,10 @@ private:
     void tintRow(S32 line, const ALTextLayout::Line& laid, const ALTextLayout::Row& row, F32 alpha, std::vector<LLColor4U>& colors) override;
     // The lines pinned at the top for the view as scrolled now, outer to
     // inner; and the number of rows they take.
-    std::vector<S32> stickyLines();
+    // Worked out afresh as the view is drawn, which reads the lines above
+    // the top anyway; asked for between -- a scroll to the caret, a click
+    // -- as last drawn, so that a batch's edit is not lexed for them.
+    std::vector<S32> stickyLines(bool fresh = false);
     S32              stickyRows();
     // What is drawn over the top of the text: the pinned headers too.
     S32              coveredAbove(S32 local_x) override;
@@ -745,7 +748,7 @@ private:
     S32 heatWidth() const;
     // How far a line is indented, in columns; a blank line as the next
     // line that is not, so that the guides run through it.
-    S32 indentOf(S32 line) const;
+    S32 indentOf(S32 line);
 
     // The list opened: as typing opens it, or asked for (Control-Space),
     // when it lists what could go at the caret with nothing typed.
@@ -912,8 +915,22 @@ private:
     S32  inlayIndexOf(S32 line, S32 id) const;
     F32  inlayWidth(const InlayHint& hint) const;
 
-    // The blocks that fold, and which are folded.
+    // The blocks that fold, and which are folded: by the syntax the
+    // grammar gives -- brackets that are code, and its block words -- and
+    // its line comment's regions, told again when the grammar changes.
     ALFoldModel             mFolds;
+    const void*             mFoldGrammar = nullptr;
+    ALFoldModel&            folds();
+    void                    foldBlocksOn(S32 line, std::vector<ALFoldModel::Block>& out);
+    // The sticky headers as last worked out: for which text, which top
+    // line and which folds.
+    std::vector<S32>        mSticky;
+    U32                     mStickyVersion = 0;
+    S32                     mStickyTop     = -1;
+    std::vector<S32>        mStickyFolded;
+    bool                    mStickyValid   = false;
+    // The lines last hidden by folds, which a change of them changes only.
+    std::vector<std::pair<S32, S32>> mHiddenByFolds;
 
     completion_provider_t   mProvider;
     completion_request_t    mCompletionRequest;

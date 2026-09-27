@@ -278,6 +278,7 @@ struct ALSyntaxGrammar::Impl
         std::string with;
     };
     std::vector<Continuation> continuations;
+    ALSyntaxGrammar::FoldWords foldWords;
     std::vector<State>       states;
     // The words the grammar declares for its tables, ahead of whatever is
     // filled in at runtime.
@@ -862,6 +863,18 @@ bool ALSyntaxGrammar::load(const LLSD& description, std::string& error)
             impl->continuations.push_back(std::move(continuation));
         }
     }
+    if (description.has("folds"))
+    {
+        const LLSD& folds = description["folds"];
+        for (const auto& [key, list] : { std::pair{ "opens", &impl->foldWords.opens }, std::pair{ "closes", &impl->foldWords.closes },
+                                         std::pair{ "middles", &impl->foldWords.middles }, std::pair{ "joined", &impl->foldWords.joined } })
+        {
+            for (LLSD::array_const_iterator it = folds[key].beginArray(); it != folds[key].endArray(); ++it)
+            {
+                list->push_back(it->asString());
+            }
+        }
+    }
     const LLSD& extensions = description["extensions"];
     for (LLSD::array_const_iterator it = extensions.beginArray(); it != extensions.endArray(); ++it)
     {
@@ -1037,6 +1050,11 @@ const std::string& ALSyntaxGrammar::blockEnd(std::string_view before) const
 {
     static const std::string NONE;
     return Impl::anyOpens(mImpl->blockEnds, before) ? mImpl->blockEndWord : NONE;
+}
+
+const ALSyntaxGrammar::FoldWords& ALSyntaxGrammar::foldWords() const
+{
+    return mImpl->foldWords;
 }
 
 bool ALSyntaxGrammar::endsComment(std::string_view text) const

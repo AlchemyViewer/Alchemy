@@ -60,31 +60,321 @@ namespace
     }
 }
 
+void ALFoldModel::setSyntax(blocks_t blocks, revision_t revision)
+{
+    mBlocks   = std::move(blocks);
+    mRevision = std::move(revision);
+    mLines.clear();
+    mValid = false;
+}
+
+void ALFoldModel::setLineComment(std::string token)
+{
+    if (token != mLineComment)
+    {
+        mLineComment = std::move(token);
+        mLines.clear();
+        mValid = false;
+    }
+}
+
+const ALFoldModel::Line& ALFoldModel::lineAt(const ALTextDocument& doc, S32 line)
+{
+    if (mLines.size() != static_cast<size_t>(doc.lineCount()))
+    {
+        mLines.resize(static_cast<size_t>(doc.lineCount()));
+    }
+    Line&     entry    = mLines[static_cast<size_t>(line)];
+    const U32 revision = mRevision ? mRevision(line) : 0;
+    if (entry.valid && entry.revision == revision)
+    {
+        return entry;
+    }
+    entry          = Line();
+    entry.valid    = true;
+    entry.revision = revision;
+    const std::string&     text = doc.line(line);
+    size_t                 lead = 0;
+    const S32              n    = alBlanksWidth(text, mTabWidth, &lead);
+    const std::string_view body = trimmed(text);
+    entry.indent                = body.empty() ? -1 : n;
+    entry.closes                = closesBlock(body);
+    entry.brace                 = body == "{";
+    // `-- #region name` and `-- #endregion`, in the text's line comment.
+    if (!mLineComment.empty() && body.substr(0, mLineComment.size()) == mLineComment)
+    {
+        std::string_view rest = body.substr(mLineComment.size());
+        rest.remove_prefix(std::min(rest.size(), rest.find_first_not_of(" \t")));
+        entry.marker = rest.substr(0, 7) == "#region" ? 1 : rest.substr(0, 10) == "#endregion" ? -1 : 0;
+    }
+    if (mBlocks && !body.empty())
+    {
+        mBlocks(line, entry.blocks);
+        const S32 first = static_cast<S32>(lead);
+        for (Block& block : entry.blocks)
+        {
+            block.first = block.column == first;
+        }
+    }
+    return entry;
+}
+
+S32 ALFoldModel::indentOf(const ALTextDocument& doc, S32 tab_width, S32 line, S32 reach)
+{
+    if (tab_width != mTabWidth)
+    {
+        mTabWidth = tab_width;
+        mLines.clear();
+        mValid = false;
+    }
+    const S32 count = doc.lineCount();
+    for (S32 l = line; l < count && l < line + reach; ++l)
+    {
+        const S32 indent = lineAt(doc, l).indent;
+        if (indent >= 0)
+        {
+            return indent;
+        }
+    }
+    return 0;
+}
+
 const std::vector<ALFoldModel::Region>& ALFoldModel::regions(const ALTextDocument& doc, S32 tab_width)
 {
-    if (mValid && mVersion == doc.version() && mTabWidth == tab_width)
+    if (tab_width != mTabWidth)
+    {
+        mTabWidth = tab_width;
+        mLines.clear();
+        mValid = false;
+    }
+    if (mValid && mVersion == doc.version())
     {
         return mRegions;
     }
+    const S32 count = doc.lineCount();
+    // Each block's last line by its first, the widest where several start
+    // on a line; then in order, with no sort.
+    std::vector<S32> end_of(static_cast<size_t>(count), -1);
+    const auto       found = [&end_of](S32 start, S32 end) {
+        if (end > start && start >= 0)
+        {
+            end_of[static_cast<size_t>(start)] = llmax(end_of[static_cast<size_t>(start)], end);
+        }
+    };
+    if (mBlocks)
+    {
+        bySyntax(doc, end_of);
+    }
+    else
+    {
+        mRegions.clear();
+        byIndent(doc, mRegions);
+        for (const Region& region : mRegions)
+        {
+            found(region.start, region.end);
+        }
+    }
+    // And the regions the text marks, as the comment says: by the syntax
+    // pass as it went, else here.
+    if (!mLineComment.empty() && !mBlocks)
+    {
+        std::vector<S32> open;
+        for (S32 l = 0; l < count; ++l)
+        {
+            const S8 marker = lineAt(doc, l).marker;
+            if (marker > 0)
+            {
+                open.push_back(l);
+            }
+            else if (marker < 0 && !open.empty())
+            {
+                found(open.back(), l);
+                open.pop_back();
+            }
+        }
+    }
     mRegions.clear();
-    const S32        count = doc.lineCount();
-    const S32        tab   = tab_width;
-    std::vector<S32> indent(count, -1);
     for (S32 l = 0; l < count; ++l)
     {
-        const std::string& line  = doc.line(l);
-        size_t             lead  = 0;
-        const S32          n     = alBlanksWidth(line, tab, &lead);
-        const bool         blank = line.find_first_not_of(" \t\r", lead) == std::string::npos;
-        indent[l]                = blank ? -1 : n;
+        if (end_of[static_cast<size_t>(l)] > l)
+        {
+            mRegions.push_back(Region{ l, end_of[static_cast<size_t>(l)] });
+        }
+    }
+    mVersion = doc.version();
+    mValid   = true;
+    return mRegions;
+}
+
+void ALFoldModel::bySyntax(const ALTextDocument& doc, std::vector<S32>& end_of)
+{
+    // What is open, each where it opened and whether it opened its line.
+    struct Opened
+    {
+        S32  line;
+        bool first;
+    };
+    const S32           count = doc.lineCount();
+    std::vector<Opened> open;
+    // The blocks, as they close; those opened on a line of their own go
+    // with their headers after.
+    std::vector<Region> alone;
+    std::vector<S32>    marked;
+    for (S32 l = 0; l < count; ++l)
+    {
+        const Line& line = lineAt(doc, l);
+        if (line.marker > 0)
+        {
+            marked.push_back(l);
+        }
+        else if (line.marker < 0 && !marked.empty())
+        {
+            if (l > marked.back())
+            {
+                end_of[static_cast<size_t>(marked.back())] = llmax(end_of[static_cast<size_t>(marked.back())], l);
+            }
+            marked.pop_back();
+        }
+        for (size_t i = 0; i < line.blocks.size(); ++i)
+        {
+            const Block& block = line.blocks[i];
+            if (block.event != Event::Open && !open.empty())
+            {
+                // Through this line, unless it opens again after the
+                // close, which it then starts.
+                bool again = block.event == Event::Middle;
+                for (size_t k = i + 1; k < line.blocks.size() && !again; ++k)
+                {
+                    again = line.blocks[k].event != Event::Close;
+                }
+                const Region region{ open.back().line, again ? l - 1 : l };
+                if (region.end > region.start)
+                {
+                    if (open.back().first)
+                    {
+                        alone.push_back(region);
+                    }
+                    else
+                    {
+                        end_of[static_cast<size_t>(region.start)] = llmax(end_of[static_cast<size_t>(region.start)], region.end);
+                    }
+                }
+                open.pop_back();
+            }
+            if (block.event != Event::Close)
+            {
+                open.push_back(Opened{ l, block.event == Event::Open && block.first });
+            }
+        }
+    }
+    // Opened on a line of its own -- a brace under its header -- a block
+    // is its header's, where that starts none of its own.
+    for (Region region : alone)
+    {
+        S32 header = region.start - 1;
+        while (header >= 0 && lineAt(doc, header).indent < 0)
+        {
+            --header;
+        }
+        if (header >= 0 && end_of[static_cast<size_t>(header)] < 0)
+        {
+            region.start = header;
+        }
+        end_of[static_cast<size_t>(region.start)] = llmax(end_of[static_cast<size_t>(region.start)], region.end);
+    }
+}
+
+std::vector<S32> ALFoldModel::openAt(const ALTextDocument& doc, S32 tab_width, S32 line, size_t most, S32 reach)
+{
+    std::vector<S32> out;
+    if (!mBlocks)
+    {
+        for (const Region& region : regions(doc, tab_width))
+        {
+            // By start: none past the line holds it.
+            if (region.start >= line)
+            {
+                break;
+            }
+            if (region.end >= line)
+            {
+                out.push_back(region.start);
+            }
+        }
+        if (out.size() > most)
+        {
+            out.erase(out.begin(), out.end() - static_cast<std::ptrdiff_t>(most));
+        }
+        return out;
+    }
+    if (tab_width != mTabWidth)
+    {
+        mTabWidth = tab_width;
+        mLines.clear();
+        mValid = false;
+    }
+    // Back from the line, innermost first: what opens with nothing after
+    // it closing it is open there.
+    S32 closes = 0;
+    for (S32 l = llmin(line, doc.lineCount()) - 1; l >= 0 && l >= line - reach && out.size() < most; --l)
+    {
+        const Line& entry = lineAt(doc, l);
+        bool        opens = false;
+        bool        first = false;
+        for (auto it = entry.blocks.rbegin(); it != entry.blocks.rend(); ++it)
+        {
+            if (it->event != Event::Close)
+            {
+                if (closes > 0)
+                {
+                    --closes;
+                }
+                else
+                {
+                    opens = true;
+                    first = it->event == Event::Open && it->first;
+                }
+            }
+            if (it->event != Event::Open)
+            {
+                ++closes;
+            }
+        }
+        if (!opens)
+        {
+            continue;
+        }
+        // Opened on a line of its own: its header's line.
+        S32 start = l;
+        if (first)
+        {
+            S32 header = l - 1;
+            while (header >= 0 && lineAt(doc, header).indent < 0)
+            {
+                --header;
+            }
+            start = header >= 0 ? header : l;
+        }
+        out.insert(out.begin(), start);
+    }
+    return out;
+}
+
+void ALFoldModel::byIndent(const ALTextDocument& doc, std::vector<Region>& out)
+{
+    const S32        count = doc.lineCount();
+    std::vector<S32> indent(static_cast<size_t>(count), -1);
+    for (S32 l = 0; l < count; ++l)
+    {
+        indent[static_cast<size_t>(l)] = lineAt(doc, l).indent;
     }
     // A block is a line and the deeper lines after it, with a line of
     // nothing going with whichever side keeps the block whole, and the
     // closer on the line after -- a brace, an `end` -- taken as part of it.
-    std::vector<S32> end_of(count, -1);
+    std::vector<S32> end_of(static_cast<size_t>(count), -1);
     for (S32 l = 0; l < count; ++l)
     {
-        if (indent[l] < 0)
+        if (indent[static_cast<size_t>(l)] < 0)
         {
             continue;
         }
@@ -92,11 +382,11 @@ const std::vector<ALFoldModel::Region>& ALFoldModel::regions(const ALTextDocumen
         S32 k   = l + 1;
         for (; k < count; ++k)
         {
-            if (indent[k] < 0)
+            if (indent[static_cast<size_t>(k)] < 0)
             {
                 continue;
             }
-            if (indent[k] > indent[l])
+            if (indent[static_cast<size_t>(k)] > indent[static_cast<size_t>(l)])
             {
                 end = k;
             }
@@ -109,42 +399,38 @@ const std::vector<ALFoldModel::Region>& ALFoldModel::regions(const ALTextDocumen
         {
             continue;
         }
-        if (k < count && indent[k] == indent[l] && closesBlock(trimmed(doc.line(k))))
+        if (k < count && indent[static_cast<size_t>(k)] == indent[static_cast<size_t>(l)] && lineAt(doc, k).closes)
         {
             end = k;
         }
-        end_of[l] = end;
+        end_of[static_cast<size_t>(l)] = end;
     }
     // A brace on a line of its own is its header's: `default` and the
     // `{` under it fold as one block, from the header.
     for (S32 l = 0; l < count; ++l)
     {
-        if (end_of[l] < 0 || trimmed(doc.line(l)) != "{")
+        if (end_of[static_cast<size_t>(l)] < 0 || !lineAt(doc, l).brace)
         {
             continue;
         }
         S32 header = l - 1;
-        while (header >= 0 && indent[header] < 0)
+        while (header >= 0 && indent[static_cast<size_t>(header)] < 0)
         {
             --header;
         }
-        if (header >= 0 && indent[header] == indent[l] && end_of[header] < 0)
+        if (header >= 0 && indent[static_cast<size_t>(header)] == indent[static_cast<size_t>(l)] && end_of[static_cast<size_t>(header)] < 0)
         {
-            end_of[header] = end_of[l];
-            end_of[l]      = -1;
+            end_of[static_cast<size_t>(header)] = end_of[static_cast<size_t>(l)];
+            end_of[static_cast<size_t>(l)]      = -1;
         }
     }
     for (S32 l = 0; l < count; ++l)
     {
-        if (end_of[l] > l)
+        if (end_of[static_cast<size_t>(l)] > l)
         {
-            mRegions.push_back(Region{ l, end_of[l] });
+            out.push_back(Region{ l, end_of[static_cast<size_t>(l)] });
         }
     }
-    mVersion  = doc.version();
-    mTabWidth = tab_width;
-    mValid    = true;
-    return mRegions;
 }
 
 const ALFoldModel::Region* ALFoldModel::startingAt(const ALTextDocument& doc, S32 tab_width, S32 line)
@@ -261,9 +547,11 @@ std::vector<std::pair<S32, S32>> ALFoldModel::hidden(const ALTextDocument& doc, 
     return out;
 }
 
-void ALFoldModel::edited(const ALTextDocument::Edit& edit)
+void ALFoldModel::edited(const ALTextDocument::Edit& edit, S32 lines)
 {
     const std::vector<ALTextDocument::Edit::LineSpan>& spans = edit.lineSpans();
+    // The lines it touched are read again.
+    mLines.applySpans(spans, lines, Line(), Line());
     std::vector<S32>                                  kept;
     kept.reserve(mFolded.size());
     for (const S32 start : mFolded)
