@@ -321,6 +321,8 @@
     <floater.string name="TabNotecardTip">A notecard, as plain text</floater.string>
     <floater.string name="TabReadOnlyTip">Read-only: you may read it and not change it</floater.string>
     <floater.string name="TrailerReadOnly">Read-only</floater.string>
+    <floater.string name="ReadAsSLua">[NAME] is read as SLua now, and compiles as SLua when it is saved</floater.string>
+    <floater.string name="ReadAsLSL">[NAME] is read as LSL now, and compiles as LSL when it is saved</floater.string>
     <floater.string name="ScriptItemDropName">Put its name in here: [TEXT]. With Shift, its key</floater.string>
     <floater.string name="ScriptItemDropKey">Put its key in here: [TEXT]</floater.string>
     <floater.string name="ScriptItemDropNoKey">Its key is not yours to see: it is not full permissions. Without Shift, its name goes in</floater.string>
@@ -1705,7 +1707,7 @@
                      layout="topleft"
                      name="compile_target"
                      right="-4"
-                     tool_tip="What the script compiles for when it is saved: an LSL script on Mono (the usual choice), on the legacy LSL2 machine, or on Luau; an SLua script as SLua. A script written in one language compiles for that language's targets only."
+                     tool_tip="What the script compiles for when it is saved: an LSL script on Mono (the usual choice), on the legacy LSL2 machine, or on Luau; an SLua script as SLua. A target of the other language reads the script as that language from then on, for a script converted from one to the other."
                      top="2"
                      width="132">
                         <combo_box.item label="LSL on Mono" name="compile_target_mono" value="mono" />

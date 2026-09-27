@@ -276,10 +276,13 @@ ALScriptWorkspace::Language ALScriptWorkspace::resolve(const LLInventoryItem* it
     {
         target = item->getRuntime();
     }
-    // An LSL script run on Luau is the LSL-on-Luau target, whatever asked.
+    // An LSL item run on Luau is LSL on Luau -- or SLua, where its text was
+    // converted and saved for Luau (a target of the other language picked
+    // in the studio), which only the text tells.
     if (!language.lua && target == "luau")
     {
-        target = "lsl-luau";
+        language.lua = looksLikeLua(content);
+        target       = language.lua ? "luau" : "lsl-luau";
     }
     if (target.empty())
     {

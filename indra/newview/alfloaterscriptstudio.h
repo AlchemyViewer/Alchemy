@@ -800,6 +800,9 @@ private:
     void addHelpCommands();
     void addEditorCommand(const std::string& name, ALEditorCommand command, bool changes);
     void onCompileTarget();
+    // The tab's script read as the other language from here: its grammar,
+    // its words, its checks; what was made of it as the one it was, gone.
+    void readAs(Doc& doc, bool lua);
     void onRunning();
     // The strip's experience, for the script in front: shown where it has
     // one or the agent has any to give it.

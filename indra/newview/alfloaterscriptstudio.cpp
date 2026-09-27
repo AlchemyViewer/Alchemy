@@ -2900,16 +2900,17 @@ void ALFloaterScriptStudio::refreshToolbar()
     }
     if (have && script)
     {
-        // The targets of the script's own language: Lua is a Lua script's
-        // one, and the LSL machines an LSL script's, LSL on Luau where the
-        // region runs Luau.
+        // Every target the region runs, whichever language the script is
+        // in: one of the other language reads it as that language, as a
+        // script converted by hand needs. The Luau machine where the
+        // region runs Luau, or the script is SLua already.
         const bool region_lua = ALScriptWorkspace::luaEnabled(doc->ref);
         const bool lua        = doc->language.lua;
         for (const std::string target : { "mono", "lsl2", "lsl-luau", "luau" })
         {
             if (LLScrollListItem* item = mCompileTarget->findItemByValue(target))
             {
-                item->setEnabled(lua ? target == "luau" : target != "luau" && (target != "lsl-luau" || region_lua));
+                item->setEnabled(target == "luau" ? lua || region_lua : target != "lsl-luau" || region_lua);
             }
         }
         mCompileTarget->setValue(doc->language.compileTarget);
@@ -6870,13 +6871,34 @@ void ALFloaterScriptStudio::onCompileTarget()
         const std::string target = mCompileTarget->getValue().asString();
         doc->language.compileTarget = target;
         // Picked, and to stand until it is saved over whatever the region
-        // says the script compiles for meanwhile. What the script is --
-        // its grammar, its words -- stays what the item says.
+        // says the script compiles for meanwhile.
         doc->targetChosen = true;
+        // One of the other language: the script is read as that one.
+        const bool lua = target == "luau";
+        if (lua != doc->language.lua)
+        {
+            readAs(*doc, lua);
+        }
         // An unsaved change, as the tab says.
         fillTabs();
         refreshToolbar();
     }
+}
+
+void ALFloaterScriptStudio::readAs(Doc& doc, bool lua)
+{
+    doc.language.lua = lua;
+    doc.editor->setSyntax(lua ? "slua" : "lsl");
+    teachEditor(doc);
+    // What was made of it as the other language -- its expansion, and
+    // what was expanded to go up -- is nothing to it now; checked again.
+    dropExpanded(doc);
+    doc.expanded.valid = false;
+    doc.uploaded.valid = false;
+    scheduleAnalysis(doc, true);
+    LLStringUtil::format_map_t args;
+    args["[NAME]"] = doc.name;
+    setStatus(getString(lua ? "ReadAsSLua" : "ReadAsLSL", args));
 }
 
 void ALFloaterScriptStudio::askExperienceOf(Doc& doc)
