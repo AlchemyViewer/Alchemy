@@ -379,6 +379,7 @@ ALScriptAnalysis::Result ALScriptAnalysis::run(const Job& job, const ALLuauServi
             const bool looked_through = request.id.rfind("lookup:", 0) == 0;
             mWorker->luau.setDocument(looked_through ? std::string_view() : std::string_view(request.id));
             mWorker->luau.setConfig(request.config);
+            mWorker->luau.setPassedOver(request.passedOver);
             mWorker->luau.setTimeLimit(job.seconds);
             mWorker->luau.setStop(stop);
             switch (request.kind)
@@ -422,6 +423,7 @@ ALScriptAnalysis::Result ALScriptAnalysis::run(const Job& job, const ALLuauServi
         {
             mWorker->loadLSL(job.lslPath);
             result.definitionsError = mWorker->lslError;
+            mWorker->lsl.setPassedOver(request.passedOver);
             switch (request.kind)
             {
                 case Kind::Check:

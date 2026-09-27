@@ -462,6 +462,14 @@ namespace tut
                                   "local a = __modules[\"a\"]\nlocal b = __modules[\"b\"]\nlocal x = require(name)\n"));
         ensure_equals("included", r.includes.size(), 2u);
         ensure_equals("b mapped to its file", r.map.files()[r.map.toSource(2, 0).file].name, std::string("b"));
+        // The modules' own lines, which the studio shows nothing of: not
+        // the table's, which are no one's, nor the script's.
+        std::string others;
+        for (const auto& [first, last] : r.map.othersLines())
+        {
+            others += std::to_string(first) + "-" + std::to_string(last) + " ";
+        }
+        ensure_equals("the modules' lines", others, std::string("2-2 5-6 "));
         r = ALPreprocessor::run("local c = require(\"c\")\n", options(true));
         ensure_equals("a cycle", messages(r), std::string("E c:0: 'c' requires itself\n"));
         r = ALPreprocessor::run("local d = require(\"d\")\n", options(true));

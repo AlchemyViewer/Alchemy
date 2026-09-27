@@ -175,6 +175,9 @@ public:
         // Whether it is about the tab in front: its questions go before
         // anything else, then its check; then weighing; then the rest.
         bool        front = false;
+        // The lines of the text nobody reads the names, hints and fixes of:
+        // what an include put into an expansion (ALSourceMap::othersLines).
+        std::vector<std::pair<S32, S32>> passedOver;
         // What a check says beyond the problems and the outline: what
         // every name is, and what the editor may show beside the text.
         bool        semantics      = false;

@@ -677,4 +677,44 @@ namespace tut
         service.signature(broken, 3, 12);
         ensure_equals("another place is mended again", service.mendings(), twice + 1);
     }
+
+    template<> template<>
+    void allslservice_object::test<20>()
+    {
+        set_test_name("lines nobody reads -- an include's -- are passed over by the names and the hints, and their problems offered no fixes");
+        // An include's function, unused, then the script's own.
+        const std::string text = "helper(integer count)\n{\n    llOwnerSay((string)count);\n}\n"
+                                 "default\n{\n    state_entry()\n    {\n        integer unused = 1;\n        llOwnerSay(\"x\");\n    }\n}\n";
+        service.setPassedOver({ { 0, 3 } });
+        const ALScriptProblems problems = service.check(text, true);
+        bool helper_said = false, helper_fixed = false, own_fixed = false;
+        for (const ALScriptProblem& problem : problems)
+        {
+            if (problem.line <= 3 && problem.key == "LSLDeclaredButNotUsed")
+            {
+                helper_said  = true;
+                helper_fixed = !problem.fixes.empty();
+            }
+            if (problem.line == 8 && problem.key == "LSLDeclaredButNotUsed")
+            {
+                own_fixed = !problem.fixes.empty();
+            }
+        }
+        ensure("the include's unused function said", helper_said);
+        ensure("but offered nothing", !helper_fixed);
+        ensure("the script's own offered its fix", own_fixed);
+        bool in_include = false;
+        for (const ALScriptSemanticToken& token : service.semanticTokens(text))
+        {
+            in_include |= token.span.line <= 3;
+        }
+        ensure("no names coloured in the include", !in_include);
+        service.setPassedOver({});
+        bool coloured = false;
+        for (const ALScriptSemanticToken& token : service.semanticTokens(text))
+        {
+            coloured |= token.span.line <= 3;
+        }
+        ensure("with nothing passed over, coloured", coloured);
+    }
 }

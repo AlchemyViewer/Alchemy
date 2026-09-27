@@ -107,6 +107,14 @@ public:
     // it stands at, so that the blanks before it are the source's own: what
     // an insertion at the line's start may be made to the source as.
     bool lineStart(S32 line, Loc& at) const;
+    // The output lines every piece of which came from another file than
+    // the script's own -- what an include put there -- as runs of first
+    // and last line: what the studio shows nothing of, so that what is
+    // worked out for them can be passed over. A line with nothing mapped,
+    // or any of the script's own on it, is not among them.
+    std::vector<std::pair<S32, S32>> othersLines() const;
+    // Whether lines first to last all lie within one of such runs.
+    static bool within(const std::vector<std::pair<S32, S32>>& runs, S32 first, S32 last);
 
     // This map over another: this one's origins are positions in the text
     // the other maps, so the result maps this one's output straight to

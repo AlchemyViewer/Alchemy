@@ -318,8 +318,31 @@ namespace
     }
 
     // Every identifier bound to a symbol, by what the symbol is.
-    struct Semantics final : public Tailslide::ASTVisitor
+    // A visitor that passes over the globals, functions and states lying
+    // wholly within lines nobody reads -- an include's -- rather than
+    // going down into them. Tailslide's lines count from one.
+    struct PassingOver : public Tailslide::ASTVisitor
     {
+        using Tailslide::ASTVisitor::visit;
+        const std::vector<std::pair<S32, S32>>* passedOver = nullptr;
+
+        bool read(Tailslide::LSLASTNode* node) const
+        {
+            if (!passedOver || passedOver->empty())
+            {
+                return true;
+            }
+            const Tailslide::YYLTYPE* loc = node->getLoc();
+            return !ALSourceMap::within(*passedOver, zeroBased(loc->first_line), zeroBased(loc->last_line));
+        }
+        bool visit(Tailslide::LSLGlobalVariable* node) override { return read(node); }
+        bool visit(Tailslide::LSLGlobalFunction* node) override { return read(node); }
+        bool visit(Tailslide::LSLState* node) override { return read(node); }
+    };
+
+    struct Semantics final : public PassingOver
+    {
+        using PassingOver::visit;
         std::vector<ALScriptSemanticToken> out;
 
         bool visit(Tailslide::LSLIdentifier* identifier) override
@@ -361,8 +384,9 @@ namespace
     };
 
     // Each argument of each call, by the parameter it fills.
-    struct Hints final : public Tailslide::ASTVisitor
+    struct Hints final : public PassingOver
     {
+        using PassingOver::visit;
         std::vector<ALScriptInlayHint> out;
 
         bool visit(Tailslide::LSLFunctionExpression* call) override
@@ -1042,6 +1066,8 @@ struct ALLSLService::Impl
     Mended                                         mendedAtPlace;
     // How many copies have been mended, for the test that says so.
     size_t                                         mendings     = 0;
+    // The lines nobody reads the names, hints and fixes of (setPassedOver).
+    std::vector<std::pair<S32, S32>>               passedOver;
     // Whether the last question had a tree to be answered from.
     bool                                           understood   = false;
 
@@ -1168,6 +1194,11 @@ size_t ALLSLService::mendings() const
     return mImpl->mendings;
 }
 
+void ALLSLService::setPassedOver(std::vector<std::pair<S32, S32>> lines)
+{
+    mImpl->passedOver = std::move(lines);
+}
+
 bool ALLSLService::hasBuiltins() const
 {
     return mImpl->builtins;
@@ -1263,13 +1294,17 @@ ALScriptProblems ALLSLService::check(std::string_view source, bool mono)
     }
     // A name it does not know changed to the nearest it does, where one is
     // near: Tailslide suggested one itself once, and no longer does.
-    // The text's lines found once, for every fix offered over it.
+    // The text's lines found once, for every fix offered over it; and a
+    // problem wholly in lines nobody reads offered none.
     const ALScriptFixes::Lines lines(source);
+    const auto                 passedOver = [this](const ALScriptProblem& problem) {
+        return ALSourceMap::within(mImpl->passedOver, problem.line, std::max(problem.line, problem.endLine));
+    };
     if (script)
     {
         for (ALScriptProblem& problem : problems)
         {
-            if (problem.key == "LSLUndeclared" && problem.args.size() == 1)
+            if (problem.key == "LSLUndeclared" && problem.args.size() == 1 && !passedOver(problem))
             {
                 ALScriptFixes::offerNames(problem, lines, problem.args[0], namesAt(script, problem.line, problem.column),
                                           builtinNames(parser.context.builtins));
@@ -1283,7 +1318,7 @@ ALScriptProblems ALLSLService::check(std::string_view source, bool mono)
     {
         for (ALScriptProblem& problem : problems)
         {
-            if (problem.key != "LSLDeclaredButNotUsed" || problem.args.size() != 2)
+            if (problem.key != "LSLDeclaredButNotUsed" || problem.args.size() != 2 || passedOver(problem))
             {
                 continue;
             }
@@ -1306,7 +1341,7 @@ ALScriptProblems ALLSLService::check(std::string_view source, bool mono)
         }
     }
     // What would put each right, where its words and its place say.
-    ALScriptFixes::attach(problems, source, false);
+    ALScriptFixes::attach(problems, lines, false, mImpl->passedOver);
     return problems;
 }
 
@@ -1566,6 +1601,7 @@ std::vector<ALScriptSemanticToken> ALLSLService::semanticTokens(std::string_view
         return {};
     }
     Semantics semantics;
+    semantics.passedOver = &mImpl->passedOver;
     script->visit(&semantics);
     std::vector<ALScriptSemanticToken>& out = semantics.out;
     std::stable_sort(out.begin(), out.end());
@@ -1590,6 +1626,7 @@ std::vector<ALScriptInlayHint> ALLSLService::inlayHints(std::string_view source,
         return {};
     }
     Hints hints;
+    hints.passedOver = &mImpl->passedOver;
     script->visit(&hints);
     std::stable_sort(hints.out.begin(), hints.out.end());
     return std::move(hints.out);

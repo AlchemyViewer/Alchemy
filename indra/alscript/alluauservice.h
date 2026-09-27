@@ -31,6 +31,7 @@
 #include <memory>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace Luau
@@ -105,6 +106,13 @@ public:
     // lookup through another object's script -- which lets none go.
     // setConfig is then the named script's own.
     void setDocument(std::string_view id);
+    // The lines of the texts asked about next whose names, hints and
+    // fixes nobody reads -- the modules an expansion put ahead of the
+    // script, runs of zero-based first and last line
+    // (ALSourceMap::othersLines): passed over by the semantic tokens and
+    // the hints, and offered no fixes. Their problems are said all the
+    // same. None until told.
+    void setPassedOver(std::vector<std::pair<S32, S32>> lines);
 
     // Everything the front end has to say about one script: parse errors
     // and type errors, then the lints, each in the order it was found.

@@ -227,6 +227,23 @@ int main(int, char**)
                      luau.inlayHints(text, true, true).size() + luau.complete(text, last, 16).size() + luau.hover(text, last, 16).label.size() +
                      luau.complete(text, last, 16).size();
         }));
+    // An expansion whose include is most of it: the names and hints of the
+    // include's lines passed over, as the studio shows none of them.
+    {
+        std::string       big      = ll_test::bigLSL(LINES);
+        const size_t      at       = big.find("default");
+        const std::string library  = big.substr(0, at);
+        const std::string expanded = library + big.substr(at);
+        const S32         lines    = static_cast<S32>(std::count(library.begin(), library.end(), '\n'));
+        lsl.check(expanded, true);
+        const auto names = [&] { g_sink = g_sink + lsl.semanticTokens(expanded).size() + lsl.inlayHints(expanded, true).size(); };
+        const double all = ms_per_run(names);
+        lsl.setPassedOver({ { 0, lines - 1 } });
+        const double own = ms_per_run(names);
+        lsl.setPassedOver({});
+        row("LSL names and hints of an expansion, all of it", all, NONE);
+        row("  its include's lines passed over", own, NONE);
+    }
     // A check with many problems, each offered its fixes: names misspelt,
     // locals nobody uses.
     {

@@ -896,4 +896,36 @@ namespace tut
         service.check(a);
         ensure_equals("unnamed: its own", service.typeChecks(), now + 2);
     }
+
+    template<> template<>
+    void alluauservice_object::test<30>()
+    {
+        set_test_name("lines nobody reads -- a module put ahead of the script -- are passed over by the names and the hints");
+        ensure("definitions loaded: " + error, loaded);
+        const std::string text = "local __modules = {}\n"
+                                 "__modules[\"m\"] = (function()\nlocal inner = 1\nreturn inner\nend)()\n"
+                                 "local own = __modules[\"m\"]\nprint(own)\n";
+        service.setPassedOver({ { 1, 4 } });
+        bool in_module = false;
+        for (const ALScriptSemanticToken& token : service.semanticTokens(text))
+        {
+            in_module |= token.span.line >= 1 && token.span.line <= 4;
+        }
+        ensure("no names coloured in the module", !in_module);
+        bool hinted_module = false, hinted_own = false;
+        for (const ALScriptInlayHint& hint : service.inlayHints(text, false, true))
+        {
+            hinted_module |= hint.line >= 1 && hint.line <= 4;
+            hinted_own |= hint.line == 5;
+        }
+        ensure("no hints in the module", !hinted_module);
+        ensure("the script's own hinted", hinted_own);
+        service.setPassedOver({});
+        in_module = false;
+        for (const ALScriptSemanticToken& token : service.semanticTokens(text))
+        {
+            in_module |= token.span.line >= 1 && token.span.line <= 4;
+        }
+        ensure("with nothing passed over, coloured", in_module);
+    }
 }

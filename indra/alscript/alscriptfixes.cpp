@@ -1336,9 +1336,17 @@ namespace ALScriptFixes
 
     void attach(ALScriptProblems& problems, std::string_view text, bool lua)
     {
-        const Lines lines(text);
+        attach(problems, Lines(text), lua, {});
+    }
+
+    void attach(ALScriptProblems& problems, const Lines& lines, bool lua, const std::vector<std::pair<S32, S32>>& passedOver)
+    {
         for (ALScriptProblem& problem : problems)
         {
+            if (!passedOver.empty() && ALSourceMap::within(passedOver, problem.line, std::max(problem.line, problem.endLine)))
+            {
+                continue;
+            }
             const std::string&              key  = problem.key;
             const std::vector<std::string>& args = problem.args;
             if (!lua && is(key, Fixed::LSLSyntaxMissing) && args.size() == 1)

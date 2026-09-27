@@ -124,6 +124,56 @@ bool ALSourceMap::lineStart(S32 line, Loc& at) const
     return true;
 }
 
+std::vector<std::pair<S32, S32>> ALSourceMap::othersLines() const
+{
+    std::vector<std::pair<S32, S32>> out;
+    const auto add = [&out](S32 line) {
+        if (!out.empty() && out.back().second + 1 == line)
+        {
+            out.back().second = line;
+        }
+        else
+        {
+            out.emplace_back(line, line);
+        }
+    };
+    // The segments in output order: a line's are together.
+    S32  line   = -1;
+    bool others = false;
+    for (const Segment& segment : mSegments)
+    {
+        if (segment.outLine != line)
+        {
+            if (line >= 0 && others)
+            {
+                add(line);
+            }
+            line   = segment.outLine;
+            others = true;
+        }
+        others = others && segment.file > 0;
+    }
+    if (line >= 0 && others)
+    {
+        add(line);
+    }
+    return out;
+}
+
+// static
+bool ALSourceMap::within(const std::vector<std::pair<S32, S32>>& runs, S32 first, S32 last)
+{
+    // The run starting at or before the first line, if any, holds them all
+    // or none does: the runs are in order and apart.
+    auto after = std::upper_bound(runs.begin(), runs.end(), first, [](S32 line, const std::pair<S32, S32>& run) { return line < run.first; });
+    if (after == runs.begin())
+    {
+        return false;
+    }
+    --after;
+    return first >= after->first && last <= after->second;
+}
+
 ALSourceMap::Loc ALSourceMap::toSource(S32 line, S32 column) const
 {
     Loc loc;

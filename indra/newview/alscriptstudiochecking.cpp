@@ -211,6 +211,7 @@ void ALScriptStudioChecking::expandedAnswer(const std::string& id, U32 version, 
     doc.expanded.generation = ++doc.check.expansions;
     doc.expanded.text     = std::make_shared<const std::string>(result.text);
     doc.expanded.map      = result.map;
+    doc.expanded.elsewhere = result.map.othersLines();
     doc.expanded.problems = result.problems;
     doc.expanded.resolved = result.resolved;
     // What the preprocessor found is shown with what the analyzers found.
@@ -293,7 +294,8 @@ void ALScriptStudioChecking::ask(Doc& doc, ALScriptAnalysis::Kind kind, const AL
         }
         // A position inside a directive has nothing there to ask about.
         expansion    = doc.expanded.generation;
-        request.text = doc.expanded.text;
+        request.text       = doc.expanded.text;
+        request.passedOver = doc.expanded.elsewhere;
         if (kind != ALScriptAnalysis::Kind::Check && kind != ALScriptAnalysis::Kind::Weigh)
         {
             const ALSourceMap::Loc loc = doc.expanded.map.toExpanded(0, at.line, at.column);

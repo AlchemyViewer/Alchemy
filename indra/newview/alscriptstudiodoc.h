@@ -301,6 +301,9 @@ struct ALScriptStudioDoc
         // Shared with every question asked over it.
         std::shared_ptr<const std::string> text = std::make_shared<const std::string>();
         ALSourceMap      map;
+        // Its lines that are wholly an include's or a module's
+        // (ALSourceMap::othersLines), which the analyzers pass over.
+        std::vector<std::pair<S32, S32>> elsewhere;
         ALScriptProblems problems;
         // What the code came to on the script's target before the
         // optimizer and after, where it ran and was weighed.

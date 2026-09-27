@@ -30,6 +30,7 @@
 #include <memory>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 // The LSL analyzer: Tailslide's parser, symbol table and type checks, given
@@ -81,6 +82,12 @@ public:
     // one after the other of the same text mends nothing again. For the
     // test that says so.
     size_t mendings() const;
+    // The lines of the texts asked about next whose names, hints and
+    // fixes nobody reads -- what an include put into an expansion, runs of
+    // zero-based first and last line (ALSourceMap::othersLines): passed
+    // over by the semantic tokens and the hints, and offered no fixes. Its
+    // problems are said all the same. None until told.
+    void setPassedOver(std::vector<std::pair<S32, S32>> lines);
 
     // The script's own symbols in scope at a position: its globals,
     // functions, states, and the parameters and locals of what encloses

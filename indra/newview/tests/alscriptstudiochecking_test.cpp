@@ -443,6 +443,7 @@ namespace tut
         ensure("taken", doc.expanded.valid && doc.expanded.version == version(doc) && doc.check.expansions == 1);
         ensure_equals("then asked", studio.asks.size(), size_t(1));
         ensure("of the expansion, at its place", *studio.asks[0].request.text == *doc.expanded.text && studio.asks[0].request.line == 4);
+        ensure("the include's line passed over", studio.asks[0].request.passedOver == (std::vector<std::pair<S32, S32>>{ { 0, 0 } }));
         ensure_equals("the problems shown with it", joined(studio.told), std::string("problems a"));
         ALScriptAnalysis::Result result;
         result.kind    = Kind::Inspect;

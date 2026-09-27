@@ -1090,6 +1090,25 @@ namespace
         }
     };
 
+    // The script's statements visited, those lying wholly within lines
+    // nobody reads -- a module the preprocessor put ahead of it -- passed
+    // over rather than gone down into.
+    void visitRead(Luau::AstStatBlock* root, Luau::AstVisitor& visitor, const std::vector<std::pair<S32, S32>>& passed)
+    {
+        if (passed.empty())
+        {
+            root->visit(&visitor);
+            return;
+        }
+        for (Luau::AstStat* stat : root->body)
+        {
+            if (!ALSourceMap::within(passed, static_cast<S32>(stat->location.begin.line), static_cast<S32>(stat->location.end.line)))
+            {
+                stat->visit(&visitor);
+            }
+        }
+    }
+
     // Each script's configuration: what its `.luaurc` said. A question
     // that wants every type strict reads autocomplete's module, which Luau
     // checks strict whatever this says.
@@ -1118,6 +1137,8 @@ struct ALLuauService::Impl
     // moving between tabs finds each checked as it was left; a few are
     // kept, and the one asked of longest ago let go of past that.
     std::string                     moduleName = SCRIPT_MODULE;
+    // The lines nobody reads the names, hints and fixes of (setPassedOver).
+    std::vector<std::pair<S32, S32>> passedOver;
     std::vector<std::string>        kept;
     static constexpr size_t         KEPT = 4;
     bool                            definitions = false;
@@ -1481,6 +1502,11 @@ void ALLuauService::setConfig(const ALLuauConfig& config)
     impl.frontend->markDirty(impl.moduleName);
 }
 
+void ALLuauService::setPassedOver(std::vector<std::pair<S32, S32>> lines)
+{
+    mImpl->passedOver = std::move(lines);
+}
+
 void ALLuauService::setDocument(std::string_view id)
 {
     Impl&             impl = *mImpl;
@@ -1667,15 +1693,16 @@ ALScriptProblems ALLuauService::check(std::string_view source)
     // A global it does not know changed to the nearest name that is in
     // scope there, where one is near: the script's own locals, its globals
     // and the definitions', up the scopes from the place.
+    // The text's lines found once, for every fix offered over it; and a
+    // problem wholly in lines nobody reads offered none.
+    const ALScriptFixes::Lines lines(source);
     if (const Luau::ModulePtr module = impl.frontend->moduleResolver.getModule(impl.moduleName))
     {
-        // The text's lines found once, for every name offered over it.
-        const ALScriptFixes::Lines lines(source);
         for (ALScriptProblem& problem : problems)
         {
             const std::string& key = problem.key;
             if ((key == "LuauUnknownGlobal" || key == "LuauUnknownGlobalAssign" || key == "LuauLintUnknownGlobal" || key == "LuauLintUnknownGlobalAssign") &&
-                problem.args.size() == 1)
+                problem.args.size() == 1 && !ALSourceMap::within(impl.passedOver, problem.line, std::max(problem.line, problem.endLine)))
             {
                 std::vector<std::string> names;
                 const Luau::Position     at(static_cast<unsigned>(problem.line), static_cast<unsigned>(problem.column));
@@ -1691,7 +1718,7 @@ ALScriptProblems ALLuauService::check(std::string_view source)
         }
     }
     // What would put each right, where its words and its place say.
-    ALScriptFixes::attach(problems, source, true);
+    ALScriptFixes::attach(problems, lines, true, impl.passedOver);
     return problems;
 }
 
@@ -2147,7 +2174,7 @@ std::vector<ALScriptSemanticToken> ALLuauService::semanticTokens(std::string_vie
         return {};
     }
     Semantics semantics(*module, impl.frontend->globals.globalScope.get());
-    module_source->root->visit(&semantics);
+    visitRead(module_source->root, semantics, impl.passedOver);
     std::vector<ALScriptSemanticToken>& out = semantics.out;
     std::stable_sort(out.begin(), out.end());
     out.erase(std::unique(out.begin(), out.end(), [](const ALScriptSemanticToken& a, const ALScriptSemanticToken& b) { return a.span == b.span; }),
@@ -2172,7 +2199,7 @@ std::vector<ALScriptInlayHint> ALLuauService::inlayHints(std::string_view source
         return {};
     }
     Hints hints(*module, parameters, types);
-    module_source->root->visit(&hints);
+    visitRead(module_source->root, hints, impl.passedOver);
     std::stable_sort(hints.out.begin(), hints.out.end());
     return std::move(hints.out);
 }

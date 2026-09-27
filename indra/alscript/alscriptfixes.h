@@ -30,6 +30,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 // The fixes the studio offers, made from a problem's words and the text it
@@ -106,6 +107,9 @@ namespace ALScriptFixes
     // definitions name one, an unused local marked unused -- in the places
     // of `text`, which is what the problems were said of.
     void attach(ALScriptProblems& problems, std::string_view text, bool lua);
+    // The same over lines found once, passing over a problem wholly within
+    // `passedOver` -- an include's lines, whose fixes nobody reads.
+    void attach(ALScriptProblems& problems, const Lines& lines, bool lua, const std::vector<std::pair<S32, S32>>& passedOver);
 
     // How far apart two names are, in edits, case aside: a character put
     // in, taken out or changed, or two side by side swapped.
