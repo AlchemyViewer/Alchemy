@@ -324,4 +324,76 @@ namespace tut
         ensure_equals("already where it goes: nothing to do", pasted("{\n    x;\n}", ALTextPos(1, 4), "a;\n    b;\n", spaces),
                       std::string("{\n    a;\n    b;\n    x;\n}"));
     }
+
+    template<> template<>
+    void altextindent_object::test<10>()
+    {
+        set_test_name("Return in LSL under a head with no brace: the one line in, then back out to the head, the outermost of a run; a brace under it brought level as it is typed");
+        const ALSyntaxGrammar* lsl = grammar("lsl");
+        // The text with Return pressed at a place, a | where the caret goes.
+        const auto returned = [&](const std::string& text, S32 line, S32 column) {
+            const ALTextDocument doc(text);
+            const Split          split = splitLine(doc, ALTextRange(ALTextPos(line, column), ALTextPos(line, column)), lsl, spaces);
+            ALTextDocument       after(text);
+            const ALTextPos      end   = after.replace(split.range, split.text).endAfter();
+            const ALTextPos      caret = split.caret ? *split.caret : end;
+            std::string          out   = after.text();
+            return out.insert(static_cast<size_t>(after.offsetOf(caret)), "|");
+        };
+        ensure_equals("if (x): the next line in", returned("if (x)", 0, 6), std::string("if (x)\n    |"));
+        ensure_equals("else too", returned("    else // otherwise", 0, 21), std::string("    else // otherwise\n        |"));
+        ensure_equals("a brace after the caret stays level", returned("if (x){", 0, 6), std::string("if (x)\n|{"));
+        ensure_equals("a statement on the line is none", returned("if (x) llSay(0, \"a\");", 0, 21), std::string("if (x) llSay(0, \"a\");\n|"));
+        ensure_equals("past its statement, back to the head", returned("if (a)\n    x;", 1, 6), std::string("if (a)\n    x;\n|"));
+        ensure_equals("the outermost of a run", returned("  if (a)\n      if (b)\n          x;", 2, 12), std::string("  if (a)\n      if (b)\n          x;\n  |"));
+        ensure_equals("a line of nothing under it stays in", returned("if (a)\n    ", 1, 4), std::string("if (a)\n\n    |"));
+        ensure_equals("under a brace, no head", returned("if (a)\n{\n    x;", 2, 6), std::string("if (a)\n{\n    x;\n    |"));
+
+        const ALTextDocument brace("if (x)\n    {");
+        const Outdent        level = outdentAsTyped(brace, ALTextPos(1, 5), ALTextPos(1, 5), '{', lsl, none(), AutoOutdent(), spaces);
+        ensure("the brace level with the head", level.replacement && applied("if (x)\n    {", *level.replacement) == "if (x)\n{");
+        const ALTextDocument opened("if (x) {\n    {");
+        ensure("under a block's opener, where it is",
+               !outdentAsTyped(opened, ALTextPos(1, 5), ALTextPos(1, 5), '{', lsl, none(), AutoOutdent(), spaces).replacement);
+    }
+
+    template<> template<>
+    void altextindent_object::test<11>()
+    {
+        set_test_name("Return in SLua puts a block's end in where it is not closed below, before a bracket after the caret; in an LSL block comment, its lines' star");
+        const ALSyntaxGrammar* slua = grammar("slua");
+        const ALSyntaxGrammar* lsl  = grammar("lsl");
+        const auto returned = [&](const ALSyntaxGrammar* grammar, const std::string& text, S32 line, S32 column, bool in_comment = false) {
+            const ALTextDocument doc(text);
+            const Split          split = splitLine(doc, ALTextRange(ALTextPos(line, column), ALTextPos(line, column)), grammar, spaces, in_comment);
+            ALTextDocument       after(text);
+            const ALTextPos      end   = after.replace(split.range, split.text).endAfter();
+            const ALTextPos      caret = split.caret ? *split.caret : end;
+            std::string          out   = after.text();
+            return out.insert(static_cast<size_t>(after.offsetOf(caret)), "|");
+        };
+        ensure_equals("then, nothing below", returned(slua, "if x then", 0, 9), std::string("if x then\n    |\nend"));
+        ensure_equals("closed below already", returned(slua, "if x then\n    y()\nend", 0, 9), std::string("if x then\n    |\n    y()\nend"));
+        ensure_equals("an elseif, the if's end below", returned(slua, "if a then\n    x()\nelseif b then\nend", 2, 13),
+                      std::string("if a then\n    x()\nelseif b then\n    |\nend"));
+        ensure_equals("inside a block that ends further out", returned(slua, "do\n    while x do\nend", 1, 14), std::string("do\n    while x do\n        |\n    end\nend"));
+        ensure_equals("a function's, before the bracket after it", returned(slua, "f(function())", 0, 12), std::string("f(function()\n    |\nend)"));
+        ensure_equals("one closed on its line opens nothing", returned(slua, "local g = function() return 1 end", 0, 33),
+                      std::string("local g = function() return 1 end\n|"));
+        ensure_equals("else: the if's own end", returned(slua, "if a then\nelse", 1, 4), std::string("if a then\nelse\n    |"));
+
+        ensure_equals("a doc comment's first line", returned(lsl, "    /**", 0, 7, true), std::string("    /**\n     * |"));
+        ensure_equals("its lines", returned(lsl, "     * one", 0, 10, true), std::string("     * one\n     * |"));
+        ensure_equals("ended, none", returned(lsl, "     */", 0, 7, true), std::string("     */\n     |"));
+        ensure_equals("closed on its line, none", returned(lsl, "/* a */", 0, 7, true), std::string("/* a */\n|"));
+        ensure_equals("not in a comment, none", returned(lsl, "/**", 0, 3, false), std::string("/**\n|"));
+        ensure_equals("a line comment, none", returned(lsl, "// a", 0, 4, true), std::string("// a\n|"));
+
+        const ALTextDocument bare("     * /");
+        const Outdent        closed = outdentAsTyped(bare, ALTextPos(0, 8), ALTextPos(0, 8), '/', lsl, none(), AutoOutdent(), spaces);
+        ensure("its end typed on a bare line: the blank taken", closed.replacement && applied("     * /", *closed.replacement) == "     */");
+        const ALTextDocument written("     * a /");
+        ensure("after something written, as typed",
+               !outdentAsTyped(written, ALTextPos(0, 10), ALTextPos(0, 10), '/', lsl, none(), AutoOutdent(), spaces).replacement);
+    }
 }

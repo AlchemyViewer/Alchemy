@@ -792,11 +792,16 @@ namespace tut
     template<> template<>
     void alcodeeditor_object::test<21>()
     {
-        set_test_name("in SLua a block opens with then, do and function, and end, else and elseif come out once the word is whole");
+        set_test_name("in SLua a block opens with then, do and function, its end put in by Return where it is not closed, and end, else and elseif come out once the word is whole");
         ALCodeEditor& e = make("", "slua");
         e.setAutoComplete(false);
         e.setSoftTabs(true);
-        type("local function f(a: number): string\nif a then\nreturn \"x\"\nelseif a > 1 then\nfor i = 1, 2 do\nprint(i)\nend\nelse\nreturn \"y\"\nend\nend");
+        // Each block's end put in as it opens, but the elseif's, which the
+        // if's closes; typed past, down and at its end.
+        type("local function f(a: number): string\nif a then\nreturn \"x\"\nelseif a > 1 then\nfor i = 1, 2 do\nprint(i)");
+        key(KEY_DOWN);
+        key(KEY_END);
+        type("\nelse\nreturn \"y\"");
         ensure_equals("nested and closed", e.text(),
                       std::string("local function f(a: number): string\n"
                                   "    if a then\n"
@@ -822,8 +827,8 @@ namespace tut
         // In a text indented with tabs, a level is a tab.
         e.setText("\tif x then");
         e.setCaret(e.document().end());
-        type("\ny()\nend");
-        ensure_equals("tabs in and out", e.text(), std::string("\tif x then\n\t\ty()\n\tend"));
+        type("\ny()");
+        ensure_equals("tabs in, and the end put in level", e.text(), std::string("\tif x then\n\t\ty()\n\tend"));
     }
 
     template<> template<>
@@ -2109,5 +2114,22 @@ namespace tut
         e.setCaret(ALTextPos(2, 4));
         e.paste();
         ensure_equals("not asked: as copied", e.text(), std::string("f()\n{\n    if (y)\n{\n    z;\n}\nx;\n}"));
+    }
+
+    template<> template<>
+    void alcodeeditor_object::test<59>()
+    {
+        set_test_name("LSL typed: a head with no brace sends one line in, its brace comes back level, and past its statement Return comes out; a doc comment goes on with its star");
+        ALCodeEditor& e = make("", "lsl");
+        e.setAutoComplete(false);
+        e.setAutoClose(false);
+        e.setSoftTabs(true);
+        type("if (x)\n{\nllSay(0, \"a\");\n}\nif (y)\nllOwnerSay(\"b\");\nz = 1;");
+        ensure_equals("as written by hand", e.text(),
+                      std::string("if (x)\n{\n    llSay(0, \"a\");\n}\nif (y)\n    llOwnerSay(\"b\");\nz = 1;"));
+        e.setText("    /**");
+        e.setCaret(e.document().end());
+        type("\nWhat it does.\n/");
+        ensure_equals("each line starred, and closed", e.text(), std::string("    /**\n     * What it does.\n     */"));
     }
 }

@@ -101,9 +101,14 @@ namespace ALTextIndent
     // would have brought it; nothing with a selection, or a grammar that
     // does not indent. Then the line split: what replaces the selection --
     // the new line with the indentation of the one it leaves, a level
-    // further in under what opens a block -- and, between a bracket and
-    // the one that closes it, the caret on the line between them, where it
-    // is not after what went in.
+    // further in under what opens a block, or under a head that sends
+    // only the next line in (`if (x)`), and back out to that head past its
+    // one statement; in a comment that goes on (`in_comment`, as the
+    // caret's token says), what its lines begin with -- and, between a
+    // bracket and the one that closes it, or under a block the language
+    // closes with a word that is not closed below (SLua's `end`), the
+    // closer on a line of its own and the caret on the line between them,
+    // where it is not after what went in.
     std::optional<Replacement> closingBeforeReturn(const ALTextDocument& doc, const ALTextPos& anchor, const ALTextPos& caret,
                                                    const ALSyntaxGrammar* grammar, const opener_t& opener, const Options& options);
     struct Split
@@ -112,10 +117,14 @@ namespace ALTextIndent
         std::string              text;
         std::optional<ALTextPos> caret;
     };
-    Split splitLine(const ALTextDocument& doc, const ALTextRange& selection, const ALSyntaxGrammar* grammar, const Options& options);
+    Split splitLine(const ALTextDocument& doc, const ALTextRange& selection, const ALSyntaxGrammar* grammar, const Options& options,
+                    bool in_comment = false);
 
     // A character just typed that finishes what closes a block, as the
-    // first thing on its line: the line brought out to where it belongs.
+    // first thing on its line: the line brought out to where it belongs;
+    // or the brace a head's block goes on with, under a head that sent
+    // the line in for one statement, level with the head; or a comment's
+    // end typed on a line Return began for it, its blank taken away.
     // A word so brought out is kept -- its line, the caret after it, and
     // the indentation it came from -- so that a character after it that
     // makes it a longer word, a name, puts the line back. `last` is what

@@ -25,7 +25,14 @@
   list of them, each a pattern or a map of one, regex, and unless, what
   keeps it from opening a block if found anywhere from where it starts --
   and closes, one matched at the start of a line's text, which brings the
-  line out to the level of what opened it as it is typed.
+  line out to the level of what opened it as it is typed. once, patterns
+  as opens are, for a head that sends only the next line in a level, and
+  once_except, what that line may begin with to stay level with the head
+  instead. ends, the word a block is closed with, which Return puts in
+  under a block that is not closed, and after, the openers it closes.
+  continues, how a comment goes on to a new line: each a regex matched
+  at the start of the line's text, what the new line begins with, and
+  unless, what ends the comment.
   pairs: the brackets and quotes typed in pairs, each its opener and
   its closer, which the editor closes as the opener is typed.
 -->
@@ -52,6 +59,32 @@
       <string>[{(\[][ \t]*(//.*)?$</string>
       <key>closes</key>
       <string>[})\]]</string>
+      <key>once</key>
+      <array>
+        <string>\b(if|while|for)[ \t]*\(.*\)[ \t]*(//.*)?$</string>
+        <string>\belse[ \t]*(//.*)?$</string>
+      </array>
+      <key>once_except</key>
+      <string>\{</string>
+      <key>continues</key>
+      <array>
+        <map>
+          <key>regex</key>
+          <string>/\*</string>
+          <key>unless</key>
+          <string>\*/</string>
+          <key>with</key>
+          <string> * </string>
+        </map>
+        <map>
+          <key>regex</key>
+          <string>\*</string>
+          <key>unless</key>
+          <string>\*/</string>
+          <key>with</key>
+          <string>* </string>
+        </map>
+      </array>
     </map>
     <key>words</key>
     <map>

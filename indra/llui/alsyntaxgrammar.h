@@ -192,6 +192,23 @@ public:
     bool   indents() const;
     bool   opensBlock(std::string_view before) const;
     size_t closesBlock(std::string_view text) const;
+    // A head that sends only the line under it in a level, as the text
+    // before the caret ends (`once`) -- LSL's `if (x)` with no brace --
+    // and whether a line's text begins with what keeps it level with such
+    // a head instead (`once_except`): the brace, on a line of its own.
+    bool   opensOnce(std::string_view before) const;
+    bool   keptLevelWithOnce(std::string_view text) const;
+    // The word the editor closes the block the text before the caret opens
+    // with (`ends`: its `word`, `after` the openers it closes) -- SLua's
+    // `end` -- or empty.
+    const std::string& blockEnd(std::string_view before) const;
+    // What a new line in a comment begins with after its indentation,
+    // going on from the line's text before the caret (`continues`, each a
+    // regex at the text's start, what the new line begins `with`, and what
+    // `unless` it has ended) -- ` * ` under `/**` -- or empty.
+    const std::string& commentContinues(std::string_view text) const;
+    // Whether text ends such a comment, as one of their `unless` says.
+    bool               endsComment(std::string_view text) const;
     // The words the grammar itself declares that begin with the prefix,
     // as the word and its table.
     void collectWords(std::string_view prefix, std::vector<std::pair<std::string, std::string>>& out) const;

@@ -1927,7 +1927,21 @@ void ALTextView::newLine()
     {
         replaceAll({ { closing->range, closing->text } });
     }
-    const ALTextIndent::Split split = ALTextIndent::splitLine(mDocument, selection(), grammar, editingOptions());
+    // In a comment, as the token before the caret says: one that goes on
+    // begins the new line as its lines do.
+    bool in_comment = false;
+    if (grammar && mCaret.column > 0 && !hasSelection())
+    {
+        for (const ALSyntaxToken& token : mHighlighter.tokens(mCaret.line))
+        {
+            if (token.begin < mCaret.column && mCaret.column <= token.end)
+            {
+                in_comment = token.kind == ALSyntaxKind::Comment || token.kind == ALSyntaxKind::DocComment;
+                break;
+            }
+        }
+    }
+    const ALTextIndent::Split split = ALTextIndent::splitLine(mDocument, selection(), grammar, editingOptions(), in_comment);
     setSelection(split.range);
     insertText(split.text);
     if (split.caret)

@@ -242,7 +242,73 @@ std::optional<Replacement> closingBeforeReturn(const ALTextDocument& doc, const 
     return reindent(doc, caret.line, closingIndent(doc, caret.line, grammar, opener, options), options);
 }
 
-Split splitLine(const ALTextDocument& doc, const ALTextRange& selection, const ALSyntaxGrammar* grammar, const Options& options)
+namespace
+{
+    // The text with its trailing blanks gone.
+    std::string_view trimmedEnd(std::string_view text)
+    {
+        while (!text.empty() && isBlank(text.back()))
+        {
+            text.remove_suffix(1);
+        }
+        return text;
+    }
+
+    // The nearest line above one with anything on it, or -1.
+    S32 filledAbove(const ALTextDocument& doc, S32 line)
+    {
+        S32 above = line - 1;
+        while (above >= 0 && doc.line(above).find_first_not_of(" \t\r") == std::string::npos)
+        {
+            --above;
+        }
+        return above;
+    }
+
+    // The head that sent a line in for its one statement -- `if (a)` over
+    // it -- or the outermost of a run of them, each further out than the
+    // last; where there is none, nothing.
+    std::optional<std::string> onceHead(const ALTextDocument& doc, S32 line, const std::string& indent, const ALSyntaxGrammar* grammar,
+                                        S32 tab_width)
+    {
+        std::optional<std::string> head;
+        S32                        width = alBlanksWidth(indent, tab_width);
+        for (S32 above = filledAbove(doc, line); above >= 0; above = filledAbove(doc, above))
+        {
+            const std::string_view text = trimmedEnd(doc.line(above));
+            size_t                 lead = 0;
+            const S32              own  = alBlanksWidth(text, tab_width, &lead);
+            if (own >= width || !grammar->opensOnce(text))
+            {
+                break;
+            }
+            head  = std::string(text.substr(0, lead));
+            width = own;
+        }
+        return head;
+    }
+
+    // Whether a block opened on a line `width` in is closed below it
+    // already: the first line past its body, as far in or less, is as far
+    // in and closes a block.
+    bool closedBelow(const ALTextDocument& doc, S32 line, S32 width, const ALSyntaxGrammar* grammar, S32 tab_width)
+    {
+        for (S32 l = line + 1; l < doc.lineCount(); ++l)
+        {
+            const std::string& text = doc.line(l);
+            size_t             lead = 0;
+            const S32          own  = alBlanksWidth(text, tab_width, &lead);
+            if (text.find_first_not_of(" \t\r", lead) == std::string::npos || own > width)
+            {
+                continue;
+            }
+            return own == width && grammar->closesBlock(std::string_view(text).substr(lead)) > 0;
+        }
+        return false;
+    }
+}
+
+Split splitLine(const ALTextDocument& doc, const ALTextRange& selection, const ALSyntaxGrammar* grammar, const Options& options, bool in_comment)
 {
     const bool rules = grammar && grammar->indents();
     // The new line starts with the indentation of the one it leaves, a
@@ -273,17 +339,51 @@ Split splitLine(const ALTextDocument& doc, const ALTextRange& selection, const A
     Split split;
     split.range = ALTextRange(sel.begin, ALTextPos(sel.end.line, skipped));
     split.text  = "\n" + indent;
+    // A comment that goes on: the new line begins as its text says.
+    if (in_comment && grammar && static_cast<size_t>(blanks) < before.size())
+    {
+        const std::string& with = grammar->commentContinues(before.substr(static_cast<size_t>(blanks)));
+        if (!with.empty())
+        {
+            split.text += with;
+            return split;
+        }
+    }
     if (rules && grammar->opensBlock(before))
     {
         const std::string inner = indent + indentUnit(indent, options);
         split.text              = "\n" + inner;
-        if (!after.empty() && !alIdentifierByte(after.front()) && grammar->closesBlock(after) > 0)
+        const bool         closer = !after.empty() && !alIdentifierByte(after.front()) && grammar->closesBlock(after) > 0;
+        const std::string& end    = grammar->blockEnd(before);
+        if (!end.empty() && (after.empty() || closer) && !closedBelow(doc, sel.end.line, alBlanksWidth(indent, options.tabWidth), grammar, options.tabWidth))
+        {
+            // A block the language closes with a word, not closed below:
+            // the word on a line of its own, level with the opening and
+            // before any bracket that followed the caret -- `end)` -- and
+            // the caret on the line between them.
+            split.text += "\n" + indent + end;
+            split.caret = ALTextPos(sel.begin.line + 1, static_cast<S32>(inner.size()));
+        }
+        else if (closer)
         {
             // Between a bracket and the one that closes it: that one on a
             // line of its own, level with the opening, and the caret on the
             // line between them.
             split.text += "\n" + indent;
             split.caret = ALTextPos(sel.begin.line + 1, static_cast<S32>(inner.size()));
+        }
+    }
+    else if (rules && grammar->opensOnce(before) && !grammar->keptLevelWithOnce(after))
+    {
+        // A head that sends only the next line in: `if (x)` with no brace.
+        split.text = "\n" + indent + indentUnit(indent, options);
+    }
+    else if (rules && static_cast<size_t>(blanks) < before.size())
+    {
+        // Past the one statement such a head sent in: back out to it.
+        if (const std::optional<std::string> head = onceHead(doc, sel.begin.line, indent, grammar, options.tabWidth))
+        {
+            split.text = "\n" + *head;
         }
     }
     if (before.empty() && after.empty())
@@ -318,6 +418,33 @@ Outdent outdentAsTyped(const ALTextDocument& doc, const ALTextPos& anchor, const
         // The word went on past a closing one -- `endpoint` -- and is a
         // name: back where it was typed.
         out.replacement = Replacement{ blanks, last.indent };
+        return out;
+    }
+    // A comment's end typed on a line Return began for it, nothing else
+    // written: the blank before it taken away -- ` * /` made ` */`.
+    if (content.size() >= 3 && content[content.size() - 2] == ' ')
+    {
+        const std::string_view begun = content.substr(0, content.size() - 1);
+        const std::string      ended = std::string(content.substr(0, content.size() - 2)) + content.back();
+        if (grammar->commentContinues(begun) == begun && grammar->endsComment(ended))
+        {
+            out.replacement = Replacement{ ALTextRange(ALTextPos(line, caret.column - 2), ALTextPos(line, caret.column - 1)), std::string() };
+            return out;
+        }
+    }
+    // The brace a head's block goes on with, on a line of its own under a
+    // head that sent the line in for one statement: level with the head.
+    if (content.size() == 1 && grammar->keptLevelWithOnce(content))
+    {
+        const S32 above = filledAbove(doc, line);
+        if (above >= 0 && grammar->opensOnce(trimmedEnd(doc.line(above))))
+        {
+            const std::string head = leadingBlanks(doc, above);
+            if (alBlanksWidth(head, options.tabWidth) < alBlanksWidth(lead, options.tabWidth))
+            {
+                out.replacement = Replacement{ blanks, head };
+            }
+        }
         return out;
     }
     // The first thing on the line, just finished: a bracket as it is
