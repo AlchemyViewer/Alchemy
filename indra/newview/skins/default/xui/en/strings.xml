@@ -512,6 +512,7 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="PreprocIncludeNotOnDisk">could not find include file '[1]': the disk was not looked in. Includes come from folders on disk: turn on Build &gt; Include from Disk, and add the folder with Build &gt; Add Include Folder...</string>
 	<string name="PreprocModuleNotOnDisk">could not find module '[1]': the disk was not looked in. Modules come from folders on disk: turn on Build &gt; Include from Disk, and add the folder with Build &gt; Add Include Folder...</string>
 	<string name="PreprocModuleInWorld">could not find module '[1]': one so named is in the object or the inventory, but modules from there are off. Modules come from folders on disk: turn on Build &gt; Include from Disk, and add the folder with Build &gt; Add Include Folder...</string>
+	<string name="PreprocIncludeNotFetched">include file '[1]' could not be fetched, and the script is not sent without it</string>
 	<string name="PreprocObjectUnanswered">the object this script is in did not say what it holds -- it did not answer in time, or is out of view -- so no include was looked for in it; save again once it answers</string>
 	<string name="PreprocNestsTooDeep">blocks nest more deeply than this preprocessor follows; nothing was preprocessed</string>
 	<string name="PreprocIncludeNeedsClose">missing '&gt;' in #include</string>

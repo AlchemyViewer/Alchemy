@@ -27,6 +27,7 @@
 #include "alscriptworkspace.h"
 
 #include "alobjectproperties.h"
+#include "alscriptanalysis.h"
 #include "alscriptenvelope.h"
 #include "alscriptpreprocessor.h"
 #include "llagent.h"
@@ -742,7 +743,7 @@ void ALScriptWorkspace::prepare(const ALScriptRef& ref, const std::string& name,
     request.compileTarget = target;
     ALScriptPreprocessor::instance().run(request, [request, envelope, lua, target, callback](const ALPreprocessor::Result& expanded) {
         Prepared prepared;
-        if (expanded.hasErrors())
+        if (expanded.hasErrors() || !expanded.pending.empty())
         {
             for (const ALScriptProblem& problem : expanded.problems)
             {
@@ -756,6 +757,16 @@ void ALScriptWorkspace::prepare(const ALScriptRef& ref, const std::string& name,
                 diagnostic.hasColumn = true;
                 diagnostic.level     = "ERROR";
                 diagnostic.message   = problem.file.empty() ? problem.message : problem.file + ": " + problem.message;
+                prepared.errors.push_back(std::move(diagnostic));
+            }
+            // An include that never came would go up left out, with nobody
+            // at a save to be told: not sent, and said why.
+            for (const std::string& name : expanded.pending)
+            {
+                Diagnostic diagnostic;
+                diagnostic.level   = "ERROR";
+                diagnostic.message = alScriptKeyedWords("PreprocIncludeNotFetched", { name },
+                                                        ALScriptProblem::fill("include file '[1]' could not be fetched, and the script is not sent without it", { name }));
                 prepared.errors.push_back(std::move(diagnostic));
             }
             callback(prepared);
