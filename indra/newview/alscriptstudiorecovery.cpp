@@ -89,13 +89,24 @@ namespace
         return entry.name.empty() ? gDirUtilp->getBaseFileName(entry.file) : entry.name;
     }
 
+    // What a tab has picked for its next save, where it has.
+    std::optional<std::string> pickedTargetOf(const ALScriptStudioDoc& doc)
+    {
+        return doc.targetChosen ? std::optional<std::string>(doc.language.compileTarget) : std::nullopt;
+    }
+    std::optional<LLUUID> pickedExperienceOf(const ALScriptStudioDoc& doc)
+    {
+        return doc.experienceChosen ? std::optional<LLUUID>(doc.experience) : std::nullopt;
+    }
+
     // Whether a tab's text and history stand as they were last written,
     // as what it is asked to be written as: durably, where that is asked.
     bool writtenAlready(const ALScriptStudioDoc& doc, ALScriptRecoveryEntry::State state, bool durable)
     {
         const ALScriptStudioDoc::RecoveryWritten& was = doc.recoveryWritten;
         return was.valid && was.state == state && (was.durable || !durable) && was.text == doc.editor->document().version() &&
-               was.history == doc.editor->undoJournal().revision();
+               was.history == doc.editor->undoJournal().revision() && was.target == pickedTargetOf(doc) &&
+               was.experience == pickedExperienceOf(doc);
     }
 
     void markWritten(ALScriptStudioDoc& doc, ALScriptRecoveryEntry::State state, bool durable)
@@ -106,6 +117,8 @@ namespace
         was.history                             = doc.editor->undoJournal().revision();
         was.state                               = state;
         was.durable                             = durable;
+        was.target                              = pickedTargetOf(doc);
+        was.experience                          = pickedExperienceOf(doc);
     }
 }
 
@@ -154,8 +167,10 @@ ALScriptStudioRecovery::Entry ALScriptStudioRecovery::entryOf(const Doc& doc)
     // journal writes them -- from what each step was written as the last
     // time -- and where the caret stood.
     entry.historyWritten = doc.editor->undoJournal().asNotation();
-    entry.caretLine   = doc.editor->caret().line;
-    entry.caretColumn = doc.editor->caret().column;
+    entry.caretLine        = doc.editor->caret().line;
+    entry.caretColumn      = doc.editor->caret().column;
+    entry.pickedTarget     = pickedTargetOf(doc);
+    entry.pickedExperience = pickedExperienceOf(doc);
     if (doc.notecard && doc.file.empty())
     {
         entry.embedded = ALScriptNotecardTab::asLLSD(doc.items ? doc.items->items() : ALScriptNotecardTab::items_t());
@@ -174,7 +189,7 @@ bool ALScriptStudioRecovery::keep(Doc& doc, Entry::State state)
     {
         // Nowhere to keep it, which matters only where there is something
         // unsaved to keep.
-        return !(doc.loaded && doc.modifiable && doc.editor->isDirty());
+        return !(doc.loaded && doc.modifiable && doc.unsaved());
     }
     // Nothing to keep of a tab still loading, one that may not be changed,
     // or one whose kept text has not been put in yet.
@@ -182,7 +197,7 @@ bool ALScriptStudioRecovery::keep(Doc& doc, Entry::State state)
     {
         return true;
     }
-    if (!doc.editor->isDirty())
+    if (!doc.unsaved())
     {
         // Saved, or never changed: nothing of this session's to keep, and
         // nothing of another's once it was taken in.
@@ -228,7 +243,7 @@ bool ALScriptStudioRecovery::keepAll(const std::vector<Doc*>& docs, Entry::State
     bool              all = true;
     for (Doc* doc : docs)
     {
-        if (!kept || doc->recoveryKey.empty() || !doc->loaded || !doc->modifiable || doc->carriedText || !doc->editor->isDirty())
+        if (!kept || doc->recoveryKey.empty() || !doc->loaded || !doc->modifiable || doc->carriedText || !doc->unsaved())
         {
             all = keep(*doc, state) && all;
             continue;
@@ -301,7 +316,7 @@ void ALScriptStudioRecovery::keepSoon(Doc& doc)
     }
     // Anything but an unsaved text to write -- nothing to keep, an entry
     // to let go of once it is written -- as it always is.
-    if (!kept || doc.recoveryKey.empty() || !doc.loaded || !doc.modifiable || doc.carriedText || !doc.editor->isDirty() || doc.recovering)
+    if (!kept || doc.recoveryKey.empty() || !doc.loaded || !doc.modifiable || doc.carriedText || !doc.unsaved() || doc.recovering)
     {
         keep(doc);
         return;
@@ -336,7 +351,7 @@ void ALScriptStudioRecovery::schedule(Doc& doc)
     {
         return;
     }
-    if (!doc.editor->isDirty())
+    if (!doc.unsaved())
     {
         keep(doc);
         return;
@@ -434,6 +449,26 @@ void ALScriptStudioRecovery::takeUp(Doc& doc, const Entry& listed)
     }
     doc.recovering  = entry;
     doc.carriedText = entry.text;
+    // What was picked for its next save, picked again: as the tab loads,
+    // over what the item says, or now, where it has.
+    if (!doc.loaded)
+    {
+        doc.carriedTarget     = entry.pickedTarget;
+        doc.carriedExperience = entry.pickedExperience;
+    }
+    else
+    {
+        if (entry.pickedTarget)
+        {
+            doc.language.compileTarget = *entry.pickedTarget;
+            doc.targetChosen           = true;
+        }
+        if (entry.pickedExperience)
+        {
+            doc.experience       = *entry.pickedExperience;
+            doc.experienceChosen = true;
+        }
+    }
     if (entry.notecard && doc.file.empty())
     {
         doc.carriedEmbedded = ALScriptNotecardTab::fromLLSD(entry.embedded);
@@ -643,34 +678,71 @@ void ALScriptStudioRecovery::show()
 }
 
 // static
-void ALScriptStudioRecovery::offer(std::function<ALScriptStudioRecovery*()> studio)
+ALScriptStudioRecovery::Offers ALScriptStudioRecovery::offersAt(const ALScriptRecoveryStore& store, bool studio_open)
+{
+    Offers offers;
+    for (Entry& entry : store.left())
+    {
+        if (entry.state == Entry::State::Unsaved)
+        {
+            offers.unsaved.push_back(std::move(entry));
+        }
+        else if (entry.state == Entry::State::Kept && !studio_open)
+        {
+            offers.kept.push_back(std::move(entry));
+        }
+    }
+    return offers;
+}
+
+namespace
+{
+    // The first few names of entries, for a question to say.
+    std::string namesOf(const std::vector<ALScriptRecoveryEntry>& entries)
+    {
+        std::string names;
+        for (size_t i = 0; i < entries.size() && i < 5; ++i)
+        {
+            names += (names.empty() ? "" : ", ") + nameOf(entries[i]);
+        }
+        if (entries.size() > 5)
+        {
+            names += ", ...";
+        }
+        return names;
+    }
+}
+
+// static
+void ALScriptStudioRecovery::offer(std::function<ALScriptStudioRecovery*()> studio, bool studio_open)
 {
     ALScriptRecoveryStore* kept = store();
     if (!kept)
     {
         return;
     }
-    std::vector<Entry> unsaved;
-    for (Entry& entry : kept->left())
+    const Offers offers = offersAt(*kept, studio_open);
+    if (!offers.kept.empty())
     {
-        if (entry.state == Entry::State::Unsaved)
-        {
-            unsaved.push_back(std::move(entry));
-        }
+        // Kept on purpose: they open with the studio, now or whenever it
+        // next opens; this only says so and offers to open it.
+        LLSD args;
+        args["COUNT"] = static_cast<S32>(offers.kept.size());
+        args["NAMES"] = namesOf(offers.kept);
+        LLNotificationsUtil::add(offers.kept.size() == 1 ? "ScriptStudioKeptOne" : "ScriptStudioKept", args, LLSD(),
+                                 [studio](const LLSD& notification, const LLSD& response) {
+                                     if (LLNotificationsUtil::getSelectedOption(notification, response) == 0 && studio)
+                                     {
+                                         studio();
+                                     }
+                                 });
     }
+    const std::vector<Entry>& unsaved = offers.unsaved;
     if (unsaved.empty())
     {
         return;
     }
-    std::string names;
-    for (size_t i = 0; i < unsaved.size() && i < 5; ++i)
-    {
-        names += (names.empty() ? "" : ", ") + nameOf(unsaved[i]);
-    }
-    if (unsaved.size() > 5)
-    {
-        names += ", ...";
-    }
+    const std::string names = namesOf(unsaved);
     // Offered now: left alone, they go a while after, as the discarded
     // do, rather than being kept for ever.
     kept->markOffered(unsaved);

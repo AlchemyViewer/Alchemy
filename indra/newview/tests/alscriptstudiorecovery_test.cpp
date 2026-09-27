@@ -190,6 +190,16 @@ namespace tut
             return *left;
         }
 
+        // An entry by its key alone, as another session may have left it.
+        static Entry entry(const std::string& key, const std::string& text)
+        {
+            Entry one;
+            one.key  = key;
+            one.name = key;
+            one.text = text;
+            return one;
+        }
+
         size_t keptFor(const std::string& key, const std::string& session = "this-session") const
         {
             size_t count = 0;
@@ -543,5 +553,54 @@ namespace tut
         }
         type(a, "y");
         ensure("typed in: written", r.keep(a) && keptFor(a.recoveryKey) == 1);
+    }
+
+    template<> template<>
+    void alscriptstudiorecovery_object::test<11>()
+    {
+        set_test_name("at login: what sessions left unsaved is offered; what was kept on purpose is offered where the studio is not open to have opened it");
+        make();
+        ALScriptRecoveryStore earlier(folder, "earlier");
+        Entry                 lost = entry("item:lost", "typed, then a crash");
+        Entry                 kept = entry("item:kept", "kept for next time");
+        kept.state                 = Entry::State::Kept;
+        ensure("written", earlier.write(lost) && earlier.write(kept));
+        const ALScriptStudioRecovery::Offers closed = ALScriptStudioRecovery::offersAt(*store, false);
+        ensure("both offered", closed.unsaved.size() == 1 && closed.kept.size() == 1 && closed.kept.front().key == "item:kept");
+        const ALScriptStudioRecovery::Offers open = ALScriptStudioRecovery::offersAt(*store, true);
+        ensure("the kept not, the studio open having opened it", open.unsaved.size() == 1 && open.kept.empty());
+    }
+
+    template<> template<>
+    void alscriptstudiorecovery_object::test<12>()
+    {
+        set_test_name("a compile target and an experience picked for the next save are kept with the text, keep a tab on their own, and are picked again as it is taken up");
+        ALScriptStudioRecovery& r          = make();
+        Doc&                    a          = tab("a", "one\n");
+        const LLUUID            experience = LLUUID::generateNewID();
+        a.language.compileTarget           = "lsl2";
+        a.targetChosen                     = true;
+        a.experience                       = experience;
+        a.experienceChosen                 = true;
+        ensure("a pick alone is unsaved, and kept", r.keep(a) && keptFor(a.recoveryKey) == 1);
+        type(a, "x");
+        const Entry written = ALScriptStudioRecovery::entryOf(a);
+        ensure("the picks with the entry", written.pickedTarget == std::optional<std::string>("lsl2") && written.pickedExperience == std::optional<LLUUID>(experience));
+        ensure("kept", r.keep(a));
+        std::optional<Entry> back = store->leftFor(a.recoveryKey);
+        ensure("not another session's", !back);
+        const std::vector<Entry> listed = store->list();
+        Entry                    read   = listed.front();
+        ensure("read whole, the picks with it", store->load(read) && read.pickedTarget == written.pickedTarget && read.pickedExperience == written.pickedExperience);
+
+        Doc& loaded = tab("b", "one\n", a.ref);
+        r.takeUp(loaded, read);
+        ensure("picked again over a tab that has loaded", loaded.targetChosen && loaded.language.compileTarget == "lsl2" && loaded.experienceChosen &&
+                                                              loaded.experience == experience);
+        Doc& loading   = tab("c", "one\n");
+        loading.loaded = false;
+        r.takeUp(loading, read);
+        ensure("carried to be picked as a tab loading loads", loading.carriedTarget == std::optional<std::string>("lsl2") &&
+                                                               loading.carriedExperience == std::optional<LLUUID>(experience) && !loading.targetChosen);
     }
 }

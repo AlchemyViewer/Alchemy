@@ -227,6 +227,14 @@ namespace
         {
             sd["caret"] = LLSD::emptyArray().with(0, e.caretLine).with(1, e.caretColumn);
         }
+        if (e.pickedTarget)
+        {
+            sd["picked_target"] = *e.pickedTarget;
+        }
+        if (e.pickedExperience)
+        {
+            sd["picked_experience"] = *e.pickedExperience;
+        }
         return sd;
     }
 
@@ -256,12 +264,14 @@ namespace
 
     void bodyFrom(const LLSD& sd, ALScriptRecoveryEntry& out)
     {
-        out.text        = sd["text"].asString();
-        out.embedded    = sd.has("embedded") ? sd["embedded"] : LLSD::emptyArray();
-        out.history     = sd["history"];
-        out.caretLine   = sd.has("caret") ? sd["caret"][0].asInteger() : -1;
-        out.caretColumn = sd.has("caret") ? sd["caret"][1].asInteger() : -1;
-        out.whole       = true;
+        out.text             = sd["text"].asString();
+        out.embedded         = sd.has("embedded") ? sd["embedded"] : LLSD::emptyArray();
+        out.history          = sd["history"];
+        out.caretLine        = sd.has("caret") ? sd["caret"][0].asInteger() : -1;
+        out.caretColumn      = sd.has("caret") ? sd["caret"][1].asInteger() : -1;
+        out.pickedTarget     = sd.has("picked_target") ? std::optional<std::string>(sd["picked_target"].asString()) : std::nullopt;
+        out.pickedExperience = sd.has("picked_experience") ? std::optional<LLUUID>(sd["picked_experience"].asUUID()) : std::nullopt;
+        out.whole            = true;
     }
 }
 
@@ -558,9 +568,11 @@ bool ALScriptRecoveryStore::load(ALScriptRecoveryEntry& entry) const
     entry.text        = std::move(read.text);
     entry.embedded    = read.embedded;
     entry.history     = read.history;
-    entry.caretLine   = read.caretLine;
-    entry.caretColumn = read.caretColumn;
-    entry.whole       = true;
+    entry.caretLine        = read.caretLine;
+    entry.caretColumn      = read.caretColumn;
+    entry.pickedTarget     = std::move(read.pickedTarget);
+    entry.pickedExperience = read.pickedExperience;
+    entry.whole            = true;
     return true;
 }
 

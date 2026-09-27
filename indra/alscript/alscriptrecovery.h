@@ -88,6 +88,10 @@ struct ALScriptRecoveryEntry
     std::string historyWritten;
     S32         caretLine   = -1;
     S32         caretColumn = -1;
+    // A compile target and an experience picked for the next save, where
+    // they were: picked again as the text is taken up.
+    std::optional<std::string> pickedTarget;
+    std::optional<LLUUID>      pickedExperience;
     // Where it lies on disk, which is not kept in it.
     std::string path;
     // Whether the text and what goes with it -- the items, the history,

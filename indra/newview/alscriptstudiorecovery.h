@@ -153,8 +153,17 @@ public:
     // At login: what a session that ended before saving left, offered, to
     // take up now, later, or not at all; `studio` opens the studio to take
     // it up in. What was kept on purpose at a quit opens with the studio,
-    // and is not asked about.
-    static void offer(std::function<ALScriptStudioRecovery*()> studio);
+    // and where the studio is not open already, is offered to open it now.
+    static void offer(std::function<ALScriptStudioRecovery*()> studio, bool studio_open);
+    // What the login offers: what sessions that ended left unsaved, and
+    // what was kept on purpose, where the studio is not open to have
+    // opened it.
+    struct Offers
+    {
+        std::vector<Entry> unsaved;
+        std::vector<Entry> kept;
+    };
+    static Offers offersAt(const ALScriptRecoveryStore& store, bool studio_open);
 
 private:
     // An entry a listing read only the start of, read whole; false, and

@@ -517,7 +517,7 @@ ALFloaterScriptStudio::~ALFloaterScriptStudio()
     ALScriptRecoveryStore* store = ALScriptStudioRecovery::store();
     for (const std::unique_ptr<Doc>& doc : mDocs)
     {
-        if (store && doc->editor && !doc->recoveryKey.empty() && doc->loaded && doc->modifiable && !doc->carriedText && doc->editor->isDirty())
+        if (store && doc->editor && !doc->recoveryKey.empty() && doc->loaded && doc->modifiable && !doc->carriedText && doc->unsaved())
         {
             store->writeSoon(ALScriptStudioRecovery::entryOf(*doc), /*durable*/ true);
         }
@@ -4837,7 +4837,7 @@ void ALFloaterScriptStudio::quitAnswered(S32 option)
             std::vector<Doc*> dirty;
             for (std::unique_ptr<Doc>& doc : mDocs)
             {
-                if (doc->loaded && doc->modifiable && doc->editor->isDirty())
+                if (doc->loaded && doc->modifiable && doc->unsaved())
                 {
                     dirty.push_back(doc.get());
                 }
@@ -5108,10 +5108,15 @@ bool ALFloaterScriptStudio::moveActiveTo(ALFloaterScriptStudio* window)
 // static
 void ALFloaterScriptStudio::offerRecovery()
 {
-    ALScriptStudioRecovery::offer([]() -> ALScriptStudioRecovery* {
-        ALFloaterScriptStudio* studio = LLFloaterReg::showTypedInstance<ALFloaterScriptStudio>("script_studio", LLSD(), TAKE_FOCUS_YES);
-        return studio ? &studio->mRecovery : nullptr;
-    });
+    // What was kept on purpose opens with the main window, which may be
+    // up already, restored as the viewer started.
+    const bool open = LLFloaterReg::findTypedInstance<ALFloaterScriptStudio>("script_studio", LLSD()) != nullptr;
+    ALScriptStudioRecovery::offer(
+        []() -> ALScriptStudioRecovery* {
+            ALFloaterScriptStudio* studio = LLFloaterReg::showTypedInstance<ALFloaterScriptStudio>("script_studio", LLSD(), TAKE_FOCUS_YES);
+            return studio ? &studio->mRecovery : nullptr;
+        },
+        open);
 }
 
 bool ALFloaterScriptStudio::recoverElsewhere(const ALScriptRecoveryEntry& entry)
@@ -5279,15 +5284,16 @@ void ALFloaterScriptStudio::pumpRecovery()
     if (gDisconnected && !mOffline)
     {
         mOffline = true;
-        S32 kept = 0;
+        std::vector<Doc*> unsaved;
         for (std::unique_ptr<Doc>& doc : mDocs)
         {
-            if (doc->loaded && doc->modifiable && doc->editor->isDirty())
+            if (doc->loaded && doc->modifiable && doc->unsaved())
             {
-                mRecovery.keep(*doc);
-                ++kept;
+                unsaved.push_back(doc.get());
             }
         }
+        mRecovery.keepAll(unsaved);
+        const S32 kept = static_cast<S32>(unsaved.size());
         if (kept > 0)
         {
             report(counted("OfflineKept", kept), true);

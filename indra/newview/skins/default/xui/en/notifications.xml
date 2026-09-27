@@ -1889,6 +1889,42 @@ A theme that comes with the viewer is called &quot;[NAME]&quot;. Save yours unde
 
   <notification
    icon="alertmodal.tga"
+   name="ScriptStudioKeptOne"
+   type="alertmodal">
+You kept the unsaved changes to [NAMES] for next time. They open with Script Studio: open it now?
+    <tag>confirm</tag>
+    <form name="form">
+      <button
+       index="0"
+       name="Open"
+       text="Open Script Studio"/>
+      <button
+       index="1"
+       name="Later"
+       text="Later"/>
+    </form>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="ScriptStudioKept"
+   type="alertmodal">
+You kept unsaved changes to [COUNT] scripts and notecards for next time: [NAMES]. They open with Script Studio: open it now?
+    <tag>confirm</tag>
+    <form name="form">
+      <button
+       index="0"
+       name="Open"
+       text="Open Script Studio"/>
+      <button
+       index="1"
+       name="Later"
+       text="Later"/>
+    </form>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
    name="ScriptStudioRecoveredOne"
    type="alertmodal">
 Script Studio kept unsaved changes to [NAMES] when the viewer last stopped before they were saved. Open them to look over and save, or discard them; File &gt; Recover Unsaved Changes has them meanwhile.

@@ -173,8 +173,9 @@ struct ALScriptStudioDoc
     F64                                        recoveryDue    = 0.0;
     bool                                       recoveryFailed = false;
     // What was last written there -- the text's version, its history's
-    // revision, as what, and whether forced out to the disk -- so that
-    // nothing is written again where neither has moved.
+    // revision, the picks for its next save, as what, and whether forced
+    // out to the disk -- so that nothing is written again where none has
+    // moved.
     struct RecoveryWritten
     {
         bool                         valid   = false;
@@ -182,6 +183,9 @@ struct ALScriptStudioDoc
         U32                          history = 0;
         ALScriptRecoveryEntry::State state   = ALScriptRecoveryEntry::State::Unsaved;
         bool                         durable = false;
+        // And what was picked for its next save.
+        std::optional<std::string>   target;
+        std::optional<LLUUID>        experience;
     };
     RecoveryWritten                            recoveryWritten;
     // What an earlier session left of this, found as it opened, offered
