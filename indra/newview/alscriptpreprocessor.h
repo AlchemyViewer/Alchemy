@@ -28,6 +28,7 @@
 #include "aldiskcache.h"
 #include "aldiskincludes.h"
 #include "alscriptjoblane.h"
+#include "alscriptsnapshot.h"
 #include "alscripttextcache.h"
 #include "alluauconfig.h"
 #include "alpreprocessor.h"
@@ -49,39 +50,6 @@ class ALSerialWorker;
 #include <optional>
 #include <string>
 #include <vector>
-
-// What the preprocessor needs of the viewer to expand one script, taken
-// on the main thread and read on any other: the settings, the agent and
-// the asset as values, and every include the script asked for when it
-// was last expanded, already resolved to its text. So a run over a
-// snapshot touches nothing of the viewer's -- no inventory, no object,
-// no setting, no cache -- and belongs on a thread of its own while the
-// main one draws. What a run asks for that the snapshot does not hold
-// is noted rather than looked up: the main thread resolves those,
-// fetches what is in the world, and takes another snapshot.
-class ALScriptSnapshot
-{
-public:
-    // Expands a script with what the snapshot holds. Any thread.
-    ALPreprocessor::Result run(std::string_view source);
-    // What the last run asked for and the snapshot could not answer,
-    // each once, in the order asked; taken away by the asking.
-    std::vector<ALPreprocessor::Ask> missed() { return std::move(mMissed); }
-
-private:
-    friend class ALScriptPreprocessor;
-    struct Answer
-    {
-        ALPreprocessor::Found   found = ALPreprocessor::Found::No;
-        ALPreprocessor::Include include;
-    };
-    // One key for the three things that decide what a name stands for.
-    static std::string keyOf(const ALPreprocessor::Ask& ask);
-
-    ALPreprocessor::Options                                                          mOptions;
-    boost::unordered_flat_map<std::string, Answer, ll::string_hash, std::equal_to<>> mAnswers;
-    std::vector<ALPreprocessor::Ask>                                                 mMissed;
-};
 
 // The preprocessor as the viewer runs it: the settings for what it does,
 // the agent and the asset for its predefined macros, and its includes

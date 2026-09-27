@@ -293,46 +293,6 @@ void ALScriptPreprocessor::setIncludeFolders(const std::vector<std::string>& fol
 }
 
 // static
-std::string ALScriptSnapshot::keyOf(const ALPreprocessor::Ask& ask)
-{
-    // What a name stands for is decided by the name, who is asking, and
-    // whether it is a require or an include of either kind.
-    std::string key = ask.from;
-    key += ask.require ? "\x01r" : ask.angled ? "\x01<" : "\x01\"";
-    key += ask.name;
-    return key;
-}
-
-ALPreprocessor::Result ALScriptSnapshot::run(std::string_view source)
-{
-    mMissed.clear();
-    ALPreprocessor::Options options = mOptions;
-    options.resolve                 = [this](const ALPreprocessor::Ask& ask, ALPreprocessor::Include& out) {
-        const std::string key    = keyOf(ask);
-        const auto        answer = mAnswers.find(key);
-        if (answer == mAnswers.end())
-        {
-            // Nobody has looked this name up yet -- a fresh script, or
-            // one whose includes the author has just changed. Noted for
-            // the main thread, which is the only one that may look
-            // anything up, and pending, so that the run goes on and
-            // says what it wanted.
-            if (std::none_of(mMissed.begin(), mMissed.end(), [&key](const ALPreprocessor::Ask& was) { return keyOf(was) == key; }))
-            {
-                mMissed.push_back(ask);
-            }
-            return ALPreprocessor::Found::Pending;
-        }
-        if (answer->second.found == ALPreprocessor::Found::Yes)
-        {
-            out = answer->second.include;
-        }
-        return answer->second.found;
-    };
-    return ALPreprocessor::run(source, options);
-}
-
-// static
 std::string ALScriptPreprocessor::keyOf(const Request& request)
 {
     return request.path.empty() ? pathOf(request.ref) : request.path;
@@ -343,33 +303,33 @@ ALScriptSnapshot ALScriptPreprocessor::snapshotFor(const std::shared_ptr<Job>& j
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
     const Request&   request  = job->request;
     ALScriptSnapshot snapshot;
-    snapshot.mOptions = optionsFor(request, /*optimize*/ false);
+    snapshot.options() = optionsFor(request, /*optimize*/ false);
     // The optimizer and the compression are the job's last step, once
     // every include is in: a round whose text is thrown away the moment
     // one arrives should not pay for either.
-    snapshot.mOptions.compress = false;
-    snapshot.mOptions.resolve  = nullptr;
+    snapshot.options().compress = false;
+    snapshot.options().resolve  = nullptr;
     // A check is asked for at every pause in typing, and nothing it makes
     // is saved: held to a quarter of what a save may make, still far more
     // than a script may be.
     if (job->check)
     {
-        snapshot.mOptions.byteBudget  = 4u * ALScriptEnvelope::MAX_ASSET_BYTES;
-        snapshot.mOptions.tokenBudget = 1000u * 1000u;
+        snapshot.options().byteBudget  = 4u * ALScriptEnvelope::MAX_ASSET_BYTES;
+        snapshot.options().tokenBudget = 1000u * 1000u;
         // And stopped part way once a later check of it is asked for.
-        snapshot.mOptions.superseded  = job->superseded.get();
+        snapshot.options().superseded  = job->superseded.get();
     }
     for (const ALPreprocessor::Ask& ask : job->asks)
     {
-        ALScriptSnapshot::Answer answer;
-        answer.found = mResolver->resolve(ask, answer.include, request, &wanted, job->retry, &job->aliasFolders);
-        if (answer.found == ALPreprocessor::Found::Pending)
+        ALPreprocessor::Include     include;
+        const ALPreprocessor::Found found = mResolver->resolve(ask, include, request, &wanted, job->retry, &job->aliasFolders);
+        if (found == ALPreprocessor::Found::Pending)
         {
             // In the world and not in hand: fetched, and the snapshot
             // taken again once it is.
             continue;
         }
-        snapshot.mAnswers.emplace(ALScriptSnapshot::keyOf(ask), std::move(answer));
+        snapshot.answer(ask, found, std::move(include));
     }
     if (request.lua)
     {
@@ -500,7 +460,7 @@ void ALScriptPreprocessor::attemptJob(const std::shared_ptr<Job>& job)
         }
         catch (const std::exception& e)
         {
-            result = ALPreprocessor::failed(job->request.sourceText(), snapshot->mOptions, e.what());
+            result = ALPreprocessor::failed(job->request.sourceText(), snapshot->options(), e.what());
             missed.clear();
         }
         LLAppViewer::instance()->postToMainCoro([this, job, result = std::move(result), missed = std::move(missed)]() mutable {
