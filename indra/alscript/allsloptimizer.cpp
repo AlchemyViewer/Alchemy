@@ -3616,26 +3616,25 @@ ALLSLOptimizer::Result ALLSLOptimizer::run(std::string_view source, const Option
             report.note(nullptr, "OptimizerStoppedEarly", "stopped after [1] rounds: there may be more to do", { std::to_string(round) });
             break;
         }
+        // The references and values found again after the folder and the
+        // simplifier together, not after each: what the folder makes are
+        // constants, whose values the simplifier reads off them, and what
+        // counts it leaves behind can only be too high -- which a pass
+        // takes as a reason to do less, never as leave to do wrong. Dead
+        // code is looked for with everything found again, since what
+        // runs is told from the values.
         int changes = 0;
         if (options.constfold)
         {
             Folder folder(ctx, report, options);
             script->visit(&folder);
             walks(1);
-            if (folder.changes)
-            {
-                changes += folder.changes;
-                refresh();
-            }
-        }
-        if (options.constfold)
-        {
             Simplifier simplifier(ctx, report, options);
             script->visit(&simplifier);
             walks(1);
-            if (simplifier.changes)
+            if (folder.changes + simplifier.changes)
             {
-                changes += simplifier.changes;
+                changes += folder.changes + simplifier.changes;
                 refresh();
             }
         }
