@@ -360,11 +360,14 @@ ALScriptAnalysis::Result ALScriptAnalysis::run(const Job& job, const ALLuauServi
                 }
                 return;
             }
+            // The bundle where the text is the script apart from its modules:
+            // what a save sends, and so what it weighs.
+            const std::string& whole = request.bundle ? *request.bundle : text;
             for (const ALScriptWeight::Target target : request.targets)
             {
                 if ((target == ALScriptWeight::Target::SLua) == request.lua)
                 {
-                    result.weights.push_back(weighed(target, text));
+                    result.weights.push_back(weighed(target, whole));
                 }
             }
         };
@@ -380,6 +383,8 @@ ALScriptAnalysis::Result ALScriptAnalysis::run(const Job& job, const ALLuauServi
             mWorker->luau.setDocument(looked_through ? std::string_view() : std::string_view(request.id));
             mWorker->luau.setConfig(request.config);
             mWorker->luau.setPassedOver(request.passedOver);
+            static const ALLuauService::Modules NONE;
+            mWorker->luau.setModules(request.modules ? *request.modules : NONE);
             mWorker->luau.setTimeLimit(job.seconds);
             mWorker->luau.setStop(stop);
             switch (request.kind)

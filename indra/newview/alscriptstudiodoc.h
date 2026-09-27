@@ -304,6 +304,14 @@ struct ALScriptStudioDoc
         // Its lines that are wholly an include's or a module's
         // (ALSourceMap::othersLines), which the analyzers pass over.
         std::vector<std::pair<S32, S32>> elsewhere;
+        // SLua with requires, apart (ALPreprocessor::Options::apart): the
+        // text and map above are the script's alone, its requires calls;
+        // these are the modules they reach, each module's map by its key
+        // for what the checker says of it, and the bundle a save sends,
+        // which is what it weighs. Empty where the text is the bundle.
+        std::shared_ptr<const ALLuauService::Modules>  modules;
+        std::vector<std::pair<std::string, ALSourceMap>> moduleMaps;
+        std::shared_ptr<const std::string>              bundle;
         ALScriptProblems problems;
         // What the code came to on the script's target before the
         // optimizer and after, where it ran and was weighed.

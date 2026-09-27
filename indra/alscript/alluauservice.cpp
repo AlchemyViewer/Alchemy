@@ -73,6 +73,28 @@ namespace
     struct ScriptResolver final : public Luau::FileResolver
     {
         boost::unordered_flat_map<std::string, std::string, ll::string_hash, std::equal_to<>> texts;
+        // Which module a require in a module names: by the requiring
+        // module's name and the name it says, joined by a unit separator.
+        boost::unordered_flat_map<std::string, std::string, ll::string_hash, std::equal_to<>> leadsTo;
+
+        std::optional<Luau::ModuleInfo> resolveModule(const Luau::ModuleInfo* context, Luau::AstExpr* expr,
+                                                      const Luau::TypeCheckLimits&) override
+        {
+            const Luau::AstExprConstantString* said = expr ? expr->as<Luau::AstExprConstantString>() : nullptr;
+            if (!context || !said)
+            {
+                return std::nullopt;
+            }
+            std::string key = context->name;
+            key += '\x1f';
+            key.append(said->value.data, said->value.size);
+            const auto found = leadsTo.find(key);
+            if (found == leadsTo.end())
+            {
+                return std::nullopt;
+            }
+            return Luau::ModuleInfo{ found->second, false };
+        }
 
         std::optional<Luau::SourceCode> readSource(const Luau::ModuleName& name) override
         {
@@ -81,7 +103,9 @@ namespace
             {
                 return std::nullopt;
             }
-            return Luau::SourceCode{ found->second, Luau::SourceCode::Script };
+            // What a require reaches is a module, which may be required; a
+            // script is not.
+            return Luau::SourceCode{ found->second, name.rfind("module:", 0) == 0 ? Luau::SourceCode::Module : Luau::SourceCode::Script };
         }
     };
 
@@ -1139,6 +1163,10 @@ struct ALLuauService::Impl
     std::string                     moduleName = SCRIPT_MODULE;
     // The lines nobody reads the names, hints and fixes of (setPassedOver).
     std::vector<std::pair<S32, S32>> passedOver;
+    // The modules each kept script requires, by its module's name: what
+    // lets a module go once no kept script requires it.
+    boost::unordered_flat_map<std::string, std::vector<std::string>, ll::string_hash, std::equal_to<>> requiredBy;
+    static std::string moduleOf(std::string_view key) { return "module:" + std::string(key); }
     std::vector<std::string>        kept;
     static constexpr size_t         KEPT = 4;
     bool                            definitions = false;
@@ -1437,6 +1465,11 @@ size_t ALLuauService::typeChecks() const
     return mImpl->checks;
 }
 
+size_t ALLuauService::modulesChecked() const
+{
+    return mImpl->frontend->stats.filesStrict + mImpl->frontend->stats.filesNonstrict;
+}
+
 bool ALLuauService::hasDefinitions() const
 {
     return mImpl->definitions;
@@ -1507,6 +1540,61 @@ void ALLuauService::setPassedOver(std::vector<std::pair<S32, S32>> lines)
     mImpl->passedOver = std::move(lines);
 }
 
+void ALLuauService::setModules(const Modules& modules)
+{
+    Impl& impl = *mImpl;
+    // Each module's text, told as it changes: a module unchanged stays
+    // checked.
+    std::vector<std::string> names;
+    names.reserve(modules.modules.size());
+    for (const Module& module : modules.modules)
+    {
+        const std::string name = Impl::moduleOf(module.key);
+        std::string&      text = impl.files.texts[name];
+        if (text != module.text)
+        {
+            text = module.text;
+            impl.frontend->markDirty(name);
+        }
+        names.push_back(name);
+    }
+    // Which require is which, as this script and its modules say now; a
+    // change of it is a change to the one that requires.
+    const auto requirer = [&impl](const std::string& from) { return from.empty() ? impl.moduleName : Impl::moduleOf(from); };
+    boost::unordered_flat_map<std::string, std::string, ll::string_hash, std::equal_to<>> now;
+    for (const Require& require : modules.reaches)
+    {
+        std::string key = requirer(require.from);
+        key += '\x1f';
+        key += require.name;
+        now[key] = Impl::moduleOf(require.key);
+    }
+    for (const auto& [key, module] : now)
+    {
+        const auto was = impl.files.leadsTo.find(key);
+        if (was == impl.files.leadsTo.end() || was->second != module)
+        {
+            impl.files.leadsTo[key] = module;
+            impl.frontend->markDirty(key.substr(0, key.find('\x1f')));
+        }
+    }
+    // The script's own that it no longer says.
+    const std::string own = impl.moduleName + '\x1f';
+    for (auto it = impl.files.leadsTo.begin(); it != impl.files.leadsTo.end();)
+    {
+        if (it->first.compare(0, own.size(), own) == 0 && !now.count(it->first))
+        {
+            impl.frontend->markDirty(impl.moduleName);
+            it = impl.files.leadsTo.erase(it);
+        }
+        else
+        {
+            ++it;
+        }
+    }
+    impl.requiredBy[impl.moduleName] = std::move(names);
+}
+
 void ALLuauService::setDocument(std::string_view id)
 {
     Impl&             impl = *mImpl;
@@ -1529,9 +1617,27 @@ void ALLuauService::setDocument(std::string_view id)
     {
         const std::string gone = kept.back();
         kept.pop_back();
-        impl.frontend->clearModules({ gone });
+        std::vector<std::string> clear{ gone };
         impl.files.texts.erase(gone);
         impl.configs.configs.erase(gone);
+        // Its modules too, where no script kept requires them.
+        if (const auto used = impl.requiredBy.find(gone); used != impl.requiredBy.end())
+        {
+            const std::vector<std::string> modules = std::move(used->second);
+            impl.requiredBy.erase(used);
+            for (const std::string& module : modules)
+            {
+                const bool still = std::any_of(impl.requiredBy.begin(), impl.requiredBy.end(), [&module](const auto& other) {
+                    return std::find(other.second.begin(), other.second.end(), module) != other.second.end();
+                });
+                if (!still)
+                {
+                    clear.push_back(module);
+                    impl.files.texts.erase(module);
+                }
+            }
+        }
+        impl.frontend->clearModules(clear);
     }
 }
 
@@ -1586,8 +1692,11 @@ ALScriptProblems ALLuauService::check(std::string_view source)
         std::string              key;
         std::vector<std::string> args;
         Luau::Location           where = error.location;
-        const Luau::CountMismatch* count = Luau::get_if<Luau::CountMismatch>(&error.data);
-        Luau::AstExprCall* counted = count && count->context == Luau::CountMismatch::Arg ? call_at(error.location) : nullptr;
+        // One in a module the script requires is the module's, in its
+        // lines: said with its key as the problem's file.
+        const bool                 elsewhere = error.moduleName != impl.moduleName && error.moduleName.rfind("module:", 0) == 0;
+        const Luau::CountMismatch* count     = Luau::get_if<Luau::CountMismatch>(&error.data);
+        Luau::AstExprCall* counted = count && count->context == Luau::CountMismatch::Arg && !elsewhere ? call_at(error.location) : nullptr;
         const Luau::TypeId* callee = counted && module ? module->astTypes.find(counted->func) : nullptr;
         const Luau::FunctionType* function = callee ? functionOf(*callee) : nullptr;
         if (counted && function && !counted->self && counted->func->is<Luau::AstExprIndexName>() && count->actual < count->expected &&
@@ -1620,7 +1729,7 @@ ALScriptProblems ALLuauService::check(std::string_view source)
             // Named by what was written -- `ll`, not the table's fields --
             // with the nearest key there is, which is usually the one meant.
             std::string head;
-            if (module_source && module_source->root)
+            if (!elsewhere && module_source && module_source->root)
             {
                 const std::vector<Luau::AstNode*> ancestry = Luau::findAstAncestryOfPosition(*module_source, error.location.begin);
                 for (auto it = ancestry.rbegin(); it != ancestry.rend() && head.empty(); ++it)
@@ -1659,6 +1768,10 @@ ALScriptProblems ALLuauService::check(std::string_view source)
                                      std::move(message)));
         problems.back().key  = key;
         problems.back().args = std::move(args);
+        if (elsewhere)
+        {
+            problems.back().file = error.moduleName.substr(7);
+        }
     }
     // What selene's comments say of the lints, where the script was
     // written for selene too: allowed, gone; denied, an error.

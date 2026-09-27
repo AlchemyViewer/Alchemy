@@ -164,7 +164,11 @@ void ALScriptStudioChecking::expandFor(Doc& doc, ALScriptAnalysis::Kind kind, co
     doc.check.expanding             = version;
     const std::weak_ptr<bool> alive = mAlive;
     const std::string         id    = doc.id;
-    sources().expand(preprocessRequest(doc), [this, alive, id, version](const ALPreprocessor::Result& result) {
+    // The script apart from its modules, for the analyzers to check each on
+    // its own.
+    ALScriptPreprocessor::Request asked = preprocessRequest(doc);
+    asked.apart                         = true;
+    sources().expand(asked, [this, alive, id, version](const ALPreprocessor::Result& result) {
         if (alive.lock())
         {
             expandedAnswer(id, version, result);
@@ -209,9 +213,37 @@ void ALScriptStudioChecking::expandedAnswer(const std::string& id, U32 version, 
     doc.expanded.disabled   = result.disabled;
     doc.expanded.version    = version;
     doc.expanded.generation = ++doc.check.expansions;
-    doc.expanded.text     = std::make_shared<const std::string>(result.text);
-    doc.expanded.map      = result.map;
-    doc.expanded.elsewhere = result.map.othersLines();
+    doc.expanded.modules.reset();
+    doc.expanded.moduleMaps.clear();
+    doc.expanded.bundle.reset();
+    if (result.apart.valid)
+    {
+        // The script alone, its requires calls, and the modules they reach,
+        // each the checker's own; the bundle kept to weigh.
+        doc.expanded.text   = std::make_shared<const std::string>(result.apart.script.text);
+        doc.expanded.map    = result.apart.script.map;
+        doc.expanded.bundle = std::make_shared<const std::string>(result.text);
+        auto modules        = std::make_shared<ALLuauService::Modules>();
+        for (const ALPreprocessor::Result::Piece& piece : result.apart.modules)
+        {
+            modules->modules.push_back({ piece.key, piece.text });
+            doc.expanded.moduleMaps.emplace_back(piece.key, piece.map);
+        }
+        for (const ALPreprocessor::Result::Resolved& resolved : result.resolved)
+        {
+            if (resolved.require)
+            {
+                modules->reaches.push_back({ resolved.from, resolved.name, resolved.path });
+            }
+        }
+        doc.expanded.modules = std::move(modules);
+    }
+    else
+    {
+        doc.expanded.text = std::make_shared<const std::string>(result.text);
+        doc.expanded.map  = result.map;
+    }
+    doc.expanded.elsewhere = doc.expanded.map.othersLines();
     doc.expanded.problems = result.problems;
     doc.expanded.resolved = result.resolved;
     // What the preprocessor found is shown with what the analyzers found.
@@ -296,6 +328,8 @@ void ALScriptStudioChecking::ask(Doc& doc, ALScriptAnalysis::Kind kind, const AL
         expansion    = doc.expanded.generation;
         request.text       = doc.expanded.text;
         request.passedOver = doc.expanded.elsewhere;
+        request.modules    = doc.expanded.modules;
+        request.bundle     = doc.expanded.bundle;
         if (kind != ALScriptAnalysis::Kind::Check && kind != ALScriptAnalysis::Kind::Weigh)
         {
             const ALSourceMap::Loc loc = doc.expanded.map.toExpanded(0, at.line, at.column);
@@ -796,7 +830,7 @@ void ALScriptStudioChecking::mapProblems(Doc& doc)
     const ALSourceMap& map = doc.expanded.map;
     doc.check.analysis.erase(std::remove_if(doc.check.analysis.begin(), doc.check.analysis.end(),
                                             [&map](const ALScriptProblem& problem) {
-                                                if (!unusedWarning(problem))
+                                                if (!problem.file.empty() || !unusedWarning(problem))
                                                 {
                                                     return false;
                                                 }
@@ -806,6 +840,33 @@ void ALScriptStudioChecking::mapProblems(Doc& doc)
                              doc.check.analysis.end());
     for (ALScriptProblem& problem : doc.check.analysis)
     {
+        // One the checker found in a module the script requires, in the
+        // module's lines: back to the file it came of, through its own map.
+        if (!problem.file.empty())
+        {
+            problem.fixes.clear();
+            const auto own = std::find_if(doc.expanded.moduleMaps.begin(), doc.expanded.moduleMaps.end(),
+                                          [&problem](const auto& module) { return module.first == problem.file; });
+            if (own == doc.expanded.moduleMaps.end())
+            {
+                continue;
+            }
+            ALScriptSpan span;
+            span.line      = problem.line;
+            span.column    = problem.column;
+            span.endLine   = problem.endLine;
+            span.endColumn = problem.endColumn;
+            const S32 file = mapSpan(own->second, span);
+            if (file >= 0)
+            {
+                problem.file      = own->second.files()[file].path;
+                problem.line      = span.line;
+                problem.column    = span.column;
+                problem.endLine   = span.endLine;
+                problem.endColumn = span.endColumn;
+            }
+            continue;
+        }
         ALScriptSpan span;
         span.line      = problem.line;
         span.column    = problem.column;

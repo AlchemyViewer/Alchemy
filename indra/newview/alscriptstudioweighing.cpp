@@ -453,7 +453,10 @@ void ALScriptStudioWeighing::measureAsset(Doc& doc)
     {
         // What envelopeFor would make, measured without making it: its
         // two texts are the tab's and the expansion's as they stand.
-        doc.weighing.assetBytes = ALScriptEnvelope::wrappedSize(doc.language.lua, text, *doc.expanded.text, doc.language.compileTarget,
+        // The bundle where the expansion is the script apart from its
+        // modules: what a save sends.
+        const std::string& sent = doc.expanded.bundle ? *doc.expanded.bundle : *doc.expanded.text;
+        doc.weighing.assetBytes = ALScriptEnvelope::wrappedSize(doc.language.lua, text, sent, doc.language.compileTarget,
                                                                 mWindow.programVersion(), LLDate::now().asString());
     }
 }

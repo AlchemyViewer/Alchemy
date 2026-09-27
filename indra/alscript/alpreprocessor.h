@@ -159,6 +159,12 @@ public:
         // `__TIME__`; zero for now.
         S64  unixTime = 0;
         resolver_t resolve;
+        // SLua: the script and each module a require reaches given apart
+        // as well (Result::apart), for the analyzers -- which check a
+        // module on its own, and the script with its requires as calls, so
+        // that a module nobody changed is not checked again with each
+        // edit of the script. The text stays the bundle a save sends.
+        bool apart = false;
     };
 
     struct Result
@@ -204,6 +210,24 @@ public:
         // The run reached its budget and stopped: the text is as far as
         // it got, and is nothing to compile or analyse.
         bool overran       = false;
+
+        // Where Options::apart asked for it, and there was a require: the
+        // script as the run made it but with its requires left as calls,
+        // and each module it reached the same way, keyed as `resolved`
+        // names what a require found. Each with a map over the same files.
+        struct Piece
+        {
+            std::string key;
+            std::string text;
+            ALSourceMap map;
+        };
+        struct Apart
+        {
+            bool               valid = false;
+            Piece              script;
+            std::vector<Piece> modules;
+        };
+        Apart apart;
 
         bool hasErrors() const;
     };

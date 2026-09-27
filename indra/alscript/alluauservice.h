@@ -114,6 +114,32 @@ public:
     // same. None until told.
     void setPassedOver(std::vector<std::pair<S32, S32>> lines);
 
+    // What the script asked about next requires, where it keeps its
+    // requires as calls (ALPreprocessor::Options::apart): each module by the
+    // key a require resolves to, and which require resolves to which -- by
+    // what requires (empty for the script itself, else a module's key) and
+    // the name it says. Each module is its own to the checker, checked
+    // once until its text changes, so an edit of the script does not check
+    // them all again. A problem the checker finds in one is the module's,
+    // said with its key as the problem's file and in its lines.
+    struct Module
+    {
+        std::string key;
+        std::string text;
+    };
+    struct Require
+    {
+        std::string from;
+        std::string name;
+        std::string key;
+    };
+    struct Modules
+    {
+        std::vector<Module>  modules;
+        std::vector<Require> reaches;
+    };
+    void setModules(const Modules& modules);
+
     // Everything the front end has to say about one script: parse errors
     // and type errors, then the lints, each in the order it was found.
     ALScriptProblems check(std::string_view source);
@@ -156,6 +182,10 @@ public:
     // script is strict, or under the new solver -- in whatever order they
     // come. For the test that says so.
     size_t typeChecks() const;
+    // How many modules the front end has checked, the script's and those it
+    // requires alike, since it was built: for the test that says a module
+    // unchanged is not checked again.
+    size_t modulesChecked() const;
 
 private:
     struct Impl;

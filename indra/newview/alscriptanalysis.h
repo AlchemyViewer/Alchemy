@@ -25,6 +25,7 @@
 #pragma once
 
 #include "alluauconfig.h"
+#include "alluauservice.h"
 #include "alscriptjobqueue.h"
 #include "alscriptproblem.h"
 #include "alscriptsymbol.h"
@@ -178,6 +179,11 @@ public:
         // The lines of the text nobody reads the names, hints and fixes of:
         // what an include put into an expansion (ALSourceMap::othersLines).
         std::vector<std::pair<S32, S32>> passedOver;
+        // SLua over an expansion that keeps its requires as calls: the
+        // modules they reach (ALLuauService::setModules); and the bundle a
+        // save sends, which is what a check's weigh weighs.
+        std::shared_ptr<const ALLuauService::Modules> modules;
+        std::shared_ptr<const std::string>            bundle;
         // What a check says beyond the problems and the outline: what
         // every name is, and what the editor may show beside the text.
         bool        semantics      = false;

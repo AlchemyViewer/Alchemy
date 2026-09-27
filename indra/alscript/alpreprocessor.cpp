@@ -3589,6 +3589,12 @@ namespace
             mInProgress.insert(key);
             Tokens body;
             mEngine.module(found, body);
+            // Kept as the run made it, its requires still calls, where the
+            // analyzers want each module apart.
+            if (mOptions.apart)
+            {
+                mApart.emplace_back(key, body);
+            }
             gather(body, key);
             mInProgress.erase(key);
             mDone.insert(key);
@@ -3604,6 +3610,12 @@ namespace
         boost::unordered_flat_set<std::string, ll::string_hash, std::equal_to<>> mDone;
         boost::unordered_flat_set<std::string, ll::string_hash, std::equal_to<>> mListed;
         std::vector<std::pair<std::string, Tokens>> mModules;
+        // Each module as the run made it, before its requires became
+        // lookups in the table (Options::apart).
+        std::vector<std::pair<std::string, Tokens>> mApart;
+
+    public:
+        const std::vector<std::pair<std::string, Tokens>>& apart() const { return mApart; }
     };
 
     // ---- the text and its map -----------------------------------------------------------
@@ -3817,7 +3829,33 @@ ALPreprocessor::Result ALPreprocessor::run(std::string_view source, const Option
     if (options.lua)
     {
         Requires gathered(engine, options, result);
+        // The script as the run made it, its requires still calls, where
+        // the analyzers want it apart from its modules.
+        Tokens as_made;
+        if (options.apart)
+        {
+            as_made = tokens;
+        }
         gathered.gather(tokens, std::string());
+        if (options.apart && !gathered.apart().empty())
+        {
+            // Each piece assembled over the same files as the whole.
+            const auto piece = [&result](std::string key, const Tokens& made) {
+                Result part;
+                for (const ALSourceMap::File& file : result.map.files())
+                {
+                    part.map.addFile(file.name, file.path);
+                }
+                assemble(made, part);
+                return Result::Piece{ std::move(key), std::move(part.text), std::move(part.map) };
+            };
+            result.apart.valid  = true;
+            result.apart.script = piece(std::string(), as_made);
+            for (const auto& [key, made] : gathered.apart())
+            {
+                result.apart.modules.push_back(piece(key, made));
+            }
+        }
         Tokens all = gathered.prologue();
         if (!all.empty())
         {

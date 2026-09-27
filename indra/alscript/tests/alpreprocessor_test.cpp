@@ -455,11 +455,11 @@ namespace tut
         add("c", "return require(\"c\")\n");
         r = ALPreprocessor::run("local a = require(\"a\")\nlocal b = require('b')\nlocal x = require(name)\n", options(true));
         ensure_equals("problems", messages(r), std::string());
-        ensure_equals("modules", r.text,
-                      std::string("local __modules = {}\n"
-                                  "__modules[\"b\"] = (function()\nreturn 42\nend)()\n"
-                                  "__modules[\"a\"] = (function()\nlocal b = __modules[\"b\"]\nreturn { b = b }\nend)()\n"
-                                  "local a = __modules[\"a\"]\nlocal b = __modules[\"b\"]\nlocal x = require(name)\n"));
+        const std::string bundled = "local __modules = {}\n"
+                                    "__modules[\"b\"] = (function()\nreturn 42\nend)()\n"
+                                    "__modules[\"a\"] = (function()\nlocal b = __modules[\"b\"]\nreturn { b = b }\nend)()\n"
+                                    "local a = __modules[\"a\"]\nlocal b = __modules[\"b\"]\nlocal x = require(name)\n";
+        ensure_equals("modules", r.text, bundled);
         ensure_equals("included", r.includes.size(), 2u);
         ensure_equals("b mapped to its file", r.map.files()[r.map.toSource(2, 0).file].name, std::string("b"));
         // The modules' own lines, which the studio shows nothing of: not
@@ -470,6 +470,25 @@ namespace tut
             others += std::to_string(first) + "-" + std::to_string(last) + " ";
         }
         ensure_equals("the modules' lines", others, std::string("2-2 5-6 "));
+        ensure("not apart unless asked", !r.apart.valid);
+        // Apart, for the analyzers: the script with its requires as calls,
+        // and each module as the run made it, each mapped to its file; the
+        // text the bundle still.
+        ALPreprocessor::Options apart = options(true);
+        apart.apart                   = true;
+        const ALPreprocessor::Result split =
+            ALPreprocessor::run("local a = require(\"a\")\nlocal b = require('b')\nlocal x = require(name)\n", apart);
+        ensure_equals("the bundle as ever", split.text, bundled);
+        ensure("apart", split.apart.valid && split.apart.modules.size() == 2);
+        ensure_equals("the script, its requires calls", split.apart.script.text,
+                      std::string("local a = require(\"a\")\nlocal b = require('b')\nlocal x = require(name)\n"));
+        ensure_equals("the first reached", split.apart.modules[0].key, std::string("a"));
+        ensure_equals("as made, its own require a call", split.apart.modules[0].text, std::string("local b = require(\"b\")\nreturn { b = b }\n"));
+        ensure_equals("then what it reached", split.apart.modules[1].key, std::string("b"));
+        ensure_equals("b", split.apart.modules[1].text, std::string("return 42\n"));
+        const ALSourceMap::Loc in_a = split.apart.modules[0].map.toSource(1, 0);
+        ensure("mapped to its file", in_a.found() && split.apart.modules[0].map.files()[in_a.file].name == "a" && in_a.line == 1);
+        ensure("the script to its own", split.apart.script.map.toSource(2, 6).file == 0);
         r = ALPreprocessor::run("local c = require(\"c\")\n", options(true));
         ensure_equals("a cycle", messages(r), std::string("E c:0: 'c' requires itself\n"));
         r = ALPreprocessor::run("local d = require(\"d\")\n", options(true));

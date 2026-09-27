@@ -928,4 +928,46 @@ namespace tut
         }
         ensure("with nothing passed over, coloured", in_module);
     }
+
+    template<> template<>
+    void alluauservice_object::test<31>()
+    {
+        set_test_name("a script's requires kept as calls reach its modules, each checked on its own and not again for an edit of the script alone");
+        ensure("definitions loaded: " + error, loaded);
+        ALLuauConfig config;
+        service.setDocument("uses");
+        service.setConfig(config);
+        ALLuauService::Modules modules;
+        modules.modules.push_back(
+            { "disk:/lib/util.luau", "--!strict\nlocal M = {}\nfunction M.twice(n: number): number\n    return n * 2\nend\nlocal bad: number = \"x\"\nreturn M\n" });
+        modules.reaches.push_back({ "", "util", "disk:/lib/util.luau" });
+        service.setModules(modules);
+        const std::string script = "--!strict\nlocal util = require(\"util\")\nlocal s: string = util.twice(2)\n";
+        const ALScriptProblems problems = service.check(script);
+        bool typed = false, module_said = false;
+        for (const ALScriptProblem& problem : problems)
+        {
+            typed |= problem.file.empty() && problem.line == 2;
+            module_said |= problem.file == "disk:/lib/util.luau" && problem.line == 5;
+        }
+        ensure("the module's types reach the script: " + said(problems), typed);
+        ensure("the module's own problem is the module's, in its lines: " + said(problems), module_said);
+        // The script typed in: only the script is checked again.
+        const size_t modules_before = service.modulesChecked();
+        service.check(script + "print(s)\n");
+        ensure_equals("the script alone", service.modulesChecked() - modules_before, size_t(1));
+        // The module changed: it, and the script that requires it.
+        modules.modules[0].text = "local M = {}\nfunction M.twice(n: number): string\n    return tostring(n * 2)\nend\nreturn M\n";
+        service.setModules(modules);
+        const size_t again = service.modulesChecked();
+        const ALScriptProblems now = service.check(script + "print(s)\n");
+        ensure_equals("both", service.modulesChecked() - again, size_t(2));
+        bool still = false;
+        for (const ALScriptProblem& problem : now)
+        {
+            still |= problem.line == 2 && problem.file.empty() && problem.severity == ALScriptProblem::Severity::Error;
+        }
+        ensure("and what it gives now fits: " + said(now), !still);
+        service.setDocument("");
+    }
 }

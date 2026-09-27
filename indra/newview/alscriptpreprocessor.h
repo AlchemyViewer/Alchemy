@@ -148,6 +148,9 @@ public:
         // shows them, and not for a compile of many, which would pay two
         // compiles more a script for words nobody reads.
         bool        weigh    = false;
+        // SLua, for the analyzers: the script and its modules apart as
+        // well as bundled (ALPreprocessor::Options::apart).
+        bool        apart    = false;
     };
     typedef std::function<void(const ALPreprocessor::Result&)> callback_t;
 

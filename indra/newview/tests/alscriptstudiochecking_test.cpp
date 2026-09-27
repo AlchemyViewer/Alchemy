@@ -918,4 +918,74 @@ namespace tut
         checking.pump(3.0);
         ensure_equals("SLua: checked again", studio.asks.size(), asks + 1);
     }
+
+    template<> template<>
+    void alscriptstudiochecking_object::test<16>()
+    {
+        set_test_name("SLua with requires: the analyzers asked of the script apart, its modules and which require reaches which, the bundle to weigh; a module's problem in its file");
+        ALScriptStudioChecking& checking = make();
+        Doc&                    doc      = tab("a");
+        doc.language.lua                 = true;
+        doc.editor->setText("local util = require(\"util\")\nprint(util.x)\n");
+        preprocessing = true;
+        checking.ask(doc, Kind::Check, ALTextPos(), ALTextPos());
+        ensure_equals("expanded", expansions.size(), size_t(1));
+        ensure("apart asked for", expansions[0].first.apart);
+        ALPreprocessor::Result result;
+        result.map.addFile("a", "object:a");
+        result.map.addFile("util", "object:util");
+        result.text               = "local __modules = {}\n-- the bundle\n";
+        result.apart.valid        = true;
+        result.apart.script.text  = doc.editor->text();
+        result.apart.script.map.addFile("a", "object:a");
+        result.apart.script.map.addFile("util", "object:util");
+        for (S32 line = 0; line < 2; ++line)
+        {
+            ALSourceMap::Segment own;
+            own.outLine = line;
+            own.length  = 30;
+            own.file    = 0;
+            own.line    = line;
+            result.apart.script.map.add(own);
+        }
+        result.apart.script.map.finish();
+        ALPreprocessor::Result::Piece util;
+        util.key  = "object:util";
+        util.text = "--!strict\nlocal M = {}\nreturn M\n";
+        util.map.addFile("a", "object:a");
+        util.map.addFile("util", "object:util");
+        for (S32 line = 0; line < 3; ++line)
+        {
+            ALSourceMap::Segment own;
+            own.outLine = line;
+            own.length  = 20;
+            own.file    = 1;
+            own.line    = line + 10;
+            util.map.add(own);
+        }
+        util.map.finish();
+        result.apart.modules.push_back(util);
+        result.resolved.push_back({ "", "util", true, "object:util" });
+        expansions[0].second(result);
+        ensure_equals("asked", studio.asks.size(), size_t(1));
+        const ALScriptAnalysis::Request& asked = studio.asks[0].request;
+        ensure("of the script apart", *asked.text == doc.editor->text());
+        ensure("with its module", asked.modules && asked.modules->modules.size() == 1 && asked.modules->modules[0].key == "object:util");
+        ensure("and which require reaches it",
+               asked.modules->reaches.size() == 1 && asked.modules->reaches[0].name == "util" && asked.modules->reaches[0].key == "object:util");
+        ensure("the bundle to weigh", asked.bundle && *asked.bundle == result.text);
+        // What the checker said of the module, in the module's lines: in
+        // its file, where its map puts it.
+        ALScriptProblem in_module = problem(1, "wrong in util");
+        in_module.file            = "object:util";
+        studio.asks[0].answered(answer(doc, { in_module, problem(1, "wrong here") }));
+        bool mapped = false, own = false;
+        for (const ALScriptProblem& p : doc.check.analysis)
+        {
+            mapped |= p.message == "wrong in util" && p.file == "object:util" && p.line == 11 && p.fixes.empty();
+            own |= p.message == "wrong here" && p.file.empty() && p.line == 1;
+        }
+        ensure("the module's, in its file's lines", mapped);
+        ensure("the script's own, in its", own);
+    }
 }

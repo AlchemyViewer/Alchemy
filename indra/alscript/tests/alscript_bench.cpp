@@ -261,6 +261,51 @@ int main(int, char**)
             NONE);
         std::printf("  %-52s %10zu\n", "  problems", problems);
     }
+    // A small script that requires a big module, typed in: the bundle
+    // checked whole at each edit, against the script apart from the module
+    // (ALPreprocessor::Options::apart), where the module stays checked.
+    {
+        const std::string module = luaScript.texts[0] + "\nreturn {}\n";
+        ALPreprocessor::Options options;
+        options.lua     = true;
+        options.apart   = true;
+        options.resolve = [&module](const ALPreprocessor::Ask& ask, ALPreprocessor::Include& out) {
+            if (ask.name != "big")
+            {
+                return ALPreprocessor::Found::No;
+            }
+            out.text = module;
+            out.name = "big";
+            out.path = "disk:/big.luau";
+            return ALPreprocessor::Found::Yes;
+        };
+        const ALPreprocessor::Result made   = ALPreprocessor::run("local big = require(\"big\")\nprint(big)\n", options);
+        const std::string            bundle = made.text;
+        ALLuauService::Modules       modules;
+        for (const ALPreprocessor::Result::Piece& piece : made.apart.modules)
+        {
+            modules.modules.push_back({ piece.key, piece.text });
+        }
+        for (const ALPreprocessor::Result::Resolved& resolved : made.resolved)
+        {
+            modules.reaches.push_back({ resolved.from, resolved.name, resolved.path });
+        }
+        int edits = 0;
+        luau.setDocument("bundled");
+        const double whole = ms_per_run([&] {
+            g_sink = g_sink + luau.check(bundle + "-- " + std::to_string(++edits) + "\n").size();
+        });
+        luau.setDocument("apart");
+        luau.setModules(modules);
+        luau.check(made.apart.script.text);
+        const double apart = ms_per_run([&] {
+            g_sink = g_sink + luau.check(made.apart.script.text + "-- " + std::to_string(++edits) + "\n").size();
+        });
+        luau.setModules({});
+        luau.setDocument("");
+        row("SLua: an edit of a script requiring a big module, bundled", NONE, whole);
+        row("  the script apart, the module kept checked", NONE, apart);
+    }
     // Two tabs in front in turn, neither typed in: each its own module,
     // found checked as it was left. (With one module for every tab, each
     // turn was a full check of each: twice the check row above.)

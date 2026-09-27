@@ -1045,6 +1045,7 @@ ALPreprocessor::Options ALScriptPreprocessor::optionsFor(const Request& request,
     static LLCachedControl<bool> extensions(gSavedSettings, "ALScriptPreprocExtensions", false);
     ALPreprocessor::Options      options;
     options.lua        = request.lua;
+    options.apart      = request.lua && request.apart;
     options.switches   = switches;
     options.lazyLists  = lazy;
     options.compress   = compress;
