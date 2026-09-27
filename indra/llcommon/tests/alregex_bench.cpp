@@ -51,6 +51,9 @@
 #include <string>
 #include <vector>
 
+// Only an optimised build measures, and only it has a use for these: an
+// unoptimised one would say they are unused.
+#if defined(LL_RELEASE)
 namespace
 {
     using clock = std::chrono::steady_clock;
@@ -835,6 +838,7 @@ namespace
         row("compiled per row (boost) vs once (re2)", boost_ns, re2_ns);
     }
 }
+#endif // LL_RELEASE
 
 int main(int, char**)
 {

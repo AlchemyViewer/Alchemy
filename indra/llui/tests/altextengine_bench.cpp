@@ -65,6 +65,9 @@ const std::string& rlvGetAnonym(const LLAvatarName& av_name)
     return gBenchAnonName;
 }
 
+// Only an optimised build measures, and only it has a use for these: an
+// unoptimised one would say they are unused.
+#if defined(LL_RELEASE)
 namespace
 {
     using clock = std::chrono::steady_clock;
@@ -177,6 +180,7 @@ namespace
         row(name, ms[0], ms[1]);
     }
 }
+#endif // LL_RELEASE
 
 int main(int, char**)
 {

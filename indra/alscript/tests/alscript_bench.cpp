@@ -58,6 +58,9 @@
 #include <sstream>
 #include <string>
 
+// Only an optimised build measures, and only it has a use for these: an
+// unoptimised one would say they are unused.
+#if defined(LL_RELEASE)
 namespace
 {
     using clock = std::chrono::steady_clock;
@@ -154,6 +157,7 @@ namespace
         return "#define TWICE(x) ((x) * 2)\n" + text;
     }
 }
+#endif // LL_RELEASE
 
 int main(int, char**)
 {

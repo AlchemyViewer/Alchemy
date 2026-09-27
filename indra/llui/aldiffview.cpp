@@ -346,9 +346,15 @@ bool ALDiffView::goToChange(bool forward)
     }
     // Both sides, which are lined up, at the change: the one in front
     // scrolled to it, and the other following it there as it is drawn.
-    for (ALCodeEditor* each : mInline ? std::initializer_list<ALCodeEditor*>{ mInlined } : std::initializer_list<ALCodeEditor*>{ mLeft, mRight })
+    // (An array of their own: a list picked by ?: would be a temporary
+    // gone before the loop reads it.)
+    ALCodeEditor* const sides[] = { mInline ? mInlined : mLeft, mInline ? nullptr : mRight };
+    for (ALCodeEditor* each : sides)
     {
-        each->goTo(ALTextPos(to, 0));
+        if (each)
+        {
+            each->goTo(ALTextPos(to, 0));
+        }
     }
     side->scrollToCaret();
     return true;
