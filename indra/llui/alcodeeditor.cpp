@@ -985,6 +985,29 @@ S32 ALCodeEditor::bracketDepthBefore(S32 line)
     return mDepthBefore[static_cast<size_t>(line)];
 }
 
+S32 ALCodeEditor::bracketDepthAt(const ALTextPos& at)
+{
+    const ALTextPos    pos   = document().clamp(at);
+    S32                depth = bracketDepthBefore(pos.line);
+    const std::string& text  = document().line(pos.line);
+    for (const ALSyntaxToken& token : highlighter().tokens(pos.line))
+    {
+        if (token.begin >= pos.column)
+        {
+            break;
+        }
+        if (token.kind != ALSyntaxKind::Punctuation && token.kind != ALSyntaxKind::Operator)
+        {
+            continue;
+        }
+        for (S32 b = token.begin; b < token.end && b < pos.column && b < static_cast<S32>(text.size()); ++b)
+        {
+            depth = llmax(0, depth + bracketDelta(text[static_cast<size_t>(b)]));
+        }
+    }
+    return depth;
+}
+
 void ALCodeEditor::tintRow(S32 line, const ALTextLayout::Line& laid, const ALTextLayout::Row& row, F32 alpha, std::vector<LLColor4U>& colors)
 {
     // What the analyzer knows a stretch to be, over the grammar's colour
@@ -2081,6 +2104,8 @@ void ALCodeEditor::closeCompletion()
 {
     hideCompletionList();
     mCompletionModel.close();
+    mCompletionAsked = false;
+    mCompletionMoved = false;
 }
 
 S32 ALCodeEditor::chosenCompletion() const
@@ -2117,34 +2142,44 @@ void ALCodeEditor::refreshCompletion()
     const std::string prefix = wordBeforeCaret();
     const ALTextPos   at     = caret();
     const ALTextPos   start(at.line, at.column - static_cast<S32>(prefix.size()));
-    // After `ll.` the members of `ll` are wanted: the head is put before
-    // the prefix for whoever answers by whole names, and taken off what
-    // they answer.
+    // After `ll.` the members of `ll` are wanted -- after `obj:` in SLua,
+    // its methods: the head is put before the prefix for whoever answers
+    // by whole names, and taken off what they answer.
     std::string head;
-    if (start.column >= 2 && document().line(start.line)[start.column - 1] == '.')
+    char        separator = '.';
+    if (start.column >= 2)
     {
-        const ALTextRange before = identifierAt(ALTextPos(start.line, start.column - 2));
-        if (!before.empty() && before.end.column == start.column - 1)
+        const std::string members = highlighter().grammar() ? highlighter().grammar()->memberSeparators() : std::string(".");
+        const char        before  = document().line(start.line)[start.column - 1];
+        const ALTextRange name    = identifierAt(ALTextPos(start.line, start.column - 2));
+        if (members.find(before) != std::string::npos && !name.empty() && name.end.column == start.column - 1)
         {
-            head = document().text(before);
+            head      = document().text(name);
+            separator = before;
         }
     }
-    if ((prefix.empty() && head.empty()) || hasSelection())
+    if ((prefix.empty() && head.empty() && !mCompletionAsked) || hasSelection())
     {
         closeCompletion();
         return;
     }
-    const std::string       asked = head.empty() ? prefix : head + "." + prefix;
-    std::vector<Completion> answered;
-    if (mProvider)
+    const std::string asked = head.empty() ? prefix : head + separator + prefix;
+    // What there is to choose from, asked for once while one identifier is
+    // typed, and narrowed as it grows.
+    if (!mCompletionModel.pooled(start, head, prefix))
     {
-        mProvider(at, asked, answered);
+        std::vector<Completion> answered;
+        if (mProvider)
+        {
+            mProvider(at, asked, answered);
+        }
+        else
+        {
+            vocabularyCompletions(asked, answered);
+        }
+        mCompletionModel.pool(start, at, prefix, head, separator, std::move(answered), document());
     }
-    else
-    {
-        vocabularyCompletions(asked, answered);
-    }
-    const bool fresh = mCompletionModel.narrow(start, at, prefix, head, std::move(answered), document());
+    const bool fresh = mCompletionModel.narrow(start, at, prefix);
     if (fresh && mCompletionRequest)
     {
         mCompletionRequest(start, prefix);
@@ -2155,9 +2190,14 @@ void ALCodeEditor::refreshCompletion()
         return;
     }
     // The same list again, an answer joined to it, keeps what was chosen
-    // in it; a list for more typed starts from the best.
-    const bool again = mCompletionModel.relisted(asked);
-    listCompletions(completionOpen() && again);
+    // in it; a list for more typed starts from the best, not moved through.
+    const bool same  = mCompletionModel.relisted(asked);
+    const bool again = completionOpen() && same;
+    if (!again)
+    {
+        mCompletionMoved = false;
+    }
+    listCompletions(again);
 }
 
 // static
@@ -2245,6 +2285,7 @@ void ALCodeEditor::hideCompletionDoc()
     {
         mCompletionDoc->setVisible(false);
     }
+    mCompletionDocFor.clear();
 }
 
 ALTextView* ALCodeEditor::sideBox()
@@ -2306,20 +2347,27 @@ void ALCodeEditor::showCompletionDoc()
 {
     const S32 index = chosenCompletion();
     const std::vector<Completion>& completions = mCompletionModel.list();
-    if (index < 0 || index >= static_cast<S32>(completions.size()) || completions[index].documentation.empty())
+    if (index < 0 || index >= static_cast<S32>(completions.size()) || !completions[index].documentation || completions[index].documentation->empty())
     {
         hideCompletionDoc();
         return;
     }
-    const Completion& c   = completions[index];
-    ALTextView&       box = *sideBox();
+    const Completion& c = completions[index];
     // Its declaration as code, then what it does in the reading face.
     std::string says = c.detail.empty() ? c.text : c.detail;
     if (c.deprecated)
     {
         says += "\n" + deprecatedNote();
     }
-    says += "\n" + c.documentation;
+    says += "\n" + *c.documentation;
+    // The same row chosen as the list is made again -- a letter more
+    // typed, an answer joined to it -- beside a list where it was: the box
+    // as it stands, not lexed and read for links again.
+    if (mCompletionDoc && mCompletionDoc->getVisible() && says == mCompletionDocFor && mCompletionList->getRect() == mCompletionDocBeside)
+    {
+        return;
+    }
+    ALTextView& box = *sideBox();
     box.setText(says);
     std::vector<ALTextView::Style> styles;
     styleAsCode(box, 0, styles, c.text, c.kind);
@@ -2337,6 +2385,8 @@ void ALCodeEditor::showCompletionDoc()
         box.linkUrlsOn(line);
     }
     placeSideBox(mCompletionList->getRect());
+    mCompletionDocFor    = says;
+    mCompletionDocBeside = mCompletionList->getRect();
 }
 
 void ALCodeEditor::supplyCompletions(const ALTextPos& at, std::vector<Completion> more)
@@ -2618,9 +2668,29 @@ bool ALCodeEditor::canQuickFix() const
     return mActionRequest || (mFixProvider && fixableAt(caret().line));
 }
 
-void ALCodeEditor::openCompletion()
+void ALCodeEditor::openCompletion(bool asked)
 {
+    mCompletionAsked = mCompletionAsked || asked;
     refreshCompletion();
+}
+
+bool ALCodeEditor::returnAccepts() const
+{
+    if (!mAcceptOnEnter || !completionOpen())
+    {
+        return false;
+    }
+    if (mCompletionMoved)
+    {
+        return true;
+    }
+    // Not moved through: taken only where it changes what is typed.
+    const S32 index = mCompletionList->chosen();
+    if (index < 0 || index >= static_cast<S32>(mCompletionModel.list().size()))
+    {
+        return false;
+    }
+    return mCompletionModel.list()[index].text != document().text(mCompletionModel.range());
 }
 
 // --- the name at the caret ---------------------------------------------------------
@@ -2924,7 +2994,7 @@ bool ALCodeEditor::complete()
     {
         return false;
     }
-    openCompletion();
+    openCompletion(true);
     return true;
 }
 
@@ -3634,6 +3704,7 @@ bool ALCodeEditor::handleKeyHere(KEY key, MASK mask)
     if (completionOpen() && modalKeymap() && mask == REAL_CONTROL && (key == 'N' || key == 'P'))
     {
         mCompletionList->moveChoice(key == 'N' ? 1 : -1, true);
+        mCompletionMoved = true;
         return true;
     }
     if (completionOpen() && mask == MASK_NONE)
@@ -3645,18 +3716,22 @@ bool ALCodeEditor::handleKeyHere(KEY key, MASK mask)
                 return true;
             case KEY_UP:
                 mCompletionList->moveChoice(-1, true);
+                mCompletionMoved = true;
                 return true;
             case KEY_DOWN:
                 mCompletionList->moveChoice(1, true);
+                mCompletionMoved = true;
                 return true;
             case KEY_PAGE_UP:
                 mCompletionList->moveChoice(-COMPLETION_ROWS, false);
+                mCompletionMoved = true;
                 return true;
             case KEY_PAGE_DOWN:
                 mCompletionList->moveChoice(COMPLETION_ROWS, false);
+                mCompletionMoved = true;
                 return true;
             case KEY_RETURN:
-                if (!mAcceptOnEnter)
+                if (!returnAccepts())
                 {
                     // A new line, as the key says; the list goes.
                     closeCompletion();
@@ -3736,7 +3811,10 @@ bool ALCodeEditor::handleUnicodeCharHere(llwchar uni_char)
     // open on its own there, where a Return meant as a new line would
     // otherwise put a call into the comment. Asked for, it still opens.
     const bool prose = mAutoComplete && !was_open && inProse(caret());
-    if (uni_char == '.' && mAutoComplete && !prose && caret().column >= 2 && !identifierAt(ALTextPos(caret().line, caret().column - 2)).empty())
+    // What comes between a name and its member: a dot, and SLua's colon.
+    const std::string members = highlighter().grammar() ? highlighter().grammar()->memberSeparators() : std::string(".");
+    const bool        member  = uni_char < 0x80 && members.find(static_cast<char>(uni_char)) != std::string::npos;
+    if (member && mAutoComplete && !prose && caret().column >= 2 && !identifierAt(ALTextPos(caret().line, caret().column - 2)).empty())
     {
         // A member is coming: what there is to choose from, at once.
         openCompletion();

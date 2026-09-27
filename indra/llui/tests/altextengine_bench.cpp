@@ -267,6 +267,35 @@ int main(int, char**)
         row("undo of a 100-character typing run", ms[0], ms[1]);
     }
 
+    // Completion as a word is typed at the end of the script, the list
+    // open: each key narrows it, over the grammar's words, the language's
+    // and the script's own.
+    std::printf("\nCompletion\n");
+    for (Subject& s : subjects)
+    {
+        s.editor->setCaret(s.editor->document().end());
+        s.editor->insertText("\n");
+    }
+    size_t offered[2] = {};
+    both("a word typed and taken back, the list open, per key", subjects, 8, [&](Subject& s, ALCodeEditor& e) {
+        for (const char c : std::string("tota"))
+        {
+            e.handleUnicodeCharHere(static_cast<llwchar>(c));
+        }
+        offered[&s - subjects] = e.completions().size();
+        for (int i = 0; i < 4; ++i)
+        {
+            e.handleKeyHere(KEY_BACKSPACE, MASK_NONE);
+        }
+    });
+    countRow("  offered at four letters", offered[0], offered[1]);
+    for (Subject& s : subjects)
+    {
+        ALCodeEditor& e = *s.editor;
+        e.closeCompletion();
+        e.deleteRange(ALTextRange(e.document().lineEnd(lastLine(e) - 1), e.document().end()));
+    }
+
     std::printf("\nFinding\n");
     size_t found[2] = {};
     both("regex find-all: every call, \\w+\\s*\\(", subjects, 1, [&](Subject& s, ALCodeEditor& e) {

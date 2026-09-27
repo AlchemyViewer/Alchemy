@@ -50,11 +50,13 @@ public:
     // A word of the language, as the region defines it.
     struct Vocab
     {
-        std::string  text;
-        std::string  detail;
-        std::string  tooltip;
-        ALSyntaxKind kind       = ALSyntaxKind::Text;
-        bool         deprecated = false;
+        std::string                        text;
+        std::string                        detail;
+        std::string                        tooltip;
+        // The tooltip as a completion carries it (ALCompletion::shared).
+        std::shared_ptr<const std::string> documentation;
+        ALSyntaxKind                       kind       = ALSyntaxKind::Text;
+        bool                               deprecated = false;
     };
     typedef ALScriptSnippets::Snippet Snippet;
 

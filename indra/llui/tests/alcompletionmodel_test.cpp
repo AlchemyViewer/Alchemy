@@ -124,13 +124,13 @@ namespace tut
         model.narrow(start, ALTextPos(0, 2), "sa", std::string(), { word("say") }, text);
         ensure("not for another place", !model.supply(ALTextPos(3, 0), { word("sample") }));
         ALCompletion better = word("say", ALSyntaxKind::Function, "say(msg)");
-        better.documentation = "Says it.";
+        better.documentation = ALCompletion::shared("Says it.");
         ensure("for this one", model.supply(start, { better, word("salt", ALSyntaxKind::Variable), word("other") }));
         const bool fresh = model.narrow(start, ALTextPos(0, 2), "sa", std::string(), { word("say") }, text);
         ensure("the same identifier", !fresh);
         ensure_equals("merged, not doubled, and what does not match left out", joined(model.list()), std::string("salt|say"));
         const ALCompletion& say = model.list()[1];
-        ensure("its detail and words filled in", say.detail == "say(msg)" && say.documentation == "Says it.");
+        ensure("its detail and words filled in", say.detail == "say(msg)" && say.documentation && *say.documentation == "Says it.");
         ensure("kept through narrowing", !model.narrow(start, ALTextPos(0, 3), "sal", std::string(), {}, text) && joined(model.list()) == "salt");
         ensure("a new identifier lets the answer go", model.narrow(ALTextPos(0, 1), ALTextPos(0, 2), "a", std::string(), {}, text) && model.list().empty());
     }
@@ -150,5 +150,32 @@ namespace tut
         model.close();
         ensure("closed", model.asked() == ALTextPos(-1, -1));
         ensure("fresh again", model.narrow(ALTextPos(0, 0), ALTextPos(0, 1), "s", std::string(), {}, text));
+    }
+
+    template<> template<>
+    void alcompletionmodel_object::test<6>()
+    {
+        set_test_name("a pool gathered once for a word and narrowed as it grows; gathered again where it shrinks, or for another word; ranked only as far as the cap");
+        ALTextDocument text("integer total;\ninteger totals;\nto");
+        const ALTextPos start(2, 0);
+        model.pool(start, ALTextPos(2, 2), "to", std::string(), '.', { word("toString"), word("touch", ALSyntaxKind::Event) }, text);
+        ensure("for the word as it grows", model.pooled(start, std::string(), "to") && model.pooled(start, std::string(), "tot"));
+        ensure("not where it shrinks past it", !model.pooled(start, std::string(), "t"));
+        ensure("nor for another word, or a member", !model.pooled(ALTextPos(1, 0), std::string(), "tot") && !model.pooled(start, "ll", "to"));
+        model.narrow(start, ALTextPos(2, 3), "tot");
+        ensure_equals("the document's words too, narrowed", joined(model.list()), std::string("total|totals"));
+        model.narrow(start, ALTextPos(2, 5), "total");
+        ensure_equals("one no longer than what is typed left out", joined(model.list()), std::string("totals"));
+
+        std::vector<ALCompletion> many;
+        for (int i = 299; i >= 0; --i)
+        {
+            char name[8];
+            snprintf(name, sizeof(name), "w%03d", i);
+            many.push_back(word(name, ALSyntaxKind::Variable));
+        }
+        ALCompletionModel::rank(many, "w");
+        ensure_equals("the cap", many.size(), ALCompletionModel::CAP);
+        ensure("the best of them, in order", many.front().text == "w000" && many.back().text == "w199");
     }
 }

@@ -29,6 +29,9 @@
   line out to the level of what opened it as it is typed.
   pairs: the brackets and quotes typed in pairs, each its opener and
   its closer, which the editor closes as the opener is typed.
+
+  member_separators: what comes between a name and a member of it, after
+  which completion opens; a dot where a grammar does not say.
 -->
 <llsd>
   <map>
@@ -45,6 +48,8 @@
     </array>
     <key>line_comment</key>
     <string>--</string>
+    <key>member_separators</key>
+    <string>.:</string>
     <key>extensions</key>
     <array>
       <string>luau</string>

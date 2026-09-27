@@ -255,6 +255,7 @@ struct ALSyntaxGrammar::Impl
     std::vector<std::string> extensions;
     std::vector<std::string> wordTables;
     std::string              lineComment;
+    std::string              memberSeparators = ".";
     std::vector<std::pair<char, char>> pairs;
     bool                     prose = false;
     // What opens a block, searched for at the end of the text before the
@@ -753,6 +754,10 @@ bool ALSyntaxGrammar::load(const LLSD& description, std::string& error)
         return false;
     }
     impl->lineComment = description["line_comment"].asString();
+    if (description.has("member_separators"))
+    {
+        impl->memberSeparators = description["member_separators"].asString();
+    }
     impl->prose       = description["prose"].asBoolean();
     const LLSD& pairs = description["pairs"];
     for (LLSD::array_const_iterator it = pairs.beginArray(); it != pairs.endArray(); ++it)
@@ -913,6 +918,11 @@ void ALSyntaxGrammar::collectWords(std::string_view prefix, std::vector<std::pai
 const std::string& ALSyntaxGrammar::lineComment() const
 {
     return mImpl->lineComment;
+}
+
+const std::string& ALSyntaxGrammar::memberSeparators() const
+{
+    return mImpl->memberSeparators;
 }
 
 const std::vector<std::pair<char, char>>& ALSyntaxGrammar::pairs() const

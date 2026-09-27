@@ -171,6 +171,10 @@ public:
     const std::vector<std::string>& wordTables() const;
     // What a comment to the end of the line begins with, or nothing.
     const std::string& lineComment() const;
+    // What comes between a name and a member of it (`member_separators`):
+    // a dot unless the file says, and a colon too for SLua's methods. A
+    // list of completions opens as one is typed after a name.
+    const std::string& memberSeparators() const;
     // The brackets and quotes typed in pairs, each an opener and its
     // closer, where the file says (`pairs`, each two characters: "()",
     // "\"\""); a quote closes itself.

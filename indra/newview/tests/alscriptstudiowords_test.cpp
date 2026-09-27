@@ -194,7 +194,7 @@ namespace tut
         const ALCodeEditor::Completion slua = Words::completionFor(*Words::word(true, "touch_start"), true);
         ensure_equals("SLua's, set on LLEvents", slua.snippet, std::string("LLEvents.touch_start = function(num_detected)\n    $0\nend"));
         const ALCodeEditor::Completion say = Words::completionFor(*Words::word(false, "llSay"), false);
-        ensure("a function as itself", say.snippet.empty() && say.text == "llSay" && say.documentation == "Says msg on channel.\nMore.");
+        ensure("a function as itself", say.snippet.empty() && say.text == "llSay" && say.documentation && *say.documentation == "Says msg on channel.\nMore.");
 
         ALCodeEditor&                         e = editor("default\n{\n    t\n}\nt\n", false);
         ALScriptSnippets::Snippet             snippet;

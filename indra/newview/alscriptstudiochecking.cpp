@@ -369,7 +369,7 @@ void ALScriptStudioChecking::answered(const ALScriptAnalysis::Result& result, U3
                 completion.detail        = c.detail;
                 completion.kind          = syntaxKindOf(c.kind);
                 completion.deprecated    = c.deprecated;
-                completion.documentation = c.documentation;
+                completion.documentation = ALCompletion::shared(c.documentation);
                 more.push_back(std::move(completion));
             }
             doc.editor->supplyCompletions(at, std::move(more));

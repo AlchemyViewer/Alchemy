@@ -360,6 +360,12 @@ public:
     // Whether a folded block starts at the line.
     bool isFolded(S32 line) const;
 
+    // How many brackets are open at a line's start, found from the top
+    // once and kept until an edit above it; and at a place of a line. A
+    // bracket in a string or a comment is none.
+    S32 bracketDepthBefore(S32 line);
+    S32 bracketDepthAt(const ALTextPos& at);
+
     // --- completion --------------------------------------------------------------
 
     // A word offered to complete what is typed (ALCompletion), and how well
@@ -384,8 +390,11 @@ public:
     bool completionOpen() const;
     void closeCompletion();
     // Whether the list opens on its own as an identifier is typed, or only
-    // when asked for; after how many letters; and whether Return takes the
-    // chosen one, as Tab does, or starts a new line.
+    // when asked for; after how many letters; and whether Return may take
+    // the chosen one, as Tab does, or always starts a new line. Where it
+    // may, it takes it only once the list has been moved through, or where
+    // taking it changes the text: a word typed out whole and Return is a
+    // new line, not the list's.
     void setAutoComplete(bool on) { mAutoComplete = on; }
     bool getAutoComplete() const { return mAutoComplete; }
     void setCompleteAfter(S32 letters) { mCompleteAfter = llclamp(letters, 1, 9); }
@@ -670,9 +679,6 @@ private:
     void drawGutter(const LLRect& text, F32 alpha);
     void drawAfterRows(const LLRect& text) override;
     void tintRow(S32 line, const ALTextLayout::Line& laid, const ALTextLayout::Row& row, F32 alpha, std::vector<LLColor4U>& colors) override;
-    // The depth of brackets open at a line's start, found from the top
-    // and kept until an edit above it.
-    S32  bracketDepthBefore(S32 line);
     // The lines pinned at the top for the view as scrolled now, outer to
     // inner; and the number of rows they take.
     std::vector<S32> stickyLines();
@@ -702,8 +708,12 @@ private:
     // line that is not, so that the guides run through it.
     S32 indentOf(S32 line) const;
 
-    void openCompletion();
+    // The list opened: as typing opens it, or asked for (Control-Space),
+    // when it lists what could go at the caret with nothing typed.
+    void openCompletion(bool asked = false);
     void refreshCompletion();
+    // Whether Return takes the chosen completion (setAcceptOnEnter).
+    bool returnAccepts() const;
     void placeCompletion();
     // A list of so many rows put under the row of a place, at its column,
     // or over it where under would run off the bottom.
@@ -877,6 +887,15 @@ private:
     ALLineTable<U8>         mFixable;
     // What the list offers, as it narrows (ALCompletionModel).
     ALCompletionModel       mCompletionModel;
+    // Whether the list was asked for, which it lists for with nothing
+    // typed; and whether it has been moved through since it last started
+    // from its best.
+    bool                    mCompletionAsked = false;
+    bool                    mCompletionMoved = false;
+    // What the documentation beside the list shows, and beside what, for
+    // a list made again with the same row chosen to leave it be.
+    std::string             mCompletionDocFor;
+    LLRect                  mCompletionDocBeside;
     // The stops of a snippet or a call being filled in (ALSnippetSession).
     ALSnippetSession         mSnippet;
     // Each placeholder's mirrors made what it holds.

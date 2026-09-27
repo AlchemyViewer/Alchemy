@@ -34,6 +34,7 @@
 #include <boost/unordered/unordered_flat_set.hpp>
 
 #include <algorithm>
+#include <limits>
 
 namespace
 {
@@ -240,7 +241,8 @@ const char* ALCompletionModel::badgeOf(const ALCompletion& completion)
 }
 
 // static
-void ALCompletionModel::documentWords(const ALTextDocument& text, const ALTextPos& at, std::string_view prefix, std::vector<ALCompletion>& out)
+void ALCompletionModel::documentWords(const ALTextDocument& text, const ALTextPos& at, std::string_view prefix, std::vector<ALCompletion>& out,
+                                      size_t most)
 {
     boost::unordered_flat_set<std::string, ll::string_hash, std::equal_to<>> seen;
     for (const ALCompletion& c : out)
@@ -248,7 +250,7 @@ void ALCompletionModel::documentWords(const ALTextDocument& text, const ALTextPo
         seen.insert(c.text);
     }
     const S32 count = text.lineCount();
-    for (S32 l = 0; l < count && out.size() < CAP; ++l)
+    for (S32 l = 0; l < count && out.size() < most; ++l)
     {
         const std::string& line = text.line(l);
         size_t             i    = 0;
@@ -308,14 +310,16 @@ void ALCompletionModel::rank(std::vector<ALCompletion>& list, std::string_view p
         S32 tier;
         S32 rank;
     };
-    std::vector<std::pair<Sorted, ALCompletion>> sorted;
+    // Ranked by index, and only as far as the cap sorted: a pool of a
+    // thousand words is ordered to its best two hundred, not whole.
+    std::vector<std::pair<Sorted, size_t>> sorted;
     sorted.reserve(list.size());
-    for (ALCompletion& c : list)
+    for (size_t i = 0; i < list.size(); ++i)
     {
-        const S32 tier = prefix.empty() ? 0 : matchTier(c.text, prefix);
-        sorted.push_back({ { tier < 0 ? 9 : tier, kindRank(c) }, std::move(c) });
+        const S32 tier = prefix.empty() ? 0 : matchTier(list[i].text, prefix);
+        sorted.push_back({ { tier < 0 ? 9 : tier, kindRank(list[i]) }, i });
     }
-    std::stable_sort(sorted.begin(), sorted.end(), [](const auto& a, const auto& b) {
+    const auto before = [&list](const auto& a, const auto& b) {
         if (a.first.tier != b.first.tier)
         {
             return a.first.tier < b.first.tier;
@@ -324,21 +328,74 @@ void ALCompletionModel::rank(std::vector<ALCompletion>& list, std::string_view p
         {
             return a.first.rank < b.first.rank;
         }
-        return a.second.text < b.second.text;
-    });
-    list.clear();
-    for (auto& [order, c] : sorted)
+        if (list[a.second].text != list[b.second].text)
+        {
+            return list[a.second].text < list[b.second].text;
+        }
+        return a.second < b.second;
+    };
+    const size_t kept = std::min(sorted.size(), CAP);
+    std::partial_sort(sorted.begin(), sorted.begin() + static_cast<std::ptrdiff_t>(kept), sorted.end(), before);
+    std::vector<ALCompletion> out;
+    out.reserve(kept);
+    for (size_t i = 0; i < kept; ++i)
     {
-        list.push_back(std::move(c));
+        out.push_back(std::move(list[sorted[i].second]));
     }
-    if (list.size() > CAP)
+    list.swap(out);
+}
+
+bool ALCompletionModel::pooled(const ALTextPos& start, const std::string& head, std::string_view prefix) const
+{
+    // A prefix grown from the one gathered for matches no word that one
+    // did not (matchTier holds for every start of what it held for).
+    return start == mPoolStart && head == mPoolHead && prefix.starts_with(mPoolPrefix);
+}
+
+void ALCompletionModel::pool(const ALTextPos& start, const ALTextPos& at, std::string_view prefix, const std::string& head, char separator,
+                             std::vector<ALCompletion> answered, const ALTextDocument& text)
+{
+    mPoolStart  = start;
+    mPoolHead   = head;
+    mPoolPrefix = std::string(prefix);
+    mPool       = std::move(answered);
+    mPoolWords.clear();
+    // After `ll.` the members of `ll` are wanted: the head was put before
+    // the prefix for whoever answers by whole names, and is taken off what
+    // they answer.
+    if (!head.empty())
     {
-        list.resize(CAP);
+        const std::string dotted = head + separator;
+        for (ALCompletion& c : mPool)
+        {
+            if (c.text.compare(0, dotted.size(), dotted) == 0)
+            {
+                c.text.erase(0, dotted.size());
+            }
+        }
+        return;
+    }
+    // The document's words, all of them that match now, for as long as
+    // the identifier is typed: each is offered while it is longer than
+    // what is typed.
+    std::vector<ALCompletion> words(mPool);
+    const size_t              answered_count = words.size();
+    documentWords(text, at, prefix, words, std::numeric_limits<size_t>::max());
+    mPoolWords.reserve(words.size() - answered_count);
+    for (size_t i = answered_count; i < words.size(); ++i)
+    {
+        mPoolWords.push_back(std::move(words[i].text));
     }
 }
 
 bool ALCompletionModel::narrow(const ALTextPos& start, const ALTextPos& at, std::string_view prefix, const std::string& head,
                                std::vector<ALCompletion> answered, const ALTextDocument& text)
+{
+    pool(start, at, prefix, head, '.', std::move(answered), text);
+    return narrow(start, at, prefix);
+}
+
+bool ALCompletionModel::narrow(const ALTextPos& start, const ALTextPos& at, std::string_view prefix)
 {
     const bool fresh = start != mAsked;
     if (fresh)
@@ -346,19 +403,13 @@ bool ALCompletionModel::narrow(const ALTextPos& start, const ALTextPos& at, std:
         mAsked = start;
         mSupplied.clear();
     }
-    mList = std::move(answered);
-    // After `ll.` the members of `ll` are wanted: the head was put before
-    // the prefix for whoever answers by whole names, and is taken off what
-    // they answer.
-    if (!head.empty())
+    // The pool narrowed to what is typed now.
+    mList.clear();
+    for (const ALCompletion& c : mPool)
     {
-        const std::string dotted = head + ".";
-        for (ALCompletion& c : mList)
+        if (prefix.empty() || matchTier(c.text, prefix) >= 0)
         {
-            if (c.text.compare(0, dotted.size(), dotted) == 0)
-            {
-                c.text.erase(0, dotted.size());
-            }
+            mList.push_back(c);
         }
     }
     // What was answered later about this identifier, narrowed to the
@@ -366,17 +417,14 @@ bool ALCompletionModel::narrow(const ALTextPos& start, const ALTextPos& at, std:
     // what is new about it fills what was empty. Each found by its name,
     // not by a walk of the list for each answer.
     boost::unordered_flat_map<std::string, size_t, ll::string_hash, std::equal_to<>> listed;
-    if (!mSupplied.empty())
+    listed.reserve(mList.size() + mSupplied.size());
+    for (size_t i = 0; i < mList.size(); ++i)
     {
-        listed.reserve(mList.size() + mSupplied.size());
-        for (size_t i = 0; i < mList.size(); ++i)
-        {
-            listed.emplace(mList[i].text, i);
-        }
+        listed.emplace(mList[i].text, i);
     }
     for (const ALCompletion& c : mSupplied)
     {
-        if (matchTier(c.text, prefix) < 0)
+        if (!prefix.empty() && matchTier(c.text, prefix) < 0)
         {
             continue;
         }
@@ -388,7 +436,7 @@ bool ALCompletionModel::narrow(const ALTextPos& start, const ALTextPos& at, std:
                 have.detail = c.detail;
                 have.kind   = c.kind;
             }
-            if (have.documentation.empty())
+            if (!have.documentation)
             {
                 have.documentation = c.documentation;
             }
@@ -397,9 +445,17 @@ bool ALCompletionModel::narrow(const ALTextPos& start, const ALTextPos& at, std:
         listed.emplace(c.text, mList.size());
         mList.push_back(c);
     }
-    if (head.empty())
+    // Then the document's own, but those named already and those no
+    // longer than what is typed.
+    for (const std::string& word : mPoolWords)
     {
-        documentWords(text, at, prefix, mList);
+        if (word.size() > prefix.size() && matchTier(word, prefix) >= 0 && !listed.contains(word))
+        {
+            ALCompletion c;
+            c.text = word;
+            listed.emplace(word, mList.size());
+            mList.push_back(std::move(c));
+        }
     }
     rank(mList, prefix);
     if (!mList.empty())
@@ -430,6 +486,11 @@ void ALCompletionModel::close()
     hide();
     mAsked = ALTextPos(-1, -1);
     mSupplied.clear();
+    mPool.clear();
+    mPoolWords.clear();
+    mPoolStart = ALTextPos(-1, -1);
+    mPoolHead.clear();
+    mPoolPrefix.clear();
 }
 
 bool ALCompletionModel::relisted(const std::string& asked)

@@ -28,6 +28,7 @@
 #include "altextdocument.h"
 #include "lluiimage.h"
 
+#include <memory>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -41,8 +42,15 @@ struct ALCompletion
     // A snippet rather than a word: accepting it puts this body in place
     // of the prefix, with its placeholders to tab through.
     std::string  snippet;
-    // What it does, shown beside the list while it is the one chosen.
-    std::string  documentation;
+    // What it does, shown beside the list while it is the one chosen: a
+    // handle to it, so that a list copied at every key copies no text of
+    // it, and a word's text outlives the vocabulary it came from while a
+    // list shows it. shared() makes one of a text, or none of nothing.
+    std::shared_ptr<const std::string> documentation;
+    static std::shared_ptr<const std::string> shared(std::string text)
+    {
+        return text.empty() ? nullptr : std::make_shared<const std::string>(std::move(text));
+    }
     // Struck from the language: marked so on the list and last in it, but
     // completed as what it is -- a function with its brackets.
     bool         deprecated = false;
@@ -78,8 +86,9 @@ public:
     // The document's own words that match what was typed -- but the one
     // being typed, which ends at `at`, one that starts with a digit, one no
     // longer than what was typed, and one `out` has already -- after what
-    // `out` holds, up to CAP.
-    static void documentWords(const ALTextDocument& text, const ALTextPos& at, std::string_view prefix, std::vector<ALCompletion>& out);
+    // `out` holds, up to `most` in all.
+    static void documentWords(const ALTextDocument& text, const ALTextPos& at, std::string_view prefix, std::vector<ALCompletion>& out,
+                              size_t most = CAP);
     // In the order offered: the start of the word as typed, then in either
     // case, then a part of it, then letters of its parts. Among equals the
     // script's own names -- a parameter, a local, a field -- then the
@@ -87,12 +96,23 @@ public:
     // the document's bare words; then the alphabet. No more than CAP.
     static void rank(std::vector<ALCompletion>& list, std::string_view prefix);
 
-    // The list for an identifier starting at `start`, typed up to `at`:
-    // `prefix` so far, after `head` and a dot where it is a member being
-    // asked for; `answered` what the provider said of `head.prefix`, the
-    // head still on each name. True where the identifier is one the list
-    // was not narrowing before, of which whoever answers later is to be
-    // asked; what an earlier one answered is let go of.
+    // What a list draws from while it narrows one identifier: what the
+    // provider answered as it was first asked, and the document's words,
+    // gathered once and filtered again as the prefix grows, rather than
+    // asked for and scanned at every key. Whether the pool is for the
+    // identifier starting at `start`, after `head`, with what was typed
+    // so far still starting with what it was gathered for; and the pool
+    // gathered: `answered` what the provider said of `head` and `prefix`,
+    // the head and its separator still on each name.
+    bool pooled(const ALTextPos& start, const std::string& head, std::string_view prefix) const;
+    void pool(const ALTextPos& start, const ALTextPos& at, std::string_view prefix, const std::string& head, char separator,
+              std::vector<ALCompletion> answered, const ALTextDocument& text);
+    // The list for an identifier starting at `start`, typed up to `at`,
+    // `prefix` so far: the pool narrowed to it. True where the identifier
+    // is one the list was not narrowing before, of which whoever answers
+    // later is to be asked; what an earlier one answered is let go of.
+    bool narrow(const ALTextPos& start, const ALTextPos& at, std::string_view prefix);
+    // Both at once, after `head` and a dot.
     bool narrow(const ALTextPos& start, const ALTextPos& at, std::string_view prefix, const std::string& head, std::vector<ALCompletion> answered,
                 const ALTextDocument& text);
     // What was answered later about the identifier starting at `start`:
@@ -120,4 +140,11 @@ private:
     // What was answered later, kept through every narrowing of the same
     // identifier until the list closes.
     std::vector<ALCompletion> mSupplied;
+    // The pool (pooled): what the provider answered, and the document's
+    // words apart, which are offered only where longer than what is typed.
+    std::vector<ALCompletion> mPool;
+    std::vector<std::string>  mPoolWords;
+    ALTextPos                 mPoolStart{ -1, -1 };
+    std::string               mPoolHead;
+    std::string               mPoolPrefix;
 };

@@ -867,7 +867,7 @@ namespace tut
                     ALCodeEditor::Completion c;
                     c.text = words[i];
                     c.kind = kinds[i];
-                    c.documentation = std::string("What ") + words[i] + " does.";
+                    c.documentation = ALCompletion::shared(std::string("What ") + words[i] + " does.");
                     out.push_back(c);
                 }
             }
@@ -2001,5 +2001,74 @@ namespace tut
         e.undo();
         ensure_equals("one step takes all of it back", e.text(), std::string());
         ensure("and there is nothing before it", !e.undoJournal().canUndo());
+    }
+
+    template<> template<>
+    void alcodeeditor_object::test<55>()
+    {
+        set_test_name("Return takes a completion once the list is moved through, or where taking it changes the text; else it is a new line; "
+                      "the provider asked once while a word is typed");
+        ALCodeEditor& e     = make("");
+        S32           asked = 0;
+        e.setCompletionProvider([&asked](const ALTextPos&, std::string_view prefix, std::vector<ALCodeEditor::Completion>& out) {
+            ++asked;
+            for (const char* w : { "count", "counter", "countdown" })
+            {
+                if (ALCodeEditor::matchTier(w, prefix) >= 0)
+                {
+                    ALCodeEditor::Completion c;
+                    c.text = w;
+                    c.kind = ALSyntaxKind::Variable;
+                    out.push_back(c);
+                }
+            }
+        });
+        type("cou");
+        ensure("open", e.completionOpen());
+        type("nt");
+        ensure_equals("asked once for the word, narrowed as it grew", asked, 1);
+        ensure_equals("the word typed out first", e.completions()[0].text, std::string("count"));
+        key(KEY_RETURN);
+        ensure("a word typed out whole and Return: the list gone", !e.completionOpen());
+        ensure_equals("and a new line", e.text(), std::string("count\n"));
+
+        type("cou");
+        key(KEY_DOWN);
+        key(KEY_RETURN);
+        ensure_equals("moved through: the one chosen", e.text(), std::string("count\ncountdown"));
+        key(KEY_RETURN);
+        type("cou");
+        key(KEY_RETURN);
+        ensure_equals("not moved, but it changes what is typed: taken", e.text(), std::string("count\ncountdown\ncount"));
+        ensure_equals("asked once for each word", asked, 3);
+
+        e.setAcceptOnEnter(false);
+        key(KEY_RETURN);
+        type("cou");
+        key(KEY_DOWN);
+        key(KEY_RETURN);
+        ensure_equals("never, where Return is not to take one", e.text(), std::string("count\ncountdown\ncount\ncou\n"));
+    }
+
+    template<> template<>
+    void alcodeeditor_object::test<56>()
+    {
+        set_test_name("Control-Space with nothing typed lists what could go there; a colon asks for SLua's methods");
+        ALCodeEditor& e = make("integer total;\n");
+        e.setCaret(e.document().end());
+        key(' ', MASK_CONTROL);
+        ensure("listed with nothing typed", e.completionOpen() && !e.completions().empty());
+        key(KEY_ESCAPE);
+
+        ALCodeEditor&                                  f = make("", "slua");
+        std::vector<std::pair<ALTextPos, std::string>> asked;
+        f.setCompletionRequest([&asked](const ALTextPos& at, std::string_view prefix) { asked.emplace_back(at, std::string(prefix)); });
+        type("obj:");
+        ensure("asked after the colon with nothing typed", !asked.empty() && asked.back().first == ALTextPos(0, 4) && asked.back().second.empty());
+        ALCodeEditor::Completion method;
+        method.text = "method";
+        method.kind = ALSyntaxKind::Function;
+        f.supplyCompletions(ALTextPos(0, 4), { method });
+        ensure("the answer listed", f.completionOpen() && f.completions().size() == 1 && f.completions()[0].text == "method");
     }
 }

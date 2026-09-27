@@ -145,10 +145,11 @@ const std::vector<ALScriptStudioWords::Vocab>& ALScriptStudioWords::vocabulary(b
         {
             const LLSD& attrs = entry->second;
             Vocab       word;
-            word.text       = entry->first;
-            word.kind       = kind;
-            word.tooltip    = attrs.get("tooltip").asString();
-            word.deprecated = attrs.has("deprecated") && (attrs["deprecated"].asBoolean() || attrs["deprecated"].asString() == "true");
+            word.text          = entry->first;
+            word.kind          = kind;
+            word.tooltip       = attrs.get("tooltip").asString();
+            word.documentation = ALCompletion::shared(word.tooltip);
+            word.deprecated    = attrs.has("deprecated") && (attrs["deprecated"].asBoolean() || attrs["deprecated"].asString() == "true");
             switch (kind)
             {
                 case ALSyntaxKind::Function:
@@ -235,20 +236,28 @@ void ALScriptStudioWords::teach(ALCodeEditor& editor, bool lua)
 // static
 bool ALScriptStudioWords::inStateBody(ALCodeEditor& editor, const ALTextPos& at)
 {
-    // The blocks open at the position, each by what opened it: a state's
-    // is the one after `default` or `state name`. Read off the grammar's
-    // tokens, so that a brace in a string or a comment is none.
-    std::vector<bool> open;
-    std::string       before[2];
-    for (S32 line = 0; line <= at.line && line < editor.document().lineCount(); ++line)
+    // Straight inside a state is one bracket deep, in a block opened after
+    // `default` or `state name`: the depth read off the editor's, kept for
+    // each line's start, rather than every line above lexed again; and
+    // only the block's opening read.
+    if (editor.bracketDepthAt(at) != 1)
+    {
+        return false;
+    }
+    // The line the block opened on: the last at or above the caret's that
+    // starts outside every bracket. What names it may stand on a line or
+    // two above its brace.
+    S32 opened = at.line;
+    while (opened > 0 && editor.bracketDepthBefore(opened) > 0)
+    {
+        --opened;
+    }
+    std::string before[2];
+    for (S32 line = llmax(0, opened - 2); line <= opened; ++line)
     {
         const std::string& text = editor.document().line(line);
         for (const ALSyntaxToken& token : editor.highlighter().tokens(line))
         {
-            if (line == at.line && token.begin >= at.column)
-            {
-                break;
-            }
             if (token.kind == ALSyntaxKind::Comment || token.kind == ALSyntaxKind::DocComment)
             {
                 continue;
@@ -258,25 +267,15 @@ bool ALScriptStudioWords::inStateBody(ALCodeEditor& editor, const ALTextPos& at)
             {
                 continue;
             }
-            if (token.kind == ALSyntaxKind::Punctuation)
+            if (line == opened && token.kind == ALSyntaxKind::Punctuation && word.find('{') != std::string_view::npos)
             {
-                for (const char c : word)
-                {
-                    if (c == '{')
-                    {
-                        open.push_back(before[0] == "default" || before[1] == "state");
-                    }
-                    else if (c == '}' && !open.empty())
-                    {
-                        open.pop_back();
-                    }
-                }
+                return before[0] == "default" || before[1] == "state";
             }
             before[1] = std::move(before[0]);
             before[0] = std::string(word);
         }
     }
-    return !open.empty() && open.back();
+    return false;
 }
 
 // static
@@ -287,7 +286,7 @@ ALCodeEditor::Completion ALScriptStudioWords::completionFor(const Vocab& word, b
     c.detail        = word.detail;
     c.kind          = word.kind;
     c.deprecated    = word.deprecated;
-    c.documentation = word.tooltip;
+    c.documentation = word.documentation;
     if (word.kind == ALSyntaxKind::Event)
     {
         // A handler to fill in: LSL's with its typed parameters as the
@@ -509,7 +508,7 @@ void ALScriptStudioWords::complete(bool lua, ALCodeEditor& editor, const ALTextP
                 c.detail        = snippet_word + "  " + snippet.name;
                 c.kind          = ALSyntaxKind::Control;
                 c.snippet       = snippet.body;
-                c.documentation = snippet.detail;
+                c.documentation = ALCompletion::shared(snippet.detail);
                 out.push_back(std::move(c));
             }
         }
