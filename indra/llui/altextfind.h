@@ -86,9 +86,13 @@ public:
     // The match nearest a place, after it or before it, round the ends;
     // -1 with none.
     S32 nearest(const ALTextPos& from, bool forward) const;
-    // Every match, for a replace of every one: those listed, or where the
-    // list stopped short, all there are, looked through again without end.
-    std::vector<ALTextRange> all(const ALTextDocument& doc, const std::string& query, const ALTextSearchOptions& options) const;
+    // Every match with what replaces it, for a replace of every one: those
+    // listed, each's replacement worked out where it stands -- a pattern
+    // run again held to the match, which costs less than looking through
+    // the whole text again -- or where the list stopped short, all there
+    // are, looked through again without end with each made as it is found.
+    std::vector<std::pair<ALTextRange, std::string>> replacements(const ALTextDocument& doc, const std::string& query,
+                                                                  const ALTextSearchOptions& options, const std::string& with) const;
     // The matches taken out, before a replace of every one; and put back,
     // where the replace did nothing.
     std::vector<ALTextRange> take();

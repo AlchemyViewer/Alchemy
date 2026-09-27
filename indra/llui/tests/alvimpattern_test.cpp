@@ -87,8 +87,9 @@ namespace tut
     {
         set_test_name("\\zs splits off where the match starts, \\ze looks ahead, and a line may be crossed only where the pattern says");
         const ALVimPattern zs = ALVimPattern::of("foo\\zsbar", std::string(), plain);
-        ensure("the match its own group", zs.regex == "(?:foo)(bar)" && zs.matchGroup == 1);
-        ensure_equals("found as the group", found("foobar barfoo", zs), std::string("bar"));
+        ensure_equals("the engine's \\K, the groups counted as written", zs.regex, std::string("foo\\Kbar"));
+        ensure_equals("found after it", found("foobar barfoo", zs), std::string("bar"));
+        ensure_equals("an alternative without it is whole", found("foobar baz", ALVimPattern::of("foo\\zsbar\\|baz", std::string(), plain)), std::string("bar|baz"));
         ensure_equals("a look ahead", regexOf("foo\\zebar"), std::string("foo(?=bar)"));
         ensure_equals("matched up to it", found("foobar foobaz", ALVimPattern::of("foo\\zebar", std::string(), plain)), std::string("foo"));
         ensure("\\_s crosses a line", ALVimPattern::of("a\\_sb", std::string(), plain).acrossLines);

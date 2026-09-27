@@ -80,7 +80,7 @@ namespace tut
         ALTextFind           find;
         find.search(doc, "z", ALTextSearchOptions(), false, ALTextRange());
         ensure("capped", find.capped() && find.count() == ALTextFind::LIMIT);
-        ensure_equals("every one for a replace", find.all(doc, "z", ALTextSearchOptions()).size(), ALTextFind::LIMIT + 2);
+        ensure_equals("every one for a replace", find.replacements(doc, "z", ALTextSearchOptions(), "y").size(), ALTextFind::LIMIT + 2);
         std::vector<ALTextRange> taken = find.take();
         ensure("taken", find.count() == 0 && taken.size() == ALTextFind::LIMIT);
         find.restore(std::move(taken), 3);

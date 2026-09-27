@@ -169,23 +169,13 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
                 case 'z':
                     if (i + 1 < vim.size() && vim[i + 1] == 's')
                     {
-                        // At the top level, what came before is put in a
-                        // group of its own and the rest in the group the
-                        // match is; inside brackets, the engine's \K.
-                        if (depth == 0 && !zs_seen)
-                        {
-                            out.regex   = "(?:" + out.regex + ")(";
-                            out.matchGroup = 1;
-                            zs_seen     = true;
-                        }
-                        else
-                        {
-                            // The engine's \K, and a note of where it went,
-                            // so that the pattern without it can be had.
-                            k_at.push_back(out.regex.size());
-                            out.regex += "\\K";
-                            zs_seen = true;
-                        }
+                        // The engine's \K, which keeps the groups counted
+                        // as they were written and & the match alone; and
+                        // a note of where it went, so that the pattern
+                        // without it can be had. The last one counts.
+                        k_at.push_back(out.regex.size());
+                        out.regex += "\\K";
+                        zs_seen = true;
                         ++i;
                         continue;
                     }
@@ -497,10 +487,6 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
     {
         out.regex += ")";
     }
-    if (out.matchGroup)
-    {
-        out.regex += ")";
-    }
     if (!k_at.empty() && !out.where.empty())
     {
         out.wholeRegex = out.regex;
@@ -529,11 +515,12 @@ ALVimPattern ALVimPattern::of(const std::string& vim, const std::string& last_re
 }
 
 std::vector<ALTextRange> ALVimPattern::matchesIn(const ALTextDocument& d, ALTextSearchOptions options, const ALTextRange* scope, const Places& places,
-                                                 std::string& error, std::vector<ALTextPos>& wholes) const
+                                                 std::string& error, std::vector<ALTextPos>& wholes, std::string_view with,
+                                                 std::vector<std::string>* replaced) const
 {
-    options.matchGroup      = matchGroup;
     options.acrossLines     = acrossLines;
-    std::vector<ALTextRange> matches = ALTextSearch::matches(d, regex, options, scope, &error, &wholes);
+    std::vector<ALTextRange> matches = replaced ? ALTextSearch::matches(d, regex, options, scope, &error, &wholes, with, *replaced)
+                                                : ALTextSearch::matches(d, regex, options, scope, &error, &wholes);
     if (error.empty() && !wholeRegex.empty())
     {
         // The pattern without its \K matches the same stretches whole:
@@ -556,12 +543,13 @@ std::vector<ALTextRange> ALVimPattern::matchesIn(const ALTextDocument& d, ALText
     }
     if (error.empty())
     {
-        constrain(d, places, matches, wholes);
+        constrain(d, places, matches, wholes, replaced);
     }
     return matches;
 }
 
-void ALVimPattern::constrain(const ALTextDocument& d, const Places& places, std::vector<ALTextRange>& matches, const std::vector<ALTextPos>& wholes) const
+void ALVimPattern::constrain(const ALTextDocument& d, const Places& places, std::vector<ALTextRange>& matches, std::vector<ALTextPos>& wholes,
+                             std::vector<std::string>* replaced) const
 {
     if (where.empty())
     {
@@ -638,15 +626,37 @@ void ALVimPattern::constrain(const ALTextDocument& d, const Places& places, std:
         }
         return true;
     };
-    std::vector<ALTextRange> kept;
+    // Each list kept where its match is, so that the n-th of each is
+    // still the n-th match's.
+    size_t kept = 0;
     for (size_t i = 0; i < matches.size(); ++i)
     {
-        if (allowed(i))
+        if (!allowed(i))
         {
-            kept.push_back(matches[i]);
+            continue;
         }
+        // Moved only once something before it has gone: a string moved
+        // onto itself is left empty.
+        if (kept != i)
+        {
+            matches[kept] = matches[i];
+            if (i < wholes.size())
+            {
+                wholes[kept] = wholes[i];
+            }
+            if (replaced && i < replaced->size())
+            {
+                (*replaced)[kept] = std::move((*replaced)[i]);
+            }
+        }
+        ++kept;
     }
-    matches.swap(kept);
+    matches.resize(kept);
+    wholes.resize(std::min(wholes.size(), kept));
+    if (replaced)
+    {
+        replaced->resize(std::min(replaced->size(), kept));
+    }
 }
 
 // static

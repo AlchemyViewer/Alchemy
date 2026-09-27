@@ -187,15 +187,22 @@ S32 ALTextFind::nearest(const ALTextPos& from, bool forward) const
     return ALTextSearch::nearest(mMatches.items(), from, forward);
 }
 
-std::vector<ALTextRange> ALTextFind::all(const ALTextDocument& doc, const std::string& query, const ALTextSearchOptions& options) const
+std::vector<std::pair<ALTextRange, std::string>> ALTextFind::replacements(const ALTextDocument& doc, const std::string& query,
+                                                                          const ALTextSearchOptions& options, const std::string& with) const
 {
-    if (!capped())
+    if (capped())
     {
-        return mMatches.items();
+        ALTextSearchOptions every = options;
+        every.limit               = 0;
+        return ALTextSearch::replacements(doc, query, every, with, mInSelection ? &mScope : nullptr);
     }
-    ALTextSearchOptions every = options;
-    every.limit               = 0;
-    return ALTextSearch::matches(doc, query, every, mInSelection ? &mScope : nullptr);
+    std::vector<std::pair<ALTextRange, std::string>> out;
+    out.reserve(mMatches.size());
+    for (const ALTextRange& match : mMatches.items())
+    {
+        out.emplace_back(match, ALTextSearch::replacement(doc, match, query, options, with));
+    }
+    return out;
 }
 
 std::vector<ALTextRange> ALTextFind::take()

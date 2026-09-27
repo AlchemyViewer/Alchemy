@@ -3105,14 +3105,8 @@ S32 ALTextView::replaceAllMatches()
         return 0;
     }
     // Every match, not only those the bar lists.
-    const std::vector<ALTextRange>                   every = mFind.all(mDocument, mFindBar->query(), mFindBar->options());
-    std::vector<std::pair<ALTextRange, std::string>> edits;
-    edits.reserve(every.size());
-    for (const ALTextRange& match : every)
-    {
-        edits.emplace_back(match, ALTextSearch::replacement(mDocument, match, mFindBar->query(), mFindBar->options(), mFindBar->replacement()));
-    }
-    const S32 count = static_cast<S32>(edits.size());
+    std::vector<std::pair<ALTextRange, std::string>> edits = mFind.replacements(mDocument, mFindBar->query(), mFindBar->options(), mFindBar->replacement());
+    const S32                                        count = static_cast<S32>(edits.size());
     // The matches let go of before the edits rather than slid through each
     // of them: every one is cut through by its own replacement, and the
     // text is looked through again once the edits settle. Where nothing

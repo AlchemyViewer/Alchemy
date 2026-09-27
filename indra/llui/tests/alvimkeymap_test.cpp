@@ -767,6 +767,21 @@ namespace tut
         ensure_equals("%[] under \\v", flat(e.text()), std::string("Z Z Z aaab|"));
         keys(":s/\\va{-2,}/Q/<CR>");
         ensure_equals("{-n,} under \\v is lazy: the fewest", flat(e.text()), std::string("Z Z Z Qab|"));
+        // A place that passes over the first match: the replacement is
+        // still the kept match's own, groups and all.
+        e.setText("foobar foobaz foobaq\n");
+        vim->handleKey(e, KEY_ESCAPE, MASK_NONE);
+        keys("0wve<Esc>:s/\\%Vfoo\\zs\\(ba.\\)/[&\\1]/g<CR>");
+        ensure_equals("\\%V passing over a \\zs match: & and \\1 are the kept one's", flat(e.text()), std::string("foobar foo[bazbaz] foobaq|"));
+        // After a top-level \zs, & is what the match is, and the groups
+        // are counted as they were written, one before the \zs too.
+        e.setText("foobar\n");
+        vim->handleKey(e, KEY_ESCAPE, MASK_NONE);
+        keys(":s/foo\\zsbar/[&]/<CR>");
+        ensure_equals("& after \\zs is the match alone", flat(e.text()), std::string("foo[bar]|"));
+        e.setText("foobar\n");
+        keys(":s/\\(f\\)oo\\zs\\(bar\\)/[\\2\\1&]/<CR>");
+        ensure_equals("a group before \\zs is still \\1", flat(e.text()), std::string("foo[barfbar]|"));
     }
     template<> template<>
     void alvimkeymap_object::test<19>()

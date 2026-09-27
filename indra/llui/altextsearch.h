@@ -28,6 +28,7 @@
 
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 struct ALTextSearchOptions
@@ -71,6 +72,20 @@ public:
     static std::vector<ALTextRange> matches(const ALTextDocument& doc, std::string_view query, const ALTextSearchOptions& options,
                                             const ALTextRange* scope = nullptr, std::string* error = nullptr,
                                             std::vector<ALTextPos>* whole_begins = nullptr);
+
+    // As above, with what each match would be replaced with worked out
+    // as it is found, into `replaced` in step with them: `with` with the
+    // match's own groups filled in, in its case where that is asked. The
+    // pattern is not run over each match again, as `replacement` runs it.
+    static std::vector<ALTextRange> matches(const ALTextDocument& doc, std::string_view query, const ALTextSearchOptions& options,
+                                            const ALTextRange* scope, std::string* error, std::vector<ALTextPos>* whole_begins,
+                                            std::string_view with, std::vector<std::string>& replaced);
+
+    // Every match with what replaces it, from the one search: the edits a
+    // Replace All makes.
+    static std::vector<std::pair<ALTextRange, std::string>> replacements(const ALTextDocument& doc, std::string_view query,
+                                                                         const ALTextSearchOptions& options, std::string_view with,
+                                                                         const ALTextRange* scope = nullptr, std::string* error = nullptr);
 
     // Going forward, the first match starting at or after `from`; going
     // back, the last starting before it; round the ends either way. -1

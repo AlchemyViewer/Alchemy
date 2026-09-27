@@ -326,6 +326,19 @@ int main(int, char**)
         e.undo();
     });
     countRow("  replaced", replaced[0], replaced[1]);
+    both("Replace All: (\\w+)\\s*\\( for $1 (, then undone", subjects, 1, [&](Subject& s, ALCodeEditor& e) {
+        e.findBar()->setQuery("(\\w+)\\s*\\(");
+        e.findBar()->setReplacement("$1 (");
+        e.findBar()->findChild<LLUICtrl>("regex")->handleMouseDown(0, 0, MASK_NONE);
+        replaced[&s - subjects] = e.replaceAllMatches();
+        e.findBar()->findChild<LLUICtrl>("regex")->handleMouseDown(0, 0, MASK_NONE);
+        e.undo();
+    });
+    countRow("  replaced", replaced[0], replaced[1]);
+    for (Subject& s : subjects)
+    {
+        s.editor->findBar()->setQuery("total");
+    }
     // A word typed into the bar a key at a time, the bar open over the text.
     both("a query typed into the find bar, per key", subjects, 5, [&](Subject&, ALCodeEditor& e) {
         for (const char* typed : { "t", "to", "tot", "tota", "total" })
@@ -494,6 +507,10 @@ int main(int, char**)
     }
     both(":g/total/s//count/, then undone", subjects, 1, [&](Subject& s, ALCodeEditor& e) {
         vims[&s - subjects]->takeLine(e, ':', "g/total/s//count/", true);
+        e.undo();
+    });
+    both(":%s/\\(\\w\\+\\)\\s*(/\\1 (/g, then undone", subjects, 1, [&](Subject& s, ALCodeEditor& e) {
+        vims[&s - subjects]->takeLine(e, ':', "%s/\\(\\w\\+\\)\\s*(/\\1 (/g", true);
         e.undo();
     });
     both(":g/total/>, then undone", subjects, 1, [&](Subject& s, ALCodeEditor& e) {

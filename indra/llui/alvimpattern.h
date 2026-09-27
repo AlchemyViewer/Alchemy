@@ -29,6 +29,7 @@
 
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 // A pattern in vim's spelling as the search engine reads it: the regular
@@ -62,7 +63,6 @@ struct ALVimPattern
         bool afterStart = false;
     };
     std::vector<Where> where;
-    S32                matchGroup = 0;
     std::string        wholeRegex;
     bool               acrossLines = false;
 
@@ -95,9 +95,14 @@ struct ALVimPattern
         S32         blockRight = -1;
     };
     // The matches in a document, or the stretch of it `scope` holds, that
-    // stand where the pattern says; with where each whole match began.
+    // stand where the pattern says; with where each whole match began,
+    // and, where `replaced` is given, what the engine's format `with`
+    // makes of each as it was found.
     std::vector<ALTextRange> matchesIn(const ALTextDocument& doc, ALTextSearchOptions options, const ALTextRange* scope, const Places& places,
-                                       std::string& error, std::vector<ALTextPos>& wholes) const;
-    // Of matches found, those that stand where the pattern says.
-    void constrain(const ALTextDocument& doc, const Places& places, std::vector<ALTextRange>& matches, const std::vector<ALTextPos>& wholes) const;
+                                       std::string& error, std::vector<ALTextPos>& wholes, std::string_view with = {},
+                                       std::vector<std::string>* replaced = nullptr) const;
+    // Of matches found, those that stand where the pattern says; where
+    // each began, and what replaces it, kept in step with them.
+    void constrain(const ALTextDocument& doc, const Places& places, std::vector<ALTextRange>& matches, std::vector<ALTextPos>& wholes,
+                   std::vector<std::string>* replaced = nullptr) const;
 };

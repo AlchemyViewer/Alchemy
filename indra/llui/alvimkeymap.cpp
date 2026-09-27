@@ -6873,11 +6873,14 @@ bool ALVimKeymap::substitute(ALTextView& view, S32 first, S32 last, const std::s
     options.regex         = true;
     const Pattern pattern_in = patternOf(pattern, exactcase ? std::optional<bool>(true) : anycase ? std::optional<bool>(false) : std::nullopt);
     options.caseSensitive    = pattern_in.caseSensitive;
-    options.matchGroup       = pattern_in.matchGroup;
     const ALTextRange     scope(d.lineStart(first), d.lineEnd(last));
     std::string           error;
     std::vector<ALTextPos>   wholes;
-    std::vector<ALTextRange> matches = matchesOf(view, pattern_in, options, &scope, error, wholes);
+    // What replaces each match, made as it is found rather than by the
+    // pattern run again over each; none made for a count alone.
+    const std::string        format = replacementOf(with);
+    std::vector<std::string> replaced;
+    std::vector<ALTextRange> matches = pattern_in.matchesIn(d, options, &scope, placesOf(view), error, wholes, format, count_only ? nullptr : &replaced);
     if (!error.empty())
     {
         say(said("VimBadPattern", "E486: [ERROR]", { { "[ERROR]", error } }), true);
@@ -6891,7 +6894,6 @@ bool ALVimKeymap::substitute(ALTextView& view, S32 first, S32 last, const std::s
         }
         return false;
     }
-    const std::string                                format = replacementOf(with);
     std::vector<std::pair<ALTextRange, std::string>> edits;
     S32                                              seen_line = -1;
     S32                                              lines     = 0;
@@ -6907,11 +6909,7 @@ bool ALVimKeymap::substitute(ALTextView& view, S32 first, S32 last, const std::s
             ++lines;
         }
         seen_line = match.begin.line;
-        // The replacement is worked out over the whole of what the pattern
-        // matched, where a \zs made the match a part of it, and put in
-        // place of the part.
-        const ALTextRange whole = pattern_in.matchGroup && m < wholes.size() ? ALTextRange(wholes[m], match.end) : match;
-        edits.emplace_back(match, count_only ? std::string() : ALTextSearch::replacement(d, whole, pattern_in.regex, options, format));
+        edits.emplace_back(match, count_only ? std::string() : std::move(replaced[m]));
     }
     const S32 count = static_cast<S32>(edits.size());
     if (count_only)
