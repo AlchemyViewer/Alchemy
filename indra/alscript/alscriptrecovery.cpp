@@ -29,6 +29,7 @@
 #include "fsyspath.h"
 #include "llfile.h"
 #include "llsdserialize.h"
+#include "threadpool.h"
 
 #include <algorithm>
 #include <cmath>
@@ -39,7 +40,6 @@
 #include <map>
 #include <mutex>
 #include <sstream>
-#include <thread>
 
 #if LL_WINDOWS
 #include <io.h>
@@ -281,11 +281,11 @@ F64 ALScriptRecoveryRetry::delayAfter(S32 failures)
     return FIRST * std::pow(3.0, static_cast<F64>(llmax(failures, 1) - 1));
 }
 
-// The thread writeSoon writes on: the entries waiting, by key, each with
-// where it goes -- handed over whole, what it holds of LLSD made on the
-// thread that asked and held by nothing else, since an LLSD's count of
-// who holds it is no thread's but one's -- and whether one is being
-// written now.
+// What writeSoon has waiting for the writer: the entries, by key, each
+// with where it goes -- handed over whole, what it holds of LLSD made on
+// the thread that asked and held by nothing else, since an LLSD's count of
+// who holds it is no thread's but one's -- whether one is being written
+// now, and whether the writer has been asked to write them.
 struct ALScriptRecoveryStore::Writer
 {
     struct Waiting
@@ -294,30 +294,24 @@ struct ALScriptRecoveryStore::Writer
         ALScriptRecoveryEntry entry;
         bool                  durable = false;
     };
-    std::mutex                        mutex;
-    std::condition_variable           changed;
-    std::map<std::string, Waiting>    waiting;
-    bool                              busy     = false;
-    bool                              stopping = false;
-    std::vector<std::string>          failed;
-    std::thread                       thread;
+    std::mutex                     mutex;
+    std::condition_variable        changed;
+    std::map<std::string, Waiting> waiting;
+    bool                           busy   = false;
+    bool                           posted = false;
+    std::vector<std::string>       failed;
 
-    void run()
+    // Everything waiting written, what comes meanwhile too.
+    void drain()
     {
         std::unique_lock<std::mutex> lock(mutex);
-        while (true)
+        while (!waiting.empty())
         {
-            changed.wait(lock, [this] { return stopping || !waiting.empty(); });
-            if (waiting.empty())
-            {
-                // Stopping, with nothing left to write.
-                return;
-            }
             auto one = waiting.extract(waiting.begin());
             busy     = true;
             lock.unlock();
-            const bool written = writeWhole(one.mapped().path, one.mapped().entry.written(), one.mapped().durable);
-            const std::string key = one.key();
+            const bool        written = writeWhole(one.mapped().path, one.mapped().entry.written(), one.mapped().durable);
+            const std::string key     = one.key();
             // Let go of here, the only thread that holds it.
             one = {};
             lock.lock();
@@ -328,8 +322,35 @@ struct ALScriptRecoveryStore::Writer
             }
             changed.notify_all();
         }
+        posted = false;
+        changed.notify_all();
     }
 };
+
+struct ALScriptRecoveryWriter::Pool
+{
+    // Only as wide as one: two stores' writes, or two of one store's, one
+    // after the other.
+    LL::ThreadPool pool{ "ScriptRecovery", 1, 1024 * 1024, /*auto_shutdown*/ false, /*fixed_width*/ true };
+};
+
+ALScriptRecoveryWriter::ALScriptRecoveryWriter() : mPool(std::make_unique<Pool>())
+{
+    mPool->pool.start();
+}
+
+ALScriptRecoveryWriter::~ALScriptRecoveryWriter() = default;
+
+void ALScriptRecoveryWriter::cleanupSingleton()
+{
+    // What is posted is written before it stops.
+    mPool->pool.close();
+}
+
+bool ALScriptRecoveryWriter::post(std::function<void()> work)
+{
+    return mPool->pool.getQueue().post(std::move(work));
+}
 
 ALScriptRecoveryStore::ALScriptRecoveryStore(std::string directory, std::string session)
 :   mDirectory(withSeparator(std::move(directory))),
@@ -340,15 +361,7 @@ ALScriptRecoveryStore::ALScriptRecoveryStore(std::string directory, std::string 
 
 ALScriptRecoveryStore::~ALScriptRecoveryStore()
 {
-    if (mWriter && mWriter->thread.joinable())
-    {
-        {
-            const std::lock_guard<std::mutex> lock(mWriter->mutex);
-            mWriter->stopping = true;
-        }
-        mWriter->changed.notify_all();
-        mWriter->thread.join();
-    }
+    flush();
 }
 
 void ALScriptRecoveryStore::writeSoon(ALScriptRecoveryEntry entry, bool durable)
@@ -381,12 +394,19 @@ void ALScriptRecoveryStore::writeSoon(ALScriptRecoveryEntry entry, bool durable)
             written.durable = written.durable || was->second.durable;
         }
         mWriter->waiting[key] = std::move(written);
-        if (!mWriter->thread.joinable())
+        if (mWriter->posted)
         {
-            mWriter->thread = std::thread([writer = mWriter.get()] { writer->run(); });
+            // Taken up by what was asked already.
+            return;
         }
+        mWriter->posted = true;
     }
-    mWriter->changed.notify_all();
+    Writer* writer = mWriter.get();
+    if (!ALScriptRecoveryWriter::instance().post([writer] { writer->drain(); }))
+    {
+        // Stopped: written here.
+        writer->drain();
+    }
 }
 
 void ALScriptRecoveryStore::flush() const
@@ -396,7 +416,7 @@ void ALScriptRecoveryStore::flush() const
         return;
     }
     std::unique_lock<std::mutex> lock(mWriter->mutex);
-    mWriter->changed.wait(lock, [this] { return mWriter->waiting.empty() && !mWriter->busy; });
+    mWriter->changed.wait(lock, [this] { return mWriter->waiting.empty() && !mWriter->busy && !mWriter->posted; });
 }
 
 std::vector<std::string> ALScriptRecoveryStore::takeFailures()

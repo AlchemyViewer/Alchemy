@@ -112,7 +112,12 @@ public:
     // took up let go of, its own from here. A write that fails is said once,
     // not at every pause in typing. False where it could not be kept.
     bool keep(Doc& doc, Entry::State state = Entry::State::Unsaved);
-    // The same, as typing asks: an unsaved text written on the store's
+    // keep for each of several tabs at once, the unsaved texts written on
+    // the writer's thread, each forced out to the disk there, and waited
+    // on once for the lot: what the viewer going asks. False where any
+    // could not be kept, which is said as keep says it.
+    bool keepAll(const std::vector<Doc*>& docs, Entry::State state = Entry::State::Unsaved);
+    // The same, as typing asks: an unsaved text written on the writer's
     // thread; anything else now, as keep does.
     void keepSoon(Doc& doc);
     // What a tab throws away set aside a while all the same, and its entry

@@ -512,13 +512,19 @@ ALFloaterScriptStudio::~ALFloaterScriptStudio()
     // without asking, as it does with no region to say goodbye to -- the
     // text is written as it stands, for the next login to offer back.
     // Straight to the store: nothing here is to be said any more.
+    // Each forced out to the disk on the writer's thread, and waited on
+    // once for the lot.
     ALScriptRecoveryStore* store = ALScriptStudioRecovery::store();
     for (const std::unique_ptr<Doc>& doc : mDocs)
     {
         if (store && doc->editor && !doc->recoveryKey.empty() && doc->loaded && doc->modifiable && !doc->carriedText && doc->editor->isDirty())
         {
-            store->write(ALScriptStudioRecovery::entryOf(*doc));
+            store->writeSoon(ALScriptStudioRecovery::entryOf(*doc), /*durable*/ true);
         }
+    }
+    if (store)
+    {
+        store->flush();
     }
 }
 
@@ -967,12 +973,12 @@ void ALFloaterScriptStudio::closeFloater(bool app_quitting)
     // offer back.
     if (app_quitting && gDisconnected && unsaved > 0)
     {
-        bool kept = true;
+        std::vector<Doc*> docs;
         for (std::unique_ptr<Doc>& doc : mDocs)
         {
-            kept = mRecovery.keep(*doc) && kept;
+            docs.push_back(doc.get());
         }
-        if (kept)
+        if (mRecovery.keepAll(docs))
         {
             mTabsAtQuit = openTabs();
             while (!mDocs.empty())
@@ -4827,15 +4833,15 @@ void ALFloaterScriptStudio::quitAnswered(S32 option)
             // Kept, to be opened again with the studio next time; the quit
             // called off where any of it could not be written, since it
             // would go with the viewer.
-            bool kept = true;
+            std::vector<Doc*> dirty;
             for (std::unique_ptr<Doc>& doc : mDocs)
             {
                 if (doc->loaded && doc->modifiable && doc->editor->isDirty())
                 {
-                    kept = mRecovery.keep(*doc, ALScriptRecoveryEntry::State::Kept) && kept;
+                    dirty.push_back(doc.get());
                 }
             }
-            if (!kept)
+            if (!mRecovery.keepAll(dirty, ALScriptRecoveryEntry::State::Kept))
             {
                 report(getString("KeepFailed"), true);
                 stopClosing();

@@ -479,4 +479,35 @@ namespace tut
         ensure_equals("taken up", again.editor->text(), std::string("x\ntyped"));
         ensure("its own from here, the set-aside one let go of", keptFor(again.recoveryKey) == 1 && !std::filesystem::exists(fsyspath(offered.path)));
     }
+
+    template<> template<>
+    void alscriptstudiorecovery_object::test<9>()
+    {
+        set_test_name("several tabs kept at once, as the viewer going asks: each unsaved text written, the lot waited on once; a clean tab forgets; one that fails is said");
+        ALScriptStudioRecovery& r     = make();
+        Doc&                    a     = tab("a", "one\n");
+        Doc&                    b     = tab("b", "two\n");
+        Doc&                    clean = tab("c", "three\n");
+        type(a, "x");
+        type(b, "y");
+        ensure("kept", r.keepAll({ &a, &b, &clean }, Entry::State::Kept));
+        ensure("both written", keptFor(a.recoveryKey) == 1 && keptFor(b.recoveryKey) == 1);
+        ensure("and nothing of the clean one", keptFor(clean.recoveryKey) == 0);
+        const std::vector<Entry> all = store->list();
+        ensure("kept for next time", std::all_of(all.begin(), all.end(), [](const Entry& one) { return one.state == Entry::State::Kept; }));
+        ensure("nothing said", services().reports.empty());
+
+        const std::string blocked = folder + "/blocked";
+        {
+            llofstream file(blocked);
+            file << "a file where a folder would be";
+        }
+        ALScriptRecoveryStore nowhere(blocked, "this-session");
+        ALScriptStudioRecovery::useStore(&nowhere);
+        type(a, "z");
+        type(b, "w");
+        ensure("not kept", !r.keepAll({ &a, &b }));
+        ensure("each said once", services().reports.size() == 2 && a.recoveryFailed && b.recoveryFailed);
+        ALScriptStudioRecovery::useStore(store.get());
+    }
 }

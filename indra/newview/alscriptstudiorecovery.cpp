@@ -34,6 +34,7 @@
 #include "llnotificationsutil.h"
 #include "lltimer.h"
 
+#include <algorithm>
 #include <memory>
 
 namespace
@@ -46,6 +47,41 @@ namespace
 
     // A test's store, in place of the account's.
     ALScriptRecoveryStore* sGivenStore = nullptr;
+
+    // The account's store, one for the process, made again where another
+    // account has logged in since; let go of in the viewer's cleanup --
+    // what it has waiting written first -- before the writer it writes on
+    // stops.
+    class AccountRecovery final : public LLSingleton<AccountRecovery>
+    {
+        LLSINGLETON(AccountRecovery);
+        void cleanupSingleton() override { mStore.reset(); }
+
+    public:
+        ALScriptRecoveryStore* storeFor(const std::string& directory)
+        {
+            if (!mStore || mMadeFor != directory)
+            {
+                LLFile::mkdir(directory);
+                mStore   = std::make_unique<ALScriptRecoveryStore>(directory, mSession);
+                mMadeFor = directory;
+                // What was discarded long ago goes for good.
+                mStore->prune(DISCARDED_KEPT);
+            }
+            return mStore.get();
+        }
+
+    private:
+        std::unique_ptr<ALScriptRecoveryStore> mStore;
+        std::string                            mMadeFor;
+        const std::string                      mSession = LLUUID::generateNewID().asString();
+    };
+
+    AccountRecovery::AccountRecovery()
+    {
+        // Asked for here, so that it is let go of after this.
+        ALScriptRecoveryWriter::getInstance();
+    }
 
     // What an entry is called in a list: its name, or its file's.
     std::string nameOf(const ALScriptRecoveryEntry& entry)
@@ -65,23 +101,11 @@ ALScriptRecoveryStore* ALScriptStudioRecovery::store()
     {
         return sGivenStore;
     }
-    static std::unique_ptr<ALScriptRecoveryStore> account;
-    static std::string                            made_for;
-    static const std::string                      session = LLUUID::generateNewID().asString();
-    if (!gDirUtilp || gDirUtilp->getLindenUserDir().empty())
+    if (!gDirUtilp || gDirUtilp->getLindenUserDir().empty() || AccountRecovery::wasDeleted())
     {
         return nullptr;
     }
-    const std::string directory = gDirUtilp->getExpandedFilename(LL_PATH_PER_SL_ACCOUNT, "script_studio_recovery");
-    if (!account || made_for != directory)
-    {
-        LLFile::mkdir(directory);
-        account  = std::make_unique<ALScriptRecoveryStore>(directory, session);
-        made_for = directory;
-        // What was discarded long ago goes for good.
-        account->prune(DISCARDED_KEPT);
-    }
-    return account.get();
+    return AccountRecovery::instance().storeFor(gDirUtilp->getExpandedFilename(LL_PATH_PER_SL_ACCOUNT, "script_studio_recovery"));
 }
 
 // static
@@ -170,6 +194,58 @@ bool ALScriptStudioRecovery::keep(Doc& doc, Entry::State state)
         doc.recovering.reset();
     }
     return true;
+}
+
+bool ALScriptStudioRecovery::keepAll(const std::vector<Doc*>& docs, Entry::State state)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
+    ALScriptRecoveryStore* kept = store();
+    // Each unsaved text handed to the writer, forced out to the disk
+    // there, and waited on once for the lot; the rest as keep does them.
+    std::vector<Doc*> written;
+    bool              all = true;
+    for (Doc* doc : docs)
+    {
+        if (!kept || doc->recoveryKey.empty() || !doc->loaded || !doc->modifiable || doc->carriedText || !doc->editor->isDirty())
+        {
+            all = keep(*doc, state) && all;
+            continue;
+        }
+        Entry entry = entryOf(*doc);
+        entry.state = state;
+        kept->writeSoon(std::move(entry), /*durable*/ true);
+        written.push_back(doc);
+    }
+    if (written.empty())
+    {
+        return all;
+    }
+    kept->flush();
+    const std::vector<std::string> failed = kept->takeFailures();
+    for (Doc* doc : written)
+    {
+        doc->recoveryDue = 0.0;
+        if (std::find(failed.begin(), failed.end(), doc->recoveryKey) != failed.end())
+        {
+            all = false;
+            if (!doc->recoveryFailed)
+            {
+                doc->recoveryFailed = true;
+                LLStringUtil::format_map_t args;
+                args["[NAME]"] = doc->name;
+                mServices.report(mServices.words("RecoveryWriteFailed", args), true, doc);
+            }
+            continue;
+        }
+        doc->recoveryFailed = false;
+        // What this tab took up is its own to keep from here.
+        if (doc->recovering)
+        {
+            kept->remove(*doc->recovering);
+            doc->recovering.reset();
+        }
+    }
+    return all;
 }
 
 void ALScriptStudioRecovery::keepSoon(Doc& doc)

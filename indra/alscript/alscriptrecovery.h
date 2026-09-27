@@ -26,8 +26,10 @@
 
 #include "lldate.h"
 #include "llsd.h"
+#include "llsingleton.h"
 #include "lluuid.h"
 
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
@@ -122,6 +124,26 @@ struct ALScriptRecoveryRetry
     static bool mayTry(S32 failures) { return failures < TRIES; }
 };
 
+// The one thread the recovery stores write on: a pool of one for the
+// process, stopped in the viewer's cleanup rather than joined as the
+// process goes. What a store has waiting stays the store's (writeSoon);
+// this runs its writing.
+class ALScriptRecoveryWriter final : public LLSingleton<ALScriptRecoveryWriter>
+{
+    LLSINGLETON(ALScriptRecoveryWriter);
+    ~ALScriptRecoveryWriter() override;
+    void cleanupSingleton() override;
+
+public:
+    // Work run out there; false once it has stopped, when whoever asked
+    // does it where it is.
+    bool post(std::function<void()> work);
+
+private:
+    struct Pool;
+    std::unique_ptr<Pool> mPool;
+};
+
 // The entries, one file each in a folder of the account's, written whole
 // and then put in place, so that what is there is always one whole text or
 // another and never half of each. Each session writes files of its own, so
@@ -130,10 +152,9 @@ struct ALScriptRecoveryRetry
 // again by the next, which offers it back. The discarded go into a folder
 // beside, and go for good once they are old.
 //
-// What typing writes goes on a thread of the store's own (writeSoon);
-// everything else is done where it is asked, once what that thread has
-// waiting is written, so that the files change in the order they were
-// asked to.
+// What typing writes goes on the writer's thread (writeSoon); everything
+// else is done where it is asked, once what the store has waiting there
+// is written, so that the files change in the order they were asked to.
 class ALScriptRecoveryStore
 {
 public:
@@ -155,7 +176,7 @@ public:
     // out to the disk. False where it could not be written, which the
     // caller is to say.
     bool write(ALScriptRecoveryEntry entry);
-    // The same a moment from now, on the store's thread, as typing asks
+    // The same a moment from now, on the writer's thread, as typing asks
     // for it: the newest for a key in place of one still waiting, and not
     // forced out to the disk -- what a crash of the viewer needs, the
     // system holding what was written, where forcing it would hold up
@@ -249,7 +270,7 @@ private:
     std::string mDirectory;
     std::string mDiscarded;
     std::string mSession;
-    // The thread writeSoon writes on, started with the first.
+    // What writeSoon has waiting for the writer, made with the first.
     struct Writer;
     std::unique_ptr<Writer> mWriter;
 };
