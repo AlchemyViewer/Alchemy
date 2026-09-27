@@ -2633,6 +2633,57 @@ namespace
         ~Nesting() { --depth; }
     };
 
+    // The functions a script marks `inline`: the marks taken off, and the
+    // names kept for the optimizer to put in place wherever they are
+    // called.
+    class InlineMarkers
+    {
+    public:
+        // An `inline` before a function's definition -- `inline f()`,
+        // `inline integer f(x)` -- taken off and the name kept.
+        Tokens run(const Tokens& in)
+        {
+            Tokens out;
+            for (size_t i = 0; i < in.size(); ++i)
+            {
+                if (in[i].is(Kind::Ident, "inline"))
+                {
+                    size_t j = skipBlank(in, i + 1);
+                    size_t name = std::string::npos;
+                    if (j < in.size() && in[j].kind == Kind::Ident)
+                    {
+                        const size_t k = skipBlank(in, j + 1);
+                        if (k < in.size() && in[k].is(Kind::Punct, "("))
+                        {
+                            name = j;
+                        }
+                        else if (k < in.size() && in[k].kind == Kind::Ident)
+                        {
+                            const size_t l = skipBlank(in, k + 1);
+                            if (l < in.size() && in[l].is(Kind::Punct, "("))
+                            {
+                                name = k;
+                            }
+                        }
+                    }
+                    if (name != std::string::npos)
+                    {
+                        mNames.push_back(in[name].text);
+                        i = j - 1;
+                        continue;
+                    }
+                }
+                out.push_back(in[i]);
+            }
+            return out;
+        }
+
+        const std::vector<std::string>& names() const { return mNames; }
+
+    private:
+        std::vector<std::string> mNames;
+    };
+
     // The language extensions LSL-PyOptimizer's users know, lowered to
     // LSL: `break` and `continue` in a loop -- `break 2` for the loop
     // outside -- as jumps to labels put after the loop and at the end
@@ -2648,15 +2699,15 @@ namespace
 
         Tokens run(const Tokens& in)
         {
-            Tokens out = markers(assignments(in));
+            Tokens out = mMarkers.run(assignments(in));
             mScopes.clear();
             return statements(out, 0, out.size());
         }
 
-        bool any() const { return mCounter > 0 || mAssignments > 0 || !mInlined.empty(); }
+        bool any() const { return mCounter > 0 || mAssignments > 0 || !mMarkers.names().empty(); }
         // The functions marked `inline`, for the optimizer to put in
         // place wherever they are called.
-        const std::vector<std::string>& inlined() const { return mInlined; }
+        const std::vector<std::string>& inlined() const { return mMarkers.names(); }
 
     private:
         struct Scope
@@ -2717,45 +2768,6 @@ namespace
                 --sign;
             }
             return sign > from && t[sign - 1].is(Kind::Punct, "@") ? t[name - 1].text : std::string();
-        }
-
-        // An `inline` before a function's definition -- `inline f()`,
-        // `inline integer f(x)` -- taken off and the name kept.
-        Tokens markers(const Tokens& in)
-        {
-            Tokens out;
-            for (size_t i = 0; i < in.size(); ++i)
-            {
-                if (in[i].is(Kind::Ident, "inline"))
-                {
-                    size_t j = skipBlank(in, i + 1);
-                    size_t name = std::string::npos;
-                    if (j < in.size() && in[j].kind == Kind::Ident)
-                    {
-                        const size_t k = skipBlank(in, j + 1);
-                        if (k < in.size() && in[k].is(Kind::Punct, "("))
-                        {
-                            name = j;
-                        }
-                        else if (k < in.size() && in[k].kind == Kind::Ident)
-                        {
-                            const size_t l = skipBlank(in, k + 1);
-                            if (l < in.size() && in[l].is(Kind::Punct, "("))
-                            {
-                                name = k;
-                            }
-                        }
-                    }
-                    if (name != std::string::npos)
-                    {
-                        mInlined.push_back(in[name].text);
-                        i = j - 1;
-                        continue;
-                    }
-                }
-                out.push_back(in[i]);
-            }
-            return out;
         }
 
         // `a &= b` and the rest as `a = a & (b)`, the left side an
@@ -3193,7 +3205,7 @@ namespace
         std::vector<Scope>       mScopes;
         S32                      mCounter     = 0;
         S32                      mAssignments = 0;
-        std::vector<std::string> mInlined;
+        InlineMarkers            mMarkers;
         // How far down the descent is.
         S32                      mNested      = 0;
     };
