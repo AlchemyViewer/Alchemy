@@ -356,8 +356,11 @@ public:
     typedef std::function<void(const Contents&)> contents_callback_t;
     // The scripts and notecards a prim holds, fetched from the region if
     // need be, answered once on the main thread: as not fetched where the
-    // region has not answered within a while.
-    void listContents(const LLUUID& prim, contents_callback_t callback);
+    // region has not answered within a while. `from_region` asks the
+    // region even where the object keeps a copy: after a change the object
+    // hears of only while it is selected -- a drop into it keeps the copy
+    // it had -- or where a person asked.
+    void listContents(const LLUUID& prim, contents_callback_t callback, bool from_region = false);
 
     // --- changing what an object holds ---------------------------------------------
 

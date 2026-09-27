@@ -394,4 +394,26 @@ namespace tut
         model.pin({ *Model::Choice::of(rowNamed(all, "Chair")->value) });
         ensure("let go", model.pins().size() == 1 && !model.isPinned(chair));
     }
+
+    template<> template<>
+    void alscriptexplorermodel_object::test<10>()
+    {
+        set_test_name("a prim dropped into, whose object keeps its copy of what it held, is asked again, and of the region, until let go of");
+        const LLUUID house = object(10, "House", 2);
+        selected           = { house };
+        list();
+        const auto always = [](const LLUUID&) { return true; };
+        ensure_equals("both asked first", model.toAsk(false, false, always).size(), size_t(2));
+        holds(id(10), { "a.lsl" });
+        holds(id(11), {});
+        ensure("known and current: nothing asked", model.toAsk(false, false, always).empty());
+        model.askRegion(id(11));
+        ensure("the one dropped into, though its object says current", model.toAsk(false, false, always) == std::vector<LLUUID>({ id(11) }));
+        ensure("and of the region", model.asksRegion(id(11)) && !model.asksRegion(id(10)));
+        holds(id(11), { "b.lsl" });
+        ensure("still, for the ask a moment later", model.toAsk(false, false, always) == std::vector<LLUUID>({ id(11) }));
+        holds(id(11), { "b.lsl" });
+        model.doneAskingRegion();
+        ensure("let go of: as any other", model.toAsk(false, false, always).empty() && !model.asksRegion(id(11)));
+    }
 }

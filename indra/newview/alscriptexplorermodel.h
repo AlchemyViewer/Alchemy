@@ -145,6 +145,14 @@ public:
     // folded out of sight, unless `filtering` looks through it. Each is
     // taken as asked until it is answered.
     std::vector<LLUUID> toAsk(bool refetch, bool filtering, const std::function<bool(const LLUUID& prim)>& current);
+    // A prim whose contents changed where its object keeps no word of it
+    // until it is selected -- a drop into it, a transfer: asked, and asked
+    // of the region rather than of the object's copy, until let go of --
+    // after the ask a moment later, which catches a region slow to count
+    // the change.
+    void askRegion(const LLUUID& prim) { mAskRegion.insert(prim); }
+    bool asksRegion(const LLUUID& prim) const { return mAskRegion.contains(prim); }
+    void doneAskingRegion() { mAskRegion.clear(); }
 
     // A new item to be opened once its prim lists it: by its id, or its
     // name where the region gave no id; with the text it is opened with.
@@ -307,6 +315,7 @@ private:
     // The prims asked what they hold and not answered yet, which are not
     // asked again meanwhile.
     boost::unordered_flat_set<LLUUID>         mContentsAsked;
+    boost::unordered_flat_set<LLUUID>         mAskRegion;
     // The prims listed; those whose names were asked of their regions while
     // listed.
     boost::unordered_flat_set<LLUUID>         mListedPrims;

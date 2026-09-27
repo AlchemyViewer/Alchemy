@@ -96,7 +96,8 @@ public:
     void pump();
     // The objects in hand listed again, and what each prim holds asked
     // where it is not known or has changed -- of every prim where `refetch`.
-    void relist(bool refetch = false);
+    // `from_region` asks every prim's region, not the objects' copies.
+    void relist(bool refetch = false, bool from_region = false);
     // A script's row, chosen and in view, with the explorer in sight and
     // the keyboard in it: what holds it unfolded first, and the filter let
     // go of where it hides the row.

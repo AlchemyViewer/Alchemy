@@ -178,7 +178,7 @@ std::vector<LLUUID> ALScriptExplorerModel::toAsk(bool refetch, bool filtering, c
         const bool object_folded = mFolded.contains(object.root);
         for (const Prim& prim : object.prims)
         {
-            if (!refetch && prim.fetched && current && current(prim.id))
+            if (!refetch && prim.fetched && current && current(prim.id) && !mAskRegion.contains(prim.id))
             {
                 continue;
             }

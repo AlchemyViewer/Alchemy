@@ -277,7 +277,7 @@ void ALScriptExplorerPane::pump()
     }
 }
 
-void ALScriptExplorerPane::relist(bool refetch)
+void ALScriptExplorerPane::relist(bool refetch, bool from_region)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
     if (!mServices)
@@ -328,12 +328,20 @@ void ALScriptExplorerPane::relist(bool refetch)
     const LLHandle<LLPanel> handle = getHandle();
     for (const LLUUID& prim : asking)
     {
-        ALScriptWorkspace::instance().listContents(prim, [handle](const ALScriptWorkspace::Contents& contents) {
-            if (ALScriptExplorerPane* pane = ALViewType::as<ALScriptExplorerPane>(handle.get()))
-            {
-                pane->contentsHeard(contents);
-            }
-        });
+        ALScriptWorkspace::instance().listContents(
+            prim,
+            [handle](const ALScriptWorkspace::Contents& contents) {
+                if (ALScriptExplorerPane* pane = ALViewType::as<ALScriptExplorerPane>(handle.get()))
+                {
+                    pane->contentsHeard(contents);
+                }
+            },
+            from_region || mModel.asksRegion(prim));
+    }
+    // Asked of the region until the second ask after a drop has gone.
+    if (mRefetchAt == 0.0)
+    {
+        mModel.doneAskingRegion();
     }
 }
 
@@ -656,8 +664,10 @@ void ALScriptExplorerPane::act(const std::string& action)
 {
     if (action == "refresh")
     {
+        // Of the regions: an object keeps its copy of what it holds, and
+        // hears that it changed only while it is selected.
         mModel.forgetRunning();
-        relist(true);
+        relist(true, true);
         return;
     }
     if (action == "copy")
@@ -1079,7 +1089,7 @@ void ALScriptExplorerPane::transfer(const LLUUID& from, const std::vector<LLUUID
     args["[NAME]"] = ALScriptWorkspace::objectName(rootOf(gObjectList.findObject(to)), mServices->words("ObjectUnnamed"));
     mServices->setStatus(mServices->words("TransferGoing", args));
     const LLHandle<LLPanel> handle = getHandle();
-    ALScriptWorkspace::instance().transfer(from, items, to, running, [handle, args](const ALScriptWorkspace::TransferResult& result) {
+    ALScriptWorkspace::instance().transfer(from, items, to, running, [handle, args, to](const ALScriptWorkspace::TransferResult& result) {
         ALScriptExplorerPane* pane = ALViewType::as<ALScriptExplorerPane>(handle.get());
         if (!pane)
         {
@@ -1116,8 +1126,9 @@ void ALScriptExplorerPane::transfer(const LLUUID& from, const std::vector<LLUUID
         }
         services.report(words, !result.error.empty() || !result.refused.empty() || !result.stranded.empty() || !result.lost.empty());
         // The prims listed again, as after a drop from the inventory.
-        pane->relist(true);
+        pane->mModel.askRegion(to);
         pane->mRefetchAt = LLTimer::getTotalSeconds() + 2.0;
+        pane->relist(true);
     });
 }
 
@@ -1231,7 +1242,10 @@ bool ALScriptExplorerPane::dropIntoPrim(LLViewerObject* prim, MASK mask, bool dr
     if (ok && drop)
     {
         // Listed again once the tree is done with the drop, and again in a
-        // moment for what a folder sends once its items are in.
+        // moment for what a folder sends once its items are in -- of the
+        // region, since the object keeps the copy it had, and would hear
+        // otherwise only while selected.
+        mModel.askRegion(prim->getID());
         relistSoon(true);
         mRefetchAt = LLTimer::getTotalSeconds() + 2.0;
     }

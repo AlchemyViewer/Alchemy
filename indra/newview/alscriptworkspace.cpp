@@ -1430,7 +1430,7 @@ void ALScriptWorkspace::processScriptRunningReply(LLMessageSystem* msg, void** d
 
 // --- what an object holds ----------------------------------------------------------
 
-void ALScriptWorkspace::listContents(const LLUUID& prim, contents_callback_t callback)
+void ALScriptWorkspace::listContents(const LLUUID& prim, contents_callback_t callback, bool from_region)
 {
     sweepListeners();
     LLViewerObject* object = gObjectList.findObject(prim);
@@ -1450,6 +1450,11 @@ void ALScriptWorkspace::listContents(const LLUUID& prim, contents_callback_t cal
         hidden.fetched = true;
         callback(hidden);
         return;
+    }
+    if (from_region)
+    {
+        // Its copy let go of once the listener asks, which fetches anew.
+        object->dirtyInventory();
     }
     auto listener = std::make_shared<ContentsListener>(object, prim, std::move(callback));
     mListeners.push_back(listener);
