@@ -116,6 +116,9 @@ public:
         virtual void fixAllOfKind(Doc& doc, const std::string& key) = 0;
         // The tab's problems gathered again.
         virtual void refreshProblems(Doc& doc) = 0;
+        // What the script said as it ran let go of, and not listed again
+        // when it is next opened.
+        virtual void runtimeCleared(Doc& doc) = 0;
         // A lint, by what names it in a language, where it is one there is
         // a choice about; how it is set, and set; the settings of all.
         virtual bool                 isLint(bool lua, const std::string& id) const                    = 0;

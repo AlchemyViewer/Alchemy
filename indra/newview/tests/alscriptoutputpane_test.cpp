@@ -55,6 +55,7 @@ namespace
             std::string file;
             S32         line   = -1;
             S32         column = -1;
+            bool        running = false;
         };
 
         bool outputInSight() const override { return inSight; }
@@ -62,9 +63,9 @@ namespace
         bool ownsObject(const LLUUID& root) const override { return owned.count(root) > 0; }
         void outputAction(ALScriptStudioDoc& doc, const std::string& action) override { actions.push_back(doc.id + ":" + action); }
         void outputShowDoc(ALScriptStudioDoc& doc, bool problems) override { shown.push_back(doc.id + (problems ? ":problems" : "")); }
-        void outputGoTo(const ALScriptRef& ref, const std::string& name, S32 line, S32 column) override
+        void outputGoTo(const ALScriptRef& ref, const std::string& name, S32 line, S32 column, bool running) override
         {
-            went.push_back({ ref, name, std::string(), line, column });
+            went.push_back({ ref, name, std::string(), line, column, running });
         }
         void outputGoToInclude(const std::string& file, const std::string& file_name, S32 line, S32 column) override
         {
@@ -382,13 +383,18 @@ namespace tut
         ensure_equals("two places gone to", studio.went.size(), size_t(2));
         ensure("the script", studio.went[0].ref == ALScriptRef(object, item) && studio.went[0].file.empty());
         ensure_equals("at the error's line", studio.went[0].line, 4);
+        ensure("read back already", !studio.went[0].running);
         ensure_equals("the include", studio.went[1].file, std::string("disk:/scripts/lib.luau"));
         ensure_equals("by its name", studio.went[1].name, std::string("lib.luau"));
         ensure_equals("at the frame's line", studio.went[1].line, 2);
 
-        // Not open here: the line the run names, as it named it.
+        // Not open here: the line the run names, as it named it, and a
+        // link that says so, for the window to read back once it can.
         services.docs.clear();
         ensure_equals("as said", out.heard(error).line, 7);
+        chosen = last();
+        out.choose(chosen);
+        ensure("gone to as the region counts it", studio.went.back().line == 7 && studio.went.back().running);
     }
 
     template<> template<>

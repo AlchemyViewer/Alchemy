@@ -1855,6 +1855,27 @@ void ALFloaterScriptStudio::goToPending(Doc& doc)
     {
         return;
     }
+    if (doc.pendingRunning)
+    {
+        // A line the region counts: read back once the map is known
+        // (runningKnown), to the source or an include.
+        if (holdsRuntime(doc))
+        {
+            return;
+        }
+        const Doc::RunningPlace place = doc.placeOfRunning(doc.pendingLine, doc.pendingColumn);
+        doc.pendingRunning            = false;
+        doc.pendingLine               = place.line;
+        doc.pendingColumn             = place.column;
+        doc.pendingLength             = 0;
+        if (!place.file.empty())
+        {
+            doc.pendingLine   = -1;
+            doc.pendingColumn = -1;
+            openIncludeAt(place.file, place.fileName, place.line, place.column, 0);
+            return;
+        }
+    }
     ALCodeEditor& source = sourceInFront(doc);
     if (doc.pendingColumn >= 0)
     {
@@ -1864,9 +1885,10 @@ void ALFloaterScriptStudio::goToPending(Doc& doc)
     {
         source.goToLine(doc.pendingLine);
     }
-    doc.pendingLine   = -1;
-    doc.pendingColumn = -1;
-    doc.pendingLength = 0;
+    doc.pendingLine    = -1;
+    doc.pendingColumn  = -1;
+    doc.pendingLength  = 0;
+    doc.pendingRunning = false;
 }
 
 void ALFloaterScriptStudio::loaded(const ALScriptWorkspace::Loaded& answer)
@@ -2077,6 +2099,11 @@ void ALFloaterScriptStudio::loaded(const ALScriptWorkspace::Loaded& answer)
                 askExperienceOf(doc);
             }
             mExplorerPane->relist();
+        }
+        if (!doc.runtimeRecalled)
+        {
+            recallRuntime(doc);
+            refreshProblems(doc);
         }
         goToPending(doc);
     }
@@ -5807,39 +5834,71 @@ void ALFloaterScriptStudio::trimTrailing(Doc& doc)
 
 void ALFloaterScriptStudio::runtimeEvent(const ALScriptWorkspace::RuntimeEvent& event)
 {
-    const ALScriptOutputPane::Place at = mOutputPane->heard(event);
+    mOutputPane->heard(event);
 
     // A run-time error in a script that is open marks its line: said
     // again, as a script failing in a timer says it every tick, it is
-    // the same problem, counted.
+    // the same problem, counted. One still loading takes it with the rest
+    // said since it last compiled, once it has (recallRuntime).
     const size_t open = event.item.notNull() ? indexOf(ALScriptRef(event.prim, event.item)) : NONE;
-    if (event.isError && open != NONE)
+    if (event.isError && open != NONE && mDocs[open]->runtimeRecalled)
     {
-        Doc&                doc = *mDocs[open];
-        Doc::RuntimeProblem problem;
-        problem.line    = at.line;
-        problem.column  = at.column;
-        problem.file    = at.file;
-        problem.message = event.error.empty() ? oneLine(event.message) : event.error;
-        const auto same = std::find_if(doc.runtime.begin(), doc.runtime.end(), [&problem](const Doc::RuntimeProblem& one) {
-            return one.line == problem.line && one.column == problem.column && one.file == problem.file && one.message == problem.message;
-        });
-        if (same != doc.runtime.end())
-        {
-            ++same->count;
-        }
-        else
-        {
-            doc.runtime.push_back(std::move(problem));
-            // A script failing many ways at once is failing: the oldest go
-            // past a few dozen.
-            constexpr size_t RUNTIME_PROBLEMS = 50;
-            if (doc.runtime.size() > RUNTIME_PROBLEMS)
-            {
-                doc.runtime.erase(doc.runtime.begin());
-            }
-        }
+        Doc& doc = *mDocs[open];
+        doc.heardRuntime(runtimeProblemOf(event), holdsRuntime(doc));
         refreshProblems(doc);
+    }
+}
+
+// static
+ALScriptStudioDoc::RuntimeProblem ALFloaterScriptStudio::runtimeProblemOf(const ALScriptWorkspace::RuntimeEvent& event)
+{
+    Doc::RuntimeProblem problem;
+    problem.line    = event.line;
+    problem.column  = event.column;
+    problem.message = event.error.empty() ? oneLine(event.message) : event.error;
+    return problem;
+}
+
+bool ALFloaterScriptStudio::holdsRuntime(const Doc& doc) const
+{
+    // Expanded, and the map what runs is read back by still to come.
+    return preprocessed(doc) && !doc.runningMap();
+}
+
+void ALFloaterScriptStudio::recallRuntime(Doc& doc)
+{
+    // What it said as it ran while it was closed, this session and since it
+    // last compiled: among its problems, where it is in the source.
+    if (doc.runtimeRecalled)
+    {
+        return;
+    }
+    doc.runtimeRecalled = true;
+    if (doc.ref.inInventory() || doc.notecard)
+    {
+        return;
+    }
+    const bool hold = holdsRuntime(doc);
+    for (const ALScriptWorkspace::RuntimeEvent& event : ALScriptWorkspace::instance().runtimeErrorsOf(doc.ref.object, doc.ref.item))
+    {
+        doc.heardRuntime(runtimeProblemOf(event), hold);
+    }
+}
+
+void ALFloaterScriptStudio::runningKnown(Doc& doc)
+{
+    doc.placeHeldRuntime();
+    if (doc.pendingRunning)
+    {
+        goToPending(doc);
+    }
+}
+
+void ALFloaterScriptStudio::runtimeCleared(Doc& doc)
+{
+    if (!doc.ref.inInventory())
+    {
+        ALScriptWorkspace::instance().forgetRuntime(doc.ref.item);
     }
 }
 
@@ -5907,25 +5966,45 @@ void ALFloaterScriptStudio::outputShowDoc(Doc& doc, bool problems)
     }
 }
 
-void ALFloaterScriptStudio::outputGoTo(const ALScriptRef& ref, const std::string& name, S32 line, S32 column)
+void ALFloaterScriptStudio::outputGoTo(const ALScriptRef& ref, const std::string& name, S32 line, S32 column, bool running)
 {
     mNavigation.noteJump();
     size_t index = indexOf(ref);
     if (index == NONE)
     {
-        // The script it names, opened; the line once it has loaded.
+        // The script it names, opened; the line once it has loaded, and
+        // one the region counts once its map is known too.
         openScript(ref, name);
         index = indexOf(ref);
         if (index != NONE)
         {
-            mDocs[index]->pendingLine = line;
+            mDocs[index]->pendingLine    = line;
+            mDocs[index]->pendingRunning = running;
         }
         return;
     }
     activate(index);
+    Doc& doc = *mDocs[index];
+    if (line >= 0 && running && (!doc.loaded || holdsRuntime(doc)))
+    {
+        doc.pendingLine    = line;
+        doc.pendingRunning = true;
+        return;
+    }
+    if (line >= 0 && running)
+    {
+        const Doc::RunningPlace place = doc.placeOfRunning(line, column);
+        if (!place.file.empty())
+        {
+            openIncludeAt(place.file, place.fileName, place.line, place.column, 0);
+            return;
+        }
+        line   = place.line;
+        column = place.column;
+    }
     if (line >= 0)
     {
-        ALCodeEditor& source = sourceInFront(*mDocs[index]);
+        ALCodeEditor& source = sourceInFront(doc);
         source.goTo(ALTextPos(line, llmax(0, column)));
         source.setFocus(true);
     }

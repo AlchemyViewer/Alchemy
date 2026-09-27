@@ -478,6 +478,11 @@ std::vector<ALScriptWorkspace::Diagnostic> ALScriptWorkspace::parseDiagnostics(c
 
 void ALScriptWorkspace::deliver(const CompileResult& result, const compile_callback_t& callback)
 {
+    if (result.success && !result.notecard)
+    {
+        // A new script runs from here; what the old one said is past.
+        forgetRuntime(result.ref.item);
+    }
     if (callback)
     {
         callback(result);
@@ -1464,6 +1469,28 @@ void ALScriptWorkspace::listContents(const LLUUID& prim, contents_callback_t cal
             still->expire();
         }
     }, CONTENTS_TIMEOUT);
+}
+
+std::vector<ALScriptWorkspace::RuntimeEvent> ALScriptWorkspace::runtimeErrorsOf(const LLUUID& prim, const LLUUID& item) const
+{
+    std::vector<RuntimeEvent> errors;
+    const auto                since = mRuntimeSince.find(item);
+    for (const RuntimeEvent& event : mRecent)
+    {
+        if (event.isError && event.prim == prim && event.item == item && (since == mRuntimeSince.end() || event.time > since->second))
+        {
+            errors.push_back(event);
+        }
+    }
+    return errors;
+}
+
+void ALScriptWorkspace::forgetRuntime(const LLUUID& item)
+{
+    if (item.notNull())
+    {
+        mRuntimeSince[item] = LLDate::now().secondsSinceEpoch();
+    }
 }
 
 void ALScriptWorkspace::sweepListeners()

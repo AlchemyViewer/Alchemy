@@ -85,6 +85,7 @@ namespace
             run = std::move(answer);
         }
         void showExpanded(Doc&, const std::string&) override {}
+        void runningKnown(Doc& doc) override { known.push_back(doc.id); }
         std::optional<ALScriptWeight::Target> weightTarget(const Doc&) const override { return target; }
         void weigh(Doc&) override { weighs.push_back("text"); }
         void weighSent(Doc&) override { weighs.push_back("sent"); }
@@ -139,7 +140,7 @@ namespace
         std::optional<ALScriptWeight::Target>               target;
         std::string                                         refuse;
         std::function<void(const ALPreprocessor::Result&)> run;
-        Names                                               tidied, analysed, runs, weighs, files, reattached, recovered, closed;
+        Names                                               tidied, analysed, runs, weighs, files, reattached, recovered, closed, known;
         std::vector<Sent>                                   sent;
         Names                                               notecards;
         std::vector<bool>                                   firstErrors;
@@ -397,6 +398,7 @@ namespace tut
         ALPreprocessor::Result wrong;
         wrong.problems.push_back(anError());
         studio.answerRun(wrong);
+        ensure("what waited on the map it made told", studio.known == Names{ "a" });
         ensure_equals("its errors stop it", lastSaid(), std::string("PreprocessErrors"));
         ensure("with Save Anyway", services.reports.back().actions == Names{ "save_anyway" });
         ensure("stopped, the problems in sight", !doc.save.underway() && studio.stops == 1 && studio.problemsShown == 1);

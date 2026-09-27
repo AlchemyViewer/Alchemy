@@ -29,6 +29,9 @@
 #include "lldate.h"
 #include "llfocusmgr.h"
 
+#include <algorithm>
+#include <utility>
+
 // static
 const char* ALScriptStudioDoc::levelName(Level level)
 {
@@ -79,6 +82,72 @@ const ALSourceMap* ALScriptStudioDoc::runningMap() const
 S32 ALScriptStudioDoc::runningCodeLine() const
 {
     return runningMap() && envelope ? envelope->codeLine() : 0;
+}
+
+ALScriptStudioDoc::RunningPlace ALScriptStudioDoc::placeOfRunning(S32 line, S32 column) const
+{
+    RunningPlace where;
+    where.line   = line;
+    where.column = column;
+    const ALSourceMap* map = line >= 0 ? runningMap() : nullptr;
+    if (!map)
+    {
+        return where;
+    }
+    // Counted by the region with the envelope's lines above the code; the
+    // map is of the code.
+    const ALSourceMap::Loc loc = map->toSource(line - runningCodeLine(), llmax(0, column));
+    if (loc.found())
+    {
+        where.line   = loc.line;
+        where.column = column >= 0 ? loc.column : -1;
+        if (loc.file > 0)
+        {
+            where.file     = map->files()[loc.file].path;
+            where.fileName = map->files()[loc.file].name;
+        }
+    }
+    return where;
+}
+
+void ALScriptStudioDoc::heardRuntime(const RuntimeProblem& running, bool hold)
+{
+    if (hold)
+    {
+        runtimeHeld.push_back(running);
+        return;
+    }
+    const RunningPlace where = placeOfRunning(running.line, running.column);
+    RuntimeProblem     problem;
+    problem.line    = where.line;
+    problem.column  = where.column;
+    problem.file    = where.file;
+    problem.message = running.message;
+    problem.count   = running.count;
+    const auto same = std::find_if(runtime.begin(), runtime.end(), [&problem](const RuntimeProblem& one) {
+        return one.line == problem.line && one.column == problem.column && one.file == problem.file && one.message == problem.message;
+    });
+    if (same != runtime.end())
+    {
+        same->count += problem.count;
+        return;
+    }
+    runtime.push_back(std::move(problem));
+    // A script failing many ways at once is failing: the oldest go past a
+    // few dozen.
+    constexpr size_t RUNTIME_PROBLEMS = 50;
+    if (runtime.size() > RUNTIME_PROBLEMS)
+    {
+        runtime.erase(runtime.begin());
+    }
+}
+
+void ALScriptStudioDoc::placeHeldRuntime()
+{
+    for (const RuntimeProblem& running : std::exchange(runtimeHeld, {}))
+    {
+        heardRuntime(running, false);
+    }
 }
 
 ALScriptEnvelope ALScriptStudioDoc::envelopeFor(const std::string& expanded_text, const std::string& program) const

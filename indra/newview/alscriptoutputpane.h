@@ -70,8 +70,10 @@ public:
         // problems, where the words were of a failure.
         virtual void outputShowDoc(ALScriptStudioDoc& doc, bool problems) = 0;
         // A script a run said something from, gone to: at a line of it,
-        // where the line is known; or at a line of one of its includes.
-        virtual void outputGoTo(const ALScriptRef& ref, const std::string& name, S32 line, S32 column) = 0;
+        // where the line is known -- `running`, one the region counts in
+        // what it runs, which the window reads back to the source once it
+        // can -- or at a line of one of its includes.
+        virtual void outputGoTo(const ALScriptRef& ref, const std::string& name, S32 line, S32 column, bool running) = 0;
         virtual void outputGoToInclude(const std::string& file, const std::string& file_name, S32 line, S32 column) = 0;
 
     protected:

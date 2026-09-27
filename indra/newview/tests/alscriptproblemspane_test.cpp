@@ -67,6 +67,7 @@ namespace
         }
         void fixAllOfKind(Doc& doc, const std::string& key) override { kinds.push_back(doc.id + ":" + key); }
         void refreshProblems(Doc& doc) override { refreshed.push_back(doc.id); }
+        void runtimeCleared(Doc& doc) override { cleared.push_back(doc.id); }
         bool isLint(bool, const std::string& id) const override { return lints.count(id) > 0; }
         ALScriptLints::Level lintLevel(bool, const std::string& id) const override
         {
@@ -84,6 +85,7 @@ namespace
         std::vector<std::string>                    fixed;
         std::vector<std::string>                    kinds;
         std::vector<std::string>                    refreshed;
+        std::vector<std::string>                    cleared;
         std::set<std::string>                       lints;
         std::map<std::string, ALScriptLints::Level> levels;
     };
@@ -452,6 +454,7 @@ namespace tut
         ensure("run-time errors to let go of", out.enabled("clear_runtime"));
         out.act("clear_runtime");
         ensure("let go of", d.runtime.empty());
+        ensure("and not recalled when it is opened again", studio.cleared == std::vector<std::string>{ d.id });
         ensure_equals("and the tab's problems gathered again", studio.refreshed.size(), size_t(1));
     }
 

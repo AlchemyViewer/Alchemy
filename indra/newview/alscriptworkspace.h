@@ -33,6 +33,7 @@
 #include "lluuid.h"
 
 #include <boost/signals2.hpp>
+#include <boost/unordered/unordered_flat_map.hpp>
 
 #include <deque>
 #include <functional>
@@ -447,6 +448,11 @@ public:
     void flushRuntime();
     // The last few hundred events, oldest first, for a pane opened late.
     const std::deque<RuntimeEvent>& recentRuntime() const { return mRecent; }
+    // A script's run-time errors among those, since it last compiled or
+    // they were let go of: what a tab opened on it lists, where it was
+    // closed as they were said.
+    std::vector<RuntimeEvent> runtimeErrorsOf(const LLUUID& prim, const LLUUID& item) const;
+    void                      forgetRuntime(const LLUUID& item);
 
     typedef boost::signals2::signal<void(const RuntimeEvent&)> runtime_signal_t;
     boost::signals2::connection onRuntime(const runtime_signal_t::slot_type& slot) { return mRuntime.connect(slot); }
@@ -478,6 +484,8 @@ private:
     LLEventTimer*                 mBurstTimer = nullptr;
     std::deque<RuntimeEvent>      mRecent;
     runtime_signal_t              mRuntime;
+    // When each script's errors were last let go of, by its item.
+    boost::unordered_flat_map<LLUUID, F64> mRuntimeSince;
     // The one in front is under way; the rest wait for it to end.
     std::vector<std::shared_ptr<Transfer>> mTransfers;
     std::vector<LLUUID>                 mOwnExperiences;

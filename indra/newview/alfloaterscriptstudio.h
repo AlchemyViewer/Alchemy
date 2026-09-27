@@ -323,6 +323,7 @@ private:
     // The expanded text put in the document's other editor, which is shown
     // once there is one where the tab asked for it.
     void                      showExpanded(Doc& doc, const std::string& text) override;
+    void                      runningKnown(Doc& doc) override;
     // The other editor gone, where what it holds is of no text the
     // script is now, and the source shown in its place.
     void                      dropExpanded(Doc& doc);
@@ -485,6 +486,7 @@ private:
     // The marks, the squiggles and the pane, from the compiler's problems
     // and the analyzer's together.
     void refreshProblems(Doc& doc) override;
+    void runtimeCleared(Doc& doc) override;
     // The rest of what the Problems tab asks of the window
     // (ALScriptProblemsPane::Window).
     void                 problemCountsChanged() override { refreshBottomTabs(); }
@@ -636,13 +638,18 @@ private:
     // What scripts say, from the workspace: listed in the Output tab, and
     // a run-time error in a script that is open marked on its line.
     void runtimeEvent(const ALScriptWorkspace::RuntimeEvent& event);
+    static ALScriptStudioDoc::RuntimeProblem runtimeProblemOf(const ALScriptWorkspace::RuntimeEvent& event);
+    // Whether a run-time error's line waits for the map what runs is read
+    // back by; and a tab's own, said while it was closed, taken as it loads.
+    bool holdsRuntime(const Doc& doc) const;
+    void recallRuntime(Doc& doc);
     // What the Output tab asks of the window (ALScriptOutputPane::Window).
     bool outputInSight() const override;
     void outputUnreadChanged() override { refreshBottomTabs(); }
     bool ownsObject(const LLUUID& root) const override;
     void outputAction(Doc& doc, const std::string& action) override;
     void outputShowDoc(Doc& doc, bool problems) override;
-    void outputGoTo(const ALScriptRef& ref, const std::string& name, S32 line, S32 column) override;
+    void outputGoTo(const ALScriptRef& ref, const std::string& name, S32 line, S32 column, bool running) override;
     void outputGoToInclude(const std::string& file, const std::string& file_name, S32 line, S32 column) override;
 
     // What the explorer asks of the window (ALScriptExplorerPane::Window).

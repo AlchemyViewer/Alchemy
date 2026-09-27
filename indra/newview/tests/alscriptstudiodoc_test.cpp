@@ -180,4 +180,47 @@ namespace tut
         doc.uploaded.resolved = { { "", "lib/util.lsl", false, "disk:/s/other.lsl" } };
         ensure_equals("or the last save's run", doc.foundAs("lib/util.lsl"), std::string("disk:/s/other.lsl"));
     }
+
+    template<> template<>
+    void alscriptstudiodoc_object::test<6>()
+    {
+        set_test_name("a run-time error read back to the source, counted where said again; held until the map is known, then placed");
+        Doc doc;
+        // Six lines run: the first two the include's, the rest the
+        // script's from its first line on.
+        ALSourceMap map;
+        map.addFile("script", "script");
+        map.addFile("lib.lsl", "disk:/s/lib.lsl");
+        for (S32 line = 0; line < 6; ++line)
+        {
+            ALSourceMap::Segment segment;
+            segment.outLine = line;
+            segment.length  = 20;
+            segment.file    = line < 2 ? 1 : 0;
+            segment.line    = line < 2 ? line : line - 2;
+            map.add(segment);
+        }
+        map.finish();
+
+        Doc::RuntimeProblem said;
+        said.line    = 4;
+        said.message = "Math Error";
+        ensure_equals("no map: as the region counts it", doc.placeOfRunning(4, -1).line, 4);
+        doc.heardRuntime(said, true);
+        ensure("held", doc.runtime.empty() && doc.runtimeHeld.size() == 1);
+        doc.heardRuntime(said, true);
+
+        doc.uploaded.valid = true;
+        doc.uploaded.map   = map;
+        const Doc::RunningPlace place = doc.placeOfRunning(1, 3);
+        ensure("an include's line, by its path and name", place.line == 1 && place.column == 3 && place.file == "disk:/s/lib.lsl" && place.fileName == "lib.lsl");
+        doc.placeHeldRuntime();
+        ensure("placed, and let go of", doc.runtimeHeld.empty() && doc.runtime.size() == 1);
+        ensure("at the source's line, said twice", doc.runtime[0].line == 2 && doc.runtime[0].file.empty() && doc.runtime[0].count == 2);
+        doc.heardRuntime(said, false);
+        ensure_equals("said again: counted", doc.runtime[0].count, 3);
+        said.line = 0;
+        doc.heardRuntime(said, false);
+        ensure("in the include", doc.runtime.size() == 2 && doc.runtime[1].file == "disk:/s/lib.lsl" && doc.runtime[1].line == 0);
+    }
 }

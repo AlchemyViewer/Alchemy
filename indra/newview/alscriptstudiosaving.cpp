@@ -118,6 +118,7 @@ void ALScriptStudioSaving::preprocessedAnswer(const std::string& id, U32 version
     doc.uploaded.codeBefore = result.codeBefore;
     doc.uploaded.codeAfter  = result.codeAfter;
     doc.expanded.valid    = false;
+    mWindow.runningKnown(doc);
     mWindow.showExpanded(doc, result.text);
     mWindow.refreshProblems(doc);
     compareCompiled(doc, version, result);

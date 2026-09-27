@@ -137,31 +137,22 @@ ALScriptOutputPane::Place ALScriptOutputPane::heard(const ALScriptWorkspace::Run
 
     // The script, where it is open here: what runs is its expansion,
     // where the preprocessor ran, and a line the run names is the
-    // expansion's -- back to the source's, or an include's.
+    // expansion's -- back to the source's, or an include's. Where it is
+    // not, or its map is not known yet, the line is the one the region
+    // counts, and a link to it says so, to be read back once it is.
     const ALScriptStudioDoc* open     = event.item.notNull() ? mServices->findDoc(ALScriptRef(event.prim, event.item)) : nullptr;
+    const bool               running  = !open || !open->runningMap();
     const auto               where_of = [&](S32 line, S32 column) {
         Place where;
         where.line   = line;
         where.column = column;
-        if (line < 0 || !open)
+        if (open)
         {
-            return where;
-        }
-        if (const ALSourceMap* map = open->runningMap())
-        {
-            // Counted by the region with the envelope's lines above the
-            // code; the map is of the code.
-            const ALSourceMap::Loc loc = map->toSource(line - open->runningCodeLine(), llmax(0, column));
-            if (loc.found())
-            {
-                where.line   = loc.line;
-                where.column = column >= 0 ? loc.column : -1;
-                if (loc.file > 0)
-                {
-                    where.file     = map->files()[loc.file].path;
-                    where.fileName = map->files()[loc.file].name;
-                }
-            }
+            const ALScriptStudioDoc::RunningPlace place = open->placeOfRunning(line, column);
+            where.line     = place.line;
+            where.column   = place.column;
+            where.file     = place.file;
+            where.fileName = place.fileName;
         }
         return where;
     };
@@ -174,6 +165,7 @@ ALScriptOutputPane::Place ALScriptOutputPane::heard(const ALScriptWorkspace::Run
         value["column"]   = where.column;
         value["file"]     = where.file;
         value["fileName"] = where.fileName;
+        value["running"]  = running && where.line >= 0;
         return value;
     };
     const Place at = where_of(event.line, event.column);
@@ -501,5 +493,6 @@ void ALScriptOutputPane::choose(const ALOutputView::Entry& entry)
         mWindow->outputGoToInclude(entry.value["file"].asString(), entry.value["fileName"].asString(), line, column);
         return;
     }
-    mWindow->outputGoTo(ALScriptRef(entry.value["prim"].asUUID(), entry.value["item"].asUUID()), entry.value["name"].asString(), line, column);
+    mWindow->outputGoTo(ALScriptRef(entry.value["prim"].asUUID(), entry.value["item"].asUUID()), entry.value["name"].asString(), line, column,
+                        entry.value["running"].asBoolean());
 }

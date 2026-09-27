@@ -990,6 +990,8 @@ void ALScriptProblemsPane::act(const std::string& action)
     {
         // What the script said as it ran, let go of until it says it again.
         doc.runtime.clear();
+        doc.runtimeHeld.clear();
+        mWindow->runtimeCleared(doc);
         mWindow->refreshProblems(doc);
     }
     else if (action == "off" && !lint.empty())

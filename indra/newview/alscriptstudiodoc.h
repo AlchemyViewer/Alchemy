@@ -141,6 +141,17 @@ struct ALScriptStudioDoc
     // line: the envelope's own lines, which the region counts in a line it
     // names, before it; none where it went up plain.
     S32                runningCodeLine() const;
+    // A place in what the region runs -- a line it names, counting the
+    // envelope's -- read back to the source's, or an include's: as it
+    // is where the text went up as written, or its map is not known.
+    struct RunningPlace
+    {
+        S32         line   = -1;
+        S32         column = -1;
+        std::string file;
+        std::string fileName;
+    };
+    RunningPlace       placeOfRunning(S32 line, S32 column) const;
     // The envelope a save sends an expansion in: the source as written,
     // its target, the program that wrote it and when.
     ALScriptEnvelope   envelopeFor(const std::string& expanded, const std::string& program) const;
@@ -369,6 +380,19 @@ struct ALScriptStudioDoc
         S32         count  = 1;
     };
     std::vector<RuntimeProblem>                runtime;
+    // Those heard before the map they are read back by was known -- in a
+    // script closed then, or loaded and not yet expanded -- in the lines
+    // the region counts, placed once it is (placeHeldRuntime).
+    std::vector<RuntimeProblem>                runtimeHeld;
+    // Whether this session's errors from before it was opened were taken.
+    bool                                       runtimeRecalled = false;
+    // A run-time error heard, as the region counts its lines: among the
+    // run-time problems at its place, counted where it was said before --
+    // a script failing in a timer says it every tick -- or, where `hold`,
+    // kept among those held until the map is known.
+    void heardRuntime(const RuntimeProblem& running, bool hold);
+    // Those held, placed.
+    void placeHeldRuntime();
     // Both were said of the text as it was: each moves with the edits
     // since, and goes when one touches its line, the text there being
     // no longer what was compiled or run.
@@ -384,6 +408,9 @@ struct ALScriptStudioDoc
     S32                                        pendingLine   = -1;
     S32                                        pendingColumn = -1;
     S32                                        pendingLength = 0;
+    // Whether that line is one the region counts, in what it runs, to be
+    // read back to the source once the map is known.
+    bool                                       pendingRunning = false;
     // Whether the script runs in its object, as the region last
     // said: -1 until it has.
     S32                                        running = -1;
