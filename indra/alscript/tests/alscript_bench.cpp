@@ -508,6 +508,33 @@ int main(int, char**)
         row("expand: a guarded header included 50 times", ms_per_run([&] { g_sink = g_sink + ALPreprocessor::run(script, guarded).text.size(); }),
             NONE);
     }
+    // Firestorm's transforms over a script that nests: loops in loops
+    // with break and continue, a switch in each, each a level of the
+    // transforms' descent.
+    {
+        std::string nested;
+        for (int f = 0; f < 200; ++f)
+        {
+            const std::string n = std::to_string(f);
+            nested += "integer nest" + n + "(integer n)\n{\n    integer total = 0;\n    integer i;\n    for (i = 0; i < n; ++i)\n    {\n"
+                      "        integer j;\n        for (j = 0; j < i; ++j)\n        {\n            if (j == 3) continue;\n"
+                      "            switch (j)\n            {\n                case 1: total = total + 1; break;\n"
+                      "                case 2: { while (total > 9) { total = total - 2; if (total == 5) break; } } break;\n"
+                      "                default: total = total + j;\n            }\n"
+                      "            do { total = total - 1; if (total < 0) break; } while (total > 50);\n"
+                      "            if (total > 100) break;\n        }\n    }\n    return total + " + n + ";\n}\n";
+        }
+        nested += "default { state_entry() { llOwnerSay((string)nest0(3)); } }\n";
+        ALPreprocessor::Options transformed = lslOptions;
+        transformed.extensions              = true;
+        transformed.switches                = true;
+        if (const ALPreprocessor::Result r = ALPreprocessor::run(nested, transformed); !r.problems.empty() || !r.usedSwitches || !r.usedExtensions)
+        {
+            std::printf("  (the nested script's transforms did not run cleanly: %zu problems)\n", r.problems.size());
+        }
+        row("expand, extensions and switches: 200 helpers that nest", ms_per_run([&] { g_sink = g_sink + ALPreprocessor::run(nested, transformed).text.size(); }),
+            NONE);
+    }
     // What a save does past the expansion: the optimizer with its notes,
     // each offered as a change, then the compression, the maps composed.
     {
