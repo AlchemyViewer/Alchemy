@@ -119,4 +119,33 @@ namespace tut
         preprocessing.join();
         ensure("expanded, within the bound", !result.overran && result.text.find("1;") != std::string::npos);
     }
+
+    template<> template<>
+    void alscriptstack_object::test<3>()
+    {
+        set_test_name("the thread's stack kept from one job to the next, and a job begun inside another run on it where it stands");
+        int         first = -1, second = -1, nested = -1;
+        bool        threw = false;
+        std::thread worker([&]() {
+            alScriptOnLargeStack([&]() { first = descend(8000); });
+            try
+            {
+                alScriptOnLargeStack([]() { throw std::runtime_error("between"); });
+            }
+            catch (const std::runtime_error&)
+            {
+                threw = true;
+            }
+            alScriptOnLargeStack([&]() {
+                second = descend(4000);
+                // Begun inside: on the stack already, part way down it.
+                alScriptOnLargeStack([&]() { nested = descend(3000); });
+            });
+        });
+        worker.join();
+        ensure_equals("the first all the way", first, 8000);
+        ensure("a throw between", threw);
+        ensure_equals("the second, on the same stack", second, 4000);
+        ensure_equals("and one inside it", nested, 3000);
+    }
 }

@@ -33,7 +33,9 @@
 // platform gives a thread: half a megabyte on macOS, which a script nested
 // deeply enough to be legal, or written to be hostile, runs out of. So the
 // work is run on a stack of its own, as deep as asked, on the thread that
-// asks, and anything it throws is thrown again once it is back.
+// asks, and anything it throws is thrown again once it is back. The stack
+// is the thread's own, made once and kept; a job begun from inside one
+// runs on it where it stands.
 constexpr std::size_t AL_SCRIPT_STACK_BYTES = 16u * 1024u * 1024u;
 
 void alScriptOnLargeStack(const std::function<void()>& work, std::size_t bytes = AL_SCRIPT_STACK_BYTES);

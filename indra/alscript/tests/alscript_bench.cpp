@@ -46,6 +46,7 @@
 #include "../almessagemap.h"
 #include "../alpreprocessor.h"
 #include "../alscriptformatter.h"
+#include "../alscriptstack.h"
 #include "../alscriptweight.h"
 
 #include "albigscript.h"
@@ -341,6 +342,10 @@ int main(int, char**)
         }));
     row("weigh (Mono; SLua bytecode)", ms_per_run([&] { g_sink = g_sink + ALScriptWeigh::mono(lslScript.text()).total; }),
         ms_per_run([&] { g_sink = g_sink + ALScriptWeigh::slua(luaScript.text()).total; }));
+
+    // What running a job on a stack as deep as a script needs costs,
+    // before the job itself: nothing to do on it.
+    row("a job on the large stack, doing nothing", ms_per_run([] { alScriptOnLargeStack([] { g_sink = g_sink + 1; }); }), NONE);
 
     std::printf("\nThe preprocessor's thread's work\n");
     ALPreprocessor::Options lslOptions;
