@@ -525,6 +525,8 @@ int main(int, char**)
             long_line += (i ? ", P(" : "P(") + std::to_string(i) + ")";
         }
         long_line += "]; llOwnerSay((string)llGetListLength(l)); } }\n";
+        row("expand: one line of 3,000 macro calls", ms_per_run([&] { g_sink = g_sink + ALPreprocessor::run(long_line, lslOptions).text.size(); }),
+            NONE);
         row("a save of one line of 3,000 macro calls", ms_per_run([&] { g_sink = g_sink + ALPreprocessor::run(long_line, saving).text.size(); }),
             NONE);
         const ALPreprocessor::Result     made = ALPreprocessor::run(long_line, lslOptions);
