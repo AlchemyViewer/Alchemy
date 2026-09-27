@@ -2,7 +2,6 @@
  * @file alscriptsnapshot.cpp
  * @brief What the preprocessor needs to expand one script, taken ahead of the run: run on any thread.
  *
- *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
  * Copyright (C) 2026, Rye <rye@alchemyviewer.org>

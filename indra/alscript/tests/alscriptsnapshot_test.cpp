@@ -2,7 +2,6 @@
  * @file alscriptsnapshot_test.cpp
  * @brief Tests for ALScriptSnapshot: a run over answers taken ahead, what it lacked noted.
  *
- *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
  * Copyright (C) 2026, Rye <rye@alchemyviewer.org>

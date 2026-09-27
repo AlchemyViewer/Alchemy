@@ -2,7 +2,6 @@
  * @file alincludeidentity_test.cpp
  * @brief Tests for ALIncludeIdentity: an include's identity made and read back.
  *
- *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
  * Copyright (C) 2026, Rye <rye@alchemyviewer.org>

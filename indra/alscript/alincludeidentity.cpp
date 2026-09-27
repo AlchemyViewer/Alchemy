@@ -2,7 +2,6 @@
  * @file alincludeidentity.cpp
  * @brief What an include is known by: an item in an object, one in the inventory, or a file on disk.
  *
- *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
  * Copyright (C) 2026, Rye <rye@alchemyviewer.org>
