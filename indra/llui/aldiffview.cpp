@@ -285,7 +285,7 @@ void ALDiffView::arrange()
 {
     const S32    width  = getRect().getWidth();
     const S32    height = getRect().getHeight();
-    const S32    head_h = llround(LLFontGL::getFontSansSerifSmall()->getLineHeight()) + 6;
+    const S32    head_h = LLFontGL::getFontSansSerifSmall()->getLineHeight() + 6;
     const S32    body   = llmax(0, height - head_h);
     const S32    half   = (width - GAP) / 2;
     mLeft->setVisible(!mInline);
