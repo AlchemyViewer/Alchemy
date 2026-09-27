@@ -556,6 +556,11 @@ int main(int, char**)
             NONE);
         row("a save of one line of 3,000 macro calls", ms_per_run([&] { g_sink = g_sink + ALPreprocessor::run(long_line, saving).text.size(); }),
             NONE);
+        // The optimizer alone, over what the expansion made: most of a
+        // save's time.
+        const std::string long_expanded = ALPreprocessor::run(long_line, lslOptions).text;
+        row("  optimize it alone",
+            ms_per_run([&] { g_sink = g_sink + ALLSLOptimizer::run(long_expanded, ALLSLOptimizer::Options()).text.size(); }), NONE);
         const ALPreprocessor::Result     made = ALPreprocessor::run(long_line, lslOptions);
         std::vector<std::pair<S32, S32>> places;
         S32                              line = 0, column = 0;
