@@ -1,6 +1,6 @@
 /**
  * @file alscriptengine.h
- * @brief The one lock the LSL engine is entered under.
+ * @brief The one thread the LSL engine is used on, and the check that it is.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -24,74 +24,67 @@
 
 #pragma once
 
+#include "llerror.h"
+
 #include <atomic>
-#include <chrono>
-#include <mutex>
 #include <thread>
 
 // Tailslide's parser and lexer are reentrant and every parse owns its
 // tree, but the builtins are one table for the whole process and a
 // script's identifiers point straight into it: resolving a script adds
 // to each builtin symbol's reference count, so two scripts resolved at
-// once write the same counters. The analyzer has a thread, the
-// optimizer has another, and a test may call from wherever it likes, so
-// every way into the engine is taken under this -- recursive, so that
-// one way in may go by another.
-//
-// Held for a whole call rather than a whole parse: a service keeps its
-// last tree and answers questions from it, and those answers read what
-// the resolution wrote.
-inline std::recursive_mutex& alScriptEngineLock()
-{
-    static std::recursive_mutex lock;
-    return lock;
-}
-
+// once write the same counters. So every use of Tailslide is on one
+// thread -- in the viewer the analysis thread, which the optimizer's runs
+// are posted to as well (ALScriptAnalysis::runEngine) -- and nothing is
+// locked. What stands at each way in is a check that no other thread is
+// in: two at once is a mistake in whoever called, said where it happens
+// rather than found later as a count gone wrong.
 namespace al_script_engine
 {
-    // How many threads wait for the engine; how many times it has been
-    // taken by a thread that did not hold it; how deep this thread's
-    // hold is.
-    inline std::atomic<int>& waiting()
+    // The thread in the engine, if any; how deep this thread is in it; and
+    // how many times a thread came in while another was in, for the test
+    // that says so.
+    inline std::atomic<std::thread::id>& owner()
     {
-        static std::atomic<int> count{ 0 };
-        return count;
-    }
-    inline std::atomic<unsigned>& taken()
-    {
-        static std::atomic<unsigned> count{ 0 };
-        return count;
+        static std::atomic<std::thread::id> id{};
+        return id;
     }
     inline int& depth()
     {
         thread_local int held = 0;
         return held;
     }
+    inline std::atomic<unsigned>& clashes()
+    {
+        static std::atomic<unsigned> count{ 0 };
+        return count;
+    }
 } // namespace al_script_engine
 
-// A hold of the engine: counted among those waiting while it waits, so
-// that a long holder knows to let go between its rounds.
 class ALScriptEngineHeld
 {
 public:
     ALScriptEngineHeld()
     {
-        std::recursive_mutex& lock = alScriptEngineLock();
-        if (!lock.try_lock())
+        using namespace al_script_engine;
+        if (depth()++ == 0)
         {
-            ++al_script_engine::waiting();
-            lock.lock();
-            --al_script_engine::waiting();
-        }
-        if (al_script_engine::depth()++ == 0)
-        {
-            ++al_script_engine::taken();
+            std::thread::id none;
+            if (!owner().compare_exchange_strong(none, std::this_thread::get_id()))
+            {
+                ++clashes();
+                LL_WARNS_ONCE("ScriptEngine") << "Tailslide entered from a second thread while another is in it" << LL_ENDL;
+            }
         }
     }
     ~ALScriptEngineHeld()
     {
-        --al_script_engine::depth();
-        alScriptEngineLock().unlock();
+        using namespace al_script_engine;
+        if (--depth() == 0)
+        {
+            std::thread::id self = std::this_thread::get_id();
+            owner().compare_exchange_strong(self, std::thread::id());
+        }
     }
     ALScriptEngineHeld(const ALScriptEngineHeld&)            = delete;
     ALScriptEngineHeld& operator=(const ALScriptEngineHeld&) = delete;
@@ -99,33 +92,3 @@ public:
 
 // What every entry point writes at its top.
 #define AL_SCRIPT_ENGINE_HELD const ALScriptEngineHeld al_engine_held
-
-// Between the rounds of a long hold -- the optimizer's, the inliner's --
-// the engine let go of while another thread waits for it, and taken
-// again once that thread has had it: a check is not held up for the
-// whole of an optimizer run over a large script, only for a round. The
-// other thread may resolve a script in the meantime, as it might have
-// between two calls, so what the caller keeps across must be its own
-// tree's, not a builtin's count. Nothing where this thread's hold is not
-// its only one, since letting go of an inner hold lets go of nothing.
-inline void alScriptEngineYield()
-{
-    using namespace al_script_engine;
-    if (depth() != 1 || waiting().load() == 0)
-    {
-        return;
-    }
-    const unsigned        was  = taken().load();
-    std::recursive_mutex& lock = alScriptEngineLock();
-    --depth();
-    lock.unlock();
-    // Not for ever, should the waiter have gone some other way.
-    const auto until = std::chrono::steady_clock::now() + std::chrono::milliseconds(250);
-    while (taken().load() == was && std::chrono::steady_clock::now() < until)
-    {
-        std::this_thread::yield();
-    }
-    lock.lock();
-    ++depth();
-    ++taken();
-}

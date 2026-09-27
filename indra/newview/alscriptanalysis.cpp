@@ -143,6 +143,29 @@ void ALScriptAnalysis::ask(Request request, callback_t callback)
     }
 }
 
+void ALScriptAnalysis::runEngine(std::function<void()> work, std::function<void()> done)
+{
+    ensureStarted();
+    Job job;
+    job.engineWork = std::move(work);
+    job.engineDone = std::move(done);
+    // Each its own: one run's work does not stand in for another's.
+    const std::string key  = "engine:" + std::to_string(++mEngineSerial);
+    auto              then = std::make_shared<std::function<void()>>(job.engineDone);
+    {
+        const std::lock_guard<std::mutex> lock(mQueueMutex);
+        mQueue.add(key, key, 0, 1, std::move(job));
+    }
+    if (!mThread->post([this]() { runNext(); }))
+    {
+        {
+            const std::lock_guard<std::mutex> lock(mQueueMutex);
+            mQueue.forget(key);
+        }
+        LLAppViewer::instance()->postToMainCoro([then]() { (*then)(); });
+    }
+}
+
 void ALScriptAnalysis::forget(const std::string& id)
 {
     const std::lock_guard<std::mutex> lock(mQueueMutex);
@@ -170,8 +193,28 @@ void ALScriptAnalysis::runNext()
             mRunningStop = stop;
         }
     }
-    const Job& job    = next->second;
-    Result     result = run(job, stop);
+    const Job& job = next->second;
+    if (job.engineWork)
+    {
+        // No question: the work, on a stack as deep as it needs, and then
+        // whoever waits on it told.
+        try
+        {
+            alScriptOnLargeStack(job.engineWork);
+        }
+        catch (const std::exception& e)
+        {
+            // Whoever gave it answers for what it throws; told, all the same.
+            LL_WARNS("ScriptAnalysis") << "Engine work failed: " << e.what() << LL_ENDL;
+        }
+        {
+            const std::lock_guard<std::mutex> lock(mQueueMutex);
+            mQueue.finished();
+        }
+        LLAppViewer::instance()->postToMainCoro([done = job.engineDone]() { done(); });
+        return;
+    }
+    Result result = run(job, stop);
     bool       unwanted = false;
     {
         const std::lock_guard<std::mutex> lock(mQueueMutex);

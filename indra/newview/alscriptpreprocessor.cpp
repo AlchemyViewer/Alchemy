@@ -1583,18 +1583,24 @@ void ALScriptPreprocessor::optimizeAndFinish(const std::shared_ptr<Job>& job, AL
         finish(job, std::move(result));
         return;
     }
-    toWorker(job, [this, job, result = std::make_shared<ALPreprocessor::Result>(std::move(result)), options]() {
-        LL_PROFILE_ZONE_NAMED_CATEGORY_SCRIPTDEV("preprocessor optimize job");
-        try
-        {
-            alScriptOnLargeStack([&]() { ALPreprocessor::finish(*result, options); });
-        }
-        catch (const std::exception& e)
-        {
-            *result = ALPreprocessor::failed(job->request.sourceText(), options, e.what());
-        }
-        LLAppViewer::instance()->postToMainCoro([this, job, result]() { finish(job, std::move(*result)); });
-    });
+    // On the analysis thread, where all of Tailslide's work is done, so that
+    // the optimizer never runs at once with a check and nothing is locked
+    // (ALScriptAnalysis::runEngine). The preprocessor's own thread goes on
+    // with the next expansion meanwhile.
+    const auto made = std::make_shared<ALPreprocessor::Result>(std::move(result));
+    ALScriptAnalysis::instance().runEngine(
+        [job, made, options]() {
+            LL_PROFILE_ZONE_NAMED_CATEGORY_SCRIPTDEV("preprocessor optimize job");
+            try
+            {
+                ALPreprocessor::finish(*made, options);
+            }
+            catch (const std::exception& e)
+            {
+                *made = ALPreprocessor::failed(job->request.sourceText(), options, e.what());
+            }
+        },
+        [this, job, made]() { finish(job, std::move(*made)); });
 }
 
 void ALScriptPreprocessor::trimTexts()

@@ -3571,8 +3571,6 @@ ALLSLOptimizer::Result ALLSLOptimizer::run(std::string_view source, const Option
     const size_t perRound = std::max<size_t>(1, nodes());
     for (int round = 0; round < 64; ++round)
     {
-        // A check waiting on another thread goes between rounds.
-        alScriptEngineYield();
         visited += perRound;
         if (visited > options.visitBudget)
         {

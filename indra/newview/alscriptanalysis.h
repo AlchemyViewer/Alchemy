@@ -238,6 +238,14 @@ public:
     // A script let go of: nothing it has waiting is run.
     void forget(const std::string& id);
 
+    // Tailslide's work that is no question -- the optimizer's run over what
+    // a save sends -- done on this thread, which every use of Tailslide is
+    // on: then none of it runs at once with another, and nothing need be
+    // locked. At the rank of the front tab's check, since a save waits on
+    // it; `done` on the main thread once `work` has run, or at once where
+    // the thread is closing and will not.
+    void runEngine(std::function<void()> work, std::function<void()> done);
+
     // The region's definitions changed: the Luau ones are read again
     // before the next check.
     void definitionsChanged();
@@ -267,6 +275,9 @@ private:
         U32                         generation = 0;
         bool                        newSolver  = false;
         F32                         seconds    = 0.f;
+        // Tailslide's work that is no question (runEngine), where it is one.
+        std::function<void()>       engineWork;
+        std::function<void()>       engineDone;
     };
     // Takes the next job and runs it, on the worker: one is posted for
     // every question asked, and one that finds nothing waiting -- its
@@ -281,4 +292,6 @@ private:
     std::mutex                                       mQueueMutex;
     ALScriptJobQueue<Job>                            mQueue;
     std::shared_ptr<Luau::FrontendCancellationToken> mRunningStop;
+    // Numbers the engine's work, each its own key.
+    U32                                              mEngineSerial = 0;
 };

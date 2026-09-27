@@ -980,33 +980,22 @@ namespace tut
     template<> template<>
     void allsloptimizer_object::test<26>()
     {
-        set_test_name("a long hold of the engine lets another thread in between its rounds, and only then");
-        std::atomic<bool> in{ false };
-        std::thread       other;
+        set_test_name("the engine is one thread's at a time: another coming in while one is in is said, and a hold within a hold is none");
+        const unsigned before = al_script_engine::clashes().load();
         {
             AL_SCRIPT_ENGINE_HELD;
-            // Nobody waiting: nothing to let go of for.
-            alScriptEngineYield();
-            other = std::thread([&in]() {
-                AL_SCRIPT_ENGINE_HELD;
-                in = true;
-            });
-            while (al_script_engine::waiting().load() == 0)
             {
-                std::this_thread::yield();
-            }
-            ensure("kept out while held", !in.load());
-            {
-                // A hold within a hold lets go of nothing, and so waits
-                // for nobody.
+                // A hold within a hold is the same thread's.
                 AL_SCRIPT_ENGINE_HELD;
-                alScriptEngineYield();
-                ensure("not from an inner hold", !in.load());
             }
-            alScriptEngineYield();
-            ensure("let in between rounds", in.load());
+            ensure_equals("none from within", al_script_engine::clashes().load(), before);
+            std::thread other([]() { AL_SCRIPT_ENGINE_HELD; });
+            other.join();
+            ensure_equals("another thread, while this one is in: said", al_script_engine::clashes().load(), before + 1);
         }
-        other.join();
+        std::thread after([]() { AL_SCRIPT_ENGINE_HELD; });
+        after.join();
+        ensure_equals("another, once it is out: nothing", al_script_engine::clashes().load(), before + 1);
     }
 
     template<> template<>
