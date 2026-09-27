@@ -227,6 +227,20 @@ int main(int, char**)
                      luau.inlayHints(text, true, true).size() + luau.complete(text, last, 16).size() + luau.hover(text, last, 16).label.size() +
                      luau.complete(text, last, 16).size();
         }));
+    // Two tabs in front in turn, neither typed in: each its own module,
+    // found checked as it was left. (With one module for every tab, each
+    // turn was a full check of each: twice the check row above.)
+    {
+        const std::string& one = luaScript.texts[0];
+        const std::string& two = luaScript.texts[1];
+        row("SLua: two tabs checked in turn, per turn", NONE, ms_per_run([&] {
+            luau.setDocument("one");
+            g_sink = g_sink + luau.check(one).size();
+            luau.setDocument("two");
+            g_sink = g_sink + luau.check(two).size();
+        }));
+        luau.setDocument("");
+    }
     // Asked again of a text already checked: what the answer itself
     // costs, the check being the one in hand.
     {

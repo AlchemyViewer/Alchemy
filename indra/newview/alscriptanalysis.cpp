@@ -373,6 +373,11 @@ ALScriptAnalysis::Result ALScriptAnalysis::run(const Job& job, const ALLuauServi
             mWorker->useSolver(job.newSolver);
             mWorker->loadLuau(job.luauPath, job.docsPath, job.generation);
             result.definitionsError = mWorker->luauError;
+            // Each tab's script its own module, kept as it was left; a
+            // lookup through another object's script shares the one of no
+            // name, rather than letting the tabs' go.
+            const bool looked_through = request.id.rfind("lookup:", 0) == 0;
+            mWorker->luau.setDocument(looked_through ? std::string_view() : std::string_view(request.id));
             mWorker->luau.setConfig(request.config);
             mWorker->luau.setTimeLimit(job.seconds);
             mWorker->luau.setStop(stop);

@@ -846,4 +846,54 @@ namespace tut
             ensure("line " + std::to_string(line) + ": declared as " + type, offered);
         }
     }
+
+    template<> template<>
+    void alluauservice_object::test<29>()
+    {
+        set_test_name("each script its own module: moving between a few finds each checked as it was left, each with its own configuration");
+        ensure("definitions loaded: " + error, loaded);
+        const std::string a = "local a: number = 1\nprint(a)\n";
+        const std::string b = "local b: string = \"x\"\nprint(b)\n";
+        ALLuauConfig      loose;
+        ALLuauConfig      strict;
+        strict.mode = "strict";
+        service.setDocument("a");
+        service.setConfig(strict);
+        service.check(a);
+        service.setDocument("b");
+        service.setConfig(loose);
+        service.check(b);
+        const size_t both = service.typeChecks();
+        for (int turn = 0; turn < 3; ++turn)
+        {
+            service.setDocument("a");
+            service.setConfig(strict);
+            service.check(a);
+            service.setDocument("b");
+            service.setConfig(loose);
+            service.check(b);
+        }
+        ensure_equals("turn and turn about, each as it was left", service.typeChecks(), both);
+        // Past a few, the one asked of longest ago is let go of.
+        for (const char* other : { "c", "d", "e" })
+        {
+            service.setDocument(other);
+            service.setConfig(loose);
+            service.check(std::string("local ") + other + " = 1\n");
+        }
+        const size_t now = service.typeChecks();
+        service.setDocument("b");
+        service.setConfig(loose);
+        service.check(b);
+        ensure_equals("one of the last few kept", service.typeChecks(), now);
+        service.setDocument("a");
+        service.setConfig(strict);
+        service.check(a);
+        ensure_equals("the one asked of longest ago let go of", service.typeChecks(), now + 1);
+        // The module of no name is apart from them all.
+        service.setDocument("");
+        service.setConfig(loose);
+        service.check(a);
+        ensure_equals("unnamed: its own", service.typeChecks(), now + 2);
+    }
 }

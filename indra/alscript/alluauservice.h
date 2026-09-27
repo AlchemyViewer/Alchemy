@@ -97,6 +97,14 @@ public:
     // without declaring. A script with no configuration is given a
     // default-constructed one.
     void setConfig(const ALLuauConfig& config);
+    // Which script the questions after are asked of, by an id of the
+    // caller's: each is its own module, checked apart and kept as it was
+    // left, so that moving between a few tabs finds each checked. A few
+    // are kept, the one asked of longest ago let go of past that. None
+    // (the empty id) is the one module for whatever is not named -- a
+    // lookup through another object's script -- which lets none go.
+    // setConfig is then the named script's own.
+    void setDocument(std::string_view id);
 
     // Everything the front end has to say about one script: parse errors
     // and type errors, then the lints, each in the order it was found.
