@@ -14,6 +14,7 @@ target_sources(
     alincludeidentity.cpp
     alincludesearch.cpp
     almodulelook.cpp
+    allsleffects.cpp
     allslinliner.cpp
     almessagemap.cpp
     allsloptimizer.cpp
@@ -48,6 +49,7 @@ target_sources(
         alincludeidentity.h
         alincludesearch.h
         almodulelook.h
+        allsleffects.h
         allslinliner.h
         almessagemap.h
         allsloptimizer.h
@@ -146,6 +148,14 @@ if(AL_BUILD_TESTS)
   al_add_test(alscriptformatter PROJECT alscript LIBRARIES alscript llcommon)
   al_add_test(alscriptmessages PROJECT alscript LIBRARIES alscript llcommon)
   al_add_test(alscriptrecovery PROJECT alscript LIBRARIES alscript llcommon)
+  # What LSL may change and the order it runs in, over scripts parsed with
+  # the grid's builtins loaded.
+  al_add_test(
+    allsleffects
+    PROJECT alscript
+    LIBRARIES alscript llcommon ll::tailslide
+    DEFINES ${definitions_defines}
+  )
   # The optimizer's golden files under tests/optimizer/, checked with the
   # grid's builtins loaded.
   al_add_test(
