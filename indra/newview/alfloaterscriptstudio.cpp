@@ -4758,8 +4758,33 @@ void ALFloaterScriptStudio::confirmReplaceAll(const LLSD& args, std::function<vo
     });
 }
 
+std::vector<ALScriptSearchPane::Window::Included> ALFloaterScriptStudio::includesOf(const ALScriptRef& ref, const std::string& file,
+                                                                                    const std::string& name, const std::string& text, bool lua)
+{
+    ALScriptPreprocessor::Request request;
+    request.ref    = ref;
+    request.path   = file.empty() ? std::string() : "disk:" + file;
+    request.name   = name;
+    request.source = text;
+    request.lua    = lua;
+    std::vector<ALScriptSearchPane::Window::Included> out;
+    for (ALPreprocessor::Include& one : ALScriptPreprocessor::instance().includedBy(request))
+    {
+        out.push_back({ std::move(one.path), std::move(one.name), std::move(one.text) });
+    }
+    return out;
+}
+
 void ALFloaterScriptStudio::searchResultChosen(const ALScriptSearch::Found& one, const ALTextRange& match, bool to_editor)
 {
+    // A file a script includes: opened as an include is, at the place.
+    if (!one.file.empty())
+    {
+        mNavigation.noteJump(!to_editor);
+        const S32 length = match.end.line == match.begin.line ? match.end.column - match.begin.column : 0;
+        openIncludeAt(one.file, one.name, match.begin.line, match.begin.column, length);
+        return;
+    }
     const bool gone = !one.doc.empty() && indexOf(one.doc) == NONE;
     if (gone && one.ref.isNull())
     {

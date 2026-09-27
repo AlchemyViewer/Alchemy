@@ -75,6 +75,10 @@
     <floater.string name="SearchOpen">open scripts</floater.string>
     <floater.string name="SearchThisObject">this object</floater.string>
     <floater.string name="SearchListed">every object listed</floater.string>
+    <floater.string name="SearchAlone">alone</floater.string>
+    <floater.string name="SearchWithIncludes">and what they include</floater.string>
+    <floater.string name="SearchIncludesTip">What an #include or a require brings in, searched too: each file once, as its own, as it is on disk or was last fetched. Replace All leaves those alone, since they are every script's that includes them.</floater.string>
+    <floater.string name="SearchIncluded">Included</floater.string>
     <floater.string name="SearchCountTip">How many places were found, in how many scripts</floater.string>
     <floater.string name="SearchCounting">[HITS] in [FILES], fetching...</floater.string>
     <floater.string name="SearchCount">[HITS] in [FILES]</floater.string>

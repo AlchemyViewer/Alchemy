@@ -48,6 +48,8 @@
 #include "llviewerobjectlist.h"
 #include "llvoavatarself.h"
 
+#include <boost/unordered/unordered_flat_set.hpp>
+
 #include <algorithm>
 #include <fstream>
 #include <sstream>
@@ -322,6 +324,76 @@ ALPreprocessor::Found ALScriptPreprocessor::lookUp(const Request& request, const
     // asking, as it is for a run.
     std::vector<std::string> alias_folders;
     return resolve(ask, out, request, nullptr, false, &alias_folders);
+}
+
+std::vector<ALPreprocessor::Include> ALScriptPreprocessor::includedBy(const Request& request)
+{
+    // What a file asks for: its `#include` lines, and a SLua script's
+    // require calls.
+    const auto asks_in = [&request](const std::string& text, const std::string& from) {
+        std::vector<ALPreprocessor::Ask> asks;
+        for (size_t at = 0; at < text.size();)
+        {
+            const size_t     nl   = text.find('\n', at);
+            std::string_view line = std::string_view(text).substr(at, nl == std::string::npos ? std::string::npos : nl - at);
+            at                    = nl == std::string::npos ? text.size() : nl + 1;
+            const size_t hash     = line.find_first_not_of(" \t");
+            if (hash == std::string_view::npos || line[hash] != '#')
+            {
+                continue;
+            }
+            line.remove_prefix(hash + 1);
+            line.remove_prefix(std::min(line.size(), line.find_first_not_of(" \t")));
+            if (line.substr(0, 7) != "include")
+            {
+                continue;
+            }
+            line.remove_prefix(7);
+            line.remove_prefix(std::min(line.size(), line.find_first_not_of(" \t")));
+            const char   open  = line.empty() ? '\0' : line.front();
+            const size_t close = open == '"' ? line.find('"', 1) : open == '<' ? line.find('>', 1) : std::string_view::npos;
+            if (close == std::string_view::npos)
+            {
+                continue;
+            }
+            ALPreprocessor::Ask ask;
+            ask.name   = std::string(line.substr(1, close - 1));
+            ask.angled = open == '<';
+            ask.from   = from;
+            asks.push_back(std::move(ask));
+        }
+        if (request.lua)
+        {
+            for (const ALPreprocessor::Required& required : ALPreprocessor::requiresIn(text))
+            {
+                ALPreprocessor::Ask ask;
+                ask.name    = required.name;
+                ask.require = true;
+                ask.from    = from;
+                asks.push_back(std::move(ask));
+            }
+        }
+        return asks;
+    };
+    std::vector<ALPreprocessor::Include>      out;
+    boost::unordered_flat_set<std::string>    seen;
+    std::vector<std::pair<std::string, std::string>> todo{ { request.source, request.path } };
+    for (size_t next = 0; next < todo.size() && out.size() < 256; ++next)
+    {
+        const std::string text = todo[next].first;
+        const std::string from = todo[next].second;
+        for (const ALPreprocessor::Ask& ask : asks_in(text, from))
+        {
+            ALPreprocessor::Include found;
+            if (lookUp(request, ask, found) != ALPreprocessor::Found::Yes || found.path.empty() || !seen.insert(found.path).second)
+            {
+                continue;
+            }
+            todo.emplace_back(found.text, found.path);
+            out.push_back(std::move(found));
+        }
+    }
+    return out;
 }
 
 std::vector<std::string> ALScriptPreprocessor::nearby(const Request& request, size_t most)

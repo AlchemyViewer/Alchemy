@@ -193,6 +193,10 @@ public:
     // Nothing is fetched, so that the fixes may ask about every name a
     // script does not know.
     ALPreprocessor::Found lookUp(const Request& request, const ALPreprocessor::Ask& ask, ALPreprocessor::Include& out);
+    // Every file a script's text includes or requires, and theirs in turn,
+    // as a run would find them now -- nothing fetched, so one in the world
+    // and not in hand is not among them -- each once, in the order met.
+    std::vector<ALPreprocessor::Include> includedBy(const Request& request);
     // The scripts and notecards near a script that may be what it
     // includes or requires and are not in hand, at most `most`: those in
     // its object, those in its inventory folder, then those in the

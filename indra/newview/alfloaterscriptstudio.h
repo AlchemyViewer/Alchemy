@@ -670,6 +670,8 @@ private:
     void fetchForSearch(const ALScriptRef& ref, U32 generation, const std::string& where) override;
     void confirmReplaceAll(const LLSD& args, std::function<void()> yes) override;
     void searchResultChosen(const ALScriptSearch::Found& one, const ALTextRange& place, bool to_editor) override;
+    std::vector<ALScriptSearchPane::Window::Included> includesOf(const ALScriptRef& ref, const std::string& file, const std::string& name,
+                                                                 const std::string& text, bool lua) override;
     // Where to go in a script once it is open, or now.
     void goToPlace(const ALScriptRef& ref, const std::string& name, S32 line, S32 column, S32 length) override;
 

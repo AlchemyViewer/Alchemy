@@ -37,6 +37,7 @@
 #include "../test/lltut.h"
 
 #include <chrono>
+#include <map>
 #include <memory>
 #include <string>
 #include <thread>
@@ -92,6 +93,13 @@ namespace
         {
             chosen.push_back({ one.doc, place, to_editor });
         }
+        // What each script, by its name, includes; and who was asked about.
+        std::vector<Included> includesOf(const ALScriptRef&, const std::string&, const std::string& name, const std::string&, bool) override
+        {
+            askedIncludes.push_back(name);
+            const auto it = includes.find(name);
+            return it == includes.end() ? std::vector<Included>() : it->second;
+        }
 
         std::vector<Object>      objects;
         LLUUID                   inHand;
@@ -100,6 +108,8 @@ namespace
         std::vector<std::string> applied;
         std::vector<LLSD>        asked;
         std::vector<Chosen>      chosen;
+        std::map<std::string, std::vector<Included>> includes;
+        std::vector<std::string>                     askedIncludes;
     };
 
     LLUUID fresh()
@@ -363,5 +373,29 @@ namespace tut
         one.notecard = false;
         one.places.clear();
         ensure("nothing found: skipped", ALScriptSearch::step(one, now) == Step::Skip);
+    }
+
+    template <>
+    template <>
+    void alscriptsearchpane_object::test<6>()
+    {
+        set_test_name("what the scripts include searched too where asked: each file once, as its own, left alone by Replace All");
+        ALScriptSearchPane& out = make();
+        doc("door", "#include \"lib\"\ntimer\n");
+        doc("gate", "#include \"lib\"\n");
+        const std::vector<FakeWindow::Included> lib{ { "disk:/scripts/lib.lsl", "lib.lsl", "timer in lib\n" } };
+        studio.includes["door.lsl"] = lib;
+        studio.includes["gate.lsl"] = lib;
+        find("timer");
+        ensure_equals("alone: the script's own", out.search().found().size(), size_t(1));
+        ensure("nothing asked of what it includes", studio.askedIncludes.empty());
+        out.bar()->setValue("includes", "yes");
+        find("timer");
+        ensure_equals("and the file it includes, once for the two", out.search().found().size(), size_t(2));
+        const ALScriptSearch::Found& found = out.search().found()[1];
+        ensure_equals("by its identity", found.file, std::string("disk:/scripts/lib.lsl"));
+        ensure("said to be included", found.where.find(services.words("SearchIncluded")) != std::string::npos && found.where.find("lib.lsl") != std::string::npos);
+        ensure_equals("a row for its place", out.list()->getItemCount(), 2);
+        ensure("Replace All leaves it", ALScriptSearch::step(found, ALScriptSearch::Now()) == ALScriptSearch::Step::Leave);
     }
 }

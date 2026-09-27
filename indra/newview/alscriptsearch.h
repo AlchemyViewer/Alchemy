@@ -63,6 +63,9 @@ public:
         // in it.
         std::vector<std::string> lines;
         std::vector<S32>         at;
+        // A file a script includes or requires, searched with it: its
+        // identity (ALScriptPreprocessor's), which it is gone to by.
+        std::string              file;
     };
 
     // --- a search ------------------------------------------------------------------
@@ -90,7 +93,7 @@ public:
         Again
     };
     Kept search(const ALScriptRef& ref, const std::string& name, const std::string& where, const ALTextDocument& text, U32 version,
-                const std::string& doc_id, bool keep_text = false, bool notecard = false);
+                const std::string& doc_id, bool keep_text = false, bool notecard = false, const std::string& file = std::string());
     // The pattern did not read, and why: said until the next search.
     bool               badPattern() const { return mBadPattern; }
     const std::string& patternError() const { return mPatternError; }
@@ -141,8 +144,9 @@ public:
     // What Replace All does with it: nothing, a notecard's places or none;
     // its places replaced in its tab, which reads as it did when it was
     // searched; the script opened with the change unsaved; or left alone,
-    // and said so -- typed in since, not to be changed, or a file on disk
-    // closed since, which has no item to open it by.
+    // and said so -- typed in since, not to be changed, a file on disk
+    // closed since, which has no item to open it by, or a file included,
+    // which is every script's that includes it.
     enum class Step : U8
     {
         Skip,

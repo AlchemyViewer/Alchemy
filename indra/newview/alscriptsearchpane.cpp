@@ -29,6 +29,7 @@
 #include "alcodeeditor.h"
 #include "alpanelist.h"
 #include "alscopebar.h"
+#include "alscriptmessages.h"
 #include "alscriptstudioservices.h"
 #include "llbutton.h"
 #include "llfloater.h"
@@ -171,6 +172,15 @@ void ALScriptSearchPane::buildSentence()
     where.choices = { { mServices->words("SearchOpen"), "open" }, { mServices->words("SearchThisObject"), "object" }, { mServices->words("SearchListed"), "listed" } };
     said.push_back(where);
 
+    // And what they include: the text an #include or a require brings in,
+    // each file once, as its own.
+    ALScopeBar::Segment includes;
+    includes.kind    = ALScopeBar::Segment::Kind::Choice;
+    includes.name    = "includes";
+    includes.toolTip = mServices->words("SearchIncludesTip");
+    includes.choices = { { mServices->words("SearchAlone"), "no" }, { mServices->words("SearchWithIncludes"), "yes" } };
+    said.push_back(includes);
+
     mBar->setSentence(std::move(said));
 }
 
@@ -215,6 +225,30 @@ void ALScriptSearchPane::searchOpen(const Doc& doc)
         return;
     }
     searched(doc.ref, doc.name, mWindow->whereIs(doc), doc.editor->document(), doc.editor->document().version(), doc.id);
+    if (!doc.notecard)
+    {
+        searchIncludes(doc.ref, doc.file, doc.name, doc.editor->text(), doc.language.lua);
+    }
+}
+
+void ALScriptSearchPane::searchIncludes(const ALScriptRef& ref, const std::string& file, const std::string& name, const std::string& text, bool lua)
+{
+    if (mBar->valueOf("includes") != "yes")
+    {
+        return;
+    }
+    for (const Window::Included& one : mWindow->includesOf(ref, file, name, text, lua))
+    {
+        if (mIncludesSearched.insert(one.path).second)
+        {
+            const ALScriptSearch::Kept kept = mSearch.search(ALScriptRef(), one.name, mServices->words("SearchIncluded"), ALTextDocument(one.text), 0,
+                                                             std::string(), false, false, one.path);
+            if (kept == ALScriptSearch::Kept::Added)
+            {
+                addRows(mSearch.found().size() - 1);
+            }
+        }
+    }
 }
 
 void ALScriptSearchPane::run()
@@ -224,6 +258,7 @@ void ALScriptSearchPane::run()
     options.wholeWord     = mBar->valueOf("how") == "word";
     options.regex         = mBar->valueOf("how") == "pattern";
     mSearch.begin(mBar->valueOf("query"), options);
+    mIncludesSearched.clear();
     mResults->deleteAllItems();
     if (mSearch.query().empty())
     {
@@ -280,6 +315,10 @@ void ALScriptSearchPane::run()
                 if (there->loaded)
                 {
                     searched(ref, there->name, object.name, there->editor->document(), 0, std::string(), true, there->notecard);
+                    if (!there->notecard)
+                    {
+                        searchIncludes(ref, there->file, there->name, there->editor->text(), there->language.lua);
+                    }
                     continue;
                 }
             }
@@ -302,6 +341,10 @@ void ALScriptSearchPane::fetched(U32 generation, const std::string& where, const
         // A wrapped script is searched as its author wrote it, and that
         // text kept for a replace to work over.
         searched(ref, name, where, ALTextDocument(*text), 0, std::string(), true, notecard);
+        if (!notecard)
+        {
+            searchIncludes(ref, std::string(), name, *text, ALScriptMessages::looksLikeLua(*text));
+        }
     }
     settled();
 }
