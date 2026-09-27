@@ -220,6 +220,13 @@ std::vector<ALIncludeSearch::Candidate> ALIncludeSearch::candidatesFor(const ALP
                     c.name             = slash == std::string::npos ? *real : real->substr(slash + 1);
                     c.path             = ALIncludeIdentity::ofFile(*real);
                     c.file             = *real;
+                    // Past a few thousand, the oldest admissions let go of
+                    // all at once: each is made again by the next run over
+                    // what names it.
+                    if (mAdmitted.size() >= ADMITTED_KEPT && !mAdmitted.contains(c.path))
+                    {
+                        mAdmitted.clear();
+                    }
                     mAdmitted.insert(c.path);
                     out.push_back(std::move(c));
                 }

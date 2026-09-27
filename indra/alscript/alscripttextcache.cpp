@@ -26,6 +26,9 @@
 
 #include "alscripttextcache.h"
 
+#include <algorithm>
+#include <utility>
+
 bool ALScriptTextCache::take(const std::string& path, const LLUUID& asset_id, std::string& text)
 {
     auto cached = mTexts.find(path);
@@ -79,22 +82,39 @@ std::vector<std::string> ALScriptTextCache::paths() const
 void ALScriptTextCache::trim()
 {
     // What is held, within the budget: the least lately read let go of
-    // first, and the newest always kept whatever its size.
-    while (mHeld > BUDGET && mTexts.size() > 1)
+    // first, and the newest always kept whatever its size. Put in order
+    // once for however many go, rather than the whole cache looked through
+    // for each.
+    if (mHeld <= BUDGET || mTexts.size() <= 1)
     {
-        auto oldest = mTexts.begin();
-        for (auto it = mTexts.begin(); it != mTexts.end(); ++it)
-        {
-            if (it->second.used < oldest->second.used)
-            {
-                oldest = it;
-            }
-        }
-        if (oldest->second.used == mUse)
+        return;
+    }
+    std::vector<std::pair<U32, std::string>> by_use;
+    by_use.reserve(mTexts.size());
+    for (const auto& [path, cached] : mTexts)
+    {
+        by_use.emplace_back(cached.used, path);
+    }
+    std::sort(by_use.begin(), by_use.end());
+    for (const auto& [used, path] : by_use)
+    {
+        if (mHeld <= BUDGET || used == mUse)
         {
             break;
         }
+        const auto oldest = mTexts.find(path);
         mHeld -= oldest->second.text.size();
         mTexts.erase(oldest);
     }
+}
+
+void ALScriptTextCache::failed(const std::string& path)
+{
+    // A session that names a great many includes that never come is not
+    // held to every one: all asked for again past a few thousand.
+    if (mFailed.size() >= FAILURES_KEPT && !mFailed.contains(path))
+    {
+        mFailed.clear();
+    }
+    mFailed.insert(path);
 }

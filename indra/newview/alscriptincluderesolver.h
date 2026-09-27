@@ -70,12 +70,26 @@ public:
 
     // What a prim holds, as the region said; one that did not answer; and
     // what is known of each.
+    // Past a few hundred prims, what all of them said let go of, and each
+    // asked again as a script in it is run.
+    static constexpr size_t PRIMS_KEPT = 256;
     void heard(const LLUUID& prim, std::vector<ALScriptWorkspace::Item> items)
     {
+        if (mContents.size() >= PRIMS_KEPT && !mContents.contains(prim))
+        {
+            mContents.clear();
+        }
         mContents[prim] = std::move(items);
         mUnanswered.erase(prim);
     }
-    void notAnswered(const LLUUID& prim) { mUnanswered.insert(prim); }
+    void notAnswered(const LLUUID& prim)
+    {
+        if (mUnanswered.size() >= PRIMS_KEPT && !mUnanswered.contains(prim))
+        {
+            mUnanswered.clear();
+        }
+        mUnanswered.insert(prim);
+    }
     bool listed(const LLUUID& prim) const { return mContents.contains(prim); }
     bool unanswered(const LLUUID& prim) const { return mUnanswered.contains(prim); }
 

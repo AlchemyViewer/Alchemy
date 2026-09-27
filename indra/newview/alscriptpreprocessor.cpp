@@ -69,6 +69,8 @@ namespace
     // that builds its names out of macros could otherwise have a longer
     // list every time it is expanded.
     constexpr size_t MAX_REMEMBERED = 128;
+    // How many scripts' asks are remembered at once.
+    constexpr size_t MAX_SCRIPTS_REMEMBERED = 256;
 
 } // namespace
 
@@ -515,7 +517,14 @@ void ALScriptPreprocessor::expandedJob(const std::shared_ptr<Job>& job, ALPrepro
         {
             job->asks.resize(MAX_REMEMBERED);
         }
-        mAsked[keyOf(job->request)] = job->asks;
+        // For as many scripts as a session works in at once: past that, all
+        // of them asked again, each in a round or two more.
+        const std::string key = keyOf(job->request);
+        if (mAsked.size() >= MAX_SCRIPTS_REMEMBERED && !mAsked.contains(key))
+        {
+            mAsked.clear();
+        }
+        mAsked[key] = job->asks;
     }
     optimizeAndFinish(job, std::move(result));
 }

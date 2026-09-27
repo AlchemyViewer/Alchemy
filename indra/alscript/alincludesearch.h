@@ -118,6 +118,9 @@ public:
         std::string text;
     };
 
+    // How many files on disk are remembered as admitted at once.
+    static constexpr size_t ADMITTED_KEPT = 4096;
+
     ALIncludeSearch(ALScriptTextCache& texts, ALIncludeWorld& world);
 
     // What a name stands for: Yes with its identity and text; Pending with

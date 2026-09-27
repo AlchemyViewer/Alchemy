@@ -75,4 +75,23 @@ namespace tut
         cache.put("huge", asset, std::string(ALScriptTextCache::BUDGET + 1, 'y'));
         ensure("the newest kept alone", cache.holds("huge") && cache.paths().size() == 1);
     }
+
+    template<> template<>
+    void alscripttextcache_object::test<3>()
+    {
+        set_test_name("a hundred texts past the budget: the least lately read go, in one trim, until what is held is within it; failures bounded");
+        const LLUUID      asset = LLUUID::generateNewID();
+        const std::string fiftieth(ALScriptTextCache::BUDGET / 50, 'x');
+        for (int i = 0; i < 100; ++i)
+        {
+            cache.put("t" + std::to_string(i), asset, fiftieth);
+        }
+        ensure("within the budget", cache.bytes() <= ALScriptTextCache::BUDGET);
+        ensure("the newest kept, the oldest gone", cache.holds("t99") && cache.holds("t60") && !cache.holds("t0") && !cache.holds("t40"));
+        for (size_t i = 0; i <= ALScriptTextCache::FAILURES_KEPT; ++i)
+        {
+            cache.failed("f" + std::to_string(i));
+        }
+        ensure("past the bound, the failures before it let go of", !cache.hasFailed("f0") && cache.hasFailed("f" + std::to_string(ALScriptTextCache::FAILURES_KEPT)));
+    }
 }

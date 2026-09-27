@@ -41,7 +41,8 @@
 class ALScriptTextCache
 {
 public:
-    static constexpr size_t BUDGET = 16u * 1024u * 1024u;
+    static constexpr size_t BUDGET        = 16u * 1024u * 1024u;
+    static constexpr size_t FAILURES_KEPT = 4096;
 
     // The text held under `path` as the asset `asset_id` -- read, so kept
     // the longer; false where none is, or one of another asset.
@@ -55,7 +56,7 @@ public:
     std::vector<std::string> paths() const;
     size_t                   bytes() const { return mHeld; }
 
-    void failed(const std::string& path) { mFailed.insert(path); }
+    void failed(const std::string& path);
     bool hasFailed(const std::string& path) const { return mFailed.contains(path); }
     void forgetFailure(const std::string& path) { mFailed.erase(path); }
 
