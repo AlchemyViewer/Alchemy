@@ -32,6 +32,7 @@
 
 #include <boost/unordered/unordered_flat_set.hpp>
 
+#include <functional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -151,6 +152,27 @@ public:
     // An include's text as it was last read: what the texts fetched hold,
     // or a file on disk a run admitted.
     bool heldText(const std::string& path, std::string& text) const;
+
+    // What is known of why a name may not have been found, for what is
+    // said of it: the object the script is in never said what it holds;
+    // the world, or the disk, not looked in -- the disk on with none of
+    // the scripter's folders, and the script not a file on disk, which a
+    // `.luaurc` beside it may have let folders in for -- and whether one so
+    // named is in the object or the inventory.
+    struct Missing
+    {
+        bool                                          objectUnanswered = false;
+        bool                                          world            = false;
+        bool                                          disk             = false;
+        bool                                          noFolders        = false;
+        bool                                          fromDisk         = false;
+        std::function<bool(const std::string& name)> inWorld;
+    };
+    // An include or a module not found, said as why, where that is known:
+    // the object's silence first, ahead of the names it would have
+    // answered; one in the world that the world is not taken from; the
+    // disk not looked in.
+    static void explainMissing(ALScriptProblems& problems, const Missing& facts);
 
     // The name an include asks for, as an item would be called: without a
     // folder, and without the `./` a require may start with; and the

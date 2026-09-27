@@ -587,3 +587,76 @@ bool ALIncludeSearch::configOf(const Asking& asking, const Where& where, ALLuauC
     }
     return ALLuauConfig::parseChain(texts, out, base);
 }
+
+// static
+void ALIncludeSearch::explainMissing(ALScriptProblems& problems, const Missing& facts)
+{
+    // What could not be found may be in the object that never said what
+    // it holds: said, ahead of the names it would have answered, so that
+    // a save stopped for them says why.
+    if (facts.objectUnanswered)
+    {
+        const bool missing = std::any_of(problems.begin(), problems.end(), [](const ALScriptProblem& p) {
+            return p.key == "PreprocIncludeNotFound" || p.key == "PreprocModuleNotFound";
+        });
+        if (missing)
+        {
+            ALScriptProblem unanswered;
+            unanswered.severity = ALScriptProblem::Severity::Error;
+            unanswered.key      = "PreprocObjectUnanswered";
+            unanswered.message  = "the object this script is in did not say what it holds -- it did not answer in time, or is out of view -- so "
+                                  "no include was looked for in it; save again once it answers";
+            problems.insert(problems.begin(), unanswered);
+        }
+    }
+    // What could not be found where includes are not taken from the world,
+    // with one so named in the object or the inventory: said so, and where
+    // it is let in, since that is what a script saved by somebody who
+    // took its includes from their inventory runs into.
+    if (!facts.world)
+    {
+        for (ALScriptProblem& problem : problems)
+        {
+            const bool include = problem.key == "PreprocIncludeNotFound";
+            if ((!include && problem.key != "PreprocModuleNotFound") || problem.args.size() != 1 || !facts.inWorld || !facts.inWorld(problem.args[0]))
+            {
+                continue;
+            }
+            problem.key     = include ? "PreprocIncludeInWorld" : "PreprocModuleInWorld";
+            problem.message = ALScriptProblem::fill(include ? "could not find include file '[1]': one so named is in the object or the inventory, "
+                                                              "which includes are not taken from -- only folders on disk are, with Build > "
+                                                              "Include from Disk on and a folder added"
+                                                            : "could not find module '[1]': one so named is in the object or the inventory, which "
+                                                              "modules are not taken from -- only folders on disk are, with Build > Include from "
+                                                              "Disk on and a folder added",
+                                                    problem.args);
+        }
+    }
+    // What could not be found where the disk was not looked in -- disk
+    // includes off, or on with no folder of the scripter's to look in --
+    // said so, and how it is: a module kept in a folder on disk, as the VS
+    // Code plugin keeps them, is what a scripter new to the studio runs
+    // into. Said from the settings alone: nothing on the disk is touched
+    // to say it. A file on disk asking may have folders a `.luaurc` beside
+    // it let in, and is not second-guessed.
+    std::string file;
+    for (ALScriptProblem& problem : problems)
+    {
+        const bool include = problem.key == "PreprocIncludeNotFound";
+        if ((!include && problem.key != "PreprocModuleNotFound") || problem.args.size() != 1)
+        {
+            continue;
+        }
+        const bool from_disk = facts.fromDisk || ALIncludeIdentity::fileOf(problem.file, file);
+        if (facts.disk && (!facts.noFolders || from_disk))
+        {
+            continue;
+        }
+        problem.key     = include ? "PreprocIncludeNotOnDisk" : "PreprocModuleNotOnDisk";
+        problem.message = ALScriptProblem::fill(include ? "could not find include file '[1]': the disk was not looked in -- it is only with "
+                                                          "Build > Include from Disk on and a folder added"
+                                                        : "could not find module '[1]': the disk was not looked in -- it is only with Build > "
+                                                          "Include from Disk on and a folder added",
+                                                problem.args);
+    }
+}

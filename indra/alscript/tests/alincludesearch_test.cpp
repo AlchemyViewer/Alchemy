@@ -257,4 +257,37 @@ namespace tut
         ensure("names of an include", ALIncludeSearch::itemNameOf("./lib/util.lsl") == "util.lsl" &&
                                           ALIncludeSearch::foldersOf("../lib/util.lsl") == std::vector<std::string>({ "..", "lib" }));
     }
+
+    template<> template<>
+    void alincludesearch_object::test<5>()
+    {
+        set_test_name("a name not found said as why: the object's silence first, one in the world that is not taken from, the disk not looked in");
+        const auto missing = [](const char* key, const char* name, const std::string& file = std::string()) {
+            ALScriptProblem p;
+            p.key  = key;
+            p.args = { name };
+            p.file = file;
+            return p;
+        };
+        ALScriptProblems problems = { missing("PreprocIncludeNotFound", "lib.lsl"), missing("PreprocModuleNotFound", "util") };
+        ALIncludeSearch::Missing facts;
+        facts.objectUnanswered = true;
+        facts.world            = false;
+        facts.disk             = true;
+        facts.noFolders        = false;
+        facts.inWorld          = [](const std::string& name) { return name == "lib.lsl"; };
+        ALIncludeSearch::explainMissing(problems, facts);
+        ensure_equals("the silence said first", problems.front().key, std::string("PreprocObjectUnanswered"));
+        ensure_equals("one in the world, not taken from", problems[1].key, std::string("PreprocIncludeInWorld"));
+        ensure_equals("one nowhere, the disk looked in: as it was", problems[2].key, std::string("PreprocModuleNotFound"));
+
+        problems = { missing("PreprocModuleNotFound", "util"), missing("PreprocIncludeNotFound", "x.lsl", "disk:/lib/a.lsl") };
+        facts    = ALIncludeSearch::Missing();
+        facts.disk      = true;
+        facts.noFolders = true;
+        ALIncludeSearch::explainMissing(problems, facts);
+        ensure_equals("no folder of the scripter's: the disk not looked in", problems[0].key, std::string("PreprocModuleNotOnDisk"));
+        ensure_equals("but one asked from a file on disk is not second-guessed", problems[1].key, std::string("PreprocIncludeNotFound"));
+        ensure("said with its name", problems[0].message.find("'util'") != std::string::npos);
+    }
 }

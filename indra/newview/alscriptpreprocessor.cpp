@@ -28,6 +28,7 @@
 #include "alscriptpreprocessor.h"
 
 #include "alincludeidentity.h"
+#include "alincludesearch.h"
 #include "alscriptincluderesolver.h"
 
 #include "llappviewer.h"
@@ -542,76 +543,18 @@ void ALScriptPreprocessor::finish(const std::shared_ptr<Job>& job, ALPreprocesso
     {
         return;
     }
-    // What could not be found may be in the object that never said what
-    // it holds: said, ahead of the names it would have answered, so that
-    // a save stopped for them says why.
-    if (!job->request.ref.inInventory() && mResolver->unanswered(job->request.ref.object))
-    {
-        const bool missing = std::any_of(result.problems.begin(), result.problems.end(), [](const ALScriptProblem& p) {
-            return p.key == "PreprocIncludeNotFound" || p.key == "PreprocModuleNotFound";
-        });
-        if (missing)
-        {
-            ALScriptProblem unanswered;
-            unanswered.severity = ALScriptProblem::Severity::Error;
-            unanswered.key      = "PreprocObjectUnanswered";
-            unanswered.message  = "the object this script is in did not say what it holds -- it did not answer in time, or is out of view -- so "
-                                  "no include was looked for in it; save again once it answers";
-            result.problems.insert(result.problems.begin(), unanswered);
-        }
-    }
-    // What could not be found where includes are not taken from the world,
-    // with one so named in the object or the inventory: said so, and where
-    // it is let in, since that is what a script saved by somebody who
-    // took its includes from their inventory runs into.
-    if (!worldIncludes())
-    {
-        for (ALScriptProblem& problem : result.problems)
-        {
-            const bool include = problem.key == "PreprocIncludeNotFound";
-            if ((!include && problem.key != "PreprocModuleNotFound") || problem.args.size() != 1 || !mResolver->inWorld(job->request, problem.args[0]))
-            {
-                continue;
-            }
-            problem.key     = include ? "PreprocIncludeInWorld" : "PreprocModuleInWorld";
-            problem.message = ALScriptProblem::fill(include ? "could not find include file '[1]': one so named is in the object or the inventory, "
-                                                              "which includes are not taken from -- only folders on disk are, with Build > "
-                                                              "Include from Disk on and a folder added"
-                                                            : "could not find module '[1]': one so named is in the object or the inventory, which "
-                                                              "modules are not taken from -- only folders on disk are, with Build > Include from "
-                                                              "Disk on and a folder added",
-                                                    problem.args);
-        }
-    }
-    // What could not be found where the disk was not looked in -- disk
-    // includes off, or on with no folder of the scripter's to look in --
-    // said so, and how it is: a module kept in a folder on disk, as the VS
-    // Code plugin keeps them, is what a scripter new to the studio runs
-    // into. Said from the settings alone: nothing on the disk is touched
-    // to say it. A file on disk asking may have folders a `.luaurc` beside
-    // it let in, and is not second-guessed.
+    // Why a name was not found, where the viewer knows: the object never
+    // said what it holds, the world or the disk not looked in.
     static LLCachedControl<bool> disk(gSavedSettings, "ALScriptPreprocDiskIncludes", false);
-    const bool                   no_folders = includeFolders().empty();
+    ALIncludeSearch::Missing     missing;
     std::string                  file;
-    for (ALScriptProblem& problem : result.problems)
-    {
-        const bool include = problem.key == "PreprocIncludeNotFound";
-        if ((!include && problem.key != "PreprocModuleNotFound") || problem.args.size() != 1)
-        {
-            continue;
-        }
-        const bool from_disk = fileOf(job->request.path, file) || fileOf(problem.file, file);
-        if (disk && (!no_folders || from_disk))
-        {
-            continue;
-        }
-        problem.key     = include ? "PreprocIncludeNotOnDisk" : "PreprocModuleNotOnDisk";
-        problem.message = ALScriptProblem::fill(include ? "could not find include file '[1]': the disk was not looked in -- it is only with "
-                                                          "Build > Include from Disk on and a folder added"
-                                                        : "could not find module '[1]': the disk was not looked in -- it is only with Build > "
-                                                          "Include from Disk on and a folder added",
-                                                problem.args);
-    }
+    missing.objectUnanswered = !job->request.ref.inInventory() && mResolver->unanswered(job->request.ref.object);
+    missing.world            = worldIncludes();
+    missing.disk             = disk;
+    missing.noFolders        = includeFolders().empty();
+    missing.fromDisk         = fileOf(job->request.path, file);
+    missing.inWorld          = [this, &job](const std::string& name) { return mResolver->inWorld(job->request, name); };
+    ALIncludeSearch::explainMissing(result.problems, missing);
     alTranslateScriptProblems(result.problems);
     if (job->callback)
     {
