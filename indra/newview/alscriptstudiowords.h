@@ -57,6 +57,11 @@ public:
         std::shared_ptr<const std::string> documentation;
         ALSyntaxKind                       kind       = ALSyntaxKind::Text;
         bool                               deprecated = false;
+        // A function's forced delay after it is called, in seconds as the
+        // definitions say it, or nothing; and whether only a god may call
+        // it.
+        std::string                        sleep;
+        bool                               godMode = false;
     };
     typedef ALScriptSnippets::Snippet Snippet;
 
@@ -79,6 +84,10 @@ public:
     static void                      forget();
     // A word by its name, or none.
     static const Vocab* word(bool lua, std::string_view name);
+    // What the definitions say of a word beyond its declaration, a line
+    // each: its documentation, its forced delay, that only a god may call
+    // it, that it is deprecated. Nothing where they say none of it.
+    static std::string notesOf(const Vocab& word);
 
     // The words put in an editor's tables, so that they colour: the
     // studio's editors and the preferences' previews alike.

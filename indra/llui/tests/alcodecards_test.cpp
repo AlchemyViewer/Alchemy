@@ -107,7 +107,7 @@ namespace tut
         ensure("not for another version of the text", !cards.askedAbout(word, 8));
         ensure("an answer for another word is not taken", !cards.heard(ALTextPos(3, 0), 7, "number", {}));
         ensure("nor one for the text as it was", !cards.heard(ALTextPos(2, 4), 6, "number", {}));
-        ensure("nor an empty one", !cards.heard(ALTextPos(2, 4), 7, std::string(), {}));
+        ensure("an empty one taken, as nothing known of the word", cards.heard(ALTextPos(2, 4), 7, std::string(), {}) && cards.answer().empty());
         ensure("the word's, taken", cards.heard(ALTextPos(2, 4), 7, "local n: number", { { "declared here", "", LLSD(1) } }));
         ensure("kept", cards.answer() == "local n: number" && cards.links().size() == 1);
         cards.asking(ALTextRange(ALTextPos(4, 0), ALTextPos(4, 2)), 7);

@@ -156,7 +156,9 @@ void ALCodeCards::asking(const ALTextRange& word, U32 version)
 
 bool ALCodeCards::heard(const ALTextPos& at, U32 version, const std::string& text, std::vector<Link> links)
 {
-    if (text.empty() || mAsked.empty() || at != mAsked.begin || version != mAskedVersion)
+    // An answer of nothing is an answer: what the definitions say is shown
+    // in its place.
+    if (mAsked.empty() || at != mAsked.begin || version != mAskedVersion)
     {
         return false;
     }

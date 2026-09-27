@@ -601,7 +601,9 @@ public:
 
     // Asked what to say about the word the mouse rests on; answers into
     // `text` and true where there is something. A decoration's message
-    // comes first where the mouse is on one.
+    // comes first where the mouse is on one; and where there is a hover
+    // request, the analyzer's answer comes before this, which is said
+    // where the analyzer answers nothing (supplyHover with no text).
     typedef std::function<bool(const ALTextPos& at, std::string_view word, std::string& text)> hover_provider_t;
     void setHoverProvider(hover_provider_t provider) { mHover = std::move(provider); }
     // Asked when the provider had nothing to say, for an answer that
@@ -827,6 +829,9 @@ private:
     // since it last moved.
     LLFrameTimer mMouseRest;
     bool         mHoverTried = false;
+    // What the hover provider said of the word asked about, shown where
+    // the analyzer answers nothing.
+    std::string  mHoverFallback;
     // The wheel turned the text under a still mouse: what it brought
     // there is not what the mouse rested on, and no card or tip comes
     // until the mouse moves.

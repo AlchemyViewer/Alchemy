@@ -108,7 +108,8 @@ public:
     bool askedAbout(const ALTextRange& word, U32 version) const { return word == mAsked && version == mAskedVersion; }
     void asking(const ALTextRange& word, U32 version);
     // An answer: kept where it is for the word last asked about, as the
-    // text stands, and false where it is not -- come too late.
+    // text stands, and false where it is not -- come too late. An empty
+    // one is the analyzer knowing nothing of the word, kept as such.
     bool                     heard(const ALTextPos& at, U32 version, const std::string& text, std::vector<Link> links);
     const ALTextRange&       asked() const { return mAsked; }
     const std::string&       answer() const { return mAnswer; }

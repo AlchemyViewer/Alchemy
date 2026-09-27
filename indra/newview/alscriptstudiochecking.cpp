@@ -444,6 +444,9 @@ void ALScriptStudioChecking::answered(const ALScriptAnalysis::Result& result, U3
         {
             if (!result.hover.found)
             {
+                // Nothing: the editor says what the definitions say, if
+                // anything.
+                doc.editor->supplyHover(at, std::string());
                 break;
             }
             std::string text = result.hover.label;
@@ -468,6 +471,21 @@ void ALScriptStudioChecking::answered(const ALScriptAnalysis::Result& result, U3
             if (!result.hover.documentation.empty())
             {
                 text += "\n" + result.hover.documentation;
+            }
+            else if (!result.hover.hasDefinition)
+            {
+                // A builtin the analyzer knows by its declaration alone --
+                // LSL's: what the definitions say of it, its delay, its
+                // god mode.
+                const ALTextRange word = doc.editor->identifierAt(at);
+                if (const ALScriptStudioWords::Vocab* known = ALScriptStudioWords::word(doc.language.lua, doc.editor->document().text(word)))
+                {
+                    const std::string notes = ALScriptStudioWords::notesOf(*known);
+                    if (!notes.empty())
+                    {
+                        text += "\n" + notes;
+                    }
+                }
             }
             if (!result.hover.link.empty())
             {

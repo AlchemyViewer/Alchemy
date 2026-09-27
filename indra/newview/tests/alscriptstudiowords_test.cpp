@@ -290,4 +290,26 @@ namespace tut
         ensure_equals("each its own", said.size(), size_t(static_cast<S32>(ALScriptSymbolKind::Module) + 1));
         ensure_equals("a function", window.floater->getString(Words::kindWordOf(ALScriptSymbolKind::Function)), std::string("function"));
     }
+
+    template<> template<>
+    void alscriptstudiowords_object::test<10>()
+    {
+        set_test_name("what the definitions say of a builtin beyond its declaration: its words, its forced delay, that only a god may call it; a member is no global of its name");
+        lsl["functions"]["llEmail"]            = LLSD().with("return", "").with("sleep", "20.0").with("tooltip", "Sends an email.");
+        lsl["functions"]["llGodLikeRezObject"] = LLSD().with("return", "").with("god-mode", true).with("sleep", "0.0");
+        slua["functions"]["type"]              = LLSD().with("return", "string").with("tooltip", "What a value is.");
+        Words::forget();
+        const Vocab* email = Words::word(false, "llEmail");
+        ensure("the email", email && email->sleep == "20.0" && !email->godMode);
+        const std::string notes = Words::notesOf(*email);
+        ensure("its words and its delay: " + notes, notes.find("Sends an email.") == 0 && notes.find("20.0") != std::string::npos);
+        const Vocab* god = Words::word(false, "llGodLikeRezObject");
+        ensure("a god's, no delay said for none", god && god->godMode && god->sleep.empty());
+        ensure("said", !Words::notesOf(*god).empty());
+        // `type` under the mouse in `obj.type` is some table's field.
+        ALCodeEditor& s = editor("local t = obj.type\nlocal u = type(t)\n", true);
+        std::string   text;
+        ensure("a member: not the global", !Words::hoverText(true, s.document(), ALTextPos(0, 15), "type", text));
+        ensure("the global itself", Words::hoverText(true, s.document(), ALTextPos(1, 11), "type", text) && text.find("What a value is.") != std::string::npos);
+    }
 }

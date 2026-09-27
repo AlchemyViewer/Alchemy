@@ -2375,4 +2375,33 @@ namespace tut
                                  "slua");
         ensure_equals("the function, each arm, the table, the region", regions(lua), std::string("0-8 1-2 3-4 5-7 9-13 10-12"));
     }
+
+    template<> template<>
+    void alcodeeditor_object::test<68>()
+    {
+        set_test_name("the analyzer's word on a word comes before the definitions', which are said where the analyzer says nothing");
+        ALCodeEditor& e = make("print(value)\n");
+        e.setHoverProvider([](const ALTextPos&, std::string_view word, std::string& text) {
+            text = "the definitions on " + std::string(word);
+            return true;
+        });
+        std::vector<ALTextPos> asked;
+        e.setHoverRequest([&asked](const ALTextPos& at, std::string_view) { asked.push_back(at); });
+        const LLRect text = e.textRect();
+        S32          row;
+        const S32    print_x = text.mLeft + static_cast<S32>(e.layout().xOf(0, 2, &row)) + 1;
+        const S32    value_x = text.mLeft + static_cast<S32>(e.layout().xOf(0, 8, &row)) + 1;
+        const S32    y       = text.mTop - e.layout().rowHeight() / 2;
+        e.handleHover(print_x, y, MASK_NONE);
+        e.handleToolTip(print_x, y, MASK_NONE);
+        ensure("asked, nothing shown before the answer", asked.size() == 1 && !e.cardShown());
+        e.supplyHover(asked[0], "local print: the script's own");
+        ensure("the analyzer's shown", e.cardShown() && e.card()->text() == "local print: the script's own");
+        e.handleHover(text.mRight - 5, text.mBottom + 5, MASK_NONE);
+        e.handleHover(value_x, y, MASK_NONE);
+        e.handleToolTip(value_x, y, MASK_NONE);
+        ensure_equals("asked of the other", asked.size(), size_t(2));
+        e.supplyHover(asked[1], std::string());
+        ensure("the analyzer saying nothing: the definitions'", e.cardShown() && e.card()->text() == "the definitions on value");
+    }
 }

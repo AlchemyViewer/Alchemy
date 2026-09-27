@@ -26,6 +26,8 @@
 
 #include "alscriptstudiowords.h"
 
+#include "alsaid.h"
+
 #include "alscriptstudiodoc.h"
 #include "lluistring.h"
 
@@ -150,6 +152,13 @@ const std::vector<ALScriptStudioWords::Vocab>& ALScriptStudioWords::vocabulary(b
             word.tooltip       = attrs.get("tooltip").asString();
             word.documentation = ALCompletion::shared(word.tooltip);
             word.deprecated    = attrs.has("deprecated") && (attrs["deprecated"].asBoolean() || attrs["deprecated"].asString() == "true");
+            word.godMode       = attrs.has("god-mode") && (attrs["god-mode"].asBoolean() || attrs["god-mode"].asString() == "true");
+            if (attrs.has("sleep"))
+            {
+                // No delay said as none.
+                const std::string sleep = attrs["sleep"].asString();
+                word.sleep              = sleep.find_first_not_of("0.") == std::string::npos ? std::string() : sleep;
+            }
             switch (kind)
             {
                 case ALSyntaxKind::Function:
@@ -418,6 +427,28 @@ const char* ALScriptStudioWords::kindWordOf(ALScriptSymbolKind kind)
 }
 
 // static
+// static
+std::string ALScriptStudioWords::notesOf(const Vocab& word)
+{
+    std::string out = word.tooltip;
+    const auto  line = [&out](const std::string& said) {
+        out += (out.empty() ? "" : "\n") + said;
+    };
+    if (!word.sleep.empty())
+    {
+        line(alSaid("ScriptWordSleep", "The script sleeps [SECONDS] s after this", { { "[SECONDS]", word.sleep } }));
+    }
+    if (word.godMode)
+    {
+        line(alSaid("ScriptWordGodMode", "Only a god may call this"));
+    }
+    if (word.deprecated)
+    {
+        line(ALCodeEditor::deprecatedNote());
+    }
+    return out;
+}
+
 bool ALScriptStudioWords::hoverText(bool lua, const ALTextDocument& text, const ALTextPos& at, std::string_view word, std::string& out)
 {
     // The word as the vocabulary knows it: `Say` under the mouse in
@@ -445,8 +476,10 @@ bool ALScriptStudioWords::hoverText(bool lua, const ALTextDocument& text, const 
         name = line.substr(head, from - 1 - head) + "." + name;
         from = head;
     }
+    // A member not known as one is some table's, not the global of its
+    // name: `obj.type` is no `type`.
     const Vocab* known = ALScriptStudioWords::word(lua, name);
-    if (!known)
+    if (!known && name == word)
     {
         known = ALScriptStudioWords::word(lua, word);
     }
@@ -454,14 +487,11 @@ bool ALScriptStudioWords::hoverText(bool lua, const ALTextDocument& text, const 
     {
         return false;
     }
-    out = known->detail.empty() ? known->text : known->detail;
-    if (!known->tooltip.empty())
+    out                     = known->detail.empty() ? known->text : known->detail;
+    const std::string notes = notesOf(*known);
+    if (!notes.empty())
     {
-        out += "\n" + known->tooltip;
-    }
-    if (known->deprecated)
-    {
-        out += "\n" + ALCodeEditor::deprecatedNote();
+        out += "\n" + notes;
     }
     return true;
 }

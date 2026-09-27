@@ -3504,13 +3504,13 @@ bool ALCodeEditor::hoverCardAt(S32 x, S32 y)
             about = about.empty() ? literal : ALTextRange(std::min(about.begin, literal.begin), std::max(about.end, literal.end));
         }
     }
-    if (says.empty() && mHover && !word.empty())
-    {
-        if (mHover(at, document().text(word), says))
-        {
-            about = about.empty() ? word : ALTextRange(std::min(about.begin, word.begin), std::max(about.end, word.end));
-        }
-    }
+    // The analyzer's word first, where there is one to ask: it tells a
+    // local from a builtin of the same name, and a field from a global.
+    // What the definitions say of the word is said where the analyzer has
+    // nothing, or where there is no analyzer to ask.
+    std::string fallback;
+    const bool  known = says.empty() && mHover && !word.empty() && mHover(at, document().text(word), fallback);
+    mHoverFallback    = known ? fallback : std::string();
     if (says.empty() && !word.empty())
     {
         // What the analyzer said of this word, if it was asked and the
@@ -3518,19 +3518,23 @@ bool ALCodeEditor::hoverCardAt(S32 x, S32 y)
         // that shows when it comes, or the next time the mouse rests
         // here.
         const U32 version = document().version();
-        if (mCards.askedAbout(word, version))
+        if (!mHoverRequest)
         {
-            if (!mCards.answer().empty())
-            {
-                says  = mCards.answer();
-                links = mCards.links();
-                about = about.empty() ? word : ALTextRange(std::min(about.begin, word.begin), std::max(about.end, word.end));
-            }
+            says = mHoverFallback;
         }
-        else if (mHoverRequest)
+        else if (mCards.askedAbout(word, version))
+        {
+            says  = mCards.answer().empty() ? mHoverFallback : mCards.answer();
+            links = mCards.answer().empty() ? std::vector<CardLink>() : mCards.links();
+        }
+        else
         {
             mCards.asking(word, version);
             mHoverRequest(word.begin, document().text(word));
+        }
+        if (!says.empty())
+        {
+            about = about.empty() ? word : ALTextRange(std::min(about.begin, word.begin), std::max(about.end, word.end));
         }
     }
     if (says.empty() && problems.empty())
@@ -3796,7 +3800,15 @@ void ALCodeEditor::supplyHover(const ALTextPos& at, const std::string& text, std
     }
     ALTextRange                    about;
     const std::vector<CardProblem> problems = problemsUnder(under, about);
-    showCard(about.empty() ? word : ALTextRange(std::min(about.begin, word.begin), std::max(about.end, word.end)), text, problems, mCards.links());
+    // Nothing from the analyzer: what the definitions say, where they say
+    // anything.
+    const std::string& says = text.empty() ? mHoverFallback : text;
+    if (says.empty() && problems.empty())
+    {
+        return;
+    }
+    showCard(about.empty() ? word : ALTextRange(std::min(about.begin, word.begin), std::max(about.end, word.end)), says, problems,
+             text.empty() ? std::vector<CardLink>() : mCards.links());
 }
 
 // --- signature help -------------------------------------------------------------
