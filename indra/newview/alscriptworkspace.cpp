@@ -732,7 +732,7 @@ void ALScriptWorkspace::prepare(const ALScriptRef& ref, const std::string& name,
     request.ref           = ref;
     request.name          = name;
     request.assetId       = asset_id;
-    request.source        = envelope ? envelope->source : text;
+    request.source        = std::make_shared<const std::string>(envelope ? envelope->source : text);
     request.lua           = lua;
     request.compileTarget = target;
     ALScriptPreprocessor::instance().run(request, [request, envelope, lua, target, callback](const ALPreprocessor::Result& expanded) {
@@ -756,12 +756,12 @@ void ALScriptWorkspace::prepare(const ALScriptRef& ref, const std::string& name,
             callback(prepared);
             return;
         }
-        prepared.text = request.source;
+        prepared.text = request.sourceText();
         if (!expanded.disabled)
         {
             ALScriptEnvelope wrapped = envelope ? *envelope : ALScriptEnvelope();
             wrapped.lua              = lua;
-            wrapped.source           = request.source;
+            wrapped.source           = request.sourceText();
             wrapped.expanded         = expanded.text;
             wrapped.compileTarget    = target;
             wrapped.programVersion   = LLVersionInfo::instance().getChannelAndVersion();

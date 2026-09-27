@@ -400,7 +400,7 @@ namespace tut
         ensure_equals("expanded", studio.expands.size(), size_t(1));
         const ALScriptPreprocessor::Request& request = studio.expands[0].request;
         ensure("as the compiler sees it, not optimized",
-               request.ref == b && request.name == "B" && request.assetId == asset && request.source == B_TEXT && !request.optimize);
+               request.ref == b && request.name == "B" && request.assetId == asset && request.sourceText() == B_TEXT && !request.optimize);
 
         studio.expands[0].expanded(
             expansion("B", ALScriptPreprocessor::pathOf(b), B_TEXT, "A", ALScriptPreprocessor::pathOf(a), "integer count;\n"));
@@ -433,7 +433,8 @@ namespace tut
         studio.lines[inc + "#0"] = "   integer count; // kept";
         Doc& doc = services.findDoc("a") ? *services.findDoc("a") : tab("a", a, A_TEXT, "A");
         unit->start(doc, ALEditorCommand::FindReferences, refsOf("count"), true, inc, span(0, 8, 5), {}, doc.editor->document().version());
-        ensure("the open one expanded at once", studio.expands.size() == 1 && studio.expands[0].request.source == open.editor->text());
+        ensure("the open one expanded at once", studio.expands.size() == 1 && studio.expands[0].request.sourceText() == open.editor->text());
+        ensure("from its tab's own copy, not another", studio.expands[0].request.source == open.snapshot());
         ensure_equals("the other read", studio.loads.size(), size_t(1));
         ensure("both waited for", doc.lookup.pending == 2 && studio.shows == 0);
 

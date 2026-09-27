@@ -221,10 +221,7 @@ void ALScriptLookup::begin(Doc& doc, U32 generation, const Candidate& candidate)
     // Read as it stands in an open tab, else as the region has it.
     if (const Doc* other = mServices.findDoc(ref); other && other->loaded)
     {
-        const std::string  name  = other->name;
-        const LLUUID       asset = other->assetId;
-        const std::string& text  = other->editor->wholeText();
-        this->candidate(id, generation, ref, name, asset, text);
+        this->candidate(id, generation, ref, other->name, other->assetId, other->snapshot());
         return;
     }
     const std::weak_ptr<bool> alive = mAlive;
@@ -232,7 +229,7 @@ void ALScriptLookup::begin(Doc& doc, U32 generation, const Candidate& candidate)
     mWindow.loadSource(ref, [this, alive, id, generation, ref, name](const LLUUID& asset, const std::string& source) {
         if (alive.lock())
         {
-            this->candidate(id, generation, ref, name, asset, source);
+            this->candidate(id, generation, ref, name, asset, std::make_shared<const std::string>(source));
         }
     });
 }
@@ -253,7 +250,7 @@ void ALScriptLookup::passed(Doc& doc)
 }
 
 void ALScriptLookup::candidate(const std::string& id, U32 generation, const ALScriptRef& ref, const std::string& name,
-                               const LLUUID& asset_id, const std::string& text)
+                               const LLUUID& asset_id, std::shared_ptr<const std::string> text)
 {
     Doc* found = lookingIn(id, generation);
     if (!found)
@@ -261,7 +258,7 @@ void ALScriptLookup::candidate(const std::string& id, U32 generation, const ALSc
         return;
     }
     Doc& doc = *found;
-    if (text.empty() || text.find(doc.lookup.name) == std::string::npos)
+    if (text->empty() || text->find(doc.lookup.name) == std::string::npos)
     {
         --doc.lookup.pending;
         passed(doc);
@@ -289,7 +286,7 @@ void ALScriptLookup::candidate(const std::string& id, U32 generation, const ALSc
 }
 
 void ALScriptLookup::expanded(const std::string& id, U32 generation, const ALScriptRef& ref, const std::string& name,
-                              const std::string& source, const ALPreprocessor::Result& result)
+                              const std::shared_ptr<const std::string>& source, const ALPreprocessor::Result& result)
 {
     Doc* found = lookingIn(id, generation);
     if (!found)
@@ -328,12 +325,14 @@ void ALScriptLookup::expanded(const std::string& id, U32 generation, const ALScr
     request.text    = std::make_shared<const std::string>(result.text);
     request.line    = at.line;
     request.column  = at.column;
-    const std::weak_ptr<bool> alive = mAlive;
+    // The texts kept for the answer are the ones the questions hold.
+    const std::weak_ptr<bool>                alive    = mAlive;
+    const std::shared_ptr<const std::string> expanded_text = request.text;
     mWindow.askAnalysis(std::move(request), [this, alive, id, generation, ref, name, source, map = result.map,
-                                             expanded = result.text](const ALScriptAnalysis::Result& answer) {
+                                             expanded_text](const ALScriptAnalysis::Result& answer) {
         if (alive.lock())
         {
-            answered(id, generation, ref, name, map, source, expanded, answer);
+            answered(id, generation, ref, name, map, *source, *expanded_text, answer);
         }
     });
 }

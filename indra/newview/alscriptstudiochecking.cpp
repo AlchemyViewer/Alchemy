@@ -123,7 +123,7 @@ ALScriptPreprocessor::Request ALScriptStudioChecking::preprocessRequest(const Do
     request.assetId = doc.assetId;
     if (with_source)
     {
-        request.source = doc.editor->text();
+        request.source = doc.snapshot();
     }
     request.lua     = doc.language.lua;
     request.compileTarget = doc.language.compileTarget;

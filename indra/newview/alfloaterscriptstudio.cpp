@@ -4767,7 +4767,7 @@ std::vector<ALScriptSearchPane::Window::Included> ALFloaterScriptStudio::include
     request.ref    = ref;
     request.path   = file.empty() ? std::string() : "disk:" + file;
     request.name   = name;
-    request.source = text;
+    request.source = std::make_shared<const std::string>(text);
     request.lua    = lua;
     std::vector<ALScriptSearchPane::Window::Included> out;
     for (ALPreprocessor::Include& one : ALScriptPreprocessor::instance().includedBy(request))

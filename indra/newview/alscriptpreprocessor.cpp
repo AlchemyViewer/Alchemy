@@ -377,7 +377,7 @@ std::vector<ALPreprocessor::Include> ALScriptPreprocessor::includedBy(const Requ
     };
     std::vector<ALPreprocessor::Include>      out;
     boost::unordered_flat_set<std::string>    seen;
-    std::vector<std::pair<std::string, std::string>> todo{ { request.source, request.path } };
+    std::vector<std::pair<std::string, std::string>> todo{ { request.sourceText(), request.path } };
     for (size_t next = 0; next < todo.size() && out.size() < 256; ++next)
     {
         const std::string text = todo[next].first;
@@ -1330,12 +1330,12 @@ void ALScriptPreprocessor::attemptJob(const std::shared_ptr<Job>& job)
         std::vector<ALPreprocessor::Ask> missed;
         try
         {
-            alScriptOnLargeStack([&]() { result = snapshot->run(job->request.source); });
+            alScriptOnLargeStack([&]() { result = snapshot->run(job->request.sourceText()); });
             missed = snapshot->missed();
         }
         catch (const std::exception& e)
         {
-            result = ALPreprocessor::failed(job->request.source, snapshot->mOptions, e.what());
+            result = ALPreprocessor::failed(job->request.sourceText(), snapshot->mOptions, e.what());
             missed.clear();
         }
         LLAppViewer::instance()->postToMainCoro([this, job, result = std::move(result), missed = std::move(missed)]() mutable {
@@ -1590,7 +1590,7 @@ void ALScriptPreprocessor::optimizeAndFinish(const std::shared_ptr<Job>& job, AL
         }
         catch (const std::exception& e)
         {
-            *result = ALPreprocessor::failed(job->request.source, options, e.what());
+            *result = ALPreprocessor::failed(job->request.sourceText(), options, e.what());
         }
         LLAppViewer::instance()->postToMainCoro([this, job, result]() { finish(job, std::move(*result)); });
     });

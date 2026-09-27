@@ -126,7 +126,14 @@ public:
         // The script's name and asset, for `__SHORTFILE__` and `__ASSETID__`.
         std::string name;
         LLUUID      assetId;
-        std::string source;
+        // The text run, shared rather than copied: a tab's snapshot of its
+        // version, which the questions about it hold too; and read.
+        std::shared_ptr<const std::string> source;
+        const std::string& sourceText() const
+        {
+            static const std::string none;
+            return source ? *source : none;
+        }
         bool        lua = false;
         // What the script compiles for, which the optimizer's arithmetic
         // follows: mono, lsl2 or lsl-luau.

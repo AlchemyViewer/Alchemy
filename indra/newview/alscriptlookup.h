@@ -141,9 +141,9 @@ private:
     // the lookup finished where it was the last.
     void passed(Doc& doc);
     void candidate(const std::string& id, U32 generation, const ALScriptRef& ref, const std::string& name, const LLUUID& asset_id,
-                   const std::string& text);
-    void expanded(const std::string& id, U32 generation, const ALScriptRef& ref, const std::string& name, const std::string& source,
-                  const ALPreprocessor::Result& result);
+                   std::shared_ptr<const std::string> text);
+    void expanded(const std::string& id, U32 generation, const ALScriptRef& ref, const std::string& name,
+                  const std::shared_ptr<const std::string>& source, const ALPreprocessor::Result& result);
     void answered(const std::string& id, U32 generation, const ALScriptRef& ref, const std::string& name, const ALSourceMap& map,
                   const std::string& source, const std::string& expanded, const ALScriptAnalysis::Result& result);
     void settled(Doc& doc);

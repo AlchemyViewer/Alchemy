@@ -199,7 +199,7 @@ namespace tut
         a.uploaded.version = versionOf(a);
         a.uploaded.text    = std::make_shared<const std::string>("sent text");
         unit.weighSent(a);
-        ensure("asked of what was sent, for its own target", studio.requests.size() == 1 && studio.requests[0].text == "sent text" &&
+        ensure("asked of what was sent, for its own target", studio.requests.size() == 1 && *studio.requests[0].text == "sent text" &&
                                                                   studio.requests[0].targets == std::vector<Target>{ Target::Mono });
         studio.answers[0](answerFor(a, { weightOf(Target::Mono, 300) }));
         ensure("kept as sent, and exact", a.weighing.weight && a.weighing.weight->total == 300 && a.weighing.sent && a.weighing.exact);
@@ -208,7 +208,7 @@ namespace tut
         ensure("the check's of the same text does not replace it", a.weighing.weight->total == 300 && a.weighing.all.size() == 1);
         a.uploaded.disabled = true;
         unit.weighSent(a);
-        ensure("the preprocessor off: the text as written", studio.requests[1].text == "default {}");
+        ensure("the preprocessor off: the text as written", *studio.requests[1].text == "default {}");
         a.editor->setCaret(a.editor->document().end());
         a.editor->insertText(" ");
         ALScriptAnalysis::Result late = answerFor(a, { weightOf(Target::Mono, 1) });
