@@ -26,6 +26,7 @@
 
 #include "almessagemap.h"
 
+#include <array>
 #include <cstring>
 
 namespace
@@ -298,90 +299,110 @@ namespace
         }
         return out;
     }
+
+    // Each table's templates cut once, in its rows' order, the first time
+    // it is looked through.
+    template <class Row, size_t N>
+    std::vector<Cut> cutAll(const Row (&rows)[N])
+    {
+        std::vector<Cut> out;
+        out.reserve(N);
+        for (const Row& row : rows)
+        {
+            out.push_back(cut(row.text));
+        }
+        return out;
+    }
+
+    // A message matched to a template already cut, nothing made unless it
+    // matches: the words then made, in the marks' order.
+    bool matchCut(const Cut& c, std::string_view message, std::vector<std::string>& args)
+    {
+        // The literal before a mark is found where the message is, and the
+        // literal after it is found next -- a mark's word is what lies between.
+        size_t                          at = 0;
+        std::array<std::string_view, 9> words{};
+        std::array<bool, 9>             seen{};
+        for (size_t i = 0; i < c.literals.size(); ++i)
+        {
+            const std::string_view literal = c.literals[i];
+            const bool             first   = i == 0;
+            const bool             last    = i + 1 == c.literals.size();
+            size_t                 found;
+            if (first)
+            {
+                if (message.compare(0, literal.size(), literal) != 0)
+                {
+                    return false;
+                }
+                // A template with no marks is its message whole, not the
+                // start of a longer one.
+                if (last && message.size() != literal.size())
+                {
+                    return false;
+                }
+                found = 0;
+            }
+            else if (last)
+            {
+                // The last literal ends the message; the word is what is
+                // left before it.
+                if (message.size() < at + literal.size() || message.compare(message.size() - literal.size(), literal.size(), literal) != 0)
+                {
+                    return false;
+                }
+                found = message.size() - literal.size();
+            }
+            else
+            {
+                found = literal.empty() ? at : message.find(literal, at);
+                if (found == std::string_view::npos)
+                {
+                    return false;
+                }
+            }
+            if (!first)
+            {
+                const int              mark = c.marks[i - 1];
+                const std::string_view word = message.substr(at, found - at);
+                if (seen[mark - 1] && words[mark - 1] != word)
+                {
+                    return false;
+                }
+                words[mark - 1] = word;
+                seen[mark - 1]  = true;
+            }
+            at = found + literal.size();
+        }
+        // The words in the marks' order, as many as the highest mark.
+        size_t count = 0;
+        for (size_t i = 0; i < 9; ++i)
+        {
+            if (seen[i])
+            {
+                count = i + 1;
+            }
+        }
+        args.assign(words.begin(), words.begin() + count);
+        return true;
+    }
 }
 
 // static
 bool ALMessageMap::match(std::string_view text, std::string_view message, std::vector<std::string>& args)
 {
-    // Cut at the marks; the literal before a mark is found where the
-    // message is, and the literal after it is found next -- a mark's
-    // word is what lies between.
-    Cut    c = cut(text);
-    size_t at = 0;
-    std::vector<std::string> words(9);
-    std::vector<bool>        seen(9, false);
-    for (size_t i = 0; i < c.literals.size(); ++i)
-    {
-        const std::string_view literal = c.literals[i];
-        const bool             first   = i == 0;
-        const bool             last    = i + 1 == c.literals.size();
-        size_t                 found;
-        if (first)
-        {
-            if (message.compare(0, literal.size(), literal) != 0)
-            {
-                return false;
-            }
-            // A template with no marks is its message whole, not the
-            // start of a longer one.
-            if (last && message.size() != literal.size())
-            {
-                return false;
-            }
-            found = 0;
-        }
-        else if (last)
-        {
-            // The last literal ends the message; the word is what is
-            // left before it.
-            if (message.size() < at + literal.size() || message.compare(message.size() - literal.size(), literal.size(), literal) != 0)
-            {
-                return false;
-            }
-            found = message.size() - literal.size();
-        }
-        else
-        {
-            found = literal.empty() ? at : message.find(literal, at);
-            if (found == std::string_view::npos)
-            {
-                return false;
-            }
-        }
-        if (!first)
-        {
-            const int         mark = c.marks[i - 1];
-            const std::string word(message.substr(at, found - at));
-            if (seen[mark - 1] && words[mark - 1] != word)
-            {
-                return false;
-            }
-            words[mark - 1] = word;
-            seen[mark - 1]  = true;
-        }
-        at = found + literal.size();
-    }
-    // The words in the marks' order, as many as the highest mark.
-    size_t count = 0;
-    for (size_t i = 0; i < 9; ++i)
-    {
-        if (seen[i])
-        {
-            count = i + 1;
-        }
-    }
-    args.assign(words.begin(), words.begin() + count);
-    return true;
+    return matchCut(cut(text), message, args);
 }
 
 // static
 bool ALMessageMap::lsl(int code, std::string_view message, Match& out)
 {
-    for (const LSLRow& row : LSL_ROWS)
+    static const std::vector<Cut> CUTS = cutAll(LSL_ROWS);
+    for (size_t i = 0; i < CUTS.size(); ++i)
     {
-        if (row.code == code && match(row.text, message, out.args))
+        if (LSL_ROWS[i].code == code && matchCut(CUTS[i], message, out.args))
         {
-            out.key = row.key;
+            out.key = LSL_ROWS[i].key;
             return true;
         }
     }
@@ -391,19 +412,21 @@ bool ALMessageMap::lsl(int code, std::string_view message, Match& out)
 // static
 bool ALMessageMap::luauLint(std::string_view name, std::string_view message, Match& out)
 {
-    for (const LintRow& row : LINT_ROWS)
+    static const std::vector<Cut> CUTS       = cutAll(LINT_ROWS);
+    static const std::vector<Cut> SHAPE_CUTS = cutAll(LINT_SHAPE_ROWS);
+    for (size_t i = 0; i < CUTS.size(); ++i)
     {
-        if (name == row.name && match(row.text, message, out.args))
+        if (name == LINT_ROWS[i].name && matchCut(CUTS[i], message, out.args))
         {
-            out.key = row.key;
+            out.key = LINT_ROWS[i].key;
             return true;
         }
     }
-    for (const LintRow& row : LINT_SHAPE_ROWS)
+    for (size_t i = 0; i < SHAPE_CUTS.size(); ++i)
     {
-        if (name == row.name && match(row.text, message, out.args))
+        if (name == LINT_SHAPE_ROWS[i].name && matchCut(SHAPE_CUTS[i], message, out.args))
         {
-            out.key = row.key;
+            out.key = LINT_SHAPE_ROWS[i].key;
             return true;
         }
     }
@@ -413,11 +436,12 @@ bool ALMessageMap::luauLint(std::string_view name, std::string_view message, Mat
 // static
 bool ALMessageMap::luauError(std::string_view message, Match& out)
 {
-    for (const ErrorRow& row : ERROR_ROWS)
+    static const std::vector<Cut> CUTS = cutAll(ERROR_ROWS);
+    for (size_t i = 0; i < CUTS.size(); ++i)
     {
-        if (match(row.text, message, out.args))
+        if (matchCut(CUTS[i], message, out.args))
         {
-            out.key = row.key;
+            out.key = ERROR_ROWS[i].key;
             return true;
         }
     }

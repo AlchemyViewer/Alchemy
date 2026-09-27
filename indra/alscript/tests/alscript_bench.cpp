@@ -43,6 +43,7 @@
 #include "../allslservice.h"
 #include "../allsloptimizer.h"
 #include "../alluauservice.h"
+#include "../almessagemap.h"
 #include "../alpreprocessor.h"
 #include "../alscriptformatter.h"
 #include "../alscriptweight.h"
@@ -258,6 +259,23 @@ int main(int, char**)
     luaFormat.lua = true;
     row("format the whole text", ms_per_run([&] { g_sink = g_sink + ALScriptFormatter::format(lslScript.text(), lslFormat).size(); }),
         ms_per_run([&] { g_sink = g_sink + ALScriptFormatter::format(luaScript.text(), luaFormat).size(); }));
+
+    // A check's messages put into the viewer's words: a thousand, of the
+    // kinds a script mid-edit has, most matching a row late or none.
+    std::printf("\nMessages\n");
+    {
+        const char* said[] = { "Unknown global 'llSya'", "Type 'number' could not be converted into 'string'",
+                               "Argument count mismatch. Function 'f' expects 2 arguments, but 3 are specified",
+                               "Something the map has no row for at all" };
+        const double ms    = ms_per_run([&] {
+            ALMessageMap::Match match;
+            for (int i = 0; i < 1000; ++i)
+            {
+                g_sink = g_sink + (ALMessageMap::luauError(said[i % 4], match) ? match.args.size() : 1);
+            }
+        });
+        row("1,000 Luau errors keyed", NONE, ms);
+    }
 
     std::printf("\n(checksum %zu)\n", static_cast<size_t>(g_sink));
     return 0;
