@@ -79,21 +79,7 @@ namespace
     const char* const MARK_COLOR_NAMES[] = { "TextFgColor", "CodeMarkNote", "CodeMarkWarning", "CodeMarkError", "CodeMarkRuntime" };
     static_assert(sizeof(MARK_COLOR_NAMES) / sizeof(MARK_COLOR_NAMES[0]) == static_cast<size_t>(ALCodeEditor::Mark::COUNT), "every mark has a colour");
 
-    // The bracket a character is, if any: its partner, and which way to look.
-    bool bracketOf(char c, char& partner, bool& opens)
-    {
-        switch (c)
-        {
-            case '(': partner = ')'; opens = true;  return true;
-            case '[': partner = ']'; opens = true;  return true;
-            case '{': partner = '}'; opens = true;  return true;
-            case ')': partner = '('; opens = false; return true;
-            case ']': partner = '['; opens = false; return true;
-            case '}': partner = '{'; opens = false; return true;
-            default:  return false;
-        }
-    }
-
+    // What a string or a comment is made of.
     bool quiet(ALSyntaxKind kind)
     {
         return kind == ALSyntaxKind::String || kind == ALSyntaxKind::Comment || kind == ALSyntaxKind::DocComment ||
@@ -134,6 +120,7 @@ ALCodeEditor::Params::Params()
 
 ALCodeEditor::ALCodeEditor(const Params& p)
 :   ALTextView(p),
+    mBracketIndex(&highlighter()),
     mShowLineNumbers(p.show_line_numbers),
     mShowFoldMarkers(p.show_fold_markers),
     mHighlightCurrentLine(p.highlight_current_line),
@@ -167,6 +154,7 @@ ALCodeEditor::ALCodeEditor(const Params& p)
     mMarks.assign(document().lineCount(), Mark::None);
     mFixable.assign(document().lineCount(), 0);
     mEditConnection    = document().onChanged([this](const ALTextDocument::Edit& edit) { onEdit(edit); });
+    mBracketIndex.attach(&document());
     layout().setInlayProvider([this](S32 line, std::vector<ALTextLayout::Inlay>& out) { provideInlays(line, out); });
     mChangedConnection = onTextChanged([this]() {
         if (completionOpen())
@@ -267,8 +255,6 @@ void ALCodeEditor::onEdit(const ALTextDocument::Edit& edit)
     // What the problems there offered goes with them: a check says again.
     mFixable.applySpans(spans, lines, 0, 0);
     closeFixes();
-    // What is known of bracket depth below the edit is known no more.
-    mDepthValid = llmin(mDepthValid, llclamp(spans.front().first, 0, lines));
     // The lines the edit touched are changed until the next save.
     mChanged.applySpans(spans, lines, 1, 0);
     slideAsides(spans);
@@ -519,11 +505,11 @@ bool ALCodeEditor::matchingBrackets(ALTextPos& open, ALTextPos& close)
     char partner = 0;
     bool opens   = false;
     ALTextPos from;
-    if (at.column > 0 && bracketOf(line[at.column - 1], partner, opens))
+    if (at.column > 0 && ALBracketIndex::bracketOf(line[at.column - 1], partner, opens))
     {
         from = ALTextPos(at.line, at.column - 1);
     }
-    else if (at.column < static_cast<S32>(line.size()) && bracketOf(line[at.column], partner, opens))
+    else if (at.column < static_cast<S32>(line.size()) && ALBracketIndex::bracketOf(line[at.column], partner, opens))
     {
         from = at;
     }
@@ -546,91 +532,9 @@ bool ALCodeEditor::closerOpenedAt(const ALTextPos& closer, ALTextPos& opener)
     return matchBracketAt(closer, opener) && opener < closer;
 }
 
-bool ALCodeEditor::matchBracketAt(const ALTextPos& from, ALTextPos& match)
+bool ALCodeEditor::matchBracketAt(const ALTextPos& from, ALTextPos& match, S32 lines)
 {
-    const ALTextDocument& doc  = document();
-    const std::string&    line = doc.line(from.line);
-    char                  c = 0, partner = 0;
-    bool                  opens = false;
-    if (from.column < 0 || from.column >= static_cast<S32>(line.size()) || !bracketOf(line[from.column], partner, opens))
-    {
-        return false;
-    }
-    c = line[from.column];
-
-    // A line's bytes walked with a cursor over its tokens, which are in
-    // order, so that whether a byte is inside a string or a comment
-    // costs the tokens once per line rather than once per byte.
-    S32 depth = 0;
-    if (opens)
-    {
-        for (S32 l = from.line; l < doc.lineCount(); ++l)
-        {
-            const std::string&                text   = doc.line(l);
-            const std::vector<ALSyntaxToken>& tokens = highlighter().tokens(l);
-            size_t                            t      = 0;
-            for (S32 i = (l == from.line ? from.column : 0); i < static_cast<S32>(text.size()); ++i)
-            {
-                if (text[i] != c && text[i] != partner)
-                {
-                    continue;
-                }
-                while (t < tokens.size() && tokens[t].end <= i)
-                {
-                    ++t;
-                }
-                if (t < tokens.size() && tokens[t].begin <= i && quiet(tokens[t].kind))
-                {
-                    if (l == from.line && i == from.column)
-                    {
-                        return false;
-                    }
-                    continue;
-                }
-                depth += (text[i] == c) ? 1 : -1;
-                if (depth == 0)
-                {
-                    match = ALTextPos(l, i);
-                    return true;
-                }
-            }
-        }
-    }
-    else
-    {
-        for (S32 l = from.line; l >= 0; --l)
-        {
-            const std::string&                text   = doc.line(l);
-            const std::vector<ALSyntaxToken>& tokens = highlighter().tokens(l);
-            size_t                            t      = tokens.size();
-            for (S32 i = (l == from.line ? from.column : static_cast<S32>(text.size()) - 1); i >= 0; --i)
-            {
-                if (text[i] != c && text[i] != partner)
-                {
-                    continue;
-                }
-                while (t > 0 && tokens[t - 1].begin > i)
-                {
-                    --t;
-                }
-                if (t > 0 && tokens[t - 1].end > i && quiet(tokens[t - 1].kind))
-                {
-                    if (l == from.line && i == from.column)
-                    {
-                        return false;
-                    }
-                    continue;
-                }
-                depth += (text[i] == c) ? 1 : -1;
-                if (depth == 0)
-                {
-                    match = ALTextPos(l, i);
-                    return true;
-                }
-            }
-        }
-    }
-    return false;
+    return mBracketIndex.match(from, match, lines);
 }
 
 // --- colours -----------------------------------------------------------------
@@ -931,83 +835,6 @@ void ALCodeEditor::drawGutter(const LLRect& text, F32 alpha)
     }
 }
 
-// --- brackets by depth --------------------------------------------------------------
-
-namespace
-{
-    // Whether a byte is a bracket, and which way it faces.
-    S32 bracketDelta(char c)
-    {
-        switch (c)
-        {
-            case '(': case '[': case '{': return 1;
-            case ')': case ']': case '}': return -1;
-            default: return 0;
-        }
-    }
-}
-
-S32 ALCodeEditor::bracketDepthBefore(S32 line)
-{
-    const S32 count = document().lineCount();
-    if (line <= 0 || line > count)
-    {
-        return 0;
-    }
-    mDepthBefore.resize(static_cast<size_t>(count) + 1, 0);
-    if (mDepthValid == 0)
-    {
-        mDepthBefore[0] = 0;
-        mDepthValid     = 1;
-    }
-    // Carried on from the last line known, over what the grammar calls
-    // punctuation or an operator; a bracket in a string or a comment is
-    // none.
-    for (S32 l = mDepthValid - 1; l < line; ++l)
-    {
-        S32                               depth  = mDepthBefore[static_cast<size_t>(l)];
-        const std::string&                text   = document().line(l);
-        const std::vector<ALSyntaxToken>& tokens = highlighter().tokens(l);
-        for (const ALSyntaxToken& token : tokens)
-        {
-            if (token.kind != ALSyntaxKind::Punctuation && token.kind != ALSyntaxKind::Operator)
-            {
-                continue;
-            }
-            for (S32 b = token.begin; b < token.end && b < static_cast<S32>(text.size()); ++b)
-            {
-                depth = llmax(0, depth + bracketDelta(text[static_cast<size_t>(b)]));
-            }
-        }
-        mDepthBefore[static_cast<size_t>(l) + 1] = depth;
-        mDepthValid                             = l + 2;
-    }
-    return mDepthBefore[static_cast<size_t>(line)];
-}
-
-S32 ALCodeEditor::bracketDepthAt(const ALTextPos& at)
-{
-    const ALTextPos    pos   = document().clamp(at);
-    S32                depth = bracketDepthBefore(pos.line);
-    const std::string& text  = document().line(pos.line);
-    for (const ALSyntaxToken& token : highlighter().tokens(pos.line))
-    {
-        if (token.begin >= pos.column)
-        {
-            break;
-        }
-        if (token.kind != ALSyntaxKind::Punctuation && token.kind != ALSyntaxKind::Operator)
-        {
-            continue;
-        }
-        for (S32 b = token.begin; b < token.end && b < pos.column && b < static_cast<S32>(text.size()); ++b)
-        {
-            depth = llmax(0, depth + bracketDelta(text[static_cast<size_t>(b)]));
-        }
-    }
-    return depth;
-}
-
 void ALCodeEditor::tintRow(S32 line, const ALTextLayout::Line& laid, const ALTextLayout::Row& row, F32 alpha, std::vector<LLColor4U>& colors)
 {
     // What the analyzer knows a stretch to be, over the grammar's colour
@@ -1059,31 +886,21 @@ void ALCodeEditor::tintRow(S32 line, const ALTextLayout::Line& laid, const ALTex
     {
         return;
     }
-    // The depth at each bracket of the line, then the row's glyphs that
-    // are brackets in their depth's colour.
-    const std::string&                text   = document().line(line);
-    const std::vector<ALSyntaxToken>& tokens = highlighter().tokens(line);
-    S32                               depth  = bracketDepthBefore(line);
-    std::vector<std::pair<S32, S32>>  at;
-    for (const ALSyntaxToken& token : tokens)
+    // The depth at each bracket of the line that is code, then the row's
+    // glyphs that are brackets in their depth's colour.
+    S32                              depth = mBracketIndex.depthBefore(line);
+    std::vector<std::pair<S32, S32>> at;
+    for (const auto& [column, c] : mBracketIndex.bracketsOn(line))
     {
-        if (token.kind != ALSyntaxKind::Punctuation && token.kind != ALSyntaxKind::Operator)
+        if (c == '(' || c == '[' || c == '{')
         {
-            continue;
+            at.emplace_back(column, depth);
+            ++depth;
         }
-        for (S32 b = token.begin; b < token.end && b < static_cast<S32>(text.size()); ++b)
+        else
         {
-            const S32 delta = bracketDelta(text[static_cast<size_t>(b)]);
-            if (delta > 0)
-            {
-                at.emplace_back(b, depth);
-                ++depth;
-            }
-            else if (delta < 0)
-            {
-                depth = llmax(0, depth - 1);
-                at.emplace_back(b, depth);
-            }
+            depth = llmax(0, depth - 1);
+            at.emplace_back(column, depth);
         }
     }
     if (at.empty())
@@ -2022,6 +1839,17 @@ std::optional<ALTextRange> ALCodeEditor::functionAround(const ALTextRange& range
 
 bool ALCodeEditor::performFunction(ALEditorCommand command)
 {
+    if (command == ALEditorCommand::GoToMatchingBracket)
+    {
+        ALTextPos to;
+        if (!bracketToGoTo(to))
+        {
+            return false;
+        }
+        setCaret(to);
+        scrollToCaret();
+        return true;
+    }
     if (command == ALEditorCommand::SelectFunction)
     {
         // The innermost around the selection; again, the one around that.
@@ -2044,8 +1872,44 @@ bool ALCodeEditor::performFunction(ALEditorCommand command)
     return true;
 }
 
+bool ALCodeEditor::bracketToGoTo(ALTextPos& to)
+{
+    // The partner of the bracket under the caret, or else just before it,
+    // the caret put on the partner, so that going again comes back; else
+    // the closer of the innermost pair around the caret, of whichever
+    // kind opens nearest. Asked for, so as far as it takes.
+    const ALTextPos    at      = caret();
+    const std::string& line    = document().line(at.line);
+    char               partner = 0;
+    bool               opens   = false;
+    if (at.column < static_cast<S32>(line.size()) && ALBracketIndex::bracketOf(line[at.column], partner, opens) &&
+        mBracketIndex.match(at, to, ALBracketIndex::ANYWHERE))
+    {
+        return true;
+    }
+    if (at.column > 0 && ALBracketIndex::bracketOf(line[at.column - 1], partner, opens) &&
+        mBracketIndex.match(ALTextPos(at.line, at.column - 1), to, ALBracketIndex::ANYWHERE))
+    {
+        return true;
+    }
+    ALTextPos nearest(-1, -1);
+    for (const char opener : { '(', '[', '{' })
+    {
+        ALTextPos found;
+        if (mBracketIndex.enclosing(at, opener, 1, found, ALBracketIndex::ANYWHERE) && (nearest.line < 0 || nearest < found))
+        {
+            nearest = found;
+        }
+    }
+    return nearest.line >= 0 && mBracketIndex.match(nearest, to, ALBracketIndex::ANYWHERE);
+}
+
 bool ALCodeEditor::canFunction(ALEditorCommand command) const
 {
+    if (command == ALEditorCommand::GoToMatchingBracket)
+    {
+        return true;
+    }
     if (!mFunctionProvider)
     {
         return false;

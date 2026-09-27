@@ -397,6 +397,38 @@ int main(int, char**)
         s.editor->undoJournal().clear();
     }
 
+    // A bracket left open at the top: its partner looked for as the caret
+    // rests beside it, and the depth the rainbow and the indent read at the
+    // end, each after a character typed and taken away below it.
+    std::printf("\nBrackets (an opener at the top, unmatched)\n");
+    for (Subject& s : subjects)
+    {
+        s.editor->setCaret(ALTextPos(0, 0));
+        s.editor->insertText("(");
+    }
+    both("its partner looked for, per look", subjects, 1, [](Subject&, ALCodeEditor& e) {
+        ALTextPos out;
+        g_sink = g_sink + e.matchBracketAt(ALTextPos(0, 0), out);
+    });
+    both("an edit on the next line, then looked for again", subjects, 1, [](Subject&, ALCodeEditor& e) {
+        e.setCaret(ALTextPos(1, 0));
+        e.insertText("x");
+        e.deleteRange(ALTextRange(ALTextPos(1, 0), ALTextPos(1, 1)));
+        ALTextPos out;
+        g_sink = g_sink + e.matchBracketAt(ALTextPos(0, 0), out);
+    });
+    both("an edit at the top, then the depth at the end", subjects, 1, [](Subject&, ALCodeEditor& e) {
+        e.setCaret(ALTextPos(0, 1));
+        e.insertText("x");
+        e.deleteRange(ALTextRange(ALTextPos(0, 1), ALTextPos(0, 2)));
+        g_sink = g_sink + e.bracketDepthAt(e.document().end());
+    });
+    for (Subject& s : subjects)
+    {
+        s.editor->deleteRange(ALTextRange(ALTextPos(0, 0), ALTextPos(0, 1)));
+        s.editor->undoJournal().clear();
+    }
+
     std::printf("\nFolding\n");
     size_t regions[2] = {};
     both("fold regions rebuilt", subjects, 1, [&](Subject& s, ALCodeEditor& e) {

@@ -106,6 +106,9 @@ enum class ALEditorCommand : U8
     NextFunction,
     PreviousFunction,
     SelectFunction,
+    // To the bracket paired with the one at the caret, or to the closer
+    // of the innermost pair around it.
+    GoToMatchingBracket,
     COUNT
 };
 

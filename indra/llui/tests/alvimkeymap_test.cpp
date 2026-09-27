@@ -2453,4 +2453,21 @@ namespace tut
         ensure_equals("mapped", flat(e.text()), std::string("onehelloxyz|twohello|threexyzhi there|"));
         ensure_equals("in one edit", edits, 1);
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<79>()
+    {
+        set_test_name("the bracket objects and [( pass over a bracket in a string or a comment, as % does");
+        ALCodeEditor& e = make("f(\"(\", x) // )\n");
+        e.setCaret(ALTextPos(0, 7));
+        keys("di(");
+        ensure_equals("inside the call, not the string's bracket", flat(e.text()), std::string("f() // )|"));
+        e.setText("g(a, \"(\", b)\n");
+        vim->handleKey(e, KEY_ESCAPE, MASK_NONE);
+        e.setCaret(ALTextPos(0, 10));
+        keys("[(");
+        ensure("back to the call's bracket", e.caret() == ALTextPos(0, 1));
+        keys("%");
+        ensure("and % to its partner", e.caret() == ALTextPos(0, 11));
+    }
 }

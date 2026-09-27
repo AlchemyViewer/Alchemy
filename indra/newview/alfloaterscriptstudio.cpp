@@ -6379,6 +6379,7 @@ void ALFloaterScriptStudio::addEditCommands()
     addEditorCommand("next_function", ALEditorCommand::NextFunction, false);
     addEditorCommand("previous_function", ALEditorCommand::PreviousFunction, false);
     addEditorCommand("select_function", ALEditorCommand::SelectFunction, false);
+    addEditorCommand("go_to_bracket", ALEditorCommand::GoToMatchingBracket, false);
     // The whole script's indentation made of spaces, or of tabs.
     for (const auto& [name, spaces] : { std::pair{ "indent_spaces", true }, std::pair{ "indent_tabs", false } })
     {

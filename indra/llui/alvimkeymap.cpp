@@ -1004,13 +1004,33 @@ void ALVimKeymap::slideMarks(const ALTextDocument::Edit& edit)
     slide(mVisualLastCaret);
 }
 
-bool ALVimKeymap::matchBracketIn(ALTextView& view, const ALTextPos& from, ALTextPos& match) const
+ALBracketIndex& ALVimKeymap::bracketsOf(ALTextView& view) const
 {
     if (ALCodeEditor* editor = ALViewType::as<ALCodeEditor>(&view))
     {
-        return editor->matchBracketAt(from, match);
+        return editor->bracketIndex();
     }
-    return matchBracket(view.document(), from, match);
+    // Summed up afresh for each question: a plain view's text is asked of
+    // seldom, and a text kept from before may not be this one.
+    if (!mPlainBrackets)
+    {
+        mPlainBrackets = std::make_unique<ALBracketIndex>();
+    }
+    mPlainBrackets->attach(&view.document());
+    return *mPlainBrackets;
+}
+
+bool ALVimKeymap::matchBracketIn(ALTextView& view, const ALTextPos& from, ALTextPos& match) const
+{
+    // An angle bracket is no bracket to the index -- a comparison in code
+    // -- and pairs by the text alone, as vim's % has it where asked.
+    const char c = at(view.document(), from);
+    if (c == '<' || c == '>')
+    {
+        return matchBracket(view.document(), from, match);
+    }
+    // Asked for: as far as it takes.
+    return bracketsOf(view).match(from, match, ALBracketIndex::ANYWHERE);
 }
 
 bool ALVimKeymap::play(ALTextView& view, const std::vector<Input>& inputs, bool remap)
@@ -3284,41 +3304,43 @@ bool ALVimKeymap::textObject(ALTextView& view, llwchar kind, llwchar what, S32 c
         {
             const char opener = (what == '(' || what == ')' || what == 'b') ? '(' : (what == '[' || what == ']') ? '[' : (what == '{' || what == '}' || what == 'B') ? '{' : '<';
             const char closer = partnerOf(opener);
-            // Back to the opener that holds the caret, counting nesting.
-            ALTextPos open  = from;
-            S32       depth = 0;
-            bool      found = at(d, open) == opener;
-            while (!found)
+            ALTextPos  open   = from;
+            if (opener != '<')
             {
-                if (!stepBack(d, open))
+                // Through the view's bracket index, as % goes: the opener
+                // under the caret where it is code, else the one left open
+                // before it; then as many more out as counted, or as many
+                // as there are.
+                ALBracketIndex& index = bracketsOf(view);
+                ALTextPos       paired;
+                if (!(at(d, from) == opener && index.match(from, paired, ALBracketIndex::ANYWHERE)) &&
+                    !index.enclosing(from, opener, 1, open, ALBracketIndex::ANYWHERE))
                 {
                     return false;
                 }
-                const char c = at(d, open);
-                if (c == closer)
+                for (S32 n = 1; n < count; ++n)
                 {
-                    ++depth;
-                }
-                else if (c == opener)
-                {
-                    if (depth == 0)
+                    ALTextPos outer;
+                    if (!index.enclosing(open, opener, 1, outer, ALBracketIndex::ANYWHERE))
                     {
-                        found = true;
+                        break;
                     }
-                    else
-                    {
-                        --depth;
-                    }
+                    open = outer;
                 }
             }
-            for (S32 n = 1; n < count; ++n)
+            else
             {
-                ALTextPos outer = open;
-                depth           = 0;
-                bool more       = false;
-                while (stepBack(d, outer))
+                // Back to the opener that holds the caret, counting nesting:
+                // an angle bracket by the text alone.
+                S32       depth = 0;
+                bool      found = at(d, open) == opener;
+                while (!found)
                 {
-                    const char c = at(d, outer);
+                    if (!stepBack(d, open))
+                    {
+                        return false;
+                    }
+                    const char c = at(d, open);
                     if (c == closer)
                     {
                         ++depth;
@@ -3327,17 +3349,42 @@ bool ALVimKeymap::textObject(ALTextView& view, llwchar kind, llwchar what, S32 c
                     {
                         if (depth == 0)
                         {
-                            more = true;
-                            break;
+                            found = true;
                         }
-                        --depth;
+                        else
+                        {
+                            --depth;
+                        }
                     }
                 }
-                if (!more)
+                for (S32 n = 1; n < count; ++n)
                 {
-                    break;
+                    ALTextPos outer = open;
+                    depth           = 0;
+                    bool more       = false;
+                    while (stepBack(d, outer))
+                    {
+                        const char c = at(d, outer);
+                        if (c == closer)
+                        {
+                            ++depth;
+                        }
+                        else if (c == opener)
+                        {
+                            if (depth == 0)
+                            {
+                                more = true;
+                                break;
+                            }
+                            --depth;
+                        }
+                    }
+                    if (!more)
+                    {
+                        break;
+                    }
+                    open = outer;
                 }
-                open = outer;
             }
             ALTextPos close;
             if (!matchBracketIn(view, open, close))
@@ -7277,73 +7324,12 @@ std::optional<ALTextRange> ALVimKeymap::matchNear(ALTextView& view, bool forward
     return matches.back();
 }
 
-bool ALVimKeymap::unmatchedBracket(const ALTextView& view, llwchar bracket, S32 count, ALTextPos& out) const
+bool ALVimKeymap::unmatchedBracket(ALTextView& view, llwchar bracket, S32 count, ALTextPos& out) const
 {
     // Out through the brackets of the other kind as well, counting pairs of
-    // this kind only: [( from a(b(c)d|) is the second (.
-    const ALTextDocument& d       = view.document();
-    const bool            forward = bracket == ')' || bracket == '}';
-    const char            open    = bracket == ')' || bracket == '(' ? '(' : '{';
-    const char            close   = open == '(' ? ')' : '}';
-    ALTextPos             at      = view.caret();
-    S32                   depth   = 0;
-    S32                   found   = 0;
-    for (;;)
-    {
-        if (forward)
-        {
-            if (atLineEnd(d, at))
-            {
-                if (at.line + 1 >= d.lineCount())
-                {
-                    return false;
-                }
-                at = ALTextPos(at.line + 1, 0);
-                if (d.lineLength(at.line) == 0)
-                {
-                    continue;
-                }
-            }
-            else
-            {
-                at = d.nextCluster(at);
-                if (atLineEnd(d, at))
-                {
-                    continue;
-                }
-            }
-        }
-        else
-        {
-            if (at.column == 0)
-            {
-                if (at.line == 0)
-                {
-                    return false;
-                }
-                at = ALTextPos(at.line - 1, d.lineLength(at.line - 1));
-                continue;
-            }
-            at = d.prevCluster(at);
-        }
-        const char c = d.line(at.line)[static_cast<size_t>(at.column)];
-        if (c == (forward ? open : close))
-        {
-            ++depth;
-        }
-        else if (c == (forward ? close : open))
-        {
-            if (depth > 0)
-            {
-                --depth;
-            }
-            else if (++found == count)
-            {
-                out = at;
-                return true;
-            }
-        }
-    }
+    // this kind only: [( from a(b(c)d|) is the second (. Asked for: as far
+    // as it takes.
+    return bracketsOf(view).enclosing(view.caret(), static_cast<char>(bracket), count, out, ALBracketIndex::ANYWHERE);
 }
 
 // static

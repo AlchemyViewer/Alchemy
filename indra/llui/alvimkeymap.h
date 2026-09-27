@@ -24,6 +24,7 @@
 
 #pragma once
 
+#include "albracketindex.h"
 #include "altextview.h"
 #include "alvimmappings.h"
 #include "alvimpattern.h"
@@ -284,6 +285,10 @@ private:
     // the view is one, so that a bracket inside a string or a comment
     // is passed over as the editor's box passes it.
     bool matchBracketIn(ALTextView& view, const ALTextPos& from, ALTextPos& match) const;
+    // Where the view's brackets pair up: the code editor's own, or one of
+    // this keymap's over a plain view's text, where every bracket counts.
+    // `%`, the bracket objects and [( all ask of it, by one set of rules.
+    ALBracketIndex& bracketsOf(ALTextView& view) const;
     // The position a range address names on the : line -- a number, .,
     // $, 'x, '< '>, with an offset -- read from `at` on; false where
     // the line has none there.
@@ -472,7 +477,7 @@ private:
     std::optional<ALTextRange> matchNear(ALTextView& view, bool forward);
     // [( [{ ]) ]}: the bracket the caret is inside of, open before it or
     // closed after it, the count out; false where there is none.
-    bool unmatchedBracket(const ALTextView& view, llwchar bracket, S32 count, ALTextPos& out) const;
+    bool unmatchedBracket(ALTextView& view, llwchar bracket, S32 count, ALTextPos& out) const;
     // A jump from `from`: vim's context marks, '' and ``, set there, and
     // the host told.
     void noteJump(ALTextView& view, const ALTextPos& from);
@@ -543,6 +548,8 @@ private:
     // they are in is listened to from the first key on it.
     std::map<char, ALTextPos> mMarks;
     const ALTextDocument*     mMarksIn = nullptr;
+    // A plain view's bracket index (bracketsOf).
+    mutable std::unique_ptr<ALBracketIndex> mPlainBrackets;
     boost::signals2::scoped_connection mMarksSlide;
     void                      slideMarks(const ALTextDocument::Edit& edit);
     void                      followDocument(ALTextView& view);

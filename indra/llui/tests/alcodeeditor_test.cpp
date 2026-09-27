@@ -2071,4 +2071,20 @@ namespace tut
         f.supplyCompletions(ALTextPos(0, 4), { method });
         ensure("the answer listed", f.completionOpen() && f.completions().size() == 1 && f.completions()[0].text == "method");
     }
+
+    template<> template<>
+    void alcodeeditor_object::test<57>()
+    {
+        set_test_name("Go to Matching Bracket: to the partner of the bracket at the caret and back; else to the closer of the pair around it");
+        ALCodeEditor& e = make("f(a, [1, 2], \"(\")\n");
+        e.setCaret(ALTextPos(0, 1));
+        key('\\', MASK_CONTROL | MASK_SHIFT);
+        ensure("to the partner, past the one in a string", e.caret() == ALTextPos(0, 16));
+        key('\\', MASK_CONTROL | MASK_SHIFT);
+        ensure("and back", e.caret() == ALTextPos(0, 1));
+        e.setCaret(ALTextPos(0, 7));
+        ensure("offered", e.canPerform(ALEditorCommand::GoToMatchingBracket));
+        e.perform(ALEditorCommand::GoToMatchingBracket);
+        ensure("inside a pair, at no bracket: to its closer", e.caret() == ALTextPos(0, 10));
+    }
 }

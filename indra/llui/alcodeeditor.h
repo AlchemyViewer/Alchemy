@@ -26,6 +26,7 @@
 
 #include "alanchoredranges.h"
 #include "alcodecards.h"
+#include "albracketindex.h"
 #include "alcompletionmodel.h"
 #include "alfixlistmodel.h"
 #include "alfoldmodel.h"
@@ -257,11 +258,14 @@ public:
 
     // The bracket the caret is at -- just before it, or under it -- and
     // its match, skipping what is inside strings and comments. False where
-    // the caret is at no bracket, or the bracket has no match.
+    // the caret is at no bracket, or the bracket has no match nearby.
     bool matchingBrackets(ALTextPos& open, ALTextPos& close);
-    // The bracket at a position and its match, likewise; what vim's %
-    // and its bracket objects ask, so that they and the box drawn agree.
-    bool matchBracketAt(const ALTextPos& at, ALTextPos& match);
+    // The bracket at a position and its match, likewise, as far as told;
+    // what vim's % and its bracket objects ask, so that they and the box
+    // drawn agree. All of it is the bracket index's (ALBracketIndex),
+    // which vim asks of directly for the brackets around a place.
+    bool            matchBracketAt(const ALTextPos& at, ALTextPos& match, S32 lines = ALBracketIndex::NEARBY);
+    ALBracketIndex& bracketIndex() { return mBracketIndex; }
 
     void setShowLineNumbers(bool show);
     bool getShowLineNumbers() const { return mShowLineNumbers; }
@@ -363,8 +367,8 @@ public:
     // How many brackets are open at a line's start, found from the top
     // once and kept until an edit above it; and at a place of a line. A
     // bracket in a string or a comment is none.
-    S32 bracketDepthBefore(S32 line);
-    S32 bracketDepthAt(const ALTextPos& at);
+    S32 bracketDepthBefore(S32 line) { return mBracketIndex.depthBefore(line); }
+    S32 bracketDepthAt(const ALTextPos& at) { return mBracketIndex.depthAt(at); }
 
     // --- completion --------------------------------------------------------------
 
@@ -662,6 +666,8 @@ protected:
     bool performFold(ALEditorCommand command) override;
     bool canFold(ALEditorCommand command) const override;
     bool performFunction(ALEditorCommand command) override;
+    // Where Go to Matching Bracket goes, or false for nowhere.
+    bool bracketToGoTo(ALTextPos& to);
     bool canFunction(ALEditorCommand command) const override;
     bool complete() override;
     bool signatureHelp() override;
@@ -806,9 +812,8 @@ private:
     bool      mStickyHeaders       = true;
     LLUIColor mBracketColors[3];
     bool      mBracketColorsSet    = false;
-    // Depth entering each line, valid for the first mDepthValid lines.
-    std::vector<S32> mDepthBefore;
-    S32              mDepthValid = 0;
+    // Where the brackets pair up, and how deep each line starts.
+    ALBracketIndex   mBracketIndex;
     bool      mGutterColorSet      = false;
     bool      mLineNumberColorSet  = false;
     bool      mCurrentLineColorSet = false;

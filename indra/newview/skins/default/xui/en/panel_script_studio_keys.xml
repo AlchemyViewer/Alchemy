@@ -86,6 +86,7 @@
     <panel.string name="cmd_next_function">Next function</panel.string>
     <panel.string name="cmd_previous_function">Previous function</panel.string>
     <panel.string name="cmd_select_function">Select the function</panel.string>
+    <panel.string name="cmd_go_to_bracket">Go to the matching bracket</panel.string>
     <panel.string name="cmd_previous_misspelling">Previous misspelling</panel.string>
     <line_editor
      follows="left|top|right"

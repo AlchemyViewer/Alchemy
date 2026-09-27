@@ -727,7 +727,8 @@ protected:
     virtual void revealLine(S32 line) { mLayout.setHidden(line, line, false); }
     virtual bool performFold(ALEditorCommand command) { return false; }
     virtual bool canFold(ALEditorCommand command) const { return false; }
-    // And about the functions a code editor's host knows of.
+    // And about the code's structure: the functions a code editor's host
+    // knows of, and a bracket's partner.
     virtual bool performFunction(ALEditorCommand command) { return false; }
     virtual bool canFunction(ALEditorCommand command) const { return false; }
     // Whether a click lands where the last one did, which is what makes

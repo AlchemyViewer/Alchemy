@@ -138,6 +138,7 @@ target_sources(
     alsurface.cpp
     alcodecards.cpp
     alcodeeditor.cpp
+    albracketindex.cpp
     alcompletionmodel.cpp
     alfuzzymatch.cpp
     alfixlistmodel.cpp
@@ -346,6 +347,7 @@ target_sources(
         alstringmatch.h
         alcodecards.h
         alcodeeditor.h
+        albracketindex.h
         alcompletionmodel.h
         alfuzzymatch.h
         alfixlistmodel.h
@@ -576,6 +578,7 @@ if(AL_BUILD_TESTS)
     alcodecards
     alcodeeditor
     aldiffview
+    albracketindex
     alcompletionmodel
     alfuzzymatch
     alfixlistmodel
