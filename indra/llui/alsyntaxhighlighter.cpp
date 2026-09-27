@@ -104,10 +104,13 @@ void ALSyntaxHighlighter::ensure(S32 line)
         return;
     }
     std::vector<ALSyntaxToken> fresh;
+    // Each line starts in the state the one before ends in, read where it
+    // is: a copy only for a line lexed anew.
+    const ALSyntaxState initial = mFirstDirty == 0 ? mGrammar->initialState() : ALSyntaxState();
     for (S32 i = mFirstDirty; i <= line; ++i)
     {
-        Line&               entry = mLines[i];
-        const ALSyntaxState start = (i == 0) ? mGrammar->initialState() : mLines[i - 1].end;
+        Line&                entry = mLines[i];
+        const ALSyntaxState& start = (i == 0) ? initial : mLines[i - 1].end;
         if (entry.valid && entry.start == start)
         {
             // Lexes as it did.
