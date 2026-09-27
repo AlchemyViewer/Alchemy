@@ -261,6 +261,32 @@ namespace
         LSLASTNode::replaceNode(old, replacement);
     }
 
+    // Nodes put together off the script -- a sum built a term at a time
+    // -- with Tailslide's counting of the references under each held off
+    // while they are: every node made counts its children's whole
+    // subtrees again, so a sum of n terms, each the left side of the
+    // next, is n squared. The whole is counted once as it is put in
+    // place. Tailslide holds it off the same way while it parses; a node
+    // made meanwhile is marked made by us, as it would have been.
+    class Uncounted
+    {
+    public:
+        explicit Uncounted(ScriptContext& context) : mContext(context), mWas(context.parsing) { mContext.parsing = true; }
+        ~Uncounted() { mContext.parsing = mWas; }
+        Uncounted(const Uncounted&)            = delete;
+        Uncounted& operator=(const Uncounted&) = delete;
+
+        template <class T> T* made(T* node) const
+        {
+            node->setSynthesized(true);
+            return node;
+        }
+
+    private:
+        ScriptContext& mContext;
+        const bool     mWas;
+    };
+
     // ---- the arithmetic of the target -------------------------------------------------------
 
     // Tailslide folds in double; the LSL VMs work in single, and integers
@@ -2377,19 +2403,26 @@ namespace
                 return false;
             }
             // [a, b, c] as (list)a + b + c.
-            const std::string was = render(expr);
-            // takeChild leaves a null in the slot, dropped each time.
-            auto* first = static_cast<LSLExpression*>(expr->takeChild(0));
-            expr->removeChild(expr->getChild(0));
-            LSLExpression* sum = ctx.allocator->newTracked<LSLTypecastExpression>(TYPE(LST_LIST), first);
-            sum->setLoc(first->getLoc());
+            const std::string           was = render(expr);
+            std::vector<LSLExpression*> terms;
+            terms.reserve(expr->getNumChildren());
             while (expr->hasChildren())
             {
-                auto* next = static_cast<LSLExpression*>(expr->takeChild(0));
+                // takeChild leaves a null in the slot, dropped each time.
+                terms.push_back(static_cast<LSLExpression*>(expr->takeChild(0)));
                 expr->removeChild(expr->getChild(0));
-                sum = ctx.allocator->newTracked<LSLBinaryExpression>(sum, OP_PLUS, bracketed(next));
-                sum->setType(TYPE(LST_LIST));
-                sum->setLoc(next->getLoc());
+            }
+            LSLExpression* sum = nullptr;
+            {
+                const Uncounted uncounted(*ctx.context);
+                sum = uncounted.made(ctx.allocator->newTracked<LSLTypecastExpression>(TYPE(LST_LIST), terms.front()));
+                sum->setLoc(terms.front()->getLoc());
+                for (size_t i = 1; i < terms.size(); ++i)
+                {
+                    sum = uncounted.made(ctx.allocator->newTracked<LSLBinaryExpression>(sum, OP_PLUS, uncounted.made(bracketed(terms[i]))));
+                    sum->setType(TYPE(LST_LIST));
+                    sum->setLoc(terms[i]->getLoc());
+                }
             }
             report.note(expr->getLoc(), "OptimizerWroteAs", "wrote [1] as [2]", { was, render(sum) });
             putInPlace(expr, sum, ctx.allocator);
