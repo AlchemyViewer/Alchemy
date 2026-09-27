@@ -76,6 +76,11 @@ public:
     // -- with every place kept where it was. A script mid-edit is
     // answered about the rest of it rather than not at all.
     bool understood() const;
+    // How many copies of a text that does not parse have been mended: a
+    // check and a question at the caret each keep their own, so asking
+    // one after the other of the same text mends nothing again. For the
+    // test that says so.
+    size_t mendings() const;
 
     // The script's own symbols in scope at a position: its globals,
     // functions, states, and the parameters and locals of what encloses

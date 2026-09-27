@@ -987,9 +987,8 @@ struct ALLSLService::Impl
         script    = nullptr;
         parsed    = false;
         passesRan = false;
-        mendedParser.reset();
-        mendedFor.clear();
-        mended = nullptr;
+        mendedWhole   = Mended();
+        mendedAtPlace = Mended();
     }
 
     // A script being typed seldom parses -- a call not yet closed, a
@@ -1000,11 +999,23 @@ struct ALLSLService::Impl
     // parser stops in blanked, and the blocks left open at the end
     // closed. Every position before the caret, and every line after its
     // own, is where it was, so the answers need no translating back.
-    std::unique_ptr<Tailslide::ScopedScriptParser> mendedParser;
-    std::string                                    mendedFor;
-    S32                                            mendedLine   = -1;
-    S32                                            mendedColumn = -1;
-    Tailslide::LSLScript*                          mended       = nullptr;
+    struct Mended
+    {
+        std::unique_ptr<Tailslide::ScopedScriptParser> parser;
+        std::string                                    source;
+        S32                                            line   = -1;
+        S32                                            column = -1;
+        Tailslide::LSLScript*                          script = nullptr;
+    };
+    // Two kept apart: the whole text's, which a check reads, and one
+    // closed at a place, which a question at the caret reads. Each is made
+    // again only when its own text or place moves; one slot for both was
+    // made again at every turn between a check and a question while the
+    // text did not parse.
+    Mended                                         mendedWhole;
+    Mended                                         mendedAtPlace;
+    // How many copies have been mended, for the test that says so.
+    size_t                                         mendings     = 0;
     // Whether the last question had a tree to be answered from.
     bool                                           understood   = false;
 
@@ -1018,37 +1029,39 @@ struct ALLSLService::Impl
             understood = true;
             return own;
         }
-        if (mendedParser && mendedFor == source && mendedLine == line && mendedColumn == column)
+        Mended& slot = line >= 0 ? mendedAtPlace : mendedWhole;
+        if (slot.parser && slot.source == source && slot.line == line && slot.column == column)
         {
-            understood = mended != nullptr;
-            return mended;
+            understood = slot.script != nullptr;
+            return slot.script;
         }
-        mendedFor.assign(source);
-        mendedLine   = line;
-        mendedColumn = column;
-        mended       = nullptr;
+        ++mendings;
+        slot.source.assign(source);
+        slot.line        = line;
+        slot.column      = column;
+        slot.script      = nullptr;
         std::string copy = line >= 0 ? closedAt(source, offsetOf(source, line, column)) : std::string(source);
         // Each try blanks a statement or closes the end; a handful mends
         // what one pause in typing leaves, and a text broken in more
         // places than that is left as it is.
         for (int attempt = 0; attempt < 8; ++attempt)
         {
-            mendedParser = std::make_unique<Tailslide::ScopedScriptParser>(nullptr);
-            mended       = mendedParser->parseLSLBytes(copy.data(), static_cast<int>(copy.size()));
-            if (mended)
+            slot.parser = std::make_unique<Tailslide::ScopedScriptParser>(nullptr);
+            slot.script = slot.parser->parseLSLBytes(copy.data(), static_cast<int>(copy.size()));
+            if (slot.script)
             {
-                mended->collectSymbols();
-                mended->determineTypes();
+                slot.script->collectSymbols();
+                slot.script->determineTypes();
                 break;
             }
-            const size_t at = stoppedAt(*mendedParser, copy);
+            const size_t at = stoppedAt(*slot.parser, copy);
             if (at == std::string_view::npos || !mendAt(copy, at))
             {
                 break;
             }
         }
-        understood = mended != nullptr;
-        return mended;
+        understood = slot.script != nullptr;
+        return slot.script;
     }
 };
 
@@ -1122,6 +1135,11 @@ bool ALLSLService::parsed() const
 bool ALLSLService::understood() const
 {
     return mImpl->understood;
+}
+
+size_t ALLSLService::mendings() const
+{
+    return mImpl->mendings;
 }
 
 bool ALLSLService::hasBuiltins() const

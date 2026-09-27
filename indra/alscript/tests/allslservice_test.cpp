@@ -653,4 +653,28 @@ namespace tut
         const ALScriptProblems kept = service.check("default\n{\n    state_entry()\n    {\n        llOwnerSay((string)llAlchemyWide(1));\n    }\n}\n", true);
         ensure_equals("what it defines is known: " + said(kept), errors(kept), size_t(0));
     }
+
+    template<> template<>
+    void allslservice_object::test<19>()
+    {
+        set_test_name("a text that does not parse is mended once whole and once at the caret, however the questions take turns");
+        const std::string broken = "integer count;\ndefault {\n    state_entry() {\n        llSay(0, (string)count\n    }\n}\n";
+        const size_t      before = service.mendings();
+        // What the check asks after it, whole; a call's parameters, at the
+        // caret.
+        service.outline(broken);
+        service.signature(broken, 3, 20);
+        const size_t twice = service.mendings();
+        ensure_equals("one each", twice - before, size_t(2));
+        for (int turn = 0; turn < 3; ++turn)
+        {
+            service.outline(broken);
+            service.signature(broken, 3, 20);
+            service.hover(broken, 3, 20);
+            service.symbols(broken, 3, 20);
+        }
+        ensure_equals("and no more, turn and turn about", service.mendings(), twice);
+        service.signature(broken, 3, 12);
+        ensure_equals("another place is mended again", service.mendings(), twice + 1);
+    }
 }
