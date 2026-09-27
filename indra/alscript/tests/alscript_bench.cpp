@@ -40,6 +40,7 @@
 
 #include "linden_common.h"
 
+#include "../aldiskcache.h"
 #include "../aldiskincludes.h"
 #include "../allslservice.h"
 #include "../allsloptimizer.h"
@@ -196,6 +197,40 @@ namespace
                     const std::optional<std::string> real = blessed.admits((std::filesystem::path(dir) / file).string());
                     std::string                      text;
                     if (!found && real && ALDiskIncludes::readOrdinary(*real, text))
+                    {
+                        read += text.size();
+                        found = true;
+                    }
+                }
+            }
+        }
+        return read;
+    }
+
+    // The same through what the disk said a moment ago, as the snapshot
+    // asks it now (ALScriptPreprocessor::blessedFor, textOf): each check
+    // within a couple of seconds of the last.
+    size_t includesKept(const IncludeTree& tree, ALDiskCache& cache)
+    {
+        size_t                         read     = 0;
+        const std::vector<std::string> own{ tree.folder };
+        const std::string              from_dir = std::filesystem::path(tree.script).parent_path().string();
+        for (const std::string& name : tree.names)
+        {
+            ALDiskCache::Blessed&    blessed = cache.blessed(own, true, from_dir, {}, 1, 1.0);
+            std::vector<std::string> dirs{ from_dir };
+            for (const std::string& folder : blessed.includes.folders())
+            {
+                dirs.push_back(folder);
+            }
+            bool found = false;
+            for (const std::string& dir : dirs)
+            {
+                for (const std::string& file : ALDiskIncludes::namesFor(name, false, false))
+                {
+                    const std::optional<std::string> real = cache.admits(blessed, (std::filesystem::path(dir) / file).string());
+                    std::string                      text;
+                    if (!found && real && cache.read(*real, text))
                     {
                         read += text.size();
                         found = true;
@@ -434,7 +469,9 @@ int main(int, char**)
     std::printf("\nThe main thread's include work, a snapshot of a script with five disk includes\n");
     {
         const IncludeTree tree;
-        row("find and read five disk includes", ms_per_run([&] { g_sink = g_sink + includesUncached(tree); }), NONE);
+        row("find and read five disk includes, asking the disk", ms_per_run([&] { g_sink = g_sink + includesUncached(tree); }), NONE);
+        ALDiskCache cache;
+        row("  what it said a moment ago kept", ms_per_run([&] { g_sink = g_sink + includesKept(tree, cache); }), NONE);
     }
 
     std::printf("\nThe preprocessor's thread's work\n");

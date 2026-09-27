@@ -9,6 +9,7 @@ add_library(alscript STATIC)
 target_sources(
   alscript
   PRIVATE
+    aldiskcache.cpp
     aldiskincludes.cpp
     allslinliner.cpp
     almessagemap.cpp
@@ -36,6 +37,7 @@ target_sources(
   PUBLIC
     FILE_SET HEADERS
       FILES
+        aldiskcache.h
         aldiskincludes.h
         allslinliner.h
         almessagemap.h
@@ -115,6 +117,7 @@ if(AL_BUILD_TESTS)
     DEFINES ${definitions_defines}
   )
   al_add_test(aldiskincludes PROJECT alscript LIBRARIES alscript llcommon)
+  al_add_test(aldiskcache PROJECT alscript LIBRARIES alscript llcommon)
   al_add_test(alscriptstack PROJECT alscript LIBRARIES alscript llcommon)
   al_add_test(alscriptenvelope PROJECT alscript LIBRARIES alscript llcommon)
   al_add_test(almessagemap PROJECT alscript LIBRARIES alscript llcommon)

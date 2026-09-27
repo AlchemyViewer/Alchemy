@@ -25,6 +25,7 @@
 
 #pragma once
 
+#include "aldiskcache.h"
 #include "aldiskincludes.h"
 #include "alluauconfig.h"
 #include "alpreprocessor.h"
@@ -249,11 +250,16 @@ private:
     // scripter's include folders while disk includes are on, and what a
     // `.lslrc` or `.luaurc` on disk lists -- `alias_folders` being those
     // the run's aliases have blessed so far. Nothing else, ever.
-    ALDiskIncludes         blessedFor(const ALPreprocessor::Ask& ask, const Request& request, const std::vector<std::string>& alias_folders);
+    // Kept a moment in the disk's cache (ALDiskCache), with what they admit.
+    ALDiskCache::Blessed&  blessedFor(const ALPreprocessor::Ask& ask, const Request& request, const std::vector<std::string>& alias_folders);
     // The scripter's own include folders, blessed, while disk includes are
     // on; nothing otherwise. What a configuration on disk may reach past
     // its own folder.
-    static ALDiskIncludes  ownFolders();
+    ALDiskCache::Blessed&  ownFolders();
+    // The include folders as the setting holds them, read once each time
+    // the settings that decide the disk move; and how often they have.
+    const std::vector<std::string>& ownIncludeFolders();
+    U32                             diskGeneration();
     // Every item of a name, from the walk or from the last one.
     const LLInventoryModel::item_array_t& namedItems(const std::string& name);
     // Whether an include or a module so named is in the world a script is
@@ -351,6 +357,13 @@ private:
     // The files on disk a run has admitted, by identity: what the studio
     // may ask the text of, and nothing else on the disk.
     wanted_t                                                                        mAdmitted;
+    // What the disk said, kept a moment: every check asks it again for each
+    // include. The settings that decide it counted, and the folders they
+    // name.
+    ALDiskCache                                                                     mDisk;
+    U32                                                                             mDiskGeneration = 1;
+    std::optional<std::vector<std::string>>                                         mOwnFolders;
+    std::vector<boost::signals2::scoped_connection>                                 mDiskSettings;
     // What each prim was last said to hold.
     boost::unordered_flat_map<LLUUID, std::vector<ALScriptWorkspace::Item>>         mContents;
     // The prims asked what they hold that did not answer -- not in time,
