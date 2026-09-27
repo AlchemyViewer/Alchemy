@@ -2815,11 +2815,11 @@ ALVimKeymap::Motion ALVimKeymap::motion(ALTextView& view, llwchar ch, S32 count,
             }
             else if (ch == 0x01)
             {
-                line = llclamp(mCount > 0 || count > 1 ? count - 1 : 0, 0, d.lineCount() - 1);
+                line = llclamp(mCount > 0 || count > 1 ? count - 1 - view.lineNumberBase() : 0, 0, d.lineCount() - 1);
             }
             else
             {
-                line = llclamp(mCount > 0 ? count - 1 : d.lineCount() - 1, 0, d.lineCount() - 1);
+                line = llclamp(mCount > 0 ? count - 1 - view.lineNumberBase() : d.lineCount() - 1, 0, d.lineCount() - 1);
             }
             m.linewise = true;
             m.moved    = line != from.line || ch == 0x01 || ch == 'G';
@@ -5317,7 +5317,8 @@ bool ALVimKeymap::lineAddress(ALTextView& view, const std::string& line, size_t&
         {
             n = n * 10 + (line[at_++] - '0');
         }
-        out = n - 1;
+        // As the lines are numbered where they are shown.
+        out = n - 1 - view.lineNumberBase();
     }
     else
     {
@@ -6637,7 +6638,7 @@ bool ALVimKeymap::global(ALTextView& view, S32 first, S32 last, bool ranged, con
         mGlobalBatch = &batch;
         for (const S32 line : lines)
         {
-            runCommand(view, std::to_string(line + 1) + command);
+            runCommand(view, std::to_string(line + 1 + view.lineNumberBase()) + command);
             if (mMessageError)
             {
                 break;
@@ -6703,7 +6704,7 @@ bool ALVimKeymap::global(ALTextView& view, S32 first, S32 last, bool ranged, con
             // On the line, as vim puts the cursor there: `.` in the
             // command is the line.
             view.setCaret(ALTextPos(line, 0));
-            runCommand(view, std::to_string(line + 1) + command);
+            runCommand(view, std::to_string(line + 1 + view.lineNumberBase()) + command);
             if (mMessageError)
             {
                 break;

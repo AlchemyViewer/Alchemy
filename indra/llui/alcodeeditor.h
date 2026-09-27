@@ -290,7 +290,7 @@ public:
     // its envelope, which a runtime error's line counts -- the lines
     // counted from there: the first shows base + 1.
     void                         setLineNumberBase(S32 base) { mLineNumberBase = llmax(0, base); }
-    S32                          lineNumberBase() const { return mLineNumberBase; }
+    S32                          lineNumberBase() const override { return mLineNumberBase; }
     void                         setLineTints(std::vector<LLColor4> tints) { mLineTints = std::move(tints); }
     const std::vector<S32>&      lineNumbers() const { return mLineNumbers; }
     const std::vector<LLColor4>& lineTints() const { return mLineTints; }

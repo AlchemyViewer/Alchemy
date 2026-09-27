@@ -268,6 +268,10 @@ public:
     // The selection as drawn now: its colour, or a subclass's for a view
     // the keyboard has left.
     virtual LLColor4 selectionDrawColor() const { return mSelectionColor.get(); }
+    // Where a text is part of a larger one, the lines before it: its first
+    // line is shown as this plus one, and a line number typed -- vim's 12G,
+    // :12 -- is one of those shown.
+    virtual S32 lineNumberBase() const { return 0; }
     // How the caret is drawn where a modal keymap does not say -- a line
     // before the character, a block over it, a bar under it -- and whether
     // it blinks.

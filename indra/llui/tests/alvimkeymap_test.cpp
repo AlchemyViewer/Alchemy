@@ -2485,4 +2485,22 @@ namespace tut
         keys("%");
         ensure("and % to its partner", e.caret() == ALTextPos(0, 11));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<80>()
+    {
+        set_test_name("a line number typed is one shown: under lines counted from 10, 12G, 11gg and :13 go where the gutter says, and :g still finds its own lines");
+        ALCodeEditor& e = make("one\ntwo\nthree\nfour\n");
+        e.setLineNumberBase(10);
+        keys("12G");
+        ensure_equals("12G the second line", e.caret().line, 1);
+        keys("11gg");
+        ensure_equals("11gg the first", e.caret().line, 0);
+        ex("13");
+        ensure_equals(":13 the third", e.caret().line, 2);
+        ex("2");
+        ensure_equals("a number before the first, the first", e.caret().line, 0);
+        ex("g/o/d");
+        ensure_equals(":g deletes the lines it matched, not those the numbers would miss", flat(e.text()), std::string("three|"));
+    }
 }
