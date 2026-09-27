@@ -1050,4 +1050,18 @@ namespace tut
         ensure("reads alone, a sum: " + r.text, r.text.find("l = (list)i + g;") != std::string::npos);
         compiles(r);
     }
+
+    template<> template<>
+    void allsloptimizer_object::test<28>()
+    {
+        set_test_name("what can never run, removed, is said as far as its first line and a few words of it");
+        std::string body = "        return;\n        llOwnerSay(\"";
+        body += std::string(300, 'x');
+        body += "\");\n";
+        const ALLSLOptimizer::Result r = ALLSLOptimizer::run(wrap("", body), options());
+        const auto note = std::find_if(r.problems.begin(), r.problems.end(), [](const ALScriptProblem& p) { return p.key == "OptimizerRemovedUnreachable"; });
+        ensure("said", note != r.problems.end() && note->args.size() == 1);
+        ensure("not all of it", note->args[0].size() < 80 && note->args[0].find("\xE2\x80\xA6") != std::string::npos);
+        ensure("from its start", note->args[0].rfind("llOwnerSay", 0) == 0);
+    }
 } // namespace tut

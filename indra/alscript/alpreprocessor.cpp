@@ -4104,11 +4104,13 @@ void ALPreprocessor::optimize(Result& result, const Options& options)
         result.problems.push_back(std::move(p));
         return;
     }
+    // The text's lines found once, for every note.
+    const ALScriptFixes::Lines lines(result.text);
     for (ALScriptProblem p : optimized.problems)
     {
         // What it did, as a change to the source where that can be said,
         // taken back with the note.
-        ALScriptFixes::attachOptimizer(p, result.text);
+        ALScriptFixes::attachOptimizer(p, lines);
         ALScriptFixes::mapThrough(result.map, p);
         mapProblem(p, result.map);
         if (!p.file.empty())

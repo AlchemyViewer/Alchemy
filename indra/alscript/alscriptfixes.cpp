@@ -1272,6 +1272,11 @@ namespace ALScriptFixes
 
     void attachOptimizer(ALScriptProblem& problem, std::string_view text)
     {
+        attachOptimizer(problem, Lines(text));
+    }
+
+    void attachOptimizer(ALScriptProblem& problem, const Lines& lines)
+    {
         const std::string&              key  = problem.key;
         const std::vector<std::string>& args = problem.args;
         if ((is(key, Fixed::OptimizerFolded) || is(key, Fixed::OptimizerEvaluated) || is(key, Fixed::OptimizerSimplified) || is(key, Fixed::OptimizerWroteAs)) && args.size() == 2 &&
@@ -1281,7 +1286,6 @@ namespace ALScriptFixes
             // has it, the same but for blanks: then what it became may go in
             // its place. A rewrite of what was written, which the scripter
             // may not want, so never preferred.
-            const Lines            lines(text);
             const std::string_view line = lines.line(problem.line);
             if (problem.column < 0 || problem.endColumn > static_cast<S32>(line.size()) || problem.endColumn <= problem.column)
             {
@@ -1314,7 +1318,7 @@ namespace ALScriptFixes
                                                                    : titled("ScriptFixRemoveNoEffect", "Remove what does nothing", {});
             fix.preferred = true;
             fix.safe      = true;
-            offerRemoval(problem, text, problem.line, problem.column, problem.endLine, problem.endColumn, std::move(fix));
+            offerRemoval(problem, lines, problem.line, problem.column, problem.endLine, problem.endColumn, std::move(fix));
         }
         else if ((is(key, Fixed::OptimizerRemovedLocal) || is(key, Fixed::OptimizerRemovedGlobal) || is(key, Fixed::OptimizerRemovedFunction) ||
                   is(key, Fixed::OptimizerRemovedState)) &&
@@ -1324,7 +1328,7 @@ namespace ALScriptFixes
             // well, but not preferred, so that one is not made twice -- that
             // one, where offerRemoval made one, and no fix already there.
             const size_t before = problem.fixes.size();
-            offerRemoval(problem, text, problem.line, problem.column, problem.endLine, problem.endColumn, args[0]);
+            offerRemoval(problem, lines, problem.line, problem.column, problem.endLine, problem.endColumn, args[0]);
             if (problem.fixes.size() > before)
             {
                 problem.fixes.back().preferred = false;

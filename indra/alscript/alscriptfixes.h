@@ -162,6 +162,8 @@ namespace ALScriptFixes
     // change is one expression or one thing removed: the notes of a run
     // over `text`, in its places.
     void attachOptimizer(ALScriptProblem& problem, std::string_view text);
+    // The same over lines found once, for every note of a run.
+    void attachOptimizer(ALScriptProblem& problem, const Lines& lines);
 
     // A problem's fixes taken through a map from the text they were made
     // over to the source, kept only where every edit lands, on one line,

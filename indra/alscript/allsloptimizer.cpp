@@ -2672,7 +2672,16 @@ namespace
             const auto               go = [&](LSLASTNode* stmt, const char* key, const char* why) {
                 if (key)
                 {
-                    report.note(stmt->getLoc(), key, std::string("removed [1]") + why, { render(stmt) });
+                    // What went, as far as its first line and a few words
+                    // of it: a note is read beside the line, not in place
+                    // of the code.
+                    std::string said = render(stmt);
+                    const size_t cut = std::min(said.find('\n'), size_t(60));
+                    if (cut < said.size())
+                    {
+                        said = said.substr(0, cut) + "\xE2\x80\xA6";
+                    }
+                    report.note(stmt->getLoc(), key, std::string("removed [1]") + why, { said });
                 }
                 going.push_back(stmt);
             };
