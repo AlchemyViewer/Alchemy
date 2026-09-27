@@ -173,6 +173,10 @@ namespace
             case ALEditorCommand::SelectFunction:
             case ALEditorCommand::GoToMatchingBracket:
             case ALEditorCommand::SelectLine:
+            case ALEditorCommand::MoveSubwordLeft:
+            case ALEditorCommand::MoveSubwordRight:
+            case ALEditorCommand::SelectSubwordLeft:
+            case ALEditorCommand::SelectSubwordRight:
             case ALEditorCommand::FindNext:
             case ALEditorCommand::FindPrevious:
             case ALEditorCommand::COUNT:
@@ -1878,6 +1882,18 @@ void ALTextView::deleteRange(const ALTextRange& range)
 
 // --- line commands and indentation ----------------------------------------------
 
+ALTextPos ALTextView::wordStep(const ALTextPos& from, bool forward, bool parts) const
+{
+    // Code by its names and marks, as a double-click takes a name; prose,
+    // and a text with no grammar, by its words.
+    const ALSyntaxGrammar* grammar = mHighlighter.grammar().get();
+    if (parts || (grammar && !grammar->prose()))
+    {
+        return forward ? mDocument.nextCodeWord(from, parts) : mDocument.prevCodeWord(from, parts);
+    }
+    return forward ? mDocument.nextWord(from) : mDocument.prevWord(from);
+}
+
 ALTextIndent::Options ALTextView::editingOptions() const
 {
     ALTextIndent::Options options;
@@ -2023,10 +2039,21 @@ bool ALTextView::perform(ALEditorCommand command)
             return true;
         case C::MoveWordLeft:
         case C::SelectWordLeft:
-            return move(mDocument.prevWord(mCaret));
+            return move(wordStep(mCaret, false, false));
         case C::MoveWordRight:
         case C::SelectWordRight:
-            return move(mDocument.nextWord(mCaret));
+            return move(wordStep(mCaret, true, false));
+        case C::MoveSubwordLeft:
+        case C::SelectSubwordLeft:
+        case C::MoveSubwordRight:
+        case C::SelectSubwordRight:
+        {
+            const bool forward = command == C::MoveSubwordRight || command == C::SelectSubwordRight;
+            placeCaret(wordStep(mCaret, forward, true), command == C::SelectSubwordLeft || command == C::SelectSubwordRight);
+            mDesiredX = -1.f;
+            scrollToCaret();
+            return true;
+        }
         case C::MoveLineStart:
         case C::SelectLineStart:
         {
@@ -2083,10 +2110,10 @@ bool ALTextView::perform(ALEditorCommand command)
             }
             return true;
         case C::DeleteWordLeft:
-            deleteRange(hasSelection() ? selection() : ALTextRange(mDocument.prevWord(mCaret), mCaret));
+            deleteRange(hasSelection() ? selection() : ALTextRange(wordStep(mCaret, false, false), mCaret));
             return true;
         case C::DeleteWordRight:
-            deleteRange(hasSelection() ? selection() : ALTextRange(mCaret, mDocument.nextWord(mCaret)));
+            deleteRange(hasSelection() ? selection() : ALTextRange(mCaret, wordStep(mCaret, true, false)));
             return true;
         case C::DeleteToLineStart:
             // Back to the line's start, or the break before it from there,

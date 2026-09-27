@@ -26,17 +26,11 @@
 
 #include "alfuzzymatch.h"
 
+#include "altextchars.h"
+
 namespace
 {
     typedef ALFuzzyMatch::Tier Tier;
-
-    bool isBreak(char c)
-    {
-        return c == '_' || c == '.' || c == ':' || c == '-' || c == '/' || c == '\\' || c == ' ';
-    }
-    bool isUpper(char c) { return c >= 'A' && c <= 'Z'; }
-    bool isLower(char c) { return c >= 'a' && c <= 'z'; }
-    bool isDigit(char c) { return c >= '0' && c <= '9'; }
 
     // A name as the matching reads it: its letters as they are and lowered,
     // and where its parts begin -- from a prepared target, or worked out as
@@ -221,25 +215,7 @@ namespace
 // static
 bool ALFuzzyMatch::partAt(std::string_view name, size_t at)
 {
-    if (at == 0)
-    {
-        return true;
-    }
-    const char prev = name[at - 1];
-    const char c    = name[at];
-    if (isBreak(prev))
-    {
-        return !isBreak(c);
-    }
-    if (isUpper(c) && isLower(prev))
-    {
-        return true;
-    }
-    if (isDigit(c) && !isDigit(prev))
-    {
-        return true;
-    }
-    return isUpper(c) && isUpper(prev) && at + 1 < name.size() && isLower(name[at + 1]);
+    return alNamePartAt(name, at);
 }
 
 // static

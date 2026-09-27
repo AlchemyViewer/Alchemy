@@ -115,6 +115,11 @@ enum class ALEditorCommand : U8
     InsertLineBelow,
     InsertLineAbove,
     SelectLine,
+    // By the parts of a name as well as by words: `Set` in `llSetPos`.
+    MoveSubwordLeft,
+    MoveSubwordRight,
+    SelectSubwordLeft,
+    SelectSubwordRight,
     COUNT
 };
 

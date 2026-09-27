@@ -2185,4 +2185,31 @@ namespace tut
         key('L', MASK_CONTROL);
         ensure("the last, to the end", e.selection().normalised() == ALTextRange(ALTextPos(7, 0), ALTextPos(7, 1)));
     }
+
+    template<> template<>
+    void alcodeeditor_object::test<62>()
+    {
+        set_test_name("the word keys go by code's names and marks in code, as a double-click takes a name; the subword keys by a name's parts");
+        ALCodeEditor& e = make("ll.Say(0, llSetPos);", "slua");
+#if LL_DARWIN
+        const MASK word = MASK_ALT;
+        const MASK part = MASK_MAC_CONTROL | MASK_ALT;
+#else
+        const MASK word = MASK_CONTROL;
+        const MASK part = MASK_CONTROL | MASK_ALT;
+#endif
+        e.setCaret(ALTextPos(0, 0));
+        key(KEY_RIGHT, word);
+        ensure("to the dot, not past ll.Say", e.caret() == ALTextPos(0, 2));
+        key(KEY_RIGHT, word | MASK_SHIFT);
+        ensure("selecting the mark", e.selection().normalised() == ALTextRange(ALTextPos(0, 2), ALTextPos(0, 3)));
+        e.setCaret(ALTextPos(0, 10));
+        key(KEY_RIGHT, part);
+        ensure("a part", e.caret() == ALTextPos(0, 12));
+        key(KEY_RIGHT, part | MASK_SHIFT);
+        ensure("and a part selected", e.selection().normalised() == ALTextRange(ALTextPos(0, 12), ALTextPos(0, 15)));
+        e.setCaret(ALTextPos(0, 18));
+        key(KEY_BACKSPACE, word);
+        ensure_equals("a word taken back is the name", e.text(), std::string("ll.Say(0, );"));
+    }
 }

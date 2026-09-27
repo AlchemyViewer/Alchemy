@@ -53,6 +53,34 @@ inline bool alIdentifierByte(char c)
     return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_';
 }
 
+// Whether a part of a name begins at a byte of it: after an underscore, a
+// dot, a colon, a dash, a slash or a blank; at a capital after a small
+// letter, and at the last capital of a run before a small one; and at a
+// digit after what is not one -- `Set` and `Pos` in `llSetPos`, `POSITION`
+// in `PRIM_POSITION`. What fuzzy matching and subword motion both read.
+inline bool alNamePartAt(std::string_view name, size_t at)
+{
+    const auto brk   = [](char c) { return c == '_' || c == '.' || c == ':' || c == '-' || c == '/' || c == '\\' || c == ' '; };
+    const auto upper = [](char c) { return c >= 'A' && c <= 'Z'; };
+    const auto lower = [](char c) { return c >= 'a' && c <= 'z'; };
+    const auto digit = [](char c) { return c >= '0' && c <= '9'; };
+    if (at == 0)
+    {
+        return true;
+    }
+    const char prev = name[at - 1];
+    const char c    = name[at];
+    if (brk(prev))
+    {
+        return !brk(c);
+    }
+    if ((upper(c) && lower(prev)) || (digit(c) && !digit(prev)))
+    {
+        return true;
+    }
+    return upper(c) && upper(prev) && at + 1 < name.size() && lower(name[at + 1]);
+}
+
 // The end of a match of the needle at `at` in the hay, or npos. Without
 // regard to case it compares codepoint by codepoint.
 inline size_t alMatchAt(std::string_view hay, size_t at, std::string_view needle, bool case_insensitive)

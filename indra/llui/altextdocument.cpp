@@ -631,6 +631,76 @@ ALTextPos ALTextDocument::prevWord(ALTextPos pos) const
     return pos.line > 0 ? lineEnd(pos.line - 1) : lineStart(pos.line);
 }
 
+namespace
+{
+    // What a byte is to code's word motion: a blank, a name's, or a mark.
+    // Bytes past ASCII are a name's, so that a character is never split.
+    enum class CodeRun : U8
+    {
+        Blank,
+        Name,
+        Mark,
+    };
+    CodeRun codeRunOf(char c)
+    {
+        return c == ' ' || c == '\t' ? CodeRun::Blank : alWordByte(c) ? CodeRun::Name : CodeRun::Mark;
+    }
+}
+
+ALTextPos ALTextDocument::nextCodeWord(ALTextPos pos, bool parts) const
+{
+    pos                    = clamp(pos);
+    const std::string& l   = mLines[pos.line];
+    const size_t       n   = l.size();
+    size_t             at  = static_cast<size_t>(pos.column);
+    if (at >= n)
+    {
+        return pos.line + 1 < lineCount() ? ALTextPos(pos.line + 1, 0) : lineEnd(pos.line);
+    }
+    const CodeRun run = codeRunOf(l[at]);
+    if (run != CodeRun::Blank)
+    {
+        ++at;
+        while (at < n && codeRunOf(l[at]) == run && !(parts && run == CodeRun::Name && alNamePartAt(l, at)))
+        {
+            ++at;
+        }
+    }
+    while (at < n && codeRunOf(l[at]) == CodeRun::Blank)
+    {
+        ++at;
+    }
+    return ALTextPos(pos.line, static_cast<S32>(at));
+}
+
+ALTextPos ALTextDocument::prevCodeWord(ALTextPos pos, bool parts) const
+{
+    pos = clamp(pos);
+    if (pos.column == 0)
+    {
+        return pos.line > 0 ? lineEnd(pos.line - 1) : pos;
+    }
+    const std::string& l  = mLines[pos.line];
+    size_t             at = static_cast<size_t>(pos.column);
+    while (at > 0 && codeRunOf(l[at - 1]) == CodeRun::Blank)
+    {
+        --at;
+    }
+    if (at > 0)
+    {
+        const CodeRun run = codeRunOf(l[at - 1]);
+        while (at > 0 && codeRunOf(l[at - 1]) == run)
+        {
+            --at;
+            if (parts && run == CodeRun::Name && alNamePartAt(l, at))
+            {
+                break;
+            }
+        }
+    }
+    return ALTextPos(pos.line, static_cast<S32>(at));
+}
+
 ALTextRange ALTextDocument::wordAt(ALTextPos pos) const
 {
     pos                             = clamp(pos);

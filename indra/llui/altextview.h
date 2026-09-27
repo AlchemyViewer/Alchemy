@@ -838,6 +838,10 @@ private:
     // the bracket a closing one closes, where a subclass can match one --
     // and what it or ALTextEditing works out done, as one step to undo.
     ALTextIndent::Options  editingOptions() const;
+    // Where a word's motion from a place ends: by code's runs where the
+    // grammar is code, by the prose's words otherwise; with `parts`, by a
+    // name's parts too, in either.
+    ALTextPos              wordStep(const ALTextPos& from, bool forward, bool parts) const;
     ALTextIndent::opener_t openerOf();
 
     void                 allowLanguageInput(bool allow);

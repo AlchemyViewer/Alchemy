@@ -90,6 +90,10 @@
     <panel.string name="cmd_insert_line_below">Insert a line below</panel.string>
     <panel.string name="cmd_insert_line_above">Insert a line above</panel.string>
     <panel.string name="cmd_select_line">Select the line</panel.string>
+    <panel.string name="cmd_move_subword_left">Move a name's part left</panel.string>
+    <panel.string name="cmd_move_subword_right">Move a name's part right</panel.string>
+    <panel.string name="cmd_select_subword_left">Select a name's part left</panel.string>
+    <panel.string name="cmd_select_subword_right">Select a name's part right</panel.string>
     <panel.string name="cmd_previous_misspelling">Previous misspelling</panel.string>
     <line_editor
      follows="left|top|right"

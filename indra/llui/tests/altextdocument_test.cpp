@@ -380,4 +380,33 @@ namespace tut
         ensure_equals("all blank", alBlanksWidth(" \t", 2, &bytes), 2);
         ensure_equals("all of it", bytes, size_t(2));
     }
+
+    template<> template<>
+    void altextdocument_object::test<18>()
+    {
+        set_test_name("words as code reads them: a name's run, a run of marks, the blanks after; and a name's parts");
+        const ALTextDocument doc("ll.Say(0, llSetPos)\n  PRIM_POSITION");
+        std::string stops;
+        for (ALTextPos at(0, 0); at.line == 0 && at.column < 19;)
+        {
+            at = doc.nextCodeWord(at);
+            stops += llformat("%d ", at.column);
+        }
+        ensure_equals("forward, each run's end past its blanks", stops, std::string("2 3 6 7 8 10 18 19 "));
+        ensure("across the line end", doc.nextCodeWord(ALTextPos(0, 19)) == ALTextPos(1, 0));
+        ensure("over the next line's blanks from its start", doc.nextCodeWord(ALTextPos(1, 0)) == ALTextPos(1, 2));
+        stops.clear();
+        for (ALTextPos at(0, 19); at.column > 0;)
+        {
+            at = doc.prevCodeWord(at);
+            stops += llformat("%d ", at.column);
+        }
+        ensure_equals("back, each run's start", stops, std::string("18 10 8 7 6 3 2 0 "));
+        ensure("back across the line start", doc.prevCodeWord(ALTextPos(1, 0)) == ALTextPos(0, 19));
+        ensure("parts forward", doc.nextCodeWord(ALTextPos(0, 10), true) == ALTextPos(0, 12) && doc.nextCodeWord(ALTextPos(0, 12), true) == ALTextPos(0, 15));
+        ensure("parts back", doc.prevCodeWord(ALTextPos(0, 17), true) == ALTextPos(0, 15) && doc.prevCodeWord(ALTextPos(0, 15), true) == ALTextPos(0, 12));
+        ensure("past an underscore", doc.nextCodeWord(ALTextPos(1, 2), true) == ALTextPos(1, 7) && doc.prevCodeWord(ALTextPos(1, 15), true) == ALTextPos(1, 7));
+        const ALTextDocument wide("x\xC3\xA9y + 1");
+        ensure("a character past ASCII kept whole", wide.nextCodeWord(ALTextPos(0, 0)) == ALTextPos(0, 5));
+    }
 }

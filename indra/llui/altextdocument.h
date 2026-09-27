@@ -263,6 +263,13 @@ public:
     ALTextPos   nextWord(ALTextPos pos) const;
     ALTextPos   prevWord(ALTextPos pos) const;
     ALTextRange wordAt(ALTextPos pos) const;
+    // A word along as code reads one: past a run of a name's characters,
+    // or of other marks, and the blanks after it, going forward; back over
+    // blanks and the run before them. `ll.Say` is three. With `parts`, a
+    // name's parts too -- `Set` and `Pos` in `llSetPos`. Across a line end
+    // as the words above.
+    ALTextPos   nextCodeWord(ALTextPos pos, bool parts = false) const;
+    ALTextPos   prevCodeWord(ALTextPos pos, bool parts = false) const;
 
     // A byte offset into text(), and back.
     size_t    offsetOf(ALTextPos pos) const;
