@@ -36,6 +36,7 @@
 #include "llsingleton.h"
 #include "llstl.h"
 
+class ALScriptIncludeResolver;
 class ALSerialWorker;
 
 #include <boost/unordered/unordered_flat_map.hpp>
@@ -188,6 +189,13 @@ public:
     // there is none.
     void fetchConfig(const Request& request, std::function<void()> fetched);
 
+    // What an include's identity starts with: an item in an object, one in
+    // the inventory, a file on disk.
+    static constexpr std::string_view OBJECT_PREFIX    = "object:";
+    static constexpr std::string_view INVENTORY_PREFIX = "inventory:";
+    static constexpr std::string_view DISK_PREFIX      = "disk:";
+    // The identity a script's asks are remembered under.
+    static std::string keyOf(const Request& request);
     // An include's identity back to the item it names, or the file; and
     // an item's identity, as the source map would name it.
     static bool        refOf(const std::string& path, ALScriptRef& ref);
@@ -234,69 +242,7 @@ public:
 private:
     typedef boost::unordered_flat_set<std::string, ll::string_hash, std::equal_to<>> wanted_t;
     struct Job;
-    // Something an include name could mean, in the order tried.
-    struct Candidate
-    {
-        std::string path;
-        std::string name;
-        ALScriptRef ref;
-        LLUUID      assetId;
-        // A file on disk, read on the spot.
-        std::string file;
-    };
-    // `unknown` says the object's contents have not been listed yet, so
-    // a name not found may still be there; an object asked that did not
-    // answer is not unknown, and holds nothing.
-    std::vector<Candidate> candidatesFor(const ALPreprocessor::Ask& ask, const Request& request, const std::vector<std::string>& alias_folders,
-                                         bool& unknown);
-    // The folders on disk an include asked for may come from: the
-    // scripter's include folders while disk includes are on, and what a
-    // `.lslrc` or `.luaurc` on disk lists -- `alias_folders` being those
-    // the run's aliases have blessed so far. Nothing else, ever.
-    // Kept a moment in the disk's cache (ALDiskCache), with what they admit.
-    ALDiskCache::Blessed&  blessedFor(const ALPreprocessor::Ask& ask, const Request& request, const std::vector<std::string>& alias_folders);
-    // The scripter's own include folders, blessed, while disk includes are
-    // on; nothing otherwise. What a configuration on disk may reach past
-    // its own folder.
-    ALDiskCache::Blessed&  ownFolders();
-    // The include folders as the setting holds them, read once each time
-    // the settings that decide the disk move; and how often they have.
-    const std::vector<std::string>& ownIncludeFolders();
-    U32                             diskGeneration();
-    // Every script and notecard of a name in the inventory.
-    LLInventoryModel::item_array_t        namedItems(const std::string& name);
-    // Whether an include or a module so named is in the world a script is
-    // in -- its object, the inventory -- whether or not it may be taken.
-    bool                                  inWorld(const Request& request, const std::string& name);
-    // `retry` asks again for what failed before rather than taking the
-    // failure for an answer: what a run's first round does, since an
-    // include that was not there may be there now.
-    // `alias_folders` gathers the folders the aliases of a `.luaurc` on
-    // disk bless, for the rest of a run.
-    ALPreprocessor::Found  resolve(const ALPreprocessor::Ask& ask, ALPreprocessor::Include& out, const Request& request, wanted_t* wanted,
-                                   bool retry, std::vector<std::string>* alias_folders = nullptr);
-    // The `.luaurc` files over a file, by the file's identity, nearest
-    // first, as Luau reads a chain of them from the top down: a file on
-    // disk's up the directories to the root; a script in the world's up
-    // its folders or in its object -- only where includes are taken from
-    // the world -- and above those, the one at the top of each of the
-    // scripter's include folders, in their order, since a script in the
-    // world has no folders on disk to look up through and its modules are
-    // read from those. Each with its identity and its text, fetched like
-    // an include where it is in the world: Pending while any is on its
-    // way. Each alias is its own file's, taken from beside it.
-    struct Config
-    {
-        std::string path;
-        std::string text;
-    };
-    ALPreprocessor::Found  configsFor(const std::string& from, const Request& request, wanted_t* wanted, bool retry, std::vector<Config>& out);
-    // An include's text, from the cache or a file; Pending, and wanted,
-    // where it is in the world and not in hand yet.
-    ALPreprocessor::Found  textOf(const Candidate& candidate, wanted_t* wanted, bool retry, std::string& text, std::string& assetId);
     ALPreprocessor::Options optionsFor(const Request& request, bool optimize);
-    // The identity a script's asks are remembered under.
-    static std::string      keyOf(const Request& request);
     // What is in hand for a job, on the main thread: the settings and
     // the agent read off, and every include the script is known to ask
     // for resolved. `wanted` gathers what is in the world and not in
@@ -332,25 +278,10 @@ private:
     // failed -- and `done` called either way.
     void                    fetch(const std::string& path, std::function<void()> done);
 
-    // The texts fetched, and what failed to come.
+    // The texts fetched, and what failed to come; and what an include or
+    // a require names, found and read.
     ALScriptTextCache                                                               mTexts;
-    // The files on disk a run has admitted, by identity: what the studio
-    // may ask the text of, and nothing else on the disk.
-    wanted_t                                                                        mAdmitted;
-    // What the disk said, kept a moment: every check asks it again for each
-    // include. The settings that decide it counted, and the folders they
-    // name.
-    ALDiskCache                                                                     mDisk;
-    U32                                                                             mDiskGeneration = 1;
-    std::optional<std::vector<std::string>>                                         mOwnFolders;
-    std::vector<boost::signals2::scoped_connection>                                 mDiskSettings;
-    // What each prim was last said to hold.
-    boost::unordered_flat_map<LLUUID, std::vector<ALScriptWorkspace::Item>>         mContents;
-    // The prims asked what they hold that did not answer -- not in time,
-    // or not in view -- and never had: nothing is looked for in one, and
-    // a run over a script in one says why, until a save asks again and
-    // it answers.
-    boost::unordered_flat_set<LLUUID>                                               mUnanswered;
+    std::unique_ptr<ALScriptIncludeResolver>                                        mResolver;
     // What each script asked for the last time it was expanded, by the
     // script's identity: a snapshot resolves these before the run goes
     // out, so that a script whose includes have not changed -- which is

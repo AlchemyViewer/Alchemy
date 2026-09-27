@@ -178,6 +178,7 @@ if(AL_BUILD_VIEWER)
     alscriptexternaleditor.cpp
     alfloaterscriptpreferences.cpp
     alscriptinspectorpane.cpp
+    alscriptincluderesolver.cpp
     alscriptinventoryindex.cpp
     alscriptkeymap.cpp
     alpanelscriptkeymap.cpp
@@ -1011,6 +1012,7 @@ if(AL_BUILD_VIEWER)
     alscriptexternaleditor.h
     alfloaterscriptpreferences.h
     alscriptinspectorpane.h
+    alscriptincluderesolver.h
     alscriptinventoryindex.h
     alscriptjoblane.h
     alscriptjobqueue.h
