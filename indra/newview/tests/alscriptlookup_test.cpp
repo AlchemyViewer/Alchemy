@@ -661,4 +661,30 @@ namespace tut
         studio.loads[2].loaded(LLUUID::null, "");
         ensure_equals("the new one's go on", studio.loads.size(), size_t(5));
     }
+
+    template<> template<>
+    void alscriptlookup_object::test<11>()
+    {
+        set_test_name("an inventory script's lookups reach the others of its folder in its language: SLua by subtype or runtime, not notecards, not itself");
+        const auto made = [](const char* name, LLAssetType::EType type, U32 subtype, const char* runtime) {
+            LLPointer<LLInventoryItem> item = new LLInventoryItem();
+            item->setUUID(LLUUID::generateNewID());
+            item->rename(name);
+            item->setType(type);
+            item->setFlags(subtype);
+            item->setRuntime(runtime);
+            return item;
+        };
+        const LLPointer<LLInventoryItem> own     = made("door.lsl", LLAssetType::AT_LSL_TEXT, SST_LSL, "mono");
+        const LLPointer<LLInventoryItem> lib     = made("lib.lsl", LLAssetType::AT_LSL_TEXT, SST_LSL, "mono");
+        const LLPointer<LLInventoryItem> lua     = made("door.luau", LLAssetType::AT_LSL_TEXT, SST_LUA, "");
+        const LLPointer<LLInventoryItem> onluau  = made("port.luau", LLAssetType::AT_LSL_TEXT, SST_LSL, "luau");
+        const LLPointer<LLInventoryItem> readme  = made("readme", LLAssetType::AT_NOTECARD, 0, "");
+        const std::vector<const LLInventoryItem*> folder = { own.get(), lib.get(), lua.get(), onluau.get(), readme.get() };
+
+        const std::vector<ALScriptLookup::Candidate> lsl = ALScriptLookup::folderCandidates(folder, own->getUUID(), false);
+        ensure("LSL: the other LSL script", lsl.size() == 1 && lsl[0].name == "lib.lsl" && lsl[0].ref.inInventory() && lsl[0].ref.item == lib->getUUID());
+        const std::vector<ALScriptLookup::Candidate> slua = ALScriptLookup::folderCandidates(folder, lua->getUUID(), true);
+        ensure("SLua: by runtime too", slua.size() == 1 && slua[0].name == "port.luau");
+    }
 }

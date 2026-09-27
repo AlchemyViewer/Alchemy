@@ -29,6 +29,7 @@
 #include "alscriptstudioplaces.h"
 #include "alscriptstudioservices.h"
 #include "alscriptstudiowords.h"
+#include "llinventorytype.h"
 
 #include <algorithm>
 #include <map>
@@ -41,6 +42,24 @@ using ALScriptPlaces::placeText;
 using ALScriptPlaces::rangeOf;
 
 ALScriptLookup::ALScriptLookup(ALScriptStudioServices& services, Window& window) : mServices(services), mWindow(window) {}
+
+// static
+std::vector<ALScriptLookup::Candidate> ALScriptLookup::folderCandidates(const std::vector<const LLInventoryItem*>& items, const LLUUID& own, bool lua)
+{
+    std::vector<Candidate> found;
+    for (const LLInventoryItem* item : items)
+    {
+        if (!item || item->getType() != LLAssetType::AT_LSL_TEXT || item->getUUID() == own)
+        {
+            continue;
+        }
+        if ((item->getRuntime() == "luau" || item->getInventorySubType() == SST_LUA) == lua)
+        {
+            found.push_back({ ALScriptRef(LLUUID::null, item->getUUID()), item->getName() });
+        }
+    }
+    return found;
+}
 
 // static
 void ALScriptLookup::addPlace(Doc::Lookup& lookup, Doc::Place place)

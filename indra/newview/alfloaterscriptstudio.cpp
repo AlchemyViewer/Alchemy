@@ -3491,7 +3491,25 @@ std::vector<ALScriptLookup::Candidate> ALFloaterScriptStudio::candidates(const D
     std::vector<ALScriptLookup::Candidate> found;
     if (doc.ref.inInventory())
     {
-        return found;
+        // An inventory script's are the others of its folder in its
+        // language, which is where a project's scripts are kept together.
+        const LLViewerInventoryItem* own = doc.ref.isNull() ? nullptr : gInventory.getItem(doc.ref.item);
+        if (!own)
+        {
+            return found;
+        }
+        LLInventoryModel::cat_array_t*  folders = nullptr;
+        LLInventoryModel::item_array_t* items   = nullptr;
+        gInventory.getDirectDescendentsOf(own->getParentUUID(), folders, items);
+        std::vector<const LLInventoryItem*> held;
+        if (items)
+        {
+            for (const LLPointer<LLViewerInventoryItem>& item : *items)
+            {
+                held.push_back(item.get());
+            }
+        }
+        return ALScriptLookup::folderCandidates(held, doc.ref.item, doc.language.lua);
     }
     for (const ALScriptExplorerModel::Object& object : mExplorerPane->model().objects())
     {

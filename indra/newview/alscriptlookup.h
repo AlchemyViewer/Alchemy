@@ -42,7 +42,8 @@ class ALScriptStudioServices;
 // A Script Studio window's lookups of a name across scripts, as the tab's
 // part `doc.lookup` keeps one: Find References and Rename, from what the
 // analyzers found in the script, then through every other script of its
-// object in the same language that may share the name -- each read as it
+// object -- or its inventory folder -- in the same language that may share
+// the name -- each read as it
 // stands in an open tab or as the region has it, passed over where it does
 // not mention the name, expanded as the compiler sees it, and asked of the
 // analyzers. What comes back is listed in the References tab, or renamed:
@@ -61,13 +62,16 @@ public:
         ALScriptRef ref;
         std::string name;
     };
+    // An inventory script's: the others of its folder's `items` in its
+    // language, SLua's by the item's subtype or its runtime.
+    static std::vector<Candidate> folderCandidates(const std::vector<const LLInventoryItem*>& items, const LLUUID& own, bool lua);
 
     // What the lookups ask of the window beyond its services.
     class Window
     {
     public:
         // The other scripts of a tab's object in its language, while the
-        // object is in sight; none for an inventory script.
+        // object is in sight; of an inventory script's folder, for one.
         virtual std::vector<Candidate> candidates(const Doc& doc) = 0;
         // A script's text as the region has it, its author's source out of
         // any envelope, and its asset; empty where it could not be read.
