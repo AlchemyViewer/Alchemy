@@ -27,6 +27,7 @@
 #include "alluauservice.h"
 
 #include "alscriptfixes.h"
+#include "alselenefilters.h"
 
 #include "almessagemap.h"
 
@@ -52,6 +53,7 @@
 
 #include <boost/unordered/unordered_flat_map.hpp>
 
+#include <limits>
 #include <set>
 
 namespace
@@ -593,6 +595,140 @@ namespace
 
 namespace
 {
+    // selene's comments in a script (ALSeleneFilters), placed: for the
+    // whole file, or for the statement each stands beside.
+    struct SeleneFilters
+    {
+        struct Scoped
+        {
+            Luau::Location          where;
+            ALSeleneFilters::Action action;
+            uint64_t                lints;
+        };
+        std::vector<std::pair<ALSeleneFilters::Action, uint64_t>> file;
+        std::vector<Scoped>                                       scoped;
+
+        // What they say of a lint at a place: the innermost statement's
+        // about it, else the file's last.
+        std::optional<ALSeleneFilters::Action> about(Luau::LintWarning::Code code, const Luau::Location& at) const
+        {
+            const uint64_t bit  = 1ull << code;
+            const Scoped*  best = nullptr;
+            for (const Scoped& one : scoped)
+            {
+                if ((one.lints & bit) && one.where.containsClosed(at.begin) && (!best || best->where.encloses(one.where)))
+                {
+                    best = &one;
+                }
+            }
+            if (best)
+            {
+                return best->action;
+            }
+            std::optional<ALSeleneFilters::Action> out;
+            for (const auto& [action, lints] : file)
+            {
+                if (lints & bit)
+                {
+                    out = action;
+                }
+            }
+            return out;
+        }
+    };
+
+    // A script's statements, blocks aside, to find the one a comment
+    // stands beside.
+    struct StatementsOf final : public Luau::AstVisitor
+    {
+        std::vector<Luau::Location> found;
+        bool                        visit(Luau::AstStat* node) override
+        {
+            if (!node->is<Luau::AstStatBlock>())
+            {
+                found.push_back(node->location);
+            }
+            return true;
+        }
+    };
+
+    SeleneFilters seleneFiltersOf(std::string_view source, const Luau::SourceModule* module)
+    {
+        SeleneFilters out;
+        if (!module || !module->root || module->commentLocations.empty() || source.find("selene") == std::string_view::npos)
+        {
+            return out;
+        }
+        std::vector<size_t> starts{ 0 };
+        for (size_t at = source.find('\n'); at != std::string_view::npos; at = source.find('\n', at + 1))
+        {
+            starts.push_back(at + 1);
+        }
+        const auto offset = [&](const Luau::Position& p) {
+            return p.line < starts.size() ? llmin(source.size(), starts[p.line] + p.column) : source.size();
+        };
+        // A whole file's must come before any code, as selene has it.
+        const Luau::Position              first_code = module->root->body.size > 0 ? module->root->body.data[0]->location.begin
+                                                                                    : Luau::Position(std::numeric_limits<unsigned int>::max(), 0);
+        std::optional<std::vector<Luau::Location>> statements;
+        for (const Luau::Comment& comment : module->commentLocations)
+        {
+            if (comment.type != Luau::Lexeme::Comment)
+            {
+                continue;
+            }
+            const size_t                                  from      = offset(comment.location.begin);
+            const std::optional<ALSeleneFilters::Directive> directive = ALSeleneFilters::read(source.substr(from, offset(comment.location.end) - from));
+            const uint64_t                                lints     = directive ? ALSeleneFilters::luauLints(*directive) : 0;
+            if (!lints)
+            {
+                continue;
+            }
+            if (directive->file)
+            {
+                if (comment.location.end <= first_code)
+                {
+                    out.file.emplace_back(directive->action, lints);
+                }
+                continue;
+            }
+            if (!statements)
+            {
+                StatementsOf visitor;
+                module->root->visit(&visitor);
+                statements = std::move(visitor.found);
+            }
+            // Beside it: the statement its line ends with, before it -- the
+            // outermost -- else the first to begin after it, the outermost
+            // of those that begin there.
+            const Luau::Location* beside = nullptr;
+            for (const Luau::Location& where : *statements)
+            {
+                if (where.end.line == comment.location.begin.line && where.end <= comment.location.begin &&
+                    (!beside || where.begin < beside->begin))
+                {
+                    beside = &where;
+                }
+            }
+            if (!beside)
+            {
+                for (const Luau::Location& where : *statements)
+                {
+                    if (comment.location.end <= where.begin &&
+                        (!beside || where.begin < beside->begin || (where.begin == beside->begin && beside->end < where.end)))
+                    {
+                        beside = &where;
+                    }
+                }
+            }
+            if (beside)
+            {
+                out.scoped.push_back({ *beside, directive->action, lints });
+            }
+        }
+        return out;
+    }
+
     // Every name, by what the check found it to be. Types are visited too,
     // which the visitor does not do on its own.
     struct Semantics final : public Luau::AstVisitor
@@ -1371,8 +1507,19 @@ ALScriptProblems ALLuauService::check(std::string_view source)
         problems.back().key  = key;
         problems.back().args = std::move(args);
     }
+    // What selene's comments say of the lints, where the script was
+    // written for selene too: allowed, gone; denied, an error.
+    const SeleneFilters selene = seleneFiltersOf(source, module_source);
     // A lint taken apart by its name, where the map knows its words.
-    auto lint = [&problems](const Luau::LintWarning& warning, ALScriptProblem::Severity severity) {
+    auto lint = [&problems, &selene](const Luau::LintWarning& warning, ALScriptProblem::Severity severity) {
+        if (const std::optional<ALSeleneFilters::Action> said = selene.about(warning.code, warning.location))
+        {
+            if (*said == ALSeleneFilters::Action::Allow)
+            {
+                return;
+            }
+            severity = *said == ALSeleneFilters::Action::Deny ? ALScriptProblem::Severity::Error : ALScriptProblem::Severity::Warning;
+        }
         const char* name = Luau::LintWarning::getName(warning.code);
         problems.push_back(problemAt(warning.location, severity, ALScriptProblem::Source::Lint, name, warning.text));
         ALMessageMap::Match known;

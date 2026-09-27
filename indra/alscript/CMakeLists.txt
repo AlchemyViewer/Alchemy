@@ -27,6 +27,7 @@ target_sources(
     alscriptrecovery.cpp
     alscriptweight.cpp
     alscriptstack.cpp
+    alselenefilters.cpp
     alsourcemap.cpp
 )
 
@@ -57,6 +58,7 @@ target_sources(
         alscriptstack.h
         alscriptsymbol.h
         alscriptweight.h
+        alselenefilters.h
         alsourcemap.h
 )
 

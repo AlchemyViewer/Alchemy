@@ -25,6 +25,8 @@
 #include "linden_common.h"
 
 #include "../alluauservice.h"
+#include "../alluauconfig.h"
+#include "../alselenefilters.h"
 
 #include "../test/lltut.h"
 
@@ -688,5 +690,41 @@ namespace tut
         }
         std::string why;
         service.setNewSolver(newSolver, why);
+    }
+
+    template<> template<>
+    void alluauservice_object::test<24>()
+    {
+        set_test_name("selene's comments: its lints named as Luau's, allowed or denied for the whole file before any code, or for the statement beside");
+        ensure("definitions load: " + error, loaded);
+        const auto read = ALSeleneFilters::read("-- # selene: allow(unused_variable, multiple_statements))");
+        ensure("read leniently, for the whole file", read && read->file && read->action == ALSeleneFilters::Action::Allow && read->lints.size() == 2);
+        ensure("a Luau name stands for itself, selene's for Luau's",
+               ALSeleneFilters::luauLints("LocalUnused") == ALLuauConfig::lintBit("LocalUnused") &&
+                   (ALSeleneFilters::luauLints("unused_variable") & ALLuauConfig::lintBit("FunctionUnused")) != 0);
+        ensure("a check Luau does not make stands for none", ALSeleneFilters::luauLints("almost_swapped") == 0);
+        ensure("not a directive", !ALSeleneFilters::read("-- seleneous: allow(x)") && !ALSeleneFilters::read("-- selene: permit(x)"));
+
+        const auto unused = [&](const std::string& script) {
+            size_t count = 0;
+            for (const ALScriptProblem& p : service.check(script))
+            {
+                count += p.key.compare(0, 19, "LuauLintLocalUnused") == 0 ? 1 : 0;
+            }
+            return count;
+        };
+        ensure_equals("without, both said", unused("local a = 1\nlocal b = 2\n"), size_t(2));
+        ensure_equals("the whole file", unused("-- @file header\n-- # selene: allow(unused_variable)\nlocal a = 1\nlocal b = 2\n"), size_t(0));
+        ensure_equals("after code, nothing: selene refuses a whole file's there", unused("local a = 1\n--# selene: allow(unused_variable)\nlocal b = 2\n"), size_t(2));
+        ensure_equals("the statement beside, not the next", unused("-- selene: allow(unused_variable)\nlocal a = 1\nlocal b = 2\n"), size_t(1));
+        ensure_equals("a whole function beside it",
+                      unused("-- selene: allow(unused_variable)\nlocal function f()\n    local a = 1\nend\nf()\nlocal b = 2\n"), size_t(1));
+        ensure_equals("at a line's end, its statement", unused("local a = 1 -- selene: allow(unused_variable)\nlocal b = 2\n"), size_t(1));
+        bool denied = false;
+        for (const ALScriptProblem& p : service.check("-- selene: deny(unused_variable)\nlocal a = 1\n"))
+        {
+            denied |= p.key.compare(0, 19, "LuauLintLocalUnused") == 0 && p.severity == ALScriptProblem::Severity::Error;
+        }
+        ensure("denied: an error", denied);
     }
 }
