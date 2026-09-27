@@ -440,14 +440,7 @@ void ALScriptStudioWeighing::measureAsset(Doc& doc)
     doc.weighing.assetBytes         = text.size();
     if (mWindow.preprocessed(doc) && doc.expanded.valid && doc.expanded.version == version && !doc.expanded.disabled)
     {
-        ALScriptEnvelope envelope = doc.envelope ? *doc.envelope : ALScriptEnvelope();
-        envelope.lua              = doc.language.lua;
-        envelope.source           = text;
-        envelope.expanded         = doc.expanded.text;
-        envelope.compileTarget    = doc.language.compileTarget;
-        envelope.programVersion   = mWindow.programVersion();
-        envelope.lastCompiled     = LLDate::now().asString();
-        doc.weighing.assetBytes            = envelope.wrap().size();
+        doc.weighing.assetBytes = doc.envelopeFor(doc.expanded.text, mWindow.programVersion()).wrap().size();
     }
 }
 

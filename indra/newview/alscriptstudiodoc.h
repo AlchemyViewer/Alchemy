@@ -137,6 +137,13 @@ struct ALScriptStudioDoc
     // what the compiler's lines and a run-time error's are read back by.
     // Null where the text went up as written.
     const ALSourceMap* runningMap() const;
+    // Where that expansion begins in what the region runs, a zero-based
+    // line: the envelope's own lines, which the region counts in a line it
+    // names, before it; none where it went up plain.
+    S32                runningCodeLine() const;
+    // The envelope a save sends an expansion in: the source as written,
+    // its target, the program that wrote it and when.
+    ALScriptEnvelope   envelopeFor(const std::string& expanded, const std::string& program) const;
 
     // An include or a module a place in a text names: anywhere on an
     // #include line, the name it includes; anywhere in a require call of

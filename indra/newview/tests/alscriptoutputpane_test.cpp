@@ -390,4 +390,37 @@ namespace tut
         services.docs.clear();
         ensure_equals("as said", out.heard(error).line, 7);
     }
+
+    template<> template<>
+    void alscriptoutputpane_object::test<7>()
+    {
+        set_test_name("a run's line counted with the envelope's lines above the code, as the region counts it, read back through the code");
+        ALScriptOutputPane& out    = make();
+        const LLUUID        object = fresh();
+        const LLUUID        item   = fresh();
+        ALSourceMap map;
+        map.addFile("script", "script");
+        for (S32 line = 0; line < 10; ++line)
+        {
+            ALSourceMap::Segment segment;
+            segment.outLine = line;
+            segment.length  = 20;
+            segment.line    = line + 100;
+            map.add(segment);
+        }
+        map.finish();
+        ALScriptStudioDoc& doc = services.addDoc("counter", ALScriptRef(object, item), "Counter");
+        doc.uploaded.valid     = true;
+        doc.uploaded.map       = map;
+        ALScriptEnvelope envelope;
+        envelope.lua           = true;
+        envelope.source        = "one\ntwo\nthree";
+        envelope.expanded      = "code\n";
+        envelope.compileTarget = "luau";
+        doc.envelope           = envelope;
+        const S32 under        = envelope.codeLine();
+        ensure("the envelope has lines of its own", under > 3);
+        ensure_equals("its code's third line, where the region names it", out.heard(failed(object, item, "Counter", "attempt to index nil", under + 2)).line, 102);
+        ensure_equals("a line in the envelope is none of the code's: as said", out.heard(failed(object, item, "Counter", "boom", 1)).line, 1);
+    }
 }

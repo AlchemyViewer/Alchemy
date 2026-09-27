@@ -2116,6 +2116,11 @@ void ALFloaterScriptStudio::showExpanded(Doc& doc, const std::string& text)
     doc.expandedEditor->setSyntax(doc.language.lua ? "slua" : "lsl");
     ALScriptStudioWords::teach(*doc.expandedEditor, doc.language.lua);
     doc.expandedEditor->setText(text);
+    // Numbered as the region counts the script it runs: after the lines
+    // of the envelope a save sends it in, which a runtime error's line
+    // counts too; from one where it goes up plain.
+    const bool plain = doc.uploaded.valid && doc.uploaded.disabled;
+    doc.expandedEditor->setLineNumberBase(plain ? 0 : doc.envelopeFor(text, saveOptions().program).codeLine());
     if (&doc != active())
     {
         return;
@@ -3878,8 +3883,11 @@ void ALFloaterScriptStudio::goToLine()
         const size_t           index  = studio ? studio->indexOf(id) : NONE;
         return index == NONE ? nullptr : studio->mDocs[index].get();
     };
+    // By the numbers the view shows: the expansion's count from past the
+    // envelope's lines, as a runtime error's does.
     auto placeOf = [](const Doc& doc, const std::string& typed, S32& line, S32& column) {
         placeTyped(typed, line, column);
+        line -= doc.shownText()->lineNumberBase();
         const S32 count = doc.shownText()->document().lineCount();
         return line >= 1 && line <= count;
     };
@@ -3943,8 +3951,9 @@ void ALFloaterScriptStudio::goToLine()
         S32                        line, column;
         const bool                 there = placeOf(*doc, typed, line, column);
         LLStringUtil::format_map_t args;
-        args["[COUNT]"] = std::to_string(text.document().lineCount());
-        args["[LINE]"]  = std::to_string(line);
+        // In the numbers the view shows.
+        args["[COUNT]"] = std::to_string(text.document().lineCount() + text.lineNumberBase());
+        args["[LINE]"]  = std::to_string(line + text.lineNumberBase());
         args["[COL]"]   = std::to_string(column);
         std::string trimmed = typed;
         LLStringUtil::trim(trimmed);

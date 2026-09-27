@@ -26,6 +26,7 @@
 
 #include "alscriptstudiodoc.h"
 
+#include "lldate.h"
 #include "llfocusmgr.h"
 
 // static
@@ -73,6 +74,23 @@ const ALSourceMap* ALScriptStudioDoc::runningMap() const
         return &*save.sentMap();
     }
     return uploaded.valid && !uploaded.disabled ? &uploaded.map : nullptr;
+}
+
+S32 ALScriptStudioDoc::runningCodeLine() const
+{
+    return runningMap() && envelope ? envelope->codeLine() : 0;
+}
+
+ALScriptEnvelope ALScriptStudioDoc::envelopeFor(const std::string& expanded_text, const std::string& program) const
+{
+    ALScriptEnvelope out = envelope ? *envelope : ALScriptEnvelope();
+    out.lua              = language.lua;
+    out.source           = editor ? editor->text() : std::string();
+    out.expanded         = expanded_text;
+    out.compileTarget    = language.compileTarget;
+    out.programVersion   = program;
+    out.lastCompiled     = LLDate::now().asString();
+    return out;
 }
 
 // static

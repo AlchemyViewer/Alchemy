@@ -286,6 +286,11 @@ public:
     // tint behind each line, the width of the text, none where its alpha
     // is 0. Each one a line, from the first; an edit clears both.
     void                         setLineNumbers(std::vector<S32> numbers) { mLineNumbers = std::move(numbers); }
+    // For a text that is part of a larger one -- a script's code under
+    // its envelope, which a runtime error's line counts -- the lines
+    // counted from there: the first shows base + 1.
+    void                         setLineNumberBase(S32 base) { mLineNumberBase = llmax(0, base); }
+    S32                          lineNumberBase() const { return mLineNumberBase; }
     void                         setLineTints(std::vector<LLColor4> tints) { mLineTints = std::move(tints); }
     const std::vector<S32>&      lineNumbers() const { return mLineNumbers; }
     const std::vector<LLColor4>& lineTints() const { return mLineTints; }
@@ -797,6 +802,7 @@ private:
 
     bool mShowLineNumbers      = true;
     std::vector<S32>      mLineNumbers;
+    S32                   mLineNumberBase = 0;
     std::vector<LLColor4> mLineTints;
     bool mShowFoldMarkers      = true;
     bool mHighlightCurrentLine = true;

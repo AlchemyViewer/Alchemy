@@ -260,6 +260,12 @@ std::string ALScriptEnvelope::wrap() const
     return out;
 }
 
+int ALScriptEnvelope::codeLine() const
+{
+    const std::string asset = wrap();
+    return static_cast<int>(std::count(asset.begin(), asset.end() - static_cast<std::ptrdiff_t>(expanded.size()), '\n'));
+}
+
 namespace
 {
     typedef std::vector<ALPreprocessor::Token> Tokens;

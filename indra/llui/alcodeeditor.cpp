@@ -766,7 +766,7 @@ S32 ALCodeEditor::gutterWidth() const
     if (mShowLineNumbers)
     {
         S32 digits = 1;
-        for (S32 n = document().lineCount(); n >= 10; n /= 10)
+        for (S32 n = document().lineCount() + mLineNumberBase; n >= 10; n /= 10)
         {
             ++digits;
         }
@@ -849,7 +849,7 @@ void ALCodeEditor::drawGutter(const LLRect& text, F32 alpha)
             // counted from the caret's line where that is asked for.
             const S32 shown = !mLineNumbers.empty()                    ? (line < static_cast<S32>(mLineNumbers.size()) ? mLineNumbers[static_cast<size_t>(line)] : 0)
                               : mRelativeLineNumbers && line != caret_line ? std::abs(line - caret_line)
-                                                                           : line + 1;
+                                                                           : line + 1 + mLineNumberBase;
             if (shown > 0)
             {
                 font->renderUTF8(std::to_string(shown), 0, static_cast<F32>(numbers_right), static_cast<F32>(screen_top - ascent),
@@ -925,7 +925,7 @@ void ALCodeEditor::drawGutter(const LLRect& text, F32 alpha)
         for (S32 i = 0; i < rows; ++i)
         {
             const S32 line  = pinned[static_cast<size_t>(i)];
-            const S32 shown_number = mRelativeLineNumbers && line != caret_line ? std::abs(line - caret_line) : line + 1;
+            const S32 shown_number = mRelativeLineNumbers && line != caret_line ? std::abs(line - caret_line) : line + 1 + mLineNumberBase;
             font->renderUTF8(std::to_string(shown_number), 0, static_cast<F32>(numbers_right), static_cast<F32>(text.mTop - i * row_h - ascent), ink,
                              LLFontGL::RIGHT, LLFontGL::BASELINE, LLFontGL::NORMAL, LLFontGL::NO_SHADOW);
         }

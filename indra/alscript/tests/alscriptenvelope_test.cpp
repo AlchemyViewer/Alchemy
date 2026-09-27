@@ -28,6 +28,9 @@
 
 #include "../test/lltut.h"
 
+#include <string>
+#include <vector>
+
 namespace tut
 {
     struct alscriptenvelope_data
@@ -234,5 +237,36 @@ namespace tut
         ensure("the time asked for: not", !ALScriptEnvelope::comparable("string t = __TIME__;", false, true, false));
         ensure("who compiled it: not", !ALScriptEnvelope::comparable("local a = __AGENTNAME__", true, true, false));
         ensure("named in a comment only: told", ALScriptEnvelope::comparable("// built __DATE__\ninteger x;", false, true, false));
+    }
+
+    template<> template<>
+    void alscriptenvelope_object::test<8>()
+    {
+        set_test_name("the line the code begins on in the asset, as the region counts a line it names: the envelope's own before it");
+        for (const bool lua : { true, false })
+        {
+            ALScriptEnvelope envelope;
+            envelope.lua            = lua;
+            envelope.source         = "a\nb\nc";
+            envelope.expanded       = "first\nsecond\n";
+            envelope.compileTarget  = lua ? "luau" : "mono";
+            envelope.programVersion = "Alchemy";
+            envelope.lastCompiled   = "today";
+            const std::string asset = envelope.wrap();
+            std::vector<std::string> lines;
+            for (size_t from = 0;;)
+            {
+                const size_t nl = asset.find('\n', from);
+                lines.push_back(asset.substr(from, nl == std::string::npos ? std::string::npos : nl - from));
+                if (nl == std::string::npos)
+                {
+                    break;
+                }
+                from = nl + 1;
+            }
+            const int at = envelope.codeLine();
+            ensure_equals(std::string(lua ? "SLua" : "LSL") + ": the code's first line there", lines[static_cast<size_t>(at)], std::string("first"));
+            ensure_equals(std::string(lua ? "SLua" : "LSL") + ": after the source's lines and the envelope's own", at, 9);
+        }
     }
 }

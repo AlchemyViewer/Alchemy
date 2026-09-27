@@ -149,7 +149,9 @@ ALScriptOutputPane::Place ALScriptOutputPane::heard(const ALScriptWorkspace::Run
         }
         if (const ALSourceMap* map = open->runningMap())
         {
-            const ALSourceMap::Loc loc = map->toSource(line, llmax(0, column));
+            // Counted by the region with the envelope's lines above the
+            // code; the map is of the code.
+            const ALSourceMap::Loc loc = map->toSource(line - open->runningCodeLine(), llmax(0, column));
             if (loc.found())
             {
                 where.line   = loc.line;

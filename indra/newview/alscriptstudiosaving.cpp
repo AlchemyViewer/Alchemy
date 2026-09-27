@@ -205,18 +205,8 @@ void ALScriptStudioSaving::sendPreprocessed(Doc& doc, const Doc::Expanded& sent)
     }
     // In the envelope, with the source as written, so Firestorm opens
     // what we save; the lines that say who wrote it and when are ours.
-    ALScriptEnvelope envelope;
-    if (doc.envelope)
-    {
-        envelope = *doc.envelope;
-    }
-    envelope.lua           = doc.language.lua;
-    envelope.source        = doc.editor->text();
-    envelope.expanded      = sent.text;
-    envelope.compileTarget = doc.language.compileTarget;
-    envelope.programVersion = mWindow.saveOptions().program;
-    envelope.lastCompiled   = LLDate::now().asString();
-    doc.envelope            = envelope;
+    const ALScriptEnvelope envelope = doc.envelopeFor(sent.text, mWindow.saveOptions().program);
+    doc.envelope                    = envelope;
     upload(doc, envelope.wrap(), &sent.map);
 }
 
@@ -630,7 +620,9 @@ void ALScriptStudioSaving::compiledHere(const ALScriptWorkspace::CompileResult& 
         return;
     }
     doc.problems.clear();
-    const ALSourceMap* read = doc.runningMap();
+    // The region's lines count the envelope's; the map is of the code under it.
+    const ALSourceMap* read  = doc.runningMap();
+    const S32          under = doc.runningCodeLine();
     for (const ALScriptWorkspace::Diagnostic& said : result.diagnostics)
     {
         Doc::Compiled one;
@@ -641,7 +633,7 @@ void ALScriptStudioSaving::compiledHere(const ALScriptWorkspace::CompileResult& 
         one.message   = said.message;
         if (read)
         {
-            const ALSourceMap::Loc loc = read->toSource(said.line, said.column);
+            const ALSourceMap::Loc loc = read->toSource(said.line - under, said.column);
             if (loc.found())
             {
                 one.line   = loc.line;

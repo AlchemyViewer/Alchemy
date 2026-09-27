@@ -74,6 +74,10 @@ struct ALScriptEnvelope
 
     // The asset this envelope makes.
     std::string wrap() const;
+    // The line of that asset, from zero, its expanded code begins on: the
+    // envelope's own lines come first, and the region counts them in every
+    // line it names -- a compile error's, a runtime error's.
+    int         codeLine() const;
 
     // The escaping of the LSL comment block, both ways.
     static std::string encodeSource(std::string_view source);

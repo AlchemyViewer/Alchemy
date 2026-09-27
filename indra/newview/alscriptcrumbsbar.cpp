@@ -144,7 +144,7 @@ void ALScriptCrumbsBar::place(Doc& doc, std::vector<Part>& parts) const
     const ALCodeEditor&        shown = *doc.shownText();
     const ALTextPos            caret = shown.caret();
     LLStringUtil::format_map_t args;
-    args["[LINE]"] = std::to_string(caret.line + 1);
+    args["[LINE]"] = std::to_string(caret.line + 1 + shown.lineNumberBase());
     // Where the caret is as it is seen -- a character a column, a tab to
     // its stop -- rather than its byte in the line.
     args["[COL]"]  = std::to_string(shown.document().displayColumn(caret, shown.getTabWidth()) + 1);
