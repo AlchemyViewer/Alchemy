@@ -28,6 +28,9 @@
 #include "alscriptpreprocessor.h"
 #include "alscriptreferencespane.h"
 #include "alscriptstudiodoc.h"
+#include "llstl.h"
+
+#include <boost/unordered/unordered_flat_map.hpp>
 
 #include <functional>
 #include <memory>
@@ -103,6 +106,12 @@ public:
     // transforms are on, a word the definitions give.
     static bool reserved(bool lua, const std::string& name);
 
+    // How many of a lookup's other scripts are read, expanded and asked
+    // about at once: a fan-out over an object of fifty scripts would
+    // otherwise put fifty reads, expansions and questions ahead of the
+    // tab's own on threads of one.
+    static constexpr S32 AT_ONCE = 2;
+
     // A lookup started from what the analyzers found in a tab.
     void start(Doc& doc, ALEditorCommand command, const ALScriptReferences& refs, bool has_definition, const std::string& home_path,
                const ALScriptSpan& definition, std::vector<Doc::Place> places, U32 version);
@@ -114,6 +123,23 @@ public:
     void applyPendingEdits(Doc& doc);
 
 private:
+    // A tab's lookup's other scripts: those still to begin, and how many
+    // are on their way. A lookup begun again in the tab lets go of the
+    // rest of the last one's.
+    struct Lane
+    {
+        U32                    generation = 0;
+        std::vector<Candidate> left;
+        size_t                 next    = 0;
+        S32                    running = 0;
+        bool                   feeding = false;
+    };
+    // As many of a tab's other scripts begun as may be on their way.
+    void feed(const std::string& id);
+    void begin(Doc& doc, U32 generation, const Candidate& candidate);
+    // One of them done with, found in or passed over: the next begun, and
+    // the lookup finished where it was the last.
+    void passed(Doc& doc);
     void candidate(const std::string& id, U32 generation, const ALScriptRef& ref, const std::string& name, const LLUUID& asset_id,
                    const std::string& text);
     void expanded(const std::string& id, U32 generation, const ALScriptRef& ref, const std::string& name, const std::string& source,
@@ -131,6 +157,8 @@ private:
     Window&                 mWindow;
     // Which lookup the answers arriving belong to.
     U32                     mGeneration = 0;
+    // Each tab's lookup's other scripts, by the tab.
+    boost::unordered_flat_map<std::string, Lane, ll::string_hash, std::equal_to<>> mLanes;
     // Held while this is, for an answer to know it still is.
     std::shared_ptr<bool>   mAlive = std::make_shared<bool>(true);
 };

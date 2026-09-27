@@ -147,30 +147,19 @@ void ALScriptLookup::start(Doc& doc, ALEditorCommand command, const ALScriptRefe
     // on the spot -- a script already open -- cannot bring the count to
     // nothing and finish the lookup with the others still to be asked.
     ++lookup.pending;
+    // What the tab's last lookup had still to begin is let go of.
+    mLanes.erase(doc.id);
     if (has_definition)
     {
-        const std::weak_ptr<bool> alive      = mAlive;
-        const std::string         id         = doc.id;
-        const U32                 generation = lookup.generation;
-        for (const Candidate& candidate : mWindow.candidates(doc))
+        // Each counted as waited for now, and begun a few at a time.
+        Lane lane;
+        lane.generation = lookup.generation;
+        lane.left       = mWindow.candidates(doc);
+        lookup.pending += static_cast<S32>(lane.left.size());
+        if (!lane.left.empty())
         {
-            const ALScriptRef ref = candidate.ref;
-            ++lookup.pending;
-            if (const Doc* other = mServices.findDoc(ref); other && other->loaded)
-            {
-                const std::string  name  = other->name;
-                const LLUUID       asset = other->assetId;
-                const std::string& text  = other->editor->wholeText();
-                this->candidate(id, generation, ref, name, asset, text);
-                continue;
-            }
-            const std::string name = candidate.name;
-            mWindow.loadSource(ref, [this, alive, id, generation, ref, name](const LLUUID& asset, const std::string& source) {
-                if (alive.lock())
-                {
-                    this->candidate(id, generation, ref, name, asset, source);
-                }
-            });
+            mLanes[doc.id] = std::move(lane);
+            feed(doc.id);
         }
     }
     // What the held one stood for: the doc is found again, since a
@@ -189,6 +178,80 @@ void ALScriptLookup::start(Doc& doc, ALEditorCommand command, const ALScriptRefe
     settled(*now);
 }
 
+void ALScriptLookup::feed(const std::string& id)
+{
+    auto found = mLanes.find(id);
+    // One begun on the spot, answered on the spot, comes back here: the
+    // loop below goes on with the next.
+    if (found == mLanes.end() || found->second.feeding)
+    {
+        return;
+    }
+    found->second.feeding = true;
+    while (true)
+    {
+        found = mLanes.find(id);
+        if (found == mLanes.end())
+        {
+            return;
+        }
+        Lane& lane = found->second;
+        Doc*  doc  = lookingIn(id, lane.generation);
+        if (!doc || (lane.next >= lane.left.size() && lane.running <= 0))
+        {
+            // Begun again, closed, or all done with.
+            mLanes.erase(found);
+            return;
+        }
+        if (lane.running >= AT_ONCE || lane.next >= lane.left.size())
+        {
+            lane.feeding = false;
+            return;
+        }
+        const Candidate candidate = lane.left[lane.next++];
+        ++lane.running;
+        begin(*doc, lane.generation, candidate);
+    }
+}
+
+void ALScriptLookup::begin(Doc& doc, U32 generation, const Candidate& candidate)
+{
+    const ALScriptRef ref = candidate.ref;
+    const std::string id  = doc.id;
+    // Read as it stands in an open tab, else as the region has it.
+    if (const Doc* other = mServices.findDoc(ref); other && other->loaded)
+    {
+        const std::string  name  = other->name;
+        const LLUUID       asset = other->assetId;
+        const std::string& text  = other->editor->wholeText();
+        this->candidate(id, generation, ref, name, asset, text);
+        return;
+    }
+    const std::weak_ptr<bool> alive = mAlive;
+    const std::string         name  = candidate.name;
+    mWindow.loadSource(ref, [this, alive, id, generation, ref, name](const LLUUID& asset, const std::string& source) {
+        if (alive.lock())
+        {
+            this->candidate(id, generation, ref, name, asset, source);
+        }
+    });
+}
+
+void ALScriptLookup::passed(Doc& doc)
+{
+    const std::string id = doc.id;
+    if (auto found = mLanes.find(id); found != mLanes.end() && found->second.generation == doc.lookup.generation)
+    {
+        --found->second.running;
+        feed(id);
+    }
+    // Found again: what was begun may have come back on the spot.
+    if (Doc* now = mServices.findDoc(id))
+    {
+        settled(*now);
+    }
+}
+
 void ALScriptLookup::candidate(const std::string& id, U32 generation, const ALScriptRef& ref, const std::string& name,
                                const LLUUID& asset_id, const std::string& text)
 {
@@ -201,7 +264,7 @@ void ALScriptLookup::candidate(const std::string& id, U32 generation, const ALSc
     if (text.empty() || text.find(doc.lookup.name) == std::string::npos)
     {
         --doc.lookup.pending;
-        settled(doc);
+        passed(doc);
         return;
     }
     // Expanded as the compiler would see it, its includes fetched.
@@ -243,14 +306,14 @@ void ALScriptLookup::expanded(const std::string& id, U32 generation, const ALScr
     if (file < 0)
     {
         --doc.lookup.pending;
-        settled(doc);
+        passed(doc);
         return;
     }
     const ALSourceMap::Loc at = result.map.toExpanded(file, doc.lookup.definition.line, doc.lookup.definition.column);
     if (!at.found())
     {
         --doc.lookup.pending;
-        settled(doc);
+        passed(doc);
         return;
     }
     ALScriptAnalysis::Request request;
@@ -327,7 +390,7 @@ void ALScriptLookup::answered(const std::string& id, U32 generation, const ALScr
             addPlace(doc.lookup, std::move(place));
         }
     }
-    settled(doc);
+    passed(doc);
 }
 
 void ALScriptLookup::settled(Doc& doc)

@@ -624,4 +624,40 @@ namespace tut
         ensure("none made", doc.editor->text() == "integer sum;\nx = count;\n");
         ensure("every one missed", services.reports.size() == 2 && has(services.reports[1].text, "ReplaceMissed [COUNT]=1"));
     }
+
+    template<> template<>
+    void alscriptlookup_object::test<10>()
+    {
+        set_test_name("the other scripts read a few at a time, the next begun as one is done with; a lookup begun again lets the rest go");
+        make();
+        const ALScriptRef e{ object, LLUUID("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee") };
+        const ALScriptRef f{ object, LLUUID("ffffffff-ffff-ffff-ffff-ffffffffffff") };
+        studio.others = { { b, "B" }, { c, "C" }, { d, "D" }, { e, "E" }, { f, "F" } };
+        Doc& doc      = lookUp(ALEditorCommand::FindReferences);
+        ensure_equals("no more than so many read at once", studio.loads.size(), size_t(ALScriptLookup::AT_ONCE));
+        ensure_equals("every one waited for", doc.lookup.pending, S32(5));
+        // One that does not name it: passed over, and the next read.
+        studio.loads[0].loaded(LLUUID::null, "default { }\n");
+        ensure_equals("the next begun", studio.loads.size(), size_t(ALScriptLookup::AT_ONCE + 1));
+        ensure_equals("one fewer waited for", doc.lookup.pending, S32(4));
+        studio.loads[1].loaded(LLUUID::null, "");
+        studio.loads[2].loaded(LLUUID::null, "");
+        ensure_equals("and on", studio.loads.size(), size_t(5));
+        studio.loads[3].loaded(LLUUID::null, "");
+        studio.loads[4].loaded(LLUUID::null, "");
+        ensure("all done with: shown", doc.lookup.pending == 0 && studio.shows == 1);
+
+        // Begun again with some still to read: what the first had not
+        // begun is let go of, and its answers dropped.
+        studio.loads.clear();
+        lookUp(ALEditorCommand::FindReferences);
+        ensure_equals("two read", studio.loads.size(), size_t(2));
+        lookUp(ALEditorCommand::FindReferences);
+        ensure_equals("two more, for the new one", studio.loads.size(), size_t(4));
+        studio.loads[0].loaded(LLUUID::null, "");
+        studio.loads[1].loaded(LLUUID::null, "");
+        ensure_equals("the first's answers begin nothing", studio.loads.size(), size_t(4));
+        studio.loads[2].loaded(LLUUID::null, "");
+        ensure_equals("the new one's go on", studio.loads.size(), size_t(5));
+    }
 }
