@@ -1011,6 +1011,7 @@ if(AL_BUILD_VIEWER)
     alfloaterscriptpreferences.h
     alscriptinspectorpane.h
     alscriptinventoryindex.h
+    alscriptjoblane.h
     alscriptjobqueue.h
     alscriptkeymap.h
     alpanelscriptkeymap.h
@@ -2696,6 +2697,9 @@ if(AL_BUILD_TESTS)
   # What waits for the script analysis thread: the latest of each kind
   # about each script, by rank, a stale text passed over.
   al_add_test(alscriptjobqueue PROJECT ${test_project} LIBRARIES llcommon)
+
+  # What waits for the preprocessor's worker, which the worker takes itself.
+  al_add_test(alscriptjoblane PROJECT ${test_project} LIBRARIES llcommon)
 
   # The inventory's scripts and notecards by name, built once and kept from
   # each item said to change.
