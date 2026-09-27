@@ -1086,4 +1086,37 @@ namespace tut
         const ALLSLInliner::Result cut = ALLSLInliner::run(source, {}, 1);
         ensure("the inliner's one round done, the next not begun", cut.inlined > 0 && (cut.stoppedEarly || cut.inlined == once.inlined));
     }
+    template<> template<>
+    void allsloptimizer_object::test<30>()
+    {
+        set_test_name("an if whose condition is always true stays where it is the last around a state change in a function, which may change state only under one");
+        const std::string source = "f()\n{\n    if (TRUE) state other;\n}\n"
+                                   "g()\n{\n    if (TRUE)\n    {\n        if (llGetUnixTime()) state other;\n    }\n}\n"
+                                   "h()\n{\n    if (FALSE) llOwnerSay(\"x\");\n    else state other;\n}\n"
+                                   "default\n{\n    state_entry()\n    {\n        f();\n        g();\n        h();\n        if (TRUE) state other;\n    }\n}\n"
+                                   "state other\n{\n    state_entry()\n    {\n    }\n}\n";
+        ALLSLService service;
+        bool         refused = false;
+        for (const ALScriptProblem& p : service.check("f()\n{\n    state other;\n}\ndefault\n{\n    state_entry()\n    {\n        f();\n    }\n}\nstate other\n{\n    state_entry()\n    {\n    }\n}\n"))
+        {
+            refused = refused || p.severity == ALScriptProblem::Severity::Error;
+        }
+        ensure("a bare state change in a function does not compile", refused);
+        const ALLSLOptimizer::Result r = ALLSLOptimizer::run(source, options());
+        ensure("optimized: " + notes(r), r.optimized);
+        for (const ALScriptProblem& p : service.check(r.text))
+        {
+            ensure("what was written compiles: " + p.message + "\n" + r.text, p.severity != ALScriptProblem::Severity::Error);
+        }
+        const auto body = [&r](const char* name) {
+            const size_t at = r.text.find(std::string(name) + "()\n{");
+            return at == std::string::npos ? std::string() : r.text.substr(at, r.text.find("\n}", at) - at);
+        };
+        ensure("f keeps its if: " + r.text, body("f").find("if (") != std::string::npos && body("f").find("state other;") != std::string::npos);
+        ensure("g loses the outer if, the inner one standing: " + r.text, body("g").find("llGetUnixTime()") != std::string::npos);
+        ensure("h keeps its if too: " + r.text, body("h").find("if (") != std::string::npos);
+        const size_t entry = r.text.find("state_entry()");
+        ensure("an event changes state as it likes: its if goes: " + r.text,
+               entry != std::string::npos && r.text.find("if (", entry) > r.text.find("state other;", entry));
+    }
 } // namespace tut

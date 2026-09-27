@@ -2801,6 +2801,10 @@ namespace
             {
                 return false;
             }
+            if (branch && lastIfOfStateChange(stmt, branch))
+            {
+                return false;
+            }
             report.note(stmt->getLoc(), taken ? "OptimizerIfAlwaysTrue" : "OptimizerIfAlwaysFalse",
                         taken ? "the condition of this if is always true; kept only what runs" : "the condition of this if is always false; kept only what runs");
             replaceStatement(stmt, branch ? static_cast<LSLStatement*>(stmt->takeChild(taken ? 1 : 2)) : nullptr);
@@ -2941,6 +2945,45 @@ namespace
                 }
             }
             return false;
+        }
+
+        // Whether taking `stmt` away for its branch would leave a state
+        // change in a function with no `if` around it: a function may
+        // change state only under an `if`, which the compiler checks
+        // (Tailslide's E_CHANGE_STATE_IN_FUNCTION), whatever the `if`
+        // tests. An event may change state anywhere.
+        static bool lastIfOfStateChange(LSLIfStatement* stmt, LSLStatement* branch)
+        {
+            for (LSLASTNode* up = stmt->getParent(); up; up = up->getParent())
+            {
+                if (up->getNodeType() == NODE_STATE || (up->getNodeType() == NODE_STATEMENT && up->getNodeSubType() == NODE_IF_STATEMENT))
+                {
+                    return false;
+                }
+                if (up->getNodeType() == NODE_GLOBAL_FUNCTION)
+                {
+                    break;
+                }
+            }
+            bool orphaned = false;
+            const std::function<void(LSLASTNode*, bool)> look = [&](LSLASTNode* node, bool underIf) {
+                if (orphaned || !node)
+                {
+                    return;
+                }
+                if (node->getNodeType() == NODE_STATEMENT && node->getNodeSubType() == NODE_STATE_STATEMENT && !underIf)
+                {
+                    orphaned = true;
+                    return;
+                }
+                const bool isIf = node->getNodeType() == NODE_STATEMENT && node->getNodeSubType() == NODE_IF_STATEMENT;
+                for (LSLASTNode* child = node->getChild(0); child; child = child->getNext())
+                {
+                    look(child, underIf || isIf);
+                }
+            };
+            look(branch, false);
+            return orphaned;
         }
 
         bool unusedLabel(LSLASTNode* label)
