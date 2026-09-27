@@ -113,9 +113,10 @@ void ALScriptStudioWeighing::weighSent(Doc& doc)
         return;
     }
     ALScriptAnalysis::Request request;
-    request.kind    = ALScriptAnalysis::Kind::Weigh;
-    request.id      = doc.id;
-    request.version = doc.uploaded.version;
+    request.kind     = ALScriptAnalysis::Kind::Weigh;
+    request.weighing = ALScriptAnalysis::Request::Weighing::Sent;
+    request.id       = doc.id;
+    request.version  = doc.uploaded.version;
     request.lua     = doc.language.lua;
     request.text    = doc.uploaded.disabled ? doc.editor->text() : doc.uploaded.text;
     request.targets = { *target };
@@ -352,11 +353,12 @@ void ALScriptStudioWeighing::weighFixes(Doc& doc, U32 shown, const std::vector<A
         return;
     }
     ALScriptAnalysis::Request request;
-    request.kind    = ALScriptAnalysis::Kind::Weigh;
-    request.id      = doc.id;
-    request.version = version;
-    request.lua     = doc.language.lua;
-    request.targets = { *target };
+    request.kind     = ALScriptAnalysis::Kind::Weigh;
+    request.weighing = ALScriptAnalysis::Request::Weighing::Fixes;
+    request.id       = doc.id;
+    request.version  = version;
+    request.lua      = doc.language.lua;
+    request.targets  = { *target };
     // What the analyzers read as it stands first, weighed with the rest so
     // that each is measured against the same weigher at the same moment.
     request.variants.push_back(mWindow.preprocessed(doc) ? doc.expanded.text : doc.editor->text());

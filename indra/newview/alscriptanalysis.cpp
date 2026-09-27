@@ -38,6 +38,7 @@
 #include "alserialworker.h"
 
 #include <algorithm>
+#include <optional>
 #include <sstream>
 
 // What lives on the worker: the two services and what they were loaded
@@ -162,7 +163,7 @@ void ALScriptAnalysis::ensureStarted()
         // Closing, a check still running is stopped rather than waited
         // for, and what waits is passed over.
         mThread = std::make_unique<ALSerialWorker>("ScriptAnalysis", [this]() {
-            const std::lock_guard<std::mutex> lock(mLatestMutex);
+            const std::lock_guard<std::mutex> lock(mQueueMutex);
             ALLuauService::cancel(mRunningStop);
         });
     }
@@ -176,35 +177,19 @@ void ALScriptAnalysis::definitionsChanged()
 void ALScriptAnalysis::ask(Request request, callback_t callback)
 {
     ensureStarted();
+    Job job;
     // The paths are the syntax cache's, which is the main thread's; the
     // worker reads what they name.
-    const std::string luau_path  = request.lua ? LLSyntaxDefCache::instance().getLuauDefinitionsPath() : std::string();
-    const std::string docs_path  = request.lua ? LLSyntaxDefCache::instance().getLuauDocsPath() : std::string();
-    const std::string lsl_path   = request.lua ? std::string() : LLSyntaxDefCache::instance().getLSLBuiltinsPath();
-    const U32         generation = mDefinitionsGeneration;
+    job.luauPath   = request.lua ? LLSyntaxDefCache::instance().getLuauDefinitionsPath() : std::string();
+    job.docsPath   = request.lua ? LLSyntaxDefCache::instance().getLuauDocsPath() : std::string();
+    job.lslPath    = request.lua ? std::string() : LLSyntaxDefCache::instance().getLSLBuiltinsPath();
+    job.generation = mDefinitionsGeneration;
     // The solver and the time limit, which are settings, and so the main
     // thread's to read.
     static LLCachedControl<std::string> solver_setting(gSavedSettings, "ALScriptLuauSolver", "old");
     static LLCachedControl<F32>         seconds_setting(gSavedSettings, "ALScriptLuauCheckSeconds", 5.f);
-    const bool                          new_solver = std::string(solver_setting) == "new";
-    const F32                           seconds    = seconds_setting;
-    // Which check of this script this is: a later one asked for while
-    // this one waits makes it stale, and the worker passes it over. Only
-    // checks are numbered -- a hover or a completion is about a place,
-    // and is cheap.
-    U32 serial = 0;
-    if (request.kind == Kind::Check)
-    {
-        const std::lock_guard<std::mutex> lock(mLatestMutex);
-        serial                    = ++mAskSerial;
-        mLatestCheck[request.id] = serial;
-        // One of this script already running is stopped: its answer
-        // would be thrown away on arrival too.
-        if (mRunningStop && mRunningId == request.id)
-        {
-            ALLuauService::cancel(mRunningStop);
-        }
-    }
+    job.newSolver = std::string(solver_setting) == "new";
+    job.seconds   = seconds_setting;
     // What is answered where the thread will not take the job -- the viewer
     // going -- so that nothing waits on it: nothing found.
     Result refused;
@@ -215,219 +200,256 @@ void ALScriptAnalysis::ask(Request request, callback_t callback)
     refused.line    = request.line;
     refused.column  = request.column;
     const auto answer = std::make_shared<callback_t>(std::move(callback));
-    const bool posted = mThread->post([this, request = std::move(request), callback = answer, luau_path, docs_path, lsl_path, generation, serial,
-                                       new_solver, seconds]() {
-        // The job as a whole, its definitions loaded included; what it
-        // asked of the service is the zone inside.
-        LL_PROFILE_ZONE_NAMED_CATEGORY_SCRIPTDEV("script analysis job");
-        // What stops this one, where it is an SLua check.
-        ALLuauService::Stop stop;
-        if (serial != 0)
+    job.callback      = answer;
+    // Waiting under the script and the kind of question -- and, for a
+    // weigh, which of its weighs -- in place of what waited there.
+    std::string key = request.id;
+    key += '\x1f';
+    key += static_cast<char>('0' + static_cast<int>(request.kind));
+    if (request.kind == Kind::Weigh)
+    {
+        key += static_cast<char>('0' + static_cast<int>(request.weighing));
+    }
+    // By rank: the front tab's questions, which someone is waiting on, then
+    // its check; weighing; everything else -- background tabs, lookups.
+    const U8 rank = request.kind == Kind::Weigh    ? 2
+                    : !request.front                ? 3
+                    : request.kind == Kind::Check   ? 1
+                                                    : 0;
+    const std::string id      = request.id;
+    const U32         version = request.version;
+    job.request               = std::move(request);
+    {
+        const std::lock_guard<std::mutex> lock(mQueueMutex);
+        if (mQueue.add(key, id, version, rank, std::move(job)))
         {
-            const std::lock_guard<std::mutex> lock(mLatestMutex);
-            const auto                        latest = mLatestCheck.find(request.id);
-            if (latest != mLatestCheck.end() && latest->second != serial)
+            // What runs is answering something no longer wanted.
+            ALLuauService::cancel(mRunningStop);
+        }
+    }
+    if (!mThread->post([this]() { runNext(); }))
+    {
+        {
+            const std::lock_guard<std::mutex> lock(mQueueMutex);
+            mQueue.forget(id);
+        }
+        LLAppViewer::instance()->postToMainCoro([refused = std::move(refused), answer]() { (*answer)(refused); });
+    }
+}
+
+void ALScriptAnalysis::forget(const std::string& id)
+{
+    const std::lock_guard<std::mutex> lock(mQueueMutex);
+    mQueue.forget(id);
+}
+
+void ALScriptAnalysis::runNext()
+{
+    // The job as a whole, its definitions loaded included; what it asked
+    // of the service is the zone inside.
+    LL_PROFILE_ZONE_NAMED_CATEGORY_SCRIPTDEV("script analysis job");
+    std::optional<std::pair<std::string, Job>> next;
+    // What stops it, where it is an SLua one.
+    ALLuauService::Stop stop;
+    {
+        const std::lock_guard<std::mutex> lock(mQueueMutex);
+        next = mQueue.take();
+        if (!next)
+        {
+            return;
+        }
+        if (next->second.request.lua)
+        {
+            stop         = ALLuauService::newStop();
+            mRunningStop = stop;
+        }
+    }
+    const Job& job    = next->second;
+    Result     result = run(job, stop);
+    bool       unwanted = false;
+    {
+        const std::lock_guard<std::mutex> lock(mQueueMutex);
+        unwanted = mQueue.superseded();
+        mQueue.finished();
+        if (mRunningStop == stop)
+        {
+            mRunningStop.reset();
+        }
+    }
+    if (stop && mWorker)
+    {
+        unwanted = unwanted || mWorker->luau.stopped();
+        mWorker->luau.setStop(nullptr);
+    }
+    if (unwanted)
+    {
+        // Stopped, or asked again while it ran: what was asked since
+        // answers in its place.
+        return;
+    }
+    const std::shared_ptr<callback_t> callback = job.callback;
+    // The words in the viewer's language, on the main thread, where
+    // the strings are.
+    LLAppViewer::instance()->postToMainCoro([result = std::move(result), callback]() mutable {
+        alTranslateScriptProblems(result.problems);
+        for (ALScriptFix& action : result.actions)
+        {
+            action.title = alScriptKeyedWords(action.key, action.args, action.title);
+        }
+        // A definitions error of this code's own carries its key
+        // between the marks, with what it is about after.
+        if (!result.definitionsError.empty() && result.definitionsError[0] == '\x01')
+        {
+            const size_t end = result.definitionsError.find('\x01', 1);
+            if (end != std::string::npos)
             {
-                // A newer check of this script is already waiting: this
-                // one's answer would be thrown away on arrival.
-                return;
-            }
-            // The newest, run: nothing is waiting behind it, and the
-            // script is forgotten until it is asked about again, so that
-            // what is kept is what is waiting rather than one entry for
-            // every script ever checked.
-            if (latest != mLatestCheck.end())
-            {
-                mLatestCheck.erase(latest);
-            }
-            if (request.lua)
-            {
-                stop         = ALLuauService::newStop();
-                mRunningId   = request.id;
-                mRunningStop = stop;
+                LLStringUtil::format_map_t args;
+                args["[PATH]"] = result.definitionsError.substr(end + 1);
+                result.definitionsError = LLTrans::getString(result.definitionsError.substr(1, end - 1), args);
             }
         }
-        // The engines recurse on how the script nests; the pool's thread
-        // has what the platform gives a thread, which on a Mac is half a
-        // megabyte. The work goes on a stack as deep as a script needs.
-        Result result;
-        alScriptOnLargeStack([&]() {
-            if (!mWorker)
+        (*callback)(result);
+    });
+}
+
+ALScriptAnalysis::Result ALScriptAnalysis::run(const Job& job, const ALLuauService::Stop& stop)
+{
+    const Request& request = job.request;
+    // The engines recurse on how the script nests; the pool's thread has
+    // what the platform gives a thread, which on a Mac is half a megabyte.
+    // The work goes on a stack as deep as a script needs.
+    Result result;
+    alScriptOnLargeStack([&]() {
+        if (!mWorker)
+        {
+            mWorker = std::make_unique<Worker>();
+        }
+        result.kind    = request.kind;
+        result.id      = request.id;
+        result.version = request.version;
+        result.lua     = request.lua;
+        result.line    = request.line;
+        result.column  = request.column;
+        if (request.lua)
+        {
+            mWorker->useSolver(job.newSolver);
+            mWorker->loadLuau(job.luauPath, job.docsPath, job.generation);
+            result.definitionsError = mWorker->luauError;
+            mWorker->luau.setConfig(request.config);
+            mWorker->luau.setTimeLimit(job.seconds);
+            mWorker->luau.setStop(stop);
+            switch (request.kind)
             {
-                mWorker = std::make_unique<Worker>();
-            }
-            result.kind    = request.kind;
-            result.id      = request.id;
-            result.version = request.version;
-            result.lua     = request.lua;
-            result.line    = request.line;
-            result.column  = request.column;
-            if (request.lua)
-            {
-                mWorker->useSolver(new_solver);
-                mWorker->loadLuau(luau_path, docs_path, generation);
-                result.definitionsError = mWorker->luauError;
-                mWorker->luau.setConfig(request.config);
-                mWorker->luau.setTimeLimit(seconds);
-                mWorker->luau.setStop(stop);
-                switch (request.kind)
-                {
-                    case Kind::Check:
-                        result.problems = mWorker->luau.check(request.text);
-                        if (mWorker->luau.stopped())
-                        {
-                            break;
-                        }
-                        result.outline  = mWorker->luau.outline(request.text);
-                        if (request.semantics)
-                        {
-                            result.semantics = mWorker->luau.semanticTokens(request.text);
-                        }
-                        result.hints = mWorker->luau.inlayHints(request.text, request.hintParameters, request.hintTypes);
-                        break;
-                    case Kind::Complete:
-                        result.completions = mWorker->luau.complete(request.text, request.line, request.column);
-                        break;
-                    case Kind::Hover:
-                    case Kind::Inspect:
-                        result.hover = mWorker->luau.hover(request.text, request.line, request.column);
-                        break;
-                    case Kind::Signature:
-                        result.signature = mWorker->luau.signature(request.text, request.line, request.column);
-                        break;
-                    case Kind::References:
-                        result.references = mWorker->luau.references(request.text, request.line, request.column);
-                        break;
-                    case Kind::Actions:
-                        result.actions = mWorker->luau.actions(request.text, request.line, request.column, request.endLine, request.endColumn);
-                        break;
-                    case Kind::Weigh:
-                        if (!request.variants.empty())
-                        {
-                            for (const std::string& variant : request.variants)
-                            {
-                                result.variantTotals.push_back(ALScriptWeigh::slua(variant).total);
-                            }
-                            break;
-                        }
-                        for (const ALScriptWeight::Target target : request.targets)
-                        {
-                            if (target == ALScriptWeight::Target::SLua)
-                            {
-                                result.weights.push_back(ALScriptWeigh::slua(request.text));
-                            }
-                        }
-                        break;
-                }
-            }
-            else
-            {
-                mWorker->loadLSL(lsl_path);
-                result.definitionsError = mWorker->lslError;
-                switch (request.kind)
-                {
-                    case Kind::Check:
-                        result.problems = mWorker->lsl.check(request.text, request.mono);
-                        result.outline  = mWorker->lsl.outline(request.text);
-                        if (request.semantics)
-                        {
-                            result.semantics = mWorker->lsl.semanticTokens(request.text);
-                        }
-                        result.hints = mWorker->lsl.inlayHints(request.text, request.hintParameters);
-                        break;
-                    case Kind::Complete:
-                        result.completions = mWorker->lsl.symbols(request.text, request.line, request.column);
-                        break;
-                    case Kind::Hover:
-                    case Kind::Inspect:
-                        result.hover = mWorker->lsl.hover(request.text, request.line, request.column);
-                        break;
-                    case Kind::Signature:
-                        result.signature = mWorker->lsl.signature(request.text, request.line, request.column);
-                        break;
-                    case Kind::References:
-                        result.references = mWorker->lsl.references(request.text, request.line, request.column);
-                        break;
-                    case Kind::Actions:
-                        result.actions = mWorker->lsl.actions(request.text, request.line, request.column, request.endLine, request.endColumn);
-                        break;
-                    case Kind::Weigh:
+                case Kind::Check:
+                    result.problems = mWorker->luau.check(request.text);
+                    if (mWorker->luau.stopped())
                     {
-                        const auto weigh = [](ALScriptWeight::Target target, const std::string& text) {
-                            return target == ALScriptWeight::Target::LSO       ? ALScriptWeigh::lso(text)
-                                   : target == ALScriptWeight::Target::Mono    ? ALScriptWeigh::mono(text)
-                                   : target == ALScriptWeight::Target::LSLLuau ? ALScriptWeigh::lslLuau(text)
-                                                                               : ALScriptWeight();
-                        };
-                        if (!request.variants.empty() && !request.targets.empty())
+                        break;
+                    }
+                    result.outline  = mWorker->luau.outline(request.text);
+                    if (request.semantics)
+                    {
+                        result.semantics = mWorker->luau.semanticTokens(request.text);
+                    }
+                    result.hints = mWorker->luau.inlayHints(request.text, request.hintParameters, request.hintTypes);
+                    break;
+                case Kind::Complete:
+                    result.completions = mWorker->luau.complete(request.text, request.line, request.column);
+                    break;
+                case Kind::Hover:
+                case Kind::Inspect:
+                    result.hover = mWorker->luau.hover(request.text, request.line, request.column);
+                    break;
+                case Kind::Signature:
+                    result.signature = mWorker->luau.signature(request.text, request.line, request.column);
+                    break;
+                case Kind::References:
+                    result.references = mWorker->luau.references(request.text, request.line, request.column);
+                    break;
+                case Kind::Actions:
+                    result.actions = mWorker->luau.actions(request.text, request.line, request.column, request.endLine, request.endColumn);
+                    break;
+                case Kind::Weigh:
+                    if (!request.variants.empty())
+                    {
+                        for (const std::string& variant : request.variants)
                         {
-                            for (const std::string& variant : request.variants)
-                            {
-                                result.variantTotals.push_back(weigh(request.targets.front(), variant).total);
-                            }
-                            break;
-                        }
-                        for (const ALScriptWeight::Target target : request.targets)
-                        {
-                            if (target != ALScriptWeight::Target::SLua)
-                            {
-                                result.weights.push_back(weigh(target, request.text));
-                            }
+                            result.variantTotals.push_back(ALScriptWeigh::slua(variant).total);
                         }
                         break;
                     }
-                }
-                result.parsed     = mWorker->lsl.parsed();
-                result.understood = mWorker->lsl.understood();
-            }
-        });
-        bool stopped = false;
-        if (stop)
-        {
-            const std::lock_guard<std::mutex> lock(mLatestMutex);
-            if (mRunningStop == stop)
-            {
-                mRunningStop.reset();
-                mRunningId.clear();
-            }
-            if (mWorker)
-            {
-                stopped = mWorker->luau.stopped();
-                mWorker->luau.setStop(nullptr);
+                    for (const ALScriptWeight::Target target : request.targets)
+                    {
+                        if (target == ALScriptWeight::Target::SLua)
+                        {
+                            result.weights.push_back(ALScriptWeigh::slua(request.text));
+                        }
+                    }
+                    break;
             }
         }
-        if (stopped)
+        else
         {
-            // Stopped for a newer check, which answers in its place.
-            return;
-        }
-        // The words in the viewer's language, on the main thread, where
-        // the strings are.
-        LLAppViewer::instance()->postToMainCoro([result = std::move(result), callback]() mutable {
-            alTranslateScriptProblems(result.problems);
-            for (ALScriptFix& action : result.actions)
+            mWorker->loadLSL(job.lslPath);
+            result.definitionsError = mWorker->lslError;
+            switch (request.kind)
             {
-                action.title = alScriptKeyedWords(action.key, action.args, action.title);
-            }
-            // A definitions error of this code's own carries its key
-            // between the marks, with what it is about after.
-            if (!result.definitionsError.empty() && result.definitionsError[0] == '\x01')
-            {
-                const size_t end = result.definitionsError.find('\x01', 1);
-                if (end != std::string::npos)
+                case Kind::Check:
+                    result.problems = mWorker->lsl.check(request.text, request.mono);
+                    result.outline  = mWorker->lsl.outline(request.text);
+                    if (request.semantics)
+                    {
+                        result.semantics = mWorker->lsl.semanticTokens(request.text);
+                    }
+                    result.hints = mWorker->lsl.inlayHints(request.text, request.hintParameters);
+                    break;
+                case Kind::Complete:
+                    result.completions = mWorker->lsl.symbols(request.text, request.line, request.column);
+                    break;
+                case Kind::Hover:
+                case Kind::Inspect:
+                    result.hover = mWorker->lsl.hover(request.text, request.line, request.column);
+                    break;
+                case Kind::Signature:
+                    result.signature = mWorker->lsl.signature(request.text, request.line, request.column);
+                    break;
+                case Kind::References:
+                    result.references = mWorker->lsl.references(request.text, request.line, request.column);
+                    break;
+                case Kind::Actions:
+                    result.actions = mWorker->lsl.actions(request.text, request.line, request.column, request.endLine, request.endColumn);
+                    break;
+                case Kind::Weigh:
                 {
-                    LLStringUtil::format_map_t args;
-                    args["[PATH]"] = result.definitionsError.substr(end + 1);
-                    result.definitionsError = LLTrans::getString(result.definitionsError.substr(1, end - 1), args);
+                    const auto weigh = [](ALScriptWeight::Target target, const std::string& text) {
+                        return target == ALScriptWeight::Target::LSO       ? ALScriptWeigh::lso(text)
+                               : target == ALScriptWeight::Target::Mono    ? ALScriptWeigh::mono(text)
+                               : target == ALScriptWeight::Target::LSLLuau ? ALScriptWeigh::lslLuau(text)
+                                                                           : ALScriptWeight();
+                    };
+                    if (!request.variants.empty() && !request.targets.empty())
+                    {
+                        for (const std::string& variant : request.variants)
+                        {
+                            result.variantTotals.push_back(weigh(request.targets.front(), variant).total);
+                        }
+                        break;
+                    }
+                    for (const ALScriptWeight::Target target : request.targets)
+                    {
+                        if (target != ALScriptWeight::Target::SLua)
+                        {
+                            result.weights.push_back(weigh(target, request.text));
+                        }
+                    }
+                    break;
                 }
             }
-            (*callback)(result);
-        });
+            result.parsed     = mWorker->lsl.parsed();
+            result.understood = mWorker->lsl.understood();
+        }
     });
-    if (!posted)
-    {
-        LLAppViewer::instance()->postToMainCoro([refused = std::move(refused), answer]() { (*answer)(refused); });
-    }
+    return result;
 }
 
 std::string alScriptKeyedWords(const std::string& key, const std::vector<std::string>& args, const std::string& english)

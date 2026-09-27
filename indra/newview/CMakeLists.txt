@@ -1006,6 +1006,7 @@ if(AL_BUILD_VIEWER)
     alscriptexternaleditor.h
     alfloaterscriptpreferences.h
     alscriptinspectorpane.h
+    alscriptjobqueue.h
     alscriptkeymap.h
     alpanelscriptkeymap.h
     alscriptlookup.h
@@ -2685,6 +2686,10 @@ if(AL_BUILD_TESTS)
       alscriptstudiowords.cpp
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
+
+  # What waits for the script analysis thread: the latest of each kind
+  # about each script, by rank, a stale text passed over.
+  al_add_test(alscriptjobqueue PROJECT ${test_project} LIBRARIES llcommon)
 
   # Script Studio's checking, the window's side and the viewer's sources
   # faked: checks due and answered, expansions, imports, lints, fixes.

@@ -2946,6 +2946,8 @@ void ALFloaterScriptStudio::askingOptions(ALScriptAnalysis::Request& request) co
     request.semantics      = mSemanticColors;
     request.hintParameters = mInlayParameters;
     request.hintTypes      = mInlayTypes;
+    // The tab in front goes first, while the window is there to be seen.
+    request.front          = mActive < mDocs.size() && mDocs[mActive]->id == request.id && getVisible() && !isMinimized();
 }
 
 void ALFloaterScriptStudio::answeredElsewhere(Doc& doc, const ALScriptAnalysis::Result& result, const ALTextPos& at)
@@ -6165,6 +6167,12 @@ void ALFloaterScriptStudio::letGoOf(size_t index, bool keep)
             store->letGo(parting);
         }
         mExternal.stop(doc);
+        // What it asked the analyzers is not run for it gone; one moved to
+        // another window still wants it.
+        if (!keep)
+        {
+            ALScriptAnalysis::instance().forget(doc.id);
+        }
         mProblemsPane->closed(doc.id);
         if (doc.id == mReferencesPane->found().from)
         {

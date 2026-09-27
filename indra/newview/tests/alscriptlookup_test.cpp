@@ -407,7 +407,7 @@ namespace tut
         ensure_equals("asked", studio.asks.size(), size_t(1));
         const ALScriptAnalysis::Request& asked = studio.asks[0].request;
         ensure("where the declaration went", asked.kind == ALScriptAnalysis::Kind::References && asked.line == 0 && asked.column == 8);
-        ensure_equals("by the script", asked.id, "lookup:" + b.id());
+        ensure_equals("by who asked and the script", asked.id, "lookup:" + doc.id + ":" + b.id());
         ensure_equals("of this lookup", asked.version, doc.lookup.generation);
 
         studio.asks[0].answered(answer({ span(0, 8, 5), span(1, 8, 5) }));

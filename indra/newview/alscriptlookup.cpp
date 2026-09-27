@@ -255,7 +255,10 @@ void ALScriptLookup::expanded(const std::string& id, U32 generation, const ALScr
     }
     ALScriptAnalysis::Request request;
     request.kind    = ALScriptAnalysis::Kind::References;
-    request.id      = "lookup:" + ref.id();
+    // Its own script to the analyzers, by who asked and what is looked
+    // through: another tab's lookup through the same script does not
+    // stand in for this one's, and this one's next lookup does.
+    request.id      = "lookup:" + id + ":" + ref.id();
     request.version = generation;
     request.lua     = doc.language.lua;
     request.mono    = doc.language.compileTarget != "lsl2";

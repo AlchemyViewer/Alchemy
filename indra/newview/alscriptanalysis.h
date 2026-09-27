@@ -25,6 +25,7 @@
 #pragma once
 
 #include "alluauconfig.h"
+#include "alscriptjobqueue.h"
 #include "alscriptproblem.h"
 #include "alscriptsymbol.h"
 #include "alscriptweight.h"
@@ -157,6 +158,19 @@ public:
         // each one's total in order (Result::variantTotals).
         std::vector<ALScriptWeight::Target> targets;
         std::vector<std::string>            variants;
+        // Weigh only: which of a script's weighs this is -- the text as it
+        // stands, the text a save sends, or the fixes' costs -- none of
+        // which stands in for another as they wait.
+        enum class Weighing : U8
+        {
+            Text,
+            Sent,
+            Fixes
+        };
+        Weighing    weighing = Weighing::Text;
+        // Whether it is about the tab in front: its questions go before
+        // anything else, then its check; then weighing; then the rest.
+        bool        front = false;
         // What a check says beyond the problems and the outline: what
         // every name is, and what the editor may show beside the text.
         bool        semantics      = false;
@@ -196,13 +210,20 @@ public:
     };
     typedef std::function<void(const Result&)> callback_t;
 
-    // Asks the worker and answers on the main thread. A check of a
-    // script whose newer check is already waiting is passed over rather
-    // than run: typing through a slow check would otherwise queue one
-    // whole-script check per keystroke, every answer but the last
-    // thrown away on arrival, with a hover or a completion waiting
-    // behind them all.
+    // Asks the worker and answers on the main thread. Only the latest of
+    // each kind of question about each script waits -- typing through a
+    // slow check would otherwise queue one whole-script check per
+    // keystroke, every answer but the last thrown away on arrival -- and
+    // the next is picked by rank: the front tab's questions, its check,
+    // weighing, then everything else. A question about a text older than
+    // one asked about since is passed over, and not answered; so is one
+    // whose answer a newer question makes pointless while it runs, which
+    // is stopped where it is an SLua one. Nothing is answered for what is
+    // passed over: whoever asked has asked again.
     void ask(Request request, callback_t callback);
+
+    // A script let go of: nothing it has waiting is run.
+    void forget(const std::string& id);
 
     // The region's definitions changed: the Luau ones are read again
     // before the next check.
@@ -221,20 +242,30 @@ private:
     // after another.
     std::unique_ptr<Worker>                             mWorker;
     U32                                                 mDefinitionsGeneration = 1;
-    // The newest check asked for of each script with one waiting, by the
-    // serial they were asked in: a check the worker reaches with a newer
-    // one already asked for is passed over, and the newest, reached,
-    // takes its script off. Written on the main thread, read on the
-    // worker; both under the lock, since a check may take a moment and
-    // the main thread goes on asking meanwhile.
-    std::mutex                                          mLatestMutex;
-    boost::unordered_flat_map<std::string, U32, ll::string_hash, std::equal_to<>> mLatestCheck;
-    U32                                                 mAskSerial = 0;
-    // The SLua check the worker is running, if any, and what stops it: a
-    // newer check of the same script asked for stops it, its answer being
-    // one that would be thrown away, and so does the viewer closing. Under
-    // the same lock. Held as the Luau stop token, which only the service
-    // knows the inside of.
-    std::string                                         mRunningId;
-    std::shared_ptr<Luau::FrontendCancellationToken>    mRunningStop;
+    // One job waiting: the question, who is answered, and what the main
+    // thread read for it -- the definitions' paths, the settings.
+    struct Job
+    {
+        Request                     request;
+        std::shared_ptr<callback_t> callback;
+        std::string                 luauPath;
+        std::string                 docsPath;
+        std::string                 lslPath;
+        U32                         generation = 0;
+        bool                        newSolver  = false;
+        F32                         seconds    = 0.f;
+    };
+    // Takes the next job and runs it, on the worker: one is posted for
+    // every question asked, and one that finds nothing waiting -- its
+    // question replaced by a later one -- does nothing.
+    void runNext();
+    Result run(const Job& job, const std::shared_ptr<Luau::FrontendCancellationToken>& stop);
+
+    // What waits, written on the main thread and taken on the worker, and
+    // the stop of the SLua job running, if any: a question that makes its
+    // answer pointless stops it, and so does the viewer closing. Both
+    // under the lock.
+    std::mutex                                       mQueueMutex;
+    ALScriptJobQueue<Job>                            mQueue;
+    std::shared_ptr<Luau::FrontendCancellationToken> mRunningStop;
 };
