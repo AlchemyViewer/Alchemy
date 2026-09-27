@@ -585,6 +585,10 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="ScriptFixAssign">Assign with '='</string>
 	<string name="ScriptFixIntFloat">Multiply as a float, then cast to integer</string>
 	<string name="ScriptFixReturn">Write 'return' instead</string>
+	<string name="ScriptFixEmptyIf">Take out the ';' that ends the if</string>
+	<string name="ScriptFixScope">Put it in braces of its own</string>
+	<string name="ScriptFixParameterType">Declare '[1]' as [2]</string>
+	<string name="ScriptFixEventParameters">Write the parameters '[1]' takes</string>
 	<string name="ScriptFixToString">Wrap in tostring()</string>
 	<string name="ScriptFixColon">Call with ':'</string>
 	<string name="ScriptFixDot">Call with '.'</string>

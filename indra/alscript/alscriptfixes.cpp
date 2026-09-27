@@ -42,10 +42,13 @@
     X(LSLAssignmentInComparison) \
     X(LSLBadReturnType) \
     X(LSLChangeToCurrentState) \
+    X(LSLDeclarationInvalidHere) \
     X(LSLDeprecatedWithReplacement) \
+    X(LSLEmptyIf) \
     X(LSLEqAsStatement) \
     X(LSLIntFloatMulAssign) \
     X(LSLInvalidOperator) \
+    X(LSLParameterUntyped) \
     X(LSLSyntaxMissing) \
     X(LSLUndeclaredWithSuggestion) \
     X(LSLWrongTypeInAssignment) \
@@ -432,6 +435,58 @@ namespace
                 brackets.edits.push_back({ problem.line, from, problem.line, from, "(" });
                 brackets.edits.push_back({ problem.line, to, problem.line, to, ")" });
                 problem.fixes.push_back(std::move(brackets));
+            }
+        }
+        else if (!lua && is(key, Fixed::LSLEmptyIf))
+        {
+            // `if (x);`: the `;` is the whole of what the if does, and what
+            // was meant to be its body runs whatever the test says. The
+            // problem marks the test; the `;` is after its bracket.
+            const auto blanks = [&line](S32 at) {
+                while (at < static_cast<S32>(line.size()) && isspace(static_cast<unsigned char>(line[at])))
+                {
+                    ++at;
+                }
+                return at;
+            };
+            const S32 close = blanks(to);
+            const S32 ended = close < static_cast<S32>(line.size()) && line[close] == ')' ? blanks(close + 1) : -1;
+            if (ended >= 0 && ended < static_cast<S32>(line.size()) && line[ended] == ';')
+            {
+                ALScriptFix fix = titled("ScriptFixEmptyIf", "Take out the ';' that ends the if", {});
+                fix.preferred   = true;
+                fix.edits.push_back({ problem.line, ended, problem.line, ended + 1, "" });
+                problem.fixes.push_back(std::move(fix));
+            }
+        }
+        else if (!lua && is(key, Fixed::LSLDeclarationInvalidHere))
+        {
+            // A declaration as the whole body of an if or a loop, in braces
+            // of its own as the message says: after its `;`, on its line.
+            S32 end = to;
+            while (end < static_cast<S32>(line.size()) && isspace(static_cast<unsigned char>(line[end])))
+            {
+                ++end;
+            }
+            if (end < static_cast<S32>(line.size()) && line[end] == ';')
+            {
+                ALScriptFix fix = titled("ScriptFixScope", "Put it in braces of its own", {});
+                fix.preferred   = true;
+                fix.edits.push_back({ problem.line, from, problem.line, from, "{ " });
+                fix.edits.push_back({ problem.line, end + 1, problem.line, end + 1, " }" });
+                problem.fixes.push_back(std::move(fix));
+            }
+        }
+        else if (!lua && is(key, Fixed::LSLParameterUntyped) && args.size() == 1 && marked == args[0] && problem.fixes.empty())
+        {
+            // A function's parameter with no type: each LSL has, none
+            // preferred, since which is the scripter's to say. An event's
+            // is given by the service, which knows what the event takes.
+            for (const char* type : { "integer", "float", "string", "key", "vector", "rotation", "list" })
+            {
+                ALScriptFix fix = titled("ScriptFixParameterType", "Declare '[1]' as [2]", { args[0], type });
+                fix.edits.push_back({ problem.line, from, problem.line, from, std::string(type) + " " });
+                problem.fixes.push_back(std::move(fix));
             }
         }
         else if (!lua && is(key, Fixed::LSLEqAsStatement))
@@ -1406,6 +1461,9 @@ namespace ALScriptFixes
                 {
                     ALScriptFix fix = titled("ScriptFixInsert", "Insert '[1]'", { token });
                     fix.preferred   = true;
+                    // A `;` the parser wanted ends the statement where it
+                    // already ended: nothing else could have been meant.
+                    fix.safe        = token == ";";
                     fix.edits.push_back({ problem.line, problem.endColumn, problem.line, problem.endColumn, token });
                     problem.fixes.push_back(std::move(fix));
                 }

@@ -937,6 +937,104 @@ namespace
     // The builtins' names that can be misspelt -- functions and constants
     // -- listed once: the table is the process's, loaded once, and some two
     // thousand names were listed again for every name not known.
+    std::string declared(Tailslide::LSLType* type);
+
+    // A handler's parameters written as its event takes them -- the types
+    // the builtins say, and the names the handler gave them where it gave
+    // them -- where they are wrong, too many, too few, or one has no type.
+    // Over the bracket after the event's name, where the list closes on
+    // its line.
+    void offerEventParameters(ALScriptProblem& problem, const ALScriptFixes::Lines& lines, Tailslide::LSLSymbolTable* builtins)
+    {
+        const std::string_view line = lines.line(problem.line);
+        std::string            event;
+        size_t                 open = std::string_view::npos;
+        if (problem.key == "LSLArgumentWrongTypeEvent" && problem.args.size() == 5)
+        {
+            event = problem.args[2];
+        }
+        else if ((problem.key == "LSLTooManyArgumentsEvent" || problem.key == "LSLTooFewArgumentsEvent") && problem.args.size() == 1)
+        {
+            event = problem.args[0];
+        }
+        else if (problem.key == "LSLParameterUntyped" && problem.column > 0 && static_cast<size_t>(problem.column) <= line.size())
+        {
+            // The name before the bracket the parameter is in.
+            open = line.rfind('(', static_cast<size_t>(problem.column) - 1);
+            size_t name_end = open;
+            while (name_end != std::string_view::npos && name_end > 0 && isspace(static_cast<unsigned char>(line[name_end - 1])))
+            {
+                --name_end;
+            }
+            size_t name_from = name_end == std::string_view::npos ? name_end : name_end;
+            while (name_from != std::string_view::npos && name_from > 0 && identifierByte(line[name_from - 1]))
+            {
+                --name_from;
+            }
+            if (open != std::string_view::npos && name_from < name_end)
+            {
+                event = std::string(line.substr(name_from, name_end - name_from));
+            }
+        }
+        Tailslide::LSLSymbol* symbol = event.empty() || !builtins ? nullptr : builtins->lookup(event.c_str(), Tailslide::SYM_EVENT);
+        if (!symbol || !symbol->getFunctionDecl())
+        {
+            return;
+        }
+        if (open == std::string_view::npos)
+        {
+            const size_t named = line.find(event, static_cast<size_t>(llmax(0, problem.column)));
+            open               = named == std::string_view::npos ? named : line.find('(', named + event.size());
+        }
+        const size_t close = open == std::string_view::npos ? open : line.find(')', open);
+        if (close == std::string_view::npos)
+        {
+            return;
+        }
+        // The names the handler gave, in order: each parameter's last word.
+        std::vector<std::string> given;
+        const std::string_view   inside = line.substr(open + 1, close - open - 1);
+        for (size_t from = 0; from <= inside.size();)
+        {
+            const size_t           comma = inside.find(',', from);
+            const std::string_view one   = inside.substr(from, comma == std::string_view::npos ? std::string_view::npos : comma - from);
+            size_t                 end   = one.find_last_not_of(" \t");
+            size_t                 start = end;
+            while (start != std::string_view::npos && start > 0 && identifierByte(one[start - 1]))
+            {
+                --start;
+            }
+            if (end != std::string_view::npos && identifierByte(one[end]))
+            {
+                given.emplace_back(one.substr(start, end - start + 1));
+            }
+            if (comma == std::string_view::npos)
+            {
+                break;
+            }
+            from = comma + 1;
+        }
+        std::string parameters;
+        size_t      n = 0;
+        for (Tailslide::LSLASTNode* node = symbol->getFunctionDecl()->getChild(0); node; node = node->getNext())
+        {
+            if (node->getNodeType() == Tailslide::NODE_IDENTIFIER)
+            {
+                auto* identifier = static_cast<Tailslide::LSLIdentifier*>(node);
+                parameters += (parameters.empty() ? "" : ", ") + declared(identifier->getType()) + " " + (n < given.size() ? given[n] : identifier->getName());
+                ++n;
+            }
+        }
+        if (parameters == inside)
+        {
+            return;
+        }
+        ALScriptFix fix = ALScriptFixes::titled("ScriptFixEventParameters", "Write the parameters '[1]' takes", { event });
+        fix.preferred   = true;
+        fix.edits.push_back({ problem.line, static_cast<S32>(open) + 1, problem.line, static_cast<S32>(close), parameters });
+        problem.fixes.push_back(std::move(fix));
+    }
+
     const std::vector<std::string>& builtinNames(Tailslide::LSLSymbolTable* builtins)
     {
         static std::mutex                                 lock;
@@ -1429,6 +1527,14 @@ ALScriptProblems ALLSLService::check(std::string_view source, bool mono)
             const Tailslide::YYLTYPE* loc = declaration->getLoc();
             ALScriptFixes::offerRemoval(problem, lines, zeroBased(loc->first_line), zeroBased(loc->first_column), zeroBased(loc->last_line),
                                         zeroBased(loc->last_column), problem.args[1]);
+        }
+    }
+    // An event's parameters as it takes them, which the builtins know.
+    for (ALScriptProblem& problem : problems)
+    {
+        if (!passedOver(problem))
+        {
+            offerEventParameters(problem, lines, parser.context.builtins);
         }
     }
     // What would put each right, where its words and its place say.

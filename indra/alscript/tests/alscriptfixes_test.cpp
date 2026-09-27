@@ -1067,4 +1067,37 @@ namespace tut
         ensure_equals("a loop from 0", fixed("local t = {1, 2}\nfor i = 0, #t do print(t[i]) end\n", true, "LuauLintForRangeZero", "Change '0' to '1'"),
                       std::string("local t = {1, 2}\nfor i = 1, #t do print(t[i]) end\n"));
     }
+
+    template<> template<>
+    void object::test<35>()
+    {
+        set_test_name("LSL: an if ended by its ';', an event's parameters as it takes them, a parameter with no type, a declaration braced, a missing ';' safe");
+        ensure_equals("the if's ';' out", fixed("default { state_entry() { integer x = llGetUnixTime(); if (x); llOwnerSay(\"a\"); } }", false, "LSLEmptyIf",
+                                                "Take out the ';' that ends the if"),
+                      std::string("default { state_entry() { integer x = llGetUnixTime(); if (x) llOwnerSay(\"a\"); } }"));
+        ensure_equals("a wrong type, the name kept", fixed("default { touch_start(string n) { llOwnerSay((string)n); } }", false, "LSLArgumentWrongTypeEvent",
+                                                          "Write the parameters 'touch_start' takes"),
+                      std::string("default { touch_start(integer n) { llOwnerSay((string)n); } }"));
+        ensure_equals("too few, the builtins' names", fixed("default { touch_start() { } }", false, "LSLTooFewArgumentsEvent", "Write the parameters 'touch_start' takes"),
+                      std::string("default { touch_start(integer NumberOfTouches) { } }"));
+        ensure_equals("too many", fixed("default { touch_start(integer n, integer m) { } }", false, "LSLTooManyArgumentsEvent", "Write the parameters 'touch_start' takes"),
+                      std::string("default { touch_start(integer n) { } }"));
+        ensure_equals("an event's with no type", fixed("default { touch_start(n) { } }", false, "LSLParameterUntyped", "Write the parameters 'touch_start' takes"),
+                      std::string("default { touch_start(integer n) { } }"));
+        ensure_equals("a declaration as an if's body, braced", fixed("default { state_entry() { if (llGetUnixTime()) integer i = 1; } }", false, "LSLDeclarationInvalidHere",
+                                                                    "Put it in braces of its own"),
+                      std::string("default { state_entry() { if (llGetUnixTime()) { integer i = 1; } } }"));
+
+        const std::string      function = "say(x) { llOwnerSay((string)x); }\ndefault { state_entry() { say(1); } }";
+        const ALScriptProblems untyped  = check(function, false);
+        const ALScriptProblem* bare     = keyed(untyped, "LSLParameterUntyped");
+        ensure("a function's: every type, none preferred", bare && bare->fixes.size() == 7 &&
+               std::none_of(bare->fixes.begin(), bare->fixes.end(), [](const ALScriptFix& fix) { return fix.preferred; }));
+        const std::optional<std::string> typed = ALScriptFixes::apply(function, bare->fixes.front());
+        ensure("declared as the first", typed && typed->rfind("say(integer x)", 0) == 0 && errors(check(*typed, false)) == 0);
+
+        const ALScriptProblems missing = check("default { state_entry() { integer x = 1 llOwnerSay(\"a\"); } }", false);
+        const ALScriptProblem* ended   = keyed(missing, "LSLSyntaxMissing");
+        ensure("a missing ';' put in safely", ended && !ended->fixes.empty() && ended->fixes.front().safe);
+    }
 }
