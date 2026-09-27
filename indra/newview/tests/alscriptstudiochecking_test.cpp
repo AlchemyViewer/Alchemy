@@ -338,7 +338,7 @@ namespace tut
         ensure_equals("asked once", studio.asks.size(), size_t(1));
         const ALScriptAnalysis::Request& asked = studio.asks[0].request;
         ensure("a check of the text as it stands",
-               asked.kind == Kind::Check && asked.id == "a" && asked.version == version(doc) && asked.text == doc.editor->text());
+               asked.kind == Kind::Check && asked.id == "a" && asked.version == version(doc) && *asked.text == doc.editor->text());
         ensure("with the window's settings", asked.hintTypes);
         ensure("remembered", doc.check.requestedVersion == version(doc) && doc.check.analysisDue == 0.0);
         checking.pump(1e9);
@@ -361,6 +361,19 @@ namespace tut
         ensure("nor preprocessed", !checking.preprocessed(doc));
         doc.notecard = false;
         ensure("a script is", checking.preprocessed(doc));
+        // A question of the text as it stands shares the one copy every
+        // other question of that text holds; one of a text typed in since
+        // has its own.
+        doc.loaded    = true;
+        preprocessing = false;
+        studio.asks.clear();
+        checking.ask(doc, Kind::Hover, ALTextPos(0, 1), ALTextPos(0, 1));
+        checking.ask(doc, Kind::Signature, ALTextPos(0, 1), ALTextPos(0, 1));
+        ensure("the same text shared, not copied", studio.asks.size() == 2 && studio.asks[1].request.text == studio.asks[0].request.text);
+        doc.editor->insertText("x");
+        checking.ask(doc, Kind::Hover, ALTextPos(0, 1), ALTextPos(0, 1));
+        ensure("a newer text its own", studio.asks.back().request.text != studio.asks[0].request.text &&
+                                           *studio.asks.back().request.text == doc.editor->text());
     }
 
     template<> template<>
@@ -418,7 +431,7 @@ namespace tut
         expansions.back().second(expansion(SCRIPT));
         ensure("taken", doc.expanded.valid && doc.expanded.version == version(doc) && doc.check.expansions == 1);
         ensure_equals("then asked", studio.asks.size(), size_t(1));
-        ensure("of the expansion, at its place", studio.asks[0].request.text == doc.expanded.text && studio.asks[0].request.line == 4);
+        ensure("of the expansion, at its place", *studio.asks[0].request.text == *doc.expanded.text && studio.asks[0].request.line == 4);
         ensure_equals("the problems shown with it", joined(studio.told), std::string("problems a"));
         ALScriptAnalysis::Result result;
         result.kind    = Kind::Inspect;
@@ -541,7 +554,7 @@ namespace tut
         doc.editor->setSyntax("lsl");
         ensure("a fragment", checking.lslFragment(doc));
         checking.ask(doc, Kind::Check, ALTextPos(), ALTextPos());
-        ensure("a state put after it", studio.asks[0].request.text == doc.editor->text() + "\ndefault{state_entry(){}}\n");
+        ensure("a state put after it", *studio.asks[0].request.text == doc.editor->text() + "\ndefault{state_entry(){}}\n");
         ALScriptProblem unused = problem(0, "helper unused", ALScriptProblem::Severity::Warning);
         unused.code            = "LocalUnused";
         ALScriptOutlineEntry state;

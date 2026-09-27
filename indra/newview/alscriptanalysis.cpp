@@ -315,6 +315,8 @@ void ALScriptAnalysis::runNext()
 ALScriptAnalysis::Result ALScriptAnalysis::run(const Job& job, const ALLuauService::Stop& stop)
 {
     const Request& request = job.request;
+    static const std::string NOTHING;
+    const std::string&       text = request.text ? *request.text : NOTHING;
     // The engines recurse on how the script nests; the pool's thread has
     // what the platform gives a thread, which on a Mac is half a megabyte.
     // The work goes on a stack as deep as a script needs.
@@ -332,15 +334,15 @@ ALScriptAnalysis::Result ALScriptAnalysis::run(const Job& job, const ALLuauServi
         result.column  = request.column;
         // A text weighed for a target of its own language: SLua's for SLua,
         // LSL's others for LSL.
-        const auto weighed = [&request](ALScriptWeight::Target target, const std::string& text) {
+        const auto weighed = [&request](ALScriptWeight::Target target, const std::string& of) {
             if ((target == ALScriptWeight::Target::SLua) != request.lua)
             {
                 return ALScriptWeight();
             }
-            return target == ALScriptWeight::Target::SLua      ? ALScriptWeigh::slua(text)
-                   : target == ALScriptWeight::Target::LSO     ? ALScriptWeigh::lso(text)
-                   : target == ALScriptWeight::Target::Mono    ? ALScriptWeigh::mono(text)
-                   : target == ALScriptWeight::Target::LSLLuau ? ALScriptWeigh::lslLuau(text)
+            return target == ALScriptWeight::Target::SLua      ? ALScriptWeigh::slua(of)
+                   : target == ALScriptWeight::Target::LSO     ? ALScriptWeigh::lso(of)
+                   : target == ALScriptWeight::Target::Mono    ? ALScriptWeigh::mono(of)
+                   : target == ALScriptWeight::Target::LSLLuau ? ALScriptWeigh::lslLuau(of)
                                                                : ALScriptWeight();
         };
         // The text weighed for each target asked for -- or, where there are
@@ -362,7 +364,7 @@ ALScriptAnalysis::Result ALScriptAnalysis::run(const Job& job, const ALLuauServi
             {
                 if ((target == ALScriptWeight::Target::SLua) == request.lua)
                 {
-                    result.weights.push_back(weighed(target, request.text));
+                    result.weights.push_back(weighed(target, text));
                 }
             }
         };
@@ -377,34 +379,34 @@ ALScriptAnalysis::Result ALScriptAnalysis::run(const Job& job, const ALLuauServi
             switch (request.kind)
             {
                 case Kind::Check:
-                    result.problems = mWorker->luau.check(request.text);
+                    result.problems = mWorker->luau.check(text);
                     if (mWorker->luau.stopped())
                     {
                         break;
                     }
-                    result.outline  = mWorker->luau.outline(request.text);
+                    result.outline  = mWorker->luau.outline(text);
                     if (request.semantics)
                     {
-                        result.semantics = mWorker->luau.semanticTokens(request.text);
+                        result.semantics = mWorker->luau.semanticTokens(text);
                     }
-                    result.hints = mWorker->luau.inlayHints(request.text, request.hintParameters, request.hintTypes);
+                    result.hints = mWorker->luau.inlayHints(text, request.hintParameters, request.hintTypes);
                     weigh();
                     break;
                 case Kind::Complete:
-                    result.completions = mWorker->luau.complete(request.text, request.line, request.column);
+                    result.completions = mWorker->luau.complete(text, request.line, request.column);
                     break;
                 case Kind::Hover:
                 case Kind::Inspect:
-                    result.hover = mWorker->luau.hover(request.text, request.line, request.column);
+                    result.hover = mWorker->luau.hover(text, request.line, request.column);
                     break;
                 case Kind::Signature:
-                    result.signature = mWorker->luau.signature(request.text, request.line, request.column);
+                    result.signature = mWorker->luau.signature(text, request.line, request.column);
                     break;
                 case Kind::References:
-                    result.references = mWorker->luau.references(request.text, request.line, request.column);
+                    result.references = mWorker->luau.references(text, request.line, request.column);
                     break;
                 case Kind::Actions:
-                    result.actions = mWorker->luau.actions(request.text, request.line, request.column, request.endLine, request.endColumn);
+                    result.actions = mWorker->luau.actions(text, request.line, request.column, request.endLine, request.endColumn);
                     break;
                 case Kind::Weigh:
                     weigh();
@@ -418,30 +420,30 @@ ALScriptAnalysis::Result ALScriptAnalysis::run(const Job& job, const ALLuauServi
             switch (request.kind)
             {
                 case Kind::Check:
-                    result.problems = mWorker->lsl.check(request.text, request.mono);
-                    result.outline  = mWorker->lsl.outline(request.text);
+                    result.problems = mWorker->lsl.check(text, request.mono);
+                    result.outline  = mWorker->lsl.outline(text);
                     if (request.semantics)
                     {
-                        result.semantics = mWorker->lsl.semanticTokens(request.text);
+                        result.semantics = mWorker->lsl.semanticTokens(text);
                     }
-                    result.hints = mWorker->lsl.inlayHints(request.text, request.hintParameters);
+                    result.hints = mWorker->lsl.inlayHints(text, request.hintParameters);
                     weigh();
                     break;
                 case Kind::Complete:
-                    result.completions = mWorker->lsl.symbols(request.text, request.line, request.column);
+                    result.completions = mWorker->lsl.symbols(text, request.line, request.column);
                     break;
                 case Kind::Hover:
                 case Kind::Inspect:
-                    result.hover = mWorker->lsl.hover(request.text, request.line, request.column);
+                    result.hover = mWorker->lsl.hover(text, request.line, request.column);
                     break;
                 case Kind::Signature:
-                    result.signature = mWorker->lsl.signature(request.text, request.line, request.column);
+                    result.signature = mWorker->lsl.signature(text, request.line, request.column);
                     break;
                 case Kind::References:
-                    result.references = mWorker->lsl.references(request.text, request.line, request.column);
+                    result.references = mWorker->lsl.references(text, request.line, request.column);
                     break;
                 case Kind::Actions:
-                    result.actions = mWorker->lsl.actions(request.text, request.line, request.column, request.endLine, request.endColumn);
+                    result.actions = mWorker->lsl.actions(text, request.line, request.column, request.endLine, request.endColumn);
                     break;
                 case Kind::Weigh:
                     weigh();

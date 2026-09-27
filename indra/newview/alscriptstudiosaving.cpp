@@ -111,7 +111,7 @@ void ALScriptStudioSaving::preprocessedAnswer(const std::string& id, U32 version
     doc.uploaded.valid    = true;
     doc.uploaded.disabled = result.disabled;
     doc.uploaded.version  = version;
-    doc.uploaded.text     = result.text;
+    doc.uploaded.text     = std::make_shared<const std::string>(result.text);
     doc.uploaded.map      = result.map;
     doc.uploaded.problems = result.problems;
     doc.uploaded.resolved = result.resolved;
@@ -205,7 +205,7 @@ void ALScriptStudioSaving::sendPreprocessed(Doc& doc, const Doc::Expanded& sent)
     }
     // In the envelope, with the source as written, so Firestorm opens
     // what we save; the lines that say who wrote it and when are ours.
-    const ALScriptEnvelope envelope = doc.envelopeFor(sent.text, mWindow.saveOptions().program);
+    const ALScriptEnvelope envelope = doc.envelopeFor(*sent.text, mWindow.saveOptions().program);
     doc.envelope                    = envelope;
     upload(doc, envelope.wrap(), &sent.map);
 }

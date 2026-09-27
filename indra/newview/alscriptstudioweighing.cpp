@@ -127,7 +127,7 @@ void ALScriptStudioWeighing::weighSent(Doc& doc)
     request.id       = doc.id;
     request.version  = doc.uploaded.version;
     request.lua     = doc.language.lua;
-    request.text    = doc.uploaded.disabled ? doc.editor->text() : doc.uploaded.text;
+    request.text    = doc.uploaded.disabled ? doc.snapshot() : doc.uploaded.text;
     request.targets = { *target };
     // What was weighed kept with the question, its map for the places: a
     // run since -- a setting changed while it was weighed -- is of another
@@ -344,7 +344,7 @@ bool ALScriptStudioWeighing::editedCopy(const Doc& doc, const std::vector<std::p
     {
         return false;
     }
-    const std::optional<std::string> made = ALScriptFixes::apply(mWindow.preprocessed(doc) ? doc.expanded.text : doc.editor->wholeText(), fix);
+    const std::optional<std::string> made = ALScriptFixes::apply(mWindow.preprocessed(doc) ? *doc.expanded.text : doc.editor->wholeText(), fix);
     if (!made)
     {
         return false;
@@ -370,7 +370,7 @@ void ALScriptStudioWeighing::weighFixes(Doc& doc, U32 shown, const std::vector<A
     request.targets  = { *target };
     // What the analyzers read as it stands first, weighed with the rest so
     // that each is measured against the same weigher at the same moment.
-    request.variants.push_back(mWindow.preprocessed(doc) ? doc.expanded.text : doc.editor->text());
+    request.variants.push_back(mWindow.preprocessed(doc) ? *doc.expanded.text : doc.editor->wholeText());
     std::vector<S32> variant_of(fixes.size(), -1);
     for (size_t i = 0; i < fixes.size(); ++i)
     {
@@ -451,7 +451,7 @@ void ALScriptStudioWeighing::measureAsset(Doc& doc)
     doc.weighing.assetBytes         = text.size();
     if (mWindow.preprocessed(doc) && doc.expanded.valid && doc.expanded.version == version && !doc.expanded.disabled)
     {
-        doc.weighing.assetBytes = doc.envelopeFor(doc.expanded.text, mWindow.programVersion()).wrap().size();
+        doc.weighing.assetBytes = doc.envelopeFor(*doc.expanded.text, mWindow.programVersion()).wrap().size();
     }
 }
 

@@ -132,7 +132,7 @@ void ALScriptStudioCaret::answered(Doc& doc, const ALScriptAnalysis::Result& res
         }
         else
         {
-            placeText(place, lineOf(doc.expanded.text, raw.line));
+            placeText(place, lineOf(*doc.expanded.text, raw.line));
             place.at = -1;
         }
         places.push_back(std::move(place));

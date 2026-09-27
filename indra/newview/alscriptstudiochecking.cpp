@@ -209,7 +209,7 @@ void ALScriptStudioChecking::expandedAnswer(const std::string& id, U32 version, 
     doc.expanded.disabled   = result.disabled;
     doc.expanded.version    = version;
     doc.expanded.generation = ++doc.check.expansions;
-    doc.expanded.text     = result.text;
+    doc.expanded.text     = std::make_shared<const std::string>(result.text);
     doc.expanded.map      = result.map;
     doc.expanded.problems = result.problems;
     doc.expanded.resolved = result.resolved;
@@ -249,7 +249,7 @@ void ALScriptStudioChecking::ask(Doc& doc, ALScriptAnalysis::Kind kind, const AL
     request.version = doc.editor->document().version();
     request.lua     = doc.language.lua;
     request.mono    = doc.language.compileTarget != "lsl2";
-    request.text    = doc.editor->text();
+    request.text    = doc.snapshot();
     request.line    = at.line;
     request.column  = at.column;
     request.endLine   = to.line;
@@ -335,7 +335,7 @@ void ALScriptStudioChecking::ask(Doc& doc, ALScriptAnalysis::Kind kind, const AL
     }
     else if (lslFragment(doc))
     {
-        request.text += FRAGMENT_STATE;
+        request.text = std::make_shared<const std::string>(*request.text + FRAGMENT_STATE);
     }
     const std::weak_ptr<bool> alive = mAlive;
     mWindow.askAnalysis(std::move(request), [this, alive, expansion](const ALScriptAnalysis::Result& result) {
@@ -660,7 +660,7 @@ void ALScriptStudioChecking::takeProblems(Doc& doc, const ALScriptAnalysis::Resu
         return;
     }
     const bool mapped_now = preprocessed(doc) && doc.expanded.valid && doc.expanded.version == result.version;
-    const S32  own_lines  = mapped_now ? static_cast<S32>(std::count(doc.expanded.text.begin(), doc.expanded.text.end(), '\n')) + 1
+    const S32  own_lines  = mapped_now ? static_cast<S32>(std::count(doc.expanded.text->begin(), doc.expanded.text->end(), '\n')) + 1
                                        : doc.editor->document().lineCount();
     doc.check.analysis.erase(std::remove_if(doc.check.analysis.begin(), doc.check.analysis.end(),
                                             [own_lines](const ALScriptProblem& problem) {

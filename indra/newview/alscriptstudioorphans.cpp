@@ -336,7 +336,7 @@ void ALScriptStudioOrphans::noticeAction(const std::string& action)
     }
     else if (action == "compare_compiled" && doc->compiledDiffers)
     {
-        mWindow.compare(*doc, *doc->compiledDiffers, doc->uploaded.text, mServices.words("CompareCompiled"), mServices.words("CompareMade"));
+        mWindow.compare(*doc, *doc->compiledDiffers, *doc->uploaded.text, mServices.words("CompareCompiled"), mServices.words("CompareMade"));
     }
     else if (action == "keep_source" && doc->compiledDiffers)
     {

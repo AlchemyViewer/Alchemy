@@ -394,7 +394,7 @@ namespace tut
         ALScriptNoticeBar::Notice notice = Orphans::noticeFor(&a, words);
         ensure("said, with its ways", notice.text == said("NoticeCompiledDiffers") && notice.buttons[0].first == "compare_compiled" &&
                                           notice.buttons[1].first == "keep_source" && notice.buttons[2].first == "take_compiled");
-        a.uploaded.text = "default { }";
+        a.uploaded.text = std::make_shared<const std::string>("default { }");
         unit.noticeAction("compare_compiled");
         ensure_equals("compared: as saved, beside what the source makes", studio.did.back(),
                       "compare a: default { touch_start(integer n) { llDie(); } } | default { } (" + said("CompareCompiled") + " | " + said("CompareMade") + ")");

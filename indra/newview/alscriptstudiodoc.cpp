@@ -93,6 +93,23 @@ ALScriptEnvelope ALScriptStudioDoc::envelopeFor(const std::string& expanded_text
     return out;
 }
 
+std::shared_ptr<const std::string> ALScriptStudioDoc::snapshot() const
+{
+    if (!editor)
+    {
+        return std::make_shared<const std::string>();
+    }
+    const U32                          version = editor->document().version();
+    std::shared_ptr<const std::string> held    = snapshotHeld.lock();
+    if (!held || snapshotVersion != version)
+    {
+        held            = std::make_shared<const std::string>(editor->wholeText());
+        snapshotHeld    = held;
+        snapshotVersion = version;
+    }
+    return held;
+}
+
 // static
 std::optional<ALScriptStudioDoc::Named> ALScriptStudioDoc::namedIn(const ALTextDocument& text, const ALTextPos& at, bool lua,
                                                                    const std::vector<ALPreprocessor::Required>& calls)

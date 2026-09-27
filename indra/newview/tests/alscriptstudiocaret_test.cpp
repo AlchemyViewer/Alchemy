@@ -253,7 +253,7 @@ namespace tut
         studio.held                = "disk:/inc.lsl";
         // The expansion: the include's line, then the script's two.
         doc.expanded.valid = true;
-        doc.expanded.text  = "integer count;\ninteger count;\ndefault { state_entry() { count = 1; llSay(0, \"x\"); } }\n";
+        doc.expanded.text  = std::make_shared<const std::string>("integer count;\ninteger count;\ndefault { state_entry() { count = 1; llSay(0, \"x\"); } }\n");
         doc.expanded.map.addFile("a", "object:a");
         doc.expanded.map.addFile("inc.lsl", "disk:/inc.lsl");
         for (S32 line = 0; line < 3; ++line)

@@ -144,7 +144,10 @@ public:
         // SLua only: what the script's `.luaurc` says -- the mode, the
         // lints, the globals -- or the defaults where it has none.
         ALLuauConfig config;
-        std::string text;
+        // The text asked about, shared rather than copied: every question
+        // of a version holds the one copy (ALScriptStudioDoc::snapshot, or
+        // the expansion's own), which lives while any of them does.
+        std::shared_ptr<const std::string> text;
         // Where, for anything but a check.
         S32         line   = 0;
         S32         column = 0;

@@ -197,7 +197,7 @@ namespace tut
         ensure("nothing sent yet: nothing asked", studio.requests.empty());
         a.uploaded.valid   = true;
         a.uploaded.version = versionOf(a);
-        a.uploaded.text    = "sent text";
+        a.uploaded.text    = std::make_shared<const std::string>("sent text");
         unit.weighSent(a);
         ensure("asked of what was sent, for its own target", studio.requests.size() == 1 && studio.requests[0].text == "sent text" &&
                                                                   studio.requests[0].targets == std::vector<Target>{ Target::Mono });

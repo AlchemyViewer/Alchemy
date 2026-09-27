@@ -325,7 +325,7 @@ void ALScriptLookup::expanded(const std::string& id, U32 generation, const ALScr
     request.version = generation;
     request.lua     = doc.language.lua;
     request.mono    = doc.language.compileTarget != "lsl2";
-    request.text    = result.text;
+    request.text    = std::make_shared<const std::string>(result.text);
     request.line    = at.line;
     request.column  = at.column;
     const std::weak_ptr<bool> alive = mAlive;

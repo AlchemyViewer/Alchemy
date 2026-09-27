@@ -144,6 +144,10 @@ struct ALScriptStudioDoc
     // The envelope a save sends an expansion in: the source as written,
     // its target, the program that wrote it and when.
     ALScriptEnvelope   envelopeFor(const std::string& expanded, const std::string& program) const;
+    // The text as it stands, for what takes it off the main thread: one
+    // copy of a version, shared by every question asked of it while any of
+    // them holds it, rather than one copy each.
+    std::shared_ptr<const std::string> snapshot() const;
 
     // An include or a module a place in a text names: anywhere on an
     // #include line, the name it includes; anywhere in a require call of
@@ -294,7 +298,8 @@ struct ALScriptStudioDoc
         // includes came in, a setting changed -- is of places no
         // longer read that way.
         U32              generation = 0;
-        std::string      text;
+        // Shared with every question asked over it.
+        std::shared_ptr<const std::string> text = std::make_shared<const std::string>();
         ALSourceMap      map;
         ALScriptProblems problems;
         // What the code came to on the script's target before the
@@ -309,6 +314,9 @@ struct ALScriptStudioDoc
     // The source's require calls, of the text at requiresOf (namedAt).
     mutable std::vector<ALPreprocessor::Required> requiresFound;
     mutable std::optional<U32>                    requiresOf;
+    // The last snapshot made, while something holds it, and its version.
+    mutable std::weak_ptr<const std::string>      snapshotHeld;
+    mutable U32                                   snapshotVersion = 0;
     // A question held until the expansion it asks about comes
     // (Check::waiting). A question of a kind replaces the one of that
     // kind still waiting: a second hover is a hover of somewhere else,
