@@ -296,6 +296,16 @@ namespace tut
         f.file = "/somewhere/f.lsl";
         unit.measureAsset(f);
         ensure_equals("a file on disk has no limit", f.weighing.assetBytes, size_t(0));
+        // Preprocessed: the envelope a save would send, measured as long as
+        // it would be made.
+        Doc& p                 = tab("p", "#define X 1\ndefault { /* x */ }");
+        studio.preprocessing   = true;
+        p.expanded.valid       = true;
+        p.expanded.version     = versionOf(p);
+        p.expanded.generation  = 1;
+        p.expanded.text        = std::make_shared<const std::string>("default { }\n");
+        unit.measureAsset(p);
+        ensure_equals("the envelope's length", p.weighing.assetBytes, p.envelopeFor(*p.expanded.text, studio.programVersion()).wrap().size());
     }
 
     template<> template<>

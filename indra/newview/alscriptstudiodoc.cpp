@@ -83,7 +83,9 @@ S32 ALScriptStudioDoc::runningCodeLine() const
 
 ALScriptEnvelope ALScriptStudioDoc::envelopeFor(const std::string& expanded_text, const std::string& program) const
 {
-    ALScriptEnvelope out = envelope ? *envelope : ALScriptEnvelope();
+    // Every field its own: the last envelope's texts are not copied in only
+    // to be written over.
+    ALScriptEnvelope out;
     out.lua              = language.lua;
     out.source           = editor ? editor->text() : std::string();
     out.expanded         = expanded_text;

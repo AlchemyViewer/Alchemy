@@ -451,7 +451,10 @@ void ALScriptStudioWeighing::measureAsset(Doc& doc)
     doc.weighing.assetBytes         = text.size();
     if (mWindow.preprocessed(doc) && doc.expanded.valid && doc.expanded.version == version && !doc.expanded.disabled)
     {
-        doc.weighing.assetBytes = doc.envelopeFor(*doc.expanded.text, mWindow.programVersion()).wrap().size();
+        // What envelopeFor would make, measured without making it: its
+        // two texts are the tab's and the expansion's as they stand.
+        doc.weighing.assetBytes = ALScriptEnvelope::wrappedSize(doc.language.lua, text, *doc.expanded.text, doc.language.compileTarget,
+                                                                mWindow.programVersion(), LLDate::now().asString());
     }
 }
 

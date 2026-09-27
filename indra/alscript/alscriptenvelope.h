@@ -74,13 +74,21 @@ struct ALScriptEnvelope
 
     // The asset this envelope makes.
     std::string wrap() const;
+    // How long that asset is, worked out rather than made: of an envelope
+    // with these fields and texts, so that what a save would send is
+    // measured without a copy of either text.
+    static size_t wrappedSize(bool lua, std::string_view source, std::string_view expanded, std::string_view compile_target,
+                              std::string_view program_version, std::string_view last_compiled);
+    size_t        wrappedSize() const;
     // The line of that asset, from zero, its expanded code begins on: the
     // envelope's own lines come first, and the region counts them in every
     // line it names -- a compile error's, a runtime error's.
     int         codeLine() const;
 
-    // The escaping of the LSL comment block, both ways.
+    // The escaping of the LSL comment block, both ways; and how long the
+    // escaped text is.
     static std::string encodeSource(std::string_view source);
+    static size_t      encodedSize(std::string_view source);
     static std::string decodeSource(std::string_view encoded);
 
     // The compile target a text asks for with a `//mono`, `//lsl2` or

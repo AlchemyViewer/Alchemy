@@ -127,6 +127,22 @@ std::string ALScriptEnvelope::encodeSource(std::string_view source)
     return out;
 }
 
+// static
+size_t ALScriptEnvelope::encodedSize(std::string_view source)
+{
+    size_t out = source.size();
+    for (size_t i = 0; i + 1 < source.size(); ++i)
+    {
+        const char c = source[i];
+        if (c == '/' || c == '*')
+        {
+            const char next = source[i + 1];
+            out += next == '/' || next == '*' || next == '|' ? 1 : 0;
+        }
+    }
+    return out;
+}
+
 std::string ALScriptEnvelope::decodeSource(std::string_view encoded)
 {
     // ([/*])\| -> $1
@@ -233,6 +249,39 @@ std::optional<ALScriptEnvelope> ALScriptEnvelope::parse(std::string_view asset)
     takeTarget(rest, lead, envelope.compileTarget);
     envelope.expanded = std::string(rest);
     return envelope;
+}
+
+// static
+size_t ALScriptEnvelope::wrappedSize(bool lua, std::string_view source, std::string_view expanded, std::string_view compile_target,
+                                     std::string_view program_version, std::string_view last_compiled)
+{
+    // As wrap() puts it together, part by part.
+    constexpr size_t LEAD = 2;
+    size_t           out  = 0;
+    if (lua)
+    {
+        const size_t level = static_cast<size_t>(luaBracketLevel(source));
+        out += std::string_view("--start_unprocessed_text\n--[").size() + level + 1 + source.size() + 1 + level + 1 +
+               std::string_view("\n--end_unprocessed_text").size();
+    }
+    else
+    {
+        out += LSL_START.size() + encodedSize(source) + LSL_END.size();
+    }
+    out += 1 + LEAD + VERSION_LINE.size() + 1;
+    out += 1 + LEAD + PROGRAM_LINE.size() + program_version.size();
+    out += 1 + LEAD + COMPILED_LINE.size() + last_compiled.size();
+    out += 1;
+    if (!compile_target.empty())
+    {
+        out += LEAD + compile_target.size() + 1;
+    }
+    return out + expanded.size();
+}
+
+size_t ALScriptEnvelope::wrappedSize() const
+{
+    return wrappedSize(lua, source, expanded, compileTarget, programVersion, lastCompiled);
 }
 
 std::string ALScriptEnvelope::wrap() const

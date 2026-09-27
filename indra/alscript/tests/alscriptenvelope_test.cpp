@@ -269,4 +269,29 @@ namespace tut
             ensure_equals(std::string(lua ? "SLua" : "LSL") + ": after the source's lines and the envelope's own", at, 9);
         }
     }
+
+    template<> template<>
+    void alscriptenvelope_object::test<9>()
+    {
+        set_test_name("how long an envelope's asset is, worked out without making it, is how long the asset made is");
+        const char* sources[] = { "", "default { }\n", "a /* b */ c // d\n/*|*/ **// x", "local s = [[x]] .. [==[y]==]\n", "]]=]==]" };
+        for (const bool lua : { false, true })
+        {
+            for (const char* source : sources)
+            {
+                for (const char* target : { "", "mono", "luau" })
+                {
+                    ALScriptEnvelope envelope;
+                    envelope.lua            = lua;
+                    envelope.source         = source;
+                    envelope.expanded       = "expanded\ncode /* here */\n";
+                    envelope.compileTarget  = target;
+                    envelope.programVersion = "Alchemy Test 1.2.3";
+                    envelope.lastCompiled   = "2026-09-27T12:00:00Z";
+                    ensure_equals(std::string(lua ? "SLua " : "LSL ") + "'" + source + "' for '" + target + "'", envelope.wrappedSize(),
+                                  envelope.wrap().size());
+                }
+            }
+        }
+    }
 }
