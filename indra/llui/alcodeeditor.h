@@ -668,6 +668,8 @@ protected:
     bool performFunction(ALEditorCommand command) override;
     // Where Go to Matching Bracket goes, or false for nowhere.
     bool bracketToGoTo(ALTextPos& to);
+    // What Expand Selection would grow the selection to (ALSmartSelect).
+    std::optional<ALTextRange> grownSelection();
     bool canFunction(ALEditorCommand command) const override;
     bool complete() override;
     bool signatureHelp() override;
@@ -814,6 +816,10 @@ private:
     bool      mBracketColorsSet    = false;
     // Where the brackets pair up, and how deep each line starts.
     ALBracketIndex   mBracketIndex;
+    // What Expand Selection grew the selection from, step by step, to go
+    // back through while the selection is still what it grew to.
+    std::vector<ALTextRange> mGrownFrom;
+    ALTextRange              mGrownTo;
     bool      mGutterColorSet      = false;
     bool      mLineNumberColorSet  = false;
     bool      mCurrentLineColorSet = false;

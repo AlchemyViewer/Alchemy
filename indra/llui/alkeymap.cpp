@@ -44,7 +44,7 @@ const char* alEditorCommandName(ALEditorCommand command)
         "find_next",     "find_previous",   "quick_fix",       "next_misspelling", "previous_misspelling",
         "join_lines",    "previous_change", "next_change",     "next_function",   "previous_function", "select_function",
         "go_to_bracket", "insert_line_below", "insert_line_above", "select_line", "move_subword_left",
-        "move_subword_right", "select_subword_left", "select_subword_right",
+        "move_subword_right", "select_subword_left", "select_subword_right", "expand_selection", "shrink_selection",
     };
     static_assert(sizeof(NAMES) / sizeof(NAMES[0]) == static_cast<size_t>(ALEditorCommand::COUNT), "every command has a name");
     const size_t index = static_cast<size_t>(command);
@@ -264,6 +264,14 @@ ALKeymap ALKeymap::standard()
     map.bind(KEY_RIGHT, part, C::MoveSubwordRight);
     map.bind(KEY_LEFT, part | MASK_SHIFT, C::SelectSubwordLeft);
     map.bind(KEY_RIGHT, part | MASK_SHIFT, C::SelectSubwordRight);
+#if LL_DARWIN
+    // Control-Shift-Command with an arrow there, Shift-Option being words.
+    const MASK grow = MASK_MAC_CONTROL | MASK_SHIFT | MASK_CONTROL;
+#else
+    const MASK grow = MASK_SHIFT | MASK_ALT;
+#endif
+    map.bind(KEY_RIGHT, grow, C::ExpandSelection);
+    map.bind(KEY_LEFT, grow, C::ShrinkSelection);
 #if LL_DARWIN
     // The Mac's own, where MASK_CONTROL is Command: Command with an arrow
     // goes to the ends of the line and of the text, Option with one by

@@ -2212,4 +2212,37 @@ namespace tut
         key(KEY_BACKSPACE, word);
         ensure_equals("a word taken back is the name", e.text(), std::string("ll.Say(0, );"));
     }
+
+    template<> template<>
+    void alcodeeditor_object::test<63>()
+    {
+        set_test_name("Expand Selection grows by the name, the member, the string, the brackets' inside and the brackets, the lines, the text; Shrink goes back");
+        ALCodeEditor& e = make("f()\n{\n    ll.Say(0, \"hi there\");\n}", "slua");
+        const auto grown = [&]() {
+            ensure("grows", e.perform(ALEditorCommand::ExpandSelection));
+            return e.selectedText();
+        };
+        e.setCaret(ALTextPos(2, 8));
+        ensure_equals("the name", grown(), std::string("Say"));
+        ensure_equals("with what it is a member of", grown(), std::string("ll.Say"));
+        ensure_equals("the line's text", grown(), std::string("    ll.Say(0, \"hi there\");"));
+        ensure_equals("the braces' inside", grown(), std::string("\n    ll.Say(0, \"hi there\");\n"));
+        ensure_equals("with the braces", grown(), std::string("{\n    ll.Say(0, \"hi there\");\n}"));
+        ensure("shrinks back", e.perform(ALEditorCommand::ShrinkSelection) && e.selectedText() == "\n    ll.Say(0, \"hi there\");\n");
+        e.perform(ALEditorCommand::ShrinkSelection);
+        e.perform(ALEditorCommand::ShrinkSelection);
+        e.perform(ALEditorCommand::ShrinkSelection);
+        ensure_equals("to the name", e.selectedText(), std::string("Say"));
+        ensure("and to the caret", e.perform(ALEditorCommand::ShrinkSelection) && e.caret() == ALTextPos(2, 8) && !e.hasSelection());
+        ensure("no further", !e.canPerform(ALEditorCommand::ShrinkSelection));
+
+        e.setCaret(ALTextPos(2, 17));
+        ensure_equals("in a string: a word", grown(), std::string("hi"));
+        ensure_equals("its inside", grown(), std::string("hi there"));
+        ensure_equals("with its quotes", grown(), std::string("\"hi there\""));
+        ensure_equals("the call's arguments", grown(), std::string("0, \"hi there\""));
+        ensure_equals("with the brackets", grown(), std::string("(0, \"hi there\")"));
+        e.setSelection(ALTextRange(ALTextPos(0, 0), ALTextPos(1, 0)));
+        ensure("moved by hand: nothing to go back through", !e.canPerform(ALEditorCommand::ShrinkSelection));
+    }
 }

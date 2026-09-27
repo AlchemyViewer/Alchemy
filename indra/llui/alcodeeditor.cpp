@@ -28,6 +28,7 @@
 
 #include "alplace.h"
 #include "alsaid.h"
+#include "alsmartselect.h"
 #include "alsurface.h"
 
 #include "altextchars.h"
@@ -1825,6 +1826,38 @@ std::optional<ALTextRange> ALCodeEditor::functionAround(const ALTextRange& range
 
 bool ALCodeEditor::performFunction(ALEditorCommand command)
 {
+    if (command == ALEditorCommand::ExpandSelection)
+    {
+        const ALTextRange                was   = selection();
+        const std::optional<ALTextRange> grown = grownSelection();
+        if (!grown)
+        {
+            return false;
+        }
+        // Kept to go back through, while nothing else has moved it.
+        if (mGrownFrom.empty() || !(was == mGrownTo))
+        {
+            mGrownFrom.clear();
+        }
+        mGrownFrom.push_back(was);
+        setSelection(*grown);
+        mGrownTo = selection();
+        scrollToCaret();
+        return true;
+    }
+    if (command == ALEditorCommand::ShrinkSelection)
+    {
+        if (!canFunction(command))
+        {
+            return false;
+        }
+        const ALTextRange back = mGrownFrom.back();
+        mGrownFrom.pop_back();
+        setSelection(back);
+        mGrownTo = selection();
+        scrollToCaret();
+        return true;
+    }
     if (command == ALEditorCommand::GoToMatchingBracket)
     {
         ALTextPos to;
@@ -1892,9 +1925,13 @@ bool ALCodeEditor::bracketToGoTo(ALTextPos& to)
 
 bool ALCodeEditor::canFunction(ALEditorCommand command) const
 {
-    if (command == ALEditorCommand::GoToMatchingBracket)
+    if (command == ALEditorCommand::GoToMatchingBracket || command == ALEditorCommand::ExpandSelection)
     {
         return true;
+    }
+    if (command == ALEditorCommand::ShrinkSelection)
+    {
+        return !mGrownFrom.empty() && selection() == mGrownTo;
     }
     if (!mFunctionProvider)
     {
@@ -1905,6 +1942,12 @@ bool ALCodeEditor::canFunction(ALEditorCommand command) const
         return functionAround(selection().normalised()).has_value();
     }
     return functionFrom(caret(), command == ALEditorCommand::NextFunction, false).has_value();
+}
+
+std::optional<ALTextRange> ALCodeEditor::grownSelection()
+{
+    const ALSyntaxGrammar* grammar = highlighter().grammar().get();
+    return ALSmartSelect::grow(document(), highlighter(), mBracketIndex, selection(), grammar ? grammar->memberSeparators() : std::string_view("."));
 }
 
 bool ALCodeEditor::canFold(ALEditorCommand command) const

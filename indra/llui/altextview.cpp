@@ -177,6 +177,8 @@ namespace
             case ALEditorCommand::MoveSubwordRight:
             case ALEditorCommand::SelectSubwordLeft:
             case ALEditorCommand::SelectSubwordRight:
+            case ALEditorCommand::ExpandSelection:
+            case ALEditorCommand::ShrinkSelection:
             case ALEditorCommand::FindNext:
             case ALEditorCommand::FindPrevious:
             case ALEditorCommand::COUNT:
@@ -2205,6 +2207,8 @@ bool ALTextView::perform(ALEditorCommand command)
         case C::PreviousFunction:
         case C::SelectFunction:
         case C::GoToMatchingBracket:
+        case C::ExpandSelection:
+        case C::ShrinkSelection:
             return performFunction(command);
         case C::JoinLines:
         {
@@ -2320,6 +2324,8 @@ bool ALTextView::canPerform(ALEditorCommand command) const
         case C::PreviousFunction:
         case C::SelectFunction:
         case C::GoToMatchingBracket:
+        case C::ExpandSelection:
+        case C::ShrinkSelection:
             return canFunction(command);
         case C::PreviousChange:
             return mChangeAt > 0;

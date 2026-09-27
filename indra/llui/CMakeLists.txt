@@ -143,6 +143,7 @@ target_sources(
     alfuzzymatch.cpp
     alfixlistmodel.cpp
     alfoldmodel.cpp
+    alsmartselect.cpp
     alsnippetsession.cpp
     alfindbar.cpp
     alkeycapture.cpp
@@ -353,6 +354,7 @@ target_sources(
         alfuzzymatch.h
         alfixlistmodel.h
         alfoldmodel.h
+        alsmartselect.h
         alsnippetsession.h
         alfindings.h
         alanchoredranges.h

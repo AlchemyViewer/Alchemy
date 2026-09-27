@@ -120,6 +120,9 @@ enum class ALEditorCommand : U8
     MoveSubwordRight,
     SelectSubwordLeft,
     SelectSubwordRight,
+    // The selection grown to what holds it as code reads it, and back.
+    ExpandSelection,
+    ShrinkSelection,
     COUNT
 };
 

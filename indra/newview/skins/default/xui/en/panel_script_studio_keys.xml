@@ -94,6 +94,8 @@
     <panel.string name="cmd_move_subword_right">Move a name's part right</panel.string>
     <panel.string name="cmd_select_subword_left">Select a name's part left</panel.string>
     <panel.string name="cmd_select_subword_right">Select a name's part right</panel.string>
+    <panel.string name="cmd_expand_selection">Expand the selection</panel.string>
+    <panel.string name="cmd_shrink_selection">Shrink the selection</panel.string>
     <panel.string name="cmd_previous_misspelling">Previous misspelling</panel.string>
     <line_editor
      follows="left|top|right"

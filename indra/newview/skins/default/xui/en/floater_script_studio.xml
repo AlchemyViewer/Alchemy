@@ -671,6 +671,14 @@
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="select_line" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="select_line" />
             </menu_item_call>
+            <menu_item_call label="Expand Selection" layout="topleft" name="expand_selection">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="expand_selection" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="expand_selection" />
+            </menu_item_call>
+            <menu_item_call label="Shrink Selection" layout="topleft" name="shrink_selection">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="shrink_selection" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="shrink_selection" />
+            </menu_item_call>
             <menu_item_call label="Select Function" layout="topleft" name="select_function">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="select_function" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="select_function" />
