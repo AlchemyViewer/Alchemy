@@ -50,7 +50,9 @@ namespace
 
         ALScriptStudioSaving::Options saveOptions() const override { return options; }
         // Each as the letters of what it did: f the fixes, m formatting, t
-        // trimming. The fixes change the text, as fixes do.
+        // trimming. The fixes change the text, as fixes do; where each
+        // `changes`, each its own edit, its letter at the start and the
+        // end by turns, so that no two run together.
         void tidy(Doc& doc, bool fix, bool format, bool trim) override
         {
             tidied.push_back(std::string(fix ? "f" : "") + (format ? "m" : "") + (trim ? "t" : ""));
@@ -59,7 +61,18 @@ namespace
                 doc.editor->setCaret(doc.editor->document().end());
                 doc.editor->insertText("\n");
             }
+            if (changes)
+            {
+                bool start = true;
+                for (const char done : tidied.back())
+                {
+                    doc.editor->setCaret(start ? doc.editor->document().start() : doc.editor->document().end());
+                    doc.editor->insertText(std::string(1, done));
+                    start = !start;
+                }
+            }
         }
+        bool changes = false;
         void holdPreview(Doc&) override {}
         void scheduleAnalysis(Doc& doc, bool) override { analysed.push_back(doc.id); }
         void refreshProblems(Doc&) override {}
@@ -596,5 +609,20 @@ namespace tut
         type(typed, " ");
         ran(typed);
         ensure("typed in before the run: not the text as it came", !typed.compiledDiffers && !typed.compareCompiledAt);
+    }
+
+    template<> template<>
+    void alscriptstudiosaving_object::test<11>()
+    {
+        set_test_name("tidied as one step to undo, however many of its parts changed the text");
+        ALScriptStudioSaving& saving = make();
+        studio.options.format = true;
+        studio.options.trim   = true;
+        studio.changes        = true;
+        Doc& doc = tab("a", "default {}");
+        saving.save(doc);
+        ensure_equals("each part changed it", doc.editor->text(), std::string("mdefault {}t"));
+        doc.editor->undo();
+        ensure_equals("one Undo takes back all of it", doc.editor->text(), std::string("default {}"));
     }
 }

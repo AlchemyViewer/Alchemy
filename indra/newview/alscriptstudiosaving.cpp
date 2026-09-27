@@ -306,10 +306,10 @@ void ALScriptStudioSaving::save(Doc& doc)
     }
     // Saved, a preview is held.
     mWindow.holdPreview(doc);
-    // Tidied as the scripter asked before anything is sent or checked: a
-    // step each to undo, and nothing where the text is tidy already. The
-    // safe fixes first, while the text is still the one they were made
-    // for.
+    // Tidied as the scripter asked before anything is sent or checked: one
+    // step to undo however many of them change it, and nothing where the
+    // text is tidy already. The safe fixes first, while the text is still
+    // the one they were made for.
     // Not a save the external editor made: what it wrote is what the
     // author is looking at there, and nothing here is written back to it,
     // so a text tidied here would read as changed on both sides at the
@@ -318,7 +318,9 @@ void ALScriptStudioSaving::save(Doc& doc)
     if (!doc.notecard && !doc.save.external())
     {
         const bool fix = options.fix && doc.check.analysisVersion == doc.editor->document().version() && doc.save.fixOnce();
+        doc.editor->undoJournal().beginGroup();
         mWindow.tidy(doc, fix, options.format, options.trim);
+        doc.editor->undoJournal().endGroup();
     }
     ALScriptSaveFlow::Tab tab;
     tab.version          = doc.editor->document().version();
