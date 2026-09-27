@@ -1119,4 +1119,17 @@ namespace tut
         ensure("an event changes state as it likes: its if goes: " + r.text,
                entry != std::string::npos && r.text.find("if (", entry) > r.text.find("state other;", entry));
     }
+    template<> template<>
+    void allsloptimizer_object::test<31>()
+    {
+        set_test_name("a key out of a list's range is NULL_KEY under LSO, written by its name; under Mono an empty key, which a key cannot be written as");
+        const std::string source = "default\n{\n    state_entry()\n    {\n        llOwnerSay((string)llList2Key([1, 2], 5));\n    }\n}\n";
+        ALLSLOptimizer::Options o = options();
+        o.target                  = ALLSLOptimizer::Target::LSO;
+        ALLSLOptimizer::Result r  = ALLSLOptimizer::run(source, o);
+        ensure("LSO: NULL_KEY: " + r.text, r.text.find("llOwnerSay((string)NULL_KEY);") != std::string::npos);
+        o.target = ALLSLOptimizer::Target::Mono;
+        r        = ALLSLOptimizer::run(source, o);
+        ensure("Mono: still the call: " + r.text, r.text.find("llList2Key(") != std::string::npos);
+    }
 } // namespace tut

@@ -1892,7 +1892,9 @@ namespace
                 case NODE_INTEGER_CONSTANT: return c.integer(0);
                 case NODE_FLOAT_CONSTANT: return c.number(0.0);
                 case NODE_STRING_CONSTANT: return c.string(std::string());
-                case NODE_KEY_CONSTANT: return c.key(std::string());
+                // What LSO gives for a key out of range is NULL_KEY, which
+                // the call is folded to by name; Mono gives an empty key.
+                case NODE_KEY_CONSTANT: return c.target == ALLSLOptimizer::Target::LSO ? c.builtin("NULL_KEY") : c.key(std::string());
                 case NODE_VECTOR_CONSTANT: return c.vector(0, 0, 0);
                 case NODE_QUATERNION_CONSTANT: return c.allocator->newTracked<LSLQuaternionConstant>(0.f, 0.f, 0.f, 1.f);
                 default: return nullptr;
