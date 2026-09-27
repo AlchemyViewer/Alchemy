@@ -155,6 +155,8 @@ ALCodeEditor::ALCodeEditor(const Params& p)
     mFixable.assign(document().lineCount(), 0);
     mEditConnection    = document().onChanged([this](const ALTextDocument::Edit& edit) { onEdit(edit); });
     mBracketIndex.attach(&document());
+    // Copy and Cut with nothing selected take the line, as code editors do.
+    setClipsLines(true);
     layout().setInlayProvider([this](S32 line, std::vector<ALTextLayout::Inlay>& out) { provideInlays(line, out); });
     mChangedConnection = onTextChanged([this]() {
         if (completionOpen())

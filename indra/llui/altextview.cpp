@@ -2374,6 +2374,9 @@ void ALTextView::redo()
     }
 }
 
+// static
+std::string ALTextView::sClippedLine;
+
 void ALTextView::cut()
 {
     if (!canCut())
@@ -2381,6 +2384,12 @@ void ALTextView::cut()
         return;
     }
     copy();
+    if (!hasSelection())
+    {
+        // The whole line, the caret on the one that takes its place.
+        apply(ALTextEditing::deleteLines(mDocument, mCaret, mCaret));
+        return;
+    }
     deleteRange(selection());
 }
 
@@ -2388,8 +2397,16 @@ void ALTextView::copy()
 {
     if (!hasSelection())
     {
+        if (!mClipsLines)
+        {
+            return;
+        }
+        // The caret's line whole, with its break, to go in as a line.
+        sClippedLine = mDocument.line(mCaret.line) + "\n";
+        LLClipboard::instance().copyToClipboard(sClippedLine, 0, static_cast<S32>(sClippedLine.size()));
         return;
     }
+    sClippedLine.clear();
     const std::string text = selectedText();
     LLClipboard::instance().copyToClipboard(text, 0, static_cast<S32>(text.size()));
 }
@@ -2408,6 +2425,18 @@ void ALTextView::paste()
     std::string text;
     if (!LLClipboard::instance().pasteFromClipboard(text))
     {
+        return;
+    }
+    // A line copied whole goes in as a line, above the caret's, the caret
+    // where it was in its own.
+    if (mClipsLines && !hasSelection() && !sClippedLine.empty() && text == sClippedLine)
+    {
+        const ALTextPos caret(mCaret.line + 1, mCaret.column);
+        mUndo.beginGroup();
+        editMany({ { ALTextRange(mDocument.lineStart(mCaret.line), mDocument.lineStart(mCaret.line)), text } }, caret);
+        mUndo.endGroup();
+        placeCaret(caret, false);
+        afterEdit();
         return;
     }
     // Lines pasted into a line's indentation brought to where they go, as

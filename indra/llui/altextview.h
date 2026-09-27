@@ -237,6 +237,10 @@ public:
     // Whether lines pasted into a line's indentation are brought to where
     // they go (ALTextIndent::planPaste), where the grammar indents.
     void            setReindentsPaste(bool reindents) { mReindentsPaste = reindents; }
+    // Whether Copy and Cut with nothing selected take the caret's whole
+    // line, which a paste with nothing selected then puts in above the
+    // caret's line, as a line.
+    void            setClipsLines(bool clips) { mClipsLines = clips; }
     void            setTabWidth(S32 spaces);
     S32             getTabWidth() const { return mTabWidth; }
     void            setSoftTabs(bool soft);
@@ -621,9 +625,9 @@ public:
     void    redo() override;
     bool    canRedo() const override { return !mReadOnly && mUndo.canRedo(); }
     void    cut() override;
-    bool    canCut() const override { return !mReadOnly && hasSelection(); }
+    bool    canCut() const override { return !mReadOnly && (hasSelection() || mClipsLines); }
     void    copy() override;
-    bool    canCopy() const override { return hasSelection(); }
+    bool    canCopy() const override { return hasSelection() || mClipsLines; }
     void    paste() override;
     bool    canPaste() const override;
     void    doDelete() override;
@@ -963,6 +967,10 @@ private:
     IndentFrom            mIndentFrom         = IndentFrom::Defaults;
     bool                  mReadsIndentation   = false;
     bool                  mReindentsPaste     = false;
+    bool                  mClipsLines         = false;
+    // What the last Copy or Cut of a whole line put on the clipboard, in
+    // any view: pasted as a line while the clipboard still holds it.
+    static std::string    sClippedLine;
     void                  useIndentation(const ALTextIndent::Options& options, IndentFrom from);
     S32  mHPad      = 4;
     S32  mVPad      = 2;

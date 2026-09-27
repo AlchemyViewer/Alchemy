@@ -2132,4 +2132,33 @@ namespace tut
         type("\nWhat it does.\n/");
         ensure_equals("each line starred, and closed", e.text(), std::string("    /**\n     * What it does.\n     */"));
     }
+
+    template<> template<>
+    void alcodeeditor_object::test<60>()
+    {
+        set_test_name("Copy and Cut with nothing selected take the caret's line, and a paste with nothing selected puts it in above the caret's line");
+        ALCodeEditor& e = make("one\ntwo\nthree", "lsl");
+        e.setCaret(ALTextPos(1, 1));
+        ensure("Copy offered with nothing selected", e.canCopy() && e.canCut());
+        e.copy();
+        std::string held;
+        LLClipboard::instance().pasteFromClipboard(held);
+        ensure_equals("the line, with its break", held, std::string("two\n"));
+        e.setCaret(ALTextPos(0, 2));
+        e.paste();
+        ensure_equals("in above the caret's line", e.text(), std::string("two\none\ntwo\nthree"));
+        ensure("the caret where it was in its line", e.caret() == ALTextPos(1, 2));
+        e.setCaret(ALTextPos(3, 3));
+        e.cut();
+        ensure_equals("cut: the last line gone, with the break before it", e.text(), std::string("two\none\ntwo"));
+        ensure("the caret on the line before", e.caret() == ALTextPos(2, 3));
+        e.setSelection(ALTextRange(ALTextPos(1, 0), ALTextPos(1, 2)));
+        e.paste();
+        ensure_equals("over a selection, as text", e.text(), std::string("two\nthree\ne\ntwo"));
+        e.setSelection(ALTextRange(ALTextPos(0, 0), ALTextPos(0, 3)));
+        e.copy();
+        e.setCaret(ALTextPos(3, 0));
+        e.paste();
+        ensure_equals("a selection copied goes in where the caret is", e.text(), std::string("two\nthree\ne\ntwotwo"));
+    }
 }
