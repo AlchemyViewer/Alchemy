@@ -29,26 +29,44 @@
 #include <tailslide/tailslide.hh>
 #include <tailslide/operations.hh>
 
-#include <cstring>
+#include <boost/unordered/unordered_flat_map.hpp>
+
+#include <string_view>
 
 namespace
 {
     const ALLSLTraits::Trait TRAITS[] = {
 #include "allsltraits.inc"
     };
+
+    // The rows by name, made once: asked of every call the optimizer
+    // folds, which a walk of five hundred names by strcmp made near a tenth
+    // of a save.
+    const boost::unordered_flat_map<std::string_view, const ALLSLTraits::Trait*>& byName()
+    {
+        static const boost::unordered_flat_map<std::string_view, const ALLSLTraits::Trait*> rows = [] {
+            boost::unordered_flat_map<std::string_view, const ALLSLTraits::Trait*> made;
+            made.reserve(std::size(TRAITS));
+            for (const ALLSLTraits::Trait& t : TRAITS)
+            {
+                made.emplace(t.name, &t);
+            }
+            return made;
+        }();
+        return rows;
+    }
 }
 
 // static
 const ALLSLTraits::Trait* ALLSLTraits::of(const char* name)
 {
-    for (const Trait& t : TRAITS)
+    if (!name)
     {
-        if (!strcmp(t.name, name))
-        {
-            return &t;
-        }
+        return nullptr;
     }
-    return nullptr;
+    const auto& rows  = byName();
+    const auto  found = rows.find(std::string_view(name));
+    return found == rows.end() ? nullptr : found->second;
 }
 
 // static
