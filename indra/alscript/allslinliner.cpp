@@ -1080,19 +1080,7 @@ ALLSLInliner::Result ALLSLInliner::run(std::string_view source, const std::vecto
     Result result;
     result.text = std::string(source);
     // The map of the text as it is: each line its own.
-    {
-        result.map.addFile(std::string(), std::string());
-        const Lines lines = splitLines(source);
-        for (size_t i = 0; i < lines.size(); ++i)
-        {
-            ALSourceMap::Segment s;
-            s.outLine = static_cast<S32>(i);
-            s.line    = static_cast<S32>(i);
-            s.length  = static_cast<S32>(lines[i].size());
-            result.map.add(s);
-        }
-        result.map.finish();
-    }
+    result.map = ALSourceMap::identity(source);
     if (!ALLSLService::builtinsLoaded())
     {
         return result;

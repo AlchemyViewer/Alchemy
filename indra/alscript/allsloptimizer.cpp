@@ -3350,31 +3350,6 @@ namespace
         std::vector<Mark>              mMarks;
     };
 
-    void identityMap(const std::string& text, const std::string& name, ALSourceMap& map)
-    {
-        map = ALSourceMap();
-        map.addFile(name, std::string());
-        S32    line  = 0;
-        size_t start = 0;
-        while (start <= text.size())
-        {
-            size_t end = text.find('\n', start);
-            if (end == std::string::npos)
-            {
-                end = text.size();
-            }
-            ALSourceMap::Segment s;
-            s.outLine  = line;
-            s.line     = line;
-            s.length   = static_cast<S32>(end - start);
-            s.verbatim = true;
-            map.add(s);
-            ++line;
-            start = end + 1;
-        }
-        map.finish();
-    }
-
     void collectMessages(Logger& logger, ALScriptProblems& problems)
     {
         for (LogMessage* message : logger.getMessages())
@@ -3465,7 +3440,7 @@ ALLSLOptimizer::Result ALLSLOptimizer::run(std::string_view source, const Option
     result.text       = std::string(source);
     result.sizeBefore = source.size();
     result.sizeAfter  = source.size();
-    identityMap(result.text, std::string(), result.map);
+    result.map = ALSourceMap::identity(result.text);
     if (!ALLSLService::builtinsLoaded())
     {
         ALScriptProblem p;

@@ -3875,27 +3875,7 @@ namespace
     // nothing was done to it.
     void asItIs(const std::string& text, const std::string& name, ALSourceMap& map)
     {
-        map = ALSourceMap();
-        map.addFile(name, std::string());
-        S32    line  = 0;
-        size_t start = 0;
-        while (start <= text.size())
-        {
-            size_t end = text.find('\n', start);
-            if (end == std::string::npos)
-            {
-                end = text.size();
-            }
-            ALSourceMap::Segment s;
-            s.outLine  = line;
-            s.line     = line;
-            s.length   = S32(end - start);
-            s.verbatim = true;
-            map.add(s);
-            ++line;
-            start = end + 1;
-        }
-        map.finish();
+        map = ALSourceMap::identity(text, name);
     }
 }
 

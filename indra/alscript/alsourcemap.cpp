@@ -52,7 +52,61 @@ S32 ALSourceMap::fileOf(const std::string& path) const
 
 void ALSourceMap::add(const Segment& segment)
 {
+    if (segment.verbatim && !mSegments.empty())
+    {
+        Segment& last = mSegments.back();
+        if (last.verbatim && last.outLine == segment.outLine && last.file == segment.file && last.line == segment.line &&
+            last.outColumn + last.length == segment.outColumn && last.column + last.length == segment.column)
+        {
+            last.length += segment.length;
+            return;
+        }
+    }
     mSegments.push_back(segment);
+}
+
+// static
+ALSourceMap ALSourceMap::identity(std::string_view text, const std::string& name)
+{
+    ALSourceMap map;
+    map.addFile(name, std::string());
+    S32    line  = 0;
+    size_t start = 0;
+    while (start <= text.size())
+    {
+        size_t end = text.find('\n', start);
+        if (end == std::string_view::npos)
+        {
+            end = text.size();
+        }
+        Segment s;
+        s.outLine  = line;
+        s.line     = line;
+        s.length   = S32(end - start);
+        s.verbatim = true;
+        map.add(s);
+        ++line;
+        start = end + 1;
+    }
+    map.finish();
+    return map;
+}
+
+size_t ALSourceMap::segmentAt(S32 line, S32 column) const
+{
+    if (line < 0 || line >= S32(mLineStart.size()))
+    {
+        return std::string::npos;
+    }
+    const size_t first = mLineStart[line];
+    if (first >= mSegments.size() || mSegments[first].outLine != line)
+    {
+        return std::string::npos;
+    }
+    const size_t end   = size_t(line) + 1 < mLineStart.size() ? mLineStart[line + 1] : mSegments.size();
+    const auto   after = std::upper_bound(mSegments.begin() + first, mSegments.begin() + end, column,
+                                          [](S32 at, const Segment& segment) { return at < segment.outColumn; });
+    return after == mSegments.begin() + first ? first : size_t(after - mSegments.begin()) - 1;
 }
 
 void ALSourceMap::finish()
@@ -92,18 +146,74 @@ ALSourceMap ALSourceMap::composed(const ALSourceMap& inner) const
     out.mFiles = inner.mFiles;
     for (const Segment& s : mSegments)
     {
-        const Loc loc = inner.toSource(s.line, s.column);
-        if (!loc.found())
+        if (!s.verbatim || s.length <= 0)
         {
+            // What a macro made maps to where it was made, as the other
+            // map says.
+            const Loc loc = inner.toSource(s.line, s.column);
+            if (!loc.found())
+            {
+                continue;
+            }
+            Segment through  = s;
+            through.file     = loc.file;
+            through.line     = loc.line;
+            through.column   = loc.column;
+            through.verbatim = false;
+            out.add(through);
             continue;
         }
-        Segment through  = s;
-        through.file     = loc.file;
-        through.line     = loc.line;
-        through.column   = loc.column;
-        // Exact only where both maps are.
-        through.verbatim = s.verbatim && inner.toSource(s.line, s.column + 1).column == loc.column + 1;
-        out.mSegments.push_back(through);
+        // Copied as it stands: each stretch of it read through the other's
+        // segment it lies over, in one walk along the line -- exact where
+        // that segment is, the invocation or the nearest before it where
+        // it is not.
+        S32 offset = 0;
+        while (offset < s.length)
+        {
+            const S32    at    = s.column + offset;
+            const size_t index = inner.segmentAt(s.line, at);
+            if (index == std::string::npos)
+            {
+                break;
+            }
+            const Segment& in    = inner.mSegments[index];
+            S32            until = s.length;
+            if (at < in.outColumn)
+            {
+                // Before the line's first: up to it.
+                until = std::min(until, in.outColumn - s.column);
+            }
+            else if (index + 1 < inner.mSegments.size() && inner.mSegments[index + 1].outLine == s.line)
+            {
+                until = std::min(until, inner.mSegments[index + 1].outColumn - s.column);
+            }
+            const bool exact = in.verbatim && at >= in.outColumn && at < in.outColumn + in.length;
+            if (exact)
+            {
+                until = std::min(until, in.outColumn + in.length - s.column);
+            }
+            until = std::max(until, offset + 1);
+            Segment piece;
+            piece.outLine   = s.outLine;
+            piece.outColumn = s.outColumn + offset;
+            piece.length    = until - offset;
+            piece.file      = in.file;
+            if (exact)
+            {
+                piece.line     = in.line;
+                piece.column   = in.column + (at - in.outColumn);
+                piece.verbatim = true;
+            }
+            else
+            {
+                const Loc loc  = inner.toSource(s.line, at);
+                piece.line     = loc.line;
+                piece.column   = loc.column;
+                piece.verbatim = false;
+            }
+            out.add(piece);
+            offset = until;
+        }
     }
     out.finish();
     return out;
@@ -177,28 +287,12 @@ bool ALSourceMap::within(const std::vector<std::pair<S32, S32>>& runs, S32 first
 ALSourceMap::Loc ALSourceMap::toSource(S32 line, S32 column) const
 {
     Loc loc;
-    if (line < 0 || line >= S32(mLineStart.size()))
-    {
-        return loc;
-    }
     // The last segment on the line that starts at or before the column,
     // else the line's first.
-    size_t first = mLineStart[line];
-    if (mSegments[first].outLine != line)
+    const size_t best = segmentAt(line, column);
+    if (best == std::string::npos)
     {
         return loc;
-    }
-    size_t best = first;
-    for (size_t i = first; i < mSegments.size() && mSegments[i].outLine == line; ++i)
-    {
-        if (mSegments[i].outColumn <= column)
-        {
-            best = i;
-        }
-        else
-        {
-            break;
-        }
     }
     const Segment& segment = mSegments[best];
     loc.file   = segment.file;

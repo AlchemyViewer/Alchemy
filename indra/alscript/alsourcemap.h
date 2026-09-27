@@ -28,6 +28,7 @@
 #include "stdtypes.h"
 
 #include <string>
+#include <string_view>
 #include <vector>
 
 // The map between a preprocessed text and the files it was made from: for
@@ -80,7 +81,10 @@ public:
     // The file with that identity, or -1.
     S32                      fileOf(const std::string& path) const;
 
-    // Segments arrive in output order.
+    // Segments arrive in output order. A verbatim one that carries on from
+    // the last -- the same line of both, the next column of each -- makes
+    // it longer rather than being a segment of its own: text copied as it
+    // stands is one segment, however many tokens it was.
     void add(const Segment& segment);
     // Builds the indexes; nothing answers until it has been called.
     void finish();
@@ -119,10 +123,18 @@ public:
     // This map over another: this one's origins are positions in the text
     // the other maps, so the result maps this one's output straight to
     // the other's files. A segment whose origin the other map has nothing
-    // for is dropped.
+    // for is dropped; a verbatim one over several of the other's is read
+    // through each in turn.
     ALSourceMap composed(const ALSourceMap& inner) const;
+    // Every line of a text mapped to itself, as one file of that name:
+    // what the map of a text nothing was done to is.
+    static ALSourceMap identity(std::string_view text, const std::string& name = std::string());
 
 private:
+    // The last segment on an output line that starts at or before the
+    // column, else the line's first; npos for a line with none.
+    size_t segmentAt(S32 line, S32 column) const;
+
     std::vector<File>        mFiles;
     std::vector<Segment>     mSegments;
     // The first segment of each output line, by line; and every segment
