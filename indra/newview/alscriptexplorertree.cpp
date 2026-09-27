@@ -113,7 +113,11 @@ public:
         }
         return true;
     }
-    bool isItemMovable() const override { return false; }
+    // An item may be dragged out -- to the inventory, to another prim --
+    // which the folder view starts only from a row that says so; what
+    // goes is the owner's to say (Hooks::drag). A prim or an object is
+    // not carried off.
+    bool isItemMovable() const override { return !mFolder && mValue.isDefined(); }
     void move(LLFolderViewModelItem* parent_listener) override {}
     // Deleting is the explorer's, asked about first; the folder view's own
     // delete, the Edit menu's, finds nothing to delete here.

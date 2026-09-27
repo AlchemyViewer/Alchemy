@@ -301,4 +301,32 @@ namespace tut
         ensure("the keyboard still there", t.hasFocus());
         gFocusMgr.setKeyboardFocus(nullptr);
     }
+
+    template<> template<>
+    void alscriptexplorertree_object::test<6>()
+    {
+        set_test_name("an item may be dragged out, which the owner starts; a prim or an object may not");
+        ALScriptExplorerTree& t     = make();
+        const LLUUID          house = object(10, "House");
+        selected                    = { house };
+        show();
+        holds(id(10), { "a.lsl" });
+        show();
+        S32                         drags = 0;
+        ALScriptExplorerTree::Hooks hooks;
+        hooks.drag = [&drags]() {
+            ++drags;
+            return true;
+        };
+        t.setHooks(std::move(hooks));
+        // The folder view drags only from a row that says it may move; the
+        // press and the move themselves want a window this has none of.
+        ensure("chosen", t.choose(itemRow("a.lsl"), false));
+        LLFolderViewItem* item = t.folderView()->getCurSelectedItem();
+        ensure("an item may move", item && item->isMovable());
+        ensure("and the drag is the owner's", t.folderView()->startDrag() && drags == 1);
+        ensure("chosen", t.choose(objectRow(house), false));
+        ensure("an object may not", !t.folderView()->getCurSelectedItem()->isMovable());
+        gFocusMgr.setKeyboardFocus(nullptr);
+    }
 }
