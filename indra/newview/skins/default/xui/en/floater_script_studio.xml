@@ -667,6 +667,10 @@
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="select_all" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="select_all" />
             </menu_item_call>
+            <menu_item_call label="Select Line" layout="topleft" name="select_line">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="select_line" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="select_line" />
+            </menu_item_call>
             <menu_item_call label="Select Function" layout="topleft" name="select_function">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="select_function" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="select_function" />
@@ -675,6 +679,14 @@
             <menu_item_call label="Toggle Comment" layout="topleft" name="toggle_comment">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="toggle_comment" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="toggle_comment" />
+            </menu_item_call>
+            <menu_item_call label="Insert Line Below" layout="topleft" name="insert_line_below">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="insert_line_below" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="insert_line_below" />
+            </menu_item_call>
+            <menu_item_call label="Insert Line Above" layout="topleft" name="insert_line_above">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="insert_line_above" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="insert_line_above" />
             </menu_item_call>
             <menu_item_call label="Duplicate Line" layout="topleft" name="duplicate_line">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="duplicate_line" />

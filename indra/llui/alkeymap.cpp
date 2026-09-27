@@ -43,7 +43,7 @@ const char* alEditorCommandName(ALEditorCommand command)
         "complete",      "signature_help", "go_to_definition", "find_references", "rename",         "find",             "replace",
         "find_next",     "find_previous",   "quick_fix",       "next_misspelling", "previous_misspelling",
         "join_lines",    "previous_change", "next_change",     "next_function",   "previous_function", "select_function",
-        "go_to_bracket",
+        "go_to_bracket", "insert_line_below", "insert_line_above", "select_line",
     };
     static_assert(sizeof(NAMES) / sizeof(NAMES[0]) == static_cast<size_t>(ALEditorCommand::COUNT), "every command has a name");
     const size_t index = static_cast<size_t>(command);
@@ -249,6 +249,10 @@ ALKeymap ALKeymap::standard()
     map.bind(KEY_PAGE_UP, MASK_ALT, C::PreviousFunction);
     // Control-Shift-\ as Visual Studio Code has it: Command on a Mac.
     map.bind('\\', MASK_CONTROL | MASK_SHIFT, C::GoToMatchingBracket);
+    // As Visual Studio Code has them; Command on a Mac.
+    map.bind(KEY_RETURN, MASK_CONTROL, C::InsertLineBelow);
+    map.bind(KEY_RETURN, MASK_CONTROL | MASK_SHIFT, C::InsertLineAbove);
+    map.bind('L', MASK_CONTROL, C::SelectLine);
 #if LL_DARWIN
     // The Mac's own, where MASK_CONTROL is Command: Command with an arrow
     // goes to the ends of the line and of the text, Option with one by

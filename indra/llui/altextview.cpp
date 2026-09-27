@@ -125,6 +125,8 @@ namespace
             case ALEditorCommand::Complete:
             case ALEditorCommand::Rename:
             case ALEditorCommand::QuickFix:
+            case ALEditorCommand::InsertLineBelow:
+            case ALEditorCommand::InsertLineAbove:
                 return true;
             case ALEditorCommand::None:
             case ALEditorCommand::MoveLeft:
@@ -170,6 +172,7 @@ namespace
             case ALEditorCommand::PreviousFunction:
             case ALEditorCommand::SelectFunction:
             case ALEditorCommand::GoToMatchingBracket:
+            case ALEditorCommand::SelectLine:
             case ALEditorCommand::FindNext:
             case ALEditorCommand::FindPrevious:
             case ALEditorCommand::COUNT:
@@ -2186,6 +2189,38 @@ bool ALTextView::perform(ALEditorCommand command)
                 return true;
             }
             return false;
+        }
+        case C::InsertLineBelow:
+            // As Return at the line's end would make it.
+            placeCaret(mDocument.lineEnd(mCaret.line), false);
+            newLine();
+            scrollToCaret();
+            return true;
+        case C::InsertLineAbove:
+        {
+            // As far in as the caret's line.
+            const std::string indent = ALTextIndent::leadingBlanks(mDocument, mCaret.line);
+            const ALTextPos   start  = mDocument.lineStart(mCaret.line);
+            const ALTextPos   caret(mCaret.line, static_cast<S32>(indent.size()));
+            mUndo.beginGroup();
+            editMany({ { ALTextRange(start, start), indent + "\n" } }, caret);
+            mUndo.endGroup();
+            placeCaret(caret, false);
+            afterEdit();
+            scrollToCaret();
+            return true;
+        }
+        case C::SelectLine:
+        {
+            // The lines the selection reaches, whole with their breaks; so
+            // lines selected whole already take the next with them.
+            const ALTextRange range = selection().normalised();
+            const S32         past  = range.end.line + 1;
+            const ALTextPos   end   = past < mDocument.lineCount() ? mDocument.lineStart(past) : mDocument.lineEnd(mDocument.lineCount() - 1);
+            placeSelection(mDocument.lineStart(range.begin.line), end);
+            mDesiredX = -1.f;
+            scrollToCaret();
+            return true;
         }
         case C::Fold:
         case C::Unfold:

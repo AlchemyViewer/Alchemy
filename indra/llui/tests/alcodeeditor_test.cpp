@@ -2161,4 +2161,28 @@ namespace tut
         e.paste();
         ensure_equals("a selection copied goes in where the caret is", e.text(), std::string("two\nthree\ne\ntwotwo"));
     }
+
+    template<> template<>
+    void alcodeeditor_object::test<61>()
+    {
+        set_test_name("a line inserted below, indented where it goes, or above, as far in as the caret's; the line selected, and the next with it");
+        ALCodeEditor& e = make("default\n{\n    state_entry()\n    {\n    }\n}", "lsl");
+        e.setSoftTabs(true);
+        e.setCaret(ALTextPos(3, 2));
+        key(KEY_RETURN, MASK_CONTROL);
+        ensure_equals("below, a level in under the brace, the brace line whole", e.document().line(4), std::string("        "));
+        ensure("the caret on it", e.caret() == ALTextPos(4, 8) && e.document().line(3) == "    {");
+        e.setCaret(ALTextPos(2, 6));
+        key(KEY_RETURN, MASK_CONTROL | MASK_SHIFT);
+        ensure_equals("above, as far in", e.document().line(2), std::string("    "));
+        ensure("the caret on it, the line below as it was", e.caret() == ALTextPos(2, 4) && e.document().line(3) == "    state_entry()");
+        e.setCaret(ALTextPos(1, 0));
+        key('L', MASK_CONTROL);
+        ensure("the line selected with its break", e.selection().normalised() == ALTextRange(ALTextPos(1, 0), ALTextPos(2, 0)));
+        key('L', MASK_CONTROL);
+        ensure("and the next", e.selection().normalised() == ALTextRange(ALTextPos(1, 0), ALTextPos(3, 0)));
+        e.setCaret(ALTextPos(7, 1));
+        key('L', MASK_CONTROL);
+        ensure("the last, to the end", e.selection().normalised() == ALTextRange(ALTextPos(7, 0), ALTextPos(7, 1)));
+    }
 }

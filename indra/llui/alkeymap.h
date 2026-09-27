@@ -109,6 +109,12 @@ enum class ALEditorCommand : U8
     // To the bracket paired with the one at the caret, or to the closer
     // of the innermost pair around it.
     GoToMatchingBracket,
+    // A line under the caret's, or over it, indented where it goes, the
+    // caret on it whatever it was in the middle of; and the caret's line
+    // selected whole, and again the next with it.
+    InsertLineBelow,
+    InsertLineAbove,
+    SelectLine,
     COUNT
 };
 
