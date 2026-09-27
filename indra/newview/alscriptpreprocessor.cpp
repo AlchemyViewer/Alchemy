@@ -273,10 +273,8 @@ bool ALScriptPreprocessor::fileOf(const std::string& path, std::string& file)
 
 bool ALScriptPreprocessor::heldText(const std::string& path, std::string& text) const
 {
-    const auto held = mTexts.find(path);
-    if (held != mTexts.end())
+    if (mTexts.held(path, text))
     {
-        text = held->second.text;
         return true;
     }
     // A file on disk only where a run admitted it, which is the only way
@@ -287,13 +285,7 @@ bool ALScriptPreprocessor::heldText(const std::string& path, std::string& text) 
 
 std::vector<std::string> ALScriptPreprocessor::heldPaths() const
 {
-    std::vector<std::string> out;
-    out.reserve(mTexts.size());
-    for (const auto& [path, cached] : mTexts)
-    {
-        out.push_back(path);
-    }
-    return out;
+    return mTexts.paths();
 }
 
 ALPreprocessor::Found ALScriptPreprocessor::lookUp(const Request& request, const ALPreprocessor::Ask& ask, ALPreprocessor::Include& out)
@@ -390,7 +382,7 @@ std::vector<std::string> ALScriptPreprocessor::nearby(const Request& request, si
         inventory = inventory || word == "inventory";
     }
     const auto take = [this, &out, most](const std::string& path) {
-        if (out.size() < most && !mTexts.count(path) && !mFailed.count(path) && std::find(out.begin(), out.end(), path) == out.end())
+        if (out.size() < most && !mTexts.holds(path) && !mTexts.hasFailed(path) && std::find(out.begin(), out.end(), path) == out.end())
         {
             out.push_back(path);
         }
@@ -417,7 +409,7 @@ std::vector<std::string> ALScriptPreprocessor::nearby(const Request& request, si
     {
         folders.push_back(own->getParentUUID());
     }
-    for (const auto& [path, cached] : mTexts)
+    for (const std::string& path : mTexts.paths())
     {
         ALScriptRef ref;
         if (refOf(path, ref) && ref.inInventory())
@@ -770,15 +762,12 @@ ALPreprocessor::Found ALScriptPreprocessor::textOf(const Candidate& c, wanted_t*
         assetId.clear();
         return mDisk.read(c.file, text) ? ALPreprocessor::Found::Yes : ALPreprocessor::Found::No;
     }
-    auto cached = mTexts.find(c.path);
-    if (cached != mTexts.end() && cached->second.assetId == c.assetId)
+    if (mTexts.take(c.path, c.assetId, text))
     {
-        cached->second.used = ++mUse;
-        text                = cached->second.text;
-        assetId             = c.assetId.isNull() ? std::string() : c.assetId.asString();
+        assetId = c.assetId.isNull() ? std::string() : c.assetId.asString();
         return ALPreprocessor::Found::Yes;
     }
-    if (mFailed.count(c.path))
+    if (mTexts.hasFailed(c.path))
     {
         if (!retry)
         {
@@ -786,7 +775,7 @@ ALPreprocessor::Found ALScriptPreprocessor::textOf(const Candidate& c, wanted_t*
         }
         // Asked for again, once: an include that was not there when this
         // script was last expanded may be there now.
-        mFailed.erase(c.path);
+        mTexts.forgetFailure(c.path);
     }
     if (wanted)
     {
@@ -1550,63 +1539,25 @@ void ALScriptPreprocessor::optimizeAndFinish(const std::shared_ptr<Job>& job, AL
         [this, job, made]() { finish(job, std::move(*made)); });
 }
 
-void ALScriptPreprocessor::trimTexts()
-{
-    // What is held, within the budget: the least lately read let go of
-    // first, and the newest always kept whatever its size.
-    constexpr size_t BUDGET = 16u * 1024u * 1024u;
-    while (mHeld > BUDGET && mTexts.size() > 1)
-    {
-        auto oldest = mTexts.begin();
-        for (auto it = mTexts.begin(); it != mTexts.end(); ++it)
-        {
-            if (it->second.used < oldest->second.used)
-            {
-                oldest = it;
-            }
-        }
-        if (oldest->second.used == mUse)
-        {
-            break;
-        }
-        mHeld -= oldest->second.text.size();
-        mTexts.erase(oldest);
-    }
-}
-
 void ALScriptPreprocessor::fetch(const std::string& path, std::function<void()> done)
 {
     ALScriptRef ref;
     if (!refOf(path, ref))
     {
-        mFailed.insert(path);
+        mTexts.failed(path);
         done();
         return;
     }
     ALScriptWorkspace::instance().load(ref, [this, path, done](const ALScriptWorkspace::Loaded& loaded) {
         if (!loaded.error.empty())
         {
-            mFailed.insert(path);
+            mTexts.failed(path);
         }
         else
         {
             // An include saved with the preprocessor on is its source.
-            Cached cached;
-            cached.assetId = loaded.assetId;
-            cached.text    = loaded.text;
-            if (std::optional<ALScriptEnvelope> envelope = ALScriptEnvelope::parse(loaded.text))
-            {
-                cached.text = envelope->source;
-            }
-            cached.used = ++mUse;
-            if (const auto was = mTexts.find(path); was != mTexts.end())
-            {
-                mHeld -= was->second.text.size();
-            }
-            mHeld += cached.text.size();
-            mTexts[path] = std::move(cached);
-            mFailed.erase(path);
-            trimTexts();
+            std::optional<ALScriptEnvelope> envelope = ALScriptEnvelope::parse(loaded.text);
+            mTexts.put(path, loaded.assetId, envelope ? envelope->source : loaded.text);
         }
         done();
     });

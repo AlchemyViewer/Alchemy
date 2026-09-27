@@ -28,6 +28,7 @@
 #include "aldiskcache.h"
 #include "aldiskincludes.h"
 #include "alscriptjoblane.h"
+#include "alscripttextcache.h"
 #include "alluauconfig.h"
 #include "alpreprocessor.h"
 #include "alscriptworkspace.h"
@@ -331,23 +332,8 @@ private:
     // failed -- and `done` called either way.
     void                    fetch(const std::string& path, std::function<void()> done);
 
-    // The texts fetched, by the identity they came under, with how many
-    // bytes they come to: kept for the session so that a check need
-    // wait for nothing, and the oldest let go of past a budget, since a
-    // session that opens a hundred scripts would otherwise hold every
-    // include any of them ever named.
-    struct Cached
-    {
-        LLUUID      assetId;
-        std::string text;
-        U32         used = 0;
-    };
-    boost::unordered_flat_map<std::string, Cached, ll::string_hash, std::equal_to<>> mTexts;
-    U32                                                                             mUse = 0;
-    size_t                                                                          mHeld = 0;
-    // The oldest let go of until what is held is within the budget.
-    void                                                                            trimTexts();
-    wanted_t                                                                        mFailed;
+    // The texts fetched, and what failed to come.
+    ALScriptTextCache                                                               mTexts;
     // The files on disk a run has admitted, by identity: what the studio
     // may ask the text of, and nothing else on the disk.
     wanted_t                                                                        mAdmitted;

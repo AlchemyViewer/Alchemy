@@ -185,6 +185,7 @@ if(AL_BUILD_VIEWER)
     alscriptnavigation.cpp
     alscriptmodules.cpp
     alscriptnameindex.cpp
+    alscripttextcache.cpp
     alscriptnoticebar.cpp
     alscriptitemdrop.cpp
     alscriptnotecardtab.cpp
@@ -1018,6 +1019,7 @@ if(AL_BUILD_VIEWER)
     alscriptlookup.h
     alscriptnavigation.h
     alscriptnameindex.h
+    alscripttextcache.h
     alscriptmodules.h
     alscriptnoticebar.h
     alscriptitemdrop.h
@@ -2704,6 +2706,9 @@ if(AL_BUILD_TESTS)
   # The inventory's scripts and notecards by name, built once and kept from
   # each item said to change.
   al_add_test(alscriptnameindex UNIT PROJECT ${test_project} LIBRARIES ${test_libs})
+
+  # The texts of includes fetched from the world, kept within a budget.
+  al_add_test(alscripttextcache UNIT PROJECT ${test_project} LIBRARIES ${test_libs})
 
   # Each language's analyzer, asked as the analysis thread asks it, over
   # the grid's own definitions.
