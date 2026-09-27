@@ -115,7 +115,13 @@ void LLUICtrl::initFromParams(const Params& p)
     mRequestsFront = p.requests_front;
 
     setIsChrome(p.chrome);
-    setControlName(p.control_name);
+    // Only where the file names one, or names none on purpose: a derived
+    // control may have bound its own already -- a check item to its
+    // on_check control -- which a name the file never gave would undo.
+    if (p.control_name.isProvided())
+    {
+        setControlName(p.control_name);
+    }
     if(p.enabled_controls.isProvided())
     {
         if (p.enabled_controls.enabled.isChosen())

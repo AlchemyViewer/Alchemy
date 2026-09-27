@@ -364,4 +364,30 @@ namespace tut
         ensure("none of them is a check box", button->as<LLCheckBoxCtrl>() == nullptr && line->as<LLCheckBoxCtrl>() == nullptr);
         ensure("none of them is a combo box or a scroll list", spin->as<LLComboBox>() == nullptr && tabs->as<LLScrollListCtrl>() == nullptr);
     }
+
+    template<> template<>
+    void alviewtype_object::test<6>()
+    {
+        set_test_name("a check item bound to a setting by its on_check keeps the binding its own params do not name, and shows the setting as it changes");
+        LLControlGroup* config = LLUI::getInstance()->mSettingGroups["config"];
+        if (!config->controlExists("ViewTypeCheck"))
+        {
+            config->declareBOOL("ViewTypeCheck", true, "A setting a check item shows");
+        }
+        config->setBOOL("ViewTypeCheck", true);
+        LLMenuItemCheckGL::Params cp;
+        cp.name                  = "check";
+        cp.label                 = "Check";
+        cp.on_check.control_name = "ViewTypeCheck";
+        std::unique_ptr<LLMenuItemCheckGL> item(LLUICtrlFactory::create<LLMenuItemCheckGL>(cp));
+        ensure("bound to the setting", item->getControlVariable() != nullptr);
+        item->buildDrawLabel();
+        ensure("checked while it is on", item->getValue().asBoolean());
+        config->setBOOL("ViewTypeCheck", false);
+        item->buildDrawLabel();
+        ensure("not checked once it is off", !item->getValue().asBoolean());
+        config->setBOOL("ViewTypeCheck", true);
+        item->buildDrawLabel();
+        ensure("and checked again", item->getValue().asBoolean());
+    }
 }
