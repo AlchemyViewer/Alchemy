@@ -93,6 +93,16 @@ struct ALScriptSignature
     // Which one the position is at, or past the end.
     S32                      active = 0;
     std::string              documentation;
+    // Every form the function has, where it has more than one: the label
+    // and parameters above are the one the call's arguments fit first,
+    // `overload` of them.
+    struct Overload
+    {
+        std::string              label;
+        std::vector<std::string> parameters;
+    };
+    std::vector<Overload> overloads;
+    S32                   overload = 0;
 };
 
 // A stretch of the script, the end exclusive.

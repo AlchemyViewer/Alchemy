@@ -448,6 +448,9 @@ namespace tut
         ensure("an older expansion: expanded again", expansions.size() == expanded + 1);
         doc.editor->setText("#define X\n" + SCRIPT);
         checking.ask(doc, Kind::Check, ALTextPos(), ALTextPos());
+        ensure("one still out: not another yet", expansions.size() == expanded + 1);
+        expansions.back().second(expansion(SCRIPT));
+        ensure("it answered of an older text: the next, for the text as it is", expansions.size() == expanded + 2);
         ALPreprocessor::Result directive = expansion(SCRIPT);
         directive.map                    = ALSourceMap();
         directive.map.addFile("a", "object:a");
@@ -800,5 +803,26 @@ namespace tut
         studio.targets = { ALScriptWeight::Target::Mono };
         checking.ask(doc, Kind::Weigh, ALTextPos(), ALTextPos());
         ensure("weighed for its targets", studio.asks.size() == asks + 1 && studio.asks.back().request.targets.size() == 1);
+    }
+
+    template<> template<>
+    void alscriptstudiochecking_object::test<13>()
+    {
+        set_test_name("preprocessed, typed in while an expansion is out: one at a time, then one for the latest text, not one a key");
+        ALScriptStudioChecking& checking = make();
+        Doc&                    doc      = tab("a");
+        preprocessing                    = true;
+        checking.ask(doc, Kind::Signature, ALTextPos(0, 1), ALTextPos(0, 1));
+        doc.editor->insertText(" ");
+        checking.ask(doc, Kind::Signature, ALTextPos(0, 2), ALTextPos(0, 2));
+        doc.editor->insertText(" ");
+        checking.ask(doc, Kind::Signature, ALTextPos(0, 3), ALTextPos(0, 3));
+        ensure_equals("one on its way, not one a key", expansions.size(), size_t(1));
+        expansions[0].second(expansion(doc.editor->text()));
+        ensure_equals("the next, for the text as it is now", expansions.size(), size_t(2));
+        ensure("the latest question still waiting", doc.check.waiting.size() == 1 && doc.check.waiting[0].at == ALTextPos(0, 3) && studio.asks.empty());
+        expansions[1].second(expansion(doc.editor->text()));
+        ensure_equals("then asked, once", studio.asks.size(), size_t(1));
+        ensure("of the latest", studio.asks[0].request.version == version(doc));
     }
 }

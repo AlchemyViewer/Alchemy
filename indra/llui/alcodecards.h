@@ -124,9 +124,22 @@ public:
         std::vector<std::pair<S32, S32>> parameters;
         S32                              active = 0;
         std::string                      documentation;
+        // Every form the function has, where it has more than one -- the
+        // label and parameters above are the one shown, `overload` of them.
+        struct Overload
+        {
+            std::string                      label;
+            std::vector<std::pair<S32, S32>> parameters;
+        };
+        std::vector<Overload> overloads;
+        S32                   overload = 0;
     };
     void             showSignature(const ALTextPos& at, Signature signature);
     void             hideSignature() { mSignature.reset(); }
+    // The parameter the caret is at, and the form shown, `step` on from
+    // this one, going round; false where there is one form, or none shown.
+    void             setSignatureActive(S32 active);
+    bool             stepOverload(S32 step);
     const Signature* signature() const { return mSignature ? &*mSignature : nullptr; }
     const ALTextPos& signatureAt() const { return mSignatureAt; }
     // Shown, and still about the call a caret is in: on its line, and not

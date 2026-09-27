@@ -1821,8 +1821,23 @@ ALScriptSignature ALLuauService::signature(std::string_view source, S32 line, S3
     {
         return answer;
     }
-    const Luau::FunctionType* function = functionOf(*callee);
-    if (!function)
+    // Each form it has: one function, or an overloaded one's every part.
+    std::vector<const Luau::FunctionType*> forms;
+    if (const Luau::IntersectionType* overloads = Luau::get<Luau::IntersectionType>(Luau::follow(*callee)))
+    {
+        for (Luau::TypeId part : overloads->parts)
+        {
+            if (const Luau::FunctionType* one = Luau::get<Luau::FunctionType>(Luau::follow(part)))
+            {
+                forms.push_back(one);
+            }
+        }
+    }
+    else if (const Luau::FunctionType* function = functionOf(*callee))
+    {
+        forms.push_back(function);
+    }
+    if (forms.empty())
     {
         return answer;
     }
@@ -1830,31 +1845,53 @@ ALScriptSignature ALLuauService::signature(std::string_view source, S32 line, S3
     const std::string name = nameOf(call->func);
     Luau::ToStringOptions options;
     options.functionTypeArguments = true;
-    answer.label = Luau::toStringNamedFunction(name.empty() ? "function" : name, *function, options);
-
-    // The parameters as they print, the first dropped when the call
-    // passes it as self.
-    const auto [arg_types, tail] = Luau::flatten(function->argTypes);
-    // Only where the call itself passes it: a method called with a dot
-    // is given its object as its first argument, which is a parameter
-    // like any other there.
-    const size_t skip = call->self && !arg_types.empty() ? 1 : 0;
-    for (size_t i = skip; i < arg_types.size(); ++i)
-    {
-        std::string parameter;
-        if (i < function->argNames.size() && function->argNames[i])
+    // A form's label, and its parameters as they print, the first dropped
+    // when the call passes it as self; and whether it takes as many
+    // arguments as the call has.
+    const auto describe = [&](const Luau::FunctionType& function, ALScriptSignature::Overload& out) {
+        out.label = Luau::toStringNamedFunction(name.empty() ? "function" : name, function, options);
+        const auto [arg_types, tail] = Luau::flatten(function.argTypes);
+        // Only where the call itself passes it: a method called with a dot
+        // is given its object as its first argument, which is a parameter
+        // like any other there.
+        const size_t skip = call->self && !arg_types.empty() ? 1 : 0;
+        for (size_t i = skip; i < arg_types.size(); ++i)
         {
-            parameter = function->argNames[i]->name + ": ";
+            std::string parameter;
+            if (i < function.argNames.size() && function.argNames[i])
+            {
+                parameter = function.argNames[i]->name + ": ";
+            }
+            parameter += typeText(arg_types[i]);
+            out.parameters.push_back(std::move(parameter));
         }
-        parameter += typeText(arg_types[i]);
-        answer.parameters.push_back(std::move(parameter));
-    }
-    // A tail that takes more, where the function does: not a hidden one,
-    // which the new solver gives a function the script wrote, nor none.
-    const Luau::VariadicTypePack* variadic = tail ? Luau::get<Luau::VariadicTypePack>(Luau::follow(*tail)) : nullptr;
-    if (tail && !Luau::isEmpty(*tail) && !(variadic && variadic->hidden))
+        // A tail that takes more, where the function does: not a hidden one,
+        // which the new solver gives a function the script wrote, nor none.
+        const Luau::VariadicTypePack* variadic = tail ? Luau::get<Luau::VariadicTypePack>(Luau::follow(*tail)) : nullptr;
+        const bool                    more     = tail && !Luau::isEmpty(*tail) && !(variadic && variadic->hidden);
+        if (more)
+        {
+            out.parameters.push_back("..." + Luau::toString(*tail));
+        }
+        return more || out.parameters.size() >= call->args.size;
+    };
+    S32 fits = -1;
+    for (const Luau::FunctionType* form : forms)
     {
-        answer.parameters.push_back("..." + Luau::toString(*tail));
+        ALScriptSignature::Overload one;
+        if (describe(*form, one) && fits < 0)
+        {
+            fits = static_cast<S32>(answer.overloads.size());
+        }
+        answer.overloads.push_back(std::move(one));
+    }
+    answer.overload   = llmax(0, fits);
+    answer.label      = answer.overloads[static_cast<size_t>(answer.overload)].label;
+    answer.parameters = answer.overloads[static_cast<size_t>(answer.overload)].parameters;
+    if (answer.overloads.size() < 2)
+    {
+        answer.overloads.clear();
+        answer.overload = 0;
     }
     // Which one the position is at: the argument that holds it, or the
     // one after the last that ends before it.

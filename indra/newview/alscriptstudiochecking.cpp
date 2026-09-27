@@ -149,11 +149,18 @@ void ALScriptStudioChecking::expandFor(Doc& doc, ALScriptAnalysis::Kind kind, co
         doc.check.waiting.push_back(Doc::Waiting{ kind, at, to });
     }
     const U32 version = doc.editor->document().version();
-    if (doc.check.expanding && *doc.check.expanding == version)
+    if (doc.check.expanding)
     {
-        // Already on its way; every question waiting takes the one answer.
+        // One at a time: every question waiting takes the one on its way,
+        // or, asked about a later text, the next, made once it answers --
+        // not one a key while the text is typed.
+        if (*doc.check.expanding != version)
+        {
+            doc.check.wanted = version;
+        }
         return;
     }
+    doc.check.wanted.reset();
     doc.check.expanding             = version;
     const std::weak_ptr<bool> alive = mAlive;
     const std::string         id    = doc.id;
@@ -179,10 +186,22 @@ void ALScriptStudioChecking::expandedAnswer(const std::string& id, U32 version, 
     }
     if (version != doc.editor->document().version())
     {
-        // The text has moved on. Whatever was waiting was asked about
+        // The text has moved on. Questions asked about it as it is now
+        // take one expansion of it, the next; any others were asked about
         // the text as it was -- a hover over a word the edit may have
-        // moved -- and the edit has scheduled a check of its own, so
-        // the questions go rather than being asked of the wrong text.
+        // moved -- and the edit has scheduled a check of its own, so they
+        // go rather than being asked of the wrong text.
+        const std::optional<U32> wanted = std::exchange(doc.check.wanted, std::nullopt);
+        if (wanted && *wanted == doc.editor->document().version() && !doc.check.waiting.empty())
+        {
+            std::vector<Doc::Waiting> waiting;
+            waiting.swap(doc.check.waiting);
+            for (const Doc::Waiting& question : waiting)
+            {
+                expandFor(doc, question.kind, question.at, question.to);
+            }
+            return;
+        }
         doc.check.waiting.clear();
         return;
     }
@@ -423,6 +442,11 @@ void ALScriptStudioChecking::answered(const ALScriptAnalysis::Result& result, U3
             signature.parameters    = spansIn(signature.label, result.signature.parameters);
             signature.active        = result.signature.active;
             signature.documentation = result.signature.documentation;
+            for (const ALScriptSignature::Overload& form : result.signature.overloads)
+            {
+                signature.overloads.push_back({ form.label, spansIn(form.label, form.parameters) });
+            }
+            signature.overload = result.signature.overload;
             doc.editor->showSignature(at, std::move(signature));
             break;
         }

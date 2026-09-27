@@ -173,6 +173,28 @@ void ALCodeCards::showSignature(const ALTextPos& at, Signature signature)
     mSignatureAt = at;
 }
 
+void ALCodeCards::setSignatureActive(S32 active)
+{
+    if (mSignature)
+    {
+        mSignature->active = active;
+    }
+}
+
+bool ALCodeCards::stepOverload(S32 step)
+{
+    if (!mSignature || mSignature->overloads.size() < 2)
+    {
+        return false;
+    }
+    const S32 count          = static_cast<S32>(mSignature->overloads.size());
+    mSignature->overload     = ((mSignature->overload + step) % count + count) % count;
+    const auto& shown        = mSignature->overloads[static_cast<size_t>(mSignature->overload)];
+    mSignature->label        = shown.label;
+    mSignature->parameters   = shown.parameters;
+    return true;
+}
+
 bool ALCodeCards::signatureFor(const ALTextPos& caret) const
 {
     return mSignature && caret.line == mSignatureAt.line && !(caret < mSignatureAt);

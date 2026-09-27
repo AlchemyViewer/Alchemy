@@ -194,6 +194,12 @@ ALCodeEditor::ALCodeEditor(const Params& p)
     });
     mCaretConnection = onCaretMoved([this]() {
         dropPlaceholdersLeft();
+        // The parameter the caret is at, worked out here rather than asked
+        // for again: the call's commas before it.
+        if (mCards.signature() && mSignatureOpen.line >= 0 && signatureShown())
+        {
+            mCards.setSignatureActive(argumentAt(mSignatureOpen, caret()));
+        }
         // The name lit again once the caret rests; put out now if it has
         // left it.
         mOccurrencesDue = true;
@@ -329,6 +335,21 @@ void ALCodeEditor::onEdit(const ALTextDocument::Edit& edit)
         [](InlayHint&) {});
     // The stops of a snippet or a call being filled in move with the text.
     mSnippet.slide(edit);
+    // So does the bracket of the call whose signature is shown; one the
+    // edit took goes, and the call with it.
+    if (mSignatureOpen.line >= 0)
+    {
+        const ALTextRange taken = edit.range.normalised();
+        if (taken.end <= mSignatureOpen)
+        {
+            mSignatureOpen = edit.slidPast(mSignatureOpen);
+        }
+        else if (taken.begin <= mSignatureOpen)
+        {
+            mSignatureOpen = ALTextPos(-1, -1);
+            hideSignature();
+        }
+    }
 
     // A closer typing put in moves with the text before it, and goes with
     // an edit that takes it.
@@ -3696,17 +3717,73 @@ void ALCodeEditor::showSignature(const ALTextPos& at, Signature signature)
         // An answer that came after a modal keymap stopped inserting.
         return;
     }
+    // The call it is about, by its bracket, which it stays shown inside.
+    ALTextPos open;
+    mSignatureOpen = mBracketIndex.enclosing(at, '(', 1, open, ALBracketIndex::NEARBY) ? open : ALTextPos(-1, -1);
     mCards.showSignature(at, std::move(signature));
 }
 
 void ALCodeEditor::hideSignature()
 {
     mCards.hideSignature();
+    mSignatureOpen = ALTextPos(-1, -1);
 }
 
 bool ALCodeEditor::signatureShown() const
 {
-    return mCards.signatureFor(caret());
+    if (!mCards.signature() || mSignatureOpen.line < 0)
+    {
+        return mCards.signatureFor(caret());
+    }
+    // Inside the call's brackets, on whichever of its lines.
+    const ALTextPos at = caret();
+    if (!(mSignatureOpen < at))
+    {
+        return false;
+    }
+    ALTextPos close;
+    return !const_cast<ALBracketIndex&>(mBracketIndex).match(mSignatureOpen, close, ALBracketIndex::NEARBY) || !(close < at);
+}
+
+S32 ALCodeEditor::argumentAt(const ALTextPos& open, const ALTextPos& at)
+{
+    S32 depth  = 0;
+    S32 commas = 0;
+    for (S32 line = open.line; line <= at.line && line < document().lineCount(); ++line)
+    {
+        const std::string& text   = document().line(line);
+        const auto&        tokens = highlighter().tokens(line);
+        size_t             t      = 0;
+        const S32          from   = line == open.line ? open.column + 1 : 0;
+        const S32          to     = line == at.line ? llmin(at.column, static_cast<S32>(text.size())) : static_cast<S32>(text.size());
+        for (S32 i = from; i < to; ++i)
+        {
+            const char c = text[static_cast<size_t>(i)];
+            if (c != ',' && c != '(' && c != ')' && c != '[' && c != ']' && c != '{' && c != '}')
+            {
+                continue;
+            }
+            // Not what a string or a comment says.
+            while (t < tokens.size() && tokens[t].end <= i)
+            {
+                ++t;
+            }
+            if (t < tokens.size() && tokens[t].begin <= i &&
+                (tokens[t].kind == ALSyntaxKind::String || tokens[t].kind == ALSyntaxKind::Comment || tokens[t].kind == ALSyntaxKind::DocComment))
+            {
+                continue;
+            }
+            if (c == ',')
+            {
+                commas += depth == 0 ? 1 : 0;
+            }
+            else
+            {
+                depth += (c == '(' || c == '[' || c == '{') ? 1 : -1;
+            }
+        }
+    }
+    return commas;
 }
 
 void ALCodeEditor::drawSignature(const LLRect& text)
@@ -3721,8 +3798,11 @@ void ALCodeEditor::drawSignature(const LLRect& text)
     const LLFontGL*  font  = getFont();
     const F32        alpha = getDrawContext().mAlpha;
     const S32        line_h = font->getLineHeight();
-    const bool       docs  = !sig.documentation.empty();
-    const std::string doc_line = docs ? sig.documentation.substr(0, sig.documentation.find('\n')) : std::string();
+    // Which form of the function, of how many, where it has several: Up
+    // and Down go through them.
+    const std::string counter  = sig.overloads.size() > 1 ? llformat("%d/%d  ", sig.overload + 1, static_cast<S32>(sig.overloads.size())) : std::string();
+    const bool        docs     = !sig.documentation.empty() || !counter.empty();
+    const std::string doc_line = counter + sig.documentation.substr(0, sig.documentation.find('\n'));
     const S32        wanted = llmax(font->getWidth(sig.label), docs ? font->getWidth(doc_line) : 0) + 2 * SIGNATURE_PAD;
     const S32        height = line_h * (docs ? 2 : 1) + 2 * SIGNATURE_PAD;
 
@@ -3951,9 +4031,25 @@ bool ALCodeEditor::handleKeyHere(KEY key, MASK mask)
         hideSignature();
         return true;
     }
+    // Another form of the function, where it has several.
+    if (mCards.signature() && !completionOpen() && mask == MASK_NONE && (key == KEY_UP || key == KEY_DOWN) && signatureShown() &&
+        mCards.stepOverload(key == KEY_DOWN ? 1 : -1))
+    {
+        return true;
+    }
+    // What a Backspace or a Delete takes: a bracket or a comma changes the
+    // call, which is asked about again; anything else only an argument.
+    char taking = 0;
+    if ((key == KEY_BACKSPACE || key == KEY_DELETE) && mask == MASK_NONE && !hasSelection())
+    {
+        const std::string& line = document().line(caret().line);
+        const S32          at   = key == KEY_BACKSPACE ? caret().column - 1 : caret().column;
+        taking                  = at >= 0 && at < static_cast<S32>(line.size()) ? line[static_cast<size_t>(at)] : 0;
+    }
+    const bool call_changes = hasSelection() || taking == '(' || taking == ',' || taking == ')';
     if (key == KEY_BACKSPACE && mask == MASK_NONE && mAutoClose && deletePair())
     {
-        if (mCards.signature() && mSignatureRequest)
+        if (mCards.signature() && mSignatureRequest && call_changes)
         {
             mSignatureRequest(caret());
         }
@@ -3966,7 +4062,7 @@ bool ALCodeEditor::handleKeyHere(KEY key, MASK mask)
         dropTyping();
         return taken;
     }
-    if (taken && mCards.signature() && mSignatureRequest && (key == KEY_BACKSPACE || key == KEY_DELETE))
+    if (taken && mCards.signature() && mSignatureRequest && (key == KEY_BACKSPACE || key == KEY_DELETE) && call_changes)
     {
         mSignatureRequest(caret());
     }
@@ -4020,8 +4116,10 @@ bool ALCodeEditor::handleUnicodeCharHere(llwchar uni_char)
     {
         openCompletion();
     }
-    // A call begins, moves on to its next argument, or ends.
-    if (mSignatureRequest && (uni_char == '(' || uni_char == ',' || uni_char == ')' || mCards.signature()))
+    // A call begins, moves on to its next argument, or ends: asked again
+    // then, and only then -- within an argument, the parameter shown
+    // follows the caret here.
+    if (mSignatureRequest && (uni_char == '(' || uni_char == ',' || uni_char == ')'))
     {
         mSignatureRequest(caret());
     }

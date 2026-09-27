@@ -427,6 +427,10 @@ struct ALScriptStudioDoc
         // however many questions wait on it.
         U32                expansions = 0;
         std::optional<U32> expanding;
+        // The version the questions waiting were last asked about, while
+        // an expansion of an older one was on its way: one expansion at a
+        // time, and the next for the latest text, not one a key.
+        std::optional<U32> wanted;
         // The questions held until it comes.
         std::vector<Waiting> waiting;
         // Whether the script's `.luaurc` was asked for once, so that a

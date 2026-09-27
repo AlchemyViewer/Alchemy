@@ -727,4 +727,19 @@ namespace tut
         }
         ensure("denied: an error", denied);
     }
+
+    template<> template<>
+    void alluauservice_object::test<25>()
+    {
+        set_test_name("an overloaded function's signature: every form, the one the arguments fit first shown");
+        ensure("definitions load: " + error, loaded);
+        const std::string       script = "local f: ((n: number) -> ()) & ((a: string, b: string) -> ()) = nil :: any\nf(\"x\", \"y\")\n";
+        const ALScriptSignature sig    = service.signature(script, 1, 7);
+        ensure("found", sig.found);
+        ensure_equals("both forms", sig.overloads.size(), size_t(2));
+        ensure_equals("the second fits two arguments", sig.overload, 1);
+        ensure("shown", sig.label == sig.overloads[1].label && sig.parameters.size() == 2);
+        ensure_equals("at the second argument", sig.active, 1);
+        ensure("one form: none listed", service.signature("local function g(a: number) end\ng(1)\n", 1, 2).overloads.empty());
+    }
 }

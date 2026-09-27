@@ -664,6 +664,9 @@ public:
     void clearHandlers();
     void showSignature(const ALTextPos& caret, Signature signature);
     void hideSignature();
+    // Which argument of the call whose bracket opens at `open` a place is
+    // in: the commas of the call's own before it, in code.
+    S32  argumentAt(const ALTextPos& open, const ALTextPos& at);
     // Shown, and still about the call the caret is in: on its line, and
     // not before where it began.
     bool signatureShown() const;
@@ -917,6 +920,9 @@ private:
     hover_provider_t        mHover;
     hover_request_t         mHoverRequest;
     signature_request_t     mSignatureRequest;
+    // The bracket the call shown opens with, or none: the signature stays
+    // while the caret is inside the call, across its lines.
+    ALTextPos               mSignatureOpen{ -1, -1 };
     symbol_request_t        mSymbolRequest;
     link_request_t          mLinkRequest;
     ALChoiceList*           mCompletionList = nullptr;

@@ -320,7 +320,7 @@ namespace tut
         e.showSignature(e.caret(), sig);
         ensure("shown", e.signatureShown() && e.signature()->label == sig.label);
         type("4");
-        ensure("typing inside asks again", signature_asks.size() == 2);
+        ensure("typing inside asks nothing: the argument is followed here", signature_asks.size() == 1);
         e.hideSignature();
         ensure("hidden", !e.signatureShown());
         e.showSignature(e.caret(), sig);
@@ -2314,5 +2314,46 @@ namespace tut
         ensure("the caret off the line: let go", e.placeholders().empty());
         type("-- ");
         ensure_equals("and typing is typing again", e.document().line(2), std::string("-- print(\"n\")"));
+    }
+
+    template<> template<>
+    void alcodeeditor_object::test<66>()
+    {
+        set_test_name("signature help stays inside a call across its lines, follows the caret's argument itself, asks again only as a bracket or a comma changes, and steps through overloads");
+        ALCodeEditor& e = make("f(a,\n  b, c)\nx\n", "lsl");
+        e.setAutoComplete(false);
+        e.setAutoClose(false);
+        S32 asked = 0;
+        e.setSignatureRequest([&asked](const ALTextPos&) { ++asked; });
+        ALCodeEditor::Signature sig;
+        sig.label      = "f(integer one, integer two, integer three)";
+        sig.parameters = { { 2, 13 }, { 15, 26 }, { 28, 41 } };
+        e.setCaret(ALTextPos(0, 2));
+        e.showSignature(ALTextPos(0, 2), sig);
+        e.setCaret(ALTextPos(1, 3));
+        ensure("shown on the call's next line", e.signatureShown());
+        ensure_equals("the second argument, by the comma above", e.signature()->active, 1);
+        e.setCaret(ALTextPos(1, 5));
+        ensure_equals("past another comma: the third", e.signature()->active, 2);
+        type("zz");
+        ensure_equals("typing within an argument asks nothing", asked, 0);
+        key(KEY_BACKSPACE);
+        ensure_equals("nor taking a letter back", asked, 0);
+        type(",");
+        ensure_equals("a comma asks", asked, 1);
+        key(KEY_BACKSPACE);
+        ensure_equals("and taking it back", asked, 2);
+        e.setCaret(ALTextPos(2, 0));
+        ensure("out of the call: gone", !e.signatureShown());
+
+        ALCodeEditor::Signature forms = sig;
+        forms.overloads = { { sig.label, sig.parameters }, { "f(string text)", { { 2, 13 } } } };
+        e.setCaret(ALTextPos(0, 2));
+        e.showSignature(ALTextPos(0, 2), forms);
+        key(KEY_DOWN);
+        ensure_equals("Down: the next form", e.signature()->label, std::string("f(string text)"));
+        ensure("the caret where it was", e.caret() == ALTextPos(0, 2));
+        key(KEY_DOWN);
+        ensure_equals("round to the first", e.signature()->label, sig.label);
     }
 }
