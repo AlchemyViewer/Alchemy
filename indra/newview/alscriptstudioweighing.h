@@ -91,6 +91,8 @@ public:
     std::vector<ALScriptWeight::Target> targets(const Doc& doc) const;
     // Weighed as it stands, with its check; and what came back.
     void weigh(Doc& doc);
+    // Whether a weighing of the text as it stands is on its way.
+    static bool asking(const Doc& doc);
     void weighed(Doc& doc, const ALScriptAnalysis::Result& result);
     // Weighed as a run of the preprocessor made it to be sent.
     void weighSent(Doc& doc);

@@ -330,6 +330,42 @@ ALScriptAnalysis::Result ALScriptAnalysis::run(const Job& job, const ALLuauServi
         result.lua     = request.lua;
         result.line    = request.line;
         result.column  = request.column;
+        // A text weighed for a target of its own language: SLua's for SLua,
+        // LSL's others for LSL.
+        const auto weighed = [&request](ALScriptWeight::Target target, const std::string& text) {
+            if ((target == ALScriptWeight::Target::SLua) != request.lua)
+            {
+                return ALScriptWeight();
+            }
+            return target == ALScriptWeight::Target::SLua      ? ALScriptWeigh::slua(text)
+                   : target == ALScriptWeight::Target::LSO     ? ALScriptWeigh::lso(text)
+                   : target == ALScriptWeight::Target::Mono    ? ALScriptWeigh::mono(text)
+                   : target == ALScriptWeight::Target::LSLLuau ? ALScriptWeigh::lslLuau(text)
+                                                               : ALScriptWeight();
+        };
+        // The text weighed for each target asked for -- or, where there are
+        // variants, each variant for the first -- by a weigh, or by a check
+        // the script's own weigh was folded into.
+        const auto weigh = [&]() {
+            if (!request.variants.empty())
+            {
+                if (!request.targets.empty())
+                {
+                    for (const std::string& variant : request.variants)
+                    {
+                        result.variantTotals.push_back(weighed(request.targets.front(), variant).total);
+                    }
+                }
+                return;
+            }
+            for (const ALScriptWeight::Target target : request.targets)
+            {
+                if ((target == ALScriptWeight::Target::SLua) == request.lua)
+                {
+                    result.weights.push_back(weighed(target, request.text));
+                }
+            }
+        };
         if (request.lua)
         {
             mWorker->useSolver(job.newSolver);
@@ -352,6 +388,7 @@ ALScriptAnalysis::Result ALScriptAnalysis::run(const Job& job, const ALLuauServi
                         result.semantics = mWorker->luau.semanticTokens(request.text);
                     }
                     result.hints = mWorker->luau.inlayHints(request.text, request.hintParameters, request.hintTypes);
+                    weigh();
                     break;
                 case Kind::Complete:
                     result.completions = mWorker->luau.complete(request.text, request.line, request.column);
@@ -370,21 +407,7 @@ ALScriptAnalysis::Result ALScriptAnalysis::run(const Job& job, const ALLuauServi
                     result.actions = mWorker->luau.actions(request.text, request.line, request.column, request.endLine, request.endColumn);
                     break;
                 case Kind::Weigh:
-                    if (!request.variants.empty())
-                    {
-                        for (const std::string& variant : request.variants)
-                        {
-                            result.variantTotals.push_back(ALScriptWeigh::slua(variant).total);
-                        }
-                        break;
-                    }
-                    for (const ALScriptWeight::Target target : request.targets)
-                    {
-                        if (target == ALScriptWeight::Target::SLua)
-                        {
-                            result.weights.push_back(ALScriptWeigh::slua(request.text));
-                        }
-                    }
+                    weigh();
                     break;
             }
         }
@@ -402,6 +425,7 @@ ALScriptAnalysis::Result ALScriptAnalysis::run(const Job& job, const ALLuauServi
                         result.semantics = mWorker->lsl.semanticTokens(request.text);
                     }
                     result.hints = mWorker->lsl.inlayHints(request.text, request.hintParameters);
+                    weigh();
                     break;
                 case Kind::Complete:
                     result.completions = mWorker->lsl.symbols(request.text, request.line, request.column);
@@ -420,30 +444,8 @@ ALScriptAnalysis::Result ALScriptAnalysis::run(const Job& job, const ALLuauServi
                     result.actions = mWorker->lsl.actions(request.text, request.line, request.column, request.endLine, request.endColumn);
                     break;
                 case Kind::Weigh:
-                {
-                    const auto weigh = [](ALScriptWeight::Target target, const std::string& text) {
-                        return target == ALScriptWeight::Target::LSO       ? ALScriptWeigh::lso(text)
-                               : target == ALScriptWeight::Target::Mono    ? ALScriptWeigh::mono(text)
-                               : target == ALScriptWeight::Target::LSLLuau ? ALScriptWeigh::lslLuau(text)
-                                                                           : ALScriptWeight();
-                    };
-                    if (!request.variants.empty() && !request.targets.empty())
-                    {
-                        for (const std::string& variant : request.variants)
-                        {
-                            result.variantTotals.push_back(weigh(request.targets.front(), variant).total);
-                        }
-                        break;
-                    }
-                    for (const ALScriptWeight::Target target : request.targets)
-                    {
-                        if (target != ALScriptWeight::Target::SLua)
-                        {
-                            result.weights.push_back(weigh(target, request.text));
-                        }
-                    }
+                    weigh();
                     break;
-                }
             }
             result.parsed     = mWorker->lsl.parsed();
             result.understood = mWorker->lsl.understood();

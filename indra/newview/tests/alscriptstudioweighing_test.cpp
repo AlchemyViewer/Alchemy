@@ -353,6 +353,7 @@ namespace tut
         a.check.analysisVersion      = versionOf(a);
         a.weighing.all               = { weightOf(Target::Mono, 1) };
         a.weighing.allVersion        = versionOf(a);
+        a.weighing.askedFor          = versionOf(a);
         unit.pump();
         ensure("the others wanted: weighed", studio.asked == Names{ "a" } && a.weighing.asking);
         unit.pump();
@@ -365,5 +366,34 @@ namespace tut
         a.weighing.all.clear();
         unit.pump();
         ensure("not looked at: nothing", studio.asked.size() == 1);
+    }
+
+    template<> template<>
+    void alscriptstudioweighing_object::test<9>()
+    {
+        set_test_name("a tab come to the front, checked but not weighed with it, is weighed once for its text; one asked for an older text is not waited on");
+        ALScriptStudioWeighing& unit = make();
+        Doc&                    a    = tab("a", "default {}");
+        Doc&                    b    = tab("b", "default {}");
+        a.check.analysisVersion      = versionOf(a);
+        b.check.analysisVersion      = versionOf(b);
+        a.weighing.askedFor          = versionOf(a);
+        services.front               = 0;
+        unit.pump();
+        ensure("weighed with its check already: nothing", studio.asked.empty());
+        services.front = 1;
+        unit.pump();
+        ensure("come to the front: weighed", studio.asked == Names{ "b" } && ALScriptStudioWeighing::asking(b));
+        unit.pump();
+        ensure("once", studio.asked.size() == 1);
+        // Typed in while it was weighed: the answer for the older text is
+        // passed over, and the check of the new one weighs it again.
+        b.editor->insertText("x");
+        ensure("not waited on", !ALScriptStudioWeighing::asking(b));
+        unit.pump();
+        ensure("not before its check", studio.asked.size() == 1);
+        b.check.analysisVersion = versionOf(b);
+        unit.pump();
+        ensure("then, for the new text", studio.asked == (Names{ "b", "b" }));
     }
 }

@@ -152,7 +152,8 @@ public:
         // or the same place for the caret alone.
         S32         endLine   = 0;
         S32         endColumn = 0;
-        // Weigh only: the targets to weigh it for. Or, where there are
+        // Weigh, or a check the script's own weigh is folded into: the
+        // targets to weigh it for. A weigh only: or, where there are
         // any, texts to weigh in its place -- the script with a fix's edits
         // made, say -- each for the first target alone, and answered as
         // each one's total in order (Result::variantTotals).

@@ -315,6 +315,16 @@ void ALScriptStudioChecking::ask(Doc& doc, ALScriptAnalysis::Kind kind, const AL
             request.endColumn = kept ? last.column : loc.column;
         }
     }
+    if (kind == ALScriptAnalysis::Kind::Check && request.front)
+    {
+        // The tab in front weighed with its check, of the same text, in
+        // the same job; the rest when they come to the front, or at a save.
+        request.targets = mWindow.weightTargets(doc);
+        if (!request.targets.empty())
+        {
+            doc.weighing.askedFor = request.version;
+        }
+    }
     if (kind == ALScriptAnalysis::Kind::Weigh)
     {
         request.targets = mWindow.weightTargets(doc);
@@ -614,6 +624,11 @@ void ALScriptStudioChecking::analysed(const ALScriptAnalysis::Result& result)
     {
         mapProblems(doc);
     }
+    // What the check weighed, where it was asked to.
+    if (!result.weights.empty())
+    {
+        mWindow.weighed(doc, result);
+    }
     checked(doc);
 }
 
@@ -806,8 +821,6 @@ void ALScriptStudioChecking::checked(Doc& doc)
     }
     mWindow.refreshProblems(doc);
     mWindow.showOutline(doc);
-    // Weighed a moment after, of the same text.
-    mWindow.weigh(doc);
     if (doc.check.fixAllAfterCheck && doc.check.analysisVersion == doc.editor->document().version())
     {
         FixPick pick;

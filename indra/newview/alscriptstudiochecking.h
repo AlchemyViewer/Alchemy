@@ -92,12 +92,12 @@ public:
         // at the caret, a weighing -- handed on, at the source's place.
         virtual void answeredElsewhere(Doc& doc, const ALScriptAnalysis::Result& result, const ALTextPos& at) = 0;
         // What a check's answer is shown by: the problems, the outline,
-        // and the weights, a moment after; and the targets a weighing is
-        // asked for.
-        virtual void                                refreshProblems(Doc& doc)       = 0;
-        virtual void                                showOutline(Doc& doc)           = 0;
-        virtual void                                weigh(Doc& doc)                 = 0;
-        virtual std::vector<ALScriptWeight::Target> weightTargets(const Doc& doc) = 0;
+        // and the weights the front tab's check weighed along with it; and
+        // the targets a weighing is asked for.
+        virtual void                                refreshProblems(Doc& doc)                                     = 0;
+        virtual void                                showOutline(Doc& doc)                                         = 0;
+        virtual void                                weighed(Doc& doc, const ALScriptAnalysis::Result& result)     = 0;
+        virtual std::vector<ALScriptWeight::Target> weightTargets(const Doc& doc)                                 = 0;
         // A save that waited on the check, done; a run of the preprocessor
         // for a save, where the settings changed.
         virtual void save(Doc& doc)             = 0;

@@ -111,7 +111,11 @@ namespace
         {
             asks.push_back({ std::move(request), std::move(answered) });
         }
-        void askingOptions(ALScriptAnalysis::Request& request) const override { request.hintTypes = true; }
+        void askingOptions(ALScriptAnalysis::Request& request) const override
+        {
+            request.hintTypes = true;
+            request.front     = request.id == front;
+        }
         void answeredElsewhere(Doc& doc, const ALScriptAnalysis::Result& result, const ALTextPos& pos) override
         {
             told.push_back(kindOf(result.kind) + " " + doc.id + " " + at(pos));
@@ -134,7 +138,10 @@ namespace
             }
         }
         void showOutline(Doc& doc) override { told.push_back("outline " + doc.id); }
-        void weigh(Doc& doc) override { told.push_back("weigh " + doc.id); }
+        void weighed(Doc& doc, const ALScriptAnalysis::Result& result) override
+        {
+            told.push_back("weighed " + doc.id + " " + std::to_string(result.weights.size()));
+        }
         std::vector<ALScriptWeight::Target> weightTargets(const Doc&) override { return targets; }
         void                                save(Doc& doc) override { told.push_back("save " + doc.id); }
         void                                preprocessForSave(Doc& doc) override { told.push_back("run " + doc.id); }
@@ -148,6 +155,8 @@ namespace
         std::vector<Ask>                    asks;
         Names                               told;
         std::vector<ALScriptWeight::Target> targets;
+        // The tab in front, by id.
+        std::string                         front;
         LLSD                                confirmed;
         std::function<void()>               confirm;
     };
@@ -373,7 +382,7 @@ namespace tut
         studio.asks[0].answered(result);
         ensure("taken", doc.check.analysis.size() == 1 && doc.check.analysisVersion == version(doc) && doc.outline.size() == 1);
         ensure_equals("LSL's lints as chosen", gLintsApplied, 1);
-        ensure_equals("told", joined(studio.told), std::string("problems a, outline a, weigh a"));
+        ensure_equals("told", joined(studio.told), std::string("problems a, outline a"));
         result.understood = false;
         result.outline.clear();
         result.problems.clear();
@@ -824,5 +833,33 @@ namespace tut
         expansions[1].second(expansion(doc.editor->text()));
         ensure_equals("then asked, once", studio.asks.size(), size_t(1));
         ensure("of the latest", studio.asks[0].request.version == version(doc));
+    }
+
+    template<> template<>
+    void alscriptstudiochecking_object::test<14>()
+    {
+        set_test_name("the tab in front weighed with its check, in the one job, and its weights handed on; a tab behind checked alone");
+        ALScriptStudioChecking& checking = make();
+        Doc&                    a        = tab("a");
+        Doc&                    b        = tab("b");
+        studio.targets                   = { ALScriptWeight::Target::Mono };
+        studio.front                     = "a";
+        checking.ask(a, Kind::Check, ALTextPos(), ALTextPos());
+        checking.ask(b, Kind::Check, ALTextPos(), ALTextPos());
+        ensure_equals("both asked", studio.asks.size(), size_t(2));
+        ensure("the front one with its targets", studio.asks[0].request.front && studio.asks[0].request.targets.size() == 1);
+        ensure("and noted as asked for", a.weighing.askedFor == version(a));
+        ensure("the other without", !studio.asks[1].request.front && studio.asks[1].request.targets.empty() && b.weighing.askedFor != version(b));
+        ALScriptAnalysis::Result weighed = answer(a, {});
+        ALScriptWeight           weight;
+        weight.target   = ALScriptWeight::Target::Mono;
+        weight.total    = 100;
+        weighed.weights = { weight };
+        studio.asks[0].answered(weighed);
+        ensure_equals("its weights handed on with the check, before its problems are shown", joined(studio.told),
+                      std::string("weighed a 1, problems a, outline a"));
+        studio.told.clear();
+        studio.asks[1].answered(answer(b, {}));
+        ensure_equals("none for the other", joined(studio.told), std::string("problems b, outline b"));
     }
 }

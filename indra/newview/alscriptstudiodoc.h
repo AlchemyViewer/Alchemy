@@ -392,6 +392,9 @@ struct ALScriptStudioDoc
         bool                          exact   = false;
         bool                          sent    = false;
         bool                          asking  = false;
+        // The version its weights were last asked for, by a weigh or with
+        // a check: a tab come to the front is weighed once for its text.
+        U32                           askedFor = 0;
         // What the Weights tab lists: each target the last check's text
         // was weighed for, its own first, in the source's places, of the
         // text at `allVersion`; and each target's as the text was last

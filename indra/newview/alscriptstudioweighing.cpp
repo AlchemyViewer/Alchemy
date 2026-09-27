@@ -57,6 +57,14 @@ std::optional<ALScriptWeight::Target> ALScriptStudioWeighing::target(const Doc& 
                                                 : std::nullopt;
 }
 
+// static
+bool ALScriptStudioWeighing::asking(const Doc& doc)
+{
+    // An answer for an older text is not coming: the analyzers pass over a
+    // question a newer text has made pointless.
+    return doc.weighing.asking && doc.weighing.askedFor == doc.editor->document().version();
+}
+
 void ALScriptStudioWeighing::weigh(Doc& doc)
 {
     if (!target(doc))
@@ -64,7 +72,8 @@ void ALScriptStudioWeighing::weigh(Doc& doc)
         doc.weighing.weight.reset();
         return;
     }
-    doc.weighing.asking = true;
+    doc.weighing.asking   = true;
+    doc.weighing.askedFor = doc.editor->document().version();
     mWindow.askWeights(doc);
 }
 
@@ -520,6 +529,17 @@ void ALScriptStudioWeighing::pump()
             weighFixes(*doc, asked.shown, asked.fixes);
         }
     }
+    // The tab in front weighed once for its text, where its check was not
+    // asked with it in front: only the front tab is weighed with its check,
+    // and one come to the front since is weighed now.
+    if (Doc* front = mServices.frontDoc(); front && target(*front))
+    {
+        const U32 version = front->editor->document().version();
+        if (front->check.analysisVersion == version && front->weighing.askedFor != version)
+        {
+            weigh(*front);
+        }
+    }
     // The Weights tab, filled while it is looked at: with what came since,
     // or with the script now in front; and that script weighed for the
     // targets beside its own, which the tab alone asks for.
@@ -533,7 +553,7 @@ void ALScriptStudioWeighing::pump()
             mStale = false;
             refreshPane();
         }
-        if (doc && !doc->weighing.asking && doc->check.analysisVersion == doc->editor->document().version())
+        if (doc && !asking(*doc) && doc->check.analysisVersion == doc->editor->document().version())
         {
             const U32 version = doc->editor->document().version();
             for (const ALScriptWeight::Target each : targets(*doc))
