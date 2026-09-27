@@ -630,12 +630,12 @@ void ALIncludeSearch::explainMissing(ALScriptProblems& problems, const Missing& 
                 continue;
             }
             problem.key     = include ? "PreprocIncludeInWorld" : "PreprocModuleInWorld";
-            problem.message = ALScriptProblem::fill(include ? "could not find include file '[1]': one so named is in the object or the inventory, "
-                                                              "which includes are not taken from -- only folders on disk are, with Build > "
-                                                              "Include from Disk on and a folder added"
-                                                            : "could not find module '[1]': one so named is in the object or the inventory, which "
-                                                              "modules are not taken from -- only folders on disk are, with Build > Include from "
-                                                              "Disk on and a folder added",
+            problem.message = ALScriptProblem::fill(include ? "could not find include file '[1]': one so named is in the object or the inventory, but "
+                                                              "includes from there are off. Includes come from folders on disk: turn on Build > "
+                                                              "Include from Disk, and add the folder with Build > Add Include Folder..."
+                                                            : "could not find module '[1]': one so named is in the object or the inventory, but "
+                                                              "modules from there are off. Modules come from folders on disk: turn on Build > "
+                                                              "Include from Disk, and add the folder with Build > Add Include Folder...",
                                                     problem.args);
         }
     }
@@ -660,10 +660,34 @@ void ALIncludeSearch::explainMissing(ALScriptProblems& problems, const Missing& 
             continue;
         }
         problem.key     = include ? "PreprocIncludeNotOnDisk" : "PreprocModuleNotOnDisk";
-        problem.message = ALScriptProblem::fill(include ? "could not find include file '[1]': the disk was not looked in -- it is only with "
-                                                          "Build > Include from Disk on and a folder added"
-                                                        : "could not find module '[1]': the disk was not looked in -- it is only with Build > "
-                                                          "Include from Disk on and a folder added",
+        problem.message = ALScriptProblem::fill(include ? "could not find include file '[1]': the disk was not looked in. Includes come from "
+                                                          "folders on disk: turn on Build > Include from Disk, and add the folder with Build > "
+                                                          "Add Include Folder..."
+                                                        : "could not find module '[1]': the disk was not looked in. Modules come from folders on "
+                                                          "disk: turn on Build > Include from Disk, and add the folder with Build > Add Include "
+                                                          "Folder...",
                                                 problem.args);
     }
+}
+
+// static
+ALIncludeSearch::LeftOut ALIncludeSearch::leftOut(const ALScriptProblems& problems)
+{
+    LeftOut out;
+    for (const ALScriptProblem& problem : problems)
+    {
+        const bool in_world = problem.key == "PreprocIncludeInWorld" || problem.key == "PreprocModuleInWorld";
+        const bool off_disk = problem.key == "PreprocIncludeNotOnDisk" || problem.key == "PreprocModuleNotOnDisk";
+        if ((!in_world && !off_disk && problem.key != "PreprocIncludeNotFound" && problem.key != "PreprocModuleNotFound") || problem.args.size() != 1)
+        {
+            continue;
+        }
+        ++out.problems;
+        out.diskRoute = out.diskRoute || in_world || off_disk;
+        if (std::find(out.names.begin(), out.names.end(), problem.args[0]) == out.names.end())
+        {
+            out.names.push_back(problem.args[0]);
+        }
+    }
+    return out;
 }

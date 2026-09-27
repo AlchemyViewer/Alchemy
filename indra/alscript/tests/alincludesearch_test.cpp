@@ -290,4 +290,32 @@ namespace tut
         ensure_equals("but one asked from a file on disk is not second-guessed", problems[1].key, std::string("PreprocIncludeNotFound"));
         ensure("said with its name", problems[0].message.find("'util'") != std::string::npos);
     }
+    template<> template<>
+    void alincludesearch_object::test<6>()
+    {
+        set_test_name("what a run left out: the names not found each once in order, the problems that said so, and whether a folder on disk would have let one in");
+        const auto said = [](const char* key, const char* name) {
+            ALScriptProblem p;
+            p.key      = key;
+            p.severity = ALScriptProblem::Severity::Error;
+            if (name)
+            {
+                p.args = { name };
+            }
+            return p;
+        };
+        const ALScriptProblems problems = { said("PreprocObjectUnanswered", nullptr), said("PreprocIncludeNotFound", "b.lsl"),
+                                            said("PreprocSomethingElse", "c.lsl"),   said("PreprocModuleNotFound", "util"),
+                                            said("PreprocIncludeNotFound", "b.lsl") };
+        ALIncludeSearch::LeftOut left = ALIncludeSearch::leftOut(problems);
+        ensure("each once, in order", left.names == std::vector<std::string>{ "b.lsl", "util" });
+        ensure_equals("every problem that said so", left.problems, 3);
+        ensure("found nowhere: nothing a folder would change", !left.diskRoute);
+
+        left = ALIncludeSearch::leftOut({ said("PreprocIncludeInWorld", "a.lsl") });
+        ensure("one in the world, which is not taken from: the disk's route", left.diskRoute && left.names.size() == 1);
+        left = ALIncludeSearch::leftOut({ said("PreprocModuleNotOnDisk", "m") });
+        ensure("the disk not looked in: the disk's route", left.diskRoute && left.names == std::vector<std::string>{ "m" });
+        ensure("nothing said: nothing left out", ALIncludeSearch::leftOut({}).names.empty());
+    }
 }

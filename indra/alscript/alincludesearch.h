@@ -177,6 +177,20 @@ public:
     // disk not looked in.
     static void explainMissing(ALScriptProblems& problems, const Missing& facts);
 
+    // What a run left out, for a save to say before it goes without them:
+    // the includes and modules not found, by the names the script gave
+    // them, each once in the order said; how many problems said so; and
+    // whether any was one a folder on disk would have let in -- one so
+    // named in the world, which is not taken from, or the disk not looked
+    // in.
+    struct LeftOut
+    {
+        std::vector<std::string> names;
+        S32                      problems  = 0;
+        bool                     diskRoute = false;
+    };
+    static LeftOut leftOut(const ALScriptProblems& problems);
+
     // The name an include asks for, as an item would be called: without a
     // folder, and without the `./` a require may start with; and the
     // folders it gives before that, `.` and `..` as they were.
