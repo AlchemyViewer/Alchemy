@@ -152,6 +152,10 @@ public:
     static void offer(std::function<ALScriptStudioRecovery*()> studio);
 
 private:
+    // An entry a listing read only the start of, read whole; false, and
+    // said, where it cannot be.
+    bool wholeOf(Entry& entry);
+
     ALScriptStudioServices& mServices;
     Window&                 mWindow;
     // Held while this is, for what answers later to know it still is.

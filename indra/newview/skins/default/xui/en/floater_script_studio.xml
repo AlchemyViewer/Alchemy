@@ -334,6 +334,7 @@
     <floater.string name="PreprocessErrorsB">The preprocessor found [COUNT] errors in [NAME]; save again to upload anyway.</floater.string>
     <floater.string name="SaveAnyway">Save anyway</floater.string>
     <floater.string name="RecoveryWriteFailed">[NAME] could not be kept on this computer against a crash: the recovery folder could not be written.</floater.string>
+    <floater.string name="RecoveryReadFailed">The kept changes to [NAME] could not be read: the file in the recovery folder is gone or damaged.</floater.string>
     <floater.string name="KeepFailed">Not everything unsaved could be kept for next time, so the viewer is not quitting: save or export what is open, or quit again and choose Don't Save.</floater.string>
     <floater.string name="OfflineKeptA">Disconnected: 1 unsaved script or notecard is kept on this computer and offered at your next login.</floater.string>
     <floater.string name="OfflineKeptB">Disconnected: [COUNT] unsaved scripts and notecards are kept on this computer and offered at your next login.</floater.string>

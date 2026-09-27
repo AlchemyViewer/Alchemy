@@ -80,13 +80,30 @@ struct ALScriptRecoveryEntry
     // the text so that the steps taken before are there to take back; and
     // where the caret stood. The store keeps these and does not read them.
     LLSD        history;
+    // The history as its journal writes it (ALTextUndo::asNotation), which
+    // goes into the file as it is, in place of `history`: what reading the
+    // file gives back is `history`.
+    std::string historyWritten;
     S32         caretLine   = -1;
     S32         caretColumn = -1;
     // Where it lies on disk, which is not kept in it.
     std::string path;
+    // Whether the text and what goes with it -- the items, the history,
+    // the caret -- are here, or only what a listing reads
+    // (ALScriptRecoveryStore::load).
+    bool        whole = true;
 
+    // The history as it was read, or as it was written where it was made
+    // here and not read: either way the journal's LLSD.
+    LLSD        historyOf() const;
+    // All of it as one map, as an entry was once written whole.
     LLSD        asLLSD() const;
     static bool fromLLSD(const LLSD& sd, ALScriptRecoveryEntry& out);
+    // As it is written: a line of what a listing reads -- whose it is,
+    // where it came from, when -- and then a line of the text and what goes
+    // with it, each LLSD notation, so that a listing reads the first line
+    // of each file and no more.
+    std::string written() const;
     // When it was written, as a day and a time in the viewer's own time
     // zone, for a person to read.
     std::string whenSaid() const;
@@ -142,10 +159,15 @@ public:
     // for it: the newest for a key in place of one still waiting, and not
     // forced out to the disk -- what a crash of the viewer needs, the
     // system holding what was written, where forcing it would hold up
-    // whoever waited on a slow disk or a scanner every time.
-    void writeSoon(ALScriptRecoveryEntry entry);
+    // whoever waited on a slow disk or a scanner every time. Forced out
+    // where `durable` says, as a batch that is flushed once is: each
+    // forced out there, not here.
+    void writeSoon(ALScriptRecoveryEntry entry, bool durable = false);
     // Everything waiting written.
     void flush() const;
+    // The text and what goes with it read in, for an entry a listing read
+    // only the start of; false where its file is gone or cannot be read.
+    bool load(ALScriptRecoveryEntry& entry) const;
     // The keys whose entries writeSoon could not write, since last asked.
     std::vector<std::string> takeFailures();
     // This session's entry for the key gone: the text was saved, or is not
@@ -185,8 +207,9 @@ public:
     bool letGo(const Parting& parting);
 
     // Every entry that can be read, newest first: this session's, other
-    // sessions', and the discarded. A file that cannot be read is left
-    // where it is, for a person to look at.
+    // sessions', and the discarded -- each as far as a listing reads it
+    // (load reads the rest). A file that cannot be read is left where it
+    // is, for a person to look at.
     std::vector<ALScriptRecoveryEntry> list() const;
     // What sessions other than this one left, unsaved or kept, newest
     // first.
@@ -215,8 +238,9 @@ private:
     std::string pathOf(const std::string& key, const std::string& session) const;
     // Written whole beside the path, forced out to the disk where it is to
     // survive the machine going down, then put in its place.
-    static bool writeWhole(const std::string& path, const LLSD& sd, bool durable = true);
-    static bool readEntry(const std::string& path, ALScriptRecoveryEntry& out);
+    static bool writeWhole(const std::string& path, const std::string& written, bool durable = true);
+    // An entry read: as far as a listing reads it, or whole.
+    static bool readEntry(const std::string& path, ALScriptRecoveryEntry& out, bool whole);
     // setAside's writing, which says where it wrote: empty where it could
     // not. Marked when it is set aside unless told to keep its own.
     std::string setAsideAt(ALScriptRecoveryEntry entry, bool keep_when);

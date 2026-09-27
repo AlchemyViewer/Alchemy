@@ -5353,9 +5353,9 @@ void ALFloaterScriptStudio::becomeOrphan(Doc& doc, const ALScriptRecoveryEntry& 
     doc.editor->setText(entry.text);
     // Its history, where it has one and it fits the text; nothing it
     // reaches was saved anywhere this tab can reach.
-    if (entry.history.isMap())
+    if (const LLSD history = entry.historyOf(); history.isMap())
     {
-        doc.editor->undoJournal().fromLLSD(entry.history);
+        doc.editor->undoJournal().fromLLSD(history);
     }
     if (entry.notecard && doc.file.empty())
     {

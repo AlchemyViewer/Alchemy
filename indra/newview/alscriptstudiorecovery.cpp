@@ -107,9 +107,10 @@ ALScriptStudioRecovery::Entry ALScriptStudioRecovery::entryOf(const Doc& doc)
     entry.compileTarget = doc.language.compileTarget;
     entry.baseAsset     = doc.assetId;
     entry.text          = doc.editor->text();
-    // The steps that led here, to be taken back next time too, and where
-    // the caret stood.
-    entry.history     = doc.editor->undoJournal().asLLSD(512 * 1024);
+    // The steps that led here, to be taken back next time too, as the
+    // journal writes them -- from what each step was written as the last
+    // time -- and where the caret stood.
+    entry.historyWritten = doc.editor->undoJournal().asNotation();
     entry.caretLine   = doc.editor->caret().line;
     entry.caretColumn = doc.editor->caret().column;
     if (doc.notecard && doc.file.empty())
@@ -267,11 +268,31 @@ void ALScriptStudioRecovery::offerFor(Doc& doc, bool held_elsewhere)
     }
 }
 
-void ALScriptStudioRecovery::takeUp(Doc& doc, const Entry& entry)
+bool ALScriptStudioRecovery::wholeOf(Entry& entry)
+{
+    // A listing reads what it shows; the text and what goes with it are
+    // read as it is taken up.
+    ALScriptRecoveryStore* kept = store();
+    if (entry.whole || (kept && kept->load(entry)))
+    {
+        return true;
+    }
+    LLStringUtil::format_map_t args;
+    args["[NAME]"] = nameOf(entry);
+    mServices.report(mServices.words("RecoveryReadFailed", args), true);
+    return false;
+}
+
+void ALScriptStudioRecovery::takeUp(Doc& doc, const Entry& listed)
 {
     // The kept text put in over what is there, as one step to undo; its
     // entry let go of once this tab's own is written. A notecard's items
     // come with it, since its text says them by their places.
+    Entry entry = listed;
+    if (!wholeOf(entry))
+    {
+        return;
+    }
     if (doc.recoverable && doc.recoverable->path == entry.path)
     {
         doc.recoverable.reset();
@@ -336,12 +357,13 @@ bool ALScriptStudioRecovery::restoreHistory(Doc& doc, const Entry& entry)
     //
     // Only over a tab that holds nothing of its own: the history takes the
     // place of the tab's, and what was typed there would go with it.
-    if (!entry.history.isMap() || doc.editor->isDirty())
+    const LLSD history = entry.historyOf();
+    if (!history.isMap() || doc.editor->isDirty())
     {
         return false;
     }
     const std::optional<std::string> standing = doc.orphan.kind == Doc::Orphan::None ? doc.editor->undoJournal().savedText() : std::nullopt;
-    if (!doc.editor->setTextWithHistory(entry.text, entry.history))
+    if (!doc.editor->setTextWithHistory(entry.text, history))
     {
         // Not the history of this text: the tab is as it was.
         return false;
@@ -372,8 +394,13 @@ bool ALScriptStudioRecovery::restoreHistory(Doc& doc, const Entry& entry)
     return true;
 }
 
-void ALScriptStudioRecovery::recover(const Entry& entry)
+void ALScriptStudioRecovery::recover(const Entry& listed)
 {
+    Entry entry = listed;
+    if (!wholeOf(entry))
+    {
+        return;
+    }
     // Open in another window: put in there, since two tabs of one script
     // would each save over the other.
     if (mWindow.recoverElsewhere(entry))

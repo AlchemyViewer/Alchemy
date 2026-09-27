@@ -182,6 +182,7 @@ namespace tut
             Entry                 entry = ALScriptStudioRecovery::entryOf(doc);
             entry.text                  = text;
             entry.history               = LLSD();
+            entry.historyWritten.clear();
             other.write(entry);
             // What another session left, as this one's store finds it.
             const std::optional<Entry> left = store->leftFor(entry.key);
@@ -215,7 +216,7 @@ namespace tut
         ensure("the text", entry.text == "default {}\n// one two" && entry.key == a.recoveryKey);
         ensure("where it came from", entry.object == a.ref.object && entry.item == a.ref.item && entry.name == "a" && !entry.notecard);
         ensure("the caret", entry.caretLine == 1 && entry.caretColumn == 10);
-        ensure("and the steps", entry.history.isMap());
+        ensure("and the steps, as the journal writes them", entry.historyOf().isMap() && !entry.historyWritten.empty());
 
         Doc& b = tab("b", "default {}\n", a.ref);
         ensure("put back", r.restoreHistory(b, entry));

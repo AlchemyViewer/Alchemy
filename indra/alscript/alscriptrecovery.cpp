@@ -135,69 +135,144 @@ std::string ALScriptRecoveryEntry::whenSaid() const
     return buffer;
 }
 
+namespace
+{
+    // What a listing reads of an entry, and the rest.
+    LLSD metaOf(const ALScriptRecoveryEntry& e, S32 version);
+    LLSD bodyOf(const ALScriptRecoveryEntry& entry);
+    bool metaFrom(const LLSD& sd, ALScriptRecoveryEntry& out);
+    void bodyFrom(const LLSD& sd, ALScriptRecoveryEntry& out);
+}
+
 LLSD ALScriptRecoveryEntry::asLLSD() const
 {
-    LLSD sd;
-    sd["version"]        = 1;
-    sd["key"]            = key;
-    sd["session"]        = session;
-    sd["state"]          = stateName(state);
-    sd["when"]           = when;
-    sd["object"]         = object;
-    sd["item"]           = item;
-    sd["file"]           = file;
-    sd["name"]           = name;
-    sd["object_name"]    = objectName;
-    sd["region"]         = region;
-    sd["lua"]            = lua;
-    sd["notecard"]       = notecard;
-    sd["wrapped"]        = wrapped;
-    sd["compile_target"] = compileTarget;
-    sd["base_asset"]     = baseAsset;
-    sd["text"]           = text;
-    if (embedded.isArray() && embedded.size() > 0)
+    LLSD       sd   = metaOf(*this, 1);
+    const LLSD body = bodyOf(*this);
+    for (LLSD::map_const_iterator it = body.beginMap(); it != body.endMap(); ++it)
     {
-        sd["embedded"] = embedded;
-    }
-    if (history.isMap())
-    {
-        sd["history"] = history;
-    }
-    if (caretLine >= 0)
-    {
-        sd["caret"] = LLSD::emptyArray().with(0, caretLine).with(1, caretColumn);
+        sd[it->first] = it->second;
     }
     return sd;
+}
+
+LLSD ALScriptRecoveryEntry::historyOf() const
+{
+    if (history.isMap() || historyWritten.empty())
+    {
+        return history;
+    }
+    std::istringstream in(historyWritten);
+    LLSD               read;
+    return LLSDSerialize::fromNotation(read, in, static_cast<llssize>(historyWritten.size())) > 0 ? read : LLSD();
+}
+
+std::string ALScriptRecoveryEntry::written() const
+{
+    std::ostringstream meta;
+    LLSDSerialize::toNotation(metaOf(*this, 2), meta);
+    std::ostringstream body;
+    LLSDSerialize::toNotation(bodyOf(*this), body);
+    std::string out = meta.str() + "\n" + body.str();
+    if (!historyWritten.empty())
+    {
+        // Into the body's map as it stands written, before its closing
+        // brace: the body always has its text before it.
+        const size_t close = out.rfind('}');
+        if (close != std::string::npos)
+        {
+            out.insert(close, ",'history':" + historyWritten);
+        }
+    }
+    return out;
+}
+
+namespace
+{
+    LLSD metaOf(const ALScriptRecoveryEntry& e, S32 version)
+    {
+        LLSD sd;
+        sd["version"]        = version;
+        sd["key"]            = e.key;
+        sd["session"]        = e.session;
+        sd["state"]          = stateName(e.state);
+        sd["when"]           = e.when;
+        sd["object"]         = e.object;
+        sd["item"]           = e.item;
+        sd["file"]           = e.file;
+        sd["name"]           = e.name;
+        sd["object_name"]    = e.objectName;
+        sd["region"]         = e.region;
+        sd["lua"]            = e.lua;
+        sd["notecard"]       = e.notecard;
+        sd["wrapped"]        = e.wrapped;
+        sd["compile_target"] = e.compileTarget;
+        sd["base_asset"]     = e.baseAsset;
+        return sd;
+    }
+
+    LLSD bodyOf(const ALScriptRecoveryEntry& e)
+    {
+        LLSD sd;
+        sd["text"] = e.text;
+        if (e.embedded.isArray() && e.embedded.size() > 0)
+        {
+            sd["embedded"] = e.embedded;
+        }
+        if (e.historyWritten.empty() && e.history.isMap())
+        {
+            sd["history"] = e.history;
+        }
+        if (e.caretLine >= 0)
+        {
+            sd["caret"] = LLSD::emptyArray().with(0, e.caretLine).with(1, e.caretColumn);
+        }
+        return sd;
+    }
+
+    bool metaFrom(const LLSD& sd, ALScriptRecoveryEntry& out)
+    {
+        if (!sd.isMap() || !sd.has("key"))
+        {
+            return false;
+        }
+        out.key           = sd["key"].asString();
+        out.session       = sd["session"].asString();
+        out.state         = stateFrom(sd["state"].asString());
+        out.when          = sd["when"].asDate();
+        out.object        = sd["object"].asUUID();
+        out.item          = sd["item"].asUUID();
+        out.file          = sd["file"].asString();
+        out.name          = sd["name"].asString();
+        out.objectName    = sd["object_name"].asString();
+        out.region        = sd["region"].asString();
+        out.lua           = sd["lua"].asBoolean();
+        out.notecard      = sd["notecard"].asBoolean();
+        out.wrapped       = sd["wrapped"].asBoolean();
+        out.compileTarget = sd["compile_target"].asString();
+        out.baseAsset     = sd["base_asset"].asUUID();
+        return !out.key.empty();
+    }
+
+    void bodyFrom(const LLSD& sd, ALScriptRecoveryEntry& out)
+    {
+        out.text        = sd["text"].asString();
+        out.embedded    = sd.has("embedded") ? sd["embedded"] : LLSD::emptyArray();
+        out.history     = sd["history"];
+        out.caretLine   = sd.has("caret") ? sd["caret"][0].asInteger() : -1;
+        out.caretColumn = sd.has("caret") ? sd["caret"][1].asInteger() : -1;
+        out.whole       = true;
+    }
 }
 
 // static
 bool ALScriptRecoveryEntry::fromLLSD(const LLSD& sd, ALScriptRecoveryEntry& out)
 {
-    if (!sd.isMap() || !sd.has("key") || !sd.has("text"))
+    if (!sd.isMap() || !sd.has("text") || !metaFrom(sd, out))
     {
         return false;
     }
-    out.key           = sd["key"].asString();
-    out.session       = sd["session"].asString();
-    out.state         = stateFrom(sd["state"].asString());
-    out.when          = sd["when"].asDate();
-    out.object        = sd["object"].asUUID();
-    out.item          = sd["item"].asUUID();
-    out.file          = sd["file"].asString();
-    out.name          = sd["name"].asString();
-    out.objectName    = sd["object_name"].asString();
-    out.region        = sd["region"].asString();
-    out.lua           = sd["lua"].asBoolean();
-    out.notecard      = sd["notecard"].asBoolean();
-    out.wrapped       = sd["wrapped"].asBoolean();
-    out.compileTarget = sd["compile_target"].asString();
-    out.baseAsset     = sd["base_asset"].asUUID();
-    out.text          = sd["text"].asString();
-    out.embedded      = sd.has("embedded") ? sd["embedded"] : LLSD::emptyArray();
-    out.history       = sd["history"];
-    out.caretLine     = sd.has("caret") ? sd["caret"][0].asInteger() : -1;
-    out.caretColumn   = sd.has("caret") ? sd["caret"][1].asInteger() : -1;
-    return !out.key.empty();
+    bodyFrom(sd, out);
+    return true;
 }
 
 // static
@@ -206,19 +281,26 @@ F64 ALScriptRecoveryRetry::delayAfter(S32 failures)
     return FIRST * std::pow(3.0, static_cast<F64>(llmax(failures, 1) - 1));
 }
 
-// The thread writeSoon writes on: the entries waiting, by key, each as
-// the LLSD it is written as -- made on the thread that asked and handed
-// over whole, since an LLSD's count of who holds it is no thread's but
-// one's -- and whether one is being written now.
+// The thread writeSoon writes on: the entries waiting, by key, each with
+// where it goes -- handed over whole, what it holds of LLSD made on the
+// thread that asked and held by nothing else, since an LLSD's count of
+// who holds it is no thread's but one's -- and whether one is being
+// written now.
 struct ALScriptRecoveryStore::Writer
 {
-    std::mutex                                           mutex;
-    std::condition_variable                              changed;
-    std::map<std::string, std::pair<std::string, LLSD>> waiting;
-    bool                                                 busy     = false;
-    bool                                                 stopping = false;
-    std::vector<std::string>                             failed;
-    std::thread                                          thread;
+    struct Waiting
+    {
+        std::string           path;
+        ALScriptRecoveryEntry entry;
+        bool                  durable = false;
+    };
+    std::mutex                        mutex;
+    std::condition_variable           changed;
+    std::map<std::string, Waiting>    waiting;
+    bool                              busy     = false;
+    bool                              stopping = false;
+    std::vector<std::string>          failed;
+    std::thread                       thread;
 
     void run()
     {
@@ -234,7 +316,7 @@ struct ALScriptRecoveryStore::Writer
             auto one = waiting.extract(waiting.begin());
             busy     = true;
             lock.unlock();
-            const bool written = writeWhole(one.mapped().first, one.mapped().second, false);
+            const bool written = writeWhole(one.mapped().path, one.mapped().entry.written(), one.mapped().durable);
             const std::string key = one.key();
             // Let go of here, the only thread that holds it.
             one = {};
@@ -269,7 +351,7 @@ ALScriptRecoveryStore::~ALScriptRecoveryStore()
     }
 }
 
-void ALScriptRecoveryStore::writeSoon(ALScriptRecoveryEntry entry)
+void ALScriptRecoveryStore::writeSoon(ALScriptRecoveryEntry entry, bool durable)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
     if (entry.key.empty())
@@ -279,17 +361,25 @@ void ALScriptRecoveryStore::writeSoon(ALScriptRecoveryEntry entry)
     LLFile::mkdir(mDirectory);
     entry.session = mSession;
     entry.when    = LLDate::now();
-    // Made into what is written here, the entry let go of here, so that
-    // the thread holds the only hold on it.
-    std::pair<std::string, LLSD> written(pathOf(entry.key, mSession), entry.asLLSD());
-    const std::string            key = std::move(entry.key);
-    entry                            = ALScriptRecoveryEntry();
+    // Handed over whole, and written out there: the thread holds the only
+    // hold on it.
+    Writer::Waiting written;
+    written.path          = pathOf(entry.key, mSession);
+    const std::string key = entry.key;
+    written.entry         = std::move(entry);
+    written.durable       = durable;
     if (!mWriter)
     {
         mWriter = std::make_unique<Writer>();
     }
     {
         const std::lock_guard<std::mutex> lock(mWriter->mutex);
+        // A durable write still waiting stays durable when a newer one
+        // takes its place.
+        if (const auto was = mWriter->waiting.find(key); was != mWriter->waiting.end())
+        {
+            written.durable = written.durable || was->second.durable;
+        }
         mWriter->waiting[key] = std::move(written);
         if (!mWriter->thread.joinable())
         {
@@ -343,14 +433,9 @@ std::string ALScriptRecoveryStore::pathOf(const std::string& key, const std::str
 }
 
 // static
-bool ALScriptRecoveryStore::writeWhole(const std::string& path, const LLSD& sd, bool durable)
+bool ALScriptRecoveryStore::writeWhole(const std::string& path, const std::string& written, bool durable)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
-    // As notation: a person can still read it, and it is a fraction of
-    // what XML makes of a history's many small edits.
-    std::ostringstream text;
-    LLSDSerialize::serialize(sd, text, LLSDSerialize::LLSD_NOTATION, LLSDFormatter::OPTIONS_NONE);
-    const std::string written = text.str();
     // Beside it first, forced out to the disk where it is to be durable,
     // then put in its place: a crash leaves the last whole text or this
     // one, and so does the power going, for one forced out.
@@ -379,21 +464,81 @@ bool ALScriptRecoveryStore::writeWhole(const std::string& path, const LLSD& sd, 
 }
 
 // static
-bool ALScriptRecoveryStore::readEntry(const std::string& path, ALScriptRecoveryEntry& out)
+bool ALScriptRecoveryStore::readEntry(const std::string& path, ALScriptRecoveryEntry& out, bool whole)
 {
-    std::error_code   ec;
-    const std::string text = LLFile::getContents(fsyspath(path), ec);
-    if (ec || text.empty())
+    llifstream file(path, std::ios::in | std::ios::binary);
+    if (!file.is_open())
     {
         return false;
     }
-    std::istringstream in(text);
+    // Its first line: what a listing reads -- or, for an entry written
+    // whole as one document, with a header, as they once were, the start
+    // of all of it.
+    std::string first;
+    std::getline(file, first);
+    if (first.empty())
+    {
+        return false;
+    }
+    if (first[0] == '<')
+    {
+        std::stringstream all;
+        all << first << '\n' << file.rdbuf();
+        const std::string text = all.str();
+        std::istringstream in(text);
+        LLSD               sd;
+        if (!LLSDSerialize::deserialize(sd, in, static_cast<llssize>(text.size())) || !ALScriptRecoveryEntry::fromLLSD(sd, out))
+        {
+            return false;
+        }
+        out.path = path;
+        return true;
+    }
+    std::istringstream meta(first);
     LLSD               sd;
-    if (!LLSDSerialize::deserialize(sd, in, static_cast<llssize>(text.size())) || !ALScriptRecoveryEntry::fromLLSD(sd, out))
+    if (LLSDSerialize::fromNotation(sd, meta, static_cast<llssize>(first.size())) <= 0 || !metaFrom(sd, out))
     {
         return false;
     }
-    out.path = path;
+    out.path  = path;
+    out.whole = false;
+    if (!whole)
+    {
+        return true;
+    }
+    std::stringstream rest;
+    rest << file.rdbuf();
+    const std::string body_text = rest.str();
+    std::istringstream body(body_text);
+    LLSD               body_sd;
+    if (LLSDSerialize::fromNotation(body_sd, body, static_cast<llssize>(body_text.size())) <= 0 || !body_sd.has("text"))
+    {
+        return false;
+    }
+    bodyFrom(body_sd, out);
+    return true;
+}
+
+bool ALScriptRecoveryStore::load(ALScriptRecoveryEntry& entry) const
+{
+    if (entry.whole)
+    {
+        return true;
+    }
+    flush();
+    // Read again whole; what the listing said of it stands, but for what
+    // only the rest says.
+    ALScriptRecoveryEntry read;
+    if (entry.path.empty() || !readEntry(entry.path, read, true) || read.key != entry.key)
+    {
+        return false;
+    }
+    entry.text        = std::move(read.text);
+    entry.embedded    = read.embedded;
+    entry.history     = read.history;
+    entry.caretLine   = read.caretLine;
+    entry.caretColumn = read.caretColumn;
+    entry.whole       = true;
     return true;
 }
 
@@ -408,7 +553,7 @@ bool ALScriptRecoveryStore::write(ALScriptRecoveryEntry entry)
     LLFile::mkdir(mDirectory);
     entry.session = mSession;
     entry.when    = LLDate::now();
-    return writeWhole(pathOf(entry.key, mSession), entry.asLLSD());
+    return writeWhole(pathOf(entry.key, mSession), entry.written());
 }
 
 void ALScriptRecoveryStore::forget(const std::string& key)
@@ -425,7 +570,9 @@ bool ALScriptRecoveryStore::setAside(ALScriptRecoveryEntry entry)
 std::string ALScriptRecoveryStore::setAsideAt(ALScriptRecoveryEntry entry, bool keep_when)
 {
     flush();
-    if (entry.key.empty())
+    // Written again whole among the discarded: what a listing read of it
+    // is not all of it.
+    if (entry.key.empty() || !load(entry))
     {
         return std::string();
     }
@@ -446,7 +593,7 @@ std::string ALScriptRecoveryStore::setAsideAt(ALScriptRecoveryEntry entry, bool 
     // share.
     const std::string target = mDiscarded + fileOf(entry.key) + "." + entry.session + "." +
                                std::to_string(static_cast<S64>(now.secondsSinceEpoch() * 1000.0)) + EXTENSION;
-    return writeWhole(target, entry.asLLSD()) ? target : std::string();
+    return writeWhole(target, entry.written()) ? target : std::string();
 }
 
 bool ALScriptRecoveryStore::discard(const ALScriptRecoveryEntry& entry)
@@ -519,7 +666,7 @@ void ALScriptRecoveryStore::listIn(const std::string& folder, std::vector<ALScri
             continue;
         }
         ALScriptRecoveryEntry entry;
-        if (readEntry(folder + name, entry))
+        if (readEntry(folder + name, entry, /*whole*/ false))
         {
             out.push_back(std::move(entry));
         }
@@ -568,7 +715,7 @@ std::optional<ALScriptRecoveryEntry> ALScriptRecoveryStore::leftFor(const std::s
             continue;
         }
         ALScriptRecoveryEntry entry;
-        if (readEntry(mDirectory + name, entry) && entry.key == key && entry.state != ALScriptRecoveryEntry::State::Discarded &&
+        if (readEntry(mDirectory + name, entry, /*whole*/ false) && entry.key == key && entry.state != ALScriptRecoveryEntry::State::Discarded &&
             (!newest || entry.when.secondsSinceEpoch() > newest->when.secondsSinceEpoch()))
         {
             newest = std::move(entry);
@@ -586,7 +733,7 @@ std::optional<ALScriptRecoveryEntry> ALScriptRecoveryStore::reclaim(const std::s
     }
     const std::string     own = pathOf(key, mSession);
     ALScriptRecoveryEntry entry;
-    if (!readEntry(own, entry) || entry.key != key || entry.state == ALScriptRecoveryEntry::State::Discarded)
+    if (!readEntry(own, entry, /*whole*/ true) || entry.key != key || entry.state == ALScriptRecoveryEntry::State::Discarded)
     {
         return std::nullopt;
     }
@@ -644,7 +791,7 @@ void ALScriptRecoveryStore::prune(F64 max_age_seconds, const LLDate& now)
         if (!known)
         {
             ALScriptRecoveryEntry entry;
-            if (!readEntry(mDiscarded + name, entry))
+            if (!readEntry(mDiscarded + name, entry, /*whole*/ false))
             {
                 continue;
             }

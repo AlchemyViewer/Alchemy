@@ -73,6 +73,25 @@ namespace tut
             return names;
         }
 
+        // Entries as a listing reads them, read whole: what they say of
+        // their text is only there then.
+        static std::vector<ALScriptRecoveryEntry> whole(const ALScriptRecoveryStore& store, std::vector<ALScriptRecoveryEntry> entries)
+        {
+            for (ALScriptRecoveryEntry& one : entries)
+            {
+                ensure("read whole: " + one.key, store.load(one));
+            }
+            return entries;
+        }
+        static std::optional<ALScriptRecoveryEntry> whole(const ALScriptRecoveryStore& store, std::optional<ALScriptRecoveryEntry> one)
+        {
+            if (one)
+            {
+                ensure("read whole: " + one->key, store.load(*one));
+            }
+            return one;
+        }
+
         static ALScriptRecoveryEntry entry(const std::string& key, const std::string& text)
         {
             ALScriptRecoveryEntry one;
@@ -153,7 +172,7 @@ namespace tut
         second["name"]    = "Home";
         card.embedded     = LLSD::emptyArray().with(0, first).with(1, second);
         ensure("written", store.write(card));
-        const std::vector<ALScriptRecoveryEntry> all = store.list();
+        const std::vector<ALScriptRecoveryEntry> all = whole(store, store.list());
         ensure_equals("one", all.size(), size_t(1));
         ensure("a notecard", all.front().notecard);
         ensure_equals("its text, the placeholders in it byte for byte", all.front().text, card.text);
@@ -163,7 +182,7 @@ namespace tut
         ensure("each whole", all.front().embedded[1]["item_id"].asUUID() == second["item_id"].asUUID());
         // Discarded, it keeps them too.
         ensure("discarded", store.discard(all.front()));
-        const std::vector<ALScriptRecoveryEntry> thrown = store.list();
+        const std::vector<ALScriptRecoveryEntry> thrown = whole(store, store.list());
         ensure("the items go with it", thrown.size() == 1 && thrown.front().embedded.size() == 2);
         // A script has none, and says so as an empty list.
         ALScriptRecoveryEntry script;
@@ -178,7 +197,7 @@ namespace tut
         ALScriptRecoveryStore store(folder, "session-a");
         ensure("written", store.write(entry("item:x", "first")));
         ensure("written again", store.write(entry("item:x", "second")));
-        const std::vector<ALScriptRecoveryEntry> all = store.list();
+        const std::vector<ALScriptRecoveryEntry> all = whole(store, store.list());
         ensure_equals("one entry for one key", all.size(), size_t(1));
         ensure_equals("the last text", all.front().text, std::string("second"));
         ensure_equals("this session's", all.front().session, std::string("session-a"));
@@ -202,10 +221,10 @@ namespace tut
         ensure("the crashed session's", before.write(entry("task:o:i", "left behind")));
         ensure("this session's", now.write(entry("task:o:i", "typed since")));
         ensure_equals("both kept", now.list().size(), size_t(2));
-        const std::vector<ALScriptRecoveryEntry> left = now.left();
+        const std::vector<ALScriptRecoveryEntry> left = whole(now, now.left());
         ensure_equals("one left by another session", left.size(), size_t(1));
         ensure_equals("its text", left.front().text, std::string("left behind"));
-        const std::optional<ALScriptRecoveryEntry> found = now.leftFor("task:o:i");
+        const std::optional<ALScriptRecoveryEntry> found = whole(now, now.leftFor("task:o:i"));
         ensure("found by its key", found.has_value() && found->text == "left behind");
         ensure("nothing for another key", !now.leftFor("task:o:j").has_value());
         ensure("something to offer", now.hasOffers());
@@ -228,7 +247,7 @@ namespace tut
             const auto mine = std::find_if(written.begin(), written.end(), [](const ALScriptRecoveryEntry& one) { return one.key == "item:gone"; });
             ensure("discarded", mine != written.end() && store.discard(*mine));
         }
-        std::vector<ALScriptRecoveryEntry> all = store.list();
+        std::vector<ALScriptRecoveryEntry> all = whole(store, store.list());
         ensure_equals("both still listed", all.size(), size_t(2));
         const auto discarded = std::find_if(all.begin(), all.end(), [](const ALScriptRecoveryEntry& one) { return one.key == "item:gone"; });
         ensure("the discarded one", discarded != all.end() && discarded->state == ALScriptRecoveryEntry::State::Discarded);
@@ -275,10 +294,10 @@ namespace tut
         ensure("another session's", other.write(entry("item:a", "left")));
         ensure("set aside", store.setAside(entry("item:a", "thrown")));
         ensure_equals("among the discarded", files("/discarded").size(), size_t(1));
-        const std::optional<ALScriptRecoveryEntry> left = store.leftFor("item:a");
+        const std::optional<ALScriptRecoveryEntry> left = whole(store, store.leftFor("item:a"));
         ensure("what it came from still left", left.has_value() && left->text == "left");
         ensure_equals("and only that is left", store.left().size(), size_t(1));
-        const std::vector<ALScriptRecoveryEntry> all = store.list();
+        const std::vector<ALScriptRecoveryEntry> all = whole(store, store.list());
         const auto thrown = std::find_if(all.begin(), all.end(), [](const ALScriptRecoveryEntry& one) { return one.text == "thrown"; });
         ensure("set aside by this session", thrown != all.end() && thrown->session == "mine" && thrown->state == ALScriptRecoveryEntry::State::Discarded);
 
@@ -306,7 +325,7 @@ namespace tut
             fputs(text.str().c_str(), xml);
             fclose(xml);
         }
-        const std::vector<ALScriptRecoveryEntry> now = store.left();
+        const std::vector<ALScriptRecoveryEntry> now = whole(store, store.left());
         ensure("read", std::any_of(now.begin(), now.end(), [](const ALScriptRecoveryEntry& one) { return one.text == "from before"; }));
     }
 
@@ -328,7 +347,7 @@ namespace tut
         parting.settled = true;
         ensure("let go of", store.letGo(parting));
 
-        const std::vector<ALScriptRecoveryEntry> all = store.list();
+        const std::vector<ALScriptRecoveryEntry> all = whole(store, store.list());
         ensure_equals("one entry", all.size(), size_t(1));
         ensure("set aside, as it stood", all.front().state == ALScriptRecoveryEntry::State::Discarded && all.front().text == "typed since, then closed");
         ensure("by this session", all.front().session == "mine");
@@ -359,7 +378,7 @@ namespace tut
         parting.settled = true;
         ensure("said to have failed", !store.letGo(parting));
 
-        const std::vector<ALScriptRecoveryEntry> all = store.list();
+        const std::vector<ALScriptRecoveryEntry> all = whole(store, store.list());
         const auto own = std::find_if(all.begin(), all.end(), [](const ALScriptRecoveryEntry& one) { return one.session == "mine"; });
         ensure("its own entry still there", own != all.end() && own->text == "typed since");
         ensure("and the one it took up", store.leftFor("item:x").has_value());
@@ -413,7 +432,7 @@ namespace tut
         moved.tookUp   = entry("item:moved", "typed in the other window");
         moved.carrying = true;
         ensure("let go of", store.letGo(moved));
-        const std::vector<ALScriptRecoveryEntry> all = store.list();
+        const std::vector<ALScriptRecoveryEntry> all = whole(store, store.list());
         ensure_equals("one entry", all.size(), size_t(1));
         ensure("the carried text set aside", all.front().state == ALScriptRecoveryEntry::State::Discarded && all.front().text == "typed in the other window");
 
@@ -468,9 +487,15 @@ namespace tut
             ensure_equals("one file", names.size(), size_t(1));
             std::error_code   ec;
             const std::string written = LLFile::getContents(fsyspath(folder + "/" + names.front()), ec);
-            ensure("as notation", written.rfind("<? llsd/notation ?>", 0) == 0);
+            // A line of what a listing reads, then a line of the rest, each
+            // LLSD notation.
+            const size_t line = written.find('\n');
+            ensure("as notation, a line of what a listing reads", written.rfind("{", 0) == 0 && line != std::string::npos);
+            ensure("which is not the text", written.substr(0, line).find("'text'") == std::string::npos);
+            ensure("then the rest", written.compare(line + 1, 8, "{'caret'") == 0 || written.compare(line + 1, 10, "{'history'") == 0 ||
+                                        written.compare(line + 1, 7, "{'text'") == 0);
         }
-        const std::vector<ALScriptRecoveryEntry> back = store.list();
+        const std::vector<ALScriptRecoveryEntry> back = whole(store, store.list());
         ensure("the text as it was", back.size() == 1 && back.front().text == awkward.text);
         ensure("the history as it was", back.front().history["undo"][0]["edits"][0][5].asString() == awkward.text &&
                                              back.front().history["undo"][0]["label"].asString() == "it's");
@@ -483,7 +508,7 @@ namespace tut
         ms_sleep(20);
         ensure("and another", store.setAside(entry("item:b", "mine, later")));
         ensure_equals("both kept", files("/discarded").size(), size_t(2));
-        const std::vector<ALScriptRecoveryEntry> all = store.list();
+        const std::vector<ALScriptRecoveryEntry> all = whole(store, store.list());
         ensure("the session it was set aside for", std::any_of(all.begin(), all.end(), [](const ALScriptRecoveryEntry& one) { return one.text == "theirs" && one.session == "theirs"; }));
         ensure("this one where none was named", std::any_of(all.begin(), all.end(), [](const ALScriptRecoveryEntry& one) { return one.text == "mine, later" && one.session == "mine"; }));
 
@@ -494,7 +519,7 @@ namespace tut
         // Apart by more than the centisecond a date is written to.
         ms_sleep(20);
         ensure("newer", newer.write(entry("item:d", "newer")));
-        const std::vector<ALScriptRecoveryEntry> left = store.left();
+        const std::vector<ALScriptRecoveryEntry> left = whole(store, store.left());
         ensure("newest first", left.size() == 2 && left.front().text == "newer" && left.back().text == "older");
     }
 
@@ -536,7 +561,7 @@ namespace tut
             }
             store.writeSoon(entry("item:y", "other"));
             store.flush();
-            const std::vector<ALScriptRecoveryEntry> all = store.list();
+            const std::vector<ALScriptRecoveryEntry> all = whole(store, store.list());
             ensure_equals("one entry a key", all.size(), size_t(2));
             for (const ALScriptRecoveryEntry& one : all)
             {
@@ -560,7 +585,7 @@ namespace tut
         }
         ALScriptRecoveryStore again(folder, "session-a");
         bool z = false;
-        for (const ALScriptRecoveryEntry& one : again.list())
+        for (const ALScriptRecoveryEntry& one : whole(again, again.list()))
         {
             z |= one.key == "item:z" && one.text == "as it went";
         }
@@ -612,7 +637,7 @@ namespace tut
 
         store.forget("task:a:b");
         ensure("a tab opened clean forgets nothing of it", files("/discarded").size() == 1);
-        const std::vector<ALScriptRecoveryEntry> listed = store.list();
+        const std::vector<ALScriptRecoveryEntry> listed = whole(store, store.list());
         ensure("offered under Recover Unsaved Changes", listed.size() == 1 && listed.front().text == went.text);
         ensure("reclaimed once", !store.reclaim("task:a:b"));
 
@@ -621,5 +646,39 @@ namespace tut
         ensure("another session's is not this one's to reclaim", !store.reclaim("task:c:d") && store.leftFor("task:c:d"));
         store.remove(*back);
         ensure("taken up, gone", files("/discarded").empty());
+    }
+
+    template<> template<>
+    void alscriptrecovery_object::test<19>()
+    {
+        set_test_name("a listing reads what it shows and no more; the rest is read as it is taken up; a history written as notation reads back as one");
+        ALScriptRecoveryStore store(folder, "mine");
+        ALScriptRecoveryStore other(folder, "theirs");
+        ALScriptRecoveryEntry big = entry("item:big", std::string(200000, 'x'));
+        big.caretLine             = 3;
+        big.caretColumn           = 4;
+        big.historyWritten        = "{'version':i2,'undo':[{'label':'it\\'s','edits':[]}],'redo':[],'saved':i-1}";
+        ensure("written", other.write(big));
+        const std::vector<ALScriptRecoveryEntry> listed = store.left();
+        ensure_equals("listed", listed.size(), size_t(1));
+        ensure("with what it shows", listed.front().name == "My Script" && listed.front().key == "item:big" && listed.front().session == "theirs");
+        ensure("and not its text", !listed.front().whole && listed.front().text.empty() && listed.front().caretLine < 0);
+        ALScriptRecoveryEntry taken = listed.front();
+        ensure("read whole", store.load(taken));
+        ensure("its text", taken.whole && taken.text == big.text);
+        ensure("its caret", taken.caretLine == 3 && taken.caretColumn == 4);
+        ensure("its history, written as notation, read back", taken.history["undo"][0]["label"].asString() == "it's" && taken.history["saved"].asInteger() == -1);
+        ensure("whole already, read again as it is", store.load(taken) && taken.text == big.text);
+        store.remove(taken);
+        ALScriptRecoveryEntry gone = listed.front();
+        ensure("its file gone, not read", !store.load(gone));
+        // Set aside from a listing, it is read whole first: nothing of its
+        // text is lost among the discarded.
+        ensure("written again", other.write(big));
+        const std::optional<ALScriptRecoveryEntry> again = store.leftFor("item:big");
+        ensure("found, as a listing reads it", again && !again->whole);
+        ensure("discarded", store.discard(*again));
+        const std::vector<ALScriptRecoveryEntry> thrown = whole(store, store.list());
+        ensure("with its text", thrown.size() == 1 && thrown.front().text == big.text && thrown.front().history["undo"].size() == 1);
     }
 }
