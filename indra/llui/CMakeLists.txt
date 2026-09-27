@@ -161,6 +161,7 @@ target_sources(
     altextdiff.cpp
     altextdocument.cpp
     altextediting.cpp
+    altextindent.cpp
     altextlayout.cpp
     altextsearch.cpp
     altextspelling.cpp
@@ -373,6 +374,7 @@ target_sources(
         altextdiff.h
         altextdocument.h
         altextediting.h
+        altextindent.h
         altextlayout.h
         altextsearch.h
         altextspelling.h
@@ -571,6 +573,7 @@ if(AL_BUILD_TESTS)
     alundostack
     alsyntaxgrammars
     altextediting
+    altextindent
     altextlayout
     altextsearch
     altextspelling

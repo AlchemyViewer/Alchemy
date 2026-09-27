@@ -29,6 +29,7 @@
 #include "alsyntaxhighlighter.h"
 #include "altextdocument.h"
 #include "altextediting.h"
+#include "altextindent.h"
 #include "altextspelling.h"
 #include "altextlayout.h"
 #include "altextsearch.h"
@@ -808,11 +809,11 @@ private:
     // first thing on its line: the line brought out to where it belongs;
     // and a word so brought out that goes on into a longer one put back.
     void                 outdentAsTyped(llwchar typed);
-    // What ALTextEditing works a command out with -- the view's tabs, and
+    // What ALTextIndent works a command out with -- the view's tabs, and
     // the bracket a closing one closes, where a subclass can match one --
-    // and what it works out done, as one step to undo.
-    ALTextEditing::Options  editingOptions() const;
-    ALTextEditing::opener_t openerOf();
+    // and what it or ALTextEditing works out done, as one step to undo.
+    ALTextIndent::Options  editingOptions() const;
+    ALTextIndent::opener_t openerOf();
 
     void                 allowLanguageInput(bool allow);
     // Whether what an input method composes goes into the text: not in a
@@ -932,7 +933,7 @@ private:
     // The line a closing word last brought out, where the caret stood
     // after it, and the blanks it had: undone if the next character makes
     // the word a longer one.
-    ALTextEditing::AutoOutdent mAutoOutdent;
+    ALTextIndent::AutoOutdent mAutoOutdent;
     bool mSoftTabs  = false;
     S32  mTabWidth  = 4;
     S32  mHPad      = 4;

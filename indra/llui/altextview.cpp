@@ -1398,7 +1398,7 @@ bool ALTextView::convertIndentation(S32 first, S32 last, bool to_spaces, S32 mea
         return false;
     }
     const std::optional<ALTextEditing::Change> change =
-        ALTextEditing::convertIndentation(mDocument, first, last, to_spaces, getTabWidth(), measured_width);
+        ALTextIndent::convertIndentation(mDocument, first, last, to_spaces, getTabWidth(), measured_width);
     if (!change)
     {
         return false;
@@ -1824,15 +1824,15 @@ void ALTextView::deleteRange(const ALTextRange& range)
 
 // --- line commands and indentation ----------------------------------------------
 
-ALTextEditing::Options ALTextView::editingOptions() const
+ALTextIndent::Options ALTextView::editingOptions() const
 {
-    ALTextEditing::Options options;
+    ALTextIndent::Options options;
     options.tabWidth = mTabWidth;
     options.softTabs = mSoftTabs;
     return options;
 }
 
-ALTextEditing::opener_t ALTextView::openerOf()
+ALTextIndent::opener_t ALTextView::openerOf()
 {
     return [this](const ALTextPos& closer, ALTextPos& opener) { return closerOpenedAt(closer, opener); };
 }
@@ -1863,7 +1863,7 @@ void ALTextView::apply(const ALTextEditing::Change& change)
 
 std::string ALTextView::tabText(const ALTextPos& at) const
 {
-    return ALTextEditing::tabText(mDocument, at, editingOptions());
+    return ALTextIndent::tabText(mDocument, at, editingOptions());
 }
 
 void ALTextView::newLine()
@@ -1872,11 +1872,11 @@ void ALTextView::newLine()
     // A key typed, whatever it takes: one with the typing around it.
     mUndo.beginTyping(selection());
     if (const std::optional<ALTextEditing::Replacement> closing =
-            ALTextEditing::closingBeforeReturn(mDocument, mAnchor, mCaret, grammar, openerOf(), editingOptions()))
+            ALTextIndent::closingBeforeReturn(mDocument, mAnchor, mCaret, grammar, openerOf(), editingOptions()))
     {
         replaceAll({ { closing->range, closing->text } });
     }
-    const ALTextEditing::Split split = ALTextEditing::splitLine(mDocument, selection(), grammar, editingOptions());
+    const ALTextIndent::Split split = ALTextIndent::splitLine(mDocument, selection(), grammar, editingOptions());
     setSelection(split.range);
     insertText(split.text);
     if (split.caret)
@@ -1889,9 +1889,9 @@ void ALTextView::newLine()
 
 void ALTextView::outdentAsTyped(llwchar typed)
 {
-    const ALTextEditing::Outdent outdent =
-        ALTextEditing::outdentAsTyped(mDocument, mAnchor, mCaret, typed, mHighlighter.grammar().get(), openerOf(), mAutoOutdent, editingOptions());
-    mAutoOutdent = ALTextEditing::AutoOutdent();
+    const ALTextIndent::Outdent outdent =
+        ALTextIndent::outdentAsTyped(mDocument, mAnchor, mCaret, typed, mHighlighter.grammar().get(), openerOf(), mAutoOutdent, editingOptions());
+    mAutoOutdent = ALTextIndent::AutoOutdent();
     if (outdent.replacement && replaceAll({ { outdent.replacement->range, outdent.replacement->text } }))
     {
         mAutoOutdent = outdent.next;
@@ -2058,7 +2058,7 @@ bool ALTextView::perform(ALEditorCommand command)
             // alone puts a tab in.
             if (hasSelection())
             {
-                apply(ALTextEditing::indentLines(mDocument, mAnchor, mCaret, true, editingOptions()));
+                apply(ALTextIndent::indentLines(mDocument, mAnchor, mCaret, true, editingOptions()));
             }
             else
             {
@@ -2066,7 +2066,7 @@ bool ALTextView::perform(ALEditorCommand command)
             }
             return true;
         case C::Unindent:
-            apply(ALTextEditing::indentLines(mDocument, mAnchor, mCaret, false, editingOptions()));
+            apply(ALTextIndent::indentLines(mDocument, mAnchor, mCaret, false, editingOptions()));
             return true;
         case C::Undo:
             undo();
