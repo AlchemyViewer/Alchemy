@@ -26,6 +26,8 @@
 
 #include "alfoldmodel.h"
 
+#include "altextchars.h"
+
 #include <algorithm>
 
 namespace
@@ -71,25 +73,10 @@ const std::vector<ALFoldModel::Region>& ALFoldModel::regions(const ALTextDocumen
     for (S32 l = 0; l < count; ++l)
     {
         const std::string& line  = doc.line(l);
-        S32                n     = 0;
-        bool               blank = true;
-        for (char c : line)
-        {
-            if (c == ' ')
-            {
-                ++n;
-            }
-            else if (c == '\t')
-            {
-                n = (n / tab + 1) * tab;
-            }
-            else if (c != '\r')
-            {
-                blank = false;
-                break;
-            }
-        }
-        indent[l] = blank ? -1 : n;
+        size_t             lead  = 0;
+        const S32          n     = alBlanksWidth(line, tab, &lead);
+        const bool         blank = line.find_first_not_of(" \t\r", lead) == std::string::npos;
+        indent[l]                = blank ? -1 : n;
     }
     // A block is a line and the deeper lines after it, with a line of
     // nothing going with whichever side keeps the block whole, and the

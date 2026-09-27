@@ -36,15 +36,13 @@ namespace
         return c == ' ' || c == '\t';
     }
 
-    // How wide a run of blanks is drawn, tabs to their stops.
-    S32 blanksWidth(std::string_view blanks, S32 tab_width)
+    // Blanks as wide as asked: tabs, then spaces for what is left; or
+    // spaces alone.
+    std::string blanksOf(S32 width, S32 tab_width, bool tabs)
     {
-        S32 width = 0;
-        for (const char c : blanks)
-        {
-            width = c == '\t' ? (width / tab_width + 1) * tab_width : width + 1;
-        }
-        return width;
+        tab_width = llmax(1, tab_width);
+        return tabs ? std::string(static_cast<size_t>(width / tab_width), '\t') + std::string(static_cast<size_t>(width % tab_width), ' ')
+                    : std::string(static_cast<size_t>(width), ' ');
     }
 
     // Where a line's text begins, past its blanks.
@@ -70,7 +68,7 @@ std::string tabText(const ALTextDocument& doc, const ALTextPos& at, const Option
         return "\t";
     }
     const S32 column = doc.displayColumn(at, options.tabWidth);
-    return std::string(options.tabWidth - (column % options.tabWidth), ' ');
+    return std::string(static_cast<size_t>(alNextTabStop(column, options.tabWidth) - column), ' ');
 }
 
 std::string leadingBlanks(const ALTextDocument& doc, S32 line)
@@ -89,12 +87,8 @@ std::string indentUnit(const std::string& like, const Options& options)
 
 std::string outdented(const std::string& indent, const Options& options)
 {
-    const S32 width = llmax(0, blanksWidth(indent, options.tabWidth) - options.tabWidth);
-    if (indent.find('\t') != std::string::npos)
-    {
-        return std::string(width / options.tabWidth, '\t') + std::string(width % options.tabWidth, ' ');
-    }
-    return std::string(width, ' ');
+    const S32 width = llmax(0, alBlanksWidth(indent, options.tabWidth) - options.tabWidth);
+    return blanksOf(width, options.tabWidth, indent.find('\t') != std::string::npos);
 }
 
 std::string closingIndent(const ALTextDocument& doc, S32 line, const ALSyntaxGrammar* grammar, const opener_t& opener, const Options& options)
@@ -131,7 +125,7 @@ std::optional<Replacement> reindent(const ALTextDocument& doc, S32 line, const s
 {
     const std::string lead = leadingBlanks(doc, line);
     // Only ever out: a line put further out by hand stays where it was put.
-    if (lead == indent || blanksWidth(lead, options.tabWidth) <= blanksWidth(indent, options.tabWidth))
+    if (lead == indent || alBlanksWidth(lead, options.tabWidth) <= alBlanksWidth(indent, options.tabWidth))
     {
         return std::nullopt;
     }
@@ -503,17 +497,10 @@ std::optional<Change> convertIndentation(const ALTextDocument& doc, S32 first, S
     Change change;
     for (S32 line = llmax(0, first); line <= last; ++line)
     {
-        // How wide the blanks are, each tab to its next stop.
         const std::string& text  = doc.line(line);
-        S32                width = 0;
         size_t             end   = 0;
-        for (; end < text.size() && (text[end] == ' ' || text[end] == '\t'); ++end)
-        {
-            width = text[end] == '\t' ? (width / measure_width + 1) * measure_width : width + 1;
-        }
-        const std::string again = to_spaces ? std::string(static_cast<size_t>(width), ' ')
-                                            : std::string(static_cast<size_t>(width / tab_width), '\t') +
-                                                  std::string(static_cast<size_t>(width % tab_width), ' ');
+        const S32          width = alBlanksWidth(text, measure_width, &end);
+        const std::string  again = blanksOf(width, tab_width, !to_spaces);
         if (again != text.substr(0, end))
         {
             change.replacements.push_back({ ALTextRange(ALTextPos(line, 0), ALTextPos(line, static_cast<S32>(end))), again });

@@ -26,6 +26,7 @@
 
 #include "altextlayout.h"
 
+#include "altextchars.h"
 #include "llfontfreetype.h"
 #include "llstring.h"
 
@@ -478,7 +479,7 @@ void ALTextLayout::layoutLine(S32 index, Line& out)
             inlays_at(piece);
             continue;
         }
-        const F32 stop = (floorf(x / tab_stop) + 1.f) * tab_stop;
+        const F32 stop = alNextTabStop(x, tab_stop);
         out.placed.push_back(LLFontGL::Placed{ nullptr, 0, x * inv_x, 0.f });
         out.glyphs.push_back(Glyph{ static_cast<S32>(at), x * inv_x, (stop - x) * inv_x });
         x     = stop;

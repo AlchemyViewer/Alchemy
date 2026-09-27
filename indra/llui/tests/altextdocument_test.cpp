@@ -361,4 +361,23 @@ namespace tut
         doc.replaceMany({ { R(P(3, 0), P(3, 0)), "x" } });
         ensure("one stretch is a plain edit", heard.size() == 1 && heard[0].parts.empty());
     }
+
+    template<> template<>
+    void altextdocument_object::test<17>()
+    {
+        set_test_name("the next tab stop, in columns and in pixels; and how wide a text's leading blanks are, and how many bytes");
+        ensure_equals("from a stop to the next", alNextTabStop(0, 4), 4);
+        ensure_equals("from inside to the next", alNextTabStop(5, 4), 8);
+        ensure_equals("a width of none taken as one", alNextTabStop(3, 0), 4);
+        ensure_equals("in pixels", alNextTabStop(13.f, 8.f), 16.f);
+        ensure_equals("in pixels, from a stop", alNextTabStop(16.f, 8.f), 24.f);
+        size_t bytes = 0;
+        ensure_equals("spaces, then a tab to its stop", alBlanksWidth("  \tx", 4, &bytes), 4);
+        ensure_equals("three bytes of them", bytes, size_t(3));
+        ensure_equals("a tab, then spaces", alBlanksWidth("\t  x", 4), 6);
+        ensure_equals("nothing blank", alBlanksWidth("x  ", 4, &bytes), 0);
+        ensure_equals("no bytes", bytes, size_t(0));
+        ensure_equals("all blank", alBlanksWidth(" \t", 2, &bytes), 2);
+        ensure_equals("all of it", bytes, size_t(2));
+    }
 }

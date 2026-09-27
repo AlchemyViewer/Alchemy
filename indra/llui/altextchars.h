@@ -26,8 +26,10 @@
 
 #include "llstring.h"
 
+#include <cmath>
 #include <string>
 #include <string_view>
+#include <type_traits>
 
 // The one answer the document, the view, the editor, the search and the
 // vim keymap give to what a byte is: part of a word, part of a name, a
@@ -83,22 +85,54 @@ inline size_t alMatchAt(std::string_view hay, size_t at, std::string_view needle
     return h;
 }
 
+// Where a tab at a place reaches: the next stop past it, the stops a tab's
+// width apart. In display columns, or in pixels as a line is laid out.
+template <typename T>
+inline T alNextTabStop(T at, T tab_width)
+{
+    if constexpr (std::is_floating_point_v<T>)
+    {
+        return tab_width > T(0) ? (std::floor(at / tab_width) + T(1)) * tab_width : at;
+    }
+    else
+    {
+        tab_width = tab_width > 0 ? tab_width : 1;
+        return (at / tab_width + 1) * tab_width;
+    }
+}
+
+// How wide the blanks a text begins with are drawn, in display columns,
+// each tab to its next stop; and how many bytes they are.
+inline S32 alBlanksWidth(std::string_view text, S32 tab_width, size_t* bytes = nullptr)
+{
+    S32    width = 0;
+    size_t at    = 0;
+    for (; at < text.size() && (text[at] == ' ' || text[at] == '\t'); ++at)
+    {
+        width = text[at] == '\t' ? alNextTabStop(width, tab_width) : width + 1;
+    }
+    if (bytes)
+    {
+        *bytes = at;
+    }
+    return width;
+}
+
 // A stretch of text with its tabs as spaces to the next stop, starting at
 // a display column -- one per character, a tab reaching the next stop --
 // which is moved on past it: what a text drawn somewhere a tab is not
 // honoured shows, where the view's own stops are wanted.
 inline std::string alExpandTabs(std::string_view text, S32& column, S32 tab_width)
 {
-    tab_width = tab_width > 0 ? tab_width : 1;
     std::string out;
     out.reserve(text.size());
     for (const char c : text)
     {
         if (c == '\t')
         {
-            const S32 spaces = tab_width - column % tab_width;
-            out.append(static_cast<size_t>(spaces), ' ');
-            column += spaces;
+            const S32 stop = alNextTabStop(column, tab_width);
+            out.append(static_cast<size_t>(stop - column), ' ');
+            column = stop;
             continue;
         }
         out.push_back(c);

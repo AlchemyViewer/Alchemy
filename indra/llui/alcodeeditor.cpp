@@ -1339,26 +1339,10 @@ S32 ALCodeEditor::indentOf(S32 line) const
     const S32 count = document().lineCount();
     for (S32 l = line; l < count && l < line + 200; ++l)
     {
-        const std::string& text = document().line(l);
-        S32                columns = 0;
-        bool               blank   = true;
-        for (char c : text)
-        {
-            if (c == ' ')
-            {
-                ++columns;
-            }
-            else if (c == '\t')
-            {
-                columns += getTabWidth() - columns % getTabWidth();
-            }
-            else
-            {
-                blank = false;
-                break;
-            }
-        }
-        if (!blank)
+        const std::string& text    = document().line(l);
+        size_t             lead    = 0;
+        const S32          columns = alBlanksWidth(text, getTabWidth(), &lead);
+        if (lead < text.size())
         {
             return columns;
         }

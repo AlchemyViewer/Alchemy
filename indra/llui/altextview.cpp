@@ -3336,7 +3336,7 @@ void ALTextView::drawMap(F32 alpha)
             if (c == '\t')
             {
                 flush(col);
-                col = (col / mTabWidth + 1) * mTabWidth;
+                col = alNextTabStop(col, mTabWidth);
             }
             else if (c == ' ')
             {

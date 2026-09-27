@@ -26,6 +26,7 @@
 
 #include "altextdocument.h"
 
+#include "altextchars.h"
 #include "llstring.h"
 
 #include <algorithm>
@@ -665,7 +666,7 @@ S32 ALTextDocument::displayColumn(ALTextPos pos, S32 tab_width) const
     while (at < static_cast<size_t>(pos.column))
     {
         const size_t next = utf8str_step_grapheme_forward(l, at);
-        col               = (l[at] == '\t') ? (col / tab_width + 1) * tab_width : col + 1;
+        col               = (l[at] == '\t') ? alNextTabStop(col, tab_width) : col + 1;
         at                = next;
     }
     return col;
@@ -680,7 +681,7 @@ ALTextPos ALTextDocument::posAtDisplayColumn(S32 line, S32 display_column, S32 t
     size_t             at  = 0;
     while (at < l.size() && col < display_column)
     {
-        const S32 after = (l[at] == '\t') ? (col / tab_width + 1) * tab_width : col + 1;
+        const S32 after = (l[at] == '\t') ? alNextTabStop(col, tab_width) : col + 1;
         // A tab that reaches past the column wanted is the column wanted:
         // nothing sits inside a tab.
         if (after > display_column && l[at] == '\t')
