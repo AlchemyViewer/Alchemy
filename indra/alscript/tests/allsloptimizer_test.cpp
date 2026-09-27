@@ -1064,4 +1064,26 @@ namespace tut
         ensure("not all of it", note->args[0].size() < 80 && note->args[0].find("\xE2\x80\xA6") != std::string::npos);
         ensure("from its start", note->args[0].rfind("llOwnerSay", 0) == 0);
     }
+
+    template<> template<>
+    void allsloptimizer_object::test<29>()
+    {
+        set_test_name("one budget for the inliner and the optimizer: what the inliner visits is spent, and a round is not begun the budget cannot see through");
+        const std::string source = wrap("integer twice(integer n) { return n * 2; }\ninteger thrice(integer n) { return twice(n) + n; }\n",
+                                        "        llSay(0, (string)thrice(2));\n        llSay(0, (string)(1 + 2));\n");
+        ALLSLOptimizer::Options o = options();
+        o.inlining                = true;
+        const ALLSLOptimizer::Result whole = ALLSLOptimizer::run(source, o);
+        ensure("with room: not stopped", !whole.stoppedEarly);
+        // Room for the inliner's first round and not much more: it stops,
+        // and leaves the optimizer nothing.
+        const ALLSLInliner::Result once = ALLSLInliner::run(source, {}, size_t(-1));
+        ensure("the inliner visits", once.visited > 0);
+        o.visitBudget = once.visited / 4;
+        const ALLSLOptimizer::Result short_of = ALLSLOptimizer::run(source, o);
+        ensure("the optimizer stopped for what the inliner spent", short_of.stoppedEarly);
+        ensure("said", std::any_of(short_of.problems.begin(), short_of.problems.end(), [](const ALScriptProblem& p) { return p.key == "OptimizerStoppedEarly"; }));
+        const ALLSLInliner::Result cut = ALLSLInliner::run(source, {}, 1);
+        ensure("the inliner's one round done, the next not begun", cut.inlined > 0 && (cut.stoppedEarly || cut.inlined == once.inlined));
+    }
 } // namespace tut

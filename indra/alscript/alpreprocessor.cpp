@@ -4158,7 +4158,7 @@ void ALPreprocessor::optimize(Result& result, const Options& options)
             {
                 ALScriptProblem& note = result.problems[i];
                 if (note.source != ALScriptProblem::Source::Optimizer || note.severity != ALScriptProblem::Severity::Note ||
-                    note.key == "OptimizerStoppedEarly" || note.endLine < note.line)
+                    note.key == "OptimizerStoppedEarly" || note.key == "InlinerStoppedEarly" || note.endLine < note.line)
                 {
                     continue;
                 }

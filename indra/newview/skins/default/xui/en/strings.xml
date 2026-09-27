@@ -542,6 +542,7 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="OptimizerSizes">optimized from [1] to [2] bytes of source; script memory is the simulator's to say</string>
 	<string name="OptimizerSizesWeighed">optimized from [1] to [2] bytes of source, and from [3] to [4] bytes of code on [5]</string>
 	<string name="OptimizerStoppedEarly">stopped after [1] rounds: there may be more to do</string>
+	<string name="InlinerStoppedEarly">stopped putting functions in place part way: there may be more to put in place</string>
 	<string name="OptimizerIfAlwaysFalse">the condition of this if is always false; kept only what runs</string>
 	<string name="OptimizerIfAlwaysTrue">the condition of this if is always true; kept only what runs</string>
 	<string name="OptimizerInlinedConstant">inlined [1] to [2]</string>

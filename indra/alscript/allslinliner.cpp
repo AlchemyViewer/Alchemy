@@ -870,7 +870,22 @@ namespace
     // One round: every call that can go in place and does not cross
     // another's edit goes, and a function goes with the last of its
     // calls. How many went.
-    S32 inlineRound(std::string& text, ALSourceMap& map, ALScriptProblems& notes, const std::vector<std::string>& marked)
+    // How many nodes a script is: what one walk of it visits.
+    struct CountNodes : public ASTVisitor
+    {
+        size_t count = 0;
+        bool   visit(LSLASTNode*) override
+        {
+            ++count;
+            return true;
+        }
+    };
+
+    // A round's walks of the script: the parse, the symbols, the types, the
+    // references, and the inliner's own look through it.
+    constexpr size_t WALKS_A_ROUND = 5;
+
+    S32 inlineRound(std::string& text, ALSourceMap& map, ALScriptProblems& notes, const std::vector<std::string>& marked, size_t& walked)
     {
         ScopedScriptParser parser(nullptr);
         LSLScript*         script = parser.parseLSLBytes(text.data(), static_cast<int>(text.size()));
@@ -878,6 +893,9 @@ namespace
         {
             return 0;
         }
+        CountNodes nodes;
+        script->visit(&nodes);
+        walked = nodes.count * WALKS_A_ROUND;
         script->collectSymbols();
         script->determineTypes();
         script->recalculateReferenceData();
@@ -1073,7 +1091,7 @@ namespace
 } // namespace
 
 // static
-ALLSLInliner::Result ALLSLInliner::run(std::string_view source, const std::vector<std::string>& marked)
+ALLSLInliner::Result ALLSLInliner::run(std::string_view source, const std::vector<std::string>& marked, size_t budget)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
     AL_SCRIPT_ENGINE_HELD;
@@ -1087,11 +1105,22 @@ ALLSLInliner::Result ALLSLInliner::run(std::string_view source, const std::vecto
     }
     // Round after round, each over the text the last made, its map over
     // the last's, until nothing more can go.
+    size_t last = 0;
     for (int round = 0; round < 64; ++round)
     {
+        // Each round a whole parse and its walks: none begun that would go
+        // past the budget as the last did, what was done so far standing.
+        if (result.visited + last > budget)
+        {
+            result.stoppedEarly = true;
+            break;
+        }
         ALSourceMap      step;
         ALScriptProblems said;
-        const S32        went = inlineRound(result.text, step, said, marked);
+        size_t           walked = 0;
+        const S32        went   = inlineRound(result.text, step, said, marked, walked);
+        result.visited += walked;
+        last = walked;
         if (went == 0)
         {
             break;

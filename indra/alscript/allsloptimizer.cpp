@@ -1904,8 +1904,8 @@ namespace
 
     // ---- the passes -----------------------------------------------------------------------------
 
-    // How many nodes a script is, for the budget: a round costs about
-    // one visit of each.
+    // How many nodes a script is, for the budget: what one walk of it
+    // visits.
     struct Gather : public ASTVisitor
     {
         size_t& count;
@@ -3467,9 +3467,21 @@ ALLSLOptimizer::Result ALLSLOptimizer::run(std::string_view source, const Option
     // inliner's hold is its only one and it can let go between rounds.
     std::string inlined;
     ALSourceMap inlinedMap;
+    size_t      spent = 0;
     if (options.inlining)
     {
-        ALLSLInliner::Result put = ALLSLInliner::run(source, options.inlineNames);
+        ALLSLInliner::Result put = ALLSLInliner::run(source, options.inlineNames, options.visitBudget);
+        // One budget for the two: what the inliner visited is spent.
+        spent = put.visited;
+        if (put.stoppedEarly)
+        {
+            ALScriptProblem p;
+            p.severity = ALScriptProblem::Severity::Note;
+            p.source   = ALScriptProblem::Source::Optimizer;
+            p.key      = "InlinerStoppedEarly";
+            p.message  = "stopped putting functions in place part way: there may be more to put in place";
+            result.problems.push_back(std::move(p));
+        }
         if (put.inlined > 0)
         {
             inlined    = std::move(put.text);
@@ -3545,18 +3557,27 @@ ALLSLOptimizer::Result ALLSLOptimizer::run(std::string_view source, const Option
     // round changes nothing -- or until the run has visited as much as
     // its budget allows, since a large script whose passes keep finding
     // work would otherwise hold whoever asked for as long as it liked.
-    size_t     visited = 0;
+    // Every walk of the script counted as it is made -- a pass, and the
+    // references and values found again after a pass that changed
+    // something -- from what the inliner left of the budget.
+    size_t     visited = spent;
     const auto nodes   = [&]() {
         size_t count = 0;
         Gather gather(count);
         script->visit(&gather);
         return count;
     };
-    const size_t perRound = std::max<size_t>(1, nodes());
+    const size_t perWalk = std::max<size_t>(1, nodes());
+    const auto   walks   = [&](size_t count) { visited += perWalk * count; };
+    const auto   refresh = [&]() {
+        script->recalculateReferenceData();
+        propagate();
+        walks(2);
+    };
     for (int round = 0; round < 64; ++round)
     {
-        visited += perRound;
-        if (visited > options.visitBudget)
+        // No round begun that the budget cannot see through its passes.
+        if (visited + perWalk * 3 > options.visitBudget)
         {
             result.stoppedEarly = true;
             report.note(nullptr, "OptimizerStoppedEarly", "stopped after [1] rounds: there may be more to do", { std::to_string(round) });
@@ -3567,33 +3588,33 @@ ALLSLOptimizer::Result ALLSLOptimizer::run(std::string_view source, const Option
         {
             Folder folder(ctx, report, options);
             script->visit(&folder);
+            walks(1);
             if (folder.changes)
             {
                 changes += folder.changes;
-                script->recalculateReferenceData();
-                propagate();
+                refresh();
             }
         }
         if (options.constfold)
         {
             Simplifier simplifier(ctx, report, options);
             script->visit(&simplifier);
+            walks(1);
             if (simplifier.changes)
             {
                 changes += simplifier.changes;
-                script->recalculateReferenceData();
-                propagate();
+                refresh();
             }
         }
         if (options.dcr)
         {
             DeadCode dead(ctx, report, options);
             const int removed = dead.run(script);
+            walks(1);
             if (removed)
             {
                 changes += removed;
-                script->recalculateReferenceData();
-                propagate();
+                refresh();
             }
         }
         if (!changes)

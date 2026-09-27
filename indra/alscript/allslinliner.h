@@ -64,10 +64,17 @@ public:
         ALScriptProblems notes;
         // How many were.
         S32              inlined = 0;
+        // What it visited, node by node over every walk of every round,
+        // against the budget it was given; and whether it stopped for it,
+        // with what it had done so far standing.
+        size_t           visited      = 0;
+        bool             stoppedEarly = false;
     };
 
     // Needs the builtins loaded through ALLSLService, as the optimizer
     // does; the source must parse, or it is returned as it is. The
     // functions named are put in place wherever they are called.
-    static Result run(std::string_view source, const std::vector<std::string>& marked = {});
+    // No more is visited than `budget`, which the optimizer's run after it
+    // shares (ALLSLOptimizer::Options::visitBudget).
+    static Result run(std::string_view source, const std::vector<std::string>& marked = {}, size_t budget = size_t(-1));
 };
