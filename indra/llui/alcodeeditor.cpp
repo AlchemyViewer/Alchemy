@@ -57,6 +57,22 @@ static LLDefaultChildRegistry::Register<ALCodeEditor> r("code_editor");
 
 namespace
 {
+    // What is left to do as a scope ends, whichever way it ends.
+    template <typename F>
+    struct AtScopeEnd
+    {
+        F f;
+        ~AtScopeEnd() { f(); }
+    };
+    template <typename F>
+    AtScopeEnd<F> atScopeEnd(F f)
+    {
+        return AtScopeEnd<F>{ std::move(f) };
+    }
+}
+
+namespace
+{
     const S32 GUTTER_PAD  = 6;
     const S32 MARK_SIZE   = 6;
     const S32 MARK_INSET  = 3;
@@ -1633,6 +1649,19 @@ void ALCodeEditor::drawRowExtras(S32 line, S32 row, const LLRect& text, S32 scre
             }
         }
     }
+    // The places of a text being changed at once, as its stop is.
+    if (mSnippet.live())
+    {
+        for (const ALSnippetSession::Mirror& mirror : mSnippet.mirrors())
+        {
+            F32 x0, x1;
+            if (mirror.range.begin.line <= line && line <= mirror.range.end.line && spanOnRow(line, row, mirror.range, x0, x1))
+            {
+                gl_rect_2d(static_cast<S32>(left + x0), screen_top, static_cast<S32>(left + x1), screen_top - row_h, highlightColor() % alpha);
+                gl_rect_2d(static_cast<S32>(left + x0), screen_top, static_cast<S32>(left + x1), screen_top - row_h, mBracketMatchColor.get() % alpha, false);
+            }
+        }
+    }
     for (S32 i = 0; i < static_cast<S32>(mSnippet.stops().size()); ++i)
     {
         F32 x0, x1;
@@ -1907,6 +1936,14 @@ std::optional<ALTextRange> ALCodeEditor::functionAround(const ALTextRange& range
 
 bool ALCodeEditor::performFunction(ALEditorCommand command)
 {
+    if (command == ALEditorCommand::SelectNextOccurrence)
+    {
+        return selectNextOccurrence();
+    }
+    if (command == ALEditorCommand::ChangeAllOccurrences)
+    {
+        return changeAllOccurrences();
+    }
     if (command == ALEditorCommand::ExpandSelection)
     {
         const ALTextRange                was   = selection();
@@ -2009,6 +2046,10 @@ bool ALCodeEditor::canFunction(ALEditorCommand command) const
     if (command == ALEditorCommand::GoToMatchingBracket || command == ALEditorCommand::ExpandSelection)
     {
         return true;
+    }
+    if (command == ALEditorCommand::SelectNextOccurrence || command == ALEditorCommand::ChangeAllOccurrences)
+    {
+        return !isReadOnly();
     }
     if (command == ALEditorCommand::ShrinkSelection)
     {
@@ -3087,9 +3128,10 @@ void ALCodeEditor::insertSnippet(std::string_view body)
     setSelection(mSnippet.stops()[0]);
 }
 
-void ALCodeEditor::syncMirrors(S32 index)
+void ALCodeEditor::syncMirrors(S32 index, bool grouped)
 {
-    // As one edit, one step to undo, and the selection as it was.
+    // As one edit, one step to undo -- or part of the key's -- and the
+    // selection as it was.
     std::string            wanted;
     const std::vector<S32> order = mSnippet.staleMirrors(index, document(), wanted);
     if (order.empty())
@@ -3104,13 +3146,166 @@ void ALCodeEditor::syncMirrors(S32 index)
         edits.emplace_back(mSnippet.mirrors()[static_cast<size_t>(k)].range, wanted);
     }
     // All of them as one edit.
-    undoJournal().beginGroup();
+    if (grouped)
+    {
+        undoJournal().beginGroup();
+    }
     mSnippet.syncingAll();
     editMany(std::move(edits), was.end);
     mSnippet.syncing(-1);
-    undoJournal().endGroup();
+    if (grouped)
+    {
+        undoJournal().endGroup();
+    }
     placeSelection(document().clamp(was.begin), document().clamp(was.end));
     afterEdit();
+}
+
+std::vector<ALTextRange> ALCodeEditor::placesOf(const std::string& wanted, bool whole, const ALTextPos& from, size_t most) const
+{
+    std::vector<ALTextRange> out;
+    const ALTextDocument&    doc   = document();
+    const S32                count = doc.lineCount();
+    if (wanted.empty() || wanted.find('\n') != std::string::npos)
+    {
+        return out;
+    }
+    // Taken already: the stop and its mirrors.
+    const auto taken = [this](const ALTextRange& range) {
+        for (const ALTextRange& stop : mSnippet.stops())
+        {
+            if (range.begin < stop.end && stop.begin < range.end)
+            {
+                return true;
+            }
+        }
+        for (const ALSnippetSession::Mirror& mirror : mSnippet.mirrors())
+        {
+            if (range.begin < mirror.range.end && mirror.range.begin < range.end)
+            {
+                return true;
+            }
+        }
+        return false;
+    };
+    // Each line once, from `from` round to it again.
+    for (S32 step = 0; step <= count && out.size() < most; ++step)
+    {
+        const S32          line  = (from.line + step) % count;
+        const std::string& text  = doc.line(line);
+        const size_t       start = step == 0 ? static_cast<size_t>(from.column) : 0;
+        const size_t       stop  = step == count ? static_cast<size_t>(from.column) : text.size();
+        for (size_t at = text.find(wanted, start); at != std::string::npos && at + wanted.size() <= stop && out.size() < most;
+             at = text.find(wanted, at + 1))
+        {
+            const size_t end = at + wanted.size();
+            if (whole && ((at > 0 && alIdentifierByte(text[at - 1])) || (end < text.size() && alIdentifierByte(text[end]))))
+            {
+                continue;
+            }
+            const ALTextRange range(ALTextPos(line, static_cast<S32>(at)), ALTextPos(line, static_cast<S32>(end)));
+            if (!taken(range) && std::none_of(out.begin(), out.end(), [&](const ALTextRange& r) { return range.begin < r.end && r.begin < range.end; }))
+            {
+                out.push_back(range);
+            }
+        }
+    }
+    return out;
+}
+
+bool ALCodeEditor::selectNextOccurrence()
+{
+    const ALTextRange taken = selection().normalised();
+    if (taken.empty())
+    {
+        // The name at the caret, to go on from.
+        ALTextRange name = identifierAtCaret();
+        if (name.empty())
+        {
+            name = document().wordAt(caret());
+        }
+        if (name.empty())
+        {
+            return false;
+        }
+        setSelection(name);
+        mOccurrenceName = selection().normalised();
+        return true;
+    }
+    if (taken.begin.line != taken.end.line || isReadOnly())
+    {
+        return false;
+    }
+    const bool going = mSnippet.live() && mSnippet.stops().size() == 1 && mSnippet.stops()[0] == taken;
+    if (!going)
+    {
+        mSnippet.start({ taken }, taken.end);
+        mSnippet.setLive(true);
+    }
+    // After the last place taken, going round: they are taken in turn.
+    const ALTextPos                from = mSnippet.mirrors().empty() ? taken.end : mSnippet.mirrors().back().range.end;
+    const std::vector<ALTextRange> next = placesOf(document().text(taken), taken == mOccurrenceName, from, 1);
+    if (next.empty())
+    {
+        if (!going)
+        {
+            mSnippet.clear();
+        }
+        return false;
+    }
+    mSnippet.addMirror({ 0, next.front() });
+    setSelection(taken);
+    scrollToLine(next.front().begin.line);
+    return true;
+}
+
+bool ALCodeEditor::changeAllOccurrences()
+{
+    ALTextRange taken = selection().normalised();
+    bool        whole = taken == mOccurrenceName;
+    if (taken.empty())
+    {
+        taken = identifierAtCaret();
+        whole = true;
+    }
+    if (taken.empty() || taken.begin.line != taken.end.line || isReadOnly())
+    {
+        return false;
+    }
+    mSnippet.start({ taken }, taken.end);
+    const std::vector<ALTextRange> places = placesOf(document().text(taken), whole, taken.end, 1000);
+    if (places.empty())
+    {
+        mSnippet.clear();
+        return false;
+    }
+    for (const ALTextRange& place : places)
+    {
+        mSnippet.addMirror({ 0, place });
+    }
+    mSnippet.setLive(true);
+    setSelection(taken);
+    return true;
+}
+
+void ALCodeEditor::undo()
+{
+    // A step back is the text as it was, the places with it: nothing to
+    // bring up to what the stop holds.
+    if (mSnippet.live())
+    {
+        clearPlaceholders();
+    }
+    ALTextView::undo();
+}
+
+void ALCodeEditor::redo()
+{
+    if (mSnippet.live())
+    {
+        clearPlaceholders();
+    }
+    ALTextView::redo();
 }
 
 void ALCodeEditor::dropPlaceholdersLeft()
@@ -3600,6 +3795,25 @@ void ALCodeEditor::dropTyping()
 
 bool ALCodeEditor::handleKeyHere(KEY key, MASK mask)
 {
+    // Every place of a text being changed at once: what the key did, and
+    // the places brought up to it, one step with the typing around it --
+    // but for a step back or forward, which ends it.
+    const ALEditorCommand command = keymap().lookup(key, mask);
+    const bool            live    = mSnippet.live() && command != ALEditorCommand::Undo && command != ALEditorCommand::Redo;
+    if (live)
+    {
+        undoJournal().beginTyping(selection());
+    }
+    const auto keep_up = atScopeEnd([this, live]() {
+        if (live)
+        {
+            if (mSnippet.live())
+            {
+                syncMirrors(mSnippet.at(), false);
+            }
+            undoJournal().endTyping();
+        }
+    });
     hideCard();
     // The fixes listed take the keys that walk them and take one, in any
     // mode a modal keymap is in -- the list was asked for; any other key
@@ -3764,10 +3978,15 @@ bool ALCodeEditor::handleUnicodeCharHere(llwchar uni_char)
     const bool typing   = typingText();
     const bool was_open = completionOpen();
     // The pair, the character and its outdent one key typed, one with the
-    // typing around it.
+    // typing around it -- and every place of a text being changed at once
+    // brought up to it in the same step.
     undoJournal().beginTyping(selection());
     const bool paired = typing && mAutoClose && uni_char < 0x80 && !isReadOnly() && typePair(static_cast<char>(uni_char));
     const bool typed  = paired || ALTextView::handleUnicodeCharHere(uni_char);
+    if (typed && mSnippet.live())
+    {
+        syncMirrors(mSnippet.at(), false);
+    }
     undoJournal().endTyping();
     if (!typed)
     {

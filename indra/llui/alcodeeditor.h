@@ -498,6 +498,18 @@ public:
     // Everything typing puts up let go of at once: the list, the
     // signature and the stops.
     void                            dropTyping();
+
+    // Every place of a text changed at once, until there are several
+    // carets: the selection a stop, and the places that read as it does
+    // its mirrors, brought up as each key is typed and lit while they
+    // are; Escape, Tab, or the caret off the stop's line lets them go.
+    // Select Next Occurrence takes the name at the caret, then adds the
+    // next place after the last one taken, going round; Change All takes
+    // every place at once. A name taken so matches whole names only.
+    bool                            selectNextOccurrence();
+    bool                            changeAllOccurrences();
+    void                            undo() override;
+    void                            redo() override;
     // The names of a signature's parameters, and where their list opens
     // (ALSnippetSession).
     static std::vector<std::string> parameterNames(std::string_view detail, std::string_view name = std::string_view())
@@ -927,8 +939,16 @@ private:
     LLRect                  mCompletionDocBeside;
     // The stops of a snippet or a call being filled in (ALSnippetSession).
     ALSnippetSession         mSnippet;
-    // Each placeholder's mirrors made what it holds.
-    void                     syncMirrors(S32 index);
+    // Each placeholder's mirrors made what it holds: as one step of its
+    // own, or as part of the key being typed.
+    void                     syncMirrors(S32 index, bool grouped = true);
+    // The places after `from` that read as `wanted`, going round, whole
+    // names only where asked, none of the stop's or its mirrors'; at most
+    // `most` of them.
+    std::vector<ALTextRange> placesOf(const std::string& wanted, bool whole, const ALTextPos& from, size_t most) const;
+    // The name Select Next Occurrence took at the caret, whose places are
+    // whole names only.
+    ALTextRange              mOccurrenceName;
     // The placeholders let go of where the caret has left the lines they
     // and where the call or the snippet ends are on.
     void                     dropPlaceholdersLeft();

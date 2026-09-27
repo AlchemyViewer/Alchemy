@@ -679,6 +679,14 @@
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="shrink_selection" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="shrink_selection" />
             </menu_item_call>
+            <menu_item_call label="Select Next Occurrence" layout="topleft" name="select_next_occurrence">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="select_next_occurrence" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="select_next_occurrence" />
+            </menu_item_call>
+            <menu_item_call label="Change All Occurrences" layout="topleft" name="change_all_occurrences">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="change_all_occurrences" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="change_all_occurrences" />
+            </menu_item_call>
             <menu_item_call label="Select Function" layout="topleft" name="select_function">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="select_function" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="select_function" />

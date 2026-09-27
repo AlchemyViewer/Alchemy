@@ -2277,4 +2277,42 @@ namespace tut
         e.lightOccurrences();
         ensure("not asked: nothing", e.highlights(H::Occurrences).empty());
     }
+
+    template<> template<>
+    void alcodeeditor_object::test<65>()
+    {
+        set_test_name("Select Next Occurrence takes the name, then its places in turn, going round; what is typed goes into every place taken, one step; Change All takes every place");
+        ALCodeEditor& e = make("local x = 1\nx = x + xy\nprint(x)", "slua");
+        e.setAutoComplete(false);
+        e.setAutoClose(false);
+        e.setCaret(ALTextPos(1, 0));
+        key('D', MASK_CONTROL);
+        ensure_equals("the name", e.selectedText(), std::string("x"));
+        key('D', MASK_CONTROL);
+        ensure("the next place taken, the selection kept", e.selection().normalised() == ALTextRange(ALTextPos(1, 0), ALTextPos(1, 1)));
+        type("count");
+        ensure_equals("typed into both, not into the longer name", e.text(), std::string("local x = 1\ncount = count + xy\nprint(x)"));
+        e.undo();
+        ensure_equals("one step back takes back both", e.text(), std::string("local x = 1\nx = x + xy\nprint(x)"));
+        ensure("and ends it", e.placeholders().empty());
+
+        e.setCaret(ALTextPos(2, 6));
+        key('D', MASK_CONTROL);
+        key('D', MASK_CONTROL);
+        key('D', MASK_CONTROL);
+        type("n");
+        ensure_equals("going round from the last to the first", e.text(), std::string("local n = 1\nn = x + xy\nprint(n)"));
+        key(KEY_ESCAPE);
+        ensure("Escape lets go", e.placeholders().empty());
+
+        e.setText("local x = 1\nx = x + xy\nprint(\"x\")");
+        e.setCaret(ALTextPos(0, 6));
+        key('L', MASK_CONTROL | MASK_SHIFT);
+        type("n");
+        ensure_equals("Change All: every place of the name, as written", e.text(), std::string("local n = 1\nn = n + xy\nprint(\"n\")"));
+        e.setCaret(ALTextPos(2, 0));
+        ensure("the caret off the line: let go", e.placeholders().empty());
+        type("-- ");
+        ensure_equals("and typing is typing again", e.document().line(2), std::string("-- print(\"n\")"));
+    }
 }

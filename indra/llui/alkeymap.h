@@ -123,6 +123,9 @@ enum class ALEditorCommand : U8
     // The selection grown to what holds it as code reads it, and back.
     ExpandSelection,
     ShrinkSelection,
+    // Every place of a text changed at once: the next place taken, or all.
+    SelectNextOccurrence,
+    ChangeAllOccurrences,
     COUNT
 };
 
