@@ -1126,14 +1126,18 @@ void ALScriptStudioChecking::explainTransformWords(Doc& doc)
         }
         std::string     word;
         const Transform transform = ALPreprocessor::transformAt(line, text.lineCount(), problem.line, word);
-        const bool      on        = preprocessing && transform != Transform::None && sources().transformOn(transform);
+        // `inline` is taken off whenever the preprocessor runs, whether
+        // the extensions are on or not.
+        const bool      marker    = transform == Transform::Extensions && word == "inline";
+        const bool      on        = preprocessing && transform != Transform::None && (marker || sources().transformOn(transform));
         if (transform == Transform::None || on)
         {
             continue;
         }
         LLStringUtil::format_map_t args;
         args["[WORD]"] = word;
-        problem.message += " " + mServices.words(transform == Transform::Switch ? "PreprocHintSwitch" : "PreprocHintExtensions", args);
+        problem.message +=
+            " " + mServices.words(transform == Transform::Switch ? "PreprocHintSwitch" : marker ? "PreprocHintInline" : "PreprocHintExtensions", args);
     }
 }
 

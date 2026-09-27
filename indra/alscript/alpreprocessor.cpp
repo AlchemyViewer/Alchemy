@@ -2635,20 +2635,63 @@ namespace
 
     // The functions a script marks `inline`: the marks taken off, and the
     // names kept for the optimizer to put in place wherever they are
-    // called.
+    // called. A function is marked where it is defined, at the top of the
+    // script, in any of the ways a mark is written:
+    // - `inline` before it: `inline f()`, `inline integer f(x)`;
+    // - `inline` after its parameters: `integer f(integer x) inline {`;
+    // - a comment there, `/*pragma inline*/` or `//pragma inline`, which a
+    //   compiler that knows nothing of marks passes over.
+    // A word is taken off; a comment is left as it is.
     class InlineMarkers
     {
     public:
-        // An `inline` before a function's definition -- `inline f()`,
-        // `inline integer f(x)` -- taken off and the name kept.
+        // Whether there may be a mark at all: cheaper to ask than making
+        // the tokens again for nothing.
+        static bool anyIn(const Tokens& in)
+        {
+            return std::any_of(in.begin(), in.end(), [](const Token& t) { return t.is(Kind::Ident, "inline") || pragma(t); });
+        }
+
         Tokens run(const Tokens& in)
         {
             Tokens out;
+            out.reserve(in.size());
+            S32 depth = 0;
+            // The parentheses open at the top, by where they stand in
+            // `out`; and the last one closed there, with its `)`.
+            std::vector<size_t> opens;
+            size_t              lastOpen  = std::string::npos;
+            size_t              lastClose = std::string::npos;
+            // The function whose parameters a `)` just closed, where a `{`
+            // comes next: what a mark after the parameters marks.
+            const auto after = [&](size_t i) -> std::string {
+                size_t back = out.size();
+                while (back > 0 && out[back - 1].blank())
+                {
+                    --back;
+                }
+                if (back == 0 || back - 1 != lastClose || lastOpen == std::string::npos)
+                {
+                    return std::string();
+                }
+                const size_t next = skipBlank(in, i + 1);
+                if (next >= in.size() || !in[next].is(Kind::Punct, "{"))
+                {
+                    return std::string();
+                }
+                size_t name = lastOpen;
+                while (name > 0 && out[name - 1].blank())
+                {
+                    --name;
+                }
+                return name > 0 && out[name - 1].kind == Kind::Ident ? out[name - 1].text : std::string();
+            };
             for (size_t i = 0; i < in.size(); ++i)
             {
-                if (in[i].is(Kind::Ident, "inline"))
+                const Token& t = in[i];
+                if (depth == 0 && t.is(Kind::Ident, "inline"))
                 {
-                    size_t j = skipBlank(in, i + 1);
+                    size_t j    = skipBlank(in, i + 1);
                     size_t name = std::string::npos;
                     if (j < in.size() && in[j].kind == Kind::Ident)
                     {
@@ -2668,12 +2711,50 @@ namespace
                     }
                     if (name != std::string::npos)
                     {
-                        mNames.push_back(in[name].text);
+                        mark(in[name].text);
                         i = j - 1;
                         continue;
                     }
+                    if (const std::string marked = after(i); !marked.empty())
+                    {
+                        mark(marked);
+                        // The space after the word goes with it.
+                        if (i + 1 < in.size() && in[i + 1].kind == Kind::Space)
+                        {
+                            ++i;
+                        }
+                        continue;
+                    }
                 }
-                out.push_back(in[i]);
+                if (depth == 0 && pragma(t))
+                {
+                    if (const std::string marked = after(i); !marked.empty())
+                    {
+                        mark(marked);
+                    }
+                }
+                if (t.kind == Kind::Punct)
+                {
+                    if (t.text == "{")
+                    {
+                        ++depth;
+                    }
+                    else if (t.text == "}")
+                    {
+                        depth = std::max(0, depth - 1);
+                    }
+                    else if (depth == 0 && t.text == "(")
+                    {
+                        opens.push_back(out.size());
+                    }
+                    else if (depth == 0 && t.text == ")" && !opens.empty())
+                    {
+                        lastOpen  = opens.back();
+                        lastClose = out.size();
+                        opens.pop_back();
+                    }
+                }
+                out.push_back(t);
             }
             return out;
         }
@@ -2681,6 +2762,38 @@ namespace
         const std::vector<std::string>& names() const { return mNames; }
 
     private:
+        static bool pragma(const Token& t)
+        {
+            if (t.kind != Kind::Comment)
+            {
+                return false;
+            }
+            std::string_view text = t.text;
+            if (text.starts_with("//"))
+            {
+                text.remove_prefix(2);
+            }
+            else if (text.starts_with("/*") && text.ends_with("*/") && text.size() >= 4)
+            {
+                text = text.substr(2, text.size() - 4);
+            }
+            else
+            {
+                return false;
+            }
+            const size_t first = text.find_first_not_of(" \t");
+            const size_t last  = text.find_last_not_of(" \t\r");
+            return first != std::string_view::npos && text.substr(first, last - first + 1) == "pragma inline";
+        }
+
+        void mark(const std::string& name)
+        {
+            if (std::find(mNames.begin(), mNames.end(), name) == mNames.end())
+            {
+                mNames.push_back(name);
+            }
+        }
+
         std::vector<std::string> mNames;
     };
 
@@ -4154,6 +4267,16 @@ ALPreprocessor::Result ALPreprocessor::run(std::string_view source, const Option
             result.usedExtensions = extensions.any();
             result.inlined        = extensions.inlined();
         }
+        else if (InlineMarkers::anyIn(tokens))
+        {
+            // The marks taken off whatever else is done: with the
+            // extensions off, a marked function is a function -- put in
+            // place if the optimizer runs, and never a word the compiler
+            // stops at.
+            InlineMarkers marks;
+            tokens         = marks.run(tokens);
+            result.inlined = marks.names();
+        }
         if (options.switches || engine.usedSwitches())
         {
             result.usedSwitches = true;
@@ -4443,6 +4566,23 @@ ALPreprocessor::Transform ALPreprocessor::transformAt(const std::function<std::s
         if (word == "break" || word == "continue")
         {
             return following == ';' || isdigit(static_cast<unsigned char>(following)) ? Transform::Extensions : Transform::None;
+        }
+        // `name(...) inline`, the mark after the parameters, which the
+        // line's first word does not show.
+        for (size_t at = text.find("inline"); at != std::string_view::npos; at = text.find("inline", at + 1))
+        {
+            const size_t after = at + 6;
+            if ((at > 0 && isWord(text[at - 1])) || (after < text.size() && isWord(text[after])))
+            {
+                continue;
+            }
+            const size_t before = at == 0 ? std::string_view::npos : text.find_last_not_of(blank, at - 1);
+            const size_t next   = text.find_first_not_of(blank, after);
+            if (before != std::string_view::npos && text[before] == ')' && (next == std::string_view::npos || text[next] == '{'))
+            {
+                word = "inline";
+                return Transform::Extensions;
+            }
         }
         if (word == "inline")
         {

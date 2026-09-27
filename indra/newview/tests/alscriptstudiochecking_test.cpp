@@ -696,6 +696,24 @@ namespace tut
         expansions.back().second(plain);
         studio.asks.back().answered(answer(lua));
         ensure("preprocessed: not", lua.check.analysis.empty());
+
+        // `inline` is taken off whenever the preprocessor runs, the
+        // extensions on or not: said as the preprocessor's alone.
+        preprocessing = false;
+        Doc& marked   = tab("m", "integer f() inline { return 1; }\n");
+        checking.ask(marked, Kind::Check, ALTextPos(), ALTextPos());
+        studio.asks.back().answered(answer(marked, { problem(0, "syntax error") }));
+        ensure("inline explained: " + marked.check.analysis[0].message, marked.check.analysis[0].message.find("syntax error PreprocHintInline [WORD]=inline") == 0);
+        preprocessing         = true;
+        marked.expanded.valid = false;
+        checking.ask(marked, Kind::Check, ALTextPos(), ALTextPos());
+        ALPreprocessor::Result stripped;
+        stripped.text = marked.editor->text();
+        stripped.map.addFile("m", "object:m");
+        stripped.map.finish();
+        expansions.back().second(stripped);
+        studio.asks.back().answered(answer(marked, { problem(0, "syntax error") }));
+        ensure_equals("preprocessing, the extensions off: not", marked.check.analysis[0].message, std::string("syntax error"));
     }
 
     template<> template<>

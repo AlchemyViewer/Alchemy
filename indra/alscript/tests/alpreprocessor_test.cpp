@@ -1049,6 +1049,10 @@ namespace tut
         ensure("an inline function", of({ "inline f(integer a)" }, 0, &word) == T::Extensions);
         ensure_equals("inline's word", word, std::string("inline"));
         ensure("an inline function with its type", of({ "inline integer f(integer a)" }, 0) == T::Extensions);
+        ensure("inline after the parameters", of({ "integer f(integer a) inline {" }, 0, &word) == T::Extensions);
+        ensure_equals("its word", word, std::string("inline"));
+        ensure("inline after them, the brace on the next line", of({ "f() inline" }, 0) == T::Extensions);
+        ensure("a name that ends in inline is not", of({ "integer f(integer a) noinline {" }, 0) == T::None);
         ensure("inline assigned", of({ "inline = 2;" }, 0) == T::None);
         ensure("after a brace and a statement's end", of({ "} ; switch (x)" }, 0) == T::Switch);
         ensure("a plain statement", of({ "integer x = 1;" }, 0) == T::None);
@@ -1424,5 +1428,44 @@ namespace tut
         const ALPreprocessor::Result r = ALPreprocessor::run(source, options());
         ensure_equals("problems", messages(r), std::string());
         ensure_equals("text", squeeze(r.text), std::string("zero zero Z\n[1] I  x I\n1+2 (1, 2)+3\n[3]\n"));
+    }
+    template<> template<>
+    void alpreprocessor_object::test<39>()
+    {
+        set_test_name("a function marked inline in any of the ways a mark is written, at the top of the script, and the marks taken off with the extensions off");
+        ALPreprocessor::Options o = options();
+        o.extensions              = true;
+        ALPreprocessor::Result r  = ALPreprocessor::run("integer f(integer a) inline { return a; }\n"
+                                                        "g(string s) /*pragma inline*/ { llOwnerSay(s); }\n"
+                                                        "h() //pragma inline\n{\n}\n"
+                                                        "k() /* pragma inline */ { }\n",
+                                                        o);
+        ensure_equals("problems", messages(r), std::string());
+        ensure("the four marked, in order", r.inlined == std::vector<std::string>{ "f", "g", "h", "k" });
+        ensure("the word after the parameters taken off: " + r.text, r.text.find("integer f(integer a) { return a; }") != std::string::npos);
+        ensure("a comment left as it is: " + r.text, r.text.find("g(string s) /*pragma inline*/ { llOwnerSay(s); }") != std::string::npos &&
+                                                         r.text.find("h() //pragma inline\n{") != std::string::npos);
+
+        r = ALPreprocessor::run("integer inline = 1;\nf() { integer x = inline; }\ng() /* not pragma inline */ { }\ninteger v = (1) /*pragma inline*/;\n", o);
+        ensure("a variable named inline, another comment, a parenthesis that closes no parameters: none marked", r.inlined.empty());
+        ensure_equals("and nothing taken off", r.text, std::string("integer inline = 1;\nf() { integer x = inline; }\ng() /* not pragma inline */ { }\ninteger v = (1) /*pragma inline*/;\n"));
+
+        r = ALPreprocessor::run("default { state_entry() inline { } }\n", o);
+        ensure("an event is not a function to put in place", r.inlined.empty());
+
+        // With the extensions off the marks come off all the same.
+        const ALPreprocessor::Result plain = ALPreprocessor::run("inline f() { }\ninteger g(integer a) inline { return a; }\n", options());
+        ensure_equals("taken off", plain.text, std::string("f() { }\ninteger g(integer a) { return a; }\n"));
+        ensure("and the names kept", plain.inlined == std::vector<std::string>{ "f", "g" });
+        ensure("the extensions not said to be used", !plain.usedExtensions);
+
+        // And the optimizer puts the marked function in place.
+        ALPreprocessor::Options optimizing = options();
+        optimizing.optimize                = true;
+        const ALPreprocessor::Result put   = ALPreprocessor::run("say(string s) inline\n{\n    llOwnerSay(s);\n    llOwnerSay(s + \"!\");\n}\n"
+                                                                 "default\n{\n    state_entry()\n    {\n        say(\"a\");\n        say(\"b\");\n    }\n}\n",
+                                                                 optimizing);
+        ensure("both calls put in place: " + put.text, put.text.find("say(") == std::string::npos && put.text.find("llOwnerSay(\"a\")") != std::string::npos &&
+                                                           put.text.find("llOwnerSay(\"b\" + \"!\")") != std::string::npos);
     }
 }
