@@ -742,4 +742,54 @@ namespace tut
         ensure_equals("at the second argument", sig.active, 1);
         ensure("one form: none listed", service.signature("local function g(a: number) end\ng(1)\n", 1, 2).overloads.empty());
     }
+
+    template<> template<>
+    void alluauservice_object::test<26>()
+    {
+        set_test_name("a text is type checked once for its check and once for the questions, in whatever order they come; once for both where it is strict or the solver is the new one");
+        ensure("definitions loaded: " + error, loaded);
+        ALLuauConfig config;
+        service.setConfig(config);
+        const bool   one_slot = service.newSolver();
+        const size_t start    = service.typeChecks();
+        // As the studio asks: a check with the outline, the names and the
+        // hints; then questions and completions in turn, and the check again.
+        const std::string loose = "local function f(a) return a + 1 end\nlocal y = f(2)\nprint(y)\n";
+        const std::string first = said(service.check(loose));
+        service.outline(loose);
+        service.semanticTokens(loose);
+        service.inlayHints(loose, true, true);
+        service.complete(loose, 2, 2);
+        service.hover(loose, 1, 6);
+        service.complete(loose, 2, 2);
+        service.signature(loose, 1, 12);
+        service.references(loose, 1, 6);
+        ensure_equals("nonstrict: the check, and the questions' own", service.typeChecks() - start, size_t(one_slot ? 1 : 2));
+        ensure_equals("the check again, from what it found", said(service.check(loose)), first);
+        ensure_equals("and not checked again", service.typeChecks() - start, size_t(one_slot ? 1 : 2));
+
+        // A script strict by its own comment: its check serves the questions.
+        const std::string strict   = "--!strict\n" + loose;
+        const size_t      before   = service.typeChecks();
+        service.hover(strict, 2, 6);
+        service.check(strict);
+        service.outline(strict);
+        service.inlayHints(strict, true, true);
+        ensure_equals("strict: one check, the question first", service.typeChecks() - before, size_t(1));
+        service.complete(strict, 3, 2);
+        ensure_equals("a completion reads autocomplete's own", service.typeChecks() - before, size_t(one_slot ? 1 : 2));
+        const std::string strict_first = said(service.check(strict));
+        service.hover(strict, 2, 6);
+        ensure_equals("and nothing checked again", service.typeChecks() - before, size_t(one_slot ? 1 : 2));
+        // The hints the questions read are the strict ones either way.
+        // The types a question reads are the strict ones, whatever the
+        // script's mode: a nonstrict check's module knows none of them.
+        const std::string typed       = "local s = string.rep(\"a\", 2)\nlocal n = #s\nprint(n)\n";
+        const auto        loose_hints = service.inlayHints(typed, false, true);
+        const auto        strict_hints = service.inlayHints("--!strict\n" + typed, false, true);
+        ensure_equals("hints read nonstrict", loose_hints.size(), size_t(2));
+        ensure_equals("and strict", strict_hints.size(), size_t(2));
+        ensure("the same", loose_hints[0].text == strict_hints[0].text && loose_hints[1].text == strict_hints[1].text);
+        ensure("the problems of each told apart", said(service.check(loose)) == first && said(service.check(strict)) == strict_first);
+    }
 }

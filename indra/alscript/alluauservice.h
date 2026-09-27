@@ -133,9 +133,12 @@ public:
     // handler for an event the script asks for and does not hear.
     std::vector<ALScriptFix> actions(std::string_view source, S32 line, S32 column, S32 endLine, S32 endColumn);
 
-    // How many times a script has been type checked: a question asked
-    // again of the same text, with the same configuration, is answered
-    // from the check already made. For the test that says so.
+    // How many times a script has been type checked: a check or a question
+    // asked again of the same text, with the same configuration, is
+    // answered from the check already made. A text is checked at most once
+    // for the check and once for the questions -- once for both where the
+    // script is strict, or under the new solver -- in whatever order they
+    // come. For the test that says so.
     size_t typeChecks() const;
 
 private:

@@ -210,6 +210,22 @@ int main(int, char**)
             g_sink = g_sink + luau.check(text).size() + luau.outline(text).size() + luau.semanticTokens(text).size() +
                      luau.inlayHints(text, true, true).size();
         }));
+    // An edit as the studio has it answered: the check job, then the
+    // questions typing asks -- a completion, a hover, a completion again.
+    row("an edit: the check job, then complete, hover, complete",
+        ms_per_run([&] {
+            const std::string& text = lslScript.text();
+            const S32          last = ll_test::big_script_detail::linesIn(text) - 12;
+            g_sink = g_sink + lsl.check(text, true).size() + lsl.outline(text).size() + lsl.semanticTokens(text).size() +
+                     lsl.inlayHints(text, true).size() + lsl.hover(text, last, 20).label.size();
+        }),
+        ms_per_run([&] {
+            const std::string& text = luaScript.text();
+            const S32          last = ll_test::big_script_detail::linesIn(text) - 8;
+            g_sink = g_sink + luau.check(text).size() + luau.outline(text).size() + luau.semanticTokens(text).size() +
+                     luau.inlayHints(text, true, true).size() + luau.complete(text, last, 16).size() + luau.hover(text, last, 16).label.size() +
+                     luau.complete(text, last, 16).size();
+        }));
     row("hover at the last helper's call",
         ms_per_run([&] {
             const std::string& text = lslScript.text();

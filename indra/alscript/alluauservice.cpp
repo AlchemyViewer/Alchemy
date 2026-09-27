@@ -1053,15 +1053,12 @@ namespace
         }
     };
 
-    // One configuration for the one script: what its `.luaurc` said,
-    // with the mode set per query -- the script's own for a check, to
-    // report what its author would be told; strict for a question,
-    // where the types of everything are wanted.
+    // One configuration for the one script: what its `.luaurc` said. A
+    // question that wants every type strict reads autocomplete's module,
+    // which Luau checks strict whatever this says.
     struct ModeResolver final : public Luau::ConfigResolver
     {
         Luau::Config config;
-        // The mode the script's configuration asks for.
-        Luau::Mode   checkMode = Luau::Mode::Nonstrict;
 
         const Luau::Config& getConfig(const Luau::ModuleName&, const Luau::TypeCheckLimits&) const override { return config; }
     };
@@ -1090,28 +1087,10 @@ struct ALLuauService::Impl
     };
     boost::unordered_flat_map<std::string, Doc, ll::string_hash, std::equal_to<>> docs;
 
-    // What each of the front end's two modules -- a query's and
-    // autocomplete's -- was last checked from: the text, and whether in
-    // strict mode, which is a query's, rather than the script's own. A
-    // check of one dirties the other, the source being one.
-    struct Checked
-    {
-        std::string text;
-        bool        strict = false;
-        bool        valid  = false;
-    };
-    Checked plain;
-    Checked autocomplete;
     // How many times a script has been type checked, for a test that
     // says a question asked again is not.
     size_t  checks = 0;
 
-    // The script checked, for a query, unless the module is already the
-    // one it would make: every hover, every signature and every
-    // completion asked it again, and a type check of a long script is
-    // the dearest thing here. Strict, whatever the script's own mode, so
-    // that what a query reads -- every local's type, which nonstrict
-    // mode does not work out -- is the same whichever came first.
     // A check's options, held to the time limit and watching the stop.
     Luau::FrontendOptions limited() const
     {
@@ -1126,46 +1105,107 @@ struct ALLuauService::Impl
 
     bool stopRequested() const { return stop && stop->requested(); }
 
-    void checked(std::string_view source, bool for_autocomplete)
+    // The text the front end reads, and it told only when that changes.
+    // Each of Luau's two modules -- the script's, checked in its own mode
+    // with its lints, and autocomplete's, which Luau always checks strict
+    // -- then stays the text's until it does, and is checked at most once
+    // for it, whatever is asked in whatever order. A change of
+    // configuration is told as it is made.
+    void sync(std::string_view source)
     {
-        wasStopped = false;
-        Checked& was = for_autocomplete ? autocomplete : plain;
-        if (was.valid && was.strict && was.text == source && frontend->getSourceModule(SCRIPT_MODULE))
-        {
-            return;
-        }
         if (files.text != source)
         {
             files.text.assign(source);
+            frontend->markDirty(SCRIPT_MODULE);
         }
-        frontend->markDirty(SCRIPT_MODULE);
-        Luau::FrontendOptions options = limited();
-        options.runLintChecks         = false;
-        if (for_autocomplete)
-        {
-            options.forAutocomplete = true;
-        }
-        configs.config.mode = Luau::Mode::Strict;
-        frontend->check(SCRIPT_MODULE, options);
-        configs.config.mode = configs.checkMode;
-        ++checks;
-        (for_autocomplete ? plain : autocomplete).valid = false;
-        // Stopped, the module is part of one: not kept as the text's.
-        if (stopRequested())
-        {
-            wasStopped = true;
-            was.valid  = false;
-            return;
-        }
-        was.text   = std::string(source);
-        was.strict = true;
-        was.valid  = true;
     }
 
-    void forgetChecks()
+    // A check that ran out of time answers what it found by then, and is
+    // not kept as the text's: asked again, perhaps with longer, it runs
+    // again.
+    void timedOut(const Luau::ModulePtr& module)
     {
-        plain.valid        = false;
-        autocomplete.valid = false;
+        if (module && module->timeout)
+        {
+            frontend->markDirty(SCRIPT_MODULE);
+        }
+    }
+
+    // A check stopped part way: Luau keeps none of what it found, and
+    // neither module is the text's. One not made, its module kept from
+    // before, was not stopped.
+    bool stoppedIn(bool checked)
+    {
+        if (!checked || !stopRequested())
+        {
+            return false;
+        }
+        wasStopped = true;
+        frontend->markDirty(SCRIPT_MODULE);
+        return true;
+    }
+
+    // The script's own module, checked where it is not the text's yet:
+    // what a check reports, and what a question reads where it will do.
+    // Whether it was checked now, and so could have been stopped.
+    bool checkScript(Luau::CheckResult* result = nullptr)
+    {
+        const bool        dirty = frontend->isDirty(SCRIPT_MODULE);
+        Luau::CheckResult made  = frontend->check(SCRIPT_MODULE, limited());
+        if (dirty)
+        {
+            ++checks;
+            timedOut(frontend->moduleResolver.getModule(SCRIPT_MODULE));
+        }
+        if (result)
+        {
+            *result = std::move(made);
+        }
+        return dirty;
+    }
+
+    // The module a question reads, checked where it is not the text's
+    // yet; none where the check was stopped. Under the new solver there is
+    // the one, in whatever mode the script is: its types are solved in
+    // either, and the mode says only which mistakes are told. Under the
+    // old, a nonstrict check leaves a local's type unknown, so the
+    // script's own module serves only where the script is strict -- by its
+    // configuration or its own --!strict -- and autocomplete's otherwise,
+    // and always for a completion, which reads nothing else.
+    Luau::ModulePtr queried(std::string_view source, bool completion = false)
+    {
+        wasStopped = false;
+        sync(source);
+        if (solver == Luau::SolverMode::New)
+        {
+            return stoppedIn(checkScript()) ? nullptr : frontend->moduleResolver.getModule(SCRIPT_MODULE);
+        }
+        if (!completion)
+        {
+            // The mode the script's check has, or will have: its own hot
+            // comment, else its configuration's. Parsed only, which the
+            // check then uses.
+            frontend->parse(SCRIPT_MODULE);
+            const Luau::SourceModule* parsed = frontend->getSourceModule(SCRIPT_MODULE);
+            if (parsed && parsed->mode.value_or(configs.config.mode) == Luau::Mode::Strict)
+            {
+                return stoppedIn(checkScript()) ? nullptr : frontend->moduleResolver.getModule(SCRIPT_MODULE);
+            }
+        }
+        if (frontend->isDirty(SCRIPT_MODULE, /*forAutocomplete*/ true))
+        {
+            Luau::FrontendOptions options = limited();
+            options.runLintChecks         = false;
+            options.forAutocomplete       = true;
+            frontend->check(SCRIPT_MODULE, options);
+            ++checks;
+            if (stoppedIn(true))
+            {
+                return nullptr;
+            }
+            timedOut(frontend->moduleResolverForAutocomplete.getModule(SCRIPT_MODULE));
+        }
+        return frontend->moduleResolverForAutocomplete.getModule(SCRIPT_MODULE);
     }
 
     const Doc* docFor(const std::optional<std::string>& symbol) const
@@ -1245,7 +1285,6 @@ bool ALLuauService::loadDefinitions(std::string_view source, std::string& error)
     mImpl->frontend          = std::move(frontend);
     mImpl->definitions       = true;
     mImpl->definitionsSource = std::string(source);
-    mImpl->forgetChecks();
     error.clear();
     return true;
 }
@@ -1270,7 +1309,6 @@ bool ALLuauService::setNewSolver(bool use, std::string& error)
     Luau::freeze(mImpl->frontend->globals.globalTypes);
     Luau::freeze(mImpl->frontend->globalsForAutocomplete.globalTypes);
     mImpl->definitions = false;
-    mImpl->forgetChecks();
     return source.empty();
 }
 
@@ -1353,14 +1391,13 @@ void ALLuauService::setConfig(const ALLuauConfig& config)
     const Luau::Mode mode    = config.mode == "strict" ? Luau::Mode::Strict : config.mode == "nocheck" ? Luau::Mode::NoCheck : Luau::Mode::Nonstrict;
     // Told before every question whether or not anything changed: the
     // same configuration leaves what was checked as it is.
-    if (mImpl->frontend && configs.checkMode == mode && configs.config.enabledLint.warningMask == config.lints &&
+    if (mImpl->frontend && configs.config.mode == mode && configs.config.enabledLint.warningMask == config.lints &&
         configs.config.fatalLint.warningMask == config.fatalLints && configs.config.lintErrors == config.lintErrors &&
         configs.config.globals == config.globals)
     {
         return;
     }
-    configs.checkMode     = mode;
-    configs.config.mode   = configs.checkMode;
+    configs.config.mode                    = mode;
     configs.config.enabledLint.warningMask = config.lints;
     configs.config.fatalLint.warningMask   = config.fatalLints;
     configs.config.lintErrors              = config.lintErrors;
@@ -1368,7 +1405,6 @@ void ALLuauService::setConfig(const ALLuauConfig& config)
     // The globals are bound into the environment as the script is
     // checked; a change to them is a change to the script.
     mImpl->frontend->markDirty(SCRIPT_MODULE);
-    mImpl->forgetChecks();
 }
 
 ALScriptProblems ALLuauService::check(std::string_view source)
@@ -1376,24 +1412,13 @@ ALScriptProblems ALLuauService::check(std::string_view source)
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
     Impl& impl = *mImpl;
     impl.wasStopped = false;
-    impl.files.text.assign(source);
-    impl.frontend->markDirty(SCRIPT_MODULE);
-    impl.configs.config.mode = impl.configs.checkMode;
-    Luau::CheckResult result = impl.frontend->check(SCRIPT_MODULE, impl.limited());
-    ++impl.checks;
-    // The module is the script's own mode's now: a query's is checked
-    // again, strict, unless that is the script's mode too.
-    impl.forgetChecks();
-    if (impl.stopRequested())
+    impl.sync(source);
+    // What was found the first time, where the text has not changed since.
+    Luau::CheckResult result;
+    if (impl.stoppedIn(impl.checkScript(&result)))
     {
-        // Stopped part way: Luau keeps none of what it found, and the
-        // module is not the text's.
-        impl.wasStopped = true;
         return ALScriptProblems();
     }
-    impl.plain.text   = std::string(source);
-    impl.plain.strict = impl.configs.checkMode == Luau::Mode::Strict;
-    impl.plain.valid  = true;
 
     ALScriptProblems problems;
     if (!result.timeoutHits.empty())
@@ -1572,7 +1597,11 @@ std::vector<ALScriptCompletion> ALLuauService::complete(std::string_view source,
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
     Impl& impl = *mImpl;
-    impl.checked(source, /*for_autocomplete*/ true);
+    // Nothing offered from a check stopped part way.
+    if (!impl.queried(source, /*completion*/ true))
+    {
+        return {};
+    }
     Luau::AutocompleteResult found = Luau::autocomplete(
         *impl.frontend, SCRIPT_MODULE, positionOf(line, column),
         [](std::string, std::optional<const Luau::ExternType*>, std::optional<std::string>) -> std::optional<Luau::AutocompleteEntryMap> {
@@ -1637,10 +1666,9 @@ ALScriptHover ALLuauService::hover(std::string_view source, S32 line, S32 column
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
     Impl& impl = *mImpl;
-    impl.checked(source, /*for_autocomplete*/ false);
+    const Luau::ModulePtr     module        = impl.queried(source);
     ALScriptHover           answer;
     const Luau::SourceModule* module_source = impl.frontend->getSourceModule(SCRIPT_MODULE);
-    const Luau::ModulePtr     module        = impl.frontend->moduleResolver.getModule(SCRIPT_MODULE);
     if (!module_source || !module)
     {
         return answer;
@@ -1792,10 +1820,9 @@ ALScriptSignature ALLuauService::signature(std::string_view source, S32 line, S3
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
     Impl& impl = *mImpl;
-    impl.checked(source, /*for_autocomplete*/ false);
+    const Luau::ModulePtr     module        = impl.queried(source);
     ALScriptSignature         answer;
     const Luau::SourceModule* module_source = impl.frontend->getSourceModule(SCRIPT_MODULE);
-    const Luau::ModulePtr     module        = impl.frontend->moduleResolver.getModule(SCRIPT_MODULE);
     if (!module_source || !module)
     {
         return answer;
@@ -1928,10 +1955,9 @@ ALScriptReferences ALLuauService::references(std::string_view source, S32 line, 
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
     Impl& impl = *mImpl;
-    impl.checked(source, /*for_autocomplete*/ false);
+    const Luau::ModulePtr     module        = impl.queried(source);
     ALScriptReferences        answer;
     const Luau::SourceModule* module_source = impl.frontend->getSourceModule(SCRIPT_MODULE);
-    const Luau::ModulePtr     module        = impl.frontend->moduleResolver.getModule(SCRIPT_MODULE);
     if (!module_source || !module || !module_source->root)
     {
         return answer;
@@ -1993,9 +2019,8 @@ std::vector<ALScriptOutlineEntry> ALLuauService::outline(std::string_view source
     // The types beside the names come from a query's check, as a hover's
     // do, whatever came before: a check in the script's own mode works out
     // fewer of them.
-    impl.checked(source, /*for_autocomplete*/ false);
+    const Luau::ModulePtr     module        = impl.queried(source);
     const Luau::SourceModule* module_source = impl.frontend->getSourceModule(SCRIPT_MODULE);
-    const Luau::ModulePtr     module        = impl.frontend->moduleResolver.getModule(SCRIPT_MODULE);
     if (!module_source || !module_source->root)
     {
         return {};
@@ -2011,9 +2036,8 @@ std::vector<ALScriptSemanticToken> ALLuauService::semanticTokens(std::string_vie
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
     Impl& impl = *mImpl;
-    impl.checked(source, /*for_autocomplete*/ false);
+    const Luau::ModulePtr     module        = impl.queried(source);
     const Luau::SourceModule* module_source = impl.frontend->getSourceModule(SCRIPT_MODULE);
-    const Luau::ModulePtr     module        = impl.frontend->moduleResolver.getModule(SCRIPT_MODULE);
     if (!module_source || !module || !module_source->root)
     {
         return {};
@@ -2037,9 +2061,8 @@ std::vector<ALScriptInlayHint> ALLuauService::inlayHints(std::string_view source
     {
         return {};
     }
-    impl.checked(source, /*for_autocomplete*/ false);
+    const Luau::ModulePtr     module        = impl.queried(source);
     const Luau::SourceModule* module_source = impl.frontend->getSourceModule(SCRIPT_MODULE);
-    const Luau::ModulePtr     module        = impl.frontend->moduleResolver.getModule(SCRIPT_MODULE);
     if (!module_source || !module || !module_source->root)
     {
         return {};
@@ -2209,9 +2232,8 @@ std::vector<ALScriptFix> ALLuauService::actions(std::string_view source, S32 lin
     }
 
     Impl& impl = *mImpl;
-    impl.checked(source, /*for_autocomplete*/ false);
+    const Luau::ModulePtr     module        = impl.queried(source);
     const Luau::SourceModule* module_source = impl.frontend->getSourceModule(SCRIPT_MODULE);
-    const Luau::ModulePtr     module        = impl.frontend->moduleResolver.getModule(SCRIPT_MODULE);
     if (!module_source || !module || !module_source->root || !module_source->parseErrors.empty())
     {
         return out;
