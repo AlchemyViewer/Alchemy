@@ -48,7 +48,7 @@ namespace tut
     {
         ll_test::HeadlessUI& ui = ll_test::HeadlessUI::get();
 
-        static bool near(const LLColor4& a, const LLColor4& b)
+        static bool nearest(const LLColor4& a, const LLColor4& b)
         {
             for (S32 i = 0; i < 4; ++i)
             {
@@ -70,11 +70,11 @@ namespace tut
         set_test_name("a surface is the paper carried towards the ink and opaque; the chosen band the same at its own weight");
         const LLColor4 paper(0.1f, 0.2f, 0.3f, 0.5f);
         const LLColor4 ink(0.9f, 0.8f, 0.7f, 1.f);
-        ensure("none of the way is the paper, opaque", near(ALSurface::shade(paper, ink, 0.f), LLColor4(0.1f, 0.2f, 0.3f, 1.f)));
-        ensure("all of it the ink", near(ALSurface::shade(paper, ink, 1.f), LLColor4(0.9f, 0.8f, 0.7f, 1.f)));
-        ensure("the ground its own way", near(ALSurface::ground(paper, ink), ALSurface::shade(paper, ink, ALSurface::GROUND)));
-        ensure("the chosen band its own", near(ALSurface::chosen(paper, ink), ALSurface::shade(paper, ink, ALSurface::CHOSEN)));
-        ensure("the frame the ink thinned", near(ALSurface::frame(ink, 0.5f), LLColor4(0.9f, 0.8f, 0.7f, ALSurface::FRAME * 0.5f)));
+        ensure("none of the way is the paper, opaque", nearest(ALSurface::shade(paper, ink, 0.f), LLColor4(0.1f, 0.2f, 0.3f, 1.f)));
+        ensure("all of it the ink", nearest(ALSurface::shade(paper, ink, 1.f), LLColor4(0.9f, 0.8f, 0.7f, 1.f)));
+        ensure("the ground its own way", nearest(ALSurface::ground(paper, ink), ALSurface::shade(paper, ink, ALSurface::GROUND)));
+        ensure("the chosen band its own", nearest(ALSurface::chosen(paper, ink), ALSurface::shade(paper, ink, ALSurface::CHOSEN)));
+        ensure("the frame the ink thinned", nearest(ALSurface::frame(ink, 0.5f), LLColor4(0.9f, 0.8f, 0.7f, ALSurface::FRAME * 0.5f)));
 
         // The ink at the chosen weight, laid over the paper as a draw lays
         // it, comes to the band a list with paper of its own is given.
@@ -85,7 +85,7 @@ namespace tut
             laid.mV[i] = paper.mV[i] * (1.f - over.mV[VALPHA]) + over.mV[i] * over.mV[VALPHA];
         }
         laid.mV[VALPHA] = 1.f;
-        ensure("the same band over any paper", near(laid, ALSurface::chosen(paper, ink)));
+        ensure("the same band over any paper", nearest(laid, ALSurface::chosen(paper, ink)));
     }
 
     template<> template<>
@@ -103,13 +103,13 @@ namespace tut
         table.setColor("LabelDisabledColor", LLColor4(0.2f, 0.3f, 0.4f, 1.f));
         table.setColor("EmphasisColor", LLColor4(0.9f, 0.6f, 0.1f, 1.f));
         table.setColor("LabelTextColor", LLColor4(0.8f, 0.8f, 0.9f, 1.f));
-        ensure("the well", near(ALSurface::well().get(), LLColor4(0.1f, 0.1f, 0.1f, 1.f)));
-        ensure("the rim", near(ALSurface::rim().get(), LLColor4(0.2f, 0.3f, 0.4f, 1.f)));
-        ensure("the handle", near(ALSurface::handle().get(), LLColor4(0.9f, 0.6f, 0.1f, 1.f)));
-        ensure("the text", near(ALSurface::text().get(), LLColor4(0.8f, 0.8f, 0.9f, 1.f)));
-        ensure("the quiet words", near(ALSurface::quiet().get(), LLColor4(0.2f, 0.3f, 0.4f, 1.f)));
+        ensure("the well", nearest(ALSurface::well().get(), LLColor4(0.1f, 0.1f, 0.1f, 1.f)));
+        ensure("the rim", nearest(ALSurface::rim().get(), LLColor4(0.2f, 0.3f, 0.4f, 1.f)));
+        ensure("the handle", nearest(ALSurface::handle().get(), LLColor4(0.9f, 0.6f, 0.1f, 1.f)));
+        ensure("the text", nearest(ALSurface::text().get(), LLColor4(0.8f, 0.8f, 0.9f, 1.f)));
+        ensure("the quiet words", nearest(ALSurface::quiet().get(), LLColor4(0.2f, 0.3f, 0.4f, 1.f)));
         // And they follow a theme that changes after.
         table.setColor("EmphasisColor", LLColor4(0.1f, 0.6f, 0.9f, 1.f));
-        ensure("followed", near(ALSurface::handle().get(), LLColor4(0.1f, 0.6f, 0.9f, 1.f)));
+        ensure("followed", nearest(ALSurface::handle().get(), LLColor4(0.1f, 0.6f, 0.9f, 1.f)));
     }
 }
