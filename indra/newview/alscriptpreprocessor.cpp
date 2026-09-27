@@ -188,6 +188,11 @@ struct ALScriptPreprocessor::Job
     // same script it stood in for, which take its result.
     bool                             check = false;
     std::vector<callback_t>          alsoAnswer;
+    // A check's: raised once a later check of the same script is asked
+    // for, which takes its answers; the run then stops where it stands.
+    std::shared_ptr<std::atomic<bool>> superseded;
+
+    bool stale() const { return superseded && superseded->load(std::memory_order_relaxed); }
 };
 
 ALScriptPreprocessor::ALScriptPreprocessor() = default;
@@ -1141,6 +1146,8 @@ ALScriptSnapshot ALScriptPreprocessor::snapshotFor(const std::shared_ptr<Job>& j
     {
         snapshot.mOptions.byteBudget  = 4u * ALScriptEnvelope::MAX_ASSET_BYTES;
         snapshot.mOptions.tokenBudget = 1000u * 1000u;
+        // And stopped part way once a later check of it is asked for.
+        snapshot.mOptions.superseded  = job->superseded.get();
     }
     for (const ALPreprocessor::Ask& ask : job->asks)
     {
@@ -1204,6 +1211,10 @@ void ALScriptPreprocessor::start(const Request& request, callback_t callback, bo
     job->request  = request;
     job->callback = std::move(callback);
     job->check    = check;
+    if (check)
+    {
+        job->superseded = std::make_shared<std::atomic<bool>>(false);
+    }
     // What this script's own includes failed at before may come now;
     // another script's failures are its own, and clearing them would
     // have every other tab fetch its missing include again.
@@ -1315,45 +1326,87 @@ void ALScriptPreprocessor::toWorker(const std::shared_ptr<Job>& job, std::functi
 {
     ensureWorker();
     Queued queued{ job, keyOf(job->request), std::move(work) };
-    if (job->check)
+    bool   start = false;
     {
-        // One of the same script still waiting is for text that has
-        // moved on since: not made, its answer this one's.
-        const auto older = std::find_if(mChecksWaiting.begin(), mChecksWaiting.end(), [&queued](const Queued& q) { return q.key == queued.key; });
-        if (older != mChecksWaiting.end())
+        std::lock_guard<std::mutex> guard(mLane->lock);
+        if (mLane->closed)
         {
-            if (older->job->callback)
-            {
-                job->alsoAnswer.push_back(std::move(older->job->callback));
-            }
-            std::move(older->job->alsoAnswer.begin(), older->job->alsoAnswer.end(), std::back_inserter(job->alsoAnswer));
-            mChecksWaiting.erase(older);
+            return;
         }
-        mChecksWaiting.push_back(std::move(queued));
+        if (job->check)
+        {
+            // Another of the same script is for text that has moved on
+            // since: its answers this one's. Still waiting, it is not made;
+            // under way, it is told to stop. Its callbacks are the main
+            // thread's alone, which the worker never touches.
+            const auto take_answers = [&job](Job& older) {
+                if (older.callback)
+                {
+                    job->alsoAnswer.push_back(std::move(older.callback));
+                    older.callback = nullptr;
+                }
+                std::move(older.alsoAnswer.begin(), older.alsoAnswer.end(), std::back_inserter(job->alsoAnswer));
+                older.alsoAnswer.clear();
+            };
+            const auto older = std::find_if(mLane->checks.begin(), mLane->checks.end(), [&queued](const Queued& q) { return q.key == queued.key; });
+            if (older != mLane->checks.end())
+            {
+                take_answers(*older->job);
+                mLane->checks.erase(older);
+            }
+            const std::shared_ptr<Job>& running = mLane->running;
+            if (running && running != job && running->check && running->superseded && keyOf(running->request) == queued.key)
+            {
+                running->superseded->store(true, std::memory_order_relaxed);
+                take_answers(*running);
+            }
+            mLane->checks.push_back(std::move(queued));
+        }
+        else
+        {
+            mLane->runs.push_back(std::move(queued));
+        }
+        if (!mLane->draining)
+        {
+            mLane->draining = start = true;
+        }
     }
-    else
+    if (!start)
     {
-        mRunsWaiting.push_back(std::move(queued));
+        return;
     }
-    nextWork();
+    const std::shared_ptr<Lane> lane = mLane;
+    if (!mThread->post([lane]() { drain(*lane); }))
+    {
+        // Closed -- the viewer going -- and what waits goes with it, as
+        // cleanup lets it go.
+        std::lock_guard<std::mutex> guard(lane->lock);
+        lane->draining = false;
+        lane->runs.clear();
+        lane->checks.clear();
+    }
 }
 
-void ALScriptPreprocessor::nextWork()
+// static
+void ALScriptPreprocessor::drain(Lane& lane)
 {
-    if (mWorking || !mThread)
+    for (;;)
     {
-        return;
-    }
-    std::deque<Queued>& lane = !mRunsWaiting.empty() ? mRunsWaiting : mChecksWaiting;
-    if (lane.empty())
-    {
-        return;
-    }
-    std::function<void()> work = std::move(lane.front().work);
-    lane.pop_front();
-    mWorking = true;
-    const bool posted = mThread->post([this, work = std::move(work)]() {
-        // The next let start whatever this one does: a job that threw past
+        std::function<void()> work;
+        {
+            std::lock_guard<std::mutex> guard(lane.lock);
+            lane.running.reset();
+            std::deque<Queued>& from = !lane.runs.empty() ? lane.runs : lane.checks;
+            if (lane.closed || from.empty())
+            {
+                lane.draining = false;
+                return;
+            }
+            work         = std::move(from.front().work);
+            lane.running = from.front().job;
+            from.pop_front();
+        }
+        // The next one begins whatever this one does: a job that threw past
         // its own answer would otherwise hold every later check and save
         // for the session.
         try
@@ -1368,23 +1421,17 @@ void ALScriptPreprocessor::nextWork()
         {
             LL_WARNS("ScriptPreprocessor") << "A preprocessor job failed" << LL_ENDL;
         }
-        LLAppViewer::instance()->postToMainCoro([this]() {
-            mWorking = false;
-            nextWork();
-        });
-    });
-    if (!posted)
-    {
-        // Closed -- the viewer going -- and what waits goes with it, as
-        // cleanup lets it go.
-        mWorking = false;
-        mRunsWaiting.clear();
-        mChecksWaiting.clear();
     }
 }
 
 void ALScriptPreprocessor::expandedJob(const std::shared_ptr<Job>& job, ALPreprocessor::Result result, std::vector<ALPreprocessor::Ask> missed)
 {
+    // Stood in for by a later check of the same script, which answers for
+    // it: nothing more made of this one.
+    if (job->stale())
+    {
+        return;
+    }
     // An include nobody had looked up yet: looked up now, and the run
     // made again with it in. The run is what says a name was asked for
     // at all -- an `#include` inside an `#if`, or one a macro made, is
@@ -1425,8 +1472,12 @@ void ALScriptPreprocessor::ensureWorker()
 
 void ALScriptPreprocessor::cleanupSingleton()
 {
-    mRunsWaiting.clear();
-    mChecksWaiting.clear();
+    {
+        std::lock_guard<std::mutex> guard(mLane->lock);
+        mLane->closed = true;
+        mLane->runs.clear();
+        mLane->checks.clear();
+    }
     if (mThread)
     {
         mThread->close();

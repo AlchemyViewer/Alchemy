@@ -1363,4 +1363,23 @@ namespace tut
         ensure("the module's own line maps to it", r.map.toSource(5, 0).found() && r.map.files()[r.map.toSource(5, 0).file].name == "m");
         ensure("the script's code after it maps back", r.map.toSource(7, 0).file == 0 && r.map.toSource(7, 0).line == 3);
     }
+
+    template<> template<>
+    void alpreprocessor_object::test<36>()
+    {
+        set_test_name("a run no longer wanted stops where it stands and says so, the source as it was; one still wanted is not touched");
+        std::atomic<bool>       later{ false };
+        ALPreprocessor::Options wanted = options(false);
+        wanted.superseded              = &later;
+        wanted.switches                = true;
+        const std::string       source = "#define TWICE(x) ((x) * 2)\ndefault { state_entry() { integer n = TWICE(3); switch (n) { case 6: break; } } }\n";
+        const ALPreprocessor::Result made = ALPreprocessor::run(source, wanted);
+        ensure("still wanted: made", !made.superseded && !made.overran && made.text.find("((3) * 2)") != std::string::npos);
+        later = true;
+        const ALPreprocessor::Result stopped = ALPreprocessor::run(source, wanted);
+        ensure("not wanted: stopped", stopped.superseded && stopped.overran);
+        ensure_equals("the source as it was", stopped.text, source);
+        ensure("nothing said of it", std::none_of(stopped.problems.begin(), stopped.problems.end(),
+                                                  [](const ALScriptProblem& p) { return p.severity == ALScriptProblem::Severity::Error; }));
+    }
 }

@@ -908,6 +908,9 @@ namespace
         size_t                                  mMade    = 0;
         size_t                                  mBytes   = 0;
         bool                                    mOverran = false;
+        // How many times the loop has gone round, which a look at whether
+        // the run is still wanted is made every so many of.
+        size_t                                  mRounds  = 0;
         // How deep argument expansion has gone.
         S32                                     mExpandDepth = 0;
         // Tokens to read before the file: what an expansion made, to be
@@ -1011,6 +1014,14 @@ namespace
     {
         while (mFiles.size() > depth && !mOverran)
         {
+            // No longer wanted: stopped where it stands, and said so.
+            if (mOptions.superseded && (mRounds++ & 1023) == 0 && mOptions.superseded->load(std::memory_order_relaxed))
+            {
+                mOverran           = true;
+                mResult.overran    = true;
+                mResult.superseded = true;
+                break;
+            }
             if (!mPending.empty())
             {
                 Token t = mPending.front();
@@ -3826,6 +3837,19 @@ ALPreprocessor::Result ALPreprocessor::run(std::string_view source, const Option
     }
 
     Tokens tokens = engine.run(source);
+    // No longer wanted, before or after the expansion: the transforms and
+    // the rest are not made either.
+    if (!result.superseded && options.superseded && options.superseded->load(std::memory_order_relaxed))
+    {
+        result.overran    = true;
+        result.superseded = true;
+    }
+    if (result.superseded)
+    {
+        result.text = std::string(source);
+        asItIs(result.text, options.fileName, result.map);
+        return result;
+    }
     if (options.lua)
     {
         Requires gathered(engine, options, result);

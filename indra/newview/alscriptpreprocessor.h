@@ -39,9 +39,11 @@ class ALSerialWorker;
 #include <boost/unordered/unordered_flat_map.hpp>
 #include <boost/unordered/unordered_flat_set.hpp>
 
+#include <atomic>
 #include <deque>
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <string>
 #include <vector>
@@ -318,21 +320,34 @@ private:
     void                    optimizeAndFinish(const std::shared_ptr<Job>& job, ALPreprocessor::Result result);
     void                    finish(const std::shared_ptr<Job>& job, ALPreprocessor::Result result);
     void                    ensureWorker();
-    // Work for the worker thread, handed to it one piece at a time so
-    // that what waits can still be put in order: a run's first, then a
-    // check's, and a check whose script is asked to be checked again
-    // while it waits dropped for the later one.
+    // Work for the worker thread, put in order as it waits: a run's
+    // first, then a check's; a check whose script is asked to be checked
+    // again while it waits dropped for the later one, and one under way
+    // told to stop (Job::superseded).
     void                    toWorker(const std::shared_ptr<Job>& job, std::function<void()> work);
-    void                    nextWork();
     struct Queued
     {
         std::shared_ptr<Job>  job;
         std::string           key;
         std::function<void()> work;
     };
-    std::deque<Queued>      mRunsWaiting;
-    std::deque<Queued>      mChecksWaiting;
-    bool                    mWorking = false;
+    // What waits for the worker, on the worker's side: it takes the next
+    // itself as each ends, rather than waiting a frame for the main thread
+    // to hand it over. The main thread puts in, the worker takes out, each
+    // under the lock.
+    struct Lane
+    {
+        std::mutex           lock;
+        std::deque<Queued>   runs;
+        std::deque<Queued>   checks;
+        // Whether the worker is taking from it, and the job it is on.
+        bool                 draining = false;
+        bool                 closed   = false;
+        std::shared_ptr<Job> running;
+    };
+    std::shared_ptr<Lane>   mLane = std::make_shared<Lane>();
+    // On the worker: what waits, taken until nothing does.
+    static void             drain(Lane& lane);
     // An include by its identity, loaded into the cache -- or noted as
     // failed -- and `done` called either way.
     void                    fetch(const std::string& path, std::function<void()> done);

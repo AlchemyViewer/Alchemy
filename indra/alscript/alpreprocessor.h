@@ -30,6 +30,7 @@
 #include "alscriptproblem.h"
 #include "alsourcemap.h"
 
+#include <atomic>
 #include <functional>
 #include <string>
 #include <string_view>
@@ -143,6 +144,11 @@ public:
         // transforms that rewrite them, which descend a level for each;
         // a chain of `else if` is no deeper for being long.
         S32    nestingDepth    = 500;
+        // Raised from another thread where what this run makes is no
+        // longer wanted -- the text it expands has moved on, and a run of
+        // the later one is waiting: looked at as the run goes, which then
+        // stops and says so (Result::superseded).
+        const std::atomic<bool>* superseded = nullptr;
         // The predefined macros' values. An empty agent id leaves the
         // agent macros undefined; an empty asset id says NOT_IN_WORLD.
         std::string agentId;
@@ -210,6 +216,8 @@ public:
         // The run reached its budget and stopped: the text is as far as
         // it got, and is nothing to compile or analyse.
         bool overran       = false;
+        // It stopped for Options::superseded: nothing in it is anybody's.
+        bool superseded    = false;
 
         // Where Options::apart asked for it, and there was a require: the
         // script as the run made it but with its requires left as calls,
