@@ -2503,4 +2503,18 @@ namespace tut
         ex("g/o/d");
         ensure_equals(":g deletes the lines it matched, not those the numbers would miss", flat(e.text()), std::string("three|"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<81>()
+    {
+        set_test_name("gI inserts in the first column, before the indent, and . does it again");
+        ALCodeEditor& e = make("    one\n    two\n");
+        e.setCaret(ALTextPos(0, 6));
+        keys("gIx<Esc>");
+        ensure_equals("before the indent", flat(e.text()), std::string("x    one|    two|"));
+        keys("j.");
+        ensure_equals("again on the next line", flat(e.text()), std::string("x    one|x    two|"));
+        keys("0wgI");
+        ensure("in insert mode", vim->inserting());
+    }
 }

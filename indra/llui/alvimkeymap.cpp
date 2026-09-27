@@ -1650,6 +1650,16 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
                         enterInsert(view, count);
                         return true;
                     }
+                    case 'I':
+                        // Inserting in the line's first column, before its
+                        // indent, where I goes after it.
+                        clearPending();
+                        if (editing && !visual)
+                        {
+                            view.setCaret(ALTextPos(view.caret().line, 0));
+                            enterInsert(view, count);
+                        }
+                        return true;
                     case '*':
                     case '#':
                     {
