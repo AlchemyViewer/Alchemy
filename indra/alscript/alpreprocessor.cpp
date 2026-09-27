@@ -36,6 +36,7 @@
 #include <boost/unordered/unordered_flat_set.hpp>
 
 #include <algorithm>
+#include <array>
 #include <ctime>
 #include <deque>
 #include <limits>
@@ -202,19 +203,48 @@ namespace
     // Longest first, so that the first match is the longest.
     // &= |= ^= are not LSL's, but the extensions transform takes them
     // and plain LSL has no use for an & before an =.
-    const char* const LSL_PUNCT[] = { "<<=", ">>=", "...", "##", "++", "--", "+=", "-=", "*=", "/=", "%=", "&=", "|=", "^=",
-                                      "==",  "!=",  "<=",  ">=", "&&", "||", "<<", ">>", nullptr };
-    const char* const LUA_PUNCT[] = { "...", "//=", "..=", "##", "..", "//", "::", "->", "+=", "-=", "*=", "/=", "%=", "^=",
-                                      "==",  "~=",  "<=",  ">=", nullptr };
+    constexpr std::string_view LSL_PUNCT[] = { "<<=", ">>=", "...", "##", "++", "--", "+=", "-=", "*=", "/=", "%=", "&=", "|=", "^=",
+                                               "==",  "!=",  "<=",  ">=", "&&", "||", "<<", ">>" };
+    constexpr std::string_view LUA_PUNCT[] = { "...", "//=", "..=", "##", "..", "//", "::", "->", "+=", "-=", "*=", "/=", "%=", "^=",
+                                               "==",  "~=",  "<=",  ">=" };
+
+    // A language's punctuators by their first byte, in the order the list
+    // has them, longest first: a mark is tried against the few that start
+    // as it does, not the whole list.
+    class Punctuators
+    {
+    public:
+        template <size_t N> explicit Punctuators(const std::string_view (&ops)[N])
+        {
+            for (std::string_view op : ops)
+            {
+                mByFirst[static_cast<unsigned char>(op.front())].push_back(op);
+            }
+        }
+        const std::vector<std::string_view>& startingWith(char c) const { return mByFirst[static_cast<unsigned char>(c)]; }
+
+    private:
+        std::array<std::vector<std::string_view>, 256> mByFirst;
+    };
+
+    const Punctuators& punctuators(bool lua)
+    {
+        static const Punctuators lsl(LSL_PUNCT);
+        static const Punctuators luau(LUA_PUNCT);
+        return lua ? luau : lsl;
+    }
 
     // Whether two punctuators written together would lex as something
     // longer than the first: what compression needs a space between.
     bool punctJoins(bool lua, std::string_view a, std::string_view b)
     {
         const std::string joined = std::string(a) + std::string(b);
-        for (const char* const* p = lua ? LUA_PUNCT : LSL_PUNCT; *p; ++p)
+        if (joined.empty())
         {
-            const std::string_view op = *p;
+            return false;
+        }
+        for (std::string_view op : punctuators(lua).startingWith(joined.front()))
+        {
             if (op.size() > a.size() && joined.compare(0, op.size(), op) == 0)
             {
                 return true;
@@ -368,9 +398,8 @@ namespace
         void punct()
         {
             start(Kind::Punct);
-            for (const char* const* p = mLua ? LUA_PUNCT : LSL_PUNCT; *p; ++p)
+            for (std::string_view op : punctuators(mLua).startingWith(at(mPos)))
             {
-                const std::string_view op = *p;
                 if (mText.compare(mPos, op.size(), op) == 0)
                 {
                     for (size_t i = 0; i < op.size(); ++i)
