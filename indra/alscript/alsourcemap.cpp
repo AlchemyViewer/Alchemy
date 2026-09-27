@@ -316,9 +316,24 @@ bool ALSourceMap::verbatimSpan(S32 line, S32 column, S32 endColumn, Loc& begin, 
     // others -- the blanks between them the source's own -- so that the
     // stretch is the source's as it stands. A segment's end is still its
     // own: an insertion just after a token goes with the token.
+    //
+    // The first of them found by halves: the last to start at the column
+    // or before it, and back over any before that reach it too -- ones
+    // that end where it is, since segments come in output order and do
+    // not overlap -- so that it is the first that holds the column, as
+    // walking the line from its start would find.
+    size_t from = segmentAt(line, column);
+    if (from == std::string::npos)
+    {
+        return false;
+    }
+    while (from > mLineStart[line] && mSegments[from - 1].outColumn + mSegments[from - 1].length >= column)
+    {
+        --from;
+    }
     const Segment* first = nullptr;
     S32            shift = 0;
-    for (size_t i = mLineStart[line]; i < mSegments.size() && mSegments[i].outLine == line; ++i)
+    for (size_t i = from; i < mSegments.size() && mSegments[i].outLine == line; ++i)
     {
         const Segment& segment = mSegments[i];
         const S32      seg_end = segment.outColumn + segment.length;

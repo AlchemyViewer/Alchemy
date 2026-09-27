@@ -132,4 +132,29 @@ namespace tut
         ensure("named", map.files().size() == 1 && map.files()[0].name == "same");
         ensure("each line", map.toSource(1, 5).line == 1 && map.toSource(1, 5).column == 5 && map.toSource(2, 2).line == 2);
     }
+    template<> template<>
+    void alsourcemap_object::test<5>()
+    {
+        set_test_name("a verbatim stretch found on a long line: the first segment that reaches the column, as a walk from the line's start finds it");
+        ALSourceMap map;
+        map.addFile("script", "script");
+        // A long line of alternating pieces: a macro's product, then a
+        // token copied from the source, then a macro's again...
+        S32 out = 0;
+        for (S32 i = 0; i < 400; ++i)
+        {
+            map.add(segment(0, out, 4, 0, 0, 0, false));
+            map.add(segment(0, out + 4, 3, 0, 1, i * 10));
+            out += 7;
+        }
+        map.finish();
+        ALSourceMap::Loc begin, end;
+        const S32        at = 7 * 250 + 4;
+        ensure("within a token copied, deep in the line", map.verbatimSpan(0, at + 1, at + 3, begin, end) && begin.line == 1 && begin.column == 2501 && end.column == 2503);
+        ensure("an insertion just after it goes with it", map.verbatimSpan(0, at + 3, at + 3, begin, end) && begin.column == 2503);
+        ensure("an insertion just before it goes with the macro's product before it", !map.verbatimSpan(0, at, at, begin, end));
+        ensure("and so does a stretch from its first column", !map.verbatimSpan(0, at, at + 3, begin, end));
+        ensure("into the macro's product after it: not the source's", !map.verbatimSpan(0, at + 1, at + 5, begin, end));
+        ensure("past the line's end", !map.verbatimSpan(0, out + 2, out + 3, begin, end));
+    }
 }
