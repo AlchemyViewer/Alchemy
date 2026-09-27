@@ -613,7 +613,7 @@ namespace tut
     template<> template<>
     void allsloptimizer_object::test<16>()
     {
-        set_test_name("an argument that changes nothing goes in as a name does, a temporary where it is read twice; one that may change something keeps the call");
+        set_test_name("an argument that changes nothing goes in as a name does, a temporary where it is read twice; one that may change something keeps the expression out, and a function called once goes as a block");
         const std::string source =
             "integer g;\n"
             "integer both(integer x)\n"
@@ -644,12 +644,16 @@ namespace tut
         ensure("a pure call read twice is made once into a temporary: " + put.text, has("        integer _t_1 = llAbs(g);\n        integer a = (_t_1 + _t_1);"));
         ensure("an expression read once goes in, in parentheses: " + put.text, has("integer b = ((g * 2) + 1);"));
         ensure("so does a pure call: " + put.text, has("integer c = ((llAbs(g)) + 1);"));
-        ensure("a call that may change something stays a call: " + put.text, has("integer d = once(bump());") && has("integer once(integer x)"));
-        ensure("so does one whose answer may change -- the time is not pure: " + put.text, has("integer e = both(llRound(llGetTime()));") && has("integer both(integer x)"));
-        // The argument's own call is not the statement's other call: the
-        // check that nothing else in the statement changes anything is
-        // about what is not being moved.
-        ensure_equals("three went", put.inlined, 3);
+        // An argument that may change something, or whose answer may
+        // change, cannot go into an expression; a function called once
+        // goes from a block before the statement instead, its value set by
+        // the body.
+        ensure("bump, called once, is set by its body before the statement, and once takes its value as a name: " + put.text,
+               has("integer _r_1;") && has("_r_1 = ++g;") && has("integer d = (_r_1 + 1);") && !has("integer once(integer x)"));
+        ensure("both, its other call gone, sets e itself, the time read once into its parameter: " + put.text,
+               has("integer e;") && has("integer x = llRound(llGetTime());") && has("e = x + x;") && !has("integer both(integer x)"));
+        ensure("no stray ; where the declaration stood: " + put.text, !has("};"));
+        ensure_equals("six went", put.inlined, 6);
         // A temporary above an if whose condition has the call, and above
         // a for whose first part has it; not above a while, whose
         // condition is read every time round, nor an else-if.
@@ -1157,5 +1161,55 @@ namespace tut
             ensure(std::string(pure) + " is pure", ALLSLTraits::pure(pure));
         }
         ensure("llGetPos is not", !ALLSLTraits::pure("llGetPos") && ALLSLTraits::of("llGetPos")->mustUse);
+    }
+    template<> template<>
+    void allsloptimizer_object::test<33>()
+    {
+        set_test_name("a function returning a value goes in whatever its body: into what a declaration or an assignment sets, back out of a function returning the same, into a fresh local before the statement -- where nothing run before it would see a difference");
+        const std::string source =
+            "integer g;\n"
+            "integer f(integer k)\n{\n    if (k) return k + g;\n    g = 7;\n    return 0;\n}\n"
+            "integer outer(integer k)\n{\n    return f(k);\n}\n"
+            "default\n{\n    state_entry()\n    {\n"
+            "        integer x = f(1);\n"
+            "        x = f(2);\n"
+            "        f(3);\n"
+            "        x = f(4) + g;\n"
+            "        x = g + f(5);\n"
+            "        if (x) x = f(6);\n"
+            "        llOwnerSay((string)outer(x));\n"
+            "    }\n}\n";
+        const ALLSLInliner::Result put = ALLSLInliner::run(source, { "f" });
+        auto has = [&put](const std::string& text) { return put.text.find(text) != std::string::npos; };
+        ensure("the declaration's variable set by the body, its returns but the last jumps: " + put.text,
+               has("integer x;\n{\ninteger k = 1;") && has("{ x = k + g; jump _ret_") && has("    x = 0;"));
+        ensure("the assignment's too: " + put.text, has("integer k = 2;"));
+        ensure("a value nobody takes: the returns that change nothing go: " + put.text, has("integer k = 3;\n\n    if (k) jump _ret_3;\n    g = 7;"));
+        // A label is one to an event: every block's end its own, however
+        // many rounds made them.
+        for (const char* label : { "@_ret_1;", "@_ret_2;", "@_ret_3;", "@_ret_4;", "@_ret_5;", "@_ret_6;" })
+        {
+            const size_t first = put.text.find(label);
+            ensure(std::string("one ") + label + ": " + put.text, first == std::string::npos || put.text.find(label, first + 1) == std::string::npos);
+        }
+        ensure("g runs before f(4) and f writes g: the call stays: " + put.text, has("x = f(4) + g;"));
+        ensure("f(5) is the right operand and runs first: set before the statement: " + put.text, has("integer _r_") && has("x = g + _r_"));
+        ensure("a branch standing alone gets braces for the block: " + put.text, has("if (x) {") || has("if (x) {\n"));
+        ensure("outer returns f's value as its own, then goes where it is called: " + put.text, !has("integer outer(integer k)") && has("integer k_1 = k;"));
+        ensure("f stays, one call of it standing: " + put.text, has("integer f(integer k)"));
+        ALLSLService service;
+        for (const ALScriptProblem& p : service.check(put.text))
+        {
+            ensure("what was written compiles: " + p.message + "\n" + put.text, p.severity != ALScriptProblem::Severity::Error);
+        }
+        ALLSLOptimizer::Options o = options();
+        o.inlining                = true;
+        o.inlineNames             = { "f" };
+        const ALLSLOptimizer::Result r = ALLSLOptimizer::run(source, o);
+        ensure("the optimizer reads it: " + notes(r), r.optimized);
+        for (const ALScriptProblem& p : service.check(r.text))
+        {
+            ensure("and what it wrote compiles: " + p.message + "\n" + r.text, p.severity != ALScriptProblem::Severity::Error);
+        }
     }
 } // namespace tut

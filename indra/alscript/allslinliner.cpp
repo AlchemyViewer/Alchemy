@@ -33,6 +33,7 @@
 #include <boost/unordered/unordered_flat_map.hpp>
 #include <boost/unordered/unordered_flat_set.hpp>
 
+#include "allsleffects.h"
 #include "allslservice.h"
 #include "allsltraits.h"
 
@@ -406,11 +407,15 @@ namespace
     // the function goes with it, and the note.
     struct Plan
     {
-        Edit            edit;
-        // Temporaries for the arguments, put before the call's statement.
+        Edit                edit;
+        // What goes before the call's statement: temporaries for the
+        // arguments, or the body setting the call's value.
         std::optional<Edit> before;
-        ALScriptProblem note;
-        S32             callLine = 0;
+        // The brace that closes those put around a statement that stood
+        // alone as a branch or a loop's body.
+        std::optional<Edit> after;
+        ALScriptProblem     note;
+        S32                 callLine = 0;
     };
 
     // The fresh names a round has given out, so that two blocks in one
@@ -429,11 +434,679 @@ namespace
         }
     }
 
-    // The plan for one call of a function, or none where the shape is
-    // not one that can go in place.
-    bool plan(const Lines& lines, ScriptContext& context, LSLGlobalFunction* function, LSLFunctionExpression* call, bool last, bool is_marked, Names& used, Plan& out)
+    // What becomes of a body's returns where it is put in place.
+    enum class Returns
     {
-        LSLSymbol* sym = function->getSymbol();
+        // A function returning nothing: a return is the end of the block.
+        Void,
+        // A value nobody takes: a return keeps its expression only where
+        // that does something.
+        Discard,
+        // A value set to a variable: a return is `target = e;`.
+        Into,
+        // A value returned on from the function the call was returned
+        // from: the returns stay as they are.
+        Keep
+    };
+
+    // The statement a node stands in.
+    LSLASTNode* statementOf(LSLASTNode* node)
+    {
+        while (node && node->getNodeType() != NODE_STATEMENT)
+        {
+            node = node->getParent();
+        }
+        return node;
+    }
+
+    // Where a statement ends, its `;` with it: a declaration's place ends
+    // before the `;`, which a block put in its place would leave behind.
+    Pos endWithSemicolon(const Lines& lines, LSLASTNode* statement)
+    {
+        Pos                e    = endOf(statement);
+        const std::string& line = lines[static_cast<size_t>(e.line)];
+        if (e.column > 0 && static_cast<size_t>(e.column) < line.size() && line[static_cast<size_t>(e.column)] == ';' &&
+            line[static_cast<size_t>(e.column - 1)] != ';')
+        {
+            ++e.column;
+        }
+        return e;
+    }
+
+    // Every name in the function or the event a node is in. A label is one
+    // to a function -- a jump goes to the last label of its name in it --
+    // and a local declared before a block is in scope for all that
+    // follows it, a later block's own declarations included, so a fresh
+    // name must be none of these, whatever block they stand in.
+    Names namesAround(LSLASTNode* node)
+    {
+        LSLASTNode* callable = node;
+        while (callable && callable->getNodeType() != NODE_GLOBAL_FUNCTION && callable->getNodeType() != NODE_EVENT_HANDLER)
+        {
+            callable = callable->getParent();
+        }
+        Names names;
+        if (callable)
+        {
+            for (LSLASTNode* n : nodesOf(callable))
+            {
+                if (n->getNodeType() == NODE_IDENTIFIER && static_cast<LSLIdentifier*>(n)->getName())
+                {
+                    names.insert(static_cast<LSLIdentifier*>(n)->getName());
+                }
+            }
+        }
+        return names;
+    }
+
+    // Whether any of the expressions reads or writes a variable.
+    bool mentions(const std::vector<LSLExpression*>& exprs, LSLSymbol* variable)
+    {
+        for (LSLExpression* e : exprs)
+        {
+            for (LSLASTNode* n : nodesOf(e))
+            {
+                if (n->getNodeType() == NODE_EXPRESSION && n->getNodeSubType() == NODE_LVALUE_EXPRESSION &&
+                    static_cast<LSLLValueExpression*>(n)->getSymbol() == variable)
+                {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    // The function's body as a block, standing where `where` stands or
+    // just before it: an opening brace; each parameter a local of the
+    // block set to its argument, in order -- a call's own order: LSL takes
+    // an operator's operands right to left, but a call's arguments left to
+    // right, in LSO and Mono alike, so an argument that changes something
+    // changes it when the call would have -- then the body's statements,
+    // and a closing brace. A name the body declares that is visible at
+    // `where`, or is `target`, gets a fresh one, since LSL has no
+    // shadowing; so does each of its labels, a label being one to a
+    // function. A return is as `returns` asks; one that is not the body's
+    // last jumps to a label that ends the block -- the one already after
+    // `where`, where the block takes its place and the next statement is a
+    // label, a loop's continue label say, since two labels at one place
+    // are one too many. False where the body cannot go: it changes state,
+    // or reads a global that a local at `where` hides.
+    bool blockOf(const Lines& lines, ScriptContext& context, LSLGlobalFunction* function, const std::vector<LSLIdentifier*>& params,
+                 const std::vector<LSLExpression*>& args, LSLASTNode* where, bool inPlace, Returns returns, const std::string& target, Names& used,
+                 Block& block)
+    {
+        LSLStatement*                  body      = function->getStatements();
+        const std::vector<LSLASTNode*> bodyNodes = nodesOf(body);
+        std::vector<LSLASTNode*>       found;
+        std::set<LSLSymbol*>           labels;
+        for (LSLASTNode* n : bodyNodes)
+        {
+            if (n->getNodeType() != NODE_STATEMENT)
+            {
+                continue;
+            }
+            switch (n->getNodeSubType())
+            {
+                case NODE_STATE_STATEMENT: return false;
+                case NODE_RETURN_STATEMENT: found.push_back(n); break;
+                case NODE_LABEL: labels.insert(static_cast<LSLLabel*>(n)->getIdentifier()->getSymbol()); break;
+                default: break;
+            }
+        }
+        // The names the body declares, and what each is called in the
+        // block: its own name unless that is visible where the block goes.
+        std::set<LSLSymbol*>              declared;
+        std::map<LSLSymbol*, std::string> renamed;
+        for (LSLIdentifier* p : params)
+        {
+            declared.insert(p->getSymbol());
+        }
+        for (LSLASTNode* n : bodyNodes)
+        {
+            if (n->getNodeType() == NODE_STATEMENT && n->getNodeSubType() == NODE_DECLARATION)
+            {
+                declared.insert(static_cast<LSLDeclaration*>(n)->getIdentifier()->getSymbol());
+            }
+        }
+        // What the body reads of the script's own must be what the same
+        // names are where the block goes.
+        if (!meansTheSameAt(body, declared, where))
+        {
+            return false;
+        }
+        const Names visible = visibleFrom(where);
+        Names       taken   = visible;
+        for (const std::string& name : namesAround(where))
+        {
+            taken.insert(name);
+        }
+        if (!target.empty())
+        {
+            taken.insert(target);
+        }
+        for (LSLSymbol* d : declared)
+        {
+            if (d)
+            {
+                taken.insert(d->getName());
+            }
+        }
+        for (LSLSymbol* d : declared)
+        {
+            if (d && (visible.count(d->getName()) || d->getName() == target))
+            {
+                renamed[d] = freshName(d->getName(), taken, used, context);
+            }
+        }
+        for (LSLSymbol* l : labels)
+        {
+            if (l)
+            {
+                renamed[l] = freshName(l->getName(), taken, used, context);
+            }
+        }
+        std::vector<Rename> renames;
+        for (LSLASTNode* n : nodesOf(function))
+        {
+            if (n->getNodeType() == NODE_IDENTIFIER)
+            {
+                auto*      id = static_cast<LSLIdentifier*>(n);
+                const auto r  = renamed.find(id->getSymbol());
+                if (r != renamed.end() && id->getSymbol())
+                {
+                    renames.push_back(Rename{ beginOf(id), endOf(id), r->second });
+                }
+            }
+        }
+        // A return that is the body's last statement is the end of the
+        // block anyway; the rest are jumps to a label at its end.
+        LSLASTNode* lastStatement = nullptr;
+        for (LSLASTNode* child = body->getChild(0); child; child = child->getNext())
+        {
+            if (child->getNodeType() == NODE_STATEMENT)
+            {
+                lastStatement = child;
+            }
+        }
+        // The label a return jumps to. Inside the block, not after it: the
+        // block may be the whole body of a loop or an if written without
+        // braces, where a label after it would stand after the loop, or
+        // between the if and its else.
+        std::string after;
+        bool        afterIsOwn = false;
+        if (LSLASTNode* next = where->getNext(); inPlace && next && next->getNodeType() == NODE_STATEMENT && next->getNodeSubType() == NODE_LABEL &&
+                                                 where->getParent() && where->getParent()->getNodeSubType() == NODE_COMPOUND_STATEMENT)
+        {
+            if (LSLSymbol* label = static_cast<LSLLabel*>(next)->getIdentifier()->getSymbol())
+            {
+                after = label->getName();
+            }
+        }
+        const auto jumpTo = [&]() {
+            if (after.empty())
+            {
+                after      = freshName("_ret", taken, used, context);
+                afterIsOwn = true;
+            }
+            return after;
+        };
+        for (LSLASTNode* r : found)
+        {
+            if (returns == Returns::Keep)
+            {
+                continue;
+            }
+            const bool     lastOne = r == lastStatement;
+            LSLExpression* value   = static_cast<LSLReturnStatement*>(r)->getExpr();
+            // A value nobody takes goes where taking it changes nothing.
+            if (!value || returns == Returns::Void || (returns == Returns::Discard && ALLSLTraits::changesNothing(value)))
+            {
+                renames.push_back(Rename{ beginOf(r), endOf(r), lastOne ? std::string() : "jump " + jumpTo() + ";" });
+                continue;
+            }
+            // `return e;` as `target = e;`, or `e;`: the word and the `;`
+            // replaced, the expression between them the body's own, its
+            // names renamed with the rest.
+            const Pos rb = beginOf(r);
+            const Pos re = endOf(r);
+            if (lines[static_cast<size_t>(rb.line)].compare(static_cast<size_t>(rb.column), 6, "return") != 0 || re.column < 1 ||
+                lines[static_cast<size_t>(re.line)][static_cast<size_t>(re.column - 1)] != ';')
+            {
+                return false;
+            }
+            const std::string head = returns == Returns::Into ? target + " =" : std::string();
+            if (lastOne)
+            {
+                renames.push_back(Rename{ rb, Pos{ rb.line, rb.column + 6 }, head });
+            }
+            else
+            {
+                renames.push_back(Rename{ rb, Pos{ rb.line, rb.column + 6 }, "{ " + head });
+                renames.push_back(Rename{ Pos{ re.line, re.column - 1 }, re, "; jump " + jumpTo() + "; }" });
+            }
+        }
+        std::sort(renames.begin(), renames.end(), [](const Rename& a, const Rename& b) { return a.begin < b.begin; });
+
+        const Pos bbegin = beginOf(body);
+        const Pos bend   = endOf(body);
+        const Pos inner_begin{ bbegin.line, bbegin.column + 1 };
+        const Pos inner_end{ bend.line, std::max(0, bend.column - 1) };
+        block.push_back(PieceLine{ Piece{ "{", beginOf(where), false } });
+        for (size_t i = 0; i < params.size(); ++i)
+        {
+            LSLSymbol*  psym = params[i]->getSymbol();
+            const char* type = psym && psym->getType() ? typeWord(psym->getType()->getIType()) : nullptr;
+            if (!type)
+            {
+                return false;
+            }
+            const auto        r    = renamed.find(psym);
+            const std::string name = r == renamed.end() ? psym->getName() : r->second;
+            // The argument as written, with the body's renames not
+            // applying to it: it is the caller's text.
+            const std::string arg = slice(lines, beginOf(args[i]), endOf(args[i]));
+            block.push_back(PieceLine{ Piece{ std::string(type) + " " + name + " = ", beginOf(params[i]), false }, Piece{ arg, beginOf(args[i]), true },
+                                       Piece{ ";", beginOf(params[i]), false } });
+        }
+        for (PieceLine& line : renamedText(lines, inner_begin, inner_end, renames))
+        {
+            block.push_back(std::move(line));
+        }
+        if (afterIsOwn)
+        {
+            block.push_back(PieceLine{ Piece{ "@" + after + ";", endOf(where), false } });
+        }
+        block.push_back(PieceLine{ Piece{ "}", endOf(where), false } });
+        return true;
+    }
+
+    // The expression in place of the call: the body must be one return of
+    // an expression that changes nothing, over arguments that are
+    // constants, names, or expressions that change nothing themselves -- a
+    // pure library call, say.
+    bool expressionOf(const Lines& lines, ScriptContext& context, LSLGlobalFunction* function, LSLFunctionExpression* call, LSLSymbol* sym,
+                      const std::vector<LSLIdentifier*>& params, const std::vector<LSLExpression*>& args, bool last, bool is_marked, Names& used,
+                      Plan& out)
+    {
+        LSLStatement* body = function->getStatements();
+        LSLASTNode* only = body->getChild(0);
+        if (!only || only->getNext() || only->getNodeSubType() != NODE_RETURN_STATEMENT)
+        {
+            return false;
+        }
+        LSLExpression* expr = static_cast<LSLReturnStatement*>(only)->getExpr();
+        if (!expr)
+        {
+            return false;
+        }
+        // Several calls: only where marked, or small enough that the
+        // expression costs about what the call did.
+        if (!last && !is_marked && nodesOf(expr).size() > 8)
+        {
+            return false;
+        }
+        bool simple = true;
+        for (LSLASTNode* n : nodesOf(expr))
+        {
+            if (n->getNodeType() == NODE_EXPRESSION && operation_mutates(static_cast<LSLExpression*>(n)->getOperation()))
+            {
+                simple = false;
+            }
+        }
+        // What the expression reads that is not a parameter must be
+        // what the same name is where the call is.
+        std::set<LSLSymbol*> own;
+        for (LSLIdentifier* p : params)
+        {
+            own.insert(p->getSymbol());
+        }
+        if (!meansTheSameAt(expr, own, call))
+        {
+            return false;
+        }
+        std::map<LSLSymbol*, int> uses;
+        for (LSLASTNode* n : nodesOf(expr))
+        {
+            if (n->getNodeType() == NODE_EXPRESSION && n->getNodeSubType() == NODE_LVALUE_EXPRESSION)
+            {
+                ++uses[static_cast<LSLLValueExpression*>(n)->getIdentifier()->getSymbol()];
+            }
+        }
+        std::vector<std::string> argText(args.size());
+        // As written, for a temporary to be set to.
+        std::vector<std::string> argRaw(args.size());
+        std::vector<size_t>      wantTemp;
+        for (size_t i = 0; i < args.size() && simple; ++i)
+        {
+            const LSLNodeSubType kind     = args[i]->getNodeSubType();
+            const bool           constant = kind == NODE_CONSTANT_EXPRESSION;
+            const bool           name     = kind == NODE_LVALUE_EXPRESSION;
+            // Anything else must change nothing, since it may be read
+            // at another time than the call would have, or not at all.
+            if (!constant && !name && !ALLSLTraits::sideEffectFree(args[i]))
+            {
+                simple = false;
+                break;
+            }
+            argRaw[i]  = slice(lines, beginOf(args[i]), endOf(args[i]));
+            argText[i] = argRaw[i];
+            if (!constant && (!name || static_cast<LSLLValueExpression*>(args[i])->getMember()))
+            {
+                argText[i] = "(" + argText[i] + ")";
+            }
+            if (!constant && uses[params[i]->getSymbol()] > 1)
+            {
+                wantTemp.push_back(i);
+            }
+        }
+        if (!simple)
+        {
+            return false;
+        }
+        // A name the expression would read more than once is read once
+        // into a temporary before the call's statement, where the
+        // statement is one a declaration can stand before -- in a
+        // block: an expression, a declaration, a return, an `if` with
+        // the call in its condition, or a `for` with the call in its
+        // first part, the parts evaluated first -- and nothing else
+        // evaluated before the call would have read the name changes
+        // anything: no other call, and no assignment but the
+        // statement's own at its root. A `while` condition is read
+        // every time round, so a temporary above it would go stale.
+        std::optional<Edit> before;
+        if (!wantTemp.empty())
+        {
+            LSLASTNode* holder = call->getParent();
+            while (holder && holder->getNodeType() != NODE_STATEMENT)
+            {
+                holder = holder->getParent();
+            }
+            if (!holder || !holder->getParent() || holder->getParent()->getNodeSubType() != NODE_COMPOUND_STATEMENT)
+            {
+                return false;
+            }
+            const LSLNodeSubType shape = holder->getNodeSubType();
+            // What is evaluated up to the call, and the expression
+            // whose own assignment at the root is allowed.
+            LSLASTNode* scanned = holder;
+            LSLASTNode* root    = nullptr;
+            switch (shape)
+            {
+                case NODE_EXPRESSION_STATEMENT: root = static_cast<LSLExpressionStatement*>(holder)->getExpr(); break;
+                case NODE_DECLARATION:
+                case NODE_RETURN_STATEMENT: break;
+                case NODE_IF_STATEMENT: scanned = static_cast<LSLIfStatement*>(holder)->getCheckExpr(); break;
+                case NODE_FOR_STATEMENT:
+                    // The first part's expression the call is in may
+                    // assign at its root, as a statement's may; the
+                    // ones after it run after the call and are not
+                    // looked at.
+                    scanned = static_cast<LSLForStatement*>(holder)->getInitExprs();
+                    for (LSLASTNode* init = scanned ? scanned->getChild(0) : nullptr; init; init = init->getNext())
+                    {
+                        if (isInside(call, init))
+                        {
+                            root = init;
+                            break;
+                        }
+                    }
+                    break;
+                default: return false;
+            }
+            if (!scanned || !isInside(call, scanned))
+            {
+                return false;
+            }
+            std::vector<LSLASTNode*> evaluated;
+            if (shape == NODE_FOR_STATEMENT)
+            {
+                for (LSLASTNode* init = scanned->getChild(0); init; init = init->getNext())
+                {
+                    for (LSLASTNode* n : nodesOf(init))
+                    {
+                        evaluated.push_back(n);
+                    }
+                    if (init == root)
+                    {
+                        break;
+                    }
+                }
+            }
+            else
+            {
+                evaluated = nodesOf(scanned);
+            }
+            for (LSLASTNode* n : evaluated)
+            {
+                if (n->getNodeType() != NODE_EXPRESSION || isInside(n, call))
+                {
+                    // The call's own arguments are what is being moved.
+                    continue;
+                }
+                if (n->getNodeSubType() == NODE_FUNCTION_EXPRESSION && n != call &&
+                    static_cast<LSLFunctionExpression*>(n)->getIdentifier()->getSymbol() != sym)
+                {
+                    // Another call of this same function changes nothing
+                    // either; any other call is its own business.
+                    return false;
+                }
+                if (n != root && operation_mutates(static_cast<LSLExpression*>(n)->getOperation()))
+                {
+                    return false;
+                }
+            }
+            Names taken = visibleFrom(holder);
+            for (const std::string& name : namesAround(holder))
+            {
+                taken.insert(name);
+            }
+            Block decls;
+            for (const size_t i : wantTemp)
+            {
+                LSLSymbol*  psym = params[i]->getSymbol();
+                const char* type = psym && psym->getType() ? typeWord(psym->getType()->getIType()) : nullptr;
+                if (!type)
+                {
+                    return false;
+                }
+                const std::string temp = freshName("_t", taken, used, context);
+                decls.push_back(PieceLine{ Piece{ std::string(type) + " " + temp + " = ", beginOf(args[i]), false },
+                                           Piece{ argRaw[i], beginOf(args[i]), true }, Piece{ ";", beginOf(args[i]), false } });
+                argText[i] = temp;
+            }
+            // The statement's own indentation before it, on the line
+            // the temporaries leave it on.
+            const Pos          at     = beginOf(holder);
+            const std::string& line   = lines[static_cast<size_t>(at.line)];
+            const size_t       indent = line.find_first_not_of(" \t");
+            decls.push_back(PieceLine{ Piece{ line.substr(0, indent == std::string::npos ? 0 : std::min(indent, static_cast<size_t>(at.column))), at, false } });
+            before = Edit{ at, at, std::move(decls) };
+        }
+        std::vector<Rename> renames;
+        for (LSLASTNode* n : nodesOf(expr))
+        {
+            if (n->getNodeType() == NODE_EXPRESSION && n->getNodeSubType() == NODE_LVALUE_EXPRESSION)
+            {
+                LSLIdentifier* id = static_cast<LSLLValueExpression*>(n)->getIdentifier();
+                for (size_t i = 0; i < params.size(); ++i)
+                {
+                    if (id->getSymbol() && id->getSymbol() == params[i]->getSymbol())
+                    {
+                        renames.push_back(Rename{ beginOf(id), endOf(id), argText[i] });
+                    }
+                }
+            }
+        }
+        std::sort(renames.begin(), renames.end(), [](const Rename& a, const Rename& b) { return a.begin < b.begin; });
+        Block block = renamedText(lines, beginOf(expr), endOf(expr), renames);
+        block.front().insert(block.front().begin(), Piece{ "(", beginOf(call), false });
+        block.back().push_back(Piece{ ")", endOf(call), false });
+        out.edit     = Edit{ beginOf(call), endOf(call), std::move(block) };
+        out.before   = std::move(before);
+        out.note     = noteAt(call, last ? "InlinerPutExpressionOnce" : "InlinerPutExpression",
+                              last ? "put what the function [1] returns in place of its one call" : "put what the function [1] returns in place of a call", { sym->getName() });
+        out.callLine = beginOf(call).line;
+        return true;
+    }
+
+    // A value put where the call is from a block before its statement,
+    // the call's value set by the body: into the variable the statement
+    // declares or sets with it, where that is all the statement does; into
+    // the function's own return, where the statement returns it from a
+    // function of the same type; else into a fresh local declared above
+    // the block, the call becoming its name. The statement may be one that
+    // runs once where it stands -- an expression, a declaration, a return,
+    // an if's condition, a for's first part -- and the call may be run
+    // before the rest of it only where nothing that ran before it there
+    // would see a difference (ALLSLEffects). A statement standing alone as
+    // a branch or a loop's body gets braces, for the block to stand in.
+    bool hoisted(const Lines& lines, ScriptContext& context, const ALLSLEffects& effects, LSLGlobalFunction* function, LSLFunctionExpression* call,
+                 LSLSymbol* sym, const std::vector<LSLIdentifier*>& params, const std::vector<LSLExpression*>& args, Names& used, Plan& out)
+    {
+        LSLASTNode* holder = statementOf(call);
+        if (!holder || !holder->getParent())
+        {
+            return false;
+        }
+        const LSLNodeSubType shape = holder->getNodeSubType();
+        switch (shape)
+        {
+            case NODE_EXPRESSION_STATEMENT:
+            case NODE_DECLARATION:
+            case NODE_RETURN_STATEMENT:
+                break;
+            case NODE_IF_STATEMENT:
+                if (!isInside(call, static_cast<LSLIfStatement*>(holder)->getCheckExpr()))
+                {
+                    return false;
+                }
+                break;
+            case NODE_FOR_STATEMENT:
+                if (!isInside(call, static_cast<LSLForStatement*>(holder)->getInitExprs()))
+                {
+                    return false;
+                }
+                break;
+            default:
+                // A loop's condition is read every time round.
+                return false;
+        }
+        LSLASTNode* parent  = holder->getParent();
+        const bool  inBlock = parent->getNodeType() == NODE_STATEMENT && parent->getNodeSubType() == NODE_COMPOUND_STATEMENT;
+        if (!inBlock && (shape == NODE_DECLARATION || parent->getNodeType() != NODE_STATEMENT))
+        {
+            return false;
+        }
+        if (!effects.mayRunFirst(holder, call))
+        {
+            return false;
+        }
+        const LSLIType type     = sym->getType() ? sym->getType()->getIType() : LST_NULL;
+        const char*    typeName = typeWord(type);
+        if (!typeName)
+        {
+            return false;
+        }
+        // The call as the statement's whole value, in parentheses or not.
+        LSLASTNode* whole = call;
+        while (whole->getParent() && whole->getParent()->getNodeType() == NODE_EXPRESSION && whole->getParent()->getNodeSubType() == NODE_PARENTHESIS_EXPRESSION)
+        {
+            whole = whole->getParent();
+        }
+        Returns     returns  = Returns::Into;
+        std::string target;
+        std::string declare;
+        bool        replaces = false;
+        if (inBlock && shape == NODE_DECLARATION && static_cast<LSLDeclaration*>(holder)->getInitializer() == whole)
+        {
+            LSLSymbol* declared = static_cast<LSLDeclaration*>(holder)->getSymbol();
+            if (declared && declared->getType() && declared->getType()->getIType() == type && !mentions(args, declared))
+            {
+                target   = declared->getName();
+                declare  = std::string(typeName) + " " + target + ";";
+                replaces = true;
+            }
+        }
+        else if (shape == NODE_EXPRESSION_STATEMENT)
+        {
+            auto* expr = static_cast<LSLExpressionStatement*>(holder)->getExpr();
+            if (expr && expr->getNodeSubType() == NODE_BINARY_EXPRESSION && expr->getOperation() == '=' && expr->getChild(1) == whole &&
+                expr->getChild(0)->getNodeSubType() == NODE_LVALUE_EXPRESSION && !static_cast<LSLLValueExpression*>(expr->getChild(0))->getMember())
+            {
+                LSLSymbol* set = static_cast<LSLLValueExpression*>(expr->getChild(0))->getSymbol();
+                if (set && set->getType() && set->getType()->getIType() == type)
+                {
+                    target   = set->getName();
+                    replaces = true;
+                }
+            }
+        }
+        else if (shape == NODE_RETURN_STATEMENT && static_cast<LSLReturnStatement*>(holder)->getExpr() == whole)
+        {
+            LSLASTNode* up = holder;
+            while (up && up->getNodeType() != NODE_GLOBAL_FUNCTION && up->getNodeType() != NODE_EVENT_HANDLER)
+            {
+                up = up->getParent();
+            }
+            LSLSymbol* returning = up && up->getNodeType() == NODE_GLOBAL_FUNCTION ? static_cast<LSLGlobalFunction*>(up)->getSymbol() : nullptr;
+            if (returning && returning->getType() && returning->getType()->getIType() == type)
+            {
+                returns  = Returns::Keep;
+                replaces = true;
+            }
+        }
+        if (!replaces)
+        {
+            Names taken = visibleFrom(holder);
+            for (const std::string& name : namesAround(holder))
+            {
+                taken.insert(name);
+            }
+            target = freshName("_r", taken, used, context);
+        }
+        Block block;
+        if (!blockOf(lines, context, function, params, args, holder, replaces, returns, target, used, block))
+        {
+            return false;
+        }
+        if (replaces)
+        {
+            if (!declare.empty())
+            {
+                block.insert(block.begin(), PieceLine{ Piece{ declare, beginOf(holder), false } });
+            }
+            out.edit = Edit{ beginOf(holder), endWithSemicolon(lines, holder), std::move(block) };
+            return true;
+        }
+        block.insert(block.begin(), PieceLine{ Piece{ std::string(typeName) + " " + target + ";", beginOf(call), false } });
+        if (!inBlock)
+        {
+            block.insert(block.begin(), PieceLine{ Piece{ "{", beginOf(holder), false } });
+        }
+        // The statement's own indentation before it, on the line the block
+        // leaves it on.
+        const Pos          at     = beginOf(holder);
+        const std::string& line   = lines[static_cast<size_t>(at.line)];
+        const size_t       indent = line.find_first_not_of(" \t");
+        block.push_back(PieceLine{ Piece{ line.substr(0, indent == std::string::npos ? 0 : std::min(indent, static_cast<size_t>(at.column))), at, false } });
+        out.before = Edit{ at, at, std::move(block) };
+        out.edit   = Edit{ beginOf(call), endOf(call), Block{ PieceLine{ Piece{ target, beginOf(call), false } } } };
+        if (!inBlock)
+        {
+            out.after = Edit{ endOf(holder), endOf(holder), Block{ PieceLine{ Piece{ " }", endOf(holder), false } } } };
+        }
+        return true;
+    }
+
+    // The plan for one call of a function, or none where the shape is
+    // not one that can go in place. A call the function is the statement
+    // of goes as a block in its place; a value, as its expression where
+    // the body is one, else from a block before its statement. Only a
+    // function called once, or marked, goes as a block.
+    bool plan(const Lines& lines, ScriptContext& context, const ALLSLEffects& effects, LSLGlobalFunction* function, LSLFunctionExpression* call, bool last,
+              bool is_marked, Names& used, Plan& out)
+    {
+        LSLSymbol*    sym  = function->getSymbol();
         LSLStatement* body = function->getStatements();
         if (!sym || !body || body->getNodeSubType() != NODE_COMPOUND_STATEMENT || isInside(call, function))
         {
@@ -467,404 +1140,42 @@ namespace
         LSLASTNode* statement = call->getParent();
         const bool  bare      = statement && statement->getNodeType() == NODE_STATEMENT && statement->getNodeSubType() == NODE_EXPRESSION_STATEMENT &&
                            static_cast<LSLExpressionStatement*>(statement)->getExpr() == call;
-        const std::vector<LSLASTNode*> bodyNodes = nodesOf(body);
-
-        if (returnsNothing && bare)
-        {
-            if (!last && !is_marked)
-            {
-                return false;
-            }
-            // A block in place of the statement: each parameter a local
-            // set to its argument, in order, then the body. The order is a
-            // call's own: LSL takes an operator's operands right to left,
-            // but a call's arguments left to right, in LSO and Mono alike,
-            // so an argument that changes something changes it when the
-            // call would have. A return in the body is
-            // a jump to a label that ends the block; the body's own labels
-            // get fresh names, since a label is one to a function; a
-            // state change cannot go.
-            std::vector<LSLASTNode*> returns;
-            std::set<LSLSymbol*>     labels;
-            for (LSLASTNode* n : bodyNodes)
-            {
-                if (n->getNodeType() != NODE_STATEMENT)
-                {
-                    continue;
-                }
-                switch (n->getNodeSubType())
-                {
-                    case NODE_STATE_STATEMENT: return false;
-                    case NODE_RETURN_STATEMENT: returns.push_back(n); break;
-                    case NODE_LABEL: labels.insert(static_cast<LSLLabel*>(n)->getIdentifier()->getSymbol()); break;
-                    default: break;
-                }
-            }
-            // The names the body declares, and what each is called in the
-            // block: its own name unless that is visible where the call is.
-            std::set<LSLSymbol*>              declared;
-            std::map<LSLSymbol*, std::string> renamed;
-            for (LSLIdentifier* p : params)
-            {
-                declared.insert(p->getSymbol());
-            }
-            for (LSLASTNode* n : bodyNodes)
-            {
-                if (n->getNodeType() == NODE_STATEMENT && n->getNodeSubType() == NODE_DECLARATION)
-                {
-                    declared.insert(static_cast<LSLDeclaration*>(n)->getIdentifier()->getSymbol());
-                }
-            }
-            // What the body reads of the script's own must be what the
-            // same names are where the call is.
-            if (!meansTheSameAt(body, declared, statement))
-            {
-                return false;
-            }
-            const Names visible = visibleFrom(statement);
-            Names       taken   = visible;
-            for (LSLSymbol* d : declared)
-            {
-                if (d)
-                {
-                    taken.insert(d->getName());
-                }
-            }
-            for (LSLSymbol* d : declared)
-            {
-                if (d && visible.count(d->getName()))
-                {
-                    renamed[d] = freshName(d->getName(), taken, used, context);
-                }
-            }
-            for (LSLSymbol* l : labels)
-            {
-                if (l)
-                {
-                    renamed[l] = freshName(l->getName(), taken, used, context);
-                }
-            }
-            std::vector<Rename> renames;
-            for (LSLASTNode* n : nodesOf(function))
-            {
-                if (n->getNodeType() == NODE_IDENTIFIER)
-                {
-                    auto*      id = static_cast<LSLIdentifier*>(n);
-                    const auto r  = renamed.find(id->getSymbol());
-                    if (r != renamed.end() && id->getSymbol())
-                    {
-                        renames.push_back(Rename{ beginOf(id), endOf(id), r->second });
-                    }
-                }
-            }
-            // A return that is the body's last statement is the end of the
-            // block anyway; the rest are jumps to a label at its end.
-            LSLASTNode* lastStatement = nullptr;
-            for (LSLASTNode* child = body->getChild(0); child; child = child->getNext())
-            {
-                if (child->getNodeType() == NODE_STATEMENT)
-                {
-                    lastStatement = child;
-                }
-            }
-            // The label a return jumps to: the one already after the
-            // call's statement, where the next statement is a label --
-            // a loop's continue label, say -- since two labels at one
-            // place are one too many; else a fresh one as the block's
-            // last statement. Inside the block, not after it: the call
-            // may be the whole body of a loop or an if written without
-            // braces, where a label after the block would stand after
-            // the loop, or between the if and its else.
-            std::string after;
-            bool        afterIsOwn = false;
-            if (LSLASTNode* next = statement->getNext(); next && next->getNodeType() == NODE_STATEMENT && next->getNodeSubType() == NODE_LABEL &&
-                                                          statement->getParent() && statement->getParent()->getNodeSubType() == NODE_COMPOUND_STATEMENT)
-            {
-                if (LSLSymbol* label = static_cast<LSLLabel*>(next)->getIdentifier()->getSymbol())
-                {
-                    after = label->getName();
-                }
-            }
-            for (LSLASTNode* r : returns)
-            {
-                if (r == lastStatement)
-                {
-                    renames.push_back(Rename{ beginOf(r), endOf(r), std::string() });
-                    continue;
-                }
-                if (after.empty())
-                {
-                    after      = freshName("_ret", taken, used, context);
-                    afterIsOwn = true;
-                }
-                renames.push_back(Rename{ beginOf(r), endOf(r), "jump " + after + ";" });
-            }
-            std::sort(renames.begin(), renames.end(), [](const Rename& a, const Rename& b) { return a.begin < b.begin; });
-
-            // The block: an opening brace at the call, the parameters as
-            // locals, the body's own lines between its braces, the label
-            // a return jumps to, and a closing brace.
-            const Pos bbegin = beginOf(body);
-            const Pos bend   = endOf(body);
-            const Pos inner_begin{ bbegin.line, bbegin.column + 1 };
-            const Pos inner_end{ bend.line, std::max(0, bend.column - 1) };
-            Block     block;
-            block.push_back(PieceLine{ Piece{ "{", beginOf(statement), false } });
-            for (size_t i = 0; i < params.size(); ++i)
-            {
-                LSLSymbol*  psym = params[i]->getSymbol();
-                const char* type = psym && psym->getType() ? typeWord(psym->getType()->getIType()) : nullptr;
-                if (!type)
-                {
-                    return false;
-                }
-                const auto        r    = renamed.find(psym);
-                const std::string name = r == renamed.end() ? psym->getName() : r->second;
-                // The argument as written, with the body's renames not
-                // applying to it: it is the caller's text.
-                const std::string arg = slice(lines, beginOf(args[i]), endOf(args[i]));
-                block.push_back(PieceLine{ Piece{ std::string(type) + " " + name + " = ", beginOf(params[i]), false },
-                                           Piece{ arg, beginOf(args[i]), true }, Piece{ ";", beginOf(params[i]), false } });
-            }
-            for (PieceLine& line : renamedText(lines, inner_begin, inner_end, renames))
-            {
-                block.push_back(std::move(line));
-            }
-            if (afterIsOwn)
-            {
-                block.push_back(PieceLine{ Piece{ "@" + after + ";", endOf(statement), false } });
-            }
-            block.push_back(PieceLine{ Piece{ "}", endOf(statement), false } });
-            out.edit     = Edit{ beginOf(statement), endOf(statement), std::move(block) };
-            out.note     = noteAt(statement, last ? "InlinerPutFunctionOnce" : "InlinerPutFunction",
+        const bool  eligible  = last || is_marked;
+        const auto  noted     = [&](LSLASTNode* at) {
+            out.note     = noteAt(at, last ? "InlinerPutFunctionOnce" : "InlinerPutFunction",
                                   last ? "put the function [1] in place of its one call" : "put the function [1] in place of a call", { sym->getName() });
-            out.callLine = beginOf(statement).line;
-            return true;
-        }
-
-        if (!returnsNothing && !bare)
+            out.callLine = beginOf(at).line;
+        };
+        if (bare)
         {
-            // The expression in place of the call: the body must be one
-            // return of an expression that changes nothing, over
-            // arguments that are constants, names, or expressions that
-            // change nothing themselves -- a pure library call, say.
-            LSLASTNode* only = body->getChild(0);
-            if (!only || only->getNext() || only->getNodeSubType() != NODE_RETURN_STATEMENT)
+            if (!eligible)
             {
                 return false;
             }
-            LSLExpression* expr = static_cast<LSLReturnStatement*>(only)->getExpr();
-            if (!expr)
+            Block block;
+            if (!blockOf(lines, context, function, params, args, statement, true, returnsNothing ? Returns::Void : Returns::Discard, std::string(), used,
+                         block))
             {
                 return false;
             }
-            // Several calls: only where marked, or small enough that the
-            // expression costs about what the call did.
-            if (!last && !is_marked && nodesOf(expr).size() > 8)
-            {
-                return false;
-            }
-            bool simple = true;
-            for (LSLASTNode* n : nodesOf(expr))
-            {
-                if (n->getNodeType() == NODE_EXPRESSION && operation_mutates(static_cast<LSLExpression*>(n)->getOperation()))
-                {
-                    simple = false;
-                }
-            }
-            // What the expression reads that is not a parameter must be
-            // what the same name is where the call is.
-            std::set<LSLSymbol*> own;
-            for (LSLIdentifier* p : params)
-            {
-                own.insert(p->getSymbol());
-            }
-            if (!meansTheSameAt(expr, own, call))
-            {
-                return false;
-            }
-            std::map<LSLSymbol*, int> uses;
-            for (LSLASTNode* n : nodesOf(expr))
-            {
-                if (n->getNodeType() == NODE_EXPRESSION && n->getNodeSubType() == NODE_LVALUE_EXPRESSION)
-                {
-                    ++uses[static_cast<LSLLValueExpression*>(n)->getIdentifier()->getSymbol()];
-                }
-            }
-            std::vector<std::string> argText(args.size());
-            // As written, for a temporary to be set to.
-            std::vector<std::string> argRaw(args.size());
-            std::vector<size_t>      wantTemp;
-            for (size_t i = 0; i < args.size() && simple; ++i)
-            {
-                const LSLNodeSubType kind     = args[i]->getNodeSubType();
-                const bool           constant = kind == NODE_CONSTANT_EXPRESSION;
-                const bool           name     = kind == NODE_LVALUE_EXPRESSION;
-                // Anything else must change nothing, since it may be read
-                // at another time than the call would have, or not at all.
-                if (!constant && !name && !ALLSLTraits::sideEffectFree(args[i]))
-                {
-                    simple = false;
-                    break;
-                }
-                argRaw[i]  = slice(lines, beginOf(args[i]), endOf(args[i]));
-                argText[i] = argRaw[i];
-                if (!constant && (!name || static_cast<LSLLValueExpression*>(args[i])->getMember()))
-                {
-                    argText[i] = "(" + argText[i] + ")";
-                }
-                if (!constant && uses[params[i]->getSymbol()] > 1)
-                {
-                    wantTemp.push_back(i);
-                }
-            }
-            if (!simple)
-            {
-                return false;
-            }
-            // A name the expression would read more than once is read once
-            // into a temporary before the call's statement, where the
-            // statement is one a declaration can stand before -- in a
-            // block: an expression, a declaration, a return, an `if` with
-            // the call in its condition, or a `for` with the call in its
-            // first part, the parts evaluated first -- and nothing else
-            // evaluated before the call would have read the name changes
-            // anything: no other call, and no assignment but the
-            // statement's own at its root. A `while` condition is read
-            // every time round, so a temporary above it would go stale.
-            std::optional<Edit> before;
-            if (!wantTemp.empty())
-            {
-                LSLASTNode* holder = call->getParent();
-                while (holder && holder->getNodeType() != NODE_STATEMENT)
-                {
-                    holder = holder->getParent();
-                }
-                if (!holder || !holder->getParent() || holder->getParent()->getNodeSubType() != NODE_COMPOUND_STATEMENT)
-                {
-                    return false;
-                }
-                const LSLNodeSubType shape = holder->getNodeSubType();
-                // What is evaluated up to the call, and the expression
-                // whose own assignment at the root is allowed.
-                LSLASTNode* scanned = holder;
-                LSLASTNode* root    = nullptr;
-                switch (shape)
-                {
-                    case NODE_EXPRESSION_STATEMENT: root = static_cast<LSLExpressionStatement*>(holder)->getExpr(); break;
-                    case NODE_DECLARATION:
-                    case NODE_RETURN_STATEMENT: break;
-                    case NODE_IF_STATEMENT: scanned = static_cast<LSLIfStatement*>(holder)->getCheckExpr(); break;
-                    case NODE_FOR_STATEMENT:
-                        // The first part's expression the call is in may
-                        // assign at its root, as a statement's may; the
-                        // ones after it run after the call and are not
-                        // looked at.
-                        scanned = static_cast<LSLForStatement*>(holder)->getInitExprs();
-                        for (LSLASTNode* init = scanned ? scanned->getChild(0) : nullptr; init; init = init->getNext())
-                        {
-                            if (isInside(call, init))
-                            {
-                                root = init;
-                                break;
-                            }
-                        }
-                        break;
-                    default: return false;
-                }
-                if (!scanned || !isInside(call, scanned))
-                {
-                    return false;
-                }
-                std::vector<LSLASTNode*> evaluated;
-                if (shape == NODE_FOR_STATEMENT)
-                {
-                    for (LSLASTNode* init = scanned->getChild(0); init; init = init->getNext())
-                    {
-                        for (LSLASTNode* n : nodesOf(init))
-                        {
-                            evaluated.push_back(n);
-                        }
-                        if (init == root)
-                        {
-                            break;
-                        }
-                    }
-                }
-                else
-                {
-                    evaluated = nodesOf(scanned);
-                }
-                for (LSLASTNode* n : evaluated)
-                {
-                    if (n->getNodeType() != NODE_EXPRESSION || isInside(n, call))
-                    {
-                        // The call's own arguments are what is being moved.
-                        continue;
-                    }
-                    if (n->getNodeSubType() == NODE_FUNCTION_EXPRESSION && n != call &&
-                        static_cast<LSLFunctionExpression*>(n)->getIdentifier()->getSymbol() != sym)
-                    {
-                        // Another call of this same function changes nothing
-                        // either; any other call is its own business.
-                        return false;
-                    }
-                    if (n != root && operation_mutates(static_cast<LSLExpression*>(n)->getOperation()))
-                    {
-                        return false;
-                    }
-                }
-                const Names visible = visibleFrom(holder);
-                Names       taken   = visible;
-                Block       decls;
-                for (const size_t i : wantTemp)
-                {
-                    LSLSymbol*  psym = params[i]->getSymbol();
-                    const char* type = psym && psym->getType() ? typeWord(psym->getType()->getIType()) : nullptr;
-                    if (!type)
-                    {
-                        return false;
-                    }
-                    const std::string temp = freshName("_t", taken, used, context);
-                    decls.push_back(PieceLine{ Piece{ std::string(type) + " " + temp + " = ", beginOf(args[i]), false },
-                                               Piece{ argRaw[i], beginOf(args[i]), true }, Piece{ ";", beginOf(args[i]), false } });
-                    argText[i] = temp;
-                }
-                // The statement's own indentation before it, on the line
-                // the temporaries leave it on.
-                const Pos          at     = beginOf(holder);
-                const std::string& line   = lines[static_cast<size_t>(at.line)];
-                const size_t       indent = line.find_first_not_of(" \t");
-                decls.push_back(PieceLine{ Piece{ line.substr(0, indent == std::string::npos ? 0 : std::min(indent, static_cast<size_t>(at.column))), at, false } });
-                before = Edit{ at, at, std::move(decls) };
-            }
-            std::vector<Rename> renames;
-            for (LSLASTNode* n : nodesOf(expr))
-            {
-                if (n->getNodeType() == NODE_EXPRESSION && n->getNodeSubType() == NODE_LVALUE_EXPRESSION)
-                {
-                    LSLIdentifier* id = static_cast<LSLLValueExpression*>(n)->getIdentifier();
-                    for (size_t i = 0; i < params.size(); ++i)
-                    {
-                        if (id->getSymbol() && id->getSymbol() == params[i]->getSymbol())
-                        {
-                            renames.push_back(Rename{ beginOf(id), endOf(id), argText[i] });
-                        }
-                    }
-                }
-            }
-            std::sort(renames.begin(), renames.end(), [](const Rename& a, const Rename& b) { return a.begin < b.begin; });
-            Block block = renamedText(lines, beginOf(expr), endOf(expr), renames);
-            block.front().insert(block.front().begin(), Piece{ "(", beginOf(call), false });
-            block.back().push_back(Piece{ ")", endOf(call), false });
-            out.edit     = Edit{ beginOf(call), endOf(call), std::move(block) };
-            out.before   = std::move(before);
-            out.note     = noteAt(call, last ? "InlinerPutExpressionOnce" : "InlinerPutExpression",
-                                  last ? "put what the function [1] returns in place of its one call" : "put what the function [1] returns in place of a call", { sym->getName() });
-            out.callLine = beginOf(call).line;
+            out.edit = Edit{ beginOf(statement), endOf(statement), std::move(block) };
+            noted(statement);
             return true;
         }
-        return false;
+        if (returnsNothing)
+        {
+            return false;
+        }
+        if (expressionOf(lines, context, function, call, sym, params, args, last, is_marked, used, out))
+        {
+            return true;
+        }
+        if (!eligible || !hoisted(lines, context, effects, function, call, sym, params, args, used, out))
+        {
+            return false;
+        }
+        noted(call);
+        return true;
     }
 
     // One round: every call that can go in place and does not cross
@@ -903,7 +1214,8 @@ namespace
         {
             return 0;
         }
-        const Lines lines = splitLines(text);
+        const Lines        lines = splitLines(text);
+        const ALLSLEffects effects(script);
 
         // The functions, and every call of each; and what each function
         // calls, since one that reaches itself -- through others or not --
@@ -1038,13 +1350,17 @@ namespace
             for (LSLFunctionExpression* call : found->second)
             {
                 Plan one;
-                if (plan(lines, parser.context, function, call, count == 1, is_marked, used, one) && !clashes(one.edit.begin, one.edit.end) &&
+                if (plan(lines, parser.context, effects, function, call, count == 1, is_marked, used, one) && !clashes(one.edit.begin, one.edit.end) &&
                     !(one.edit.begin.line >= fbegin.line && one.edit.end.line <= fend.line) &&
-                    !(one.before && clashes(one.before->begin, one.before->end)))
+                    !(one.before && clashes(one.before->begin, one.before->end)) && !(one.after && clashes(one.after->begin, one.after->end)))
                 {
                     if (one.before)
                     {
                         edited.emplace_back(one.before->begin, one.before->end);
+                    }
+                    if (one.after)
+                    {
+                        edited.emplace_back(one.after->begin, one.after->end);
                     }
                     edited.emplace_back(one.edit.begin, one.edit.end);
                     plans.push_back(std::move(one));
@@ -1065,6 +1381,10 @@ namespace
                 {
                     weave.edits.push_back(std::move(*one.before));
                 }
+                if (one.after)
+                {
+                    weave.edits.push_back(std::move(*one.after));
+                }
                 weave.edits.push_back(std::move(one.edit));
                 ++went;
             }
@@ -1081,11 +1401,32 @@ namespace
         {
             return 0;
         }
+        std::string made;
+        ALSourceMap step;
+        weave.run(made, step);
+        // What the round made must be a script that checks as the one it
+        // was made from did; else the round is not kept, and the text is
+        // what the last round left.
+        {
+            ScopedScriptParser check(nullptr);
+            LSLScript*         again = check.parseLSLBytes(made.data(), static_cast<int>(made.size()));
+            if (again && !check.logger.getErrors())
+            {
+                again->collectSymbols();
+                again->determineTypes();
+            }
+            walked += nodes.count * 3;
+            if (!again || check.logger.getErrors())
+            {
+                return 0;
+            }
+        }
         for (ALScriptProblem& note : said)
         {
             notes.push_back(std::move(note));
         }
-        weave.run(text, map);
+        text = std::move(made);
+        map  = std::move(step);
         return went;
     }
 } // namespace
