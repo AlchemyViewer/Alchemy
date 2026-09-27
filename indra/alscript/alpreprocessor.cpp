@@ -90,55 +90,105 @@ namespace
 
     typedef std::vector<Token> Tokens;
 
-    hide_set_ptr hideUnion(const hide_set_ptr& a, const HideSet& b)
+    // The run's hide sets, each made once. A set with a macro's name
+    // added, two joined, two met: each is remembered by what it was made
+    // of, and every set is interned, so the same names are always the one
+    // set and a set is known by its address -- rather than a new set made
+    // for every expansion, and for every token of it that brought one of
+    // its own. No names at all is no set.
+    class HideSets
     {
-        if (b.empty())
+    public:
+        hide_set_ptr with(const hide_set_ptr& set, const std::string& name)
         {
-            return a;
-        }
-        auto set = std::make_shared<HideSet>(b);
-        if (a)
-        {
-            set->insert(a->begin(), a->end());
-        }
-        return set;
-    }
-
-    // The union of a token's own hide set with an expansion's, where
-    // most tokens have none of their own and take the expansion's as it
-    // is: one set shared by the tokens one expansion made, as Prosser
-    // has it, rather than a copy of it per token.
-    hide_set_ptr hideWith(const hide_set_ptr& own, const hide_set_ptr& theirs)
-    {
-        if (!own || own == theirs)
-        {
-            return theirs;
-        }
-        if (!theirs)
-        {
-            return own;
-        }
-        auto set = std::make_shared<HideSet>(*theirs);
-        set->insert(own->begin(), own->end());
-        return set;
-    }
-
-    hide_set_ptr hideIntersect(const hide_set_ptr& a, const hide_set_ptr& b)
-    {
-        if (!a || !b)
-        {
-            return hide_set_ptr();
-        }
-        auto set = std::make_shared<HideSet>();
-        for (const std::string& name : *a)
-        {
-            if (b->count(name))
+            if (set && set->contains(name))
             {
-                set->insert(name);
+                return set;
             }
+            hide_set_ptr& made = mWith[{ set.get(), name }];
+            if (!made)
+            {
+                HideSet names = set ? *set : HideSet();
+                names.insert(name);
+                made = intern(std::move(names));
+            }
+            return made;
         }
-        return set;
-    }
+
+        hide_set_ptr join(const hide_set_ptr& own, const hide_set_ptr& theirs)
+        {
+            if (!own || own == theirs)
+            {
+                return theirs;
+            }
+            if (!theirs)
+            {
+                return own;
+            }
+            hide_set_ptr& made = mJoined[{ own.get(), theirs.get() }];
+            if (!made)
+            {
+                HideSet names = *theirs;
+                names.insert(own->begin(), own->end());
+                made = intern(std::move(names));
+            }
+            return made;
+        }
+
+        hide_set_ptr meet(const hide_set_ptr& a, const hide_set_ptr& b)
+        {
+            if (!a || !b)
+            {
+                return hide_set_ptr();
+            }
+            if (a == b)
+            {
+                return a;
+            }
+            const auto known = mMet.find({ a.get(), b.get() });
+            if (known != mMet.end())
+            {
+                return known->second;
+            }
+            HideSet names;
+            for (const std::string& name : *a)
+            {
+                if (b->contains(name))
+                {
+                    names.insert(name);
+                }
+            }
+            return mMet[{ a.get(), b.get() }] = intern(std::move(names));
+        }
+
+    private:
+        // The one set of these names, made where there is none yet.
+        hide_set_ptr intern(HideSet names)
+        {
+            if (names.empty())
+            {
+                return hide_set_ptr();
+            }
+            std::vector<std::string_view> sorted(names.begin(), names.end());
+            std::sort(sorted.begin(), sorted.end());
+            std::string key;
+            for (std::string_view name : sorted)
+            {
+                key.append(name).push_back('\x01');
+            }
+            hide_set_ptr& set = mSets[key];
+            if (!set)
+            {
+                set = std::make_shared<const HideSet>(std::move(names));
+            }
+            return set;
+        }
+
+        boost::unordered_flat_map<std::string, hide_set_ptr, ll::string_hash, std::equal_to<>> mSets;
+        boost::unordered_flat_map<std::pair<const HideSet*, std::string>, hide_set_ptr>      mWith;
+        boost::unordered_flat_map<std::pair<const HideSet*, const HideSet*>, hide_set_ptr>   mJoined;
+        boost::unordered_flat_map<std::pair<const HideSet*, const HideSet*>, hide_set_ptr>   mMet;
+    };
 
     // ---- the tokenizers ---------------------------------------------------------
 
@@ -1014,6 +1064,8 @@ namespace
         size_t                                  mMade    = 0;
         size_t                                  mBytes   = 0;
         bool                                    mOverran = false;
+        // Every hide set of the run, each made once.
+        HideSets                                mHides;
         // How many times the loop has gone round, which a look at whether
         // the run is still wanted is made every so many of.
         size_t                                  mRounds  = 0;
@@ -1317,7 +1369,7 @@ namespace
     {
         Token out = t;
         out.verbatim = false;
-        out.hide     = hideUnion(t.hide, { m.name });
+        out.hide     = mHides.with(t.hide, m.name);
         const FileState& f = *mFiles.back();
         switch (m.dynamic)
         {
@@ -1343,7 +1395,7 @@ namespace
 
     bool Engine::expandObject(const Token& t, const Macro& m)
     {
-        const hide_set_ptr hs  = hideUnion(t.hide, { m.name });
+        const hide_set_ptr hs  = mHides.with(t.hide, m.name);
         Tokens             out = substitute(m, {}, t, hs);
         if (mOverran)
         {
@@ -1461,7 +1513,7 @@ namespace
             }
             return true;
         }
-        const hide_set_ptr hs  = hideUnion(hideIntersect(t.hide, rparen.hide), { m.name });
+        const hide_set_ptr hs  = mHides.with(mHides.meet(t.hide, rparen.hide), m.name);
         Tokens             out = substitute(m, args, t, hs);
         if (mOverran)
         {
@@ -1691,7 +1743,7 @@ namespace
             {
                 continue;
             }
-                t.hide = hideWith(t.hide, hs);
+            t.hide = mHides.join(t.hide, hs);
             result.push_back(t);
         }
         return result;
