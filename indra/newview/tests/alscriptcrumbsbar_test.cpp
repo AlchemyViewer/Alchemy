@@ -313,7 +313,7 @@ namespace tut
         doc.weighing.weight = weight;
         crumbs->showTrailer(doc);
         const Part* weighed = part("Mono");
-        ensure("weighed", weighed && weighed->text == "Mono 40.0 of 64 KB" && !weighed->color);
+        ensure("weighed", weighed && weighed->text == "Mono 40.0 of 64 KB used" && !weighed->color);
         ensure("before the optimizer", weighed->toolTip.find("Weighed before the preprocessor") != std::string::npos);
         doc.weighing.exact = true;
         doc.weighing.sent  = true;
@@ -382,7 +382,7 @@ namespace tut
         doc.uploaded.codeAfter  = 10240;
         told().target           = ALScriptWeight::Target::Mono;
         crumbs->showTrailer(doc);
-        ensure_equals("before and after", part("Mono")->text, std::string("Mono ~20.0 \xE2\x86\x92 ~10.0 of 64 KB"));
+        ensure_equals("before and after", part("Mono")->text, std::string("Mono ~20.0 \xE2\x86\x92 ~10.0 of 64 KB used"));
         ensure_equals("once", parts().size(), size_t(4));
         doc.uploaded.codeAfter = 60000;
         crumbs->showTrailer(doc);

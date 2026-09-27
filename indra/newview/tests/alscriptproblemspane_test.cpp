@@ -517,4 +517,37 @@ namespace tut
         LLComboBox* origins = window.find<LLComboBox>("problems_origin");
         ensure("the origins offer the weight", origins && origins->selectByValue(LLSD(services.words("OriginWeight"))));
     }
+
+    template <>
+    template <>
+    void alscriptproblemspane_object::test<7>()
+    {
+        set_test_name("code past four fifths of its target's limit is a warning that says what is left to run in; not before the optimizer, nor under");
+        make();
+        Doc& d = doc("door");
+        ALScriptWeight weight;
+        weight.target      = ALScriptWeight::Target::LSO;
+        weight.total       = 14 * 1024;
+        weight.limit       = 16 * 1024;
+        d.weighing.weight  = weight;
+        d.weighing.version = d.editor->document().version();
+        d.weighing.exact   = true;
+        const auto weights = [&](const ALScriptProblemsPane::Made& made) {
+            std::vector<Doc::Shown> rows;
+            std::copy_if(made.rows.begin(), made.rows.end(), std::back_inserter(rows), [&](const Doc::Shown& row) { return row.origin == services.words("OriginWeight"); });
+            return rows;
+        };
+        std::vector<Doc::Shown> rows = weights(gather(d));
+        ensure_equals("near: one row", rows.size(), size_t(1));
+        ensure("a warning", rows[0].level == Doc::Level::Warning);
+        ensure("what is left", rows[0].message == services.words("WeightNear", { { "[SIZE]", "14.0" }, { "[LIMIT]", "16" }, { "[LEFT]", "2.0" }, { "[TARGET]", "LSO" } }));
+        d.weighing.exact = false;
+        ensure("before the optimizer, nothing", weights(gather(d)).empty());
+        d.weighing.exact            = true;
+        d.weighing.weight->total    = 12 * 1024;
+        ensure("at three quarters, nothing", weights(gather(d)).empty());
+        d.weighing.weight->total    = 17 * 1024;
+        rows = weights(gather(d));
+        ensure("over: the over row alone", rows.size() == 1 && rows[0].message.find("more than") != std::string::npos);
+    }
 }

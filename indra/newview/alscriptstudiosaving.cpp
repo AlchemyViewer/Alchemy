@@ -239,11 +239,10 @@ void ALScriptStudioSaving::warnOverWeight(Doc& doc)
         return;
     }
     doc.save.setWarnWeightFor(-1);
-    // Over the limit of a target counted as exact, as nearly as the studio
-    // can tell: Mono's is an estimate at the best of times, and its
-    // Problems row says so.
+    // Over the limit as the text was sent, as nearly as the studio can
+    // tell: Mono's an estimate, and said as one.
     const ALScriptWeight& weight = *doc.weighing.weight;
-    if (doc.weighing.exact && !weight.estimate && weight.total > weight.limit)
+    if (doc.weighing.exact && weight.total > weight.limit)
     {
         reportOverWeight(doc, weight);
     }
@@ -750,7 +749,7 @@ void ALScriptStudioSaving::reportOverWeight(const Doc& doc, const ALScriptWeight
     args["[SIZE]"]   = llformat("%.1f", (F64)weight.total / 1024.0);
     args["[LIMIT]"]  = std::to_string(weight.limit / 1024);
     args["[TARGET]"] = ALScriptWeight::nameOf(weight.target);
-    mServices.report(mServices.words("SaveOverWeight", args), true, &doc);
+    mServices.report(mServices.words(weight.estimate ? "SaveOverWeightEstimate" : "SaveOverWeight", args), true, &doc);
 }
 
 void ALScriptStudioSaving::saveAsked(Doc& doc)

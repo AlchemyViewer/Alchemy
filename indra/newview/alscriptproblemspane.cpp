@@ -226,19 +226,29 @@ ALScriptProblemsPane::Made ALScriptProblemsPane::make(const Doc& doc, const ALSc
     // Code heavier than its target runs a script in: a warning, since
     // the number is the studio's reckoning of what the region compiles --
     // an estimate for Mono, and of the text before the optimizer where it
-    // runs after -- and not the region's word.
+    // runs after -- and not the region's word. Past four fifths of it, as
+    // the trailer colours it, a warning too: what is left is all the
+    // script has to run in. Not where the optimizer is still to run, which
+    // only makes it lighter.
     const std::optional<ALScriptWeight>& weighed = doc.weighing.weight;
-    if (weighed && doc.weighing.version == doc.editor->document().version() && weighed->total > weighed->limit)
+    const bool current = weighed && doc.weighing.version == doc.editor->document().version();
+    const bool over    = current && weighed->total > weighed->limit;
+    const bool near    = current && !over && doc.weighing.exact && weighed->total * 5 > weighed->limit * 4;
+    if (over || near)
     {
         const ALScriptWeight&      weight = *doc.weighing.weight;
         LLStringUtil::format_map_t args;
         args["[SIZE]"]   = llformat("%.1f", (F64)weight.total / 1024.0);
         args["[LIMIT]"]  = std::to_string(weight.limit / 1024);
+        args["[LEFT]"]   = near ? llformat("%.1f", (F64)(weight.limit - weight.total) / 1024.0) : std::string();
         args["[TARGET]"] = ALScriptWeight::nameOf(weight.target);
         Doc::Shown row;
         row.level   = Doc::Level::Warning;
         row.origin  = services.words("OriginWeight");
-        const char* said = weight.estimate ? "WeightOverEstimate" : !doc.weighing.exact ? "WeightOverBefore" : "WeightOver";
+        const char* said = near            ? (weight.estimate ? "WeightNearEstimate" : "WeightNear")
+                           : weight.estimate ? "WeightOverEstimate"
+                           : !doc.weighing.exact ? "WeightOverBefore"
+                                                 : "WeightOver";
         row.message      = services.words(said, args);
         made.rows.push_back(std::move(row));
     }

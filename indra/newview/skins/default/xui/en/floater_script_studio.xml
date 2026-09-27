@@ -469,8 +469,8 @@
     <floater.string name="PaletteOff">off</floater.string>
     <floater.string name="UndoWhatRename">Rename</floater.string>
     <floater.string name="UndoWhatFix">Fix</floater.string>
-    <floater.string name="TrailerWeight">[TARGET] [SIZE] of [LIMIT] KB</floater.string>
-    <floater.string name="TrailerWeightEstimate">[TARGET] ~[SIZE] of [LIMIT] KB</floater.string>
+    <floater.string name="TrailerWeight">[TARGET] [SIZE] of [LIMIT] KB used</floater.string>
+    <floater.string name="TrailerWeightEstimate">[TARGET] ~[SIZE] of [LIMIT] KB used</floater.string>
     <floater.string name="TrailerWeightTip">What the script's code weighs for [TARGET]: [BYTES] of the [MAX] bytes it runs a script in. What it allocates as it runs is not in this.</floater.string>
     <floater.string name="TrailerWeightEstimateTip">About what the script's code weighs for [TARGET]: [BYTES] of the [MAX] bytes it runs a script in, estimated from the code its compiler makes. What it allocates as it runs is not in this.</floater.string>
     <floater.string name="TrailerWeightBeforeTip">Weighed before the preprocessor's optimizer, which a save runs: the saved script may weigh less.</floater.string>
@@ -478,6 +478,8 @@
     <floater.string name="OriginWeight">Weight</floater.string>
     <floater.string name="WeightOver">The script's code comes to about [SIZE] KB, more than the [LIMIT] KB [TARGET] runs a script in.</floater.string>
     <floater.string name="WeightOverEstimate">The script's code is about [SIZE] KB, likely more than the [LIMIT] KB [TARGET] runs a script in.</floater.string>
+    <floater.string name="WeightNear">The script's code comes to [SIZE] of the [LIMIT] KB [TARGET] runs a script in, leaving [LEFT] KB for what it allocates as it runs: its lists, its strings, its stack.</floater.string>
+    <floater.string name="WeightNearEstimate">The script's code comes to about [SIZE] of the [LIMIT] KB [TARGET] runs a script in, leaving about [LEFT] KB for what it allocates as it runs: its lists, its strings, its stack.</floater.string>
     <floater.string name="WeightOverBefore">The script's code is [SIZE] KB before the optimizer, more than the [LIMIT] KB [TARGET] runs a script in: it may fit once the optimizer has been over it.</floater.string>
     <floater.string name="TrailerSize">[SIZE] KB of [LIMIT] KB</floater.string>
     <floater.string name="TrailerSizeTip">What saving this script sends: [BYTES] of the [MAX] bytes a script may be. A preprocessed script is sent as written and as expanded, measured here before the optimizer and compression a save adds.</floater.string>
@@ -487,8 +489,8 @@
     <floater.string name="WeightsNoScript">Nothing open to weigh.</floater.string>
     <floater.string name="WeightsNoTarget">[NAME] has no code of its own to weigh: a notecard, or a script that is only ever included.</floater.string>
     <floater.string name="WeightsNotYet">[NAME] is weighed once it has been checked.</floater.string>
-    <floater.string name="WeightsHead">[NAME] on [TARGET]: [SIZE] of [LIMIT] KB, [SHARE].</floater.string>
-    <floater.string name="WeightsHeadEstimate">[NAME] on [TARGET]: about [SIZE] of [LIMIT] KB, [SHARE].</floater.string>
+    <floater.string name="WeightsHead">[NAME] on [TARGET]: [SIZE] of [LIMIT] KB used, [SHARE].</floater.string>
+    <floater.string name="WeightsHeadEstimate">[NAME] on [TARGET]: about [SIZE] of [LIMIT] KB used, [SHARE].</floater.string>
     <floater.string name="WeightsHeadFailed">[NAME] does not compile for [TARGET]: [ERROR]</floater.string>
     <floater.string name="WeightsHeadError">As it stands, [ERROR].</floater.string>
     <floater.string name="WeightsHeadBefore">Weighed before the preprocessor's optimizer, which a save runs.</floater.string>
@@ -528,8 +530,8 @@
     <floater.string name="OptimizerNoteLighter">(its lines [BYTES] bytes lighter on [TARGET])</floater.string>
     <floater.string name="OptimizerNoteHeavier">(its lines [BYTES] bytes heavier on [TARGET])</floater.string>
     <floater.string name="OptimizerNoteSame">(its lines no lighter on [TARGET])</floater.string>
-    <floater.string name="TrailerOptimized">[TARGET] [BEFORE] → [AFTER] of [LIMIT] KB</floater.string>
-    <floater.string name="TrailerOptimizedEstimate">[TARGET] ~[BEFORE] → ~[AFTER] of [LIMIT] KB</floater.string>
+    <floater.string name="TrailerOptimized">[TARGET] [BEFORE] → [AFTER] of [LIMIT] KB used</floater.string>
+    <floater.string name="TrailerOptimizedEstimate">[TARGET] ~[BEFORE] → ~[AFTER] of [LIMIT] KB used</floater.string>
     <floater.string name="TrailerOptimizedTip">What the script's code weighs on [TARGET] before the preprocessor's optimizer and after it, as this view shows it sent: [BYTESBEFORE] and then [BYTESAFTER] of the [MAX] bytes it runs a script in.</floater.string>
     <floater.string name="TrailerOptimizedEstimateTip">About what the script's code weighs on [TARGET] before the preprocessor's optimizer and after it, as this view shows it sent: [BYTESBEFORE] and then [BYTESAFTER] of the [MAX] bytes it runs a script in, estimated from the code its compiler makes.</floater.string>
     <floater.string name="FixLighter">[BYTES] bytes lighter on [TARGET]</floater.string>
@@ -537,6 +539,7 @@
     <floater.string name="FixHeavier">[BYTES] bytes heavier on [TARGET]</floater.string>
     <floater.string name="FixHeavierEstimate">about [BYTES] bytes heavier on [TARGET]</floater.string>
     <floater.string name="SaveOverWeight">[NAME] was sent, but by the studio's reckoning its code comes to about [SIZE] KB, more than the [LIMIT] KB [TARGET] runs a script in: the region may not compile it, or it may not run.</floater.string>
+    <floater.string name="SaveOverWeightEstimate">[NAME] was sent, but by the studio's estimate its code comes to about [SIZE] KB, likely more than the [LIMIT] KB [TARGET] runs a script in: it may not run.</floater.string>
     <floater.string name="SaveTooLarge">[NAME] was not saved: it is [SIZE] bytes, [OVER] more than the [LIMIT] a script may be.</floater.string>
     <floater.string name="SaveTooLargePlain">Moving part of it into another script, or into a notecard it reads, would bring it under.</floater.string>
     <floater.string name="SaveTooLargeCompress">A preprocessed script is sent as written and as expanded: turning on Compress in the preprocessor's settings shrinks the expanded half.</floater.string>

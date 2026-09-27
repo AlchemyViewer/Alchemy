@@ -513,7 +513,7 @@ namespace tut
     template<> template<>
     void alscriptstudiosaving_object::test<8>()
     {
-        set_test_name("what a save sends weighed as it goes, and over its target's limit said once, where the weight is exact");
+        set_test_name("what a save sends weighed as it goes, and over its target's limit said once, where the weight is exact; an estimate's said as one");
         ALScriptStudioSaving& saving = make();
         studio.target                = ALScriptWeight::Target::Mono;
 
@@ -543,7 +543,10 @@ namespace tut
         guessed.weighing.version = guessed.editor->document().version();
         guessed.weighing.exact   = true;
         saving.warnOverWeight(guessed);
-        ensure("an estimate is not said", services.reports.size() == said);
+        ensure_equals("an estimate said as one", lastSaid(), std::string("SaveOverWeightEstimate"));
+        ensure("once too", services.reports.size() == said + 1);
+        saving.warnOverWeight(guessed);
+        ensure("and only once", services.reports.size() == said + 1);
     }
 
     template<> template<>
