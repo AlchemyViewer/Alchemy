@@ -223,6 +223,7 @@ namespace tut
         bool                                    switches      = false;
         std::vector<std::pair<ALScriptPreprocessor::Request, std::function<void(const ALPreprocessor::Result&)>>> expansions;
         std::vector<ALScriptModules::Module>    modules;
+        std::function<void()>                   modulesReady;
         std::vector<std::function<void()>>      nearby;
 
         alscriptstudiochecking_data()
@@ -241,7 +242,10 @@ namespace tut
                 return ALPreprocessor::Found::No;
             };
             sources.modules = [this](const ALScriptPreprocessor::Request&, std::function<std::vector<ALScriptModules::Open>()>,
-                                     const std::vector<std::string>&) { return modules; };
+                                     const std::vector<std::string>&, std::function<void()> ready) {
+                modulesReady = std::move(ready);
+                return modules;
+            };
             sources.fetchNearby = [this](const ALScriptPreprocessor::Request&, std::function<void()> fetched) {
                 nearby.push_back(fetched);
             };
@@ -634,6 +638,12 @@ namespace tut
         given_all.problems[0].line         = 4;
         studio.asks.back().answered(given_all);
         ensure("all given: nothing fetched", !doc.check.analysis[0].fixes.empty() && nearby.size() == 1);
+        // What is in reach found anew on the index's thread: the script
+        // checked again.
+        doc.check.analysisDue = 0.0;
+        ensure("a reach new to it told", (bool)modulesReady);
+        modulesReady();
+        ensure("checked again", doc.check.analysisDue > 0.0);
         doc.check.analysisDue = 0.0;
         unit.reset();
         nearby[0]();

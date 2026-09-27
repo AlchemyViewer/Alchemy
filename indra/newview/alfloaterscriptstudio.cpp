@@ -175,7 +175,9 @@ namespace
             return ALScriptPreprocessor::instance().lookUp(request, ask, found);
         };
         sources.modules = [](const ALScriptPreprocessor::Request& request, std::function<std::vector<ALScriptModules::Open>()> open,
-                             const std::vector<std::string>& names) { return ALScriptModules::instance().giving(request, open, names); };
+                             const std::vector<std::string>& names, std::function<void()> ready) {
+            return ALScriptModules::instance().giving(request, open, names, std::move(ready));
+        };
         sources.fetchNearby = [](const ALScriptPreprocessor::Request& request, std::function<void()> fetched) {
             ALScriptModules::instance().fetchNearby(request, std::move(fetched));
         };

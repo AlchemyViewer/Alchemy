@@ -28,8 +28,10 @@
 
 #include "aldiskincludes.h"
 #include "alscriptenvelope.h"
+#include "alserialworker.h"
 #include "allslexports.h"
 #include "alluauexports.h"
+#include "llappviewer.h"
 #include "llinventorymodel.h"
 #include "llviewerinventory.h"
 #include "llviewerobject.h"
@@ -127,18 +129,35 @@ namespace
     }
 }
 
+ALScriptModules::ALScriptModules() = default;
+ALScriptModules::~ALScriptModules() = default;
+
+void ALScriptModules::cleanupSingleton()
+{
+    // A look under way ends before what it reads goes.
+    *mAlive = false;
+    if (mWorker)
+    {
+        mWorker->close();
+        mWorker.reset();
+    }
+}
+
 // static
 std::string ALScriptModules::identity(const std::string& path)
 {
     return sameFile(path);
 }
 
-const std::vector<std::string>& ALScriptModules::exportsOf(const std::string& path, const std::string& text, bool lua)
+const std::vector<std::string>& ALScriptModules::exportsOf(const std::string& path, U32 version, const std::string& text, bool lua)
 {
-    const size_t hash = std::hash<std::string>()(text);
+    // An open text by its version, which is not read again until it moves;
+    // a held one by what it holds.
     Read&        read = mRead[(lua ? "lua:" : "lsl:") + path];
-    if (read.hash != hash || hash == 0)
+    const size_t hash = version == 0 ? std::hash<std::string>()(text) : 0;
+    if (version != 0 ? read.version != version : read.version != 0 || read.hash != hash || hash == 0)
     {
+        read.version = version;
         read.hash    = hash;
         read.exports = lua ? ALLuauExports::of(text) : ALLSLExports::of(text);
     }
@@ -217,63 +236,65 @@ void ALScriptModules::listFolder(const std::string& prefix, const std::string& f
     }
 }
 
-ALScriptModules::Reach& ALScriptModules::reachOf(const ALScriptPreprocessor::Request& request, const open_t& open)
+ALScriptModules::Look ALScriptModules::lookFor(const ALScriptPreprocessor::Request& request, const open_t& open)
 {
-    const bool        lua  = request.lua;
-    const std::string self = sameFile(request.path.empty() ? ALScriptPreprocessor::pathOf(request.ref) : request.path);
-    const std::string kept = (lua ? "lua:" : "lsl:") + self;
-    const F64         now  = LLTimer::getTotalSeconds();
-    if (mReach.size() > SCRIPTS_KEPT && !mReach.count(kept))
+    // What only the main thread may read: the texts open, those the
+    // preprocessor holds, the folders its settings bless, the aliases.
+    Look look;
+    look.lua  = request.lua;
+    look.self = sameFile(request.path.empty() ? ALScriptPreprocessor::pathOf(request.ref) : request.path);
+    for (Open& one : open())
     {
-        mReach.clear();
-    }
-    Reach& reach = mReach[kept];
-    if (reach.at > 0.0 && now - reach.at < HOLD_SECONDS)
-    {
-        return reach;
-    }
-    reach.at = now;
-    reach.candidates.clear();
-    reach.named.clear();
-
-    // Everything that could be a module, each once: what is open first,
-    // since it is what the module is becoming; then what the cache holds;
-    // then the files of the folders a require or an include reads.
-    std::vector<Candidate>&                                                           found = reach.candidates;
-    boost::unordered_flat_map<std::string, size_t, ll::string_hash, std::equal_to<>> at;
-    at[self] = std::string::npos;
-    const auto add = [this, &found, &at, lua](std::string path, std::string name, const std::string& text) {
-        if (at.emplace(path, found.size()).second)
+        if (one.text)
         {
-            std::vector<std::string> exports = exportsOf(path, text, lua);
-            found.push_back({ std::move(path), std::move(name), {}, std::move(exports) });
+            look.texts.push_back({ sameFile(one.path), one.name, one.version, std::move(one.text) });
         }
-    };
-    for (const Open& one : open())
-    {
-        add(sameFile(one.path), one.name, one.text);
     }
     ALScriptPreprocessor& preprocessor = ALScriptPreprocessor::instance();
     for (const std::string& path : preprocessor.heldPaths())
     {
-        if (at.count(path))
-        {
-            continue;
-        }
         const std::string name = itemNamed(path);
         std::string       text;
         if (!name.empty() && preprocessor.heldText(path, text) && text.size() <= MODULE_BYTES)
         {
-            add(path, name, text);
+            look.texts.push_back({ path, name, 0, std::make_shared<const std::string>(std::move(text)) });
         }
     }
-    const std::vector<std::pair<std::string, std::string>> folders = preprocessor.moduleFolders(request);
-    ALDiskIncludes                                         blessed;
-    for (const auto& [prefix, folder] : folders)
+    look.folders = preprocessor.moduleFolders(request);
+    if (request.lua)
+    {
+        ALLuauConfig config;
+        preprocessor.configOf(request, config);
+        for (const auto& [alias, folder] : config.aliases)
+        {
+            look.aliases.push_back(alias);
+        }
+    }
+    return look;
+}
+
+std::vector<ALScriptModules::Candidate> ALScriptModules::look(const Look& look)
+{
+    // Everything that could be a module, each once: what is open first,
+    // since it is what the module is becoming; then what the cache holds;
+    // then the files of the folders a require or an include reads.
+    const bool                                                                        lua = look.lua;
+    std::vector<Candidate>                                                            found;
+    boost::unordered_flat_map<std::string, size_t, ll::string_hash, std::equal_to<>> at;
+    at[look.self] = std::string::npos;
+    for (const Look::Text& one : look.texts)
+    {
+        if (at.emplace(one.path, found.size()).second)
+        {
+            found.push_back({ one.path, one.name, {}, exportsOf(one.path, one.version, *one.text, lua) });
+        }
+    }
+    ALDiskIncludes blessed;
+    for (const auto& [prefix, folder] : look.folders)
     {
         blessed.bless(folder);
     }
-    for (const auto& [prefix, folder] : folders)
+    for (const auto& [prefix, folder] : look.folders)
     {
         listFolder(prefix, folder, blessed, lua, found, at);
     }
@@ -281,11 +302,6 @@ ALScriptModules::Reach& ALScriptModules::reachOf(const ALScriptPreprocessor::Req
     // The names each might be found by, after those its folders give it:
     // its own, its own without its extension, and its own under each alias
     // a SLua configuration names.
-    ALLuauConfig config;
-    if (lua)
-    {
-        preprocessor.configOf(request, config);
-    }
     for (Candidate& one : found)
     {
         const std::string stem = stemOf(one.name, lua);
@@ -296,7 +312,7 @@ ALScriptModules::Reach& ALScriptModules::reachOf(const ALScriptPreprocessor::Req
                 one.names.push_back(name);
             }
         }
-        for (const auto& [alias, folder] : config.aliases)
+        for (const std::string& alias : look.aliases)
         {
             const std::string under = "@" + alias + "/" + stem;
             if (!contains(one.names, under))
@@ -306,7 +322,49 @@ ALScriptModules::Reach& ALScriptModules::reachOf(const ALScriptPreprocessor::Req
         }
         one.name = stem;
     }
-    return reach;
+    return found;
+}
+
+void ALScriptModules::startLook(const std::string& kept, Look look)
+{
+    Reach& reach  = mReach[kept];
+    reach.looking = true;
+    if (!mWorker)
+    {
+        mWorker = std::make_unique<ALSerialWorker>("ScriptModules");
+    }
+    const std::weak_ptr<bool> alive  = mAlive;
+    const bool                posted = mWorker->post([this, alive, kept, look = std::move(look)]() {
+        std::vector<Candidate> found = this->look(look);
+        LLAppViewer::instance()->postToMainCoro([this, alive, kept, found = std::move(found)]() mutable {
+            if (const std::shared_ptr<bool> still = alive.lock(); still && *still)
+            {
+                looked(kept, std::move(found));
+            }
+        });
+    });
+    if (!posted)
+    {
+        reach.looking = false;
+    }
+}
+
+void ALScriptModules::looked(const std::string& kept, std::vector<Candidate> found)
+{
+    Reach& reach  = mReach[kept];
+    reach.looking = false;
+    reach.at      = LLTimer::getTotalSeconds();
+    if (found == reach.candidates)
+    {
+        return;
+    }
+    reach.candidates = std::move(found);
+    reach.named.clear();
+    // Whoever was answered from what was there before asks again.
+    if (std::function<void()> ready = std::exchange(reach.ready, nullptr))
+    {
+        ready();
+    }
 }
 
 std::string ALScriptModules::nameOf(const ALScriptPreprocessor::Request& request, const Candidate& candidate)
@@ -352,7 +410,12 @@ bool ALScriptModules::fetchNearby(const ALScriptPreprocessor::Request& request, 
     }
     had += paths.size();
     ALScriptPreprocessor::instance().prefetch(paths, [this, kept, fetched = std::move(fetched)]() {
-        mReach.erase(kept);
+        // Looked for again at the next question, what was found answering
+        // until then.
+        if (const auto reach = mReach.find(kept); reach != mReach.end())
+        {
+            reach->second.at = 0.0;
+        }
         if (fetched)
         {
             fetched();
@@ -362,9 +425,24 @@ bool ALScriptModules::fetchNearby(const ALScriptPreprocessor::Request& request, 
 }
 
 std::vector<ALScriptModules::Module> ALScriptModules::giving(const ALScriptPreprocessor::Request& request, const open_t& open,
-                                                             const std::vector<std::string>& names)
+                                                             const std::vector<std::string>& names, std::function<void()> ready)
 {
-    Reach&              reach = reachOf(request, open);
+    const std::string self = sameFile(request.path.empty() ? ALScriptPreprocessor::pathOf(request.ref) : request.path);
+    const std::string kept = (request.lua ? "lua:" : "lsl:") + self;
+    const F64         now  = LLTimer::getTotalSeconds();
+    if (mReach.size() > SCRIPTS_KEPT && !mReach.count(kept))
+    {
+        mReach.clear();
+    }
+    Reach& reach = mReach[kept];
+    if (!reach.looking && (reach.at <= 0.0 || now - reach.at >= HOLD_SECONDS))
+    {
+        startLook(kept, lookFor(request, open));
+    }
+    if (ready)
+    {
+        reach.ready = std::move(ready);
+    }
     std::vector<Module> out;
     for (const Candidate& candidate : reach.candidates)
     {

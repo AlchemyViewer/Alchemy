@@ -74,7 +74,7 @@ public:
             lookUp;
         std::function<std::vector<ALScriptModules::Module>(const ALScriptPreprocessor::Request&,
                                                            std::function<std::vector<ALScriptModules::Open>()>,
-                                                           const std::vector<std::string>&)>
+                                                           const std::vector<std::string>&, std::function<void()>)>
                                                                                           modules;
         std::function<void(const ALScriptPreprocessor::Request&, std::function<void()>)> fetchNearby;
     };

@@ -991,7 +991,7 @@ void ALScriptStudioChecking::offerImports(Doc& doc)
     const std::string self = ALScriptModules::identity(request.path.empty() ? ALScriptPreprocessor::pathOf(request.ref) : request.path);
     const std::string&                  text = doc.editor->wholeText();
     // The texts of the script's language open here, as they are being
-    // written.
+    // written: each version's own, shared, which what it gives is kept for.
     const auto open = [this, &doc, lua]() {
         std::vector<ALScriptModules::Open> out;
         for (const Doc* other : mServices.openDocs())
@@ -999,7 +999,7 @@ void ALScriptStudioChecking::offerImports(Doc& doc)
             if (other != &doc && other->loaded && other->language.lua == lua)
             {
                 const std::string path = other->file.empty() ? ALScriptPreprocessor::pathOf(other->ref) : "disk:" + other->file;
-                out.push_back({ path, other->name, other->editor->text() });
+                out.push_back({ path, other->name, other->editor->document().version(), other->snapshot() });
             }
         }
         return out;
@@ -1026,7 +1026,16 @@ void ALScriptStudioChecking::offerImports(Doc& doc)
             names.push_back(problem.args[0]);
         }
     }
-    const std::vector<ALScriptModules::Module> modules = sources().modules(request, open, names);
+    // What is in reach looked for again on its own thread now and then: the
+    // script checked again once what it finds is new.
+    const std::weak_ptr<bool>                  waiting = mAlive;
+    const std::string                          waiter  = doc.id;
+    const std::vector<ALScriptModules::Module> modules = sources().modules(request, open, names, [this, waiting, waiter]() {
+        if (Doc* asked = waiting.lock() ? mServices.findDoc(waiter) : nullptr)
+        {
+            schedule(*asked, true);
+        }
+    });
     bool                                       given_all = true;
     for (ALScriptProblem& problem : doc.check.analysis)
     {
