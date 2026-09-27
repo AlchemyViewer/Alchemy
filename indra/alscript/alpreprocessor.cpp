@@ -3486,8 +3486,11 @@ namespace
             {
                 return out;
             }
+            // Nothing of the script's: the table maps to no line of it, so
+            // nothing said about the table is said about the script's first.
             Token site;
             site.verbatim = false;
+            site.file     = -1;
             const auto word = [&](Kind kind, const std::string& text) { out.push_back(synth(kind, text, site)); };
             word(Kind::Ident, "local");
             word(Kind::Space, " ");
@@ -3638,7 +3641,8 @@ namespace
         S32 column = 0;
         for (const Token& t : tokens)
         {
-            if (t.kind != Kind::Newline)
+            // What came from no file -- the module table -- maps nowhere.
+            if (t.kind != Kind::Newline && t.file >= 0)
             {
                 // A token over several lines -- a block comment, a long
                 // string -- is a segment on each of them, so that every
@@ -3817,10 +3821,12 @@ ALPreprocessor::Result ALPreprocessor::run(std::string_view source, const Option
         Tokens all = gathered.prologue();
         if (!all.empty())
         {
-            // Luau reads its `--!strict` and the like only at the top, so
-            // the script's leading ones go ahead of the module table.
+            // Luau reads its `--!strict` and the like only before the first
+            // token that is not a comment -- a header of plain comments may
+            // come before them -- so the script's leading comments all go
+            // ahead of the module table.
             size_t head = 0;
-            while (head < tokens.size() && (tokens[head].blank() && (tokens[head].kind != Kind::Comment || tokens[head].text.compare(0, 3, "--!") == 0)))
+            while (head < tokens.size() && tokens[head].blank())
             {
                 ++head;
             }

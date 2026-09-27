@@ -1,4 +1,6 @@
 --!strict
+-- Modules gathered at the top, each once, dependencies first.
+
 local __modules = {}
 __modules["deep.luau"] = (function()
 return { suffix = "!" }
@@ -12,8 +14,6 @@ function M.greet(name: string): string
 end
 return M
 end)()
--- Modules gathered at the top, each once, dependencies first.
-
 local util = __modules["util.luau"]
 local deep = __modules["deep.luau"]
 local s = [[require("util") CHANNEL]]
