@@ -170,6 +170,7 @@ if(AL_BUILD_VIEWER)
     alsceneexplorerpredicate.cpp
     alscopedata.cpp
     alscriptanalysis.cpp
+    alscriptanalyzers.cpp
     alscriptcrumbsbar.cpp
     alscriptexplorermodel.cpp
     alscriptexplorerpane.cpp
@@ -999,6 +1000,7 @@ if(AL_BUILD_VIEWER)
     alsceneexplorerpredicate.h
     alscopedata.h
     alscriptanalysis.h
+    alscriptanalyzers.h
     alscriptcrumbsbar.h
     alscriptexplorermodel.h
     alscriptexplorerpane.h

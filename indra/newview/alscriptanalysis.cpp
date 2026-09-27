@@ -26,12 +26,10 @@
 
 #include "alscriptanalysis.h"
 
-#include "allslservice.h"
-#include "alluauservice.h"
+#include "alscriptanalyzers.h"
 #include "alscriptstack.h"
 #include "llappviewer.h"
 #include "llviewercontrol.h"
-#include "llfile.h"
 #include "llsyntaxid.h"
 #include "alsaid.h"
 #include "lltrans.h"
@@ -39,109 +37,12 @@
 
 #include <algorithm>
 #include <optional>
-#include <sstream>
 
-// What lives on the worker: the two services and what they were loaded
-// from, so that a request whose definitions moved on reloads before it
-// checks.
+// What lives on the worker: each language's analyzer.
 struct ALScriptAnalysis::Worker
 {
-    ALLuauService luau;
-    ALLSLService  lsl;
-    std::string   luauDefinitionsPath;
-    std::string   luauDocsPath;
-    U32           luauGeneration = 0;
-    std::string   luauError;
-    bool          lslLoaded = false;
-    std::string   lslError;
-
-    static std::string readWhole(const std::string& path)
-    {
-        std::string text;
-        if (!path.empty())
-        {
-            llifstream in(path, std::ios::in | std::ios::binary);
-            if (in.is_open())
-            {
-                std::ostringstream buffer;
-                buffer << in.rdbuf();
-                text = buffer.str();
-            }
-        }
-        return text;
-    }
-
-    void loadLuau(const std::string& path, const std::string& docs_path, U32 generation)
-    {
-        if (generation == luauGeneration && path == luauDefinitionsPath && docs_path == luauDocsPath)
-        {
-            return;
-        }
-        luauGeneration      = generation;
-        luauDefinitionsPath = path;
-        luauDocsPath        = docs_path;
-        luauError.clear();
-        const std::string source = readWhole(path);
-        if (source.empty())
-        {
-            // Said with a key, for the main thread to put into the
-            // viewer's language; what the engine says is said as it is.
-            luauError = "\x01AnalysisNoLuauDefinitions\x01" + path;
-            return;
-        }
-        std::string error;
-        if (!luau.loadDefinitions(source, error))
-        {
-            luauError = error;
-        }
-        const std::string docs = readWhole(docs_path);
-        if (!docs.empty() && !luau.loadDocs(docs, error))
-        {
-            LL_WARNS("ScriptAnalysis") << "The Luau docs did not load: " << error << LL_ENDL;
-        }
-    }
-
-    // The solver the scripts are checked with: a change builds the front
-    // end again and loads the definitions into it again.
-    void useSolver(bool use_new)
-    {
-        if (luau.newSolver() == use_new)
-        {
-            return;
-        }
-        std::string error;
-        const bool  loaded = luau.setNewSolver(use_new, error);
-        if (!loaded || luau.hasDefinitions())
-        {
-            luauError = error;
-        }
-    }
-
-    // Once for the session, from the first region's builtins: Tailslide
-    // keeps them in a table of the whole process that it adds to and never
-    // replaces, so a region whose LSL has more functions than the first's
-    // is checked against the first's until the viewer starts again.
-    // Luau's front end is the service's own, and is loaded again
-    // (loadLuau).
-    void loadLSL(const std::string& path)
-    {
-        if (lslLoaded)
-        {
-            return;
-        }
-        lslLoaded = true;
-        lslError.clear();
-        if (path.empty())
-        {
-            lslError = "\x01AnalysisNoLSLBuiltins\x01";
-            return;
-        }
-        std::string error;
-        if (!lsl.loadBuiltins(path, error))
-        {
-            lslError = error;
-        }
-    }
+    ALLuauAnalyzer luau;
+    ALLSLAnalyzer  lsl;
 };
 
 ALScriptAnalysis::ALScriptAnalysis() = default;
@@ -279,7 +180,7 @@ void ALScriptAnalysis::runNext()
     if (stop && mWorker)
     {
         unwanted = unwanted || mWorker->luau.stopped();
-        mWorker->luau.setStop(nullptr);
+        mWorker->luau.forgetStop();
     }
     if (unwanted)
     {
@@ -317,6 +218,14 @@ ALScriptAnalysis::Result ALScriptAnalysis::run(const Job& job, const ALLuauServi
     const Request& request = job.request;
     static const std::string NOTHING;
     const std::string&       text = request.text ? *request.text : NOTHING;
+    ALScriptAnalyzer::Setup  setup;
+    setup.luauPath   = job.luauPath;
+    setup.docsPath   = job.docsPath;
+    setup.lslPath    = job.lslPath;
+    setup.generation = job.generation;
+    setup.newSolver  = job.newSolver;
+    setup.seconds    = job.seconds;
+    setup.stop       = stop;
     // The engines recurse on how the script nests; the pool's thread has
     // what the platform gives a thread, which on a Mac is half a megabyte.
     // The work goes on a stack as deep as a script needs.
@@ -332,137 +241,13 @@ ALScriptAnalysis::Result ALScriptAnalysis::run(const Job& job, const ALLuauServi
         result.lua     = request.lua;
         result.line    = request.line;
         result.column  = request.column;
-        // A text weighed for a target of its own language: SLua's for SLua,
-        // LSL's others for LSL.
-        const auto weighed = [&request](ALScriptWeight::Target target, const std::string& of) {
-            if ((target == ALScriptWeight::Target::SLua) != request.lua)
-            {
-                return ALScriptWeight();
-            }
-            return target == ALScriptWeight::Target::SLua      ? ALScriptWeigh::slua(of)
-                   : target == ALScriptWeight::Target::LSO     ? ALScriptWeigh::lso(of)
-                   : target == ALScriptWeight::Target::Mono    ? ALScriptWeigh::mono(of)
-                   : target == ALScriptWeight::Target::LSLLuau ? ALScriptWeigh::lslLuau(of)
-                                                               : ALScriptWeight();
-        };
-        // The text weighed for each target asked for -- or, where there are
-        // variants, each variant for the first -- by a weigh, or by a check
-        // the script's own weigh was folded into.
-        const auto weigh = [&]() {
-            if (!request.variants.empty())
-            {
-                if (!request.targets.empty())
-                {
-                    for (const std::string& variant : request.variants)
-                    {
-                        result.variantTotals.push_back(weighed(request.targets.front(), variant).total);
-                    }
-                }
-                return;
-            }
-            // The bundle where the text is the script apart from its modules:
-            // what a save sends, and so what it weighs.
-            const std::string& whole = request.bundle ? *request.bundle : text;
-            for (const ALScriptWeight::Target target : request.targets)
-            {
-                if ((target == ALScriptWeight::Target::SLua) == request.lua)
-                {
-                    result.weights.push_back(weighed(target, whole));
-                }
-            }
-        };
         if (request.lua)
         {
-            mWorker->useSolver(job.newSolver);
-            mWorker->loadLuau(job.luauPath, job.docsPath, job.generation);
-            result.definitionsError = mWorker->luauError;
-            // Each tab's script its own module, kept as it was left; a
-            // lookup through another object's script shares the one of no
-            // name, rather than letting the tabs' go.
-            const bool looked_through = request.id.rfind("lookup:", 0) == 0;
-            mWorker->luau.setDocument(looked_through ? std::string_view() : std::string_view(request.id));
-            mWorker->luau.setConfig(request.config);
-            mWorker->luau.setPassedOver(request.passedOver);
-            static const ALLuauService::Modules NONE;
-            mWorker->luau.setModules(request.modules ? *request.modules : NONE);
-            mWorker->luau.setTimeLimit(job.seconds);
-            mWorker->luau.setStop(stop);
-            switch (request.kind)
-            {
-                case Kind::Check:
-                    result.problems = mWorker->luau.check(text);
-                    if (mWorker->luau.stopped())
-                    {
-                        break;
-                    }
-                    result.outline  = mWorker->luau.outline(text);
-                    if (request.semantics)
-                    {
-                        result.semantics = mWorker->luau.semanticTokens(text);
-                    }
-                    result.hints = mWorker->luau.inlayHints(text, request.hintParameters, request.hintTypes);
-                    weigh();
-                    break;
-                case Kind::Complete:
-                    result.completions = mWorker->luau.complete(text, request.line, request.column);
-                    break;
-                case Kind::Hover:
-                case Kind::Inspect:
-                    result.hover = mWorker->luau.hover(text, request.line, request.column);
-                    break;
-                case Kind::Signature:
-                    result.signature = mWorker->luau.signature(text, request.line, request.column);
-                    break;
-                case Kind::References:
-                    result.references = mWorker->luau.references(text, request.line, request.column);
-                    break;
-                case Kind::Actions:
-                    result.actions = mWorker->luau.actions(text, request.line, request.column, request.endLine, request.endColumn);
-                    break;
-                case Kind::Weigh:
-                    weigh();
-                    break;
-            }
+            mWorker->luau.answer(request, text, setup, result);
         }
         else
         {
-            mWorker->loadLSL(job.lslPath);
-            result.definitionsError = mWorker->lslError;
-            mWorker->lsl.setPassedOver(request.passedOver);
-            switch (request.kind)
-            {
-                case Kind::Check:
-                    result.problems = mWorker->lsl.check(text, request.mono);
-                    result.outline  = mWorker->lsl.outline(text);
-                    if (request.semantics)
-                    {
-                        result.semantics = mWorker->lsl.semanticTokens(text);
-                    }
-                    result.hints = mWorker->lsl.inlayHints(text, request.hintParameters);
-                    weigh();
-                    break;
-                case Kind::Complete:
-                    result.completions = mWorker->lsl.symbols(text, request.line, request.column);
-                    break;
-                case Kind::Hover:
-                case Kind::Inspect:
-                    result.hover = mWorker->lsl.hover(text, request.line, request.column);
-                    break;
-                case Kind::Signature:
-                    result.signature = mWorker->lsl.signature(text, request.line, request.column);
-                    break;
-                case Kind::References:
-                    result.references = mWorker->lsl.references(text, request.line, request.column);
-                    break;
-                case Kind::Actions:
-                    result.actions = mWorker->lsl.actions(text, request.line, request.column, request.endLine, request.endColumn);
-                    break;
-                case Kind::Weigh:
-                    weigh();
-                    break;
-            }
-            result.parsed     = mWorker->lsl.parsed();
-            result.understood = mWorker->lsl.understood();
+            mWorker->lsl.answer(request, text, setup, result);
         }
     });
     return result;
