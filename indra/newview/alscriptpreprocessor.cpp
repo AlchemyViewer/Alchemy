@@ -27,6 +27,8 @@
 
 #include "alscriptpreprocessor.h"
 
+#include "alscriptinventoryindex.h"
+
 #include "llappviewer.h"
 #include "alserialworker.h"
 
@@ -161,14 +163,6 @@ namespace
         return !relative || at == base;
     }
 
-    class ScriptOrNotecard : public LLInventoryCollectFunctor
-    {
-    public:
-        bool operator()(LLInventoryCategory*, LLInventoryItem* item) override
-        {
-            return item && (item->getType() == LLAssetType::AT_LSL_TEXT || item->getType() == LLAssetType::AT_NOTECARD);
-        }
-    };
 } // namespace
 
 struct ALScriptPreprocessor::Job
@@ -196,43 +190,22 @@ struct ALScriptPreprocessor::Job
     std::vector<callback_t>          alsoAnswer;
 };
 
-// Anything at all changing in the inventory is enough: what an include
-// name stands for is a walk of the whole tree, and the answer is kept
-// only until the tree moves.
-struct ALScriptPreprocessor::Watcher final : public LLInventoryObserver
-{
-    U32& generation;
-
-    explicit Watcher(U32& generation_in) : generation(generation_in) { gInventory.addObserver(this); }
-    ~Watcher() override { gInventory.removeObserver(this); }
-    void changed(U32) override { ++generation; }
-};
-
 ALScriptPreprocessor::ALScriptPreprocessor() = default;
 ALScriptPreprocessor::~ALScriptPreprocessor() = default;
 
-const LLInventoryModel::item_array_t& ALScriptPreprocessor::namedItems(const std::string& name)
+LLInventoryModel::item_array_t ALScriptPreprocessor::namedItems(const std::string& name)
 {
-    if (!mWatcher)
+    // From the one index of the inventory's scripts and notecards, kept
+    // from what changes rather than walked again.
+    LLInventoryModel::item_array_t items;
+    for (const LLUUID& id : ALScriptInventoryIndex::instance().named(name))
     {
-        mWatcher = std::make_unique<Watcher>(mInventoryGeneration);
-    }
-    if (mNamedFor != mInventoryGeneration)
-    {
-        LLInventoryModel::cat_array_t  cats;
-        LLInventoryModel::item_array_t items;
-        ScriptOrNotecard               wanted;
-        gInventory.collectDescendentsIf(gInventory.getRootFolderID(), cats, items, LLInventoryModel::EXCLUDE_TRASH, wanted);
-        mNamed.clear();
-        for (const LLPointer<LLViewerInventoryItem>& item : items)
+        if (LLViewerInventoryItem* item = gInventory.getItem(id))
         {
-            mNamed[item->getName()].push_back(item);
+            items.push_back(item);
         }
-        mNamedFor = mInventoryGeneration;
     }
-    static const LLInventoryModel::item_array_t NONE;
-    const auto                                   found = mNamed.find(name);
-    return found == mNamed.end() ? NONE : found->second;
+    return items;
 }
 
 // static

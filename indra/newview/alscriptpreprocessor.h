@@ -260,8 +260,8 @@ private:
     // the settings that decide the disk move; and how often they have.
     const std::vector<std::string>& ownIncludeFolders();
     U32                             diskGeneration();
-    // Every item of a name, from the walk or from the last one.
-    const LLInventoryModel::item_array_t& namedItems(const std::string& name);
+    // Every script and notecard of a name in the inventory.
+    LLInventoryModel::item_array_t        namedItems(const std::string& name);
     // Whether an include or a module so named is in the world a script is
     // in -- its object, the inventory -- whether or not it may be taken.
     bool                                  inWorld(const Request& request, const std::string& name);
@@ -371,22 +371,6 @@ private:
     // a run over a script in one says why, until a save asks again and
     // it answers.
     boost::unordered_flat_set<LLUUID>                                               mUnanswered;
-    // Every script and notecard of a name, from the last walk of the
-    // inventory for it. The walk is of the whole tree, and a check runs
-    // a moment after every keystroke: a script naming three includes
-    // would otherwise walk the whole inventory three times a keystroke.
-    // What a name stands for changes when the inventory does, which is
-    // all the generation counts; the folders a name gives are weighed
-    // after the walk, so a relative include is still answered afresh.
-    // Every script and notecard in the inventory by name, from one walk
-    // an inventory generation: the fixes ask about each name a script
-    // does not know, and a walk a name would go over the whole inventory
-    // each time.
-    boost::unordered_flat_map<std::string, LLInventoryModel::item_array_t, ll::string_hash, std::equal_to<>> mNamed;
-    std::optional<U32>                                                                                        mNamedFor;
-    struct Watcher;
-    std::unique_ptr<Watcher>                                                        mWatcher;
-    U32                                                                             mInventoryGeneration = 1;
     // What each script asked for the last time it was expanded, by the
     // script's identity: a snapshot resolves these before the run goes
     // out, so that a script whose includes have not changed -- which is
