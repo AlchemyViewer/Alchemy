@@ -40,6 +40,7 @@
 
 #include "linden_common.h"
 
+#include "../aldiskincludes.h"
 #include "../allslservice.h"
 #include "../allsloptimizer.h"
 #include "../alluauservice.h"
@@ -56,6 +57,8 @@
 #include <chrono>
 #include <cmath>
 #include <cstdio>
+#include <filesystem>
+#include <fstream>
 #include <functional>
 #include <sstream>
 #include <string>
@@ -122,6 +125,85 @@ namespace
         {
             std::printf(" %10.3f", ms);
         }
+    }
+
+    // A scripter's include folder on disk, its `.lslrc` listing a library
+    // folder under it, and a script three folders down that includes five
+    // files: what the main thread reads each time that script is checked.
+    struct IncludeTree
+    {
+        std::filesystem::path    root;
+        std::string              folder;
+        std::string              script;
+        std::vector<std::string> names;
+
+        IncludeTree()
+        {
+            namespace fs = std::filesystem;
+            root         = fs::temp_directory_path() / ("alscript_bench_" + std::to_string(clock::now().time_since_epoch().count()));
+            fs::create_directories(root / "includes" / "lib");
+            fs::create_directories(root / "project" / "a" / "b");
+            folder = (root / "includes").string();
+            script = (root / "project" / "a" / "b" / "door.lsl").string();
+            std::ofstream(root / "includes" / ".lslrc") << "{\"include\": [\"lib\"]}";
+            for (int i = 0; i < 5; ++i)
+            {
+                const std::string name = "part" + std::to_string(i) + ".lsl";
+                std::ofstream(root / "includes" / "lib" / name) << "integer part" << i << "() { return " << i << "; }\n";
+                names.push_back(name);
+            }
+            std::ofstream(script) << "default { state_entry() { } }\n";
+        }
+        ~IncludeTree()
+        {
+            std::error_code ec;
+            std::filesystem::remove_all(root, ec);
+        }
+    };
+
+    // What the preprocessor's snapshot does for each include a script asks
+    // for (ALScriptPreprocessor::candidatesFor, textOf): the folders
+    // blessed afresh -- the scripter's, what their `.lslrc` lists, the
+    // nearest `.lslrc` up from the script -- then each name looked for in
+    // each folder, and the one found read.
+    size_t includesUncached(const IncludeTree& tree)
+    {
+        size_t read = 0;
+        for (const std::string& name : tree.names)
+        {
+            ALDiskIncludes blessed;
+            blessed.bless(tree.folder);
+            for (const std::string& listed : ALDiskIncludes::lslrcFolders(tree.folder))
+            {
+                blessed.blessFromConfig(listed, tree.folder);
+            }
+            const std::string from_dir = std::filesystem::path(tree.script).parent_path().string();
+            std::string       config_folder;
+            for (const std::string& listed : ALDiskIncludes::nearestLslrcFolders(from_dir, &config_folder))
+            {
+                blessed.blessFromConfig(listed, config_folder);
+            }
+            std::vector<std::string> dirs{ from_dir };
+            for (const std::string& folder : blessed.folders())
+            {
+                dirs.push_back(folder);
+            }
+            bool found = false;
+            for (const std::string& dir : dirs)
+            {
+                for (const std::string& file : ALDiskIncludes::namesFor(name, false, false))
+                {
+                    const std::optional<std::string> real = blessed.admits((std::filesystem::path(dir) / file).string());
+                    std::string                      text;
+                    if (!found && real && ALDiskIncludes::readOrdinary(*real, text))
+                    {
+                        read += text.size();
+                        found = true;
+                    }
+                }
+            }
+        }
+        return read;
     }
 
     void row(const char* name, double lsl, double slua)
@@ -346,6 +428,14 @@ int main(int, char**)
     // What running a job on a stack as deep as a script needs costs,
     // before the job itself: nothing to do on it.
     row("a job on the large stack, doing nothing", ms_per_run([] { alScriptOnLargeStack([] { g_sink = g_sink + 1; }); }), NONE);
+
+    // What the main thread does for a check before the preprocessor's
+    // thread has anything to do: the includes found on disk and read.
+    std::printf("\nThe main thread's include work, a snapshot of a script with five disk includes\n");
+    {
+        const IncludeTree tree;
+        row("find and read five disk includes", ms_per_run([&] { g_sink = g_sink + includesUncached(tree); }), NONE);
+    }
 
     std::printf("\nThe preprocessor's thread's work\n");
     ALPreprocessor::Options lslOptions;
