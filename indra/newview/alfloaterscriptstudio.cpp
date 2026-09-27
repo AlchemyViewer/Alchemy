@@ -1586,6 +1586,7 @@ void ALFloaterScriptStudio::applyTypingOptions(ALCodeEditor& editor)
     // is asked; one given its own for its tab keeps that.
     editor.setIndentDefaults(llclamp(gSavedSettings.getS32("ALScriptStudioTabWidth"), 1, 16), gSavedSettings.getBOOL("ALScriptStudioInsertSpaces"));
     editor.setReadsIndentation(gSavedSettings.getBOOL("ALScriptStudioDetectIndentation"));
+    editor.setReindentsPaste(gSavedSettings.getBOOL("ALScriptStudioReindentOnPaste"));
     editor.setAutoComplete(gSavedSettings.getBOOL("ALScriptStudioAutoComplete"));
     editor.setCompleteAfter(gSavedSettings.getS32("ALScriptStudioCompleteAfter"));
     editor.setAcceptOnEnter(gSavedSettings.getBOOL("ALScriptStudioAcceptOnEnter"));

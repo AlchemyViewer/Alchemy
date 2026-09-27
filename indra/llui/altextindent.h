@@ -30,7 +30,9 @@
 #include <functional>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <utility>
+#include <vector>
 
 class ALSyntaxGrammar;
 
@@ -131,6 +133,36 @@ namespace ALTextIndent
     };
     Outdent outdentAsTyped(const ALTextDocument& doc, const ALTextPos& anchor, const ALTextPos& caret, llwchar typed,
                            const ALSyntaxGrammar* grammar, const opener_t& opener, const AutoOutdent& last, const Options& options);
+
+    // --- pasted lines ---------------------------------------------------------------
+
+    // Lines pasted into a line's indentation, and where they go: the
+    // first of them with anything on it to `base` columns in -- the
+    // indentation of the line they went into, or where the line above
+    // says a line goes when there is nothing else on it, a level out for
+    // one that closes a block -- and each after it as far in from there as
+    // it was from the first. The first may have been copied from where a
+    // line's text begins, without its indentation: its width is then the
+    // shallowest of the rest (`ref`), where none of them is at none.
+    struct PastePlan
+    {
+        S32              base = 0;
+        S32              ref  = 0;
+        // Each pasted line's width, or -1 for a blank one.
+        std::vector<S32> widths;
+        // What followed the paste on its line goes on after it, at `base`.
+        bool             restoreRest = false;
+    };
+    // Worked out before the paste goes in, over the selection it replaces;
+    // nothing for a single line, a grammar that does not indent, or a paste
+    // after text on its line.
+    std::optional<PastePlan> planPaste(const ALTextDocument& doc, const ALTextRange& selection, std::string_view pasted, const ALSyntaxGrammar* grammar,
+                                       const Options& options);
+    // Then, over the text with the paste in at `at`: the lines' blanks
+    // made so, in the blank the text is indented by, the caret moved with
+    // its line. Nothing where every line is where it goes.
+    std::optional<Change> reindentPasted(const ALTextDocument& doc, const ALTextPos& at, const PastePlan& plan, const ALTextPos& caret,
+                                         const Options& options);
 
     // --- whole lines ------------------------------------------------------------------
 

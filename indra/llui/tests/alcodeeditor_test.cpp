@@ -29,6 +29,7 @@
 #include "../alchoicelist.h"
 #include "../alfindbar.h"
 #include "../alsurface.h"
+#include "../llclipboard.h"
 
 #include "../llfocusmgr.h"
 #include "../lluicolortable.h"
@@ -2086,5 +2087,27 @@ namespace tut
         ensure("offered", e.canPerform(ALEditorCommand::GoToMatchingBracket));
         e.perform(ALEditorCommand::GoToMatchingBracket);
         ensure("inside a pair, at no bracket: to its closer", e.caret() == ALTextPos(0, 10));
+    }
+
+    template<> template<>
+    void alcodeeditor_object::test<58>()
+    {
+        set_test_name("a paste of lines into a line's indentation brought to where they go, as a step of its own that Undo takes back first");
+        ALCodeEditor& e = make("f()\n{\n    x;\n}", "lsl");
+        e.setSoftTabs(true);
+        e.setReindentsPaste(true);
+        const std::string copied = "if (y)\n{\n    z;\n}\n";
+        LLClipboard::instance().copyToClipboard(copied, 0, static_cast<S32>(copied.size()));
+        e.setCaret(ALTextPos(2, 4));
+        e.paste();
+        ensure_equals("where it goes", e.text(), std::string("f()\n{\n    if (y)\n    {\n        z;\n    }\n    x;\n}"));
+        e.undo();
+        ensure_equals("Undo: as it was copied", e.text(), std::string("f()\n{\n    if (y)\n{\n    z;\n}\nx;\n}"));
+        e.undo();
+        ensure_equals("and again: before the paste", e.text(), std::string("f()\n{\n    x;\n}"));
+        e.setReindentsPaste(false);
+        e.setCaret(ALTextPos(2, 4));
+        e.paste();
+        ensure_equals("not asked: as copied", e.text(), std::string("f()\n{\n    if (y)\n{\n    z;\n}\nx;\n}"));
     }
 }

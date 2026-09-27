@@ -30,6 +30,7 @@
 #include "altextchars.h"
 #include "alsyntaxgrammar.h"
 
+#include <algorithm>
 #include <array>
 #include <cstdlib>
 
@@ -339,6 +340,146 @@ Outdent outdentAsTyped(const ALTextDocument& doc, const ALTextPos& anchor, const
         out.next.indent = lead;
     }
     return out;
+}
+
+// --- pasted lines ---------------------------------------------------------------
+
+std::optional<PastePlan> planPaste(const ALTextDocument& doc, const ALTextRange& selection, std::string_view pasted, const ALSyntaxGrammar* grammar,
+                                   const Options& options)
+{
+    if (!grammar || !grammar->indents() || pasted.find('\n') == std::string_view::npos)
+    {
+        return std::nullopt;
+    }
+    const ALTextRange  sel  = selection.normalised();
+    const std::string& line = doc.line(sel.begin.line);
+    size_t             lead = 0;
+    const S32          own  = alBlanksWidth(line, options.tabWidth, &lead);
+    if (static_cast<size_t>(sel.begin.column) > lead)
+    {
+        return std::nullopt;
+    }
+    const S32 level = llmax(1, options.tabWidth);
+    PastePlan plan;
+    for (size_t from = 0;;)
+    {
+        const size_t           nl   = pasted.find('\n', from);
+        const std::string_view text = pasted.substr(from, nl == std::string_view::npos ? std::string_view::npos : nl - from);
+        size_t                 blanks = 0;
+        const S32              width  = alBlanksWidth(text, options.tabWidth, &blanks);
+        plan.widths.push_back(text.find_first_not_of(" \t\r", blanks) == std::string_view::npos ? -1 : width);
+        if (nl == std::string_view::npos)
+        {
+            break;
+        }
+        from = nl + 1;
+    }
+    const auto first = std::find_if(plan.widths.begin(), plan.widths.end(), [](S32 width) { return width >= 0; });
+    if (first == plan.widths.end())
+    {
+        return std::nullopt;
+    }
+    // Copied from where a line's text begins: the rest say how far in it was.
+    plan.ref = *first;
+    if (*first == 0)
+    {
+        S32 shallowest = -1;
+        for (auto it = first + 1; it != plan.widths.end(); ++it)
+        {
+            if (*it >= 0 && (shallowest < 0 || *it < shallowest))
+            {
+                shallowest = *it;
+            }
+        }
+        plan.ref = llmax(0, shallowest);
+    }
+    // What stays on the line after the paste.
+    const std::string& end_line = doc.line(sel.end.line);
+    const bool rest = end_line.find_first_not_of(" \t\r", static_cast<size_t>(sel.end.column)) != std::string::npos;
+    plan.restoreRest = rest && pasted.back() == '\n';
+    if (rest || lead < line.size())
+    {
+        plan.base = own;
+        return plan;
+    }
+    // Nothing else on the line: where the line above says a line goes.
+    S32 above = sel.begin.line - 1;
+    while (above >= 0 && doc.line(above).find_first_not_of(" \t\r") == std::string::npos)
+    {
+        --above;
+    }
+    if (above >= 0)
+    {
+        std::string_view above_text = doc.line(above);
+        while (!above_text.empty() && isBlank(above_text.back()))
+        {
+            above_text.remove_suffix(1);
+        }
+        plan.base = alBlanksWidth(above_text, options.tabWidth) + (grammar->opensBlock(above_text) ? level : 0);
+    }
+    std::string_view head = pasted.substr(pasted.find_first_not_of(" \t\r\n"));
+    head = head.substr(0, head.find('\n'));
+    if (grammar->closesBlock(head) > 0)
+    {
+        plan.base = llmax(0, plan.base - level);
+    }
+    return plan;
+}
+
+std::optional<Change> reindentPasted(const ALTextDocument& doc, const ALTextPos& at, const PastePlan& plan, const ALTextPos& caret,
+                                     const Options& options)
+{
+    Change change;
+    S32    moved = 0;
+    const size_t first = static_cast<size_t>(std::find_if(plan.widths.begin(), plan.widths.end(), [](S32 width) { return width >= 0; }) - plan.widths.begin());
+    for (size_t k = 0; k < plan.widths.size(); ++k)
+    {
+        const S32 line = at.line + static_cast<S32>(k);
+        if (line >= doc.lineCount())
+        {
+            break;
+        }
+        const bool last = k + 1 == plan.widths.size();
+        S32        width;
+        if (last && plan.restoreRest)
+        {
+            width = plan.base;
+        }
+        else if (plan.widths[k] < 0)
+        {
+            // A blank line pasted keeps no blanks; the line it went into
+            // keeps what it had before the paste, and what followed it
+            // there, but blanks alone.
+            if (k == 0 || doc.line(line).find_first_not_of(" \t") != std::string::npos)
+            {
+                continue;
+            }
+            width = 0;
+        }
+        else
+        {
+            width = k == first ? plan.base : llmax(0, plan.base + plan.widths[k] - plan.ref);
+        }
+        const std::string& text   = doc.line(line);
+        size_t             lead   = 0;
+        alBlanksWidth(text, options.tabWidth, &lead);
+        const std::string wanted = blanksOf(width, options.tabWidth, !options.softTabs);
+        if (text.compare(0, lead, wanted) == 0 && wanted.size() == lead)
+        {
+            continue;
+        }
+        change.replacements.push_back({ ALTextRange(ALTextPos(line, 0), ALTextPos(line, static_cast<S32>(lead))), wanted });
+        if (line == caret.line)
+        {
+            moved = static_cast<S32>(wanted.size()) - static_cast<S32>(lead);
+        }
+    }
+    if (change.replacements.empty())
+    {
+        return std::nullopt;
+    }
+    change.caret = ALTextPos(caret.line, llmax(0, caret.column + moved));
+    return change;
 }
 
 // --- whole lines ------------------------------------------------------------------

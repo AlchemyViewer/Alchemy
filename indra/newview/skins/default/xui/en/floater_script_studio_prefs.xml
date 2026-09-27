@@ -373,6 +373,17 @@ end</floater.string>
              top_pad="4"
              width="370" />
             <check_box
+             control_name="ALScriptStudioReindentOnPaste"
+             follows="left|top"
+             height="20"
+             label="Indent pasted lines to where they go"
+             layout="topleft"
+             left="12"
+             name="reindent_on_paste"
+             tool_tip="Lines pasted into a line's indentation go to that line's level, or where the line above says, each as far in from the first as it was. One Undo leaves them as they were copied."
+             top_pad="4"
+             width="370" />
+            <check_box
              control_name="ALScriptStudioAutoClose"
              follows="left|top"
              height="20"

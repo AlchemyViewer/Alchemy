@@ -279,4 +279,49 @@ namespace tut
         wide.tabWidth = 8;
         ensure_equals("a level as wide as the tab", backspaceFrom(doc, ALTextPos(0, 8), wide)->column, 0);
     }
+
+    template<> template<>
+    void altextindent_object::test<9>()
+    {
+        set_test_name("lines pasted into a line's indentation brought to where they go: the line's level, or the line above's say; each as far in from the first as it was; the caret with its line");
+        const ALSyntaxGrammar* lsl = grammar("lsl");
+        // The text with the paste in, then brought to where it goes; and
+        // where the caret ends.
+        const auto pasted = [&](const std::string& text, const ALTextPos& at, const std::string& clip, const Options& options, ALTextPos* caret = nullptr) {
+            ALTextDocument                 doc(text);
+            const std::optional<PastePlan> plan = planPaste(doc, ALTextRange(at, at), clip, lsl, options);
+            const ALTextPos                end  = doc.insert(at, clip).endAfter();
+            std::optional<Change>          change;
+            if (plan)
+            {
+                change = reindentPasted(doc, at, *plan, end, options);
+            }
+            if (caret)
+            {
+                *caret = change ? change->caret : end;
+            }
+            return change ? applied(doc.text(), *change) : doc.text();
+        };
+        ensure_equals("whole lines into a blank line under an opener: a level in from it",
+                      pasted("f()\n{\n\n}", ALTextPos(2, 0), "        a;\n        if (x)\n        {\n            b;\n        }\n", spaces),
+                      std::string("f()\n{\n    a;\n    if (x)\n    {\n        b;\n    }\n\n}"));
+        ALTextPos caret;
+        ensure_equals("copied from where the text begins: the rest say how far in it was; what followed kept at its level",
+                      pasted("f()\n{\n    x;\n}", ALTextPos(2, 4), "if (y) {\n        z;\n    }\n", spaces, &caret),
+                      std::string("f()\n{\n    if (y) {\n        z;\n    }\n    x;\n}"));
+        ensure("the caret with its line", caret == ALTextPos(5, 4));
+        ensure_equals("spaces made tabs where the text is indented by tabs",
+                      pasted("f()\n{\n\tx;\n}", ALTextPos(2, 1), "    a;\n        b;\n", tabs), std::string("f()\n{\n\ta;\n\t\tb;\n\tx;\n}"));
+        ensure_equals("a closer first: a level out from where the line above says",
+                      pasted("f()\n{\n    x;\n\n", ALTextPos(3, 0), "}\ng()\n", spaces), std::string("f()\n{\n    x;\n}\ng()\n\n"));
+        ensure_equals("a blank line pasted keeps no blanks", pasted("{\n\n}", ALTextPos(1, 0), "  a;\n   \n  b;", spaces),
+                      std::string("{\n    a;\n\n    b;\n}"));
+
+        const ALTextDocument doc("{\n    x;\n}");
+        ensure("one line: nothing", !planPaste(doc, ALTextRange(ALTextPos(1, 4), ALTextPos(1, 4)), "a;", lsl, spaces));
+        ensure("after text on its line: nothing", !planPaste(doc, ALTextRange(ALTextPos(1, 6), ALTextPos(1, 6)), "a;\nb;", lsl, spaces));
+        ensure("no grammar that indents: nothing", !planPaste(doc, ALTextRange(ALTextPos(1, 4), ALTextPos(1, 4)), "a;\nb;", nullptr, spaces));
+        ensure_equals("already where it goes: nothing to do", pasted("{\n    x;\n}", ALTextPos(1, 4), "a;\n    b;\n", spaces),
+                      std::string("{\n    a;\n    b;\n    x;\n}"));
+    }
 }

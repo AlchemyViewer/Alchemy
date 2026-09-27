@@ -2396,9 +2396,22 @@ void ALTextView::paste()
     {
         return;
     }
+    // Lines pasted into a line's indentation brought to where they go, as
+    // a step of its own: Undo takes back the re-indenting first, and
+    // leaves the paste as it was copied.
+    const ALTextRange                           into = selection().normalised();
+    const std::optional<ALTextIndent::PastePlan> plan =
+        mReindentsPaste ? ALTextIndent::planPaste(mDocument, into, text, mHighlighter.grammar().get(), editingOptions()) : std::nullopt;
     mUndo.beginGroup();
     insertText(text);
     mUndo.endGroup();
+    if (plan)
+    {
+        if (const std::optional<ALTextEditing::Change> change = ALTextIndent::reindentPasted(mDocument, into.begin, *plan, mCaret, editingOptions()))
+        {
+            apply(*change);
+        }
+    }
 }
 
 void ALTextView::doDelete()

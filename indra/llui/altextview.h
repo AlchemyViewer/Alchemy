@@ -234,6 +234,9 @@ public:
     void            setIndentDefaults(S32 tab_width, bool soft_tabs);
     void            setReadsIndentation(bool reads);
     bool            readsIndentation() const { return mReadsIndentation; }
+    // Whether lines pasted into a line's indentation are brought to where
+    // they go (ALTextIndent::planPaste), where the grammar indents.
+    void            setReindentsPaste(bool reindents) { mReindentsPaste = reindents; }
     void            setTabWidth(S32 spaces);
     S32             getTabWidth() const { return mTabWidth; }
     void            setSoftTabs(bool soft);
@@ -959,6 +962,7 @@ private:
     ALTextIndent::Options mIndentDefaults;
     IndentFrom            mIndentFrom         = IndentFrom::Defaults;
     bool                  mReadsIndentation   = false;
+    bool                  mReindentsPaste     = false;
     void                  useIndentation(const ALTextIndent::Options& options, IndentFrom from);
     S32  mHPad      = 4;
     S32  mVPad      = 2;

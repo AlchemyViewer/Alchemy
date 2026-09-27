@@ -717,6 +717,17 @@
             <key>Value</key>
             <string />
         </map>
+        <key>ALScriptStudioReindentOnPaste</key>
+        <map>
+            <key>Comment</key>
+            <string>Lines pasted into a line's indentation in Script Studio are brought to where they go, each as far in from the first as it was; one Undo leaves them as they were copied.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
         <key>ALScriptStudioDetectIndentation</key>
         <map>
             <key>Comment</key>
