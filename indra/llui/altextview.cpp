@@ -2050,7 +2050,9 @@ bool ALTextView::perform(ALEditorCommand command)
             }
             else if (mCaret != mDocument.start())
             {
-                deleteRange(ALTextRange(mDocument.prevCluster(mCaret), mCaret));
+                // In a line's indentation, a level's spaces at once.
+                const std::optional<ALTextPos> level = ALTextIndent::backspaceFrom(mDocument, mCaret, editingOptions());
+                deleteRange(ALTextRange(level ? *level : mDocument.prevCluster(mCaret), mCaret));
             }
             return true;
         case C::DeleteRight:

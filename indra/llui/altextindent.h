@@ -71,6 +71,11 @@ namespace ALTextIndent
     // What a tab typed at a place puts in: a tab, or spaces to the next
     // stop where tabs are soft.
     std::string tabText(const ALTextDocument& doc, const ALTextPos& at, const Options& options);
+    // Where Backspace at a place takes the text back to, where it takes
+    // more than a character: in a line's leading blanks, spaces back to
+    // the stop before, a level's worth -- never past a tab, nor past what
+    // is not a space. Nothing where it takes one character, as ever.
+    std::optional<ALTextPos> backspaceFrom(const ALTextDocument& doc, const ALTextPos& at, const Options& options);
     // The blanks a line begins with.
     std::string leadingBlanks(const ALTextDocument& doc, S32 line);
     // An indentation one level in from, or out from, another, in the kind

@@ -133,6 +133,30 @@ std::string tabText(const ALTextDocument& doc, const ALTextPos& at, const Option
     return std::string(static_cast<size_t>(alNextTabStop(column, options.tabWidth) - column), ' ');
 }
 
+std::optional<ALTextPos> backspaceFrom(const ALTextDocument& doc, const ALTextPos& at, const Options& options)
+{
+    const std::string& text = doc.line(at.line);
+    if (at.column < 2 || at.column > static_cast<S32>(text.size()) || text[at.column - 1] != ' ')
+    {
+        return std::nullopt;
+    }
+    size_t lead = 0;
+    const S32 width = alBlanksWidth(std::string_view(text).substr(0, static_cast<size_t>(at.column)), options.tabWidth, &lead);
+    if (lead < static_cast<size_t>(at.column))
+    {
+        return std::nullopt;
+    }
+    // Back to the stop before the caret's column, over spaces alone.
+    const S32 tab  = llmax(1, options.tabWidth);
+    const S32 stop = (width - 1) / tab * tab;
+    S32       from = at.column;
+    while (from > 0 && text[from - 1] == ' ' && at.column - from < width - stop)
+    {
+        --from;
+    }
+    return at.column - from > 1 ? std::optional<ALTextPos>(ALTextPos(at.line, from)) : std::nullopt;
+}
+
 std::string leadingBlanks(const ALTextDocument& doc, S32 line)
 {
     const std::string& text = doc.line(line);

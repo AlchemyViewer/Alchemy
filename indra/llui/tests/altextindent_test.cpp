@@ -257,4 +257,26 @@ namespace tut
         ensure_equals("only the lines asked about", read("a\nb\n\tc", 2), std::string("none"));
         ensure_equals("closing two levels at once is still steps of four", read("a\n    b\n        c\nd\n    e\n        f\ng"), std::string("spaces 4"));
     }
+
+    template<> template<>
+    void altextindent_object::test<8>()
+    {
+        set_test_name("Backspace in a line's leading spaces takes them back to the stop before; one character past a tab, in the text, or where one is all there is");
+        const ALTextDocument doc("        x\n   y\n\t  z\n  w  v\n     u");
+        const auto from = [&](S32 line, S32 column) {
+            const std::optional<ALTextPos> to = backspaceFrom(doc, ALTextPos(line, column), spaces);
+            return to ? llformat("%d:%d", to->line, to->column) : std::string("one");
+        };
+        ensure_equals("a level from a stop", from(0, 8), std::string("0:4"));
+        ensure_equals("to the stop from between", from(0, 6), std::string("0:4"));
+        ensure_equals("from just past a stop, one", from(0, 5), std::string("one"));
+        ensure_equals("three to none", from(1, 3), std::string("1:0"));
+        ensure_equals("never past a tab", from(2, 3), std::string("2:1"));
+        ensure_equals("not in the text", from(3, 5), std::string("one"));
+        ensure_equals("from five, to four", from(4, 5), std::string("one"));
+        ensure_equals("before the text, not after it", from(0, 9), std::string("one"));
+        Options wide = spaces;
+        wide.tabWidth = 8;
+        ensure_equals("a level as wide as the tab", backspaceFrom(doc, ALTextPos(0, 8), wide)->column, 0);
+    }
 }

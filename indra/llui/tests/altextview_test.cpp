@@ -1476,4 +1476,20 @@ namespace tut
         v.readIndentation();
         ensure("forgotten: the text's own again", v.indentFrom() == ALTextView::IndentFrom::Text && v.getSoftTabs() && v.getTabWidth() == 2);
     }
+
+    template<> template<>
+    void altextview_object::test<49>()
+    {
+        set_test_name("Backspace in a line's indentation takes a level's spaces; elsewhere, one character");
+        ALTextView& v = make("        x = 1;");
+        v.setCaret(ALTextPos(0, 8));
+        key(KEY_BACKSPACE);
+        ensure_equals("a level", v.text(), std::string("    x = 1;"));
+        key(KEY_BACKSPACE);
+        ensure_equals("another", v.text(), std::string("x = 1;"));
+        v.setText("a  b");
+        v.setCaret(ALTextPos(0, 3));
+        key(KEY_BACKSPACE);
+        ensure_equals("within the text, one", v.text(), std::string("a b"));
+    }
 }
