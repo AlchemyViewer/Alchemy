@@ -1195,7 +1195,7 @@ void ALFloaterScriptStudio::pickLine(std::vector<ALQuickOpen::Candidate> candida
 
 ALScriptStudioSaving::Options ALFloaterScriptStudio::saveOptions() const
 {
-    static LLCachedControl<bool> hold(gSavedSettings, "ALScriptStudioPreflight", false);
+    static LLCachedControl<bool> hold(gSavedSettings, "ALScriptStudioPreflight", true);
     ALScriptStudioSaving::Options options;
     options.fix          = gSavedSettings.getBOOL("ALScriptFixOnSave");
     options.format       = gSavedSettings.getBOOL("ALScriptFormatOnSave");
