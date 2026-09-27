@@ -3243,10 +3243,45 @@ void ALTextView::drawBars(F32 alpha)
                 gl_rect_2d(middle, y, ruler.mRight - 2, y - 2, mark % alpha);
             }
         }
-        for (const ALTextRange& match : mFind.matches())
+        // The matches by the pixel rows they fall on, found again only as
+        // they, the track or the text's height change, and drawn as runs:
+        // a letter found over a long text is tens of thousands of matches
+        // and a few hundred rows.
+        const std::vector<ALTextRange>& matches = mFind.matches();
+        if (!matches.empty())
         {
-            const S32 y = yOf(match.begin.line);
-            gl_rect_2d(ruler.mLeft + 2, y, middle, y - 2, mFindMatchColor.get() % alpha);
+            if (!mRulerRowsValid || mRulerRowsGeneration != mFind.generation() || mRulerRowsTop != ruler.mTop || mRulerRowsHeight != track_h ||
+                mRulerRowsTotal != total)
+            {
+                mRulerRows.assign(static_cast<size_t>(track_h) + 2, 0);
+                for (const ALTextRange& match : matches)
+                {
+                    const S32 row = llclamp(ruler.mTop - yOf(match.begin.line), 0, track_h);
+                    mRulerRows[static_cast<size_t>(row)]     = 1;
+                    mRulerRows[static_cast<size_t>(row) + 1] = 1;
+                }
+                mRulerRowsValid      = true;
+                mRulerRowsGeneration = mFind.generation();
+                mRulerRowsTop        = ruler.mTop;
+                mRulerRowsHeight     = track_h;
+                mRulerRowsTotal      = total;
+            }
+            const LLColor4 found = mFindMatchColor.get() % alpha;
+            for (size_t row = 0; row < mRulerRows.size();)
+            {
+                if (!mRulerRows[row])
+                {
+                    ++row;
+                    continue;
+                }
+                size_t end = row;
+                while (end < mRulerRows.size() && mRulerRows[end])
+                {
+                    ++end;
+                }
+                gl_rect_2d(ruler.mLeft + 2, ruler.mTop - static_cast<S32>(row), middle, ruler.mTop - static_cast<S32>(end), found);
+                row = end;
+            }
         }
         // The blip: where the caret is.
         const S32 caret_y = yOf(mCaret.line);

@@ -577,6 +577,7 @@ if(AL_BUILD_TESTS)
     alundostack
     alsyntaxgrammars
     altextediting
+    altextfind
     altextindent
     altextlayout
     altextsearch

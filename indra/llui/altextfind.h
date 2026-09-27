@@ -79,6 +79,8 @@ public:
     // where the replace did nothing.
     std::vector<ALTextRange> take();
     void                     restore(std::vector<ALTextRange> matches, S32 current);
+    // Moved on whenever the matches change, found or slid.
+    U32                      generation() const { return mGeneration; }
 
 private:
     ALAnchoredRanges<ALTextRange> mMatches;
@@ -88,4 +90,5 @@ private:
     bool                          mInSelection = false;
     ALTextRange                   mScope;
     std::string                   mError;
+    U32                           mGeneration = 0;
 };

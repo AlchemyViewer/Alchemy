@@ -30,6 +30,7 @@
 void ALTextFind::search(const ALTextDocument& doc, const std::string& query, const ALTextSearchOptions& options, bool in_selection,
                         const ALTextRange& selection)
 {
+    ++mGeneration;
     mStale = false;
     if (in_selection)
     {
@@ -62,6 +63,7 @@ void ALTextFind::search(const ALTextDocument& doc, const std::string& query, con
 
 void ALTextFind::clear()
 {
+    ++mGeneration;
     mMatches.clear();
     mCurrent = -1;
     mStale   = false;
@@ -69,6 +71,7 @@ void ALTextFind::clear()
 
 void ALTextFind::edited(const ALTextDocument::Edit& edit)
 {
+    ++mGeneration;
     if (mInSelection)
     {
         mScope = edit.stretched(mScope);
@@ -108,6 +111,7 @@ std::vector<ALTextRange> ALTextFind::all(const ALTextDocument& doc, const std::s
 
 std::vector<ALTextRange> ALTextFind::take()
 {
+    ++mGeneration;
     std::vector<ALTextRange> out = mMatches.take();
     mMatches.clear();
     mCurrent = -1;
@@ -116,6 +120,7 @@ std::vector<ALTextRange> ALTextFind::take()
 
 void ALTextFind::restore(std::vector<ALTextRange> matches, S32 current)
 {
+    ++mGeneration;
     mMatches.assign(std::move(matches));
     mCurrent = current;
 }

@@ -1059,6 +1059,14 @@ private:
     S32              mMapLinesCount    = 0;
     std::vector<S32> mRulerMarkLines;
     bool             mRulerMarksValid    = false;
+    // Each pixel row of the ruler's track with a match on it, as last found:
+    // for which matches, which track and which text's height.
+    std::vector<U8> mRulerRows;
+    bool            mRulerRowsValid      = false;
+    U32             mRulerRowsGeneration = 0;
+    S32             mRulerRowsTop        = 0;
+    S32             mRulerRowsHeight     = 0;
+    S32             mRulerRowsTotal      = 0;
     U32              mRulerMarksVersion  = 0;
     U32              mRulerMarksRevision = 0;
 
