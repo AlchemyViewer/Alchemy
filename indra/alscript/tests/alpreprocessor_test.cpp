@@ -1410,4 +1410,19 @@ namespace tut
         const ALPreprocessor::Result after = ALPreprocessor::run("#include \"after.lsl\"\n#include \"after.lsl\"\n", options());
         ensure("code after the #endif: no guard, made twice", after.text.find("integer after;") != after.text.rfind("integer after;"));
     }
+    template<> template<>
+    void alpreprocessor_object::test<38>()
+    {
+        set_test_name("a macro's arguments: none for one with no parameters, a line an argument runs over a space, blanks with no ( after them given back as they were");
+        const std::string source = "#define Z() zero\n"
+                                   "#define I(x) [x]\n"
+                                   "#define TWO(a, b) a+b\n"
+                                   "Z() Z( ) Z\n"
+                                   "I (1) I  x I\n"
+                                   "TWO(1,\n2) TWO( (1, 2) ,\t3 )\n"
+                                   "I\n(3)\n";
+        const ALPreprocessor::Result r = ALPreprocessor::run(source, options());
+        ensure_equals("problems", messages(r), std::string());
+        ensure_equals("text", squeeze(r.text), std::string("zero zero Z\n[1] I  x I\n1+2 (1, 2)+3\n[3]\n"));
+    }
 }

@@ -66,7 +66,9 @@ namespace
     };
 
     typedef boost::unordered_flat_set<std::string, ll::string_hash, std::equal_to<>> HideSet;
-    typedef std::shared_ptr<const HideSet>                                          hide_set_ptr;
+    // A set the run's HideSets made and keeps, for as long as the run's
+    // tokens are: copied with a token as the pointer it is.
+    typedef const HideSet*                                                          hide_set_ptr;
 
     struct Token
     {
@@ -81,7 +83,7 @@ namespace
         bool        verbatim = true;
         // The macros this token will not expand as: Prosser's hide set,
         // shared by the tokens one expansion made.
-        hide_set_ptr hide;
+        hide_set_ptr hide = nullptr;
 
         bool is(Kind k, std::string_view t) const { return kind == k && text == t; }
         bool blank() const { return kind == Kind::Space || kind == Kind::Newline || kind == Kind::Comment; }
@@ -99,13 +101,13 @@ namespace
     class HideSets
     {
     public:
-        hide_set_ptr with(const hide_set_ptr& set, const std::string& name)
+        hide_set_ptr with(hide_set_ptr set, const std::string& name)
         {
             if (set && set->contains(name))
             {
                 return set;
             }
-            hide_set_ptr& made = mWith[{ set.get(), name }];
+            hide_set_ptr& made = mWith[{ set, name }];
             if (!made)
             {
                 HideSet names = set ? *set : HideSet();
@@ -115,7 +117,7 @@ namespace
             return made;
         }
 
-        hide_set_ptr join(const hide_set_ptr& own, const hide_set_ptr& theirs)
+        hide_set_ptr join(hide_set_ptr own, hide_set_ptr theirs)
         {
             if (!own || own == theirs)
             {
@@ -125,7 +127,7 @@ namespace
             {
                 return own;
             }
-            hide_set_ptr& made = mJoined[{ own.get(), theirs.get() }];
+            hide_set_ptr& made = mJoined[{ own, theirs }];
             if (!made)
             {
                 HideSet names = *theirs;
@@ -135,17 +137,17 @@ namespace
             return made;
         }
 
-        hide_set_ptr meet(const hide_set_ptr& a, const hide_set_ptr& b)
+        hide_set_ptr meet(hide_set_ptr a, hide_set_ptr b)
         {
             if (!a || !b)
             {
-                return hide_set_ptr();
+                return nullptr;
             }
             if (a == b)
             {
                 return a;
             }
-            const auto known = mMet.find({ a.get(), b.get() });
+            const auto known = mMet.find({ a, b });
             if (known != mMet.end())
             {
                 return known->second;
@@ -158,7 +160,7 @@ namespace
                     names.insert(name);
                 }
             }
-            return mMet[{ a.get(), b.get() }] = intern(std::move(names));
+            return mMet[{ a, b }] = intern(std::move(names));
         }
 
     private:
@@ -167,7 +169,7 @@ namespace
         {
             if (names.empty())
             {
-                return hide_set_ptr();
+                return nullptr;
             }
             std::vector<std::string_view> sorted(names.begin(), names.end());
             std::sort(sorted.begin(), sorted.end());
@@ -176,15 +178,15 @@ namespace
             {
                 key.append(name).push_back('\x01');
             }
-            hide_set_ptr& set = mSets[key];
+            std::unique_ptr<const HideSet>& set = mSets[key];
             if (!set)
             {
-                set = std::make_shared<const HideSet>(std::move(names));
+                set = std::make_unique<const HideSet>(std::move(names));
             }
-            return set;
+            return set.get();
         }
 
-        boost::unordered_flat_map<std::string, hide_set_ptr, ll::string_hash, std::equal_to<>> mSets;
+        boost::unordered_flat_map<std::string, std::unique_ptr<const HideSet>, ll::string_hash, std::equal_to<>> mSets;
         boost::unordered_flat_map<std::pair<const HideSet*, std::string>, hide_set_ptr>      mWith;
         boost::unordered_flat_map<std::pair<const HideSet*, const HideSet*>, hide_set_ptr>   mJoined;
         boost::unordered_flat_map<std::pair<const HideSet*, const HideSet*>, hide_set_ptr>   mMet;
@@ -261,7 +263,7 @@ namespace
             mToken.line     = mLine;
             mToken.column   = mColumn;
             mToken.verbatim = true;
-            mToken.hide.reset();
+            mToken.hide = nullptr;
         }
 
         // Takes one byte into the token, keeping the place.
@@ -936,18 +938,21 @@ namespace
 
     struct FileState
     {
-        S32               index = 0;
-        std::string       path;
-        std::string       name;
-        std::string       assetId;
-        Tokens            tokens;
-        size_t            pos       = 0;
+        S32                           index = 0;
+        std::string                   path;
+        std::string                   name;
+        std::string                   assetId;
+        // The file's tokens as lexed, shared with every other opening of
+        // the same file: read, never changed.
+        std::shared_ptr<const Tokens> lexed;
+        size_t                        pos = 0;
         // Nothing but blanks since the last newline: where a directive
         // may stand.
-        bool              lineStart = true;
-        std::vector<Cond> conds;
+        bool                          lineStart = true;
+        std::vector<Cond>             conds;
 
-        bool active() const { return conds.empty() || conds.back().active; }
+        bool          active() const { return conds.empty() || conds.back().active; }
+        const Tokens& tokens() const { return *lexed; }
     };
 
     class Engine
@@ -1000,8 +1005,9 @@ namespace
 
         // -- tokens --
         bool next(Token& t);
-        void unread(const Tokens& tokens);
+        void unread(Tokens&& tokens);
         void emit(const Token& t) { mSink->push_back(t); }
+        void emit(Token&& t) { mSink->push_back(std::move(t)); }
         // What a run may make, against the budget: every token put back
         // to be scanned again and every token given out is one more, and
         // its text so many bytes more. A run that reaches the budget says
@@ -1024,11 +1030,11 @@ namespace
         bool overran() const { return mOverran; }
 
         // -- expansion --
-        void   handle(const Token& t);
+        void   handle(Token t);
         bool   expandDynamic(const Token& t, const Macro& m);
         bool   expandObject(const Token& t, const Macro& m);
         bool   expandFunction(const Token& t, const Macro& m);
-        Tokens substitute(const Macro& m, const std::vector<Tokens>& args, const Token& site, const hide_set_ptr& hs);
+        Tokens substitute(const Macro& m, const std::vector<Tokens>& args, const Token& site, hide_set_ptr hs);
         Tokens expandAll(const Tokens& in);
         Token  stringize(const Tokens& arg, const Token& site);
         bool   paste(const Token& left, const Token& right, const Token& site, Token& out);
@@ -1053,8 +1059,8 @@ namespace
         // include guard is on, where it has one.
         struct Lexed
         {
-            S32    index = 0;
-            Tokens tokens;
+            S32                           index = 0;
+            std::shared_ptr<const Tokens> tokens;
         };
         boost::unordered_flat_map<std::string, Lexed, ll::string_hash, std::equal_to<>>       mLexed;
         boost::unordered_flat_map<std::string, std::string, ll::string_hash, std::equal_to<>> mGuards;
@@ -1134,17 +1140,17 @@ namespace
         // map: its tokens are where they were.
         if (const auto lexed = path.empty() ? mLexed.end() : mLexed.find(path); lexed != mLexed.end())
         {
-            f->index  = lexed->second.index;
-            f->tokens = lexed->second.tokens;
+            f->index = lexed->second.index;
+            f->lexed = lexed->second.tokens;
         }
         else
         {
-            f->index  = mResult.map.addFile(name, path);
-            f->tokens = Lexer(mOptions.lua, f->index).run(text);
+            f->index = mResult.map.addFile(name, path);
+            f->lexed = std::make_shared<const Tokens>(Lexer(mOptions.lua, f->index).run(text));
             if (!path.empty())
             {
-                mLexed[path] = Lexed{ f->index, f->tokens };
-                if (std::string guard = guardOf(f->tokens); !guard.empty())
+                mLexed[path] = Lexed{ f->index, f->lexed };
+                if (std::string guard = guardOf(f->tokens()); !guard.empty())
                 {
                     mGuards[path] = std::move(guard);
                 }
@@ -1155,12 +1161,12 @@ namespace
         // the include depth allows, is more files than there are.
         Token at;
         at.file = mFiles.empty() ? 0 : mFiles.back()->index;
-        if (!mFiles.empty() && !mFiles.back()->tokens.empty())
+        if (!mFiles.empty() && !mFiles.back()->tokens().empty())
         {
             const FileState& asking = *mFiles.back();
-            at = asking.tokens[std::min(asking.pos, asking.tokens.size()) - (asking.pos > 0 ? 1 : 0)];
+            at = asking.tokens()[std::min(asking.pos, asking.tokens().size()) - (asking.pos > 0 ? 1 : 0)];
         }
-        if (!spend(f->tokens.size(), text.size(), at))
+        if (!spend(f->tokens().size(), text.size(), at))
         {
             return;
         }
@@ -1174,7 +1180,7 @@ namespace
         {
             Token at;
             at.file = f.index;
-            at.line = f.tokens.empty() ? 0 : f.tokens.back().line;
+            at.line = f.tokens().empty() ? 0 : f.tokens().back().line;
             problem(ALScriptProblem::Severity::Error, "PreprocIfWithoutEndif", "#if without #endif at the end of the file", {}, at);
         }
         mFiles.pop_back();
@@ -1182,8 +1188,9 @@ namespace
 
     bool Engine::directiveAhead(const FileState& f) const
     {
-        const size_t i = skipSpace(f.tokens, f.pos);
-        return i < f.tokens.size() && f.tokens[i].is(Kind::Punct, "#");
+        const Tokens& tokens = f.tokens();
+        const size_t  i      = skipSpace(tokens, f.pos);
+        return i < tokens.size() && tokens[i].is(Kind::Punct, "#");
     }
 
     void Engine::loop(size_t depth)
@@ -1200,9 +1207,9 @@ namespace
             }
             if (!mPending.empty())
             {
-                Token t = mPending.front();
+                Token t = std::move(mPending.front());
                 mPending.pop_front();
-                handle(t);
+                handle(std::move(t));
                 continue;
             }
             FileState& f = *mFiles.back();
@@ -1221,11 +1228,11 @@ namespace
             {
                 if (t.kind == Kind::Newline)
                 {
-                    emit(t);
+                    emit(std::move(t));
                 }
                 continue;
             }
-            handle(t);
+            handle(std::move(t));
         }
     }
 
@@ -1253,7 +1260,7 @@ namespace
     {
         if (!mPending.empty())
         {
-            t = mPending.front();
+            t = std::move(mPending.front());
             mPending.pop_front();
             return true;
         }
@@ -1262,11 +1269,11 @@ namespace
             return false;
         }
         FileState& f = *mFiles.back();
-        if (f.pos >= f.tokens.size())
+        if (f.pos >= f.tokens().size())
         {
             return false;
         }
-        t = f.tokens[f.pos++];
+        t = f.tokens()[f.pos++];
         if (t.kind == Kind::Newline)
         {
             f.lineStart = true;
@@ -1278,9 +1285,9 @@ namespace
         return true;
     }
 
-    void Engine::unread(const Tokens& tokens)
+    void Engine::unread(Tokens&& tokens)
     {
-        mPending.insert(mPending.begin(), tokens.begin(), tokens.end());
+        mPending.insert(mPending.begin(), std::make_move_iterator(tokens.begin()), std::make_move_iterator(tokens.end()));
     }
 
     bool Engine::spend(size_t made, size_t bytes, const Token& at)
@@ -1332,7 +1339,7 @@ namespace
 
     // -- expansion --
 
-    void Engine::handle(const Token& t)
+    void Engine::handle(Token t)
     {
         if (t.kind == Kind::Ident && !t.hidden(t.text))
         {
@@ -1346,7 +1353,7 @@ namespace
                 }
             }
         }
-        emit(t);
+        emit(std::move(t));
     }
 
     S32 Engine::paramIndex(const Macro& m, const Token& t)
@@ -1389,7 +1396,7 @@ namespace
             case Macro::Dynamic::None:
                 return false;
         }
-        mPending.push_front(out);
+        mPending.push_front(std::move(out));
         return true;
     }
 
@@ -1401,7 +1408,7 @@ namespace
         {
             return true;
         }
-        unread(out);
+        unread(std::move(out));
         return true;
     }
 
@@ -1416,34 +1423,37 @@ namespace
         {
             if (!next(n))
             {
-                unread(read);
+                unread(std::move(read));
                 return false;
             }
-            read.push_back(n);
-            if (!n.blank())
+            const bool blank   = n.blank();
+            const bool newline = n.kind == Kind::Newline;
+            read.push_back(std::move(n));
+            if (!blank)
             {
                 break;
             }
-            if (n.kind == Kind::Newline && mPending.empty() && !mIsolated && directiveAhead(*mFiles.back()))
+            if (newline && mPending.empty() && !mIsolated && directiveAhead(*mFiles.back()))
             {
-                unread(read);
+                unread(std::move(read));
                 mFiles.back()->lineStart = true;
                 return false;
             }
         }
-        if (!n.is(Kind::Punct, "("))
+        if (!read.back().is(Kind::Punct, "("))
         {
-            unread(read);
+            unread(std::move(read));
             return false;
         }
-        std::vector<Tokens> args;
-        Tokens              current;
-        S32                 depth  = 0;
-        bool                closed = false;
-        Token               rparen;
+        // Each argument a stretch of what was read, which is all given
+        // back as it was if the call is not one; made into the arguments
+        // only once it is.
+        std::vector<std::pair<size_t, size_t>> spans;
+        size_t                                 from   = read.size();
+        S32                                    depth  = 0;
+        bool                                   closed = false;
         while (next(n))
         {
-            read.push_back(n);
             if (n.is(Kind::Punct, "("))
             {
                 ++depth;
@@ -1453,73 +1463,83 @@ namespace
                 if (depth == 0)
                 {
                     closed = true;
-                    rparen = n;
+                    read.push_back(std::move(n));
                     break;
                 }
                 --depth;
             }
-            else if (n.is(Kind::Punct, ",") && depth == 0 && !(m.variadic && args.size() + 1 >= m.params.size()))
+            else if (n.is(Kind::Punct, ",") && depth == 0 && !(m.variadic && spans.size() + 1 >= m.params.size()))
             {
-                args.push_back(current);
-                current.clear();
+                spans.emplace_back(from, read.size());
+                read.push_back(std::move(n));
+                from = read.size();
                 continue;
             }
-            if (n.kind == Kind::Newline)
-            {
-                n.kind = Kind::Space;
-                n.text = " ";
-            }
-            current.push_back(n);
+            read.push_back(std::move(n));
         }
         if (!closed)
         {
             problem(ALScriptProblem::Severity::Error, "PreprocUnterminatedArguments", "unterminated argument list invoking macro '[1]'", { m.name }, t);
             emit(t);
-            for (const Token& r : read)
+            for (Token& r : read)
             {
-                emit(r);
+                emit(std::move(r));
             }
             return true;
         }
-        args.push_back(current);
-        // Each argument without the blanks around it; `M()` with no
-        // parameters is no arguments.
-        for (Tokens& arg : args)
+        spans.emplace_back(from, read.size() - 1);
+        // `M()` with no parameters is no arguments.
+        size_t count = spans.size();
+        if (m.params.empty() && count == 1 && skipBlank(read, spans[0].first) >= spans[0].second)
         {
-            size_t from = skipBlank(arg, 0);
-            size_t to   = arg.size();
-            while (to > from && arg[to - 1].blank())
-            {
-                --to;
-            }
-            arg = Tokens(arg.begin() + from, arg.begin() + to);
+            count = 0;
         }
-        if (m.params.empty() && args.size() == 1 && args[0].empty())
+        const size_t given = count + (m.variadic && count + 1 == m.params.size() ? 1 : 0);
+        if (given != m.params.size())
         {
-            args.clear();
-        }
-        if (m.variadic && args.size() + 1 == m.params.size())
-        {
-            args.push_back(Tokens());
-        }
-        if (args.size() != m.params.size())
-        {
-            problem(ALScriptProblem::Severity::Error, args.size() < m.params.size() ? "PreprocTooFewArguments" : "PreprocTooManyArguments",
-                    args.size() < m.params.size() ? "too few arguments for macro '[1]'" : "too many arguments for macro '[1]'", { m.name }, t);
+            problem(ALScriptProblem::Severity::Error, given < m.params.size() ? "PreprocTooFewArguments" : "PreprocTooManyArguments",
+                    given < m.params.size() ? "too few arguments for macro '[1]'" : "too many arguments for macro '[1]'", { m.name }, t);
             emit(t);
-            for (const Token& r : read)
+            for (Token& r : read)
             {
-                emit(r);
+                emit(std::move(r));
             }
             return true;
         }
-        const hide_set_ptr hs  = mHides.with(mHides.meet(t.hide, rparen.hide), m.name);
+        // Each argument without the blanks around it, a line it runs over
+        // a space.
+        std::vector<Tokens> args(given);
+        for (size_t a = 0; a < count; ++a)
+        {
+            size_t first = spans[a].first;
+            size_t last  = spans[a].second;
+            while (first < last && read[first].blank())
+            {
+                ++first;
+            }
+            while (last > first && read[last - 1].blank())
+            {
+                --last;
+            }
+            Tokens& arg = args[a];
+            arg.reserve(last - first);
+            for (size_t i = first; i < last; ++i)
+            {
+                Token& moved = arg.emplace_back(std::move(read[i]));
+                if (moved.kind == Kind::Newline)
+                {
+                    moved.kind = Kind::Space;
+                    moved.text = " ";
+                }
+            }
+        }
+        const hide_set_ptr hs  = mHides.with(mHides.meet(t.hide, read.back().hide), m.name);
         Tokens             out = substitute(m, args, t, hs);
         if (mOverran)
         {
             return true;
         }
-        unread(out);
+        unread(std::move(out));
         return true;
     }
 
@@ -1602,11 +1622,13 @@ namespace
         return true;
     }
 
-    Tokens Engine::substitute(const Macro& m, const std::vector<Tokens>& args, const Token& site, const hide_set_ptr& hs)
+    Tokens Engine::substitute(const Macro& m, const std::vector<Tokens>& args, const Token& site, hide_set_ptr hs)
     {
-        const Tokens&                  body = m.body;
-        Tokens                         out;
+        const Tokens&                      body = m.body;
+        Tokens                             out;
         std::vector<std::optional<Tokens>> expanded(args.size());
+        // Whether a `##` is to be done: without one, no pass for them.
+        bool                               pastes = false;
         const auto pasteBeside = [&](size_t i, bool before) {
             size_t j = i;
             if (before)
@@ -1647,7 +1669,8 @@ namespace
                 op.line     = site.line;
                 op.column   = site.column;
                 op.verbatim = false;
-                out.push_back(op);
+                out.push_back(std::move(op));
+                pastes = true;
                 continue;
             }
             const S32 idx = m.functionLike ? paramIndex(m, b) : -1;
@@ -1663,7 +1686,7 @@ namespace
                         mark.line     = site.line;
                         mark.column   = site.column;
                         mark.verbatim = false;
-                        out.push_back(mark);
+                        out.push_back(std::move(mark));
                     }
                     else
                     {
@@ -1695,20 +1718,28 @@ namespace
             {
                 return Tokens();
             }
-            Token copy    = b;
+            Token& copy   = out.emplace_back(b);
             copy.file     = site.file;
             copy.line     = site.line;
             copy.column   = site.column;
             copy.verbatim = false;
-            out.push_back(copy);
+        }
+        if (!pastes)
+        {
+            for (Token& t : out)
+            {
+                t.hide = mHides.join(t.hide, hs);
+            }
+            return out;
         }
         // The pastes, left to right.
         Tokens pasted;
+        pasted.reserve(out.size());
         for (size_t i = 0; i < out.size(); ++i)
         {
             if (out[i].kind != Kind::Paste)
             {
-                pasted.push_back(out[i]);
+                pasted.push_back(std::move(out[i]));
                 continue;
             }
             while (!pasted.empty() && pasted.back().blank())
@@ -1724,7 +1755,7 @@ namespace
             Token joined;
             if (paste(pasted.back(), out[j], site, joined))
             {
-                pasted.back() = joined;
+                pasted.back() = std::move(joined);
             }
             else if (mOverran)
             {
@@ -1732,21 +1763,16 @@ namespace
             }
             else
             {
-                pasted.push_back(out[j]);
+                pasted.push_back(std::move(out[j]));
             }
             i = j;
         }
-        Tokens result;
+        std::erase_if(pasted, [](const Token& t) { return t.kind == Kind::Placemarker; });
         for (Token& t : pasted)
         {
-            if (t.kind == Kind::Placemarker)
-            {
-                continue;
-            }
             t.hide = mHides.join(t.hide, hs);
-            result.push_back(t);
         }
-        return result;
+        return pasted;
     }
 
     Tokens Engine::expandAll(const Tokens& in)
@@ -1778,7 +1804,7 @@ namespace
         Token t;
         while (!mOverran && next(t))
         {
-            handle(t);
+            handle(std::move(t));
         }
         mSink     = sink;
         mIsolated = isolated;
@@ -1791,9 +1817,9 @@ namespace
     Tokens Engine::readLine(FileState& f, Token& newline)
     {
         Tokens line;
-        while (f.pos < f.tokens.size())
+        while (f.pos < f.tokens().size())
         {
-            const Token& t = f.tokens[f.pos++];
+            const Token& t = f.tokens()[f.pos++];
             if (t.kind == Kind::Newline)
             {
                 newline     = t;
@@ -2562,6 +2588,13 @@ namespace
         out.insert(out.end(), more.begin(), more.end());
     }
 
+    // What a level of a transform made, moved into the level above it
+    // rather than copied at every level it passes up through.
+    void append(Tokens& out, Tokens&& more)
+    {
+        out.insert(out.end(), std::make_move_iterator(more.begin()), std::make_move_iterator(more.end()));
+    }
+
     // A level of a transform's descent into what the script nests,
     // counted while it stands.
     struct Nesting
@@ -2741,7 +2774,7 @@ namespace
                     out.push_back(t);
                     continue;
                 }
-                const Tokens lhs(out.begin() + static_cast<std::ptrdiff_t>(lhs_begin), out.begin() + static_cast<std::ptrdiff_t>(back));
+                Tokens lhs(out.begin() + static_cast<std::ptrdiff_t>(lhs_begin), out.begin() + static_cast<std::ptrdiff_t>(back));
                 // The right side.
                 size_t end   = i + 1;
                 S32    depth = 0;
@@ -2775,7 +2808,7 @@ namespace
                 out.push_back(synth(Kind::Space, " ", t));
                 out.push_back(synth(Kind::Punct, "=", t));
                 out.push_back(synth(Kind::Space, " ", t));
-                append(out, lhs);
+                append(out, std::move(lhs));
                 out.push_back(synth(Kind::Space, " ", t));
                 out.push_back(synth(Kind::Punct, std::string(op, strlen(op) - 1), t));
                 out.push_back(synth(Kind::Space, " ", t));
@@ -3105,7 +3138,7 @@ namespace
                     Tokens with;
                     with.push_back(synth(Kind::Space, " ", site));
                     with.push_back(synth(Kind::Punct, "{", site));
-                    append(with, body);
+                    append(with, std::move(body));
                     with.push_back(synth(Kind::Punct, "@", site));
                     with.push_back(synth(Kind::Ident, done.continueLabel, site));
                     with.push_back(synth(Kind::Punct, ";", site));
@@ -3113,7 +3146,7 @@ namespace
                     body.swap(with);
                 }
             }
-            append(out, body);
+            append(out, std::move(body));
             if (site.is(Kind::Ident, "do"))
             {
                 append(out, slice(in, body_end, end));
@@ -3320,7 +3353,7 @@ namespace
             out.push_back(synth(Kind::Ident, hasDefault ? dflt : end, site));
             out.push_back(synth(Kind::Punct, ";", site));
             out.push_back(synth(Kind::Newline, "\n", site));
-            append(out, inner);
+            append(out, std::move(inner));
             out.push_back(synth(Kind::Newline, "\n", site));
             out.push_back(synth(Kind::Punct, "@", site));
             out.push_back(synth(Kind::Ident, end, site));
@@ -3441,7 +3474,7 @@ namespace
                                 {
                                     value.pop_back();
                                 }
-                                append(out, value);
+                                append(out, std::move(value));
                                 out.push_back(synth(Kind::Punct, "]", t));
                                 out.push_back(synth(Kind::Punct, ")", t));
                                 i = stop;
