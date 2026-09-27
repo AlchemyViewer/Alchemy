@@ -76,6 +76,8 @@ namespace
     // What a line's problems offer, as the gutter keeps it.
     const U8  FIXES_ANY          = 1;
     const U8  FIXES_CHANGE       = 2;
+    // How long the caret rests on a name before its other places are lit.
+    const F32 OCCURRENCES_REST   = 0.25f;
 
     const char* const MARK_COLOR_NAMES[] = { "TextFgColor", "CodeMarkNote", "CodeMarkWarning", "CodeMarkError", "CodeMarkRuntime" };
     static_assert(sizeof(MARK_COLOR_NAMES) / sizeof(MARK_COLOR_NAMES[0]) == static_cast<size_t>(ALCodeEditor::Mark::COUNT), "every mark has a colour");
@@ -164,13 +166,27 @@ ALCodeEditor::ALCodeEditor(const Params& p)
         {
             refreshCompletion();
         }
+        // What was lit may be another name now.
+        clearHighlights(Highlight::Occurrences);
+        mOccurrencesDue = true;
+        mOccurrencesRest.reset();
         // Stepped back to the saved text: nothing is changed since.
         if (!isDirty())
         {
             std::fill(mChanged.begin(), mChanged.end(), 0);
         }
     });
-    mCaretConnection = onCaretMoved([this]() { dropPlaceholdersLeft(); });
+    mCaretConnection = onCaretMoved([this]() {
+        dropPlaceholdersLeft();
+        // The name lit again once the caret rests; put out now if it has
+        // left it.
+        mOccurrencesDue = true;
+        mOccurrencesRest.reset();
+        if (!highlights(Highlight::Occurrences).empty() && (hasSelection() || !highlighted(Highlight::Occurrences, caret())))
+        {
+            clearHighlights(Highlight::Occurrences);
+        }
+    });
 
     // The list of completions, made once and shown when there is
     // something to choose; a child, so it draws over the text and goes
@@ -483,6 +499,68 @@ std::vector<ALTextRange> ALCodeEditor::highlights() const
         out.insert(out.end(), layer.begin(), layer.end());
     }
     return out;
+}
+
+void ALCodeEditor::setLightsOccurrences(bool lights)
+{
+    mLightsOccurrences = lights;
+    if (!lights)
+    {
+        clearHighlights(Highlight::Occurrences);
+    }
+}
+
+void ALCodeEditor::lightOccurrences()
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+    mOccurrencesDue = false;
+    clearHighlights(Highlight::Occurrences);
+    const ALTextRange name = identifierAtCaret();
+    if (!mLightsOccurrences || hasSelection() || name.empty())
+    {
+        return;
+    }
+    // Not the name as a string or a comment says it.
+    const auto in_code = [this](S32 line, S32 column) {
+        for (const ALSyntaxToken& token : highlighter().tokens(line))
+        {
+            if (token.begin <= column && column < token.end)
+            {
+                return token.kind != ALSyntaxKind::String && token.kind != ALSyntaxKind::Escape && token.kind != ALSyntaxKind::Comment &&
+                       token.kind != ALSyntaxKind::DocComment;
+            }
+        }
+        return true;
+    };
+    if (!in_code(name.begin.line, name.begin.column))
+    {
+        return;
+    }
+    const std::string word  = document().text(name);
+    const S32         first = firstVisibleLine();
+    const S32         last  = lastVisibleLine();
+    const S32         span  = llmax(1, last - first + 1);
+    mOccurrencesFirst       = llmax(0, first - span);
+    mOccurrencesLast        = llmin(document().lineCount() - 1, last + span);
+    std::vector<ALTextRange> lit;
+    for (S32 line = mOccurrencesFirst; line <= mOccurrencesLast; ++line)
+    {
+        const std::string& text = document().line(line);
+        for (size_t at = text.find(word); at != std::string::npos; at = text.find(word, at + word.size()))
+        {
+            const size_t end = at + word.size();
+            if ((at > 0 && alIdentifierByte(text[at - 1])) || (end < text.size() && alIdentifierByte(text[end])) ||
+                !in_code(line, static_cast<S32>(at)))
+            {
+                continue;
+            }
+            lit.emplace_back(ALTextPos(line, static_cast<S32>(at)), ALTextPos(line, static_cast<S32>(end)));
+        }
+    }
+    if (lit.size() > 1)
+    {
+        setHighlights(Highlight::Occurrences, std::move(lit));
+    }
 }
 
 bool ALCodeEditor::highlighted(Highlight layer, const ALTextPos& at) const
@@ -1540,15 +1618,18 @@ void ALCodeEditor::drawRowExtras(S32 line, S32 row, const LLRect& text, S32 scre
         }
     }
     const LLColor4 wash = highlightColor() % alpha;
-    for (const auto& layer : mHighlights)
+    for (size_t index = 0; index < mHighlights.size(); ++index)
     {
-        const auto on = layer.onLine(line);
+        // The name's other places more lightly: they are only what is
+        // written alike, lit without being asked for.
+        const LLColor4 ink = index == static_cast<size_t>(Highlight::Occurrences) ? wash % 0.5f : wash;
+        const auto     on  = mHighlights[index].onLine(line);
         for (auto it = on.first; it != on.second; ++it)
         {
             F32 x0, x1;
             if (spanOnRow(line, row, *it, x0, x1))
             {
-                gl_rect_2d(static_cast<S32>(left + x0), screen_top, static_cast<S32>(left + x1), screen_top - row_h, wash);
+                gl_rect_2d(static_cast<S32>(left + x0), screen_top, static_cast<S32>(left + x1), screen_top - row_h, ink);
             }
         }
     }
@@ -4157,6 +4238,14 @@ void ALCodeEditor::draw()
     }
     // A closer put in is typed over only on its own line.
     mAutoClosed.eraseIf([this](const ALTextPos& at) { return at.line != caret().line; });
+    // The name under the caret lit once the caret has rested, and again
+    // where the view has scrolled past the lines it was lit over.
+    if (mLightsOccurrences &&
+        ((mOccurrencesDue && mOccurrencesRest.getElapsedTimeF32() >= OCCURRENCES_REST) ||
+         (!highlights(Highlight::Occurrences).empty() && (firstVisibleLine() < mOccurrencesFirst || lastVisibleLine() > mOccurrencesLast))))
+    {
+        lightOccurrences();
+    }
     // The mouse rested long enough on the text: its card, once.
     if (mHoverCards && mHoverDelay >= 0.f && !mHoverTried && !mWheeled && mMouseX >= 0 && mMouseRest.getElapsedTimeF32() >= mHoverDelay && !cardShown() &&
         textRect().pointInRect(mMouseX, mMouseY) && !(mCompletionList && mCompletionList->getVisible() && mCompletionList->getRect().pointInRect(mMouseX, mMouseY)))

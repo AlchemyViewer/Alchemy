@@ -236,15 +236,18 @@ public:
 
     // Stretches washed over, each by what lit it, so that one does not
     // put out another: a search's matches, vim's visual block, the places
-    // a substitution asks about, the places a name stands. Each until it
-    // is cleared -- the references also as the caret leaves them all; an
-    // edit slides them as it does the decorations.
+    // a substitution asks about, the places a name stands as found, the
+    // other places the name under the caret stands as written. Each until
+    // it is cleared -- the references also as the caret leaves them all,
+    // the occurrences as it leaves the name; an edit slides them as it
+    // does the decorations.
     enum class Highlight : U8
     {
         Search,
         Block,
         Confirm,
         References,
+        Occurrences,
         COUNT
     };
     void                            setHighlights(Highlight layer, std::vector<ALTextRange> ranges);
@@ -255,6 +258,14 @@ public:
     std::vector<ALTextRange>        highlights() const;
     // Whether a position is on one of a layer's.
     bool                            highlighted(Highlight layer, const ALTextPos& at) const;
+    // The other places the name under the caret stands lit, washed more
+    // lightly than the rest, once the caret has rested on it: in code --
+    // not in a string or a comment -- on the lines in view and a view's
+    // worth either side, and only where it stands more than once. Put out
+    // as the caret leaves the name, or the text changes. As drawing does
+    // it, or at once.
+    void                            setLightsOccurrences(bool lights);
+    void                            lightOccurrences();
 
     // The bracket the caret is at -- just before it, or under it -- and
     // its match, skipping what is inside strings and comments. False where
@@ -816,6 +827,13 @@ private:
     bool      mBracketColorsSet    = false;
     // Where the brackets pair up, and how deep each line starts.
     ALBracketIndex   mBracketIndex;
+    // Whether the name under the caret is to be lit, since when it is due,
+    // and the lines it was lit over.
+    bool         mLightsOccurrences = true;
+    bool         mOccurrencesDue    = false;
+    LLFrameTimer mOccurrencesRest;
+    S32          mOccurrencesFirst  = 0;
+    S32          mOccurrencesLast   = -1;
     // What Expand Selection grew the selection from, step by step, to go
     // back through while the selection is still what it grew to.
     std::vector<ALTextRange> mGrownFrom;

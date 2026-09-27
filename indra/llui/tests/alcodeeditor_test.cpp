@@ -2245,4 +2245,36 @@ namespace tut
         e.setSelection(ALTextRange(ALTextPos(0, 0), ALTextPos(1, 0)));
         ensure("moved by hand: nothing to go back through", !e.canPerform(ALEditorCommand::ShrinkSelection));
     }
+
+    template<> template<>
+    void alcodeeditor_object::test<64>()
+    {
+        set_test_name("the name under the caret: its other places in code lit, not in a string or a comment, nor a longer name; put out as the caret leaves it or the text changes");
+        ALCodeEditor& e = make("local x = x + xy\nprint(x) -- x\nprint(\"x\")", "slua");
+        typedef ALCodeEditor::Highlight H;
+        e.setCaret(ALTextPos(0, 6));
+        e.lightOccurrences();
+        const std::vector<ALTextRange>& lit = e.highlights(H::Occurrences);
+        ensure_equals("three in code", lit.size(), size_t(3));
+        ensure("where they are", lit[0] == ALTextRange(ALTextPos(0, 6), ALTextPos(0, 7)) && lit[1] == ALTextRange(ALTextPos(0, 10), ALTextPos(0, 11)) &&
+                                     lit[2] == ALTextRange(ALTextPos(1, 6), ALTextPos(1, 7)));
+        e.setCaret(ALTextPos(0, 11));
+        ensure("still on one: kept", e.highlights(H::Occurrences).size() == 3);
+        e.setCaret(ALTextPos(0, 8));
+        ensure("off it: put out", e.highlights(H::Occurrences).empty());
+        e.setCaret(ALTextPos(0, 14));
+        e.lightOccurrences();
+        ensure("a name that stands once: nothing", e.highlights(H::Occurrences).empty());
+        e.setCaret(ALTextPos(1, 12));
+        e.lightOccurrences();
+        ensure("in a comment: nothing", e.highlights(H::Occurrences).empty());
+        e.setCaret(ALTextPos(0, 6));
+        e.lightOccurrences();
+        e.insertText("z");
+        ensure("the text changed: put out", e.highlights(H::Occurrences).empty());
+        e.setLightsOccurrences(false);
+        e.setCaret(ALTextPos(1, 6));
+        e.lightOccurrences();
+        ensure("not asked: nothing", e.highlights(H::Occurrences).empty());
+    }
 }
