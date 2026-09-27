@@ -43,8 +43,10 @@
 #include <tailslide/visitor.hh>
 
 #include <algorithm>
-#include <set>
 #include <cstring>
+#include <mutex>
+#include <optional>
+#include <set>
 
 namespace
 {
@@ -768,7 +770,9 @@ namespace
     // where it is missing, rather than on the next line's brace -- and
     // anything else is unexpected, with what was wanted where it says.
     // Keyed, as the map's messages are, for the studio to translate.
-    void plainSyntaxError(std::string_view source, ALScriptProblem& problem)
+    // `lexed` is the text lexed, once for all its syntax errors, made the
+    // first time one wants it.
+    void plainSyntaxError(std::string_view source, ALScriptProblem& problem, std::optional<Lexed>& lexed_once)
     {
         const std::string& said = problem.message;
         const std::string  UNEXPECTED("syntax error, unexpected ");
@@ -793,7 +797,11 @@ namespace
         // The last character before where the parser stopped, past blanks
         // and comments, and whether nothing but blanks is before the stop
         // on its line.
-        const Lexed  lexed   = lex(source);
+        if (!lexed_once)
+        {
+            lexed_once = lex(source);
+        }
+        const Lexed& lexed   = *lexed_once;
         const size_t stopped = std::min(offsetOf(source, problem.line, problem.column), source.size());
         size_t       before  = stopped;
         while (before > 0 && (lexed.code[before - 1] == COMMENT_BYTE || isspace(static_cast<unsigned char>(source[before - 1]))))
@@ -902,7 +910,35 @@ namespace
     // The names in scope at a place, as a name there could be spelt: the
     // script's own -- a local only from where it is declared -- and, with
     // `builtins`, the language's functions and constants.
-    std::vector<std::string> namesAt(Tailslide::LSLScript* script, Tailslide::LSLSymbolTable* builtins, S32 line, S32 column)
+    // The builtins' names that can be misspelt -- functions and constants
+    // -- listed once: the table is the process's, loaded once, and some two
+    // thousand names were listed again for every name not known.
+    const std::vector<std::string>& builtinNames(Tailslide::LSLSymbolTable* builtins)
+    {
+        static std::mutex                                 lock;
+        static Tailslide::LSLSymbolTable*                 listed = nullptr;
+        static size_t                                     count  = 0;
+        static std::vector<std::string>                   names;
+        const std::lock_guard<std::mutex>                 guard(lock);
+        if (builtins && (builtins != listed || builtins->getMap().size() != count))
+        {
+            names.clear();
+            for (auto& [name, symbol] : builtins->getMap())
+            {
+                if (symbol->getSymbolType() == Tailslide::SYM_FUNCTION || symbol->getSymbolType() == Tailslide::SYM_VARIABLE)
+                {
+                    names.emplace_back(symbol->getName());
+                }
+            }
+            listed = builtins;
+            count  = builtins->getMap().size();
+        }
+        return names;
+    }
+
+    // The script's own names in scope at a place: its globals, and what
+    // encloses the place declared before it. The builtins are builtinNames.
+    std::vector<std::string> namesAt(Tailslide::LSLScript* script, S32 line, S32 column)
     {
         std::vector<std::string>            out;
         std::vector<Tailslide::LSLASTNode*> path;
@@ -918,16 +954,6 @@ namespace
             for (auto& [name, symbol] : table->getMap())
             {
                 if (!lexical || startsBefore(*symbol->getLoc(), line + 1, column + 1))
-                {
-                    out.emplace_back(symbol->getName());
-                }
-            }
-        }
-        if (builtins)
-        {
-            for (auto& [name, symbol] : builtins->getMap())
-            {
-                if (symbol->getSymbolType() == Tailslide::SYM_FUNCTION || symbol->getSymbolType() == Tailslide::SYM_VARIABLE)
                 {
                     out.emplace_back(symbol->getName());
                 }
@@ -1183,6 +1209,8 @@ ALScriptProblems ALLSLService::check(std::string_view source, bool mono)
     Tailslide::ScopedScriptParser& parser = *mImpl->parser;
 
     ALScriptProblems problems;
+    // The text lexed once for every syntax error, where there is one.
+    std::optional<Lexed> lexed;
     for (Tailslide::LogMessage* message : parser.logger.getMessages())
     {
         ALScriptProblem problem;
@@ -1224,7 +1252,7 @@ ALScriptProblems ALLSLService::check(std::string_view source, bool mono)
         ALMessageMap::Match known;
         if (code == Tailslide::E_SYNTAX_ERROR)
         {
-            plainSyntaxError(source, problem);
+            plainSyntaxError(source, problem, lexed);
         }
         else if (ALMessageMap::lsl(static_cast<int>(code), problem.message, known))
         {
@@ -1235,13 +1263,16 @@ ALScriptProblems ALLSLService::check(std::string_view source, bool mono)
     }
     // A name it does not know changed to the nearest it does, where one is
     // near: Tailslide suggested one itself once, and no longer does.
+    // The text's lines found once, for every fix offered over it.
+    const ALScriptFixes::Lines lines(source);
     if (script)
     {
         for (ALScriptProblem& problem : problems)
         {
             if (problem.key == "LSLUndeclared" && problem.args.size() == 1)
             {
-                ALScriptFixes::offerNames(problem, source, problem.args[0], namesAt(script, parser.context.builtins, problem.line, problem.column));
+                ALScriptFixes::offerNames(problem, lines, problem.args[0], namesAt(script, problem.line, problem.column),
+                                          builtinNames(parser.context.builtins));
             }
         }
     }
@@ -1270,7 +1301,7 @@ ALScriptProblems ALLSLService::check(std::string_view source, bool mono)
                 }
             }
             const Tailslide::YYLTYPE* loc = declaration->getLoc();
-            ALScriptFixes::offerRemoval(problem, source, zeroBased(loc->first_line), zeroBased(loc->first_column), zeroBased(loc->last_line),
+            ALScriptFixes::offerRemoval(problem, lines, zeroBased(loc->first_line), zeroBased(loc->first_column), zeroBased(loc->last_line),
                                         zeroBased(loc->last_column), problem.args[1]);
         }
     }

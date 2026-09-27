@@ -1669,6 +1669,8 @@ ALScriptProblems ALLuauService::check(std::string_view source)
     // and the definitions', up the scopes from the place.
     if (const Luau::ModulePtr module = impl.frontend->moduleResolver.getModule(impl.moduleName))
     {
+        // The text's lines found once, for every name offered over it.
+        const ALScriptFixes::Lines lines(source);
         for (ALScriptProblem& problem : problems)
         {
             const std::string& key = problem.key;
@@ -1684,7 +1686,7 @@ ALScriptProblems ALLuauService::check(std::string_view source)
                         names.emplace_back(symbol.c_str());
                     }
                 }
-                ALScriptFixes::offerNames(problem, source, problem.args[0], names);
+                ALScriptFixes::offerNames(problem, lines, problem.args[0], names);
             }
         }
     }

@@ -990,6 +990,12 @@ namespace tut
         problem  = keyed(problems, "LSLUndeclared");
         ensure("said: " + said(problems), problem != nullptr && problem->fixes.size() == 1 && problem->fixes.front().preferred);
         ensure_equals("swapped back", ALScriptFixes::editDistance("totla", "total"), size_t(1));
+        // A name one edit past how far a guess may be is no guess, even
+        // where it is the only one that near.
+        problems = check(head + "        integer count = 1;\n        llOwnerSay((string)(count + cqunx));\n" + tail, false);
+        problem  = keyed(problems, "LSLUndeclared");
+        ensure("said: " + said(problems), problem != nullptr);
+        ensure("two edits from a five-letter name: no guess: " + titles(problem->fixes), problem->fixes.empty());
     }
 
     template<> template<>

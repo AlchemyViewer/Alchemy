@@ -227,6 +227,23 @@ int main(int, char**)
                      luau.inlayHints(text, true, true).size() + luau.complete(text, last, 16).size() + luau.hover(text, last, 16).label.size() +
                      luau.complete(text, last, 16).size();
         }));
+    // A check with many problems, each offered its fixes: names misspelt,
+    // locals nobody uses.
+    {
+        std::string troubled = ll_test::bigLSL(LINES);
+        std::string body     = "troubled()\n{\n";
+        for (int i = 0; i < 100; ++i)
+        {
+            body += "    integer unused" + std::to_string(i) + " = " + std::to_string(i) + ";\n";
+            body += "    llSya(0, \"x\");\n";
+        }
+        body += "}\n";
+        troubled.insert(troubled.find("default"), body);
+        size_t problems = 0;
+        row("LSL check of a text with 200 problems", ms_per_run([&] { problems = lsl.check(troubled, true).size(); g_sink = g_sink + problems; }),
+            NONE);
+        std::printf("  %-52s %10zu\n", "  problems", problems);
+    }
     // Two tabs in front in turn, neither typed in: each its own module,
     // found checked as it was left. (With one module for every tab, each
     // turn was a full check of each: twice the check row above.)

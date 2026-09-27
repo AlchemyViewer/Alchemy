@@ -103,54 +103,7 @@ namespace
         return key == FIXED_KEYS[static_cast<size_t>(which)];
     }
 
-    // The text's lines, each without its break, and where each begins.
-    class Lines
-    {
-    public:
-        explicit Lines(std::string_view text) : mText(text)
-        {
-            mStarts.push_back(0);
-            for (size_t i = 0; i < text.size(); ++i)
-            {
-                if (text[i] == '\n')
-                {
-                    mStarts.push_back(i + 1);
-                }
-            }
-        }
-
-        S32 count() const { return static_cast<S32>(mStarts.size()); }
-
-        std::string_view line(S32 n) const
-        {
-            if (n < 0 || static_cast<size_t>(n) >= mStarts.size())
-            {
-                return {};
-            }
-            const size_t begin = mStarts[n];
-            size_t       end   = static_cast<size_t>(n) + 1 < mStarts.size() ? mStarts[n + 1] - 1 : mText.size();
-            if (end > begin && mText[end - 1] == '\r')
-            {
-                --end;
-            }
-            return mText.substr(begin, end - begin);
-        }
-
-        // Where a place is in the text, or nothing for a place past its
-        // line's end or past the last line.
-        std::optional<size_t> offsetOf(S32 line, S32 column) const
-        {
-            if (column < 0 || static_cast<size_t>(column) > this->line(line).size() || line < 0 || static_cast<size_t>(line) >= mStarts.size())
-            {
-                return std::nullopt;
-            }
-            return mStarts[line] + static_cast<size_t>(column);
-        }
-
-    private:
-        std::string_view    mText;
-        std::vector<size_t> mStarts;
-    };
+    using ALScriptFixes::Lines;
 
     bool identifierByte(char c)
     {
@@ -987,8 +940,13 @@ namespace ALScriptFixes
 
     size_t editDistance(std::string_view a, std::string_view b)
     {
-        // Three rows: a swap reaches back two.
-        std::vector<size_t> before(b.size() + 1), last(b.size() + 1), row(b.size() + 1);
+        // Three rows: a swap reaches back two. Kept on the thread between
+        // calls, which come a couple of thousand at a time -- a name
+        // against every one in scope.
+        thread_local std::vector<size_t> before, last, row;
+        before.assign(b.size() + 1, 0);
+        last.resize(b.size() + 1);
+        row.assign(b.size() + 1, 0);
         for (size_t j = 0; j <= b.size(); ++j)
         {
             last[j] = j;
@@ -1014,25 +972,52 @@ namespace ALScriptFixes
 
     std::vector<std::string> nearestNames(std::string_view word, const std::vector<std::string>& names)
     {
+        return nearestAmong(word, names, nullptr);
+    }
+
+    std::vector<std::string> nearestAmong(std::string_view word, const std::vector<std::string>& names, const std::vector<std::string>* more)
+    {
         const size_t n     = word.size();
         const size_t limit = n <= 1 ? 0 : n <= 5 ? 1 : n <= 9 ? 2 : n / 3;
         std::vector<std::string> best;
-        size_t                   best_distance = limit + 1;
-        for (const std::string& name : names)
-        {
+        // As far off as a guess may be, then as near as the nearest yet.
+        size_t     best_distance = limit;
+        const auto look          = [&](const std::string& name) {
             if (name == word)
             {
-                continue;
+                return;
+            }
+            // At least as many edits apart as their lengths differ: most
+            // names are passed over without being measured.
+            const size_t gap = name.size() > n ? name.size() - n : n - name.size();
+            if (gap > best_distance)
+            {
+                return;
             }
             const size_t distance = editDistance(name, word);
+            if (distance > best_distance)
+            {
+                return;
+            }
             if (distance < best_distance)
             {
                 best.clear();
                 best_distance = distance;
             }
-            if (distance == best_distance && std::find(best.begin(), best.end(), name) == best.end())
+            if (std::find(best.begin(), best.end(), name) == best.end())
             {
                 best.push_back(name);
+            }
+        };
+        for (const std::string& name : names)
+        {
+            look(name);
+        }
+        if (more)
+        {
+            for (const std::string& name : *more)
+            {
+                look(name);
             }
         }
         std::sort(best.begin(), best.end());
@@ -1060,29 +1045,55 @@ namespace ALScriptFixes
 
     void offerNames(ALScriptProblem& problem, std::string_view text, const std::string& was, const std::vector<std::string>& names)
     {
+        offerNames(problem, Lines(text), was, names);
+    }
+
+    void offerNames(ALScriptProblem& problem, const Lines& lines, const std::string& was, const std::vector<std::string>& names)
+    {
+        offerNames(problem, lines, was, names, {});
+    }
+
+    void offerNames(ALScriptProblem& problem, const Lines& lines, const std::string& was, const std::vector<std::string>& names,
+                    const std::vector<std::string>& more)
+    {
         // A few at most: past that the name was no near miss.
-        const std::vector<std::string> nearest = nearestNames(was, names);
-        if (nearest.size() > 3)
+        const std::vector<std::string> nearest = nearestAmong(was, names, &more);
+        if (nearest.size() > 3 || !isIdentifier(was))
         {
             return;
         }
         for (const std::string& now : nearest)
         {
-            offerName(problem, text, was, now, nearest.size() == 1 && surelyMeant(was, now));
+            if (!isIdentifier(now))
+            {
+                continue;
+            }
+            ALScriptFix fix = titled("ScriptFixChange", "Change '[1]' to '[2]'", { was, now });
+            fix.preferred   = nearest.size() == 1 && surelyMeant(was, now);
+            changeName(problem, lines, was, now, std::move(fix), false);
         }
     }
 
     void offerRemoval(ALScriptProblem& problem, std::string_view text, S32 line, S32 column, S32 endLine, S32 endColumn, const std::string& name)
     {
-        ALScriptFix fix = titled("ScriptFixRemove", "Remove '[1]'", { name });
-        fix.preferred   = true;
-        fix.safe        = true;
-        offerRemoval(problem, text, line, column, endLine, endColumn, std::move(fix));
+        offerRemoval(problem, Lines(text), line, column, endLine, endColumn, name);
     }
 
     void offerRemoval(ALScriptProblem& problem, std::string_view text, S32 line, S32 column, S32 endLine, S32 endColumn, ALScriptFix fix)
     {
-        const Lines lines(text);
+        offerRemoval(problem, Lines(text), line, column, endLine, endColumn, std::move(fix));
+    }
+
+    void offerRemoval(ALScriptProblem& problem, const Lines& lines, S32 line, S32 column, S32 endLine, S32 endColumn, const std::string& name)
+    {
+        ALScriptFix fix = titled("ScriptFixRemove", "Remove '[1]'", { name });
+        fix.preferred   = true;
+        fix.safe        = true;
+        offerRemoval(problem, lines, line, column, endLine, endColumn, std::move(fix));
+    }
+
+    void offerRemoval(ALScriptProblem& problem, const Lines& lines, S32 line, S32 column, S32 endLine, S32 endColumn, ALScriptFix fix)
+    {
         std::string_view first = lines.line(line);
         std::string_view last  = lines.line(endLine);
         if (!lines.offsetOf(line, column) || !lines.offsetOf(endLine, endColumn) || endLine < line || (endLine == line && endColumn <= column))
@@ -1426,22 +1437,32 @@ namespace ALScriptFixes
 
     void offerRequire(ALScriptProblem& problem, std::string_view text, const std::string& module, bool field)
     {
+        offerRequire(problem, Lines(text), module, field);
+    }
+
+    void offerRequire(ALScriptProblem& problem, const Lines& lines, const std::string& module, bool field)
+    {
         if (problem.args.size() != 1 || !isIdentifier(problem.args[0]) || module.empty())
         {
             return;
         }
         const std::string& name = problem.args[0];
-        offerAtHead(problem, Lines(text), /*lua*/ true, "local " + name + " = require(" + luaString(module) + ")" + (field ? "." + name : std::string()),
+        offerAtHead(problem, lines, /*lua*/ true, "local " + name + " = require(" + luaString(module) + ")" + (field ? "." + name : std::string()),
                     field ? titled("ScriptFixRequireField", "Take '[1]' from '[2]'", { name, module }) : titled("ScriptFixRequire", "Require '[1]'", { module }));
     }
 
     void offerInclude(ALScriptProblem& problem, std::string_view text, const std::string& include)
     {
+        offerInclude(problem, Lines(text), include);
+    }
+
+    void offerInclude(ALScriptProblem& problem, const Lines& lines, const std::string& include)
+    {
         if (problem.args.size() != 1 || !isIdentifier(problem.args[0]) || include.empty() || include.find_first_of("\"\n\r") != std::string::npos)
         {
             return;
         }
-        offerAtHead(problem, Lines(text), /*lua*/ false, "#include \"" + include + "\"", titled("ScriptFixInclude", "Include '[1]'", { include }));
+        offerAtHead(problem, lines, /*lua*/ false, "#include \"" + include + "\"", titled("ScriptFixInclude", "Include '[1]'", { include }));
     }
 
     std::string freshName(std::string_view text, std::string_view base)

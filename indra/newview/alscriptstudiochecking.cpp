@@ -918,14 +918,16 @@ void ALScriptStudioChecking::offerImports(Doc& doc)
         }
         return out;
     };
-    const auto offer = [&text, lua](ALScriptProblem& problem, const std::string& module, bool field) {
+    // The text's lines found once, for every import offered over it.
+    const ALScriptFixes::Lines lines(text);
+    const auto                 offer = [&lines, lua](ALScriptProblem& problem, const std::string& module, bool field) {
         if (lua)
         {
-            ALScriptFixes::offerRequire(problem, text, module, field);
+            ALScriptFixes::offerRequire(problem, lines, module, field);
         }
         else
         {
-            ALScriptFixes::offerInclude(problem, text, module);
+            ALScriptFixes::offerInclude(problem, lines, module);
         }
     };
     // What the index knows of the names asked for: each module so named,
