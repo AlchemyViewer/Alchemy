@@ -27,6 +27,7 @@
 
 #include "alscriptpreprocessor.h"
 
+#include "alincludeidentity.h"
 #include "alscriptincluderesolver.h"
 
 #include "llappviewer.h"
@@ -155,45 +156,19 @@ bool ALScriptPreprocessor::worldIncludes()
 // static
 bool ALScriptPreprocessor::refOf(const std::string& path, ALScriptRef& ref)
 {
-    if (path.compare(0, OBJECT_PREFIX.size(), OBJECT_PREFIX) == 0)
-    {
-        const size_t colon = path.find(':', OBJECT_PREFIX.size());
-        if (colon == std::string::npos)
-        {
-            return false;
-        }
-        ref.object.set(path.substr(OBJECT_PREFIX.size(), colon - OBJECT_PREFIX.size()));
-        ref.item.set(path.substr(colon + 1));
-        return ref.object.notNull() && ref.item.notNull();
-    }
-    if (path.compare(0, INVENTORY_PREFIX.size(), INVENTORY_PREFIX) == 0)
-    {
-        ref.object.setNull();
-        ref.item.set(path.substr(INVENTORY_PREFIX.size()));
-        return ref.item.notNull();
-    }
-    return false;
+    return ALIncludeIdentity::itemOf(path, ref.object, ref.item);
 }
 
 // static
 std::string ALScriptPreprocessor::pathOf(const ALScriptRef& ref)
 {
-    if (ref.inInventory())
-    {
-        return std::string(INVENTORY_PREFIX) + ref.item.asString();
-    }
-    return std::string(OBJECT_PREFIX) + ref.object.asString() + ":" + ref.item.asString();
+    return ALIncludeIdentity::ofItem(ref.object, ref.item);
 }
 
 // static
 bool ALScriptPreprocessor::fileOf(const std::string& path, std::string& file)
 {
-    if (path.compare(0, DISK_PREFIX.size(), DISK_PREFIX) == 0)
-    {
-        file = path.substr(DISK_PREFIX.size());
-        return !file.empty();
-    }
-    return false;
+    return ALIncludeIdentity::fileOf(path, file);
 }
 
 void ALScriptPreprocessor::prefetch(const std::vector<std::string>& paths, std::function<void()> done)

@@ -26,6 +26,7 @@
 #pragma once
 
 #include "aldiskcache.h"
+#include "alincludeidentity.h"
 #include "aldiskincludes.h"
 #include "alscriptjoblane.h"
 #include "alscriptsnapshot.h"
@@ -159,9 +160,9 @@ public:
 
     // What an include's identity starts with: an item in an object, one in
     // the inventory, a file on disk.
-    static constexpr std::string_view OBJECT_PREFIX    = "object:";
-    static constexpr std::string_view INVENTORY_PREFIX = "inventory:";
-    static constexpr std::string_view DISK_PREFIX      = "disk:";
+    static constexpr std::string_view OBJECT_PREFIX    = ALIncludeIdentity::OBJECT;
+    static constexpr std::string_view INVENTORY_PREFIX = ALIncludeIdentity::INVENTORY;
+    static constexpr std::string_view DISK_PREFIX      = ALIncludeIdentity::DISK;
     // The identity a script's asks are remembered under.
     static std::string keyOf(const Request& request);
     // An include's identity back to the item it names, or the file; and

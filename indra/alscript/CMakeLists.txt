@@ -11,6 +11,7 @@ target_sources(
   PRIVATE
     aldiskcache.cpp
     aldiskincludes.cpp
+    alincludeidentity.cpp
     allslinliner.cpp
     almessagemap.cpp
     allsloptimizer.cpp
@@ -42,6 +43,7 @@ target_sources(
       FILES
         aldiskcache.h
         aldiskincludes.h
+        alincludeidentity.h
         allslinliner.h
         almessagemap.h
         allsloptimizer.h
@@ -125,6 +127,7 @@ if(AL_BUILD_TESTS)
   )
   al_add_test(aldiskincludes PROJECT alscript LIBRARIES alscript llcommon)
   al_add_test(aldiskcache PROJECT alscript LIBRARIES alscript llcommon)
+  al_add_test(alincludeidentity PROJECT alscript LIBRARIES alscript llcommon)
   al_add_test(alscriptjoblane PROJECT alscript LIBRARIES alscript llcommon)
   al_add_test(alscriptnameindex PROJECT alscript LIBRARIES alscript llcommon)
   al_add_test(alscriptsnapshot PROJECT alscript LIBRARIES alscript llcommon)
