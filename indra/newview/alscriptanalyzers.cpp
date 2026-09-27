@@ -147,8 +147,10 @@ void ALLSLAnalyzer::answer(const Request& request, const std::string& text, cons
             result.actions = mService.actions(text, request.line, request.column, request.endLine, request.endColumn);
             break;
         case Kind::Weigh:
+            // Weighed by the compiler, not asked of the service: what the
+            // service last parsed may be another tab's.
             weigh(request, text, result);
-            break;
+            return;
     }
     result.parsed     = mService.parsed();
     result.understood = mService.understood();

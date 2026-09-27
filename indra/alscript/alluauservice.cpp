@@ -54,6 +54,7 @@
 #include <boost/unordered/unordered_flat_map.hpp>
 
 #include <limits>
+#include <mutex>
 #include <set>
 
 namespace
@@ -1339,15 +1340,25 @@ struct ALLuauService::Impl
 ALLuauService::ALLuauService()
 :   mImpl(std::make_unique<Impl>())
 {
-    // A type in a message is a glance, not a listing: `ll` has hundreds
-    // of fields, and an error naming it must not print them all.
-    FInt::LuauTableTypeMaximumStringifierLength.value = 8;
+    setUpProcess();
     mImpl->frontend = Impl::plainFrontend(mImpl->files, mImpl->configs, mImpl->solver);
     Luau::freeze(mImpl->frontend->globals.globalTypes);
     Luau::freeze(mImpl->frontend->globalsForAutocomplete.globalTypes);
 }
 
 ALLuauService::~ALLuauService() = default;
+
+// static
+void ALLuauService::setUpProcess()
+{
+    static std::once_flag once;
+    std::call_once(once, []() {
+        // A type in a message is a glance, not a listing: `ll` has
+        // hundreds of fields, and an error naming it must not print them
+        // all.
+        FInt::LuauTableTypeMaximumStringifierLength.value = 8;
+    });
+}
 
 bool ALLuauService::loadDefinitions(std::string_view source, std::string& error)
 {

@@ -38,11 +38,13 @@
 #include <algorithm>
 #include <optional>
 
-// What lives on the worker: each language's analyzer.
+// What lives on the worker: each language's analyzer, made the first time
+// a question in its language comes -- a viewer that never opens an SLua
+// script builds no Luau front end.
 struct ALScriptAnalysis::Worker
 {
-    ALLuauAnalyzer luau;
-    ALLSLAnalyzer  lsl;
+    std::unique_ptr<ALLuauAnalyzer> luau;
+    std::unique_ptr<ALLSLAnalyzer>  lsl;
 };
 
 ALScriptAnalysis::ALScriptAnalysis() = default;
@@ -61,6 +63,9 @@ void ALScriptAnalysis::ensureStarted()
 {
     if (!mThread)
     {
+        // What Luau keeps for the whole process, set here on the main
+        // thread before the worker reads it.
+        ALLuauService::setUpProcess();
         // Closing, a check still running is stopped rather than waited
         // for, and what waits is passed over.
         mThread = std::make_unique<ALSerialWorker>("ScriptAnalysis", [this]() {
@@ -177,10 +182,10 @@ void ALScriptAnalysis::runNext()
             mRunningStop.reset();
         }
     }
-    if (stop && mWorker)
+    if (stop && mWorker && mWorker->luau)
     {
-        unwanted = unwanted || mWorker->luau.stopped();
-        mWorker->luau.forgetStop();
+        unwanted = unwanted || mWorker->luau->stopped();
+        mWorker->luau->forgetStop();
     }
     if (unwanted)
     {
@@ -243,11 +248,19 @@ ALScriptAnalysis::Result ALScriptAnalysis::run(const Job& job, const ALLuauServi
         result.column  = request.column;
         if (request.lua)
         {
-            mWorker->luau.answer(request, text, setup, result);
+            if (!mWorker->luau)
+            {
+                mWorker->luau = std::make_unique<ALLuauAnalyzer>();
+            }
+            mWorker->luau->answer(request, text, setup, result);
         }
         else
         {
-            mWorker->lsl.answer(request, text, setup, result);
+            if (!mWorker->lsl)
+            {
+                mWorker->lsl = std::make_unique<ALLSLAnalyzer>();
+            }
+            mWorker->lsl->answer(request, text, setup, result);
         }
     });
     return result;

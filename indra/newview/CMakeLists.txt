@@ -2693,6 +2693,16 @@ if(AL_BUILD_TESTS)
   # about each script, by rank, a stale text passed over.
   al_add_test(alscriptjobqueue PROJECT ${test_project} LIBRARIES llcommon)
 
+  # Each language's analyzer, asked as the analysis thread asks it, over
+  # the grid's own definitions.
+  al_add_test(
+    alscriptanalyzers
+    UNIT
+    PROJECT ${test_project}
+    LIBRARIES alscript llui ${test_libs}
+    DEFINES "AL_LSL_DEFINITIONS_DIR=\"${LSL_DEFINITIONS_DIR}\""
+  )
+
   # Script Studio's checking, the window's side and the viewer's sources
   # faked: checks due and answered, expansions, imports, lints, fixes.
   al_add_test(

@@ -52,6 +52,11 @@ class ALLuauService
 {
 public:
     ALLuauService();
+    // What Luau keeps for the whole process -- how long a type is said in a
+    // message -- set once, whichever thread first asks: the viewer asks on
+    // its main thread before the analysis thread starts, so the thread only
+    // reads it.
+    static void setUpProcess();
     ~ALLuauService();
     ALLuauService(const ALLuauService&) = delete;
     ALLuauService& operator=(const ALLuauService&) = delete;
