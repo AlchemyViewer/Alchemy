@@ -3093,12 +3093,14 @@ void ALFloaterScriptStudio::refreshBottomTabs()
 std::vector<ALTextPos> ALFloaterScriptStudio::problemPlaces(const Doc& doc) const
 {
     // The script's own problems, each place once and in order; not the
-    // note about the definitions, which is about no place.
+    // note about the definitions, nor the one about the script's weight,
+    // which are about no place in it.
     const std::string      definitions = getString("OriginDefinitions");
+    const std::string      weight      = getString("OriginWeight");
     std::vector<ALTextPos> places;
     for (const Doc::Shown& row : doc.shown)
     {
-        if (row.file.empty() && row.origin != definitions)
+        if (row.file.empty() && row.origin != definitions && row.origin != weight)
         {
             places.push_back(doc.editor->document().clamp(ALTextPos(row.line, row.hasColumn ? row.column : 0)));
         }

@@ -26,6 +26,8 @@
 
 #include "alscriptproblemspane.h"
 
+#include "alscriptfixes.h"
+
 #include "alcodeeditor.h"
 #include "alpanelist.h"
 #include "alscriptstudioservices.h"
@@ -93,27 +95,33 @@ ALScriptProblemsPane::Made ALScriptProblemsPane::make(const Doc& doc, const ALSc
     };
 
     // The analyzer's word on a line as it is now over the compiler's on
-    // the text last saved: a syntax error both found is said once.
+    // the text last saved: a syntax error both found is said once. Within
+    // a line either way, since the two say where a statement went wrong
+    // differently -- the analyzer at the missing `;`, the compiler at what
+    // came after it.
     const bool analysis_current = doc.check.analysisVersion == doc.editor->document().version();
-    auto       analysed_error_on = [&](S32 line) {
+    auto       analysed_error_near = [&](S32 line) {
         for (const ALScriptProblem& problem : doc.check.analysis)
         {
-            if (problem.severity == ALScriptProblem::Severity::Error && problem.file.empty() && problem.line == line)
+            if (problem.severity == ALScriptProblem::Severity::Error && problem.file.empty() && std::abs(problem.line - line) <= 1)
             {
                 return true;
             }
         }
         return false;
     };
+    // The compiler's are of the text as it was saved: said so, once the
+    // text has changed since, which they may no longer be true of.
+    const std::string as_saved = doc.editor->isDirty() ? " " + services.words("CompilerAsSaved") : std::string();
     for (const Doc::Compiled& problem : doc.problems)
     {
         const Doc::Level level = Doc::levelOf(problem.level);
-        if (analysis_current && level == Doc::Level::Error && problem.file.empty() && analysed_error_on(problem.line))
+        if (analysis_current && level == Doc::Level::Error && problem.file.empty() && analysed_error_near(problem.line))
         {
             continue;
         }
-        add(problem.line, problem.column, problem.hasColumn, problem.line, problem.column, Doc::markOf(level), level, services.words("OriginCompiler"), problem.message,
-            problem.file);
+        add(problem.line, problem.column, problem.hasColumn, problem.line, problem.column, Doc::markOf(level), level, services.words("OriginCompiler"),
+            problem.message + as_saved, problem.file);
     }
     // The preprocessor's own word on the text as it stands, and the
     // optimizer's notes from the last run ahead of a save.
@@ -169,10 +177,15 @@ ALScriptProblemsPane::Made ALScriptProblemsPane::make(const Doc& doc, const ALSc
         const std::string origin = problem.source == ALScriptProblem::Source::Parser  ? services.words("OriginParser")
                                    : problem.source == ALScriptProblem::Source::Types ? services.words("OriginTypes")
                                                                                       : services.words("OriginLint");
-        // A Luau lint's name says what to look up or turn off; an LSL
-        // error's number says nothing to whoever reads it.
-        const bool        named   = !problem.code.empty() && problem.code.find_first_not_of("0123456789") != std::string::npos;
-        const std::string message = named ? problem.message + " [" + problem.code + "]" : problem.message;
+        // A lint's name says what to look up, or what a NOLINT comment
+        // turns off: Luau's own, LSL's as its key has it. An error's number
+        // says nothing to whoever reads it.
+        std::string name = ALScriptFixes::lintName(problem, doc.language.lua);
+        if (name.empty() && !problem.code.empty() && problem.code.find_first_not_of("0123456789") != std::string::npos)
+        {
+            name = problem.code;
+        }
+        const std::string message = name.empty() ? problem.message : problem.message + " [" + name + "]";
         add(problem.line, problem.column, true, problem.endLine, problem.endColumn, Doc::markOf(level), level, origin, message, problem.file,
             problem.source == ALScriptProblem::Source::Lint ? problem.code : std::string());
         made.rows.back().key      = problem.key;
@@ -275,7 +288,8 @@ bool ALScriptProblemsPane::postBuild()
     mList->setRightMouseDownCallback([this](LLUICtrl*, S32 x, S32 y, MASK) { showMenu(x, y); });
     // The pane's filters: whose, which levels, which source, which words.
     mOrigin->add(mServices->words("OriginAny"), LLSD(""));
-    for (const char* origin : { "OriginParser", "OriginTypes", "OriginLint", "OriginCompiler", "OriginPreprocessor", "OriginOptimizer", "OriginRuntime", "OriginDefinitions" })
+    for (const char* origin : { "OriginParser", "OriginTypes", "OriginLint", "OriginCompiler", "OriginPreprocessor", "OriginOptimizer", "OriginRuntime", "OriginDefinitions",
+                                "OriginWeight" })
     {
         mOrigin->add(mServices->words(origin), LLSD(mServices->words(origin)));
     }

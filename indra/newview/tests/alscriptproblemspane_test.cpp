@@ -454,4 +454,67 @@ namespace tut
         ensure("let go of", d.runtime.empty());
         ensure_equals("and the tab's problems gathered again", studio.refreshed.size(), size_t(1));
     }
+
+    template <>
+    template <>
+    void alscriptproblemspane_object::test<5>()
+    {
+        set_test_name("the compiler's error a line from the analyzer's is the same error said once; the compiler's said to be as of the last save once the text has changed");
+        make();
+        Doc& d = doc("door");
+        using S = ALScriptProblem::Source;
+        using V = ALScriptProblem::Severity;
+        // The analyzer at the missing `;`, the compiler at what came after.
+        d.problems.push_back({ 7, 0, true, std::string(), "ERROR", "syntax error" });
+        d.problems.push_back({ 2, 0, true, std::string(), "ERROR", "far from any" });
+        d.check.analysis.push_back(problem(S::Parser, V::Error, 6, "Missing ';'"));
+        d.check.analysisVersion = d.editor->document().version();
+        ALScriptProblemsPane::Made made = gather(d);
+        std::vector<std::string> messages;
+        for (const Doc::Shown& row : made.rows)
+        {
+            messages.push_back(row.message);
+        }
+        ensure("the one a line after said once", std::find(messages.begin(), messages.end(), "syntax error") == messages.end());
+        ensure("one further off kept", std::find(messages.begin(), messages.end(), "far from any") != messages.end());
+        // Typed in since the save: what the compiler said is of the text
+        // as it was.
+        d.editor->insertText("x");
+        made = gather(d);
+        bool marked = false;
+        for (const Doc::Shown& row : made.rows)
+        {
+            marked |= row.message == "far from any " + services.words("CompilerAsSaved");
+        }
+        ensure("as of the last save", marked);
+    }
+
+    template <>
+    template <>
+    void alscriptproblemspane_object::test<6>()
+    {
+        set_test_name("an LSL lint says its name, which a NOLINT comment turns it off by; an error says no number; the origins offer the weight");
+        make();
+        Doc& d = doc("door");
+        using S = ALScriptProblem::Source;
+        using V = ALScriptProblem::Severity;
+        ALScriptProblem unused = problem(S::Lint, V::Warning, 2, "declared but never used");
+        unused.key             = "LSLDeclaredButNotUsed";
+        unused.code            = "20009";
+        ALScriptProblem wrong  = problem(S::Types, V::Error, 3, "type mismatch");
+        wrong.code             = "10002";
+        d.check.analysis       = { unused, wrong };
+        d.check.analysisVersion = d.editor->document().version();
+        ALScriptProblemsPane::Made made = gather(d);
+        bool named = false, numbered = false;
+        for (const Doc::Shown& row : made.rows)
+        {
+            named |= row.message == "declared but never used [DeclaredButNotUsed]";
+            numbered |= row.message.find("10002") != std::string::npos;
+        }
+        ensure("the lint named", named);
+        ensure("the error no number", !numbered);
+        LLComboBox* origins = window.find<LLComboBox>("problems_origin");
+        ensure("the origins offer the weight", origins && origins->selectByValue(LLSD(services.words("OriginWeight"))));
+    }
 }
