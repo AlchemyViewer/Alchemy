@@ -942,11 +942,46 @@ namespace
         const bool                     types;
         std::vector<ALScriptInlayHint> out;
 
+        // Where only one line's are wanted: what the refactors at a place
+        // read, which is not worth every line's.
+        std::optional<unsigned>        onlyLine;
+        // Each local's type, by the local: every scope's bindings read
+        // once, where finding each local's scope from its place walked the
+        // scopes again for every one.
+        boost::unordered_flat_map<const Luau::AstLocal*, Luau::TypeId> localTypes;
+        bool                                                           localTypesRead = false;
+
         Hints(const Luau::Module& module_in, bool parameters_in, bool types_in)
         :   module(module_in),
             parameters(parameters_in),
             types(types_in)
         {
+        }
+
+        std::optional<Luau::TypeId> typeOf(const Luau::AstLocal* local)
+        {
+            if (!localTypesRead)
+            {
+                localTypesRead = true;
+                for (const auto& [where, scope] : module.scopes)
+                {
+                    for (const auto& [symbol, binding] : scope->bindings)
+                    {
+                        if (symbol.local)
+                        {
+                            localTypes.emplace(symbol.local, binding.typeId);
+                        }
+                    }
+                }
+            }
+            const auto found = localTypes.find(local);
+            return found != localTypes.end() ? std::optional<Luau::TypeId>(found->second) : std::nullopt;
+        }
+
+        // Only down into what holds the one line, where one is asked for.
+        bool visit(Luau::AstNode* node) override
+        {
+            return !onlyLine || (node->location.begin.line <= *onlyLine && *onlyLine <= node->location.end.line);
         }
 
         void add(const Luau::Position& at, ALScriptInlayHint::Kind kind, std::string text, bool writable = false)
@@ -1007,18 +1042,17 @@ namespace
             {
                 return true;
             }
-            const Luau::ScopePtr scope = Luau::findScopeAtPosition(module, stat->location.begin);
             for (size_t i = 0; i < stat->vars.size; ++i)
             {
                 Luau::AstLocal* local = stat->vars.data[i];
                 Luau::AstExpr*  value = i < stat->values.size ? stat->values.data[i] : nullptr;
                 // A name annotated says its type; a function's is its
                 // signature, which is the line itself.
-                if (local->annotation || !value || value->is<Luau::AstExprFunction>())
+                if (local->annotation || !value || value->is<Luau::AstExprFunction>() || (onlyLine && local->location.end.line != *onlyLine))
                 {
                     continue;
                 }
-                std::optional<Luau::TypeId> type = scope ? scope->lookup(Luau::Symbol(local)) : std::nullopt;
+                std::optional<Luau::TypeId> type = typeOf(local);
                 if (!type)
                 {
                     if (const Luau::TypeId* of_value = module.astTypes.find(value))
@@ -2230,9 +2264,22 @@ std::vector<ALScriptFix> ALLuauService::actions(std::string_view source, S32 lin
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
     std::vector<ALScriptFix> out;
+    Impl&                     impl          = *mImpl;
+    const Luau::ModulePtr     module        = impl.queried(source);
+    const Luau::SourceModule* module_source = impl.frontend->getSourceModule(SCRIPT_MODULE);
     // The type a local was given without saying, where the caret is on its
-    // name: the hint the editor shows beside it, written in.
-    for (const ALScriptInlayHint& hint : inlayHints(source, false, true))
+    // name: the hint the editor shows beside it, written in. That line's
+    // hints alone.
+    std::vector<ALScriptInlayHint> line_hints;
+    if (module && module_source && module_source->root)
+    {
+        Hints on_line(*module, false, true);
+        on_line.onlyLine = static_cast<unsigned>(std::max(0, line));
+        module_source->root->visit(&on_line);
+        std::stable_sort(on_line.out.begin(), on_line.out.end());
+        line_hints = std::move(on_line.out);
+    }
+    for (const ALScriptInlayHint& hint : line_hints)
     {
         if (hint.kind != ALScriptInlayHint::Kind::Type || hint.line != line || column > hint.column)
         {
@@ -2252,9 +2299,6 @@ std::vector<ALScriptFix> ALLuauService::actions(std::string_view source, S32 lin
         }
     }
 
-    Impl& impl = *mImpl;
-    const Luau::ModulePtr     module        = impl.queried(source);
-    const Luau::SourceModule* module_source = impl.frontend->getSourceModule(SCRIPT_MODULE);
     if (!module_source || !module || !module_source->root || !module_source->parseErrors.empty())
     {
         return out;

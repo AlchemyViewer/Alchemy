@@ -814,4 +814,36 @@ namespace tut
         ensure("checked again against them", service.typeChecks() > checked);
         service.loadDefinitions(definitions, why);
     }
+
+    template<> template<>
+    void alluauservice_object::test<28>()
+    {
+        set_test_name("a local's type is found however deep its scope, and the refactor at a line reads that line's hint as the whole text's has it");
+        ensure("definitions loaded: " + error, loaded);
+        const std::string script = "local a = 1\n"
+                                   "local function f()\n"
+                                   "    local b = \"x\"\n"
+                                   "    if a > 0 then\n"
+                                   "        local c = a + 1\n"
+                                   "        print(b, c)\n"
+                                   "    end\n"
+                                   "end\n"
+                                   "f()\n";
+        const std::vector<ALScriptInlayHint> hints = service.inlayHints(script, false, true);
+        std::string                          all;
+        for (const ALScriptInlayHint& hint : hints)
+        {
+            all += std::to_string(hint.line) + hint.text + ";";
+        }
+        ensure_equals("every local's, at every depth", all, std::string("0: number;2: string;4: number;"));
+        for (const auto& [line, column, type] : { std::tuple{ 0, 6, "number" }, std::tuple{ 2, 10, "string" }, std::tuple{ 4, 14, "number" } })
+        {
+            bool offered = false;
+            for (const ALScriptFix& fix : service.actions(script, line, column, line, column))
+            {
+                offered |= fix.title == std::string("Declare it as '") + type + "'";
+            }
+            ensure("line " + std::to_string(line) + ": declared as " + type, offered);
+        }
+    }
 }

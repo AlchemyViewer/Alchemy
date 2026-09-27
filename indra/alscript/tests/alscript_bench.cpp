@@ -227,6 +227,16 @@ int main(int, char**)
                      luau.inlayHints(text, true, true).size() + luau.complete(text, last, 16).size() + luau.hover(text, last, 16).label.size() +
                      luau.complete(text, last, 16).size();
         }));
+    // Asked again of a text already checked: what the answer itself
+    // costs, the check being the one in hand.
+    {
+        const std::string& text = luaScript.texts[0];
+        luau.check(text);
+        const S32 last = ll_test::big_script_detail::linesIn(text) - 8;
+        row("SLua hints of a checked text", NONE, ms_per_run([&] { g_sink = g_sink + luau.inlayHints(text, true, true).size(); }));
+        row("SLua refactors at a place of a checked text", NONE,
+            ms_per_run([&] { g_sink = g_sink + luau.actions(text, last, 16, last, 16).size(); }));
+    }
     row("hover at the last helper's call",
         ms_per_run([&] {
             const std::string& text = lslScript.text();
