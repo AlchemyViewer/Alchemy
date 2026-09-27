@@ -26,6 +26,8 @@
 
 #include "alkeymap.h"
 
+#include "alkeychord.h"
+
 #include <algorithm>
 
 const char* alEditorCommandName(ALEditorCommand command)
@@ -65,8 +67,9 @@ std::optional<ALEditorCommand> alEditorCommandFromName(std::string_view name)
     return std::nullopt;
 }
 
-void ALKeymap::bind(KEY key, MASK mask, ALEditorCommand command)
+void ALKeymap::bind(KEY pressed, MASK mask, ALEditorCommand command)
 {
+    const KEY key = alKeyAsBound(pressed);
     for (Binding& binding : mBindings)
     {
         if (binding.key == key && binding.mask == mask)
@@ -78,8 +81,9 @@ void ALKeymap::bind(KEY key, MASK mask, ALEditorCommand command)
     mBindings.push_back(Binding{ key, mask, command });
 }
 
-void ALKeymap::unbind(KEY key, MASK mask)
+void ALKeymap::unbind(KEY pressed, MASK mask)
 {
+    const KEY key = alKeyAsBound(pressed);
     mBindings.erase(std::remove_if(mBindings.begin(), mBindings.end(),
                                    [&](const Binding& b) { return b.key == key && b.mask == mask; }),
                     mBindings.end());
@@ -115,8 +119,9 @@ bool ALKeymap::keysFor(ALEditorCommand command, KEY& key, MASK& mask) const
     return found;
 }
 
-ALEditorCommand ALKeymap::lookup(KEY key, MASK mask) const
+ALEditorCommand ALKeymap::lookup(KEY pressed, MASK mask) const
 {
+    const KEY key = alKeyAsBound(pressed);
     for (const Binding& binding : mBindings)
     {
         if (binding.key == key && binding.mask == mask)

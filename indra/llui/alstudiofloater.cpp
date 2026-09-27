@@ -65,12 +65,13 @@ void ALStudioFloater::addCommand(const KeyedCommand& command, std::function<bool
     mCommands.push_back({ command, std::move(run) });
 }
 
-bool ALStudioFloater::runCommandKey(KEY key, MASK mask)
+bool ALStudioFloater::runCommandKey(KEY pressed, MASK mask)
 {
-    if (key == KEY_NONE)
+    if (pressed == KEY_NONE)
     {
         return false;
     }
+    const KEY key = alKeyAsBound(pressed);
     if (runChord(ALKeyChord{ key, mask }))
     {
         return true;

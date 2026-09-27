@@ -33,6 +33,14 @@
 
 class LLView;
 
+// A key as the studio's keymaps name it. SDL's windows -- the Mac's and
+// Linux's -- say KEY_DIVIDE for the slash key, which is the keypad's
+// slash on Windows, so a key bound as '/' is heard from either.
+inline KEY alKeyAsBound(KEY key)
+{
+    return key == KEY_DIVIDE ? KEY('/') : key;
+}
+
 // A key and its modifiers, or two in turn -- Control-K, then S -- for the
 // commands past what single keys hold without taking Control and Alt
 // together, which is AltGr on many a keyboard, and types.

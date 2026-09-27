@@ -90,13 +90,14 @@ namespace ALKeyChords
 
     void stop() { sWait = Wait(); }
 
-    bool takeKey(KEY key, MASK mask)
+    bool takeKey(KEY pressed, MASK mask)
     {
-        if (!live() || key == KEY_SHIFT || key == KEY_CONTROL || key == KEY_ALT)
+        if (!live() || pressed == KEY_SHIFT || pressed == KEY_CONTROL || pressed == KEY_ALT)
         {
             return false;
         }
-        if (key == sWait.leadKey && mask == sWait.leadMask && gKeyboard && gKeyboard->getKeyRepeated(key))
+        const KEY key = alKeyAsBound(pressed);
+        if (key == sWait.leadKey && mask == sWait.leadMask && gKeyboard && gKeyboard->getKeyRepeated(pressed))
         {
             // The first key still held: nothing new yet.
             return true;

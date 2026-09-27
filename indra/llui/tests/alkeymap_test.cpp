@@ -132,4 +132,22 @@ namespace tut
         ensure("F3 the next match, shown", map.keysFor(C::FindNext, key, mask) && key == KEY_F3);
 #endif
     }
+
+    template<> template<>
+    void alkeymap_object::test<5>()
+    {
+        set_test_name("the slash key is heard as the SDL windows name it: KEY_DIVIDE comments as '/' does, and binds as '/'");
+        ALKeymap map = ALKeymap::standard();
+        ensure("Control with the slash key as '/'", map.lookup('/', MASK_CONTROL) == C::ToggleComment);
+        ensure("and as KEY_DIVIDE", map.lookup(KEY_DIVIDE, MASK_CONTROL) == C::ToggleComment);
+        ensure("KEY_DIVIDE on its own nothing", map.lookup(KEY_DIVIDE, MASK_NONE) == C::None);
+
+        map.unbind(KEY_DIVIDE, MASK_CONTROL);
+        ensure("unbound as either", map.lookup('/', MASK_CONTROL) == C::None);
+        map.unbind('7', MASK_CONTROL | MASK_SHIFT);
+        map.bind(KEY_DIVIDE, MASK_CONTROL | MASK_ALT, C::ToggleComment);
+        KEY  key  = KEY_NONE;
+        MASK mask = MASK_NONE;
+        ensure("bound as KEY_DIVIDE, kept and shown as '/'", map.keysFor(C::ToggleComment, key, mask) && key == '/' && mask == (MASK_CONTROL | MASK_ALT));
+    }
 }
