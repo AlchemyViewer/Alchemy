@@ -28,6 +28,9 @@
 
 #include "../test/lltut.h"
 
+#include "llsdserialize.h"
+
+#include <sstream>
 #include <string>
 
 namespace tut
@@ -683,5 +686,33 @@ namespace tut
         journal.undo();
         journal.undo();
         ensure_equals("stepped back through it", again.text(), std::string());
+    }
+
+    template<> template<>
+    void altextundo_object::test<22>()
+    {
+        set_test_name("the history written as notation reads back as asLLSD's, the newest step written again as it changes");
+        const auto same = [this](const char* what) {
+            std::istringstream in(undo.asNotation());
+            LLSD               read;
+            ensure(std::string(what) + ": reads back", LLSDSerialize::fromNotation(read, in, LLSDSerialize::SIZE_UNLIMITED) > 0);
+            std::ostringstream a, b;
+            LLSDSerialize::toNotation(read, a);
+            LLSDSerialize::toNotation(undo.asLLSD(), b);
+            ensure_equals(std::string(what) + ": as asLLSD writes it", a.str(), b.str());
+        };
+        ALTextPos at = type(ALTextPos(0, 0), "one", 2.0);
+        at           = type(at, " two", 2.0);
+        undo.label("Typing");
+        same("two steps, one named");
+        at = type(at, "s");
+        same("the newest joined");
+        undo.settle(ALTextRange(ALTextPos(0, 0), ALTextPos(0, 2)));
+        same("its selection settled");
+        undo.markSaved();
+        undo.undo();
+        same("one taken back, the saved mark past it");
+        std::optional<ALTextUndo::History> read = ALTextUndo::historyFrom(undo.asLLSD(), doc.text());
+        ensure("and it is a history of the text", read.has_value());
     }
 }

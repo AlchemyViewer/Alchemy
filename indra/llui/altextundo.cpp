@@ -26,7 +26,10 @@
 
 #include "altextundo.h"
 
+#include "llsdserialize.h"
 #include "llstring.h"
+
+#include <sstream>
 
 namespace
 {
@@ -246,6 +249,7 @@ void ALTextUndo::join(Step& last, Step&& next)
     }
     last.caretAfter  = next.caretAfter;
     last.anchorAfter = next.anchorAfter;
+    last.written.clear();
 }
 
 void ALTextUndo::record(const ALTextDocument::Edit& edit, const ALTextPos& before, const ALTextPos& after, F64 now)
@@ -262,6 +266,17 @@ void ALTextUndo::settle(const ALTextRange& selection)
     Step& newest       = mSteps.newest();
     newest.anchorAfter = selection.begin;
     newest.caretAfter  = selection.end;
+    newest.written.clear();
+}
+
+void ALTextUndo::label(std::string_view text)
+{
+    // The newest may be named by it, and be written again.
+    if (!mSteps.undone().empty())
+    {
+        mSteps.newest().written.clear();
+    }
+    mSteps.label(text);
 }
 
 void ALTextUndo::record(const ALTextDocument::Edit& edit, const ALTextRange& before_in, const ALTextPos& after, F64 now)
@@ -448,9 +463,12 @@ void ALTextUndo::markSaved()
     mSteps.breakRun();
 }
 
-LLSD ALTextUndo::asLLSD(size_t budget) const
+namespace
 {
-    const auto stepAsLLSD = [](const Step& step, size_t& bytes) {
+    // A step as it is written: its carets, its name, and its edits, each
+    // run folded into the one edit it amounts to.
+    LLSD stepAsLLSD(const ALTextUndo::Step& step)
+    {
         LLSD out;
         out["label"]  = step.mLabel;
         out["before"] = posAsLLSD(step.caretBefore);
@@ -464,13 +482,7 @@ LLSD ALTextUndo::asLLSD(size_t budget) const
         {
             out["anchor_after"] = posAsLLSD(step.anchorAfter);
         }
-        bytes += STEP_WRITTEN + step.mLabel.size();
-        LLSD       edits = LLSD::emptyArray();
-        const auto write = [&edits, &bytes](const ALTextDocument::Edit& edit) {
-            bytes += EDIT_WRITTEN + edit.removed.size() + edit.inserted.size();
-            edits.append(editAsLLSD(edit));
-        };
-        // Each run folded into the one edit it amounts to as it is written.
+        LLSD                                edits = LLSD::emptyArray();
         std::optional<ALTextDocument::Edit> pending;
         for (const ALTextDocument::Edit& edit : step.edits)
         {
@@ -480,68 +492,126 @@ LLSD ALTextUndo::asLLSD(size_t budget) const
             }
             if (pending)
             {
-                write(*pending);
+                edits.append(editAsLLSD(*pending));
             }
             pending = edit;
         }
         if (pending)
         {
-            write(*pending);
+            edits.append(editAsLLSD(*pending));
         }
         out["edits"] = edits;
         return out;
-    };
+    }
+}
+
+ALTextUndo::Written ALTextUndo::writtenWithin(size_t budget) const
+{
     const std::vector<Step>& undone = mSteps.undone();
     const std::vector<Step>& redone = mSteps.redone();
+    Written                  out;
     // The steps forward, all or none: part of them would lead nowhere the
     // text was.
     size_t used = 0;
-    LLSD   ahead = LLSD::emptyArray();
     for (const Step& step : redone)
     {
-        ahead.append(stepAsLLSD(step, used));
+        used += weighWritten(step);
     }
-    if (used > budget / 4)
+    out.ahead = used <= budget / 4;
+    if (!out.ahead)
     {
-        ahead = LLSD::emptyArray();
-        used  = 0;
+        used = 0;
     }
-    // The steps back, newest first, as many as the budget holds.
-    std::vector<LLSD> back;
-    size_t            first = undone.size();
-    while (first > 0)
+    // The steps back, newest first, as many as the budget holds, and the
+    // newest whatever it weighs.
+    out.first = undone.size();
+    while (out.first > 0)
     {
-        size_t     bytes = 0;
-        const LLSD step  = stepAsLLSD(undone[first - 1], bytes);
-        if (used + bytes > budget && !back.empty())
+        const size_t bytes = weighWritten(undone[out.first - 1]);
+        if (used + bytes > budget && out.first < undone.size())
         {
             break;
         }
         used += bytes;
-        back.push_back(step);
-        --first;
+        --out.first;
     }
-    LLSD out;
-    out["version"] = HISTORY_VERSION;
-    out["undo"]    = LLSD::emptyArray();
-    for (auto it = back.rbegin(); it != back.rend(); ++it)
-    {
-        out["undo"].append(*it);
-    }
-    out["redo"] = ahead;
     // Where the saved text stands, counted from the oldest step kept; a
     // mark among the steps let go of, or past the steps forward kept, is
     // nowhere.
-    S32 saved = -1;
-    if (mSavedInForce != NOWHERE && mSavedInForce >= first)
+    if (mSavedInForce != NOWHERE && mSavedInForce >= out.first)
     {
-        const size_t at = mSavedInForce - first;
-        if (at <= back.size() + static_cast<size_t>(ahead.size()))
+        const size_t at = mSavedInForce - out.first;
+        if (at <= undone.size() - out.first + (out.ahead ? redone.size() : 0))
         {
-            saved = static_cast<S32>(at);
+            out.saved = static_cast<S32>(at);
         }
     }
-    out["saved"] = saved;
+    return out;
+}
+
+LLSD ALTextUndo::asLLSD(size_t budget) const
+{
+    const Written            within = writtenWithin(budget);
+    const std::vector<Step>& undone = mSteps.undone();
+    LLSD                     out;
+    out["version"] = HISTORY_VERSION;
+    out["undo"]    = LLSD::emptyArray();
+    for (size_t i = within.first; i < undone.size(); ++i)
+    {
+        out["undo"].append(stepAsLLSD(undone[i]));
+    }
+    out["redo"] = LLSD::emptyArray();
+    if (within.ahead)
+    {
+        for (const Step& step : mSteps.redone())
+        {
+            out["redo"].append(stepAsLLSD(step));
+        }
+    }
+    out["saved"] = within.saved;
+    return out;
+}
+
+std::string ALTextUndo::asNotation(size_t budget) const
+{
+    // Each step as it was written the last time, or written now and kept;
+    // the frame around them as LLSD notation writes a map and its arrays,
+    // so that it reads back as asLLSD's.
+    const auto written = [](const Step& step) -> const std::string& {
+        if (step.written.empty())
+        {
+            std::ostringstream text;
+            LLSDSerialize::toNotation(stepAsLLSD(step), text);
+            step.written = text.str();
+        }
+        return step.written;
+    };
+    const Written            within = writtenWithin(budget);
+    const std::vector<Step>& undone = mSteps.undone();
+    std::string              out    = "{'version':i" + std::to_string(HISTORY_VERSION) + ",'undo':[";
+    for (size_t i = within.first; i < undone.size(); ++i)
+    {
+        if (i > within.first)
+        {
+            out += ',';
+        }
+        out += written(undone[i]);
+    }
+    out += "],'redo':[";
+    if (within.ahead)
+    {
+        bool first = true;
+        for (const Step& step : mSteps.redone())
+        {
+            if (!first)
+            {
+                out += ',';
+            }
+            first = false;
+            out += written(step);
+        }
+    }
+    out += "],'saved':i" + std::to_string(within.saved) + "}";
     return out;
 }
 

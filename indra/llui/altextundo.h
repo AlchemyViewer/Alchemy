@@ -71,6 +71,10 @@ public:
         // Made by keys typed (beginTyping), which the next key typed may
         // carry on.
         bool                              typed = false;
+        // What it was written as the last time (asNotation), kept until it
+        // changes -- joined, settled, named -- so that a history written
+        // every moment writes its newest steps only.
+        mutable std::string               written;
     };
     // What the steps back may weigh together, and the history written
     // out: the oldest go first past it, the newest always kept.
@@ -141,7 +145,7 @@ public:
 
     // What the next step back and forward are called: the first thing
     // said after a change names it.
-    void        label(std::string_view text) { mSteps.label(text); }
+    void        label(std::string_view text);
     std::string undoLabel() const { return mSteps.undoLabel(); }
     std::string redoLabel() const { return mSteps.redoLabel(); }
 
@@ -162,6 +166,9 @@ public:
     // back go first past it, and the steps forward all go where they alone
     // would pass a quarter of it.
     LLSD asLLSD(size_t budget = BUDGET) const;
+    // The same history written out as LLSD notation, as a file holds it,
+    // from what each step was written as the last time.
+    std::string asNotation(size_t budget = BUDGET) const;
     // That history read for a text it must have been written with: every
     // step tried on copies, back from the text and forward again, each
     // edit's text standing where it says it stood. Nothing where one does
@@ -199,8 +206,18 @@ private:
     // and in the place the run had reached.
     static bool carriesOn(const Step& last, const ALTextDocument::Edit& next);
     static void join(Step& last, Step&& next);
-    // What a step weighs against the budget.
+    // What a step weighs against the budget; and written out, its name too.
     static size_t weigh(const Step& step) { return step.bytes; }
+    static size_t weighWritten(const Step& step) { return step.bytes + step.mLabel.size(); }
+    // Which steps a history written to a budget holds: the steps back from
+    // the first of them, and whether the steps forward, all or none.
+    struct Written
+    {
+        size_t first = 0;
+        bool   ahead = false;
+        S32    saved = -1;
+    };
+    Written     writtenWithin(size_t budget) const;
     // The oldest step forgotten: the saved mark and the era with it.
     void        forgotOldest();
     // The oldest steps forgotten while the steps back weigh more than the
