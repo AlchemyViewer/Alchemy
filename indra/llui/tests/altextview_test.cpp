@@ -406,11 +406,17 @@ namespace tut
         ensure("the first selected", v.selection().normalised() == ALTextRange(ALTextPos(0, 0), ALTextPos(0, 3)) && v.findCurrent() == 0);
         key(KEY_F3);
         ensure("F3 goes on", v.selection().normalised() == ALTextRange(ALTextPos(0, 8), ALTextPos(0, 11)));
+        ensure_equals("no going round said", v.findBar()->countSaid(), std::string("2 of 3"));
         key(KEY_F3);
         key(KEY_F3);
         ensure("and round to the first", v.findCurrent() == 0);
+        ensure_equals("going round said, on from the top", v.findBar()->countSaid(), std::string("\xE2\x86\xBB 1 of 3"));
         key(KEY_F3, MASK_SHIFT);
         ensure("shift-F3 goes back round to the last", v.selection().normalised() == ALTextRange(ALTextPos(1, 4), ALTextPos(1, 7)));
+        ensure_equals("and back from the bottom", v.findBar()->countSaid(), std::string("\xE2\x86\xBA 3 of 3"));
+        key(KEY_F3, MASK_SHIFT);
+        ensure_equals("said until the next step", v.findBar()->countSaid(), std::string("2 of 3"));
+        key(KEY_F3);
 
         v.findBar()->setReplacement("1");
         v.findNext(true);  // the first again

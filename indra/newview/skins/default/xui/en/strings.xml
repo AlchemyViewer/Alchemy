@@ -394,6 +394,8 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="FindBarBadPattern">Not a pattern</string>
 	<string name="FindBarNone">No results</string>
 	<string name="FindBarOf">[CURRENT] of [TOTAL]</string>
+	<string name="FindBarWrappedToTop">Went round the end, on from the top</string>
+	<string name="FindBarWrappedToBottom">Went round the start, back from the bottom</string>
 
 	<!-- The row of tabs over an editor (altabstrip.cpp): the button that
 	     lists them all once they run past it. -->

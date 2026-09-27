@@ -3071,9 +3071,13 @@ bool ALTextView::findNext(bool forward)
     {
         return false;
     }
+    const ALTextRange& match = mFind.matches()[static_cast<size_t>(index)];
+    // Round the text's end: on to one before where it started, or back to
+    // one at or after it.
+    const S32 wrapped = forward ? (match.begin < from ? 1 : 0) : (match.begin < from ? 0 : -1);
     mFind.setCurrent(index);
-    setSelection(mFind.matches()[static_cast<size_t>(index)]);
-    mFindBar->setCount(mFind.current(), static_cast<S32>(mFind.count()), mFind.error(), mFind.capped());
+    setSelection(match);
+    mFindBar->setCount(mFind.current(), static_cast<S32>(mFind.count()), mFind.error(), mFind.capped(), wrapped);
     return true;
 }
 

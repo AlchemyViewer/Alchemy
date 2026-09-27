@@ -60,6 +60,10 @@ namespace
 #else
     constexpr MASK TOGGLE_MASK = MASK_ALT;
 #endif
+    // Return with it replaces every match: Control and Alt, Command and
+    // Option on a Mac, as the modern editors have it. No character is
+    // typed with Return, AltGr or not.
+    constexpr MASK REPLACE_ALL_MASK = MASK_CONTROL | MASK_ALT;
 }
 
 // --- a flat glyph button ---------------------------------------------------------------
@@ -84,15 +88,20 @@ public:
     }
 
     void setGlyph(const std::string& glyph) { mGlyph = glyph; }
-    // The letter that presses it with TOGGLE_MASK, said after its tip.
-    void setKey(KEY key) { mKey = key; }
+    // The key that presses it, with TOGGLE_MASK unless said, said after
+    // its tip.
+    void setKey(KEY key, MASK mask = TOGGLE_MASK)
+    {
+        mKey     = key;
+        mKeyMask = mask;
+    }
 
     // Put together as it is shown rather than when it is made: a key's
     // name is the viewer's to give, in the viewer's language.
     std::string getToolTip() const override
     {
         const std::string tip = LLUICtrl::getToolTip();
-        return mKey == KEY_NONE || tip.empty() ? tip : tip + " (" + LLKeyboard::stringFromAccelerator(TOGGLE_MASK, mKey) + ")";
+        return mKey == KEY_NONE || tip.empty() ? tip : tip + " (" + LLKeyboard::stringFromAccelerator(mKeyMask, mKey) + ")";
     }
     void setInk(const LLColor4& ink) { mInk = ink; }
     void setLit(const LLColor4& lit) { mLit = lit; }
@@ -185,8 +194,9 @@ public:
 
 private:
     std::string mGlyph;
-    KEY         mKey    = KEY_NONE;
-    bool        mToggle = false;
+    KEY         mKey     = KEY_NONE;
+    MASK        mKeyMask = TOGGLE_MASK;
+    bool        mToggle  = false;
     bool        mOn     = false;
     bool        mHover  = false;
     LLUIColor   mInk;
@@ -263,6 +273,7 @@ ALFindBar::ALFindBar(const Params& p)
     mReplaceEvery = flat("replace_all", "\xE2\x87\x89", false, alSaid("FindBarReplaceAll", "Replace every one, as one step to undo"));
     mReplaceOne->setCommitCallback([this](LLUICtrl*, const LLSD&) { mReplace(); });
     mReplaceEvery->setCommitCallback([this](LLUICtrl*, const LLSD&) { mReplaceAll(); });
+    mReplaceEvery->setKey(KEY_RETURN, REPLACE_ALL_MASK);
 
     setReplaceShown(false);
     setCount(-1, 0, std::string());
@@ -366,7 +377,7 @@ std::string ALFindBar::countSaid() const
     return mCount->getText();
 }
 
-void ALFindBar::setCount(S32 current, S32 total, const std::string& error, bool capped)
+void ALFindBar::setCount(S32 current, S32 total, const std::string& error, bool capped, S32 wrapped)
 {
     std::string said;
     if (!error.empty())
@@ -386,8 +397,17 @@ void ALFindBar::setCount(S32 current, S32 total, const std::string& error, bool 
     {
         said = llformat("%d%s", total, capped ? "+" : "");
     }
+    std::string tip = error;
+    if (wrapped != 0 && error.empty() && total > 0)
+    {
+        // Round the text's end: a turning arrow before the count, and in
+        // words in its tip.
+        said = (wrapped > 0 ? "\xE2\x86\xBB " : "\xE2\x86\xBA ") + said;
+        tip  = wrapped > 0 ? alSaid("FindBarWrappedToTop", "Went round the end, on from the top")
+                           : alSaid("FindBarWrappedToBottom", "Went round the start, back from the bottom");
+    }
     mCount->setText(said);
-    mCount->setToolTip(error);
+    mCount->setToolTip(tip);
     for (Flat* button : { mPrev, mNextButton, mReplaceOne, mReplaceEvery })
     {
         button->setEnabled(total > 0);
@@ -466,6 +486,23 @@ bool ALFindBar::handleKeyHere(KEY key, MASK mask)
             toggle->press();
             return true;
         }
+    }
+    // Return goes on through the fields and buttons by themselves; with
+    // Shift, back; with REPLACE_ALL_MASK, every one replaced where the
+    // second row is out.
+    if (key == KEY_RETURN && mask == MASK_SHIFT)
+    {
+        mPrevious();
+        return true;
+    }
+    if (key == KEY_RETURN && mask == REPLACE_ALL_MASK)
+    {
+        // Only with the replacement in sight: what it is was seen.
+        if (mReplaceShown && mReplaceEvery->getEnabled())
+        {
+            mReplaceAll();
+        }
+        return true;
     }
     if (key == KEY_F3 && (mask == MASK_NONE || mask == MASK_SHIFT))
     {

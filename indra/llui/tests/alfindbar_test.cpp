@@ -134,4 +134,42 @@ namespace tut
         ensure("the tip says the key: " + tip, tip.find(LLKeyboard::stringFromAccelerator(toggle, 'C')) != std::string::npos);
         bar->die();
     }
+
+    // In the bar, Return with Shift goes back; with Control and Alt --
+    // Command and Option on a Mac -- it replaces every one, with the
+    // replacement in sight, and the button's tip says so.
+    template<> template<>
+    void alfindbar_object::test<3>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        ALFindBar* bar      = make();
+        S32        previous = 0;
+        S32        every    = 0;
+        bar->onPrevious([&]() { ++previous; });
+        bar->onReplaceAll([&]() { ++every; });
+        bar->setCount(0, 3, std::string());
+        LLUICtrl* field = bar->getChild<LLUICtrl>("find");
+        ensure("Shift and Return, from the field, taken", field->handleKey(KEY_RETURN, MASK_SHIFT, false));
+        ensure_equals("back", previous, 1);
+        constexpr MASK replace_all = MASK_CONTROL | MASK_ALT;
+        ensure("the Replace All key taken", field->handleKey(KEY_RETURN, replace_all, false));
+        ensure_equals("with the replacement folded away, nothing replaced", every, 0);
+        bar->setReplaceShown(true);
+        field->handleKey(KEY_RETURN, replace_all, false);
+        ensure_equals("with it out, every one", every, 1);
+        bar->setCount(-1, 0, std::string());
+        field->handleKey(KEY_RETURN, replace_all, false);
+        ensure_equals("with nothing found, nothing", every, 1);
+        LLKeyboard::setStringTranslatorFunc([](std::string_view name) { return std::string(name); });
+        const std::string tip = bar->getChild<LLUICtrl>("replace_all")->getToolTip();
+        ensure("the tip says the key: " + tip, tip.find(LLKeyboard::stringFromAccelerator(replace_all, KEY_RETURN)) != std::string::npos);
+        bar->setCount(0, 3, std::string(), false, 1);
+        ensure("going round, in the count's tip", !bar->getChild<LLUICtrl>("count")->getToolTip().empty());
+        bar->setCount(0, 3, std::string());
+        ensure("and gone with the next count", bar->getChild<LLUICtrl>("count")->getToolTip().empty());
+        bar->die();
+    }
 }
