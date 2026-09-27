@@ -24,6 +24,7 @@
 
 #pragma once
 
+#include "alfuzzymatch.h"
 #include "alsyntaxgrammar.h"
 #include "altextdocument.h"
 #include "lluiimage.h"
@@ -74,10 +75,12 @@ public:
     // at all: 0 its start as typed, 1 its start in either case, 2 a run
     // of it from where one of its parts begins -- `Say` in `llSay`,
     // `listen` in `llListen` -- and 3 a letter at the start of each of
-    // several parts, runs of each after -- `setpos` or `sp` in
-    // `llSetPos`. The parts begin after an underscore or a dot, at a
-    // capital after a small letter, and at a digit.
+    // several parts, runs of each after -- `sp` or `spos` in
+    // `llSetPos`. The shared matcher's first four tiers (ALFuzzyMatch),
+    // whose parts begin after an underscore or a dot, at a capital after
+    // a small letter, and at a digit.
     static S32 matchTier(std::string_view word, std::string_view typed);
+    static S32 tierOf(const ALFuzzyMatch::Match& match);
     // The icon a kind wears on the list -- Symbol_Function and the rest --
     // and the badge, a letter, where there is no image provider to look
     // them up in.
@@ -142,9 +145,11 @@ private:
     std::vector<ALCompletion> mSupplied;
     // The pool (pooled): what the provider answered, and the document's
     // words apart, which are offered only where longer than what is typed.
-    std::vector<ALCompletion> mPool;
-    std::vector<std::string>  mPoolWords;
-    ALTextPos                 mPoolStart{ -1, -1 };
-    std::string               mPoolHead;
-    std::string               mPoolPrefix;
+    std::vector<ALCompletion>         mPool;
+    // Each made ready to be matched (ALFuzzyMatch), beside it.
+    std::vector<ALFuzzyMatch::Target> mPoolTargets;
+    std::vector<ALFuzzyMatch::Target> mPoolWords;
+    ALTextPos                         mPoolStart{ -1, -1 };
+    std::string                       mPoolHead;
+    std::string                       mPoolPrefix;
 };

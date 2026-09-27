@@ -139,6 +139,7 @@ target_sources(
     alcodecards.cpp
     alcodeeditor.cpp
     alcompletionmodel.cpp
+    alfuzzymatch.cpp
     alfixlistmodel.cpp
     alfoldmodel.cpp
     alsnippetsession.cpp
@@ -346,6 +347,7 @@ target_sources(
         alcodecards.h
         alcodeeditor.h
         alcompletionmodel.h
+        alfuzzymatch.h
         alfixlistmodel.h
         alfoldmodel.h
         alsnippetsession.h
@@ -575,6 +577,7 @@ if(AL_BUILD_TESTS)
     alcodeeditor
     aldiffview
     alcompletionmodel
+    alfuzzymatch
     alfixlistmodel
     alfoldmodel
     alsnippetsession

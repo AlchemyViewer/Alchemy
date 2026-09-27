@@ -298,7 +298,7 @@ namespace tut
     template<> template<>
     void alquickopen_object::test<9>()
     {
-        set_test_name("with nothing typed, every candidate to browse; typed, the best few; none, said so");
+        set_test_name("with nothing typed, the first few to browse; typed, the best few; none, said so");
         if (!ll_test::HeadlessUI::get().ok())
         {
             skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
@@ -318,7 +318,8 @@ namespace tut
         }
         quick->setCandidates(many);
         const ALChoiceList* list = quick->findChild<ALChoiceList>("matches");
-        ensure_equals("nothing typed: all of them", list->count(), 20);
+        ensure_equals("nothing typed: the first as many as were asked for", list->count(), 3);
+        ensure("in the order given", quick->listed().front() == "llFunction00");
         quick->setQuery("func");
         ensure_equals("typed: as many as were asked for", list->count(), 3);
         ensure("the best chosen", quick->chosenRow() == 0 && quick->listed().size() == 3);

@@ -42,6 +42,7 @@
 #include "../alfindbar.h"
 #include "../alfoldmodel.h"
 #include "../aloutputview.h"
+#include "../alquickopen.h"
 #include "../altextsearch.h"
 #include "../alvimkeymap.h"
 
@@ -510,6 +511,40 @@ int main(int, char**)
                    g_sink = g_sink + log->document().lineCount();
                }));
         log->die();
+    }
+    // Quick Open over the names of a big project, a query typed a letter
+    // at a time and taken back.
+    std::printf("\nQuick Open (2,000 candidates)\n");
+    {
+        ALQuickOpen::Params p(LLUICtrlFactory::getDefaultParams<ALQuickOpen>());
+        p.name              = "quick";
+        p.rect              = LLRect(0, 400, 500, 0);
+        ALQuickOpen* quick  = LLUICtrlFactory::create<ALQuickOpen>(p);
+        std::vector<ALQuickOpen::Candidate> names;
+        for (S32 i = 0; i < 2000; ++i)
+        {
+            ALQuickOpen::Candidate one;
+            one.label  = llformat("%s_%s_%d.xml", i % 3 ? "floater" : "panel", i % 5 ? "script_studio" : "preferences", i);
+            one.detail = "skins/default/xui/en";
+            one.also   = llformat("Script Studio %d", i);
+            one.value  = one.label;
+            names.push_back(std::move(one));
+        }
+        quick->setCandidates(std::move(names));
+        rowOne("a query typed and taken back, per key", ms_per_item(10, [&] {
+                   const std::string query = "flscst";
+                   for (size_t n = 1; n <= query.size(); ++n)
+                   {
+                       quick->setQuery(query.substr(0, n));
+                   }
+                   for (size_t n = query.size() - 1; n > 0; --n)
+                   {
+                       quick->setQuery(query.substr(0, n));
+                   }
+                   quick->setQuery(std::string());
+                   g_sink = g_sink + quick->listed().size();
+               }));
+        quick->die();
     }
     std::printf("\n(checksum %zu)\n", static_cast<size_t>(g_sink));
     return 0;

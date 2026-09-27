@@ -79,130 +79,82 @@ namespace
     // still what was typed, and the words are how else it is known.
     constexpr S32 SCORE_WORDS_BELOW = 1000;
 
-    char lower(char c)
+    // A candidate's rank from how its label and its other words answer:
+    // the other words a tier down.
+    S32 rankOf(S32 by_label, S32 by_words)
     {
-        return LLStringOps::toLower(c);
+        return llmax(by_label, by_words > 0 ? llmax(1, by_words - SCORE_WORDS_BELOW) : 0);
     }
 
-    bool isBreak(char c)
+    std::vector<size_t> ordered(std::vector<std::pair<S32, size_t>>& scored)
     {
-        return c == '_' || c == '-' || c == '.' || c == '/' || c == '\\' || c == ' ';
-    }
-
-    // The first letter of each word: `floater_buy.xml` gives f, b, x.
-    std::string initialsOf(std::string_view label)
-    {
-        std::string letters;
-        bool at_start = true;
-        for (char c : label)
+        // Best first; among equals, the order they were given, which is the
+        // caller's own idea of which matters more.
+        std::stable_sort(scored.begin(), scored.end(), [](const auto& a, const auto& b) { return a.first > b.first; });
+        std::vector<size_t> order;
+        order.reserve(scored.size());
+        for (const auto& [how, at] : scored)
         {
-            if (isBreak(c))
-            {
-                at_start = true;
-                continue;
-            }
-            if (at_start)
-            {
-                letters.push_back(lower(c));
-                at_start = false;
-            }
+            order.push_back(at);
         }
-        return letters;
-    }
-
-    // Whether every letter of the query appears in order, and how far into
-    // the label the last of them is: a match that finishes early is a better
-    // answer than one that straggles to the end.
-    bool inOrder(std::string_view label, std::string_view query, size_t& reach)
-    {
-        size_t at = 0;
-        for (char want : query)
-        {
-            const char c = lower(want);
-            while (at < label.size() && lower(label[at]) != c)
-            {
-                ++at;
-            }
-            if (at == label.size())
-            {
-                return false;
-            }
-            ++at;
-        }
-        reach = at;
-        return true;
+        return order;
     }
 }
 
 // static
 S32 ALQuickOpen::score(std::string_view label, std::string_view query)
 {
+    return score(ALFuzzyMatch::prepare(label), query);
+}
+
+// static
+S32 ALQuickOpen::score(const ALFuzzyMatch::Target& label, std::string_view query)
+{
     if (query.empty())
     {
         return 1;   // everything answers nothing, equally
     }
-    if (label.empty() || query.size() > label.size())
+    if (label.text.empty() || query.size() > label.text.size())
     {
         return 0;
     }
-
-    std::string lowered;
-    lowered.reserve(label.size());
-    for (char c : label)
-    {
-        lowered.push_back(lower(c));
-    }
-    std::string wanted;
-    wanted.reserve(query.size());
-    for (char c : query)
-    {
-        wanted.push_back(lower(c));
-    }
-
     // A shorter label answering the same query answered it better: `panel`
     // beats `panel_preferences_advanced` for `pan`, and it is the one meant.
-    const S32 brevity = (S32)llmax(0, 200 - (S32)label.size());
+    const S32 brevity = (S32)llmax(0, 200 - (S32)label.text.size());
 
-    if (lowered == wanted)
+    bool whole = label.lowered.size() == query.size();
+    for (size_t i = 0; whole && i < query.size(); ++i)
+    {
+        whole = label.lowered[i] == ALFuzzyMatch::lower(query[i]);
+    }
+    if (whole)
     {
         return SCORE_WHOLE + brevity;
     }
-    if (lowered.rfind(wanted, 0) == 0)
+    const ALFuzzyMatch::Match match = ALFuzzyMatch::match(label, query);
+    switch (match.tier)
     {
-        return SCORE_PREFIX + brevity;
-    }
-
-    const std::string letters = initialsOf(label);
-    if (letters.rfind(wanted, 0) == 0)
-    {
-        return SCORE_INITIALS + brevity;
-    }
-
-    // A word inside the name starting with it: `buy` in `floater_buy.xml`.
-    for (size_t i = 1; i < lowered.size(); ++i)
-    {
-        if (isBreak(lowered[i - 1]) && lowered.compare(i, wanted.size(), wanted) == 0)
-        {
+        case ALFuzzyMatch::Tier::Prefix:
+        case ALFuzzyMatch::Tier::PrefixAnyCase:
+            return SCORE_PREFIX + brevity;
+        // The letters of its words: `fb` or `flbuy` for `floater_buy.xml`.
+        case ALFuzzyMatch::Tier::Parts:
+            return SCORE_INITIALS + brevity;
+        // A word inside the name starting with it: `buy` in
+        // `floater_buy.xml`.
+        case ALFuzzyMatch::Tier::PartRun:
             return SCORE_WORD_START + brevity;
-        }
+        // The two that are worth less the further in they are found keep
+        // to their own tier however far that is: a run never sinks to
+        // scattered letters, and scattered letters never to nothing -- a
+        // long line of history is still an answer.
+        case ALFuzzyMatch::Tier::Run:
+            return llmax(SCORE_SCATTERED_MOST + 1, SCORE_RUN + brevity - (S32)llmin(match.at, (size_t)SCORE_RUN));
+        case ALFuzzyMatch::Tier::Scattered:
+            return llmax(1, SCORE_SCATTERED + brevity - (S32)llmin(match.at, (size_t)SCORE_SCATTERED_MOST));
+        default:
+            return 0;
     }
-
-    // The two that are worth less the further in they are found keep to
-    // their own tier however far that is: a run never sinks to scattered
-    // letters, and scattered letters never to nothing -- a long line of
-    // history is still an answer.
-    if (const size_t at = lowered.find(wanted); at != std::string::npos)
-    {
-        // A run anywhere, worth less the further in it starts.
-        return llmax(SCORE_SCATTERED_MOST + 1, SCORE_RUN + brevity - (S32)llmin(at, (size_t)SCORE_RUN));
-    }
-
-    size_t reach = 0;
-    if (inOrder(lowered, wanted, reach))
-    {
-        return llmax(1, SCORE_SCATTERED + brevity - (S32)llmin(reach, (size_t)SCORE_SCATTERED_MOST));
-    }
-    return 0;
 }
 
 // static
@@ -214,26 +166,27 @@ std::vector<size_t> ALQuickOpen::rank(const std::vector<Candidate>& candidates,
     std::vector<std::pair<S32, size_t> > scored;
     for (size_t i = 0; i < candidates.size(); ++i)
     {
-        const S32 by_label = score(candidates[i].label, query);
-        const S32 by_words = score(candidates[i].also, query);
-        const S32 how = llmax(by_label, by_words > 0 ? llmax(1, by_words - SCORE_WORDS_BELOW) : 0);
+        const S32 how = rankOf(score(candidates[i].label, query), score(candidates[i].also, query));
         if (how > 0)
         {
             scored.emplace_back(how, i);
         }
     }
-    // Best first; among equals, the order they were given, which is the
-    // caller's own idea of which matters more.
-    std::stable_sort(scored.begin(), scored.end(),
-                     [](const auto& a, const auto& b) { return a.first > b.first; });
+    return ordered(scored);
+}
 
-    std::vector<size_t> order;
-    order.reserve(scored.size());
-    for (const auto& [how, at] : scored)
+std::vector<size_t> ALQuickOpen::ranked(std::string_view query) const
+{
+    std::vector<std::pair<S32, size_t> > scored;
+    for (size_t i = 0; i < mLabels.size(); ++i)
     {
-        order.push_back(at);
+        const S32 how = rankOf(score(mLabels[i], query), score(mAlso[i], query));
+        if (how > 0)
+        {
+            scored.emplace_back(how, i);
+        }
     }
-    return order;
+    return ordered(scored);
 }
 
 ALQuickOpen::Params::Params()
@@ -280,6 +233,15 @@ ALQuickOpen::ALQuickOpen(const Params& p)
 void ALQuickOpen::setCandidates(std::vector<Candidate> candidates)
 {
     mCandidates = std::move(candidates);
+    mLabels.clear();
+    mAlso.clear();
+    mLabels.reserve(mCandidates.size());
+    mAlso.reserve(mCandidates.size());
+    for (const Candidate& one : mCandidates)
+    {
+        mLabels.push_back(ALFuzzyMatch::prepare(one.label));
+        mAlso.push_back(ALFuzzyMatch::prepare(one.also));
+    }
     fill();
 }
 
@@ -335,12 +297,12 @@ void ALQuickOpen::fill()
         return;
     }
     const std::string_view asked = matched();
-    mRanked                      = rank(mCandidates, asked);
-    // As many as were asked for while something is typed: the answer
-    // meant is at the top, and a list of seven hundred rows made again on
-    // every letter typed is what the ranking exists to spare. With nothing
-    // typed the list is being browsed, and all of it is there to scroll.
-    if (mRows > 0 && !asked.empty() && mRanked.size() > (size_t)mRows)
+    mRanked                      = ranked(asked);
+    // As many as were asked for: the answer meant is at the top, and a
+    // list of seven hundred rows made again on every letter typed is what
+    // the ranking exists to spare. With nothing typed, the first so many
+    // in the order given, to browse; a letter typed finds the rest.
+    if (mRows > 0 && mRanked.size() > (size_t)mRows)
     {
         mRanked.resize((size_t)mRows);
     }

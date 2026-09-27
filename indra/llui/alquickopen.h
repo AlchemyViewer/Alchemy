@@ -24,6 +24,7 @@
 
 #pragma once
 
+#include "alfuzzymatch.h"
 #include "llpanel.h"
 
 #include <string>
@@ -59,8 +60,9 @@ public:
     struct Params : public LLInitParam::Block<Params, LLPanel::Params>
     {
         Optional<std::string> placeholder;
-        // How many to offer at once while something is typed; with nothing
-        // typed, every candidate, which is browsing.
+        // How many to offer at once: the best so many while something is
+        // typed, and with nothing typed the first so many, in the order
+        // given, to browse -- not a list of hundreds made at every key.
         Optional<S32>         rows;
         Params();
     };
@@ -118,8 +120,10 @@ public:
                                     std::string_view query);
 
     // How well one label answers a query, higher being better; zero is not a
-    // match at all. Exposed for the same reason.
+    // match at all. Exposed for the same reason. By the shared matcher
+    // (ALFuzzyMatch), each kind of answer worth its own tier here.
     static S32 score(std::string_view label, std::string_view query);
+    static S32 score(const ALFuzzyMatch::Target& label, std::string_view query);
 
     // How tall to make one that is to show so many rows under its field
     // with nothing to scroll: what a freeform question, whose one row is
@@ -162,11 +166,18 @@ protected:
     ALQuickOpen(const Params& p);
 
 private:
+    // The ranking of the candidates as they were set, from what was made
+    // ready of them.
+    std::vector<size_t> ranked(std::string_view query) const;
     void fill();
     void chooseSelected(bool hold = false);
     void layout();
 
     std::vector<Candidate>  mCandidates;
+    // Each candidate's label and other words made ready to be matched
+    // once, as they are set, rather than at every key.
+    std::vector<ALFuzzyMatch::Target> mLabels;
+    std::vector<ALFuzzyMatch::Target> mAlso;
     std::vector<size_t>     mRanked;
     std::string             mQuery;
     std::string             mPlaceholder;
