@@ -52,4 +52,9 @@ public:
     // losing anything: no assignment, no call but to a function the
     // definitions call pure, no print. A null node is nothing.
     static bool sideEffectFree(Tailslide::LSLASTNode* node);
+    // What an expression can be dropped without losing anything, though
+    // not read at another time: as sideEffectFree, but a call may also be
+    // to one whose result is the only point of calling it -- llGetPos,
+    // llGetTime -- which reads what changes and changes nothing.
+    static bool changesNothing(Tailslide::LSLASTNode* node);
 };

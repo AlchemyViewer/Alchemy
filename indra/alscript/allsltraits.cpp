@@ -76,57 +76,79 @@ bool ALLSLTraits::pure(const char* name)
     return t && t->pure;
 }
 
+namespace
+{
+    // What changes nothing: no assignment, no print, no call but to a
+    // library function that changes nothing -- pure, or, where `reads`,
+    // one whose result is the only point of calling it.
+    bool quiet(Tailslide::LSLASTNode* node, bool reads)
+    {
+        using namespace Tailslide;
+        if (!node)
+        {
+            return true;
+        }
+        switch (node->getNodeType())
+        {
+            case NODE_NULL:
+            case NODE_CONSTANT:
+            case NODE_IDENTIFIER:
+            case NODE_TYPE:
+                return true;
+            case NODE_EXPRESSION:
+            case NODE_AST_NODE_LIST:
+                break;
+            default:
+                return false;
+        }
+        if (node->getNodeType() == NODE_EXPRESSION)
+        {
+            auto* expr = static_cast<LSLExpression*>(node);
+            if (operation_mutates(expr->getOperation()))
+            {
+                return false;
+            }
+            switch (expr->getNodeSubType())
+            {
+                case NODE_PRINT_EXPRESSION:
+                    return false;
+                case NODE_FUNCTION_EXPRESSION:
+                {
+                    LSLSymbol* sym = expr->getSymbol();
+                    if (!sym || sym->getSubType() != SYM_BUILTIN)
+                    {
+                        return false;
+                    }
+                    const ALLSLTraits::Trait* t = ALLSLTraits::of(sym->getName());
+                    if (!t || !(t->pure || (reads && t->mustUse)))
+                    {
+                        return false;
+                    }
+                    break;
+                }
+                default:
+                    break;
+            }
+        }
+        for (LSLASTNode* child : *node)
+        {
+            if (!quiet(child, reads))
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+}
+
 // static
 bool ALLSLTraits::sideEffectFree(Tailslide::LSLASTNode* node)
 {
-    using namespace Tailslide;
-    if (!node)
-    {
-        return true;
-    }
-    switch (node->getNodeType())
-    {
-        case NODE_NULL:
-        case NODE_CONSTANT:
-        case NODE_IDENTIFIER:
-        case NODE_TYPE:
-            return true;
-        case NODE_EXPRESSION:
-        case NODE_AST_NODE_LIST:
-            break;
-        default:
-            return false;
-    }
-    if (node->getNodeType() == NODE_EXPRESSION)
-    {
-        auto* expr = static_cast<LSLExpression*>(node);
-        if (operation_mutates(expr->getOperation()))
-        {
-            return false;
-        }
-        switch (expr->getNodeSubType())
-        {
-            case NODE_PRINT_EXPRESSION:
-                return false;
-            case NODE_FUNCTION_EXPRESSION:
-            {
-                LSLSymbol* sym = expr->getSymbol();
-                if (!sym || sym->getSubType() != SYM_BUILTIN || !pure(sym->getName()))
-                {
-                    return false;
-                }
-                break;
-            }
-            default:
-                break;
-        }
-    }
-    for (LSLASTNode* child : *node)
-    {
-        if (!sideEffectFree(child))
-        {
-            return false;
-        }
-    }
-    return true;
+    return quiet(node, false);
+}
+
+// static
+bool ALLSLTraits::changesNothing(Tailslide::LSLASTNode* node)
+{
+    return quiet(node, true);
 }

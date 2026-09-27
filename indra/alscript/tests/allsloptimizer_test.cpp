@@ -29,6 +29,7 @@
 #include "../allslinliner.h"
 #include "../allsloptimizer.h"
 #include "../allslservice.h"
+#include "../allsltraits.h"
 
 #include "../test/lltut.h"
 
@@ -1131,5 +1132,30 @@ namespace tut
         o.target = ALLSLOptimizer::Target::Mono;
         r        = ALLSLOptimizer::run(source, o);
         ensure("Mono: still the call: " + r.text, r.text.find("llList2Key(") != std::string::npos);
+    }
+    template<> template<>
+    void allsloptimizer_object::test<32>()
+    {
+        set_test_name("a read of the world or the clock whose answer nobody takes goes, but is never read at another time; a function whose answer is its arguments' alone is pure");
+        const std::string source = "default\n{\n    state_entry()\n    {\n"
+                                   "        llGetPos();\n"
+                                   "        llSetPos(<1, 2, 3>);\n"
+                                   "        vector p = llGetPos();\n"
+                                   "        list l = [llGetTime(), llGetTime()];\n"
+                                   "        llOwnerSay(llList2CSV(l));\n"
+                                   "    }\n}\n";
+        ALLSLOptimizer::Options o = options();
+        o.target                  = ALLSLOptimizer::Target::Mono;
+        const ALLSLOptimizer::Result r = ALLSLOptimizer::run(source, o);
+        ensure("optimized: " + notes(r), r.optimized);
+        ensure("the unused read goes: " + r.text, r.text.find("    llGetPos();") == std::string::npos);
+        ensure("the change stays: " + r.text, r.text.find("llSetPos(") != std::string::npos);
+        ensure("so does the unused local read from the world: " + r.text, r.text.find("vector p") == std::string::npos);
+        ensure("two reads of the clock are not put in another order: " + r.text, r.text.find("[llGetTime(), llGetTime()]") != std::string::npos);
+        for (const char* pure : { "llRound", "llListFindList", "llListSort", "llDumpList2String", "llMD5String", "llAcos", "llAsin" })
+        {
+            ensure(std::string(pure) + " is pure", ALLSLTraits::pure(pure));
+        }
+        ensure("llGetPos is not", !ALLSLTraits::pure("llGetPos") && ALLSLTraits::of("llGetPos")->mustUse);
     }
 } // namespace tut

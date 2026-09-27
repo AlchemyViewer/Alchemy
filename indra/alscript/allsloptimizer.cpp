@@ -180,6 +180,9 @@ namespace
     }
 
     bool sideEffectFree(LSLASTNode* node) { return ALLSLTraits::sideEffectFree(node); }
+    // What may be dropped, though not moved: a read of the world or the
+    // clock changes nothing.
+    bool changesNothing(LSLASTNode* node) { return ALLSLTraits::changesNothing(node); }
 
     // Skips the parentheses around an expression.
     LSLExpression* bare(LSLExpression* expr)
@@ -2237,8 +2240,8 @@ namespace
                 case OP_MUL:
                     if (keepLeft && one(right)) return keep(expr, 0);
                     if (keepRight && one(left)) return keep(expr, 1);
-                    if (type == LST_INTEGER && isInteger(right, 0) && sideEffectFree(left)) return become(expr, ctx.integer(0));
-                    if (type == LST_INTEGER && isInteger(left, 0) && sideEffectFree(right)) return become(expr, ctx.integer(0));
+                    if (type == LST_INTEGER && isInteger(right, 0) && changesNothing(left)) return become(expr, ctx.integer(0));
+                    if (type == LST_INTEGER && isInteger(left, 0) && changesNothing(right)) return become(expr, ctx.integer(0));
                     break;
                 case OP_DIV:
                     if (keepLeft && one(right)) return keep(expr, 0);
@@ -2253,8 +2256,8 @@ namespace
                 case OP_BIT_AND:
                     if (isInteger(right, -1)) return keep(expr, 0);
                     if (isInteger(left, -1)) return keep(expr, 1);
-                    if (isInteger(right, 0) && sideEffectFree(left)) return become(expr, ctx.integer(0));
-                    if (isInteger(left, 0) && sideEffectFree(right)) return become(expr, ctx.integer(0));
+                    if (isInteger(right, 0) && changesNothing(left)) return become(expr, ctx.integer(0));
+                    if (isInteger(left, 0) && changesNothing(right)) return become(expr, ctx.integer(0));
                     break;
                 case OP_EQ:
                     // `x == 0` is `!x`, and one token shorter.
@@ -2397,6 +2400,8 @@ namespace
                 {
                     return false;
                 }
+                // Read at another time than it was: a read of the clock
+                // counts as a change here.
                 changing += sideEffectFree(child) ? 0 : 1;
                 varying += child->getConstantValue() ? 0 : 1;
             }
@@ -2763,7 +2768,7 @@ namespace
                     case NODE_EXPRESSION_STATEMENT:
                     {
                         LSLExpression* expr = static_cast<LSLExpressionStatement*>(stmt)->getExpr();
-                        if (sideEffectFree(expr) || callsNothing(expr))
+                        if (changesNothing(expr) || callsNothing(expr))
                         {
                             go(stmt, "OptimizerRemovedNoEffect", ", which does nothing");
                         }
@@ -2900,7 +2905,7 @@ namespace
             }
             for (LSLASTNode* arg : *static_cast<LSLFunctionExpression*>(expr)->getArguments())
             {
-                if (!sideEffectFree(arg))
+                if (!changesNothing(arg))
                 {
                     return false;
                 }
@@ -3007,7 +3012,7 @@ namespace
                 return false;
             }
             LSLASTNode* init = decl->getInitializer();
-            if (init && !sideEffectFree(init))
+            if (init && !changesNothing(init))
             {
                 return false;
             }

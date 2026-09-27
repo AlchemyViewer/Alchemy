@@ -1519,7 +1519,7 @@ ALScriptProblems ALLSLService::check(std::string_view source, bool mono)
             if (declaration->getNodeSubType() == Tailslide::NODE_DECLARATION)
             {
                 Tailslide::LSLASTNode* given = declaration->getChild(1);
-                if (given && given->getNodeType() != Tailslide::NODE_NULL && !ALLSLTraits::sideEffectFree(given))
+                if (given && given->getNodeType() != Tailslide::NODE_NULL && !ALLSLTraits::changesNothing(given))
                 {
                     continue;
                 }
