@@ -464,6 +464,26 @@ namespace ALScriptLints
 
     ALLuauConfig luauBase()
     {
+        // Made once, and again only when a setting it reads changes: every
+        // SLua question asks for it -- each check, hover and signature --
+        // and made afresh it reads the lint levels once a lint.
+        static std::optional<ALLuauConfig> made;
+        static bool                         watching = false;
+        if (!watching)
+        {
+            watching = true;
+            for (const char* name : { "ALScriptLintLevels", "ALScriptLuauMode", "ALScriptLuauSolver" })
+            {
+                if (LLControlVariable* control = gSavedSettings.getControl(name))
+                {
+                    control->getSignal()->connect([](LLControlVariable*, const LLSD&, const LLSD&) { made.reset(); });
+                }
+            }
+        }
+        if (made)
+        {
+            return *made;
+        }
         ALLuauConfig base;
         for (const Lint& lint : all())
         {
@@ -499,6 +519,7 @@ namespace ALScriptLints
         {
             base.mode = gSavedSettings.getString("ALScriptLuauSolver") == "new" ? "strict" : "nonstrict";
         }
+        made = base;
         return base;
     }
 }
