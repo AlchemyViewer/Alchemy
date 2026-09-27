@@ -26,6 +26,7 @@
 
 #include "alscriptstudiosaving.h"
 
+#include "alincludesearch.h"
 #include "alscriptnotecardtab.h"
 #include "alscriptstudioservices.h"
 #include "lldate.h"
@@ -68,6 +69,17 @@ namespace
     {
         const std::string first = a.substr(0, a.find(' '));
         return !first.empty() && first == b.substr(0, b.find(' '));
+    }
+
+    // Names as a save says them: in a row, a comma between.
+    std::string joined(const std::vector<std::string>& names)
+    {
+        std::string out;
+        for (const std::string& name : names)
+        {
+            out += (out.empty() ? "" : ", ") + name;
+        }
+        return out;
     }
 }
 
@@ -145,12 +157,7 @@ void ALScriptStudioSaving::preprocessedAnswer(const std::string& id, U32 version
     }
     mWindow.scheduleAnalysis(doc, true);
     // The includes that never came, by the names the script gave them.
-    std::string pending;
-    for (const std::string& name : result.pending)
-    {
-        pending += (pending.empty() ? "" : ", ") + name;
-    }
-    args["[FILES]"] = pending;
+    args["[FILES]"] = joined(result.pending);
     switch (landed)
     {
         case ALScriptSaveFlow::Landed::NotForSave:
@@ -176,7 +183,28 @@ void ALScriptStudioSaving::preprocessedAnswer(const std::string& id, U32 version
             {
                 errors += problem.severity == ALScriptProblem::Severity::Error ? 1 : 0;
             }
-            mServices.report(mServices.counted("PreprocessErrors", errors, args), true, &doc, { "save_anyway" });
+            // An include not found is said by name, as one that would go
+            // up without it: a second save sends the rest, and a script
+            // missing what it calls stops in the object.
+            const ALIncludeSearch::LeftOut left_out = ALIncludeSearch::leftOut(result.problems);
+            if (left_out.names.empty())
+            {
+                mServices.report(mServices.counted("PreprocessErrors", errors, args), true, &doc, { "save_anyway" });
+            }
+            else
+            {
+                args["[FILES]"]  = joined(left_out.names);
+                std::string said = mServices.counted("PreprocessMissingSave", static_cast<S32>(left_out.names.size()), args);
+                if (errors > left_out.problems)
+                {
+                    said += " " + mServices.counted("PreprocessOtherErrors", errors - left_out.problems, args);
+                }
+                if (left_out.diskRoute)
+                {
+                    said += " " + mServices.words("PreprocessMissingDiskRoute", args);
+                }
+                mServices.report(said, true, &doc, { "save_anyway" });
+            }
             stopped(doc);
             mWindow.showProblems();
             return;
@@ -189,6 +217,21 @@ void ALScriptStudioSaving::preprocessedAnswer(const std::string& id, U32 version
         case ALScriptSaveFlow::Landed::MovedOn:
         case ALScriptSaveFlow::Landed::Send:
             break;
+    }
+    // Going up without what was not found or never came, as the save
+    // before this one said it would: said again as it goes.
+    std::vector<std::string> without = ALIncludeSearch::leftOut(result.problems).names;
+    for (const std::string& name : result.pending)
+    {
+        if (std::find(without.begin(), without.end(), name) == without.end())
+        {
+            without.push_back(name);
+        }
+    }
+    if (!without.empty())
+    {
+        args["[FILES]"] = joined(without);
+        mServices.report(mServices.counted("SavingWithout", static_cast<S32>(without.size()), args), true, &doc);
     }
     // Weighed as it goes.
     weighForSave(doc);

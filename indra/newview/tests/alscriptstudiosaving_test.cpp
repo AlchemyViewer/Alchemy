@@ -630,4 +630,61 @@ namespace tut
         doc.editor->undo();
         ensure_equals("one Undo takes back all of it", doc.editor->text(), std::string("default {}"));
     }
+    template<> template<>
+    void alscriptstudiosaving_object::test<12>()
+    {
+        set_test_name("an include not found stops the save by name, with the other errors and the disk's route; saved anyway or without one that never came, it says what goes up without");
+        ALScriptStudioSaving& saving = make();
+        studio.preprocessor          = true;
+
+        Doc& doc = tab("a", "#include \"lib.lsl\"\n#include \"x.lsl\"\ndefault {}");
+        saving.save(doc);
+        ALPreprocessor::Result wrong;
+        ALScriptProblem        missing = anError();
+        missing.key                    = "PreprocIncludeInWorld";
+        missing.args                   = { "lib.lsl" };
+        ALScriptProblem nowhere        = anError();
+        nowhere.key                    = "PreprocIncludeNotFound";
+        nowhere.args                   = { "x.lsl" };
+        wrong.problems                 = { missing, nowhere, anError() };
+        studio.answerRun(wrong);
+        ensure_equals("said by name", lastSaid(), std::string("PreprocessMissingSave"));
+        const std::string& said = services.reports.back().text;
+        ensure("both of them", said.find("[FILES]=lib.lsl, x.lsl") != std::string::npos && said.find("[COUNT]=2") != std::string::npos);
+        ensure("the error besides them", said.find("PreprocessOtherErrors") != std::string::npos);
+        ensure("and where includes come from", said.find("PreprocessMissingDiskRoute") != std::string::npos);
+        ensure("with Save Anyway, stopped", services.reports.back().actions == Names{ "save_anyway" } && !doc.save.underway());
+
+        saving.saveAsked(doc);
+        wrong.text = "default {}";
+        studio.answerRun(wrong);
+        ensure_equals("sent anyway", studio.sent.size(), size_t(1));
+        const auto going = std::find_if(services.reports.begin(), services.reports.end(),
+                                        [](const al_studio_test::FakeServices::Said& s) { return nameOf(s.text) == "SavingWithout"; });
+        ensure("said as it went, by name, a failure of the tab",
+               going != services.reports.end() && going->text.find("[FILES]=lib.lsl, x.lsl") != std::string::npos && going->failure && going->doc == "a");
+        saving.compiled(answer(doc));
+
+        // Only the other errors: said as before.
+        type(doc, " ");
+        saving.save(doc);
+        ALPreprocessor::Result plain;
+        plain.problems = { anError() };
+        studio.answerRun(plain);
+        ensure_equals("no include in it: as it was", lastSaid(), std::string("PreprocessErrors"));
+
+        // One that never came, sent without on the second save: said.
+        Doc& other = tab("b", "#include \"far.lsl\"\ndefault {}");
+        saving.save(other);
+        ALPreprocessor::Result waiting;
+        waiting.text    = "default {}";
+        waiting.pending = { "far.lsl" };
+        studio.answerRun(waiting);
+        ensure_equals("stopped for it", lastSaid(), std::string("PreprocessPendingSave"));
+        saving.saveAsked(other);
+        studio.answerRun(waiting);
+        ensure_equals("sent without it", studio.sent.size(), size_t(2));
+        ensure("and said so", services.reports.back().text.find("SavingWithout") == 0 &&
+                                  services.reports.back().text.find("[FILES]=far.lsl") != std::string::npos);
+    }
 }
