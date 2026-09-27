@@ -3565,9 +3565,11 @@ void ALFloaterScriptStudio::showFound(Doc& doc, const ALScriptLookup::Found& fou
 }
 
 void ALFloaterScriptStudio::askNewName(Doc& doc, std::function<std::string(const std::string& typed)> hint,
-                                       std::function<void(const std::string& name)> chosen)
+                                       std::function<void(const std::string& name)> chosen, std::function<void(const std::string& name)> previewed)
 {
-    ALQuickOpen* quick = quickOpen({}, getString("RenamePlaceholder"), getString("RenameTitle"), std::move(chosen), mEditorHost, 420, 56);
+    // Return renames; Shift-Return shows it in the References tab first.
+    ALQuickOpen* quick = quickOpen({}, getString("RenamePlaceholder"), getString("RenameTitle"), std::move(chosen), mEditorHost, 420, 56, {},
+                                   std::move(previewed));
     if (!quick)
     {
         return;
@@ -3581,6 +3583,23 @@ void ALFloaterScriptStudio::askNewName(Doc& doc, std::function<std::string(const
     });
     quick->setQuery(doc.lookup.name);
     quick->takeFocus();
+}
+
+void ALFloaterScriptStudio::previewRename(Doc& doc, const ALScriptLookup::Found& found, const std::string& new_name, const std::string& said,
+                                          std::function<void(const std::vector<size_t>& kept)> apply)
+{
+    std::vector<ALTextRange> lit;
+    for (const Doc::Place& place : found.places)
+    {
+        if (place.file.empty())
+        {
+            lit.push_back(rangeOf(place.span));
+        }
+    }
+    doc.editor->setHighlights(ALCodeEditor::Highlight::References, std::move(lit));
+    mReferencesPane->preview(found, new_name, said, std::move(apply));
+    showBottom("references_tab");
+    mReferencesPane->list()->setFocus(true);
 }
 
 void ALFloaterScriptStudio::referenceChosen(const ALScriptReferencesPane::Found& found, const Doc::Place& place, bool to_editor)

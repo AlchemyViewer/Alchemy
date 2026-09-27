@@ -29,6 +29,7 @@
 #include "alpanelist.h"
 #include "alscriptstudioplaces.h"
 #include "alscriptstudioservices.h"
+#include "llbutton.h"
 #include "llfloater.h"
 #include "llscrolllistcell.h"
 #include "llscrolllistitem.h"
@@ -43,8 +44,11 @@ ALScriptReferencesPane::ALScriptReferencesPane(const LLPanel::Params& params) : 
 
 bool ALScriptReferencesPane::postBuild()
 {
-    mList = getChild<ALPaneList>("references");
-    mHead = getChild<LLTextBox>("references_head");
+    mList      = getChild<ALPaneList>("references");
+    mHead      = getChild<LLTextBox>("references_head");
+    mRename    = getChild<LLButton>("references_rename");
+    mCancel    = getChild<LLButton>("references_cancel");
+    mHeadRight = mHead->getRect().mRight;
     // The window this is a tab of, found through the view tree, as what
     // the tab asks of it.
     LLFloater* window = getParentByType<LLFloater>();
@@ -55,7 +59,21 @@ bool ALScriptReferencesPane::postBuild()
         LL_WARNS() << "The References tab is not in a Script Studio window" << LL_ENDL;
         return true;
     }
-    mList->setCommitCallback([this](LLUICtrl*, const LLSD&) { choose(false); });
+    // A box ticked, where a rename is previewed, is read before the place
+    // is shown.
+    mList->setCommitCallback([this](LLUICtrl*, const LLSD&) {
+        readBoxes();
+        choose(false);
+    });
+    mList->setSpace([this]() {
+        if (LLScrollListItem* item = previewing() ? mList->getFirstSelected() : nullptr)
+        {
+            const U32 id = static_cast<U32>(item->getValue().asInteger());
+            setKept(id - 1, mLeftOut.contains(id));
+        }
+    });
+    mRename->setCommitCallback([this](LLUICtrl*, const LLSD&) { renamePreviewed(); });
+    mCancel->setCommitCallback([this](LLUICtrl*, const LLSD&) { cancelPreview(); });
     // Return and a double-click go to the place chosen, to type there, and
     // escape goes back to the script without going anywhere.
     mList->setGo([this]() { choose(true); });
@@ -92,13 +110,125 @@ bool ALScriptReferencesPane::postBuild()
 
 void ALScriptReferencesPane::show(Found found)
 {
+    take(std::move(found));
+    fill();
+}
+
+void ALScriptReferencesPane::take(Found found)
+{
     mFound = std::move(found);
     U32 id = 0;
     for (Doc::Place& place : mFound.places)
     {
         place.id = ++id;
     }
+    mApply = nullptr;
+    mNewName.clear();
+    mSaid.clear();
+    mLeftOut.clear();
+    showButtons();
+}
+
+void ALScriptReferencesPane::preview(Found found, const std::string& new_name, const std::string& said,
+                                     std::function<void(const std::vector<size_t>& kept)> apply)
+{
+    take(std::move(found));
+    mNewName = new_name;
+    mSaid    = said;
+    mApply   = std::move(apply);
+    showButtons();
     fill();
+}
+
+std::vector<size_t> ALScriptReferencesPane::kept() const
+{
+    // The places still listed -- one an edit took the name from is gone --
+    // and not left out, by the order they were found in.
+    std::vector<size_t> out;
+    for (const Doc::Place& place : mFound.places)
+    {
+        if (!mLeftOut.contains(place.id))
+        {
+            out.push_back(static_cast<size_t>(place.id) - 1);
+        }
+    }
+    return out;
+}
+
+void ALScriptReferencesPane::setKept(size_t index, bool kept)
+{
+    const U32 id = static_cast<U32>(index) + 1;
+    if (kept)
+    {
+        mLeftOut.erase(id);
+    }
+    else
+    {
+        mLeftOut.insert(id);
+    }
+    fill();
+}
+
+void ALScriptReferencesPane::readBoxes()
+{
+    if (!previewing())
+    {
+        return;
+    }
+    for (const LLScrollListItem* item : mList->getAllData())
+    {
+        const LLScrollListCell* box = item->getColumn(2);
+        const U32               id  = static_cast<U32>(item->getValue().asInteger());
+        if (box && box->getValue().asBoolean())
+        {
+            mLeftOut.erase(id);
+        }
+        else
+        {
+            mLeftOut.insert(id);
+        }
+    }
+}
+
+void ALScriptReferencesPane::renamePreviewed()
+{
+    if (!previewing())
+    {
+        return;
+    }
+    // Listed as found again before the change is made, which then takes
+    // the renamed places out as it lands: what is left is what was left
+    // out.
+    readBoxes();
+    const std::vector<size_t> chosen = kept();
+    const auto                apply  = std::move(mApply);
+    mApply                           = nullptr;
+    mLeftOut.clear();
+    showButtons();
+    fill();
+    apply(chosen);
+}
+
+void ALScriptReferencesPane::cancelPreview()
+{
+    mApply = nullptr;
+    mLeftOut.clear();
+    showButtons();
+    fill();
+}
+
+void ALScriptReferencesPane::showButtons()
+{
+    if (!mRename || !mCancel || !mHead)
+    {
+        return;
+    }
+    const bool shown = previewing();
+    mRename->setVisible(shown);
+    mCancel->setVisible(shown);
+    LLRect head = mHead->getRect();
+    head.mRight = shown ? mRename->getRect().mLeft - 4 : mHeadRight;
+    mHead->setRect(head);
 }
 
 void ALScriptReferencesPane::fill()
@@ -134,7 +264,7 @@ void ALScriptReferencesPane::fill()
     args["[NAME]"]  = mFound.name;
     args["[FILES]"] = std::to_string(files.size());
     const S32 count = static_cast<S32>(mFound.places.size());
-    mHead->setText(mServices->counted(files.size() > 1 ? "ReferencesFoundAcross" : "ReferencesFound", count, args));
+    mHead->setText(previewing() ? mSaid : mServices->counted(files.size() > 1 ? "ReferencesFoundAcross" : "ReferencesFound", count, args));
 
     LLStringUtil::format_map_t named;
     named["[NAME]"]                = mFound.name;
@@ -157,6 +287,19 @@ void ALScriptReferencesPane::fill()
         row["columns"][2]["value"]  = declaration ? mServices->words("ReferenceDeclaration") : std::string();
         row["columns"][3]["column"] = "text";
         row["columns"][3]["value"]  = place.text;
+        // Previewed: a box to leave the place out by, and the line as the
+        // rename would leave it.
+        const bool left    = mLeftOut.contains(place.id);
+        const bool renamed = previewing() && !left && place.at >= 0 && static_cast<size_t>(place.at) + mFound.name.size() <= place.text.size();
+        if (previewing())
+        {
+            row["columns"][2]["type"]  = "checkbox";
+            row["columns"][2]["value"] = !left;
+        }
+        if (renamed)
+        {
+            row["columns"][3]["value"] = place.text.substr(0, place.at) + mNewName + place.text.substr(place.at + mFound.name.size());
+        }
         if (declaration)
         {
             for (S32 c = 0; c < 4; ++c)
@@ -171,7 +314,7 @@ void ALScriptReferencesPane::fill()
         {
             if (LLScrollListCell* text = item->getColumn(3))
             {
-                text->highlightText(place.at, static_cast<S32>(mFound.name.size()));
+                text->highlightText(place.at, static_cast<S32>(renamed ? mNewName.size() : mFound.name.size()));
             }
         }
     }

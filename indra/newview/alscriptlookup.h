@@ -35,6 +35,7 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 class ALScriptStudioServices;
@@ -87,9 +88,15 @@ public:
         // brought up.
         virtual void showFound(Doc& doc, const Found& found) = 0;
         // The new name asked for, `hint` saying what Return will do with
-        // what is typed; `chosen` with it.
+        // what is typed; `chosen` with it, or `previewed` with Shift.
         virtual void askNewName(Doc& doc, std::function<std::string(const std::string& typed)> hint,
-                                std::function<void(const std::string& name)> chosen) = 0;
+                                std::function<void(const std::string& name)> chosen,
+                                std::function<void(const std::string& name)> previewed) = 0;
+        // A rename shown before it is made: each place found, to be left
+        // out or not, and `said` over them; `apply` with the places kept,
+        // by their order in what was found.
+        virtual void previewRename(Doc& doc, const Found& found, const std::string& new_name, const std::string& said,
+                                   std::function<void(const std::vector<size_t>& kept)> apply) = 0;
         // A file on disk opened in a tab here; a tab brought forward.
         virtual Doc* openFileTab(const std::string& path, bool lua) = 0;
         virtual void activate(Doc& doc)                             = 0;
@@ -120,8 +127,14 @@ public:
     void start(Doc& doc, ALEditorCommand command, const ALScriptReferences& refs, bool has_definition, const std::string& home_path,
                const ALScriptSpan& definition, std::vector<Doc::Place> places, U32 version);
     // The rename to a name, from the tab a lookup of this generation was
-    // started in.
-    void renameTo(const std::string& id, U32 generation, const std::string& new_name);
+    // started in: at every place found, or at those `kept`, by their order.
+    void renameTo(const std::string& id, U32 generation, const std::string& new_name, const std::vector<size_t>* kept = nullptr);
+    // The same shown in the References tab first, each place to be left
+    // out or not.
+    void previewRename(const std::string& id, U32 generation, const std::string& new_name);
+    // Whether `name` stands in `text` as a name, outside its comments and
+    // strings.
+    static bool mentions(std::string_view text, std::string_view name, bool lua);
     // The edits a rename left waiting for a tab's text, made where the old
     // name still stands; the places missed said.
     void applyPendingEdits(Doc& doc);
@@ -149,11 +162,19 @@ private:
     void expanded(const std::string& id, U32 generation, const ALScriptRef& ref, const std::string& name,
                   const std::shared_ptr<const std::string>& source, const ALPreprocessor::Result& result);
     void answered(const std::string& id, U32 generation, const ALScriptRef& ref, const std::string& name, const ALSourceMap& map,
-                  const std::string& source, const std::string& expanded, const ALScriptAnalysis::Result& result);
+                  const std::string& source, const std::shared_ptr<const std::string>& expanded, const ALScriptAnalysis::Result& result);
     void settled(Doc& doc);
     // What Return does with a name typed for a rename of `old_name`, found
     // at `count` places in `scripts` scripts, said.
-    std::string renameHint(const Doc& doc, const std::string& old_name, S32 count, S32 scripts, const std::string& typed) const;
+    // Under the prompt, `prompting`, it says Shift-Return previews.
+    std::string renameHint(const Doc& doc, const std::string& old_name, S32 count, S32 scripts, const std::string& typed, bool prompting = true) const;
+    // Why a name typed cannot be renamed to, said; empty where it can.
+    std::string refused(const Doc& doc, const std::string& name) const;
+    // The script a rename's texts name `name` in already, where one does.
+    std::string clashIn(const Doc& doc, const std::string& name) const;
+    // What a rename cannot reach, said: the scripts of other objects that
+    // share an include it changes. Empty where it changes no include.
+    std::string unreached(const Doc& doc) const;
     // The tab of a lookup of this generation, where it is still open.
     Doc* lookingIn(const std::string& id, U32 generation);
 

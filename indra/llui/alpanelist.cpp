@@ -148,6 +148,16 @@ void ALPaneList::setGo(std::function<void()> go)
     });
 }
 
+bool ALPaneList::handleUnicodeCharHere(llwchar uni_char)
+{
+    if (uni_char == ' ' && mSpace && getFirstSelected())
+    {
+        mSpace();
+        return true;
+    }
+    return LLScrollListCtrl::handleUnicodeCharHere(uni_char);
+}
+
 bool ALPaneList::handleKeyHere(KEY key, MASK mask)
 {
     // Shift-F10 or the Menu key: what a right click on the row chosen

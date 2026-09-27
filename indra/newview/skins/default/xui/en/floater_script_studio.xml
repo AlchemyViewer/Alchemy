@@ -196,7 +196,9 @@
     <floater.string name="ReplaceMissedA">In [NAME], 1 place no longer read as it did when searched, and was not replaced.</floater.string>
     <floater.string name="ReplaceMissedB">In [NAME], [COUNT] places no longer read as they did when searched, and were not replaced.</floater.string>
     <floater.string name="RenameReserved">[NAME] is a word of the language's own, and cannot be a name of the script's.</floater.string>
-    <floater.string name="RenameClash">Rename to [NEW]; [NEW] is declared in this script already, so the two may clash.</floater.string>
+    <floater.string name="RenameClash">Rename to [NEW]; [NEW] is a name in [SCRIPT] already, so the two may clash.</floater.string>
+    <floater.string name="RenameUnreached">Scripts of other objects that include [NAMES] are not changed.</floater.string>
+    <floater.string name="RenamePreviewHint">Shift+Return shows each place first.</floater.string>
     <floater.string name="CaretPosition">Ln [LINE], Col [COL]</floater.string>
     <floater.string name="SelectedLinesA">1 line selected</floater.string>
     <floater.string name="SelectedLinesB">[COUNT] lines selected</floater.string>
@@ -1917,6 +1919,28 @@
                                 <pane_list.columns label="" name="role" width="76" />
                                 <pane_list.columns dynamic_width="true" label="Text" name="text" />
                             </pane_list>
+                            <button
+                             follows="top|right"
+                             height="20"
+                             label="Rename"
+                             layout="topleft"
+                             left="422"
+                             name="references_rename"
+                             tool_tip="Rename at the places checked, leaving the rest as they are."
+                             top="1"
+                             visible="false"
+                             width="72" />
+                            <button
+                             follows="top|right"
+                             height="20"
+                             label="Cancel"
+                             layout="topleft"
+                             left_pad="4"
+                             name="references_cancel"
+                             tool_tip="Rename nothing, and list the places as found."
+                             top="1"
+                             visible="false"
+                             width="72" />
                         </panel>
                         <panel
                          class="script_studio_output"

@@ -520,8 +520,10 @@ private:
     void loadSource(const ALScriptRef& ref, std::function<void(const LLUUID& asset, const std::string& source)> loaded) override;
     void expand(ALScriptPreprocessor::Request request, std::function<void(const ALPreprocessor::Result&)> expanded) override;
     void showFound(Doc& doc, const ALScriptLookup::Found& found) override;
-    void askNewName(Doc& doc, std::function<std::string(const std::string& typed)> hint,
-                    std::function<void(const std::string& name)> chosen) override;
+    void askNewName(Doc& doc, std::function<std::string(const std::string& typed)> hint, std::function<void(const std::string& name)> chosen,
+                    std::function<void(const std::string& name)> previewed) override;
+    void previewRename(Doc& doc, const ALScriptLookup::Found& found, const std::string& new_name, const std::string& said,
+                       std::function<void(const std::vector<size_t>& kept)> apply) override;
     void applyPendingEdits(Doc& doc) override { mLookup.applyPendingEdits(doc); }
     // The script handed to an external editor (ALScriptExternalEditor):
     // saving's calls to it, a save from outside run here, and the bridge

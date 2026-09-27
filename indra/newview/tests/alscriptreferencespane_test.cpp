@@ -28,6 +28,7 @@
 
 #include "alpanelist.h"
 #include "alscriptstudio_fixture.h"
+#include "llbutton.h"
 #include "llfocusmgr.h"
 #include "llscrolllistcell.h"
 #include "llscrolllistitem.h"
@@ -301,5 +302,45 @@ namespace tut
         ensure_equals("A's second, not what took its index", joined(window.pane().chosen), std::string("a||1"));
         refs->pump();
         ensure_equals("listed again, the row still chosen", cell(refs->list()->getFirstSelected(), 1), std::string("2:5"));
+    }
+
+    template<> template<>
+    void alscriptreferencespane_object::test<6>()
+    {
+        set_test_name("a rename previewed: a box by each place and its line as renamed, Rename with the places kept, Space and a box leaving one out, Cancel listing them as found");
+        ALScriptReferencesPane* refs = pane();
+        std::vector<size_t>     made;
+        bool                    applied = false;
+        refs->preview(found(), "total", "Rename 3 places", [&](const std::vector<size_t>& kept) {
+            made    = kept;
+            applied = true;
+        });
+        ensure("previewing", refs->previewing());
+        ensure_equals("what it will do over them", head(), std::string("Rename 3 places"));
+        LLButton* rename = window.find<LLButton>("references_rename");
+        ensure("its buttons shown", rename && rename->getVisible() && window.find<LLButton>("references_cancel")->getVisible());
+        const std::vector<LLScrollListItem*> rows = refs->list()->getAllData();
+        ensure("each checked", rows.size() == 3 && std::all_of(rows.begin(), rows.end(), [](const LLScrollListItem* row) {
+                   return row->getColumn(2)->getValue().asBoolean();
+               }));
+        ensure_equals("the line as it would read", cell(rows[1], 3), std::string("x = total;"));
+
+        // Left out by Space on the row chosen: its box clear, its line as it is.
+        refs->list()->selectNthItem(1);
+        refs->list()->handleUnicodeCharHere(' ');
+        ensure("left out", !refs->list()->getAllData()[1]->getColumn(2)->getValue().asBoolean());
+        ensure_equals("its line as it is", cell(refs->list()->getAllData()[1], 3), std::string("x = count;"));
+        refs->setKept(2, false);
+        refs->setKept(2, true);
+        rename->onCommit();
+        ensure("made at the rest, by their order in what was found", applied && made == std::vector<size_t>({ 0, 2 }));
+        ensure("done previewing", !refs->previewing() && !rename->getVisible());
+        ensure_equals("listed as found again", head().find("total"), std::string::npos);
+
+        applied = false;
+        refs->preview(found(), "total", "Rename 3 places", [&](const std::vector<size_t>&) { applied = true; });
+        window.find<LLButton>("references_cancel")->onCommit();
+        ensure("Cancel makes nothing", !applied && !refs->previewing());
+        ensure("each row as found", cell(refs->list()->getAllData()[0], 3) == "integer count;" && refs->list()->getAllData()[0]->getColumn(2)->getValue().asString() != "1");
     }
 }

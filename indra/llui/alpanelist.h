@@ -74,6 +74,9 @@ public:
     // where the typing was: escape. Unset, those keys are the list's own.
     void setGo(std::function<void()> go);
     void setBack(std::function<void()> back) { mBack = std::move(back); }
+    // What Space does to the row chosen -- ticks its box, where the rows
+    // have one -- rather than find a row by its first letter.
+    void setSpace(std::function<void()> space) { mSpace = std::move(space); }
 
     // What the list says while it has no rows: a headline and a sentence
     // where the rows would be (ALEmptyState). Empty words, nothing.
@@ -135,6 +138,7 @@ public:
     ~ALPaneList() override;
 
     bool handleKeyHere(KEY key, MASK mask) override;
+    bool handleUnicodeCharHere(llwchar uni_char) override;
     // Copyable, the row under the pointer is chosen, unless the click is in
     // a choice already made, and the copying menu opens.
     bool handleRightMouseDown(S32 x, S32 y, MASK mask) override;
@@ -172,6 +176,7 @@ private:
     arrow_t                     mArrowAt;
     std::function<void()>       mGo;
     std::function<void()>       mBack;
+    std::function<void()>       mSpace;
     // A double-click went, and its release is not a choice of its own.
     bool                        mWentByClick = false;
     bool                        mCopyable = false;

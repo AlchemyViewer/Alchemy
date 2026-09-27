@@ -607,6 +607,12 @@ struct ALScriptStudioDoc
         std::vector<Place>             places;
         boost::unordered_flat_set<std::string, ll::string_hash, std::equal_to<>>      seen;
         boost::unordered_flat_map<std::string, U32, ll::string_hash, std::equal_to<>> versions;
+        // What a rename would change, for its clash check: each script's
+        // text as the analyzers read it -- this one's expansion, with its
+        // includes, and each other script's reached -- by its name; and
+        // the other scripts reached, by the path the map calls them.
+        std::vector<std::pair<std::string, std::shared_ptr<const std::string>>> texts;
+        boost::unordered_flat_set<std::string, ll::string_hash, std::equal_to<>>  scripts;
     };
     Lookup                                     lookup;
     // Edits to make once the script has loaded: a rename that reached

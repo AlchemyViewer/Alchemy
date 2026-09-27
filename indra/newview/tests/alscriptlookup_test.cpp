@@ -143,12 +143,22 @@ namespace
             shown   = found;
             ++shows;
         }
-        void askNewName(Doc& doc, std::function<std::string(const std::string&)> hint_of,
-                        std::function<void(const std::string&)> chose) override
+        void askNewName(Doc& doc, std::function<std::string(const std::string&)> hint_of, std::function<void(const std::string&)> chose,
+                        std::function<void(const std::string&)> preview_of) override
         {
             askedName = doc.id;
             hint      = std::move(hint_of);
             chosen    = std::move(chose);
+            previewed = std::move(preview_of);
+        }
+        void previewRename(Doc& doc, const Found& found, const std::string& new_name, const std::string& said,
+                           std::function<void(const std::vector<size_t>&)> apply_kept) override
+        {
+            previewIn   = doc.id;
+            previewOf   = found;
+            previewName = new_name;
+            previewSaid = said;
+            apply       = std::move(apply_kept);
         }
         Doc* openFileTab(const std::string& path, bool lua) override
         {
@@ -168,6 +178,10 @@ namespace
         S32                                                shows = 0;
         std::function<std::string(const std::string&)>     hint;
         std::function<void(const std::string&)>            chosen;
+        std::function<void(const std::string&)>            previewed;
+        std::string                                        previewIn, previewName, previewSaid;
+        Found                                              previewOf;
+        std::function<void(const std::vector<size_t>&)>    apply;
         std::function<Doc*(const std::string&)>            whenFileOpened;
     };
 
@@ -509,7 +523,7 @@ namespace tut
         doc.outline.push_back(entry);
         ensure("nothing typed", has(studio.hint(""), "RenameHint [COUNT]=2 [FILES]=1 [NAME]=count"));
         ensure("no name", has(studio.hint("9lives"), "RenameBadName") && has(studio.hint("9lives"), "[NAME]=9lives"));
-        ensure("reserved", has(studio.hint("state"), "RenameReserved [COUNT]=2 [FILES]=1 [NAME]=state"));
+        ensure("reserved", has(studio.hint("state"), "RenameReserved [NAME]=state"));
         ensure("the same", has(studio.hint(" count "), "RenameSame"));
         ensure("a clash said, allowed", has(studio.hint("total"), "RenameClash"));
         ensure("what it will do", has(studio.hint("sum"), "RenameTo [COUNT]=2") && has(studio.hint("sum"), "[NEW]=sum"));
@@ -686,5 +700,44 @@ namespace tut
         ensure("LSL: the other LSL script", lsl.size() == 1 && lsl[0].name == "lib.lsl" && lsl[0].ref.inInventory() && lsl[0].ref.item == lib->getUUID());
         const std::vector<ALScriptLookup::Candidate> slua = ALScriptLookup::folderCandidates(folder, lua->getUUID(), true);
         ensure("SLua: by runtime too", slua.size() == 1 && slua[0].name == "port.luau");
+    }
+
+    template<> template<>
+    void alscriptlookup_object::test<12>()
+    {
+        set_test_name("Rename previewed: Shift-Return shows each place, made at those kept; a name anywhere in what it changes is a clash; an include's other scripts said out of reach");
+        make();
+        lookUp(ALEditorCommand::Rename, false);
+        ensure("previewing offered", (bool)studio.previewed);
+        ensure("the prompt says Shift-Return shows it first", has(studio.hint("sum"), "RenamePreviewHint"));
+        studio.previewed("9lives");
+        ensure("no name: nothing shown", has(services.statuses.back(), "RenameBadName") && !studio.apply);
+        studio.previewed("sum");
+        ensure("shown from its tab", studio.previewIn == "a" && studio.previewName == "sum" && studio.previewOf.places.size() == 2);
+        ensure("what it will do said over them", has(studio.previewSaid, "RenameTo [COUNT]=2") && !has(studio.previewSaid, "RenamePreviewHint"));
+        studio.apply({ 1 });
+        Doc& doc = *services.findDoc("a");
+        ensure_equals("made at the one kept", doc.editor->text(), std::string("integer count;\ndefault { state_entry() { sum = 1; } }\n"));
+
+        // A local of the same name -- in no outline -- is a clash; a name in
+        // a comment or a string is not.
+        doc.editor->setText("integer count;\ndefault { state_entry() { integer total = count; llSay(0, \"hidden\"); } } // gone\n");
+        lookUp(ALEditorCommand::Rename, false);
+        ensure("a local's name", has(studio.hint("total"), "RenameClash") && has(studio.hint("total"), "[SCRIPT]=A"));
+        ensure("not a string's", !has(studio.hint("hidden"), "RenameClash"));
+        ensure("nor a comment's", !has(studio.hint("gone"), "RenameClash"));
+
+        // A place in an include: the scripts elsewhere that include it are
+        // not reached, and said to be so.
+        unit->start(doc, ALEditorCommand::Rename, refsOf("count"), true, "disk:/lib.lsl", span(0, 8, 5),
+                    { place("", 1, 26), place("disk:/lib.lsl", 0, 8, 5, "lib.lsl") }, doc.editor->document().version());
+        ensure("out of reach said", has(studio.hint("sum"), "RenameUnreached [NAMES]=lib.lsl"));
+
+        ensure("SLua: a comment is not a mention", !ALScriptLookup::mentions("local a = 1 -- total\n", "total", true));
+        ensure("nor a long comment", !ALScriptLookup::mentions("--[[ total ]] local b = 2", "total", true));
+        ensure("nor a long string", !ALScriptLookup::mentions("local s = [==[ total ]==]", "total", true));
+        ensure("a local is", ALScriptLookup::mentions("local total = 1", "total", true));
+        ensure("not part of a longer name", !ALScriptLookup::mentions("integer totals;", "total", false));
+        ensure("LSL: nor in a block comment", !ALScriptLookup::mentions("/* total */ integer x;", "total", false));
     }
 }

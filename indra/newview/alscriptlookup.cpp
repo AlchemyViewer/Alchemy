@@ -351,13 +351,13 @@ void ALScriptLookup::expanded(const std::string& id, U32 generation, const ALScr
                                              expanded_text](const ALScriptAnalysis::Result& answer) {
         if (alive.lock())
         {
-            answered(id, generation, ref, name, map, *source, *expanded_text, answer);
+            answered(id, generation, ref, name, map, *source, expanded_text, answer);
         }
     });
 }
 
 void ALScriptLookup::answered(const std::string& id, U32 generation, const ALScriptRef& ref, const std::string& name,
-                              const ALSourceMap& map, const std::string& source, const std::string& expanded,
+                              const ALSourceMap& map, const std::string& source, const std::shared_ptr<const std::string>& expanded,
                               const ALScriptAnalysis::Result& result)
 {
     Doc* found = lookingIn(id, generation);
@@ -402,10 +402,15 @@ void ALScriptLookup::answered(const std::string& id, U32 generation, const ALScr
             }
             else
             {
-                placeText(place, lineOf(expanded, raw.line));
+                placeText(place, lineOf(*expanded, raw.line));
                 place.at = -1;
             }
             addPlace(doc.lookup, std::move(place));
+        }
+        // Reached, and what it reads as kept for a rename's clash check.
+        if (doc.lookup.scripts.insert(self).second)
+        {
+            doc.lookup.texts.emplace_back(name, expanded);
         }
     }
     passed(doc);
@@ -451,6 +456,10 @@ void ALScriptLookup::settled(Doc& doc)
             mServices.setStatus(mServices.words("NotRenamable", args));
             return;
         }
+        // This script as the analyzers read it, its includes in it, first
+        // among what the clash check reads.
+        const bool expanded = doc.expanded.valid && doc.expanded.version == lookup.version && doc.expanded.text;
+        lookup.texts.insert(lookup.texts.begin(), { doc.name, expanded ? doc.expanded.text : doc.snapshot() });
         const std::string         id         = doc.id;
         const U32                 generation = lookup.generation;
         const std::string         old_name   = lookup.name;
@@ -468,11 +477,17 @@ void ALScriptLookup::settled(Doc& doc)
                 {
                     renameTo(id, generation, typed);
                 }
+            },
+            [this, alive, id, generation](const std::string& typed) {
+                if (alive.lock())
+                {
+                    previewRename(id, generation, typed);
+                }
             });
     }
 }
 
-std::string ALScriptLookup::renameHint(const Doc& doc, const std::string& old_name, S32 count, S32 scripts, const std::string& typed) const
+std::string ALScriptLookup::renameHint(const Doc& doc, const std::string& old_name, S32 count, S32 scripts, const std::string& typed, bool prompting) const
 {
     // The row under the field says what return will do with what is typed.
     std::string name = typed;
@@ -486,29 +501,219 @@ std::string ALScriptLookup::renameHint(const Doc& doc, const std::string& old_na
     {
         return mServices.words("RenameHint", args);
     }
-    if (!isIdentifier(name))
+    if (const std::string said = refused(doc, name); !said.empty())
     {
-        args["[NAME]"] = name;
-        return mServices.words("RenameBadName", args);
-    }
-    if (reserved(doc.language.lua, name))
-    {
-        args["[NAME]"] = name;
-        return mServices.words("RenameReserved", args);
+        return said;
     }
     if (name == old_name)
     {
         return mServices.words("RenameSame", args);
     }
-    if (std::any_of(doc.outline.begin(), doc.outline.end(), [&name](const ALScriptOutlineEntry& entry) { return entry.name == name; }))
+    // What it cannot reach, after what it will do; and under the prompt,
+    // that Shift-Return shows it first.
+    std::string beyond = unreached(doc);
+    beyond             = beyond.empty() ? beyond : " " + beyond;
+    if (prompting)
+    {
+        beyond += " " + mServices.words("RenamePreviewHint");
+    }
+    if (const std::string in = clashIn(doc, name); !in.empty())
     {
         // Allowed, since a name in another scope may be meant; said.
-        return mServices.words("RenameClash", args);
+        args["[SCRIPT]"] = in;
+        return mServices.words("RenameClash", args) + beyond;
     }
-    return scripts > 1 ? mServices.words("RenameToAcross", args) : mServices.counted("RenameTo", count, args);
+    return (scripts > 1 ? mServices.words("RenameToAcross", args) : mServices.counted("RenameTo", count, args)) + beyond;
 }
 
-void ALScriptLookup::renameTo(const std::string& id, U32 generation, const std::string& new_name)
+std::string ALScriptLookup::refused(const Doc& doc, const std::string& name) const
+{
+    LLStringUtil::format_map_t args;
+    args["[NAME]"] = name;
+    if (!isIdentifier(name))
+    {
+        return mServices.words("RenameBadName", args);
+    }
+    if (reserved(doc.language.lua, name))
+    {
+        return mServices.words("RenameReserved", args);
+    }
+    return std::string();
+}
+
+// static
+bool ALScriptLookup::mentions(std::string_view text, std::string_view name, bool lua)
+{
+    // Passed over as the lexers pass over them: `//` and `/* */` comments
+    // and "" strings in LSL; `--` and `--[[ ]]` comments, '' "" `` strings
+    // and [[ ]] long ones in SLua.
+    const auto long_close = [&text](size_t at, size_t& level) {
+        // A long bracket opening at `at`, `[[` or `[==[`: its closer.
+        if (at >= text.size() || text[at] != '[')
+        {
+            return std::string();
+        }
+        level = 0;
+        while (at + 1 + level < text.size() && text[at + 1 + level] == '=')
+        {
+            ++level;
+        }
+        return at + 1 + level < text.size() && text[at + 1 + level] == '[' ? "]" + std::string(level, '=') + "]" : std::string();
+    };
+    const auto name_byte = [](char c) { return isalnum(static_cast<unsigned char>(c)) || c == '_'; };
+    for (size_t i = 0; i < text.size();)
+    {
+        const char c = text[i];
+        if (c == '"' || (lua && (c == '\'' || c == '`')))
+        {
+            for (++i; i < text.size() && text[i] != c && text[i] != '\n'; ++i)
+            {
+                i += text[i] == '\\' ? 1 : 0;
+            }
+            ++i;
+            continue;
+        }
+        if (lua && c == '-' && i + 1 < text.size() && text[i + 1] == '-')
+        {
+            size_t            level  = 0;
+            const std::string closer = long_close(i + 2, level);
+            const size_t      end    = closer.empty() ? text.find('\n', i) : text.find(closer, i + 4 + level);
+            i                        = end == std::string_view::npos ? text.size() : end + (closer.empty() ? 0 : closer.size());
+            continue;
+        }
+        if (lua && c == '[')
+        {
+            size_t            level  = 0;
+            const std::string closer = long_close(i, level);
+            if (!closer.empty())
+            {
+                const size_t end = text.find(closer, i + 2 + level);
+                i                = end == std::string_view::npos ? text.size() : end + closer.size();
+                continue;
+            }
+        }
+        if (!lua && c == '/' && i + 1 < text.size() && (text[i + 1] == '/' || text[i + 1] == '*'))
+        {
+            const size_t end = text[i + 1] == '/' ? text.find('\n', i) : text.find("*/", i + 2);
+            i                = end == std::string_view::npos ? text.size() : end + (text[i + 1] == '/' ? 0 : 2);
+            continue;
+        }
+        if (name_byte(c))
+        {
+            size_t end = i;
+            while (end < text.size() && name_byte(text[end]))
+            {
+                ++end;
+            }
+            if (text.substr(i, end - i) == name)
+            {
+                return true;
+            }
+            i = end;
+            continue;
+        }
+        ++i;
+    }
+    return false;
+}
+
+std::string ALScriptLookup::clashIn(const Doc& doc, const std::string& name) const
+{
+    // Declared in this script, by what the outline says of it; else named
+    // anywhere in what the rename changes -- a local, a parameter, an
+    // include's global -- which may be in another scope, and may not.
+    if (std::any_of(doc.outline.begin(), doc.outline.end(), [&name](const ALScriptOutlineEntry& entry) { return entry.name == name; }))
+    {
+        return doc.name;
+    }
+    for (const auto& [script, text] : doc.lookup.texts)
+    {
+        if (text && mentions(*text, name, doc.language.lua))
+        {
+            return script;
+        }
+    }
+    return std::string();
+}
+
+std::string ALScriptLookup::unreached(const Doc& doc) const
+{
+    // An include is changed wherever it is; the scripts that include it
+    // and were not read -- other objects', other folders' -- are not, and
+    // will not compile against it until they are.
+    std::vector<std::string> includes;
+    // A file on disk renamed in its own tab is one such include.
+    if (!doc.file.empty() && std::any_of(doc.lookup.places.begin(), doc.lookup.places.end(), [](const Doc::Place& place) { return place.file.empty(); }))
+    {
+        includes.push_back(doc.name);
+    }
+    for (const Doc::Place& place : doc.lookup.places)
+    {
+        if (!place.file.empty() && !doc.lookup.scripts.contains(place.file) &&
+            std::find(includes.begin(), includes.end(), place.fileName) == includes.end())
+        {
+            includes.push_back(place.fileName);
+        }
+    }
+    if (includes.empty())
+    {
+        return std::string();
+    }
+    std::string names;
+    for (const std::string& include : includes)
+    {
+        names += (names.empty() ? "" : ", ") + include;
+    }
+    return mServices.words("RenameUnreached", { { "[NAMES]", names } });
+}
+
+void ALScriptLookup::previewRename(const std::string& id, U32 generation, const std::string& new_name)
+{
+    Doc* found = lookingIn(id, generation);
+    if (!found)
+    {
+        return;
+    }
+    Doc&        doc  = *found;
+    std::string name = new_name;
+    LLStringUtil::trim(name);
+    if (const std::string said = refused(doc, name); !said.empty())
+    {
+        mServices.setStatus(said, true);
+        return;
+    }
+    if (name == doc.lookup.name)
+    {
+        doc.editor->setFocus(true);
+        return;
+    }
+    const Doc::Lookup& lookup = doc.lookup;
+    Found              shown;
+    shown.from          = doc.id;
+    shown.fromName      = doc.name;
+    shown.name          = lookup.name;
+    shown.places        = lookup.places;
+    shown.hasDefinition = lookup.hasDefinition;
+    shown.home          = lookup.homePath;
+    shown.definition    = lookup.definition;
+    // What it will do, what may clash, and what it cannot reach, over the
+    // places.
+    std::set<std::string> files;
+    for (const Doc::Place& place : lookup.places)
+    {
+        files.insert(place.file);
+    }
+    std::string said = renameHint(doc, lookup.name, static_cast<S32>(lookup.places.size()), static_cast<S32>(files.size()), name, false);
+    const std::weak_ptr<bool> alive = mAlive;
+    mWindow.previewRename(doc, shown, name, said, [this, alive, id, generation, name](const std::vector<size_t>& kept) {
+        if (alive.lock())
+        {
+            renameTo(id, generation, name, &kept);
+        }
+    });
+}
+
+void ALScriptLookup::renameTo(const std::string& id, U32 generation, const std::string& new_name, const std::vector<size_t>* kept)
 {
     Doc* found = lookingIn(id, generation);
     if (!found)
@@ -522,14 +727,9 @@ void ALScriptLookup::renameTo(const std::string& id, U32 generation, const std::
     LLStringUtil::trim(name);
     LLStringUtil::format_map_t args;
     args["[NAME]"] = name;
-    if (!isIdentifier(name))
+    if (const std::string said = refused(doc, name); !said.empty())
     {
-        mServices.setStatus(mServices.words("RenameBadName", args), true);
-        return;
-    }
-    if (reserved(doc.language.lua, name))
-    {
-        mServices.setStatus(mServices.words("RenameReserved", args), true);
+        mServices.setStatus(said, true);
         return;
     }
     if (name == old_name)
@@ -545,10 +745,14 @@ void ALScriptLookup::renameTo(const std::string& id, U32 generation, const std::
     // Each script's places together: this one's put in as one step;
     // another's the same where it is open and unchanged since it was
     // read, else opened with the change waiting for its text.
+    // Every place, or those kept where the rename was previewed.
     std::map<std::string, std::vector<const Doc::Place*>> by_file;
-    for (const Doc::Place& place : lookup.places)
+    for (size_t i = 0; i < lookup.places.size(); ++i)
     {
-        by_file[place.file].push_back(&place);
+        if (!kept || std::find(kept->begin(), kept->end(), i) != kept->end())
+        {
+            by_file[lookup.places[i].file].push_back(&lookup.places[i]);
+        }
     }
     S32 renamed = 0;
     S32 scripts = 0;
@@ -682,7 +886,9 @@ void ALScriptLookup::renameTo(const std::string& id, U32 generation, const std::
         args["[SCRIPTS]"] = mServices.counted("Scripts", stale);
         said += "; " + mServices.words("RenamedLeft", args);
     }
-    mServices.report(said + ".", stale > 0);
+    // What it could not reach, said with what it did.
+    const std::string beyond = unreached(doc);
+    mServices.report(said + "." + (beyond.empty() ? std::string() : " " + beyond), stale > 0);
     mWindow.activate(doc);
     doc.editor->setFocus(true);
 }

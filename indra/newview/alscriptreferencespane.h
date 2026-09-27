@@ -27,11 +27,14 @@
 #include "alscriptstudiodoc.h"
 #include "llpanel.h"
 
+#include <functional>
+#include <set>
 #include <string>
 #include <vector>
 
 class ALPaneList;
 class ALScriptStudioServices;
+class LLButton;
 class LLTextBox;
 
 // The References tab of a Script Studio window: the places a name was last
@@ -91,8 +94,26 @@ public:
     // The row chosen gone to.
     void choose(bool to_editor);
 
+    // A rename previewed over what was found: a box by each place, checked,
+    // to leave it out by, and its line as it would read with `new_name`;
+    // `said` over them. Rename makes it at the places still checked, by
+    // their order in what was found; Cancel lists them as found. Anything
+    // shown after lets it go.
+    void preview(Found found, const std::string& new_name, const std::string& said, std::function<void(const std::vector<size_t>& kept)> apply);
+    bool previewing() const { return static_cast<bool>(mApply); }
+    std::vector<size_t> kept() const;
+    // A place's box turned, by its order in what was found.
+    void setKept(size_t index, bool kept);
+    void renamePreviewed();
+    void cancelPreview();
+
 private:
     void fill();
+    // The places numbered, the preview let go of.
+    void take(Found found);
+    // The boxes as the rows have them now, after a click.
+    void readBoxes();
+    void showButtons();
     // Where in the places the one with this number is; the end where it is
     // gone, or with `or_after` the first after it, else the last.
     size_t placeWith(U32 id, bool or_after) const;
@@ -101,7 +122,17 @@ private:
     Window*                 mWindow   = nullptr;
     ALPaneList*             mList     = nullptr;
     LLTextBox*              mHead     = nullptr;
+    LLButton*               mRename   = nullptr;
+    LLButton*               mCancel   = nullptr;
     Found                   mFound;
+    // The rename previewed: the name, what is said of it, the places left
+    // out by their numbers, and what makes it.
+    std::string             mNewName;
+    std::string             mSaid;
+    std::set<U32>           mLeftOut;
+    std::function<void(const std::vector<size_t>& kept)> mApply;
+    // The head's width with no buttons beside it.
+    S32                     mHeadRight = 0;
     // Whether an edit has moved the places since the list was filled.
     bool                    mStale = false;
 };
