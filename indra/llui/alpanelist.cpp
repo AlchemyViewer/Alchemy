@@ -142,6 +142,7 @@ void ALPaneList::setGo(std::function<void()> go)
     {
         if (mGo)
         {
+            mWentByClick = true;
             mGo();
         }
     });
@@ -415,6 +416,7 @@ void ALPaneList::onFocusLost()
 
 bool ALPaneList::handleMouseDown(S32 x, S32 y, MASK mask)
 {
+    mWentByClick = false;
     // An arrow pressed turns its row's fold, before the list takes the
     // press as a choice.
     if (mask == MASK_NONE && mFold && mArrowAt)
@@ -462,6 +464,17 @@ bool ALPaneList::handleMouseUp(S32 x, S32 y, MASK mask)
 {
     mPress.release();
     mPressed.clear();
+    if (std::exchange(mWentByClick, false))
+    {
+        // The release of a double-click that went where its row goes: the
+        // first click chose the row, and choosing it again now would take
+        // the keyboard back from where it went.
+        if (hasMouseCapture())
+        {
+            gFocusMgr.setMouseCapture(nullptr);
+        }
+        return true;
+    }
     return LLScrollListCtrl::handleMouseUp(x, y, mask);
 }
 

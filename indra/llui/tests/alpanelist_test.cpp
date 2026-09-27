@@ -462,4 +462,28 @@ namespace tut
         ensure("each on the row chosen", clicked == std::vector<std::string>({ "two", "two" }));
         ensure("which stays chosen", l.getFirstSelectedIndex() == 1);
     }
+
+    template<> template<>
+    void alpanelist_object::test<12>()
+    {
+        set_test_name("a double-click's release chooses nothing again, which would take the keyboard back from where it went; a later click's does");
+        ALPaneList& l = make();
+        add("one", 0);
+        add("two", 0);
+        S32 went = 0, chosen = 0;
+        l.setGo([&]() { ++went; });
+        l.setCommitCallback([&](LLUICtrl*, const LLSD&) { ++chosen; });
+        const LLRect row = l.getCellRect(1, 0);
+        l.handleMouseDown(row.getCenterX(), row.getCenterY(), MASK_NONE);
+        l.handleMouseUp(row.getCenterX(), row.getCenterY(), MASK_NONE);
+        ensure_equals("the first click chooses", chosen, 1);
+        l.handleDoubleClick(row.getCenterX(), row.getCenterY(), MASK_NONE);
+        l.handleMouseUp(row.getCenterX(), row.getCenterY(), MASK_NONE);
+        ensure_equals("the double-click goes", went, 1);
+        ensure_equals("and its release chooses nothing", chosen, 1);
+        ensure("nor holds the mouse", !l.hasMouseCapture());
+        l.handleMouseDown(row.getCenterX(), row.getCenterY(), MASK_NONE);
+        l.handleMouseUp(row.getCenterX(), row.getCenterY(), MASK_NONE);
+        ensure_equals("a click after chooses again", chosen, 2);
+    }
 }

@@ -172,6 +172,8 @@ private:
     arrow_t                     mArrowAt;
     std::function<void()>       mGo;
     std::function<void()>       mBack;
+    // A double-click went, and its release is not a choice of its own.
+    bool                        mWentByClick = false;
     bool                        mCopyable = false;
     std::function<std::string()> mCopyCaption;
     // The cell last right-clicked, for the copy meant to be pasted into a
