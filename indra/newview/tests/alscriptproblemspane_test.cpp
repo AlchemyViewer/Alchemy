@@ -553,4 +553,20 @@ namespace tut
         rows = weights(gather(d));
         ensure("over: the over row alone", rows.size() == 1 && rows[0].message.find("more than") != std::string::npos);
     }
+
+    template <>
+    template <>
+    void alscriptproblemspane_object::test<8>()
+    {
+        set_test_name("a problem in code the preprocessor made is listed under that name, not marked on the source's line of its number");
+        make();
+        Doc& d = doc("door");
+        ALScriptProblem made_here = problem(ALScriptProblem::Source::Parser, ALScriptProblem::Severity::Error, 1, "in a switch's jump table", Doc::GENERATED);
+        d.check.analysis          = { made_here };
+        d.check.analysisVersion   = d.editor->document().version();
+        const ALScriptProblemsPane::Made made = gather(d);
+        ensure_equals("one row", made.rows.size(), size_t(1));
+        ensure_equals("named so", made.rows[0].fileName, services.words("InGeneratedCode"));
+        ensure("no mark, no squiggle", made.marks.empty() && made.decorations.empty());
+    }
 }

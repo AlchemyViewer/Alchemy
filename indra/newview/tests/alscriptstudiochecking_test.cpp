@@ -519,7 +519,7 @@ namespace tut
     template<> template<>
     void alscriptstudiochecking_object::test<4>()
     {
-        set_test_name("a check of an expansion: problems back in the source, an include's kept by its file without fixes, its unused not said");
+        set_test_name("a check of an expansion: problems back in the source, an include's kept by its file without fixes, its unused not said, one in generated code said so");
         ALScriptStudioChecking& checking = make();
         Doc&                    doc      = tab("a");
         preprocessing                    = true;
@@ -552,6 +552,7 @@ namespace tut
                got[0].fixes[0].edits[0].line == 3);
         ensure("the include's: by its file, no fixes", got[1].file == "disk:/lib.lsl" && got[1].line == 2 && got[1].fixes.empty());
         ensure("nowhere: no fixes", got[3].fixes.empty());
+        ensure("and said to be in code the preprocessor made, at the expansion's line", got[3].file == Doc::GENERATED && got[3].line == 9);
         ensure("the include's symbol not outlined", doc.outline.size() == 1 && doc.outline[0].name == "count" &&
                doc.outline[0].nameSpan.line == 0);
     }

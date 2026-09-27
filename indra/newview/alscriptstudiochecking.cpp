@@ -893,6 +893,10 @@ void ALScriptStudioChecking::mapProblems(Doc& doc)
         const S32 file = mapSpan(map, span);
         if (file < 0)
         {
+            // In code the preprocessor made: said so, at the expansion's
+            // line, rather than at whatever line of the source has that
+            // number.
+            problem.file = Doc::GENERATED;
             problem.fixes.clear();
             continue;
         }

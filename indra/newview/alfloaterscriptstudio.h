@@ -638,6 +638,8 @@ private:
     // What scripts say, from the workspace: listed in the Output tab, and
     // a run-time error in a script that is open marked on its line.
     void runtimeEvent(const ALScriptWorkspace::RuntimeEvent& event);
+    // A line of code the preprocessor made, shown in the Preprocessed view.
+    void showGenerated(Doc& doc, S32 line, S32 column);
     static ALScriptStudioDoc::RuntimeProblem runtimeProblemOf(const ALScriptWorkspace::RuntimeEvent& event);
     // Whether a run-time error's line waits for the map what runs is read
     // back by; and a tab's own, said while it was closed, taken as it loads.

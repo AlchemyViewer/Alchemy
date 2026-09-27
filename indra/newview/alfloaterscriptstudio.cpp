@@ -1868,6 +1868,13 @@ void ALFloaterScriptStudio::goToPending(Doc& doc)
         doc.pendingLine               = place.line;
         doc.pendingColumn             = place.column;
         doc.pendingLength             = 0;
+        if (place.generated)
+        {
+            doc.pendingLine   = -1;
+            doc.pendingColumn = -1;
+            showGenerated(doc, place.line, 0);
+            return;
+        }
         if (!place.file.empty())
         {
             doc.pendingLine   = -1;
@@ -2179,6 +2186,19 @@ void ALFloaterScriptStudio::showExpanded(Doc& doc, const std::string& text)
     {
         refreshToolbar();
     }
+}
+
+void ALFloaterScriptStudio::showGenerated(Doc& doc, S32 line, S32 column)
+{
+    // A place in code the preprocessor made, which no line of the source
+    // stands for: in the Preprocessed view, where there is one.
+    if (!doc.expandedEditor)
+    {
+        setStatus(getString("NoGeneratedView"));
+        return;
+    }
+    showView(doc, Doc::View::Expanded, true);
+    doc.expandedEditor->goTo(doc.expandedEditor->document().clamp(ALTextPos(line, llmax(0, column))));
 }
 
 void ALFloaterScriptStudio::dropExpanded(Doc& doc)
@@ -3057,7 +3077,7 @@ void ALFloaterScriptStudio::refreshProblems(Doc& doc)
 
 std::string ALFloaterScriptStudio::problemIcon(const Doc& doc, const std::string& include) const
 {
-    return include.empty() ? ALScriptStudioWords::imageNameOf(doc) : includeImage(include, doc.language.lua);
+    return include.empty() || include == Doc::GENERATED ? ALScriptStudioWords::imageNameOf(doc) : includeImage(include, doc.language.lua);
 }
 
 void ALFloaterScriptStudio::fixAllOfKind(Doc& doc, const std::string& key)
@@ -3356,7 +3376,15 @@ void ALFloaterScriptStudio::problemChosen(const ALScriptProblemsPane::Place& pla
     }
     mNavigation.noteJump(!to_editor);
     ++mHoldPanes;
-    if (!place.file.empty())
+    if (place.file == Doc::GENERATED)
+    {
+        if (index != mActive)
+        {
+            activate(index);
+        }
+        showGenerated(*mDocs[index], line, has_column ? column : 0);
+    }
+    else if (!place.file.empty())
     {
         // In an include: opened in a tab of its own where it is a script
         // or a notecard in the world, or a file on disk.
@@ -5994,6 +6022,11 @@ void ALFloaterScriptStudio::outputGoTo(const ALScriptRef& ref, const std::string
     if (line >= 0 && running)
     {
         const Doc::RunningPlace place = doc.placeOfRunning(line, column);
+        if (place.generated)
+        {
+            showGenerated(doc, place.line, llmax(0, column));
+            return;
+        }
         if (!place.file.empty())
         {
             openIncludeAt(place.file, place.fileName, place.line, place.column, 0);

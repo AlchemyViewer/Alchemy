@@ -89,6 +89,9 @@ public:
         S32         column = -1;
         std::string file;
         std::string fileName;
+        // Still the line the region counts: the script not open, its map
+        // not known, or the place in code the preprocessor made.
+        bool        running = false;
     };
 
     // Built by the skin, as the tab (class="script_studio_output"), in a

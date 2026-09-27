@@ -643,6 +643,12 @@ void ALScriptStudioSaving::compiledHere(const ALScriptWorkspace::CompileResult& 
                     one.file = read->files()[loc.file].path;
                 }
             }
+            else
+            {
+                // In code the preprocessor made, at the expansion's line.
+                one.line = llmax(0, said.line - under);
+                one.file = Doc::GENERATED;
+            }
         }
         doc.problems.push_back(std::move(one));
     }

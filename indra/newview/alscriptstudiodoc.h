@@ -150,7 +150,14 @@ struct ALScriptStudioDoc
         S32         column = -1;
         std::string file;
         std::string fileName;
+        // In code the preprocessor made, which no line of the source or an
+        // include stands for: the line is the expansion's, counted from
+        // its code's first.
+        bool        generated = false;
     };
+    // The file a problem is said to be in where it is in such code: its
+    // line the expansion's, which the Preprocessed view shows.
+    static const std::string GENERATED;
     RunningPlace       placeOfRunning(S32 line, S32 column) const;
     // The envelope a save sends an expansion in: the source as written,
     // its target, the program that wrote it and when.

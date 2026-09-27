@@ -141,18 +141,23 @@ ALScriptOutputPane::Place ALScriptOutputPane::heard(const ALScriptWorkspace::Run
     // not, or its map is not known yet, the line is the one the region
     // counts, and a link to it says so, to be read back once it is.
     const ALScriptStudioDoc* open     = event.item.notNull() ? mServices->findDoc(ALScriptRef(event.prim, event.item)) : nullptr;
-    const bool               running  = !open || !open->runningMap();
     const auto               where_of = [&](S32 line, S32 column) {
         Place where;
-        where.line   = line;
-        where.column = column;
-        if (open)
+        where.line    = line;
+        where.column  = column;
+        where.running = line >= 0;
+        if (!open || !open->runningMap())
         {
-            const ALScriptStudioDoc::RunningPlace place = open->placeOfRunning(line, column);
+            return where;
+        }
+        const ALScriptStudioDoc::RunningPlace place = open->placeOfRunning(line, column);
+        if (!place.generated)
+        {
             where.line     = place.line;
             where.column   = place.column;
             where.file     = place.file;
             where.fileName = place.fileName;
+            where.running  = false;
         }
         return where;
     };
@@ -165,7 +170,7 @@ ALScriptOutputPane::Place ALScriptOutputPane::heard(const ALScriptWorkspace::Run
         value["column"]   = where.column;
         value["file"]     = where.file;
         value["fileName"] = where.fileName;
-        value["running"]  = running && where.line >= 0;
+        value["running"]  = where.running;
         return value;
     };
     const Place at = where_of(event.line, event.column);

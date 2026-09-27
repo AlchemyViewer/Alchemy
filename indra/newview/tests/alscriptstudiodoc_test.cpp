@@ -222,5 +222,10 @@ namespace tut
         said.line = 0;
         doc.heardRuntime(said, false);
         ensure("in the include", doc.runtime.size() == 2 && doc.runtime[1].file == "disk:/s/lib.lsl" && doc.runtime[1].line == 0);
+        const Doc::RunningPlace made = doc.placeOfRunning(9, -1);
+        ensure("past the map: code the preprocessor made, at its own line", made.generated && made.line == 9 && made.file.empty());
+        said.line = 9;
+        doc.heardRuntime(said, false);
+        ensure("said to be there", doc.runtime.size() == 3 && doc.runtime[2].file == Doc::GENERATED && doc.runtime[2].line == 9);
     }
 }

@@ -71,8 +71,9 @@ ALScriptProblemsPane::Made ALScriptProblemsPane::make(const Doc& doc, const ALSc
         row.file      = file;
         if (!file.empty())
         {
-            // In an include: listed under its name, not marked here.
-            row.fileName = making.includeName ? making.includeName(file) : file;
+            // In an include, or in code the preprocessor made: listed under
+            // its name, not marked here.
+            row.fileName = file == Doc::GENERATED ? services.words("InGeneratedCode") : making.includeName ? making.includeName(file) : file;
             made.rows.push_back(std::move(row));
             return;
         }

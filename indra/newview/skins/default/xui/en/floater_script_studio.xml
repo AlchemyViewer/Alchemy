@@ -458,6 +458,8 @@
     <floater.string name="OriginTypes">Types</floater.string>
     <floater.string name="OriginLint">Lint</floater.string>
     <floater.string name="OriginDefinitions">Definitions</floater.string>
+    <floater.string name="InGeneratedCode">Code the preprocessor made</floater.string>
+    <floater.string name="NoGeneratedView">That is in code the preprocessor made, which the Preprocessed view shows once the script has been expanded.</floater.string>
     <floater.string name="MenuUndo">Undo</floater.string>
     <floater.string name="MenuUndoWhat">Undo [WHAT]</floater.string>
     <floater.string name="MenuRedo">Redo</floater.string>

@@ -33,6 +33,9 @@
 #include <utility>
 
 // static
+const std::string ALScriptStudioDoc::GENERATED = "generated:";
+
+// static
 const char* ALScriptStudioDoc::levelName(Level level)
 {
     return level == Level::Error ? "ERROR" : level == Level::Warning ? "WARNING" : "NOTE";
@@ -107,6 +110,11 @@ ALScriptStudioDoc::RunningPlace ALScriptStudioDoc::placeOfRunning(S32 line, S32 
             where.fileName = map->files()[loc.file].name;
         }
     }
+    else
+    {
+        where.line      = llmax(0, line - runningCodeLine());
+        where.generated = true;
+    }
     return where;
 }
 
@@ -121,7 +129,7 @@ void ALScriptStudioDoc::heardRuntime(const RuntimeProblem& running, bool hold)
     RuntimeProblem     problem;
     problem.line    = where.line;
     problem.column  = where.column;
-    problem.file    = where.file;
+    problem.file    = where.generated ? GENERATED : where.file;
     problem.message = running.message;
     problem.count   = running.count;
     const auto same = std::find_if(runtime.begin(), runtime.end(), [&problem](const RuntimeProblem& one) {
