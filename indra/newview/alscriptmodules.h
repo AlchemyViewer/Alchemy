@@ -24,6 +24,7 @@
 
 #pragma once
 
+#include "almodulelook.h"
 #include "alscriptpreprocessor.h"
 #include "llsingleton.h"
 
@@ -109,36 +110,8 @@ public:
     static std::string  identity(const std::string& path);
 
 private:
-    // Something that may be a module: what it gives, and the names a
-    // require or an include might find it by, in the order tried.
-    struct Candidate
-    {
-        std::string              path;
-        std::string              name;
-        std::vector<std::string> names;
-        std::vector<std::string> exports;
-
-        bool operator==(const Candidate&) const = default;
-    };
-    // What a look for what is in reach of a script is given, gathered on
-    // the main thread: the texts open and held, the folders a require or
-    // an include reads, and the aliases a SLua configuration names.
-    struct Look
-    {
-        struct Text
-        {
-            std::string                        path;
-            std::string                        name;
-            // Zero for a text held, which is known by what it holds.
-            U32                                version = 0;
-            std::shared_ptr<const std::string> text;
-        };
-        bool                                             lua = false;
-        std::string                                      self;
-        std::vector<Text>                                texts;
-        std::vector<std::pair<std::string, std::string>> folders;
-        std::vector<std::string>                         aliases;
-    };
+    typedef ALModuleLook::Candidate Candidate;
+    typedef ALModuleLook::Input     Look;
     struct Reach
     {
         F64                    at      = 0.0;
@@ -153,39 +126,11 @@ private:
     Look                   lookFor(const ALScriptPreprocessor::Request& request, const open_t& open);
     void                   startLook(const std::string& kept, Look look);
     void                   looked(const std::string& kept, std::vector<Candidate> found);
-    // On the index's thread: everything that could be a module, each once,
-    // with the names it might be found by.
-    std::vector<Candidate> look(const Look& look);
-    // The files of a folder and the folders under it, each as a candidate
-    // named by its path from the folder, `prefix` before it.
-    void        listFolder(const std::string& prefix, const std::string& folder, const ALDiskIncludes& blessed, bool lua,
-                           std::vector<Candidate>& found, boost::unordered_flat_map<std::string, size_t, ll::string_hash, std::equal_to<>>& at);
     std::string nameOf(const ALScriptPreprocessor::Request& request, const Candidate& candidate);
 
-    // What a text gives, by its identity and language, while its version
-    // is the same -- or, for one held, its text.
-    const std::vector<std::string>& exportsOf(const std::string& path, U32 version, const std::string& text, bool lua);
-    // What a file gives, kept while its time and its size are the same: a
-    // folder's files are looked at every few seconds, and read and parsed
-    // again only once they change. Null for one that cannot be read.
-    const std::vector<std::string>* fileExports(const std::string& file, bool lua);
-
-    // The index's thread's alone.
-    struct Read
-    {
-        U32                      version = 0;
-        size_t                   hash    = 0;
-        std::vector<std::string> exports;
-    };
-    boost::unordered_flat_map<std::string, Read, ll::string_hash, std::equal_to<>> mRead;
-    struct OnDisk
-    {
-        std::filesystem::file_time_type time;
-        std::uintmax_t                  size     = 0;
-        bool                            readable = false;
-        std::vector<std::string>        exports;
-    };
-    boost::unordered_flat_map<std::string, OnDisk, ll::string_hash, std::equal_to<>> mOnDisk;
+    // What looks for what is in reach, and keeps what it read: the index's
+    // thread's alone.
+    ALModuleLook                                                                     mLook;
     // The main thread's.
     boost::unordered_flat_map<std::string, Reach, ll::string_hash, std::equal_to<>>  mReach;
     std::unique_ptr<ALSerialWorker>                                                  mWorker;

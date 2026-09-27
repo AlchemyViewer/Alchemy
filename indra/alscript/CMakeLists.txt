@@ -13,6 +13,7 @@ target_sources(
     aldiskincludes.cpp
     alincludeidentity.cpp
     alincludesearch.cpp
+    almodulelook.cpp
     allslinliner.cpp
     almessagemap.cpp
     allsloptimizer.cpp
@@ -46,6 +47,7 @@ target_sources(
         aldiskincludes.h
         alincludeidentity.h
         alincludesearch.h
+        almodulelook.h
         allslinliner.h
         almessagemap.h
         allsloptimizer.h
@@ -131,6 +133,7 @@ if(AL_BUILD_TESTS)
   al_add_test(aldiskcache PROJECT alscript LIBRARIES alscript llcommon)
   al_add_test(alincludeidentity PROJECT alscript LIBRARIES alscript llcommon)
   al_add_test(alincludesearch PROJECT alscript LIBRARIES alscript llcommon)
+  al_add_test(almodulelook PROJECT alscript LIBRARIES alscript llcommon)
   al_add_test(alscriptjoblane PROJECT alscript LIBRARIES alscript llcommon)
   al_add_test(alscriptnameindex PROJECT alscript LIBRARIES alscript llcommon)
   al_add_test(alscriptsnapshot PROJECT alscript LIBRARIES alscript llcommon)
