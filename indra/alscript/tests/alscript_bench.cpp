@@ -483,6 +483,73 @@ int main(int, char**)
         ms_per_run([&] { g_sink = g_sink + ALPreprocessor::run(luaScript.text(), luaOptions).text.size(); }));
     row("expand: a macro in every helper",
         ms_per_run([&] { g_sink = g_sink + ALPreprocessor::run(macroScript.text(), lslOptions).text.size(); }), NONE);
+    // A library of helpers behind classic include guards, included fifty
+    // times, as headers including one another do: its body is wanted once.
+    {
+        std::string header = "#ifndef GUARDED_LSL\n#define GUARDED_LSL\n";
+        for (int i = 0; i < 400; ++i)
+        {
+            header += "integer helper" + std::to_string(i) + "(integer x) { return x + " + std::to_string(i) + "; }\n";
+        }
+        header += "#endif\n";
+        std::string script;
+        for (int i = 0; i < 50; ++i)
+        {
+            script += "#include \"guarded.lsl\"\n";
+        }
+        script += "default { state_entry() { llOwnerSay((string)helper1(2)); } }\n";
+        ALPreprocessor::Options guarded = lslOptions;
+        guarded.resolve                 = [&header](const ALPreprocessor::Ask&, ALPreprocessor::Include& out) {
+            out.path = "disk:/guarded.lsl";
+            out.name = "guarded.lsl";
+            out.text = header;
+            return ALPreprocessor::Found::Yes;
+        };
+        row("expand: a guarded header included 50 times", ms_per_run([&] { g_sink = g_sink + ALPreprocessor::run(script, guarded).text.size(); }),
+            NONE);
+    }
+    // What a save does past the expansion: the optimizer with its notes,
+    // each offered as a change, then the compression, the maps composed.
+    {
+        ALPreprocessor::Options saving = lslOptions;
+        saving.optimize                = true;
+        saving.compress                = true;
+        row("expand, optimize with notes, compress (a save)",
+            ms_per_run([&] { g_sink = g_sink + ALPreprocessor::run(macroScript.text(), saving).problems.size(); }), NONE);
+        // One line a macro makes long -- a list of three thousand calls of
+        // it, as generated data is -- saved, and places all along it read
+        // back to the source, as the checker's colours and problems are.
+        std::string long_line = "#define P(x) ((x) + 1)\ndefault { state_entry() { list l = [";
+        for (int i = 0; i < 3000; ++i)
+        {
+            long_line += (i ? ", P(" : "P(") + std::to_string(i) + ")";
+        }
+        long_line += "]; llOwnerSay((string)llGetListLength(l)); } }\n";
+        row("a save of one line of 3,000 macro calls", ms_per_run([&] { g_sink = g_sink + ALPreprocessor::run(long_line, saving).text.size(); }),
+            NONE);
+        const ALPreprocessor::Result     made = ALPreprocessor::run(long_line, lslOptions);
+        std::vector<std::pair<S32, S32>> places;
+        S32                              line = 0, column = 0;
+        for (size_t i = 0; i < made.text.size(); ++i, ++column)
+        {
+            if (made.text[i] == '\n')
+            {
+                ++line;
+                column = -1;
+            }
+            else if (i % 64 == 0)
+            {
+                places.emplace_back(line, column);
+            }
+        }
+        row("  every 64th byte of its expansion read back", ms_per_run([&] {
+                for (const auto& [at_line, at_column] : places)
+                {
+                    g_sink = g_sink + size_t(made.map.toSource(at_line, at_column).line);
+                }
+            }),
+            NONE);
+    }
     ALLSLOptimizer::Options optimizer;
     optimizer.notes = false;
     row("optimize (Mono)", ms_per_run([&] { g_sink = g_sink + ALLSLOptimizer::run(lslScript.text(), optimizer).text.size(); }),
