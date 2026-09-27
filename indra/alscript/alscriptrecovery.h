@@ -246,13 +246,28 @@ public:
     // there is none, or it could not be set aside.
     std::optional<ALScriptRecoveryEntry> reclaim(const std::string& key);
     // Whether there is anything to offer: another session's entry, or a
-    // discarded one. By the files' names, without reading them.
+    // discarded one. By the files' names, without reading them, and
+    // then kept a moment, since a menu asks as it is drawn; anything this
+    // store changes asks again.
     bool hasOffers() const;
+    // What other sessions left unsaved, marked as offered at a login --
+    // their files' names say when -- to go for good a while after
+    // (prune), as the discarded do, rather than to be kept for ever.
+    void markOffered(const std::vector<ALScriptRecoveryEntry>& entries, const LLDate& now = LLDate::now());
 
-    // The discarded older than this let go of for good, by when their
-    // names say they were discarded; and whatever a write cut short left
-    // half written beside an entry.
+    // The discarded, and what was offered and left, older than this let
+    // go of for good, by when their names say; past so many, or so much,
+    // the oldest of the discarded too; and whatever a write cut short
+    // left half written beside an entry.
+    static constexpr size_t MAX_DISCARDED       = 200;
+    static constexpr size_t MAX_DISCARDED_BYTES = 64 * 1024 * 1024;
     void prune(F64 max_age_seconds, const LLDate& now = LLDate::now());
+    // Other limits than those, for a test.
+    void limitDiscarded(size_t count, size_t bytes)
+    {
+        mMaxDiscarded      = count;
+        mMaxDiscardedBytes = bytes;
+    }
 
 private:
     std::string fileOf(const std::string& key) const;
@@ -266,6 +281,12 @@ private:
     // not. Marked when it is set aside unless told to keep its own.
     std::string setAsideAt(ALScriptRecoveryEntry entry, bool keep_when);
     void        listIn(const std::string& folder, std::vector<ALScriptRecoveryEntry>& out) const;
+    // The folders made, once each, before anything is written in them.
+    void        makeFolders(bool discarded);
+    // The discarded past so many or so much, the oldest first, let go of.
+    void        capDiscarded();
+    // What this store changed, which hasOffers asks again after.
+    void        changed() const { mOffersKnown = false; }
 
     std::string mDirectory;
     std::string mDiscarded;
@@ -273,4 +294,12 @@ private:
     // What writeSoon has waiting for the writer, made with the first.
     struct Writer;
     std::unique_ptr<Writer> mWriter;
+    size_t                  mMaxDiscarded      = MAX_DISCARDED;
+    size_t                  mMaxDiscardedBytes = MAX_DISCARDED_BYTES;
+    bool                    mMadeDirectory = false;
+    bool                    mMadeDiscarded = false;
+    // What hasOffers found, and until when it holds.
+    mutable bool            mOffersKnown = false;
+    mutable bool            mOffers      = false;
+    mutable F64             mOffersUntil = 0.0;
 };

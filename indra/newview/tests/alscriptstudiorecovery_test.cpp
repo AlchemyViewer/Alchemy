@@ -510,4 +510,38 @@ namespace tut
         ensure("each said once", services().reports.size() == 2 && a.recoveryFailed && b.recoveryFailed);
         ALScriptStudioRecovery::useStore(store.get());
     }
+
+    template<> template<>
+    void alscriptstudiorecovery_object::test<10>()
+    {
+        set_test_name("nothing is written again where neither the text nor its history has moved; a change, or asking for more, writes it");
+        ALScriptStudioRecovery& r = make();
+        Doc&                    a = tab("a", "one\n");
+        type(a, "x");
+        ensure("kept", r.keep(a) && keptFor(a.recoveryKey) == 1);
+        // Taken away behind its back: not written again while nothing moved.
+        for (const Entry& entry : store->list())
+        {
+            store->remove(entry);
+        }
+        ensure("kept again, as nothing moved", r.keep(a) && keptFor(a.recoveryKey) == 0);
+        r.keepSoon(a);
+        store->flush();
+        ensure("nor as typing asks", keptFor(a.recoveryKey) == 0);
+        a.editor->undoJournal().label("Named");
+        r.keepSoon(a);
+        store->flush();
+        ensure("its history moved: written", keptFor(a.recoveryKey) == 1);
+        for (const Entry& entry : store->list())
+        {
+            store->remove(entry);
+        }
+        ensure("kept for next time is more than was asked", r.keep(a, Entry::State::Kept) && keptFor(a.recoveryKey) == 1);
+        for (const Entry& entry : store->list())
+        {
+            store->remove(entry);
+        }
+        type(a, "y");
+        ensure("typed in: written", r.keep(a) && keptFor(a.recoveryKey) == 1);
+    }
 }

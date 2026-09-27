@@ -328,6 +328,41 @@ int main(int, char**)
         e.undo();
     });
 
+    // What the crash journal writes as typing goes on: a history of
+    // 3,000 steps, a character typed at the top before each write. As LLSD
+    // built step by step, as it was, and as notation from what each step
+    // was written as the last time.
+    std::printf("\nThe history written against a crash (3,000 steps)\n");
+    for (Subject& s : subjects)
+    {
+        ALCodeEditor& e = *s.editor;
+        e.undoJournal().clear();
+        for (S32 i = 0; i < 3000; ++i)
+        {
+            // Each at a line of its own: a step of its own.
+            e.setCaret(ALTextPos(i * 7 % lastLine(e), 0));
+            e.insertText("x");
+        }
+    }
+    size_t written[2] = {};
+    both("as LLSD, every step built", subjects, 1, [&](Subject& s, ALCodeEditor& e) {
+        e.setCaret(ALTextPos(0, 0));
+        e.insertText("y");
+        const LLSD history      = e.undoJournal().asLLSD();
+        written[&s - subjects] = history["undo"].size();
+        g_sink                 = g_sink + written[&s - subjects];
+    });
+    both("as notation, from each step's last", subjects, 1, [&](Subject& s, ALCodeEditor& e) {
+        e.setCaret(ALTextPos(0, 0));
+        e.insertText("y");
+        g_sink = g_sink + e.undoJournal().asNotation().size();
+    });
+    countRow("  steps written", written[0], written[1]);
+    for (Subject& s : subjects)
+    {
+        s.editor->undoJournal().clear();
+    }
+
     std::printf("\nFolding\n");
     size_t regions[2] = {};
     both("fold regions rebuilt", subjects, 1, [&](Subject& s, ALCodeEditor& e) {

@@ -149,6 +149,11 @@ public:
     std::string undoLabel() const { return mSteps.undoLabel(); }
     std::string redoLabel() const { return mSteps.redoLabel(); }
 
+    // Moved on by whatever changes the history as written: a change
+    // recorded, a step taken back or forward, a name, a settled
+    // selection, the saved mark, the oldest forgotten.
+    U32 revision() const { return mRevision; }
+
     // The text as it stands is the one that was saved.
     void markSaved();
     bool isPristine() const;
@@ -248,4 +253,5 @@ private:
     // What the steps back weigh together, kept as they change rather than
     // summed at each.
     size_t            mUndoneBytes  = 0;
+    U32               mRevision     = 0;
 };

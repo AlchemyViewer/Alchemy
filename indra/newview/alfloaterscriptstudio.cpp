@@ -3613,8 +3613,9 @@ void ALFloaterScriptStudio::becomeFile(Doc& doc, const std::string& path)
     {
         store->forget(doc.recoveryKey);
     }
-    doc.recoveryKey = ALScriptRecoveryStore::keyOf(LLUUID::null, LLUUID::null, path);
-    doc.file        = path;
+    doc.recoveryKey           = ALScriptRecoveryStore::keyOf(LLUUID::null, LLUUID::null, path);
+    doc.recoveryWritten.valid = false;
+    doc.file                  = path;
     doc.name        = gDirUtilp->getBaseFileName(path);
     rekeyDoc(doc, "disk:" + path);
     if (const FileLanguage said = ALScriptStudioFiles::languageOf(path, false); said.said)

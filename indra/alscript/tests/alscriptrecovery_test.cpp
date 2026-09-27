@@ -681,4 +681,52 @@ namespace tut
         const std::vector<ALScriptRecoveryEntry> thrown = whole(store, store.list());
         ensure("with its text", thrown.size() == 1 && thrown.front().text == big.text && thrown.front().history["undo"].size() == 1);
     }
+
+    template<> template<>
+    void alscriptrecovery_object::test<20>()
+    {
+        set_test_name("what was offered and left goes a while after; the discarded are held to so many and so much; offers are counted once a moment");
+        ALScriptRecoveryStore store(folder, "mine");
+        ALScriptRecoveryStore other(folder, "theirs");
+        ensure("nothing to offer", !store.hasOffers());
+        ensure("left by another session", other.write(entry("item:a", "left")));
+        ensure("counted a moment ago: not yet seen", !store.hasOffers());
+        store.forget("item:none");
+        ensure("seen once this store changes anything", store.hasOffers());
+
+        // Offered: marked when, still offered, and gone a while after.
+        const LLDate offered = LLDate::now();
+        store.markOffered(store.left(), offered);
+        const std::vector<std::string> names = files();
+        ensure("renamed to say when", names.size() == 1 && names.front().find(std::to_string(static_cast<S64>(offered.secondsSinceEpoch() * 1000.0))) != std::string::npos);
+        ensure("still offered", store.hasOffers() && store.left().size() == 1 && store.leftFor("item:a").has_value());
+        ensure("and read", whole(store, store.leftFor("item:a"))->text == "left");
+        store.markOffered(store.left(), LLDate(offered.secondsSinceEpoch() + 100.0));
+        ensure("marked once", files().front() == names.front());
+        store.prune(60.0, LLDate(offered.secondsSinceEpoch() + 30.0));
+        ensure("young, it stays", files().size() == 1);
+        store.prune(60.0, LLDate(offered.secondsSinceEpoch() + 120.0));
+        ensure("left alone a while, it goes", files().empty() && !store.hasOffers());
+        ensure("this session's own is never offered", store.write(entry("item:mine", "mine")));
+        store.markOffered(store.list());
+        ensure("nor marked", files().size() == 1 && files().front().find(".mine.llsd") != std::string::npos);
+
+        // The discarded held to three, then to what two of them weigh.
+        store.limitDiscarded(3, 1024 * 1024);
+        for (int i = 0; i < 5; ++i)
+        {
+            ensure("set aside", store.setAside(entry("item:d" + std::to_string(i), "discarded " + std::to_string(i))));
+            // Apart by more than the millisecond their names say.
+            ms_sleep(5);
+        }
+        std::vector<ALScriptRecoveryEntry> kept = whole(store, store.list());
+        ensure_equals("three kept", files("/discarded").size(), size_t(3));
+        ensure("the newest", std::any_of(kept.begin(), kept.end(), [](const ALScriptRecoveryEntry& one) { return one.text == "discarded 4"; }) &&
+                                 std::none_of(kept.begin(), kept.end(), [](const ALScriptRecoveryEntry& one) { return one.text == "discarded 1"; }));
+        std::error_code ec;
+        const uintmax_t one = std::filesystem::file_size(fsyspath(folder + "/discarded/" + files("/discarded").front()), ec);
+        store.limitDiscarded(100, static_cast<size_t>(one * 2 + one / 2));
+        store.prune(60.0);
+        ensure_equals("two, by what they weigh", files("/discarded").size(), size_t(2));
+    }
 }

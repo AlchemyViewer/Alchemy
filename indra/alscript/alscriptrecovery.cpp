@@ -29,6 +29,7 @@
 #include "fsyspath.h"
 #include "llfile.h"
 #include "llsdserialize.h"
+#include "lltimer.h"
 #include "threadpool.h"
 
 #include <algorithm>
@@ -371,7 +372,8 @@ void ALScriptRecoveryStore::writeSoon(ALScriptRecoveryEntry entry, bool durable)
     {
         return;
     }
-    LLFile::mkdir(mDirectory);
+    makeFolders(false);
+    changed();
     entry.session = mSession;
     entry.when    = LLDate::now();
     // Handed over whole, and written out there: the thread holds the only
@@ -570,7 +572,8 @@ bool ALScriptRecoveryStore::write(ALScriptRecoveryEntry entry)
     {
         return false;
     }
-    LLFile::mkdir(mDirectory);
+    makeFolders(false);
+    changed();
     entry.session = mSession;
     entry.when    = LLDate::now();
     return writeWhole(pathOf(entry.key, mSession), entry.written());
@@ -579,6 +582,7 @@ bool ALScriptRecoveryStore::write(ALScriptRecoveryEntry entry)
 void ALScriptRecoveryStore::forget(const std::string& key)
 {
     flush();
+    changed();
     LLFile::remove(pathOf(key, mSession), ENOENT);
 }
 
@@ -606,14 +610,73 @@ std::string ALScriptRecoveryStore::setAsideAt(ALScriptRecoveryEntry entry, bool 
     {
         entry.when = now;
     }
-    LLFile::mkdir(mDirectory);
-    LLFile::mkdir(mDiscarded);
+    makeFolders(true);
+    changed();
     // Named by when it was set aside, to the millisecond, which prune
     // reads without opening it, and which two set aside in a moment do not
     // share.
     const std::string target = mDiscarded + fileOf(entry.key) + "." + entry.session + "." +
                                std::to_string(static_cast<S64>(now.secondsSinceEpoch() * 1000.0)) + EXTENSION;
-    return writeWhole(target, entry.written()) ? target : std::string();
+    if (!writeWhole(target, entry.written()))
+    {
+        return std::string();
+    }
+    capDiscarded();
+    return target;
+}
+
+void ALScriptRecoveryStore::makeFolders(bool discarded)
+{
+    if (!mMadeDirectory)
+    {
+        LLFile::mkdir(mDirectory);
+        mMadeDirectory = true;
+    }
+    if (discarded && !mMadeDiscarded)
+    {
+        LLFile::mkdir(mDiscarded);
+        mMadeDiscarded = true;
+    }
+}
+
+void ALScriptRecoveryStore::capDiscarded()
+{
+    // The newest kept, by when their names say they were set aside; one
+    // whose name does not say goes as if it were the oldest.
+    struct One
+    {
+        std::string name;
+        S64         when  = 0;
+        uintmax_t   bytes = 0;
+    };
+    std::vector<One> all;
+    for (const std::string& name : namesIn(mDiscarded))
+    {
+        const std::vector<std::string> parts = partsOf(name);
+        if (parts.size() < 2)
+        {
+            continue;
+        }
+        One one;
+        one.name = name;
+        if (parts.size() == 3)
+        {
+            one.when = std::strtoll(parts[2].c_str(), nullptr, 10);
+        }
+        std::error_code ec;
+        one.bytes = std::filesystem::file_size(fsyspath(mDiscarded + name), ec);
+        all.push_back(std::move(one));
+    }
+    std::sort(all.begin(), all.end(), [](const One& a, const One& b) { return a.when > b.when; });
+    uintmax_t held = 0;
+    for (size_t i = 0; i < all.size(); ++i)
+    {
+        held += all[i].bytes;
+        if (i >= mMaxDiscarded || (i > 0 && held > mMaxDiscardedBytes))
+        {
+            LLFile::remove(mDiscarded + all[i].name, ENOENT);
+        }
+    }
 }
 
 bool ALScriptRecoveryStore::discard(const ALScriptRecoveryEntry& entry)
@@ -633,6 +696,7 @@ bool ALScriptRecoveryStore::discard(const ALScriptRecoveryEntry& entry)
 void ALScriptRecoveryStore::remove(const ALScriptRecoveryEntry& entry)
 {
     flush();
+    changed();
     if (!entry.path.empty())
     {
         LLFile::remove(entry.path, ENOENT);
@@ -730,7 +794,7 @@ std::optional<ALScriptRecoveryEntry> ALScriptRecoveryStore::leftFor(const std::s
     for (const std::string& name : namesIn(mDirectory))
     {
         const std::vector<std::string> parts = partsOf(name);
-        if (parts.size() != 2 || parts[0] != hash || parts[1] == mSession)
+        if (parts.size() < 2 || parts.size() > 3 || parts[0] != hash || parts[1] == mSession)
         {
             continue;
         }
@@ -770,26 +834,74 @@ std::optional<ALScriptRecoveryEntry> ALScriptRecoveryStore::reclaim(const std::s
 
 bool ALScriptRecoveryStore::hasOffers() const
 {
+    // Another session -- another viewer on this account -- may write
+    // meanwhile: asked again after a few seconds whatever this one does.
+    const F64 now = LLTimer::getTotalSeconds();
+    if (mOffersKnown && now < mOffersUntil)
+    {
+        return mOffers;
+    }
+    mOffersKnown = true;
+    mOffersUntil = now + 5.0;
+    mOffers      = false;
     for (const std::string& name : namesIn(mDirectory))
     {
         const std::vector<std::string> parts = partsOf(name);
-        if (parts.size() == 2 && parts[1] != mSession)
+        if ((parts.size() == 2 || parts.size() == 3) && parts[1] != mSession)
         {
-            return true;
+            mOffers = true;
+            return mOffers;
         }
     }
     for (const std::string& name : namesIn(mDiscarded))
     {
         if (partsOf(name).size() >= 2)
         {
-            return true;
+            mOffers = true;
+            return mOffers;
         }
     }
-    return false;
+    return mOffers;
+}
+
+void ALScriptRecoveryStore::markOffered(const std::vector<ALScriptRecoveryEntry>& entries, const LLDate& now)
+{
+    flush();
+    changed();
+    const std::string when = std::to_string(static_cast<S64>(now.secondsSinceEpoch() * 1000.0));
+    for (const ALScriptRecoveryEntry& entry : entries)
+    {
+        // Another session's, not yet marked: renamed to say when.
+        const size_t                   slash = entry.path.find_last_of("/\\");
+        const std::string              file  = slash == std::string::npos ? entry.path : entry.path.substr(slash + 1);
+        const std::vector<std::string> parts = partsOf(file);
+        if (entry.session == mSession || entry.state == ALScriptRecoveryEntry::State::Discarded || parts.size() != 2 ||
+            entry.path.compare(0, mDirectory.size(), mDirectory) != 0)
+        {
+            continue;
+        }
+        LLFile::rename(entry.path, mDirectory + parts[0] + "." + parts[1] + "." + when + EXTENSION);
+    }
 }
 
 void ALScriptRecoveryStore::prune(F64 max_age_seconds, const LLDate& now)
 {
+    changed();
+    // What was offered and left, as old since it was offered.
+    for (const std::string& name : namesIn(mDirectory))
+    {
+        const std::vector<std::string> parts = partsOf(name);
+        if (parts.size() != 3)
+        {
+            continue;
+        }
+        char*     end    = nullptr;
+        const S64 millis = std::strtoll(parts[2].c_str(), &end, 10);
+        if (end && *end == '\0' && !parts[2].empty() && now.secondsSinceEpoch() - static_cast<F64>(millis) / 1000.0 > max_age_seconds)
+        {
+            LLFile::remove(mDirectory + name, ENOENT);
+        }
+    }
     for (const std::string& name : namesIn(mDiscarded))
     {
         // When, from the name; read from the file only where the name does
@@ -822,6 +934,7 @@ void ALScriptRecoveryStore::prune(F64 max_age_seconds, const LLDate& now)
             LLFile::remove(mDiscarded + name, ENOENT);
         }
     }
+    capDiscarded();
     // A write cut short -- a crash between writing and putting in place --
     // leaves its half beside the entry, which nothing reads. This session
     // has written nothing yet where it prunes as it starts, and writes

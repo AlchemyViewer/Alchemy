@@ -263,6 +263,7 @@ void ALTextUndo::settle(const ALTextRange& selection)
     {
         return;
     }
+    ++mRevision;
     Step& newest       = mSteps.newest();
     newest.anchorAfter = selection.begin;
     newest.caretAfter  = selection.end;
@@ -271,6 +272,7 @@ void ALTextUndo::settle(const ALTextRange& selection)
 
 void ALTextUndo::label(std::string_view text)
 {
+    ++mRevision;
     // The newest may be named by it, and be written again.
     if (!mSteps.undone().empty())
     {
@@ -285,6 +287,7 @@ void ALTextUndo::record(const ALTextDocument::Edit& edit, const ALTextRange& bef
     {
         return;
     }
+    ++mRevision;
     mSettling               = true;
     const ALTextPos& before = before_in.end;
     // A change after an undo throws the redo steps away; the saved text,
@@ -388,6 +391,7 @@ void ALTextUndo::forgotOldest()
     // with it -- or away, where the saved text was what that step led from,
     // since no stepping back reaches it any more.
     ++mEra;
+    ++mRevision;
     if (mSavedInForce != NOWHERE)
     {
         mSavedInForce = mSavedInForce == 0 ? NOWHERE : mSavedInForce - 1;
@@ -419,6 +423,7 @@ std::optional<ALTextRange> ALTextUndo::undo()
         return std::nullopt;
     }
     mSettling = false;
+    ++mRevision;
     mUndoneBytes -= step->bytes;
     for (auto it = step->edits.rbegin(); it != step->edits.rend(); ++it)
     {
@@ -438,6 +443,7 @@ std::optional<ALTextRange> ALTextUndo::redo()
         return std::nullopt;
     }
     mSettling = false;
+    ++mRevision;
     mUndoneBytes += step->bytes;
     for (const ALTextDocument::Edit& edit : step->edits)
     {
@@ -450,6 +456,7 @@ std::optional<ALTextRange> ALTextUndo::redo()
 
 void ALTextUndo::clear()
 {
+    ++mRevision;
     mSteps.clear();
     mUndoneBytes  = 0;
     mSavedInForce = 0;
@@ -459,6 +466,7 @@ void ALTextUndo::clear()
 
 void ALTextUndo::markSaved()
 {
+    ++mRevision;
     mSavedInForce = mSteps.inForce();
     mSteps.breakRun();
 }
@@ -700,6 +708,7 @@ void ALTextUndo::restore(History history)
     const size_t dropped = mSteps.restore(std::move(history.undo), std::move(history.redo));
     mUndoneBytes         = undoneBytes();
     ++mEra;
+    ++mRevision;
     mSettling     = false;
     mSavedInForce = saved >= 0 && static_cast<size_t>(saved) <= steps && static_cast<size_t>(saved) >= dropped ? static_cast<size_t>(saved) - dropped : NOWHERE;
     forgetOverBudget();
@@ -750,6 +759,7 @@ std::optional<std::string> ALTextUndo::savedText() const
 
 void ALTextUndo::markNeverSaved()
 {
+    ++mRevision;
     mSavedInForce = NOWHERE;
     mSteps.breakRun();
 }
@@ -770,6 +780,7 @@ ALTextUndo::SavePoint ALTextUndo::savePoint()
 
 void ALTextUndo::markSaved(const SavePoint& point)
 {
+    ++mRevision;
     if (point.serial == 0)
     {
         // The text before any step: reachable while the bottom of the

@@ -88,6 +88,25 @@ namespace
     {
         return entry.name.empty() ? gDirUtilp->getBaseFileName(entry.file) : entry.name;
     }
+
+    // Whether a tab's text and history stand as they were last written,
+    // as what it is asked to be written as: durably, where that is asked.
+    bool writtenAlready(const ALScriptStudioDoc& doc, ALScriptRecoveryEntry::State state, bool durable)
+    {
+        const ALScriptStudioDoc::RecoveryWritten& was = doc.recoveryWritten;
+        return was.valid && was.state == state && (was.durable || !durable) && was.text == doc.editor->document().version() &&
+               was.history == doc.editor->undoJournal().revision();
+    }
+
+    void markWritten(ALScriptStudioDoc& doc, ALScriptRecoveryEntry::State state, bool durable)
+    {
+        ALScriptStudioDoc::RecoveryWritten& was = doc.recoveryWritten;
+        was.valid                               = true;
+        was.text                                = doc.editor->document().version();
+        was.history                             = doc.editor->undoJournal().revision();
+        was.state                               = state;
+        was.durable                             = durable;
+    }
 }
 
 ALScriptStudioRecovery::ALScriptStudioRecovery(ALScriptStudioServices& services, Window& window) : mServices(services), mWindow(window) {}
@@ -168,8 +187,9 @@ bool ALScriptStudioRecovery::keep(Doc& doc, Entry::State state)
         // Saved, or never changed: nothing of this session's to keep, and
         // nothing of another's once it was taken in.
         kept->forget(doc.recoveryKey);
+        doc.recoveryWritten.valid = false;
     }
-    else
+    else if (!writtenAlready(doc, state, /*durable*/ true))
     {
         Entry entry = entryOf(doc);
         entry.state = state;
@@ -183,9 +203,11 @@ bool ALScriptStudioRecovery::keep(Doc& doc, Entry::State state)
                 args["[NAME]"] = doc.name;
                 mServices.report(mServices.words("RecoveryWriteFailed", args), true, &doc);
             }
+            doc.recoveryWritten.valid = false;
             return false;
         }
         doc.recoveryFailed = false;
+        markWritten(doc, state, /*durable*/ true);
     }
     // What this tab took up is its own to keep from here.
     if (doc.recovering)
@@ -227,7 +249,8 @@ bool ALScriptStudioRecovery::keepAll(const std::vector<Doc*>& docs, Entry::State
         doc->recoveryDue = 0.0;
         if (std::find(failed.begin(), failed.end(), doc->recoveryKey) != failed.end())
         {
-            all = false;
+            all                        = false;
+            doc->recoveryWritten.valid = false;
             if (!doc->recoveryFailed)
             {
                 doc->recoveryFailed = true;
@@ -238,6 +261,7 @@ bool ALScriptStudioRecovery::keepAll(const std::vector<Doc*>& docs, Entry::State
             continue;
         }
         doc->recoveryFailed = false;
+        markWritten(*doc, state, /*durable*/ true);
         // What this tab took up is its own to keep from here.
         if (doc->recovering)
         {
@@ -260,6 +284,11 @@ void ALScriptStudioRecovery::keepSoon(Doc& doc)
         {
             for (Doc* each : mServices.openDocs())
             {
+                if (each->recoveryKey == key)
+                {
+                    // Not written after all: written again next time.
+                    each->recoveryWritten.valid = false;
+                }
                 if (each->recoveryKey == key && !each->recoveryFailed)
                 {
                     each->recoveryFailed = true;
@@ -278,9 +307,15 @@ void ALScriptStudioRecovery::keepSoon(Doc& doc)
         return;
     }
     doc.recoveryDue = 0.0;
-    Entry entry     = entryOf(doc);
-    entry.state     = Entry::State::Unsaved;
+    if (writtenAlready(doc, Entry::State::Unsaved, /*durable*/ false))
+    {
+        // Neither the text nor its history has moved since.
+        return;
+    }
+    Entry entry = entryOf(doc);
+    entry.state = Entry::State::Unsaved;
     kept->writeSoon(std::move(entry));
+    markWritten(doc, Entry::State::Unsaved, /*durable*/ false);
 }
 
 bool ALScriptStudioRecovery::setAside(Doc& doc)
@@ -291,6 +326,7 @@ bool ALScriptStudioRecovery::setAside(Doc& doc)
         return false;
     }
     kept->forget(doc.recoveryKey);
+    doc.recoveryWritten.valid = false;
     return true;
 }
 
@@ -635,6 +671,9 @@ void ALScriptStudioRecovery::offer(std::function<ALScriptStudioRecovery*()> stud
     {
         names += ", ...";
     }
+    // Offered now: left alone, they go a while after, as the discarded
+    // do, rather than being kept for ever.
+    kept->markOffered(unsaved);
     LLSD args;
     args["COUNT"] = static_cast<S32>(unsaved.size());
     args["NAMES"] = names;

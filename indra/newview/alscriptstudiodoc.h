@@ -172,6 +172,18 @@ struct ALScriptStudioDoc
     std::string                                recoveryKey;
     F64                                        recoveryDue    = 0.0;
     bool                                       recoveryFailed = false;
+    // What was last written there -- the text's version, its history's
+    // revision, as what, and whether forced out to the disk -- so that
+    // nothing is written again where neither has moved.
+    struct RecoveryWritten
+    {
+        bool                         valid   = false;
+        U32                          text    = 0;
+        U32                          history = 0;
+        ALScriptRecoveryEntry::State state   = ALScriptRecoveryEntry::State::Unsaved;
+        bool                         durable = false;
+    };
+    RecoveryWritten                            recoveryWritten;
     // What an earlier session left of this, found as it opened, offered
     // in the notice until it is restored or discarded; and one being
     // taken up here, whose file goes once this tab's own is written.
