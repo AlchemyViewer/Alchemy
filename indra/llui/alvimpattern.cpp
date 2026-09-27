@@ -540,15 +540,17 @@ std::vector<ALTextRange> ALVimPattern::matchesIn(const ALTextDocument& d, ALText
         // each match here is the whole one that ends where it does.
         std::string              other;
         std::vector<ALTextRange> full = ALTextSearch::matches(d, wholeRegex, options, scope, &other);
+        // Both in the text's order: paired walking the two together.
+        size_t f = 0;
         for (size_t i = 0; i < matches.size() && i < wholes.size(); ++i)
         {
-            for (const ALTextRange& f : full)
+            while (f < full.size() && full[f].end < matches[i].end)
             {
-                if (f.end == matches[i].end)
-                {
-                    wholes[i] = f.begin;
-                    break;
-                }
+                ++f;
+            }
+            if (f < full.size() && full[f].end == matches[i].end)
+            {
+                wholes[i] = full[f].begin;
             }
         }
     }

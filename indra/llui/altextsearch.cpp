@@ -32,6 +32,8 @@
 
 #include <algorithm>
 #include <functional>
+#include <memory>
+#include <mutex>
 #include <stdexcept>
 
 namespace
@@ -70,21 +72,53 @@ namespace
         }
     }
 
-    // The pattern last compiled, kept: a replace-all asks for the same
-    // one once per match, a find bar once per keystroke.
-    const boost::regex* compiledOnce(std::string_view query, const ALTextSearchOptions& options, std::string* error)
+    // The patterns last compiled, the latest first, a few of them: a
+    // replace-all asks for the same one once per match, a find bar once a
+    // key, and a whole-word vim pattern asks for two in turn, which one
+    // kept alone recompiled both every time. Behind a lock, since a search
+    // over many scripts may run off the main thread; each handed out
+    // shared, so that one being used outlives its place here.
+    std::shared_ptr<const boost::regex> compiledOnce(std::string_view query, const ALTextSearchOptions& options, std::string* error)
     {
-        static std::string  last_query;
-        static bool         last_case = false;
-        static bool         last_ok   = false;
-        static boost::regex last_re;
-        if (!last_ok || last_query != query || last_case != options.caseSensitive)
+        struct Kept
         {
-            last_query.assign(query);
-            last_case = options.caseSensitive;
-            last_ok   = compile(query, options, last_re, error);
+            std::string                         query;
+            bool                                caseSensitive = false;
+            std::shared_ptr<const boost::regex> re;
+            std::string                         error;
+        };
+        constexpr size_t         KEPT = 4;
+        static std::mutex        lock;
+        static std::vector<Kept> kept;
+        std::lock_guard<std::mutex> guard(lock);
+        auto found = std::find_if(kept.begin(), kept.end(), [&](const Kept& one) { return one.caseSensitive == options.caseSensitive && one.query == query; });
+        if (found == kept.end())
+        {
+            Kept         made;
+            boost::regex re;
+            made.query         = std::string(query);
+            made.caseSensitive = options.caseSensitive;
+            if (compile(query, options, re, &made.error))
+            {
+                made.re = std::make_shared<const boost::regex>(std::move(re));
+            }
+            kept.insert(kept.begin(), std::move(made));
+            if (kept.size() > KEPT)
+            {
+                kept.pop_back();
+            }
+            found = kept.begin();
         }
-        return last_ok ? &last_re : nullptr;
+        else if (found != kept.begin())
+        {
+            std::rotate(kept.begin(), found, found + 1);
+            found = kept.begin();
+        }
+        if (error && !found->re)
+        {
+            *error = found->error;
+        }
+        return found->re;
     }
 }
 
@@ -105,7 +139,7 @@ std::vector<ALTextRange> ALTextSearch::matches(const ALTextDocument& doc, std::s
     {
         return out;
     }
-    const boost::regex* compiled = options.regex ? compiledOnce(query, options, error) : nullptr;
+    const std::shared_ptr<const boost::regex> compiled = options.regex ? compiledOnce(query, options, error) : nullptr;
     if (options.regex && !compiled)
     {
         return out;
@@ -308,7 +342,7 @@ std::string ALTextSearch::replacement(const ALTextDocument& doc, const ALTextRan
     if (options.regex)
     {
         // The pattern as compiled for the matches, once for the lot.
-        const boost::regex* re = compiledOnce(query, options, nullptr);
+        const std::shared_ptr<const boost::regex> re = compiledOnce(query, options, nullptr);
         if (re)
         {
             // Matched again where it stands, with what is around it there

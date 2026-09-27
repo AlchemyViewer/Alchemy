@@ -28,6 +28,9 @@
 
 #include "../test/lltut.h"
 
+#include <atomic>
+#include <thread>
+
 #include <string>
 
 namespace tut
@@ -270,5 +273,39 @@ namespace tut
         const ALTextRange first(ALTextPos(0, 0), ALTextPos(0, 3));
         ensure_equals("a look past the stretch's end sees what is there", said(ALTextSearch::matches(doc, "foo(?= bar)", options, &first)), std::string("0:0-3"));
         ensure("and a match past it is not in it", ALTextSearch::matches(doc, "foo bar", options, &first).empty());
+    }
+
+    template<> template<>
+    void altextsearch_object::test<11>()
+    {
+        set_test_name("patterns kept a few at once: several asked for in turn each answer as their own, searched on two threads at once");
+        const ALTextDocument doc("alpha beta\ngamma alpha\nbeta beta\n");
+        ALTextSearchOptions  regex;
+        regex.regex = true;
+        for (int round = 0; round < 20; ++round)
+        {
+            ensure_equals("alpha", ALTextSearch::matches(doc, "al\\w+", regex).size(), size_t(2));
+            ensure_equals("beta", ALTextSearch::matches(doc, "be\\w+", regex).size(), size_t(3));
+            ensure_equals("gamma", ALTextSearch::matches(doc, "ga\\w+", regex).size(), size_t(1));
+        }
+        std::string bad;
+        ALTextSearch::matches(doc, "(", regex, nullptr, &bad);
+        ensure("a pattern that does not read, said", !bad.empty());
+        bad.clear();
+        ALTextSearch::matches(doc, "(", regex, nullptr, &bad);
+        ensure("and said again, kept as it is", !bad.empty());
+        std::atomic<bool> wrong{ false };
+        std::thread other([&]() {
+            for (int round = 0; round < 200; ++round)
+            {
+                wrong = wrong || ALTextSearch::matches(doc, "be\\w+", regex).size() != 3;
+            }
+        });
+        for (int round = 0; round < 200; ++round)
+        {
+            wrong = wrong || ALTextSearch::matches(doc, "al\\w+|ga\\w+", regex).size() != 3;
+        }
+        other.join();
+        ensure("each thread its own answers", !wrong);
     }
 }
