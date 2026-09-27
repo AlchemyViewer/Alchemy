@@ -873,11 +873,19 @@ private:
     void refreshFind();
     // The bar's query or its choices changed.
     void queryChanged();
+    // The bar told what was found.
+    void findCounted();
     void settleFind()
     {
         if (mFind.isStale())
         {
             refreshFind();
+        }
+        // A worker's matches waited for: whatever asks acts on the text as
+        // it is.
+        if (mFind.searching() && mFind.collect(mDocument, selection().normalised(), true))
+        {
+            findCounted();
         }
     }
     // The map: the lines it shows, hidden ones left out, and how far its

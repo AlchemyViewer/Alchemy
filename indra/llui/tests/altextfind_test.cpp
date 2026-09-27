@@ -90,4 +90,31 @@ namespace tut
         find.clear();
         ensure("put away", find.count() == 0 && !find.isStale() && find.current() == -1);
     }
+
+    template<> template<>
+    void altextfind_object::test<3>()
+    {
+        set_test_name("a long text looked through on a worker, its matches taken as they come; of a text changed meanwhile, looked for again");
+        std::string text;
+        while (text.size() < ALTextFind::ON_A_WORKER + 1024)
+        {
+            text += "needle in a haystack of words\n";
+        }
+        ALTextDocument doc(text);
+        ALTextFind     find;
+        doc.onChanged([&find](const ALTextDocument::Edit& edit) { find.edited(edit); });
+        find.search(doc, "needle", ALTextSearchOptions(), false, ALTextRange());
+        ensure("on a worker", find.searching());
+        ensure("taken, waited for", find.collect(doc, ALTextRange(), true) && !find.searching());
+        const size_t lines = static_cast<size_t>(doc.lineCount() - 1);
+        ensure_equals("every line's", find.count(), llmin(lines, ALTextFind::LIMIT));
+
+        find.search(doc, "haystack", ALTextSearchOptions(), false, ALTextRange());
+        doc.replace(ALTextRange(ALTextPos(0, 0), ALTextPos(0, 0)), "haystack ");
+        ensure("of the text as it is now", find.collect(doc, ALTextRange(), true));
+        ensure("the one typed meanwhile among them", !find.matches().empty() && find.matches()[0] == ALTextRange(ALTextPos(0, 0), ALTextPos(0, 8)));
+        find.search(doc, "needle", ALTextSearchOptions(), false, ALTextRange());
+        find.clear();
+        ensure("put away with a worker out: let go of", !find.searching() && find.count() == 0);
+    }
 }

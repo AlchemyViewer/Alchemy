@@ -30,6 +30,7 @@
 #include "altextsearch.h"
 #include "llframetimer.h"
 
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -39,6 +40,12 @@
 // moment after the text stops changing, not at every edit. Nothing here
 // draws or asks anything of a view: the view's find bar says what to look
 // for, and the view draws what was found.
+//
+// A long text, or a pattern that reads across lines, is looked through on
+// a worker over a copy of it, so that a slow one holds nothing up: the
+// matches there were stand until the worker's come in (collect); one of a
+// text changed since is looked for again. Whatever acts on the matches
+// waits for them (settle), so that it acts on the text as it is.
 class ALTextFind
 {
 public:
@@ -48,6 +55,13 @@ public:
     // the one the selection is.
     void search(const ALTextDocument& doc, const std::string& query, const ALTextSearchOptions& options, bool in_selection,
                 const ALTextRange& selection);
+    // A worker's matches, where they have come in: taken where the text is
+    // as it was looked through, and true; looked for again where it is
+    // not. With `wait`, waited for.
+    bool collect(const ALTextDocument& doc, const ALTextRange& selection, bool wait = false);
+    bool searching() const { return mWorking != nullptr; }
+    // Past this many bytes, a text is looked through on a worker.
+    static constexpr size_t ON_A_WORKER = 256 * 1024;
     // Nothing found, and nothing to look through again: the find put away.
     void clear();
     // An edit of the text: the matches after it slide, those it cut
@@ -91,4 +105,9 @@ private:
     ALTextRange                   mScope;
     std::string                   mError;
     U32                           mGeneration = 0;
+    // The worker's search on its way: what it was asked, and what it
+    // found, which it hands over through the lock.
+    struct Working;
+    std::shared_ptr<Working>      mWorking;
+    void                          take(const ALTextDocument& doc, std::vector<ALTextRange> found, const std::string& error, const ALTextRange& selection);
 };

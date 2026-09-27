@@ -3038,7 +3038,19 @@ void ALTextView::refreshFind()
         return;
     }
     mFind.search(mDocument, mFindBar->query(), mFindBar->options(), mFindBar->inSelection(), selection().normalised());
-    mFindBar->setCount(mFind.current(), static_cast<S32>(mFind.count()), mFind.error(), mFind.capped());
+    // Said once a worker's are in, where they are on their way.
+    if (!mFind.searching())
+    {
+        findCounted();
+    }
+}
+
+void ALTextView::findCounted()
+{
+    if (mFindBar)
+    {
+        mFindBar->setCount(mFind.current(), static_cast<S32>(mFind.count()), mFind.error(), mFind.capped());
+    }
 }
 
 bool ALTextView::findNext(bool forward)
@@ -4061,10 +4073,15 @@ void ALTextView::draw()
         }
     }
     // The find bar's query looked for through the text again once edits
-    // have stopped coming for a moment, not at every keystroke.
+    // have stopped coming for a moment, not at every keystroke; and a
+    // worker's matches taken as they come in.
     if (mFind.due())
     {
         refreshFind();
+    }
+    if (mFind.searching() && mFind.collect(mDocument, selection().normalised()))
+    {
+        findCounted();
     }
     syncScrollbar();
     const F32 alpha = getDrawContext().mAlpha;

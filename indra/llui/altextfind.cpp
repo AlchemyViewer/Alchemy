@@ -27,6 +27,24 @@
 
 #include "altextfind.h"
 
+#include <condition_variable>
+#include <mutex>
+#include <optional>
+#include <thread>
+
+struct ALTextFind::Working
+{
+    std::mutex               lock;
+    std::condition_variable  done;
+    bool                     finished = false;
+    std::vector<ALTextRange> found;
+    std::string              error;
+    // What it was asked, to ask it again where the text has moved on.
+    U32                      version = 0;
+    std::string              query;
+    ALTextSearchOptions      options;
+};
+
 void ALTextFind::search(const ALTextDocument& doc, const std::string& query, const ALTextSearchOptions& options, bool in_selection,
                         const ALTextRange& selection)
 {
@@ -48,7 +66,42 @@ void ALTextFind::search(const ALTextDocument& doc, const std::string& query, con
     // text is otherwise every place it stands.
     ALTextSearchOptions capped = options;
     capped.limit               = LIMIT;
-    mMatches.assign(ALTextSearch::matches(doc, query, capped, mInSelection ? &mScope : nullptr, &mError));
+    // A long text, or a pattern across lines, on a worker over a copy: the
+    // matches there were stand until its come.
+    if (!query.empty() && (doc.byteCount() > ON_A_WORKER || (options.regex && options.acrossLines)))
+    {
+        auto working     = std::make_shared<Working>();
+        working->version = doc.version();
+        working->query   = query;
+        working->options = options;
+        mWorking         = working;
+        std::optional<ALTextRange> scope;
+        if (mInSelection)
+        {
+            scope = mScope;
+        }
+        std::thread([working, text = doc.text(), query, capped, scope]() {
+            const ALTextDocument     copy(text);
+            std::string              error;
+            std::vector<ALTextRange> found = ALTextSearch::matches(copy, query, capped, scope ? &*scope : nullptr, &error);
+            std::lock_guard<std::mutex> guard(working->lock);
+            working->found    = std::move(found);
+            working->error    = std::move(error);
+            working->finished = true;
+            working->done.notify_all();
+        }).detach();
+        return;
+    }
+    mWorking.reset();
+    std::vector<ALTextRange> found = ALTextSearch::matches(doc, query, capped, mInSelection ? &mScope : nullptr, &mError);
+    take(doc, std::move(found), mError, selection);
+}
+
+void ALTextFind::take(const ALTextDocument& doc, std::vector<ALTextRange> found, const std::string& error, const ALTextRange& selection)
+{
+    ++mGeneration;
+    mError = error;
+    mMatches.assign(std::move(found));
     // The current one is the match the selection is.
     mCurrent = -1;
     for (size_t i = 0; i < mMatches.size(); ++i)
@@ -61,9 +114,45 @@ void ALTextFind::search(const ALTextDocument& doc, const std::string& query, con
     }
 }
 
+bool ALTextFind::collect(const ALTextDocument& doc, const ALTextRange& selection, bool wait)
+{
+    if (!mWorking)
+    {
+        return false;
+    }
+    std::shared_ptr<Working> working = mWorking;
+    std::unique_lock<std::mutex> guard(working->lock);
+    if (wait)
+    {
+        working->done.wait(guard, [&working]() { return working->finished; });
+    }
+    if (!working->finished)
+    {
+        return false;
+    }
+    mWorking.reset();
+    if (working->version != doc.version())
+    {
+        // Of a text since changed: looked for again, as it is now.
+        const std::string         query   = working->query;
+        const ALTextSearchOptions options = working->options;
+        guard.unlock();
+        search(doc, query, options, mInSelection, selection);
+        // Looked through at once, or on a worker again.
+        return !mWorking || (wait && collect(doc, selection, true));
+    }
+    std::vector<ALTextRange> found = std::move(working->found);
+    const std::string        error = working->error;
+    guard.unlock();
+    take(doc, std::move(found), error, selection);
+    return true;
+}
+
 void ALTextFind::clear()
 {
     ++mGeneration;
+    // A worker still looking is let go of; what it finds, nobody takes.
+    mWorking.reset();
     mMatches.clear();
     mCurrent = -1;
     mStale   = false;
