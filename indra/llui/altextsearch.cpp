@@ -112,6 +112,8 @@ std::vector<ALTextRange> ALTextSearch::matches(const ALTextDocument& doc, std::s
     }
     static const boost::regex NONE;
     const boost::regex&       re     = compiled ? *compiled : NONE;
+    // As many as were asked for, and no more looked for.
+    const auto full = [&out, &options]() { return options.limit > 0 && out.size() >= options.limit; };
     const ALTextRange   within = scope ? scope->normalised() : ALTextRange(doc.start(), doc.end());
     const std::string_view needle = query;
 
@@ -178,6 +180,10 @@ std::vector<ALTextRange> ALTextSearch::matches(const ALTextDocument& doc, std::s
                     {
                         whole_begins->push_back(posOf(static_cast<S32>(found[0].first - base)));
                     }
+                    if (full())
+                    {
+                        break;
+                    }
                 }
                 if (found[0].length() == 0)
                 {
@@ -220,6 +226,10 @@ std::vector<ALTextRange> ALTextSearch::matches(const ALTextDocument& doc, std::s
                     {
                         whole_begins->push_back(posOf(static_cast<S32>(begin)));
                     }
+                    if (full())
+                    {
+                        break;
+                    }
                 }
                 at = options.caseSensitive ? begin + 1 : utf8str_decode_at(text, begin).next;
             }
@@ -252,7 +262,7 @@ std::vector<ALTextRange> ALTextSearch::matches(const ALTextDocument& doc, std::s
         const S32          size = static_cast<S32>(text.size());
         const S32          from = line == within.begin.line ? llclamp(within.begin.column, 0, size) : 0;
         const S32          to   = line == within.end.line ? llclamp(within.end.column, 0, size) : size;
-        if (!searchIn(text, from, to, [line](S32 offset) { return ALTextPos(line, offset); }))
+        if (!searchIn(text, from, to, [line](S32 offset) { return ALTextPos(line, offset); }) || full())
         {
             break;
         }

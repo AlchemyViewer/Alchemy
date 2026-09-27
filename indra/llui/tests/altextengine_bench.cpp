@@ -326,6 +326,17 @@ int main(int, char**)
         e.undo();
     });
     countRow("  replaced", replaced[0], replaced[1]);
+    // A word typed into the bar a key at a time, the bar open over the text.
+    both("a query typed into the find bar, per key", subjects, 5, [&](Subject&, ALCodeEditor& e) {
+        for (const char* typed : { "t", "to", "tot", "tota", "total" })
+        {
+            e.findBar()->setQuery(typed);
+        }
+    });
+    for (Subject& s : subjects)
+    {
+        g_sink = g_sink + s.editor->findMatches().size();
+    }
 
     // What lies over the text slides with each edit: every match found,
     // a squiggle on every other line.

@@ -65,9 +65,16 @@ public:
     S32                             current() const { return mCurrent; }
     void                            setCurrent(S32 index) { mCurrent = index; }
     const std::string&              error() const { return mError; }
+    // Whether the matches stopped at as many as a find lists (LIMIT),
+    // with more in the text.
+    bool                            capped() const { return mMatches.size() >= LIMIT; }
+    static constexpr size_t         LIMIT = 10000;
     // The match nearest a place, after it or before it, round the ends;
     // -1 with none.
     S32 nearest(const ALTextPos& from, bool forward) const;
+    // Every match, for a replace of every one: those listed, or where the
+    // list stopped short, all there are, looked through again without end.
+    std::vector<ALTextRange> all(const ALTextDocument& doc, const std::string& query, const ALTextSearchOptions& options) const;
     // The matches taken out, before a replace of every one; and put back,
     // where the replace did nothing.
     std::vector<ALTextRange> take();

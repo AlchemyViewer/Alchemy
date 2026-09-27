@@ -59,7 +59,9 @@ public:
         Params();
     };
 
-    void               setQuery(const std::string& query);
+    // Without `announce`, no change is said: what seeds the bar as it opens.
+
+    void setQuery(const std::string& query, bool announce = true);
     const std::string& query() const { return mQuery; }
     void               setReplacement(const std::string& text);
     std::string        replacement() const;
@@ -74,7 +76,8 @@ public:
 
     // What the view found: which one is current, of how many; or what was
     // wrong with the pattern.
-    void setCount(S32 current, S32 total, const std::string& error);
+    // `capped`: the total is as many as were looked for, and there are more.
+    void setCount(S32 current, S32 total, const std::string& error, bool capped = false);
     std::string countSaid() const;
 
     // The colours of the view the bar is over: its glyphs and its count

@@ -871,6 +871,8 @@ private:
     // edits stop coming for a moment, the matches sliding with the text
     // until then; and at once where they are about to be used.
     void refreshFind();
+    // The bar's query or its choices changed.
+    void queryChanged();
     void settleFind()
     {
         if (mFind.isStale())

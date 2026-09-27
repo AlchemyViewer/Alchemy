@@ -50,6 +50,8 @@ struct ALTextSearchOptions
     // on its own and no match crosses one. A query that is not a
     // pattern crosses lines where it has a line break in it.
     bool acrossLines   = false;
+    // At most so many matches, the first in the text; none for no end.
+    size_t limit       = 0;
 };
 
 // Finding in a document: every place a query stands, plain or as a

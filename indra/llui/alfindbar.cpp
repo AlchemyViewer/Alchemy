@@ -298,14 +298,17 @@ LLLineEditor* ALFindBar::field(const std::string& name, const std::string& label
     return made;
 }
 
-void ALFindBar::setQuery(const std::string& query)
+void ALFindBar::setQuery(const std::string& query, bool announce)
 {
     mQuery = query;
     if (mFind->getText() != query)
     {
         mFind->setText(query);
     }
-    mChanged();
+    if (announce)
+    {
+        mChanged();
+    }
 }
 
 void ALFindBar::setReplacement(const std::string& text)
@@ -363,7 +366,7 @@ std::string ALFindBar::countSaid() const
     return mCount->getText();
 }
 
-void ALFindBar::setCount(S32 current, S32 total, const std::string& error)
+void ALFindBar::setCount(S32 current, S32 total, const std::string& error, bool capped)
 {
     std::string said;
     if (!error.empty())
@@ -376,11 +379,12 @@ void ALFindBar::setCount(S32 current, S32 total, const std::string& error)
     }
     else if (current >= 0)
     {
-        said = alSaid("FindBarOf", "[CURRENT] of [TOTAL]", { { "[CURRENT]", std::to_string(current + 1) }, { "[TOTAL]", std::to_string(total) } });
+        said = alSaid("FindBarOf", "[CURRENT] of [TOTAL]",
+                      { { "[CURRENT]", std::to_string(current + 1) }, { "[TOTAL]", std::to_string(total) + (capped ? "+" : "") } });
     }
     else
     {
-        said = llformat("%d", total);
+        said = llformat("%d%s", total, capped ? "+" : "");
     }
     mCount->setText(said);
     mCount->setToolTip(error);

@@ -43,7 +43,11 @@ void ALTextFind::search(const ALTextDocument& doc, const std::string& query, con
     {
         mInSelection = false;
     }
-    mMatches.assign(ALTextSearch::matches(doc, query, options, mInSelection ? &mScope : nullptr, &mError));
+    // No more than a list of them is any use as: a letter over a long
+    // text is otherwise every place it stands.
+    ALTextSearchOptions capped = options;
+    capped.limit               = LIMIT;
+    mMatches.assign(ALTextSearch::matches(doc, query, capped, mInSelection ? &mScope : nullptr, &mError));
     // The current one is the match the selection is.
     mCurrent = -1;
     for (size_t i = 0; i < mMatches.size(); ++i)
@@ -89,6 +93,17 @@ bool ALTextFind::due() const
 S32 ALTextFind::nearest(const ALTextPos& from, bool forward) const
 {
     return ALTextSearch::nearest(mMatches.items(), from, forward);
+}
+
+std::vector<ALTextRange> ALTextFind::all(const ALTextDocument& doc, const std::string& query, const ALTextSearchOptions& options) const
+{
+    if (!capped())
+    {
+        return mMatches.items();
+    }
+    ALTextSearchOptions every = options;
+    every.limit               = 0;
+    return ALTextSearch::matches(doc, query, every, mInSelection ? &mScope : nullptr);
 }
 
 std::vector<ALTextRange> ALTextFind::take()

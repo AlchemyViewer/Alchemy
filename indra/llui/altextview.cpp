@@ -1751,7 +1751,7 @@ void ALTextView::afterEdit()
     if (findShown())
     {
         mFind.stale();
-        mFindBar->setCount(mFind.current(), static_cast<S32>(mFind.count()), mFind.error());
+        mFindBar->setCount(mFind.current(), static_cast<S32>(mFind.count()), mFind.error(), mFind.capped());
     }
     mChanged();
 }
@@ -2920,7 +2920,7 @@ void ALTextView::showFind(bool with_replace)
         p.follows.flags(FOLLOWS_TOP | FOLLOWS_RIGHT);
         mFindBar = LLUICtrlFactory::create<ALFindBar>(p);
         addChild(mFindBar);
-        mFindBar->onChanged([this]() { refreshFind(); });
+        mFindBar->onChanged([this]() { queryChanged(); });
         mFindBar->onNext([this]() { findNext(true); });
         mFindBar->onPrevious([this]() { findNext(false); });
         mFindBar->onReplace([this]() { replaceMatch(); });
@@ -2966,7 +2966,8 @@ void ALTextView::showFind(bool with_replace)
             }
             seed.swap(escaped);
         }
-        mFindBar->setQuery(seed);
+        // Quietly: the bar is looked through once, below.
+        mFindBar->setQuery(seed, false);
     }
     mFindBar->setReplaceAllowed(!mReadOnly);
     mFindBar->setReplaceShown(with_replace);
@@ -3007,6 +3008,20 @@ void ALTextView::placeFindBar()
     mFindBar->setColors(backgroundColor(), textColor());
 }
 
+void ALTextView::queryChanged()
+{
+    // A text of a script's size looked through at once, as the query is
+    // typed; a longer one once the query has stopped changing for a
+    // moment, as it is after an edit, not at every key.
+    constexpr size_t AT_ONCE = 256 * 1024;
+    if (mDocument.byteCount() > AT_ONCE)
+    {
+        mFind.stale();
+        return;
+    }
+    refreshFind();
+}
+
 void ALTextView::findChanged()
 {
     if (findShown())
@@ -3023,7 +3038,7 @@ void ALTextView::refreshFind()
         return;
     }
     mFind.search(mDocument, mFindBar->query(), mFindBar->options(), mFindBar->inSelection(), selection().normalised());
-    mFindBar->setCount(mFind.current(), static_cast<S32>(mFind.count()), mFind.error());
+    mFindBar->setCount(mFind.current(), static_cast<S32>(mFind.count()), mFind.error(), mFind.capped());
 }
 
 bool ALTextView::findNext(bool forward)
@@ -3046,7 +3061,7 @@ bool ALTextView::findNext(bool forward)
     }
     mFind.setCurrent(index);
     setSelection(mFind.matches()[static_cast<size_t>(index)]);
-    mFindBar->setCount(mFind.current(), static_cast<S32>(mFind.count()), mFind.error());
+    mFindBar->setCount(mFind.current(), static_cast<S32>(mFind.count()), mFind.error(), mFind.capped());
     return true;
 }
 
@@ -3077,9 +3092,11 @@ S32 ALTextView::replaceAllMatches()
     {
         return 0;
     }
+    // Every match, not only those the bar lists.
+    const std::vector<ALTextRange>                   every = mFind.all(mDocument, mFindBar->query(), mFindBar->options());
     std::vector<std::pair<ALTextRange, std::string>> edits;
-    edits.reserve(mFind.count());
-    for (const ALTextRange& match : mFind.matches())
+    edits.reserve(every.size());
+    for (const ALTextRange& match : every)
     {
         edits.emplace_back(match, ALTextSearch::replacement(mDocument, match, mFindBar->query(), mFindBar->options(), mFindBar->replacement()));
     }

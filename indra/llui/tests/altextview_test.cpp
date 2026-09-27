@@ -1492,4 +1492,36 @@ namespace tut
         key(KEY_BACKSPACE);
         ensure_equals("within the text, one", v.text(), std::string("a b"));
     }
+
+    template<> template<>
+    void altextview_object::test<50>()
+    {
+        set_test_name("find: no more matches than a list is any use as, said with a plus; a long text looked through once the query settles, not at each key");
+        std::string many;
+        for (size_t i = 0; i < ALTextFind::LIMIT + 5; ++i)
+        {
+            many += "a\n";
+        }
+        ALTextView& v = make(many.c_str());
+        v.showFind(false);
+        v.findBar()->setQuery("a");
+        ensure_equals("as many as are listed", v.findMatches().size(), ALTextFind::LIMIT);
+        ensure_equals("and more said", v.findBar()->countSaid(), std::to_string(ALTextFind::LIMIT) + "+");
+        v.findBar()->setReplacement("b");
+        ensure_equals("Replace All: every one, not only those listed", v.replaceAllMatches(), static_cast<S32>(ALTextFind::LIMIT + 5));
+        ensure("none left", v.text().find('a') == std::string::npos);
+
+        // Past a script's size: the count waits for the query to settle.
+        std::string big;
+        while (big.size() < 300 * 1024)
+        {
+            big += "one two three four five six seven eight nine ten\n";
+        }
+        v.setText(big);
+        v.findMatches();
+        const std::string before = v.findBar()->countSaid();
+        v.findBar()->setQuery("seven");
+        ensure_equals("not looked through at the key", v.findBar()->countSaid(), before);
+        ensure("looked through once asked for, as a moment later", !v.findMatches().empty() && v.findBar()->countSaid() != before);
+    }
 }
