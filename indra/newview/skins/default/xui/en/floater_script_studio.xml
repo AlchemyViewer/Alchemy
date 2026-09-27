@@ -453,6 +453,7 @@
     <floater.string name="ClearRecentFiles">Clear Menu</floater.string>
     <floater.string name="OriginCompiler">Compiler</floater.string>
     <floater.string name="CompilerAsSaved">(as of the last save)</floater.string>
+    <floater.string name="UpdatingDefinitions">Asking the region for its language definitions again; every script is checked again once they are in.</floater.string>
     <floater.string name="OriginParser">Parser</floater.string>
     <floater.string name="OriginTypes">Types</floater.string>
     <floater.string name="OriginLint">Lint</floater.string>
@@ -623,6 +624,9 @@
             <menu_item_separator layout="topleft" />
             <menu_item_call label="Preferences..." layout="topleft" name="preferences">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="preferences" />
+            </menu_item_call>
+            <menu_item_call label="Update Language Definitions" layout="topleft" name="update_definitions">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="update_definitions" />
             </menu_item_call>
             <menu_item_separator layout="topleft" />
             <menu_item_call label="Move to New Window" layout="topleft" name="pop_out">

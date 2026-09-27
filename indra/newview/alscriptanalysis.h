@@ -56,9 +56,10 @@ namespace Luau
 // the region's, by the paths the syntax cache gives, read on the worker.
 //
 // Tailslide's builtins are a table the library holds once for the whole
-// process and adds to rather than replaces, so the LSL builtins are loaded
-// once; the Luau definitions are read again when the region's change, and
-// when ALScriptLuauSolver picks the other of Luau's type solvers. An SLua
+// process and adds to rather than replaces, so a region's LSL builtins add
+// what the table lacks; the Luau definitions are read again when the
+// region's change, and when ALScriptLuauSolver picks the other of Luau's
+// type solvers. An SLua
 // type check is held to ALScriptLuauCheckSeconds, and one a newer check of
 // its script has made pointless is stopped where it is.
 // Words keyed as the library keys them, in the skin's language where it has

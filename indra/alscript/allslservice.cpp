@@ -1124,9 +1124,100 @@ ALLSLService::ALLSLService()
 
 ALLSLService::~ALLSLService() = default;
 
+namespace
+{
+    // What a builtins line declares: a constant's name after its type, an
+    // event's after `event`, a function's after what it returns.
+    std::string builtinNameOf(std::string_view line)
+    {
+        std::vector<std::string_view> words;
+        size_t                        at = 0;
+        while (words.size() < 3 && at < line.size())
+        {
+            const size_t begin = line.find_first_not_of(" \t(),=\r\n", at);
+            if (begin == std::string_view::npos)
+            {
+                break;
+            }
+            const size_t end = line.find_first_of(" \t(),=\r\n", begin);
+            words.push_back(line.substr(begin, end == std::string_view::npos ? std::string_view::npos : end - begin));
+            at = end == std::string_view::npos ? line.size() : end;
+        }
+        if (words.size() < 2 || line.compare(0, 2, "//") == 0)
+        {
+            return std::string();
+        }
+        return std::string(words[0] == "const" ? (words.size() > 2 ? words[2] : std::string_view()) : words[1]);
+    }
+}
+
 bool ALLSLService::loadBuiltins(const std::string& path, std::string& error)
 {
     AL_SCRIPT_ENGINE_HELD;
+    // Loaded before -- another region's: Tailslide's table is the
+    // process's and is only ever added to, and loading a file again would
+    // put every name in it twice. So what this one declares that the table
+    // lacks is loaded alone, and what both declare stays as first loaded.
+    if (sBuiltinsLoaded)
+    {
+        llifstream in(path, std::ios::in | std::ios::binary);
+        if (!in.is_open())
+        {
+            error = "cannot open " + path;
+            return false;
+        }
+        Tailslide::ScopedScriptParser probe(nullptr);
+        Tailslide::LSLSymbolTable*    table = probe.context.builtins;
+        std::string                   added;
+        std::set<std::string>         names;
+        for (std::string line; std::getline(in, line);)
+        {
+            const std::string name = builtinNameOf(line);
+            if (!name.empty() && table && !table->lookup(name.c_str(), Tailslide::SYM_ANY) && names.insert(name).second)
+            {
+                added += line;
+                added += '\n';
+            }
+        }
+        error.clear();
+        if (added.empty())
+        {
+            return true;
+        }
+        const std::string more = path + ".added";
+        {
+            llofstream out(more, std::ios::out | std::ios::binary | std::ios::trunc);
+            out << added;
+        }
+        Tailslide::tailslide_init_builtins(more.c_str());
+        LLFile::remove(more);
+        // An event new here numbered as the runtime numbers it, or after
+        // every event there already was: those numbered before keep theirs.
+        int last = 0;
+        std::vector<Tailslide::LSLSymbol*> fresh;
+        for (auto& [name, symbol] : table->getMap())
+        {
+            if (symbol->getSymbolType() != Tailslide::SYM_EVENT)
+            {
+                continue;
+            }
+            if (names.count(symbol->getName()))
+            {
+                fresh.push_back(symbol);
+            }
+            else
+            {
+                last = std::max(last, symbol->getEventIndex());
+            }
+        }
+        for (Tailslide::LSLSymbol* symbol : fresh)
+        {
+            const int index = Luau::lslEventIndex(symbol->getName());
+            symbol->setEventIndex(index > 0 ? index : ++last);
+        }
+        mImpl->builtins = true;
+        return true;
+    }
     // A file that is not there has nothing loaded, which is said here: the
     // file is opened first. A line Tailslide cannot read -- a type it does
     // not know, a constant it cannot parse, blanks -- it says so on stderr

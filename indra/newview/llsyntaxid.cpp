@@ -160,6 +160,20 @@ bool LLSyntaxDefCache::updateSyntaxId()
     return false;
 }
 
+void LLSyntaxDefCache::forceUpdate()
+{
+    updateSyntaxId();
+    if (mCapabilityURL.empty())
+    {
+        // No region to ask: what is kept, or the shipped definitions, read
+        // again, and those listening told as a fetch would tell them.
+        checkCacheAndLoad(mSyntaxId);
+        mSyntaxIDChangedSignal();
+        return;
+    }
+    fetchKeywords();
+}
+
 void LLSyntaxDefCache::handleRegionChanged()
 {
     if (updateSyntaxId())

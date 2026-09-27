@@ -89,16 +89,18 @@ void ALScriptAnalyzer::weigh(const Request& request, const std::string& text, Re
 
 // --- LSL ---------------------------------------------------------------------------------
 
-void ALLSLAnalyzer::load(const std::string& path)
+void ALLSLAnalyzer::load(const std::string& path, U32 generation)
 {
-    // Once for the session, from the first region's builtins: a region
-    // whose LSL has more functions than the first's is checked against the
-    // first's until the viewer starts again.
-    if (mLoaded)
+    // Each region's builtins as it comes: a region with functions the last
+    // lacked has them added (ALLSLService::loadBuiltins), so that a function
+    // new on an RC region is no undeclared name there.
+    if (mLoaded && path == mPath && generation == mGeneration)
     {
         return;
     }
-    mLoaded = true;
+    mLoaded     = true;
+    mPath       = path;
+    mGeneration = generation;
     mError.clear();
     if (path.empty())
     {
@@ -115,7 +117,7 @@ void ALLSLAnalyzer::load(const std::string& path)
 void ALLSLAnalyzer::answer(const Request& request, const std::string& text, const Setup& setup, Result& result)
 {
     using Kind = ALScriptAnalysis::Kind;
-    load(setup.lslPath);
+    load(setup.lslPath, setup.generation);
     result.definitionsError = mError;
     mService.setPassedOver(request.passedOver);
     switch (request.kind)

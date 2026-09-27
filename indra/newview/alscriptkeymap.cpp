@@ -259,6 +259,7 @@ namespace ALScriptKeymap
             { "save_as", KEY_NONE, MASK_NONE },
             { "external_editor", KEY_NONE, MASK_NONE },
             { "preferences", KEY_NONE, MASK_NONE },
+            { "update_definitions", KEY_NONE, MASK_NONE },
             { "pop_out", KEY_NONE, MASK_NONE },
             { "close", 'W', MASK_CONTROL },
             { "close_others", KEY_NONE, MASK_NONE },

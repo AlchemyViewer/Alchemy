@@ -6365,6 +6365,13 @@ void ALFloaterScriptStudio::addFileCommands()
             return doc && doc->loaded && doc->modifiable && !doc->notecard;
         });
     mCommands.add("preferences", []() { LLFloaterReg::showInstance("script_studio_prefs"); });
+    // The region asked for its language definitions again, whatever is
+    // kept of them: for a script checked against functions the region has
+    // since added. Everything is checked again once they are in.
+    mCommands.add("update_definitions", [this]() {
+        LLSyntaxDefCache::instance().forceUpdate();
+        setStatus(getString("UpdatingDefinitions"));
+    });
     mCommands.add(
         "pop_out", [this]() { popOut(); },
         [this]() {

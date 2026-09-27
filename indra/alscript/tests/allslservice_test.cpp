@@ -717,4 +717,45 @@ namespace tut
         }
         ensure("with nothing passed over, coloured", coloured);
     }
+
+    template<> template<>
+    void allslservice_object::test<21>()
+    {
+        set_test_name("another region's builtins: what it adds is known after, what both have stays as first loaded, and nothing is said twice");
+        const std::string base = std::string(AL_LSL_DEFINITIONS_DIR) + "/builtins.txt";
+        std::string       error;
+        ensure("the first region's: " + error, service.loadBuiltins(base, error));
+        const std::string script = "default\n{\n    state_entry()\n    {\n        integer n = llBrandNewThing(1);\n        llOwnerSay((string)n);\n    }\n}\n";
+        bool unknown = false;
+        for (const ALScriptProblem& problem : service.check(script))
+        {
+            unknown |= problem.message.find("llBrandNewThing") != std::string::npos;
+        }
+        ensure("not yet known", unknown);
+        // A region with one function more.
+        std::string text;
+        {
+            llifstream in(base, std::ios::in | std::ios::binary);
+            std::ostringstream all;
+            all << in.rdbuf();
+            text = all.str();
+        }
+        const std::string path = (std::filesystem::temp_directory_path() / "alscript-test-builtins-newer.txt").string();
+        {
+            llofstream out(path, std::ios::out | std::ios::binary | std::ios::trunc);
+            out << text << "integer llBrandNewThing( integer Value )\n";
+        }
+        const bool loaded = service.loadBuiltins(path, error);
+        LLFile::remove(path);
+        ensure("loaded: " + error, loaded);
+        unknown = false;
+        for (const ALScriptProblem& problem : service.check(script))
+        {
+            unknown |= problem.message.find("llBrandNewThing") != std::string::npos;
+        }
+        ensure("known now", !unknown);
+        // Nothing twice: an old one still one declaration.
+        const ALScriptSignature said = service.signature("default { state_entry() { llAbs( } }\n", 0, 32);
+        ensure("an old function as it was", said.found && said.label.find("llAbs") != std::string::npos);
+    }
 }

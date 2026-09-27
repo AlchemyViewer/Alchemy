@@ -65,19 +65,21 @@ public:
     static void weigh(const Request& request, const std::string& text, Result& result);
 };
 
-// LSL's, over Tailslide: its builtins loaded once for the session, since
-// Tailslide keeps them in a table of the whole process that it adds to and
-// never replaces.
+// LSL's, over Tailslide: its builtins loaded as each region's come, what a
+// region adds put into the table Tailslide keeps for the whole process,
+// which is only ever added to.
 class ALLSLAnalyzer final : public ALScriptAnalyzer
 {
 public:
     void answer(const Request& request, const std::string& text, const Setup& setup, Result& result) override;
 
 private:
-    void load(const std::string& path);
+    void load(const std::string& path, U32 generation);
 
     ALLSLService mService;
     bool         mLoaded = false;
+    std::string  mPath;
+    U32          mGeneration = 0;
     std::string  mError;
 };
 

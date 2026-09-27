@@ -93,6 +93,10 @@ public:
     syntax_id_changed_h         addSyntaxIDCallback(const syntax_id_changed_signal_t::slot_type& cb);
 
     bool                        checkCacheAndLoad(const LLUUID& syntax_id);
+    // The region's definitions fetched again, whatever is kept of them,
+    // and those listening told once they are in: for a scripter who
+    // suspects what is kept is behind what the region runs.
+    void                        forceUpdate();
 
     static std::string          buildCacheDirectoryName(const LLUUID& syntax_id);
 
