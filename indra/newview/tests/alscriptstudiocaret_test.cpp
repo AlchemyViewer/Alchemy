@@ -80,8 +80,9 @@ namespace
             said.push_back("problems " + at(pos));
             return problems;
         }
+        bool inspectorShown() const override { return inspector; }
 
-        bool                    expanded = false, problems = false;
+        bool                    expanded = false, problems = false, inspector = true;
         std::string             held;
         Names                   asked, said;
         S32                     typing = 0;
@@ -365,5 +366,25 @@ namespace tut
         doc.expandedEditor->setFocus(true);
         caret.pump(9.5);
         ensure_equals("typing", studio.typing, 1);
+    }
+
+    template<> template<>
+    void alscriptstudiocaret_object::test<6>()
+    {
+        set_test_name("with the inspector folded away nothing is asked as the caret settles; brought out, what is at the caret is asked");
+        ALScriptStudioCaret& caret = make();
+        Doc&                 doc   = tab("a");
+        studio.inspector           = false;
+        doc.editor->setCaret(ALTextPos(0, 10));
+        caret.pump(10.0);
+        caret.pump(10.0 + ALScriptStudioCaret::SETTLE);
+        ensure("folded: nothing asked", studio.asked.empty());
+        caret.pump(20.0);
+        ensure("still nothing", studio.asked.empty());
+        studio.inspector = true;
+        caret.pump(21.0);
+        ensure_equals("brought out: asked", joined(studio.asked), std::string("inspect 0:8"));
+        caret.pump(22.0);
+        ensure_equals("once", studio.asked.size(), size_t(1));
     }
 }

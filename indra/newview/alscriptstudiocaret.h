@@ -81,6 +81,9 @@ public:
         // shown in the inspector, false where nothing is.
         virtual void showPath(Doc& doc)                           = 0;
         virtual bool showProblemsAt(Doc& doc, const ALTextPos& at) = 0;
+        // Whether the inspector is out to be read: folded away, what is at
+        // the caret is not asked, and is asked as it comes out.
+        virtual bool inspectorShown() const                        = 0;
 
     protected:
         ~Window() = default;

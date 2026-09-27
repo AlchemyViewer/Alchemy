@@ -5825,6 +5825,11 @@ void ALFloaterScriptStudio::runtimeEvent(const ALScriptWorkspace::RuntimeEvent& 
     }
 }
 
+bool ALFloaterScriptStudio::inspectorShown() const
+{
+    return mInspectorPane && !mFolds.collapsed("inspector") && mInspectorPane->isInVisibleChain() && getVisible() && !isMinimized();
+}
+
 bool ALFloaterScriptStudio::outputInSight() const
 {
     return !mFolds.collapsed("bottom") && mBottomTabs->getCurrentPanel() && mBottomTabs->getCurrentPanel()->getName() == "output_tab";

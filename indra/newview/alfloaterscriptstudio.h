@@ -355,6 +355,7 @@ private:
     void showOutline(Doc& doc) override { mOutlinePane->show(doc); }
     std::vector<ALScriptWeight::Target> weightTargets(const Doc& doc) override { return mWeighing.targets(doc); }
     void weighed(Doc& doc, const ALScriptAnalysis::Result& result) override { mWeighing.weighed(doc, result); }
+    bool inspectorShown() const override;
     void                                preprocessForSave(Doc& doc) override { mSaving.preprocess(doc); }
     ALCodeEditor&                       editorInFront(Doc& doc) override { return sourceInFront(doc); }
     void                                confirmFixAll(const LLSD& args, std::function<void()> yes) override;

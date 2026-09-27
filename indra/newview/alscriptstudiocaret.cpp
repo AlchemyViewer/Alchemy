@@ -197,7 +197,9 @@ void ALScriptStudioCaret::pump(F64 now)
             }
         }
     }
-    if (source && doc->caret.inspectDue > 0.0 && now >= doc->caret.inspectDue)
+    // Settled, and the inspector out to say it: a whole-text question at
+    // every settle is the analyzers' time nobody reads with it folded.
+    if (source && doc->caret.inspectDue > 0.0 && now >= doc->caret.inspectDue && mWindow.inspectorShown())
     {
         doc->caret.inspectDue = 0.0;
         const ALTextRange word    = doc->editor->identifierAtCaret();
