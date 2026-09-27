@@ -1042,4 +1042,29 @@ namespace tut
         ALScriptFixes::attachOptimizer(problem, "integer x;\n");
         ensure("added: " + std::to_string(problem.fixes.size()), problem.fixes.size() == 2 && !problem.fixes.back().preferred && problem.fixes.front().preferred);
     }
+
+    template<> template<>
+    void object::test<34>()
+    {
+        set_test_name("SLua written with LSL's habits -- != && || ! -- changed to SLua's words, only ~= safe; an index or a loop from 0 counted from 1");
+        ensure_equals("~=", fixed("local a, b = 1, 2\nif a != b then print(1) end\n", true, "LuauUnexpectedDidYouMean", "Change '!=' to '~='"),
+                      std::string("local a, b = 1, 2\nif a ~= b then print(1) end\n"));
+        ensure_equals("and, apart from what it joins", fixed("local a, b = true, false\nif a&&b then print(1) end\n", true, "LuauUnexpectedDidYouMean", "Change '&&' to 'and'"),
+                      std::string("local a, b = true, false\nif a and b then print(1) end\n"));
+        ensure_equals("or", fixed("local a, b = true, false\nif a || b then print(1) end\n", true, "LuauUnexpectedDidYouMean", "Change '||' to 'or'"),
+                      std::string("local a, b = true, false\nif a or b then print(1) end\n"));
+        ensure_equals("not, apart from its operand", fixed("local a = true\nif(!a) then print(1) end\n", true, "LuauUnexpectedDidYouMean", "Change '!' to 'not'"),
+                      std::string("local a = true\nif(not a) then print(1) end\n"));
+        const ALScriptProblems compared = check("local a, b = 1, 2\nif a != b then print(1) end\n", true);
+        const ALScriptProblems denied   = check("local a = true\nif !a then print(1) end\n", true);
+        const ALScriptProblem* unequal  = keyed(compared, "LuauUnexpectedDidYouMean");
+        const ALScriptProblem* negated  = keyed(denied, "LuauUnexpectedDidYouMean");
+        ensure("~= safe, the same whatever it compares", unequal && unequal->fixes.front().safe);
+        ensure("not unsafe: 0 is true in SLua", negated && !negated->fixes.front().safe);
+
+        ensure_equals("an index from 0", fixed("local t = {}\ntable.insert(t, 0, 5)\n", true, "LuauLintTableInsertZero", "Change '0' to '1'"),
+                      std::string("local t = {}\ntable.insert(t, 1, 5)\n"));
+        ensure_equals("a loop from 0", fixed("local t = {1, 2}\nfor i = 0, #t do print(t[i]) end\n", true, "LuauLintForRangeZero", "Change '0' to '1'"),
+                      std::string("local t = {1, 2}\nfor i = 1, #t do print(t[i]) end\n"));
+    }
 }

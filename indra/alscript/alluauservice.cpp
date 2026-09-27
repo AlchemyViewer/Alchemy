@@ -1762,9 +1762,10 @@ ALScriptProblems ALLuauService::check(std::string_view source)
             args                      = { unknown->key, head, nearest };
             message                   = ALScriptProblem::fill(nearest.empty() ? "Key '[1]' not found in [2]" : "Key '[1]' not found in [2]; did you mean '[3]'?", args);
         }
-        else if (!syntax)
+        else
         {
-            // One of the commonest shapes, taken apart by its words.
+            // One of the commonest shapes, taken apart by its words: a type
+            // error's, or the parser's where it says what was meant.
             ALMessageMap::Match known;
             if (ALMessageMap::luauError(message, known))
             {

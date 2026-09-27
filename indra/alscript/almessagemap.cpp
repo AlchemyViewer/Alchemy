@@ -208,6 +208,9 @@ namespace
     // rather than formats them: the fuller shape before the one it
     // begins with, since a mark at the end takes whatever is left.
     const ErrorRow ERROR_ROWS[] = {
+        // The parser's, where it knows what was meant: an LSL habit -- `!=`,
+        // `&&`, `||`, `!` -- and SLua's way of saying it.
+        { "LuauUnexpectedDidYouMean", "Unexpected '[1]'; did you mean '[2]'?" },
         { "LuauUnknownGlobalAssign", "Unknown global '[1]'; consider assigning to it first" },
         { "LuauUnknownType", "Unknown type '[1]'" },
         { "LuauTypeMismatchUnreachableReason", "Expected this to be unreachable, but got [1]; [2]" },

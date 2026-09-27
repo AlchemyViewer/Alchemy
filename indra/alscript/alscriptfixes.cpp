@@ -57,12 +57,16 @@
     X(LuauLintDeprecatedMemberUseReason) \
     X(LuauLintDirectiveNolintUnknownDidYouMean) \
     X(LuauLintDirectiveUnknownDidYouMean) \
+    X(LuauLintForRangeZero) \
     X(LuauLintFunctionUnused) \
     X(LuauLintGlobalNeverRead) \
     X(LuauLintGlobalUsedAsLocalFunction) \
     X(LuauLintGlobalUsedAsLocalLine) \
     X(LuauLintImportUnused) \
     X(LuauLintLocalUnused) \
+    X(LuauLintTableInsertZero) \
+    X(LuauLintTableMoveZero) \
+    X(LuauLintTableRemoveZero) \
     X(LuauLintUninitializedLocal) \
     X(LuauMissingExternPropertyDidYouMean) \
     X(LuauMissingPropertyDidYouMean) \
@@ -70,6 +74,7 @@
     X(LuauRequiresSelf) \
     X(LuauTypeMismatch) \
     X(LuauTypeMismatchReason) \
+    X(LuauUnexpectedDidYouMean) \
     X(OptimizerEvaluated) \
     X(OptimizerFolded) \
     X(OptimizerRemovedFunction) \
@@ -557,6 +562,48 @@ namespace
                 fix.edits.push_back({ at_line, static_cast<S32>(end), at_line, static_cast<S32>(end), " = nil" });
                 problem.fixes.push_back(std::move(fix));
             }
+        }
+        else if (lua && is(key, Fixed::LuauUnexpectedDidYouMean) && args.size() == 2 && marked == args[0])
+        {
+            // An LSL habit, written as SLua writes it. Only `~=` is the same
+            // whatever it is given: `not`, `and` and `or` read 0 and "" as
+            // true where LSL reads them as false, so the change is the
+            // scripter's to look at.
+            static const std::pair<std::string_view, std::string_view> HABITS[] = { { "!=", "~=" }, { "&&", "and" }, { "||", "or" }, { "!", "not" } };
+            const auto habit = std::find_if(std::begin(HABITS), std::end(HABITS), [&args](const auto& one) { return one.first == args[0] && one.second == args[1]; });
+            if (habit != std::end(HABITS))
+            {
+                // A word apart from what stands against it: `a&&b` is
+                // `a and b`, `!x` is `not x`.
+                const bool  word   = isalpha(static_cast<unsigned char>(habit->second.front())) != 0;
+                const char  before = from > 0 ? line[from - 1] : ' ';
+                const char  after  = to < static_cast<S32>(line.size()) ? line[to] : ' ';
+                std::string with(habit->second);
+                if (word && (habit->second == "not" ? identifierByte(before) : !isspace(static_cast<unsigned char>(before))))
+                {
+                    with = " " + with;
+                }
+                if (word && !isspace(static_cast<unsigned char>(after)))
+                {
+                    with += " ";
+                }
+                ALScriptFix fix = titled("ScriptFixChange", "Change '[1]' to '[2]'", { args[0], args[1] });
+                fix.preferred   = true;
+                fix.safe        = habit->second == "~=";
+                fix.edits.push_back({ problem.line, from, problem.line, to, with });
+                problem.fixes.push_back(std::move(fix));
+            }
+        }
+        else if (lua && (is(key, Fixed::LuauLintTableInsertZero) || is(key, Fixed::LuauLintTableRemoveZero) || is(key, Fixed::LuauLintTableMoveZero) ||
+                         is(key, Fixed::LuauLintForRangeZero)) &&
+                 !marked.empty() && marked.front() == '0' && (marked.size() == 1 || !(isalnum(static_cast<unsigned char>(marked[1])) || marked[1] == '.' || marked[1] == '_')))
+        {
+            // Counted from 1, where SLua's arrays start: the 0 the lint
+            // marks -- the index given, or where the loop begins.
+            ALScriptFix fix = titled("ScriptFixChange", "Change '[1]' to '[2]'", { "0", "1" });
+            fix.preferred   = true;
+            fix.edits.push_back({ problem.line, from, problem.line, from + 1, "1" });
+            problem.fixes.push_back(std::move(fix));
         }
         else if (lua && (is(key, Fixed::LuauLintDirectiveUnknownDidYouMean) || is(key, Fixed::LuauLintDirectiveNolintUnknownDidYouMean)) && args.size() == 2 &&
                  isIdentifier(args[0]) && isIdentifier(args[1]))

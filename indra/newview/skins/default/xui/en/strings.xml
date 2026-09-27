@@ -753,6 +753,7 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="LuauLintDeprecatedFunctionUse">Function '[1]' is deprecated, use '[2]' instead</string>
 	<string name="LuauLintDeprecatedFunctionReason">Function '[1]' is deprecated. [2]</string>
 	<string name="LuauLintDeprecatedFunction">Function '[1]' is deprecated</string>
+	<string name="LuauUnexpectedDidYouMean">Unexpected '[1]'; did you mean '[2]'?</string>
 	<string name="LuauUnknownGlobalAssign">Unknown global '[1]'; consider assigning to it first</string>
 	<string name="LuauUnknownType">Unknown type '[1]'</string>
 	<string name="LuauTypeMismatchUnreachableReason">Expected this to be unreachable, but got [1]; [2]</string>
