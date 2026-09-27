@@ -427,6 +427,9 @@ struct ALScriptStudioDoc
         // What the analyzer said of the text at analysisVersion; when the
         // next check is due, or zero; the version last asked about.
         ALScriptProblems analysis;
+        // LSL's, as the analyzer said them, before the lints as chosen:
+        // what a change of the lints filters again.
+        ALScriptProblems unfiltered;
         U32              analysisVersion  = 0;
         U32              requestedVersion = 0;
         F64              analysisDue      = 0.0;

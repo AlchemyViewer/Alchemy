@@ -138,6 +138,11 @@ public:
     // checked again, the editors taught its words where they changed.
     void pump(F64 now);
     void settingsChanged(bool words, F64 now);
+    // The lints chosen again: an LSL tab's last check filtered again by
+    // them, as they are applied after the analyzer rather than in it; an
+    // SLua tab's, or one without a check of its text as it stands,
+    // checked again.
+    void relint(Doc& doc);
     // The compiler's and the run's problems moved along with an edit; and
     // the outline, until the next check says it again.
     void slideProblems(Doc& doc, const ALTextDocument::Edit& edit);
@@ -173,9 +178,18 @@ private:
     // who waited on the check.
     void analysed(const ALScriptAnalysis::Result& result);
     void takeProblems(Doc& doc, const ALScriptAnalysis::Result& result);
+    // The problems taken as the scripter chose the lints, and those of a
+    // fragment's own lines alone.
+    void filterProblems(Doc& doc);
+    // How many lines of what was checked are a fragment's own, before the
+    // state put after it.
+    S32  fragmentLines(const Doc& doc, U32 version) const;
     void takeColours(Doc& doc, const ALScriptAnalysis::Result& result, const ALSourceMap* map);
     void mapProblems(Doc& doc);
+    void mapOutline(Doc& doc);
     void checked(Doc& doc);
+    // What is made of the problems, and they shown.
+    void showProblems(Doc& doc);
     // What is made of the problems: imports offered, what a comment says
     // is not wanted dropped, the preprocessor's words and a require
     // explained.

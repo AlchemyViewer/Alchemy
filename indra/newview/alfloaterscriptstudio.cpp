@@ -743,16 +743,32 @@ bool ALFloaterScriptStudio::postBuild()
         }
     });
 
-    // The lints chosen again, the mode, the solver or how long a check may
-    // take: every script checked again.
-    for (const char* setting : { "ALScriptLintLevels", "ALScriptLuauMode", "ALScriptLuauSolver", "ALScriptLuauCheckSeconds" })
+    // The lints chosen again: LSL's are applied after the analyzer, so an
+    // LSL script's last check is filtered again; an SLua script's are in
+    // its configuration, and it is checked again -- from the check it has,
+    // where its configuration comes to the same.
+    if (LLControlVariable* control = gSavedSettings.getControl("ALScriptLintLevels"))
+    {
+        mSettingConnections.emplace_back(control->getSignal()->connect([this](LLControlVariable*, const LLSD&, const LLSD&) {
+            for (std::unique_ptr<Doc>& doc : mDocs)
+            {
+                if (doc->loaded)
+                {
+                    mChecking.relint(*doc);
+                }
+            }
+        }));
+    }
+    // The mode, the solver or how long a check may take: SLua's, and every
+    // SLua script checked again.
+    for (const char* setting : { "ALScriptLuauMode", "ALScriptLuauSolver", "ALScriptLuauCheckSeconds" })
     {
         if (LLControlVariable* control = gSavedSettings.getControl(setting))
         {
             mSettingConnections.emplace_back(control->getSignal()->connect([this](LLControlVariable*, const LLSD&, const LLSD&) {
                 for (std::unique_ptr<Doc>& doc : mDocs)
                 {
-                    if (doc->loaded)
+                    if (doc->loaded && doc->language.lua)
                     {
                         scheduleAnalysis(*doc, true);
                     }
@@ -6690,25 +6706,31 @@ void ALFloaterScriptStudio::addViewCommands()
             saveState();
         },
         nullptr, [this]() { return mVimMode; });
-    // Off at once; on with the next check, which is now.
+    // Off at once, with nothing asked; on with the next check, which is
+    // now -- as are the hints that stay, one kind of them turned off.
     for (const auto& [name, flag] : { std::pair{ "semantic_colors", &mSemanticColors }, std::pair{ "inlay_parameters", &mInlayParameters },
                                       std::pair{ "inlay_types", &mInlayTypes } })
     {
+        const bool colours = flag == &mSemanticColors;
         mCommands.add(
             name,
-            [this, flag]() {
+            [this, flag, colours]() {
                 *flag = !*flag;
+                const bool hints = mInlayParameters || mInlayTypes;
                 for (std::unique_ptr<Doc>& each : mDocs)
                 {
                     if (!mSemanticColors)
                     {
                         each->editor->setSemanticTokens({});
                     }
-                    if (!mInlayParameters && !mInlayTypes)
+                    if (!hints)
                     {
                         each->editor->setInlayHints({});
                     }
-                    scheduleAnalysis(*each, true);
+                    if (*flag || (!colours && hints))
+                    {
+                        scheduleAnalysis(*each, true);
+                    }
                 }
                 saveState();
             },

@@ -37,15 +37,25 @@
 
 #include "../test/lltut.h"
 
+#include <algorithm>
+
 // The lints as a scripter chose them, and the skin's words for a key, are
 // the viewer's settings.
 namespace
 {
-    S32 gLintsApplied = 0;
+    S32  gLintsApplied = 0;
+    // Whether the lints as chosen drop every warning.
+    bool gWarningsOff  = false;
 }
-void ALScriptLints::apply(ALScriptProblems&)
+void ALScriptLints::apply(ALScriptProblems& problems)
 {
     ++gLintsApplied;
+    if (gWarningsOff)
+    {
+        problems.erase(std::remove_if(problems.begin(), problems.end(),
+                                      [](const ALScriptProblem& p) { return p.severity == ALScriptProblem::Severity::Warning; }),
+                       problems.end());
+    }
 }
 ALLuauConfig ALScriptLints::luauBase()
 {
@@ -236,6 +246,7 @@ namespace tut
                 nearby.push_back(fetched);
             };
             gLintsApplied       = 0;
+            gWarningsOff        = false;
         }
         ~alscriptstudiochecking_data()
         {
@@ -874,5 +885,36 @@ namespace tut
         studio.told.clear();
         studio.asks[1].answered(answer(b, {}));
         ensure_equals("none for the other", joined(studio.told), std::string("problems b, outline b"));
+    }
+
+    template<> template<>
+    void alscriptstudiochecking_object::test<15>()
+    {
+        set_test_name("the lints chosen again: an LSL tab's last check filtered afresh, nothing asked; an SLua tab, or a text since typed in, checked again");
+        ALScriptStudioChecking& checking = make();
+        Doc&                    doc      = tab("a");
+        checking.schedule(doc, true);
+        checking.pump(1.0);
+        studio.asks[0].answered(answer(doc, { problem(0, "wrong"), problem(1, "unused", ALScriptProblem::Severity::Warning) }));
+        ensure_equals("both taken", doc.check.analysis.size(), size_t(2));
+        studio.told.clear();
+        gWarningsOff = true;
+        checking.relint(doc);
+        ensure_equals("nothing asked", studio.asks.size(), size_t(1));
+        ensure("the warning filtered out", doc.check.analysis.size() == 1 && doc.check.analysis[0].message == "wrong");
+        ensure_equals("and shown", joined(studio.told), std::string("problems a"));
+        gWarningsOff = false;
+        checking.relint(doc);
+        ensure_equals("back again, from what the check said", doc.check.analysis.size(), size_t(2));
+        doc.editor->insertText("x");
+        checking.relint(doc);
+        checking.pump(2.0);
+        ensure_equals("typed in since: checked again", studio.asks.size(), size_t(2));
+        Doc& lua          = tab("b");
+        lua.language.lua  = true;
+        const size_t asks = studio.asks.size();
+        checking.relint(lua);
+        checking.pump(3.0);
+        ensure_equals("SLua: checked again", studio.asks.size(), asks + 1);
     }
 }

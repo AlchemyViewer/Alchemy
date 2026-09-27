@@ -623,6 +623,7 @@ void ALScriptStudioChecking::analysed(const ALScriptAnalysis::Result& result)
     if (mapped)
     {
         mapProblems(doc);
+        mapOutline(doc);
     }
     // What the check weighed, where it was asked to.
     if (!result.weights.empty())
@@ -636,12 +637,12 @@ void ALScriptStudioChecking::takeProblems(Doc& doc, const ALScriptAnalysis::Resu
 {
     doc.check.analysis        = result.problems;
     doc.check.analysisVersion = result.version;
-    // LSL's warnings as the scripter chose them; Luau's lints were chosen
-    // in the configuration the check ran with.
+    // Kept as said, for the lints chosen again to filter afresh.
     if (!doc.language.lua)
     {
-        ALScriptLints::apply(doc.check.analysis);
+        doc.check.unfiltered = result.problems;
     }
+    filterProblems(doc);
     doc.check.definitionsError = result.definitionsError;
     // A script mid-edit is answered from a copy mended to parse; one past
     // mending answers nothing, and what it declares, what its names are
@@ -653,26 +654,61 @@ void ALScriptStudioChecking::takeProblems(Doc& doc, const ALScriptAnalysis::Resu
     {
         doc.outline = result.outline;
     }
-    // An include checked with a state after it: what is said of the
-    // state, and that what it declares goes unused, is not the include's.
-    if (!lslFragment(doc))
+    // An include checked with a state after it: what it declares, and
+    // not the state put after it.
+    if (!lslFragment(doc) || !result.understood)
     {
         return;
     }
-    const bool mapped_now = preprocessed(doc) && doc.expanded.valid && doc.expanded.version == result.version;
-    const S32  own_lines  = mapped_now ? static_cast<S32>(std::count(doc.expanded.text->begin(), doc.expanded.text->end(), '\n')) + 1
-                                       : doc.editor->document().lineCount();
-    doc.check.analysis.erase(std::remove_if(doc.check.analysis.begin(), doc.check.analysis.end(),
-                                            [own_lines](const ALScriptProblem& problem) {
-                                                return problem.line >= own_lines || unusedWarning(problem);
-                                            }),
-                             doc.check.analysis.end());
-    if (result.understood)
+    const S32 own_lines = fragmentLines(doc, result.version);
+    doc.outline.erase(std::remove_if(doc.outline.begin(), doc.outline.end(),
+                                     [own_lines](const ALScriptOutlineEntry& entry) { return entry.nameSpan.line >= own_lines; }),
+                      doc.outline.end());
+}
+
+S32 ALScriptStudioChecking::fragmentLines(const Doc& doc, U32 version) const
+{
+    const bool mapped_now = preprocessed(doc) && doc.expanded.valid && doc.expanded.version == version;
+    return mapped_now ? static_cast<S32>(std::count(doc.expanded.text->begin(), doc.expanded.text->end(), '\n')) + 1
+                      : doc.editor->document().lineCount();
+}
+
+void ALScriptStudioChecking::filterProblems(Doc& doc)
+{
+    // LSL's warnings as the scripter chose them; Luau's lints were chosen
+    // in the configuration the check ran with.
+    if (!doc.language.lua)
     {
-        doc.outline.erase(std::remove_if(doc.outline.begin(), doc.outline.end(),
-                                         [own_lines](const ALScriptOutlineEntry& entry) { return entry.nameSpan.line >= own_lines; }),
-                          doc.outline.end());
+        ALScriptLints::apply(doc.check.analysis);
     }
+    // An include checked with a state after it: what is said of the
+    // state, and that what it declares goes unused, is not the include's.
+    if (lslFragment(doc))
+    {
+        const S32 own_lines = fragmentLines(doc, doc.check.analysisVersion);
+        doc.check.analysis.erase(std::remove_if(doc.check.analysis.begin(), doc.check.analysis.end(),
+                                                [own_lines](const ALScriptProblem& problem) {
+                                                    return problem.line >= own_lines || unusedWarning(problem);
+                                                }),
+                                 doc.check.analysis.end());
+    }
+}
+
+void ALScriptStudioChecking::relint(Doc& doc)
+{
+    const U32 version = doc.editor->document().version();
+    if (doc.language.lua || !doc.loaded || doc.notecard || doc.check.analysisVersion != version)
+    {
+        schedule(doc, true);
+        return;
+    }
+    doc.check.analysis = doc.check.unfiltered;
+    filterProblems(doc);
+    if (preprocessed(doc) && doc.expanded.valid && doc.expanded.version == version)
+    {
+        mapProblems(doc);
+    }
+    showProblems(doc);
 }
 
 void ALScriptStudioChecking::takeColours(Doc& doc, const ALScriptAnalysis::Result& result, const ALSourceMap* map)
@@ -794,6 +830,11 @@ void ALScriptStudioChecking::mapProblems(Doc& doc)
             ALScriptFixes::mapThrough(map, problem);
         }
     }
+}
+
+void ALScriptStudioChecking::mapOutline(Doc& doc)
+{
+    const ALSourceMap&                map = doc.expanded.map;
     std::vector<ALScriptOutlineEntry> outline;
     for (ALScriptOutlineEntry entry : doc.outline)
     {
@@ -806,6 +847,23 @@ void ALScriptStudioChecking::mapProblems(Doc& doc)
 }
 
 void ALScriptStudioChecking::checked(Doc& doc)
+{
+    showProblems(doc);
+    mWindow.showOutline(doc);
+    if (doc.check.fixAllAfterCheck && doc.check.analysisVersion == doc.editor->document().version())
+    {
+        FixPick pick;
+        pick.key = *doc.check.fixAllAfterCheck;
+        doc.check.fixAllAfterCheck.reset();
+        askFixAll(doc, pick);
+    }
+    if (doc.save.checked())
+    {
+        mWindow.save(doc);
+    }
+}
+
+void ALScriptStudioChecking::showProblems(Doc& doc)
 {
     // In the source's places now, where the words are, and where a comment
     // may say a lint is wanted.
@@ -820,18 +878,6 @@ void ALScriptStudioChecking::checked(Doc& doc)
         explainTransformWords(doc);
     }
     mWindow.refreshProblems(doc);
-    mWindow.showOutline(doc);
-    if (doc.check.fixAllAfterCheck && doc.check.analysisVersion == doc.editor->document().version())
-    {
-        FixPick pick;
-        pick.key = *doc.check.fixAllAfterCheck;
-        doc.check.fixAllAfterCheck.reset();
-        askFixAll(doc, pick);
-    }
-    if (doc.save.checked())
-    {
-        mWindow.save(doc);
-    }
 }
 
 void ALScriptStudioChecking::offerImports(Doc& doc)
