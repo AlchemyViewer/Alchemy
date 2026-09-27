@@ -321,6 +321,10 @@
     <floater.string name="TabNotecardTip">A notecard, as plain text</floater.string>
     <floater.string name="TabReadOnlyTip">Read-only: you may read it and not change it</floater.string>
     <floater.string name="TrailerReadOnly">Read-only</floater.string>
+    <floater.string name="ScriptItemDropName">Put its name in here: [TEXT]. With Shift, its key</floater.string>
+    <floater.string name="ScriptItemDropKey">Put its key in here: [TEXT]</floater.string>
+    <floater.string name="ScriptItemDropNoKey">Its key is not yours to see: it is not full permissions. Without Shift, its name goes in</floater.string>
+    <floater.string name="ScriptItemDropReadOnly">This script may not be changed</floater.string>
     <floater.string name="TrailerIndentSpaces">Spaces: [WIDTH]</floater.string>
     <floater.string name="TrailerIndentTabs">Tab Size: [WIDTH]</floater.string>
     <floater.string name="TrailerIndentTipText">How this script is indented, read from its own lines. Press to indent it otherwise, or to convert it</floater.string>

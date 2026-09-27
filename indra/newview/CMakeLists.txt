@@ -183,6 +183,7 @@ if(AL_BUILD_VIEWER)
     alscriptnavigation.cpp
     alscriptmodules.cpp
     alscriptnoticebar.cpp
+    alscriptitemdrop.cpp
     alscriptnotecardtab.cpp
     alscriptnotecardworld.cpp
     alscriptoutlinepane.cpp
@@ -1011,6 +1012,7 @@ if(AL_BUILD_VIEWER)
     alscriptnavigation.h
     alscriptmodules.h
     alscriptnoticebar.h
+    alscriptitemdrop.h
     alscriptnotecardtab.h
     alscriptoutlinepane.h
     alscriptoutputpane.h
@@ -2459,6 +2461,16 @@ if(AL_BUILD_TESTS)
     PROJECT ${test_project}
     LIBRARIES ${test_libs}
     SOURCES tests/llviewertexture_stub.cpp
+  )
+
+  # An inventory item dropped on a script: its name or its key, over the
+  # studio's own window.
+  al_add_test(
+    alscriptitemdrop
+    UNIT
+    PROJECT ${test_project}
+    LIBRARIES llui alscript ${test_libs}
+    DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
 
   # A notecard's items in its Script Studio tab, over a fake of the

@@ -45,6 +45,7 @@
 #include "alscopebar.h"
 #include "alscriptfixes.h"
 #include "alscriptformatter.h"
+#include "alscriptitemdrop.h"
 #include "alscriptkeymap.h"
 #include "alscriptmessages.h"
 #include "altabstrip.h"
@@ -108,6 +109,22 @@
 #include <ctime>
 #include <filesystem>
 #include <fstream>
+
+namespace
+{
+    // An inventory item's asset key where the viewer shows it -- as Copy
+    // Asset UUID does: a kind whose key is knowable, the item whole in
+    // its permissions -- else null.
+    LLUUID assetKeyShown(const LLInventoryItem& item)
+    {
+        const LLViewerInventoryItem* viewer = dynamic_cast<const LLViewerInventoryItem*>(&item);
+        if (!viewer || !LLAssetType::lookupIsAssetIDKnowable(item.getType()) || !(viewer->getIsFullPerm() || gAgent.isGodlikeWithoutAdminMenuFakery()))
+        {
+            return LLUUID::null;
+        }
+        return viewer->getProtectedAssetUUID();
+    }
+}
 
 namespace
 {
@@ -1737,6 +1754,12 @@ ALScriptNotecardTab& ALFloaterScriptStudio::notecardItems(Doc& doc, bool fresh)
 void ALFloaterScriptStudio::wireDoc(Doc& doc)
 {
     Doc* raw    = &doc;
+    // An inventory item dropped on a script: its name, or its key; a
+    // notecard's own tab takes it over for a notecard.
+    doc.editor->setDropHandler([this, raw](S32 x, S32 y, MASK mask, bool dropping, EDragAndDropType type, void* cargo, EAcceptance* accept,
+                                           std::string& tooltip) {
+        return ALScriptItemDrop::drop(*raw, *this, &assetKeyShown, x, y, mask, dropping, type, cargo, accept, tooltip);
+    });
     doc.changed = doc.editor->onTextChanged([this, raw]() {
         LL_PROFILE_ZONE_NAMED_CATEGORY_SCRIPTDEV("studio text changed");
         // Typed in, a preview is held.
