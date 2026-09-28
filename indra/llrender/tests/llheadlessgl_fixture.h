@@ -52,6 +52,8 @@
 #include "llwindow.h"
 #include "llwindowcallbacks.h"
 
+#include <cstring>
+
 namespace ll_test
 {
     // Test-only accessor for LLFontTextCache's private capture lists.
@@ -117,15 +119,23 @@ namespace ll_test
     };
 
     // GL 3.3 core pass-through UI vertex shader. Same uniform / attribute
-    // shape as indra/newview/app_settings/shaders/class1/interface/uiV.glsl;
-    // LLRender::syncMatrices recognises modelview_projection_matrix and
-    // texture_matrix0 by reserved-name lookup.
+    // shape as indra/newview/app_settings/shaders/class1/interface/uiV.glsl:
+    // the matrices are read from the Matrices block, laid out as
+    // class1/deferred/matricesBlock.glsl lays it out, which
+    // LLRender::syncMatrices fills and mapUniforms binds at UB_MATRICES.
     inline const char* kTestUIVertexShader()
     {
         return
             "#version 330\n"
-            "uniform mat4 texture_matrix0;\n"
-            "uniform mat4 modelview_projection_matrix;\n"
+            "layout (std140) uniform Matrices\n"
+            "{\n"
+            "    mat4 modelview_matrix;\n"
+            "    mat4 projection_matrix;\n"
+            "    mat4 modelview_projection_matrix;\n"
+            "    mat4 inv_proj;\n"
+            "    mat4 texture_matrix0;\n"
+            "    mat3 normal_matrix;\n"
+            "};\n"
             "in vec3 position;\n"
             "in vec4 diffuse_color;\n"
             "in vec2 texcoord0;\n"
@@ -230,6 +240,25 @@ namespace ll_test
             gUIProgram.unload();
             gUIProgram.mProgramObject = 0;
         }
+    }
+
+    // A white texel where the viewer puts its white image, which an unbound
+    // texture slot samples: what is drawn with no texture then comes out in
+    // its own colour, as it does in the viewer, rather than black. Made once,
+    // on the first call; the context must be up.
+    inline void installWhiteTexture()
+    {
+        static LLPointer<LLImageGL> white;
+        if (!white)
+        {
+            LLPointer<LLImageRaw> raw = new LLImageRaw(1, 1, 4);
+            std::memset(raw->getData(), 0xFF, 4);
+            white = new LLImageGL(raw, false);
+        }
+        ALTextureSlot::sWhiteTexture = white->getTexName();
+        // Bound once, so that the slot holds a texture: an unbind puts the
+        // white one back only over one that was there.
+        gGL.getTextureSlot(0)->bindManual(ALTextureSlot::TT_TEXTURE, white->getTexName());
     }
 
     // Read back the framebuffer's color buffer as RGBA8 (tightly

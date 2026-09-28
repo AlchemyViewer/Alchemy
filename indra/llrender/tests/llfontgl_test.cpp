@@ -1028,12 +1028,12 @@ namespace tut
         const std::string s = "A";
 
         // Held against the quads the draw emits rather than against pixels.
-        // Nothing this harness draws reaches the framebuffer -- a readback
-        // after a render finds the clear colour and nothing else -- so a test
-        // that asks whether a glyph appeared there can only answer yes by
-        // accident. It did: clearFramebuffer clears to opaque black, the check
-        // was for a non-zero alpha, and alpha is 255 over the whole buffer
-        // before anything is drawn at all.
+        // Until the fixture's UI shader read its matrices from the Matrices
+        // block, nothing this harness drew reached the framebuffer, and a
+        // test that asked whether a glyph appeared there answered yes by
+        // accident: clearFramebuffer clears to opaque black, the check was
+        // for a non-zero alpha, and alpha is 255 over the whole buffer before
+        // anything is drawn at all.
         std::list<LLVertexBufferData> capture;
         gGL.beginList(&capture);
         const S32 n = font->renderBytes(s, 0, /*x=*/64.f, /*y=*/64.f,

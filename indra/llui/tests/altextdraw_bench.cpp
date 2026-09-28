@@ -189,6 +189,7 @@ int main(int, char**)
     try
     {
         gl = std::make_unique<ll_test::HeadlessGL>(true, true, true, /*needs_render=*/true);
+        ll_test::installWhiteTexture();
     }
     catch (const std::exception& e)
     {
