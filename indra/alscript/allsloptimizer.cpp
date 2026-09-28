@@ -1880,6 +1880,20 @@ namespace
         }
     };
 
+    using Counted = boost::unordered_flat_map<std::string, int, ll::string_hash, std::equal_to<>>;
+
+    // The string literals in what it visits.
+    struct Strings : public ASTVisitor
+    {
+        Counted found;
+
+        bool visit(LSLStringConstant* c) override
+        {
+            ++found[c->getValue()];
+            return false;
+        }
+    };
+
     struct Pass
     {
         Ctx&                          ctx;
@@ -2241,8 +2255,6 @@ namespace
             return smaller;
         }
 
-        using Counted = boost::unordered_flat_map<std::string, int, ll::string_hash, std::equal_to<>>;
-
         // The strings in a value, each as many times as it is there.
         static void count(LSLConstant* cv, Counted& out)
         {
@@ -2312,18 +2324,6 @@ namespace
             scope->visit(&strings);
             return std::move(strings.found);
         }
-
-        // The string literals in what it visits.
-        struct Strings : public ASTVisitor
-        {
-            Counted found;
-
-            bool visit(LSLStringConstant* c) override
-            {
-                ++found[c->getValue()];
-                return false;
-            }
-        };
 
         // The characters of the strings written in a call's arguments,
         // which go with it: a variable's value stays where it is.
