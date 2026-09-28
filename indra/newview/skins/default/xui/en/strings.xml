@@ -538,6 +538,7 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<!-- What const promises, held to (allslconsts.cpp); [1], [2] are the names -->
 	<string name="ConstAssigned">[1] is const: its value is set where it is declared, and nowhere else</string>
 	<string name="ConstWithoutValue">the const [1] needs a value where it is declared</string>
+	<string name="ConstNotKnown">the value of the const [1] cannot be worked out before the script runs</string>
 	<string name="ConstFunctionSets">the const function [1] sets [2]: what it gives back must come of its arguments alone</string>
 	<string name="ConstFunctionReads">the const function [1] reads [2], which the script changes</string>
 	<string name="ConstFunctionCalls">the const function [1] calls [2], which does more than work out a value</string>

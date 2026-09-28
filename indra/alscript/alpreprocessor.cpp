@@ -4149,6 +4149,54 @@ namespace
         result.map.finish();
     }
 
+    // Const globals' values written as the literals they come to: each
+    // stretch of the text replaced, what replaced it mapped where the
+    // stretch was, and the names declared const said where they are now.
+    void writeValues(ALPreprocessor::Result& result, const std::vector<ALLSLConsts::Value>& values)
+    {
+        using Place = std::pair<S32, S32>;
+        std::map<Place, bool> declared;
+        for (const ALPreprocessor::Result::Const& c : result.consts)
+        {
+            declared[{ c.line, c.column }] = c.function;
+        }
+        Tokens tokens = Lexer(false, 0, true).run(result.text);
+        Tokens out;
+        out.reserve(tokens.size());
+        size_t next = 0;
+        for (Token& t : tokens)
+        {
+            const Place at{ t.line, t.column };
+            while (next < values.size() && Place{ values[next].endLine, values[next].endColumn } <= at)
+            {
+                ++next;
+            }
+            if (next < values.size() && Place{ values[next].line, values[next].column } <= at)
+            {
+                const ALLSLConsts::Value& v = values[next];
+                if (at == Place{ v.line, v.column })
+                {
+                    Token literal    = t;
+                    literal.kind     = Kind::Other;
+                    literal.text     = v.text;
+                    literal.verbatim = false;
+                    out.push_back(std::move(literal));
+                }
+                continue;
+            }
+            if (const auto found = declared.find(at); found != declared.end() && t.kind == Kind::Ident)
+            {
+                t.declared = found->second ? Token::Const::Function : Token::Const::Variable;
+            }
+            out.push_back(std::move(t));
+        }
+        ALPreprocessor::Result written;
+        assemble(out, written);
+        result.map    = written.map.composed(result.map);
+        result.text   = std::move(written.text);
+        result.consts = std::move(written.consts);
+    }
+
     std::string stamp(S64 when, const char* format)
     {
         const std::time_t t = std::time_t(when);
@@ -4367,11 +4415,17 @@ ALPreprocessor::Result ALPreprocessor::run(std::string_view source, const Option
     }
     if (!options.lua && !result.consts.empty())
     {
-        // What `const` promised, held to over the whole of the text.
-        for (ALScriptProblem& p : ALLSLConsts::run(result.text, result.consts, options.optimizer.target).problems)
+        // What `const` promised, held to over the whole of the text, and
+        // each const global's value as the literal LSL takes there.
+        ALLSLConsts::Result held = ALLSLConsts::run(result.text, result.consts, options.optimizer.target);
+        for (ALScriptProblem& p : held.problems)
         {
             mapProblem(p, result.map);
             result.problems.push_back(std::move(p));
+        }
+        if (!held.values.empty())
+        {
+            writeValues(result, held.values);
         }
     }
     finish(result, options);

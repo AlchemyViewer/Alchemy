@@ -29,6 +29,7 @@
 #include <tailslide/tailslide.hh>
 #include <tailslide/operations.hh>
 
+#include <optional>
 #include <string>
 
 // Tailslide folds in double; the LSL VMs work in single, and integers
@@ -65,4 +66,12 @@ namespace ALLSLValues
     // An integral value that an integer literal can stand for: not
     // negative zero, which keeps its sign, and within the integer's range.
     bool integral(double v);
+
+    // A value written as a literal LSL takes as a global's value: floats
+    // as floats, the shortest that reads back the same (`wide`, Luau's
+    // doubles, or singles). Nothing where no literal is the value: a float
+    // that is not finite, a string with a tab, which the compiler would
+    // turn into spaces, or a list holding a key, which a literal would make
+    // a string.
+    std::optional<std::string> literal(Tailslide::LSLConstant* value, bool wide);
 }

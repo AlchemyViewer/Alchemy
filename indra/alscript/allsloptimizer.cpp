@@ -4312,3 +4312,45 @@ ALLSLOptimizer::Result ALLSLOptimizer::run(std::string_view source, const Option
     }
     return tried;
 }
+
+// static
+void ALLSLOptimizer::foldGlobals(LSLScript* script, ScriptAllocator* allocator, ScriptContext* context, Target target)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
+    if (!script || !script->getGlobals())
+    {
+        return;
+    }
+    Options options;
+    options.target     = target;
+    options.addstrings = true;
+    options.notes      = false;
+    ALLSLArithmetic behavior(allocator, options.addstrings, target);
+    Ctx             ctx;
+    ctx.allocator = allocator;
+    ctx.context   = context;
+    ctx.target    = target;
+    ALScriptProblems unsaid;
+    Report           report(unsaid, false);
+    script->recalculateReferenceData();
+    // A value folded may be what another is folded from: round and round,
+    // as a run does, until a round folds nothing.
+    for (int round = 0; round < 16; ++round)
+    {
+        ConstantDeterminingVisitor values(&behavior, allocator);
+        script->visit(&values);
+        Folder folder(ctx, report, options);
+        for (LSLASTNode* global : *script->getGlobals())
+        {
+            if (global->getNodeType() == NODE_GLOBAL_VARIABLE)
+            {
+                global->visit(&folder);
+            }
+        }
+        if (!folder.changes)
+        {
+            break;
+        }
+        script->recalculateReferenceData();
+    }
+}

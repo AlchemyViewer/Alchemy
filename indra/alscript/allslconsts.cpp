@@ -29,9 +29,12 @@
 #include "allsleffects.h"
 #include "allslservice.h"
 #include "allsltraits.h"
+#include "allslvalues.h"
 #include "alscriptengine.h"
 
 #include <tailslide/tailslide.hh>
+#include <tailslide/passes/globalexpr_validator.hh>
+#include <tailslide/passes/values.hh>
 
 #include <boost/unordered/unordered_flat_map.hpp>
 
@@ -83,7 +86,7 @@ namespace
         p.severity = ALScriptProblem::Severity::Error;
         p.source   = ALScriptProblem::Source::Preprocessor;
         p.key      = key;
-        if (const YYLTYPE* loc = at->getLoc(); loc && loc->first_line > 0)
+        if (const Tailslide::YYLTYPE* loc = at->getLoc(); loc && loc->first_line > 0)
         {
             p.line      = zeroBased(loc->first_line);
             p.column    = zeroBased(loc->first_column);
@@ -193,7 +196,7 @@ ALLSLConsts::Result ALLSLConsts::run(std::string_view text, const std::vector<De
     boost::unordered_flat_map<LSLSymbol*, LSLASTNode*> variables;
     std::vector<LSLGlobalFunction*>                    functions;
     each(script, [&](LSLASTNode* node) {
-        const YYLTYPE* loc = node->getLoc();
+        const Tailslide::YYLTYPE* loc = node->getLoc();
         if (node->getNodeType() != NODE_IDENTIFIER || !loc || loc->first_line <= 0)
         {
             return;
@@ -260,7 +263,65 @@ ALLSLConsts::Result ALLSLConsts::run(std::string_view text, const std::vector<De
             checkFunction(function, effects, result.problems);
         }
     }
-    (void)target;
+    // A global's value worked out where LSL would not take it as written.
+    std::vector<LSLGlobalVariable*> globals;
+    for (const auto& [sym, declaration] : variables)
+    {
+        if (declaration->getNodeType() == NODE_GLOBAL_VARIABLE && static_cast<LSLGlobalVariable*>(declaration)->getInitializer())
+        {
+            globals.push_back(static_cast<LSLGlobalVariable*>(declaration));
+        }
+    }
+    if (!globals.empty())
+    {
+        // Which values LSL takes as written -- a literal, a name -- told
+        // before anything is folded, so that those stay as they are.
+        ALLSLArithmetic            arithmetic(&parser.allocator, true, target);
+        ConstantDeterminingVisitor values(&arithmetic, &parser.allocator);
+        script->visit(&values);
+        std::vector<LSLGlobalVariable*> folding;
+        for (LSLGlobalVariable* global : globals)
+        {
+            SimpleAssignableValidatingVisitor simple(target != ALLSLOptimizer::Target::LSO);
+            const int                         errors = parser.logger.getErrors();
+            global->visit(&simple);
+            LSLASTNode* init = global->getInitializer();
+            const bool  name = init->getNodeType() == NODE_EXPRESSION && init->getNodeSubType() == NODE_LVALUE_EXPRESSION;
+            // Tailslide says nothing of a value that is no constant for
+            // what it reads -- a global the script changes -- which, as
+            // anything but that global's own name, is none a const takes.
+            if (parser.logger.getErrors() != errors || (!init->getConstantValue() && !name))
+            {
+                folding.push_back(global);
+            }
+        }
+        if (!folding.empty())
+        {
+            ALLSLOptimizer::foldGlobals(script, &parser.allocator, &parser.context, target);
+        }
+        for (LSLGlobalVariable* global : folding)
+        {
+            LSLASTNode*  init  = global->getInitializer();
+            LSLConstant* value = init ? init->getConstantValue() : nullptr;
+            // An integer a float is given reads as the float it becomes.
+            if (value && value->getIType() == LST_INTEGER && global->getSymbol() && global->getSymbol()->getIType() == LST_FLOATINGPOINT)
+            {
+                value = parser.allocator.newTracked<LSLFloatConstant>(static_cast<double>(static_cast<LSLIntegerConstant*>(value)->getValue()));
+            }
+            const std::optional<std::string> written = ALLSLValues::literal(value, target == ALLSLOptimizer::Target::Luau);
+            const Tailslide::YYLTYPE*        loc     = init ? init->getLoc() : nullptr;
+            const std::string                name    = global->getSymbol() ? global->getSymbol()->getName() : std::string();
+            if (!written || !loc || loc->first_line <= 0)
+            {
+                result.problems.push_back(error(init ? init : global, "ConstNotKnown", "the value of the const [1] cannot be worked out before the script runs", { name }));
+                continue;
+            }
+            result.values.push_back({ zeroBased(loc->first_line), zeroBased(loc->first_column), zeroBased(loc->last_line), zeroBased(loc->last_column), *written });
+        }
+        std::sort(result.values.begin(), result.values.end(), [](const Value& a, const Value& b) {
+            return a.line != b.line ? a.line < b.line : a.column < b.column;
+        });
+    }
     std::stable_sort(result.problems.begin(), result.problems.end(), [](const ALScriptProblem& a, const ALScriptProblem& b) {
         return a.line != b.line ? a.line < b.line : a.column < b.column;
     });

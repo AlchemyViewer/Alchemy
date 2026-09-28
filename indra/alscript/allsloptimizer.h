@@ -33,6 +33,13 @@
 #include <string>
 #include <string_view>
 
+namespace Tailslide
+{
+    class LSLScript;
+    class ScriptAllocator;
+    class ScriptContext;
+}
+
 // The simulator's compilers optimise nothing, so every byte a script
 // saves is saved before upload: this runs over Tailslide's tree after
 // symbol resolution and type checking, folds what is constant with the
@@ -138,4 +145,12 @@ public:
     // Needs the builtins loaded through ALLSLService first; without them
     // the run says so and does nothing.
     static Result run(std::string_view source, const Options& options);
+
+    // The folder alone, over the values of a parsed script's globals, as a
+    // run folds them for `target`: what can be worked out before the script
+    // runs, a pure library call answered, made the constant it comes to,
+    // and nothing else in the script touched. For what `const` globals are
+    // worked out with (ALLSLConsts); the script's symbols and types must be
+    // resolved.
+    static void foldGlobals(Tailslide::LSLScript* script, Tailslide::ScriptAllocator* allocator, Tailslide::ScriptContext* context, Target target);
 };

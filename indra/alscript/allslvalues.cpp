@@ -227,4 +227,95 @@ namespace ALLSLValues
     {
         return std::isfinite(v) && std::floor(v) == v && !std::signbit(v) && v < 2147483648.0;
     }
+
+    std::optional<std::string> literal(LSLConstant* value, bool wide)
+    {
+        if (!value)
+        {
+            return std::nullopt;
+        }
+        const auto number = [wide](double v) -> std::optional<std::string> {
+            if (!std::isfinite(v))
+            {
+                return std::nullopt;
+            }
+            return floatText(v, wide);
+        };
+        switch (value->getIType())
+        {
+            case LST_INTEGER:
+                return std::to_string(static_cast<LSLIntegerConstant*>(value)->getValue());
+            case LST_FLOATINGPOINT:
+                return number(static_cast<LSLFloatConstant*>(value)->getValue());
+            case LST_STRING:
+            case LST_KEY:
+            {
+                const char* text = value->getIType() == LST_STRING ? static_cast<LSLStringConstant*>(value)->getValue()
+                                                                     : static_cast<LSLKeyConstant*>(value)->getValue();
+                std::string out = "\"";
+                for (const char* c = text; *c; ++c)
+                {
+                    switch (*c)
+                    {
+                        case '\\':
+                            out += "\\\\";
+                            break;
+                        case '"':
+                            out += "\\\"";
+                            break;
+                        case '\n':
+                            out += "\\n";
+                            break;
+                        case '\t':
+                            return std::nullopt;
+                        default:
+                            out += *c;
+                            break;
+                    }
+                }
+                return out + "\"";
+            }
+            case LST_VECTOR:
+            {
+                const Vector3* v = static_cast<LSLVectorConstant*>(value)->getValue();
+                const auto     x = number(v->x), y = number(v->y), z = number(v->z);
+                if (!x || !y || !z)
+                {
+                    return std::nullopt;
+                }
+                return "<" + *x + ", " + *y + ", " + *z + ">";
+            }
+            case LST_QUATERNION:
+            {
+                const Quaternion* q = static_cast<LSLQuaternionConstant*>(value)->getValue();
+                const auto        x = number(q->x), y = number(q->y), z = number(q->z), s = number(q->s);
+                if (!x || !y || !z || !s)
+                {
+                    return std::nullopt;
+                }
+                return "<" + *x + ", " + *y + ", " + *z + ", " + *s + ">";
+            }
+            case LST_LIST:
+            {
+                std::string out = "[";
+                for (LSLASTNode* item : *static_cast<LSLListConstant*>(value))
+                {
+                    auto* element = static_cast<LSLConstant*>(item);
+                    if (element->getIType() == LST_KEY)
+                    {
+                        return std::nullopt;
+                    }
+                    const auto written = literal(element, wide);
+                    if (!written)
+                    {
+                        return std::nullopt;
+                    }
+                    out += (out.size() > 1 ? ", " : "") + *written;
+                }
+                return out + "]";
+            }
+            default:
+                return std::nullopt;
+        }
+    }
 }

@@ -109,4 +109,86 @@ namespace tut
                       said(globals + "bump() { counter += 1; }\nconst integer f(integer x) { bump(); return x; }\n" + handler),
                       std::string("ConstFunctionCalls 3:29 f bump\n"));
     }
+
+    template<> template<>
+    void allslconsts_object::test<3>()
+    {
+        set_test_name("a const global's value is worked out, and written as the literal LSL takes there, with the optimizer off");
+        ensure("builtins: " + error, lslLoaded);
+        const std::string source = "const integer FLAGS = PERMISSION_TAKE_CONTROLS | PERMISSION_TRIGGER_ANIMATION;\n"
+                                   "const float STEP = TWO_PI / 12;\n"
+                                   "const integer TWICE = FLAGS * 2;\n"
+                                   "const vector UP = <0, 0, 1> * 2;\n"
+                                   "const string NAME = \"a \\\"b\\\"\" + \"\\n\" + (string)llAbs(-3);\n"
+                                   "const list L = [FLAGS * 1,\n    TWICE];\n"
+                                   "const integer SAME = FLAGS;\n"
+                                   "const integer PLAIN = -5;\n"
+                                   "integer changing = 1;\n"
+                                   "const integer C = changing + 1;\n"
+                                   "default { state_entry() { changing = 2; llOwnerSay((string)[FLAGS, STEP, TWICE, UP, NAME, SAME, PLAIN, C] + (string)L); } }\n";
+        const ALPreprocessor::Result r = ALPreprocessor::run(source, ALPreprocessor::Options());
+        ensure_equals("nothing wrong", said(source), std::string());
+        ensure_equals("each written",
+                      r.text,
+                      std::string("integer FLAGS = 20;\n"
+                                  "float STEP = 0.5235988;\n"
+                                  "integer TWICE = 40;\n"
+                                  "vector UP = <0.0, 0.0, 2.0>;\n"
+                                  "string NAME = \"a \\\"b\\\"\\n3\";\n"
+                                  "list L = [20, 40];\n"
+                                  "integer SAME = FLAGS;\n"
+                                  "integer PLAIN = -5;\n"
+                                  "integer changing = 1;\n"
+                                  "integer C = 2;\n"
+                                  "default { state_entry() { changing = 2; llOwnerSay((string)[FLAGS, STEP, TWICE, UP, NAME, SAME, PLAIN, C] + (string)L); } }\n"));
+        // What was written maps to what it was written for.
+        const ALSourceMap::Loc twenty = r.map.toSource(0, 16);
+        ensure("the value maps to the expression", twenty.found() && twenty.line == 0 && twenty.column == 22);
+        // The names are where they are now: the list's two lines are one.
+        ensure("nine", r.consts.size() == 9);
+        ensure("a name after the folded list, a line up", r.consts[6].name == "SAME" && r.consts[6].line == 6 && r.consts[6].column == 8);
+        const ALSourceMap::Loc same = r.map.toSource(6, 8);
+        ensure("and mapped to where it was", same.found() && same.line == 7);
+        // The target's arithmetic: Luau's doubles.
+        ALPreprocessor::Options luau = ALPreprocessor::Options();
+        luau.optimizer.target        = ALLSLOptimizer::Target::Luau;
+        const ALPreprocessor::Result wide = ALPreprocessor::run("const float STEP = TWO_PI / 12;\ndefault { state_entry() { llOwnerSay((string)STEP); } }\n", luau);
+        ensure("in doubles on Luau: " + wide.text, wide.text.find("float STEP = 0.5235987") == 0 && wide.text.find(";") > 26);
+    }
+
+    template<> template<>
+    void allslconsts_object::test<4>()
+    {
+        set_test_name("a const global whose value cannot be worked out before the script runs is an error, and so is one that cannot be written");
+        ensure("builtins: " + error, lslLoaded);
+        // A global the script changes is no bar: globals are given their
+        // values as the script starts, when each has its first.
+        ensure_equals("each, at its value",
+                      said("const integer T = llGetUnixTime();\n"
+                           "const float BIG = 1e30 * 1e30;\n"
+                           "const list KEYS = [(key)NULL_KEY] + [];\n"
+                           "default { state_entry() { llOwnerSay((string)[T, BIG] + (string)KEYS); } }\n"),
+                      std::string("ConstNotKnown 0:18 T\n"
+                                  "ConstNotKnown 1:18 BIG\n"
+                                  "ConstNotKnown 2:18 KEYS\n"));
+        // A plain global is left to the compiler: only a const is worked out.
+        const std::string plain = "integer A = 2 * 3;\ndefault { state_entry() { llOwnerSay((string)A); } }\n";
+        ensure_equals("not a const", ALPreprocessor::run(plain, ALPreprocessor::Options()).text, plain);
+    }
+
+    template<> template<>
+    void allslconsts_object::test<5>()
+    {
+        set_test_name("with the optimizer on, a const's value goes where it is read, and the global with it");
+        ensure("builtins: " + error, lslLoaded);
+        ALPreprocessor::Options o = ALPreprocessor::Options();
+        o.optimize                = true;
+        const ALPreprocessor::Result r =
+            ALPreprocessor::run("const integer FLAGS = PERMISSION_TAKE_CONTROLS | PERMISSION_TRIGGER_ANIMATION;\n"
+                                "default { state_entry() { llRequestPermissions(llGetOwner(), FLAGS); } }\n",
+                                o);
+        ensure("optimized: " + r.text, r.optimized);
+        ensure("the value in place: " + r.text, r.text.find("llRequestPermissions(llGetOwner(), 20);") != std::string::npos);
+        ensure("and no global: " + r.text, r.text.find("FLAGS") == std::string::npos);
+    }
 }

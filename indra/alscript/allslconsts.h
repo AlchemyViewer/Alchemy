@@ -39,6 +39,9 @@
 // - a const function works out what it gives back from its arguments
 //   alone: it sets no global, reads none the script changes, calls nothing
 //   that does more than work out a value, and changes no state.
+// A const global's value may be any expression that can be worked out
+// before the script runs -- LSL takes only a literal there -- and is
+// worked out with the target's arithmetic (ALLSLArithmetic) into one.
 // A text that does not parse, or whose types do not agree, is the
 // compiler's to say what is wrong with: nothing is said of it here.
 class ALLSLConsts
@@ -54,10 +57,24 @@ public:
         bool        function = false;
     };
 
+    // A const global's value as the literal it comes to, where the text's
+    // is not one LSL takes there: the stretch of the text to replace,
+    // zero-based and its end past its last character, and what with.
+    struct Value
+    {
+        S32         line      = 0;
+        S32         column    = 0;
+        S32         endLine   = 0;
+        S32         endColumn = 0;
+        std::string text;
+    };
+
     struct Result
     {
         // Errors, each where the promise is broken, in the text's places.
-        ALScriptProblems problems;
+        ALScriptProblems   problems;
+        // In the order they are in the text.
+        std::vector<Value> values;
     };
 
     // Needs the builtins loaded through ALLSLService, as the optimizer

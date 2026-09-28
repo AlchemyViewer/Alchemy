@@ -1490,7 +1490,7 @@ namespace tut
         ensure_equals("problems", messages(r), std::string());
         ensure_equals("taken off", r.text,
                       std::string("integer X = 5;\n"
-                                  "float Y = X * 2;\n"
+                                  "float Y = 10.0;\n"
                                   "integer sq(integer x) { return x * x; }\n"
                                   "default { state_entry() { vector v = <1, 2, 3>; llOwnerSay((string)v); } }\n"));
         ensure_equals("five", r.consts.size(), size_t(5));
