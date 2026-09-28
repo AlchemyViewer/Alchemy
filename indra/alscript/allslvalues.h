@@ -58,7 +58,8 @@ private:
 namespace ALLSLValues
 {
     // The shortest text that reads back as the same single (or, for Luau,
-    // double), with a dot so that it stays a float literal.
+    // double), with a dot so that it stays a float literal; a whole number
+    // under a billion as its digits.
     std::string floatText(double v, bool wide);
 
     // An integral value that an integer literal can stand for: not

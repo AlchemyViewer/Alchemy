@@ -206,6 +206,13 @@ namespace ALLSLValues
             }
         }
         std::string  text = buffer;
+        // A whole number as its digits rather than an exponent: 10.0, not
+        // 1.0e+01. Its exact value, which reads back as itself.
+        if (text.find_first_of("eE") != std::string::npos && std::floor(v) == v && std::fabs(v) < 1e9)
+        {
+            snprintf(buffer, sizeof(buffer), "%.0f", v);
+            return std::string(buffer) + ".0";
+        }
         const size_t e    = text.find_first_of("eE");
         std::string  mantissa = e == std::string::npos ? text : text.substr(0, e);
         std::string  exponent = e == std::string::npos ? std::string() : text.substr(e);
