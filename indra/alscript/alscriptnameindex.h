@@ -56,6 +56,15 @@ public:
     void changed(const LLUUID& id, const std::optional<std::string>& name);
     // The items of a name, in the order they came.
     const std::vector<LLUUID>& named(std::string_view name) const;
+    // Every item listed, with its name, in no order.
+    template<typename Visit>
+    void forEach(Visit&& visit) const
+    {
+        for (const auto& [id, name] : mNameOf)
+        {
+            visit(id, name);
+        }
+    }
     // Moves whenever what is listed does.
     U32    generation() const { return mGeneration; }
     size_t size() const { return mNameOf.size(); }

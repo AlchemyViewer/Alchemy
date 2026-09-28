@@ -48,6 +48,17 @@ class ALScriptInventoryIndex final : public LLSingleton<ALScriptInventoryIndex>,
 public:
     const std::vector<LLUUID>& named(std::string_view name);
     U32                        generation();
+    // Every script and notecard listed, with its name, in no order: what
+    // Quick Open offers. A link is listed as itself.
+    template<typename Visit>
+    void each(Visit&& visit)
+    {
+        if (!mIndex.built())
+        {
+            build();
+        }
+        mIndex.forEach(std::forward<Visit>(visit));
+    }
 
     void changed(U32 mask) override;
 

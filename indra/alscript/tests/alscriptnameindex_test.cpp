@@ -28,6 +28,8 @@
 
 #include "../test/lltut.h"
 
+#include <map>
+
 namespace tut
 {
     struct alscriptnameindex_data
@@ -77,5 +79,19 @@ namespace tut
         generation = index.generation();
         index.forget();
         ensure("forgotten: built again at the next question", !index.built() && index.generation() != generation);
+    }
+
+    template<> template<>
+    void alscriptnameindex_object::test<2>()
+    {
+        set_test_name("every item listed is visited once with its name, as it is now");
+        ALScriptNameIndex index;
+        index.build({ { id(1), "lib" }, { id(2), "lib" }, { id(3), "door" } });
+        index.changed(id(2), std::string("util"));
+        index.changed(id(3), std::nullopt);
+        std::map<LLUUID, std::string> seen;
+        index.forEach([&seen](const LLUUID& item, const std::string& name) { ensure("once each", seen.emplace(item, name).second); });
+        ensure_equals("what is listed", seen.size(), size_t(2));
+        ensure("by its name now", seen[id(1)] == "lib" && seen[id(2)] == "util");
     }
 }

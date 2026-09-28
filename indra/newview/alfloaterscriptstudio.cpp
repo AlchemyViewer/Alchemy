@@ -31,6 +31,7 @@
 #include "alfilewrite.h"
 #include "fsyspath.h"
 #include "alnotecarditems.h"
+#include "alscriptinventoryindex.h"
 #include "alscriptmodules.h"
 #include "alscriptpreprocessor.h"
 #include "alscriptweightspane.h"
@@ -4279,13 +4280,11 @@ std::vector<ALQuickOpen::Candidate> ALFloaterScriptStudio::paletteScripts(std::v
         add(std::move(target), gDirUtilp->getBaseFileName(path), path);
     }
     // Last, every script and notecard in the inventory, outside the Trash,
-    // with the folder it is in. A link is its item, listed once.
+    // with the folder it is in, by folder and then name. A link is its item,
+    // listed once. From the inventory index, which walks the inventory once
+    // and then follows what it says changed, not at every Ctrl+P.
     if (gInventory.isInventoryUsable())
     {
-        LLInventoryModel::cat_array_t  folders;
-        LLInventoryModel::item_array_t items;
-        LLIsOneOfTypes                 wanted({ LLAssetType::AT_LSL_TEXT, LLAssetType::AT_NOTECARD });
-        gInventory.collectDescendentsIf(gInventory.getRootFolderID(), folders, items, LLInventoryModel::EXCLUDE_TRASH, wanted);
         std::map<LLUUID, std::string> paths;
         const auto path_of = [&paths](const LLUUID& folder) -> const std::string& {
             if (const auto known = paths.find(folder); known != paths.end())
@@ -4305,23 +4304,40 @@ std::vector<ALQuickOpen::Candidate> ALFloaterScriptStudio::paletteScripts(std::v
             }
             return paths.emplace(folder, path.empty() ? LLTrans::getString("InvFolder My Inventory") : path).first->second;
         };
-        for (const LLPointer<LLViewerInventoryItem>& item : items)
+        struct Held
         {
+            ALScriptRef ref;
+            std::string name;
+            std::string path;
+        };
+        std::vector<Held> held;
+        ALScriptInventoryIndex::instance().each([&](const LLUUID& id, const std::string&) {
+            const LLViewerInventoryItem* item = gInventory.getItem(id);
+            if (!item)
+            {
+                return;
+            }
             const ALScriptRef ref(LLUUID::null, item->getLinkedUUID());
             if (!listed.insert(ref.id()).second)
             {
-                continue;
+                return;
             }
-            const LLViewerInventoryItem* real = gInventory.getItem(ref.item);
-            if (!real)
+            if (const LLViewerInventoryItem* real = gInventory.getItem(ref.item))
             {
-                continue;
+                held.push_back({ ref, real->getName(), path_of(real->getParentUUID()) });
             }
+        });
+        std::sort(held.begin(), held.end(), [](const Held& a, const Held& b) {
+            const S32 by_path = LLStringUtil::compareDict(a.path, b.path);
+            return by_path != 0 ? by_path < 0 : LLStringUtil::compareDict(a.name, b.name) < 0;
+        });
+        for (Held& one : held)
+        {
             GoTo target;
             target.kind = GoTo::Kind::Script;
-            target.ref  = ref;
-            target.name = real->getName();
-            add(std::move(target), real->getName(), path_of(real->getParentUUID()));
+            target.ref  = one.ref;
+            target.name = one.name;
+            add(std::move(target), one.name, one.path);
         }
     }
     return candidates;
@@ -4329,12 +4345,27 @@ std::vector<ALQuickOpen::Candidate> ALFloaterScriptStudio::paletteScripts(std::v
 
 void ALFloaterScriptStudio::showQuickOpen(bool commands)
 {
-    auto                                targets        = std::make_shared<std::vector<GoTo>>();
-    std::vector<ALQuickOpen::Candidate> command_list   = paletteCommands();
-    std::vector<ALQuickOpen::Candidate> script_list    = paletteScripts(*targets);
-    const LLHandle<LLFloater>           handle         = getHandle();
-    ALQuickOpen*                        quick          = quickOpen(commands ? command_list : script_list, getString("QuickOpenPlaceholder"),
-                                                                   getString("QuickOpenTitle"), [handle, targets](const std::string& value) {
+    // Each list made the first time it is shown, not for the other's sake:
+    // the scripts' from what is open and the indexes, the commands' by
+    // asking every menu item whether it may be given now.
+    struct Lists
+    {
+        std::optional<std::vector<ALQuickOpen::Candidate>> commands;
+        std::optional<std::vector<ALQuickOpen::Candidate>> scripts;
+        std::vector<GoTo>                                  targets;
+    };
+    auto       lists = std::make_shared<Lists>();
+    const auto make  = [lists](ALFloaterScriptStudio& studio, bool of_commands) -> const std::vector<ALQuickOpen::Candidate>& {
+        std::optional<std::vector<ALQuickOpen::Candidate>>& list = of_commands ? lists->commands : lists->scripts;
+        if (!list)
+        {
+            list = of_commands ? studio.paletteCommands() : studio.paletteScripts(lists->targets);
+        }
+        return *list;
+    };
+    const LLHandle<LLFloater> handle = getHandle();
+    ALQuickOpen*              quick  = quickOpen(make(*this, commands), getString("QuickOpenPlaceholder"), getString("QuickOpenTitle"),
+                                                 [handle, lists](const std::string& value) {
         ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get());
         if (!studio)
         {
@@ -4358,11 +4389,11 @@ void ALFloaterScriptStudio::showQuickOpen(bool commands)
             return;
         }
         const size_t at = static_cast<size_t>(std::atoi(value.c_str() + 3));
-        if (at >= targets->size())
+        if (at >= lists->targets.size())
         {
             return;
         }
-        const GoTo& to = (*targets)[at];
+        const GoTo& to = lists->targets[at];
         switch (to.kind)
         {
             case GoTo::Kind::Tab:
@@ -4393,15 +4424,15 @@ void ALFloaterScriptStudio::showQuickOpen(bool commands)
     // the scripts again, as in Visual Studio Code.
     quick->setPrefix(">");
     auto shown           = std::make_shared<bool>(commands);
-    mQuickModeConnection = quick->onQueryChanged(
-        [quick, shown, command_list = std::move(command_list), script_list = std::move(script_list)](const std::string& typed) {
-            const bool now = !typed.empty() && typed.front() == '>';
-            if (now != *shown)
-            {
-                *shown = now;
-                quick->setCandidates(now ? command_list : script_list);
-            }
-        });
+    mQuickModeConnection = quick->onQueryChanged([quick, shown, handle, make](const std::string& typed) {
+        const bool             now    = !typed.empty() && typed.front() == '>';
+        ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get());
+        if (now != *shown && studio)
+        {
+            *shown = now;
+            quick->setCandidates(make(*studio, now));
+        }
+    });
     // Asked for one way while it is up the other: the `>` put in, or taken
     // out, with the list to match.
     if (commands)
