@@ -344,6 +344,8 @@ public:
     // how the drawing asks about one row of a wrapped line without
     // walking the whole of it once per row.
     std::vector<Blank> blanksOn(S32 line, S32 from = 0, S32 to = S32_MAX) const;
+    // The same into a list the caller keeps, as a frame's drawing does.
+    void               blanksOn(S32 line, S32 from, S32 to, std::vector<Blank>& out) const;
     // Line numbers counted from the caret's line, which is numbered as
     // itself: what a jump of so many lines reads off.
     void setRelativeLineNumbers(bool relative) { mRelativeLineNumbers = relative; }
@@ -872,6 +874,27 @@ private:
     std::vector<LLFontGL::Placed>   mNumberGlyphs;
     std::vector<LLColor4U>          mNumberColours;
     std::vector<LLFontGL::GlyphRun> mNumberRuns;
+    std::vector<Blank>              mBlankScratch;
+    // The signature card's pieces as last measured, for as long as the
+    // signature, its active parameter and the font hold.
+    struct SignatureShown
+    {
+        std::string     label;
+        std::string     documentation;
+        S32             overload  = -1;
+        size_t          overloads = 0;
+        S32             active    = -1;
+        const LLFontGL* font      = nullptr;
+        bool            docs      = false;
+        std::string     docLine;
+        S32             labelWidth   = 0;
+        S32             docWidth     = 0;
+        S32             throughWidth = 0;
+        S32             begin = -1, end = -1;
+        std::string     pieces[3];
+        S32             widths[3] = { 0, 0, 0 };
+    };
+    SignatureShown                  mSignatureShown;
     // Whether the name under the caret is to be lit, since when it is due,
     // and the lines it was lit over.
     bool         mLightsOccurrences = true;

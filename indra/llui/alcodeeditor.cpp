@@ -1538,9 +1538,16 @@ S32 ALCodeEditor::indentOf(S32 line)
 std::vector<ALCodeEditor::Blank> ALCodeEditor::blanksOn(S32 line, S32 within_from, S32 within_to) const
 {
     std::vector<Blank> out;
+    blanksOn(line, within_from, within_to, out);
+    return out;
+}
+
+void ALCodeEditor::blanksOn(S32 line, S32 within_from, S32 within_to, std::vector<Blank>& out) const
+{
+    out.clear();
     if (mShowWhitespace == Whitespace::None || line < 0 || line >= document().lineCount())
     {
-        return out;
+        return;
     }
     const std::string& source = document().line(line);
     const S32          length = static_cast<S32>(source.size());
@@ -1556,7 +1563,7 @@ std::vector<ALCodeEditor::Blank> ALCodeEditor::blanksOn(S32 line, S32 within_fro
         const ALTextRange sel = selection().normalised();
         if (sel.empty() || line < sel.begin.line || line > sel.end.line)
         {
-            return out;
+            return;
         }
         from = llmax(from, sel.begin.line == line ? sel.begin.column : 0);
         to   = llmin(to, sel.end.line == line ? sel.end.column : length);
@@ -1585,7 +1592,7 @@ std::vector<ALCodeEditor::Blank> ALCodeEditor::blanksOn(S32 line, S32 within_fro
         }
         if (tail >= length)
         {
-            return out;
+            return;
         }
         from = llmax(from, tail);
     }
@@ -1612,7 +1619,6 @@ std::vector<ALCodeEditor::Blank> ALCodeEditor::blanksOn(S32 line, S32 within_fro
             ++i;
         }
     }
-    return out;
 }
 
 void ALCodeEditor::drawWhitespace(S32 line, S32 r, const LLRect& text, S32 screen_top, F32 left, F32 alpha)
@@ -1629,8 +1635,9 @@ void ALCodeEditor::drawWhitespace(S32 line, S32 r, const LLRect& text, S32 scree
     // Only what this row covers, and of that what is in sight: a line
     // wrapped into many rows, or scrolled across, would otherwise be
     // walked whole for each.
-    const ALTextLayout::Row row    = rowInSight(laid, laid.rows[static_cast<size_t>(r)], text);
-    std::vector<Blank>      blanks = blanksOn(line, row.begin, row.end);
+    const ALTextLayout::Row   row    = rowInSight(laid, laid.rows[static_cast<size_t>(r)], text);
+    std::vector<Blank>&       blanks = mBlankScratch;
+    blanksOn(line, row.begin, row.end, blanks);
     if (blanks.empty())
     {
         return;
@@ -3964,13 +3971,48 @@ void ALCodeEditor::drawSignature(const LLRect& text)
     const LLFontGL*  font  = getFont();
     const F32        alpha = getDrawContext().mAlpha;
     const S32        line_h = font->getLineHeight();
-    // Which form of the function, of how many, where it has several: Up
-    // and Down go through them.
-    const std::string counter  = sig.overloads.size() > 1 ? llformat("%d/%d  ", sig.overload + 1, static_cast<S32>(sig.overloads.size())) : std::string();
-    const bool        docs     = !sig.documentation.empty() || !counter.empty();
-    const std::string doc_line = counter + sig.documentation.substr(0, sig.documentation.find('\n'));
-    const S32        wanted = llmax(font->getWidth(sig.label), docs ? font->getWidth(doc_line) : 0) + 2 * SIGNATURE_PAD;
-    const S32        height = line_h * (docs ? 2 : 1) + 2 * SIGNATURE_PAD;
+    // Its pieces measured once for the signature as it stands, and again
+    // only when it, its active parameter or the font moves.
+    SignatureShown& measured = mSignatureShown;
+    if (measured.label != sig.label || measured.documentation != sig.documentation || measured.overload != sig.overload ||
+        measured.overloads != sig.overloads.size() || measured.active != sig.active || measured.font != font)
+    {
+        measured.label         = sig.label;
+        measured.documentation = sig.documentation;
+        measured.overload      = sig.overload;
+        measured.overloads     = sig.overloads.size();
+        measured.active        = sig.active;
+        measured.font          = font;
+        // Which form of the function, of how many, where it has several:
+        // Up and Down go through them.
+        const std::string counter = sig.overloads.size() > 1 ? llformat("%d/%d  ", sig.overload + 1, static_cast<S32>(sig.overloads.size())) : std::string();
+        measured.docs             = !sig.documentation.empty() || !counter.empty();
+        measured.docLine          = counter + sig.documentation.substr(0, sig.documentation.find('\n'));
+        measured.labelWidth       = font->getWidth(sig.label);
+        measured.docWidth         = measured.docs ? font->getWidth(measured.docLine) : 0;
+        measured.begin            = -1;
+        measured.end              = -1;
+        if (sig.active >= 0 && sig.active < static_cast<S32>(sig.parameters.size()))
+        {
+            measured.begin = sig.parameters[sig.active].first;
+            measured.end   = sig.parameters[sig.active].second;
+        }
+        measured.throughWidth = measured.end > 0 ? font->getWidth(sig.label.substr(0, static_cast<size_t>(measured.end))) : measured.labelWidth;
+        // The label in three pieces, the active parameter the middle one;
+        // or whole, where no parameter is active.
+        const S32  size    = static_cast<S32>(sig.label.size());
+        const bool split   = measured.begin >= 0 && measured.end > measured.begin && measured.end <= size;
+        const S32  cuts[4] = { 0, split ? measured.begin : size, split ? measured.end : size, size };
+        for (S32 i = 0; i < 3; ++i)
+        {
+            measured.pieces[i] = sig.label.substr(static_cast<size_t>(cuts[i]), static_cast<size_t>(cuts[i + 1] - cuts[i]));
+            measured.widths[i] = measured.pieces[i].empty() ? 0 : font->getWidth(measured.pieces[i]);
+        }
+    }
+    const bool         docs     = measured.docs;
+    const std::string& doc_line = measured.docLine;
+    const S32          wanted   = llmax(measured.labelWidth, docs ? measured.docWidth : 0) + 2 * SIGNATURE_PAD;
+    const S32          height   = line_h * (docs ? 2 : 1) + 2 * SIGNATURE_PAD;
 
     // Above the caret's row, left with the call's column, kept inside the
     // view; under the row where above would run off the top.
@@ -3985,40 +4027,24 @@ void ALCodeEditor::drawSignature(const LLRect& text)
 
     // The label in three pieces, the active parameter in its own colour.
     const F32 baseline = static_cast<F32>(box.mTop - SIGNATURE_PAD - llround(font->getAscenderHeight()));
-    S32       begin = -1, end = -1;
-    if (sig.active >= 0 && sig.active < static_cast<S32>(sig.parameters.size()))
-    {
-        begin = sig.parameters[sig.active].first;
-        end   = sig.parameters[sig.active].second;
-    }
     // Where the label is longer than the room, it is scrolled so that the
     // parameter being filled in is in the box. The head of a signature is
     // the part already typed, so it is the part to give up; what runs off
     // the left edge under the clip reads as more of it being there.
-    const F32 label_w = static_cast<F32>(font->getWidth(sig.label));
-    const F32 through = end > 0 ? static_cast<F32>(font->getWidth(sig.label.substr(0, static_cast<size_t>(end)))) : label_w;
+    const F32 label_w = static_cast<F32>(measured.labelWidth);
+    const F32 through = static_cast<F32>(measured.throughWidth);
     const F32 shift   = ALCodeCards::labelShift(label_w, through, static_cast<F32>(room));
-    F32 pen = static_cast<F32>(box.mLeft + SIGNATURE_PAD) - shift;
-    auto piece = [&](S32 from, S32 to, const LLColor4& color) {
-        if (to <= from)
-        {
-            return;
-        }
-        const std::string part = sig.label.substr(from, to - from);
-        font->renderUTF8(part, 0, pen, baseline, color, LLFontGL::LEFT, LLFontGL::BASELINE, LLFontGL::NORMAL, LLFontGL::NO_SHADOW);
-        pen += static_cast<F32>(font->getWidth(part));
-    };
+    F32       pen     = static_cast<F32>(box.mLeft + SIGNATURE_PAD) - shift;
     {
         LLLocalClipRect clip(LLRect(box.mLeft + SIGNATURE_PAD, box.mTop - 1, box.mRight - SIGNATURE_PAD, box.mBottom + 1));
-        if (begin >= 0 && end > begin && end <= static_cast<S32>(sig.label.size()))
+        for (S32 i = 0; i < 3; ++i)
         {
-            piece(0, begin, ink);
-            piece(begin, end, active);
-            piece(end, static_cast<S32>(sig.label.size()), ink);
-        }
-        else
-        {
-            piece(0, static_cast<S32>(sig.label.size()), ink);
+            if (!measured.pieces[i].empty())
+            {
+                font->renderUTF8(measured.pieces[i], 0, pen, baseline, i == 1 ? active : ink, LLFontGL::LEFT, LLFontGL::BASELINE, LLFontGL::NORMAL,
+                                 LLFontGL::NO_SHADOW);
+                pen += static_cast<F32>(measured.widths[i]);
+            }
         }
     }
     if (docs)
