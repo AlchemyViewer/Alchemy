@@ -149,6 +149,27 @@ public:
     // no other face is consulted.
     void renderGlyphs(const Placed* glyphs, const LLColor4U* colors, size_t count, F32 x, F32 y, U8 style = NORMAL) const;
 
+    // Runs of glyphs as renderGlyphs draws one, each from its own (x, y) in
+    // its own colours, all under one transform and in as few batches as
+    // their atlases allow: every row of a text view drawn in one call,
+    // rather than a push and a pop of the transform, and a draw, for each.
+    struct GlyphRun
+    {
+        const Placed*    glyphs = nullptr;
+        const LLColor4U* colors = nullptr;
+        size_t           count  = 0;
+        F32              x      = 0.f;
+        F32              y      = 0.f;
+    };
+    void renderGlyphRuns(const GlyphRun* runs, size_t count, U8 style = NORMAL) const;
+
+    // A string's glyphs placed as renderBytes lays them down, shaped through
+    // the same cache, for renderGlyphs and renderGlyphRuns to draw. Returns
+    // how far along x the run starts for `halign`, which is what to add to
+    // the x it is drawn from: a right-aligned string's width back, measured
+    // as renderBytes measures it.
+    F32 placeGlyphs(std::string_view text, HAlign halign, std::vector<Placed>& out) const;
+
     // The draw: `begin_offset`, `max_bytes` and the count returned all index
     // the UTF-8.
     S32 renderBytes(std::string_view utf8text, S32 begin_offset,

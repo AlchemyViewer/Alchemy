@@ -44,6 +44,7 @@
 #include "../test/lltut.h"
 
 #include <cstdio>
+#include <functional>
 
 #include <set>
 
@@ -1559,4 +1560,70 @@ namespace tut
                ALFontShaping::cacheMutationCount() > before);
     }
 
+    // A string placed by placeGlyphs and drawn by renderGlyphs lands on the
+    // pixels renderUTF8 puts it on, whichever way it is aligned; and runs
+    // drawn in one call by renderGlyphRuns are the runs drawn apiece.
+    template<> template<>
+    void llfontgl_render_object::test<11>()
+    {
+        if (!fileExists(kFontsXml))
+            skip("fonts.xml not found");
+        const S32  w     = ll_test::HeadlessGL::WIDTH;
+        const S32  h     = ll_test::HeadlessGL::HEIGHT;
+        const auto frame = [&](const std::function<void()>& draw) {
+            gl.clearFramebuffer();
+            glEnable(GL_BLEND);
+            gGL.setSceneBlendType(LLRender::BT_ALPHA);
+            draw();
+            gGL.flush();
+            glDisable(GL_BLEND);
+            glFinish();
+            return ll_test::readFramebufferRGBA(w, h);
+        };
+        const auto lit = [](const std::vector<U8>& px) {
+            for (size_t i = 0; i < px.size(); i += 4)
+            {
+                if (px[i] > 0)
+                    return true;
+            }
+            return false;
+        };
+        const LLFontGL::HAlign aligns[] = { LLFontGL::LEFT, LLFontGL::RIGHT, LLFontGL::HCENTER };
+        for (LLFontGL* font : { LLFontGL::getFontMonospace(), LLFontGL::getFontSansSerif() })
+        {
+            ensure("font resolves", font != nullptr);
+            for (const std::string s : { "7", "42", "12345", "Hello, world" })
+            {
+                for (LLFontGL::HAlign halign : aligns)
+                {
+                    const std::string what = s + " aligned " + std::to_string((int)halign);
+                    const std::vector<U8> said = frame([&] {
+                        font->renderUTF8(s, 0, 128.f, 100.f, LLColor4::white, halign, LLFontGL::BASELINE, LLFontGL::NORMAL, LLFontGL::NO_SHADOW);
+                    });
+                    std::vector<LLFontGL::Placed> placed;
+                    const F32                     shift = font->placeGlyphs(s, halign, placed);
+                    const std::vector<LLColor4U>  colors(placed.size(), LLColor4U(255, 255, 255, 255));
+                    const std::vector<U8>         drawn = frame([&] { font->renderGlyphs(placed.data(), colors.data(), placed.size(), 128.f + shift, 100.f); });
+                    ensure(what + ": drawn at all", lit(said));
+                    ensure(what + ": the same pixels", said == drawn);
+                }
+            }
+        }
+
+        LLFontGL*                     font = LLFontGL::getFontSansSerif();
+        std::vector<LLFontGL::Placed> first, second;
+        font->placeGlyphs("abc", LLFontGL::LEFT, first);
+        font->placeGlyphs("xyz", LLFontGL::LEFT, second);
+        const std::vector<LLColor4U> red(first.size(), LLColor4U(255, 0, 0, 255));
+        const std::vector<LLColor4U> green(second.size(), LLColor4U(0, 255, 0, 255));
+        const std::vector<U8> apiece = frame([&] {
+            font->renderGlyphs(first.data(), red.data(), first.size(), 20.f, 50.f);
+            font->renderGlyphs(second.data(), green.data(), second.size(), 100.f, 150.f);
+        });
+        const LLFontGL::GlyphRun runs[] = { { first.data(), red.data(), first.size(), 20.f, 50.f },
+                                            { second.data(), green.data(), second.size(), 100.f, 150.f } };
+        const std::vector<U8> together = frame([&] { font->renderGlyphRuns(runs, 2); });
+        ensure("runs drawn at all", lit(apiece));
+        ensure("runs in one call are the runs apiece", apiece == together);
+    }
 }

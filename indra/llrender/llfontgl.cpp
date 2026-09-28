@@ -1137,8 +1137,14 @@ S32 LLFontGL::renderUTF8(std::string_view text, S32 begin_offset, S32 x, S32 y, 
 
 void LLFontGL::renderGlyphs(const Placed* glyphs, const LLColor4U* colors, size_t count, F32 x, F32 y, U8 style) const
 {
+    const GlyphRun run{ glyphs, colors, count, x, y };
+    renderGlyphRuns(&run, 1, style);
+}
+
+void LLFontGL::renderGlyphRuns(const GlyphRun* runs, size_t run_count, U8 style) const
+{
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
-    if (!sDisplayFont || count == 0 || !mFontFreetype)
+    if (!sDisplayFont || run_count == 0 || !mFontFreetype)
     {
         return;
     }
@@ -1205,51 +1211,89 @@ void LLFontGL::renderGlyphs(const Placed* glyphs, const LLColor4U* colors, size_
         }
     };
 
-    const F32 base_x = x * sScaleX;
-    const F32 base_y = y * sScaleY;
-    for (size_t i = 0; i < count; ++i)
+    for (size_t r = 0; r < run_count; ++r)
     {
-        const Placed& g = glyphs[i];
-        if (!g.face)
+        const GlyphRun&  run    = runs[r];
+        const LLColor4U* colors = run.colors;
+        const F32        base_x = run.x * sScaleX;
+        const F32        base_y = run.y * sScaleY;
+        for (size_t i = 0; i < run.count; ++i)
         {
-            continue;
+            const Placed& g = run.glyphs[i];
+            if (!g.face)
+            {
+                continue;
+            }
+            // The cache lives on the root face and its atlas; the glyph's own
+            // face is only where it came from.
+            const LLFontGlyphInfo* gi = mFontFreetype->getGlyphInfoByIndex(g.face, g.glyph_id, glyph_type);
+            if (!gi)
+            {
+                continue;
+            }
+            const F32 pen_x = base_x + g.x * sScaleX;
+            const F32 pen_y = base_y + g.y * sScaleY;
+            U8        phase;
+            S32       dest_int_x;
+            place_glyph(gi, pen_x, phase, dest_int_x);
+            const auto& slot = gi->mPhaseSlots[phase];
+            use_atlas(gi->mSourceFace, slot.mBitmapEntry);
+            if (!batch_image)
+            {
+                continue;
+            }
+            const F32     glyph_x = (F32)(dest_int_x + slot.mXBearing);
+            const F32     glyph_y = (F32)ll_round(pen_y) + (F32)slot.mYBearing;
+            const LLRectf uv_rect(slot.mXBitmapOffset * inv_width,
+                                  (slot.mYBitmapOffset + slot.mHeight + PAD_UVY) * inv_height,
+                                  (slot.mXBitmapOffset + slot.mWidth) * inv_width,
+                                  (slot.mYBitmapOffset - PAD_UVY) * inv_height);
+            const LLRectf screen_rect(glyph_x, glyph_y, glyph_x + (F32)slot.mWidth, glyph_y - (F32)slot.mHeight);
+            if (glyph_count >= GLYPH_BATCH_SIZE)
+            {
+                flush_batch();
+            }
+            // A colour glyph carries its own colours and takes only the alpha.
+            const LLColor4U color = bitmap_entry.first == EFontGlyphType::Grayscale
+                                        ? colors[i]
+                                        : LLColor4U(255, 255, 255, colors[i].mV[VALPHA]);
+            drawGlyphForeground(glyph_count, vertices, uvs, batch_colors, screen_rect, uv_rect, color, style_to_add, slant_offset);
         }
-        // The cache lives on the root face and its atlas; the glyph's own
-        // face is only where it came from.
-        const LLFontGlyphInfo* gi = mFontFreetype->getGlyphInfoByIndex(g.face, g.glyph_id, glyph_type);
-        if (!gi)
-        {
-            continue;
-        }
-        const F32 pen_x = base_x + g.x * sScaleX;
-        const F32 pen_y = base_y + g.y * sScaleY;
-        U8        phase;
-        S32       dest_int_x;
-        place_glyph(gi, pen_x, phase, dest_int_x);
-        const auto& slot = gi->mPhaseSlots[phase];
-        use_atlas(gi->mSourceFace, slot.mBitmapEntry);
-        if (!batch_image)
-        {
-            continue;
-        }
-        const F32     glyph_x = (F32)(dest_int_x + slot.mXBearing);
-        const F32     glyph_y = (F32)ll_round(pen_y) + (F32)slot.mYBearing;
-        const LLRectf uv_rect(slot.mXBitmapOffset * inv_width,
-                              (slot.mYBitmapOffset + slot.mHeight + PAD_UVY) * inv_height,
-                              (slot.mXBitmapOffset + slot.mWidth) * inv_width,
-                              (slot.mYBitmapOffset - PAD_UVY) * inv_height);
-        const LLRectf screen_rect(glyph_x, glyph_y, glyph_x + (F32)slot.mWidth, glyph_y - (F32)slot.mHeight);
-        if (glyph_count >= GLYPH_BATCH_SIZE)
-        {
-            flush_batch();
-        }
-        // A colour glyph carries its own colours and takes only the alpha.
-        const LLColor4U color = bitmap_entry.first == EFontGlyphType::Grayscale
-                                    ? colors[i]
-                                    : LLColor4U(255, 255, 255, colors[i].mV[VALPHA]);
-        drawGlyphForeground(glyph_count, vertices, uvs, batch_colors, screen_rect, uv_rect, color, style_to_add, slant_offset);
     }
     flush_batch();
+}
+
+F32 LLFontGL::placeGlyphs(std::string_view text, HAlign halign, std::vector<Placed>& out) const
+{
+    out.clear();
+    if (!mFontFreetype || text.empty())
+    {
+        return 0.f;
+    }
+    // Shaped and measured as renderBytes shapes and measures it: the width a
+    // right-aligned or centred string is moved back by is the same number.
+    const std::vector<ALShapedGlyph>& shaped       = ALFontShaping::shapeLine(mFontFreetype, text, 0, text.size());
+    const bool                        subpixel_pen = mFontFreetype->useSubpixelPen();
+    F32                               shift        = 0.f;
+    if (halign != LEFT)
+    {
+        const F32 unscaled = shaped_run_width(mFontFreetype, shaped, /*no_padding=*/false, subpixel_pen) / sScaleX;
+        const S32 scaled   = ll_round(unscaled * sScaleX);
+        shift              = static_cast<F32>(halign == RIGHT ? -scaled : -(scaled / 2));
+    }
+    // The pen moves as renderBytes moves it.
+    out.reserve(shaped.size());
+    F32 cur = 0.f;
+    for (const ALShapedGlyph& sg : shaped)
+    {
+        out.push_back(Placed{ sg.face, sg.glyph_id, (cur + sg.x_offset) / sScaleX, sg.y_offset / sScaleY });
+        cur += sg.x_advance;
+        if (!subpixel_pen)
+        {
+            cur = static_cast<F32>(ll_round(cur));
+        }
+    }
+    return shift / sScaleX;
 }
 
 // font metrics - override for LLFontFreetype that returns units of virtual pixels
