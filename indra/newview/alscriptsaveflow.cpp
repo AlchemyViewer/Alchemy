@@ -129,8 +129,9 @@ ALScriptSaveFlow::Landed ALScriptSaveFlow::preprocessed(const Run& run)
     return Landed::Send;
 }
 
-void ALScriptSaveFlow::sent(const ALTextUndo::SavePoint& at, std::optional<ALSourceMap> map, std::vector<LLUUID> items)
+void ALScriptSaveFlow::sent(const ALTextUndo::SavePoint& at, std::optional<ALSourceMap> map, std::vector<LLUUID> items, U64 request)
 {
+    mRequest     = request;
     mStage       = Stage::Sending;
     mFixed       = false;
     mGateVersion = -1;
@@ -160,7 +161,7 @@ void ALScriptSaveFlow::done()
 ALScriptSaveFlow::Landing ALScriptSaveFlow::compiled(const Answer& answer)
 {
     Landing landing;
-    landing.ours = mStage == Stage::Sending;
+    landing.ours = mStage == Stage::Sending && answer.request == mRequest;
     if (landing.ours)
     {
         mStage = Stage::Idle;

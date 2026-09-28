@@ -114,9 +114,12 @@ public:
 
         // A script's text sent to be saved and compiled; a notecard's, with
         // its items. False, with why, where nothing was sent.
+        // Each as the request `options.sender` or `request` names, which its
+        // answer carries; a new one from newRequest().
         virtual bool send(const Doc& doc, const std::string& text, const ALScriptWorkspace::SaveOptions& options, std::string& error) = 0;
         virtual bool sendNotecard(const Doc& doc, const std::string& text, const std::vector<LLPointer<LLInventoryItem>>& items,
-                                  std::string& error)                                                                            = 0;
+                                  std::string& error, U64 request)                                                                = 0;
+        virtual U64  newRequest()                                                                                                 = 0;
         // A file's text written back where it came from.
         virtual void saveFile(Doc& doc) = 0;
 

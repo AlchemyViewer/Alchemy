@@ -2509,7 +2509,7 @@ void LLScriptEditorWSServer::sendCompiled(const ALScriptWorkspace::CompileResult
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
     // Nothing compiled: a notecard, or an upload that failed.
-    if (result.notecard || !result.error.empty() || result.ref.item.isNull())
+    if (result.kind == ALScriptWorkspace::Kind::Notecard || !result.error.empty() || result.ref.item.isNull())
     {
         return;
     }

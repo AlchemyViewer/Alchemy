@@ -362,8 +362,9 @@ void ALScriptStudioSaving::save(Doc& doc)
                 text = doc.editor->text();
             }
             std::string                 error;
-            const ALTextUndo::SavePoint at = doc.editor->savePoint();
-            if (!mWindow.sendNotecard(doc, text, items, error))
+            const ALTextUndo::SavePoint at      = doc.editor->savePoint();
+            const U64                   request = mWindow.newRequest();
+            if (!mWindow.sendNotecard(doc, text, items, error, request))
             {
                 LLStringUtil::format_map_t failed;
                 failed["[NAME]"]  = doc.name;
@@ -377,7 +378,7 @@ void ALScriptStudioSaving::save(Doc& doc)
             {
                 sent.push_back(each->getUUID());
             }
-            doc.save.sent(at, std::nullopt, std::move(sent));
+            doc.save.sent(at, std::nullopt, std::move(sent), request);
             mServices.setStatus(mServices.words("Saving", args));
             mWindow.refreshToolbar();
             return;
@@ -482,6 +483,7 @@ void ALScriptStudioSaving::upload(Doc& doc, const std::string& text, const ALSou
     {
         options.experience = doc.experience;
     }
+    options.sender = ALScriptWorkspace::Sender(ALScriptWorkspace::Origin::Studio, mWindow.newRequest());
     std::string error;
     // Where the journal stands as the text goes, taken before anything
     // can be typed after it.
@@ -496,7 +498,7 @@ void ALScriptStudioSaving::upload(Doc& doc, const std::string& text, const ALSou
         return;
     }
     // With the map the compiler's lines are read back through.
-    doc.save.sent(at, map ? std::optional<ALSourceMap>(*map) : std::nullopt, {});
+    doc.save.sent(at, map ? std::optional<ALSourceMap>(*map) : std::nullopt, {}, options.sender.request);
     doc.problems.clear();
     mWindow.refreshProblems(doc);
     LLStringUtil::format_map_t args;
@@ -561,6 +563,7 @@ void ALScriptStudioSaving::compiledHere(const ALScriptWorkspace::CompileResult& 
     answer.up                             = result.error.empty();
     answer.compiled                       = result.success;
     answer.quitting                       = mWindow.quittingOnUs();
+    answer.request                        = result.sender.request;
     const ALScriptSaveFlow::Landing landing = doc.save.compiled(answer);
     const bool                      ours    = landing.ours;
     LLStringUtil::format_map_t args;
@@ -613,7 +616,7 @@ void ALScriptStudioSaving::compiledHere(const ALScriptWorkspace::CompileResult& 
     // Saved: nothing of it to keep against a crash any more, or only what
     // was typed while the save was on its way.
     mWindow.keepForRecovery(doc);
-    if (result.notecard)
+    if (result.kind == ALScriptWorkspace::Kind::Notecard)
     {
         // The asset carries what was sent, and the server can copy it out.
         if (ours)

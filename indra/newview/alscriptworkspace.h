@@ -151,6 +151,35 @@ public:
 
     // --- saving and compiling ----------------------------------------------
 
+    // What a saved item is: a script, compiled as it goes up, or a notecard.
+    enum class Kind : U8
+    {
+        Script,
+        Notecard
+    };
+    // Who sent a save -- the studio, VS Code through the bridge, a legacy
+    // editor, a queue over an object, a recompile -- and which save it was:
+    // a tab waiting on its own save takes its own answer, not another's for
+    // the same item. A request of zero is given one as it is sent.
+    enum class Origin : U8
+    {
+        Studio,
+        Bridge,
+        Editor,
+        Queue,
+        Recompile
+    };
+    struct Sender
+    {
+        // Constructed rather than initialised in place, to be a default
+        // argument of this class's own functions.
+        Sender(Origin origin_in = Origin::Studio, U64 request_in = 0) : origin(origin_in), request(request_in) {}
+        Origin origin;
+        U64    request;
+    };
+    // A request id to send a save with, for one who must know it first.
+    U64 newRequest() { return ++mNextRequest; }
+
     // Zero-based line and column, as everything in the studio counts.
     struct Diagnostic
     {
@@ -167,8 +196,9 @@ public:
         ALScriptRef             ref;
         bool                    success = false;
         bool                    running = false;
-        // A notecard saved rather than a script compiled.
-        bool                    notecard = false;
+        // A notecard saved rather than a script compiled; and who sent it.
+        Kind                    kind = Kind::Script;
+        Sender                  sender;
         LLUUID                  newAssetId;
         std::vector<Diagnostic> diagnostics;
         // The server's lines as they came.
@@ -193,6 +223,7 @@ public:
         // would take it away.
         bool                  running = true;
         std::optional<LLUUID> experience;
+        Sender                sender;
     };
 
     // Uploads and compiles. False, with why and nothing sent, where there
@@ -203,7 +234,24 @@ public:
     // A notecard's text uploaded in its format with the items it carried;
     // the result says it was saved, or why not, the same way.
     bool saveNotecard(const ALScriptRef& ref, const std::string& text, const std::vector<LLPointer<LLInventoryItem>>& embedded,
-                      compile_callback_t callback, std::string& error);
+                      compile_callback_t callback, std::string& error, Sender sender = Sender());
+
+    // Something's text saved, whoever sent it: the text as it went up, its
+    // new asset, and who sent it -- a script's whether it compiled or not,
+    // since the text is up either way. Every editor hears it, and takes it
+    // where it holds the item, or asks whose to keep where it has changes
+    // of its own; the sender knows its own by the request.
+    struct Saved
+    {
+        ALScriptRef ref;
+        Kind        kind = Kind::Script;
+        std::string text;
+        LLUUID      asset;
+        Sender      sender;
+        bool        compiled = false;
+    };
+    typedef boost::signals2::signal<void(const Saved&)> saved_signal_t;
+    boost::signals2::connection onSaved(const saved_signal_t::slot_type& slot) { return mSaved.connect(slot); }
 
     // A script's text as it goes up again: expanded afresh from its
     // source where the preprocessor wrapped it or is on, so that its
@@ -224,7 +272,8 @@ public:
     // compiler said reaches the callback and every listener; a script
     // that cannot go up says why in the result's error. It runs after
     // unless `running` says it was known to be stopped.
-    void recompile(const ALScriptRef& ref, const std::string& target, compile_callback_t callback, std::optional<bool> running = std::nullopt);
+    void recompile(const ALScriptRef& ref, const std::string& target, compile_callback_t callback, std::optional<bool> running = std::nullopt,
+                   Sender sender = Sender(Origin::Recompile));
 
     // The server's error strings as diagnostics.
     static std::vector<Diagnostic> parseDiagnostics(const LLSD& errors, bool lua);
@@ -477,11 +526,15 @@ private:
 
     struct LoadRequest;
     static void onAssetLoaded(const LLUUID& asset_id, LLAssetType::EType type, void* user_data, S32 status, LLExtStat ext_status);
-    void        deliver(const CompileResult& result, const compile_callback_t& callback);
+    // An answer handed to its caller and every listener, on the main
+    // coroutine; and, where the text went up, said as saved with it.
+    void        deliver(const CompileResult& result, const compile_callback_t& callback, const std::string* text = nullptr);
     bool        scriptMessage(const ALScriptRef& ref, const char* message, bool running, bool with_running);
 
     compiled_signal_t             mCompiled;
+    saved_signal_t                mSaved;
     running_signal_t              mRunningState;
+    U64                           mNextRequest = 0;
     std::unique_ptr<ALScriptContentsIndex> mContentsIndex;
     // What leaves the object list let go of by the index.
     boost::signals2::scoped_connection     mPresenceConnection;

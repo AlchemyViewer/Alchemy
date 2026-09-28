@@ -441,8 +441,9 @@ private:
     ALScriptStudioSaving::Options saveOptions() const override;
     void tidy(Doc& doc, bool fix, bool format, bool trim) override;
     bool send(const Doc& doc, const std::string& text, const ALScriptWorkspace::SaveOptions& options, std::string& error) override;
-    bool sendNotecard(const Doc& doc, const std::string& text, const std::vector<LLPointer<LLInventoryItem>>& items,
-                      std::string& error) override;
+    bool sendNotecard(const Doc& doc, const std::string& text, const std::vector<LLPointer<LLInventoryItem>>& items, std::string& error,
+                      U64 request) override;
+    U64  newRequest() override;
     void keepForRecovery(Doc& doc) override;
     void showProblems() override;
     void selectFirstError(bool checkers_only) override;

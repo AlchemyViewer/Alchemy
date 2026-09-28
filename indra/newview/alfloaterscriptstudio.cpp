@@ -1238,9 +1238,15 @@ bool ALFloaterScriptStudio::send(const Doc& doc, const std::string& text, const 
 }
 
 bool ALFloaterScriptStudio::sendNotecard(const Doc& doc, const std::string& text, const std::vector<LLPointer<LLInventoryItem>>& items,
-                                         std::string& error)
+                                         std::string& error, U64 request)
 {
-    return ALScriptWorkspace::instance().saveNotecard(doc.ref, text, items, nullptr, error);
+    return ALScriptWorkspace::instance().saveNotecard(doc.ref, text, items, nullptr, error,
+                                                      ALScriptWorkspace::Sender(ALScriptWorkspace::Origin::Studio, request));
+}
+
+U64 ALFloaterScriptStudio::newRequest()
+{
+    return ALScriptWorkspace::instance().newRequest();
 }
 
 void ALFloaterScriptStudio::runPreprocessor(const Doc& doc, std::function<void(const ALPreprocessor::Result&)> answer)

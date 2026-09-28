@@ -521,9 +521,12 @@ std::vector<ALScriptWorkspace::Diagnostic> ALScriptWorkspace::parseDiagnostics(c
     return out;
 }
 
-void ALScriptWorkspace::deliver(const CompileResult& result, const compile_callback_t& callback)
+void ALScriptWorkspace::deliver(const CompileResult& result, const compile_callback_t& callback, const std::string* text)
 {
-    if (result.success && !result.notecard)
+    // Everything that draws hears it, and a text editor's reflow takes a
+    // mutex a fiber may not.
+    llassert(LLCoros::on_main_coro());
+    if (result.success && result.kind == Kind::Script)
     {
         // A new script runs from here; what the old one said is past.
         forgetRuntime(result.ref.item);
@@ -533,10 +536,29 @@ void ALScriptWorkspace::deliver(const CompileResult& result, const compile_callb
         callback(result);
     }
     mCompiled(result);
+    if (text && result.error.empty() && result.newAssetId.notNull())
+    {
+        Saved saved;
+        saved.ref      = result.ref;
+        saved.kind     = result.kind;
+        saved.text     = *text;
+        saved.asset    = result.newAssetId;
+        saved.sender   = result.sender;
+        saved.compiled = result.success;
+        mSaved(saved);
+    }
 }
 
 bool ALScriptWorkspace::save(const ALScriptRef& ref, const std::string& text, const SaveOptions& options, compile_callback_t callback, std::string& error)
 {
+    // Which save it is, from here to its answer, the region asked first or
+    // not.
+    if (options.sender.request == 0)
+    {
+        SaveOptions numbered    = options;
+        numbered.sender.request = newRequest();
+        return save(ref, text, numbered, callback, error);
+    }
     if (!ref.inInventory())
     {
         if (std::string refused = rlvRefusal(gObjectList.findObject(ref.object), LLAssetType::AT_LSL_TEXT, RlvUse::Change); !refused.empty())
@@ -577,8 +599,9 @@ bool ALScriptWorkspace::save(const ALScriptRef& ref, const std::string& text, co
                 why                      = LLTrans::getString("WorkspaceExperienceUnknown");
                 result.experienceUnknown = true;
             }
-            result.ref   = ref;
-            result.error = why;
+            result.ref    = ref;
+            result.sender = options.sender;
+            result.error  = why;
             deliver(result, callback);
         });
         return true;
@@ -598,9 +621,11 @@ bool ALScriptWorkspace::save(const ALScriptRef& ref, const std::string& text, co
         return false;
     }
     const bool lua = options.compileTarget == "luau";
-    auto answered  = [this, ref, lua, callback, running = options.running, experience = options.experience](const LLSD& response, const LLUUID& new_asset_id) {
+    auto answered  = [this, ref, lua, callback, text, sender = options.sender, running = options.running,
+                     experience = options.experience](const LLSD& response, const LLUUID& new_asset_id) {
         CompileResult result;
         result.ref        = ref;
+        result.sender     = sender;
         result.success    = response["compiled"].asBoolean();
         result.running    = running;
         result.newAssetId = new_asset_id;
@@ -613,12 +638,13 @@ bool ALScriptWorkspace::save(const ALScriptRef& ref, const std::string& text, co
             result.messages.push_back(it->asString());
         }
         result.diagnostics = parseDiagnostics(response["errors"], lua);
-        LLAppViewer::instance()->postToMainCoro([this, result, callback]() { deliver(result, callback); });
+        LLAppViewer::instance()->postToMainCoro([this, result, callback, text]() { deliver(result, callback, &text); });
     };
-    auto failed = [this, ref, callback](LLUUID, LLUUID, LLSD, std::string reason) -> bool {
+    auto failed = [this, ref, callback, sender = options.sender](LLUUID, LLUUID, LLSD, std::string reason) -> bool {
         CompileResult result;
-        result.ref   = ref;
-        result.error = reason.empty() ? LLTrans::getString("WorkspaceUploadFailed") : reason;
+        result.ref    = ref;
+        result.sender = sender;
+        result.error  = reason.empty() ? LLTrans::getString("WorkspaceUploadFailed") : reason;
         LLAppViewer::instance()->postToMainCoro([this, result, callback]() { deliver(result, callback); });
         return true;
     };
@@ -676,8 +702,12 @@ bool ALScriptWorkspace::save(const ALScriptRef& ref, const std::string& text, co
 }
 
 bool ALScriptWorkspace::saveNotecard(const ALScriptRef& ref, const std::string& text, const std::vector<LLPointer<LLInventoryItem>>& embedded,
-                                     compile_callback_t callback, std::string& error)
+                                     compile_callback_t callback, std::string& error, Sender sender)
 {
+    if (sender.request == 0)
+    {
+        sender.request = newRequest();
+    }
     // Nothing a notecard is read back with takes more text than this -- the
     // reader refuses the whole notecard -- so nothing more is written.
     if (text.size() > static_cast<size_t>(LLNotecard::MAX_SIZE))
@@ -699,10 +729,11 @@ bool ALScriptWorkspace::saveNotecard(const ALScriptRef& ref, const std::string& 
     }
     const std::string buffer   = out.str();
     const bool        carries  = !embedded.empty();
-    auto              answered = [this, ref, callback, carries](const LLUUID& new_asset_id) {
+    auto              answered = [this, ref, callback, carries, sender, text](const LLUUID& new_asset_id) {
         CompileResult result;
         result.ref        = ref;
-        result.notecard   = true;
+        result.kind       = Kind::Notecard;
+        result.sender     = sender;
         result.success    = true;
         result.newAssetId = new_asset_id;
         if (carries)
@@ -711,13 +742,14 @@ bool ALScriptWorkspace::saveNotecard(const ALScriptRef& ref, const std::string& 
             // in the cache is not to be trusted.
             LLFileSystem::removeFile(new_asset_id, LLAssetType::AT_NOTECARD);
         }
-        LLAppViewer::instance()->postToMainCoro([this, result, callback]() { deliver(result, callback); });
+        LLAppViewer::instance()->postToMainCoro([this, result, callback, text]() { deliver(result, callback, &text); });
     };
-    auto failed = [this, ref, callback](LLUUID, LLUUID, LLSD, std::string reason) -> bool {
+    auto failed = [this, ref, callback, sender](LLUUID, LLUUID, LLSD, std::string reason) -> bool {
         CompileResult result;
-        result.ref      = ref;
-        result.notecard = true;
-        result.error    = reason.empty() ? LLTrans::getString("WorkspaceUploadFailed") : reason;
+        result.ref    = ref;
+        result.kind   = Kind::Notecard;
+        result.sender = sender;
+        result.error  = reason.empty() ? LLTrans::getString("WorkspaceUploadFailed") : reason;
         LLAppViewer::instance()->postToMainCoro([this, result, callback]() { deliver(result, callback); });
         return true;
     };
@@ -832,12 +864,18 @@ void ALScriptWorkspace::prepare(const ALScriptRef& ref, const std::string& name,
     });
 }
 
-void ALScriptWorkspace::recompile(const ALScriptRef& ref, const std::string& requested, compile_callback_t callback, std::optional<bool> running)
+void ALScriptWorkspace::recompile(const ALScriptRef& ref, const std::string& requested, compile_callback_t callback, std::optional<bool> running,
+                                  Sender sender)
 {
-    auto fail = [this, ref, callback](const std::string& why) {
+    if (sender.request == 0)
+    {
+        sender.request = newRequest();
+    }
+    auto fail = [this, ref, callback, sender](const std::string& why) {
         CompileResult result;
-        result.ref   = ref;
-        result.error = why;
+        result.ref    = ref;
+        result.sender = sender;
+        result.error  = why;
         deliver(result, callback);
     };
     LLViewerObject*        object = ref.inInventory() ? nullptr : gObjectList.findObject(ref.object);
@@ -874,18 +912,19 @@ void ALScriptWorkspace::recompile(const ALScriptRef& ref, const std::string& req
     }
     const std::string name = item->getName();
     // Its text, then the upload, which keeps the experience it runs under.
-    load(ref, [this, target, lua, name, callback, fail, running](const Loaded& loaded) {
+    load(ref, [this, target, lua, name, callback, fail, running, sender](const Loaded& loaded) {
         if (!loaded.error.empty())
         {
             fail(loaded.error);
             return;
         }
         const ALScriptRef ref = loaded.ref;
-        prepare(ref, name, loaded.assetId, loaded.text, lua, target, [this, ref, target, callback, fail, running](const Prepared& prepared) {
+        prepare(ref, name, loaded.assetId, loaded.text, lua, target, [this, ref, target, callback, fail, running, sender](const Prepared& prepared) {
             if (!prepared.errors.empty())
             {
                 CompileResult result;
                 result.ref         = ref;
+                result.sender      = sender;
                 result.diagnostics = prepared.errors;
                 for (const Diagnostic& diagnostic : prepared.errors)
                 {
@@ -897,6 +936,7 @@ void ALScriptWorkspace::recompile(const ALScriptRef& ref, const std::string& req
             SaveOptions options;
             options.compileTarget = target;
             options.running       = running.value_or(true);
+            options.sender        = sender;
             std::string error;
             if (!save(ref, prepared.text, options, callback, error))
             {

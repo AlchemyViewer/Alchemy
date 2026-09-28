@@ -100,11 +100,12 @@ namespace
             sent.push_back({ doc.id, text, with });
             return true;
         }
-        bool sendNotecard(const Doc& doc, const std::string& text, const std::vector<LLPointer<LLInventoryItem>>&, std::string&) override
+        bool sendNotecard(const Doc& doc, const std::string& text, const std::vector<LLPointer<LLInventoryItem>>&, std::string&, U64) override
         {
             notecards.push_back(text);
             return true;
         }
+        U64 newRequest() override { return ++requests; }
         void saveFile(Doc& doc) override { files.push_back(doc.id); }
         void reattach(Doc& doc) override { reattached.push_back(doc.id); }
         void refreshNotice() override { ++notices; }
@@ -143,6 +144,7 @@ namespace
         Names                                               tidied, analysed, runs, weighs, files, reattached, recovered, closed, known;
         std::vector<Sent>                                   sent;
         Names                                               notecards;
+        U64                                                 requests = 0;
         std::vector<bool>                                   firstErrors;
         S32                                                 problemsShown = 0, notices = 0, stops = 0, continues = 0;
     };
@@ -212,11 +214,13 @@ namespace tut
             doc.check.analysis        = std::move(problems);
             doc.check.analysisVersion = doc.editor->document().version();
         }
+        // The answer to the tab's own save, by the request it sent.
         static CompileResult answer(const Doc& doc, bool success = true)
         {
             CompileResult result;
-            result.ref     = doc.ref;
-            result.success = success;
+            result.ref            = doc.ref;
+            result.success        = success;
+            result.sender.request = doc.save.request();
             return result;
         }
 
@@ -247,7 +251,7 @@ namespace tut
         ensure("a notecard sent as it stands", studio.notecards == Names{ "some words" });
         ensure("and not tidied", studio.tidied.size() == 1);
         CompileResult saved = answer(card);
-        saved.notecard      = true;
+        saved.kind          = ALScriptWorkspace::Kind::Notecard;
         saving.compiled(saved);
         ensure_equals("its answer said", lastSaid(), std::string("SavedNotecard"));
         ensure("and kept as saved", studio.recovered == Names{ "card" } && !card.save.underway());
@@ -476,7 +480,7 @@ namespace tut
         type(card, " ");
         saving.saveToClose("card");
         CompileResult saved = answer(card);
-        saved.notecard      = true;
+        saved.kind          = ALScriptWorkspace::Kind::Notecard;
         saving.compiled(saved);
         ensure("a notecard the same", studio.closed == Names{ "a", "card" } && studio.continues == 2);
 
@@ -684,5 +688,28 @@ namespace tut
         ensure_equals("sent without it", studio.sent.size(), size_t(3));
         ensure("and said so", services.reports.back().text.find("SavingWithout") == 0 &&
                                   services.reports.back().text.find("[FILES]=far.lsl") != std::string::npos);
+    }
+
+    template<> template<>
+    void alscriptstudiosaving_object::test<13>()
+    {
+        set_test_name("a tab sending takes only its own save's answer: another's for the same script, a recompile's, does not land as its own");
+        ALScriptStudioSaving& saving = make();
+        Doc&                  doc    = tab("a", "default {}");
+        type(doc, "\n// mine");
+        saving.save(doc);
+        ensure("on its way", doc.save.sending());
+        const U64 mine = studio.sent.back().options.sender.request;
+        ensure("sent as a request of the studio's", mine != 0 && studio.sent.back().options.sender.origin == ALScriptWorkspace::Origin::Studio);
+
+        // A recompile from the explorer answers first, for the same script.
+        CompileResult other = answer(doc);
+        other.sender        = ALScriptWorkspace::Sender(ALScriptWorkspace::Origin::Recompile, mine + 100);
+        saving.compiled(other);
+        ensure("still on its way", doc.save.sending());
+        ensure("not marked saved by another's answer", doc.editor->isDirty());
+
+        saving.compiled(answer(doc));
+        ensure("its own lands", !doc.save.sending() && !doc.editor->isDirty());
     }
 }

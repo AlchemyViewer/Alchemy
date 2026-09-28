@@ -148,8 +148,9 @@ public:
     Landed preprocessed(const Run& run);
     // Sent: the journal's save point as the text went, which the answer
     // marks saved whatever is typed meanwhile; the map the expansion went
-    // through, where it was expanded; a notecard's items.
-    void sent(const ALTextUndo::SavePoint& at, std::optional<ALSourceMap> map, std::vector<LLUUID> items);
+    // through, where it was expanded; a notecard's items; and the request
+    // it went as, which its answer carries.
+    void sent(const ALTextUndo::SavePoint& at, std::optional<ALSourceMap> map, std::vector<LLUUID> items, U64 request = 0);
     // It could not go, said why, or stopped where it was: nothing on its
     // way, the safe fixes to be made again next time, and no close waiting
     // on it any more.
@@ -163,6 +164,9 @@ public:
         bool up       = false;
         bool compiled = false;
         bool quitting = false;
+        // Which save it answers: the tab's own only where it is the request
+        // the tab sent, not another's for the same item on its way at once.
+        U64  request  = 0;
     };
     // Whether it answers this tab's save, rather than a recompile made from
     // elsewhere; whether the text is to be marked saved; and whether it
@@ -201,6 +205,8 @@ public:
     const ALTextUndo::SavePoint&      savePoint() const { return mSavePoint; }
     const std::optional<ALSourceMap>& sentMap() const { return mSentMap; }
     const std::vector<LLUUID>&        sentItems() const { return mSentItems; }
+    // The request the last save went as.
+    U64                               request() const { return mRequest; }
     void                              forgetSentItems() { mSentItems.clear(); }
     // The text a save sent, whose weight is said once it is known, where it
     // is over the target's limit; -1 for none.
@@ -223,5 +229,6 @@ private:
     ALTextUndo::SavePoint      mSavePoint;
     std::optional<ALSourceMap> mSentMap;
     std::vector<LLUUID>        mSentItems;
+    U64                        mRequest = 0;
     S64                        mWarnWeightFor = -1;
 };
