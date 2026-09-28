@@ -101,9 +101,6 @@ private:
     ALPaneList*              mList     = nullptr;
     LLFilterEditor*          mFilter   = nullptr;
     LLComboBox*              mSort     = nullptr;
-    // What the rows last said, and whose they were: a check that changes
-    // none of it leaves the list as it is.
-    std::vector<std::string> mSaid;
     // Each entry's key -- the names down to it -- and whether it holds
     // others, as the rows were last made.
     std::vector<std::string> mKeys;
@@ -111,4 +108,7 @@ private:
     // Shown or followed out of sight: the tab in front's listed once it is
     // seen.
     bool                     mUnseen = false;
+    // Whether the caret was followed while the outline was shown, by way of
+    // the bar at the bottom, which is told first.
+    bool                     mFollowed = false;
 };

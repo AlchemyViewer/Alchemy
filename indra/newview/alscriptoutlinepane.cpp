@@ -199,52 +199,56 @@ void ALScriptOutlinePane::show(Doc& doc)
         };
         walk(roots, 0);
     }
-    // What the rows say. A check comes at every pause in typing and most
-    // change nothing the outline shows; the list is only made again where
-    // something did, and then keeps its scroll, so that whoever is
-    // reading down it is not sent back to the top.
+    // Each symbol a row by the names down to it -- two of one name under
+    // one holder told apart by which comes first -- in this tab's list. A
+    // check comes at every pause in typing and most change nothing the
+    // outline shows: nothing is made again then, and one that adds a
+    // symbol or changes a declaration makes that row, the rest moving
+    // along, with the scroll and the row chosen kept.
     const std::string open   = mServices->words("ArrowOpen");
     const std::string folded = mServices->words("ArrowFolded");
-    std::vector<std::string> said;
-    said.reserve(rows.size() + 1);
+    boost::unordered_flat_map<std::string, S32, ll::string_hash, std::equal_to<>> seen;
+    std::vector<ALPaneList::Row>                                                  list;
+    list.reserve(rows.size());
     for (const Row& row : rows)
     {
         const ALScriptOutlineEntry& entry  = doc.outline[row.index];
         const bool                  parent = filter.empty() && mParents[row.index];
         const std::string arrow = !parent ? std::string("   ") : doc.caret.outlineFolded.contains(mKeys[row.index]) ? folded : open;
-        said.push_back(std::string(static_cast<size_t>(row.depth) * 4, ' ') + arrow + entry.name + "|" +
-                       std::to_string(static_cast<S32>(entry.kind)) + "|" + std::to_string(row.index) + "|" + entry.detail);
-    }
-    said.push_back(doc.id);
-    if (said != mSaid)
-    {
-        mSaid            = said;
-        const S32 scroll = mList->getScrollPos();
-        mList->deleteAllItems();
-        for (size_t r = 0; r < rows.size(); ++r)
+        ALPaneList::Row   one;
+        one.key = doc.id + "\x1f" + mKeys[row.index];
+        if (const S32 times = seen[one.key]++; times > 0)
         {
-            const ALScriptOutlineEntry& entry = doc.outline[rows[r].index];
-            LLSD                        row;
-            row["value"]                  = static_cast<S32>(rows[r].index);
-            row["columns"][0]["column"]   = "icon";
-            row["columns"][0]["type"]     = "icon";
-            row["columns"][0]["value"]    = ALScriptStudioWords::imageNameOf(entry.kind);
-            row["columns"][0]["tool_tip"] = kindName(entry.kind);
-            row["columns"][1]["column"]   = "symbol";
-            // Nested under what holds it, with the arrow that folds what
-            // it holds; what it is, and its declaration, on the mouse.
-            row["columns"][1]["value"]    = said[r].substr(0, said[r].find('|'));
-            row["columns"][1]["tool_tip"] = entry.detail.empty() ? kindName(entry.kind) : kindName(entry.kind) + "\n" + entry.detail;
-            mList->addElement(row);
+            one.key += "\x1f" + std::to_string(times);
         }
-        mList->setScrollPos(scroll);
+        one.value = static_cast<S32>(row.index);
+        LLScrollListCell::Params icon;
+        icon.column   = "icon";
+        icon.type     = "icon";
+        icon.value    = ALScriptStudioWords::imageNameOf(entry.kind);
+        icon.tool_tip = kindName(entry.kind);
+        // Nested under what holds it, with the arrow that folds what it
+        // holds; what it is, and its declaration, on the mouse.
+        LLScrollListCell::Params symbol;
+        symbol.column   = "symbol";
+        symbol.value    = std::string(static_cast<size_t>(row.depth) * 4, ' ') + arrow + entry.name;
+        symbol.tool_tip = entry.detail.empty() ? kindName(entry.kind) : kindName(entry.kind) + "\n" + entry.detail;
+        one.cells       = { icon, symbol };
+        list.push_back(std::move(one));
     }
+    mList->setRows(std::move(list));
     mList->setEmpty(doc.outline.empty() ? mServices->words(doc.loaded ? "NoOutline" : "NoOutlineYet")
                     : rows.empty()      ? mServices->words("OutlineNoMatch")
                                         : LLStringUtil::null,
                     LLStringUtil::null);
+    // The bar at the bottom told, which follows the caret here where its
+    // path moved; else followed here, once.
+    mFollowed = false;
     mWindow->outlineShown(doc);
-    followCaret(doc);
+    if (!mFollowed)
+    {
+        followCaret(doc);
+    }
 }
 
 bool ALScriptOutlinePane::arrowAt(const LLScrollListItem* item, S32 x) const
@@ -322,6 +326,7 @@ void ALScriptOutlinePane::followCaret(Doc& doc)
         mUnseen = true;
         return;
     }
+    mFollowed = true;
     // The innermost symbol the caret is in, as the breadcrumb found it.
     if (doc.caret.crumbPath.empty())
     {
@@ -374,9 +379,6 @@ void ALScriptOutlinePane::forget()
 {
     mUnseen = false;
     mList->deleteAllItems();
-    // What the list says is nothing now: the next tab's is put in
-    // whatever it says, the same rows as the last one's or not.
-    mSaid.clear();
 }
 
 std::string ALScriptOutlinePane::sortOrder() const
