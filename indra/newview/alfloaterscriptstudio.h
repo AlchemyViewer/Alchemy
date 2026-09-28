@@ -96,6 +96,7 @@ class LLScrollListCtrl;
 class LLContextMenu;
 class ALScopeBar;
 class LLEditMenuHandler;
+class LLInventoryObserver;
 class LLTabContainer;
 class LLTextEditor;
 class LLViewerObject;
@@ -413,6 +414,8 @@ private:
     void askReload(const Doc& doc, std::function<void(bool reload)> answered) override;
     void saveStopped(Doc& doc) override;
     void fileWritten(const std::string& path) override;
+    // A file of a tab changed on disk, or went: what is in reach looked at.
+    void reachChanged() override { mOrphansDirty = true; }
     void becomeFile(Doc& doc, const std::string& path) override;
     LLMenuGL* recentMenu() override;
     void      recentChanged() override { saveState(); }
@@ -955,7 +958,19 @@ private:
     // Whether the connection was seen lost; and when what holds each tab
     // was last looked at.
     bool                               mOffline        = false;
-    F64                                mOrphansChecked = 0.0;
+    // Whether what is in reach of a tab may have changed since the orphans
+    // were last looked at, which the inventory, objects coming and going,
+    // prims' contents and files say; when they asked to be looked at again
+    // for time alone; and a look now and then all the same, for what says
+    // nothing -- a name heard.
+    bool                               mOrphansDirty    = true;
+    F64                                mOrphansDue      = 0.0;
+    F64                                mOrphansBackstop = 0.0;
+    std::unique_ptr<LLInventoryObserver> mInventoryHeard;
+    boost::signals2::scoped_connection mOrphansPresence;
+    boost::signals2::scoped_connection mOrphansContents;
+    // Whether a tab holds a script of the prim.
+    bool                               holdsScriptOf(const LLUUID& prim) const;
     // What the editors' vim keymaps share: the : and / lines entered in
     // any of them, and the settings a :set changes.
     bool                               mWordWrap    = false;

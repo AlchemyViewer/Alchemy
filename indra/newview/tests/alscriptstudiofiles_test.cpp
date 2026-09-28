@@ -93,6 +93,7 @@ namespace
         }
         void      saveStopped(Doc& doc) override { stopped.push_back(doc.id); }
         void      fileWritten(const std::string& path) override { written.push_back(path); }
+        void      reachChanged() override { ++reachChanges; }
         void      becomeFile(Doc& doc, const std::string& path) override
         {
             became.push_back(path);
@@ -103,6 +104,7 @@ namespace
         void      recentChanged() override { ++recentTold; }
 
         Names                     opened, activated, reverted, taken, checked, asked, settled, stopped, written, became;
+        S32                       reachChanges = 0;
         bool                      pickedSeveral = false;
         Chosen                    toOpen, toSave;
         std::string               savedAs;
@@ -334,9 +336,11 @@ namespace tut
         studio.answer(true);
         ensure("read again", studio.reverted == Names{ f.id });
         unit.changedOutside("nobody", f.file);
+        const S32 before = studio.reachChanges;
         std::filesystem::remove(fsyspath(f.file));
         unit.changedOutside(f.id, f.file);
         ensure("gone or unknown: nothing", studio.asked.size() == 2);
+        ensure("but what is in reach looked at again", studio.reachChanges == before + 1);
     }
 
     template<> template<>

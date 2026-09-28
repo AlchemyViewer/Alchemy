@@ -97,6 +97,9 @@ public:
         // A file written that the studio reads something from: the
         // snippets, the vimrc.
         virtual void fileWritten(const std::string& path) = 0;
+        // A tab's file changed on disk, or went: what is in reach of the
+        // tabs to be looked at again (ALScriptStudioOrphans).
+        virtual void reachChanged() = 0;
         // A tab that is a file, the file at `path` from here on: keyed by
         // it, named after it, its problems and what recovery kept of it
         // forgotten, in the language its name says.

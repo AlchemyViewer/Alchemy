@@ -518,8 +518,27 @@ ALFloaterScriptStudio::ALFloaterScriptStudio(const LLSD& key)
     mEnableCallbackRegistrar.add("ScriptStudio.Check", [this](LLUICtrl*, const LLSD& name) { return mCommands.checked(name.asString()); });
 }
 
+namespace
+{
+    // Told of any change to the inventory: an item come, gone, renamed or
+    // moved, to the Trash among them.
+    class InventoryHeard final : public LLInventoryObserver
+    {
+    public:
+        explicit InventoryHeard(std::function<void()> heard) : mHeard(std::move(heard)) {}
+        void changed(U32) override { mHeard(); }
+
+    private:
+        std::function<void()> mHeard;
+    };
+}
+
 ALFloaterScriptStudio::~ALFloaterScriptStudio()
 {
+    if (mInventoryHeard)
+    {
+        gInventory.removeObserver(mInventoryHeard.get());
+    }
     // The keyboard, the mouse and a top control let go of now, while the
     // tabs and the units are here: LLFloater's destructor would let go of
     // them after, and a filter losing the keyboard commits into a pane,
@@ -818,6 +837,23 @@ bool ALFloaterScriptStudio::postBuild()
     }
     // The vimrc read again into this window's vim whenever it changes: its
     // file saved, a notecard dropped on the preferences' box, or saved.
+    // What is in reach of a tab looked at again when it may have changed:
+    // the inventory, an object of a tab's come or gone, what a tab's prim
+    // holds.
+    mInventoryHeard = std::make_unique<InventoryHeard>([this]() { mOrphansDirty = true; });
+    gInventory.addObserver(mInventoryHeard.get());
+    mOrphansPresence = gObjectList.onPresence([this](const LLUUID& id, bool) {
+        if (holdsScriptOf(id))
+        {
+            mOrphansDirty = true;
+        }
+    });
+    mOrphansContents = ALScriptWorkspace::instance().contentsIndex().onHeard([this](const ALScriptWorkspace::Contents& contents) {
+        if (holdsScriptOf(contents.prim))
+        {
+            mOrphansDirty = true;
+        }
+    });
     mVimrcConnection = ALScriptStudioVimrc::instance().onChanged([this]() {
         if (mVim.sourced())
         {
@@ -1775,6 +1811,7 @@ void ALFloaterScriptStudio::openScript(const ALScriptRef& ref, const std::string
     // An object's check listed it while it was closed: its tab says now.
     mProblemsPane->forgetChecked(ref);
     mDocs.push_back(std::move(doc));
+    mOrphansDirty = true;
     reindexDocs();
     activate(mDocs.size() - 1, focus);
 
@@ -1929,6 +1966,7 @@ void ALFloaterScriptStudio::goToPending(Doc& doc)
 
 void ALFloaterScriptStudio::loaded(const ALScriptWorkspace::Loaded& answer)
 {
+    mOrphansDirty = true;
     const size_t index = indexOf(answer.ref);
     if (index == NONE)
     {
@@ -2445,6 +2483,7 @@ void ALFloaterScriptStudio::openFileHere(const std::string& path, bool lua, S32 
         doc->recoveryKey = ALScriptRecoveryStore::keyOf(LLUUID::null, LLUUID::null, path);
         mRecovery.offerFor(*doc, holderOf(ALScriptRef(), path) != nullptr);
         mDocs.push_back(std::move(doc));
+        mOrphansDirty = true;
         reindexDocs();
         already = mDocs.size() - 1;
         if (language.script)
@@ -5878,11 +5917,20 @@ void ALFloaterScriptStudio::pumpRecovery()
         }
         mOrphans.check();
     }
-    if (now >= mOrphansChecked + 1.0)
+    // When what is in reach may have changed, or when the last look asked
+    // to be looked at again; and now and then all the same.
+    constexpr F64 ORPHANS_BACKSTOP = 30.0;
+    if (mOrphansDirty || (mOrphansDue > 0.0 && now >= mOrphansDue) || now >= mOrphansBackstop)
     {
-        mOrphansChecked = now;
-        mOrphans.check();
+        mOrphansDirty    = false;
+        mOrphansBackstop = now + ORPHANS_BACKSTOP;
+        mOrphansDue      = mOrphans.check();
     }
+}
+
+bool ALFloaterScriptStudio::holdsScriptOf(const LLUUID& prim) const
+{
+    return std::any_of(mDocs.begin(), mDocs.end(), [&prim](const std::unique_ptr<Doc>& doc) { return doc->ref.object == prim; });
 }
 
 // static
@@ -5980,6 +6028,7 @@ void ALFloaterScriptStudio::openOrphan(const ALScriptRecoveryEntry& entry, Doc::
     doc->editor      = makeEditor(doc->id, false);
     wireDoc(*doc);
     mDocs.push_back(std::move(doc));
+    mOrphansDirty = true;
     reindexDocs();
     const size_t index = mDocs.size() - 1;
     becomeOrphan(*mDocs[index], entry, orphan);

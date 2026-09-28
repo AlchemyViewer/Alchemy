@@ -32,6 +32,8 @@
 #include "alscriptstudioservices.h"
 #include "lltimer.h"
 
+#include <algorithm>
+
 #include <vector>
 
 ALScriptStudioOrphans::ALScriptStudioOrphans(ALScriptStudioServices& services, Window& window) : mServices(services), mWindow(window)
@@ -126,10 +128,13 @@ void ALScriptStudioOrphans::reattach(Doc& doc)
     mWindow.loadScript(doc.ref);
 }
 
-void ALScriptStudioOrphans::check()
+F64 ALScriptStudioOrphans::check()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
     bool changed = false;
+    // The soonest a tab is to be looked at again for time alone.
+    F64        due     = 0.0;
+    const auto soonest = [&due](F64 at) { due = due <= 0.0 ? at : std::min(due, at); };
     for (Doc* each : mServices.openDocs())
     {
         Doc& doc = *each;
@@ -150,6 +155,7 @@ void ALScriptStudioOrphans::check()
             }
             if (now - doc.orphan.awaySince < AWAY_AFTER)
             {
+                soonest(doc.orphan.awaySince + AWAY_AFTER);
                 continue;
             }
         }
@@ -195,10 +201,17 @@ void ALScriptStudioOrphans::check()
         const Doc& doc   = *each;
         const bool ready = doc.orphan.kind == Orphan::None ||
                            (doc.orphan.kind == Orphan::Unloaded && doc.loadFailure == ALScriptWorkspace::Loaded::Failure::Fetch);
-        const bool due = ALScriptRecoveryRetry::mayTry(doc.orphan.reattachTries) && now >= doc.orphan.nextReattach;
-        if (doc.orphan.detached && doc.loaded && ready && due)
+        const bool may = ALScriptRecoveryRetry::mayTry(doc.orphan.reattachTries);
+        if (doc.orphan.detached && doc.loaded && ready && may)
         {
-            reattaching.push_back(doc.id);
+            if (now >= doc.orphan.nextReattach)
+            {
+                reattaching.push_back(doc.id);
+            }
+            else
+            {
+                soonest(doc.orphan.nextReattach);
+            }
         }
     }
     for (const std::string& id : reattaching)
@@ -213,6 +226,7 @@ void ALScriptStudioOrphans::check()
         refreshNotice();
         mWindow.refreshToolbar();
     }
+    return due;
 }
 
 // static

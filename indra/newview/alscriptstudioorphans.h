@@ -38,7 +38,9 @@ struct ALScriptRecoveryEntry;
 // `doc.orphan` keeping it: its object out of sight, its item gone from the
 // object or the inventory, the connection lost, the item in the Trash, the
 // file gone from disk; or a kept text over a script that may no longer be
-// changed, or that could not be loaded. Looked at again every second; a
+// changed, or that could not be loaded. Looked at again when what is in
+// reach may have changed -- the window says when: the inventory, an object
+// come or gone, a prim's contents, a file -- and when this asks to be; a
 // tab loaded under what it holds once its item is back in reach, tried a
 // few times further apart each time. And the notice over the editor, which
 // says what the tab in front has to reckon with, and what its buttons do.
@@ -119,8 +121,9 @@ public:
     // now -- an object out of sight a moment not yet gone -- said where it
     // changed, what was typed kept where it is lost; and each detached tab
     // whose item is in reach loaded under what it holds, where its next
-    // try is due.
-    void check();
+    // try is due. When to look again with nothing else changed: when an
+    // object out of sight a moment is gone, or a try is due; 0 for never.
+    F64 check();
     // What a tab holds carried over what its item has, with its history, as
     // a kept text is taken up: the item loaded under it, so that what it is
     // saved as is what the item is.

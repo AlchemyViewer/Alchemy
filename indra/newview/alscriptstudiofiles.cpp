@@ -103,6 +103,7 @@ void ALScriptStudioFiles::changedOutside(const std::string& id, const std::strin
         return;
     }
     Doc& doc = *found;
+    mWindow.reachChanged();
     // Gone, or not to be read: nothing to take. Deleted, the tab keeps
     // what it holds and the check on what holds each tab says the file
     // is gone; mid-save by something that writes it in two steps, it is

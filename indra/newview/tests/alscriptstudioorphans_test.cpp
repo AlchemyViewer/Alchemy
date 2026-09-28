@@ -215,9 +215,10 @@ namespace tut
         Doc&     a    = tab("a");
         Doc&     b    = tab("b");
         studio.reaches["a"].objectThere = false;
-        unit.check();
+        const F64 due = unit.check();
         ensure("each tab's place taken", studio.placed == Names{ "a", "b" });
         ensure("out of sight a moment: not yet away", a.orphan.kind == Orphan::None && a.orphan.awaySince > 0.0);
+        ensure("and to be looked at again once the moment is past", due > a.orphan.awaySince && due <= a.orphan.awaySince + 3.0);
         a.orphan.awaySince -= 5.0;
         a.orphan.noticeDismissed = true;
         unit.check();
@@ -257,7 +258,8 @@ namespace tut
         ensure("tried out: waits for a person", studio.loads.empty());
         a.orphan.reattachTries = 1;
         a.orphan.nextReattach  = LLTimer::getTotalSeconds() + 60.0;
-        unit.check();
+        const F64 next = unit.check();
+        ensure("to be looked at again when its try is due", next == a.orphan.nextReattach);
         ensure("not due yet", studio.loads.empty());
         a.orphan.nextReattach = 0.0;
         unit.check();
