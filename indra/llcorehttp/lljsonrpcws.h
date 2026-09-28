@@ -353,14 +353,18 @@ protected:
     /**
      * @brief Process a single JSON-RPC message
      * @param message_obj The parsed JSON message
+     * @param frame The text it was parsed from, where there is one: what an
+     *        async request hands the main thread, rather than the message
+     *        written out again
      */
-    void processMessage(const LLSD& message_obj);
+    void processMessage(const LLSD& message_obj, const std::string* frame = nullptr);
 
     /**
      * @brief Process a JSON-RPC request
      * @param request The request object
+     * @param frame The text it was parsed from, where there is one
      */
-    void processRequest(const LLSD& request);
+    void processRequest(const LLSD& request, const std::string* frame = nullptr);
 
     /**
      * @brief Process a JSON-RPC response

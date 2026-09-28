@@ -165,8 +165,9 @@ void LLJSONRPCConnection::onMessage(const std::string& message)
             return;
         }
 
-        // Single message
-        processMessage(message_obj);
+        // Single message, with the frame it came in: a batch is refused
+        // above, so the frame is this message's text alone.
+        processMessage(message_obj, &message);
     }
     catch (const std::exception& e)
     {
@@ -175,7 +176,7 @@ void LLJSONRPCConnection::onMessage(const std::string& message)
     }
 }
 
-void LLJSONRPCConnection::processMessage(const LLSD& message_obj)
+void LLJSONRPCConnection::processMessage(const LLSD& message_obj, const std::string* frame)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_WEBSOCKET;
     try
@@ -191,7 +192,7 @@ void LLJSONRPCConnection::processMessage(const LLSD& message_obj)
             {
                 throw InvalidRequest(reason);
             }
-            processRequest(message_obj);
+            processRequest(message_obj, frame);
         }
         else if (message_obj.has("result") || message_obj.has("error"))
         {
@@ -214,7 +215,7 @@ void LLJSONRPCConnection::processMessage(const LLSD& message_obj)
     }
 }
 
-void LLJSONRPCConnection::processRequest(const LLSD& request)
+void LLJSONRPCConnection::processRequest(const LLSD& request, const std::string* frame)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_WEBSOCKET;
     std::string method = request["method"].asString();
@@ -279,8 +280,10 @@ void LLJSONRPCConnection::processRequest(const LLSD& request)
         // The request goes to the main thread as its text, and is read
         // there: an LLSD's parts are shared between copies and counted
         // without a lock, so no part of one read here may be used there.
+        // The frame it came in as, where there is one, rather than the
+        // request written out again: a save carries the whole script.
         const bool posted = postToMainThread(
-            [handler, conn, text = LlsdToJson(request)]()
+            [handler, conn, text = frame ? *frame : LlsdToJson(request)]()
             {
                 LLSD request;
                 if (!LlsdFromJsonString(text, request))
