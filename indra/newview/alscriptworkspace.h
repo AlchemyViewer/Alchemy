@@ -40,6 +40,7 @@
 #include <memory>
 #include <map>
 #include <optional>
+#include <set>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -467,7 +468,9 @@ private:
     struct ContentsListener;
     struct Transfer;
     void startTransfer(const std::shared_ptr<Transfer>& transfer);
-    void transferArrived(const std::shared_ptr<Transfer>& transfer);
+    // What changed that came into the transfer's folder, taken where it is
+    // what the transfer waits for.
+    void transferArrived(const std::shared_ptr<Transfer>& transfer, const std::set<LLUUID>& changed);
     void transferEnd(const std::shared_ptr<Transfer>& transfer);
     void deliverRuntime(const Burst& burst);
     void sweepListeners();

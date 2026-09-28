@@ -986,11 +986,13 @@ struct ALScriptWorkspace::Transfer final : public LLInventoryObserver
     bool                              finished = false;
     std::weak_ptr<Transfer>           self;
 
+    // What the inventory says changed, not the folder read again: it is
+    // shared by every transfer ever made, in the trash, and only grows.
     void changed(U32) override
     {
         if (const std::shared_ptr<Transfer> held = self.lock(); held && !finished && folder.notNull())
         {
-            ALScriptWorkspace::instance().transferArrived(held);
+            ALScriptWorkspace::instance().transferArrived(held, gInventory.getChangedIDs());
         }
     }
 };
@@ -1112,15 +1114,13 @@ void ALScriptWorkspace::startTransfer(const std::shared_ptr<Transfer>& one)
     gInventory.createNewCategory(trash, LLFolderType::FT_NONE, name, begin);
 }
 
-void ALScriptWorkspace::transferArrived(const std::shared_ptr<Transfer>& one)
+void ALScriptWorkspace::transferArrived(const std::shared_ptr<Transfer>& one, const std::set<LLUUID>& changed)
 {
-    LLInventoryModel::cat_array_t*  cats  = nullptr;
-    LLInventoryModel::item_array_t* items = nullptr;
-    gInventory.getDirectDescendentsOf(one->folder, cats, items);
     std::vector<LLPointer<LLViewerInventoryItem>> fresh;
-    for (const LLPointer<LLViewerInventoryItem>& item : items ? *items : LLInventoryModel::item_array_t())
+    for (const LLUUID& id : changed)
     {
-        if (!item || one->arrived.count(item->getUUID()))
+        LLViewerInventoryItem* item = gInventory.getItem(id);
+        if (!item || item->getParentUUID() != one->folder || one->arrived.count(id))
         {
             continue;
         }
