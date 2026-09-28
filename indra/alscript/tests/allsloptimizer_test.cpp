@@ -1299,4 +1299,36 @@ namespace tut
             ensure("what was written compiles: " + p.message + "\n" + r.text, p.severity != ALScriptProblem::Severity::Error);
         }
     }
+    template<> template<>
+    void allsloptimizer_object::test<36>()
+    {
+        set_test_name("a block in a block is flattened where its names are its own, and a declaration moves down to its first assignment where nothing between jumps or names it");
+        const std::string source =
+            wrap("integer g;\n", "        { llOwnerSay(\"a\"); }\n"
+                              "        { integer u = llGetUnixTime(); llOwnerSay((string)(u + u)); }\n"
+                              "        { integer v = llGetUnixTime(); llOwnerSay((string)(v + v)); }\n"
+                              "        { integer v = llGetUnixTime(); llOwnerSay((string)(v * v)); }\n"
+                              "        integer x;\n"
+                              "        llOwnerSay(\"b\");\n"
+                              "        x = llGetUnixTime();\n"
+                              "        llOwnerSay((string)(x + x));\n"
+                              "        integer y;\n"
+                              "        if (llGetUnixTime() & 1) jump over;\n"
+                              "        y = llGetUnixTime();\n"
+                              "        @over;\n"
+                              "        llOwnerSay((string)(y + y));\n");
+        const ALLSLOptimizer::Result r = ALLSLOptimizer::run(source, options());
+        ensure("optimized: " + notes(r), r.optimized);
+        auto has = [&r](const std::string& text) { return r.text.find(text) != std::string::npos; };
+        ensure("a block of one statement is that statement: " + r.text, has("    llOwnerSay(\"a\");") && !has("{\n            llOwnerSay(\"a\");"));
+        ensure("one whose local is named nowhere else too: " + r.text, has("        integer u = llGetUnixTime();"));
+        ensure("two whose locals share a name stay blocks: " + r.text, has("            integer v = llGetUnixTime();"));
+        ensure("x declared where it is first set: " + r.text, !has("integer x;") && has("integer x = llGetUnixTime();"));
+        ensure("y not past the jump: " + r.text, has("integer y;") && has("y = llGetUnixTime();"));
+        ALLSLService service;
+        for (const ALScriptProblem& p : service.check(r.text))
+        {
+            ensure("what was written compiles: " + p.message + "\n" + r.text, p.severity != ALScriptProblem::Severity::Error);
+        }
+    }
 } // namespace tut

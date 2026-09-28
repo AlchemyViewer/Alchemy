@@ -2804,8 +2804,224 @@ namespace
                 block->removeChild(stmt);
                 ++changes;
             }
+            flattenBlocks(block);
+            sinkDeclarations(block);
             substituteLocals(block);
             return false;
+        }
+
+        // How many identifiers of each name a function or event has,
+        // counted once a run: what the pass takes away only makes a count
+        // more than there are, never fewer.
+        const boost::unordered_flat_map<std::string_view, int>& namesIn(LSLASTNode* node)
+        {
+            LSLASTNode* callable = node;
+            while (callable && callable->getNodeType() != NODE_GLOBAL_FUNCTION && callable->getNodeType() != NODE_EVENT_HANDLER)
+            {
+                callable = callable->getParent();
+            }
+            auto& counted = mNames[callable];
+            if (counted.empty() && callable)
+            {
+                std::vector<LSLASTNode*> stack{ callable };
+                while (!stack.empty())
+                {
+                    LSLASTNode* n = stack.back();
+                    stack.pop_back();
+                    if (n->getNodeType() == NODE_IDENTIFIER && static_cast<LSLIdentifier*>(n)->getName())
+                    {
+                        ++counted[static_cast<LSLIdentifier*>(n)->getName()];
+                    }
+                    for (LSLASTNode* child = n->getChild(0); child; child = child->getNext())
+                    {
+                        stack.push_back(child);
+                    }
+                }
+            }
+            return counted;
+        }
+
+        // A block standing as a statement of a block, its statements put
+        // in its place: where it declares nothing and holds no label, or
+        // only names no identifier outside it has -- LSL has no shadowing,
+        // and a name it declared would otherwise be one a later declaration
+        // shadows, or a global a later read meant; and two labels of a name
+        // may not stand in one block.
+        void flattenBlocks(LSLCompoundStatement* block)
+        {
+            const auto flat = [&](LSLASTNode* inner) {
+                if (inner->getNodeSubType() != NODE_COMPOUND_STATEMENT)
+                {
+                    return false;
+                }
+                boost::unordered_flat_map<std::string_view, int> own;
+                std::vector<const char*>                        declared;
+                std::vector<LSLASTNode*>                        stack{ inner };
+                while (!stack.empty())
+                {
+                    LSLASTNode* n = stack.back();
+                    stack.pop_back();
+                    if (n->getNodeType() == NODE_IDENTIFIER && static_cast<LSLIdentifier*>(n)->getName())
+                    {
+                        ++own[static_cast<LSLIdentifier*>(n)->getName()];
+                    }
+                    for (LSLASTNode* child = n->getChild(0); child; child = child->getNext())
+                    {
+                        stack.push_back(child);
+                    }
+                }
+                // What it declares, and the labels it holds: two labels of a
+                // name may not stand in one block.
+                for (LSLASTNode* stmt = inner->getChild(0); stmt; stmt = stmt->getNext())
+                {
+                    if (stmt->getNodeSubType() == NODE_DECLARATION)
+                    {
+                        declared.push_back(static_cast<LSLDeclaration*>(stmt)->getIdentifier()->getName());
+                    }
+                    else if (stmt->getNodeSubType() == NODE_LABEL)
+                    {
+                        declared.push_back(static_cast<LSLLabel*>(stmt)->getIdentifier()->getName());
+                    }
+                }
+                const auto& all = namesIn(block);
+                for (const char* name : declared)
+                {
+                    const auto total = all.find(std::string_view(name));
+                    if (!name || total == all.end() || total->second != own[std::string_view(name)])
+                    {
+                        return false;
+                    }
+                }
+                return true;
+            };
+            std::vector<LSLASTNode*> statements;
+            bool                     any = false;
+            for (LSLASTNode* stmt : *block)
+            {
+                statements.push_back(stmt);
+                any = any || flat(stmt);
+            }
+            if (!any)
+            {
+                return;
+            }
+            std::vector<bool> flatten(statements.size());
+            for (size_t i = 0; i < statements.size(); ++i)
+            {
+                flatten[i] = flat(statements[i]);
+            }
+            // The statements are the ones they were, every reference in
+            // them still in the script: counted neither out nor in again.
+            const Uncounted uncounted(*ctx.context);
+            for (LSLASTNode* stmt : statements)
+            {
+                block->removeChild(stmt);
+            }
+            for (size_t i = 0; i < statements.size(); ++i)
+            {
+                if (!flatten[i])
+                {
+                    block->pushChild(statements[i]);
+                    continue;
+                }
+                std::vector<LSLASTNode*> inner;
+                for (LSLASTNode* stmt = statements[i]->getChild(0); stmt; stmt = stmt->getNext())
+                {
+                    inner.push_back(stmt);
+                }
+                for (LSLASTNode* stmt : inner)
+                {
+                    statements[i]->removeChild(stmt);
+                    block->pushChild(stmt);
+                }
+                ++changes;
+            }
+        }
+
+        // `T x;` and, later in the block, `x = e;` with nothing between that
+        // names x, jumps or is jumped to: the declaration where the
+        // assignment was, `T x = e;` -- which the local's value may then
+        // go further from.
+        void sinkDeclarations(LSLCompoundStatement* block)
+        {
+            std::vector<LSLASTNode*> statements;
+            for (LSLASTNode* stmt : *block)
+            {
+                statements.push_back(stmt);
+            }
+            const auto mentions = [](LSLASTNode* root, LSLSymbol* sym) {
+                std::vector<LSLASTNode*> stack{ root };
+                while (!stack.empty())
+                {
+                    LSLASTNode* n = stack.back();
+                    stack.pop_back();
+                    if (n->getNodeType() == NODE_IDENTIFIER && static_cast<LSLIdentifier*>(n)->getSymbol() == sym)
+                    {
+                        return true;
+                    }
+                    for (LSLASTNode* child = n->getChild(0); child; child = child->getNext())
+                    {
+                        stack.push_back(child);
+                    }
+                }
+                return false;
+            };
+            const auto jumpy = [](LSLASTNode* root) {
+                std::vector<LSLASTNode*> stack{ root };
+                while (!stack.empty())
+                {
+                    LSLASTNode* n = stack.back();
+                    stack.pop_back();
+                    if (n->getNodeType() == NODE_STATEMENT && (n->getNodeSubType() == NODE_LABEL || n->getNodeSubType() == NODE_JUMP_STATEMENT))
+                    {
+                        return true;
+                    }
+                    for (LSLASTNode* child = n->getChild(0); child; child = child->getNext())
+                    {
+                        stack.push_back(child);
+                    }
+                }
+                return false;
+            };
+            for (size_t i = 0; i < statements.size(); ++i)
+            {
+                if (statements[i]->getNodeSubType() != NODE_DECLARATION)
+                {
+                    continue;
+                }
+                auto*      decl = static_cast<LSLDeclaration*>(statements[i]);
+                LSLSymbol* sym  = decl->getSymbol();
+                LSLASTNode* init = decl->getChild(1);
+                if (!sym || sym->getSubType() != SYM_LOCAL || (init && init->getNodeType() != NODE_NULL))
+                {
+                    continue;
+                }
+                for (size_t j = i + 1; j < statements.size(); ++j)
+                {
+                    LSLASTNode* stmt = statements[j];
+                    if (!mentions(stmt, sym))
+                    {
+                        if (jumpy(stmt))
+                        {
+                            break;
+                        }
+                        continue;
+                    }
+                    auto* expr = stmt->getNodeSubType() == NODE_EXPRESSION_STATEMENT ? static_cast<LSLExpressionStatement*>(stmt)->getExpr() : nullptr;
+                    if (!expr || expr->getNodeSubType() != NODE_BINARY_EXPRESSION || expr->getOperation() != '=' ||
+                        expr->getChild(0)->getNodeSubType() != NODE_LVALUE_EXPRESSION || static_cast<LSLLValueExpression*>(expr->getChild(0))->getMember() ||
+                        static_cast<LSLLValueExpression*>(expr->getChild(0))->getSymbol() != sym || mentions(expr->getChild(1), sym))
+                    {
+                        break;
+                    }
+                    decl->setChild(1, static_cast<LSLExpression*>(expr->takeChild(1)));
+                    block->removeChild(decl);
+                    LSLASTNode::replaceNode(stmt, decl);
+                    statements[j] = decl;
+                    ++changes;
+                    break;
+                }
+            }
         }
 
         // How many labels of a name the function or event a node is in has.
@@ -3309,6 +3525,7 @@ namespace
         }
 
         boost::unordered_flat_map<LSLSymbol*, LSLGlobalFunction*> mFunctions;
+        boost::unordered_flat_map<LSLASTNode*, boost::unordered_flat_map<std::string_view, int>> mNames;
 
         void states(LSLScript* script)
         {
