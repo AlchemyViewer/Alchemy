@@ -160,6 +160,9 @@ public:
     // A script or notecard gone from its object, so that a tab holding
     // it goes too.
     static void itemRemoved(const ALScriptRef& ref);
+    // Whether a script is open with changes not saved, in any of the
+    // studio's windows: what a recompile of the server's text leaves out.
+    static bool unsavedIn(const ALScriptRef& ref);
     // Whether this is the main window, which keeps the state and is
     // hidden rather than destroyed when closed; the others are the
     // scripts popped out into windows of their own, gone when closed.

@@ -6378,6 +6378,12 @@ void ALFloaterScriptStudio::itemDeleted(const ALScriptRef& ref)
 
 bool ALFloaterScriptStudio::unsavedAnywhere(const ALScriptRef& ref) const
 {
+    return unsavedIn(ref);
+}
+
+// static
+bool ALFloaterScriptStudio::unsavedIn(const ALScriptRef& ref)
+{
     const ALFloaterScriptStudio* holder = holderOf(ref, std::string());
     const size_t                 index  = holder ? holder->indexOf(ref) : NONE;
     return index != NONE && holder->mDocs[index]->editor->isDirty() && holder->mDocs[index]->modifiable;

@@ -179,6 +179,9 @@ public:
     };
     // A request id to send a save with, for one who must know it first.
     U64 newRequest() { return ++mNextRequest; }
+    // Whether a save of the item is on its way: a recompile skips it
+    // rather than land the server's text over it.
+    bool saving(const ALScriptRef& ref) const;
 
     // Zero-based line and column, as everything in the studio counts.
     struct Diagnostic
@@ -547,6 +550,8 @@ private:
     saved_signal_t                mSaved;
     running_signal_t              mRunningState;
     U64                           mNextRequest = 0;
+    // The saves on their way, by request, until each is answered.
+    boost::unordered_flat_map<U64, ALScriptRef> mUnderway;
     std::unique_ptr<ALScriptContentsIndex> mContentsIndex;
     // What leaves the object list let go of by the index.
     boost::signals2::scoped_connection     mPresenceConnection;

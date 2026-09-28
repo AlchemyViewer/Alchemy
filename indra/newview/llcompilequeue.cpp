@@ -36,6 +36,8 @@
 
 #include "llcompilequeue.h"
 
+#include "alfloaterscriptstudio.h"
+
 #include "alscriptenvelope.h"
 #include "alscriptpreprocessor.h"
 #include "alscriptworkspace.h"
@@ -470,6 +472,20 @@ bool LLFloaterCompileQueue::processScript(LLHandle<LLFloaterCompileQueue> hfloat
     // one whose text is not at hand is fetched by the workspace itself.
     {
         const ALScriptRef ref(object->getID(), inventory->getUUID());
+        // A save of it on its way would have the server's text land over
+        // it: left alone. Changes not saved in the studio are not what
+        // compiles: said so.
+        LLStringUtil::format_map_t named;
+        named["[SCRIPT_NAME]"] = inventory->getName();
+        if (ALScriptWorkspace::instance().saving(ref))
+        {
+            floater->addStringMessage(LLTrans::getString("CompileQueueSkippedSaving", named));
+            return true;
+        }
+        if (ALFloaterScriptStudio::unsavedIn(ref))
+        {
+            floater->addStringMessage(LLTrans::getString("CompileQueueUnsavedInStudio", named));
+        }
         const std::string pumpName = pump.getName();
         const bool        running  = floater->runsAfterCompile(object->getID(), inventory->getUUID());
         const auto        heard    = [pumpName](const ALScriptWorkspace::CompileResult& compiled) {

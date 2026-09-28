@@ -1005,6 +1005,18 @@ void ALScriptExplorerPane::recompile(const std::vector<Choice>& rows)
         const std::string          name = row.name;
         LLStringUtil::format_map_t args;
         args["[NAME]"] = name;
+        // A save of it on its way would have the server's text land over
+        // it: left alone. Changes not saved in a tab are not what compiles:
+        // said so.
+        if (ALScriptWorkspace::instance().saving(ref))
+        {
+            mServices->report(mServices->words("RecompileSkippedSaving", args), true);
+            continue;
+        }
+        if (mWindow->unsavedAnywhere(ref))
+        {
+            mServices->report(mServices->words("RecompileUnsaved", args), true);
+        }
         mServices->setStatus(mServices->words("Recompiling", args));
         const std::optional<bool> running = knownRunning(ref);
         ALScriptWorkspace::instance().recompile(

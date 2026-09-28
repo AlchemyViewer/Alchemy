@@ -462,6 +462,8 @@
     <floater.string name="SavedElsewhereConflict">[NAME] was saved by [WHO] while it had changes here.</floater.string>
     <floater.string name="SavedElsewhereKept">Kept what is here in [NAME]; saving it replaces what was saved elsewhere.</floater.string>
     <floater.string name="SavedByBridge">VS Code</floater.string>
+    <floater.string name="RecompileSkippedSaving">[NAME] was not recompiled: a save of it is on its way, which a recompile would land over.</floater.string>
+    <floater.string name="RecompileUnsaved">[NAME] has changes not saved here; what recompiles is the server's text, without them.</floater.string>
     <floater.string name="SavedByEditor">another editor</floater.string>
     <floater.string name="SavedByQueue">a recompile</floater.string>
     <floater.string name="CompareSavedThere">Saved elsewhere</floater.string>

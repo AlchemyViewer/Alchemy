@@ -526,6 +526,7 @@ void ALScriptWorkspace::deliver(const CompileResult& result, const compile_callb
     // Everything that draws hears it, and a text editor's reflow takes a
     // mutex a fiber may not.
     llassert(LLCoros::on_main_coro());
+    mUnderway.erase(result.sender.request);
     if (result.success && result.kind == Kind::Script)
     {
         // A new script runs from here; what the old one said is past.
@@ -547,6 +548,11 @@ void ALScriptWorkspace::deliver(const CompileResult& result, const compile_callb
         saved.compiled = result.success;
         mSaved(saved);
     }
+}
+
+bool ALScriptWorkspace::saving(const ALScriptRef& ref) const
+{
+    return std::any_of(mUnderway.begin(), mUnderway.end(), [&ref](const auto& one) { return one.second == ref; });
 }
 
 bool ALScriptWorkspace::save(const ALScriptRef& ref, const std::string& text, const SaveOptions& options, compile_callback_t callback, std::string& error)
@@ -672,6 +678,7 @@ bool ALScriptWorkspace::save(const ALScriptRef& ref, const std::string& text, co
                 answered(response, new_asset_id);
             },
             failed));
+        mUnderway[options.sender.request] = ref;
         LLViewerAssetUpload::EnqueueInventoryUpload(url, info);
         return true;
     }
@@ -697,6 +704,7 @@ bool ALScriptWorkspace::save(const ALScriptRef& ref, const std::string& text, co
             answered(response, new_asset_id);
         },
         failed));
+    mUnderway[options.sender.request] = ref;
     LLViewerAssetUpload::EnqueueInventoryUpload(url, info);
     return true;
 }
@@ -793,6 +801,7 @@ bool ALScriptWorkspace::uploadNotecard(const ALScriptRef& ref, const std::string
         LLResourceUploadInfo::ptr_t info(std::make_shared<LLBufferedAssetUploadInfo>(
             ref.item, LLAssetType::AT_NOTECARD, buffer,
             [answered](LLUUID, LLUUID new_asset_id, LLUUID new_item_id, LLSD) { answered(new_asset_id, new_item_id); }, failed));
+        mUnderway[sender.request] = ref;
         LLViewerAssetUpload::EnqueueInventoryUpload(url, info);
         return true;
     }
@@ -817,6 +826,7 @@ bool ALScriptWorkspace::uploadNotecard(const ALScriptRef& ref, const std::string
     LLResourceUploadInfo::ptr_t info(std::make_shared<LLBufferedAssetUploadInfo>(
         ref.object, ref.item, LLAssetType::AT_NOTECARD, buffer,
         [answered](LLUUID, LLUUID, LLUUID new_asset_id, LLSD) { answered(new_asset_id, LLUUID::null); }, failed));
+    mUnderway[sender.request] = ref;
     LLViewerAssetUpload::EnqueueInventoryUpload(url, info);
     return true;
 }
