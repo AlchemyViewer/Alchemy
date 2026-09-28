@@ -27,6 +27,7 @@
 #include "../alscriptstudiofiles.h"
 #include "../alscriptstudiofileio.h"
 
+#include "alfilewrite.h"
 #include "alscriptstudio_fixture.h"
 #include "llmenugl.h"
 
@@ -411,7 +412,7 @@ namespace tut
         const fsyspath    folder_path = fsyspath(in("J\xC3\xBCrgen"));
         std::filesystem::create_directories(folder_path);
         const std::string path = fsyspath(folder_path / fsyspath("\xC3\x9C" "berpr\xC3\xBC" "fung.lsl")).string();
-        ensure("written", ALScriptFileIO::writeTempFile(path, "default\r\n{\r\n}\r\n"));
+        ensure("written", ALFileWrite::temp(path, "default\r\n{\r\n}\r\n"));
         std::string text;
         ensure("read back", ALScriptFileIO::readWholeFile(path, text));
         ensure_equals("as an editor keeps it", text, std::string("default\n{\n}\n"));

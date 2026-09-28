@@ -30,14 +30,14 @@
 #include <string>
 #include <string_view>
 
-// What the studio's window and its units share of reading and writing
-// files: a file's text whole, a temp file of the studio's own written
-// safely, and a file watched for the changes made to it outside.
+// What the studio's window and its units share of reading files: a file's
+// text whole, its line endings as an editor here keeps them, and a file
+// watched for the changes made to it outside. Writing is ALFileWrite's: a
+// file the author keeps whole or not at all, a temp file safely.
 namespace ALScriptFileIO
 {
     bool fileTooLarge(const std::string& path);
     bool readWholeFile(const std::string& path, std::string& text);
-    bool writeTempFile(const std::string& path, std::string_view text);
 
     // The temp file an external editor is given, watched for its saves;
     // gone from disk with it. What is written here is marked seen as it

@@ -199,7 +199,6 @@ namespace
 using ALScriptFileIO::fileTooLarge;
 using ALScriptFileIO::readWholeFile;
 using ALScriptFileIO::StudioLiveFile;
-using ALScriptFileIO::writeTempFile;
 using ALScriptPlaces::declaredOf;
 using ALScriptPlaces::isIdentifier;
 using ALScriptPlaces::lineOf;

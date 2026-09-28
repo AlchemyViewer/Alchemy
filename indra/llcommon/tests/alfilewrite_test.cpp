@@ -37,6 +37,7 @@
 #include <sstream>
 
 #if !LL_WINDOWS
+#include <sys/stat.h>
 #include <unistd.h>
 #endif
 
@@ -197,6 +198,52 @@ namespace tut
         fs::permissions(fsyspath(sub), fs::perms::owner_all, fs::perm_options::replace, ec);
         ensure("written", written);
         ensure_equals("in place", read(file), std::string("new"));
+#endif
+    }
+
+    template<> template<>
+    void alfilewrite_object::test<7>()
+    {
+        set_test_name("the one reader: an ordinary file whole, up to a limit; not a folder, and not a pipe, which it does not wait on");
+        const std::string file = in("include.lsl");
+        put(file, "integer x;\n");
+        std::string text = "left over";
+        ensure("read", ALFileRead::whole(file, text, 64));
+        ensure_equals("whole", text, std::string("integer x;\n"));
+        ensure("at the limit", ALFileRead::whole(file, text, 11) && text.size() == 11);
+        ensure("past it", !ALFileRead::whole(file, text, 10) && text.empty());
+        ensure("a folder is not read", !ALFileRead::whole(folder, text, 64));
+        ensure("nothing is not read", !ALFileRead::whole(in("gone.lsl"), text, 64));
+#if !LL_WINDOWS
+        const std::string pipe = in("pipe");
+        if (mkfifo(pipe.c_str(), 0600) == 0)
+        {
+            ensure("a pipe is not read", !ALFileRead::whole(pipe, text, 64));
+        }
+#endif
+    }
+
+    template<> template<>
+    void alfilewrite_object::test<8>()
+    {
+        set_test_name("a temp file is written in place, the user's alone, and never through a link");
+        const std::string file = in("sl_script_x_id.lsl");
+        ensure("written", ALFileWrite::temp(file, "default {}"));
+        ensure_equals("its text", read(file), std::string("default {}"));
+        ensure("again, shorter", ALFileWrite::temp(file, "x"));
+        ensure_equals("all of the old gone", read(file), std::string("x"));
+#if !LL_WINDOWS
+        ensure("the user's alone", fs::status(fsyspath(file)).permissions() == (fs::perms::owner_read | fs::perms::owner_write));
+        const std::string target = in("elsewhere.txt");
+        put(target, "somebody's");
+        const std::string link = in("sl_script_y_id.lsl");
+        std::error_code   ec;
+        fs::create_symlink(fsyspath(target), fsyspath(link), ec);
+        if (!ec)
+        {
+            ensure("not through a link", !ALFileWrite::temp(link, "mine"));
+            ensure_equals("what it names untouched", read(target), std::string("somebody's"));
+        }
 #endif
     }
 }

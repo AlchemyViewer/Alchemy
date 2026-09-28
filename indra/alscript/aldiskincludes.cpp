@@ -26,6 +26,7 @@
 
 #include "aldiskincludes.h"
 
+#include "alfilewrite.h"
 #include "alluauconfig.h"
 
 #include "fsyspath.h"
@@ -239,53 +240,7 @@ std::vector<ALDiskIncludes::Listed> ALDiskIncludes::filesUnder(const std::string
 // static
 bool ALDiskIncludes::readOrdinary(const std::string& file, std::string& out)
 {
-    out.clear();
-    std::error_code ec;
-    const std::filesystem::path path = fsyspath(file);
-    // What a stat says it is, links followed: a device or a pipe would be
-    // read for ever, and a folder not at all.
-    if (!fs::is_regular_file(path, ec) || ec)
-    {
-        return false;
-    }
-    const std::uintmax_t size = fs::file_size(path, ec);
-    if (ec || size > MAX_BYTES)
-    {
-        return false;
-    }
-    llifstream in(path, std::ios::binary);
-    if (!in)
-    {
-        return false;
-    }
-    // As much as the stat said and a byte more, to see a file that grew
-    // since: one that did is read on, a piece at a time, but never past
-    // the limit.
-    std::string text;
-    size_t      want = static_cast<size_t>(size) + 1;
-    for (;;)
-    {
-        const size_t at = text.size();
-        text.resize(at + want);
-        in.read(text.data() + at, static_cast<std::streamsize>(want));
-        const std::streamsize got = in.gcount();
-        if (got < 0)
-        {
-            return false;
-        }
-        text.resize(at + static_cast<size_t>(got));
-        if (text.size() > MAX_BYTES)
-        {
-            return false;
-        }
-        if (static_cast<size_t>(got) < want)
-        {
-            break;
-        }
-        want = std::min<size_t>(64 * 1024, static_cast<size_t>(MAX_BYTES) + 1 - text.size());
-    }
-    out = std::move(text);
-    return true;
+    return ALFileRead::whole(file, out, MAX_BYTES);
 }
 
 // static

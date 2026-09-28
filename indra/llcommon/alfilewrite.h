@@ -26,6 +26,7 @@
 
 #include "llpreprocessor.h"
 
+#include <cstdint>
 #include <string>
 #include <string_view>
 
@@ -46,6 +47,25 @@ namespace ALFileWrite
     // False, and the file as it was, where it could not be written.
     LL_COMMON_API bool whole(const std::string& path, std::string_view text);
 
+    // A file nobody keeps -- a copy of a script given to an editor outside,
+    // its log -- written in place, the viewer user's alone: never through
+    // a link, never a file somebody else made by that name first, and
+    // readable by nobody else. The temp folder it goes in is everyone's on
+    // Linux, and its names anyone can work out. False where any of it did
+    // not go.
+    LL_COMMON_API bool temp(const std::string& path, std::string_view text);
+
     // What is written beside a file on the way: the name it is given.
     LL_COMMON_API std::string besideOf(const std::string& path);
+}
+
+// A file read whole: an ordinary one, links followed, of at most `most`
+// bytes. False, and nothing read, for anything else -- a folder, or a
+// device or a pipe, which would be read for ever or wait on a writer --
+// and for one that grew past `most` while it was being read. The one
+// reader of whole files, whoever limits them to what.
+namespace ALFileRead
+{
+    // Safe on any thread.
+    LL_COMMON_API bool whole(const std::string& path, std::string& out, std::uintmax_t most);
 }

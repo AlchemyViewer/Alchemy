@@ -28,8 +28,16 @@
 
 #include "fsyspath.h"
 
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
+
+#if !LL_WINDOWS
+#include <cerrno>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#endif
 
 namespace
 {
@@ -125,5 +133,90 @@ bool whole(const std::string& path, std::string_view text)
     // Nothing could be put beside it, or it could not be replaced: in place,
     // as it always was written.
     return writeAll(target, text) == Wrote::Done;
+}
+
+bool temp(const std::string& path, std::string_view text)
+{
+#if LL_WINDOWS
+    llofstream out(fsyspath(path), std::ios::binary);
+    out.write(text.data(), static_cast<std::streamsize>(text.size()));
+    out.close();
+    return !out.fail();
+#else
+    const int fd = ::open(path.c_str(), O_WRONLY | O_CREAT | O_NOFOLLOW | O_CLOEXEC, S_IRUSR | S_IWUSR);
+    if (fd < 0)
+    {
+        return false;
+    }
+    struct stat st;
+    bool        all = fstat(fd, &st) == 0 && S_ISREG(st.st_mode) && st.st_uid == getuid() && st.st_nlink == 1 &&
+               fchmod(fd, S_IRUSR | S_IWUSR) == 0 && ftruncate(fd, 0) == 0;
+    size_t done = 0;
+    while (all && done < text.size())
+    {
+        const ssize_t wrote = ::write(fd, text.data() + done, text.size() - done);
+        if (wrote < 0 && errno == EINTR)
+        {
+            continue;
+        }
+        all = wrote > 0;
+        done += wrote > 0 ? static_cast<size_t>(wrote) : 0;
+    }
+    return ::close(fd) == 0 && all;
+#endif
+}
+}
+
+namespace ALFileRead
+{
+bool whole(const std::string& file, std::string& out, std::uintmax_t most)
+{
+    out.clear();
+    std::error_code ec;
+    const std::filesystem::path path = fsyspath(file);
+    // What a stat says it is, links followed: a device or a pipe would be
+    // read for ever, and a folder not at all.
+    if (!std::filesystem::is_regular_file(path, ec) || ec)
+    {
+        return false;
+    }
+    const std::uintmax_t size = std::filesystem::file_size(path, ec);
+    if (ec || size > most)
+    {
+        return false;
+    }
+    llifstream in(path, std::ios::binary);
+    if (!in)
+    {
+        return false;
+    }
+    // As much as the stat said and a byte more, to see a file that grew
+    // since: one that did is read on, a piece at a time, but never past
+    // the limit.
+    std::string text;
+    size_t      want = static_cast<size_t>(size) + 1;
+    for (;;)
+    {
+        const size_t at = text.size();
+        text.resize(at + want);
+        in.read(text.data() + at, static_cast<std::streamsize>(want));
+        const std::streamsize got = in.gcount();
+        if (got < 0)
+        {
+            return false;
+        }
+        text.resize(at + static_cast<size_t>(got));
+        if (text.size() > most)
+        {
+            return false;
+        }
+        if (static_cast<size_t>(got) < want)
+        {
+            break;
+        }
+        want = static_cast<size_t>(std::min<std::uintmax_t>(64 * 1024, most + 1 - text.size()));
+    }
+    out = std::move(text);
+    return true;
 }
 }

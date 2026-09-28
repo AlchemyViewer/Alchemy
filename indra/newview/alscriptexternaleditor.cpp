@@ -26,6 +26,7 @@
 
 #include "alscriptexternaleditor.h"
 
+#include "alfilewrite.h"
 #include "alscriptstudiofileio.h"
 #include "alscriptstudioservices.h"
 #include "llcallbacklist.h"
@@ -38,14 +39,13 @@
 
 using ALScriptFileIO::readWholeFile;
 using ALScriptFileIO::StudioLiveFile;
-using ALScriptFileIO::writeTempFile;
 
 namespace
 {
     bool writeWhole(const std::string& path, const std::string& text)
     {
         // An empty script is stored as one space, as it always was.
-        return writeTempFile(path, text.empty() ? std::string_view(" ") : std::string_view(text));
+        return ALFileWrite::temp(path, text.empty() ? std::string_view(" ") : std::string_view(text));
     }
 }
 
@@ -241,7 +241,7 @@ void ALScriptExternalEditor::log(Doc& doc, const ALScriptWorkspace::CompileResul
     {
         return;
     }
-    // Beside the copy, and made as it is (writeTempFile): never through a
+    // Beside the copy, and made as it is (ALFileWrite::temp): never through a
     // link somebody else left at its name.
     std::string text = "// " + LLLogChat::timestamp2LogString(0, true) + "\n\n";
     if (result.success)
@@ -254,7 +254,7 @@ void ALScriptExternalEditor::log(Doc& doc, const ALScriptWorkspace::CompileResul
         LLStringUtil::stripNonprintable(line);
         text += line + "\n";
     }
-    writeTempFile(doc.external.log, text);
+    ALFileWrite::temp(doc.external.log, text);
 }
 
 void ALScriptExternalEditor::stop(Doc& doc)
