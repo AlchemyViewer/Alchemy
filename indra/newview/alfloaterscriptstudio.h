@@ -62,6 +62,7 @@
 #include "alscriptworkspace.h"
 #include "alsourcemap.h"
 #include "alstudiofloater.h"
+#include "altabstrip.h"
 #include "alvimkeymap.h"
 
 #include "llstl.h"
@@ -83,7 +84,6 @@ class ALEmptyState;
 class ALJumpBar;
 class ALPaneList;
 class ALScriptWeightsPane;
-class ALTabStrip;
 class LLButton;
 class LLCheckBoxCtrl;
 class LLComboBox;
@@ -283,10 +283,13 @@ private:
     size_t indexOf(std::string_view id) const;
     // The tab in front, its editor given the keyboard where asked.
     void   activate(size_t index, bool focus = true);
-    // The strip filled from the docs, and the toolbar put right. Both
-    // are asked for on every keystroke; each does its work only when
-    // what it shows has actually changed since the last.
+    // The strip filled from the docs, and the toolbar put right. Each does
+    // its work only when what it shows has actually changed since the
+    // last. One tab's facts moved -- a keystroke's unsaved dot, a check's
+    // count -- that tab alone is made again, where the strip is otherwise
+    // as it was.
     void   fillTabs() override;
+    void   fillTabs(const Doc& doc);
     void   refreshToolbar() override;
     // The strip under the editor's right-hand words: the caret's place,
     // what is selected, and how many problems the script has.
@@ -906,6 +909,8 @@ private:
         friend bool operator!=(const TabFacts& a, const TabFacts& b) { return !(a == b); }
     };
     TabFacts tabFactsOf(const Doc& doc) const;
+    // The tab a doc is drawn as, from its facts.
+    ALTabStrip::Tab tabOf(const Doc& doc, const TabFacts& facts) const;
     std::vector<TabFacts>              mTabFacts;
     size_t                             mTabFactsActive = NONE;
     // The docs by id, for the lookups every answer makes.

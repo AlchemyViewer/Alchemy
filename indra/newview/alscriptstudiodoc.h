@@ -558,6 +558,12 @@ struct ALScriptStudioDoc
         U32                      fixesFor = 0;
     };
     std::vector<Shown>                         shown;
+    // How many of them are errors and warnings, counted as they are put
+    // in: the tab's dot and the trailer ask on every key.
+    S32                                        shownErrors   = 0;
+    S32                                        shownWarnings = 0;
+    // The rows put in, and counted.
+    void setShown(std::vector<Shown> rows);
     // The problem listed at a place, in the script or an include, saying
     // what it says; null where the list has been made again without it.
     const Shown* findShown(S32 line, S32 column, const std::string& file, const std::string& message) const;

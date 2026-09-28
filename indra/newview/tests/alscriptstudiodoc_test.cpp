@@ -228,4 +228,22 @@ namespace tut
         doc.heardRuntime(said, false);
         ensure("said to be there", doc.runtime.size() == 3 && doc.runtime[2].file == Doc::GENERATED && doc.runtime[2].line == 9);
     }
+
+    template<> template<>
+    void alscriptstudiodoc_object::test<7>()
+    {
+        set_test_name("the rows put in counted: errors and warnings, notes not; counted again when others are put in");
+        Doc                    doc;
+        std::vector<Doc::Shown> rows(4);
+        rows[0].level = Doc::Level::Error;
+        rows[1].level = Doc::Level::Warning;
+        rows[2].level = Doc::Level::Warning;
+        rows[3].level = Doc::Level::Note;
+        doc.setShown(rows);
+        ensure("four rows", doc.shown.size() == 4);
+        ensure_equals("one error", doc.shownErrors, 1);
+        ensure_equals("two warnings", doc.shownWarnings, 2);
+        doc.setShown({});
+        ensure("none", doc.shown.empty() && doc.shownErrors == 0 && doc.shownWarnings == 0);
+    }
 }

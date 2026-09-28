@@ -104,6 +104,10 @@ public:
     // every keystroke would otherwise have every name measured again
     // every frame.
     void setTabs(std::vector<Tab> tabs, const std::string& chosen);
+    // One tab afresh, the one with its value: its dot, its tip, its name.
+    // The tabs are laid out again only where what it is measured by -- its
+    // words, its face, its mark -- has changed. False where no tab has it.
+    bool setTab(Tab tab);
     const std::vector<Tab>& tabs() const { return mTabs; }
 
     void choose(const std::string& value);

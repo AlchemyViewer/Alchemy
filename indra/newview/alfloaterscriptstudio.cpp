@@ -1849,13 +1849,13 @@ void ALFloaterScriptStudio::wireDoc(Doc& doc)
         {
             raw->preview = false;
         }
-        // The strip and the toolbar made again only where the tab's facts
+        // Its tab and the toolbar made again only where the tab's facts
         // moved -- its unsaved dot, once in a stretch of typing -- and
         // otherwise only what a keystroke does move: undo and redo.
         const size_t index = indexOf(raw->id);
         if (index >= mTabFacts.size() || mTabFacts[index] != tabFactsOf(*raw))
         {
-            fillTabs();
+            fillTabs(*raw);
             refreshToolbar();
         }
         else if (raw == active())
@@ -2820,9 +2820,7 @@ void ALFloaterScriptStudio::fillTabs()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
     // What the strip would say now: the facts a tab is drawn from. The
-    // strip is filled only where one of them moved, since a keystroke
-    // asks for this and a keystroke changes none of them but the dirty
-    // mark.
+    // strip is filled only where one of them moved.
     std::vector<TabFacts> facts;
     facts.reserve(mDocs.size());
     for (const std::unique_ptr<Doc>& doc : mDocs)
@@ -2837,47 +2835,71 @@ void ALFloaterScriptStudio::fillTabs()
     mTabFactsActive = mActive;
 
     std::vector<ALTabStrip::Tab> tabs;
-    std::string                  chosen;
+    tabs.reserve(mDocs.size());
     for (size_t i = 0; i < mDocs.size(); ++i)
     {
-        const Doc&      doc = *mDocs[i];
-        ALTabStrip::Tab tab;
-        tab.label   = doc.name;
-        tab.value   = doc.id;
-        tab.dirty   = facts[i].dirty;
-        tab.preview = facts[i].preview;
-        tab.image   = LLUI::getUIImage(facts[i].image);
-        // A dot in the worst problem's colour, for a script with any.
-        const S32 errors = facts[i].errors, warnings = facts[i].warnings;
-        if (errors > 0 || warnings > 0)
-        {
-            static const LLUIColor error_color   = LLUIColorTable::instance().getColor("CodeMarkError", LLColor4::red);
-            static const LLUIColor warning_color = LLUIColorTable::instance().getColor("CodeMarkWarning", LLColor4::yellow);
-            tab.badge                            = errors > 0 ? error_color.get() : warning_color.get();
-        }
-        // The name first, then where it is. The strip halves a name that
-        // does not fit, and the name it cut is the one thing you hover a
-        // cut tab to read; saying only where the script lives answered a
-        // question nobody had asked.
-        const std::string where = !doc.file.empty() ? doc.file
-                                  : doc.notecard    ? getString("TabNotecardTip")
-                                  : doc.ref.inInventory() ? getString("TabInventoryTip")
-                                                          : getString("TabObjectTip");
-        tab.toolTip = doc.name + "\n" + where;
-        if (doc.loaded && !doc.modifiable)
-        {
-            tab.toolTip += "\n" + getString("TabReadOnlyTip");
-        }
-        tabs.push_back(std::move(tab));
-        if (i == mActive)
-        {
-            chosen = doc.id;
-        }
+        tabs.push_back(tabOf(*mDocs[i], facts[i]));
     }
-    mTabs->setTabs(std::move(tabs), chosen);
+    mTabs->setTabs(std::move(tabs), mActive < mDocs.size() ? mDocs[mActive]->id : std::string());
     // Every window says which script is in front, as a window of one did.
     const Doc* doc = active();
     setTitle(doc ? getString("WindowTitle") + " - " + doc->name : getString("WindowTitle"));
+}
+
+void ALFloaterScriptStudio::fillTabs(const Doc& doc)
+{
+    // The one tab, where the strip is the docs' still -- the same tabs in
+    // the same order, the same one in front -- and only its facts moved: a
+    // keystroke's unsaved dot, a check's count.
+    const size_t index = indexOf(doc.id);
+    if (index == NONE || mTabFacts.size() != mDocs.size() || mTabFactsActive != mActive || mTabFacts[index].id != doc.id)
+    {
+        fillTabs();
+        return;
+    }
+    TabFacts facts = tabFactsOf(doc);
+    if (facts == mTabFacts[index])
+    {
+        return;
+    }
+    const bool renamed = facts.name != mTabFacts[index].name;
+    mTabFacts[index]   = std::move(facts);
+    mTabs->setTab(tabOf(doc, mTabFacts[index]));
+    if (renamed && index == mActive)
+    {
+        setTitle(getString("WindowTitle") + " - " + doc.name);
+    }
+}
+
+ALTabStrip::Tab ALFloaterScriptStudio::tabOf(const Doc& doc, const TabFacts& facts) const
+{
+    ALTabStrip::Tab tab;
+    tab.label   = doc.name;
+    tab.value   = doc.id;
+    tab.dirty   = facts.dirty;
+    tab.preview = facts.preview;
+    tab.image   = LLUI::getUIImage(facts.image);
+    // A dot in the worst problem's colour, for a script with any.
+    if (facts.errors > 0 || facts.warnings > 0)
+    {
+        static const LLUIColor error_color   = LLUIColorTable::instance().getColor("CodeMarkError", LLColor4::red);
+        static const LLUIColor warning_color = LLUIColorTable::instance().getColor("CodeMarkWarning", LLColor4::yellow);
+        tab.badge                            = facts.errors > 0 ? error_color.get() : warning_color.get();
+    }
+    // The name first, then where it is. The strip halves a name that
+    // does not fit, and the name it cut is the one thing you hover a
+    // cut tab to read; saying only where the script lives answered a
+    // question nobody had asked.
+    const std::string where = !doc.file.empty()      ? doc.file
+                              : doc.notecard          ? getString("TabNotecardTip")
+                              : doc.ref.inInventory() ? getString("TabInventoryTip")
+                                                      : getString("TabObjectTip");
+    tab.toolTip = doc.name + "\n" + where;
+    if (facts.readOnly)
+    {
+        tab.toolTip += "\n" + getString("TabReadOnlyTip");
+    }
+    return tab;
 }
 
 ALFloaterScriptStudio::TabFacts ALFloaterScriptStudio::tabFactsOf(const Doc& doc) const
@@ -2895,12 +2917,8 @@ ALFloaterScriptStudio::TabFacts ALFloaterScriptStudio::tabFactsOf(const Doc& doc
 
 void ALFloaterScriptStudio::problemCounts(const Doc& doc, S32& errors, S32& warnings) const
 {
-    errors = warnings = 0;
-    for (const Doc::Shown& shown : doc.shown)
-    {
-        errors += shown.level == Doc::Level::Error ? 1 : 0;
-        warnings += shown.level == Doc::Level::Warning ? 1 : 0;
-    }
+    errors   = doc.shownErrors;
+    warnings = doc.shownWarnings;
 }
 
 void ALFloaterScriptStudio::showTabMenu(const std::string& value, S32 x, S32 y)
@@ -3201,7 +3219,7 @@ void ALFloaterScriptStudio::refreshProblems(Doc& doc)
     making.target      = weightTarget(doc);
     making.includeName = [this, &doc](const std::string& path) { return includeName(doc, path); };
     ALScriptProblemsPane::Made made = ALScriptProblemsPane::make(doc, *this, making);
-    doc.shown                       = std::move(made.rows);
+    doc.setShown(std::move(made.rows));
     doc.editor->clearMarks();
     for (const auto& [line, mark] : made.marks)
     {
@@ -3223,7 +3241,7 @@ void ALFloaterScriptStudio::refreshProblems(Doc& doc)
     {
         refreshTrailer(doc);
     }
-    fillTabs();
+    fillTabs(doc);
 }
 
 std::string ALFloaterScriptStudio::problemIcon(const Doc& doc, const std::string& include) const

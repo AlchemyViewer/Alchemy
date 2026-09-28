@@ -158,6 +158,24 @@ void ALTabStrip::setTabs(std::vector<Tab> tabs, const std::string& chosen)
     }
 }
 
+bool ALTabStrip::setTab(Tab tab)
+{
+    const S32 at = indexOf(tab.value);
+    if (at < 0)
+    {
+        return false;
+    }
+    Tab&       was      = mTabs[static_cast<size_t>(at)];
+    const bool measured = textOf(was) != textOf(tab) || styleOf(was) != styleOf(tab) || (was.image != nullptr) != (tab.image != nullptr);
+    was                 = std::move(tab);
+    if (measured)
+    {
+        layout();
+        showChosen();
+    }
+    return true;
+}
+
 S32 ALTabStrip::indexOf(const std::string& value) const
 {
     for (size_t i = 0; i < mTabs.size(); ++i)

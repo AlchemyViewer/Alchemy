@@ -660,4 +660,33 @@ namespace tut
         strip->setTabs(three(), "");
         ensure("with tabs, the walk starts", strip->handleKeyHere(KEY_RIGHT, MASK_NONE) && strip->chosen() == "a");
     }
+
+    // One tab made again by its value: its dot and its tip change where it
+    // is, and nothing moves; a longer name lays the tabs out again. A value
+    // no tab has changes nothing.
+    template<> template<>
+    void altabstrip_object::test<14>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        ALTabStrip* strip = make(WIDTH * 2);
+        strip->setTabs(three(), "b");
+        const LLRect    before = strip->rectOf(2);
+        ALTabStrip::Tab dirty  = tab("floater_b.xml", "b");
+        dirty.dirty            = true;
+        dirty.toolTip          = "unsaved";
+        dirty.badge            = LLColor4::red;
+        ensure("found", strip->setTab(dirty));
+        ensure("changed in place", strip->tabs()[1].dirty && strip->tabs()[1].toolTip == "unsaved" && strip->tabs()[1].badge == LLColor4::red);
+        ensure("the others as they were", strip->tabs()[0].label == "floater_a.xml" && !strip->tabs()[2].dirty);
+        ensure("nothing moved", strip->rectOf(2) == before && strip->chosen() == "b");
+
+        ensure("a longer name", strip->setTab(tab("floater_b_with_a_much_longer_name.xml", "b")));
+        ensure("the tabs after it moved along: " + std::to_string(strip->rectOf(2).mLeft) + " > " + std::to_string(before.mLeft),
+               strip->rectOf(2).mLeft > before.mLeft);
+        ensure("no such tab", !strip->setTab(tab("gone.xml", "z")) && strip->tabs().size() == 3);
+        strip->die();
+    }
 }

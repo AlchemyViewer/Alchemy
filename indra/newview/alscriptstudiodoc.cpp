@@ -307,6 +307,18 @@ std::string ALScriptStudioDoc::foundAs(const std::string& name, std::optional<bo
     return std::string();
 }
 
+void ALScriptStudioDoc::setShown(std::vector<Shown> rows)
+{
+    shown         = std::move(rows);
+    shownErrors   = 0;
+    shownWarnings = 0;
+    for (const Shown& one : shown)
+    {
+        shownErrors += one.level == Level::Error ? 1 : 0;
+        shownWarnings += one.level == Level::Warning ? 1 : 0;
+    }
+}
+
 const ALScriptStudioDoc::Shown* ALScriptStudioDoc::findShown(S32 line, S32 column, const std::string& file, const std::string& message) const
 {
     for (const Shown& one : shown)
