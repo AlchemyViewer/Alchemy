@@ -2934,7 +2934,7 @@ void ALFloaterScriptStudio::activate(size_t index, bool focus)
     mDocs[index]->caret.seen      = ALTextPos(-1, -1);
     mDocs[index]->caret.inspectAt = ALTextPos(-1, -1);
     mInspectorPane->forget();
-    mCrumbsBar->showPath(*mDocs[index]);
+    mCaret.placePath(*mDocs[index]);
     refreshNotice();
 }
 
@@ -4997,7 +4997,7 @@ void ALFloaterScriptStudio::renameDoc(Doc& doc, const std::string& name)
     }
     doc.name = name;
     fillTabs();
-    mCrumbsBar->showPath(doc);
+    mCaret.placePath(doc);
 }
 
 void ALFloaterScriptStudio::outlineChosen(Doc& doc, const ALScriptOutlineEntry& entry, bool to_editor)

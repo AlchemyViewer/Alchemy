@@ -48,7 +48,6 @@ namespace
     // what it was told.
     struct FakeCrumbsWindow : public ALScriptCrumbsBar::Window
     {
-        void pathChanged(Doc& doc) override { paths.push_back(doc.id); }
         void crumbChosen(Doc& doc, std::optional<ALTextRange> at) override
         {
             chosen.push_back(doc.id + (at ? " " + std::to_string(at->begin.line) + ":" + std::to_string(at->begin.column) + "-" +
@@ -64,7 +63,7 @@ namespace
         }
         std::optional<ALScriptWeight::Target> weightTarget(const Doc&) const override { return target; }
 
-        Names                                 paths, chosen, pressed;
+        Names                                 chosen, pressed;
         std::string                           banner;
         S32                                   errors = 0, warnings = 0;
         std::optional<ALScriptWeight::Target> target;
@@ -125,6 +124,13 @@ namespace tut
             return found;
         }
         ALJumpBar*        jump() { return window.find<ALJumpBar>("breadcrumb"); }
+        // The caret's path found, as the caret's unit finds it, and shown.
+        void place(ALScriptCrumbsBar* crumbs, Doc& doc)
+        {
+            doc.caret.crumbPath = ALScriptPlaces::pathAt(doc.outline, doc.editor->caret());
+            doc.caret.crumbsOf  = doc.check.analysisVersion;
+            crumbs->showPath(doc);
+        }
         FakeCrumbsWindow& told() { return window.pane(); }
         ALCodeEditor*     editor(const std::string& name, const std::string& text)
         {
@@ -208,55 +214,49 @@ namespace tut
     template<> template<>
     void alscriptcrumbsbar_object::test<1>()
     {
-        set_test_name("the path the caret is in, each step offering those beside it; the bar told only where the path or the tab changed");
+        set_test_name("the path the caret is in, each step offering those beside it; made again where the path, the tab or its name changed");
         ALScriptCrumbsBar* crumbs = bar();
         Doc&               doc    = tab("a");
         doc.editor->setCaret(ALTextPos(3, 5));
-        crumbs->showPath(doc);
+        place(crumbs, doc);
         const std::string top = "Script a [default, f, g, h, other]";
         ensure_equals("the path", path(), top + ", default [default, f, g, h, other], state_entry [state_entry, touch_start]");
         ensure_equals("kept", doc.caret.crumbPath.size(), size_t(2));
-        ensure_equals("the outline told", joined(told().paths), std::string("a"));
         ensure_equals("the script's step", jump()->path()[0].value, std::string("top"));
         ensure_equals("said", jump()->path()[0].toolTip,
                       std::string("Script a: press to go to the top; its arrow lists what the script declares"));
         ensure_equals("a symbol's", jump()->path()[2].toolTip, std::string("Go to state_entry; its arrow lists what is beside it"));
 
         doc.editor->setCaret(ALTextPos(4, 0));
-        crumbs->showPath(doc);
-        ensure("the same path: not told", told().paths.size() == 1);
+        place(crumbs, doc);
         ensure("the trailer is", trailer().find("Ln 5, Col 1") != std::string::npos);
         doc.editor->setCaret(ALTextPos(11, 0));
-        crumbs->showPath(doc);
+        place(crumbs, doc);
         ensure_equals("in f", path(), top + ", f [default, f, g, h, other]");
         doc.editor->setCaret(ALTextPos(9, 0));
-        crumbs->showPath(doc);
+        place(crumbs, doc);
         ensure_equals("between: the script", path(), top);
-        ensure_equals("told each time", told().paths.size(), size_t(3));
         doc.editor->setCaret(ALTextPos(4, 5));
-        crumbs->showPath(doc);
+        place(crumbs, doc);
         ensure("at a symbol's very end: still in it", path().find("state_entry [") != std::string::npos);
         doc.editor->setCaret(ALTextPos(13, 5));
-        crumbs->showPath(doc);
+        place(crumbs, doc);
         ensure_equals("where two meet: the later", jump()->path().back().label, std::string("h"));
         doc.editor->setCaret(ALTextPos(17, 0));
-        crumbs->showPath(doc);
+        place(crumbs, doc);
         ensure_equals("alone in its state: nothing beside it", path(), top + ", other [default, f, g, h, other], timer");
-        ensure_equals("told", told().paths.size(), size_t(6));
 
         doc.name = "Renamed";
-        crumbs->showPath(doc);
-        ensure("a new name: again", told().paths.size() == 7 && jump()->path()[0].label == "Renamed");
-        ++doc.check.analysisVersion;
-        crumbs->showPath(doc);
-        ensure_equals("a new outline: again", told().paths.size(), size_t(8));
+        place(crumbs, doc);
+        ensure_equals("a new name: again", jump()->path()[0].label, std::string("Renamed"));
         Doc& other = tab("b");
-        crumbs->showPath(other);
-        ensure_equals("not in front: nothing", told().paths.size(), size_t(8));
+        other.name = "Other";
+        place(crumbs, other);
+        ensure_equals("not in front: nothing", jump()->path()[0].label, std::string("Renamed"));
         crumbs->forget();
         ensure("forgotten", jump()->path().empty() && jump()->trailer().empty());
-        crumbs->showPath(doc);
-        ensure_equals("and shown again whatever", told().paths.size(), size_t(9));
+        place(crumbs, doc);
+        ensure_equals("and shown again whatever", jump()->path()[0].label, std::string("Renamed"));
     }
 
     template<> template<>

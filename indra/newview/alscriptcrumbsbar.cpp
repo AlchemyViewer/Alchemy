@@ -483,48 +483,22 @@ void ALScriptCrumbsBar::showPath(Doc& doc)
     {
         return;
     }
-    const ALTextPos caret = doc.editor->caret();
-    // The path the caret is in: which outline entry at each depth holds
-    // it. The crumbs are built from the outline, which a caret move
-    // does not touch, so the bar is told only where the path itself has
-    // changed -- and it is asked on every key. The outline is the
-    // source's, so while the expansion is in front, whose lines are other
-    // lines, the path is the script alone.
-    std::vector<size_t> path;
-    if (doc.shownView() == Doc::View::Source)
-    {
-        size_t parent = NONE;
-        for (S32 depth = 0;; ++depth)
-        {
-            size_t found = NONE;
-            for (size_t i = 0; i < doc.outline.size(); ++i)
-            {
-                const ALScriptOutlineEntry& entry = doc.outline[i];
-                if (entry.depth == depth && holds(entry.span, caret) && (parent == NONE || within(entry.span, doc.outline[parent].span)))
-                {
-                    found = i;
-                }
-            }
-            if (found == NONE)
-            {
-                break;
-            }
-            path.push_back(found);
-            parent = found;
-        }
-    }
-    if (mShownFor == doc.id && doc.caret.crumbsOf == doc.check.analysisVersion && doc.caret.crumbPath == path &&
-        doc.caret.crumbName == doc.name)
+    // The path the caret is in, as the caret's unit found it: the crumbs
+    // are built from the outline, which a caret move does not touch, so
+    // they are made again only where the path, the outline it was read
+    // from, the tab or its name has changed -- and it is asked on every
+    // key.
+    const std::vector<size_t>& path = doc.caret.crumbPath;
+    if (mShownFor == doc.id && mShownOf == doc.caret.crumbsOf && mShownPath == path && mShownName == doc.name)
     {
         // The same steps over the same outline: only the trailer, which
         // says where the caret is.
         showTrailer(doc);
         return;
     }
-    doc.caret.crumbsOf  = doc.check.analysisVersion;
-    doc.caret.crumbPath = path;
-    doc.caret.crumbName = doc.name;
-    mWindow->pathChanged(doc);
+    mShownOf   = doc.caret.crumbsOf;
+    mShownPath = path;
+    mShownName = doc.name;
 
     std::vector<ALJumpBar::Crumb> crumbs;
     LLStringUtil::format_map_t    args;

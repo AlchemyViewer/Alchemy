@@ -682,12 +682,11 @@ struct ALScriptStudioDoc
         ALEditorCommand symbolCommand = ALEditorCommand::None;
         U32             symbolVersion = 0;
         ALTextPos       symbolAt;
-        // The crumb path the bar was last told, by the outline it was
-        // read from: a caret that stays within the same symbols asks for
-        // no new crumbs, and it is asked on every key.
+        // The symbols the caret is in, the outermost first, by the outline
+        // it was read from (ALScriptStudioCaret::placePath): what the bar
+        // at the bottom and the outline both show.
         std::vector<size_t> crumbPath;
         U32                 crumbsOf = 0;
-        std::string         crumbName;
         // Where the caret was last seen; when the inspector is due to be
         // told what it is on, or zero; and what it was last told about.
         ALTextPos seen{ -1, -1 };

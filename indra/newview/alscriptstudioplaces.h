@@ -68,6 +68,10 @@ namespace ALScriptPlaces
         std::vector<size_t>                mStarts;
     };
     bool        isIdentifier(const std::string& text);
+    // The symbols of an outline a place is in, the outermost first: which
+    // entry at each depth holds it, within the one before. At a symbol's
+    // very end is still in it; where two meet, the later.
+    std::vector<size_t> pathAt(const std::vector<ALScriptOutlineEntry>& outline, const ALTextPos& at);
     // A span of an expansion as the source's, in place; the file of the
     // expansion's map it is in, or -1 where it is in none.
     S32         mapSpan(const ALSourceMap& map, ALScriptSpan& span);

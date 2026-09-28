@@ -181,6 +181,19 @@ void ALScriptStudioCaret::answered(Doc& doc, const ALScriptAnalysis::Result& res
     }
 }
 
+void ALScriptStudioCaret::placePath(Doc& doc)
+{
+    std::vector<size_t> path;
+    if (doc.loaded && doc.shownView() == Doc::View::Source)
+    {
+        path = ALScriptPlaces::pathAt(doc.outline, doc.editor->caret());
+    }
+    const bool changed  = path != doc.caret.crumbPath || doc.caret.crumbsOf != doc.check.analysisVersion;
+    doc.caret.crumbPath = std::move(path);
+    doc.caret.crumbsOf  = doc.check.analysisVersion;
+    mWindow.showPath(doc, changed);
+}
+
 void ALScriptStudioCaret::pump(F64 now)
 {
     Doc* doc = mServices.frontDoc();
@@ -202,7 +215,7 @@ void ALScriptStudioCaret::pump(F64 now)
     {
         doc->caret.seen       = caret;
         doc->caret.inspectDue = source ? now + SETTLE : 0.0;
-        mWindow.showPath(*doc);
+        placePath(*doc);
         // A search's lit places, and a name's, each go once the caret has
         // left them all; vim's visual block and the places a substitution
         // asks about are vim's to put out.

@@ -56,8 +56,6 @@ public:
     class Window
     {
     public:
-        // The path the caret is in changed: the outline follows it.
-        virtual void pathChanged(Doc& doc) = 0;
         // A step chosen: the caret put where it says in the tab's script,
         // or only the keyboard given it, where the step names nothing now.
         virtual void crumbChosen(Doc& doc, std::optional<ALTextRange> at) = 0;
@@ -87,9 +85,10 @@ public:
     ~ALScriptCrumbsBar() override;
     bool postBuild() override;
 
-    // The path of the tab in front's caret, and its trailer: the bar told
-    // only where the path, the outline, the tab or its name has changed --
-    // it is asked on every key -- and the trailer every time.
+    // The path of the tab in front's caret, as the caret's unit found it
+    // (doc.caret.crumbPath), and its trailer: the crumbs made again only
+    // where the path, the outline, the tab or its name has changed -- it
+    // is asked on every key -- and the trailer every time.
     void showPath(Doc& doc);
     void showTrailer(Doc& doc);
     // A step chosen by what the bar calls it: the script's top, or a
@@ -133,8 +132,12 @@ private:
     LLHandle<LLContextMenu> mIndentMenu;
     Tips                    mTips;
     // Whose path the bar shows, so that a tab come to the front is shown
-    // there whatever its own path was when last shown.
+    // there whatever its own path was when last shown; and the path, the
+    // outline it was read from and the name, as the crumbs were last made.
     std::string             mShownFor;
+    std::vector<size_t>     mShownPath;
+    U32                     mShownOf = 0;
+    std::string             mShownName;
 
     // What the trailer's words that do not move with the caret are made
     // of -- all but the caret's place and the selection -- and those

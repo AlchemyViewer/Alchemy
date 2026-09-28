@@ -106,6 +106,47 @@ namespace ALScriptPlaces
         return mText->substr(begin, end - begin);
     }
 
+    namespace
+    {
+        // Whether a span holds a position, its ends included.
+        bool holds(const ALScriptSpan& span, const ALTextPos& pos)
+        {
+            const ALTextPos begin(span.line, span.column);
+            const ALTextPos end(span.endLine, span.endColumn);
+            return begin <= pos && pos <= end;
+        }
+
+        // Whether a span lies within another.
+        bool within(const ALScriptSpan& inner, const ALScriptSpan& outer)
+        {
+            return holds(outer, ALTextPos(inner.line, inner.column)) && holds(outer, ALTextPos(inner.endLine, inner.endColumn));
+        }
+    }
+
+    std::vector<size_t> pathAt(const std::vector<ALScriptOutlineEntry>& outline, const ALTextPos& at)
+    {
+        std::vector<size_t> path;
+        size_t              parent = NONE;
+        for (S32 depth = 0;; ++depth)
+        {
+            size_t found = NONE;
+            for (size_t i = 0; i < outline.size(); ++i)
+            {
+                const ALScriptOutlineEntry& entry = outline[i];
+                if (entry.depth == depth && holds(entry.span, at) && (parent == NONE || within(entry.span, outline[parent].span)))
+                {
+                    found = i;
+                }
+            }
+            if (found == NONE)
+            {
+                return path;
+            }
+            path.push_back(found);
+            parent = found;
+        }
+    }
+
     std::string lineOf(const ALTextDocument& text, S32 line)
     {
         if (line < 0 || line >= text.lineCount())

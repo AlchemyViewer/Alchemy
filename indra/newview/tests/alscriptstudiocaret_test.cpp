@@ -74,7 +74,7 @@ namespace
                            " v" + std::to_string(version));
             found = std::move(places);
         }
-        void showPath(Doc& doc) override { said.push_back("path " + at(doc.editor->caret())); }
+        void showPath(Doc& doc, bool changed) override { said.push_back("path " + at(doc.editor->caret()) + (changed ? " changed" : "")); }
         bool showProblemsAt(Doc&, const ALTextPos& pos) override
         {
             said.push_back("problems " + at(pos));
@@ -386,5 +386,38 @@ namespace tut
         ensure_equals("brought out: asked", joined(studio.asked), std::string("inspect 0:8"));
         caret.pump(22.0);
         ensure_equals("once", studio.asked.size(), size_t(1));
+    }
+
+    template<> template<>
+    void alscriptstudiocaret_object::test<7>()
+    {
+        set_test_name("the caret's path found once for both panes: changed where it moves into another symbol, or the outline is made again");
+        ALScriptStudioCaret& caret = make();
+        Doc&                 doc   = tab("a");
+        ALScriptOutlineEntry state;
+        state.name  = "default";
+        state.depth = 0;
+        state.span  = { 1, 0, 1, 50 };
+        ALScriptOutlineEntry event = state;
+        event.name                 = "touch_start";
+        event.depth                = 1;
+        event.span                 = { 1, 10, 1, 48 };
+        doc.outline                = { state, event };
+        doc.editor->setCaret(ALTextPos(1, 12));
+        caret.placePath(doc);
+        ensure("in both", doc.caret.crumbPath == std::vector<size_t>({ 0, 1 }) && studio.said.back() == "path 1:12 changed");
+        doc.editor->setCaret(ALTextPos(1, 14));
+        caret.placePath(doc);
+        ensure_equals("the same symbols: shown, not changed", studio.said.back(), std::string("path 1:14"));
+        doc.editor->setCaret(ALTextPos(1, 2));
+        caret.placePath(doc);
+        ensure("out of the event: changed", doc.caret.crumbPath == std::vector<size_t>({ 0 }) && studio.said.back() == "path 1:2 changed");
+        ++doc.check.analysisVersion;
+        caret.placePath(doc);
+        ensure_equals("a new outline: changed", studio.said.back(), std::string("path 1:2 changed"));
+        doc.expandedEditor = editor("expanded_a", "integer count;\n");
+        doc.view           = Doc::View::Expanded;
+        caret.placePath(doc);
+        ensure("the expansion in front: no path", doc.caret.crumbPath.empty());
     }
 }

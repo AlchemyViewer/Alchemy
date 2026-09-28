@@ -556,7 +556,14 @@ private:
     {
         mLookup.start(doc, command, refs, has_definition, home_path, definition, std::move(places), version);
     }
-    void showPath(Doc& doc) override { mCrumbsBar->showPath(doc); }
+    void showPath(Doc& doc, bool changed) override
+    {
+        mCrumbsBar->showPath(doc);
+        if (changed)
+        {
+            mOutlinePane->followCaret(doc);
+        }
+    }
     bool showProblemsAt(Doc& doc, const ALTextPos& at) override;
     // A name looked for beyond the script (ALScriptLookup): the object's
     // other scripts in its language, read as the region has them and
@@ -642,14 +649,13 @@ private:
 
     // The outline (ALScriptOutlinePane): shown, which the bar at the
     // bottom is told of; a symbol chosen, gone to; its sort kept.
-    void        outlineShown(Doc& doc) override { mCrumbsBar->showPath(doc); }
+    void        outlineShown(Doc& doc) override { mCaret.placePath(doc); }
     void        outlineChosen(Doc& doc, const ALScriptOutlineEntry& entry, bool to_editor) override;
     void        outlineSortChanged() override { saveState(); }
-    // The bar under the editor (ALScriptCrumbsBar): its path moved, which
-    // the outline follows; a step chosen, gone to; a word past the path
-    // pressed -- the caret's place opens Go to Line, the counts the
-    // problems, the view the other view; and vim's word.
-    void        pathChanged(Doc& doc) override { mOutlinePane->followCaret(doc); }
+    // The bar under the editor (ALScriptCrumbsBar): a step chosen, gone
+    // to; a word past the path pressed -- the caret's place opens Go to
+    // Line, the counts the problems, the view the other view; and vim's
+    // word.
     void        crumbChosen(Doc& doc, std::optional<ALTextRange> at) override;
     void        trailerChosen(const std::string& value) override;
     std::string vimBanner() const override { return mVim.banner(); }
