@@ -359,6 +359,7 @@ target_sources(
         alsnippetsession.h
         alfindings.h
         alanchoredranges.h
+        alfenwicktree.h
         alfindbar.h
         alkeycapture.h
         alkeychord.h
@@ -483,6 +484,7 @@ if(AL_BUILD_TESTS)
   al_add_test(alkeymap UNIT PROJECT llui LIBRARIES ${test_libs})
   al_add_test(altextdiff UNIT PROJECT llui LIBRARIES ${test_libs})
   al_add_test(alanchoredranges PROJECT llui SOURCES altextdocument.cpp LIBRARIES ${test_libs})
+  al_add_test(alfenwicktree PROJECT llui LIBRARIES ${test_libs})
   al_add_test(allinetable PROJECT llui LIBRARIES ${test_libs})
   al_add_test(altextdocument UNIT PROJECT llui LIBRARIES ${test_libs})
   al_add_test(altextundo UNIT PROJECT llui SOURCES altextdocument.cpp LIBRARIES ${test_libs})
