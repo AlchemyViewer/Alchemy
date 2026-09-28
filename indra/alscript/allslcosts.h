@@ -76,6 +76,9 @@ struct ALLSLCosts
     bool complementNegateForDecrement = false;
     // `x++` as `++x`, and `x--` as `--x`, where the value goes unused.
     bool preForPost = false;
+    // A key a library function is given that is NULL_KEY, or no key at
+    // all, as "": the function takes either as it takes the other.
+    bool emptyForNullKey = false;
 
     // ---- functions, for whether putting one in place saves
 

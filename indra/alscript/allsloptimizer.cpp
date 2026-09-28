@@ -2521,6 +2521,16 @@ namespace
             return false;
         }
 
+        bool visit(LSLFunctionExpression* expr) override
+        {
+            visitChildren(expr);
+            if (mStage == Stage::Values && !inGlobal(expr))
+            {
+                nullKeys(expr);
+            }
+            return false;
+        }
+
         bool visit(LSLBinaryExpression* expr) override
         {
             if (inGlobal(expr))
@@ -2838,6 +2848,64 @@ namespace
                     return;
                 default:
                     return;
+            }
+        }
+
+        // Whether a constant is no key a library function would find
+        // anything by: NULL_KEY, or anything that is not a key's form.
+        static bool nullKey(LSLConstant* cv)
+        {
+            if (!cv || (cv->getIType() != LST_STRING && cv->getIType() != LST_KEY))
+            {
+                return false;
+            }
+            const std::string_view text = cv->getIType() == LST_STRING ? static_cast<LSLStringConstant*>(cv)->getValue()
+                                                                        : static_cast<LSLKeyConstant*>(cv)->getValue();
+            if (text.size() != 36)
+            {
+                return true;
+            }
+            bool zero = true;
+            for (size_t i = 0; i < text.size(); ++i)
+            {
+                const bool dash = i == 8 || i == 13 || i == 18 || i == 23;
+                if (dash ? text[i] != '-' : !isxdigit(static_cast<unsigned char>(text[i])))
+                {
+                    return true;
+                }
+                zero = zero && (dash || text[i] == '0');
+            }
+            return zero;
+        }
+
+        // A library function given NULL_KEY, or no key at all, for a key
+        // it looks something up by, given "" instead, which it takes the
+        // same way; not the two that pass a key on as it came.
+        void nullKeys(LSLFunctionExpression* expr)
+        {
+            LSLSymbol* sym = expr->getSymbol();
+            if (!mCosts.emptyForNullKey || !sym || sym->getSubType() != SYM_BUILTIN || !sym->getFunctionDecl() || !expr->getArguments() ||
+                !strcmp(sym->getName(), "llMessageLinked") || !strcmp(sym->getName(), "llRemoteDataReply"))
+            {
+                return;
+            }
+            std::vector<LSLASTNode*> nulls;
+            LSLASTNode*              param = sym->getFunctionDecl()->getChild(0);
+            for (LSLASTNode* arg = expr->getArguments()->getChild(0); arg && param; arg = arg->getNext(), param = param->getNext())
+            {
+                LSLConstant* cv = arg->getConstantValue();
+                const bool   empty = cv && cv->getIType() == LST_STRING && !*static_cast<LSLStringConstant*>(cv)->getValue();
+                if (param->getIType() == LST_KEY && !empty && nullKey(cv))
+                {
+                    nulls.push_back(arg);
+                }
+            }
+            for (LSLASTNode* arg : nulls)
+            {
+                const std::string before = report.wanted() ? render(arg) : std::string();
+                auto*             made   = constant(ctx.string(std::string()), arg);
+                LSLASTNode::replaceNode(arg, made);
+                wrote(arg, made, before);
             }
         }
 

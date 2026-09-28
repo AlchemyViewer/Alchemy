@@ -231,7 +231,7 @@ namespace tut
             { "!(a < b) as a >= b", { "", "if (!(j < i)) i = 2;" }, { "", "if (j >= i) i = 2;" }, "<=<", nullptr },
             { "a || b as a | b", { "", "if (i || j) i = 2;" }, { "", "if (i | j) i = 2;" }, "=<>", nullptr },
             { "a && b as !(!a | !b)", { "", "if (i && j) i = 2;" }, { "", "if (!(!i | !j)) i = 2;" }, ">=>", nullptr },
-            { "NULL_KEY as \"\"", { "", "k = llGetOwnerKey(NULL_KEY);" }, { "", "k = llGetOwnerKey(\"\");" }, "<<<", nullptr },
+            { "NULL_KEY as \"\"", { "", "k = llGetOwnerKey(NULL_KEY);" }, { "", "k = llGetOwnerKey(\"\");" }, "<<<", &ALLSLCosts::emptyForNullKey },
             { "llStringLength(s) as s != \"\"", { "", "if (llStringLength(s)) i = 2;" }, { "", "if (s != \"\") i = 2;" }, "<>>", nullptr },
             { "llDumpList2String(l, \"\") as (string)l", { "", "s = llDumpList2String(l, \"\");" }, { "", "s = (string)l;" }, "<<<", nullptr },
             { "if (!a) A else B as if (a) B else A", { "", "if (!j) i = 2; else i = 3;" }, { "", "if (j) i = 3; else i = 2;" }, "<<<", nullptr },

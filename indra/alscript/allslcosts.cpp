@@ -44,6 +44,7 @@ namespace
         c.negateComplementForIncrement = true;
         c.complementNegateForDecrement = true;
         c.preForPost                   = true;
+        c.emptyForNullKey              = true;
 
         c.local         = 11;
         c.jump          = 5;
@@ -86,6 +87,7 @@ namespace
         c.negateComplementForIncrement = false;
         c.complementNegateForDecrement = true;
         c.preForPost                   = true;
+        c.emptyForNullKey              = true;
 
         c.local         = 6;
         c.jump          = 5;
@@ -129,6 +131,7 @@ namespace
         c.negateComplementForIncrement = false;
         c.complementNegateForDecrement = false;
         c.preForPost                   = false;
+        c.emptyForNullKey              = true;
 
         c.local         = 4;
         c.jump          = 93;

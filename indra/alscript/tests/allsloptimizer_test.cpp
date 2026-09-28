@@ -1576,4 +1576,39 @@ namespace tut
         lso.target                  = ALLSLOptimizer::Target::LSO;
         ensure("LSO, bare once", ALLSLOptimizer::run(adding(1), lso).text.find("l += llGetSubString") != std::string::npos);
     }
+
+    template<> template<>
+    void allsloptimizer_object::test<42>()
+    {
+        set_test_name("NULL_KEY, or no key at all, given to a library function for a key it looks up, is given as \"\"; not to llMessageLinked, nor for a string");
+        const std::string source = wrap("say(key k)\n{\n    llOwnerSay((string)k);\n}\n",
+                                        "        key o = llGetOwnerKey(NULL_KEY);\n"
+                                        "        llListen(0, \"\", NULL_KEY, \"\");\n"
+                                        "        llGiveInventory((key)\"not a key\", \"x\");\n"
+                                        "        key v = llGetOwnerKey(\"01234567-89ab-cdef-0123-456789abcdef\");\n"
+                                        "        llMessageLinked(LINK_SET, 0, \"\", NULL_KEY);\n"
+                                        "        llOwnerSay(NULL_KEY);\n"
+                                        "        say(NULL_KEY);\n"
+                                        "        say(o);\n        say(v);\n");
+        for (const ALLSLOptimizer::Target target : { ALLSLOptimizer::Target::LSO, ALLSLOptimizer::Target::Mono, ALLSLOptimizer::Target::Luau })
+        {
+            ALLSLOptimizer::Options o = options();
+            o.target                  = target;
+            const ALLSLOptimizer::Result r = ALLSLOptimizer::run(source, o);
+            ensure("optimized: " + notes(r), r.optimized);
+            const auto has = [&r](const std::string& what) { return r.text.find(what) != std::string::npos; };
+            ensure("a lookup's null key: " + r.text, has("llGetOwnerKey(\"\")"));
+            ensure("a listen's", has("llListen(0, \"\", \"\", \"\")"));
+            ensure("no key at all", has("llGiveInventory(\"\", \"x\")"));
+            ensure("a key stays", has("\"01234567-89ab-cdef-0123-456789abcdef\""));
+            ensure("a linked message's stays, passed on as it came", has("llMessageLinked(LINK_SET, 0, \"\", NULL_KEY)"));
+            ensure("a string's stays", has("llOwnerSay(NULL_KEY)"));
+            ensure("a function of the script's has its own", !has("say(\"\")"));
+            ALLSLService service;
+            for (const ALScriptProblem& p : service.check(r.text, target != ALLSLOptimizer::Target::LSO))
+            {
+                ensure("what was written compiles: " + p.message + "\n" + r.text, p.severity != ALScriptProblem::Severity::Error);
+            }
+        }
+    }
 } // namespace tut
