@@ -30,6 +30,7 @@
 #include "alsourcemap.h"
 
 #include <map>
+#include <optional>
 #include <string>
 #include <string_view>
 
@@ -149,6 +150,11 @@ public:
     // Needs the builtins loaded through ALLSLService first; without them
     // the run says so and does nothing.
     static Result run(std::string_view source, const Options& options);
+
+    // What a run checks of what it wrote before it gives it back: that it
+    // parses and its types agree. Nothing where it does; where it does not,
+    // the warning the run gives instead, the source going as it was.
+    static std::optional<ALScriptProblem> checkWritten(std::string_view written);
 
     // The folder alone, over the values of a parsed script's globals, as a
     // run folds them for `target`: what can be worked out before the script

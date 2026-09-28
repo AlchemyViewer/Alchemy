@@ -4612,30 +4612,11 @@ namespace
         // What was written must check as what it was made from did: a script
         // the optimizer made unable to compile is the optimizer's fault, and
         // the source goes as it was, said so, rather than that.
+        if (std::optional<ALScriptProblem> refused = ALLSLOptimizer::checkWritten(written))
         {
-            ScopedScriptParser check(nullptr);
-            LSLScript*         again = check.parseLSLBytes(written.data(), static_cast<int>(written.size()));
-            if (again && !check.logger.getErrors())
-            {
-                again->collectSymbols();
-                again->determineTypes();
-            }
-            if (!again || check.logger.getErrors())
-            {
-                ALScriptProblems said;
-                collectMessages(check.logger, said);
-                ALScriptProblem p;
-                p.severity = ALScriptProblem::Severity::Warning;
-                p.source   = ALScriptProblem::Source::Optimizer;
-                p.key      = "OptimizerWroteUncompilable";
-                p.args     = { said.empty() ? std::string() : said.front().message };
-                p.message  = ALScriptProblem::fill("not optimized: what the optimizer made of this script did not compile ([1]), so it goes as it was; "
-                                                   "please report it",
-                                                   p.args);
-                result.problems.clear();
-                result.problems.push_back(std::move(p));
-                return result;
-            }
+            result.problems.clear();
+            result.problems.push_back(std::move(*refused));
+            return result;
         }
         result.text = std::move(written);
         result.map  = printer.map(std::string());
@@ -4774,4 +4755,33 @@ void ALLSLOptimizer::foldGlobals(LSLScript* script, ScriptAllocator* allocator, 
         }
         script->recalculateReferenceData();
     }
+}
+
+// static
+std::optional<ALScriptProblem> ALLSLOptimizer::checkWritten(std::string_view written)
+{
+    AL_SCRIPT_ENGINE_HELD;
+    ScopedScriptParser check(nullptr);
+    const std::string  text(written);
+    LSLScript*         again = check.parseLSLBytes(text.data(), static_cast<int>(text.size()));
+    if (again && !check.logger.getErrors())
+    {
+        again->collectSymbols();
+        again->determineTypes();
+    }
+    if (again && !check.logger.getErrors())
+    {
+        return std::nullopt;
+    }
+    ALScriptProblems said;
+    collectMessages(check.logger, said);
+    ALScriptProblem p;
+    p.severity = ALScriptProblem::Severity::Warning;
+    p.source   = ALScriptProblem::Source::Optimizer;
+    p.key      = "OptimizerWroteUncompilable";
+    p.args     = { said.empty() ? std::string() : said.front().message };
+    p.message  = ALScriptProblem::fill("not optimized: what the optimizer made of this script did not compile ([1]), so it goes as it was; "
+                                       "please report it",
+                                       p.args);
+    return p;
 }

@@ -1346,26 +1346,31 @@ namespace tut
     template<> template<>
     void allsloptimizer_object::test<37>()
     {
-        set_test_name("what the optimizer wrote is checked: where it does not compile, the script goes as it was, and that is said");
-        // A literal past a float's range: what it folds to cannot be
-        // written back (O0g), which is how this test finds a failure.
-        const std::string source = "default\n{\n    state_entry()\n    {\n        llSetPos(<-2.0e+9999, 2.0e+9999, 0>);\n    }\n}\n";
-        const ALLSLOptimizer::Result r = ALLSLOptimizer::run(source, options());
-        if (r.optimized)
+        set_test_name("infinity is written as a literal that reads back as it, on each target (O0g); what was written is checked, and refused where it does not compile");
+        const std::string source = "float foo = -2.0e+9999;\nfloat bar = 2.0e+9999;\n"
+                                   "default\n{\n    state_entry()\n    {\n        llSetPos(<-2.0e+9999, 2.0e+9999, 0>);\n"
+                                   "        llSetRot(<-2.0e+9999, 2.0e+9999, 0, 0>);\n        llOwnerSay((string)(foo + bar));\n    }\n}\n";
+        for (const ALLSLOptimizer::Target target : { ALLSLOptimizer::Target::LSO, ALLSLOptimizer::Target::Mono, ALLSLOptimizer::Target::Luau })
         {
-            // Should the optimizer learn to write it, the check has nothing
-            // to refuse; what it wrote must then compile.
+            ALLSLOptimizer::Options o = options();
+            o.target                  = target;
+            const ALLSLOptimizer::Result r = ALLSLOptimizer::run(source, o);
+            ensure("optimized: " + notes(r), r.optimized);
+            ensure("written as past the range: " + r.text, r.text.find("<-1.0e+999, 1.0e+999, 0") != std::string::npos);
             ALLSLService service;
-            for (const ALScriptProblem& p : service.check(r.text))
+            for (const ALScriptProblem& p : service.check(r.text, target != ALLSLOptimizer::Target::LSO))
             {
                 ensure("what was written compiles: " + p.message + "\n" + r.text, p.severity != ALScriptProblem::Severity::Error);
             }
-            return;
         }
-        ensure_equals("the source as it was", r.text, source);
-        ensure("said, once, as a warning", r.problems.size() == 1 && r.problems[0].key == "OptimizerWroteUncompilable" &&
-                                                r.problems[0].severity == ALScriptProblem::Severity::Warning);
-        ensure_equals("its map the source's own", r.map.toSource(4, 8).line, 4);
+
+        // The check a run makes of what it wrote, which gives the source
+        // back where what was written does not compile.
+        ensure("a script that compiles passes", !ALLSLOptimizer::checkWritten(source).has_value());
+        const std::optional<ALScriptProblem> refused = ALLSLOptimizer::checkWritten("default { state_entry() { llOwnerSay(inf.0); } }\n");
+        ensure("one that does not is refused", refused.has_value());
+        ensure("as a warning with the parser's words",
+               refused->key == "OptimizerWroteUncompilable" && refused->severity == ALScriptProblem::Severity::Warning && !refused->args[0].empty());
     }
 
     template<> template<>

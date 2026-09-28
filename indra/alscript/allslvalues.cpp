@@ -181,6 +181,12 @@ namespace ALLSLValues
 {
     std::string floatText(double v, bool wide)
     {
+        // Infinity as a literal past any float's range, which reads back as
+        // it: a single's and a double's, a global's value too.
+        if (std::isinf(v))
+        {
+            return v < 0 ? "-1.0e+999" : "1.0e+999";
+        }
         char buffer[64];
         if (!wide)
         {
