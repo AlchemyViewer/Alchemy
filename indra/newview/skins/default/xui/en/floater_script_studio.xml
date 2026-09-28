@@ -186,6 +186,8 @@
     <floater.string name="ReferencesFoundB">[COUNT] places where [NAME] stands.</floater.string>
     <floater.string name="LookingAcrossA">Looking for [NAME] across 1 other script of the object...</floater.string>
     <floater.string name="LookingAcrossB">Looking for [NAME] across [COUNT] other scripts of the object...</floater.string>
+    <floater.string name="ReferencesUnlistedA">1 more place, not listed</floater.string>
+    <floater.string name="ReferencesUnlistedB">[COUNT] more places, not listed</floater.string>
     <floater.string name="ReferencesFoundAcrossA">1 place where [NAME] stands, in [FILES] scripts.</floater.string>
     <floater.string name="ReferencesFoundAcrossB">[COUNT] places where [NAME] stands, in [FILES] scripts.</floater.string>
     <floater.string name="LevelError">Error</floater.string>

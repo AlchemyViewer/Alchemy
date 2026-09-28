@@ -180,6 +180,11 @@ void ALScriptReferencesPane::readBoxes()
     {
         const LLScrollListCell* box = item->getColumn(2);
         const U32               id  = static_cast<U32>(item->getValue().asInteger());
+        if (id == 0)
+        {
+            // The count of those not listed.
+            continue;
+        }
         if (box && box->getValue().asBoolean())
         {
             mLeftOut.erase(id);
@@ -239,15 +244,14 @@ void ALScriptReferencesPane::fill()
     {
         return;
     }
-    // The row chosen and the scroll kept through a refill, which an edit
-    // moving the places asks for.
-    mStale             = false;
-    const S32 scrolled = mList->getScrollPos();
-    const S32 chosen   = mList->getFirstSelected() ? mList->getFirstSelected()->getValue().asInteger() : 0;
-    mList->deleteAllItems();
+    // The row chosen and the scroll are kept through a refill by the
+    // places' numbers, which an edit moving the places asks for.
+    mStale           = false;
+    const S32 chosen = mList->getFirstSelected() ? mList->getFirstSelected()->getValue().asInteger() : 0;
     mWindow->referencesCounted();
     if (mFound.places.empty())
     {
+        mList->setRows({});
         // A list with nothing in it and nothing to say is a pane that
         // looks broken; this one is empty until it is asked a question,
         // so it says which question.
@@ -270,63 +274,77 @@ void ALScriptReferencesPane::fill()
     LLStringUtil::format_map_t named;
     named["[NAME]"]                = mFound.name;
     const std::string declared_tip = mServices->words("ReferenceDeclarationTip", named);
-    for (size_t i = 0; i < mFound.places.size(); ++i)
+    const std::string declared     = mServices->words("ReferenceDeclaration");
+    const LLFontGL*   bold         = LLFontGL::getFontSansSerifSmallBold();
+    // Each place its own row by the number it was given, made again only
+    // where it says something else -- an edit moving its line -- and no
+    // more than PLACES_MOST of them, the rest counted.
+    const size_t                 listing = llmin(mFound.places.size(), PLACES_MOST);
+    std::vector<ALPaneList::Row> rows;
+    rows.reserve(listing + 1);
+    for (size_t i = 0; i < listing; ++i)
     {
         const Doc::Place& place = mFound.places[i];
         // The declaration, marked: in the script it was looked up from
         // where no include declares it, else in the include that does.
-        const std::string& in_file     = place.file;
-        const bool         declaration = mFound.hasDefinition && place.span.line == mFound.definition.line &&
-                                 place.span.column == mFound.definition.column && in_file == mFound.home;
-        LLSD row;
-        row["value"]                = static_cast<S32>(place.id);
-        row["columns"][0]["column"] = "where";
-        row["columns"][0]["value"]  = place.file.empty() ? mFound.fromName : place.fileName;
-        row["columns"][1]["column"] = "line";
-        row["columns"][1]["value"]  = llformat("%d:%d", place.span.line + 1, place.span.column + 1);
-        row["columns"][2]["column"] = "role";
-        row["columns"][2]["value"]  = declaration ? mServices->words("ReferenceDeclaration") : std::string();
-        row["columns"][3]["column"] = "text";
-        row["columns"][3]["value"]  = place.text;
+        const bool declaration = mFound.hasDefinition && place.span.line == mFound.definition.line &&
+                                 place.span.column == mFound.definition.column && place.file == mFound.home;
         // Previewed: a box to leave the place out by, and the line as the
         // rename would leave it.
         const bool left    = mLeftOut.contains(place.id);
         const bool renamed = previewing() && !left && place.at >= 0 && static_cast<size_t>(place.at) + mFound.name.size() <= place.text.size();
-        if (previewing())
-        {
-            row["columns"][2]["type"]  = "checkbox";
-            row["columns"][2]["value"] = !left;
-        }
-        if (renamed)
-        {
-            row["columns"][3]["value"] = place.text.substr(0, place.at) + mNewName + place.text.substr(place.at + mFound.name.size());
-        }
-        if (declaration)
-        {
-            for (S32 c = 0; c < 4; ++c)
+        const auto cell    = [&](const char* column, const LLSD& value, const char* type = "text") {
+            LLScrollListCell::Params one;
+            one.column = column;
+            one.type   = type;
+            one.value  = value;
+            if (declaration)
             {
-                row["columns"][c]["font"]["style"] = "BOLD";
-                row["columns"][c]["tool_tip"]      = declared_tip;
+                one.font     = bold;
+                one.tool_tip = declared_tip;
             }
-        }
-        LLScrollListItem* item = mList->addElement(row);
-        // The name, lit where it stands in the line.
-        if (item && place.at >= 0)
+            return one;
+        };
+        ALPaneList::Row row;
+        row.key   = std::to_string(place.id);
+        row.value = static_cast<S32>(place.id);
+        row.cells = { cell("where", place.file.empty() ? mFound.fromName : place.fileName),
+                      cell("line", llformat("%d:%d", place.span.line + 1, place.span.column + 1)),
+                      previewing() ? cell("role", LLSD(!left), "checkbox") : cell("role", declaration ? declared : std::string()),
+                      cell("text", renamed ? place.text.substr(0, place.at) + mNewName + place.text.substr(place.at + mFound.name.size()) : place.text) };
+        rows.push_back(std::move(row));
+    }
+    if (listing < mFound.places.size())
+    {
+        ALPaneList::Row more;
+        more.key     = "#unlisted";
+        more.enabled = false;
+        LLScrollListCell::Params words;
+        words.column = "text";
+        words.value  = mServices->counted("ReferencesUnlisted", static_cast<S32>(mFound.places.size() - listing));
+        more.cells   = { words };
+        rows.push_back(std::move(more));
+    }
+    mList->setRows(std::move(rows));
+    // The name, lit where it stands in each line.
+    for (size_t i = 0; i < listing; ++i)
+    {
+        const Doc::Place& place   = mFound.places[i];
+        const bool        renamed = previewing() && !mLeftOut.contains(place.id) && place.at >= 0 &&
+                             static_cast<size_t>(place.at) + mFound.name.size() <= place.text.size();
+        LLScrollListItem* item = place.at >= 0 ? mList->rowWithKey(std::to_string(place.id)) : nullptr;
+        if (LLScrollListCell* text = item ? item->getColumn(3) : nullptr)
         {
-            if (LLScrollListCell* text = item->getColumn(3))
-            {
-                text->highlightText(place.at, static_cast<S32>(renamed ? mNewName.size() : mFound.name.size()));
-            }
+            text->highlightText(place.at, static_cast<S32>(renamed ? mNewName.size() : mFound.name.size()));
         }
     }
     // The row chosen, where its place is still listed; else the one now
     // at its place in the list.
-    if (chosen > 0 && !mList->selectByValue(LLSD(chosen)))
+    if (chosen > 0 && !mList->getFirstSelected())
     {
-        const size_t at = placeWith(static_cast<U32>(chosen), true);
-        mList->selectByValue(LLSD(static_cast<S32>(mFound.places[llmin(at, mFound.places.size() - 1)].id)));
+        const size_t at = llmin(placeWith(static_cast<U32>(chosen), true), listing - 1);
+        mList->selectByValue(LLSD(static_cast<S32>(mFound.places[at].id)));
     }
-    mList->setScrollPos(scrolled);
 }
 
 void ALScriptReferencesPane::slide(Doc& doc, const std::string& path, const ALTextDocument::Edit& edit)

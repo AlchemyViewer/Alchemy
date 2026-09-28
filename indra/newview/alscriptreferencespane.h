@@ -108,7 +108,12 @@ public:
     void cancelPreview();
 
 private:
-    void fill();
+    // The places listed: each a row of its own by its number, made again
+    // only where it says something else, and no more than PLACES_MOST of
+    // them -- a name used everywhere in a big script, or across many --
+    // the rest counted in a row of their own.
+    static constexpr size_t PLACES_MOST = 1000;
+    void                    fill();
     // The places numbered, the preview let go of.
     void take(Found found);
     // The boxes as the rows have them now, after a click.

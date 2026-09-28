@@ -367,4 +367,39 @@ namespace tut
         refs->pump();
         ensure_equals("seen: listed again", lines(), joined(Names{ "A 2:9", "A 3:5", "B 1:9" }));
     }
+
+    template<> template<>
+    void alscriptreferencespane_object::test<8>()
+    {
+        set_test_name("a place slid is the same row, made again where it says something else; a thousand places listed at most, the rest counted");
+        ALScriptReferencesPane* refs = pane();
+        Doc&                    a    = tab("a", "integer count;\nx = count;\n");
+        tab("b", "foo() { count; }\n");
+        refs->show(found());
+        boost::signals2::scoped_connection in_a(
+            a.editor->document().onChanged([refs, &a](const ALTextDocument::Edit& edit) { refs->slide(a, "object:1:a", edit); }));
+        LLScrollListItem* in_b     = refs->list()->rowWithKey("3");
+        LLScrollListCell* b_line   = in_b ? in_b->getColumn(1) : nullptr;
+        LLScrollListItem* second   = refs->list()->rowWithKey("2");
+        refs->list()->selectByValue(LLSD(2));
+        a.editor->replaceAll({ { ALTextRange(ALTextPos(0, 0), ALTextPos(0, 0)), "// one\n" } });
+        refs->pump();
+        ensure_equals("slid", lines(), joined(Names{ "A 2:9", "A 3:5", "B 1:9" }));
+        ensure("the same rows", refs->list()->rowWithKey("2") == second && refs->list()->rowWithKey("3") == in_b);
+        ensure("one not moved, its cells as they were", in_b->getColumn(1) == b_line);
+        ensure("the row chosen kept", refs->list()->getFirstSelected() == second);
+
+        Found many;
+        many.from     = "a";
+        many.fromName = "A";
+        many.name     = "count";
+        for (S32 i = 0; i < 1003; ++i)
+        {
+            many.places.push_back(place("", i, 0, "count;"));
+        }
+        refs->show(many);
+        ensure_equals("a thousand and one row saying the rest", refs->list()->getItemCount(), 1001);
+        ensure_equals("the rest", cell(refs->list()->getAllData().back(), 3), window.services().counted("ReferencesUnlisted", 3));
+        ensure("all of them counted over the list", head().find("1003") != std::string::npos);
+    }
 }
