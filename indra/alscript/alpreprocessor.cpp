@@ -4388,7 +4388,8 @@ void ALPreprocessor::optimize(Result& result, const Options& options)
     if (options.weigh)
     {
         const ALScriptWeight before = weigh(result.text);
-        const ALScriptWeight after  = weigh(optimized.text);
+        // The optimizer's own weighing where it made one to choose by.
+        const ALScriptWeight after  = optimized.weight.compiled ? optimized.weight : weigh(optimized.text);
         weighed                     = before.total > 0 && after.total > 0;
         if (weighed)
         {

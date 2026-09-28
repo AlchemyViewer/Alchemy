@@ -26,6 +26,7 @@
 #pragma once
 
 #include "alscriptproblem.h"
+#include "alscriptweight.h"
 #include "alsourcemap.h"
 
 #include <map>
@@ -96,6 +97,14 @@ public:
         // script marked `inline`.
         bool                     inlining = false;
         std::vector<std::string> inlineNames;
+        // With inlining, a function called from more than one place and
+        // not marked is put in place too where the target's compiler says
+        // the script comes out smaller: estimated from what each function
+        // weighs (ALLSLCosts), then the script optimized again with those
+        // in place, both weighed, and the smaller kept. What it costs is a
+        // weighing where there is a function to try, and a second run and
+        // weighing where one is estimated to be worth it.
+        bool                     inlineByCost = true;
     };
 
     struct Result
@@ -116,6 +125,9 @@ public:
         // The run reached its budget and stopped early; what it did
         // stands, and there may have been more to do.
         bool   stoppedEarly = false;
+        // What the text weighs on its target, where the run weighed it to
+        // choose what to put in place; not compiled where it did not.
+        ALScriptWeight weight;
         // The script as given does not parse, or its types do not agree:
         // the errors are the script's own, the compiler's to say, and not
         // something the optimizer did. Not set where the optimizer's own

@@ -46,6 +46,7 @@
 #include <tailslide/visitor.hh>
 
 #include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/unordered/unordered_flat_set.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -4049,9 +4050,131 @@ namespace
         block->pushChild(yes);
         node->setChild(1, block);
     }
+    // A user function a run left standing, with what putting it in place
+    // would take but for its bytes (ALLSLCosts), and where it is in the
+    // source.
+    struct Standing
+    {
+        std::string          name;
+        ALLSLCosts::Inlining shape;
+        S32                  line      = 0;
+        S32                  column    = 0;
+        S32                  endLine   = 0;
+        S32                  endColumn = 0;
+    };
+
+    // Each user function left in the script, as the inliner would put it
+    // in place: one whose body is `return e;` as its expression, with its
+    // arguments where its parameters were; any other as a block, each
+    // parameter a local and its value another, each return but a last one
+    // a jump.
+    void standingFunctions(LSLScript* script, const ALSourceMap& inlinedMap, std::vector<Standing>& out)
+    {
+        if (!script->getGlobals())
+        {
+            return;
+        }
+        for (LSLASTNode* global : *script->getGlobals())
+        {
+            if (global->getNodeType() != NODE_GLOBAL_FUNCTION)
+            {
+                continue;
+            }
+            auto*         function = static_cast<LSLGlobalFunction*>(global);
+            LSLSymbol*    sym      = function->getSymbol();
+            LSLStatement* body     = function->getStatements();
+            if (!sym || !body)
+            {
+                continue;
+            }
+            Standing f;
+            f.name        = sym->getName();
+            f.shape.name  = f.name.size();
+            f.shape.calls = sym->getReferences() - 1;
+            if (LSLFunctionDec* dec = function->getArguments())
+            {
+                f.shape.params = static_cast<S32>(dec->getNumChildren());
+            }
+            const bool   value = sym->getType() && sym->getType()->getIType() != LST_NULL;
+            LSLASTNode*  last  = nullptr;
+            for (LSLASTNode* statement = body->getChild(0); statement; statement = statement->getNext())
+            {
+                last = statement;
+            }
+            const bool returnsLast = last && last->getNodeType() == NODE_STATEMENT && last->getNodeSubType() == NODE_RETURN_STATEMENT;
+            const bool expression  = value && returnsLast && body->getNumChildren() == 1;
+            f.shape.locals         = expression ? 0 : f.shape.params + (value ? 1 : 0);
+            boost::unordered_flat_set<std::string, ll::string_hash, std::equal_to<>> strings;
+            std::vector<LSLASTNode*>                                                 stack{ body };
+            while (!stack.empty())
+            {
+                LSLASTNode* node = stack.back();
+                stack.pop_back();
+                if (node->getNodeType() == NODE_STATEMENT && node->getNodeSubType() == NODE_RETURN_STATEMENT && node != last)
+                {
+                    ++f.shape.jumps;
+                }
+                else if (node->getNodeType() == NODE_CONSTANT && node->getNodeSubType() == NODE_STRING_CONSTANT)
+                {
+                    strings.insert(static_cast<LSLStringConstant*>(node)->getValue());
+                }
+                for (LSLASTNode* child = node->getChild(0); child; child = child->getNext())
+                {
+                    stack.push_back(child);
+                }
+            }
+            f.shape.strings = static_cast<S32>(strings.size());
+            for (const std::string& text : strings)
+            {
+                f.shape.chars += static_cast<S32>(text.size());
+            }
+            if (const Tailslide::YYLTYPE* loc = function->getLoc())
+            {
+                f.line      = zeroBased(loc->first_line);
+                f.column    = zeroBased(loc->first_column);
+                f.endLine   = zeroBased(loc->last_line);
+                f.endColumn = zeroBased(loc->last_column);
+                if (!inlinedMap.empty())
+                {
+                    const ALSourceMap::Loc from = inlinedMap.toSource(f.line, f.column);
+                    const ALSourceMap::Loc to   = inlinedMap.toSource(f.endLine, f.endColumn);
+                    if (from.found() && to.found())
+                    {
+                        f.line      = from.line;
+                        f.column    = from.column;
+                        f.endLine   = to.line;
+                        f.endColumn = to.column;
+                    }
+                }
+            }
+            out.push_back(std::move(f));
+        }
+    }
+
+    ALScriptWeight::Target weightTarget(ALLSLOptimizer::Target target)
+    {
+        return target == ALLSLOptimizer::Target::LSO    ? ALScriptWeight::Target::LSO
+               : target == ALLSLOptimizer::Target::Luau ? ALScriptWeight::Target::LSLLuau
+                                                        : ALScriptWeight::Target::Mono;
+    }
+
+    ALScriptWeight weigh(ALLSLOptimizer::Target target, std::string_view text)
+    {
+        switch (weightTarget(target))
+        {
+            case ALScriptWeight::Target::LSO:
+                return ALScriptWeigh::lso(text);
+            case ALScriptWeight::Target::LSLLuau:
+                return ALScriptWeigh::lslLuau(text);
+            default:
+                return ALScriptWeigh::mono(text);
+        }
+    }
+
     // One run over a script: put in place what is to be, then the rounds,
-    // then the printing, and what was printed checked.
-    ALLSLOptimizer::Result once(std::string_view source, const ALLSLOptimizer::Options& options)
+    // then the printing, and what was printed checked. The functions it
+    // leaves standing into `standing`, where that is asked for.
+    ALLSLOptimizer::Result once(std::string_view source, const ALLSLOptimizer::Options& options, std::vector<Standing>* standing)
     {
         using Result = ALLSLOptimizer::Result;
         Result result;
@@ -4239,6 +4362,10 @@ namespace
             script->visit(&shapes);
             walks(1);
         }
+        if (standing)
+        {
+            standingFunctions(script, inlinedMap, *standing);
+        }
         if (options.shrinknames)
         {
             shrink(script, parser.context, parser.allocator, report, result);
@@ -4297,5 +4424,83 @@ namespace
 ALLSLOptimizer::Result ALLSLOptimizer::run(std::string_view source, const Options& options)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
-    return once(source, options);
+    const bool            byCost = options.inlining && options.inlineByCost;
+    std::vector<Standing> standing;
+    Result                kept = once(source, options, byCost ? &standing : nullptr);
+    // Of the functions left standing, those called from more than one
+    // place and not marked -- a marked one went wherever it could -- are
+    // what the cost may put in place.
+    std::erase_if(standing, [&options](const Standing& f) {
+        return f.shape.calls < 2 || std::find(options.inlineNames.begin(), options.inlineNames.end(), f.name) != options.inlineNames.end();
+    });
+    if (!byCost || !kept.optimized || standing.empty())
+    {
+        return kept;
+    }
+    kept.weight = weigh(options.target, kept.text);
+    if (!kept.weight.compiled)
+    {
+        return kept;
+    }
+    // Each estimated from what it weighs as the run left it.
+    const ALLSLCosts&                               costs = ALLSLCosts::of(options.target);
+    Options                                         more  = options;
+    std::vector<std::pair<const Standing*, S32>>    chosen;
+    for (const Standing& f : standing)
+    {
+        const auto        renamed = kept.renamed.find(f.name);
+        const std::string shown   = renamed == kept.renamed.end() ? f.name : renamed->second;
+        for (const ALScriptWeight::Part& part : kept.weight.parts)
+        {
+            if (part.kind != ALScriptWeight::Part::Kind::Function || part.name != shown)
+            {
+                continue;
+            }
+            ALLSLCosts::Inlining shape = f.shape;
+            shape.bytes                = static_cast<S32>(part.bytes);
+            shape.name                 = shown.size();
+            if (const S32 estimate = costs.inlined(shape); estimate < 0)
+            {
+                more.inlineNames.push_back(f.name);
+                chosen.emplace_back(&f, estimate);
+            }
+            break;
+        }
+    }
+    if (chosen.empty())
+    {
+        return kept;
+    }
+    // Tried, and kept only where it is smaller as the compiler counts it.
+    std::vector<Standing> left;
+    Result                tried = once(source, more, &left);
+    // What the inliner could not take is the same text.
+    if (!tried.optimized || tried.text == kept.text)
+    {
+        return kept;
+    }
+    tried.weight = weigh(options.target, tried.text);
+    if (!tried.weight.compiled || tried.weight.total >= kept.weight.total)
+    {
+        return kept;
+    }
+    for (const auto& [f, estimate] : chosen)
+    {
+        if (std::any_of(left.begin(), left.end(), [f](const Standing& l) { return l.name == f->name; }) || !options.notes)
+        {
+            continue;
+        }
+        ALScriptProblem p;
+        p.severity  = ALScriptProblem::Severity::Note;
+        p.source    = ALScriptProblem::Source::Optimizer;
+        p.key       = "InlinerChoseFunction";
+        p.line      = f->line;
+        p.column    = f->column;
+        p.endLine   = f->endLine;
+        p.endColumn = f->endColumn;
+        p.args      = { f->name, std::to_string(f->shape.calls), std::to_string(-estimate), ALScriptWeight::nameOf(weightTarget(options.target)) };
+        p.message   = ALScriptProblem::fill("put the function [1] in place at its [2] calls: about [3] bytes less code on [4]", p.args);
+        tried.problems.push_back(std::move(p));
+    }
+    return tried;
 }

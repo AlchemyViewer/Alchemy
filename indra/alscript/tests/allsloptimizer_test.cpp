@@ -1412,4 +1412,48 @@ namespace tut
         const ALLSLOptimizer::Result folded = ALLSLOptimizer::run(reads(V, "v += V * 2;", 3), lso);
         ensure("a product folds: " + folded.text, !kept(folded, "vector V") && folded.text.find("<3.0, 5.0, 7.0>") != std::string::npos);
     }
+
+    template<> template<>
+    void allsloptimizer_object::test<39>()
+    {
+        set_test_name("with inlining, a function called from several places goes where the target's compiler says that is smaller, and says so");
+        const std::string source = "say(integer n)\n{\n    llOwnerSay(\"n=\" + (string)n);\n}\n"
+                                   "tell(integer n)\n{\n    if (n > 2)\n        llOwnerSay(\"many: \" + (string)n + \" of them, which is a lot\");\n"
+                                   "    else\n        llOwnerSay(\"a few: \" + (string)n);\n    llSetText((string)n, <1.0, 0.5, 0.25>, 1.0);\n}\n"
+                                   "default\n{\n    touch_start(integer t)\n    {\n        integer a = t * 3;\n        integer b = a + t;\n"
+                                   "        say(a); say(b); say(t);\n        tell(a); tell(b); tell(a * b); tell(a + b); tell(t);\n    }\n}\n";
+        ALLSLOptimizer::Options o = options();
+        o.inlining                = true;
+        for (const ALLSLOptimizer::Target target : { ALLSLOptimizer::Target::LSO, ALLSLOptimizer::Target::Mono })
+        {
+            o.target                       = target;
+            o.inlineByCost                 = true;
+            const ALLSLOptimizer::Result r = ALLSLOptimizer::run(source, o);
+            ensure("optimized: " + notes(r), r.optimized);
+            ensure("the small one goes: " + r.text, r.text.find("say(") == std::string::npos);
+            ensure("the large one stays: " + r.text, r.text.find("tell(") != std::string::npos);
+            ensure("weighed", r.weight.compiled && r.weight.total > 0);
+            const ALScriptProblem* chose = nullptr;
+            for (const ALScriptProblem& p : r.problems)
+            {
+                chose = p.key == "InlinerChoseFunction" ? &p : chose;
+            }
+            ensure("said: " + notes(r), chose && chose->args.size() == 4 && chose->args[0] == "say" && chose->args[1] == "3");
+            ensure_equals("at the function", chose->line, 0);
+            ensure_equals("to its end", chose->endLine, 3);
+
+            o.inlineByCost                    = false;
+            const ALLSLOptimizer::Result left = ALLSLOptimizer::run(source, o);
+            ensure("left alone without it: " + left.text, left.text.find("say(") != std::string::npos);
+            ensure("and nothing weighed", !left.weight.compiled);
+        }
+        // On Luau, where a call costs little, putting it in place comes to
+        // a byte more: tried, and not kept.
+        o.target                              = ALLSLOptimizer::Target::Luau;
+        o.inlineByCost                        = true;
+        const ALLSLOptimizer::Result weighed  = ALLSLOptimizer::run(source, o);
+        o.inlineByCost                        = false;
+        const ALLSLOptimizer::Result unweighed = ALLSLOptimizer::run(source, o);
+        ensure("never larger for trying", weighed.weight.compiled && weighed.weight.total <= ALScriptWeigh::lslLuau(unweighed.text).total);
+    }
 } // namespace tut
