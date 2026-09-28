@@ -209,49 +209,6 @@ ALCodeEditor::ALCodeEditor(const Params& p)
             clearHighlights(Highlight::Occurrences);
         }
     });
-
-    // The list of completions, made once and shown when there is
-    // something to choose; a child, so it draws over the text and goes
-    // where the view goes. On the text engine, as the hover card is: the
-    // completions in the editor's face and the colours of their kinds,
-    // their details in the reading face after them.
-    ALChoiceList::Params list(LLUICtrlFactory::getDefaultParams<ALChoiceList>());
-    list.name("completions");
-    list.rect(LLRect(0, 10, 10, 0));
-    list.visible(false);
-    list.follows.flags(FOLLOWS_NONE);
-    list.mouse_opaque(true);
-    list.font(getFont());
-    list.bg_visible(true);
-    list.bg_color(LLUIColorTable::instance().getColor("CodeCompletionBgColor", LLColor4::black));
-    list.bg_readonly_color(LLUIColorTable::instance().getColor("CodeCompletionBgColor", LLColor4::black));
-    list.text_readonly_color(textColor());
-    list.context_menu(std::string());
-    list.h_pad(4);
-    list.v_pad(2);
-    mCompletionList = LLUICtrlFactory::create<ALChoiceList>(list);
-    mCompletionList->onPicked([this](S32) { acceptCompletion(); });
-    mCompletionList->onChosen([this](S32) {
-        if (completionOpen())
-        {
-            showCompletionDoc();
-        }
-    });
-    addChild(mCompletionList);
-
-    // The fixes offered at a problem, on a list of their own made the same
-    // way: a fix is not a completion, and the one list open at a time
-    // keeps its own keys.
-    list.name("fixes");
-    mFixList = LLUICtrlFactory::create<ALChoiceList>(list);
-    mFixList->onPicked([this](S32 index) { takeFix(index); });
-    mFixList->onChosen([this](S32) {
-        if (fixesOpen())
-        {
-            showFixPreview();
-        }
-    });
-    addChild(mFixList);
 }
 
 ALCodeEditor::~ALCodeEditor()
@@ -2286,6 +2243,49 @@ bool ALCodeEditor::completionOpen() const
     return mCompletionList && mCompletionList->getVisible();
 }
 
+ALChoiceList* ALCodeEditor::makeChoiceList(const std::string& name)
+{
+    // A child, so it draws over the text and goes where the view goes. On
+    // the text engine, as the hover card is: the choices in the editor's
+    // face and the colours of their kinds, their details in the reading
+    // face after them.
+    ALChoiceList::Params list(LLUICtrlFactory::getDefaultParams<ALChoiceList>());
+    list.name(name);
+    list.rect(LLRect(0, 10, 10, 0));
+    list.visible(false);
+    list.follows.flags(FOLLOWS_NONE);
+    list.mouse_opaque(true);
+    list.font(getFont());
+    list.bg_visible(true);
+    list.bg_color(LLUIColorTable::instance().getColor("CodeCompletionBgColor", LLColor4::black));
+    list.bg_readonly_color(LLUIColorTable::instance().getColor("CodeCompletionBgColor", LLColor4::black));
+    list.text_readonly_color(textColor());
+    list.context_menu(std::string());
+    list.h_pad(4);
+    list.v_pad(2);
+    ALChoiceList* made = LLUICtrlFactory::create<ALChoiceList>(list);
+    addChild(made);
+    return made;
+}
+
+ALChoiceList& ALCodeEditor::completionList()
+{
+    // Made the first time there is something to choose: most editors --
+    // a tab not looked at, a read-only view -- never show one.
+    if (!mCompletionList)
+    {
+        mCompletionList = makeChoiceList("completions");
+        mCompletionList->onPicked([this](S32) { acceptCompletion(); });
+        mCompletionList->onChosen([this](S32) {
+            if (completionOpen())
+            {
+                showCompletionDoc();
+            }
+        });
+    }
+    return *mCompletionList;
+}
+
 void ALCodeEditor::hideCompletionList()
 {
     if (mCompletionList)
@@ -2416,6 +2416,7 @@ LLUIImagePtr ALCodeEditor::iconOf(const Completion& completion)
 
 void ALCodeEditor::listCompletions(bool keep_choice)
 {
+    completionList();
     // What was chosen, by its word: an answer joined to the list may put
     // rows above it, and the row under the finger must stay the word the
     // finger is on.
@@ -2674,8 +2675,28 @@ void ALCodeEditor::showFixes(S32 line, std::vector<Fix> fixes, S32 chosen)
     }
 }
 
+ALChoiceList& ALCodeEditor::fixList()
+{
+    // The fixes offered at a problem, on a list of their own made the same
+    // way the first time there are any: a fix is not a completion, and the
+    // one list open at a time keeps its own keys.
+    if (!mFixList)
+    {
+        mFixList = makeChoiceList("fixes");
+        mFixList->onPicked([this](S32 index) { takeFix(index); });
+        mFixList->onChosen([this](S32) {
+            if (fixesOpen())
+            {
+                showFixPreview();
+            }
+        });
+    }
+    return *mFixList;
+}
+
 void ALCodeEditor::fillFixList(S32 chosen)
 {
+    fixList();
     // In the editor's colours, as the completions are; a suppression, and
     // the word that there is nothing, quieter than what makes a change.
     mFixList->setBackgroundColor(paint(Paint::Widget));

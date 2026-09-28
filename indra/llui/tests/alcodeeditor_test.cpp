@@ -2514,5 +2514,28 @@ namespace tut
             same("wrapped row " + std::to_string(r) + " after the opener", deeper, again.rows[r]);
         }
     }
-}
 
+    template<> template<>
+    void alcodeeditor_object::test<70>()
+    {
+        set_test_name("an editor makes its completion and fix lists the first time each is shown, not before");
+        ALCodeEditor& e = make("integer count;\nllSay(0, co");
+        ensure("no completion list yet", e.findChild<LLView>("completions", false) == nullptr);
+        ensure("no fix list yet", e.findChild<LLView>("fixes", false) == nullptr);
+        ensure("neither open", !e.completionOpen() && !e.fixesOpen());
+        e.setCaret(e.document().end());
+        key(' ', MASK_CONTROL);
+        ensure("the completions listed", e.completionOpen() && e.findChild<LLView>("completions", false) != nullptr);
+        ensure("and still no fix list", e.findChild<LLView>("fixes", false) == nullptr);
+        key(KEY_ESCAPE);
+        e.setFixProvider([](S32 line, std::vector<ALCodeEditor::Fix>& out) {
+            ALCodeEditor::Fix semi;
+            semi.title = "Insert ';'";
+            semi.value = "semi";
+            semi.edits.emplace_back(ALTextRange(ALTextPos(line, 0), ALTextPos(line, 0)), ";");
+            out = { semi };
+        });
+        e.setFixable(1, true, true);
+        ensure("the fixes listed", e.handleKeyHere('.', MASK_CONTROL) && e.fixesOpen() && e.findChild<LLView>("fixes", false) != nullptr);
+    }
+}

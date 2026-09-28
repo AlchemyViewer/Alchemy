@@ -785,6 +785,11 @@ private:
     // Out of sight, but still about the word it was asked about, for an
     // answer that may yet come.
     void hideCompletionList();
+    // The completions' list and the fixes', made the first time each is
+    // shown; a choice list for either.
+    ALChoiceList& completionList();
+    ALChoiceList& fixList();
+    ALChoiceList* makeChoiceList(const std::string& name);
     void drawSignature(const LLRect& text);
     // The card for the problems and the word at a point of the text, where
     // there is anything to say; what the tooltip and the resting mouse
