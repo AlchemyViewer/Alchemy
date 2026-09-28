@@ -424,6 +424,28 @@ int main(int, char**)
     // A bracket left open at the top: its partner looked for as the caret
     // rests beside it, and the depth the rainbow and the indent read at the
     // end, each after a character typed and taken away below it.
+    // Where a caret is as it is seen: every line's end counted in columns,
+    // as the trailer and vim's vertical motions ask of one line at a time;
+    // then the same of a line with a combining accent in it, which the
+    // characters are walked for.
+    std::printf("\nDisplay columns (every line's end)\n");
+    both("ASCII lines, per thousand", subjects, static_cast<size_t>(LINES / 1000), [](Subject&, ALCodeEditor& e) {
+        const ALTextDocument& d = e.document();
+        for (S32 line = 0; line < d.lineCount(); ++line)
+        {
+            g_sink = g_sink + static_cast<size_t>(d.displayColumn(ALTextPos(line, d.lineLength(line)), 4));
+        }
+    });
+    {
+        const ALTextDocument accented("\tinteger cafe\xCC\x81 = llStringLength(\"cr\xC3\xA8" "me br\xC3\xBB" "l\xC3\xA9" "e\"); // \xE6\x97\xA5\xE6\x9C\xAC");
+        rowOne("a line with accents and CJK, per thousand", ms_per_item(1, [&] {
+            for (int i = 0; i < 1000; ++i)
+            {
+                g_sink = g_sink + static_cast<size_t>(accented.displayColumn(ALTextPos(0, accented.lineLength(0)), 4));
+            }
+        }));
+    }
+
     std::printf("\nBrackets (an opener at the top, unmatched)\n");
     for (Subject& s : subjects)
     {

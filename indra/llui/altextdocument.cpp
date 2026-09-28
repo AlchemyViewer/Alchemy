@@ -731,13 +731,21 @@ S32 ALTextDocument::displayColumn(ALTextPos pos, S32 tab_width) const
     pos                    = clampBytes(pos);
     tab_width              = llmax(1, tab_width);
     const std::string& l   = mLines[pos.line];
+    const size_t       end = static_cast<size_t>(pos.column);
     S32                col = 0;
-    size_t             at  = 0;
-    while (at < static_cast<size_t>(pos.column))
+    // ASCII, as code nearly always is: a byte a column, a tab to its stop.
+    if (std::all_of(l.begin(), l.begin() + end, [](char c) { return static_cast<unsigned char>(c) < 0x80; }))
     {
-        const size_t next = utf8str_step_grapheme_forward(l, at);
-        col               = (l[at] == '\t') ? alNextTabStop(col, tab_width) : col + 1;
-        at                = next;
+        for (size_t at = 0; at < end; ++at)
+        {
+            col = (l[at] == '\t') ? alNextTabStop(col, tab_width) : col + 1;
+        }
+        return col;
+    }
+    // A column a character as it is seen, walked with one iterator.
+    for (const size_t at : utf8str_grapheme_starts(l, end))
+    {
+        col = (l[at] == '\t') ? alNextTabStop(col, tab_width) : col + 1;
     }
     return col;
 }
@@ -747,11 +755,17 @@ ALTextPos ALTextDocument::posAtDisplayColumn(S32 line, S32 display_column, S32 t
     line                   = llclamp(line, 0, lineCount() - 1);
     tab_width              = llmax(1, tab_width);
     const std::string& l   = mLines[line];
-    S32                col = 0;
-    size_t             at  = 0;
-    while (at < l.size() && col < display_column)
+    const bool         ascii = std::all_of(l.begin(), l.end(), [](char c) { return static_cast<unsigned char>(c) < 0x80; });
+    // Where each character starts: every byte of ASCII, else as a walk
+    // with one iterator finds them.
+    const std::vector<size_t> starts = ascii ? std::vector<size_t>() : utf8str_grapheme_starts(l, l.size());
+    const size_t              count  = ascii ? l.size() : starts.size();
+    S32                       col    = 0;
+    size_t                    i      = 0;
+    for (; i < count && col < display_column; ++i)
     {
-        const S32 after = (l[at] == '\t') ? alNextTabStop(col, tab_width) : col + 1;
+        const size_t at    = ascii ? i : starts[i];
+        const S32    after = (l[at] == '\t') ? alNextTabStop(col, tab_width) : col + 1;
         // A tab that reaches past the column wanted is the column wanted:
         // nothing sits inside a tab.
         if (after > display_column && l[at] == '\t')
@@ -759,7 +773,7 @@ ALTextPos ALTextDocument::posAtDisplayColumn(S32 line, S32 display_column, S32 t
             break;
         }
         col = after;
-        at  = utf8str_step_grapheme_forward(l, at);
     }
+    const size_t at = i >= count ? l.size() : ascii ? i : starts[i];
     return ALTextPos(line, static_cast<S32>(at));
 }

@@ -851,6 +851,10 @@ LL_COMMON_API std::string utf8str_sanitize(std::string_view utf8str);
 // Cost is one pass over the line containing `byte_pos`.
 LL_COMMON_API size_t utf8str_step_grapheme_forward(std::string_view utf8str, size_t byte_pos);
 LL_COMMON_API size_t utf8str_step_grapheme_backward(std::string_view utf8str, size_t byte_pos);
+// Where each grapheme cluster that begins before `end` begins, in order:
+// the same stops utf8str_step_grapheme_forward makes one at a time, walked
+// with one break iterator rather than one a step.
+LL_COMMON_API std::vector<size_t> utf8str_grapheme_starts(std::string_view utf8str, size_t end);
 
 // Snap `byte_pos` onto a grapheme cluster boundary when it sits strictly inside
 // a cluster. The backward variant snaps to the cluster's start, the forward

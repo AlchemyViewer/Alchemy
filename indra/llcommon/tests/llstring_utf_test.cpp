@@ -220,9 +220,9 @@ namespace tut
     //   12x utf8 walkers     (byte-offset segmentation against its wide twin)
     //   14x trim             (Unicode whitespace, and what is not whitespace)
     // The TUT default registers only test<1>..test<50>, but the explicit
-    // test_group<..., 145> below raises that ceiling. Keep this index in
+    // test_group<..., 146> below raises that ceiling. Keep this index in
     // sync with categories used below.
-    typedef test_group<llstring_utf_data, 145> llstring_utf_t;
+    typedef test_group<llstring_utf_data, 146> llstring_utf_t;
     typedef llstring_utf_t::object llstring_utf_object_t;
     tut::llstring_utf_t tut_llstring_utf("LLStringUTF");
 
@@ -2913,5 +2913,27 @@ namespace tut
         ensure_equals("the view form cuts the same place", std::string(view), expected);
 
         ensure_equals("utf8str_trim agrees", utf8str_trim(src), expected);
+    }
+
+    // Where each cluster starts, walked at once, is where stepping one at a
+    // time stops: the combining acute and the flag's two indicators kept
+    // with what they belong to; none past the end asked for.
+    template<> template<>
+    void llstring_utf_object_t::test<145>()
+    {
+        const std::string utf8 =
+            "ab "
+            "\xE6\x97\xA5\xE6\x9C\xAC"
+            " e\xCC\x81 "
+            "\xF0\x9F\x87\xBA\xF0\x9F\x87\xB8"
+            " end";
+        std::vector<size_t> stepped;
+        for (size_t at = 0; at < utf8.size(); at = utf8str_step_grapheme_forward(utf8, at))
+        {
+            stepped.push_back(at);
+        }
+        ensure("the same stops", utf8str_grapheme_starts(utf8, utf8.size()) == stepped);
+        ensure("those before the end asked for", utf8str_grapheme_starts(utf8, 11) == std::vector<size_t>({ 0, 1, 2, 3, 6, 9, 10 }));
+        ensure("nothing of nothing", utf8str_grapheme_starts(std::string(), 5).empty() && utf8str_grapheme_starts(utf8, 0).empty());
     }
 }

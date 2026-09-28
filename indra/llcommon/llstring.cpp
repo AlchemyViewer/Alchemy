@@ -1396,6 +1396,29 @@ size_t utf8str_step_grapheme_forward(std::string_view utf8str, size_t byte_pos)
     return next == UBRK_DONE ? n : (size_t)next;
 }
 
+std::vector<size_t> utf8str_grapheme_starts(std::string_view utf8str, size_t end)
+{
+    std::vector<size_t> starts;
+    end = std::min(end, utf8str.size());
+    if (end == 0)
+        return starts;
+
+    const Utf8Breaks breaks(utf8str, UBRK_CHARACTER);
+    size_t           at = 0;
+    while (at < end)
+    {
+        starts.push_back(at);
+        if (!breaks)
+        {
+            at = (size_t)utf8str_decode_at(utf8str, at).next;
+            continue;
+        }
+        const int32_t next = ubrk_following(breaks.get(), (int32_t)at);
+        at                 = next == UBRK_DONE ? utf8str.size() : (size_t)next;
+    }
+    return starts;
+}
+
 size_t utf8str_step_grapheme_backward(std::string_view utf8str, size_t byte_pos)
 {
     const size_t n = utf8str.size();

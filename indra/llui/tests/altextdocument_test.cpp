@@ -214,6 +214,13 @@ namespace tut
         ensure("into a tab is the tab", doc.posAtDisplayColumn(0, 2, 4) == ALTextPos(0, 0));
         ensure("past the end is the end", doc.posAtDisplayColumn(0, 40, 4) == ALTextPos(0, 7));
         ensure("column six", doc.posAtDisplayColumn(0, 6, 4) == ALTextPos(0, 3));
+        // ASCII alone, read a byte a column.
+        ALTextDocument ascii("\tab\tc");
+        ensure_equals("ascii: past the second tab", ascii.displayColumn(ALTextPos(0, 5), 4), 9);
+        ensure_equals("ascii: before it", ascii.displayColumn(ALTextPos(0, 3), 4), 6);
+        ensure("ascii: back to the byte", ascii.posAtDisplayColumn(0, 5, 4) == ALTextPos(0, 2));
+        ensure("ascii: into a tab is the tab", ascii.posAtDisplayColumn(0, 7, 4) == ALTextPos(0, 3));
+        ensure("ascii: past the end is the end", ascii.posAtDisplayColumn(0, 40, 4) == ALTextPos(0, 5));
     }
 
     template<> template<>
