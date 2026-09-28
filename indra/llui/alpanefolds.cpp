@@ -136,6 +136,29 @@ void ALPaneFolds::setCollapsed(std::string_view pane, bool collapsed)
     refreshButtons();
 }
 
+// static
+bool ALPaneFolds::inSight(const LLView* view)
+{
+    if (!view || !view->isInVisibleChain())
+    {
+        return false;
+    }
+    // A folded panel keeps its views shown, and a minimized window its
+    // views: neither is drawn.
+    for (const LLView* up = view; up; up = up->getParent())
+    {
+        if (const LLLayoutPanel* panel = dynamic_cast<const LLLayoutPanel*>(up); panel && panel->isCollapsed())
+        {
+            return false;
+        }
+        if (const LLFloater* window = dynamic_cast<const LLFloater*>(up))
+        {
+            return !window->isMinimized();
+        }
+    }
+    return true;
+}
+
 bool ALPaneFolds::collapsed(std::string_view pane) const
 {
     const Bound* bound = find(pane);

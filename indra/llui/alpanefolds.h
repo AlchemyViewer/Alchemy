@@ -104,6 +104,13 @@ public:
     // The buttons pressed in while their regions show.
     void refreshButtons();
 
+    // Whether a view can be seen: shown all the way up to its window --
+    // its tab the one chosen, nothing it is in hidden -- no layout panel it
+    // is in folded away, and the window it is in, this one or one it is out
+    // in, not minimized. What a pane that fills only while it is looked at
+    // asks before it fills.
+    static bool inSight(const LLView* view);
+
     // Into and out of a saved state.
     void save(LLSD& state) const;
     void load(const LLSD& state);

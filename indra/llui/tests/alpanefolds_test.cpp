@@ -296,4 +296,51 @@ namespace tut
         ensure("and stays there", !folds.out("page"));
         w.floater->die();
     }
+
+    // In sight: shown up to its window, in no folded panel, its window not
+    // minimized; out in a window of its own, whatever became of its room.
+    template<> template<>
+    void alpanefolds_object::test<6>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        Window          w = build();
+        LLPanel::Params ip(LLUICtrlFactory::getDefaultParams<LLPanel>());
+        ip.name          = "in_the_side";
+        ip.rect          = LLRect(0, 100, 100, 0);
+        LLPanel* in_side = LLUICtrlFactory::create<LLPanel>(ip);
+        w.side->addChild(in_side);
+        ALPaneFolds folds;
+        folds.bind(w.floater, panes());
+        gFloaterView->addChild(w.floater);
+        w.floater->setVisible(true);
+
+        ensure("nothing is not", !ALPaneFolds::inSight(nullptr));
+        ensure("in the page", ALPaneFolds::inSight(w.in_page));
+        ensure("in the side", ALPaneFolds::inSight(in_side));
+        folds.toggle("side");
+        ensure("the side folded: not", !ALPaneFolds::inSight(in_side) && ALPaneFolds::inSight(w.in_page));
+        folds.toggleOut("side");
+        ensure("out in a window of its own: it is", folds.out("side") && ALPaneFolds::inSight(in_side));
+        folds.dockAll();
+        ensure("home again, as its fold says", ALPaneFolds::inSight(in_side) == !folds.collapsed("side"));
+        folds.setCollapsed("side", true);
+        ensure("folded at home: not", !ALPaneFolds::inSight(in_side));
+        folds.setCollapsed("side", false);
+        ensure("unfolded", ALPaneFolds::inSight(in_side));
+
+        w.page->setVisible(false);
+        ensure("its page hidden: not", !ALPaneFolds::inSight(w.in_page));
+        w.page->setVisible(true);
+        w.floater->setMinimized(true);
+        ensure("the window minimized: not", !ALPaneFolds::inSight(w.in_page) && !ALPaneFolds::inSight(in_side));
+        w.floater->setMinimized(false);
+        ensure("restored", ALPaneFolds::inSight(w.in_page));
+        w.floater->setVisible(false);
+        ensure("the window hidden: not", !ALPaneFolds::inSight(w.in_page));
+        gFloaterView->removeChild(w.floater);
+        w.floater->die();
+    }
 }
