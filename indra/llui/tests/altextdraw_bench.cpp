@@ -55,6 +55,7 @@
 #include <chrono>
 #include <cstdio>
 #include <functional>
+#include <list>
 #include <memory>
 #include <string>
 
@@ -130,6 +131,32 @@ namespace
     void row(const char* name, double lsl, double slua)
     {
         std::printf("  %-52s %10.3f %10.3f\n", name, lsl, slua);
+    }
+
+    // How many draw calls a frame makes: each flush of the batch the
+    // renderer is given, taken down rather than drawn from its cache.
+    size_t drawCalls(ALCodeEditor& e)
+    {
+        std::list<LLVertexBufferData> capture;
+        gGL.beginList(&capture);
+        e.draw();
+        gGL.flush();
+        gGL.endList();
+        glFinish();
+        return capture.size();
+    }
+
+    template <class Setup>
+    void countBoth(const char* name, Subject (&subjects)[2], Setup&& setup)
+    {
+        size_t counts[2];
+        for (int i = 0; i < 2; ++i)
+        {
+            ALCodeEditor& e = *subjects[i].editor;
+            setup(e);
+            counts[i] = drawCalls(e);
+        }
+        std::printf("  %-52s %10zu %10zu\n", name, counts[0], counts[1]);
     }
 
     template <class Setup>
@@ -262,6 +289,18 @@ int main(int, char**)
             s.editor->setWordWrap(false);
             s.editor->deleteRange(ALTextRange(ALTextPos(2, 0), ALTextPos(3, 0)));
         }
+    }
+
+    std::printf("\nDraw calls a frame\n");
+    countBoth("plain", subjects, [](ALCodeEditor&) {});
+    countBoth("a squiggle under every line", subjects, [](ALCodeEditor& e) { e.setDecorations(squiggleEveryLine(e)); });
+    countBoth("the map beside the text", subjects, [](ALCodeEditor& e) {
+        e.setDecorations({});
+        e.setScrollMap(true);
+    });
+    for (Subject& s : subjects)
+    {
+        s.editor->setScrollMap(false);
     }
 
     for (Subject& s : subjects)
