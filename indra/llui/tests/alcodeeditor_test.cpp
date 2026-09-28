@@ -423,7 +423,7 @@ namespace tut
     {
         set_test_name("a dot opens the members of the name before it, and a function accepted comes with its brackets");
         ALCodeEditor& e = make("", "slua");
-        e.highlighter().words().set("function", { "ll.Say", "ll.Abs", "print" });
+        e.highlighter().ownWords().set("function", { "ll.Say", "ll.Abs", "print" });
         std::vector<std::pair<ALTextPos, std::string>> asked;
         e.setCompletionRequest([&](const ALTextPos& at, std::string_view prefix) { asked.emplace_back(at, std::string(prefix)); });
         std::vector<ALTextPos> signatures;
@@ -1239,7 +1239,7 @@ namespace tut
     {
         set_test_name("with nobody to ask, the grammar's words are found by their parts as the document's are");
         ALCodeEditor& e = make("", "lsl");
-        e.highlighter().words().set("function", { "llSetPos", "llSay" });
+        e.highlighter().ownWords().set("function", { "llSetPos", "llSay" });
         type("setp");
         key(' ', MASK_CONTROL);
         bool found = false;

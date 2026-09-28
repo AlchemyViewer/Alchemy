@@ -290,7 +290,7 @@ namespace tut
         ensure("nothing without a grammar", highlighter.tokens(0).empty());
         highlighter.setGrammar(loaded(mini()));
         ensure_equals("plain words", said(doc.line(0), highlighter.tokens(0)), std::string("text:foo bar"));
-        highlighter.words().set("function", { "bar" });
+        highlighter.ownWords().set("function", { "bar" });
         highlighter.wordsChanged();
         ensure_equals("a function now", said(doc.line(0), highlighter.tokens(0)), std::string("text:foo |function:bar"));
     }
@@ -352,5 +352,33 @@ namespace tut
         {
             ensure("line " + std::to_string(line) + " as lexed afresh", highlighter.tokens(line) == fresh.tokens(line));
         }
+    }
+    template<> template<>
+    void alsyntaxhighlighter_object::test<10>()
+    {
+        set_test_name("words set once are shared between views; a view's own copy changes it and no other; none set, none");
+        auto shared = std::make_shared<ALSyntaxWords>();
+        shared->set("function", { "foo" });
+        ALTextDocument doc;
+        doc.setText("foo bar\n");
+        ALSyntaxHighlighter a, b;
+        a.setGrammar(loaded(mini()));
+        b.setGrammar(loaded(mini()));
+        a.attach(&doc);
+        b.attach(&doc);
+        a.setWords(shared);
+        b.setWords(shared);
+        ensure("the same words", &a.words() == &b.words());
+        ensure_equals("a word of them", said(doc.line(0), a.tokens(0)), std::string("function:foo|text: bar"));
+
+        b.ownWords().set("function", { "bar" });
+        b.wordsChanged();
+        ensure("its own now", &a.words() != &b.words());
+        ensure("the other's as they were", a.words().has("function", "foo") && !a.words().has("function", "bar"));
+        ensure_equals("its own word", said(doc.line(0), b.tokens(0)), std::string("text:foo |function:bar"));
+        ensure_equals("and the other's", said(doc.line(0), a.tokens(0)), std::string("function:foo|text: bar"));
+
+        a.setWords(nullptr);
+        ensure_equals("none set, none", said(doc.line(0), a.tokens(0)), std::string("text:foo bar"));
     }
 }

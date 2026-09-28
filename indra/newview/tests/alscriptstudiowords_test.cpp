@@ -330,4 +330,41 @@ namespace tut
         ensure("a word not known, none", !Words::linkArgument(false, "llNothing", 0));
         ensure("SLua's by its name with its library", Words::linkArgument(true, "ll.MessageLinked", 0) && !Words::linkArgument(true, "ll.MessageLinked", 1));
     }
+    template<> template<>
+    void alscriptstudiowords_object::test<12>()
+    {
+        set_test_name("a language's tables are made once and shared by every editor of it; new definitions are read once however many ask; new preprocessor words make new tables");
+        S32         asked   = 0;
+        std::string version = "one";
+        Words::sources().keywords = [this, &asked](bool lua) {
+            ++asked;
+            return lua ? slua : lsl;
+        };
+        Words::sources().definitionsVersion = [&version] { return version; };
+        Words::forget();
+        ALCodeEditor& a = editor("default {}", false);
+        ALCodeEditor& b = editor("default {}", false);
+        ALCodeEditor& s = editor("x", true);
+        Words::teach(a, false);
+        Words::teach(b, false);
+        Words::teach(s, true);
+        ensure("one set for both LSL editors", &a.highlighter().words() == &b.highlighter().words());
+        ensure("another for SLua's", &s.highlighter().words() != &a.highlighter().words());
+        const S32 first = asked;
+        Words::teach(a, false);
+        ensure_equals("taught again from what is kept", asked, first);
+
+        version                     = "two";
+        lsl["functions"]["llShout"] = LLSD().with("return", "");
+        Words::teach(a, false);
+        Words::teach(b, false);
+        ensure_equals("new definitions read once for both", asked, first + 1);
+        ensure("and shared still, with the new word", &a.highlighter().words() == &b.highlighter().words() &&
+                                                          a.highlighter().words().has("function", "llShout"));
+
+        const ALSyntaxWords* before = &a.highlighter().words();
+        extra                       = { "switch" };
+        Words::teach(a, false);
+        ensure("new preprocessor words, new tables", &a.highlighter().words() != before && a.highlighter().words().has("control", "switch"));
+    }
 }

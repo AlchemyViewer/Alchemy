@@ -33,7 +33,19 @@ namespace
     const std::vector<ALSyntaxToken> NO_TOKENS;
 }
 
-ALSyntaxHighlighter::ALSyntaxHighlighter() = default;
+namespace
+{
+    const std::shared_ptr<const ALSyntaxWords>& noWords()
+    {
+        static const std::shared_ptr<const ALSyntaxWords> none = std::make_shared<const ALSyntaxWords>();
+        return none;
+    }
+}
+
+ALSyntaxHighlighter::ALSyntaxHighlighter()
+:   mWords(noWords())
+{
+}
 
 ALSyntaxHighlighter::~ALSyntaxHighlighter() = default;
 
@@ -41,6 +53,31 @@ void ALSyntaxHighlighter::setGrammar(std::shared_ptr<const ALSyntaxGrammar> gram
 {
     mGrammar = std::move(grammar);
     reset();
+}
+
+void ALSyntaxHighlighter::setWords(std::shared_ptr<const ALSyntaxWords> words)
+{
+    if (!words)
+    {
+        words = noWords();
+    }
+    if (words == mWords)
+    {
+        return;
+    }
+    mWords = std::move(words);
+    mOwnWords.reset();
+    reset();
+}
+
+ALSyntaxWords& ALSyntaxHighlighter::ownWords()
+{
+    if (!mOwnWords || mOwnWords.get() != mWords.get())
+    {
+        mOwnWords = std::make_shared<ALSyntaxWords>(*mWords);
+        mWords    = mOwnWords;
+    }
+    return *mOwnWords;
 }
 
 void ALSyntaxHighlighter::wordsChanged()
@@ -181,7 +218,7 @@ void ALSyntaxHighlighter::ensure(S32 line)
             continue;
         }
         ALSyntaxState state = mStates[start];
-        mGrammar->lexLine(mDocument->line(i), state, fresh, mWords);
+        mGrammar->lexLine(mDocument->line(i), state, fresh, *mWords);
         ++mLastLexed;
         if (!entry.valid || fresh != entry.tokens)
         {

@@ -156,6 +156,7 @@ namespace
             return words;
         };
         sources.lslHelpUrl = [] { return gSavedSettings.getString("LSLHelpURL"); };
+        sources.definitionsVersion = [] { return LLSyntaxDefCache::instance().getSyntaxID().asString(); };
         return true;
     }();
 
@@ -806,8 +807,9 @@ bool ALFloaterScriptStudio::postBuild()
     // New definitions from the region: the analyzers reload, the words
     // are rebuilt, and every script is checked again.
     mDefinitionsConnection = LLSyntaxDefCache::instance().addSyntaxIDCallback([this]() {
+        // The words are built again on the first ask, by whichever window
+        // asks first, as the definitions' version has moved.
         ALScriptAnalysis::instance().definitionsChanged();
-        ALScriptStudioWords::forget();
         for (std::unique_ptr<Doc>& doc : mDocs)
         {
             if (doc->loaded)
@@ -2656,12 +2658,7 @@ void ALFloaterScriptStudio::speakFileLanguage(Doc& doc, const FileLanguage& lang
         editor.setHoverRequest(nullptr);
         editor.setSignatureRequest(nullptr);
         editor.setSymbolRequest(nullptr);
-        ALSyntaxWords& tables = editor.highlighter().words();
-        for (const char* table : { "function", "event", "type", "control", "constant", "deprecated" })
-        {
-            tables.set(table, {});
-        }
-        editor.highlighter().wordsChanged();
+        editor.highlighter().setWords(nullptr);
         editor.clearMarks();
     }
     doc.outline.clear();

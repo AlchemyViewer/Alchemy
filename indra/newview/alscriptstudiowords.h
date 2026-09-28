@@ -75,6 +75,9 @@ public:
         std::function<LLSD(bool lua)>             keywords;
         std::function<std::vector<std::string>()> preprocessorWords;
         std::function<std::string()>              lslHelpUrl;
+        // Which definitions keywords() gives: the vocabulary is built again
+        // on the first ask after it moves, once for every window.
+        std::function<std::string()>              definitionsVersion;
     };
     static Sources& sources();
 
@@ -90,8 +93,11 @@ public:
     static std::string notesOf(const Vocab& word);
 
     // The words put in an editor's tables, so that they colour: the
-    // studio's editors and the preferences' previews alike.
-    static void teach(ALCodeEditor& editor, bool lua);
+    // studio's editors and the preferences' previews alike. The tables are
+    // a language's, made once from the vocabulary and the preprocessor's
+    // words and shared by every editor of it, not copied into each.
+    static void                                 teach(ALCodeEditor& editor, bool lua);
+    static std::shared_ptr<const ALSyntaxWords> tables(bool lua);
     // What the hover card says of the word under the mouse, where the
     // vocabulary knows it: `Say` in `ll.Say` asked about as `ll.Say`, `pi`
     // in `math.pi` as `math.pi`. False where it is a word of the script's.

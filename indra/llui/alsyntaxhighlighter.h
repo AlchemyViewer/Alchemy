@@ -53,7 +53,14 @@ public:
     // everything again.
     void                                   setGrammar(std::shared_ptr<const ALSyntaxGrammar> grammar);
     std::shared_ptr<const ALSyntaxGrammar> grammar() const { return mGrammar; }
-    ALSyntaxWords&                         words() { return mWords; }
+    // The words its tables hold: a language's, shared by every view of it
+    // and taught once rather than copied into each, set again when they
+    // change; none, set to nothing. ownWords() is this view's own to
+    // change, copied from what it shared where it has none of its own --
+    // for a test, or a view taught by hand -- and wordsChanged() says so.
+    void                                   setWords(std::shared_ptr<const ALSyntaxWords> words);
+    const ALSyntaxWords&                   words() const { return *mWords; }
+    ALSyntaxWords&                         ownWords();
     void                                   wordsChanged();
 
     // The document to follow; null to follow none.
@@ -97,7 +104,8 @@ private:
     ALTextDocument*                        mDocument = nullptr;
     boost::signals2::scoped_connection     mConnection;
     std::shared_ptr<const ALSyntaxGrammar> mGrammar;
-    ALSyntaxWords                          mWords;
+    std::shared_ptr<const ALSyntaxWords>   mWords;
+    std::shared_ptr<ALSyntaxWords>         mOwnWords;
     ALLineTable<Line>                      mLines;
     // Every state a line starts or ends in, each once, and the number of
     // the one the first line starts in: a line keeps two numbers rather

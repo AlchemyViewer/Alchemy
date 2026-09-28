@@ -44,6 +44,17 @@ namespace
     // How many times each has been built: what an index over one knows it
     // by, since the list built again is the same list, and may be as long.
     U32                                     sVocabularyBuilds[2] = { 0, 0 };
+    // The definitions each was built from.
+    std::string                             sVocabularyVersion[2];
+    // Each language's tables, as the vocabulary and the preprocessor's
+    // words last made them.
+    struct Tables
+    {
+        std::shared_ptr<const ALSyntaxWords> words;
+        U32                                  builds = 0;
+        std::vector<std::string>             extra;
+    };
+    Tables sTables[2];
 }
 
 // static
@@ -62,12 +73,14 @@ void ALScriptStudioWords::forget()
 // static
 const std::vector<ALScriptStudioWords::Vocab>& ALScriptStudioWords::vocabulary(bool lua)
 {
-    std::vector<Vocab>& out = sVocabulary[lua ? 1 : 0];
-    if (sVocabularyBuilt[lua ? 1 : 0])
+    std::vector<Vocab>& out     = sVocabulary[lua ? 1 : 0];
+    const std::string   version = sources().definitionsVersion ? sources().definitionsVersion() : std::string();
+    if (sVocabularyBuilt[lua ? 1 : 0] && sVocabularyVersion[lua ? 1 : 0] == version)
     {
         return out;
     }
-    sVocabularyBuilt[lua ? 1 : 0] = true;
+    sVocabularyBuilt[lua ? 1 : 0]   = true;
+    sVocabularyVersion[lua ? 1 : 0] = version;
     ++sVocabularyBuilds[lua ? 1 : 0];
     out.clear();
     const LLSD keywords = sources().keywords ? sources().keywords(lua) : LLSD();
@@ -199,8 +212,24 @@ const std::vector<ALScriptStudioWords::Vocab>& ALScriptStudioWords::vocabulary(b
 // static
 void ALScriptStudioWords::teach(ALCodeEditor& editor, bool lua)
 {
+    editor.highlighter().setWords(tables(lua));
+}
+
+// static
+std::shared_ptr<const ALSyntaxWords> ALScriptStudioWords::tables(bool lua)
+{
     const std::vector<Vocab>& words = vocabulary(lua);
-    std::vector<std::string>  functions, events, types, controls, constants, deprecated;
+    // The preprocessor's words, which the grid's keywords do not list,
+    // while their transforms are on: Firestorm's switch and case, the
+    // extensions' break and continue, and inline and const, which it takes
+    // off whenever it runs.
+    const std::vector<std::string> extra = !lua && sources().preprocessorWords ? sources().preprocessorWords() : std::vector<std::string>();
+    Tables&                        kept  = sTables[lua ? 1 : 0];
+    if (kept.words && kept.builds == sVocabularyBuilds[lua ? 1 : 0] && kept.extra == extra)
+    {
+        return kept.words;
+    }
+    std::vector<std::string> functions, events, types, controls, constants, deprecated;
     for (const Vocab& word : words)
     {
         if (word.deprecated)
@@ -218,29 +247,24 @@ void ALScriptStudioWords::teach(ALCodeEditor& editor, bool lua)
             default: break;
         }
     }
-    if (!lua)
+    for (const std::string& word : extra)
     {
-        // The preprocessor's words, which the grid's keywords do not list,
-        // while their transforms are on: Firestorm's switch and case, the
-        // extensions' break and continue, and inline and const, which it
-        // takes off whenever it runs.
-        const std::vector<std::string> extra = sources().preprocessorWords ? sources().preprocessorWords() : std::vector<std::string>();
-        for (const std::string& word : extra)
+        if (std::find(controls.begin(), controls.end(), word) == controls.end())
         {
-            if (std::find(controls.begin(), controls.end(), word) == controls.end())
-            {
-                controls.push_back(word);
-            }
+            controls.push_back(word);
         }
     }
-    ALSyntaxWords& tables = editor.highlighter().words();
-    tables.set("function", std::move(functions));
-    tables.set("event", std::move(events));
-    tables.set("type", std::move(types));
-    tables.set("control", std::move(controls));
-    tables.set("constant", std::move(constants));
-    tables.set("deprecated", std::move(deprecated));
-    editor.highlighter().wordsChanged();
+    auto made = std::make_shared<ALSyntaxWords>();
+    made->set("function", std::move(functions));
+    made->set("event", std::move(events));
+    made->set("type", std::move(types));
+    made->set("control", std::move(controls));
+    made->set("constant", std::move(constants));
+    made->set("deprecated", std::move(deprecated));
+    kept.words  = std::move(made);
+    kept.builds = sVocabularyBuilds[lua ? 1 : 0];
+    kept.extra  = extra;
+    return kept.words;
 }
 
 // static
