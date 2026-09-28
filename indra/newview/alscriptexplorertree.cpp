@@ -48,10 +48,10 @@ static LLPanelInjector<ALScriptExplorerTree> t_script_studio_explorer_tree("scri
 class ALScriptExplorerTree::Node final : public ALFilteredItem
 {
 public:
-    Node(ALScriptExplorerTree& tree, LLFolderViewModelInterface& model, std::string key, bool folder)
+    Node(ALScriptExplorerTree& tree, LLFolderViewModelInterface& model, const Key& key, bool folder)
     :   ALFilteredItem(model),
         mTree(tree),
-        mKey(std::move(key)),
+        mKey(key),
         mFolder(folder)
     {
     }
@@ -73,7 +73,7 @@ public:
         return changed;
     }
 
-    const std::string& key() const { return mKey; }
+    const Key&         key() const { return mKey; }
     const LLSD&        value() const { return mValue; }
     bool               folder() const { return mFolder; }
     bool               known() const { return mKnown; }
@@ -149,7 +149,7 @@ public:
 
 private:
     ALScriptExplorerTree& mTree;
-    const std::string     mKey;
+    const Key             mKey;
     const bool            mFolder;
     LLSD                  mValue;
     std::string           mName;
@@ -220,7 +220,7 @@ ALScriptExplorerTree::~ALScriptExplorerTree()
 bool ALScriptExplorerTree::postBuild()
 {
     mViewModel = std::make_unique<ViewModel>(*this);
-    mRoot      = new Node(*this, *mViewModel, std::string(), true);
+    mRoot      = new Node(*this, *mViewModel, Key(), true);
 
     LLFolderView::Params p(LLUICtrlFactory::getDefaultParams<LLFolderView>());
     p.name              = "explorer_folders";
@@ -360,25 +360,25 @@ const ALScriptExplorerTree::Node* ALScriptExplorerTree::parentOf(const Node* nod
 }
 
 // static
-std::string ALScriptExplorerTree::keyOf(const LLSD& row)
+ALScriptExplorerTree::Key ALScriptExplorerTree::keyOf(const LLSD& row)
 {
     if (!row.isMap())
     {
-        return std::string();
+        return Key();
     }
     if (row.has("item"))
     {
-        return "i:" + row["prim"].asString() + ":" + row["item"].asString();
+        return { 'i', row["prim"].asUUID(), row["item"].asUUID() };
     }
     if (row.has("empties"))
     {
-        return "e:" + row["root"].asString();
+        return { 'e', row["root"].asUUID(), LLUUID::null };
     }
     if (row.has("prim"))
     {
-        return "p:" + row["prim"].asString();
+        return { 'p', row["prim"].asUUID(), LLUUID::null };
     }
-    return "o:" + row["root"].asString();
+    return { 'o', row["root"].asUUID(), LLUUID::null };
 }
 
 const ALScriptExplorerTree::Entry* ALScriptExplorerTree::find(const LLSD& row) const
@@ -387,7 +387,7 @@ const ALScriptExplorerTree::Entry* ALScriptExplorerTree::find(const LLSD& row) c
     return found != mNodes.end() ? &found->second : nullptr;
 }
 
-ALScriptExplorerTree::Entry ALScriptExplorerTree::make(const Row& row, const std::string& key, const Entry& parent)
+ALScriptExplorerTree::Entry ALScriptExplorerTree::make(const Row& row, const Key& key, const Entry& parent)
 {
     const bool folder = row.kind != Row::Kind::Item;
     Entry      made;
@@ -426,7 +426,7 @@ void ALScriptExplorerTree::forget(Node* node)
     mNodes.erase(node->key());
 }
 
-void ALScriptExplorerTree::drop(const std::string& key)
+void ALScriptExplorerTree::drop(const Key& key)
 {
     const auto found = mNodes.find(key);
     if (found == mNodes.end())
@@ -455,6 +455,7 @@ void ALScriptExplorerTree::show(const std::vector<Row>& rows, const std::functio
         return;
     }
     mShowing = true;
+    ++mShows;
     Filter& lit = static_cast<Filter&>(mViewModel->getFilter());
     lit.setWords(filter);
     lit.setEmptyLookupMessage(empty);
@@ -462,14 +463,16 @@ void ALScriptExplorerTree::show(const std::vector<Row>& rows, const std::functio
     // Each row's node, and what holds it: an object at the top; a prim in
     // its object, or with the prims holding nothing after that row; an item
     // in its prim, or in its object where that is one prim.
-    const Entry                               root{ mRoot, mFolderView };
-    boost::unordered_flat_set<std::string, ll::string_hash, std::equal_to<>> shown;
-    Entry                                     object, empties, prim;
-    bool                                      resort = false;
-    S32                                       order  = 0;
+    const Entry                    root{ mRoot, mFolderView };
+    boost::unordered_flat_set<Key> shown;
+    Entry                          object, empties, prim;
+    bool                           resort = false;
+    // Whether anything is otherwise than it was: laid out again only then.
+    bool                           changed = false;
+    S32                            order   = 0;
     for (const Row& row : rows)
     {
-        const std::string key = keyOf(row.value);
+        const Key key = keyOf(row.value);
         const Entry*      parent = &root;
         switch (row.kind)
         {
@@ -499,6 +502,7 @@ void ALScriptExplorerTree::show(const std::vector<Row>& rows, const std::functio
         if (entry.node->set(row, look(row)) || fresh)
         {
             entry.widget->refresh();
+            changed = true;
         }
         if (entry.node->mOrder != order)
         {
@@ -510,6 +514,7 @@ void ALScriptExplorerTree::show(const std::vector<Row>& rows, const std::functio
         {
             entry.node->mRowFolded = row.folded;
             static_cast<LLFolderViewFolder*>(entry.widget)->setOpen(!row.folded);
+            changed = true;
         }
         switch (row.kind)
         {
@@ -524,7 +529,7 @@ void ALScriptExplorerTree::show(const std::vector<Row>& rows, const std::functio
         }
     }
     // What is no longer a row goes, with what it held.
-    std::vector<std::string> gone;
+    std::vector<Key> gone;
     for (const auto& [key, entry] : mNodes)
     {
         if (!shown.contains(key))
@@ -532,7 +537,7 @@ void ALScriptExplorerTree::show(const std::vector<Row>& rows, const std::functio
             gone.push_back(key);
         }
     }
-    for (const std::string& key : gone)
+    for (const Key& key : gone)
     {
         drop(key);
     }
@@ -540,7 +545,12 @@ void ALScriptExplorerTree::show(const std::vector<Row>& rows, const std::functio
     {
         mViewModel->requestSortAll();
     }
-    mFolderView->arrangeAll();
+    if (changed || resort || !gone.empty() || filter != mShownFilter || empty != mShownEmpty)
+    {
+        mShownFilter = filter;
+        mShownEmpty  = empty;
+        mFolderView->arrangeAll();
+    }
     mShowing = false;
 }
 
@@ -579,15 +589,25 @@ void ALScriptExplorerTree::closed(Node& node)
 
 std::vector<LLSD> ALScriptExplorerTree::chosen() const
 {
-    std::vector<const Node*> nodes;
+    // As last asked, where the same widgets are chosen among the same rows.
+    std::vector<const LLFolderViewItem*> items;
     if (mFolderView)
     {
         for (const LLFolderViewItem* item : mFolderView->getSelectionList())
         {
-            if (const Node* node = static_cast<const Node*>(item->getViewModelItem()); node && node->value().isDefined())
-            {
-                nodes.push_back(node);
-            }
+            items.push_back(item);
+        }
+    }
+    if (mChosenOf == mShows && items == mChosenItems)
+    {
+        return mChosen;
+    }
+    std::vector<const Node*> nodes;
+    for (const LLFolderViewItem* item : items)
+    {
+        if (const Node* node = static_cast<const Node*>(item->getViewModelItem()); node && node->value().isDefined())
+        {
+            nodes.push_back(node);
         }
     }
     // In the tree's order: by what holds each, then among its own.
@@ -605,6 +625,9 @@ std::vector<LLSD> ALScriptExplorerTree::chosen() const
     {
         rows.push_back(node->value());
     }
+    mChosenOf    = mShows;
+    mChosenItems = std::move(items);
+    mChosen      = rows;
     return rows;
 }
 

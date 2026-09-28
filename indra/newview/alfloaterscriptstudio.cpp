@@ -1591,7 +1591,7 @@ void ALFloaterScriptStudio::releaseTabs()
     }
     if (held.relist)
     {
-        mExplorerPane->relist();
+        mExplorerPane->relistSoon();
     }
 }
 
@@ -1602,7 +1602,7 @@ void ALFloaterScriptStudio::relistExplorer()
         mHeld.relist = true;
         return;
     }
-    mExplorerPane->relist();
+    mExplorerPane->relistSoon();
 }
 
 void ALFloaterScriptStudio::rekeyDoc(Doc& doc, const std::string& id)
@@ -2199,7 +2199,7 @@ void ALFloaterScriptStudio::loaded(const ALScriptWorkspace::Loaded& answer)
         setStatus(getString(answer.modifiable ? "Loaded" : "LoadedReadOnly", args));
         if (!doc.ref.inInventory())
         {
-            mExplorerPane->relist();
+            relistExplorer();
         }
         goToPending(doc);
     }

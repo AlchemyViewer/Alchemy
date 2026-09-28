@@ -229,14 +229,17 @@ bool ALScriptExplorerPane::postBuild()
     // A filter looks through what is folded too: what a large linkset's
     // folded prims hold is asked for once there is one.
     mFilter->setCommitCallback([this](LLUICtrl*, const LLSD&) {
-        if (mFilter->getText().empty())
-        {
-            fillWhenSeen();
-        }
-        else
+        // The first letter asks what folded prims hold, which the filter
+        // looks through; each letter after it, and letting it go, only
+        // fills again from what is listed.
+        const bool filtering = !mFilter->getText().empty();
+        if (filtering && !std::exchange(mFiltering, true))
         {
             relist();
+            return;
         }
+        mFiltering = filtering;
+        fillWhenSeen();
     });
     for (const char* action : { "open", "start", "stop", "reset", "refresh" })
     {
@@ -498,8 +501,17 @@ void ALScriptExplorerPane::fill()
     // What a row is -- an object, a prim, a script -- is its icon, and a
     // script's state and an object out of sight follow its name, as the
     // inventory's worn items say so.
-    const auto said = [this](const std::string& word) { return " (" + mServices->words(word) + ")"; };
-    const auto look = [&](const Model::Row& row) {
+    // The words every row of a kind says, looked up once for all of them.
+    const auto        said        = [this](const std::string& word) { return " (" + mServices->words(word) + ")"; };
+    const std::string pinned_mark = mServices->words("PinnedMark");
+    const std::string away        = said("KindAway");
+    const std::string coming      = mServices->words("ObjectNameComing");
+    const std::string unknown     = said("StateUnknown");
+    const std::string running_yes = said("RunningYes");
+    const std::string running_no  = said("RunningNo");
+    const std::string no_modify   = said("NoModifyMark");
+    const std::string no_copy     = said("NoCopyMark");
+    const auto        look        = [&](const Model::Row& row) {
         ALScriptExplorerTree::Look out;
         switch (row.kind)
         {
@@ -508,9 +520,9 @@ void ALScriptExplorerPane::fill()
                 // Away, where it was last: its pin keeps the place.
                 LLStringUtil::format_map_t where;
                 where["[REGION]"] = row.region;
-                out.label  = (row.pinned ? mServices->words("PinnedMark") : LLStringUtil::null) + row.name;
+                out.label  = (row.pinned ? pinned_mark : LLStringUtil::null) + row.name;
                 out.suffix = row.present         ? LLStringUtil::null
-                             : row.region.empty() ? said("KindAway")
+                             : row.region.empty() ? away
                                                   : " (" + mServices->words("KindAwayIn", where) + ")";
                 out.icon   = row.many ? "Inv_Object_Multi" : "Inv_Object";
                 break;
@@ -528,7 +540,7 @@ void ALScriptExplorerPane::fill()
                 // By its link number, as llGetLinkName and the rest take it.
                 LLStringUtil::format_map_t args;
                 args["[LINK]"] = std::to_string(row.link);
-                args["[NAME]"] = row.name.empty() ? mServices->words("ObjectNameComing") : row.name;
+                args["[NAME]"] = row.name.empty() ? coming : row.name;
                 out.label      = mServices->words("PrimLinked", args);
                 out.icon       = "Studio_Prim";
                 break;
@@ -538,16 +550,16 @@ void ALScriptExplorerPane::fill()
                 if (row.script)
                 {
                     const std::optional<bool> running = knownRunning(row.ref);
-                    out.suffix = said(!running ? "StateUnknown" : *running ? "RunningYes" : "RunningNo");
+                    out.suffix = !running ? unknown : *running ? running_yes : running_no;
                 }
                 // What the agent may not do with it, as the inventory says.
                 if (row.noModify)
                 {
-                    out.suffix += said("NoModifyMark");
+                    out.suffix += no_modify;
                 }
                 if (row.noCopy)
                 {
-                    out.suffix += said("NoCopyMark");
+                    out.suffix += no_copy;
                 }
                 out.icon = row.script ? (row.lua ? "Inv_Script_Luau" : "Inv_Script")
                            : row.name == ".luaurc" || row.name == ".lslrc" ? "Studio_Config"

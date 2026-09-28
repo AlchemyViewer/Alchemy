@@ -106,6 +106,9 @@ public:
     // where it is not known or has changed -- of every prim where `refetch`.
     // `from_region` asks every prim's region, not the objects' copies.
     void relist(bool refetch = false, bool from_region = false);
+    // The same on the next frame, however many ask before it: a tab loaded
+    // or closed, a script's own answer, many of them at a time.
+    void relistSoon(bool refetch = false);
     // A script's row, chosen and in view, with the explorer in sight and
     // the keyboard in it: what holds it unfolded first, and the filter let
     // go of where it hides the row.
@@ -136,10 +139,9 @@ private:
     // or an open script remembers it by, or an ellipsis while it is asked.
     std::string nameGivenTo(const LLUUID& root) const;
     void        refold(Model::Refold refold);
-    // Listed again, or filled again, on the next frame: asked for from
-    // within the tree's own handling of a click, a drop or a rename, which
-    // the tree is not to be changed under.
-    void        relistSoon(bool refetch);
+    // Filled again on the next frame: asked for from within the tree's own
+    // handling of a click, a drop or a rename, which the tree is not to be
+    // changed under.
     void        fillSoon();
 
     void onChosen();
@@ -218,6 +220,8 @@ private:
     bool                    mNamesStale = false;
     // Listed again on the next frame, and whether every prim is asked again.
     std::optional<bool>     mRelistWanted;
+    // Whether the filter has words in it, as it last committed.
+    bool                    mFiltering = false;
     boost::signals2::scoped_connection mPropertiesConnection;
     boost::signals2::scoped_connection mSelectionConnection;
     boost::signals2::scoped_connection mRunningConnection;
