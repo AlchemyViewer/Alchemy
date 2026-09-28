@@ -206,6 +206,17 @@ public:
         // The functions the script marked `inline`, which the optimizer
         // puts in place wherever they are called.
         std::vector<std::string> inlined;
+        // What the script declared `const`, the keyword taken off: each
+        // name where its declaration names it in the text, and whether it
+        // is a function's (ALLSLConsts).
+        struct Const
+        {
+            std::string name;
+            S32         line     = 0;
+            S32         column   = 0;
+            bool        function = false;
+        };
+        std::vector<Const> consts;
         // The optimizer ran and its text is what came out.
         bool optimized     = false;
         // Where it was weighed: what the code came to for its target
@@ -287,7 +298,7 @@ public:
     // The transform a line of LSL is written for, by the shape of its
     // first statement: `switch (` and `case ...:` the switch's; `break;`,
     // `break 2;`, `continue;`, `inline f(` and `inline type f(` the
-    // extensions'. A brace on a line of its own is the switch's where the
+    // extensions', and `const` before a type anywhere on the line. A brace on a line of its own is the switch's where the
     // line before it, past blank ones, opens one, since its brace may go
     // on the next. Nothing where the word is a name of the script's own --
     // `case = 1;`, `inline(` -- or the line is none of these. What a parse

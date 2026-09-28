@@ -82,6 +82,15 @@ namespace
         // The text is the file's own at that place, rather than what a
         // macro made there.
         bool        verbatim = true;
+        // A name the script declared `const` (ConstMarkers): a variable's,
+        // or a function's.
+        enum class Const : U8
+        {
+            None,
+            Variable,
+            Function
+        };
+        Const        declared = Const::None;
         // The macros this token will not expand as: Prosser's hide set,
         // shared by the tokens one expansion made.
         hide_set_ptr hide = nullptr;
@@ -2797,6 +2806,61 @@ namespace
         std::vector<std::string> mNames;
     };
 
+    // `const` before a declaration's type -- a global's, a local's, a
+    // parameter's, or a function's -- taken off wherever the preprocessor
+    // runs over LSL, as `inline` is, and the name it declares flagged, for
+    // assemble() to say where it is (ALLSLConsts checks and folds them).
+    // `const` then a type is no LSL, so no script that compiles loses a
+    // word it meant: `integer const = 1;` keeps its variable.
+    class ConstMarkers
+    {
+    public:
+        static bool anyIn(const Tokens& in)
+        {
+            return std::any_of(in.begin(), in.end(), [](const Token& t) { return t.is(Kind::Ident, "const"); });
+        }
+
+        static Tokens run(Tokens in)
+        {
+            Tokens out;
+            out.reserve(in.size());
+            S32 braces = 0;
+            S32 parens = 0;
+            for (size_t i = 0; i < in.size(); ++i)
+            {
+                if (in[i].is(Kind::Ident, "const"))
+                {
+                    const size_t type = skipSpace(in, i + 1);
+                    const size_t name = type < in.size() && isType(in[type]) ? skipBlank(in, type + 1) : in.size();
+                    if (name < in.size() && in[name].kind == Kind::Ident)
+                    {
+                        const size_t after    = skipBlank(in, name + 1);
+                        const bool   function = braces == 0 && parens == 0 && after < in.size() && in[after].is(Kind::Punct, "(");
+                        in[name].declared     = function ? Token::Const::Function : Token::Const::Variable;
+                        // The word, and the spaces up to the type.
+                        i = type - 1;
+                        continue;
+                    }
+                }
+                if (in[i].kind == Kind::Punct)
+                {
+                    const std::string& p = in[i].text;
+                    braces += p == "{" ? 1 : p == "}" && braces > 0 ? -1 : 0;
+                    parens += p == "(" ? 1 : p == ")" && parens > 0 ? -1 : 0;
+                }
+                out.push_back(std::move(in[i]));
+            }
+            return out;
+        }
+
+    private:
+        static bool isType(const Token& t)
+        {
+            static constexpr std::string_view TYPES[] = { "integer", "float", "string", "key", "vector", "rotation", "quaternion", "list" };
+            return t.kind == Kind::Ident && std::find(std::begin(TYPES), std::end(TYPES), t.text) != std::end(TYPES);
+        }
+    };
+
     // The language extensions LSL-PyOptimizer's users know, lowered to
     // LSL: `break` and `continue` in a loop -- `break 2` for the loop
     // outside -- as jumps to labels put after the loop and at the end
@@ -4033,6 +4097,10 @@ namespace
         S32 column = 0;
         for (const Token& t : tokens)
         {
+            if (t.declared != Token::Const::None)
+            {
+                result.consts.push_back({ t.text, line, column, t.declared == Token::Const::Function });
+            }
             // What came from no file -- the module table -- maps nowhere.
             if (t.kind != Kind::Newline && t.file >= 0)
             {
@@ -4256,6 +4324,11 @@ ALPreprocessor::Result ALPreprocessor::run(std::string_view source, const Option
             LazyLists lazy(engine);
             tokens               = lazy.run(tokens);
             result.usedLazyLists = lazy.any();
+        }
+        if (ConstMarkers::anyIn(tokens))
+        {
+            // Taken off whatever else is done, as `inline` is.
+            tokens = ConstMarkers::run(std::move(tokens));
         }
         if (options.extensions || engine.usedExtensions())
         {
@@ -4582,6 +4655,29 @@ ALPreprocessor::Transform ALPreprocessor::transformAt(const std::function<std::s
             if (before != std::string_view::npos && text[before] == ')' && (next == std::string_view::npos || text[next] == '{'))
             {
                 word = "inline";
+                return Transform::Extensions;
+            }
+        }
+        // `const` before a type, anywhere on the line: a declaration's, or
+        // a parameter's.
+        for (size_t at = text.find("const"); at != std::string_view::npos; at = text.find("const", at + 1))
+        {
+            const size_t after = at + 5;
+            if ((at > 0 && isWord(text[at - 1])) || after >= text.size() || isWord(text[after]))
+            {
+                continue;
+            }
+            const size_t type = text.find_first_not_of(blank, after);
+            size_t       end  = type;
+            while (end != std::string_view::npos && end < text.size() && isWord(text[end]))
+            {
+                ++end;
+            }
+            static constexpr std::string_view TYPES[] = { "integer", "float", "string", "key", "vector", "rotation", "quaternion", "list" };
+            if (type != std::string_view::npos && end > type &&
+                std::find(std::begin(TYPES), std::end(TYPES), text.substr(type, end - type)) != std::end(TYPES))
+            {
+                word = "const";
                 return Transform::Extensions;
             }
         }

@@ -714,6 +714,15 @@ namespace tut
         expansions.back().second(stripped);
         studio.asks.back().answered(answer(marked, { problem(0, "syntax error") }));
         ensure_equals("preprocessing, the extensions off: not", marked.check.analysis[0].message, std::string("syntax error"));
+
+        // And so is `const`, before a type anywhere on the line.
+        preprocessing = false;
+        Doc& constant = tab("c", "f(const integer n) { }\n");
+        checking.ask(constant, Kind::Check, ALTextPos(), ALTextPos());
+        studio.asks.back().answered(answer(constant, { problem(0, "syntax error") }));
+        ensure("const explained: " + constant.check.analysis[0].message,
+               constant.check.analysis[0].message.find("syntax error PreprocHintConst [WORD]=const") == 0);
+        preprocessing = true;
     }
 
     template<> template<>

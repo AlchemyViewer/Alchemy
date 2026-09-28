@@ -461,6 +461,7 @@
     <floater.string name="PreprocHintSwitch">([WORD] is Firestorm's: turn on Build > Preprocess on Save and Build > Firestorm > Switch Statements)</floater.string>
     <floater.string name="RequireNotPreprocessed">require("[NAME]") goes up as written, and the grid has no require: turn on Build > Preprocess on Save to put the module in its place</floater.string>
     <floater.string name="PreprocHintExtensions">([WORD] is an extension: turn on Build > Preprocess on Save and Build > Extensions)</floater.string>
+    <floater.string name="PreprocHintConst">([WORD] marks what never changes, and lets a global's value be worked out from others: turn on Build > Preprocess on Save)</floater.string>
     <floater.string name="PreprocHintInline">([WORD] marks a function to be put where it is called: turn on Build > Preprocess on Save)</floater.string>
     <floater.string name="ClearRecentFiles">Clear Menu</floater.string>
     <floater.string name="OriginCompiler">Compiler</floater.string>

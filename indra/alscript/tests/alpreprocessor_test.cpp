@@ -1054,6 +1054,11 @@ namespace tut
         ensure("inline after them, the brace on the next line", of({ "f() inline" }, 0) == T::Extensions);
         ensure("a name that ends in inline is not", of({ "integer f(integer a) noinline {" }, 0) == T::None);
         ensure("inline assigned", of({ "inline = 2;" }, 0) == T::None);
+        ensure("const before a type", of({ "const integer X = 1;" }, 0, &word) == T::Extensions);
+        ensure_equals("const's word", word, std::string("const"));
+        ensure("a const parameter", of({ "f(integer a, const vector v)" }, 0) == T::Extensions);
+        ensure("a variable named const", of({ "integer const = 1;" }, 0) == T::None);
+        ensure("a word that starts with const", of({ "constant = 1;" }, 0) == T::None);
         ensure("after a brace and a statement's end", of({ "} ; switch (x)" }, 0) == T::Switch);
         ensure("a plain statement", of({ "integer x = 1;" }, 0) == T::None);
         ensure("a blank line", of({ "   " }, 0) == T::None);
@@ -1467,5 +1472,51 @@ namespace tut
                                                                  optimizing);
         ensure("both calls put in place: " + put.text, put.text.find("say(") == std::string::npos && put.text.find("llOwnerSay(\"a\")") != std::string::npos &&
                                                            put.text.find("llOwnerSay(\"b\" + \"!\")") != std::string::npos);
+    }
+
+    template<> template<>
+    void alpreprocessor_object::test<40>()
+    {
+        set_test_name("const before a type is taken off, and each name it declares said where it is, a function's as a function");
+        const auto at = [](const ALPreprocessor::Result& r, size_t i, const std::string& name, S32 line, S32 column, bool function) {
+            return i < r.consts.size() && r.consts[i].name == name && r.consts[i].line == line && r.consts[i].column == column &&
+                   r.consts[i].function == function;
+        };
+        ALPreprocessor::Result r = ALPreprocessor::run("const integer X = 5;\n"
+                                                       "const   float Y = X * 2;\n"
+                                                       "const integer sq(const integer x) { return x * x; }\n"
+                                                       "default { state_entry() { const vector v = <1, 2, 3>; llOwnerSay((string)v); } }\n",
+                                                       options());
+        ensure_equals("problems", messages(r), std::string());
+        ensure_equals("taken off", r.text,
+                      std::string("integer X = 5;\n"
+                                  "float Y = X * 2;\n"
+                                  "integer sq(integer x) { return x * x; }\n"
+                                  "default { state_entry() { vector v = <1, 2, 3>; llOwnerSay((string)v); } }\n"));
+        ensure_equals("five", r.consts.size(), size_t(5));
+        ensure("a global", at(r, 0, "X", 0, 8, false));
+        ensure("the spaces up to the type gone too", at(r, 1, "Y", 1, 6, false));
+        ensure("a function", at(r, 2, "sq", 2, 8, true));
+        ensure("its parameter", at(r, 3, "x", 2, 19, false));
+        ensure("a local", at(r, 4, "v", 3, 33, false));
+        ensure("the extensions not said to be used", !r.usedExtensions);
+
+        // A name, an assignment, a word with no type after it: no const.
+        const std::string plain = "integer const = 1;\nf() { const = 2; integer constant = const; }\n";
+        r                       = ALPreprocessor::run(plain, options());
+        ensure_equals("nothing taken off", r.text, plain);
+        ensure("nothing said", r.consts.empty());
+
+        // Made by a macro, and with the extensions on.
+        ALPreprocessor::Options o = options();
+        o.extensions              = true;
+        r                         = ALPreprocessor::run("#define FIXED const integer\nFIXED Z = 3;\n", o);
+        ensure_equals("problems", messages(r), std::string());
+        ensure_equals("a macro's", squeeze(r.text), std::string("integer Z = 3;\n"));
+        const size_t z       = r.text.find('Z');
+        const size_t newline = r.text.rfind('\n', z);
+        const S32    line    = static_cast<S32>(std::count(r.text.begin(), r.text.begin() + z, '\n'));
+        const S32    column  = static_cast<S32>(newline == std::string::npos ? z : z - newline - 1);
+        ensure("where the name is in the text", at(r, 0, "Z", line, column, false) && r.consts.size() == 1);
     }
 }
