@@ -61,15 +61,10 @@ void ALScriptExplorerModel::list(const Listing& listing)
     // away again.
     const boost::unordered_flat_set<LLUUID> known_prims = std::move(mListedPrims);
     mObjects.clear();
+    mObjectAt.clear();
     auto known = [this](const LLUUID& root) -> Object* {
-        for (Object& each : mObjects)
-        {
-            if (each.root == root)
-            {
-                return &each;
-            }
-        }
-        return nullptr;
+        const auto found = mObjectAt.find(root);
+        return found != mObjectAt.end() ? &mObjects[found->second] : nullptr;
     };
     auto add = [&](const LLUUID& id) -> Object* {
         const std::optional<Seen> seen = listing.seen ? listing.seen(id) : std::nullopt;
@@ -110,6 +105,7 @@ void ALScriptExplorerModel::list(const Listing& listing)
                 }
             }
         }
+        mObjectAt.emplace(one.root, mObjects.size());
         mObjects.push_back(std::move(one));
         return &mObjects.back();
     };
@@ -126,6 +122,7 @@ void ALScriptExplorerModel::list(const Listing& listing)
             away.name    = pin.name.empty() ? listing.unnamed : pin.name;
             away.pinned  = true;
             away.present = false;
+            mObjectAt.emplace(away.root, mObjects.size());
             mObjects.push_back(std::move(away));
         }
     }
@@ -148,14 +145,27 @@ void ALScriptExplorerModel::list(const Listing& listing)
     mSought.insert(listing.selected.begin(), listing.selected.end());
     mSought.insert(listing.open.begin(), listing.open.end());
     mListedPrims.clear();
-    for (const Object& object : mObjects)
+    mPrimAt.clear();
+    for (size_t o = 0; o < mObjects.size(); ++o)
     {
-        for (const Prim& prim : object.prims)
+        for (size_t p = 0; p < mObjects[o].prims.size(); ++p)
         {
-            mListedPrims.insert(prim.id);
+            mListedPrims.insert(mObjects[o].prims[p].id);
+            mPrimAt.emplace(mObjects[o].prims[p].id, At{ o, p });
         }
     }
     boost::unordered::erase_if(mNamesAsked, [this](const LLUUID& id) { return !mListedPrims.contains(id); });
+    // What was folded of what is no longer listed let go of: it is folded
+    // again as it was first, should it come back.
+    boost::unordered::erase_if(mFoldedPrims, [this](const LLUUID& id) { return !mListedPrims.contains(id); });
+    boost::unordered::erase_if(mFolded, [this](const LLUUID& id) { return !mObjectAt.contains(id) && !mListedPrims.contains(id); });
+    boost::unordered::erase_if(mEmptiesOpen, [this](const LLUUID& id) { return !mObjectAt.contains(id); });
+}
+
+const ALScriptExplorerModel::Object* ALScriptExplorerModel::objectAt(const LLUUID& root) const
+{
+    const auto found = mObjectAt.find(root);
+    return found != mObjectAt.end() ? &mObjects[found->second] : nullptr;
 }
 
 std::vector<LLUUID> ALScriptExplorerModel::wanted(bool filtering) const
@@ -183,43 +193,39 @@ void ALScriptExplorerModel::openWhenListed(const LLUUID& prim, const LLUUID& ite
 
 ALScriptExplorerModel::Heard ALScriptExplorerModel::contents(const ALScriptWorkspace::Contents& contents)
 {
-    Heard heard;
-    for (Object& object : mObjects)
+    Heard      heard;
+    const auto at = mPrimAt.find(contents.prim);
+    if (at == mPrimAt.end())
     {
-        for (Prim& prim : object.prims)
+        return heard;
+    }
+    Object& object = mObjects[at->second.object];
+    Prim&   prim   = object.prims[at->second.prim];
+    heard.listed   = true;
+    if (!contents.name.empty())
+    {
+        prim.name = contents.name;
+        if (prim.id == object.root)
         {
-            if (prim.id != contents.prim)
-            {
-                continue;
-            }
-            heard.listed = true;
-            if (!contents.name.empty())
-            {
-                prim.name = contents.name;
-                if (prim.id == object.root)
-                {
-                    renameObject(object, contents.name);
-                }
-            }
-            // The new items waited for in it, now that it lists them, each
-            // with the text it was made with; taken off the list before any
-            // is opened, since opening one can list the prim again.
-            const std::vector<Item>& items = mIndex.items(prim.id);
-            for (auto waiting = mOpenWhenListed.begin(); waiting != mOpenWhenListed.end();)
-            {
-                const auto listed = waiting->prim != prim.id ? items.end() : std::find_if(items.begin(), items.end(), [&waiting](const Item& item) {
-                    return waiting->item.notNull() ? item.id == waiting->item : item.name == waiting->name;
-                });
-                if (listed == items.end())
-                {
-                    ++waiting;
-                    continue;
-                }
-                heard.opening.push_back(Opening{ ALScriptRef(prim.id, listed->id), listed->name, std::move(waiting->text) });
-                waiting = mOpenWhenListed.erase(waiting);
-            }
-            return heard;
+            renameObject(object, contents.name);
         }
+    }
+    // The new items waited for in it, now that it lists them, each with the
+    // text it was made with; taken off the list before any is opened, since
+    // opening one can list the prim again.
+    const std::vector<Item>& items = mIndex.items(prim.id);
+    for (auto waiting = mOpenWhenListed.begin(); waiting != mOpenWhenListed.end();)
+    {
+        const auto listed = waiting->prim != prim.id ? items.end() : std::find_if(items.begin(), items.end(), [&waiting](const Item& item) {
+            return waiting->item.notNull() ? item.id == waiting->item : item.name == waiting->name;
+        });
+        if (listed == items.end())
+        {
+            ++waiting;
+            continue;
+        }
+        heard.opening.push_back(Opening{ ALScriptRef(prim.id, listed->id), listed->name, std::move(waiting->text) });
+        waiting = mOpenWhenListed.erase(waiting);
     }
     return heard;
 }
@@ -266,21 +272,16 @@ bool ALScriptExplorerModel::rereadNames(const std::function<std::string(const LL
 
 void ALScriptExplorerModel::renamed(const LLUUID& prim, const std::string& name)
 {
-    for (Object& object : mObjects)
+    if (const auto at = mPrimAt.find(prim); at != mPrimAt.end())
     {
-        for (Prim& each : object.prims)
+        Object& object = mObjects[at->second.object];
+        Prim&   each   = object.prims[at->second.prim];
+        each.name      = name;
+        each.named     = true;
+        if (prim == object.root)
         {
-            if (each.id != prim)
-            {
-                continue;
-            }
-            each.name  = name;
-            each.named = true;
-            if (prim == object.root)
-            {
-                object.named = true;
-                renameObject(object, name);
-            }
+            object.named = true;
+            renameObject(object, name);
         }
     }
     mNamesAsked.erase(prim);
@@ -477,20 +478,14 @@ ALScriptExplorerModel::Refold ALScriptExplorerModel::foldRow(const LLSD& row, st
 
 bool ALScriptExplorerModel::unfoldTo(const LLUUID& prim)
 {
-    bool unasked = false;
-    for (const Object& object : mObjects)
+    const auto at = mPrimAt.find(prim);
+    if (at == mPrimAt.end())
     {
-        for (const Prim& each : object.prims)
-        {
-            if (each.id == prim)
-            {
-                mFolded.erase(object.root);
-                mFoldedPrims.erase(each.id);
-                unasked = !mIndex.fetched(each.id);
-            }
-        }
+        return false;
     }
-    return unasked;
+    mFolded.erase(mObjects[at->second.object].root);
+    mFoldedPrims.erase(prim);
+    return !mIndex.fetched(prim);
 }
 
 // --- what the rows chosen reach ----------------------------------------------------
@@ -498,34 +493,19 @@ bool ALScriptExplorerModel::unfoldTo(const LLUUID& prim)
 std::vector<std::pair<LLUUID, std::string>> ALScriptExplorerModel::containerPrims(const std::vector<Choice>& rows) const
 {
     std::vector<std::pair<LLUUID, std::string>> prims;
-    auto                                        take = [&prims](const LLUUID& id, const std::string& name) {
-        for (const auto& known : prims)
-        {
-            if (known.first == id)
-            {
-                return;
-            }
-        }
-        prims.emplace_back(id, name);
-    };
+    boost::unordered_flat_set<LLUUID>           taken;
     for (const Choice& row : rows)
     {
-        if (row.isItem())
+        const Object* object = row.isItem() ? nullptr : objectAt(row.root);
+        if (!object || !object->present)
         {
             continue;
         }
-        for (const Object& object : mObjects)
+        for (const Prim& prim : object->prims)
         {
-            if (object.root != row.root || !object.present)
+            if ((row.prim == row.root || prim.id == row.prim) && taken.insert(prim.id).second)
             {
-                continue;
-            }
-            for (const Prim& prim : object.prims)
-            {
-                if (row.prim == row.root || prim.id == row.prim)
-                {
-                    take(prim.id, prim.name.empty() ? object.name : prim.name);
-                }
+                prims.emplace_back(prim.id, prim.name.empty() ? object->name : prim.name);
             }
         }
     }
@@ -542,23 +522,13 @@ S32 ALScriptExplorerModel::scriptsReached(const std::vector<Choice>& rows) const
             reached.emplace(row.prim, row.item);
         }
     }
-    for (const auto& [prim_id, name] : containerPrims(rows))
+    for (const auto& [prim, name] : containerPrims(rows))
     {
-        for (const Object& object : mObjects)
+        for (const Item& item : mIndex.items(prim))
         {
-            for (const Prim& prim : object.prims)
+            if (item.script)
             {
-                if (prim.id != prim_id)
-                {
-                    continue;
-                }
-                for (const Item& item : mIndex.items(prim.id))
-                {
-                    if (item.script)
-                    {
-                        reached.emplace(prim.id, item.id);
-                    }
-                }
+                reached.emplace(prim, item.id);
             }
         }
     }
@@ -573,27 +543,14 @@ bool ALScriptExplorerModel::walkedByQueue(const Choice& row, const std::vector<s
 
 bool ALScriptExplorerModel::present(const LLUUID& root) const
 {
-    for (const Object& object : mObjects)
-    {
-        if (object.root == root)
-        {
-            return object.present;
-        }
-    }
-    return false;
+    const Object* object = objectAt(root);
+    return object && object->present;
 }
 
 std::string ALScriptExplorerModel::nameOf(const LLUUID& root) const
 {
-    std::string name;
-    for (const Object& object : mObjects)
-    {
-        if (object.root == root)
-        {
-            name = object.name;
-        }
-    }
-    return name;
+    const Object* object = objectAt(root);
+    return object ? object->name : std::string();
 }
 
 // static

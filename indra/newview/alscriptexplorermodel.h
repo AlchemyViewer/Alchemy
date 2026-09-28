@@ -29,6 +29,7 @@
 #include "llsd.h"
 #include "lluuid.h"
 
+#include <boost/unordered/unordered_flat_map.hpp>
 #include <boost/unordered/unordered_flat_set.hpp>
 
 #include <functional>
@@ -304,6 +305,14 @@ public:
 private:
     // An object's name, and its pin's with it.
     void renameObject(Object& object, const std::string& name);
+    // Where a listed prim is, and an object by its root: made with the
+    // listing.
+    struct At
+    {
+        size_t object = 0;
+        size_t prim   = 0;
+    };
+    const Object* objectAt(const LLUUID& root) const;
 
     ALScriptContentsIndex&                    mIndex;
     std::vector<Object>                       mObjects;
@@ -321,6 +330,8 @@ private:
     // listed.
     boost::unordered_flat_set<LLUUID>         mListedPrims;
     boost::unordered_flat_set<LLUUID>         mSought;
+    boost::unordered_flat_map<LLUUID, At>     mPrimAt;
+    boost::unordered_flat_map<LLUUID, size_t> mObjectAt;
     boost::unordered_flat_set<LLUUID>         mNamesAsked;
     // The new items to be opened once their prims list them.
     struct OpenWhenListed

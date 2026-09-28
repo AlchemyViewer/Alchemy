@@ -480,4 +480,36 @@ namespace tut
         model.doneAskingRegion();
         ensure("let go of: as any other", ask(false, false).empty() && !model.asksRegion(id(11)));
     }
+
+    template<> template<>
+    void alscriptexplorermodel_object::test<11>()
+    {
+        set_test_name("what was folded of an object no longer listed is let go of, and folded as at first should it come back; prims found by id");
+        const size_t count = Model::LARGE_LINKSET + 2;
+        const LLUUID big   = object(200, "Big", count);
+        selected           = { big };
+        list();
+        ensure("a prim of a large linkset folded at first", model.fold(id(201), true, true) == Model::Refold::None);
+        ensure("opened", model.fold(id(201), true, false) == Model::Refold::Relist);
+        ensure("folded shut", model.fold(big, false, true) == Model::Refold::Refill);
+        list();
+        ensure("open through a listing again", model.fold(id(201), true, false) == Model::Refold::None);
+        ensure("and the object shut", model.folded(big));
+
+        selected.clear();
+        list();
+        ensure("not listed: nothing folded", !model.folded(big));
+        selected = { big };
+        list();
+        ensure("back: its prims folded as at first", model.fold(id(201), true, true) == Model::Refold::None);
+        ensure("the object open", !model.folded(big));
+
+        // By id, wherever it is in the list.
+        ensure("a prim revealed, never asked what it holds, is to be asked", model.unfoldTo(id(205)));
+        ensure("unfolded to", model.fold(id(205), true, false) == Model::Refold::None);
+        model.renamed(id(203), "Middle");
+        ensure("renamed in place", rowNamed(model.rows(std::string()), "Middle") != nullptr);
+        ensure_equals("named by its root", model.nameOf(big), std::string("Big"));
+        ensure("present", model.present(big) && !model.present(id(203)));
+    }
 }
