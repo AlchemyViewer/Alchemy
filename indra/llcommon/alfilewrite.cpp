@@ -28,12 +28,15 @@
 
 #include "alwatchedfile.h"
 #include "fsyspath.h"
+#include "llfile.h"
 
 #include <algorithm>
 #include <filesystem>
 #include <fstream>
 
-#if !LL_WINDOWS
+#if LL_WINDOWS
+#include <io.h>
+#else
 #include <cerrno>
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -52,17 +55,26 @@ namespace
     };
 
     // Every byte of the text, the file closed: the last of it is written as
-    // the file closes, and is the likeliest not to go.
-    Wrote writeAll(const std::filesystem::path& file, std::string_view text)
+    // the file closes, and is the likeliest not to go. Durable, forced out
+    // to the disk first, as far as the disk says it can be.
+    Wrote writeAll(const std::filesystem::path& file, std::string_view text, bool durable)
     {
-        llofstream out(file, std::ios::binary | std::ios::trunc);
-        if (!out.is_open())
+        LLFILE* out = LLFile::fopen(file, LLFILE_MODE("wb"));
+        if (!out)
         {
             return Wrote::NotOpened;
         }
-        out.write(text.data(), static_cast<std::streamsize>(text.size()));
-        out.close();
-        return out.fail() ? Wrote::Failed : Wrote::Done;
+        bool all = fwrite(text.data(), 1, text.size(), out) == text.size() && fflush(out) == 0;
+        if (all && durable)
+        {
+#if LL_WINDOWS
+            _commit(_fileno(out));
+#else
+            fsync(fileno(out));
+#endif
+        }
+        all = fclose(out) == 0 && all;
+        return all ? Wrote::Done : Wrote::Failed;
     }
 }
 
@@ -72,10 +84,10 @@ std::string besideOf(const std::string& path)
 {
     // A name nothing else would give a file, since whatever is there by it
     // is written over and then gone.
-    return path + ".saving";
+    return path + std::string(BESIDE);
 }
 
-bool whole(const std::string& path, std::string_view text)
+bool whole(const std::string& path, std::string_view text, bool durable)
 {
     std::error_code ec;
     std::filesystem::path target = fsyspath(path);
@@ -105,7 +117,7 @@ bool whole(const std::string& path, std::string_view text)
         }
     }
     const fsyspath beside(besideOf(fsyspath(target).string()));
-    const Wrote    wrote = writeAll(beside, text);
+    const Wrote    wrote = writeAll(beside, text, durable);
     if (wrote == Wrote::Done)
     {
         // What anyone could do with the old file, they can with the new.
@@ -126,14 +138,15 @@ bool whole(const std::string& path, std::string_view text)
         std::filesystem::remove(beside, ec);
     }
     // Not all of it would go beside it -- the disk is full: in place it
-    // would go no better, and would take the old text with it.
-    if (wrote == Wrote::Failed)
+    // would go no better, and would take the old text with it. A durable
+    // write is whole or nothing.
+    if (wrote == Wrote::Failed || durable)
     {
         return false;
     }
     // Nothing could be put beside it, or it could not be replaced: in place,
     // as it always was written.
-    return writeAll(target, text) == Wrote::Done;
+    return writeAll(target, text, false) == Wrote::Done;
 }
 
 bool temp(const std::string& path, std::string_view text)

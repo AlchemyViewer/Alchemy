@@ -42,10 +42,15 @@
 // Where nothing can be put beside it -- a folder only its files may be
 // written in -- or it cannot be replaced -- a program on Windows holding it
 // open -- it is written in place, as it always was.
+//
+// A durable write is forced out to the disk before it is put in place, so
+// that the power going leaves the old text or the new rather than a file
+// of nothing; and it is never written in place, where it could be caught
+// half written. What the viewer keeps against a crash is written so.
 namespace ALFileWrite
 {
     // False, and the file as it was, where it could not be written.
-    LL_COMMON_API bool whole(const std::string& path, std::string_view text);
+    LL_COMMON_API bool whole(const std::string& path, std::string_view text, bool durable = false);
 
     // A file nobody keeps -- a copy of a script given to an editor outside,
     // its log -- written in place, the viewer user's alone: never through
@@ -55,6 +60,9 @@ namespace ALFileWrite
     // not go.
     LL_COMMON_API bool temp(const std::string& path, std::string_view text);
 
+    // What a file written beside another is named for: whatever ends so
+    // and is not being written is one a crash cut short.
+    inline constexpr std::string_view BESIDE = ".saving";
     // What is written beside a file on the way: the name it is given.
     LL_COMMON_API std::string besideOf(const std::string& path);
 }

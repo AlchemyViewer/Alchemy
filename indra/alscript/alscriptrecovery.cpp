@@ -26,6 +26,7 @@
 
 #include "alscriptrecovery.h"
 
+#include "alfilewrite.h"
 #include "fsyspath.h"
 #include "llfile.h"
 #include "llsdserialize.h"
@@ -41,18 +42,14 @@
 #include <map>
 #include <mutex>
 #include <sstream>
-
-#if LL_WINDOWS
-#include <io.h>
-#else
-#include <unistd.h>
-#endif
+#include <string_view>
 
 namespace
 {
     const char* const EXTENSION = ".llsd";
-    // What a file is written as first, beside where it goes.
-    const char* const HALF_WRITTEN = ".tmp";
+    // What a file was written as first, beside where it goes, before
+    // ALFileWrite wrote them: a crash's leftovers are still swept.
+    constexpr std::string_view HALF_WRITTEN = ".tmp";
 
     const char* stateName(ALScriptRecoveryEntry::State state)
     {
@@ -321,7 +318,7 @@ struct ALScriptRecoveryStore::Writer
             auto one = waiting.extract(waiting.begin());
             busy     = true;
             lock.unlock();
-            const bool        written = writeWhole(one.mapped().path, one.mapped().entry.written(), one.mapped().durable);
+            const bool        written = ALFileWrite::whole(one.mapped().path, one.mapped().entry.written(), one.mapped().durable);
             const std::string key     = one.key();
             // Let go of here, the only thread that holds it.
             one = {};
@@ -465,37 +462,6 @@ std::string ALScriptRecoveryStore::pathOf(const std::string& key, const std::str
 }
 
 // static
-bool ALScriptRecoveryStore::writeWhole(const std::string& path, const std::string& written, bool durable)
-{
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
-    // Beside it first, forced out to the disk where it is to be durable,
-    // then put in its place: a crash leaves the last whole text or this
-    // one, and so does the power going, for one forced out.
-    const std::string beside = path + HALF_WRITTEN;
-    LLFILE*           file   = LLFile::fopen(beside, LLFILE_MODE("wb"));
-    if (!file)
-    {
-        return false;
-    }
-    const bool whole = fwrite(written.data(), 1, written.size(), file) == written.size() && fflush(file) == 0;
-    if (durable)
-    {
-#if LL_WINDOWS
-        _commit(_fileno(file));
-#else
-        fsync(fileno(file));
-#endif
-    }
-    fclose(file);
-    if (!whole || LLFile::rename(beside, path) != 0)
-    {
-        LLFile::remove(beside, ENOENT);
-        return false;
-    }
-    return true;
-}
-
-// static
 bool ALScriptRecoveryStore::readEntry(const std::string& path, ALScriptRecoveryEntry& out, bool whole)
 {
     llifstream file(path, std::ios::in | std::ios::binary);
@@ -588,7 +554,7 @@ bool ALScriptRecoveryStore::write(ALScriptRecoveryEntry entry)
     changed();
     entry.session = mSession;
     entry.when    = LLDate::now();
-    return writeWhole(pathOf(entry.key, mSession), entry.written());
+    return ALFileWrite::whole(pathOf(entry.key, mSession), entry.written(), /*durable*/ true);
 }
 
 void ALScriptRecoveryStore::forget(const std::string& key)
@@ -629,7 +595,7 @@ std::string ALScriptRecoveryStore::setAsideAt(ALScriptRecoveryEntry entry, bool 
     // share.
     const std::string target = mDiscarded + fileOf(entry.key) + "." + entry.session + "." +
                                std::to_string(static_cast<S64>(now.secondsSinceEpoch() * 1000.0)) + EXTENSION;
-    if (!writeWhole(target, entry.written()))
+    if (!ALFileWrite::whole(target, entry.written(), /*durable*/ true))
     {
         return std::string();
     }
@@ -955,10 +921,13 @@ void ALScriptRecoveryStore::prune(F64 max_age_seconds, const LLDate& now)
     {
         for (const std::string& name : namesIn(folder))
         {
-            const size_t tail = strlen(HALF_WRITTEN);
-            if (name.size() > tail && name.compare(name.size() - tail, tail, HALF_WRITTEN) == 0 && name.find(mSession) == std::string::npos)
+            for (const std::string_view tail : { ALFileWrite::BESIDE, HALF_WRITTEN })
             {
-                LLFile::remove(folder + name, ENOENT);
+                if (name.size() > tail.size() && name.compare(name.size() - tail.size(), tail.size(), tail) == 0 &&
+                    name.find(mSession) == std::string::npos)
+                {
+                    LLFile::remove(folder + name, ENOENT);
+                }
             }
         }
     }

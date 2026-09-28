@@ -202,6 +202,21 @@ namespace tut
     }
 
     template<> template<>
+    void alfilewrite_object::test<6>()
+    {
+        set_test_name("a durable write is whole or nothing: where nothing can be put beside the file, it is not written in place");
+        const std::string file = in("journal.llsd");
+        ensure("a new one", ALFileWrite::whole(file, "one", /*durable*/ true));
+        ensure("over it", ALFileWrite::whole(file, "two", /*durable*/ true));
+        ensure_equals("the new text", read(file), std::string("two"));
+        std::error_code ec;
+        ensure("nothing left beside it", !fs::exists(fsyspath(ALFileWrite::besideOf(file)), ec));
+        fs::create_directories(fsyspath(ALFileWrite::besideOf(file)), ec);
+        ensure("refused", !ALFileWrite::whole(file, "three", /*durable*/ true));
+        ensure_equals("the old text, whole", read(file), std::string("two"));
+    }
+
+    template<> template<>
     void alfilewrite_object::test<7>()
     {
         set_test_name("the one reader: an ordinary file whole, up to a limit; not a folder, and not a pipe, which it does not wait on");

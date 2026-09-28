@@ -26,6 +26,7 @@
 
 #include "alscriptstudiofileio.h"
 
+#include "alfilewrite.h"
 #include "fsyspath.h"
 
 namespace ALScriptFileIO
@@ -35,11 +36,11 @@ namespace ALScriptFileIO
     // this is room for any include, snippets file or log anyone edits by
     // hand, and short of a file picked by mistake -- which is read on the
     // main thread, and put in an editor whole.
-    constexpr S64 MOST_FILE_BYTES = 8 * 1024 * 1024;
+    constexpr std::uintmax_t MOST_FILE_BYTES = 8 * 1024 * 1024;
 
     bool fileTooLarge(const std::string& path)
     {
-        return LLFile::size(path) > MOST_FILE_BYTES;
+        return ALFileStamp::of(path).size > MOST_FILE_BYTES;
     }
 
     // A file's text, whole, its line endings as an editor here keeps them:
@@ -50,19 +51,14 @@ namespace ALScriptFileIO
     // more than a file opened here may.
     bool readWholeFile(const std::string& path, std::string& text)
     {
-        if (fileTooLarge(path))
+        // An ordinary file, and never more than a file opened here may
+        // hold: a pipe or a device picked by mistake would be read for
+        // ever.
+        std::string bytes;
+        if (!ALFileRead::whole(path, bytes, MOST_FILE_BYTES))
         {
             return false;
         }
-        // By the path as the system spells it: a name past ASCII -- a
-        // user's folder, a script's name -- read in the ANSI code page on
-        // Windows is another name, or none.
-        llifstream in(fsyspath(path), std::ios::binary);
-        if (!in)
-        {
-            return false;
-        }
-        const std::string bytes((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
         text.clear();
         text.reserve(bytes.size());
         for (size_t i = 0; i < bytes.size(); ++i)

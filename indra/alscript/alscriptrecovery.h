@@ -276,9 +276,6 @@ public:
 private:
     std::string fileOf(const std::string& key) const;
     std::string pathOf(const std::string& key, const std::string& session) const;
-    // Written whole beside the path, forced out to the disk where it is to
-    // survive the machine going down, then put in its place.
-    static bool writeWhole(const std::string& path, const std::string& written, bool durable = true);
     // An entry read: as far as a listing reads it, or whole.
     static bool readEntry(const std::string& path, ALScriptRecoveryEntry& out, bool whole);
     // setAside's writing, which says where it wrote: empty where it could
