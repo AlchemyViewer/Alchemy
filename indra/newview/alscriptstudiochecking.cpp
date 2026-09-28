@@ -663,16 +663,38 @@ void ALScriptStudioChecking::pump(F64 now)
             schedule(*doc, true);
         }
     }
+    // The tab in front as soon as it is due; the others one a frame, the
+    // longest due first, so that many tabs opened or restored at once are
+    // not as many whole-text checks asked in one frame.
+    const Doc* front = mServices.frontDoc();
+    Doc*       next  = nullptr;
     for (Doc* doc : mServices.openDocs())
     {
-        if (doc->check.analysisDue > 0.0 && now >= doc->check.analysisDue)
+        if (doc->check.analysisDue <= 0.0 || now < doc->check.analysisDue)
         {
-            doc->check.analysisDue      = 0.0;
-            doc->check.requestedVersion = doc->editor->document().version();
-            doc->check.askedAt          = now;
-            ask(*doc, ALScriptAnalysis::Kind::Check, ALTextPos(), ALTextPos());
+            continue;
+        }
+        if (doc == front)
+        {
+            askCheck(*doc, now);
+        }
+        else if (!next || doc->check.analysisDue < next->check.analysisDue)
+        {
+            next = doc;
         }
     }
+    if (next)
+    {
+        askCheck(*next, now);
+    }
+}
+
+void ALScriptStudioChecking::askCheck(Doc& doc, F64 now)
+{
+    doc.check.analysisDue      = 0.0;
+    doc.check.requestedVersion = doc.editor->document().version();
+    doc.check.askedAt          = now;
+    ask(doc, ALScriptAnalysis::Kind::Check, ALTextPos(), ALTextPos());
 }
 
 void ALScriptStudioChecking::analysed(const ALScriptAnalysis::Result& result)

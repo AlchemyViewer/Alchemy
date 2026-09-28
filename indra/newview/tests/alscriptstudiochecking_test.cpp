@@ -1074,4 +1074,30 @@ namespace tut
         ensure_equals("said const", inspect(1, 8, "integer count"), std::string("const integer count"));
         ensure_equals("another name is not", inspect(0, 8, "integer helper"), std::string("integer helper"));
     }
+
+    template<> template<>
+    void alscriptstudiochecking_object::test<18>()
+    {
+        set_test_name("the tab in front checked as soon as it is due; the others one a frame, the one due longest first");
+        ALScriptStudioChecking& checking = make();
+        Doc&                    a        = tab("a");
+        Doc&                    b        = tab("b");
+        Doc&                    c        = tab("c");
+        services.front                   = 2;
+        checking.schedule(a, false);
+        checking.schedule(b, true);
+        checking.schedule(c, true);
+        a.check.analysisDue = 0.5;
+        checking.pump(1.0);
+        std::string asked;
+        for (const auto& one : studio.asks)
+        {
+            asked += one.request.id;
+        }
+        ensure_equals("in front, and the one due longest", asked, std::string("ca"));
+        checking.pump(1.0);
+        ensure("then the next", studio.asks.size() == 3 && studio.asks[2].request.id == "b");
+        checking.pump(1.0);
+        ensure_equals("and none again", studio.asks.size(), size_t(3));
+    }
 }

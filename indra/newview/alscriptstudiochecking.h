@@ -137,7 +137,8 @@ public:
     // to `to`: of what the compiler would see, the expansion asked for
     // first where it is not in hand.
     void ask(Doc& doc, ALScriptAnalysis::Kind kind, const ALTextPos& at, const ALTextPos& to);
-    // Each frame, at `now`: the checks that are due sent; and, where the
+    // Each frame, at `now`: the checks that are due sent -- the tab in
+    // front's, and of the others the one due longest -- and, where the
     // preprocessor's settings changed a moment ago, every tab expanded and
     // checked again, the editors taught its words where they changed.
     void pump(F64 now);
@@ -177,6 +178,8 @@ public:
                         const std::vector<std::pair<std::string, ALSourceMap>>& module_maps);
 
 private:
+    // A check asked of a tab now.
+    void askCheck(Doc& doc, F64 now);
     // The expansion asked for, a question waiting on it; and taken.
     void expandFor(Doc& doc, ALScriptAnalysis::Kind kind, const ALTextPos& at, const ALTextPos& to);
     void expandedAnswer(const std::string& id, U32 version, const ALPreprocessor::Result& result);
