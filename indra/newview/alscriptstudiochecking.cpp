@@ -277,6 +277,27 @@ void ALScriptStudioChecking::ask(Doc& doc, ALScriptAnalysis::Kind kind, const AL
     {
         return;
     }
+    // The tip and the inspector ask the same question: the one asking of a
+    // word the other was told of, as the text stands, is told the same.
+    const auto read_now = [this, &doc](U32 expansion) {
+        return (expansion != 0) == preprocessed(doc) && (expansion == 0 || (doc.expanded.valid && doc.expanded.generation == expansion));
+    };
+    if ((kind == ALScriptAnalysis::Kind::Hover || kind == ALScriptAnalysis::Kind::Inspect) && doc.check.hovered &&
+        doc.check.hovered->version == doc.editor->document().version() && read_now(doc.check.hovered->expansion) &&
+        doc.check.hovered->word == doc.editor->identifierAt(at).begin)
+    {
+        ALScriptAnalysis::Result said = doc.check.hovered->said;
+        said.kind                     = kind;
+        if (kind == ALScriptAnalysis::Kind::Hover)
+        {
+            showHover(doc, said, at);
+        }
+        else
+        {
+            mWindow.answeredElsewhere(doc, said, at);
+        }
+        return;
+    }
     ALScriptAnalysis::Request request;
     request.kind    = kind;
     request.id      = doc.id;
@@ -436,6 +457,12 @@ void ALScriptStudioChecking::answered(const ALScriptAnalysis::Result& result, U3
         }
     }
     const ALScriptAnalysis::Result& shown = marked ? *marked : result;
+    // Kept for the other of the two to ask about the same word.
+    if ((result.kind == ALScriptAnalysis::Kind::Hover || result.kind == ALScriptAnalysis::Kind::Inspect) &&
+        result.version == doc.editor->document().version())
+    {
+        doc.check.hovered = Doc::Check::Hovered{ result.version, expansion, doc.editor->identifierAt(at).begin, shown };
+    }
     switch (result.kind)
     {
         case ALScriptAnalysis::Kind::Check:
@@ -459,59 +486,8 @@ void ALScriptStudioChecking::answered(const ALScriptAnalysis::Result& result, U3
             break;
         }
         case ALScriptAnalysis::Kind::Hover:
-        {
-            if (!result.hover.found)
-            {
-                // Nothing: the editor says what the definitions say, if
-                // anything.
-                doc.editor->supplyHover(at, std::string());
-                break;
-            }
-            std::string text = shown.hover.label;
-            // Where it was declared, as the inspector says it: a link there.
-            std::vector<ALCodeEditor::CardLink> links;
-            const Declared                      declared = declaredOf(doc, result, preprocessed(doc));
-            if (declared.line >= 0)
-            {
-                LLStringUtil::format_map_t args;
-                args["[LINE]"]          = std::to_string(declared.line + 1);
-                args["[FILE]"]          = declared.name;
-                const std::string where = mServices.words(declared.path.empty() ? "InspectDeclared" : "InspectDeclaredIn", args);
-                text += "\n" + where;
-                links.push_back({ where, mServices.words("InspectDeclaredTip"), declared.value() });
-            }
-            if (!result.hover.expected.empty())
-            {
-                LLStringUtil::format_map_t args;
-                args["[TYPE]"] = result.hover.expected;
-                text += "\n" + mServices.words("HoverExpected", args);
-            }
-            if (!result.hover.documentation.empty())
-            {
-                text += "\n" + result.hover.documentation;
-            }
-            else if (!result.hover.hasDefinition)
-            {
-                // A builtin the analyzer knows by its declaration alone --
-                // LSL's: what the definitions say of it, its delay, its
-                // god mode.
-                const ALTextRange word = doc.editor->identifierAt(at);
-                if (const ALScriptStudioWords::Vocab* known = ALScriptStudioWords::word(doc.language.lua, doc.editor->document().text(word)))
-                {
-                    const std::string notes = ALScriptStudioWords::notesOf(*known);
-                    if (!notes.empty())
-                    {
-                        text += "\n" + notes;
-                    }
-                }
-            }
-            if (!result.hover.link.empty())
-            {
-                text += "\n" + result.hover.link;
-            }
-            doc.editor->supplyHover(at, text, std::move(links));
+            showHover(doc, shown, at);
             break;
-        }
         case ALScriptAnalysis::Kind::Signature:
         {
             if (!result.signature.found)
@@ -541,6 +517,60 @@ void ALScriptStudioChecking::answered(const ALScriptAnalysis::Result& result, U3
             mWindow.answeredElsewhere(doc, shown, at);
             break;
     }
+}
+
+void ALScriptStudioChecking::showHover(Doc& doc, const ALScriptAnalysis::Result& said, const ALTextPos& at)
+{
+    if (!said.hover.found)
+    {
+        // Nothing: the editor says what the definitions say, if
+        // anything.
+        doc.editor->supplyHover(at, std::string());
+        return;
+    }
+    std::string text = said.hover.label;
+    // Where it was declared, as the inspector says it: a link there.
+    std::vector<ALCodeEditor::CardLink> links;
+    const Declared                      declared = declaredOf(doc, said, preprocessed(doc));
+    if (declared.line >= 0)
+    {
+        LLStringUtil::format_map_t args;
+        args["[LINE]"]          = std::to_string(declared.line + 1);
+        args["[FILE]"]          = declared.name;
+        const std::string where = mServices.words(declared.path.empty() ? "InspectDeclared" : "InspectDeclaredIn", args);
+        text += "\n" + where;
+        links.push_back({ where, mServices.words("InspectDeclaredTip"), declared.value() });
+    }
+    if (!said.hover.expected.empty())
+    {
+        LLStringUtil::format_map_t args;
+        args["[TYPE]"] = said.hover.expected;
+        text += "\n" + mServices.words("HoverExpected", args);
+    }
+    if (!said.hover.documentation.empty())
+    {
+        text += "\n" + said.hover.documentation;
+    }
+    else if (!said.hover.hasDefinition)
+    {
+        // A builtin the analyzer knows by its declaration alone --
+        // LSL's: what the definitions say of it, its delay, its
+        // god mode.
+        const ALTextRange word = doc.editor->identifierAt(at);
+        if (const ALScriptStudioWords::Vocab* known = ALScriptStudioWords::word(doc.language.lua, doc.editor->document().text(word)))
+        {
+            const std::string notes = ALScriptStudioWords::notesOf(*known);
+            if (!notes.empty())
+            {
+                text += "\n" + notes;
+            }
+        }
+    }
+    if (!said.hover.link.empty())
+    {
+        text += "\n" + said.hover.link;
+    }
+    doc.editor->supplyHover(at, text, std::move(links));
 }
 
 void ALScriptStudioChecking::actionsAnswered(Doc& doc, const ALScriptAnalysis::Result& result, U32 expansion)

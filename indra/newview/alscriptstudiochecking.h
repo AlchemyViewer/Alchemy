@@ -178,6 +178,8 @@ public:
                         const std::vector<std::pair<std::string, ALSourceMap>>& module_maps);
 
 private:
+    // What the analyzers said of a word, on the tip under the mouse.
+    void showHover(Doc& doc, const ALScriptAnalysis::Result& said, const ALTextPos& at);
     // A check asked of a tab now.
     void askCheck(Doc& doc, F64 now);
     // The expansion asked for, a question waiting on it; and taken.

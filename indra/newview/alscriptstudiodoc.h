@@ -504,6 +504,19 @@ struct ALScriptStudioDoc
         // an expansion of an older one was on its way: one expansion at a
         // time, and the next for the latest text, not one a key.
         std::optional<U32> wanted;
+        // What the analyzers last said of a word -- for the tip under the
+        // mouse or the inspector at the caret, which ask the same question
+        // -- by the text's version, the expansion it was read through (none
+        // for the text as it stands) and where the word starts: the other
+        // asking of it is answered from here.
+        struct Hovered
+        {
+            U32                      version   = 0;
+            U32                      expansion = 0;
+            ALTextPos                word;
+            ALScriptAnalysis::Result said;
+        };
+        std::optional<Hovered> hovered;
         // Whether the text, at the version kept with it, has no default
         // state (ALScriptStudioChecking::lslFragment): asked on every
         // caret move and every frame Weights is shown, and a walk of the

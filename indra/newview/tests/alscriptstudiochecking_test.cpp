@@ -1102,4 +1102,33 @@ namespace tut
         checking.pump(1.0);
         ensure_equals("and none again", studio.asks.size(), size_t(3));
     }
+
+    template<> template<>
+    void alscriptstudiochecking_object::test<19>()
+    {
+        set_test_name("the tip and the inspector ask the same question: the second of a word, as the text stands, told what the first was");
+        ALScriptStudioChecking& checking = make();
+        Doc&                    doc      = tab("a");
+        checking.ask(doc, Kind::Hover, ALTextPos(0, 8), ALTextPos(0, 8));
+        ensure_equals("the tip asks", studio.asks.size(), size_t(1));
+        ALScriptAnalysis::Result said;
+        said.kind        = Kind::Hover;
+        said.id          = "a";
+        said.version     = version(doc);
+        said.line        = 0;
+        said.column      = 8;
+        said.hover.found = true;
+        said.hover.label = "integer count";
+        studio.asks[0].answered(said);
+        checking.ask(doc, Kind::Inspect, ALTextPos(0, 10), ALTextPos(0, 10));
+        ensure_equals("the inspector, of the same word: not asked", studio.asks.size(), size_t(1));
+        ensure_equals("but told", studio.told.back(), std::string("inspect a 0:10"));
+        ensure_equals("what the tip was", studio.labels.back(), std::string("integer count"));
+        checking.ask(doc, Kind::Inspect, ALTextPos(1, 0), ALTextPos(1, 0));
+        ensure_equals("another word: asked", studio.asks.size(), size_t(2));
+        doc.editor->setCaret(ALTextPos(0, 0));
+        doc.editor->insertText(" ");
+        checking.ask(doc, Kind::Inspect, ALTextPos(0, 10), ALTextPos(0, 10));
+        ensure_equals("typed in since: asked", studio.asks.size(), size_t(3));
+    }
 }
