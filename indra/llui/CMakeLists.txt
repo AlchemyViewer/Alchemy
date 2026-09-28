@@ -610,6 +610,9 @@ if(AL_BUILD_TESTS)
     )
   endforeach()
 
+  # What the text view draws, read back from llrender's hidden window.
+  al_add_test(altextview_gl GL PROJECT llui LIBRARIES ${test_libs})
+
   # The code editor over 50,000-line scripts: what each change to the edit
   # pipeline, the highlighter, the layout, the folds or find is measured by.
   al_add_bench(

@@ -786,8 +786,9 @@ protected:
     // The x span of a range on a row, if it touches the row; a range past
     // the line's end reaches a little past the last glyph.
     bool spanOnRow(S32 line, S32 row, const ALTextRange& range, F32& x0, F32& x1);
-    // A wavy line from x0 to x1 with its middle at y.
-    void drawSquiggle(F32 x0, F32 x1, S32 y, const LLColor4& color);
+    // A wavy line from x0 to x1 with its middle at y, as much of it as is
+    // within `clip`'s sides.
+    static void drawSquiggle(F32 x0, F32 x1, S32 y, const LLColor4& color, const LLRect& clip);
     // Something was asked about the name at the caret: its definition,
     // its references, a new name; whether it could be.
     virtual bool performSymbol(ALEditorCommand command) { return false; }
@@ -1121,5 +1122,4 @@ private:
     std::string                             mPlaceholder;
     LLFrameTimer                            mSpellTimer;
     boost::signals2::scoped_connection      mSpellSettingsConnection;
-    std::vector<LLVector2>                  mSquiggleScratch;
 };

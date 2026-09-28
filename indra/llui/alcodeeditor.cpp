@@ -1759,7 +1759,7 @@ void ALCodeEditor::drawRowExtras(S32 line, S32 row, const LLRect& text, S32 scre
         }
         else
         {
-            drawSquiggle(left + x0, left + x1, screen_top - row_h + 2, d.color % alpha);
+            drawSquiggle(left + x0, left + x1, screen_top - row_h + 2, d.color % alpha, text);
         }
     }
     if (mBrackets.matched && (line == mBrackets.open.line || line == mBrackets.close.line))

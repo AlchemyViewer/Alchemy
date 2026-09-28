@@ -34,6 +34,8 @@
 #include "llclipboard.h"
 #include "lldir.h"
 #include "llfocusmgr.h"
+#include "llimage.h"
+#include "llimagegl.h"
 #include "llkeyboard.h"
 #include "lllocalcliprect.h"
 #include "llmenugl.h"
@@ -197,8 +199,62 @@ namespace
 
     // How long the word at the caret is left unmarked after it was typed.
     const F32 SPELL_SETTLE_SECONDS = 1.5f;
-    const F32 SQUIGGLE_AMPLITUDE   = 1.f;
-    const F32 SQUIGGLE_WAVE        = 5.f;
+    // A squiggle: a wave a pixel high either way and five pixels long,
+    // drawn as a line a pixel wide whose edges fade over a pixel more, as
+    // gl_polyline_2d draws one.
+    constexpr F32 SQUIGGLE_AMPLITUDE = 1.f;
+    constexpr S32 SQUIGGLE_WAVE      = 5;
+    constexpr S32 SQUIGGLE_HEIGHT    = 6;
+    constexpr F32 SQUIGGLE_HALF      = 0.5f;
+    constexpr F32 SQUIGGLE_FEATHER   = 1.f;
+
+    // One wave of a squiggle, which a squiggle repeats along its length: so
+    // that one is a quad, however long, rather than a ribbon of triangles
+    // for each pixel of it. White, with as much alpha at each texel as the
+    // line covers of it, and drawn in the squiggle's colour. Texels are as
+    // many to a point as the UI's scale has pixels, so that the line stays
+    // as sharp on a screen that scales it; remade when the scale changes.
+    LLImageGL* squiggleTexture()
+    {
+        static LLPointer<LLImageGL> texture;
+        static S32                  made_at = 0;
+        const S32                   scale   = llclamp(static_cast<S32>(ceilf(LLUI::getScaleFactor().mV[VX])), 1, 4);
+        if (texture && made_at == scale)
+        {
+            return texture;
+        }
+        const S32             width  = SQUIGGLE_WAVE * scale;
+        const S32             height = SQUIGGLE_HEIGHT * scale;
+        LLPointer<LLImageRaw> raw    = new LLImageRaw(static_cast<U16>(width), static_cast<U16>(height), 4);
+        U8*                   data   = raw->getData();
+        const F32             step   = 2.f * F_PI / static_cast<F32>(SQUIGGLE_WAVE);
+        for (S32 row = 0; row < height; ++row)
+        {
+            for (S32 column = 0; column < width; ++column)
+            {
+                // The texel's middle, in points from the wave's start and
+                // its middle, and how near the wave comes to it: looked
+                // for along a wave either side, finely enough that the
+                // fade is smooth.
+                const F32 x    = (static_cast<F32>(column) + 0.5f) / static_cast<F32>(scale);
+                const F32 y    = (static_cast<F32>(row) + 0.5f) / static_cast<F32>(scale) - 0.5f * static_cast<F32>(SQUIGGLE_HEIGHT);
+                F32       near = F32_MAX;
+                for (F32 along = x - static_cast<F32>(SQUIGGLE_WAVE); along <= x + static_cast<F32>(SQUIGGLE_WAVE); along += 0.01f)
+                {
+                    const F32 dx = x - along;
+                    const F32 dy = y - SQUIGGLE_AMPLITUDE * sinf(along * step);
+                    near         = llmin(near, dx * dx + dy * dy);
+                }
+                const F32 cover = llclamp((SQUIGGLE_HALF + SQUIGGLE_FEATHER - sqrtf(near)) / SQUIGGLE_FEATHER, 0.f, 1.f);
+                U8*       texel = data + (static_cast<size_t>(row) * width + column) * 4;
+                texel[0] = texel[1] = texel[2] = 255;
+                texel[3] = static_cast<U8>(llround(cover * 255.f));
+            }
+        }
+        texture = new LLImageGL(raw, false);
+        made_at = scale;
+        return texture;
+    }
 }
 
 ALTextView::Params::Params()
@@ -3750,17 +3806,38 @@ void ALTextView::colorRow(S32 line, const ALTextLayout::Line& laid, const ALText
     }
 }
 
-void ALTextView::drawSquiggle(F32 x0, F32 x1, S32 y, const LLColor4& color)
+void ALTextView::drawSquiggle(F32 x0, F32 x1, S32 y, const LLColor4& color, const LLRect& clip)
 {
-    mSquiggleScratch.clear();
-    for (F32 x = x0; x <= x1; x += 1.f)
+    // As much of it as is in sight, the wave kept where it began.
+    const F32 from = llmax(x0, static_cast<F32>(clip.mLeft));
+    const F32 to   = llmin(x1, static_cast<F32>(clip.mRight));
+    LLImageGL* wave = squiggleTexture();
+    if (from >= to || !wave || !wave->getHasGLTexture())
     {
-        mSquiggleScratch.emplace_back(x, static_cast<F32>(y) + SQUIGGLE_AMPLITUDE * sinf((x - x0) * (2.f * F_PI / SQUIGGLE_WAVE)));
+        return;
     }
-    if (mSquiggleScratch.size() >= 2)
-    {
-        gl_polyline_2d(mSquiggleScratch, color, 1.f);
-    }
+    const F32 u0     = (from - x0) / static_cast<F32>(SQUIGGLE_WAVE);
+    const F32 u1     = (to - x0) / static_cast<F32>(SQUIGGLE_WAVE);
+    const F32 bottom = static_cast<F32>(y - SQUIGGLE_HEIGHT / 2);
+    const F32 top    = static_cast<F32>(y + SQUIGGLE_HEIGHT / 2);
+    gGL.getTextureSlot(0)->bindSampled(wave, ALSamplers::BilinearWrap);
+    gGL.color4fv(color.mV);
+    gGL.begin(LLRender::TRIANGLES);
+    gGL.texCoord2f(u0, 1.f);
+    gGL.vertex2f(from, top);
+    gGL.texCoord2f(u0, 0.f);
+    gGL.vertex2f(from, bottom);
+    gGL.texCoord2f(u1, 0.f);
+    gGL.vertex2f(to, bottom);
+    gGL.texCoord2f(u0, 1.f);
+    gGL.vertex2f(from, top);
+    gGL.texCoord2f(u1, 0.f);
+    gGL.vertex2f(to, bottom);
+    gGL.texCoord2f(u1, 1.f);
+    gGL.vertex2f(to, top);
+    gGL.end();
+    // What is drawn next without a texture of its own gets the white one.
+    gGL.getTextureSlot(0)->unbind();
 }
 
 void ALTextView::drawLayers(S32 line, const ALTextLayout::Line& laid, S32 r, const LLRect& text, S32 row_top, F32 left, F32 alpha)
@@ -3850,7 +3927,7 @@ void ALTextView::drawLayers(S32 line, const ALTextLayout::Line& laid, S32 r, con
             F32 x0, x1;
             if (spanOnRow(line, r, ALTextRange(ALTextPos(line, begin), ALTextPos(line, end)), x0, x1))
             {
-                drawSquiggle(left + x0, left + x1, screen_top - row_h + 2, mSpellErrorColor.get() % alpha);
+                drawSquiggle(left + x0, left + x1, screen_top - row_h + 2, mSpellErrorColor.get() % alpha, text);
             }
         }
     }
