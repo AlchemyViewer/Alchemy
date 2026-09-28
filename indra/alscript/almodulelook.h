@@ -25,6 +25,7 @@
 #pragma once
 
 #include "aldiskincludes.h"
+#include "alwatchedfile.h"
 #include "llstl.h"
 #include "stdtypes.h"
 
@@ -108,10 +109,9 @@ private:
     boost::unordered_flat_map<std::string, Read, ll::string_hash, std::equal_to<>> mRead;
     struct OnDisk
     {
-        std::filesystem::file_time_type time;
-        std::uintmax_t                  size     = 0;
-        bool                            readable = false;
-        std::vector<std::string>        exports;
+        ALFileStamp              stamp;
+        bool                     readable = false;
+        std::vector<std::string> exports;
     };
     boost::unordered_flat_map<std::string, OnDisk, ll::string_hash, std::equal_to<>> mOnDisk;
 };

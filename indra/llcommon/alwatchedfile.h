@@ -28,12 +28,26 @@
 #include "stdtypes.h"
 
 #include <cstdint>
-#include <filesystem>
 #include <functional>
 #include <memory>
 #include <string>
 
-class LLEventTimer;
+// What a file is as one look finds it: whether it is there -- a file, not
+// a folder -- when it was last written, to the nanosecond as far as the
+// file system keeps it, and its size. A look is one call to the system,
+// where a time asked of std::filesystem and then a size is two, or three.
+// The time is in the file system's own ticks, and only ever compared.
+struct LL_COMMON_API ALFileStamp
+{
+    bool           exists = false;
+    S64            time   = 0;
+    std::uintmax_t size   = 0;
+
+    bool operator==(const ALFileStamp& other) const = default;
+
+    // Safe on any thread.
+    static ALFileStamp of(const std::string& path);
+};
 
 // A file watched for changes made to it from outside -- an editor saving
 // it, a program writing it -- looked at every so often. It has changed
@@ -49,6 +63,12 @@ class LLEventTimer;
 // seen as it writes it, and that is no change: there is no flag waiting on
 // the next change to be the owner's, which a write missed would leave for
 // somebody else's.
+//
+// Every file polled is looked at by one watcher, on a thread of its own:
+// the main thread makes no call to the system for it, and what each look
+// finds is handed back to the main thread, where the owner is told. The
+// files' looks are spread over their periods rather than made all at
+// once.
 class LL_COMMON_API ALWatchedFile
 {
 public:
@@ -62,33 +82,33 @@ public:
 
     const std::string& path() const { return mPath; }
 
-    // Looked at every `period` seconds from here on, by the event timer.
+    // Looked at every `period` seconds from here on, by the watcher.
     void poll(F32 period);
-    // A look now: true, and the owner told, where the file has changed
-    // since it was last seen and held still since the look before. The
-    // owner may let go of this as it is told.
+    // A look now, on this thread: true, and the owner told, where the file
+    // has changed since it was last seen and held still since the look
+    // before. The owner may let go of this as it is told.
     bool check();
     // What is there now taken as seen: a write of the owner's own.
     void seen();
+    // Whether the file was there at the last look, or as last seen.
+    bool there() const { return mLooked.exists; }
 
 private:
-    struct Stamp
-    {
-        bool                            exists = false;
-        std::filesystem::file_time_type time{};
-        std::uintmax_t                  size = 0;
+    class Watcher;
+    friend class Watcher;
+    // What a look found, wherever it was made.
+    bool looked(const ALFileStamp& now);
 
-        bool operator==(const Stamp& other) const = default;
-    };
-    Stamp stamp() const;
-
-    class Poll;
-
-    std::string   mPath;
-    changed_t     mChanged;
+    std::string mPath;
+    changed_t   mChanged;
     // What the owner has been told of, or wrote itself; and what the last
     // look found.
-    Stamp         mSeen;
-    Stamp         mLooked;
-    std::unique_ptr<LLEventTimer> mPoll;
+    ALFileStamp mSeen;
+    ALFileStamp mLooked;
+    // The watcher, and this file's id with it, once it is polled.
+    std::shared_ptr<Watcher> mWatcher;
+    U64                      mId = 0;
+    // Counted up at each seen(): a look the watcher made before the
+    // owner's write is passed over, not taken for the file as it is.
+    U32                      mSeenCount = 0;
 };

@@ -26,6 +26,7 @@
 
 #include "alfilewrite.h"
 
+#include "alwatchedfile.h"
 #include "fsyspath.h"
 
 #include <algorithm>
@@ -169,32 +170,27 @@ bool temp(const std::string& path, std::string_view text)
 
 namespace ALFileRead
 {
-bool whole(const std::string& file, std::string& out, std::uintmax_t most)
+bool whole(const std::string& path, std::string& out, std::uintmax_t most)
 {
     out.clear();
-    std::error_code ec;
-    const std::filesystem::path path = fsyspath(file);
-    // What a stat says it is, links followed: a device or a pipe would be
-    // read for ever, and a folder not at all.
-    if (!std::filesystem::is_regular_file(path, ec) || ec)
+    // What one look says it is, links followed: a device or a pipe would
+    // be read for ever, or wait for somebody to write it, and a folder not
+    // read at all.
+    const ALFileStamp stamp = ALFileStamp::of(path);
+    if (!stamp.exists || stamp.size > most)
     {
         return false;
     }
-    const std::uintmax_t size = std::filesystem::file_size(path, ec);
-    if (ec || size > most)
-    {
-        return false;
-    }
-    llifstream in(path, std::ios::binary);
+    llifstream in(fsyspath(path), std::ios::binary);
     if (!in)
     {
         return false;
     }
-    // As much as the stat said and a byte more, to see a file that grew
+    // As much as the look said and a byte more, to see a file that grew
     // since: one that did is read on, a piece at a time, but never past
     // the limit.
     std::string text;
-    size_t      want = static_cast<size_t>(size) + 1;
+    size_t      want = static_cast<size_t>(stamp.size) + 1;
     for (;;)
     {
         const size_t at = text.size();

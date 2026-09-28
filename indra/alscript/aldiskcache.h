@@ -25,6 +25,7 @@
 #pragma once
 
 #include "aldiskincludes.h"
+#include "alwatchedfile.h"
 #include "llstl.h"
 #include "stdtypes.h"
 
@@ -91,9 +92,8 @@ public:
 private:
     struct Text
     {
-        std::filesystem::file_time_type time;
-        std::uintmax_t                  size = 0;
-        std::string                     text;
+        ALFileStamp stamp;
+        std::string text;
     };
     struct Up
     {

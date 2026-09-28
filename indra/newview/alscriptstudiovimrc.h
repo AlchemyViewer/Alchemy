@@ -30,7 +30,10 @@
 
 #include <boost/signals2.hpp>
 
+#include <memory>
 #include <string>
+
+class ALWatchedFile;
 
 // The vimrc Script Studio's vim reads: the file vimrc in the viewer's
 // settings folder, or a notecard dropped on the box for it in the
@@ -48,6 +51,7 @@
 class ALScriptStudioVimrc final : public LLSingleton<ALScriptStudioVimrc>
 {
     LLSINGLETON(ALScriptStudioVimrc);
+    ~ALScriptStudioVimrc() override;
 
 public:
     // The file that is the vimrc while no notecard is.
@@ -71,11 +75,12 @@ public:
     typedef boost::signals2::signal<void()> changed_signal_t;
     boost::signals2::connection onChanged(const changed_signal_t::slot_type& slot) { return mChanged.connect(slot); }
 
-    // Looked at again: the file, where it is the vimrc, read afresh where
-    // it changed on disk since it was read; the notecard fetched where
-    // its item has another asset now -- saved since, here or elsewhere --
-    // or has come into inventory with one. At most once a second, for a
-    // caller each frame; at once with `now`.
+    // Looked at again: the file, where it is the vimrc, read afresh at
+    // once with `now` -- it is watched, and read again as it changes on
+    // disk, whatever this is asked; the notecard fetched where its item
+    // has another asset now -- saved since, here or elsewhere -- or has
+    // come into inventory with one. At most once a second, for a caller
+    // each frame; at once with `now`.
     void check(bool now = false);
 
 private:
@@ -91,10 +96,9 @@ private:
 
     std::string      mText;
     std::string      mError;
-    // The file as it was when read: when it was last written, and its
-    // size; -1 where there was none.
-    S64              mFileTime = -1;
-    S64              mFileSize = -1;
+    // The file, watched while it is the vimrc, and read again as it
+    // changes (ALWatchedFile, off the main thread).
+    std::unique_ptr<ALWatchedFile> mWatch;
     LLTimer          mSinceCheck;
     // The notecard's copy kept on disk: whose, from which asset, its name
     // and its text.

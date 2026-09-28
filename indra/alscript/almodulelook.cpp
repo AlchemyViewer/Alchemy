@@ -100,20 +100,17 @@ const std::vector<std::string>& ALModuleLook::exportsOf(const std::string& path,
 
 const std::vector<std::string>* ALModuleLook::fileExports(const std::string& file, bool lua)
 {
-    std::error_code             ec;
-    const std::filesystem::path path = fsyspath(file);
-    const auto                  time = std::filesystem::last_write_time(path, ec);
-    const std::uintmax_t        size = ec ? 0 : std::filesystem::file_size(path, ec);
-    if (ec || size > MODULE_BYTES)
+    // Read again only where one look finds it moved.
+    const ALFileStamp stamp = ALFileStamp::of(file);
+    if (!stamp.exists || stamp.size > MODULE_BYTES)
     {
         return nullptr;
     }
     OnDisk& on = mOnDisk[(lua ? "lua:" : "lsl:") + file];
-    if (on.time != time || on.size != size)
+    if (!(on.stamp == stamp))
     {
         std::string text;
-        on.time     = time;
-        on.size     = size;
+        on.stamp    = stamp;
         on.readable = ALDiskIncludes::readOrdinary(file, text) && text.size() <= MODULE_BYTES;
         on.exports  = on.readable ? (lua ? ALLuauExports::of(text) : ALLSLExports::of(text)) : std::vector<std::string>();
     }

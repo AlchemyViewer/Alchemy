@@ -124,16 +124,14 @@ std::vector<std::string> ALDiskCache::atTop(Blessed& blessed, const std::string&
 
 bool ALDiskCache::read(const std::string& file, std::string& out)
 {
-    std::error_code      ec;
-    const fs::path       path = fsyspath(file);
-    const auto           time = fs::last_write_time(path, ec);
-    const std::uintmax_t size = ec ? 0 : fs::file_size(path, ec);
-    if (ec)
+    // Held while the file is as it was when read: one look at it.
+    const ALFileStamp stamp = ALFileStamp::of(file);
+    if (!stamp.exists)
     {
         mTexts.erase(file);
         return false;
     }
-    if (const auto held = mTexts.find(file); held != mTexts.end() && held->second.time == time && held->second.size == size)
+    if (const auto held = mTexts.find(file); held != mTexts.end() && held->second.stamp == stamp)
     {
         out = held->second.text;
         return true;
@@ -150,8 +148,7 @@ bool ALDiskCache::read(const std::string& file, std::string& out)
     }
     Text& held = mTexts[file];
     mTextBytes = mTextBytes - held.text.size() + out.size();
-    held.time  = time;
-    held.size  = size;
+    held.stamp = stamp;
     held.text  = out;
     return true;
 }

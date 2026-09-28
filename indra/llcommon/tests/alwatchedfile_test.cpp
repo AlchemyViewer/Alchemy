@@ -27,8 +27,11 @@
 #include "../alwatchedfile.h"
 
 #include "../fsyspath.h"
+#include "../lleventtimer.h"
 #include "../llfile.h"
+#include "../lltimer.h"
 #include "../lluuid.h"
+#include "../workqueue.h"
 
 #include "../test/lltut.h"
 
@@ -36,6 +39,7 @@
 #include <filesystem>
 #include <memory>
 #include <sstream>
+#include <thread>
 #include <vector>
 
 namespace tut
@@ -101,6 +105,33 @@ namespace tut
         {
             const bool first = watched.check();
             return watched.check() || first;
+        }
+
+        // The main loop's queue, which the watcher hands its looks back
+        // through, as the viewer's is.
+        static LL::WorkQueue::ptr_t mainLoop()
+        {
+            static LL::WorkQueue queue("mainloop", 1024);
+            return LL::WorkQueue::getInstance("mainloop");
+        }
+
+        // The timers ticked and the main loop run, as the viewer's frames
+        // do, until `until` holds or a few seconds go by.
+        static bool pumped(const std::function<bool()>& until)
+        {
+            const LL::WorkQueue::ptr_t main = mainLoop();
+            LLTimer                    timer;
+            while (timer.getElapsedTimeF32() < 5.f)
+            {
+                LLEventTimer::updateClass();
+                main->runPending();
+                if (until())
+                {
+                    return true;
+                }
+                std::this_thread::sleep_for(std::chrono::milliseconds(5));
+            }
+            return false;
         }
     };
 
@@ -228,5 +259,74 @@ namespace tut
         ensure("heard, and let go", watch.check());
         ensure("gone", !watched);
         ensure_equals("told of the file all the same", told, file);
+    }
+
+    template<> template<>
+    void alwatchedfile_object::test<8>()
+    {
+        set_test_name("a polled file is looked at on the watcher's thread, and its owner told on the main loop");
+        put("print(1)\n", 100);
+        const std::thread::id here = std::this_thread::get_id();
+        std::thread::id       told_on;
+        ALWatchedFile         watched(file, [&](const std::string& path) {
+            heard.push_back(path);
+            held.push_back(read(path));
+            told_on = std::this_thread::get_id();
+        });
+        watched.poll(0.05f);
+        put("print(2)\n", 200);
+        ensure("heard", pumped([&]() { return !heard.empty(); }));
+        ensure_equals("what was written", held.at(0), std::string("print(2)\n"));
+        ensure("told on the main loop's thread", told_on == here);
+        // Still: not told again, however many looks go by.
+        LLTimer timer;
+        pumped([&]() { return timer.getElapsedTimeF32() > 0.5f; });
+        ensure_equals("told once", heard.size(), size_t(1));
+    }
+
+    template<> template<>
+    void alwatchedfile_object::test<9>()
+    {
+        set_test_name("a file let go of is not told, and the others are; the owner may let go of the last as it is told");
+        const std::string other = fsyspath(fsyspath(folder) / fsyspath("sl_script_other.lsl")).string();
+        put("one\n", 100);
+        {
+            llofstream out(other, std::ios::binary);
+            out << "default {}\n";
+        }
+        std::unique_ptr<ALWatchedFile> kept;
+        kept = std::make_unique<ALWatchedFile>(file, [&](const std::string& path) {
+            heard.push_back(path);
+            kept.reset();
+        });
+        std::unique_ptr<ALWatchedFile> dropped = std::make_unique<ALWatchedFile>(other, [&](const std::string& path) { heard.push_back(path); });
+        kept->poll(0.05f);
+        dropped->poll(0.05f);
+        dropped.reset();
+        put("two\n", 200);
+        {
+            llofstream out(other, std::ios::binary | std::ios::trunc);
+            out << "default { state_entry() {} }\n";
+        }
+        ensure("heard", pumped([&]() { return !heard.empty(); }));
+        ensure("and let go", !kept);
+        LLTimer timer;
+        pumped([&]() { return timer.getElapsedTimeF32() > 0.4f; });
+        ensure_equals("the one kept, only", heard.size(), size_t(1));
+        ensure_equals("which is the file", heard[0], file);
+    }
+
+    template<> template<>
+    void alwatchedfile_object::test<10>()
+    {
+        set_test_name("a stamp: a file's size and time, and nothing for a folder or nothing at all");
+        put("12345", 250);
+        const ALFileStamp stamp = ALFileStamp::of(file);
+        ensure("there", stamp.exists);
+        ensure_equals("its size", stamp.size, std::uintmax_t(5));
+        put("12345", 251);
+        ensure("a millisecond later is another time", !(ALFileStamp::of(file) == stamp));
+        ensure("a folder is no file", !ALFileStamp::of(folder).exists);
+        ensure("nothing is nothing", !ALFileStamp::of(file + ".gone").exists);
     }
 }

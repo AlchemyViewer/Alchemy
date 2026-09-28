@@ -26,7 +26,9 @@
 
 #include "alscriptstudiovimrc.h"
 
+#include "alfilewrite.h"
 #include "alscriptworkspace.h"
+#include "alwatchedfile.h"
 #include "llfile.h"
 #include "llinventorymodel.h"
 #include "llsdserialize.h"
@@ -39,6 +41,8 @@ namespace
     // More than any vimrc: a file this size is not read.
     constexpr S64 MOST_VIMRC_BYTES = 256 * 1024;
 }
+
+ALScriptStudioVimrc::~ALScriptStudioVimrc() = default;
 
 ALScriptStudioVimrc::ALScriptStudioVimrc()
 {
@@ -100,7 +104,12 @@ void ALScriptStudioVimrc::check(bool now)
     const LLUUID item = notecard();
     if (item.isNull())
     {
-        readFile();
+        // Watched, and read as it changes; read now where asked, or where
+        // it has yet to be watched.
+        if (now || !mWatch)
+        {
+            readFile();
+        }
         return;
     }
     const LLViewerInventoryItem* held = gInventory.getItem(item);
@@ -115,11 +124,11 @@ void ALScriptStudioVimrc::refresh()
     const LLUUID item = notecard();
     if (item.isNull())
     {
-        // Read whatever it holds, however it compares with the last read.
-        mFileTime = -2;
         readFile();
         return;
     }
+    // Not the vimrc while the notecard is.
+    mWatch.reset();
     loadCache();
     const bool                   kept = mCacheItem == item;
     const LLViewerInventoryItem* held = gInventory.getItem(item);
@@ -137,34 +146,27 @@ void ALScriptStudioVimrc::refresh()
 void ALScriptStudioVimrc::readFile()
 {
     const std::string path = filePath();
-    llstat            status;
-    S64               time = -1;
-    S64               size = -1;
-    if (LLFile::stat(path, &status) == 0)
+    // Watched from what is read here: a change after it is heard, and
+    // read in turn.
+    if (!mWatch || mWatch->path() != path)
     {
-        time = static_cast<S64>(status.st_mtime);
-        size = static_cast<S64>(status.st_size);
+        mWatch = std::make_unique<ALWatchedFile>(path, [this](const std::string&) { readFile(); });
+        mWatch->poll(1.f);
     }
-    if (time == mFileTime && size == mFileSize)
+    else
     {
-        return;
+        mWatch->seen();
     }
-    mFileTime = time;
-    mFileSize = size;
-    if (size > MOST_VIMRC_BYTES)
+    const ALFileStamp stamp = ALFileStamp::of(path);
+    if (stamp.size > static_cast<std::uintmax_t>(MOST_VIMRC_BYTES))
     {
         take(std::string(), LLTrans::getString("VimrcTooLarge"));
         return;
     }
     std::string text;
-    if (size > 0)
+    if (!ALFileRead::whole(path, text, static_cast<std::uintmax_t>(MOST_VIMRC_BYTES)))
     {
-        std::error_code error;
-        text = LLFile::getContents(path, error);
-        if (error)
-        {
-            text.clear();
-        }
+        text.clear();
     }
     take(text, std::string());
 }

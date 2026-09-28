@@ -5868,7 +5868,10 @@ ALScriptStudioOrphans::Reach ALFloaterScriptStudio::reach(const Doc& doc)
     reach.offline = gDisconnected;
     if (!doc.file.empty())
     {
-        reach.fileThere = LLFile::isfile(doc.file);
+        // As the watcher last found it, off the main thread; looked at here
+        // only where nothing watches it.
+        const ALWatchedFile* watch = doc.external.watch.get();
+        reach.fileThere            = watch && watch->path() == doc.file ? watch->there() : LLFile::isfile(doc.file);
         return reach;
     }
     if (doc.ref.isNull())
