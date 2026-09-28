@@ -7125,12 +7125,15 @@ bool ALVimKeymap::misspelling(ALTextView& view, bool forward, S32 count)
         say(said("VimNoSpellCheck", "E756: Spell checking is not enabled"), true);
         return false;
     }
-    // The view's, round past the ends, the count times.
+    // The view's, round past the ends, the count times. A search that ran
+    // out of time says so, rather than that there is none: what it checked
+    // is kept, and the same search again goes on from there.
     std::optional<ALTextRange> word;
-    ALTextPos                  at = cursor(view);
+    ALTextPos                  at  = cursor(view);
+    bool                       cut = false;
     for (S32 n = 0; n < count; ++n)
     {
-        const std::optional<ALTextRange> next = view.misspellingFrom(at, forward);
+        const std::optional<ALTextRange> next = view.misspellingFrom(at, forward, &cut);
         if (!next)
         {
             break;
@@ -7138,12 +7141,17 @@ bool ALVimKeymap::misspelling(ALTextView& view, bool forward, S32 count)
         word = next;
         at   = next->begin;
     }
+    const std::string still_checking = cut ? said("VimMisspellingCut", "Still checking the spelling: search again to go on") : std::string();
     if (!word)
     {
-        say(said("VimNoMisspelling", "No misspelled words"), true);
+        say(cut ? still_checking : said("VimNoMisspelling", "No misspelled words"), true);
         return false;
     }
     moveTo(view, word->begin);
+    if (cut)
+    {
+        say(still_checking, false);
+    }
     return true;
 }
 

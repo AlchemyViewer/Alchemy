@@ -102,6 +102,9 @@ public:
     // asked for again.
     static constexpr size_t WORDS_KEPT = 8192;
     size_t                  wordsKept() const { return mSpelled.size(); }
+    // How many times a line has been checked: moved by misspellings()
+    // where the line was not checked already.
+    U32 checks() const { return mChecks; }
 
 private:
     void checkLine(const ALTextDocument& doc, ALSyntaxHighlighter& highlighter, S32 line, bool on);
@@ -119,6 +122,7 @@ private:
         words_t words;
     };
     ALLineTable<Line>        mLines;
+    U32                      mChecks = 0;
     // What the checker said of each word, until the dictionary or the
     // checker changes (recheck).
     boost::unordered_flat_map<std::string, bool, ll::string_hash, std::equal_to<>> mSpelled;

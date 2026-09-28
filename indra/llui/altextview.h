@@ -513,10 +513,17 @@ public:
     void        recheckSpelling();
     // The next misspelled word after a place, or the last before it, line
     // by line round past the ends to the place's own line again; none
-    // where there is none, or no spell check.
-    std::optional<ALTextRange> misspellingFrom(const ALTextPos& from, bool forward);
+    // where there is none, or no spell check. Lines not checked yet are
+    // checked for so long (MISSPELLING_BUDGET) and no longer: where that
+    // runs out first, none, and `cut` says so. What was checked is kept,
+    // so the same search again goes on from about where this one stopped.
+    std::optional<ALTextRange> misspellingFrom(const ALTextPos& from, bool forward, bool* cut = nullptr);
+    static constexpr F32       MISSPELLING_BUDGET = 0.02f;
     // Next Misspelling and Previous Misspelling: the word selected, from
-    // the selection's end or its start. False where there is none.
+    // the selection's end or its start. False where there is none. Where
+    // the search runs out of time it goes on a frame at a time, and the
+    // word is selected when found -- unless the text or the selection has
+    // moved meanwhile, which drops it.
     bool goToMisspelling(bool forward);
     // A change worked out over the document (ALTextEditing) made, as one
     // step to undo, and the selection it says after.
@@ -905,6 +912,9 @@ private:
     void queryChanged();
     // The bar told what was found.
     void findCounted();
+    // Next Misspelling gone on with where it ran out of time, while the
+    // text and the selection are as they were.
+    void seekMisspelling();
     void settleFind()
     {
         if (mFind.isStale())
@@ -1214,6 +1224,16 @@ private:
     // left alone for a moment after it was typed.
     bool                                    mSpellCheck = false;
     ALTextSpelling                          mSpelling;
+    // Next Misspelling still looking, from a selection in a version of
+    // the text; and how long a search may check lines for.
+    struct MisspellingSought
+    {
+        bool        forward = true;
+        ALTextRange selection;
+        U32         version = 0;
+    };
+    std::optional<MisspellingSought>        mMisspellingSought;
+    F32                                     mMisspellingBudget = MISSPELLING_BUDGET;
     // The change list (changes), and where in it the caret was last taken.
     std::vector<ALTextPos>                  mChanges;
     S32                                     mChangeAt = 0;

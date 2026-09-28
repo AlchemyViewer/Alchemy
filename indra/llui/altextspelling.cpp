@@ -90,6 +90,7 @@ void ALTextSpelling::checkLine(const ALTextDocument& doc, ALSyntaxHighlighter& h
     {
         mLines.resize(static_cast<size_t>(doc.lineCount()));
     }
+    ++mChecks;
     Line& checked    = mLines[static_cast<size_t>(line)];
     checked.valid    = true;
     checked.revision = highlighter.revision(line);

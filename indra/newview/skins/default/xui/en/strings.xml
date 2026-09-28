@@ -431,6 +431,7 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="VimNoFileUnderCursor">E446: No file name under cursor</string>
 	<string name="VimNoSpellCheck">E756: Spell checking is not enabled</string>
 	<string name="VimNoMisspelling">No misspelled words</string>
+	<string name="VimMisspellingCut">Still checking the spelling: search again to go on</string>
 	<string name="VimNoSuggestions">Sorry, no suggestions</string>
 	<string name="VimNotAddable">E764: Cannot add this word</string>
 	<string name="VimNothingInRegister">E353: Nothing in register [REGISTER]</string>

@@ -1470,21 +1470,31 @@ void ALTextView::recheckSpelling()
     mSpelling.recheck();
 }
 
-std::optional<ALTextRange> ALTextView::misspellingFrom(const ALTextPos& from, bool forward)
+std::optional<ALTextRange> ALTextView::misspellingFrom(const ALTextPos& from, bool forward, bool* cut)
 {
+    if (cut)
+    {
+        *cut = false;
+    }
     const S32 lines = mDocument.lineCount();
     if (!getSpellCheck() || lines == 0)
     {
         return std::nullopt;
     }
+    // A real-time clock, read only after a line that had to be checked: a
+    // line checked already costs next to nothing to look at again, and the
+    // search always gets at least one line further.
+    LLTimer spent;
+    spent.setTimerExpirySec(mMisspellingBudget);
     for (S32 i = 0; i <= lines; ++i)
     {
         const S32   line  = ((forward ? from.line + i : from.line - i) % lines + lines) % lines;
         // The place's own line first, after it or before it; and last, once
         // round, what is left of it.
         const bool  own   = i == 0;
-        const bool  again = i == lines;
-        const auto& words = misspellings(line);
+        const bool  again  = i == lines;
+        const U32   checks = mSpelling.checks();
+        const auto& words  = misspellings(line);
         auto found = [&](const std::pair<S32, S32>& word) {
             return ALTextRange(ALTextPos(line, word.first), ALTextPos(line, word.second));
         };
@@ -1507,6 +1517,14 @@ std::optional<ALTextRange> ALTextView::misspellingFrom(const ALTextPos& from, bo
                     return found(*it);
                 }
             }
+        }
+        if (i < lines && mSpelling.checks() != checks && spent.hasExpired())
+        {
+            if (cut)
+            {
+                *cut = true;
+            }
+            return std::nullopt;
         }
     }
     return std::nullopt;
@@ -1546,15 +1564,31 @@ bool ALTextView::convertIndentation(S32 first, S32 last, bool to_spaces, S32 mea
 
 bool ALTextView::goToMisspelling(bool forward)
 {
+    mMisspellingSought.reset();
     const ALTextRange                selected = selection().normalised();
-    const std::optional<ALTextRange> word     = misspellingFrom(forward ? selected.end : selected.begin, forward);
+    bool                             cut      = false;
+    const std::optional<ALTextRange> word     = misspellingFrom(forward ? selected.end : selected.begin, forward, &cut);
     if (!word)
     {
-        return false;
+        if (cut)
+        {
+            mMisspellingSought = MisspellingSought{ forward, selection(), mDocument.version() };
+        }
+        return cut;
     }
     setSelection(*word);
     scrollToCaret();
     return true;
+}
+
+void ALTextView::seekMisspelling()
+{
+    const MisspellingSought sought = *mMisspellingSought;
+    mMisspellingSought.reset();
+    if (sought.version == mDocument.version() && sought.selection == selection() && getSpellCheck())
+    {
+        goToMisspelling(sought.forward);
+    }
 }
 
 const std::vector<std::pair<S32, S32>>& ALTextView::misspellings(S32 line)
@@ -4311,6 +4345,10 @@ void ALTextView::draw()
     if (mFind.searching() && mFind.collect(mDocument, selection().normalised()))
     {
         findCounted();
+    }
+    if (mMisspellingSought)
+    {
+        seekMisspelling();
     }
     syncScrollbar();
     const F32 alpha = getDrawContext().mAlpha;

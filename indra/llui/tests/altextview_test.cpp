@@ -54,6 +54,24 @@ const std::string& rlvGetAnonym(const LLAvatarName& av_name)
     return gViewTestAnonName;
 }
 
+namespace ll_test
+{
+    // What a test reaches inside the view for: how long Next Misspelling
+    // may check lines for, and its going on as the next frame would.
+    struct TextViewProbe
+    {
+        static void misspellingBudget(ALTextView& view, F32 seconds) { view.mMisspellingBudget = seconds; }
+        static bool seeking(const ALTextView& view) { return view.mMisspellingSought.has_value(); }
+        static void nextFrame(ALTextView& view)
+        {
+            if (view.mMisspellingSought)
+            {
+                view.seekMisspelling();
+            }
+        }
+    };
+}
+
 namespace tut
 {
     struct altextview_data
@@ -1618,5 +1636,69 @@ namespace tut
         ensure("the new line checked", v.misspellings(0).empty());
         ensure_equals("the first let go of, and asked again", asked[word(0)], 2);
         ensure_equals("the last still kept", asked[word(many - 1)], 1);
+    }
+
+    template<> template<>
+    void altextview_object::test<53>()
+    {
+        set_test_name("Next Misspelling checks lines for so long, then goes on a frame at a time; an edit or a moved selection drops it");
+        ALTextView& v = make("all fine\nall fine\nall fine\nall fine\nall fine\nteh end\n");
+        v.setSpellChecker([](const std::string& word) { return word != "teh"; });
+        v.setSpellCheck(true);
+        // No time at all: a line newly checked each time, and no more.
+        ll_test::TextViewProbe::misspellingBudget(v, 0.f);
+        bool cut = false;
+        ensure("cut short", !v.misspellingFrom(ALTextPos(0, 0), true, &cut) && cut);
+        std::optional<ALTextRange> found;
+        S32                        asks = 1;
+        for (; !found && asks < 20; ++asks)
+        {
+            found = v.misspellingFrom(ALTextPos(0, 0), true, &cut);
+        }
+        ensure("found, the same search asked again", found && *found == ALTextRange(ALTextPos(5, 0), ALTextPos(5, 3)) && !cut);
+        ensure_equals("a line further each time", asks, 6);
+
+        v.recheckSpelling();
+        v.setCaret(ALTextPos(0, 0));
+        key(KEY_F7);
+        ensure("still looking", ll_test::TextViewProbe::seeking(v) && v.selection().empty());
+        S32 frames = 0;
+        for (; ll_test::TextViewProbe::seeking(v) && frames < 20; ++frames)
+        {
+            ll_test::TextViewProbe::nextFrame(v);
+        }
+        ensure("found in the frames after", v.selection() == ALTextRange(ALTextPos(5, 0), ALTextPos(5, 3)));
+        ensure_equals("a line a frame", frames, 5);
+
+        v.recheckSpelling();
+        v.setCaret(ALTextPos(0, 0));
+        key(KEY_F7);
+        v.setCaret(ALTextPos(1, 2));
+        ll_test::TextViewProbe::nextFrame(v);
+        ensure("the caret moved: dropped", !ll_test::TextViewProbe::seeking(v) && v.selection().empty() && v.caret() == ALTextPos(1, 2));
+
+        v.recheckSpelling();
+        v.setCaret(ALTextPos(0, 0));
+        key(KEY_F7);
+        v.document().insert(ALTextPos(3, 0), "x");
+        ll_test::TextViewProbe::nextFrame(v);
+        ensure("the text changed: dropped", !ll_test::TextViewProbe::seeking(v) && v.selection().empty());
+
+        // None at all: it looks through every line, then stops.
+        v.setText("all fine\nall fine\nall fine");
+        v.setCaret(ALTextPos(0, 0));
+        key(KEY_F7);
+        for (frames = 0; ll_test::TextViewProbe::seeking(v) && frames < 20; ++frames)
+        {
+            ll_test::TextViewProbe::nextFrame(v);
+        }
+        ensure("none: it stopped, and nothing selected", !ll_test::TextViewProbe::seeking(v) && frames < 20 && v.selection().empty());
+
+        // With the time it has, all at once as before.
+        ll_test::TextViewProbe::misspellingBudget(v, ALTextView::MISSPELLING_BUDGET);
+        v.setText("all fine\nteh");
+        v.setCaret(ALTextPos(0, 0));
+        key(KEY_F7);
+        ensure("at once", !ll_test::TextViewProbe::seeking(v) && v.selection() == ALTextRange(ALTextPos(1, 0), ALTextPos(1, 3)));
     }
 }

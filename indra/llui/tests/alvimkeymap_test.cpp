@@ -44,6 +44,15 @@ const std::string& rlvGetAnonym(const LLAvatarName& av_name)
     return gVimTestAnonName;
 }
 
+namespace ll_test
+{
+    // How long a search for a misspelling may check lines for.
+    struct TextViewProbe
+    {
+        static void misspellingBudget(ALTextView& view, F32 seconds) { view.mMisspellingBudget = seconds; }
+    };
+}
+
 namespace tut
 {
     struct alvimkeymap_data
@@ -2547,5 +2556,27 @@ namespace tut
         moved("a pattern not found said");
         keys("j");
         moved("the message cleared by a key");
+    }
+
+    template<> template<>
+    void alvimkeymap_object::test<83>()
+    {
+        set_test_name("]s run out of time says so, not that there is none, and ]s again goes on from there");
+        ALCodeEditor& e = make("all fine\nall fine\nall fine\nteh end\n", "text");
+        e.setSpellChecker([](const std::string& word) { return word != "teh"; });
+        e.setSpellCheck(true);
+        ll_test::TextViewProbe::misspellingBudget(e, 0.f);
+        keys("]s");
+        ensure_equals("said", vim->message(), std::string("Still checking the spelling: search again to go on"));
+        ensure("not moved", e.caret() == ALTextPos(0, 0));
+        keys("]s");
+        keys("]s");
+        ensure("still not", e.caret() == ALTextPos(0, 0));
+        keys("]s");
+        ensure("found, a line further each time", e.caret() == ALTextPos(3, 0));
+        e.recheckSpelling();
+        ll_test::TextViewProbe::misspellingBudget(e, ALTextView::MISSPELLING_BUDGET);
+        keys("gg]s");
+        ensure("with time, at once", e.caret() == ALTextPos(3, 0));
     }
 }
