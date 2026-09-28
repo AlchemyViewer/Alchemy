@@ -79,7 +79,9 @@ public:
     // Whether `node` may be run ahead of the rest of `root` -- moved out
     // before its statement -- with nothing seen differently: all that
     // runs before it changes nothing, calls nothing but pure library
-    // functions, and reads nothing it may change.
+    // functions, and reads nothing it may change. Where `node` changes
+    // nothing itself, a call of the script's own before it that changes
+    // nothing is no bar either, whatever it reads.
     bool mayRunFirst(Tailslide::LSLASTNode* root, Tailslide::LSLASTNode* node) const;
 
 private:

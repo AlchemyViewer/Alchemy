@@ -251,6 +251,9 @@ std::vector<LSLASTNode*> ALLSLEffects::before(LSLASTNode* root, LSLASTNode* node
 bool ALLSLEffects::mayRunFirst(LSLASTNode* root, LSLASTNode* node) const
 {
     const Writes moved = of(node);
+    // What changes nothing runs in either order with a call of the
+    // script's own that changes nothing, whatever that reads.
+    const bool quiet = moved.variables.empty() && !moved.impure;
     for (LSLASTNode* earlier : before(root, node))
     {
         bool fine = true;
@@ -265,7 +268,9 @@ bool ALLSLEffects::mayRunFirst(LSLASTNode* root, LSLASTNode* node) const
             }
             else if (LSLSymbol* callee = called(n))
             {
-                fine = callee->getSubType() == SYM_BUILTIN && ALLSLTraits::pure(callee->getName());
+                const Writes& theirs = ofFunction(callee);
+                fine = callee->getSubType() == SYM_BUILTIN ? ALLSLTraits::pure(callee->getName())
+                                                           : quiet && theirs.variables.empty() && !theirs.impure;
             }
             else if (n->getNodeType() == NODE_EXPRESSION && n->getNodeSubType() == NODE_LVALUE_EXPRESSION)
             {

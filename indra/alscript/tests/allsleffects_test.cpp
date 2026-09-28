@@ -198,5 +198,23 @@ namespace tut
         ensure("12: an assignment's store is after its value", first(bumps[10]));
         ensure_equals("before the right operand: nothing", ALLSLEffects::before(statementOf(bumps[0]), bumps[0]).size(), size_t(0));
         ensure_equals("before the left: the right", ALLSLEffects::before(statementOf(bumps[1]), bumps[1]).size(), size_t(1));
+
+        // Calls of the script's own that change nothing, either side.
+        const Parsed q("integer g;\n"
+                       "integer bump() { return ++g; }\n"
+                       "integer look() { return g; }\n"
+                       "integer same(integer v) { return v; }\n"
+                       "default { state_entry() {\n"
+                       "    list l;\n"
+                       "    l = [look(), same(1)];\n"  // same changes nothing, and look nothing
+                       "    l = [look(), bump()];\n"   // bump writes what look reads
+                       "    l = [bump(), same(2)];\n"  // same changes nothing, and bump does
+                       "} }\n");
+        ensure("parsed", q.script != nullptr);
+        const ALLSLEffects quiet(q.script);
+        const auto         firstQ = [&](LSLFunctionExpression* call) { return quiet.mayRunFirst(statementOf(call), call); };
+        ensure("a quiet call before a quiet one", firstQ(q.calls("same")[0]));
+        ensure("a call that reads before one that writes", !firstQ(q.calls("bump")[0]));
+        ensure("a call that writes before a quiet one", !firstQ(q.calls("same")[1]));
     }
 }
