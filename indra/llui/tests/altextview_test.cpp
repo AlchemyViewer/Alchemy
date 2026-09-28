@@ -62,6 +62,8 @@ namespace ll_test
     {
         static void misspellingBudget(ALTextView& view, F32 seconds) { view.mMisspellingBudget = seconds; }
         static bool seeking(const ALTextView& view) { return view.mMisspellingSought.has_value(); }
+        static void trimLayout(ALTextView& view) { view.trimLayout(); }
+        static S32  heldMost() { return ALTextView::LAYOUT_HELD_MOST; }
         static void nextFrame(ALTextView& view)
         {
             if (view.mMisspellingSought)
@@ -1700,5 +1702,44 @@ namespace tut
         v.setCaret(ALTextPos(0, 0));
         key(KEY_F7);
         ensure("at once", !ll_test::TextViewProbe::seeking(v) && v.selection() == ALTextRange(ALTextPos(1, 0), ALTextPos(1, 3)));
+    }
+
+    template<> template<>
+    void altextview_object::test<54>()
+    {
+        set_test_name("scrolled end to end, the view holds only so many lines' glyphs, and none out of sight; no line's top moves for it");
+        std::string lines;
+        for (int i = 0; i < 5000; ++i)
+        {
+            lines += "line " + std::to_string(i) + "\n";
+        }
+        ALTextView& v     = make(lines.c_str());
+        const S32   total = v.layout().totalHeight();
+        const S32   step  = llmax(1, v.textRect().getHeight());
+        S32         most  = 0;
+        // A screenful at a time, each laid out as a frame draws it.
+        for (S32 y = 0; y < total; y += step)
+        {
+            v.setScrollY(y);
+            ll_test::TextViewProbe::trimLayout(v);
+            for (S32 l = v.firstVisibleLine(); l <= v.lastVisibleLine(); ++l)
+            {
+                v.layout().line(l);
+            }
+            most = llmax(most, v.layout().linesHeld());
+        }
+        // Trimmed before a frame lays out its screen, as draw() does: so
+        // many past what is in sight, and the next screen.
+        const S32 screen = v.lastVisibleLine() - v.firstVisibleLine() + 1;
+        ensure("never more than so many held", most <= ll_test::TextViewProbe::heldMost() + 2 * screen);
+        ensure("fewer than were laid out", most < 5000);
+        ensure_equals("the column as tall", v.layout().totalHeight(), total);
+        ensure("what is in sight held", v.layout().line(v.firstVisibleLine()).valid);
+
+        v.setVisible(false);
+        ensure_equals("out of sight: none held", v.layout().linesHeld(), 0);
+        ensure_equals("and the column as tall", v.layout().totalHeight(), total);
+        v.setVisible(true);
+        ensure("laid out again when asked", !v.layout().line(v.firstVisibleLine()).rows.empty());
     }
 }

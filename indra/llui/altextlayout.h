@@ -187,6 +187,9 @@ public:
         S32                                             wrappedAt = -1;
         std::vector<std::pair<size_t, const LLFontGL*>> fonts;
         std::vector<std::pair<size_t, S32>>             boxes;
+        // Let go of by trim(): its glyphs and rows gone, its height and
+        // width still those of its text.
+        bool                                            trimmed = false;
     };
 
     ALTextLayout();
@@ -294,6 +297,18 @@ public:
     // not thrown away for nothing.
     U32 linesLaidOut() const { return mLinesLaidOut; }
 
+    // --- memory --------------------------------------------------------------
+
+    // Lets go of the glyphs and rows of every line outside first..last --
+    // lines far from the view, or every line of a view not seen -- keeping
+    // what each measured: its height, so no line's top moves, and its
+    // width, so the scrollbar does not. A line let go of is laid out again
+    // when next asked for. How many were let go of.
+    S32 trim(S32 first, S32 last);
+    // At most how many lines hold glyphs: counted exactly by trim(), and
+    // one more for each line laid out since.
+    S32 linesHeld() const { return mLinesHeld; }
+
 private:
     void onEdit(const ALTextDocument::Edit& edit);
     void invalidateAll();
@@ -341,6 +356,7 @@ private:
     F32                                mScaleY         = 1.f;
     U32                                mHiddenRevision = 0;
     U32                                mLinesLaidOut   = 0;
+    S32                                mLinesHeld      = 0;
     // Scratch a wrapping loop keeps rather than allocates per line.
     std::vector<size_t>                mBreaks;
     inlay_provider_t                   mInlays;

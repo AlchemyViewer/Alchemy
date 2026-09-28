@@ -662,6 +662,9 @@ public:
 
     void draw() override;
     void reshape(S32 width, S32 height, bool called_from_parent = true) override;
+    // Out of sight -- a tab not looked at, a window closed -- the layout
+    // lets go of every line's glyphs, keeping their heights.
+    void onVisibilityChange(bool new_visibility) override;
     bool handleKeyHere(KEY key, MASK mask) override;
     bool handleUnicodeCharHere(llwchar uni_char) override;
     bool handleMouseDown(S32 x, S32 y, MASK mask) override;
@@ -915,6 +918,12 @@ private:
     // Next Misspelling gone on with where it ran out of time, while the
     // text and the selection are as they were.
     void seekMisspelling();
+    // Past so many lines laid out beyond those in sight, the layout lets go
+    // of those more than so many lines from what is in sight: a script
+    // scrolled through end to end otherwise keeps every line's glyphs.
+    static constexpr S32 LAYOUT_HELD_MOST   = 1024;
+    static constexpr S32 LAYOUT_KEPT_AROUND = 256;
+    void                 trimLayout();
     void settleFind()
     {
         if (mFind.isStale())

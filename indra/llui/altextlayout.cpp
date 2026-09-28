@@ -153,6 +153,7 @@ void ALTextLayout::refreshIfFontsChanged()
 void ALTextLayout::invalidateAll()
 {
     mLines.assign(mDocument ? mDocument->lineCount() : 0, Line());
+    mLinesHeld = 0;
     // What is folded stays folded through a change of font; a document of
     // another length is another document.
     if (mHidden.size() != mLines.size())
@@ -235,8 +236,9 @@ F32 ALTextLayout::contentWidth()
         const F32 per_byte = spaceAdvance() / mScaleX;
         for (size_t i = 0; i < mLines.size(); ++i)
         {
-            const F32 width = mLines[i].valid ? mLines[i].width
-                                              : (mDocument ? static_cast<F32>(mDocument->lineLength(static_cast<S32>(i))) * per_byte : 0.f);
+            const F32 width = mLines[i].valid || mLines[i].trimmed
+                                  ? mLines[i].width
+                                  : (mDocument ? static_cast<F32>(mDocument->lineLength(static_cast<S32>(i))) * per_byte : 0.f);
             widest = llmax(widest, width);
         }
         mContentWidth = widest;
@@ -332,13 +334,16 @@ void ALTextLayout::invalidateLine(S32 index)
         return;
     }
     // Laid out again when next asked for, keeping its height until then.
-    mLines[index].valid = false;
-    mContentWidth       = -1.f;
+    mLines[index].valid   = false;
+    mLines[index].trimmed = false;
+    mContentWidth         = -1.f;
 }
 
 void ALTextLayout::layoutLine(S32 index, Line& out)
 {
     ++mLinesLaidOut;
+    ++mLinesHeld;
+    out.trimmed = false;
     out.placed.clear();
     out.glyphs.clear();
     out.rows.clear();
@@ -758,6 +763,41 @@ const ALTextLayout::Line& ALTextLayout::line(S32 index)
         }
     }
     return entry;
+}
+
+S32 ALTextLayout::trim(S32 first, S32 last)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+    S32 let_go = 0;
+    S32 held   = 0;
+    for (size_t i = 0; i < mLines.size(); ++i)
+    {
+        Line&      entry = mLines[i];
+        const bool holds = entry.placed.capacity() > 0 || entry.glyphs.capacity() > 0 || entry.rows.capacity() > 0;
+        if (!holds)
+        {
+            continue;
+        }
+        const S32 index = static_cast<S32>(i);
+        if (index >= first && index <= last)
+        {
+            ++held;
+            continue;
+        }
+        // Its height stays as it counts in the column, and its width, where
+        // it was current, as the widest line's.
+        entry.trimmed   = entry.valid || entry.trimmed;
+        entry.valid     = false;
+        entry.wrappedAt = -1;
+        std::vector<LLFontGL::Placed>().swap(entry.placed);
+        std::vector<Glyph>().swap(entry.glyphs);
+        std::vector<Row>().swap(entry.rows);
+        std::vector<std::pair<size_t, const LLFontGL*>>().swap(entry.fonts);
+        std::vector<std::pair<size_t, S32>>().swap(entry.boxes);
+        ++let_go;
+    }
+    mLinesHeld = held;
+    return let_go;
 }
 
 S32 ALTextLayout::countedHeight(S32 index) const

@@ -710,4 +710,45 @@ namespace tut
         ensure("taller once laid out", layout.lineTop(1) > before);
         ensure("and the heights moved", layout.heightsRevision() != revision);
     }
+
+    template<> template<>
+    void altextlayout_object::test<18>()
+    {
+        set_test_name("trim lets go of the lines outside what it keeps, their heights and widths kept, and they are laid out again when asked for");
+        std::string text;
+        for (int i = 0; i < 40; ++i)
+        {
+            text += i == 7 ? "a line longer than every other line in the text, and wrapped\n" : "line\n";
+        }
+        ready(text.c_str());
+        layout.setWrapWidth(static_cast<S32>(layout.columnWidth() * 12.f));
+        for (S32 l = 0; l < layout.lineCount(); ++l)
+        {
+            layout.line(l);
+        }
+        const S32 top      = layout.lineTop(30);
+        const S32 total    = layout.totalHeight();
+        const F32 widest   = layout.contentWidth();
+        const U32 heights  = layout.heightsRevision();
+        const S32 wrapped  = layout.lineHeight(7);
+        ensure("every line held", layout.linesHeld() >= layout.lineCount());
+        ensure_equals("all but 20..29 let go of", layout.trim(20, 29), layout.lineCount() - 10);
+        ensure_equals("ten held", layout.linesHeld(), 10);
+        ensure_equals("no top moved", layout.lineTop(30), top);
+        ensure_equals("nor the whole", layout.totalHeight(), total);
+        ensure_equals("the wrapped line as tall as it was", layout.lineTop(8) - layout.lineTop(7), wrapped);
+        ensure("and taller than a row", wrapped > layout.rowHeight());
+        ensure("nor any height revised", layout.heightsRevision() == heights);
+        ensure_equals("the widest as wide", layout.contentWidth(), widest);
+        const U32 laid = layout.linesLaidOut();
+        layout.line(25);
+        ensure_equals("a line kept is not laid out again", layout.linesLaidOut(), laid);
+        const size_t rows = layout.line(7).rows.size();
+        ensure_equals("a line let go of is, when asked for", layout.linesLaidOut(), laid + 1);
+        ensure("in its rows again", rows > 1);
+        ensure_equals("and as tall", layout.lineHeight(7), wrapped);
+        ensure_equals("nothing kept: nothing held", layout.trim(0, -1), 11);
+        ensure_equals("none held", layout.linesHeld(), 0);
+        ensure_equals("nothing more to let go of", layout.trim(0, -1), 0);
+    }
 }

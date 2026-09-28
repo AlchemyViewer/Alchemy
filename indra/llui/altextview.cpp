@@ -775,6 +775,27 @@ void ALTextView::scrollToLine(S32 line)
     syncScrollbar();
 }
 
+void ALTextView::trimLayout()
+{
+    // So many past what is in sight, however much that is: a window tall
+    // enough to show more lines than that is not trimmed every frame.
+    const S32 first = firstVisibleLine();
+    const S32 last  = lastVisibleLine();
+    if (mLayout.linesHeld() > LAYOUT_HELD_MOST + (last - first + 1))
+    {
+        mLayout.trim(first - LAYOUT_KEPT_AROUND, last + LAYOUT_KEPT_AROUND);
+    }
+}
+
+void ALTextView::onVisibilityChange(bool new_visibility)
+{
+    if (!new_visibility)
+    {
+        mLayout.trim(0, -1);
+    }
+    LLUICtrl::onVisibilityChange(new_visibility);
+}
+
 S32 ALTextView::firstVisibleLine()
 {
     return mLayout.lineAtY(mScrollY);
@@ -4351,6 +4372,7 @@ void ALTextView::draw()
         seekMisspelling();
     }
     syncScrollbar();
+    trimLayout();
     const F32 alpha = getDrawContext().mAlpha;
     if (mBgVisible)
     {
