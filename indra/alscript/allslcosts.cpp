@@ -49,6 +49,9 @@ namespace
         c.xorForNotEqual               = true;
         c.strictForInclusive           = false;
         c.bitOrForOr                   = false;
+        c.castForDump                  = true;
+        c.castForDetail                = true;
+        c.castForWholeFloat            = false;
 
         c.local         = 11;
         c.jump          = 5;
@@ -96,6 +99,11 @@ namespace
         c.xorForNotEqual               = true;
         c.strictForInclusive           = true;
         c.bitOrForOr                   = true;
+        c.castForDump                  = true;
+        // A byte a place, against the helper to cast a list to a string a
+        // script may not have.
+        c.castForDetail                = false;
+        c.castForWholeFloat            = true;
 
         c.local         = 6;
         c.jump          = 5;
@@ -144,6 +152,11 @@ namespace
         c.xorForNotEqual               = false;
         c.strictForInclusive           = false;
         c.bitOrForOr                   = false;
+        // Nothing a place: only what the first place takes away, which
+        // depends on what else the script calls.
+        c.castForDump                  = false;
+        c.castForDetail                = false;
+        c.castForWholeFloat            = false;
 
         c.local         = 4;
         c.jump          = 93;

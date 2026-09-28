@@ -90,6 +90,14 @@ struct ALLSLCosts
     // `a || b` as `a | b` where only truth counts: LSL runs both sides of
     // either.
     bool bitOrForOr = false;
+    // llDumpList2String(l, "") as (string)l.
+    bool castForDump = false;
+    // llList2String(llGetObjectDetails(k, [X]), 0) as a cast of the
+    // details to a string.
+    bool castForDetail = false;
+    // A float whose value is whole, where LSL converts nothing for it -- a
+    // list's element, what is cast -- as `((float)2)` rather than `2.0`.
+    bool castForWholeFloat = false;
 
     // ---- functions, for whether putting one in place saves
 

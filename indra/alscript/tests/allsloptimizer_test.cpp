@@ -184,7 +184,8 @@ namespace tut
         // would convert one, and stays a float where it would not.
         r = ALLSLOptimizer::run(wrap("", "        float f = 2.0;\n        list l = [2.0];\n        string s = (string)2.0;\n        vector v = <1.0, 2.0, 3.5>;\n        llSay(0, (string)f + llList2CSV(l) + s + (string)v);\n        f = 0; l = []; s = \"\"; v = ZERO_VECTOR;\n"), options());
         ensure("whole float as integer: " + r.text, r.text.find("float f = 2;") != std::string::npos);
-        ensure("list element stays a float: " + r.text, r.text.find("list l = (list)2.0;") != std::string::npos);
+        // As the cast of an integer on Mono, where that is smaller (ALLSLCosts::castForWholeFloat).
+        ensure("list element stays a float: " + r.text, r.text.find("list l = (list)((float)2);") != std::string::npos);
         ensure("cast folded with six places", r.text.find("string s = \"2.000000\";") != std::string::npos);
         ensure("vector components", r.text.find("vector v = <1, 2, 3.5>;") != std::string::npos);
     }
@@ -782,7 +783,7 @@ namespace tut
         ensure("optimized", r.optimized);
         ensure("a zero appended stays: " + r.text, r.text.find("l = l + 0;") != std::string::npos);
         ensure("an empty string appended stays: " + r.text, r.text.find("l = l + \"\";") != std::string::npos);
-        ensure("a zero put in front stays: " + r.text, r.text.find("l = 0") != std::string::npos && r.text.find("+ l;") != std::string::npos);
+        ensure("a zero put in front stays: " + r.text, r.text.find("l = ((float)0) + l;") != std::string::npos);
         ensure("a negative appended is not turned into a subtraction: " + r.text, r.text.find("l - 1") == std::string::npos);
         ensure("an empty list adds nothing: " + r.text, r.text.find("l + [];") == std::string::npos);
         ensure("nor an empty string to a string: " + r.text, r.text.find("llList2String(l, 0) + \"\"") == std::string::npos);
@@ -795,7 +796,8 @@ namespace tut
         ensure("the call", call != std::string::npos);
         const std::string args = r.text.substr(call, r.text.find(';', call) - call);
         ensure("the face, a zero: " + args, args.find("PRIM_TEXTURE + 0") != std::string::npos || args.find("PRIM_TEXTURE, 0") != std::string::npos);
-        ensure("and the last element: " + args, args.find("ZERO_VECTOR + 0") != std::string::npos || args.find("ZERO_VECTOR, 0") != std::string::npos);
+        ensure("and the last element, a float: " + args, args.find("ZERO_VECTOR + ((float)0)") != std::string::npos ||
+                                                          args.find("ZERO_VECTOR, ((float)0)") != std::string::npos);
         // And what it wrote compiles.
         ALLSLService service;
         const ALScriptProblems said = service.check(r.text);
@@ -1697,6 +1699,47 @@ namespace tut
             ensure("inclusive against a constant", has(mono ? "if (a > 4)" : "if (a >= 5)") && has(mono ? "if (b < 6)" : "if (b <= 5)"));
             ensure("not past the largest integer", has("if (b <= 2147483647)"));
             ensure("|| where only truth counts", has(mono ? "while (a | b)" : "while (a || b)"));
+            ALLSLService service;
+            for (const ALScriptProblem& p : service.check(r.text, !lso))
+            {
+                ensure("what was written compiles: " + p.message + "\n" + r.text, p.severity != ALScriptProblem::Severity::Error);
+            }
+        }
+    }
+
+    template<> template<>
+    void allsloptimizer_object::test<45>()
+    {
+        set_test_name("a list dumped with nothing between as a cast, one object detail read as a string as a cast, and a whole float as the cast of an integer on Mono");
+        const std::string source = wrap("list L = [2.0];\n",
+                                        "        list l = llParseString2List(llGetObjectName(), [\" \"], []);\n"
+                                        "        string d = llDumpList2String(l, \"\");\n"
+                                        "        string e = llDumpList2String(l, \", \");\n"
+                                        "        string n = llList2String(llGetObjectDetails(llGetOwner(), [OBJECT_NAME]), 0);\n"
+                                        "        string both = llList2String(llGetObjectDetails(llGetOwner(), [OBJECT_NAME, OBJECT_DESC]), 0);\n"
+                                        "        string second = llList2String(llGetObjectDetails(llGetOwner(), [OBJECT_NAME]), 1);\n"
+                                        "        l += [-3.0];\n"
+                                        "        llOwnerSay(d + e + n + both + second + (string)l + (string)L);\n");
+        for (const ALLSLOptimizer::Target target : { ALLSLOptimizer::Target::LSO, ALLSLOptimizer::Target::Mono, ALLSLOptimizer::Target::Luau })
+        {
+            ALLSLOptimizer::Options o = options();
+            o.target                  = target;
+            const ALLSLOptimizer::Result r = ALLSLOptimizer::run(source, o);
+            ensure("optimized: " + notes(r), r.optimized);
+            const auto has = [&r](const std::string& what) { return r.text.find(what) != std::string::npos; };
+            const bool lso = target == ALLSLOptimizer::Target::LSO;
+            // On LSO and Mono; on Luau a place saves nothing.
+            ensure("dumped with nothing between: " + r.text,
+                   target == ALLSLOptimizer::Target::Luau ? has("llDumpList2String(l, \"\")") : has("(string)l") && !has("llDumpList2String(l, \"\")"));
+            ensure("with something between, a dump", has("llDumpList2String(l, \", \")"));
+            // On LSO; on Mono a byte a place, against a helper the script may lack.
+            ensure("one detail: " + r.text, lso == (has("(string)llGetObjectDetails(llGetOwner(), [OBJECT_NAME])") ||
+                                                     has("(string)llGetObjectDetails(llGetOwner(), (list)OBJECT_NAME)")));
+            ensure("two, a read", has("llList2String(llGetObjectDetails(llGetOwner(), "));
+            ensure("the second, a read", has("OBJECT_NAME]), 1)") || has("(list)OBJECT_NAME), 1)"));
+            const bool mono = target == ALLSLOptimizer::Target::Mono;
+            ensure("a whole float in a list: " + r.text, has(mono ? "((float)-3)" : "-3.0"));
+            ensure("not in a global's value", has("list L = [2.0];"));
             ALLSLService service;
             for (const ALScriptProblem& p : service.check(r.text, !lso))
             {

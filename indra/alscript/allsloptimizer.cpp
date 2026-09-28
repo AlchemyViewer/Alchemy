@@ -2456,6 +2456,92 @@ namespace
         }
     };
 
+    // Which of Mono's list helpers a script calls, each by what Tailslide's
+    // Mono compiler calls one for: a literal, an empty list, a cast to a
+    // list and one of a list to a string, a list's literal among the
+    // globals, something added to a list -- a helper for each type added
+    // -- and something added before one.
+    // The assembly references each once, which is what a list's shapes can
+    // cost that they do not save at each place: a helper nothing in the
+    // script called before.
+    class ListHelpers : public ASTVisitor
+    {
+    public:
+        boost::unordered_flat_set<U32> used;
+        // Lists dumped with nothing between their elements, each a cast to
+        // a string it may be.
+        S32                            dumps = 0;
+
+        bool castsToString() const { return used.contains(TO_STRING); }
+
+        bool visit(LSLFunctionExpression* expr) override
+        {
+            LSLSymbol*                     sym  = expr->getSymbol();
+            LSLASTNodeList<LSLExpression>* args = expr->getArguments();
+            if (sym && sym->getSubType() == SYM_BUILTIN && !strcmp(sym->getName(), "llDumpList2String") && args && args->getNumChildren() == 2)
+            {
+                LSLConstant* cv = args->getChild(1)->getConstantValue();
+                dumps += cv && cv->getIType() == LST_STRING && !*static_cast<LSLStringConstant*>(cv)->getValue() ? 1 : 0;
+            }
+            return true;
+        }
+
+        // How many of `after`'s helpers are not among these.
+        S32 freshIn(const ListHelpers& after) const
+        {
+            return static_cast<S32>(std::count_if(after.used.begin(), after.used.end(), [this](U32 helper) { return !used.contains(helper); }));
+        }
+
+        bool visit(LSLGlobalVariable* global) override
+        {
+            mGlobal = true;
+            visitChildren(global);
+            mGlobal = false;
+            return false;
+        }
+        bool visit(LSLListExpression* expr) override
+        {
+            used.insert(mGlobal ? GLOBAL_LITERAL : expr->hasChildren() ? LITERAL : EMPTY);
+            return true;
+        }
+        bool visit(LSLTypecastExpression* expr) override
+        {
+            if (expr->getIType() == LST_LIST)
+            {
+                used.insert(CAST);
+            }
+            else if (expr->getIType() == LST_STRING && expr->getChildExpr() && expr->getChildExpr()->getIType() == LST_LIST)
+            {
+                used.insert(TO_STRING);
+            }
+            return true;
+        }
+        bool visit(LSLBinaryExpression* expr) override
+        {
+            const LSLOperator op    = expr->getOperation();
+            LSLExpression*    left  = expr->getLHS();
+            LSLExpression*    right = expr->getRHS();
+            if ((op == OP_PLUS || op == OP_ADD_ASSIGN) && expr->getIType() == LST_LIST && left && right)
+            {
+                used.insert(left->getIType() == LST_LIST ? APPEND | static_cast<U32>(right->getIType()) : PREPEND);
+            }
+            return true;
+        }
+
+    private:
+        enum : U32
+        {
+            LITERAL        = 1u << 8,
+            EMPTY          = 2u << 8,
+            GLOBAL_LITERAL = 3u << 8,
+            CAST           = 4u << 8,
+            PREPEND        = 5u << 8,
+            APPEND         = 6u << 8,
+            TO_STRING      = 7u << 8
+        };
+        bool mGlobal = false;
+    };
+
     // Rewrites made for size alone, once the rounds are done: each hides a
     // value the folder could have used -- a list's literal made a sum is
     // no longer a constant -- so they wait until nothing more will fold.
@@ -2565,9 +2651,17 @@ namespace
         bool visit(LSLFunctionExpression* expr) override
         {
             visitChildren(expr);
-            if (mStage == Stage::Values && !inGlobal(expr))
+            if (!inGlobal(expr))
             {
-                nullKeys(expr);
+                if (mStage == Stage::Values)
+                {
+                    nullKeys(expr);
+                }
+                else
+                {
+                    // A list cast to a string, a list's helper on Mono.
+                    libraryCast(expr);
+                }
             }
             return false;
         }
@@ -2657,9 +2751,17 @@ namespace
             return false;
         }
 
+    public:
+        // What list helpers the script called before a list's shapes, where
+        // they are held once for the script (Mono): a list dumped with
+        // nothing between is cast to a string only where the script casts
+        // one already, or the dumps are enough to pay for the helper.
+        void setHelpers(const ListHelpers* had) { mHad = had; }
+
     private:
-        const ALLSLCosts& mCosts;
-        const Stage       mStage;
+        const ALLSLCosts&  mCosts;
+        const Stage        mStage;
+        const ListHelpers* mHad = nullptr;
 
         static bool inGlobal(LSLASTNode* node)
         {
@@ -2995,6 +3097,55 @@ namespace
                 default:
                     return;
             }
+        }
+
+        // A library call that a cast to a string says the same as:
+        // llDumpList2String(l, "") as (string)l, and the one detail
+        // llGetObjectDetails gives as a string -- or "", as both say where
+        // there is no such object.
+        void libraryCast(LSLFunctionExpression* expr)
+        {
+            LSLSymbol*                     sym  = expr->getSymbol();
+            LSLASTNodeList<LSLExpression>* args = expr->getArguments();
+            if (!sym || sym->getSubType() != SYM_BUILTIN || !args || args->getNumChildren() != 2)
+            {
+                return;
+            }
+            auto*       first  = static_cast<LSLExpression*>(args->getChild(0));
+            LSLASTNode* second = args->getChild(1);
+            bool        cast   = false;
+            if (mCosts.castForDump && !strcmp(sym->getName(), "llDumpList2String"))
+            {
+                LSLConstant* cv   = second->getConstantValue();
+                const bool   pays = !mHad || mHad->castsToString() || mHad->dumps * mCosts.listShapeLeast > mCosts.listHelperMost;
+                cast              = pays && cv && cv->getIType() == LST_STRING && !*static_cast<LSLStringConstant*>(cv)->getValue();
+            }
+            else if (mCosts.castForDetail && !strcmp(sym->getName(), "llList2String") && isInteger(second, 0))
+            {
+                LSLExpression* details = bare(first);
+                LSLSymbol*     inner   = details && details->getNodeSubType() == NODE_FUNCTION_EXPRESSION ? details->getSymbol() : nullptr;
+                LSLASTNodeList<LSLExpression>* asked = inner ? static_cast<LSLFunctionExpression*>(details)->getArguments() : nullptr;
+                LSLASTNode*                    which = asked && asked->getNumChildren() == 2 ? asked->getChild(1) : nullptr;
+                LSLExpression*                 named = which && which->getNodeType() == NODE_EXPRESSION ? bare(static_cast<LSLExpression*>(which)) : nullptr;
+                // One detail asked for: a literal of one, or that literal as
+                // the cast listadd makes of it.
+                const bool one = named && ((named->getNodeSubType() == NODE_LIST_EXPRESSION && named->getNumChildren() == 1) ||
+                                           (named->getNodeSubType() == NODE_TYPECAST_EXPRESSION && named->getIType() == LST_LIST &&
+                                            static_cast<LSLTypecastExpression*>(named)->getChildExpr() &&
+                                            static_cast<LSLTypecastExpression*>(named)->getChildExpr()->getIType() != LST_LIST));
+                cast = inner && inner->getSubType() == SYM_BUILTIN && !strcmp(inner->getName(), "llGetObjectDetails") && one;
+            }
+            if (!cast)
+            {
+                return;
+            }
+            const std::string before = report.wanted() ? render(expr) : std::string();
+            args->takeChild(0);
+            auto* made = ctx.allocator->newTracked<LSLTypecastExpression>(TYPE(LST_STRING), first);
+            made->setType(TYPE(LST_STRING));
+            made->setLoc(expr->getLoc());
+            putInPlace(expr, made, ctx.allocator);
+            wrote(expr, made, before);
         }
 
         // Whether a constant is no key a library function would find
@@ -4446,7 +4597,19 @@ namespace
         bool visit(LSLFloatConstant* c) override
         {
             return marked(c, [&] {
-                mStream << number(c->getValue(), integerAllowed(c));
+                const double v       = c->getValue();
+                const bool   integer = integerAllowed(c);
+                // A whole float where nothing converts an integer for it,
+                // as the cast of one where that is smaller; not in a
+                // global's value, which takes no cast, nor a negative
+                // zero, which the cast would lose the sign of.
+                if (!integer && mOptions.optfloats && ALLSLCosts::of(mOptions.target).castForWholeFloat && std::isfinite(v) && std::floor(v) == v &&
+                    std::fabs(v) < 2147483648.0 && !(v == 0.0 && std::signbit(v)) && !inGlobal(c))
+                {
+                    mStream << "((float)" << static_cast<long long>(v) << ")";
+                    return false;
+                }
+                mStream << number(v, integer);
                 return false;
             });
         }
@@ -4573,6 +4736,18 @@ namespace
         // Whether an integer literal may stand where this float does: where
         // LSL converts one on its own, and the operation does not change
         // with it.
+        static bool inGlobal(LSLASTNode* c)
+        {
+            for (LSLASTNode* up = c->getParent(); up; up = up->getParent())
+            {
+                if (up->getNodeType() == NODE_GLOBAL_VARIABLE)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
         static bool integerAllowed(LSLASTNode* c)
         {
             LSLASTNode* node   = c->getParent();
@@ -4863,68 +5038,6 @@ namespace
         }
     }
 
-    // Which of Mono's list helpers a script calls, each by what Tailslide's
-    // Mono compiler calls one for: a literal, an empty list, a cast to a
-    // list, a list's literal among the globals, something added to a list
-    // -- a helper for each type added -- and something added before one.
-    // The assembly references each once, which is what a list's shapes can
-    // cost that they do not save at each place: a helper nothing in the
-    // script called before.
-    class ListHelpers : public ASTVisitor
-    {
-    public:
-        boost::unordered_flat_set<U32> used;
-
-        // How many of `after`'s helpers are not among these.
-        S32 freshIn(const ListHelpers& after) const
-        {
-            return static_cast<S32>(std::count_if(after.used.begin(), after.used.end(), [this](U32 helper) { return !used.contains(helper); }));
-        }
-
-        bool visit(LSLGlobalVariable* global) override
-        {
-            mGlobal = true;
-            visitChildren(global);
-            mGlobal = false;
-            return false;
-        }
-        bool visit(LSLListExpression* expr) override
-        {
-            used.insert(mGlobal ? GLOBAL_LITERAL : expr->hasChildren() ? LITERAL : EMPTY);
-            return true;
-        }
-        bool visit(LSLTypecastExpression* expr) override
-        {
-            if (expr->getIType() == LST_LIST)
-            {
-                used.insert(CAST);
-            }
-            return true;
-        }
-        bool visit(LSLBinaryExpression* expr) override
-        {
-            const LSLOperator op    = expr->getOperation();
-            LSLExpression*    left  = expr->getLHS();
-            LSLExpression*    right = expr->getRHS();
-            if ((op == OP_PLUS || op == OP_ADD_ASSIGN) && expr->getIType() == LST_LIST && left && right)
-            {
-                used.insert(left->getIType() == LST_LIST ? APPEND | static_cast<U32>(right->getIType()) : PREPEND);
-            }
-            return true;
-        }
-
-    private:
-        enum : U32
-        {
-            LITERAL        = 1u << 8,
-            EMPTY          = 2u << 8,
-            GLOBAL_LITERAL = 3u << 8,
-            CAST           = 4u << 8,
-            PREPEND        = 5u << 8,
-            APPEND         = 6u << 8
-        };
-        bool mGlobal = false;
-    };
 
     // One run over a script: put in place what is to be, then the rounds,
     // then the printing, and what was printed checked. The functions it
@@ -5139,6 +5252,10 @@ namespace
             if (lists)
             {
                 Shapes shaped(ctx, report, options, Shapes::Stage::Lists);
+                if (mono)
+                {
+                    shaped.setHelpers(&had);
+                }
                 script->visit(&shaped);
                 walks(1);
                 if (mono && shaped.changes)

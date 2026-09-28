@@ -237,6 +237,16 @@ namespace tut
             { "a <= 5 as a < 6", { "", "if (j <= 5) i = 2;" }, { "", "if (j < 6) i = 2;" }, "=<=", &ALLSLCosts::strictForInclusive },
             { "a || b as a | b", { "", "while (i || j) i--;" }, { "", "while (i | j) i--;" }, "=<>", &ALLSLCosts::bitOrForOr },
             { "a <= b as a < b + 1, of a variable", { "", "i = j <= i;" }, { "", "i = j < i + 1;" }, "><=", nullptr },
+            // The library as casts.
+            { "llDumpList2String(l, \"\") as (string)l", { "", "s = llDumpList2String(l, \"\");" }, { "", "s = (string)l;" }, "<<<",
+              &ALLSLCosts::castForDump },
+            { "llList2String(llGetObjectDetails(k, [X]), 0) as (string)", { "", "s = llList2String(llGetObjectDetails(k, [OBJECT_NAME]), 0);" },
+              { "", "s = (string)llGetObjectDetails(k, [OBJECT_NAME]);" }, "<<<", &ALLSLCosts::castForDetail },
+            // Not taken: a key's is NULL_KEY from an empty list, an integer's no 0 of a key.
+            { "llList2Key(llGetObjectDetails(k, [X]), 0) as (key)(string)", { "", "k = llList2Key(llGetObjectDetails(k, [OBJECT_OWNER]), 0);" },
+              { "", "k = (key)((string)llGetObjectDetails(k, [OBJECT_OWNER]));" }, "<>>", nullptr },
+            { "a whole float in a list as ((float)2)", { "", "l = [2.0];" }, { "", "l = [(float)2];" }, "><=", &ALLSLCosts::castForWholeFloat },
+            { "a whole float cast as ((float)2)", { "", "s = (string)2.0;" }, { "", "s = (string)((float)2);" }, "><=", &ALLSLCosts::castForWholeFloat },
             // To come.
             { "i = i + 1 as ++i", { "", "i = i + 1;" }, { "", "++i;" }, "===", nullptr },
             { "-5 as ((integer)-5)", { "", "i = -5;" }, { "", "i = ((integer)-5);" }, "===", nullptr },
@@ -258,9 +268,12 @@ namespace tut
                 said(fact.what, t, d, 0);
                 const char v = fact.once ? verdict({ d.first, d.first }) : verdict(d);
                 ensure_equals(std::string(fact.what) + " on " + nameOf(t), v, fact.verdicts[n]);
-                if (fact.flag)
+                // A flag on is a form smaller there; one off may be for what
+                // a first use costs a script that the pair does not show
+                // (allslcosts.cpp says where).
+                if (fact.flag && ALLSLCosts::of(t).*fact.flag)
                 {
-                    ensure_equals(std::string(fact.what) + ": the flag on " + nameOf(t), ALLSLCosts::of(t).*fact.flag, v == '<');
+                    ensure(std::string(fact.what) + ": the flag on " + nameOf(t) + ", and the form not smaller", v == '<');
                 }
             }
         }
