@@ -170,6 +170,11 @@ public:
         F32                           width  = 0.f;
         S32                           height = 0;
         bool                          valid  = false;
+        // Whether its glyphs' clusters never go back, as a line of text
+        // written left to right has them: what finding a glyph by its
+        // column with a search needs. A line with text written right to
+        // left in it is walked instead.
+        bool                          ordered = true;
     };
 
     ALTextLayout();
@@ -261,6 +266,12 @@ public:
     // `round`, else the one at or before.
     S32 columnAt(S32 index, S32 row, F32 x, bool round);
 
+    // A row cut down to its glyphs that lie between two x's from the row's
+    // start, and one more either side, its columns theirs: as much of a
+    // long row as is in sight. The row as it is where its line's clusters
+    // are not in order, or where all of it is in sight.
+    static Row rowWithin(const Line& line, const Row& row, F32 from, F32 to);
+
     // How many lines have been laid out, for a test that says a layout is
     // not thrown away for nothing.
     U32 linesLaidOut() const { return mLinesLaidOut; }
@@ -302,7 +313,6 @@ private:
     U32                                mLinesLaidOut   = 0;
     // Scratch a wrapping loop keeps rather than allocates per line.
     std::vector<size_t>                mBreaks;
-    std::vector<ALShapedGlyph>         mShaped;
     inlay_provider_t                   mInlays;
     std::vector<Inlay>                 mInlayScratch;
     substitution_provider_t            mSubstitutions;

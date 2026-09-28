@@ -26,12 +26,16 @@
 
 #include "../altextlayout.h"
 
+#include "alfontshaping.h"
+#include "llfontfreetype.h"
+
 #include "alheadlessui_fixture.h"
 
 #include "../test/lltut.h"
 
 #include <cmath>
 #include <string>
+#include <vector>
 
 // llui reaches the viewer for this one, and linking any of the library pulls
 // the object that calls it. Nothing under test goes near it.
@@ -62,6 +66,90 @@ namespace tut
         }
 
         static bool close_to(F32 a, F32 b, F32 within = 0.75f) { return std::fabs(a - b) <= within; }
+
+        // What the layout answered by walking, before it searched: the x of
+        // a column within its row, and the column at an x.
+        static F32 walkedX(const ALTextLayout::Line& line, const ALTextLayout::Row& row, S32 column)
+        {
+            for (size_t k = row.glyphBegin; k < row.glyphEnd; ++k)
+            {
+                const ALTextLayout::Glyph& glyph = line.glyphs[k];
+                if (glyph.cluster < column)
+                {
+                    continue;
+                }
+                if (glyph.inlay >= 0 && glyph.inlayBefore && glyph.cluster == column && k + 1 < row.glyphEnd)
+                {
+                    continue;
+                }
+                return glyph.pen - row.xStart;
+            }
+            return row.width;
+        }
+        static S32 walkedColumn(const ALTextLayout::Line& line, const ALTextLayout::Row& row, F32 x, bool round)
+        {
+            if (x <= 0.f)
+            {
+                return row.begin;
+            }
+            S32 cluster = row.begin;
+            F32 left    = 0.f;
+            for (size_t k = row.glyphBegin; k <= row.glyphEnd; ++k)
+            {
+                const bool at_end     = (k == row.glyphEnd);
+                const bool starts_one = at_end || k == row.glyphBegin || line.glyphs[k].cluster != line.glyphs[k - 1].cluster;
+                if (!starts_one)
+                {
+                    continue;
+                }
+                const S32 next_cluster = at_end ? row.end : line.glyphs[k].cluster;
+                const F32 right        = at_end ? row.width : line.glyphs[k].pen - row.xStart;
+                if (k != row.glyphBegin && x < right)
+                {
+                    return (round && (x - left) * 2.f >= (right - left)) ? next_cluster : cluster;
+                }
+                cluster = next_cluster;
+                left    = right;
+            }
+            return row.end;
+        }
+        static S32 walkedRow(const ALTextLayout::Line& line, S32 column)
+        {
+            for (size_t r = 0; r + 1 < line.rows.size(); ++r)
+            {
+                if (column < line.rows[r].end)
+                {
+                    return static_cast<S32>(r);
+                }
+            }
+            return line.rows.empty() ? 0 : static_cast<S32>(line.rows.size()) - 1;
+        }
+
+        // Every column and every half pixel of every row of a line, asked of
+        // the layout and walked: the same answers.
+        void searchedAsWalked(S32 index)
+        {
+            const ALTextLayout::Line& line   = layout.line(index);
+            const S32                 length = static_cast<S32>(doc.line(index).size());
+            for (S32 column = 0; column <= length; ++column)
+            {
+                const S32 row = walkedRow(line, column);
+                ensure_equals("the row of column " + std::to_string(column), layout.rowOf(index, column), row);
+                ensure_equals("the x of column " + std::to_string(column), layout.xOf(index, column), walkedX(line, line.rows[static_cast<size_t>(row)], column));
+            }
+            for (size_t r = 0; r < line.rows.size(); ++r)
+            {
+                const ALTextLayout::Row& row = line.rows[r];
+                for (F32 x = -2.f; x <= row.width + 4.f; x += 0.5f)
+                {
+                    for (bool round : { false, true })
+                    {
+                        ensure_equals("the column at x " + std::to_string(x) + " of row " + std::to_string(r) + (round ? ", rounded" : ""),
+                                      layout.columnAt(index, static_cast<S32>(r), x, round), walkedColumn(line, row, x, round));
+                    }
+                }
+            }
+        }
     };
 
     typedef test_group<altextlayout_data> altextlayout_group;
@@ -421,5 +509,124 @@ namespace tut
         was = layout.hiddenRevision();
         doc.replace(ALTextRange(ALTextPos(4, 0), ALTextPos(4, 3)), "X");
         ensure("typed over a hidden line, which is shown", layout.hiddenRevision() != was && !layout.hidden(4) && layout.hidden(5));
+    }
+    template<> template<>
+    void altextlayout_object::test<11>()
+    {
+        set_test_name("the row, the x and the column are searched for, and are what walking the line found: through tabs, a cluster, inlays and rows");
+        ready("\tlocal e\xCC\x81 = f(a, b)\t-- and a note long enough to wrap onto rows\nshort");
+        layout.setInlayProvider([](S32 line, std::vector<ALTextLayout::Inlay>& out) {
+            if (line == 0)
+            {
+                out.push_back(ALTextLayout::Inlay{ 17, 30.f, true, 0 });
+                out.push_back(ALTextLayout::Inlay{ 20, 24.f, false, 1 });
+            }
+        });
+        layout.setWrapWidth(static_cast<S32>(layout.columnWidth() * 20.f));
+        ensure("the line wraps", layout.line(0).rows.size() > 2);
+        ensure("in order", layout.line(0).ordered);
+        searchedAsWalked(0);
+        searchedAsWalked(1);
+    }
+
+    template<> template<>
+    void altextlayout_object::test<12>()
+    {
+        set_test_name("text written right to left is shaped left to right, so a line's clusters stay in order; a row whose clusters go back is not cut down");
+        // Hebrew between two runs of Latin.
+        ready("abc \xD7\xA9\xD7\x9C\xD7\x95\xD7\x9D def");
+        ensure("in order", layout.line(0).ordered);
+        searchedAsWalked(0);
+        // A row whose clusters go back, as a right-to-left run shaped as one
+        // would have them: the search needs them in order, so it has all of
+        // the row, whatever is in sight.
+        ALTextLayout::Line back;
+        back.ordered = false;
+        for (S32 i = 0; i < 40; ++i)
+        {
+            back.glyphs.push_back(ALTextLayout::Glyph{ 39 - i, 8.f * static_cast<F32>(i), 8.f });
+        }
+        ALTextLayout::Row row;
+        row.glyphBegin = 0;
+        row.glyphEnd   = 40;
+        row.begin      = 39;
+        row.end        = 40;
+        row.width      = 320.f;
+        back.rows.push_back(row);
+        const ALTextLayout::Row seen = ALTextLayout::rowWithin(back, row, 100.f, 140.f);
+        ensure("not cut down", seen.glyphBegin == 0 && seen.glyphEnd == 40 && seen.begin == 39 && seen.end == 40);
+    }
+
+    template<> template<>
+    void altextlayout_object::test<13>()
+    {
+        set_test_name("a long line is shaped a piece at a time, as it would be in one; and an edit shapes again only the piece it is in");
+        std::string text;
+        for (S32 i = 0; text.size() < 20000; ++i)
+        {
+            text += "value" + std::to_string(i % 97) + " = f(x, [y, z]) + ";
+        }
+        ready(text.c_str());
+        const size_t              before = ALFontShaping::cacheSize();
+        const ALTextLayout::Line& line   = layout.line(0);
+        ensure("shaped in pieces", ALFontShaping::cacheSize() > before + 10);
+
+        // Shaped in one go, with the pen carried as the layout carries it.
+        const LLFontFreetype*      face = LLFontGL::getFontMonospace()->getFontFreetype();
+        std::vector<ALShapedGlyph> whole;
+        ALFontShaping::shapeRun(face, text, 0, text.size(), whole);
+        ensure_equals("as many glyphs", line.glyphs.size(), whole.size());
+        F32 x = 0.f;
+        for (size_t k = 0; k < whole.size(); ++k)
+        {
+            ensure_equals("the cluster of glyph " + std::to_string(k), line.glyphs[k].cluster, whole[k].cluster);
+            ensure("the pen of glyph " + std::to_string(k), close_to(line.glyphs[k].pen, x, 0.01f));
+            x += whole[k].x_advance;
+            if (!face->useSubpixelPen())
+            {
+                x = static_cast<F32>(ll_round(x));
+            }
+        }
+
+        // A character typed in the middle: the piece it is in is shaped
+        // again, and the pieces either side are found shaped already.
+        const size_t made = ALFontShaping::cacheMutationCount();
+        doc.insert(ALTextPos(0, 10000), "q");
+        const ALTextLayout::Line& again = layout.line(0);
+        ensure_equals("one glyph more", again.glyphs.size(), whole.size() + 1);
+        ensure("one piece shaped again", ALFontShaping::cacheMutationCount() - made <= 2);
+    }
+
+    template<> template<>
+    void altextlayout_object::test<14>()
+    {
+        set_test_name("a row cut down to what is in sight holds every glyph that reaches into it, and one more either side");
+        std::string text;
+        while (text.size() < 4000)
+        {
+            text += "word ";
+        }
+        ready(text.c_str());
+        const ALTextLayout::Line& line = layout.line(0);
+        const ALTextLayout::Row&  row  = line.rows[0];
+        const ALTextLayout::Row   all  = ALTextLayout::rowWithin(line, row, -100.f, line.width + 100.f);
+        ensure("all of it in sight: the row", all.glyphBegin == row.glyphBegin && all.glyphEnd == row.glyphEnd && all.begin == row.begin && all.end == row.end);
+        const F32               from = 1000.f;
+        const F32               to   = 1800.f;
+        const ALTextLayout::Row seen = ALTextLayout::rowWithin(line, row, from, to);
+        ensure("cut down", seen.glyphBegin > row.glyphBegin && seen.glyphEnd < row.glyphEnd);
+        ensure_equals("its first column", seen.begin, line.glyphs[seen.glyphBegin].cluster);
+        ensure_equals("its end", seen.end, line.glyphs[seen.glyphEnd].cluster);
+        for (size_t k = row.glyphBegin; k < row.glyphEnd; ++k)
+        {
+            const ALTextLayout::Glyph& glyph = line.glyphs[k];
+            const bool                 in    = glyph.pen + glyph.advance - row.xStart >= from && glyph.pen - row.xStart <= to;
+            if (in)
+            {
+                ensure("glyph " + std::to_string(k) + " in sight is held", k >= seen.glyphBegin && k < seen.glyphEnd);
+            }
+        }
+        ensure("one more before, no more", line.glyphs[seen.glyphBegin + 1].pen + line.glyphs[seen.glyphBegin + 1].advance - row.xStart >= from);
+        ensure("one more after, no more", line.glyphs[seen.glyphEnd - 2].pen - row.xStart <= to);
     }
 }

@@ -35,6 +35,47 @@
 namespace
 {
     const ALTextLayout::Line EMPTY_LINE;
+
+    // A stretch of a line longer than this is shaped a piece at a time.
+    constexpr size_t SHAPE_PIECE_LEAST = 256;
+    constexpr size_t SHAPE_PIECE_MOST  = 1024;
+
+    // Where the piece of a long stretch that begins at `from` ends: after a
+    // space, where no font joins one glyph to the next, and after one the
+    // four bytes before it pick rather than one so far along. An edit then
+    // changes the piece it is in and no other, and every other piece is
+    // found shaped already. The bytes pick one space in sixteen; where they
+    // pick none by the most a piece may be, the last space before that
+    // ends it, and where there is no space at all, the stretch's end.
+    size_t pieceEnd(const std::string& text, size_t from, size_t end)
+    {
+        if (end - from <= SHAPE_PIECE_MOST)
+        {
+            return end;
+        }
+        size_t last_space = std::string::npos;
+        for (size_t i = from + SHAPE_PIECE_LEAST; i < end; ++i)
+        {
+            if (text[i] == ' ')
+            {
+                last_space = i;
+                U32 picked = 0;
+                for (size_t k = i - 4; k < i; ++k)
+                {
+                    picked = picked * 31 + static_cast<U8>(text[k]);
+                }
+                if ((picked & 15) == 0)
+                {
+                    return i + 1;
+                }
+            }
+            if (i >= from + SHAPE_PIECE_MOST && last_space != std::string::npos)
+            {
+                return last_space + 1;
+            }
+        }
+        return end;
+    }
 }
 
 ALTextLayout::ALTextLayout() = default;
@@ -276,9 +317,10 @@ void ALTextLayout::layoutLine(S32 index, Line& out)
     out.placed.clear();
     out.glyphs.clear();
     out.rows.clear();
-    out.width  = 0.f;
-    out.height = 0;
-    out.valid  = true;
+    out.width   = 0.f;
+    out.height  = 0;
+    out.valid   = true;
+    out.ordered = true;
 
     const std::string&    text = mDocument ? mDocument->line(index) : LLStringUtil::null;
     const LLFontFreetype* face = mFont ? mFont->getFontFreetype() : nullptr;
@@ -377,16 +419,23 @@ void ALTextLayout::layoutLine(S32 index, Line& out)
         {
             return;
         }
-        ALFontShaping::shapeRun(in, source, begin, end, mShaped);
-        for (const ALShapedGlyph& sg : mShaped)
+        for (size_t from = begin; from < end;)
         {
-            out.placed.push_back(LLFontGL::Placed{ sg.face, sg.glyph_id, (x + sg.x_offset) * inv_x, sg.y_offset * inv_y });
-            out.glyphs.push_back(Glyph{ sg.cluster, x * inv_x, sg.x_advance * inv_x, -1, true, substitution });
-            x += sg.x_advance;
-            if (!subpixel)
+            const size_t to = pieceEnd(source, from, end);
+            // Read where the shaper keeps it, before anything else is shaped.
+            const std::vector<ALShapedGlyph>& shaped = ALFontShaping::shapeLine(in, source, from, to);
+            const S32                         base   = static_cast<S32>(from);
+            for (const ALShapedGlyph& sg : shaped)
             {
-                x = static_cast<F32>(ll_round(x));
+                out.placed.push_back(LLFontGL::Placed{ sg.face, sg.glyph_id, (x + sg.x_offset) * inv_x, sg.y_offset * inv_y });
+                out.glyphs.push_back(Glyph{ base + sg.cluster, x * inv_x, sg.x_advance * inv_x, -1, true, substitution });
+                x += sg.x_advance;
+                if (!subpixel)
+                {
+                    x = static_cast<F32>(ll_round(x));
+                }
             }
+            from = to;
         }
     };
     // A piece of the text, shaped run by run where runs cross it.
@@ -486,6 +535,10 @@ void ALTextLayout::layoutLine(S32 index, Line& out)
         piece = at + 1;
     }
     out.width = x * inv_x;
+    for (size_t k = 1; k < out.glyphs.size() && out.ordered; ++k)
+    {
+        out.ordered = out.glyphs[k].cluster >= out.glyphs[k - 1].cluster;
+    }
     // The widest line, kept up in the UI's pixels as the width is.
     if (mContentWidth >= 0.f && out.width > mContentWidth)
     {
@@ -751,27 +804,29 @@ S32 ALTextLayout::rowHeightOf(S32 index, S32 row)
 S32 ALTextLayout::rowAtY(S32 index, S32 y)
 {
     const Line& entry = line(index);
-    for (size_t r = 0; r + 1 < entry.rows.size(); ++r)
+    if (entry.rows.size() <= 1)
     {
-        if (y < entry.rows[r].top + entry.rows[r].height)
-        {
-            return static_cast<S32>(r);
-        }
+        return 0;
     }
-    return entry.rows.empty() ? 0 : static_cast<S32>(entry.rows.size()) - 1;
+    // The first row whose bottom is below y; the last, past them all.
+    const auto last = entry.rows.end() - 1;
+    const auto it   = std::upper_bound(entry.rows.begin(), last, y, [](S32 at, const Row& row) { return at < row.top + row.height; });
+    return static_cast<S32>(it - entry.rows.begin());
 }
 
 S32 ALTextLayout::rowOf(S32 index, S32 column)
 {
     const Line& entry = line(index);
-    for (size_t r = 0; r + 1 < entry.rows.size(); ++r)
+    if (entry.rows.size() <= 1)
     {
-        if (column < entry.rows[r].end)
-        {
-            return static_cast<S32>(r);
-        }
+        return 0;
     }
-    return entry.rows.empty() ? 0 : static_cast<S32>(entry.rows.size()) - 1;
+    // The first row that ends past the column; the last, past them all.
+    const auto last  = entry.rows.end() - 1;
+    const auto after = [column](const Row& row) { return column < row.end; };
+    const auto it    = entry.ordered ? std::upper_bound(entry.rows.begin(), last, column, [](S32 at, const Row& row) { return at < row.end; })
+                                     : std::find_if(entry.rows.begin(), last, after);
+    return static_cast<S32>(it - entry.rows.begin());
 }
 
 F32 ALTextLayout::xOf(S32 index, S32 column, S32* row_out)
@@ -787,7 +842,14 @@ F32 ALTextLayout::xOf(S32 index, S32 column, S32* row_out)
         return 0.f;
     }
     const Row& row = entry.rows[r];
-    for (size_t k = row.glyphBegin; k < row.glyphEnd; ++k)
+    size_t     k   = row.glyphBegin;
+    if (entry.ordered)
+    {
+        const auto first = entry.glyphs.begin() + static_cast<std::ptrdiff_t>(row.glyphBegin);
+        const auto end   = entry.glyphs.begin() + static_cast<std::ptrdiff_t>(row.glyphEnd);
+        k                = static_cast<size_t>(std::partition_point(first, end, [column](const Glyph& g) { return g.cluster < column; }) - entry.glyphs.begin());
+    }
+    for (; k < row.glyphEnd; ++k)
     {
         const Glyph& glyph = entry.glyphs[k];
         if (glyph.cluster < column)
@@ -817,25 +879,63 @@ S32 ALTextLayout::columnAt(S32 index, S32 r, F32 x, bool round)
     {
         return row.begin;
     }
-    // Each cluster's left edge and the next cluster's, which is its right.
-    S32 cluster = row.begin;
-    F32 left    = 0.f;
-    for (size_t k = row.glyphBegin; k <= row.glyphEnd; ++k)
+    // The first glyph after the row's first that begins a cluster past x,
+    // and the one that begins the cluster before it: x lies between their
+    // left edges. The pens go forward whichever way the text is written,
+    // so both are found by a search, and a step or two over the glyphs of
+    // one cluster.
+    if (row.glyphBegin >= row.glyphEnd)
     {
-        const bool at_end     = (k == row.glyphEnd);
-        const bool starts_one = at_end || k == row.glyphBegin || entry.glyphs[k].cluster != entry.glyphs[k - 1].cluster;
-        if (!starts_one)
-        {
-            continue;
-        }
-        const S32 next_cluster = at_end ? row.end : entry.glyphs[k].cluster;
-        const F32 right        = at_end ? row.width : entry.glyphs[k].pen - row.xStart;
-        if (k != row.glyphBegin && x < right)
-        {
-            return (round && (x - left) * 2.f >= (right - left)) ? next_cluster : cluster;
-        }
-        cluster = next_cluster;
-        left    = right;
+        return row.end;
     }
-    return row.end;
+    const auto starts_one = [&](size_t k) { return k == row.glyphBegin || entry.glyphs[k].cluster != entry.glyphs[k - 1].cluster; };
+    const auto first      = entry.glyphs.begin() + static_cast<std::ptrdiff_t>(row.glyphBegin);
+    const auto end        = entry.glyphs.begin() + static_cast<std::ptrdiff_t>(row.glyphEnd);
+    size_t     k = static_cast<size_t>(std::partition_point(first + 1, end, [&](const Glyph& g) { return g.pen - row.xStart <= x; }) - entry.glyphs.begin());
+    while (k < row.glyphEnd && !starts_one(k))
+    {
+        ++k;
+    }
+    size_t before = k > row.glyphBegin ? k - 1 : row.glyphBegin;
+    while (before > row.glyphBegin && !starts_one(before))
+    {
+        --before;
+    }
+    const bool at_end = k >= row.glyphEnd;
+    const F32  right  = at_end ? row.width : entry.glyphs[k].pen - row.xStart;
+    const F32  left   = entry.glyphs[before].pen - row.xStart;
+    if (x >= right)
+    {
+        return row.end;
+    }
+    const S32 cluster      = entry.glyphs[before].cluster;
+    const S32 next_cluster = at_end ? row.end : entry.glyphs[k].cluster;
+    return (round && (x - left) * 2.f >= (right - left)) ? next_cluster : cluster;
+}
+
+// static
+ALTextLayout::Row ALTextLayout::rowWithin(const Line& line, const Row& row, F32 from, F32 to)
+{
+    if (!line.ordered || row.glyphBegin >= row.glyphEnd)
+    {
+        return row;
+    }
+    const auto first = line.glyphs.begin() + static_cast<std::ptrdiff_t>(row.glyphBegin);
+    const auto end   = line.glyphs.begin() + static_cast<std::ptrdiff_t>(row.glyphEnd);
+    // The first glyph whose right edge reaches `from`, and the first whose
+    // left edge is past `to`; one more either side of those.
+    auto lo = std::partition_point(first, end, [&](const Glyph& g) { return g.pen + g.advance - row.xStart < from; });
+    auto hi = std::partition_point(lo, end, [&](const Glyph& g) { return g.pen - row.xStart <= to; });
+    lo      = lo == first ? lo : lo - 1;
+    hi      = hi == end ? hi : hi + 1;
+    if (lo == first && hi == end)
+    {
+        return row;
+    }
+    Row seen        = row;
+    seen.glyphBegin = static_cast<size_t>(lo - line.glyphs.begin());
+    seen.glyphEnd   = static_cast<size_t>(hi - line.glyphs.begin());
+    seen.begin      = lo == first ? row.begin : lo->cluster;
+    seen.end        = hi == end ? row.end : hi->cluster;
+    return seen;
 }
