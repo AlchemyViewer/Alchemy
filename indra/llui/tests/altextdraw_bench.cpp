@@ -284,6 +284,7 @@ int main(int, char**)
             e.setScrollX(0.f);
             e.setWordWrap(true);
         });
+        countBoth("  draw calls", subjects, [](ALCodeEditor&) {});
         for (Subject& s : subjects)
         {
             s.editor->setWordWrap(false);

@@ -841,20 +841,53 @@ void ALCodeEditor::drawGutter(const LLRect& text, F32 alpha)
     // runs: a line down the column from its first row to its last.
     const FoldRegion* shown = mShowFoldMarkers && mGutterHover && mGutterHoverLine >= 0 ? regionStartingAt(mGutterHoverLine) : nullptr;
     S32               guide_top = 0, guide_bottom = 0;
+    // The numbers are placed as they come and drawn together after the
+    // rest, one call for all of them rather than one for each.
+    mNumberGlyphs.clear();
+    mNumberColours.clear();
+    mNumberRuns.clear();
+    const auto number = [&](S32 value, F32 right, F32 baseline, const LLColor4& colour) {
+        char       digits[16];
+        const S32  length = snprintf(digits, sizeof(digits), "%d", value);
+        const F32  shift  = font->placeGlyphs(std::string_view(digits, static_cast<size_t>(llmax(0, length))), LLFontGL::RIGHT, mNumberScratch);
+        const auto ink    = LLColor4U(colour);
+        mNumberRuns.push_back(LLFontGL::GlyphRun{ nullptr, nullptr, mNumberScratch.size(), right + shift, baseline });
+        mNumberGlyphs.insert(mNumberGlyphs.end(), mNumberScratch.begin(), mNumberScratch.end());
+        mNumberColours.insert(mNumberColours.end(), mNumberScratch.size(), ink);
+    };
+    const auto draw_numbers = [&]() {
+        size_t at = 0;
+        for (LLFontGL::GlyphRun& run : mNumberRuns)
+        {
+            run.glyphs = mNumberGlyphs.data() + at;
+            run.colors = mNumberColours.data() + at;
+            at += run.count;
+        }
+        font->renderGlyphRuns(mNumberRuns.data(), mNumberRuns.size());
+        mNumberRuns.clear();
+        mNumberGlyphs.clear();
+        mNumberColours.clear();
+    };
+    // Down every row of a line: the bar of a line changed, and the heat of
+    // one that made something, at least faintly and the warmest in the
+    // heat's own colour; all in one batch.
+    gGL.getTextureSlot(0)->unbind();
+    gGL.begin(LLRender::TRIANGLES);
     forEachVisibleRow(text, [&](S32 line, S32 row, S32 screen_top) {
         if (lineChanged(line))
         {
-            gl_rect_2d(gutter.mLeft, screen_top, gutter.mLeft + 2, screen_top - row_h, changed);
+            gl_rect_2d_in_batch(gutter.mLeft, screen_top, gutter.mLeft + 2, screen_top - row_h, changed);
         }
-        // Down every row of the line, a line that made something at least
-        // faintly and the warmest in the heat's own colour.
         if (mHeatShown)
         {
             if (const F32 heat = heatAt(line); heat > 0.f)
             {
-                gl_rect_2d(fold_right + 1, screen_top, gutter.mRight - 1, screen_top - row_h, warm % (alpha * (0.15f + 0.85f * llclamp(heat, 0.f, 1.f))));
+                gl_rect_2d_in_batch(fold_right + 1, screen_top, gutter.mRight - 1, screen_top - row_h, warm % (alpha * (0.15f + 0.85f * llclamp(heat, 0.f, 1.f))));
             }
         }
+    });
+    gGL.end();
+    forEachVisibleRow(text, [&](S32 line, S32 row, S32 screen_top) {
         if (shown && line >= shown->start && line <= shown->end)
         {
             guide_top    = guide_top == 0 ? screen_top : guide_top;
@@ -873,8 +906,7 @@ void ALCodeEditor::drawGutter(const LLRect& text, F32 alpha)
                                                                            : line + 1 + mLineNumberBase;
             if (shown > 0)
             {
-                font->renderUTF8(std::to_string(shown), 0, static_cast<F32>(numbers_right), static_cast<F32>(screen_top - ascent),
-                                 line == caret_line ? lit : ink, LLFontGL::RIGHT, LLFontGL::BASELINE, LLFontGL::NORMAL, LLFontGL::NO_SHADOW);
+                number(shown, static_cast<F32>(numbers_right), static_cast<F32>(screen_top - ascent), line == caret_line ? lit : ink);
             }
             const Mark mark = markAt(line);
             if (line == caret_line && fixableAt(line) && !isReadOnly())
@@ -934,6 +966,7 @@ void ALCodeEditor::drawGutter(const LLRect& text, F32 alpha)
         const S32 cx = fold_right - FOLD_COLUMN / 2;
         gl_rect_2d(cx, guide_top - row_h + FOLD_MARKER / 2, cx + 1, guide_bottom, fold);
     }
+    draw_numbers();
     // The headers pinned over the text have their numbers pinned over
     // the gutter, on the same band.
     const std::vector<S32> pinned = stickyLines(true);
@@ -947,9 +980,9 @@ void ALCodeEditor::drawGutter(const LLRect& text, F32 alpha)
         {
             const S32 line  = pinned[static_cast<size_t>(i)];
             const S32 shown_number = mRelativeLineNumbers && line != caret_line ? std::abs(line - caret_line) : line + 1 + mLineNumberBase;
-            font->renderUTF8(std::to_string(shown_number), 0, static_cast<F32>(numbers_right), static_cast<F32>(text.mTop - i * row_h - ascent), ink,
-                             LLFontGL::RIGHT, LLFontGL::BASELINE, LLFontGL::NORMAL, LLFontGL::NO_SHADOW);
+            number(shown_number, static_cast<F32>(numbers_right), static_cast<F32>(text.mTop - i * row_h - ascent), ink);
         }
+        draw_numbers();
     }
 }
 

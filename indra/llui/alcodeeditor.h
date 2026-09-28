@@ -866,6 +866,12 @@ private:
         std::vector<std::pair<S32, S32>> at;
     };
     BracketDepths    mBracketDepths;
+    // The gutter's numbers as a frame places them, drawn in one call: kept
+    // from frame to frame rather than made for each.
+    std::vector<LLFontGL::Placed>   mNumberScratch;
+    std::vector<LLFontGL::Placed>   mNumberGlyphs;
+    std::vector<LLColor4U>          mNumberColours;
+    std::vector<LLFontGL::GlyphRun> mNumberRuns;
     // Whether the name under the caret is to be lit, since when it is due,
     // and the lines it was lit over.
     bool         mLightsOccurrences = true;
