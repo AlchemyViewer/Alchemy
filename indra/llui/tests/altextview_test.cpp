@@ -40,6 +40,8 @@
 
 #include "../test/lltut.h"
 
+#include <map>
+#include <optional>
 #include <set>
 #include <string>
 
@@ -1567,5 +1569,54 @@ namespace tut
         ensure_equals("where it was asked to be", v.scrollY(), asked);
         v.setScrollX(0.f);
         ensure_equals("and stays", v.scrollY(), asked);
+    }
+
+    template<> template<>
+    void altextview_object::test<52>()
+    {
+        set_test_name("a word is asked of the checker once however often it is met, and again once the dictionary changes; so many are kept and no more");
+        ALTextView&                v = make("");
+        std::map<std::string, int> asked;
+        v.setSpellChecker([&](const std::string& word) {
+            ++asked[word];
+            return word != "teh";
+        });
+        v.setSpellCheck(true);
+        v.setText("teh cat and teh dog\nthe cat and the dog\nteh end");
+        ensure_equals("the misspellings as ever", v.misspellings(0).size(), size_t(2));
+        ensure("the next line has none", v.misspellings(1).empty());
+        ensure_equals("and the last one", v.misspellings(2).size(), size_t(1));
+        const std::map<std::string, int> once = { { "and", 1 }, { "cat", 1 }, { "dog", 1 }, { "end", 1 }, { "teh", 1 }, { "the", 1 } };
+        ensure("each word asked once", asked == once);
+        v.recheckSpelling();
+        ensure_equals("the same answer", v.misspellings(0).size(), size_t(2));
+        ensure_equals("asked again once the dictionary changed", asked["teh"], 2);
+
+        // More words than are kept: the first of them asked again when
+        // next met, the last not.
+        auto word = [](size_t n) {
+            std::string out = "zz";
+            do
+            {
+                out += static_cast<char>('a' + n % 26);
+                n /= 26;
+            } while (n > 0);
+            return out;
+        };
+        const size_t many = ALTextSpelling::WORDS_KEPT + 10;
+        std::string  text;
+        for (size_t n = 0; n < many; ++n)
+        {
+            text += word(n) + " ";
+        }
+        v.setText(text);
+        asked.clear();
+        ensure("every one right", v.misspellings(0).empty());
+        ensure_equals("every one asked", asked.size(), many);
+        v.setCaret(ALTextPos(0, 0));
+        v.insertText(word(0) + " " + word(many - 1) + "\n");
+        ensure("the new line checked", v.misspellings(0).empty());
+        ensure_equals("the first let go of, and asked again", asked[word(0)], 2);
+        ensure_equals("the last still kept", asked[word(many - 1)], 1);
     }
 }

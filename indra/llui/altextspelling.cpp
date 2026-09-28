@@ -30,6 +30,8 @@
 #include "llspellcheck.h"
 #include "llstring.h"
 
+#include <algorithm>
+
 namespace
 {
     // A word the spell check has no business with: code rather than
@@ -77,6 +79,7 @@ bool ALTextSpelling::available() const
 void ALTextSpelling::recheck()
 {
     mLines.clear();
+    mSpelled.clear();
     mSuggestions.clear();
     mSuggestedFor = ALTextRange();
 }
@@ -96,29 +99,29 @@ void ALTextSpelling::checkLine(const ALTextDocument& doc, ALSyntaxHighlighter& h
         return;
     }
     const std::string& text = doc.line(line);
+    // The line's words, found in one walk the first time a stretch of it
+    // is prose: a stretch's words are the line's -- segmented over the
+    // whole line, as a word does not end at a token's edge -- from the
+    // first to end past its start, the last cut at its end.
+    std::vector<std::pair<size_t, size_t>>& words     = mWordScratch;
+    bool                                     segmented = false;
     // What is prose: everything, without a grammar or with one that
     // says so; comments and strings otherwise.
     auto check_stretch = [&](S32 begin, S32 end) {
-        size_t at = static_cast<size_t>(begin);
-        while (at < static_cast<size_t>(end))
+        if (!segmented)
         {
-            const auto word = utf8str_next_word_range(text, at);
-            if (word.first >= word.second || word.first >= static_cast<size_t>(end))
+            utf8str_word_ranges(text, words);
+            segmented = true;
+        }
+        auto word = std::partition_point(words.begin(), words.end(),
+                                         [&](const std::pair<size_t, size_t>& w) { return w.second <= static_cast<size_t>(begin); });
+        for (; word != words.end() && word->first < static_cast<size_t>(end); ++word)
+        {
+            const size_t           word_end = llmin(word->second, static_cast<size_t>(end));
+            const std::string_view piece(text.data() + word->first, word_end - word->first);
+            if (proseWord(piece) && !spelledRight(piece))
             {
-                break;
-            }
-            const size_t word_end = llmin(word.second, static_cast<size_t>(end));
-            at                    = word.second;
-            const std::string_view piece(text.data() + word.first, word_end - word.first);
-            if (!proseWord(piece))
-            {
-                continue;
-            }
-            const std::string spelled(piece);
-            const bool        ok = mChecker ? mChecker(spelled) : LLSpellChecker::instance().checkSpelling(spelled);
-            if (!ok)
-            {
-                checked.words.emplace_back(static_cast<S32>(word.first), static_cast<S32>(word_end));
+                checked.words.emplace_back(static_cast<S32>(word->first), static_cast<S32>(word_end));
             }
         }
     };
@@ -138,6 +141,24 @@ void ALTextSpelling::checkLine(const ALTextDocument& doc, ALSyntaxHighlighter& h
             check_stretch(token.begin, token.end);
         }
     }
+}
+
+bool ALTextSpelling::spelledRight(std::string_view word)
+{
+    if (const auto known = mSpelled.find(word); known != mSpelled.end())
+    {
+        return known->second;
+    }
+    const std::string spelled(word);
+    const bool        ok = mChecker ? mChecker(spelled) : LLSpellChecker::instance().checkSpelling(spelled);
+    // Bounded: a long enough text of prose says more different words
+    // than are worth keeping, and they are asked for again from here.
+    if (mSpelled.size() >= WORDS_KEPT)
+    {
+        mSpelled.clear();
+    }
+    mSpelled.emplace(spelled, ok);
+    return ok;
 }
 
 const ALTextSpelling::words_t& ALTextSpelling::misspellings(const ALTextDocument& doc, ALSyntaxHighlighter& highlighter, S32 line, bool on)

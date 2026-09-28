@@ -26,10 +26,14 @@
 
 #include "allinetable.h"
 #include "altextdocument.h"
+#include "llstl.h"
+
+#include <boost/unordered/unordered_flat_map.hpp>
 
 #include <functional>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -39,7 +43,10 @@ class ALSyntaxHighlighter;
 // from the dictionary -- all of a line of prose, only the comments and
 // strings of code, and never what reads as code, a name or a number -- are
 // found when the line is asked about, and kept until the line changes, its
-// tokens do (a comment opened above it), or the dictionary does. Beside
+// tokens do (a comment opened above it), or the dictionary does. What the
+// checker said of each word is kept as well, so that a word met again is
+// not asked about again: the platform's checker takes tens of
+// microseconds a word, and a script says the same few words over. Beside
 // them, the misspelling at the caret with what it might have been, and the
 // word taken into the dictionary or let pass.
 //
@@ -91,8 +98,16 @@ public:
     void addToDictionary(const ALTextDocument& doc);
     void addToIgnore(const ALTextDocument& doc);
 
+    // How many words' answers are kept before they are let go of and
+    // asked for again.
+    static constexpr size_t WORDS_KEPT = 8192;
+    size_t                  wordsKept() const { return mSpelled.size(); }
+
 private:
     void checkLine(const ALTextDocument& doc, ALSyntaxHighlighter& highlighter, S32 line, bool on);
+    // Whether a word is spelled right, asked of the checker the first
+    // time it is met since the dictionary last changed.
+    bool spelledRight(std::string_view word);
 
     checker_t   mChecker;
     suggester_t mSuggester;
@@ -104,6 +119,11 @@ private:
         words_t words;
     };
     ALLineTable<Line>        mLines;
+    // What the checker said of each word, until the dictionary or the
+    // checker changes (recheck).
+    boost::unordered_flat_map<std::string, bool, ll::string_hash, std::equal_to<>> mSpelled;
+    // A line's words, as checkLine segments them.
+    std::vector<std::pair<size_t, size_t>> mWordScratch;
     std::vector<std::string> mSuggestions;
     ALTextRange              mSuggestedFor;
 };
