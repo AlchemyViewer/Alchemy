@@ -368,4 +368,33 @@ namespace tut
         ensure("the selection on the same words, a line up", v.selection() == ALTextRange(ALTextPos(1, 18), ALTextPos(1, 23)));
         ensure_equals("which are", v.document().text(v.selection()), std::string("three"));
     }
+
+    template<> template<>
+    void aloutputview_object::test<9>()
+    {
+        set_test_name("the same said again, one after another, is one entry counted; anything else between, or other words, another entry");
+        ALOutputView& v = make(10);
+        v.append(entry("error", "Math Error"));
+        ALOutputView::Entry again = entry("error", "Math Error");
+        again.time                = "12:00:05";
+        v.append(again);
+        v.append(again);
+        ensure_equals("one entry", v.entries().size(), size_t(1));
+        ensure_equals("counted, at the last time", v.document().line(0), std::string("[12:00:05] Thing (error \xC3\x97" "3): Math Error"));
+        ensure_equals("one line", v.document().lineCount(), 1);
+        v.append(entry("", "Math Error"));
+        v.append(entry("error", "Math Error"));
+        ensure_equals("another kind between: three", v.entries().size(), size_t(3));
+        v.append(entry("error", "Other"));
+        v.append(entry("error", "Other"));
+        ensure_equals("other words: another, counted", v.document().line(3), std::string("[12:00:00] Thing (error \xC3\x97" "2): Other"));
+        ALOutputView::Entry plain = entry("", "plain");
+        v.append(plain);
+        v.append(plain);
+        ensure_equals("the count alone where it has no kind", v.document().line(4), std::string("[12:00:00] Thing (\xC3\x97" "2): plain"));
+        v.setFilter([](const ALOutputView::Entry& one) { return one.text != "plain"; });
+        v.append(plain);
+        v.setFilter(nullptr);
+        ensure_equals("counted out of sight too", v.document().line(4), std::string("[12:00:00] Thing (\xC3\x97" "3): plain"));
+    }
 }

@@ -126,8 +126,15 @@ public:
         // What a filter may go by beside the words: the caller's own
         // key, an object's id say.
         LLSD                    key;
+        // How many times it was said, one after another: a script failing
+        // in a timer says the same every tick, which is one entry, said
+        // with its count after its kind, and not a lane's worth.
+        S32                     times = 1;
     };
 
+    // An entry at the end of the log; the same as the last -- the same
+    // lane, source, kind, words, links, key and value -- the last said
+    // once more instead, at the new one's time.
     void                     append(Entry entry);
     void                     clearEntries();
     const std::deque<Entry>& entries() const { return mEntries; }
@@ -175,6 +182,8 @@ private:
         S32         kindEnd     = 0;
         S32         textBegin   = 0;
     };
+    // An entry said once more: shown again where it stands, the last.
+    void        again(size_t index);
     static Laid lay(const Entry& entry);
     // What lies on an entry's lines -- the stamp's face, the source bold,
     // its links, the URLs in what was said -- by its lines from its first:

@@ -27,6 +27,7 @@
 #include "aloutputview.h"
 
 #include "alviewtype.h"
+#include "llsdutil.h"
 #include "llurlaction.h"
 #include "lluicolortable.h"
 
@@ -76,14 +77,17 @@ ALOutputView::Laid ALOutputView::lay(const Entry& entry)
     laid.sourceEnd = static_cast<S32>(laid.text.size());
     laid.kindBegin = laid.sourceEnd;
     laid.kindEnd   = laid.sourceEnd;
-    if (!entry.kind.empty())
+    // Said again and again: how many times, with the kind.
+    const std::string kind = entry.times > 1 ? (entry.kind.empty() ? std::string() : entry.kind + " ") + "\xC3\x97" + std::to_string(entry.times)
+                                             : entry.kind;
+    if (!kind.empty())
     {
         laid.text += " ";
         laid.kindBegin = static_cast<S32>(laid.text.size());
-        laid.text += "(" + entry.kind + ")";
+        laid.text += "(" + kind + ")";
         laid.kindEnd = static_cast<S32>(laid.text.size());
     }
-    if (!entry.source.empty() || !entry.kind.empty())
+    if (!entry.source.empty() || !kind.empty())
     {
         laid.text += ": ";
     }
@@ -429,10 +433,39 @@ const ALOutputView::Entry* ALOutputView::entryOf(U32 serial) const
 
 void ALOutputView::append(Entry entry)
 {
+    entry.lane = llmin<U8>(entry.lane, LANES - 1);
+    // The same as the last thing said: that one, said once more.
+    if (!mEntries.empty())
+    {
+        Entry&     last       = mEntries.back();
+        const auto same_links = [&]() {
+            if (last.links.size() != entry.links.size())
+            {
+                return false;
+            }
+            for (size_t i = 0; i < last.links.size(); ++i)
+            {
+                const Entry::Link& a = last.links[i];
+                const Entry::Link& b = entry.links[i];
+                if (a.line != b.line || a.begin != b.begin || a.end != b.end || a.tooltip != b.tooltip || !llsd_equals(a.value, b.value))
+                {
+                    return false;
+                }
+            }
+            return true;
+        };
+        if (last.lane == entry.lane && last.source == entry.source && last.kind == entry.kind && last.text == entry.text &&
+            llsd_equals(last.key, entry.key) && llsd_equals(last.value, entry.value) && same_links())
+        {
+            last.times += entry.times;
+            last.time = entry.time;
+            again(mEntries.size() - 1);
+            return;
+        }
+    }
     const bool follow = atTail();
     const U32  serial = mNextSerial++;
-    entry.lane        = llmin<U8>(entry.lane, LANES - 1);
-    const U8 lane     = entry.lane;
+    const U8   lane   = entry.lane;
     mEntries.push_back(std::move(entry));
     mSerials.push_back(serial);
     mDecor.emplace_back();
@@ -445,6 +478,35 @@ void ALOutputView::append(Entry entry)
         {
             followTail();
         }
+    }
+}
+
+void ALOutputView::again(size_t index)
+{
+    // Shown last: its lines taken out and put back as it reads now, with
+    // what lies on them worked out again for the count's width.
+    mDecor[index] = Decor();
+    if (mShown.empty() || mShown.back().serial != mSerials[index])
+    {
+        return;
+    }
+    const bool follow = atTail();
+    const S32  lines  = mShown.back().lines;
+    const S32  first  = document().lineCount() - lines;
+    mShown.pop_back();
+    ++mShownGeneration;
+    if (first > 0)
+    {
+        document().replace(ALTextRange(document().lineEnd(first - 1), document().end()), std::string());
+    }
+    else
+    {
+        document().replace(ALTextRange(document().start(), document().end()), std::string());
+    }
+    show(index);
+    if (follow)
+    {
+        followTail();
     }
 }
 
