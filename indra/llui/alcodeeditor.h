@@ -33,6 +33,9 @@
 #include "allinetable.h"
 #include "alsnippetsession.h"
 #include "altextview.h"
+#include "llstl.h"
+
+#include <boost/unordered/unordered_flat_map.hpp>
 
 #include <array>
 #include <functional>
@@ -392,10 +395,11 @@ public:
 
     // A word offered to complete what is typed (ALCompletion), and how well
     // what was typed matches a word (ALCompletionModel::matchTier). The
-    // icon a kind wears on the list, looked up once each.
+    // icon a kind wears on the list, looked up once each by this editor and
+    // let go of with it, before the viewer lets go of its images.
     typedef ALCompletion Completion;
-    static S32          matchTier(std::string_view word, std::string_view typed) { return ALCompletionModel::matchTier(word, typed); }
-    static LLUIImagePtr iconOf(const Completion& completion);
+    static S32   matchTier(std::string_view word, std::string_view typed) { return ALCompletionModel::matchTier(word, typed); }
+    LLUIImagePtr iconOf(const Completion& completion);
     // Asked for what could go at a position, given the identifier typed
     // so far; answers into `out`, already narrowed to the prefix. The
     // words of the document itself are added after whatever it answers,
@@ -993,6 +997,8 @@ private:
     link_request_t          mLinkRequest;
     ALChoiceList*           mCompletionList = nullptr;
     ALTextView*             mCompletionDoc  = nullptr;
+    // The icons the completions wear, by name (iconOf).
+    boost::unordered_flat_map<std::string, LLUIImagePtr, ll::string_hash, std::equal_to<>> mIcons;
     fix_provider_t          mFixProvider;
     function_provider_t     mFunctionProvider;
     fix_handler_t           mFixHandler;

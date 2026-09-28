@@ -2397,19 +2397,17 @@ void ALCodeEditor::refreshCompletion()
     listCompletions(again);
 }
 
-// static
 LLUIImagePtr ALCodeEditor::iconOf(const Completion& completion)
 {
     if (completion.icon)
     {
         return completion.icon;
     }
-    static boost::unordered_flat_map<std::string, LLUIImagePtr, ll::string_hash, std::equal_to<>> looked_up;
-    const std::string_view                                                                       name = ALCompletionModel::iconNameOf(completion);
-    auto                                                                                         found = looked_up.find(name);
-    if (found == looked_up.end())
+    const std::string_view name  = ALCompletionModel::iconNameOf(completion);
+    auto                   found = mIcons.find(name);
+    if (found == mIcons.end())
     {
-        found = looked_up.emplace(std::string(name), LLUI::getUIImage(std::string(name))).first;
+        found = mIcons.emplace(std::string(name), LLUI::getUIImage(name)).first;
     }
     return found->second;
 }
