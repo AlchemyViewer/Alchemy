@@ -3395,6 +3395,7 @@ namespace
             states(script);
             unreached(script);
             writeOnly(script);
+            emptyHandlers(script);
             return changes;
         }
 
@@ -3458,6 +3459,15 @@ namespace
                     case NODE_STATE_STATEMENT:
                         dead = true;
                         break;
+                    case NODE_IF_STATEMENT:
+                    case NODE_WHILE_STATEMENT:
+                    case NODE_DO_STATEMENT:
+                    case NODE_FOR_STATEMENT:
+                        // An if none of whose ways goes on, a loop that
+                        // never ends -- but for a jump out, whose label
+                        // keeps what follows it (above).
+                        dead = stops(stmt);
+                        break;
                     case NODE_NOP_STATEMENT:
                         go(stmt, nullptr, "");
                         break;
@@ -3474,6 +3484,7 @@ namespace
                         {
                             go(stmt, "OptimizerRemovedNoEffect", ", which does nothing");
                         }
+                        dead = stops(stmt);
                         break;
                     }
                     case NODE_DECLARATION:
@@ -4214,6 +4225,57 @@ namespace
         boost::unordered_flat_map<LSLSymbol*, LSLGlobalFunction*> mFunctions;
         boost::unordered_flat_map<LSLASTNode*, boost::unordered_flat_map<std::string_view, int>> mNames;
 
+        // Whether what follows a statement never runs by running on from it:
+        // it returns, changes state or jumps; resets the script; is an if
+        // every way of which does so, or a loop that never ends. A label
+        // jumped to after it is the dead code's own business (above).
+        static bool stops(LSLASTNode* stmt)
+        {
+            if (!stmt || stmt->getNodeType() != NODE_STATEMENT)
+            {
+                return false;
+            }
+            const auto forever = [](LSLExpression* check) {
+                LSLConstant* cv = check ? check->getConstantValue() : nullptr;
+                return cv && cv->getNodeSubType() == NODE_INTEGER_CONSTANT && static_cast<LSLIntegerConstant*>(cv)->getValue() != 0;
+            };
+            switch (stmt->getNodeSubType())
+            {
+                case NODE_RETURN_STATEMENT:
+                case NODE_STATE_STATEMENT:
+                case NODE_JUMP_STATEMENT:
+                    return true;
+                case NODE_EXPRESSION_STATEMENT:
+                {
+                    LSLExpression* expr = bare(static_cast<LSLExpressionStatement*>(stmt)->getExpr());
+                    LSLSymbol*     sym  = expr && expr->getNodeSubType() == NODE_FUNCTION_EXPRESSION ? expr->getSymbol() : nullptr;
+                    return sym && sym->getSubType() == SYM_BUILTIN && !strcmp(sym->getName(), "llResetScript");
+                }
+                case NODE_COMPOUND_STATEMENT:
+                {
+                    LSLASTNode* last = nullptr;
+                    for (LSLASTNode* child = stmt->getChild(0); child; child = child->getNext())
+                    {
+                        last = child;
+                    }
+                    return stops(last);
+                }
+                case NODE_IF_STATEMENT:
+                {
+                    auto* branch = static_cast<LSLIfStatement*>(stmt);
+                    return branch->getFalseBranch() && stops(branch->getTrueBranch()) && stops(branch->getFalseBranch());
+                }
+                case NODE_WHILE_STATEMENT:
+                    return forever(static_cast<LSLWhileStatement*>(stmt)->getCheckExpr());
+                case NODE_DO_STATEMENT:
+                    return forever(static_cast<LSLDoStatement*>(stmt)->getCheckExpr());
+                case NODE_FOR_STATEMENT:
+                    return forever(static_cast<LSLForStatement*>(stmt)->getCheckExpr());
+                default:
+                    return false;
+            }
+        }
+
         // Every node of a subtree, the root first.
         template <class F> static void each(LSLASTNode* root, const F& f)
         {
@@ -4299,6 +4361,52 @@ namespace
                 {
                     script->getSymbolTable()->remove(node->getSymbol());
                     list->removeChild(node);
+                    ++changes;
+                }
+            }
+        }
+
+        // A handler with nothing in it goes where having it changes
+        // nothing: not a touch's, which makes the object touchable, nor a
+        // collision's, money's or control's, whose handler changes what the
+        // object does. A state keeps one handler, which it must have.
+        void emptyHandlers(LSLScript* script)
+        {
+            static constexpr std::string_view QUIET[] = { "state_entry", "state_exit", "on_rez", "attach", "changed", "timer", "listen", "link_message",
+                                                          "dataserver", "http_response", "sensor", "no_sensor", "at_target", "not_at_target",
+                                                          "at_rot_target", "not_at_rot_target", "moving_start", "moving_end", "object_rez",
+                                                          "email", "remote_data", "run_time_permissions", "linkset_data", "transaction_result",
+                                                          "path_update", "experience_permissions", "experience_permissions_denied" };
+            for (LSLASTNode* state = script->getStates()->getChild(0); state; state = state->getNext())
+            {
+                LSLASTNode* handlers = state->getChild(1);
+                if (!handlers)
+                {
+                    continue;
+                }
+                std::vector<LSLASTNode*> going;
+                size_t                   count = 0;
+                for (LSLASTNode* handler = handlers->getChild(0); handler; handler = handler->getNext())
+                {
+                    ++count;
+                    auto*         event = static_cast<LSLEventHandler*>(handler);
+                    LSLStatement* body  = event->getStatements();
+                    LSLSymbol*    sym   = event->getSymbol();
+                    if (sym && body && body->getNodeSubType() == NODE_COMPOUND_STATEMENT && !body->hasChildren() &&
+                        std::find(std::begin(QUIET), std::end(QUIET), std::string_view(sym->getName())) != std::end(QUIET))
+                    {
+                        going.push_back(handler);
+                    }
+                }
+                if (going.size() == count)
+                {
+                    going.pop_back();
+                }
+                for (LSLASTNode* handler : going)
+                {
+                    report.note(handler->getLoc(), "OptimizerRemovedEmptyHandler", "removed the empty handler of [1], which having changes nothing",
+                                { handler->getSymbol()->getName() });
+                    handlers->removeChild(handler);
                     ++changes;
                 }
             }

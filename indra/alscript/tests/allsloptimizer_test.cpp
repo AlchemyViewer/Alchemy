@@ -1747,4 +1747,36 @@ namespace tut
             }
         }
     }
+
+    template<> template<>
+    void allsloptimizer_object::test<46>()
+    {
+        set_test_name("what follows a reset, an if none of whose ways goes on, or a loop that never ends never runs; an empty handler goes where having it changes nothing");
+        const std::string source = "integer a;\n"
+                                   "both()\n{\n    if (a)\n    {\n        llOwnerSay(\"a\");\n        return;\n    }\n    else\n    {\n        llOwnerSay(\"b\");\n        return;\n    }\n"
+                                   "    llOwnerSay(\"after both\");\n}\n"
+                                   "forever()\n{\n    while (TRUE)\n        llSleep(1.0);\n    llOwnerSay(\"after forever\");\n}\n"
+                                   "out()\n{\n    while (TRUE)\n    {\n        if (a)\n            jump done;\n        llSleep(1.0);\n    }\n    @done;\n"
+                                   "    llOwnerSay(\"after out\");\n}\n"
+                                   "default\n{\n    state_entry()\n    {\n    }\n"
+                                   "    touch_start(integer n)\n    {\n        a = n;\n        both();\n        forever();\n        out();\n"
+                                   "        llResetScript();\n        llOwnerSay(\"after reset\");\n    }\n"
+                                   "    collision_start(integer n)\n    {\n    }\n}\n"
+                                   "state idle\n{\n    timer()\n    {\n    }\n}\n";
+        ALLSLOptimizer::Result r = ALLSLOptimizer::run(source, options());
+        ensure("optimized: " + notes(r), r.optimized);
+        const auto has = [&r](const std::string& what) { return r.text.find(what) != std::string::npos; };
+        ensure("after an if none of whose ways goes on: " + r.text, !has("after both"));
+        ensure("after a loop that never ends", !has("after forever"));
+        ensure("after one jumped out of, it runs", has("after out"));
+        ensure("after a reset", !has("after reset") && has("llResetScript();"));
+        ensure("an empty state_entry goes", !has("state_entry"));
+        ensure("an empty collision stays, which having makes the object collide so", has("collision_start(integer n)"));
+        ensure("a state keeps its one handler", !has("state idle") || has("timer()"));
+        ALLSLService service;
+        for (const ALScriptProblem& p : service.check(r.text))
+        {
+            ensure("what was written compiles: " + p.message + "\n" + r.text, p.severity != ALScriptProblem::Severity::Error);
+        }
+    }
 } // namespace tut
