@@ -397,7 +397,8 @@ std::string ALScriptWeightsPane::partName(const ALScriptWeight::Part& part) cons
     }
     if (part.name.empty())
     {
-        return mStrings->getString("WeightsPartUnnamed");
+        const auto handler = part.file.empty() ? mShown.handlers.find(part.line) : mShown.handlers.end();
+        return handler != mShown.handlers.end() ? handler->second : mStrings->getString("WeightsPartUnnamed");
     }
     if (!part.within.empty())
     {

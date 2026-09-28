@@ -296,4 +296,31 @@ namespace tut
         changes = column(list("weights_parts"), 4);
         ensure_equals("the middle one, and one new" + joined(changes), joined(changes), std::string("||+50||new"));
     }
+
+    template<> template<>
+    void alscriptweightspane_object::test<6>()
+    {
+        set_test_name("a function with no name of its own called by the event it handles, where the outline says so; else said to have none");
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        using Kind = ALScriptWeight::Part::Kind;
+        ALScriptWeightsPane&       pane = weights();
+        ALScriptWeightsPane::Shown shown;
+        shown.id   = "script-6";
+        shown.name = "Handlers";
+        ALScriptWeight slua;
+        slua.target   = ALScriptWeight::Target::SLua;
+        slua.compiled = true;
+        slua.limit    = 131072;
+        slua.total    = 300;
+        slua.parts    = { part(Kind::Function, "", 200, 0), part(Kind::Function, "", 100, 4) };
+        shown.weights = { slua };
+        shown.handlers[0] = "touch_start";
+        pane.show(shown);
+        const std::string names = joined(column(list("weights_parts"), 0));
+        ensure("the handler by its event: " + names, names.find("touch_start") != std::string::npos);
+        ensure("the other with none: " + names, names.find(window.find<LLPanel>("weights_tab")->getString("WeightsPartUnnamed")) != std::string::npos);
+    }
 }

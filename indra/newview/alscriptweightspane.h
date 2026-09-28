@@ -67,6 +67,10 @@ public:
         std::optional<size_t>       sent;
         // An include's name, by the identity its parts carry.
         boost::unordered_flat_map<std::string, std::string> fileNames;
+        // What a function with no name of its own is called by where it
+        // stands: the event a handler is put on, as the outline lists it,
+        // by the line the function starts on.
+        boost::unordered_flat_map<S32, std::string> handlers;
     };
     // Where a part is: in the script shown where `file` is empty, else in
     // that include.

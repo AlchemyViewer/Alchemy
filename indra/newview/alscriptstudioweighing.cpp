@@ -491,6 +491,13 @@ void ALScriptStudioWeighing::refreshPane()
     shown.name    = doc->name;
     shown.weights = doc->weighing.all;
     shown.saved   = doc->weighing.saved;
+    for (const ALScriptOutlineEntry& entry : doc->outline)
+    {
+        if (entry.kind == ALScriptSymbolKind::Event)
+        {
+            shown.handlers.emplace(entry.span.line, entry.name);
+        }
+    }
     // Weighed as the check has the text, which is before the optimizer
     // where one runs; what a save sends beside it, where it has been
     // weighed of the text as it stands.

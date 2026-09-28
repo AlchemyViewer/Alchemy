@@ -618,6 +618,49 @@ namespace
             inside(expr->body);
             return false;
         }
+        // A handler put on an event -- `LLEvents:on("touch_start", function
+        // ... end)`, or `:once` -- listed as the event, as LSL's are; and a
+        // timer's, `LLTimers:every(5, function ... end)` or `:once`, as a
+        // timer, with how often where the script says it plainly.
+        bool visit(Luau::AstExprCall* call) override
+        {
+            Luau::AstExprIndexName* index = call->func->as<Luau::AstExprIndexName>();
+            Luau::AstExprGlobal*    table = index ? index->expr->as<Luau::AstExprGlobal>() : nullptr;
+            if (!table || !call->self || call->args.size < 2)
+            {
+                return true;
+            }
+            const std::string    on       = index->index.value;
+            const bool           events   = strcmp(table->name.value, "LLEvents") == 0 && (on == "on" || on == "once");
+            const bool           timers   = strcmp(table->name.value, "LLTimers") == 0 && (on == "every" || on == "once");
+            Luau::AstExprFunction* handler = call->args.data[call->args.size - 1]->as<Luau::AstExprFunction>();
+            if ((!events && !timers) || !handler)
+            {
+                return true;
+            }
+            Luau::AstExpr* first = call->args.data[0];
+            std::string    name;
+            if (events)
+            {
+                Luau::AstExprConstantString* event = first->as<Luau::AstExprConstantString>();
+                if (!event)
+                {
+                    return true;
+                }
+                name.assign(event->value.data, event->value.size);
+            }
+            else
+            {
+                name = "timer " + on;
+                if (Luau::AstExprConstantNumber* every = first->as<Luau::AstExprConstantNumber>())
+                {
+                    name += " " + llformat("%g", every->value);
+                }
+            }
+            entry(name, first->location, call->location, ALScriptSymbolKind::Event, typeAt(handler));
+            inside(handler->body);
+            return false;
+        }
     };
 }
 

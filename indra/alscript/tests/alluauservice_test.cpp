@@ -970,4 +970,31 @@ namespace tut
         ensure("and what it gives now fits: " + said(now), !still);
         service.setDocument("");
     }
+
+    template<> template<>
+    void alluauservice_object::test<32>()
+    {
+        set_test_name("the outline lists a handler put on an event as the event, a timer's as a timer, each with what is inside it");
+        ensure("definitions loaded: " + error, loaded);
+        const std::string script =
+            "LLEvents:on(\"touch_start\", function(events)\n"
+            "    local who = events[1]\n"
+            "    local function greet() end\n"
+            "end)\n"
+            "LLEvents:once(\"listen\", function(events) end)\n"
+            "LLTimers:every(2.5, function() end)\n"
+            "LLTimers:once(delay, function() end)\n"
+            "LLEvents:off(\"touch_start\", nothing)\n";
+        std::vector<ALScriptOutlineEntry> outline = service.outline(script);
+        std::string names;
+        for (const ALScriptOutlineEntry& e : outline) names += " " + e.name + llformat("@%d", e.depth);
+        ensure_equals("five entries:" + names, outline.size(), size_t(5));
+        ensure("the touch as an event", outline[0].name == "touch_start" && outline[0].kind == ALScriptSymbolKind::Event && outline[0].depth == 0);
+        ensure("named where its event is", outline[0].nameSpan.line == 0 && outline[0].nameSpan.column == 12);
+        ensure("spanning the call", outline[0].span.line == 0 && outline[0].span.endLine == 3);
+        ensure("what it holds, one deeper", outline[1].name == "greet" && outline[1].depth == 1);
+        ensure("once, too", outline[2].name == "listen" && outline[2].kind == ALScriptSymbolKind::Event);
+        ensure_equals("a timer, how often", outline[3].name, std::string("timer every 2.5"));
+        ensure_equals("a timer whose delay the script works out", outline[4].name, std::string("timer once"));
+    }
 }
