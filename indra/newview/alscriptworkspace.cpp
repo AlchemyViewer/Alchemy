@@ -292,6 +292,15 @@ ALScriptWorkspace::ALScriptWorkspace()
     };
     world.askRunning = [this](const ALScriptRef& ref) { askRunning(ref); };
     mContentsIndex   = std::make_unique<ALScriptContentsIndex>(std::move(world));
+    // A prim gone from the world is asked again if it comes back: what it
+    // held and which of its scripts ran are not kept for every prim ever
+    // seen.
+    mPresenceConnection = gObjectList.onPresence([this](const LLUUID& id, bool arrived) {
+        if (!arrived)
+        {
+            mContentsIndex->forget(id);
+        }
+    });
 }
 
 bool ALScriptWorkspace::looksLikeLua(std::string_view content)

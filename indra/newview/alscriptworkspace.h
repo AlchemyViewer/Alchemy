@@ -480,6 +480,8 @@ private:
     compiled_signal_t             mCompiled;
     running_signal_t              mRunningState;
     std::unique_ptr<ALScriptContentsIndex> mContentsIndex;
+    // What leaves the object list let go of by the index.
+    boost::signals2::scoped_connection     mPresenceConnection;
     // Shared, so that the timer answering one the object never did can
     // tell whether it is still here.
     std::vector<std::shared_ptr<ContentsListener>> mListeners;

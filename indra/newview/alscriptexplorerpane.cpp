@@ -58,6 +58,10 @@ namespace
     // often at most it is filled again while answers come in.
     const F64 EXPLORER_POLL = 1.0;
     const F64 EXPLORER_FILL = 0.2;
+    // How long after an object it lists comes or goes it is listed again:
+    // a linkset's prims arrive after its root, and a region's objects in a
+    // stream as one teleports in or out.
+    const F64 EXPLORER_PRESENCE = 0.5;
 
     // The roots selected in world, in their order.
     std::vector<LLUUID> selectedRoots()
@@ -196,6 +200,14 @@ bool ALScriptExplorerPane::postBuild()
     // window's.
     mHeardConnection = ALScriptWorkspace::instance().contentsIndex().onHeard(
         [this](const ALScriptWorkspace::Contents& contents) { contentsHeard(contents); });
+    // An object it lists, or would list in sight, coming or going: a pin in
+    // sight again after a teleport, one taken back into the inventory.
+    mPresenceConnection = gObjectList.onPresence([this](const LLUUID& id, bool) {
+        if (mModel.concerns(id))
+        {
+            mPresenceAt = LLTimer::getTotalSeconds() + EXPLORER_PRESENCE;
+        }
+    });
     return true;
 }
 
@@ -263,6 +275,11 @@ void ALScriptExplorerPane::pump()
     {
         mRefetchAt = 0.0;
         relist(true);
+    }
+    if (mPresenceAt > 0.0 && now >= mPresenceAt)
+    {
+        mPresenceAt = 0.0;
+        relist();
     }
     if (!mSelectionChanged && now < mPolled + EXPLORER_POLL)
     {

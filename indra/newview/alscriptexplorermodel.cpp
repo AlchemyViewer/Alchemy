@@ -137,9 +137,16 @@ void ALScriptExplorerModel::list(const Listing& listing)
     {
         add(prim);
     }
-    // What is listed, for the world's word on a name to be looked for
-    // among; a name asked of a prim no longer listed is asked again if it
-    // comes back.
+    // What was asked for, in sight or not, and what is listed, for the
+    // world's word on a name to be looked for among; a name asked of a prim
+    // no longer listed is asked again if it comes back.
+    mSought.clear();
+    for (const Pin& pin : mPins)
+    {
+        mSought.insert(pin.root);
+    }
+    mSought.insert(listing.selected.begin(), listing.selected.end());
+    mSought.insert(listing.open.begin(), listing.open.end());
     mListedPrims.clear();
     for (const Object& object : mObjects)
     {

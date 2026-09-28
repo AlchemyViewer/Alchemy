@@ -180,6 +180,10 @@ public:
     // Whether a prim is listed, among which the world's word on a name is
     // looked for.
     bool listed(const LLUUID& prim) const { return mListedPrims.contains(prim); }
+    // Whether an object coming into sight or leaving it changes the list: a
+    // prim listed, or one the listing asked for -- a pin's, a selected
+    // object's, an open script's -- in sight or not.
+    bool concerns(const LLUUID& id) const { return mListedPrims.contains(id) || mSought.contains(id); }
     // A name to be asked of its region, once while it is listed: true the
     // first time.
     bool askName(const LLUUID& prim);
@@ -316,6 +320,7 @@ private:
     // The prims listed; those whose names were asked of their regions while
     // listed.
     boost::unordered_flat_set<LLUUID>         mListedPrims;
+    boost::unordered_flat_set<LLUUID>         mSought;
     boost::unordered_flat_set<LLUUID>         mNamesAsked;
     // The new items to be opened once their prims list them.
     struct OpenWhenListed

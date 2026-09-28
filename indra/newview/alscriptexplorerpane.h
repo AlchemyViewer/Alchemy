@@ -191,6 +191,8 @@ private:
     // When what the prims hold is asked again after a drop, for what the
     // drop sends on its own time: a folder's items, fetched first.
     F64                     mRefetchAt = 0.0;
+    // When it is listed again, after an object it lists came or went.
+    F64                     mPresenceAt = 0.0;
     // What a drag from another prim has dropped so far, sent with its last.
     std::vector<LLUUID>     mTransferring;
     // Names the region said of what the list shows since the last frame.
@@ -201,4 +203,5 @@ private:
     boost::signals2::scoped_connection mSelectionConnection;
     boost::signals2::scoped_connection mRunningConnection;
     boost::signals2::scoped_connection mHeardConnection;
+    boost::signals2::scoped_connection mPresenceConnection;
 };

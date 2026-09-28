@@ -243,6 +243,8 @@ namespace tut
         ensure_equals(names(), std::string("Lamp* Gone(away)* (unnamed)(away)* Chair Table"));
         ensure("an object by a prim of it, listed by its root", model.objects().back().root == table && model.objects().back().prims.size() == 3);
         ensure("listed prims", model.listed(id(22)) && !model.listed(id(90)));
+        ensure("what coming or going concerns: a listed prim, a pin away", model.concerns(id(22)) && model.concerns(id(90)));
+        ensure("not what it neither lists nor asked for", !model.concerns(id(55)));
 
         // Across sessions, the pins as they were read.
         LLSD kept;

@@ -1438,6 +1438,7 @@ void LLViewerObjectList::cleanupReferences(LLViewerObject *objectp)
     LL_DEBUGS("ObjectUpdate") << " dereferencing id " << objectp->mID << LL_ENDL;
 
     mUUIDObjectMap.erase(objectp->mID);
+    mPresenceSignal(objectp->mID, false);
 
     //if (objectp->getRegion())
     //{
@@ -2080,6 +2081,7 @@ LLViewerObject *LLViewerObjectList::createObjectViewer(const LLPCode pcode, LLVi
     }
 
     mUUIDObjectMap[fullid] = objectp;
+    mPresenceSignal(fullid, true);
 
     mObjects.push_back(objectp);
 
@@ -2103,6 +2105,7 @@ LLViewerObject *LLViewerObjectList::createObjectFromCache(const LLPCode pcode, L
 
     objectp->mLocalID = local_id;
     mUUIDObjectMap[uuid] = objectp;
+    mPresenceSignal(uuid, true);
     setUUIDAndLocal(uuid,
                     local_id,
                     regionp->getHost().getAddress(),
@@ -2142,6 +2145,7 @@ LLViewerObject *LLViewerObjectList::createObject(const LLPCode pcode, LLViewerRe
     }
 
     mUUIDObjectMap[fullid] = objectp;
+    mPresenceSignal(fullid, true);
     setUUIDAndLocal(fullid,
                     local_id,
                     gMessageSystem->getSenderIP(),
