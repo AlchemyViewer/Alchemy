@@ -170,7 +170,10 @@ void ALScriptSearchPane::buildSentence()
     where.kind    = ALScopeBar::Segment::Kind::Choice;
     where.name    = "scope";
     where.toolTip = mServices->words("SearchScopeTip");
-    where.choices = { { mServices->words("SearchOpen"), "open" }, { mServices->words("SearchThisObject"), "object" }, { mServices->words("SearchListed"), "listed" } };
+    where.choices = { { mServices->words("SearchOpen"), "open" },
+                      { mServices->words("SearchThisObject"), "object" },
+                      { mServices->words("SearchListed"), "listed" },
+                      { mServices->words("SearchInventory"), "inventory" } };
     said.push_back(where);
 
     // And what they include: the text an #include or a require brings in,
@@ -275,6 +278,31 @@ void ALScriptSearchPane::run()
         for (const Doc* doc : mServices->openDocs())
         {
             searchOpen(*doc);
+        }
+        settled();
+        return;
+    }
+    // The inventory's scripts and notecards: one open here searched as it
+    // stands, one open in another window as it stands there, the rest as
+    // the asset server has them -- or as read for an earlier search.
+    if (scope == "inventory")
+    {
+        const U32         generation = mSearch.generation();
+        const std::string where      = mServices->words("SearchInventoryWhere");
+        for (const Window::InventoryItem& one : mWindow->inventoryItems())
+        {
+            if (const Doc* doc = mServices->findDoc(one.ref))
+            {
+                searchOpen(*doc);
+                continue;
+            }
+            if (const Doc* there = mWindow->openElsewhere(one.ref); there && there->loaded)
+            {
+                searched(one.ref, there->name, where, there->editor->document(), 0, std::string(), true, there->notecard);
+                continue;
+            }
+            mSearch.asked();
+            mWindow->fetchForSearch(one.ref, generation, where);
         }
         settled();
         return;
@@ -521,7 +549,16 @@ void ALScriptSearchPane::typedIn(const Doc& doc)
     {
         return;
     }
-    if (mBar->valueOf("scope") != "open")
+    const std::string scope = mBar->valueOf("scope");
+    if (scope == "inventory")
+    {
+        // One of the inventory's, which the search was over.
+        if (!doc.ref.inInventory() || doc.ref.isNull())
+        {
+            return;
+        }
+    }
+    else if (scope != "open")
     {
         // One of the objects the search was over: the one searched, or
         // those listed when it began -- not any open script's.

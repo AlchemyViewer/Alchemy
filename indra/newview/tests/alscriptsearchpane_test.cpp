@@ -101,6 +101,8 @@ namespace
         // The tests' scripts are each in a prim of its own, its own root.
         LLUUID rootOf(const ALScriptRef& ref) const override { return ref.object; }
         Doc*   openElsewhere(const ALScriptRef& ref) override { return elsewhere && elsewhere->ref == ref ? elsewhere : nullptr; }
+        std::vector<InventoryItem> inventoryItems() override { return inventory; }
+        std::vector<InventoryItem> inventory;
         void   fetchForSearch(const ALScriptRef& ref, U32 generation, const std::string& where) override { fetches.push_back({ ref, generation, where }); }
         // Sought here and now, as the thread would, but for when.
         void matchApart(std::shared_ptr<const std::string> text, const std::string& query, const ALTextSearchOptions& options,
@@ -533,5 +535,29 @@ namespace tut
         const S32 before = studio.apart;
         out.fetched(studio.fetches[0].generation + 7, "Thing", away, "away.lsl", std::make_shared<const std::string>("timer\n"), false);
         ensure("another search's: not sought", studio.apart == before);
+    }
+
+    template <>
+    template <>
+    void alscriptsearchpane_object::test<10>()
+    {
+        set_test_name("the inventory searched: a script open here as it stands, the rest fetched; typing in an inventory script searches it again");
+        ALScriptSearchPane& out  = make();
+        Doc&                door = doc("door", "timer here\n");
+        door.ref                 = ALScriptRef(LLUUID::null, fresh());
+        const ALScriptRef   away(LLUUID::null, fresh());
+        studio.inventory         = { { door.ref, "door" }, { away, "away.lsl" } };
+        find("timer", "inventory");
+        ensure("the open one as it stands", out.search().found().size() == 1 && out.search().found()[0].doc == door.id);
+        ensure_equals("the other fetched", studio.fetches.size(), size_t(1));
+        ensure("from the inventory", studio.fetches[0].ref == away && studio.fetches[0].where == window.services().words("SearchInventoryWhere"));
+        out.fetched(studio.fetches[0].generation, studio.fetches[0].where, away, "away.lsl", std::make_shared<const std::string>("a timer\n"), false);
+        ensure("both found", out.search().found().size() == 2 && out.search().pending() == 0);
+        door.editor->setCaret(ALTextPos(0, 0));
+        door.editor->insertText("x");
+        out.typedIn(door);
+        std::this_thread::sleep_for(std::chrono::milliseconds(700));
+        out.pump();
+        ensure_equals("typed in: searched again", out.search().found()[0].places[0].begin.column, 1);
     }
 }

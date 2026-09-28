@@ -71,10 +71,12 @@
     <floater.string name="SearchAnyCase">ignoring case</floater.string>
     <floater.string name="SearchThisCase">matching case</floater.string>
     <floater.string name="SearchIn">in</floater.string>
-    <floater.string name="SearchScopeTip">Where to look: the scripts and notecards open, the contents of this script's object, or of every object the explorer lists</floater.string>
+    <floater.string name="SearchScopeTip">Where to look: the scripts and notecards open, the contents of this script's object, of every object the explorer lists, or every script and notecard in your inventory</floater.string>
     <floater.string name="SearchOpen">open scripts</floater.string>
     <floater.string name="SearchThisObject">this object</floater.string>
     <floater.string name="SearchListed">every object listed</floater.string>
+    <floater.string name="SearchInventory">my inventory</floater.string>
+    <floater.string name="SearchInventoryWhere">Inventory</floater.string>
     <floater.string name="SearchAlone">alone</floater.string>
     <floater.string name="SearchWithIncludes">and what they include</floater.string>
     <floater.string name="RunningTip">Whether the script runs in its object; a save keeps whatever this says</floater.string>

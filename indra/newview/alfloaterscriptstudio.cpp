@@ -5636,6 +5636,22 @@ void ALFloaterScriptStudio::fetchForSearch(const ALScriptRef& ref, U32 generatio
     });
 }
 
+std::vector<ALScriptSearchPane::Window::InventoryItem> ALFloaterScriptStudio::inventoryItems()
+{
+    // From the index Quick Open lists, each item once through its links.
+    std::vector<InventoryItem>                   items;
+    boost::unordered_flat_set<LLUUID>            listed;
+    ALScriptInventoryIndex::instance().each([&](const LLUUID& id, const std::string&) {
+        const LLViewerInventoryItem* item = gInventory.getItem(id);
+        const LLViewerInventoryItem* real = item ? gInventory.getItem(item->getLinkedUUID()) : nullptr;
+        if (real && listed.insert(real->getUUID()).second)
+        {
+            items.push_back({ ALScriptRef(LLUUID::null, real->getUUID()), real->getName() });
+        }
+    });
+    return items;
+}
+
 void ALFloaterScriptStudio::matchApart(std::shared_ptr<const std::string> text, const std::string& query, const ALTextSearchOptions& options,
                                        std::function<void(ALScriptSearch::Matched)> matched)
 {

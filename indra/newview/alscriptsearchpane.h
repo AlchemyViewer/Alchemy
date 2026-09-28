@@ -85,6 +85,14 @@ public:
         virtual LLUUID rootOf(const ALScriptRef& ref) const = 0;
         // A script open in another of the studio's windows: its tab there.
         virtual Doc* openElsewhere(const ALScriptRef& ref) = 0;
+        // The agent's scripts and notecards, each once however many links
+        // there are to it: what a search of the inventory is over.
+        struct InventoryItem
+        {
+            ALScriptRef ref;
+            std::string name;
+        };
+        virtual std::vector<InventoryItem> inventoryItems() = 0;
         // A script's text fetched for the search at `generation`, which
         // answers through fetched(): as read for an earlier search, where
         // it has not been saved since.
