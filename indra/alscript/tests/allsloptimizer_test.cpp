@@ -1881,4 +1881,42 @@ namespace tut
             ensure_equals("one name in state_entry: " + r.text, names.size(), size_t(1));
         }
     }
+    template<> template<>
+    void allsloptimizer_object::test<50>()
+    {
+        set_test_name("names shortened first where the target's code keeps them, and a state named for a string the script holds on Mono");
+        const std::string source = "integer counted;\n"
+                                   "default\n{\n    touch_start(integer n)\n    {\n"
+                                   "        integer busy = n;\n        busy = busy * busy + busy;\n        busy = busy - busy / 3;\n"
+                                   "        counted = busy;\n        llOwnerSay(\"Q\" + (string)counted);\n        state waiting;\n    }\n}\n"
+                                   "state waiting\n{\n    touch_start(integer n)\n    {\n        state default;\n    }\n}\n";
+        const auto run = [&source](ALLSLOptimizer::Target target) {
+            ALLSLOptimizer::Options o = options();
+            o.target                  = target;
+            o.shrinknames             = true;
+            const ALLSLOptimizer::Result r = ALLSLOptimizer::run(source, o);
+            ensure("optimized: " + notes(r), r.optimized);
+            return r;
+        };
+        const auto nameOf = [](const ALLSLOptimizer::Result& r, const std::string& name) {
+            const auto found = r.renamed.find(name);
+            return found == r.renamed.end() ? std::string() : found->second;
+        };
+        // Mono keeps a global's name in its field and where it is used; a
+        // local's nowhere.
+        const ALLSLOptimizer::Result mono = run(ALLSLOptimizer::Target::Mono);
+        ensure("the state takes the string it can share: " + mono.text, nameOf(mono, "waiting") == "Q");
+        ensure("the global before the busier local: " + mono.text, nameOf(mono, "counted").size() == 1 && nameOf(mono, "counted") < nameOf(mono, "busy"));
+        // LSO keeps no names: the most used is named first, the text's
+        // shortest.
+        const ALLSLOptimizer::Result lso = run(ALLSLOptimizer::Target::LSO);
+        ensure("on LSO the busiest first: " + lso.text, nameOf(lso, "busy") == "a");
+        ensure("and no string taken for a state: " + lso.text, nameOf(lso, "waiting") != "Q");
+        const ALScriptWeight named = ALScriptWeigh::mono(mono.text);
+        ALLSLOptimizer::Options  plain = options();
+        plain.shrinknames              = true;
+        plain.target                   = ALLSLOptimizer::Target::LSO;
+        const ALScriptWeight asLso = ALScriptWeigh::mono(ALLSLOptimizer::run(source, plain).text);
+        ensure("smaller on Mono than named for LSO", named.compiled && asLso.compiled && named.total < asLso.total);
+    }
 } // namespace tut

@@ -1882,12 +1882,17 @@ namespace
 
     using Counted = boost::unordered_flat_map<std::string, int, ll::string_hash, std::equal_to<>>;
 
-    // The string literals in what it visits.
+    // The string literals in what it visits, keys' too.
     struct Strings : public ASTVisitor
     {
         Counted found;
 
         bool visit(LSLStringConstant* c) override
+        {
+            ++found[c->getValue()];
+            return false;
+        }
+        bool visit(LSLKeyConstant* c) override
         {
             ++found[c->getValue()];
             return false;
@@ -4919,8 +4924,42 @@ namespace
                                      "while",   "print",  "integer", "float",    "string", "key",   "vector",     "rotation",
                                      "quaternion", "list", "TRUE",   "FALSE",    "inline", "const", "break", "continue",   "switch", "case", nullptr };
 
-    // Every name the script owns, shortest first for the most used.
-    void shrink(LSLScript* script, ScriptContext& context, ScriptAllocator& allocator, Report& report, ALLSLOptimizer::Result& result)
+    // What each character of a name costs the target's code, where the
+    // compiled script keeps it. Mono keeps a global's as its field's, and a
+    // function's as its method's, and each once more where the code
+    // reaches it; and a state's in the name of each of its handlers'
+    // methods, and in the string a change to it loads, whose characters
+    // are two bytes. Luau keeps a global's and a function's once. Nothing
+    // else keeps a name: LSO none, and a local's, a parameter's or a
+    // label's no target.
+    S32 nameCost(LSLSymbol* sym, ALLSLOptimizer::Target target, const std::map<LSLSymbol*, S32>& handlers)
+    {
+        const bool global = sym->getSymbolType() == SYM_VARIABLE && sym->getSubType() == SYM_GLOBAL;
+        const bool used   = sym->getReferences() > 1;
+        switch (target)
+        {
+            case ALLSLOptimizer::Target::Mono:
+                if (global || sym->getSymbolType() == SYM_FUNCTION)
+                {
+                    return used ? 2 : 1;
+                }
+                if (sym->getSymbolType() == SYM_STATE)
+                {
+                    const auto found = handlers.find(sym);
+                    return (found == handlers.end() ? 0 : found->second) + (used ? 2 : 0);
+                }
+                return 0;
+            case ALLSLOptimizer::Target::Luau:
+                return global || sym->getSymbolType() == SYM_FUNCTION ? 1 : 0;
+            default:
+                return 0;
+        }
+    }
+
+    // Every name the script owns, shortest first for those whose characters
+    // cost the compiled script the most, then for the most used.
+    void shrink(LSLScript* script, ScriptContext& context, ScriptAllocator& allocator, Report& report, ALLSLOptimizer::Result& result,
+                ALLSLOptimizer::Target target)
     {
         TableCollector collector;
         script->visit(&collector);
@@ -4945,9 +4984,26 @@ namespace
                 symbols.push_back(sym);
             }
         }
+        std::map<LSLSymbol*, S32> handlers;
+        for (LSLState* state : *script->getStates())
+        {
+            if (LSLSymbol* sym = state->getSymbol())
+            {
+                handlers[sym] = static_cast<S32>(state->getEventHandlers()->getNumChildren());
+            }
+        }
+        std::map<LSLSymbol*, S32> costs;
+        for (LSLSymbol* sym : symbols)
+        {
+            costs[sym] = nameCost(sym, target, handlers);
+        }
         // Equally used, the first declared first, then by name: the tables
         // are hash maps, whose order is the standard library's own.
-        std::stable_sort(symbols.begin(), symbols.end(), [](LSLSymbol* a, LSLSymbol* b) {
+        std::stable_sort(symbols.begin(), symbols.end(), [&costs](LSLSymbol* a, LSLSymbol* b) {
+            if (costs[a] != costs[b])
+            {
+                return costs[a] > costs[b];
+            }
             if (a->getReferences() != b->getReferences())
             {
                 return a->getReferences() > b->getReferences();
@@ -4962,52 +5018,102 @@ namespace
         });
         const std::string first = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_";
         const std::string rest  = first + "0123456789";
-        std::vector<int>  digits;
-        const auto        next = [&]() {
-            // Counts up in a mixed radix: the first digit over `first`,
-            // the rest over `rest`.
-            std::string name;
+        // Every name given so far, which none is given again but a label's.
+        boost::unordered_flat_set<std::string, ll::string_hash, std::equal_to<>> given;
+        const auto usable = [&](const std::string& name) {
+            for (const char* const* k = KEYWORDS; *k; ++k)
+            {
+                if (name == *k)
+                {
+                    return false;
+                }
+            }
+            return !given.contains(name) && !(context.builtins && context.builtins->lookup(name.c_str(), SYM_ANY));
+        };
+        std::vector<int> digits;
+        // The next name, counting up in a mixed radix: the first digit over
+        // `first`, the rest over `rest`. Looked at, or taken.
+        const auto next = [&](bool take) {
+            std::vector<int>  looked = digits;
+            std::vector<int>& at     = take ? digits : looked;
+            std::string       name;
             while (true)
             {
-                if (digits.empty())
+                if (at.empty())
                 {
-                    digits.push_back(0);
+                    at.push_back(0);
                 }
                 else
                 {
-                    size_t i = digits.size();
+                    size_t i = at.size();
                     while (i > 0)
                     {
                         --i;
                         const int radix = i == 0 ? static_cast<int>(first.size()) : static_cast<int>(rest.size());
-                        if (++digits[i] < radix)
+                        if (++at[i] < radix)
                         {
                             break;
                         }
-                        digits[i] = 0;
+                        at[i] = 0;
                         if (i == 0)
                         {
-                            digits.insert(digits.begin(), 0);
+                            at.insert(at.begin(), 0);
                             break;
                         }
                     }
                 }
                 name.clear();
-                for (size_t i = 0; i < digits.size(); ++i)
+                for (size_t i = 0; i < at.size(); ++i)
                 {
-                    name += (i == 0 ? first : rest)[digits[i]];
+                    name += (i == 0 ? first : rest)[at[i]];
                 }
-                bool keyword = false;
-                for (const char* const* k = KEYWORDS; *k; ++k)
+                if (usable(name))
                 {
-                    keyword = keyword || name == *k;
+                    return name;
                 }
-                if (keyword || (context.builtins && context.builtins->lookup(name.c_str(), SYM_ANY)))
-                {
-                    continue;
-                }
-                return name;
             }
+        };
+        // Mono loads a state's name as a string where the script changes to
+        // it, and holds each string once: such a state is named for a string
+        // the script holds already, where its characters in each handler's
+        // name cost less than the next name's and a string of that.
+        Strings strings;
+        std::vector<std::string> held;
+        if (target == ALLSLOptimizer::Target::Mono)
+        {
+            script->visit(&strings);
+            for (const auto& [text, times] : strings.found)
+            {
+                const bool shaped = !text.empty() && first.find(text[0]) != std::string::npos &&
+                                    text.find_first_not_of(rest) == std::string::npos;
+                if (shaped)
+                {
+                    held.push_back(text);
+                }
+            }
+            std::sort(held.begin(), held.end(), [](const std::string& a, const std::string& b) { return a.size() != b.size() ? a.size() < b.size() : a < b; });
+        }
+        const auto heldName = [&](LSLSymbol* sym) -> std::optional<std::string> {
+            const auto count = handlers.find(sym);
+            if (held.empty() || sym->getSymbolType() != SYM_STATE || sym->getReferences() < 2 || count == handlers.end())
+            {
+                return std::nullopt;
+            }
+            const std::string ours = next(false);
+            const S32         each = count->second;
+            const S32         cost = each * S32(ours.size()) + (strings.found.contains(ours) ? 0 : 2 * S32(ours.size()) + 2);
+            for (const std::string& text : held)
+            {
+                if (each * S32(text.size()) >= cost)
+                {
+                    break;
+                }
+                if (usable(text))
+                {
+                    return text;
+                }
+            }
+            return std::nullopt;
         };
         LabelScopes labels;
         script->visit(&labels);
@@ -5021,14 +5127,19 @@ namespace
                 auto [named, fresh] = labelNames.try_emplace({ scope->second, sym->getName() });
                 if (fresh)
                 {
-                    named->second = next();
+                    named->second = next(true);
                 }
                 name = named->second;
             }
+            else if (const std::optional<std::string> text = heldName(sym))
+            {
+                name = *text;
+            }
             else
             {
-                name = next();
+                name = next(true);
             }
+            given.insert(name);
             sym->setMangledName(allocator.copyStr(name.c_str()));
             result.renamed.emplace(sym->getName(), name);
             report.note(sym->getLoc(), "OptimizerRenamed", "renamed the [1] [2] to [3]", { LSLSymbol::getTypeName(sym->getSymbolType()), sym->getName(), name });
@@ -5728,7 +5839,7 @@ namespace
         }
         if (options.shrinknames)
         {
-            shrink(script, parser.context, parser.allocator, report, result);
+            shrink(script, parser.context, parser.allocator, report, result, options.target);
         }
         braceDanglingElses(script, &parser.allocator);
 
