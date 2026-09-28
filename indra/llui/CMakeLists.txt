@@ -619,4 +619,13 @@ if(AL_BUILD_TESTS)
     INCLUDES ${INDRA_SOURCE_DIR}/test
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
+  # The same editor drawn, a frame at a time, into llrender's hidden window:
+  # what the drawing steps are measured by.
+  al_add_bench(
+    altextdraw
+    PROJECT llui
+    LIBRARIES ${test_libs}
+    INCLUDES ${INDRA_SOURCE_DIR}/test
+    DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
+  )
 endif()

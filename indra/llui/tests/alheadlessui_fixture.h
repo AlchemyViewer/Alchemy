@@ -71,7 +71,8 @@ namespace ll_test
     // What a widget above LLView needs before it can be constructed: settings
     // groups, where a key nobody declared warns and reads as its default; a
     // 2D renderer with no image provider, so every image is null; and the
-    // font registry over the source tree's fonts, with no GL textures.
+    // font registry over the source tree's fonts, with no GL textures unless
+    // a caller that draws asks for them.
     //
     // One per process. LLFontGL's per-face getters cache their answer in a
     // static, and the LLUI singleton owns spell-check and 2D state that is
@@ -79,9 +80,11 @@ namespace ll_test
     class HeadlessUI
     {
     public:
-        static HeadlessUI& get()
+        // With `gl_textures`, the fonts put their glyphs in GL textures, for
+        // a caller that has a context up and draws; the first call decides.
+        static HeadlessUI& get(bool gl_textures = false)
         {
-            static HeadlessUI ui;
+            static HeadlessUI ui(gl_textures);
             return ui;
         }
 
@@ -93,7 +96,7 @@ namespace ll_test
         HeadlessUI& operator=(const HeadlessUI&) = delete;
 
     private:
-        HeadlessUI()
+        explicit HeadlessUI(bool gl_textures)
         :   mDir(LLUI_TEST_APP_DIR),
             mConfig("config")
         {
@@ -117,7 +120,7 @@ namespace ll_test
 
             LLFontManager::initClass();
             LLFontGL::initClass(96.f, 1.f, 1.f, LLUI_TEST_APP_DIR, fonts_xml, LLSD(),
-                                /*create_gl_textures=*/false);
+                                gl_textures);
 
             // A floater reaches for the floater view while it is being built
             // -- to fit itself on a screen this has none of -- and reads its
