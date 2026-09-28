@@ -616,6 +616,11 @@ struct ALScriptStudioDoc
         // the other scripts reached, by the path the map calls them.
         std::vector<std::pair<std::string, std::shared_ptr<const std::string>>> texts;
         boost::unordered_flat_set<std::string, ll::string_hash, std::equal_to<>>  scripts;
+        // What it could not look through: how many of the object's prims
+        // did not say what they hold, and the scripts that could not be
+        // read, by name.
+        S32                                                                       unlisted = 0;
+        std::vector<std::string>                                                  unread;
     };
     Lookup                                     lookup;
     // Edits to make once the script has loaded: a rename that reached

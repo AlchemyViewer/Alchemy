@@ -34,6 +34,8 @@ void ALScriptSearch::begin(const std::string& query, const ALTextSearchOptions& 
     mQuery      = query;
     mOptions    = options;
     mPending    = 0;
+    mUnread     = 0;
+    mUnlisted   = 0;
     mHits       = 0;
     mFiles      = 0;
     mBadPattern = false;

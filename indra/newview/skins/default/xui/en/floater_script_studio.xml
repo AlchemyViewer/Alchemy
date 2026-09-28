@@ -82,6 +82,12 @@
     <floater.string name="SearchCountTip">How many places were found, in how many scripts</floater.string>
     <floater.string name="SearchCounting">[HITS] in [FILES], fetching...</floater.string>
     <floater.string name="SearchCount">[HITS] in [FILES]</floater.string>
+    <floater.string name="SearchPassedOver">[SAID], but [MISSED]</floater.string>
+    <floater.string name="SearchBoth">[FIRST] and [SECOND]</floater.string>
+    <floater.string name="SearchUnlistedA">1 prim did not say what it holds</floater.string>
+    <floater.string name="SearchUnlistedB">[COUNT] prims did not say what they hold</floater.string>
+    <floater.string name="SearchUnreadA">1 script could not be read</floater.string>
+    <floater.string name="SearchUnreadB">[COUNT] scripts could not be read</floater.string>
     <floater.string name="SearchCountCapped">[HITS] in [FILES], the first [SHOWN] listed</floater.string>
     <floater.string name="MatchesA">1 match</floater.string>
     <floater.string name="MatchesB">[COUNT] matches</floater.string>
@@ -198,6 +204,10 @@
     <floater.string name="RenameReserved">[NAME] is a word of the language's own, and cannot be a name of the script's.</floater.string>
     <floater.string name="RenameClash">Rename to [NEW]; [NEW] is a name in [SCRIPT] already, so the two may clash.</floater.string>
     <floater.string name="RenameUnreached">Scripts of other objects that include [NAMES] are not changed.</floater.string>
+    <floater.string name="LookupUnlistedA">1 prim of the object did not say what it holds, so its scripts were not looked through.</floater.string>
+    <floater.string name="LookupUnlistedB">[COUNT] prims of the object did not say what they hold, so their scripts were not looked through.</floater.string>
+    <floater.string name="LookupUnreadA">[NAMES] could not be read, so it was not looked through.</floater.string>
+    <floater.string name="LookupUnreadB">[COUNT] scripts could not be read, so they were not looked through: [NAMES].</floater.string>
     <floater.string name="RenamePreviewHint">Shift+Return shows each place first.</floater.string>
     <floater.string name="CaretPosition">Ln [LINE], Col [COL]</floater.string>
     <floater.string name="SelectedLinesA">1 line selected</floater.string>

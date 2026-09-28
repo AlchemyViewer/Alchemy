@@ -170,16 +170,35 @@ void ALScriptLookup::start(Doc& doc, ALEditorCommand command, const ALScriptRefe
     mLanes.erase(doc.id);
     if (has_definition)
     {
-        // Each counted as waited for now, and begun a few at a time.
-        Lane lane;
-        lane.generation = lookup.generation;
-        lane.left       = mWindow.candidates(doc);
-        lookup.pending += static_cast<S32>(lane.left.size());
-        if (!lane.left.empty())
-        {
-            mLanes[doc.id] = std::move(lane);
-            feed(doc.id);
-        }
+        // Held until the window has them, which may be once every prim of
+        // the object has said what it holds; then each counted as waited
+        // for, and begun a few at a time.
+        ++lookup.pending;
+        const std::weak_ptr<bool> alive = mAlive;
+        mWindow.candidates(doc, [this, alive, id_of_lookup, lookup_generation](Candidates found) {
+            Doc* doc = alive.lock() ? lookingIn(id_of_lookup, lookup_generation) : nullptr;
+            if (!doc)
+            {
+                return;
+            }
+            doc->lookup.unlisted = found.unlisted;
+            doc->lookup.pending += static_cast<S32>(found.scripts.size());
+            if (!found.scripts.empty())
+            {
+                Lane lane;
+                lane.generation        = lookup_generation;
+                lane.left              = std::move(found.scripts);
+                mLanes[id_of_lookup] = std::move(lane);
+                feed(id_of_lookup);
+            }
+            // The hold let go of, the doc found again: a candidate answered
+            // on the spot may have opened a tab.
+            if (Doc* now = lookingIn(id_of_lookup, lookup_generation))
+            {
+                --now->lookup.pending;
+                settled(*now);
+            }
+        });
     }
     // What the held one stood for: the doc is found again, since a
     // candidate answered on the spot may have opened a tab.
@@ -245,10 +264,22 @@ void ALScriptLookup::begin(Doc& doc, U32 generation, const Candidate& candidate)
     }
     const std::weak_ptr<bool> alive = mAlive;
     const std::string         name  = candidate.name;
-    mWindow.loadSource(ref, [this, alive, id, generation, ref, name](const LLUUID& asset, const std::string& source) {
-        if (alive.lock())
+    mWindow.loadSource(ref, [this, alive, id, generation, ref, name](const LLUUID& asset, const std::optional<std::string>& source) {
+        if (!alive.lock())
         {
-            this->candidate(id, generation, ref, name, asset, std::make_shared<const std::string>(source));
+            return;
+        }
+        if (source)
+        {
+            this->candidate(id, generation, ref, name, asset, std::make_shared<const std::string>(*source));
+            return;
+        }
+        // Not read: passed over, and said so with what was found.
+        if (Doc* doc = lookingIn(id, generation))
+        {
+            doc->lookup.unread.push_back(name);
+            --doc->lookup.pending;
+            passed(*doc);
         }
     });
 }
@@ -446,8 +477,10 @@ void ALScriptLookup::settled(Doc& doc)
         found.home          = lookup.homePath;
         found.definition    = lookup.definition;
         mWindow.showFound(doc, found);
-        const S32 count = static_cast<S32>(lookup.places.size());
-        mServices.setStatus(mServices.counted(files.size() > 1 ? "ReferencesFoundAcross" : "ReferencesFound", count, args));
+        const S32         count  = static_cast<S32>(lookup.places.size());
+        const std::string missed = passedOver(doc);
+        mServices.setStatus(mServices.counted(files.size() > 1 ? "ReferencesFoundAcross" : "ReferencesFound", count, args) +
+                            (missed.empty() ? std::string() : " " + missed));
     }
     else if (command == ALEditorCommand::Rename)
     {
@@ -513,6 +546,10 @@ std::string ALScriptLookup::renameHint(const Doc& doc, const std::string& old_na
     // that Shift-Return shows it first.
     std::string beyond = unreached(doc);
     beyond             = beyond.empty() ? beyond : " " + beyond;
+    if (const std::string missed = passedOver(doc); !missed.empty())
+    {
+        beyond += " " + missed;
+    }
     if (prompting)
     {
         beyond += " " + mServices.words("RenamePreviewHint");
@@ -665,6 +702,26 @@ std::string ALScriptLookup::unreached(const Doc& doc) const
         names += (names.empty() ? "" : ", ") + include;
     }
     return mServices.words("RenameUnreached", { { "[NAMES]", names } });
+}
+
+std::string ALScriptLookup::passedOver(const Doc& doc) const
+{
+    std::string said;
+    if (doc.lookup.unlisted > 0)
+    {
+        said = mServices.counted("LookupUnlisted", doc.lookup.unlisted);
+    }
+    if (!doc.lookup.unread.empty())
+    {
+        std::string names;
+        for (const std::string& name : doc.lookup.unread)
+        {
+            names += (names.empty() ? "" : ", ") + name;
+        }
+        said += (said.empty() ? "" : " ") +
+                mServices.counted("LookupUnread", static_cast<S32>(doc.lookup.unread.size()), { { "[NAMES]", names } });
+    }
+    return said;
 }
 
 void ALScriptLookup::previewRename(const std::string& id, U32 generation, const std::string& new_name)
@@ -886,9 +943,13 @@ void ALScriptLookup::renameTo(const std::string& id, U32 generation, const std::
         args["[SCRIPTS]"] = mServices.counted("Scripts", stale);
         said += "; " + mServices.words("RenamedLeft", args);
     }
-    // What it could not reach, said with what it did.
-    const std::string beyond = unreached(doc);
-    mServices.report(said + "." + (beyond.empty() ? std::string() : " " + beyond), stale > 0);
+    // What it could not reach, or look through, said with what it did.
+    std::string beyond = unreached(doc);
+    if (const std::string missed = passedOver(doc); !missed.empty())
+    {
+        beyond += (beyond.empty() ? "" : " ") + missed;
+    }
+    mServices.report(said + "." + (beyond.empty() ? std::string() : " " + beyond), stale > 0 || !passedOver(doc).empty());
     mWindow.activate(doc);
     doc.editor->setFocus(true);
 }

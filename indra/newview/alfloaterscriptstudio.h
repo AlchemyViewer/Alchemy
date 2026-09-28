@@ -516,8 +516,8 @@ private:
     // expanded; the places found shown; the new name asked for in a
     // popover over the window, with a row saying what return will do as
     // it is typed.
-    std::vector<ALScriptLookup::Candidate> candidates(const Doc& doc) override;
-    void loadSource(const ALScriptRef& ref, std::function<void(const LLUUID& asset, const std::string& source)> loaded) override;
+    void candidates(const Doc& doc, std::function<void(ALScriptLookup::Candidates)> told) override;
+    void loadSource(const ALScriptRef& ref, std::function<void(const LLUUID& asset, const std::optional<std::string>& source)> loaded) override;
     void expand(ALScriptPreprocessor::Request request, std::function<void(const ALPreprocessor::Result&)> expanded) override;
     void showFound(Doc& doc, const ALScriptLookup::Found& found) override;
     void askNewName(Doc& doc, std::function<std::string(const std::string& typed)> hint, std::function<void(const std::string& name)> chosen,
@@ -674,7 +674,7 @@ private:
     // what arrives after another search has begun is dropped.
     void findInFiles();
     // What the Search tab asks of the window (ALScriptSearchPane::Window).
-    std::vector<ALScriptSearchPane::Window::Object> objectsListed() const override;
+    void listObjects(const LLUUID& only, std::function<void(std::vector<ALScriptSearchPane::Window::Object>)> told) override;
     std::string                                     objectName(const LLUUID& root) const override;
     std::string                                     whereIs(const Doc& doc) const override;
     LLUUID                                          objectInHand() const override;

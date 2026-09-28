@@ -293,14 +293,30 @@ void ALScriptSearchPane::run()
         }
         mSearch.setObject(only);
     }
-    const U32 generation = mSearch.generation();
-    for (const Window::Object& object : mWindow->objectsListed())
-    {
-        if (only.notNull() && object.root != only)
+    // Every prim of each object asked what it holds first, which is waited
+    // for as a script's text is.
+    mSearch.asked();
+    const U32               generation = mSearch.generation();
+    const LLHandle<LLPanel> handle     = getHandle();
+    mWindow->listObjects(only, [handle, generation](std::vector<Window::Object> objects) {
+        if (ALScriptSearchPane* pane = ALViewType::as<ALScriptSearchPane>(handle.get()))
         {
-            continue;
+            pane->searchObjects(generation, objects);
         }
+    });
+    settled();
+}
+
+void ALScriptSearchPane::searchObjects(U32 generation, const std::vector<Window::Object>& objects)
+{
+    if (!mSearch.answered(generation))
+    {
+        return;
+    }
+    for (const Window::Object& object : objects)
+    {
         mSearch.over(object.root);
+        mSearch.notListed(object.unlisted);
         for (const ALScriptRef& ref : object.items)
         {
             if (const Doc* doc = mServices->findDoc(ref))
@@ -345,6 +361,12 @@ void ALScriptSearchPane::fetched(U32 generation, const std::string& where, const
         {
             searchIncludes(ref, std::string(), name, *text, ALScriptMessages::looksLikeLua(*text));
         }
+    }
+    else
+    {
+        // Not searched, and counted so: a count that read as complete over
+        // a script not read would pass for having found nothing in it.
+        mSearch.notRead();
     }
     settled();
 }
@@ -575,10 +597,25 @@ void ALScriptSearchPane::settled()
         mCount->setText(mServices->words("SearchBadPattern"));
         return;
     }
-    const std::string said = mSearch.pending() > 0         ? mServices->words("SearchCounting", args)
-                             : mSearch.hits() > SEARCH_ROWS ? mServices->words("SearchCountCapped", args)
-                             : mSearch.hits() > 0           ? mServices->words("SearchCount", args)
-                                                            : mServices->words("SearchNone", args);
+    std::string said = mSearch.pending() > 0         ? mServices->words("SearchCounting", args)
+                       : mSearch.hits() > SEARCH_ROWS ? mServices->words("SearchCountCapped", args)
+                       : mSearch.hits() > 0           ? mServices->words("SearchCount", args)
+                                                      : mServices->words("SearchNone", args);
+    // What it could not look through, after what it found.
+    std::string missed;
+    if (mSearch.unlisted() > 0)
+    {
+        missed = mServices->counted("SearchUnlisted", mSearch.unlisted());
+    }
+    if (mSearch.unread() > 0)
+    {
+        const std::string unread = mServices->counted("SearchUnread", mSearch.unread());
+        missed = missed.empty() ? unread : mServices->words("SearchBoth", { { "[FIRST]", missed }, { "[SECOND]", unread } });
+    }
+    if (!missed.empty())
+    {
+        said = mServices->words("SearchPassedOver", { { "[SAID]", said }, { "[MISSED]", missed } });
+    }
     mCount->setText(said);
     // The whole of it on the tip, where the slot cuts it; and which object,
     // for a search of one -- the rows say it too, but a search that found

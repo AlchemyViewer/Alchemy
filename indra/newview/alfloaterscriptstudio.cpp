@@ -3493,9 +3493,9 @@ bool ALFloaterScriptStudio::sourceLine(const std::string& path, S32 line, std::s
 
 // --- across the object's scripts ------------------------------------------------------
 
-std::vector<ALScriptLookup::Candidate> ALFloaterScriptStudio::candidates(const Doc& doc)
+void ALFloaterScriptStudio::candidates(const Doc& doc, std::function<void(ALScriptLookup::Candidates)> told)
 {
-    std::vector<ALScriptLookup::Candidate> found;
+    ALScriptLookup::Candidates found;
     if (doc.ref.inInventory())
     {
         // An inventory script's are the others of its folder in its
@@ -3503,7 +3503,8 @@ std::vector<ALScriptLookup::Candidate> ALFloaterScriptStudio::candidates(const D
         const LLViewerInventoryItem* own = doc.ref.isNull() ? nullptr : gInventory.getItem(doc.ref.item);
         if (!own)
         {
-            return found;
+            told(std::move(found));
+            return;
         }
         LLInventoryModel::cat_array_t*  folders = nullptr;
         LLInventoryModel::item_array_t* items   = nullptr;
@@ -3516,38 +3517,44 @@ std::vector<ALScriptLookup::Candidate> ALFloaterScriptStudio::candidates(const D
                 held.push_back(item.get());
             }
         }
-        return ALScriptLookup::folderCandidates(held, doc.ref.item, doc.language.lua);
+        found.scripts = ALScriptLookup::folderCandidates(held, doc.ref.item, doc.language.lua);
+        told(std::move(found));
+        return;
     }
-    for (const ALScriptExplorerModel::Object& object : mExplorerPane->model().objects())
+    // An object's, while it is in sight: every prim of it asked what it
+    // holds first, a large linkset's folded ones among them, and those
+    // that did not say counted.
+    const LLUUID root = rootOf(doc.ref);
+    if (root.isNull())
     {
-        bool ours = false;
-        for (const ALScriptExplorerModel::Prim& prim : object.prims)
+        told(std::move(found));
+        return;
+    }
+    const ALScriptRef own = doc.ref;
+    const bool        lua = doc.language.lua;
+    ALScriptWorkspace::instance().contentsIndex().ensureListed(root, [own, lua, told = std::move(told)](const ALScriptContentsIndex::Listed& listed) {
+        const ALScriptContentsIndex& index = ALScriptWorkspace::instance().contentsIndex();
+        ALScriptLookup::Candidates   found;
+        found.unlisted = static_cast<S32>(listed.unlisted.size());
+        for (const LLUUID& prim : listed.prims)
         {
-            ours = ours || prim.id == doc.ref.object;
-        }
-        if (!ours || !object.present)
-        {
-            continue;
-        }
-        for (const ALScriptExplorerModel::Prim& prim : object.prims)
-        {
-            for (const ALScriptWorkspace::Item& item : mExplorerPane->model().items(prim.id))
+            for (const ALScriptWorkspace::Item& item : index.items(prim))
             {
-                const ALScriptRef ref(prim.id, item.id);
-                if (item.script && item.lua == doc.language.lua && ref != doc.ref)
+                const ALScriptRef ref(prim, item.id);
+                if (item.script && item.lua == lua && ref != own)
                 {
-                    found.push_back({ ref, item.name });
+                    found.scripts.push_back({ ref, item.name });
                 }
             }
         }
-    }
-    return found;
+        told(std::move(found));
+    });
 }
 
-void ALFloaterScriptStudio::loadSource(const ALScriptRef& ref, std::function<void(const LLUUID& asset, const std::string& source)> loaded)
+void ALFloaterScriptStudio::loadSource(const ALScriptRef& ref, std::function<void(const LLUUID& asset, const std::optional<std::string>& source)> loaded)
 {
     ALScriptWorkspace::instance().load(ref, [loaded = std::move(loaded)](const ALScriptWorkspace::Loaded& answer) {
-        loaded(answer.assetId, sourceOf(answer));
+        loaded(answer.assetId, answer.error.empty() ? std::optional<std::string>(sourceOf(answer)) : std::nullopt);
     });
 }
 
@@ -4780,41 +4787,93 @@ std::string ALFloaterScriptStudio::whereIs(const Doc& doc) const
     return doc.ref.inInventory() ? LLStringUtil::null : ALScriptWorkspace::objectName(gObjectList.findObject(doc.ref.object), getString("ObjectUnnamed"));
 }
 
-std::vector<ALScriptSearchPane::Window::Object> ALFloaterScriptStudio::objectsListed() const
+void ALFloaterScriptStudio::listObjects(const LLUUID& only, std::function<void(std::vector<ALScriptSearchPane::Window::Object>)> told)
 {
-    std::vector<ALScriptSearchPane::Window::Object> listed;
-    for (const ALScriptExplorerModel::Object& object : mExplorerPane->model().objects())
+    typedef ALScriptSearchPane::Window::Object Object;
+    std::vector<LLUUID> roots;
+    if (only.notNull())
     {
-        if (!object.present)
+        roots.push_back(only);
+    }
+    else
+    {
+        for (const ALScriptExplorerModel::Object& object : mExplorerPane->model().objects())
         {
-            continue;
-        }
-        ALScriptSearchPane::Window::Object one;
-        one.root = object.root;
-        one.name = object.name;
-        for (const ALScriptExplorerModel::Prim& prim : object.prims)
-        {
-            for (const ALScriptWorkspace::Item& item : mExplorerPane->model().items(prim.id))
+            if (object.present)
             {
-                one.items.emplace_back(prim.id, item.id);
+                roots.push_back(object.root);
             }
         }
-        listed.push_back(std::move(one));
     }
-    return listed;
+    // Each object's prims all asked what they hold, and the objects told of
+    // once the last has answered, in the order they were asked for. One
+    // out of sight by now is left out.
+    struct Gathering
+    {
+        std::vector<std::optional<Object>>        objects;
+        size_t                                    left = 0;
+        std::function<void(std::vector<Object>)> told;
+    };
+    auto gathering     = std::make_shared<Gathering>();
+    gathering->objects.resize(roots.size());
+    gathering->left    = roots.size();
+    gathering->told    = std::move(told);
+    const auto finish  = [gathering]() {
+        std::vector<Object> out;
+        for (std::optional<Object>& one : gathering->objects)
+        {
+            if (one)
+            {
+                out.push_back(std::move(*one));
+            }
+        }
+        gathering->told(std::move(out));
+    };
+    if (roots.empty())
+    {
+        finish();
+        return;
+    }
+    const std::string unnamed = getString("ObjectUnnamed");
+    for (size_t i = 0; i < roots.size(); ++i)
+    {
+        const std::string name = objectName(roots[i]);
+        ALScriptWorkspace::instance().contentsIndex().ensureListed(roots[i], [gathering, finish, i, name, unnamed](const ALScriptContentsIndex::Listed& listed) {
+            if (listed.present)
+            {
+                const ALScriptContentsIndex& index = ALScriptWorkspace::instance().contentsIndex();
+                Object                       one;
+                one.root     = listed.root;
+                one.name     = !name.empty() ? name : ALScriptWorkspace::objectName(gObjectList.findObject(listed.root), unnamed);
+                one.unlisted = static_cast<S32>(listed.unlisted.size());
+                for (const LLUUID& prim : listed.prims)
+                {
+                    for (const ALScriptWorkspace::Item& item : index.items(prim))
+                    {
+                        one.items.emplace_back(prim, item.id);
+                    }
+                }
+                gathering->objects[i] = std::move(one);
+            }
+            if (--gathering->left == 0)
+            {
+                finish();
+            }
+        });
+    }
 }
 
 std::string ALFloaterScriptStudio::objectName(const LLUUID& root) const
 {
-    std::string name;
     for (const ALScriptExplorerModel::Object& one : mExplorerPane->model().objects())
     {
         if (one.root == root)
         {
-            name = one.name;
+            return one.name;
         }
     }
-    return name;
+    // Not listed: by the name the world has for it.
+    return ALScriptWorkspace::objectName(gObjectList.findObject(root), LLStringUtil::null);
 }
 
 LLUUID ALFloaterScriptStudio::objectInHand() const

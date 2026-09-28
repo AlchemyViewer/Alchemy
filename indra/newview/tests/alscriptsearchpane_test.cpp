@@ -65,7 +65,25 @@ namespace
             bool        toEditor = false;
         };
 
-        std::vector<Object> objectsListed() const override { return objects; }
+        // The objects as the test lists them: the one in hand alone where
+        // asked for; told on the spot, or held until the test says.
+        void listObjects(const LLUUID& only, std::function<void(std::vector<Object>)> told) override
+        {
+            std::vector<Object> out;
+            for (const Object& one : objects)
+            {
+                if (only.isNull() || one.root == only)
+                {
+                    out.push_back(one);
+                }
+            }
+            if (holdListing)
+            {
+                heldListing = [told = std::move(told), out]() { told(out); };
+                return;
+            }
+            told(std::move(out));
+        }
         std::string         objectName(const LLUUID& root) const override
         {
             for (const Object& one : objects)
@@ -102,6 +120,8 @@ namespace
         }
 
         std::vector<Object>      objects;
+        bool                     holdListing = false;
+        std::function<void()>    heldListing;
         LLUUID                   inHand;
         Doc*                     elsewhere = nullptr;
         std::vector<Fetch>       fetches;
@@ -397,5 +417,51 @@ namespace tut
         ensure("said to be included", found.where.find(services.words("SearchIncluded")) != std::string::npos && found.where.find("lib.lsl") != std::string::npos);
         ensure_equals("a row for its place", out.list()->getItemCount(), 2);
         ensure("Replace All leaves it", ALScriptSearch::step(found, ALScriptSearch::Now()) == ALScriptSearch::Step::Leave);
+    }
+
+    template <>
+    template <>
+    void alscriptsearchpane_object::test<7>()
+    {
+        set_test_name("an object's scripts searched once its prims have said what they hold; the prims that did not, and a script not read, said with the count");
+        ALScriptSearchPane& out = make();
+        const ALScriptRef   one(fresh(), fresh());
+        const ALScriptRef   two(fresh(), fresh());
+        const LLUUID        root = fresh();
+        ALScriptSearchPane::Window::Object thing;
+        thing.root          = root;
+        thing.name          = "Thing";
+        thing.items         = { one, two };
+        thing.unlisted      = 3;
+        studio.objects      = { thing };
+        studio.inHand       = root;
+        studio.holdListing  = true;
+        find("timer", "object");
+        ensure("nothing fetched while its prims are asked", studio.fetches.empty());
+        ensure_equals("waited for", out.search().pending(), 1);
+        studio.heldListing();
+        ensure_equals("both fetched", studio.fetches.size(), size_t(2));
+        out.fetched(studio.fetches[0].generation, "Thing", one, "one.lsl", std::string("timer\n"), false);
+        out.fetched(studio.fetches[1].generation, "Thing", two, "two.lsl", std::nullopt, false);
+        ensure_equals("none to wait for", out.search().pending(), 0);
+        ensure_equals("one read", out.search().found().size(), size_t(1));
+        const std::string said = services.words("SearchCount", { { "[HITS]", services.counted("Matches", 1) },
+                                                                 { "[FILES]", services.counted("Files", 1) },
+                                                                 { "[SHOWN]", "2000" } });
+        const std::string missed = services.words("SearchBoth", { { "[FIRST]", services.counted("SearchUnlisted", 3) },
+                                                                  { "[SECOND]", services.counted("SearchUnread", 1) } });
+        ensure_equals("what was passed over, after what was found", counted(),
+                      services.words("SearchPassedOver", { { "[SAID]", said }, { "[MISSED]", missed } }));
+
+        // A search begun again lets the held listing go: its answer is an
+        // earlier search's.
+        studio.fetches.clear();
+        find("timer", "object");
+        std::function<void()> first = std::move(studio.heldListing);
+        find("other", "object");
+        first();
+        ensure("the earlier listing dropped", studio.fetches.empty());
+        studio.heldListing();
+        ensure_equals("the later one searched", studio.fetches.size(), size_t(2));
     }
 }

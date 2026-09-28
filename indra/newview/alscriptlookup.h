@@ -34,6 +34,7 @@
 
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -63,6 +64,13 @@ public:
         ALScriptRef ref;
         std::string name;
     };
+    // All of them, and how many of the object's prims did not say what
+    // they hold, whose scripts are not among them.
+    struct Candidates
+    {
+        std::vector<Candidate> scripts;
+        S32                    unlisted = 0;
+    };
     // An inventory script's: the others of its folder's `items` in its
     // language, SLua's by the item's subtype or its runtime.
     static std::vector<Candidate> folderCandidates(const std::vector<const LLInventoryItem*>& items, const LLUUID& own, bool lua);
@@ -72,11 +80,13 @@ public:
     {
     public:
         // The other scripts of a tab's object in its language, while the
-        // object is in sight; of an inventory script's folder, for one.
-        virtual std::vector<Candidate> candidates(const Doc& doc) = 0;
+        // object is in sight, told once every prim of it has said what it
+        // holds -- a large linkset's folded ones among them; of an
+        // inventory script's folder, for one, at once.
+        virtual void candidates(const Doc& doc, std::function<void(Candidates)> told) = 0;
         // A script's text as the region has it, its author's source out of
-        // any envelope, and its asset; empty where it could not be read.
-        virtual void loadSource(const ALScriptRef& ref, std::function<void(const LLUUID& asset, const std::string& source)> loaded) = 0;
+        // any envelope, and its asset; nothing where it could not be read.
+        virtual void loadSource(const ALScriptRef& ref, std::function<void(const LLUUID& asset, const std::optional<std::string>& source)> loaded) = 0;
         // A script expanded as the compiler sees it; and the analyzers asked.
         virtual void expand(ALScriptPreprocessor::Request request, std::function<void(const ALPreprocessor::Result&)> expanded) = 0;
         virtual void askAnalysis(ALScriptAnalysis::Request request, std::function<void(const ALScriptAnalysis::Result&)> answered) = 0;
@@ -175,6 +185,10 @@ private:
     // What a rename cannot reach, said: the scripts of other objects that
     // share an include it changes. Empty where it changes no include.
     std::string unreached(const Doc& doc) const;
+    // What a lookup could not look through, said: the object's prims that
+    // did not say what they hold, and the scripts that could not be read.
+    // Empty where it looked through all.
+    std::string passedOver(const Doc& doc) const;
     // The tab of a lookup of this generation, where it is still open.
     Doc* lookingIn(const std::string& id, U32 generation);
 

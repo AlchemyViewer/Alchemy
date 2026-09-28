@@ -81,6 +81,13 @@ public:
     void asked() { ++mPending; }
     bool answered(U32 generation);
     S32  pending() const { return mPending; }
+    // What the search could not look through, said with what it found: a
+    // script whose text could not be read, and prims that did not say what
+    // they hold.
+    void notRead() { ++mUnread; }
+    void notListed(S32 prims) { mUnlisted += prims; }
+    S32  unread() const { return mUnread; }
+    S32  unlisted() const { return mUnlisted; }
 
     // A script's text searched: its places kept where it has any, with
     // the text where `keep_text`, for a replace to work over; in its place
@@ -166,6 +173,8 @@ private:
     ALTextSearchOptions      mOptions;
     U32                      mGeneration = 0;
     S32                      mPending    = 0;
+    S32                      mUnread     = 0;
+    S32                      mUnlisted   = 0;
     S32                      mHits       = 0;
     S32                      mFiles      = 0;
     bool                     mBadPattern = false;

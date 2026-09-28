@@ -95,8 +95,8 @@ namespace
     {
         struct Load
         {
-            ALScriptRef                                                ref;
-            std::function<void(const LLUUID&, const std::string&)>     loaded;
+            ALScriptRef                                                          ref;
+            std::function<void(const LLUUID&, const std::optional<std::string>&)> loaded;
         };
         struct Expand
         {
@@ -109,12 +109,20 @@ namespace
             std::function<void(const ALScriptAnalysis::Result&)>       answered;
         };
 
-        std::vector<ALScriptLookup::Candidate> candidates(const Doc& doc) override
+        void candidates(const Doc& doc, std::function<void(ALScriptLookup::Candidates)> told) override
         {
             asked.push_back(doc.id);
-            return others;
+            ALScriptLookup::Candidates found;
+            found.scripts  = others;
+            found.unlisted = unlisted;
+            if (holdCandidates)
+            {
+                heldCandidates = [told = std::move(told), found]() { told(found); };
+                return;
+            }
+            told(std::move(found));
         }
-        void loadSource(const ALScriptRef& ref, std::function<void(const LLUUID&, const std::string&)> loaded) override
+        void loadSource(const ALScriptRef& ref, std::function<void(const LLUUID&, const std::optional<std::string>&)> loaded) override
         {
             loads.push_back({ ref, std::move(loaded) });
         }
@@ -168,6 +176,11 @@ namespace
         void activate(Doc& doc) override { activated.push_back(doc.id); }
 
         std::vector<ALScriptLookup::Candidate>             others;
+        // How many prims did not say what they hold; the candidates held
+        // back, as an object's are while its prims are asked, until told.
+        S32                                                unlisted       = 0;
+        bool                                               holdCandidates = false;
+        std::function<void()>                              heldCandidates;
         std::map<std::string, std::string>                 lines;
         std::vector<Load>                                  loads;
         std::vector<Expand>                                expands;
@@ -739,5 +752,40 @@ namespace tut
         ensure("a local is", ALScriptLookup::mentions("local total = 1", "total", true));
         ensure("not part of a longer name", !ALScriptLookup::mentions("integer totals;", "total", false));
         ensure("LSL: nor in a block comment", !ALScriptLookup::mentions("/* total */ integer x;", "total", false));
+    }
+
+    template<> template<>
+    void alscriptlookup_object::test<13>()
+    {
+        set_test_name("an object's others taken once its prims have said what they hold; the prims that did not, and a script not read, said with what was found");
+        make();
+        studio.others         = { { b, "B" }, { c, "C" } };
+        studio.unlisted       = 2;
+        studio.holdCandidates = true;
+        lookUp(ALEditorCommand::FindReferences);
+        ensure("asked", studio.asked == Names{ "a" });
+        ensure("nothing read while the prims are asked", studio.loads.empty());
+        ensure_equals("nothing shown", studio.shows, 0);
+        studio.heldCandidates();
+        ensure_equals("both read", studio.loads.size(), size_t(2));
+        studio.loads[0].loaded(LLUUID::null, std::nullopt);
+        ensure_equals("one still out", studio.shows, 0);
+        studio.loads[1].loaded(LLUUID::null, std::string("default { }\n"));
+        ensure_equals("shown", studio.shows, 1);
+        const std::string said = services.statuses.back();
+        ensure("found, then what was passed over: " + said,
+               has(said, "ReferencesFound") && has(said, "LookupUnlisted [COUNT]=2") && has(said, "LookupUnread [COUNT]=1 [NAMES]=B"));
+
+        // A rename says it under the prompt, all prims listed this time.
+        studio.holdCandidates = false;
+        studio.unlisted       = 0;
+        studio.loads.clear();
+        lookUp(ALEditorCommand::Rename);
+        ensure_equals("read again", studio.loads.size(), size_t(2));
+        studio.loads[0].loaded(LLUUID::null, std::nullopt);
+        studio.loads[1].loaded(LLUUID::null, std::string("default { }\n"));
+        ensure("a new name asked", static_cast<bool>(studio.hint));
+        const std::string hint = studio.hint("total");
+        ensure("the hint says it: " + hint, has(hint, "LookupUnread [COUNT]=1 [NAMES]=B") && !has(hint, "LookupUnlisted"));
     }
 }

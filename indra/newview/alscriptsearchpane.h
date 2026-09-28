@@ -60,15 +60,19 @@ public:
     class Window
     {
     public:
-        // An object the explorer lists and is in sight: its root, its name,
-        // and what its prims hold.
+        // An object to search, in sight: its root, its name, what its prims
+        // hold, and how many of them did not say what they hold.
         struct Object
         {
             LLUUID                   root;
             std::string              name;
             std::vector<ALScriptRef> items;
+            S32                      unlisted = 0;
         };
-        virtual std::vector<Object> objectsListed() const               = 0;
+        // The objects to search, told once every prim of each has said what
+        // it holds, a large linkset's folded ones among them: `only`, where
+        // it is not null, else every object the explorer lists in sight.
+        virtual void        listObjects(const LLUUID& only, std::function<void(std::vector<Object>)> told) = 0;
         virtual std::string         objectName(const LLUUID& root) const = 0;
         // What a row says an open script is in: its object, by the name it
         // has now; nothing for one in the inventory or on disk.
@@ -153,6 +157,9 @@ private:
     void buildSentence();
     void onChanged();
     void searchOpen(const Doc& doc);
+    // The objects listed for the search at `generation` searched: each
+    // script as it stands where it is open, else fetched.
+    void searchObjects(U32 generation, const std::vector<Window::Object>& objects);
     void searched(const ALScriptRef& ref, const std::string& name, const std::string& where, const ALTextDocument& text, U32 version,
                   const std::string& doc_id, bool keep_text = false, bool notecard = false);
     // What a script searched includes, each file once a search, where the
