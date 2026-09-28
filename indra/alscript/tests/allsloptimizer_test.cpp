@@ -773,10 +773,9 @@ namespace tut
         ensure("a negative appended is not turned into a subtraction: " + r.text, r.text.find("l - 1") == std::string::npos);
         ensure("an empty list adds nothing: " + r.text, r.text.find("l + [];") == std::string::npos);
         ensure("nor an empty string to a string: " + r.text, r.text.find("llList2String(l, 0) + \"\"") == std::string::npos);
-        const size_t n_at = r.text.find("integer n = ");
-        ensure("the count", n_at != std::string::npos);
-        const std::string n_line = r.text.substr(n_at, r.text.find(';', n_at) - n_at);
-        ensure("nor a zero to an integer: " + n_line, n_line.find("+ 0") == std::string::npos);
+        // The count is read once, and goes where it is read.
+        ensure("nor a zero to an integer: " + r.text, r.text.find("llGetListLength(l) + 0") == std::string::npos && r.text.find("l != [] + 0") == std::string::npos &&
+                                                          r.text.find("integer n") == std::string::npos);
         // The literal's elements, however it is written now, all there:
         // the texture's face and the glow.
         const size_t call = r.text.find("llSetPrimitiveParams(");
@@ -817,8 +816,9 @@ namespace tut
                      "        a = b = [];\n        i = j = 0;\n");
         ALLSLOptimizer::Result r = ALLSLOptimizer::run(source, options());
         ensure("a list's not-equal is the difference of the lengths, so !(a == b) stays: " + r.text, r.text.find("!(a == b)") != std::string::npos);
-        ensure("!(a != b) is a == b for lists too: " + r.text, r.text.find("same = a == b;") != std::string::npos);
-        ensure("and for integers !(i == j) is i != j: " + r.text, r.text.find("ints = i != j;") != std::string::npos);
+        // Each read once, and gone where it is read.
+        ensure("!(a != b) is a == b for lists too: " + r.text, r.text.find("+ (a == b) +") != std::string::npos);
+        ensure("and for integers !(i == j) is i != j: " + r.text, r.text.find("(i != j)") != std::string::npos);
     }
     template<> template<>
     void allsloptimizer_object::test<21>()
@@ -1252,6 +1252,51 @@ namespace tut
             {
                 ensure("and what the optimizer wrote compiles: " + p.message + "\n" + r.text, p.severity != ALScriptProblem::Severity::Error);
             }
+        }
+    }
+    template<> template<>
+    void allsloptimizer_object::test<35>()
+    {
+        set_test_name("a local set from what changes nothing and read once goes where it is read, where nothing between writes what it reads; a jump that goes where running on goes goes");
+        const std::string source =
+            wrap("integer g;\n", "        integer a = llGetUnixTime();\n"
+                                   "        integer b = g * 2;\n"
+                                   "        llOwnerSay((string)b);\n"
+                                   "        integer c = g + 1;\n"
+                                   "        g = 5;\n"
+                                   "        llOwnerSay((string)c);\n"
+                                   "        integer d = g * 3;\n"
+                                   "        llOwnerSay((string)(d + d));\n"
+                                   "        integer e = g * 4;\n"
+                                   "        while (a--) llOwnerSay((string)e);\n"
+                                   "        integer f = g * 5;\n"
+                                   "        if (a) { llOwnerSay((string)f); }\n"
+                                   "        integer h = g * 6;\n"
+                                   "        @here;\n"
+                                   "        llOwnerSay((string)h);\n"
+                                   "        if (a) { g = 1; jump out; }\n"
+                                   "        @out;\n"
+                                   "        if (a) { g = 2; jump twice; }\n"
+                                   "        @twice;\n"
+                                   "        if (g) jump here;\n"
+                                   "        if (a) { @twice; g = 3; }\n"
+                                   "        llOwnerSay((string)(a + g));\n");
+        const ALLSLOptimizer::Result r = ALLSLOptimizer::run(source, options());
+        ensure("optimized: " + notes(r), r.optimized);
+        auto has = [&r](const std::string& text) { return r.text.find(text) != std::string::npos; };
+        ensure("b goes where it is read: " + r.text, !has("integer b") && has("llOwnerSay((string)(g * 2));"));
+        ensure("c's g is written between: it stays: " + r.text, has("integer c = g + 1;"));
+        ensure("d is read twice: " + r.text, has("integer d = g * 3;"));
+        ensure("e is read round a loop: " + r.text, has("integer e = g * 4;"));
+        ensure("f is read in a branch, a statement of its own: " + r.text, has("integer f = g * 5;"));
+        ensure("h is read after a label: " + r.text, has("integer h = g * 6;"));
+        ensure("the read of the clock stays: " + r.text, has("integer a = llGetUnixTime();"));
+        ensure("a jump to the label next goes, and the label with it: " + r.text, !has("jump out;") && !has("@out;"));
+        ensure("a jump to a label whose name is twice in the event stays: " + r.text, has("jump twice;"));
+        ALLSLService service;
+        for (const ALScriptProblem& p : service.check(r.text))
+        {
+            ensure("what was written compiles: " + p.message + "\n" + r.text, p.severity != ALScriptProblem::Severity::Error);
         }
     }
 } // namespace tut

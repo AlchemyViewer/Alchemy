@@ -29,6 +29,7 @@
 
 #include "alscriptengine.h"
 
+#include "allsleffects.h"
 #include "allslinliner.h"
 #include "allslservice.h"
 #include "allsltraits.h"
@@ -451,6 +452,10 @@ namespace
         ScriptContext*         context   = nullptr;
         ALLSLOptimizer::Target target    = ALLSLOptimizer::Target::Mono;
         bool                   foldtabs  = false;
+        // What each function may write, found once for the run: the passes
+        // only take code away, so what it says stays true, if more than
+        // is left.
+        const ALLSLEffects*    effects   = nullptr;
 
         // A builtin constant as an answer: the JSON_* names, whose values
         // are characters no literal may carry, are folded to the name.
@@ -2754,8 +2759,15 @@ namespace
                 }
                 switch (stmt->getNodeSubType())
                 {
-                    case NODE_RETURN_STATEMENT:
                     case NODE_JUMP_STATEMENT:
+                        if (jumpsToNext(stmt))
+                        {
+                            go(stmt, "OptimizerRemovedJump", ", which goes where running on goes");
+                            break;
+                        }
+                        dead = true;
+                        break;
+                    case NODE_RETURN_STATEMENT:
                     case NODE_STATE_STATEMENT:
                         dead = true;
                         break;
@@ -2792,7 +2804,232 @@ namespace
                 block->removeChild(stmt);
                 ++changes;
             }
+            substituteLocals(block);
             return false;
+        }
+
+        // How many labels of a name the function or event a node is in has.
+        // A jump goes to the last of them; the compiler finds it among
+        // those in scope.
+        static int labelsNamed(LSLASTNode* node, const char* name)
+        {
+            LSLASTNode* callable = node;
+            while (callable && callable->getNodeType() != NODE_GLOBAL_FUNCTION && callable->getNodeType() != NODE_EVENT_HANDLER)
+            {
+                callable = callable->getParent();
+            }
+            int                                    named = 0;
+            const std::function<void(LSLASTNode*)> count = [&](LSLASTNode* n) {
+                if (n->getNodeType() == NODE_STATEMENT && n->getNodeSubType() == NODE_LABEL && !strcmp(static_cast<LSLLabel*>(n)->getIdentifier()->getName(), name))
+                {
+                    ++named;
+                }
+                for (LSLASTNode* child = n->getChild(0); child; child = child->getNext())
+                {
+                    count(child);
+                }
+            };
+            if (callable)
+            {
+                count(callable);
+            }
+            return named;
+        }
+
+        // Whether a jump goes where running on would go anyway: its label
+        // is the next statement to run -- after the jump, or after the
+        // blocks and the if branches it is the end of -- and the only
+        // label of its name in the function, a jump going to the last of
+        // a name.
+        static bool jumpsToNext(LSLASTNode* jump)
+        {
+            LSLIdentifier* id     = static_cast<LSLJumpStatement*>(jump)->getIdentifier();
+            const char*    target = id ? id->getName() : nullptr;
+            if (!target)
+            {
+                return false;
+            }
+            const auto empty = [](LSLASTNode* n) {
+                return n->getNodeSubType() == NODE_NOP_STATEMENT || (n->getNodeSubType() == NODE_COMPOUND_STATEMENT && !n->hasChildren());
+            };
+            LSLASTNode* at = jump;
+            while (true)
+            {
+                LSLASTNode* parent = at->getParent();
+                if (!parent || parent->getNodeType() != NODE_STATEMENT)
+                {
+                    return false;
+                }
+                if (parent->getNodeSubType() == NODE_IF_STATEMENT && at != static_cast<LSLIfStatement*>(parent)->getCheckExpr())
+                {
+                    at = parent;
+                    continue;
+                }
+                if (parent->getNodeSubType() != NODE_COMPOUND_STATEMENT)
+                {
+                    return false;
+                }
+                LSLASTNode* next = at->getNext();
+                while (next && empty(next))
+                {
+                    next = next->getNext();
+                }
+                if (!next)
+                {
+                    at = parent;
+                    continue;
+                }
+                if (next->getNodeSubType() != NODE_LABEL || strcmp(static_cast<LSLLabel*>(next)->getIdentifier()->getName(), target))
+                {
+                    return false;
+                }
+                // The only label of the name in the function or event.
+                return labelsNamed(next, target) == 1;
+            }
+        }
+
+        // A local set once from what changes nothing and is read the same
+        // at any time, then read once in the expression of a later
+        // statement of the same block: its value put where it is read, and
+        // the local gone -- where no loop reads it again and no label
+        // could bring the run in between, and nothing that runs between
+        // writes what the value reads. A parameter a function was put in
+        // place with, or the variable its value was set in, most often.
+        void substituteLocals(LSLCompoundStatement* block)
+        {
+            // The block's locals that may go -- declared here from what
+            // changes nothing, never written, read once -- and, in one walk
+            // of what follows, where each is read.
+            std::vector<LSLASTNode*>                                                          statements;
+            boost::unordered_flat_map<LSLSymbol*, std::pair<size_t, LSLLValueExpression*>> reads;
+            for (LSLASTNode* stmt : *block)
+            {
+                if (stmt->getNodeSubType() == NODE_DECLARATION)
+                {
+                    auto*      decl = static_cast<LSLDeclaration*>(stmt);
+                    LSLSymbol* sym  = decl->getSymbol();
+                    if (sym && sym->getSubType() == SYM_LOCAL && sym->getAssignments() == 0 && sym->getReferences() == 2 && decl->getInitializer() &&
+                        decl->getInitializer()->getNodeType() == NODE_EXPRESSION)
+                    {
+                        reads.emplace(sym, std::make_pair(size_t(-1), nullptr));
+                    }
+                }
+                statements.push_back(stmt);
+            }
+            if (reads.empty())
+            {
+                return;
+            }
+            std::vector<LSLASTNode*> stack;
+            for (size_t k = 0; k < statements.size(); ++k)
+            {
+                stack.assign(1, statements[k]);
+                while (!stack.empty())
+                {
+                    LSLASTNode* n = stack.back();
+                    stack.pop_back();
+                    if (n->getNodeType() == NODE_EXPRESSION && n->getNodeSubType() == NODE_LVALUE_EXPRESSION)
+                    {
+                        const auto found = reads.find(static_cast<LSLLValueExpression*>(n)->getSymbol());
+                        if (found != reads.end() && !found->second.second)
+                        {
+                            found->second = { k, static_cast<LSLLValueExpression*>(n) };
+                        }
+                    }
+                    // A statement's own expressions only: a read in one it
+                    // holds is not one a value may be put in, and that
+                    // statement's own block walks it.
+                    for (LSLASTNode* child = n->getChild(0); child; child = child->getNext())
+                    {
+                        if (child->getNodeType() != NODE_STATEMENT)
+                        {
+                            stack.push_back(child);
+                        }
+                    }
+                }
+            }
+            const auto holdsLabel = [](LSLASTNode* root) {
+                bool                                   found = false;
+                const std::function<void(LSLASTNode*)> look  = [&](LSLASTNode* n) {
+                    found = found || (n->getNodeType() == NODE_STATEMENT && n->getNodeSubType() == NODE_LABEL);
+                    for (LSLASTNode* child = n->getChild(0); child && !found; child = child->getNext())
+                    {
+                        look(child);
+                    }
+                };
+                look(root);
+                return found;
+            };
+            std::vector<LSLDeclaration*> gone;
+            for (size_t i = 0; i < statements.size(); ++i)
+            {
+                if (statements[i]->getNodeSubType() != NODE_DECLARATION)
+                {
+                    continue;
+                }
+                auto*          decl  = static_cast<LSLDeclaration*>(statements[i]);
+                LSLSymbol*     sym   = decl->getSymbol();
+                LSLExpression* value = decl->getInitializer();
+                const auto     read  = sym ? reads.find(sym) : reads.end();
+                if (read == reads.end() || !value || !sideEffectFree(value) || value->getIType() != sym->getIType())
+                {
+                    continue;
+                }
+                // The read, and the statement it is in: one after this.
+                const size_t         at  = read->second.first;
+                LSLLValueExpression* use = read->second.second;
+                if (!use || at <= i || use->getMember())
+                {
+                    continue;
+                }
+                // In the statement's own expression: no statement, and so
+                // no loop or branch, between it and the read.
+                bool direct = true;
+                for (LSLASTNode* up = use->getParent(); up && up != statements[at]; up = up->getParent())
+                {
+                    direct = direct && up->getNodeType() != NODE_STATEMENT;
+                }
+                const LSLNodeSubType shape = statements[at]->getNodeSubType();
+                if (!direct || shape == NODE_WHILE_STATEMENT || shape == NODE_DO_STATEMENT || shape == NODE_FOR_STATEMENT)
+                {
+                    continue;
+                }
+                bool                  labelled = false;
+                ALLSLEffects::Writes  between;
+                for (size_t k = i + 1; k < at; ++k)
+                {
+                    labelled = labelled || holdsLabel(statements[k]);
+                    between.add(ctx.effects->of(statements[k]));
+                }
+                for (LSLASTNode* earlier : ALLSLEffects::before(statements[at], use))
+                {
+                    between.add(ctx.effects->of(earlier));
+                }
+                bool written = false;
+                const std::function<void(LSLASTNode*)> reads = [&](LSLASTNode* n) {
+                    if (n->getNodeType() == NODE_EXPRESSION && n->getNodeSubType() == NODE_LVALUE_EXPRESSION)
+                    {
+                        written = written || between.writes(static_cast<LSLLValueExpression*>(n)->getSymbol());
+                    }
+                    for (LSLASTNode* child = n->getChild(0); child; child = child->getNext())
+                    {
+                        reads(child);
+                    }
+                };
+                reads(value);
+                if (labelled || written)
+                {
+                    continue;
+                }
+                report.note(decl->getLoc(), "OptimizerSubstitutedLocal", "put the value of [1] where it is read, and removed it", { sym->getName() });
+                putInPlace(use, static_cast<LSLExpression*>(decl->takeChild(1)), ctx.allocator);
+                gone.push_back(decl);
+                ++changes;
+            }
+            for (LSLDeclaration* decl : gone)
+            {
+                block->removeChild(decl);
+            }
         }
 
         bool visit(LSLIfStatement* stmt) override
@@ -3000,6 +3237,13 @@ namespace
         {
             LSLSymbol* sym = label->getSymbol();
             if (!sym || sym->getReferences() > 1)
+            {
+                return false;
+            }
+            // Another label of its name, and a jump the compiler finds this
+            // one for, runs to the last: the count of this one's own jumps
+            // does not say it is unused.
+            if (labelsNamed(label, static_cast<LSLLabel*>(label)->getIdentifier()->getName()) > 1)
             {
                 return false;
             }
@@ -3633,11 +3877,13 @@ ALLSLOptimizer::Result ALLSLOptimizer::run(std::string_view source, const Option
         return result;
     }
 
-    Ctx ctx;
+    const ALLSLEffects effects(script);
+    Ctx                ctx;
     ctx.allocator = &parser.allocator;
     ctx.context   = &parser.context;
     ctx.target    = options.target;
     ctx.foldtabs  = options.foldtabs;
+    ctx.effects   = &effects;
     Report report(result.problems, options.notes);
     // Each pass opens the way for the others; round and round until a
     // round changes nothing -- or until the run has visited as much as
