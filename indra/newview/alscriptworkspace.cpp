@@ -28,6 +28,7 @@
 
 #include "alobjectproperties.h"
 #include "alscriptanalysis.h"
+#include "alscriptcontentsindex.h"
 #include "alscriptenvelope.h"
 #include "alscriptpreprocessor.h"
 #include "llagent.h"
@@ -261,7 +262,37 @@ ALScriptRef ALScriptRef::fromKey(const LLSD& key)
 
 // --- language ------------------------------------------------------------------
 
-ALScriptWorkspace::ALScriptWorkspace() = default;
+ALScriptWorkspace::ALScriptWorkspace()
+{
+    ALScriptContentsIndex::World world;
+    world.linkset = [](const LLUUID& id) {
+        std::vector<LLUUID> prims;
+        LLViewerObject*     object = gObjectList.findObject(id);
+        if (!object || object->isAvatar())
+        {
+            return prims;
+        }
+        LLViewerObject* root = object->getRootEdit() ? object->getRootEdit() : object;
+        prims.push_back(root->getID());
+        for (const LLPointer<LLViewerObject>& child : root->getChildren())
+        {
+            if (child && !child->isAvatar())
+            {
+                prims.push_back(child->getID());
+            }
+        }
+        return prims;
+    };
+    world.current = [](const LLUUID& prim) {
+        LLViewerObject* in_world = gObjectList.findObject(prim);
+        return in_world && !in_world->isInventoryDirty();
+    };
+    world.ask = [this](const LLUUID& prim, bool from_region, std::function<void(const Contents&)> told) {
+        listContents(prim, std::move(told), from_region);
+    };
+    world.askRunning = [this](const ALScriptRef& ref) { askRunning(ref); };
+    mContentsIndex   = std::make_unique<ALScriptContentsIndex>(std::move(world));
+}
 
 bool ALScriptWorkspace::looksLikeLua(std::string_view content)
 {
@@ -1439,6 +1470,7 @@ void ALScriptWorkspace::processScriptRunningReply(LLMessageSystem* msg, void** d
     state.compileTarget = luau ? (luau_language ? "luau" : "lsl-luau") : mono ? "mono" : "lsl2";
     if (instanceExists())
     {
+        instance().mContentsIndex->running(state.ref, state.running);
         instance().mRunningState(state);
     }
     LLLiveLSLEditor::processScriptRunningReply(msg, data);

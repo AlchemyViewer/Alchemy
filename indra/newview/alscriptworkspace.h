@@ -44,6 +44,7 @@
 #include <string_view>
 #include <vector>
 
+class ALScriptContentsIndex;
 class LLChat;
 class LLEventTimer;
 class LLInventoryItem;
@@ -362,6 +363,10 @@ public:
     // hears of only while it is selected -- a drop into it keeps the copy
     // it had -- or where a person asked.
     void listContents(const LLUUID& prim, contents_callback_t callback, bool from_region = false);
+    // What every prim asked about holds, as its region last said, and
+    // whether its scripts run: the one index the studio's windows, lookups
+    // and searches read (alscriptcontentsindex.h).
+    ALScriptContentsIndex& contentsIndex() { return *mContentsIndex; }
 
     // --- changing what an object holds ---------------------------------------------
 
@@ -474,6 +479,7 @@ private:
 
     compiled_signal_t             mCompiled;
     running_signal_t              mRunningState;
+    std::unique_ptr<ALScriptContentsIndex> mContentsIndex;
     // Shared, so that the timer answering one the object never did can
     // tell whether it is still here.
     std::vector<std::shared_ptr<ContentsListener>> mListeners;

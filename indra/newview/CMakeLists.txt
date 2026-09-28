@@ -171,6 +171,7 @@ if(AL_BUILD_VIEWER)
     alscopedata.cpp
     alscriptanalysis.cpp
     alscriptanalyzers.cpp
+    alscriptcontentsindex.cpp
     alscriptcrumbsbar.cpp
     alscriptexplorermodel.cpp
     alscriptexplorerpane.cpp
@@ -1003,6 +1004,7 @@ if(AL_BUILD_VIEWER)
     alscopedata.h
     alscriptanalysis.h
     alscriptanalyzers.h
+    alscriptcontentsindex.h
     alscriptcrumbsbar.h
     alscriptexplorermodel.h
     alscriptexplorerpane.h
@@ -2488,6 +2490,15 @@ if(AL_BUILD_TESTS)
     PROJECT ${test_project}
     LIBRARIES llui alscript ${test_libs}
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
+  )
+
+  # What each prim holds, as one index for every studio window, over a
+  # fake of the world.
+  al_add_test(
+    alscriptcontentsindex
+    UNIT
+    PROJECT ${test_project}
+    LIBRARIES llui alscript ${test_libs}
   )
 
   # What the Script Studio's explorer lists, and the rows it makes of them,
