@@ -296,6 +296,15 @@
     <floater.string name="ProblemNotesB">[COUNT] notes</floater.string>
     <floater.string name="ProblemsIncluded">[FILE]</floater.string>
     <floater.string name="ProblemsIncludedBy">[FILE], as [NAME] includes it</floater.string>
+    <floater.string name="ProblemsChecked">[NAME] in [OBJECT] (not open)</floater.string>
+    <floater.string name="CheckNoObject">Open one of an object's scripts, or choose the object in the explorer, to check every script in it.</floater.string>
+    <floater.string name="CheckingObject">Checking every script in [OBJECT]...</floater.string>
+    <floater.string name="CheckObjectAway">[OBJECT] is not in sight, so its scripts could not be checked.</floater.string>
+    <floater.string name="CheckedObjectA">Checked 1 script in [OBJECT]</floater.string>
+    <floater.string name="CheckedObjectB">Checked [COUNT] scripts in [OBJECT]</floater.string>
+    <floater.string name="CheckedClean">nothing found wrong</floater.string>
+    <floater.string name="CheckedOpenA">1 open in a tab is checked there.</floater.string>
+    <floater.string name="CheckedOpenB">[COUNT] open in tabs are checked there.</floater.string>
     <floater.string name="NoProblemsOpen">No problems in the scripts open.</floater.string>
     <floater.string name="NoProblemsIn">No problems in [NAME].</floater.string>
     <floater.string name="RepeatedTimes">([COUNT] times)</floater.string>
@@ -780,6 +789,10 @@
             <menu_item_call label="Fix All Problems" layout="topleft" name="fix_all">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="fix_all" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="fix_all" />
+            </menu_item_call>
+            <menu_item_call label="Check Every Script in This Object" layout="topleft" name="check_object">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="check_object" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="check_object" />
             </menu_item_call>
             <menu_item_call label="Next Misspelling" layout="topleft" name="next_misspelling">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="next_misspelling" />

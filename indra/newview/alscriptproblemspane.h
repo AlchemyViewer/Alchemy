@@ -82,9 +82,13 @@ public:
 
     // --- the pane ------------------------------------------------------------------
 
-    // Where a row's problem is: whose, in which file, and its stretch.
+    // Where a row's problem is: whose, in which file, and its stretch. A
+    // script no tab holds, which an object's check reached, is by its item
+    // and name, with no tab.
     struct Place
     {
+        ALScriptRef ref;
+        std::string name;
         std::string doc;
         std::string file;
         std::string fileName;
@@ -108,7 +112,9 @@ public:
         // to walk on, or taken to the script (`to_editor`).
         virtual void problemChosen(const Place& place, bool to_editor) = 0;
         // The mark a script's rows are listed under; one of its includes'.
+        // And a script's no tab holds, by its language.
         virtual std::string problemIcon(const Doc& doc, const std::string& include) const = 0;
+        virtual std::string scriptIcon(bool lua, const std::string& include) const        = 0;
         // A fix made over the text at `version`, whose places it is in.
         virtual bool applyFix(Doc& doc, const ALScriptFix& fix, U32 version) = 0;
         // The preferred fix of every problem of a kind made -- of every
@@ -147,6 +153,17 @@ public:
     // A tab called something else from here on.
     void rekey(const std::string& from, const std::string& to);
 
+    // A script an object's check reached that no tab holds, with `where` it
+    // is: its rows kept, and listed after the open scripts' where the list
+    // holds every script's, under its name -- until a tab opens it, or the
+    // next check. The list brought to every script's; the last check's let
+    // go of.
+    void checkedScript(const ALScriptRef& ref, const std::string& name, bool lua, const std::vector<Doc::Shown>& rows, const std::string& where);
+    void forgetChecked(const ALScriptRef& ref);
+    void clearChecked();
+    void showEveryScript();
+    size_t checkedCount() const { return mChecked.size(); }
+
     // The list filled with a tab's problems, and every open script's
     // where the scope says, the row chosen and the scroll kept through a
     // refill of the same; with none, only the counts.
@@ -183,7 +200,8 @@ public:
 private:
     typedef ALFindings<Doc::Shown, Doc::ProblemTraits> store_t;
 
-    store_t::Query          query(const Doc& doc) const;
+    // The filters' question of one script's problems, by its id.
+    store_t::Query          query(const std::string& id) const;
     std::vector<const Doc*> docsFor(const Doc* doc);
     bool                    everyScript() const;
     void                    layoutFilters();
@@ -192,6 +210,19 @@ private:
     Doc*              chosenDoc() const;
     const Doc::Shown* chosenShown() const;
     std::string       chosenLint(bool& lua) const;
+
+    // A script no tab holds, as an object's check left it.
+    struct Checked
+    {
+        std::string             id;
+        ALScriptRef             ref;
+        std::string             name;
+        std::string             where;
+        bool                    lua = false;
+        std::vector<Doc::Shown> rows;
+    };
+    // Those listed with the open scripts': not while a tab holds one.
+    std::vector<const Checked*> checkedFor();
 
     ALScriptStudioServices* mServices = nullptr;
     Window*                 mWindow   = nullptr;
@@ -204,6 +235,7 @@ private:
     LLComboBox*             mOrigin   = nullptr;
     LLFilterEditor*         mFilter   = nullptr;
     store_t                 mStore;
+    std::vector<Checked>    mChecked;
     // Whose problems the list holds, so that a refill of the same
     // script's keeps the row chosen and the scroll.
     std::string             mShownFor;

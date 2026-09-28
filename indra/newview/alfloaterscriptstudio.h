@@ -43,6 +43,7 @@
 #include "alscriptstudioorphans.h"
 #include "alscriptnavigation.h"
 #include "alscriptlookup.h"
+#include "alscriptobjectcheck.h"
 #include "alscriptreferencespane.h"
 #include "alscriptoutlinepane.h"
 #include "alscriptcrumbsbar.h"
@@ -119,7 +120,8 @@ class ALFloaterScriptStudio final : public ALStudioFloater, public ALScriptStudi
                                     public ALScriptNoticeBar::Window, public ALScriptNavigation::Window, public ALScriptLookup::Window,
                                     public ALScriptReferencesPane::Window, public ALScriptOutlinePane::Window,
                                     public ALScriptCrumbsBar::Window, public ALScriptInspectorPane::Window,
-                                    public ALScriptStudioCaret::Window, public ALScriptStudioChecking::Window
+                                    public ALScriptStudioCaret::Window, public ALScriptStudioChecking::Window,
+                                    public ALScriptObjectCheck::Window
 {
     friend class LLFloaterReg;
 
@@ -450,6 +452,17 @@ private:
     // to the script to type there. Tabs opened on the way leave the panes
     // on what they were listing.
     void problemChosen(const ALScriptProblemsPane::Place& place, bool to_editor) override;
+    // Every script of the object with `root` checked, those no tab holds
+    // listed in Problems with the open scripts' (ALScriptObjectCheck); and
+    // what the check asks of the window.
+    void checkObject(const LLUUID& root);
+    void listScripts(const LLUUID& root, std::function<void(ALScriptObjectCheck::Window::Listed)> told) override;
+    bool isOpen(const ALScriptRef& ref) override;
+    void read(const ALScriptRef& ref, std::function<void(std::optional<ALScriptObjectCheck::Window::Read>)> told) override;
+    bool preprocessing() const override;
+    bool luauConfig(const ALScriptPreprocessor::Request& root, ALLuauConfig& config) const override;
+    void scriptChecked(const ALScriptObjectCheck::Script& script) override;
+    void objectChecked(const ALScriptObjectCheck::Done& done) override;
     // Navigation (ALScriptNavigation): the services' and saving's calls to
     // it, and what it asks of the window.
     void revealed(LLUICtrl* list, bool to_editor) override { mNavigation.revealed(list, to_editor); }
@@ -492,6 +505,7 @@ private:
     void                 problemCountsChanged() override { refreshBottomTabs(); }
     void                 problemFiltersChanged() override { saveState(); }
     std::string          problemIcon(const Doc& doc, const std::string& include) const override;
+    std::string          scriptIcon(bool lua, const std::string& include) const override;
     void                 fixAllOfKind(Doc& doc, const std::string& key) override;
     bool                 isLint(bool lua, const std::string& id) const override;
     ALScriptLints::Level lintLevel(bool lua, const std::string& id) const override;
@@ -659,6 +673,7 @@ private:
     // What the explorer asks of the window (ALScriptExplorerPane::Window).
     void showExplorer() override;
     void explorerPinsChanged() override { saveState(); }
+    void checkScripts(const LLUUID& root) override { checkObject(root); }
     void itemRenamed(const ALScriptRef& ref, const std::string& name) override;
     void itemDeleted(const ALScriptRef& ref) override;
     bool unsavedAnywhere(const ALScriptRef& ref) const override;
@@ -1001,6 +1016,11 @@ private:
     ALScriptNavigation                 mNavigation{ *this, *this };
     // Its names looked up across the object's scripts, and renamed.
     ALScriptLookup                     mLookup{ *this, *this };
+    // Every script of an object checked, and what it is called while it is.
+    ALScriptObjectCheck                mObjectCheck{ *this, *this };
+    std::string                        mCheckingWhere;
+    S32                                mCheckedErrors   = 0;
+    S32                                mCheckedWarnings = 0;
     // The name at its caret, and the caret watched.
     ALScriptStudioCaret                mCaret{ *this, *this };
     // Its checking: the analyzers asked and answered, and fixes.

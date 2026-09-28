@@ -60,6 +60,7 @@ namespace
             toEditor.push_back(to_editor);
         }
         std::string problemIcon(const Doc&, const std::string& include) const override { return include.empty() ? "Inv_Script" : "Studio_File"; }
+        std::string scriptIcon(bool lua, const std::string& include) const override { return include.empty() ? (lua ? "Inv_Script_Luau" : "Inv_Script") : "Studio_File"; }
         bool        applyFix(Doc& doc, const ALScriptFix& fix, U32) override
         {
             fixed.push_back(doc.id + ":" + fix.title);
@@ -568,5 +569,56 @@ namespace tut
         ensure_equals("one row", made.rows.size(), size_t(1));
         ensure_equals("named so", made.rows[0].fileName, services.words("InGeneratedCode"));
         ensure("no mark, no squiggle", made.marks.empty() && made.decorations.empty());
+    }
+
+    template<> template<>
+    void alscriptproblemspane_object::test<9>()
+    {
+        set_test_name("a script no tab holds, which an object's check reached, is listed after the open ones under its name, chosen by its item, and gives way to its tab");
+        make();
+        Doc& d           = doc("door");
+        d.check.analysis = { problem(ALScriptProblem::Source::Parser, ALScriptProblem::Severity::Error, 1, "in the open one") };
+        gather(d);
+        LLUUID object, item;
+        object.generate();
+        item.generate();
+        const ALScriptRef closed(object, item);
+        Doc::Shown        row;
+        row.line      = 3;
+        row.column    = 1;
+        row.hasColumn = true;
+        row.level     = Doc::Level::Warning;
+        row.origin    = "Lint";
+        row.message   = "in the closed one";
+        pane->checkedScript(closed, "hinge.lsl", false, { row }, "House");
+        pane->showEveryScript();
+        const std::string listed  = shown();
+        const std::string heading = "#" + services.words("ProblemsChecked", { { "[NAME]", "hinge.lsl" }, { "[OBJECT]", "House" } });
+        ensure("the open one's, then the closed one's under its name and object: " + listed,
+               listed.find("in the open one") < listed.find(heading) && listed.find(heading) < listed.find("in the closed one") &&
+                   listed.find("in the closed one") != std::string::npos);
+        ensure_equals("counted with the rest", pane->held(), 2);
+
+        // Chosen by its item and name, with no tab.
+        const std::vector<LLScrollListItem*> rows = list()->getAllData();
+        S32 at = -1;
+        for (size_t i = 0; i < rows.size(); ++i)
+        {
+            at = rows[i]->getValue().has("checked") ? static_cast<S32>(i) : at;
+        }
+        ensure("a row of it", at >= 0);
+        list()->selectNthItem(at);
+        pane->choose(false);
+        ensure("chosen", !studio.chosen.empty());
+        const ALScriptProblemsPane::Place& place = studio.chosen.back();
+        ensure("by its item, with no tab", place.ref == closed && place.name == "hinge.lsl" && place.doc.empty() && place.line == 3);
+
+        // Opened, its tab says; a new check lets the last one's go.
+        pane->forgetChecked(closed);
+        ensure("given way", shown().find("in the closed one") == std::string::npos && pane->held() == 1);
+        pane->checkedScript(closed, "hinge.lsl", false, { row }, "House");
+        ensure_equals("back", pane->checkedCount(), size_t(1));
+        pane->clearChecked();
+        ensure("let go of", pane->checkedCount() == 0 && shown().find("in the closed one") == std::string::npos);
     }
 }

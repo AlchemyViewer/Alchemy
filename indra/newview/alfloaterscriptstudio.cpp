@@ -1759,6 +1759,8 @@ void ALFloaterScriptStudio::openScript(const ALScriptRef& ref, const std::string
     doc->recoveryKey = ALScriptRecoveryStore::keyOf(ref.object, ref.item, std::string());
     mRecovery.offerFor(*doc, holderOf(ref, std::string()) != nullptr);
 
+    // An object's check listed it while it was closed: its tab says now.
+    mProblemsPane->forgetChecked(ref);
     mDocs.push_back(std::move(doc));
     reindexDocs();
     activate(mDocs.size() - 1, focus);
@@ -3094,6 +3096,11 @@ std::string ALFloaterScriptStudio::problemIcon(const Doc& doc, const std::string
     return include.empty() || include == Doc::GENERATED ? ALScriptStudioWords::imageNameOf(doc) : includeImage(include, doc.language.lua);
 }
 
+std::string ALFloaterScriptStudio::scriptIcon(bool lua, const std::string& include) const
+{
+    return include.empty() || include == Doc::GENERATED ? (lua ? "Inv_Script_Luau" : "Inv_Script") : includeImage(include, lua);
+}
+
 void ALFloaterScriptStudio::fixAllOfKind(Doc& doc, const std::string& key)
 {
     mChecking.askFixAll(doc, FixPick{ key });
@@ -3376,6 +3383,25 @@ void ALFloaterScriptStudio::refreshUndoLabels()
 
 void ALFloaterScriptStudio::problemChosen(const ALScriptProblemsPane::Place& place, bool to_editor)
 {
+    // A script no tab holds, which an object's check reached: opened at the
+    // place, or its include; code the preprocessor made has no tab to show
+    // it in, so the script opens at its top.
+    if (place.doc.empty() && !place.ref.isNull())
+    {
+        mNavigation.noteJump(!to_editor);
+        ++mHoldPanes;
+        if (!place.file.empty() && place.file != Doc::GENERATED)
+        {
+            openIncludeAt(place.file, place.fileName, place.line, place.hasColumn ? place.column : -1, 0);
+        }
+        else
+        {
+            const bool at = place.file.empty();
+            goToPlace(place.ref, place.name, at ? place.line : 0, at && place.hasColumn ? place.column : 0, 0);
+        }
+        --mHoldPanes;
+        return;
+    }
     const size_t index = indexOf(place.doc);
     if (index == NONE)
     {
@@ -4861,6 +4887,141 @@ void ALFloaterScriptStudio::listObjects(const LLUUID& only, std::function<void(s
             }
         });
     }
+}
+
+// --- an object's scripts checked ---------------------------------------------------------
+
+void ALFloaterScriptStudio::checkObject(const LLUUID& root)
+{
+    if (root.isNull())
+    {
+        setStatus(getString("CheckNoObject"));
+        return;
+    }
+    mCheckingWhere = objectName(root);
+    if (mCheckingWhere.empty())
+    {
+        mCheckingWhere = getString("ObjectUnnamed");
+    }
+    mCheckedErrors   = 0;
+    mCheckedWarnings = 0;
+    // The last check's let go of, and every script's listed, which is what
+    // was asked for.
+    mProblemsPane->clearChecked();
+    mProblemsPane->showEveryScript();
+    showProblems();
+    setStatus(words("CheckingObject", { { "[OBJECT]", mCheckingWhere } }));
+    mObjectCheck.check(root, mCheckingWhere);
+}
+
+void ALFloaterScriptStudio::listScripts(const LLUUID& root, std::function<void(ALScriptObjectCheck::Window::Listed)> told)
+{
+    ALScriptWorkspace::instance().contentsIndex().ensureListed(root, [told = std::move(told)](const ALScriptContentsIndex::Listed& listed) {
+        const ALScriptContentsIndex&       index = ALScriptWorkspace::instance().contentsIndex();
+        ALScriptObjectCheck::Window::Listed out;
+        out.present  = listed.present;
+        out.unlisted = static_cast<S32>(listed.unlisted.size());
+        for (const LLUUID& prim : listed.prims)
+        {
+            for (const ALScriptWorkspace::Item& item : index.items(prim))
+            {
+                if (item.script)
+                {
+                    out.scripts.push_back({ ALScriptRef(prim, item.id), item.name });
+                }
+            }
+        }
+        told(std::move(out));
+    });
+}
+
+bool ALFloaterScriptStudio::isOpen(const ALScriptRef& ref)
+{
+    return indexOf(ref) != NONE || holderOf(ref, std::string()) != nullptr;
+}
+
+void ALFloaterScriptStudio::read(const ALScriptRef& ref, std::function<void(std::optional<ALScriptObjectCheck::Window::Read>)> told)
+{
+    ALScriptWorkspace::instance().load(ref, [told = std::move(told)](const ALScriptWorkspace::Loaded& loaded) {
+        if (!loaded.error.empty() || loaded.notecard)
+        {
+            told(std::nullopt);
+            return;
+        }
+        ALScriptObjectCheck::Window::Read read;
+        read.text          = sourceOf(loaded);
+        read.assetId       = loaded.assetId;
+        read.lua           = loaded.language.lua;
+        read.compileTarget = loaded.language.compileTarget;
+        read.enveloped     = ALScriptEnvelope::parse(loaded.text).has_value();
+        told(std::move(read));
+    });
+}
+
+bool ALFloaterScriptStudio::preprocessing() const
+{
+    const ALScriptStudioChecking::Sources& sources = ALScriptStudioChecking::sources();
+    return sources.preprocessing && sources.preprocessing();
+}
+
+bool ALFloaterScriptStudio::luauConfig(const ALScriptPreprocessor::Request& root, ALLuauConfig& config) const
+{
+    const ALScriptStudioChecking::Sources& sources = ALScriptStudioChecking::sources();
+    const ALLuauConfig                     base    = ALScriptLints::luauBase();
+    return sources.configOf && sources.configOf(root, config, &base);
+}
+
+void ALFloaterScriptStudio::scriptChecked(const ALScriptObjectCheck::Script& script)
+{
+    for (const Doc::Shown& row : script.rows)
+    {
+        mCheckedErrors += row.level == Doc::Level::Error ? 1 : 0;
+        mCheckedWarnings += row.level == Doc::Level::Warning ? 1 : 0;
+    }
+    mProblemsPane->checkedScript(script.ref, script.name, script.lua, script.rows, mCheckingWhere);
+}
+
+void ALFloaterScriptStudio::objectChecked(const ALScriptObjectCheck::Done& done)
+{
+    LLStringUtil::format_map_t args;
+    args["[OBJECT]"] = done.name;
+    if (!done.present)
+    {
+        report(words("CheckObjectAway", args), true);
+        return;
+    }
+    // How many it checked and what it found; those it left to their tabs;
+    // what it could not reach.
+    std::string said = counted("CheckedObject", done.checked, args);
+    std::vector<std::string> found;
+    if (mCheckedErrors > 0)
+    {
+        found.push_back(counted("ProblemErrors", mCheckedErrors));
+    }
+    if (mCheckedWarnings > 0)
+    {
+        found.push_back(counted("ProblemWarnings", mCheckedWarnings));
+    }
+    said += ": " + (found.empty() ? getString("CheckedClean") : found.size() == 1 ? found[0] : found[0] + ", " + found[1]);
+    said += ".";
+    if (done.open > 0)
+    {
+        said += " " + counted("CheckedOpen", done.open);
+    }
+    if (done.unlisted > 0)
+    {
+        said += " " + counted("LookupUnlisted", done.unlisted);
+    }
+    if (!done.unread.empty())
+    {
+        std::string names;
+        for (const std::string& name : done.unread)
+        {
+            names += (names.empty() ? "" : ", ") + name;
+        }
+        said += " " + counted("LookupUnread", static_cast<S32>(done.unread.size()), { { "[NAMES]", names } });
+    }
+    report(said, mCheckedErrors > 0 || done.unlisted > 0 || !done.unread.empty());
 }
 
 std::string ALFloaterScriptStudio::objectName(const LLUUID& root) const
@@ -6782,6 +6943,10 @@ void ALFloaterScriptStudio::addEditCommands()
             [this]() { return active() != nullptr; });
     }
     mCommands.add("find_in_files", [this]() { findInFiles(); });
+    // Every script of the object in hand checked: the front script's, else
+    // the one chosen in the explorer.
+    mCommands.add(
+        "check_object", [this]() { checkObject(objectInHand()); }, [this]() { return objectInHand().notNull() && !mObjectCheck.running(); });
 }
 
 void ALFloaterScriptStudio::addInsertCommands()

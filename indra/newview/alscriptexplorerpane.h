@@ -72,6 +72,8 @@ public:
         virtual void itemDeleted(const ALScriptRef& ref) = 0;
         // Whether an item is open with unsaved changes in any of them.
         virtual bool unsavedAnywhere(const ALScriptRef& ref) const = 0;
+        // Every script of an object checked, its problems listed.
+        virtual void checkScripts(const LLUUID& root) = 0;
 
     protected:
         ~Window() = default;

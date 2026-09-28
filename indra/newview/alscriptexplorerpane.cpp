@@ -655,6 +655,12 @@ bool ALScriptExplorerPane::enabled(const std::string& action) const
     {
         return rows.size() == 1 && present(rows.front());
     }
+    if (action == "check")
+    {
+        // One object, in sight, whatever row of it.
+        return !rows.empty() && present(rows.front()) &&
+               !any([&rows](const Choice& row) { return row.root != rows.front().root; });
+    }
     if (action == "pin")
     {
         return !rows.empty();
@@ -744,6 +750,10 @@ void ALScriptExplorerPane::act(const std::string& action)
         mModel.pin(rows);
         mWindow->explorerPinsChanged();
         relist();
+    }
+    else if (action == "check")
+    {
+        mWindow->checkScripts(rows.front().root);
     }
 }
 
