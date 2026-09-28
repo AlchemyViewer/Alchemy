@@ -44,6 +44,7 @@
 #include "alscriptnavigation.h"
 #include "alscriptlookup.h"
 #include "alscriptobjectcheck.h"
+#include "alscriptrecompile.h"
 #include "alscriptreferencespane.h"
 #include "alscriptoutlinepane.h"
 #include "alscriptcrumbsbar.h"
@@ -121,7 +122,7 @@ class ALFloaterScriptStudio final : public ALStudioFloater, public ALScriptStudi
                                     public ALScriptReferencesPane::Window, public ALScriptOutlinePane::Window,
                                     public ALScriptCrumbsBar::Window, public ALScriptInspectorPane::Window,
                                     public ALScriptStudioCaret::Window, public ALScriptStudioChecking::Window,
-                                    public ALScriptObjectCheck::Window
+                                    public ALScriptObjectCheck::Window, public ALScriptRecompile::Window
 {
     friend class LLFloaterReg;
 
@@ -469,6 +470,18 @@ private:
     bool luauConfig(const ALScriptPreprocessor::Request& root, ALLuauConfig& config) const override;
     void scriptChecked(const ALScriptObjectCheck::Script& script) override;
     void objectChecked(const ALScriptObjectCheck::Done& done) override;
+    // Scripts, prims and objects recompiled from the Explorer, each said in
+    // Output and a closed one's problems listed (ALScriptRecompile); and
+    // what the recompile asks of the window.
+    void recompileScripts(std::vector<ALScriptRecompile::One> scripts, std::vector<std::pair<LLUUID, std::string>> prims,
+                          const std::string& target) override;
+    void listScripts(const std::vector<std::pair<LLUUID, std::string>>& prims, std::function<void(ALScriptRecompile::Window::Listed)> told) override;
+    bool saving(const ALScriptRef& ref) override;
+    bool unsaved(const ALScriptRef& ref) override { return unsavedAnywhere(ref); }
+    std::optional<bool> knownRunning(const ALScriptRef& ref) override;
+    void recompile(const ALScriptRef& ref, const std::string& target, std::optional<bool> running, ALScriptWorkspace::compile_callback_t told) override;
+    void scriptRecompiled(const ALScriptRecompile::Script& script) override;
+    void recompiled(const ALScriptRecompile::Done& done) override;
     // Navigation (ALScriptNavigation): the services' and saving's calls to
     // it, and what it asks of the window.
     void revealed(LLUICtrl* list, bool to_editor) override { mNavigation.revealed(list, to_editor); }
@@ -1025,6 +1038,8 @@ private:
     ALScriptLookup                     mLookup{ *this, *this };
     // Every script of an object checked, and what it is called while it is.
     ALScriptObjectCheck                mObjectCheck{ *this, *this };
+    // Recompiles from the Explorer.
+    ALScriptRecompile                  mRecompile{ *this, *this };
     std::string                        mCheckingWhere;
     S32                                mCheckedErrors   = 0;
     S32                                mCheckedWarnings = 0;

@@ -621,4 +621,45 @@ namespace tut
         pane->clearChecked();
         ensure("let go of", pane->checkedCount() == 0 && shown().find("in the closed one") == std::string::npos);
     }
+
+    template<> template<>
+    void alscriptproblemspane_object::test<10>()
+    {
+        set_test_name("what a recompile's compiler said of a closed script is listed beside its check's rows, the last recompile's alone, and goes when it compiles clean");
+        make();
+        LLUUID object, item;
+        object.generate();
+        item.generate();
+        const ALScriptRef closed(object, item);
+        const auto        row = [](const std::string& message, const std::string& origin) {
+            Doc::Shown made;
+            made.line    = 2;
+            made.level   = Doc::Level::Error;
+            made.origin  = origin;
+            made.message = message;
+            return made;
+        };
+        pane->showEveryScript();
+        pane->compiledScript(closed, "hinge.lsl", false, {}, "House");
+        ensure("clean, and nothing listed of it: nothing to list", pane->checkedCount() == 0);
+
+        pane->checkedScript(closed, "hinge.lsl", false, { row("the check's", "Lint") }, "House");
+        pane->compiledScript(closed, "hinge.lsl", false, { row("the compiler's", "Compiler") }, "House");
+        ensure("both listed", shown().find("the check's") != std::string::npos && shown().find("the compiler's") != std::string::npos);
+        ensure_equals("counted", pane->held(), 2);
+
+        pane->compiledScript(closed, "hinge.lsl", false, { row("again", "Compiler") }, "House");
+        ensure("the last recompile's alone", shown().find("the compiler's") == std::string::npos && shown().find("again") != std::string::npos);
+        pane->compiledScript(closed, "hinge.lsl", false, {}, "House");
+        ensure("clean: the compiler's gone, the check's stay", shown().find("again") == std::string::npos && shown().find("the check's") != std::string::npos);
+
+        // Recompiled alone, with no check: gone with its rows.
+        LLUUID other;
+        other.generate();
+        const ALScriptRef lone(object, other);
+        pane->compiledScript(lone, "latch.lsl", false, { row("latch", "Compiler") }, "House");
+        ensure_equals("listed", pane->checkedCount(), size_t(2));
+        pane->compiledScript(lone, "latch.lsl", false, {}, "House");
+        ensure_equals("gone", pane->checkedCount(), size_t(1));
+    }
 }

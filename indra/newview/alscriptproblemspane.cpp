@@ -380,8 +380,7 @@ void ALScriptProblemsPane::rekey(const std::string& from, const std::string& to)
     }
 }
 
-void ALScriptProblemsPane::checkedScript(const ALScriptRef& ref, const std::string& name, bool lua, const std::vector<Doc::Shown>& rows,
-                                         const std::string& where)
+ALScriptProblemsPane::Checked& ALScriptProblemsPane::checkedEntry(const ALScriptRef& ref, const std::string& name, bool lua, const std::string& where)
 {
     const std::string id    = "checked:" + ref.object.asString() + ":" + ref.item.asString();
     auto              found = std::find_if(mChecked.begin(), mChecked.end(), [&id](const Checked& one) { return one.id == id; });
@@ -391,12 +390,46 @@ void ALScriptProblemsPane::checkedScript(const ALScriptRef& ref, const std::stri
     one.name                = name;
     one.where               = where;
     one.lua                 = lua;
-    one.rows                = rows;
-    mStore.replace(id, one.rows);
+    return one;
+}
+
+void ALScriptProblemsPane::relist(Checked& one)
+{
+    one.rows = one.analysed;
+    one.rows.insert(one.rows.end(), one.compiled.begin(), one.compiled.end());
+    mStore.replace(one.id, one.rows);
     if (everyScript())
     {
         fill(listed());
     }
+}
+
+void ALScriptProblemsPane::checkedScript(const ALScriptRef& ref, const std::string& name, bool lua, const std::vector<Doc::Shown>& rows,
+                                         const std::string& where)
+{
+    Checked& one = checkedEntry(ref, name, lua, where);
+    one.checked  = true;
+    one.analysed = rows;
+    relist(one);
+}
+
+void ALScriptProblemsPane::compiledScript(const ALScriptRef& ref, const std::string& name, bool lua, const std::vector<Doc::Shown>& rows,
+                                          const std::string& where)
+{
+    const auto found = std::find_if(mChecked.begin(), mChecked.end(), [&ref](const Checked& one) { return one.ref == ref; });
+    // Clean, and nothing listed of it: nothing to list.
+    if (rows.empty() && found == mChecked.end())
+    {
+        return;
+    }
+    Checked& one = checkedEntry(ref, name, lua, where);
+    one.compiled = rows;
+    if (!one.checked && one.compiled.empty())
+    {
+        forgetChecked(ref);
+        return;
+    }
+    relist(one);
 }
 
 void ALScriptProblemsPane::forgetChecked(const ALScriptRef& ref)

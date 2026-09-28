@@ -951,6 +951,11 @@ void ALScriptWorkspace::prepare(const ALScriptRef& ref, const std::string& name,
             wrapped.programVersion   = LLVersionInfo::instance().getChannelAndVersion();
             wrapped.lastCompiled     = LLDate::now().asString();
             prepared.text            = wrapped.wrap();
+            prepared.map             = std::make_shared<const ALSourceMap>(expanded.map);
+            if (const std::optional<ALScriptEnvelope> sent = ALScriptEnvelope::parse(prepared.text))
+            {
+                prepared.codeLine = sent->codeLine();
+            }
         }
         callback(prepared);
     });
@@ -1029,8 +1034,20 @@ void ALScriptWorkspace::recompile(const ALScriptRef& ref, const std::string& req
             options.compileTarget = target;
             options.running       = running;
             options.sender        = sender;
+            // What the compiler says is of the expansion: the caller told
+            // how to read it back.
+            const auto told = [callback, map = prepared.map, line = prepared.codeLine](const CompileResult& result) {
+                if (!callback)
+                {
+                    return;
+                }
+                CompileResult read = result;
+                read.sourceMap     = map;
+                read.codeLine      = line;
+                callback(read);
+            };
             std::string error;
-            if (!save(ref, prepared.text, options, callback, error))
+            if (!save(ref, prepared.text, options, told, error))
             {
                 fail(error);
             }

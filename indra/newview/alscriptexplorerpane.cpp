@@ -87,20 +87,16 @@ namespace
     }
 
     // The legacy queues over whole prims, which walk their contents and
-    // report in a window of their own: every script recompiled for a
-    // target ("auto" for what each compiles for now), reset, started or
-    // stopped. Each prim comes with a name for the report. A recompile
-    // leaves a script `running` knows to be stopped stopped, by prim and
-    // item; the rest run after it, as the queue always had it.
+    // report in a window of their own: every script reset, started or
+    // stopped. Each prim comes with a name for the report. A recompile is
+    // the window's own (ALScriptRecompile).
     enum class Queue : U8
     {
-            Recompile,
             Reset,
             Start,
             Stop
         };
-        bool startQueue(Queue kind, const std::vector<std::pair<LLUUID, std::string>>& prims, const std::string& target, std::string& error,
-                        std::map<std::pair<LLUUID, LLUUID>, bool> running = {})
+        bool startQueue(Queue kind, const std::vector<std::pair<LLUUID, std::string>>& prims, std::string& error)
         {
         // Only the objects RLVa lets be changed; none, and why.
         std::vector<std::pair<LLUUID, std::string>> allowed;
@@ -122,8 +118,8 @@ namespace
             error = refused.empty() ? LLTrans::getString("WorkspaceNothingToDo") : refused;
             return false;
         }
-        const char* name  = kind == Queue::Recompile ? "compile_queue" : kind == Queue::Reset ? "reset_queue" : kind == Queue::Start ? "start_queue" : "stop_queue";
-        const char* title = kind == Queue::Recompile ? "CompileQueueTitle" : kind == Queue::Reset ? "ResetQueueTitle" : kind == Queue::Start ? "RunQueueTitle" : "NotRunQueueTitle";
+        const char* name  = kind == Queue::Reset ? "reset_queue" : kind == Queue::Start ? "start_queue" : "stop_queue";
+        const char* title = kind == Queue::Reset ? "ResetQueueTitle" : kind == Queue::Start ? "RunQueueTitle" : "NotRunQueueTitle";
         LLUUID      id;
         id.generate();
         LLFloaterScriptQueue* queue = LLFloaterReg::getTypedInstance<LLFloaterScriptQueue>(name, LLSD(id));
@@ -132,8 +128,6 @@ namespace
             error = LLTrans::getString("WorkspaceQueueCannotOpen");
             return false;
         }
-        queue->setCompileTarget(target.empty() ? std::string("auto") : target);
-        queue->setKnownRunning(std::move(running));
         for (const auto& [prim, prim_name] : allowed)
         {
             queue->addObject(prim, prim_name);
@@ -710,9 +704,15 @@ bool ALScriptExplorerPane::enabled(const std::string& action) const
     {
         return !rows.empty() && !any([](const Choice& row) { return !row.isItem(); });
     }
-    if (action == "start" || action == "stop" || action == "reset" || action == "restart" || action == "recompile")
+    if (action == "recompile_lsl_luau" && !any([](const Choice& row) { return ALScriptWorkspace::luaEnabled(ALScriptRef(row.prim, LLUUID::null)); }))
     {
-        // Scripts, or whole prims and objects, which the queues walk;
+        // Only where the region runs Luau.
+        return false;
+    }
+    if (action == "start" || action == "stop" || action == "reset" || action == "restart" || action == "recompile" || action == "recompile_mono" ||
+        action == "recompile_lsl2" || action == "recompile_lsl_luau")
+    {
+        // Scripts, or whole prims and objects, whose scripts are walked;
         // restart is one script at a time.
         return any([&](const Choice& row) { return present(row) && (row.script || (action != "restart" && !row.isItem())); });
     }
@@ -769,9 +769,13 @@ void ALScriptExplorerPane::act(const std::string& action)
     {
         remove(rows);
     }
-    else if (action == "recompile")
+    else if (action == "recompile" || action == "recompile_mono" || action == "recompile_lsl2" || action == "recompile_lsl_luau")
     {
-        recompile(rows);
+        // Each as it compiles now, or every LSL script for one target.
+        recompile(rows, action == "recompile_mono"       ? "mono"
+                        : action == "recompile_lsl2"     ? "lsl2"
+                        : action == "recompile_lsl_luau" ? "lsl-luau"
+                                                         : "auto");
     }
     else if (action == "start" || action == "stop" || action == "reset" || action == "restart")
     {
@@ -863,7 +867,7 @@ void ALScriptExplorerPane::run(const std::string& action, const std::vector<Choi
                           : action == "stop" ? Queue::Stop
                                              : Queue::Reset;
         std::string error;
-        if (!startQueue(kind, prims, LLStringUtil::null, error))
+        if (!startQueue(kind, prims, error))
         {
             mServices->report(error, true);
         }
@@ -1056,85 +1060,22 @@ void ALScriptExplorerPane::remove(const std::vector<Choice>& rows)
     });
 }
 
-void ALScriptExplorerPane::recompile(const std::vector<Choice>& rows)
+void ALScriptExplorerPane::recompile(const std::vector<Choice>& rows, const std::string& target)
 {
-    // Each script chosen goes up again on its own, for what it compiles
-    // for now; a prim or an object chosen has every script walked by the
-    // compile queue, which reports in a window of its own. A script known
-    // to be stopped stays stopped, which the standard viewer's recompile
-    // does not do; one not known to be either runs after, as there.
-    const LLHandle<LLPanel>                           handle = getHandle();
-    const std::vector<std::pair<LLUUID, std::string>> prims  = mModel.containerPrims(rows);
+    // Each script chosen, and every script of each prim or object chosen,
+    // up again for the target, said in Output as each is and a closed
+    // one's problems listed: the window's recompile, not the legacy queue.
+    const std::vector<std::pair<LLUUID, std::string>> prims = mModel.containerPrims(rows);
+    std::vector<ALScriptRecompile::One>               scripts;
     for (const Choice& row : rows)
     {
-        // A script chosen with its prim is compiled once, by the queue.
-        if (!row.script || Model::walkedByQueue(row, prims))
+        // A script chosen with its prim goes up once, with the prim's.
+        if (row.script && !Model::walkedByQueue(row, prims))
         {
-            continue;
-        }
-        const ALScriptRef          ref  = row.ref();
-        const std::string          name = row.name;
-        LLStringUtil::format_map_t args;
-        args["[NAME]"] = name;
-        // A save of it on its way would have the server's text land over
-        // it: left alone. Changes not saved in a tab are not what compiles:
-        // said so.
-        if (ALScriptWorkspace::instance().saving(ref))
-        {
-            mServices->report(mServices->words("RecompileSkippedSaving", args), true);
-            continue;
-        }
-        if (mWindow->unsavedAnywhere(ref))
-        {
-            mServices->report(mServices->words("RecompileUnsaved", args), true);
-        }
-        mServices->setStatus(mServices->words("Recompiling", args));
-        const std::optional<bool> running = knownRunning(ref);
-        ALScriptWorkspace::instance().recompile(
-            ref, "auto",
-            [handle, ref, name](const ALScriptWorkspace::CompileResult& result) {
-                ALScriptExplorerPane* pane = ALViewType::as<ALScriptExplorerPane>(handle.get());
-                if (!pane || pane->mServices->findDoc(ref))
-                {
-                    // An open script hears of it through the listener, and
-                    // shows what the compiler said.
-                    return;
-                }
-                ALScriptStudioServices&    services = *pane->mServices;
-                LLStringUtil::format_map_t args;
-                args["[NAME]"] = name;
-                if (!result.error.empty())
-                {
-                    args["[ERROR]"] = result.error;
-                    services.report(services.words("SaveFailed", args), true);
-                }
-                else if (result.success)
-                {
-                    services.report(services.words("Compiled", args));
-                }
-                else
-                {
-                    services.report(services.counted("CompileFailed", static_cast<S32>(result.diagnostics.size()), args), true);
-                }
-            },
-            running);
-    }
-    if (!prims.empty())
-    {
-        std::string                               error;
-        std::map<std::pair<LLUUID, LLUUID>, bool> running = ALScriptWorkspace::instance().contentsIndex().runningKnown();
-        for (const ALScriptStudioDoc* doc : mServices->openDocs())
-        {
-            if (!doc->ref.inInventory() && doc->running >= 0)
-            {
-                running[{ doc->ref.object, doc->ref.item }] = doc->running != 0;
-            }
-        }
-        if (!startQueue(Queue::Recompile, prims, "auto", error, std::move(running)))
-        {
-            mServices->report(error, true);
+            scripts.push_back({ row.ref(), row.name, mModel.nameOf(row.root), row.lua });
         }
     }
+    mWindow->recompileScripts(std::move(scripts), prims, target);
 }
 
 // --- dragging out and dropping in --------------------------------------------------------

@@ -47,6 +47,7 @@
 
 class ALScriptContentsIndex;
 class ALScriptTempFiles;
+class ALSourceMap;
 class LLChat;
 class LLEventTimer;
 class LLInventoryItem;
@@ -216,6 +217,12 @@ public:
         // Task scripts: the experience it was sent to run under -- the
         // null one for none -- which it runs under now.
         std::optional<LLUUID> experience;
+        // A recompile's, where it went up expanded: the expansion's map,
+        // which the diagnostics are of once the envelope's lines above the
+        // code -- `codeLine` of them -- are taken off. Nothing on a save's:
+        // its sender has the expansion.
+        std::shared_ptr<const ALSourceMap> sourceMap;
+        S32                                codeLine = 0;
     };
     typedef std::function<void(const CompileResult&)> compile_callback_t;
 
@@ -277,6 +284,10 @@ public:
     {
         std::string             text;
         std::vector<Diagnostic> errors;
+        // Where it went into its envelope: the expansion's map, and the
+        // line of the text the expanded code starts on.
+        std::shared_ptr<const ALSourceMap> map;
+        S32                                codeLine = 0;
     };
     typedef std::function<void(const Prepared&)> prepared_callback_t;
     void prepare(const ALScriptRef& ref, const std::string& name, const LLUUID& asset_id, const std::string& text, bool lua,

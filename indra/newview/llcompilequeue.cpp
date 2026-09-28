@@ -487,7 +487,9 @@ bool LLFloaterCompileQueue::processScript(LLHandle<LLFloaterCompileQueue> hfloat
             floater->addStringMessage(LLTrans::getString("CompileQueueUnsavedInStudio", named));
         }
         const std::string pumpName = pump.getName();
-        const std::optional<bool> running = floater->runsAfterCompile(object->getID(), inventory->getUUID());
+        // Whether it runs after as it runs now, which the save asks the
+        // region.
+        const std::optional<bool> running;
         const auto        heard    = [pumpName](const ALScriptWorkspace::CompileResult& compiled) {
             LLSD out;
             out["compiled"] = compiled.success;

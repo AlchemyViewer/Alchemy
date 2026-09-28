@@ -36,7 +36,6 @@
 #include "llevents.h"
 
 #include <map>
-#include <optional>
 
 class LLScrollListCtrl;
 
@@ -62,11 +61,6 @@ public:
     /*virtual*/ bool postBuild() override;
 
     void setCompileTarget(std::string target) { mCompileTarget = target; }
-    // What is known of whether each script runs, by prim and item: a
-    // recompile leaves one known to be stopped stopped, and starts the
-    // rest, as it always did.
-    void setKnownRunning(std::map<std::pair<LLUUID, LLUUID>, bool> known) { mKnownRunning = std::move(known); }
-
     // addObject() accepts an object id.
     void addObject(const LLUUID& id, std::string name);
 
@@ -107,13 +101,6 @@ protected:
 
     std::string mStartString;
     std::string mCompileTarget { "lsl2" };
-    std::map<std::pair<LLUUID, LLUUID>, bool> mKnownRunning;
-    // As the explorer knew it; not known, the save asks the region.
-    std::optional<bool> runsAfterCompile(const LLUUID& object, const LLUUID& item) const
-    {
-        const auto known = mKnownRunning.find({ object, item });
-        return known == mKnownRunning.end() ? std::nullopt : std::optional<bool>(known->second);
-    }
 
     typedef std::function<bool(const LLPointer<LLViewerObject> &, LLInventoryObject*, LLEventPump &)>   fnQueueAction_t;
     static void objectScriptProcessingQueueCoro(std::string action, LLHandle<LLFloaterScriptQueue> hfloater, object_data_list_t objectList, fnQueueAction_t func);

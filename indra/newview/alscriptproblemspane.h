@@ -159,6 +159,10 @@ public:
     // next check. The list brought to every script's; the last check's let
     // go of.
     void checkedScript(const ALScriptRef& ref, const std::string& name, bool lua, const std::vector<Doc::Shown>& rows, const std::string& where);
+    // What the compiler said of a script no tab holds when the Explorer
+    // recompiled it, beside what a check found: the last recompile's rows
+    // in place of the one's before, none once it compiles clean.
+    void compiledScript(const ALScriptRef& ref, const std::string& name, bool lua, const std::vector<Doc::Shown>& rows, const std::string& where);
     void forgetChecked(const ALScriptRef& ref);
     void clearChecked();
     void showEveryScript();
@@ -219,8 +223,17 @@ private:
         std::string             name;
         std::string             where;
         bool                    lua = false;
+        // What a check found and what a recompile's compiler said, and the
+        // two together, which is what is listed.
+        bool                    checked = false;
+        std::vector<Doc::Shown> analysed;
+        std::vector<Doc::Shown> compiled;
         std::vector<Doc::Shown> rows;
     };
+    // The entry for a script, made where there is none; and it listed again
+    // with what it holds now.
+    Checked& checkedEntry(const ALScriptRef& ref, const std::string& name, bool lua, const std::string& where);
+    void     relist(Checked& one);
     // Those listed with the open scripts': not while a tab holds one.
     std::vector<const Checked*> checkedFor();
 

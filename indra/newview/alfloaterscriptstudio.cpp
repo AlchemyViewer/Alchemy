@@ -5079,6 +5079,122 @@ void ALFloaterScriptStudio::objectChecked(const ALScriptObjectCheck::Done& done)
     report(said, mCheckedErrors > 0 || done.unlisted > 0 || !done.unread.empty());
 }
 
+void ALFloaterScriptStudio::recompileScripts(std::vector<ALScriptRecompile::One> scripts, std::vector<std::pair<LLUUID, std::string>> prims,
+                                             const std::string& target)
+{
+    setStatus(getString("RecompilingMany"));
+    mRecompile.recompile(std::move(scripts), std::move(prims), target);
+}
+
+void ALFloaterScriptStudio::listScripts(const std::vector<std::pair<LLUUID, std::string>>& prims,
+                                        std::function<void(ALScriptRecompile::Window::Listed)> told)
+{
+    // By object: each object's prims asked what they hold, as a check asks,
+    // and the scripts of the prims chosen taken, each by its prim's name.
+    std::map<LLUUID, std::vector<std::pair<LLUUID, std::string>>> by_root;
+    for (const auto& prim : prims)
+    {
+        LLViewerObject* object = gObjectList.findObject(prim.first);
+        LLViewerObject* root   = object && object->getRootEdit() ? object->getRootEdit() : object;
+        by_root[root ? root->getID() : prim.first].push_back(prim);
+    }
+    auto out  = std::make_shared<ALScriptRecompile::Window::Listed>();
+    auto left = std::make_shared<size_t>(by_root.size());
+    for (const auto& [root, chosen] : by_root)
+    {
+        ALScriptWorkspace::instance().contentsIndex().ensureListed(root, [out, left, told, chosen](const ALScriptContentsIndex::Listed& listed) {
+            const ALScriptContentsIndex& index = ALScriptWorkspace::instance().contentsIndex();
+            for (const auto& [prim, name] : chosen)
+            {
+                const bool heard = listed.present && std::find(listed.prims.begin(), listed.prims.end(), prim) != listed.prims.end() &&
+                                   std::find(listed.unlisted.begin(), listed.unlisted.end(), prim) == listed.unlisted.end();
+                if (!heard)
+                {
+                    ++out->unlisted;
+                    continue;
+                }
+                for (const ALScriptWorkspace::Item& item : index.items(prim))
+                {
+                    if (item.script)
+                    {
+                        out->scripts.push_back({ ALScriptRef(prim, item.id), item.name, name, item.lua });
+                    }
+                }
+            }
+            if (--*left == 0)
+            {
+                told(std::move(*out));
+            }
+        });
+    }
+}
+
+bool ALFloaterScriptStudio::saving(const ALScriptRef& ref)
+{
+    return ALScriptWorkspace::instance().saving(ref);
+}
+
+std::optional<bool> ALFloaterScriptStudio::knownRunning(const ALScriptRef& ref)
+{
+    // Its tab's word, else the region's last answer.
+    if (const Doc* doc = findDoc(ref); doc && doc->running >= 0)
+    {
+        return doc->running != 0;
+    }
+    return ALScriptWorkspace::instance().contentsIndex().running(ref);
+}
+
+void ALFloaterScriptStudio::recompile(const ALScriptRef& ref, const std::string& target, std::optional<bool> running,
+                                      ALScriptWorkspace::compile_callback_t told)
+{
+    ALScriptWorkspace::instance().recompile(ref, target, std::move(told), running, ALScriptWorkspace::Sender(ALScriptWorkspace::Origin::Recompile));
+}
+
+void ALFloaterScriptStudio::scriptRecompiled(const ALScriptRecompile::Script& script)
+{
+    // A tab holding it shows what the compiler said; the rest are listed
+    // with the open scripts', and let go of once one compiles clean.
+    if (!script.open)
+    {
+        mProblemsPane->compiledScript(script.one.ref, script.one.name, script.one.lua, script.rows, script.one.object);
+    }
+}
+
+void ALFloaterScriptStudio::recompiled(const ALScriptRecompile::Done& done)
+{
+    const S32 total = done.compiled + done.failed + done.notSent + done.skipped;
+    if (total == 0 && done.unlisted == 0)
+    {
+        report(getString("RecompileNothing"));
+        return;
+    }
+    LLStringUtil::format_map_t args;
+    args["[TARGET]"] = getString(done.target == "mono"       ? "RecompiledForMono"
+                                 : done.target == "lsl2"     ? "RecompiledForLegacy"
+                                 : done.target == "lsl-luau" ? "RecompiledForLuau"
+                                                             : "RecompiledAsTheyAre");
+    std::string              said = counted("Recompiled", total, args);
+    std::vector<std::string> parts;
+    for (const auto& [count, word] : { std::pair{ done.compiled, "RecompiledCompiled" }, std::pair{ done.failed, "RecompiledFailed" },
+                                       std::pair{ done.notSent, "RecompiledNotSent" }, std::pair{ done.skipped, "RecompiledSkipped" } })
+    {
+        if (count > 0)
+        {
+            parts.push_back(counted(word, count));
+        }
+    }
+    for (size_t i = 0; i < parts.size(); ++i)
+    {
+        said += (i == 0 ? ": " : ", ") + parts[i];
+    }
+    said += ".";
+    if (done.unlisted > 0)
+    {
+        said += " " + counted("LookupUnlisted", done.unlisted);
+    }
+    report(said, done.failed > 0 || done.notSent > 0 || done.unlisted > 0);
+}
+
 std::string ALFloaterScriptStudio::objectName(const LLUUID& root) const
 {
     for (const ALScriptExplorerModel::Object& one : mExplorerPane->model().objects())

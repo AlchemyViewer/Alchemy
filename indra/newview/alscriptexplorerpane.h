@@ -25,6 +25,7 @@
 #pragma once
 
 #include "alscriptexplorermodel.h"
+#include "alscriptrecompile.h"
 #include "llui.h"
 #include "llhandle.h"
 #include "llpanel.h"
@@ -74,6 +75,11 @@ public:
         virtual bool unsavedAnywhere(const ALScriptRef& ref) const = 0;
         // Every script of an object checked, its problems listed.
         virtual void checkScripts(const LLUUID& root) = 0;
+        // The scripts, and every script of the prims -- each prim with its
+        // object's name -- recompiled for a target, each said in Output and
+        // a closed one's problems listed (ALScriptRecompile).
+        virtual void recompileScripts(std::vector<ALScriptRecompile::One> scripts, std::vector<std::pair<LLUUID, std::string>> prims,
+                                      const std::string& target) = 0;
 
     protected:
         ~Window() = default;
@@ -149,7 +155,9 @@ private:
     // The name a row was given where it stands, taken.
     void renamed(const Choice& row, const std::string& was, std::string name);
     void remove(const std::vector<Choice>& rows);
-    void recompile(const std::vector<Choice>& rows);
+    // The rows' scripts, and their prims', up again for a target: "auto"
+    // for each as it compiles now.
+    void recompile(const std::vector<Choice>& rows, const std::string& target);
     // Start, stop, reset or restart over the rows, asked about first where
     // it reaches more than one script.
     void run(const std::string& action, const std::vector<Choice>& rows);

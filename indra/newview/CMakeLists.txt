@@ -185,6 +185,7 @@ if(AL_BUILD_VIEWER)
     alpanelscriptkeymap.cpp
     alscriptlookup.cpp
     alscriptobjectcheck.cpp
+    alscriptrecompile.cpp
     alscriptnavigation.cpp
     alscriptmodules.cpp
     alscriptnoticebar.cpp
@@ -1020,6 +1021,7 @@ if(AL_BUILD_VIEWER)
     alpanelscriptkeymap.h
     alscriptlookup.h
     alscriptobjectcheck.h
+    alscriptrecompile.h
     alscriptnavigation.h
     alscriptmodules.h
     alscriptnoticebar.h
@@ -2748,6 +2750,23 @@ if(AL_BUILD_TESTS)
       alscriptnotecardtab.cpp
       alscriptsaveflow.cpp
       alscriptstudiochecking.cpp
+      alscriptstudiodoc.cpp
+      alscriptstudioplaces.cpp
+      alscriptstudiowords.cpp
+    DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
+  )
+
+  # A recompile from the Explorer, the window and the world faked: scripts
+  # and prims walked a few at a time, each said, a closed one's problems
+  # read back through its expansion.
+  al_add_test(
+    alscriptrecompile
+    UNIT
+    PROJECT ${test_project}
+    LIBRARIES llui alscript ${test_libs}
+    SOURCES
+      alscriptnotecardtab.cpp
+      alscriptsaveflow.cpp
       alscriptstudiodoc.cpp
       alscriptstudioplaces.cpp
       alscriptstudiowords.cpp
