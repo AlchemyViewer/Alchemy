@@ -4365,6 +4365,15 @@ ALPreprocessor::Result ALPreprocessor::run(std::string_view source, const Option
         asItIs(result.text, options.fileName, result.map);
         return result;
     }
+    if (!options.lua && !result.consts.empty())
+    {
+        // What `const` promised, held to over the whole of the text.
+        for (ALScriptProblem& p : ALLSLConsts::run(result.text, result.consts, options.optimizer.target).problems)
+        {
+            mapProblem(p, result.map);
+            result.problems.push_back(std::move(p));
+        }
+    }
     finish(result, options);
     return result;
 }

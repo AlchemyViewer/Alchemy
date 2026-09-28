@@ -535,6 +535,14 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="PreprocUnexpectedInExpression">unexpected '[1]' in preprocessor expression</string>
 	<string name="PreprocUnterminatedArguments">unterminated argument list invoking macro '[1]'</string>
 
+	<!-- What const promises, held to (allslconsts.cpp); [1], [2] are the names -->
+	<string name="ConstAssigned">[1] is const: its value is set where it is declared, and nowhere else</string>
+	<string name="ConstWithoutValue">the const [1] needs a value where it is declared</string>
+	<string name="ConstFunctionSets">the const function [1] sets [2]: what it gives back must come of its arguments alone</string>
+	<string name="ConstFunctionReads">the const function [1] reads [2], which the script changes</string>
+	<string name="ConstFunctionCalls">the const function [1] calls [2], which does more than work out a value</string>
+	<string name="ConstFunctionChangesState">the const function [1] changes state</string>
+
 	<!-- The optimizer's notes on what it did (allsloptimizer.cpp) -->
 	<string name="OptimizerDoRunsOnce">a do loop whose condition is always false runs once; kept its body</string>
 	<string name="OptimizerDroppedCast">dropped the cast in [1]</string>

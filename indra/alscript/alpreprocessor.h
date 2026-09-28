@@ -25,6 +25,7 @@
 
 #pragma once
 
+#include "allslconsts.h"
 #include "allsloptimizer.h"
 #include "alscriptenvelope.h"
 #include "alscriptproblem.h"
@@ -208,14 +209,9 @@ public:
         std::vector<std::string> inlined;
         // What the script declared `const`, the keyword taken off: each
         // name where its declaration names it in the text, and whether it
-        // is a function's (ALLSLConsts).
-        struct Const
-        {
-            std::string name;
-            S32         line     = 0;
-            S32         column   = 0;
-            bool        function = false;
-        };
+        // is a function's. What the word promises is checked in the run
+        // (ALLSLConsts), its errors among the problems.
+        using Const = ALLSLConsts::Declared;
         std::vector<Const> consts;
         // The optimizer ran and its text is what came out.
         bool optimized     = false;

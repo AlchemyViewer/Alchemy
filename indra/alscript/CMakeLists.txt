@@ -14,6 +14,7 @@ target_sources(
     alincludeidentity.cpp
     alincludesearch.cpp
     almodulelook.cpp
+    allslconsts.cpp
     allslcosts.cpp
     allsleffects.cpp
     allslinliner.cpp
@@ -50,6 +51,7 @@ target_sources(
         alincludeidentity.h
         alincludesearch.h
         almodulelook.h
+        allslconsts.h
         allslcosts.h
         allsleffects.h
         allslinliner.h
@@ -162,6 +164,13 @@ if(AL_BUILD_TESTS)
   # Tailslide, against what the optimizer takes them to cost.
   al_add_test(
     allslcosts
+    PROJECT alscript
+    LIBRARIES alscript llcommon
+    DEFINES ${definitions_defines}
+  )
+  # The const keyword over scripts parsed with the grid's builtins loaded.
+  al_add_test(
+    allslconsts
     PROJECT alscript
     LIBRARIES alscript llcommon
     DEFINES ${definitions_defines}
