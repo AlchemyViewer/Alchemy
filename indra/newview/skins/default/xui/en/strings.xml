@@ -566,6 +566,9 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="OptimizerRemovedLocal">removed the unused local [1]</string>
 	<string name="OptimizerRemovedNoEffect">removed [1], which does nothing</string>
 	<string name="OptimizerRemovedState">removed the state [1], which nothing enters</string>
+	<string name="OptimizerRemovedUncalled">removed the function [1], which nothing that runs calls</string>
+	<string name="OptimizerRemovedUnentered">removed the state [1], which nothing that runs enters</string>
+	<string name="OptimizerRemovedWriteOnly">removed [1], which is set and never read</string>
 	<string name="OptimizerRemovedUnreachable">removed [1], which can never run</string>
 	<string name="OptimizerRemovedWhile">removed a while loop whose condition is always false</string>
 	<string name="OptimizerRenamed">renamed the [1] [2] to [3]</string>

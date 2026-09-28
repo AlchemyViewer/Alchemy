@@ -269,7 +269,7 @@ namespace tut
     void allsloptimizer_object::test<7>()
     {
         set_test_name("llGetListLength becomes a comparison, and a list literal a sum, with parentheses where they matter, each where smaller");
-        const std::string source = wrap("list l;\n", "        integer n = llGetListLength(l) + 1;\n        if (llGetListLength(l)) l = [1, \"a\"];\n        l = [];\n        n = 0;\n");
+        const std::string source = wrap("list l;\n", "        integer n = llGetListLength(l) + 1;\n        if (llGetListLength(l)) l = [1, \"a\"];\n        l = [];\n        llOwnerSay((string)n);\n");
         // On LSO both are smaller.
         ALLSLOptimizer::Options lso = options();
         lso.target                  = ALLSLOptimizer::Target::LSO;
@@ -1604,6 +1604,50 @@ namespace tut
             ensure("a linked message's stays, passed on as it came", has("llMessageLinked(LINK_SET, 0, \"\", NULL_KEY)"));
             ensure("a string's stays", has("llOwnerSay(NULL_KEY)"));
             ensure("a function of the script's has its own", !has("say(\"\")"));
+            ALLSLService service;
+            for (const ALScriptProblem& p : service.check(r.text, target != ALLSLOptimizer::Target::LSO))
+            {
+                ensure("what was written compiles: " + p.message + "\n" + r.text, p.severity != ALScriptProblem::Severity::Error);
+            }
+        }
+    }
+
+    template<> template<>
+    void allsloptimizer_object::test<43>()
+    {
+        set_test_name("functions and states nothing that runs reaches go, cycles too; a variable set and never read goes, what it was set to still run");
+        const std::string source = "integer count;\ninteger shown;\nlist l;\n"
+                                   "ping()\n{\n    pong();\n}\npong()\n{\n    ping();\n}\n"
+                                   "leave()\n{\n    if (llFrand(1.0) > 0.5)\n        state away;\n}\n"
+                                   "show()\n{\n    llOwnerSay((string)shown);\n}\n"
+                                   "default\n{\n    state_entry()\n    {\n"
+                                   "        integer h = llListen(0, \"\", NULL_KEY, \"\");\n"
+                                   "        count++;\n        count += 2;\n        count = llGetUnixTime();\n"
+                                   "        integer i;\n        for (i = 0; llGetListLength(l) > 5; i++)\n            l = llDeleteSubList(l, 0, 0);\n"
+                                   "        shown = llGetUnixTime();\n        show();\n"
+                                   "        if (llGetObjectName() == \"on\")\n            count = 1;\n        else\n            llOwnerSay(\"off\");\n"
+                                   "        state on;\n    }\n}\n"
+                                   "state on\n{\n    touch_start(integer n)\n    {\n        llOwnerSay(\"on\");\n    }\n}\n"
+                                   "state away\n{\n    state_entry()\n    {\n        state back;\n    }\n}\n"
+                                   "state back\n{\n    state_entry()\n    {\n        state away;\n    }\n}\n";
+        for (const ALLSLOptimizer::Target target : { ALLSLOptimizer::Target::LSO, ALLSLOptimizer::Target::Mono, ALLSLOptimizer::Target::Luau })
+        {
+            ALLSLOptimizer::Options o = options();
+            o.target                  = target;
+            const ALLSLOptimizer::Result r = ALLSLOptimizer::run(source, o);
+            ensure("optimized: " + notes(r), r.optimized);
+            const auto has = [&r](const std::string& what) { return r.text.find(what) != std::string::npos; };
+            ensure("functions calling only each other: " + r.text, !has("ping") && !has("pong"));
+            ensure("one nothing calls, and the states only it and they enter", !has("leave") && !has("state away") && !has("state back"));
+            ensure("a state entered stays", has("state on"));
+            ensure("a listen's handle never read: the call stays: " + r.text, has("llListen(0, \"\", \"\", \"\");") && !has("integer h"));
+            ensure("a global only set, and a read of the clock that set it", !has("count") && !has("llGetUnixTime();\n        integer"));
+            ensure("a loop's counter never read: " + r.text, !has("i = 0") && !has("i++") && !has("integer i") && has("for (; ") && has(" > 5; )"));
+            ensure("a global read stays", has("shown = llGetUnixTime();"));
+            ensure("a branch left empty turned around, what it negates bracketed", has("if (!(llGetObjectName() == \"on\"))"));
+            ensure("said, as set and never read", std::any_of(r.problems.begin(), r.problems.end(), [](const ALScriptProblem& p) {
+                       return p.key == "OptimizerRemovedWriteOnly" && p.args.size() == 1 && p.args[0] == "count";
+                   }));
             ALLSLService service;
             for (const ALScriptProblem& p : service.check(r.text, target != ALLSLOptimizer::Target::LSO))
             {

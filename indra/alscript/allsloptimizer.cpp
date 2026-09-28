@@ -2269,9 +2269,19 @@ namespace
             }
             if (no && empty(yes) && cond->getIType() == LST_INTEGER)
             {
-                // if (c) ; else B is if (!c) B.
+                // if (c) ; else B is if (!c) B: !(c) where c is an
+                // operation, which the ! would take only the first operand
+                // of otherwise.
                 stmt->setCheckExpr(nullptr);
-                auto* negated = ctx.allocator->newTracked<LSLUnaryExpression>(cond, OP_BOOLEAN_NOT);
+                LSLExpression* operand = cond;
+                if (cond->getNodeSubType() == NODE_BINARY_EXPRESSION)
+                {
+                    auto* parens = ctx.allocator->newTracked<LSLParenthesisExpression>(cond);
+                    parens->setType(cond->getType());
+                    parens->setLoc(cond->getLoc());
+                    operand = parens;
+                }
+                auto* negated = ctx.allocator->newTracked<LSLUnaryExpression>(operand, OP_BOOLEAN_NOT);
                 negated->setType(TYPE(LST_INTEGER));
                 negated->setLoc(cond->getLoc());
                 stmt->setCheckExpr(negated);
@@ -3096,6 +3106,8 @@ namespace
             script->visit(this);
             globals(script);
             states(script);
+            unreached(script);
+            writeOnly(script);
             return changes;
         }
 
@@ -3914,6 +3926,225 @@ namespace
 
         boost::unordered_flat_map<LSLSymbol*, LSLGlobalFunction*> mFunctions;
         boost::unordered_flat_map<LSLASTNode*, boost::unordered_flat_map<std::string_view, int>> mNames;
+
+        // Every node of a subtree, the root first.
+        template <class F> static void each(LSLASTNode* root, const F& f)
+        {
+            std::vector<LSLASTNode*> stack{ root };
+            while (!stack.empty())
+            {
+                LSLASTNode* node = stack.back();
+                stack.pop_back();
+                if (!node)
+                {
+                    continue;
+                }
+                f(node);
+                for (LSLASTNode* child = node->getChild(0); child; child = child->getNext())
+                {
+                    stack.push_back(child);
+                }
+            }
+        }
+
+        // What can run: the default state's handlers, each function they
+        // call and each state they enter, and on through those. A function
+        // or a state nothing that runs reaches goes, though others that do
+        // not run reach it -- functions that call only each other.
+        void unreached(LSLScript* script)
+        {
+            boost::unordered_flat_map<LSLSymbol*, LSLASTNode*> states;
+            LSLASTNode*                                        start = nullptr;
+            for (LSLASTNode* state : *script->getStates())
+            {
+                if (LSLSymbol* sym = state->getSymbol())
+                {
+                    states[sym] = state;
+                    start       = !strcmp(sym->getName(), "default") ? state : start;
+                }
+            }
+            if (!start)
+            {
+                return;
+            }
+            boost::unordered_flat_set<LSLASTNode*> reached{ start };
+            std::vector<LSLASTNode*>               todo{ start };
+            const auto                             reach = [&](LSLASTNode* node) {
+                if (node && reached.insert(node).second)
+                {
+                    todo.push_back(node);
+                }
+            };
+            while (!todo.empty())
+            {
+                LSLASTNode* from = todo.back();
+                todo.pop_back();
+                each(from, [&](LSLASTNode* node) {
+                    if (node->getNodeType() == NODE_EXPRESSION && node->getNodeSubType() == NODE_FUNCTION_EXPRESSION)
+                    {
+                        LSLSymbol* sym   = static_cast<LSLFunctionExpression*>(node)->getSymbol();
+                        const auto found = sym ? mFunctions.find(sym) : mFunctions.end();
+                        reach(found == mFunctions.end() ? nullptr : found->second);
+                    }
+                    else if (node->getNodeType() == NODE_STATEMENT && node->getNodeSubType() == NODE_STATE_STATEMENT)
+                    {
+                        LSLIdentifier* id    = static_cast<LSLStateStatement*>(node)->getIdentifier();
+                        const auto     found = id && id->getSymbol() ? states.find(id->getSymbol()) : states.end();
+                        reach(found == states.end() ? nullptr : found->second);
+                    }
+                });
+            }
+            for (LSLASTNode* list : { static_cast<LSLASTNode*>(script->getGlobals()), static_cast<LSLASTNode*>(script->getStates()) })
+            {
+                std::vector<LSLASTNode*> going;
+                for (LSLASTNode* node = list->getChild(0); node; node = node->getNext())
+                {
+                    const bool function = node->getNodeType() == NODE_GLOBAL_FUNCTION;
+                    if ((function || node->getNodeType() == NODE_STATE) && node->getSymbol() && !reached.contains(node))
+                    {
+                        report.note(node->getLoc(), function ? "OptimizerRemovedUncalled" : "OptimizerRemovedUnentered",
+                                    function ? "removed the function [1], which nothing that runs calls" : "removed the state [1], which nothing that runs enters",
+                                    { node->getSymbol()->getName() });
+                        going.push_back(node);
+                    }
+                }
+                for (LSLASTNode* node : going)
+                {
+                    script->getSymbolTable()->remove(node->getSymbol());
+                    list->removeChild(node);
+                    ++changes;
+                }
+            }
+        }
+
+        // Whether an assignment's or an increment's value goes unread: it is
+        // a statement of its own, or a for's first part or step.
+        static bool unread(LSLASTNode* expr)
+        {
+            LSLASTNode* up = expr->getParent();
+            if (up && up->getNodeType() == NODE_STATEMENT && up->getNodeSubType() == NODE_EXPRESSION_STATEMENT)
+            {
+                return true;
+            }
+            LSLASTNode* loop = up ? up->getParent() : nullptr;
+            return up && up->getNodeType() == NODE_AST_NODE_LIST && loop && loop->getNodeType() == NODE_STATEMENT &&
+                   loop->getNodeSubType() == NODE_FOR_STATEMENT &&
+                   (up == static_cast<LSLForStatement*>(loop)->getInitExprs() || up == static_cast<LSLForStatement*>(loop)->getIncrExprs());
+        }
+
+        // A statement taken out: from its block or its for, or made nothing
+        // where it is the whole of an if's or a loop's body.
+        void takeOut(LSLASTNode* node)
+        {
+            LSLASTNode* up = node->getParent();
+            if (up && (up->getNodeSubType() == NODE_COMPOUND_STATEMENT || up->getNodeType() == NODE_AST_NODE_LIST))
+            {
+                up->removeChild(node);
+                return;
+            }
+            LSLASTNode::replaceNode(node, ctx.allocator->newTracked<LSLNopStatement>());
+        }
+
+        // A variable -- a local, a global -- set and never read goes, and
+        // each place it is set keeps what setting it ran: `x = f();` is
+        // `f();`, `x++;` nothing, and `integer h = llListen(...);` the
+        // call. Only where every place that names it but its declaration
+        // sets it, and nothing reads what was set.
+        void writeOnly(LSLScript* script)
+        {
+            struct Uses
+            {
+                LSLASTNode*              declaration = nullptr;
+                std::vector<LSLASTNode*> writes;
+                bool                     read = false;
+            };
+            boost::unordered_flat_map<LSLSymbol*, Uses> uses;
+            std::vector<LSLSymbol*>                     order;
+            const auto                                  of = [&](LSLSymbol* sym) -> Uses& {
+                auto [it, fresh] = uses.try_emplace(sym);
+                if (fresh)
+                {
+                    order.push_back(sym);
+                }
+                return it->second;
+            };
+            each(script, [&](LSLASTNode* node) {
+                if (node->getNodeType() == NODE_GLOBAL_VARIABLE && node->getSymbol())
+                {
+                    of(node->getSymbol()).declaration = node;
+                }
+                else if (node->getNodeType() == NODE_STATEMENT && node->getNodeSubType() == NODE_DECLARATION && node->getSymbol())
+                {
+                    of(node->getSymbol()).declaration = node;
+                }
+                else if (node->getNodeType() == NODE_EXPRESSION && node->getNodeSubType() == NODE_LVALUE_EXPRESSION)
+                {
+                    LSLSymbol* sym = node->getSymbol();
+                    if (!sym || (sym->getSubType() != SYM_LOCAL && sym->getSubType() != SYM_GLOBAL))
+                    {
+                        return;
+                    }
+                    LSLASTNode* parent = node->getParent();
+                    const bool  write  = parent && parent->getNodeType() == NODE_EXPRESSION &&
+                                        operation_mutates(static_cast<LSLExpression*>(parent)->getOperation()) && parent->getChild(0) == node;
+                    if (write && unread(parent))
+                    {
+                        of(sym).writes.push_back(parent);
+                    }
+                    else
+                    {
+                        of(sym).read = true;
+                    }
+                }
+            });
+            for (LSLSymbol* sym : order)
+            {
+                // A global never used at all goes with the unused (globals()),
+                // and a local set to nothing that changes anything goes with
+                // those (unusedLocal); one set to what does is this pass's.
+                Uses&      use    = uses[sym];
+                const bool global = use.declaration && use.declaration->getNodeType() == NODE_GLOBAL_VARIABLE;
+                if (use.read || !use.declaration || (global && use.writes.empty()))
+                {
+                    continue;
+                }
+                report.note(use.declaration->getLoc(), "OptimizerRemovedWriteOnly", "removed [1], which is set and never read", { sym->getName() });
+                for (LSLASTNode* write : use.writes)
+                {
+                    LSLASTNode* value  = write->getNodeSubType() == NODE_BINARY_EXPRESSION ? write->getChild(1) : nullptr;
+                    LSLASTNode* holder = write->getParent()->getNodeType() == NODE_AST_NODE_LIST ? write : write->getParent();
+                    if (value && !changesNothing(value))
+                    {
+                        // What it was set to, still worked out.
+                        LSLASTNode::replaceNode(write, write->takeChild(1));
+                    }
+                    else
+                    {
+                        takeOut(holder);
+                    }
+                }
+                if (global)
+                {
+                    script->getSymbolTable()->remove(sym);
+                    script->getGlobals()->removeChild(use.declaration);
+                }
+                else
+                {
+                    auto*       decl = static_cast<LSLDeclaration*>(use.declaration);
+                    LSLASTNode* init = decl->getInitializer();
+                    forget(decl, sym);
+                    if (init && !changesNothing(init))
+                    {
+                        LSLASTNode::replaceNode(decl, ctx.allocator->newTracked<LSLExpressionStatement>(static_cast<LSLExpression*>(decl->takeChild(1))));
+                    }
+                    else
+                    {
+                        takeOut(decl);
+                    }
+                }
+                ++changes;
+            }
+        }
 
         void states(LSLScript* script)
         {
