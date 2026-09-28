@@ -1364,4 +1364,52 @@ namespace tut
                                                 r.problems[0].severity == ALScriptProblem::Severity::Warning);
         ensure_equals("its map the source's own", r.map.toSource(4, 8).line, 4);
     }
+
+    template<> template<>
+    void allsloptimizer_object::test<38>()
+    {
+        set_test_name("a global's value is written where it is read only where that costs less than the global, on each target");
+        const auto reads = [](const std::string& global, const std::string& read, int times) {
+            std::string body;
+            for (int i = 0; i < times; ++i)
+            {
+                body += "        " + read + "\n";
+            }
+            return wrap(global + "\n", "        vector v; float f; string s;\n" + body + "        llOwnerSay((string)[v, f, s]);\n");
+        };
+        const auto kept = [](const ALLSLOptimizer::Result& r, const std::string& global) { return r.text.find(global) != std::string::npos; };
+        ALLSLOptimizer::Options lso  = options();
+        lso.target                   = ALLSLOptimizer::Target::LSO;
+        ALLSLOptimizer::Options mono = options();
+        ALLSLOptimizer::Options luau = options();
+        luau.target                  = ALLSLOptimizer::Target::Luau;
+
+        // A vector: once is less than the global everywhere; three times
+        // is not on LSO, nor on Mono unless its parts are whole.
+        const std::string V = "vector V = <1.5, 2.5, 3.5>;";
+        const std::string W = "vector W = <1.0, 2.0, 3.0>;";
+        ensure("a vector read once goes on LSO", !kept(ALLSLOptimizer::run(reads(V, "v += V;", 1), lso), "vector V"));
+        ensure("read three times it stays on LSO", kept(ALLSLOptimizer::run(reads(V, "v += V;", 3), lso), "vector V"));
+        ensure("and on Mono", kept(ALLSLOptimizer::run(reads(V, "v += V;", 3), mono), "vector V"));
+        ensure("but not whole on Mono", !kept(ALLSLOptimizer::run(reads(W, "v += W;", 3), mono), "vector W"));
+        ensure("and not on Luau, which keeps a constant once", !kept(ALLSLOptimizer::run(reads(V, "v += V;", 3), luau), "vector V"));
+
+        // A float goes on LSO and Luau however often; on Mono, up to where
+        // nine bytes a read come to the field.
+        const std::string F = "float F = 2.5;";
+        ensure("a float read twenty times goes on LSO", !kept(ALLSLOptimizer::run(reads(F, "f += F;", 20), lso), "float F"));
+        ensure("and on Luau", !kept(ALLSLOptimizer::run(reads(F, "f += F;", 20), luau), "float F"));
+        ensure("but stays on Mono", kept(ALLSLOptimizer::run(reads(F, "f += F;", 20), mono), "float F"));
+        ensure("which takes it read three times", !kept(ALLSLOptimizer::run(reads(F, "f += F;", 3), mono), "float F"));
+
+        // A string: Mono holds it once whatever; LSO writes it at each
+        // place, which a long one read often does not pay for.
+        const std::string S = "string S = \"a sentence long enough to matter\";";
+        ensure("a long string read five times stays on LSO", kept(ALLSLOptimizer::run(reads(S, "s += S;", 5), lso), "string S"));
+        ensure("and goes on Mono", !kept(ALLSLOptimizer::run(reads(S, "s += S;", 5), mono), "string S"));
+
+        // Folded into a larger value, a global is no read of it.
+        const ALLSLOptimizer::Result folded = ALLSLOptimizer::run(reads(V, "v += V * 2;", 3), lso);
+        ensure("a product folds: " + folded.text, !kept(folded, "vector V") && folded.text.find("<3.0, 5.0, 7.0>") != std::string::npos);
+    }
 } // namespace tut

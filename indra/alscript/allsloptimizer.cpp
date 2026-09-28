@@ -2083,7 +2083,7 @@ namespace
                 return false;
             }
             LSLConstant* cv = lvalue->getConstantValue();
-            if (cv && inlineable(cv))
+            if (cv && inlineable(cv) && writeOut(sym, cv))
             {
                 fold(lvalue, cv, "OptimizerInlinedConstant", "inlined");
             }
@@ -2091,6 +2091,51 @@ namespace
         }
 
     private:
+        // A global's value goes where it is read only where writing it at
+        // every place it is read costs less than the global does: a vector
+        // read ten times is ten vectors. What goes where is the target's
+        // (ALLSLCosts). A value a larger expression folds into is not a
+        // read of it, and folds whatever this says.
+        bool writeOut(LSLSymbol* sym, LSLConstant* cv) const
+        {
+            if (sym->getSubType() != SYM_GLOBAL)
+            {
+                return true;
+            }
+            const ALLSLCosts& costs = ALLSLCosts::of(ctx.target);
+            const auto        whole = [](std::initializer_list<double> parts) {
+                return std::all_of(parts.begin(), parts.end(), [](double v) { return integral(v); });
+            };
+            ALLSLCosts::Held held;
+            switch (cv->getIType())
+            {
+                case LST_INTEGER:
+                    held = costs.integer;
+                    break;
+                case LST_FLOATINGPOINT:
+                    held = whole({ static_cast<LSLFloatConstant*>(cv)->getValue() }) ? costs.wholeFloating : costs.floating;
+                    break;
+                case LST_VECTOR:
+                {
+                    const Vector3* v = static_cast<LSLVectorConstant*>(cv)->getValue();
+                    held             = whole({ v->x, v->y, v->z }) ? costs.wholeVector : costs.vector;
+                    break;
+                }
+                case LST_QUATERNION:
+                {
+                    const Quaternion* q = static_cast<LSLQuaternionConstant*>(cv)->getValue();
+                    held                = whole({ q->x, q->y, q->z, q->s }) ? costs.wholeRotation : costs.rotation;
+                    break;
+                }
+                case LST_STRING:
+                    held = costs.stringOf(static_cast<S32>(strlen(static_cast<LSLStringConstant*>(cv)->getValue())));
+                    break;
+                default:
+                    return true;
+            }
+            return held.writeOut(sym->getReferences() - 1 - sym->getAssignments());
+        }
+
         // Tailslide's rules: a key's key-ness must not be lost to a list,
         // a print, a condition or a boolean.
         static bool keyMayInline(LSLLValueExpression* lvalue)
