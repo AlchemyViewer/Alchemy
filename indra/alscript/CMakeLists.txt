@@ -37,6 +37,7 @@ target_sources(
     alscriptrecovery.cpp
     alscriptweight.cpp
     alscriptstack.cpp
+    alscripttempfiles.cpp
     alscripttextcache.cpp
     alselenefilters.cpp
     alsourcemap.cpp
@@ -79,6 +80,7 @@ target_sources(
         alscriptproblem.h
         alscriptstack.h
         alscriptsymbol.h
+        alscripttempfiles.h
         alscripttextcache.h
         alscriptweight.h
         alselenefilters.h
@@ -154,6 +156,7 @@ if(AL_BUILD_TESTS)
   al_add_test(alscriptformatter PROJECT alscript LIBRARIES alscript llcommon)
   al_add_test(alscriptmessages PROJECT alscript LIBRARIES alscript llcommon)
   al_add_test(alscriptrecovery PROJECT alscript LIBRARIES alscript llcommon)
+  al_add_test(alscripttempfiles PROJECT alscript LIBRARIES alscript llcommon)
   # What LSL may change and the order it runs in, over scripts parsed with
   # the grid's builtins loaded.
   al_add_test(

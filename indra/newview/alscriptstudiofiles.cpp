@@ -92,7 +92,7 @@ void ALScriptStudioFiles::watch(Doc& doc)
                 changedOutside(id, file);
             }
         },
-        false);
+        nullptr);
 }
 
 void ALScriptStudioFiles::changedOutside(const std::string& id, const std::string& file)

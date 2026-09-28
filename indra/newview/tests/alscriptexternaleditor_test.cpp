@@ -35,6 +35,7 @@
 
 #include <filesystem>
 #include <fstream>
+#include <optional>
 
 // The log's first line says when; the chat log's clock is the viewer's.
 std::string LLLogChat::timestamp2LogString(U32, bool)
@@ -74,11 +75,16 @@ namespace
         {
             started.push_back(file + (on_disk ? " on disk" : ""));
         }
+        std::shared_ptr<ALScriptTempFiles::Claim> holdCopy(const std::string& path) override { return copies->claim(path); }
 
         // A name of its own each run: the copies go in the temp folder.
         std::string bridge      = LLUUID::generateNewID().asString();
         bool        bridgeThere = false;
         Names       watched, taken, saved, subscribed, unsubscribed, started;
+        // Held as the workspace holds them, the lists in a folder of the
+        // run's own.
+        std::string                        lists  = (std::filesystem::temp_directory_path() / ("alscriptexternaleditor_" + bridge)).string();
+        std::optional<ALScriptTempFiles>   copies = std::make_optional<ALScriptTempFiles>(lists, "test");
     };
 }
 
@@ -101,6 +107,9 @@ namespace tut
                     unit->stop(*doc);
                 }
             }
+            studio.copies.reset();
+            std::error_code ec;
+            std::filesystem::remove_all(studio.lists, ec);
         }
 
         ALScriptExternalEditor& make()
@@ -172,7 +181,7 @@ namespace tut
         const std::string file = unit.fileName(a);
         ensure_equals("the copy", contents(file), std::string("default {}"));
         ensure("watched", a.external.watch && a.external.watch->path() == file);
-        ensure_equals("the log beside it", a.external.log, file + ".log");
+        ensure("the log beside it", a.external.log && a.external.log->path() == file + ".log");
         ensure("the bridge told", studio.subscribed == Names{ "a" } && a.external.subscribed);
         ensure("the editor started on it", studio.started == Names{ file });
         ensure_equals("what it holds, known", a.external.written, std::string("default {}"));
@@ -185,7 +194,7 @@ namespace tut
         d.file = "/somewhere/d.lsl";
         unit.edit(d);
         ensure("a file on disk watched where it is", studio.watched == Names{ "d" } && studio.started.back() == "/somewhere/d.lsl on disk");
-        ensure("with no log, and nothing for the bridge", d.external.log.empty() && studio.subscribed.size() == 2);
+        ensure("with no log, and nothing for the bridge", !d.external.log && studio.subscribed.size() == 2);
 
         Doc& n    = tab("n", "x");
         n.notecard = true;
@@ -280,14 +289,14 @@ namespace tut
         ALScriptWorkspace::CompileResult result;
         result.messages = { "(1, 2) : ERROR : Syntax error\x07" };
         unit.log(a, result);
-        const std::string log = contents(a.external.log);
+        const std::string log = contents(a.external.log->path());
         ensure("the log: when, then the words, what cannot be printed dropped",
                log.find("// [when]") == 0 && log.find("Syntax error\n") != std::string::npos && log.find('\x07') == std::string::npos);
         Doc& d = tab("d", "x");
         d.file = "/somewhere/d.lsl";
         unit.log(d, result);
         unit.sync(d);
-        ensure("a tab not held outside: nothing", d.external.log.empty() && !d.external.watch);
+        ensure("a tab not held outside: nothing", !d.external.log && !d.external.watch);
     }
 
     template<> template<>
@@ -301,13 +310,13 @@ namespace tut
         ALScriptWorkspace::CompileResult result;
         unit.log(a, result);
         const std::string file = unit.fileName(a);
-        const std::string log  = a.external.log;
+        const std::string log  = a.external.log->path();
         ensure("both there", exists(file) && exists(log));
         a.save.fromExternal(1);
         unit.stop(a);
         ensure("the bridge told", studio.unsubscribed == Names{ "a" } && !a.external.subscribed);
         ensure("the watch gone, and the studio's copy with it", !a.external.watch && !exists(file));
-        ensure("the log gone", !exists(log) && a.external.log.empty());
+        ensure("the log gone", !exists(log) && !a.external.log);
         ensure("a save under way is no longer the editor's", !a.save.external());
     }
 }

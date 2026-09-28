@@ -63,6 +63,10 @@ public:
         virtual std::string bridgeId(const Doc& doc) const = 0;
         virtual bool        subscribe(Doc& doc)            = 0;
         virtual void        unsubscribe(const Doc& doc)    = 0;
+        // A copy in the temp folder, or its log, held while the result
+        // is: the old script window may hold the same copy, and it goes
+        // with whichever lets go last (ALScriptTempFiles).
+        virtual std::shared_ptr<ALScriptTempFiles::Claim> holdCopy(const std::string& path) = 0;
         // The editor outside started on the file at the caret's line: VS
         // Code where the bridge is set to it and the file is the studio's
         // copy, else the command the settings give; what went wrong said.
@@ -92,10 +96,9 @@ public:
     void log(Doc& doc, const ALScriptWorkspace::CompileResult& result);
     // The tab let go of: the bridge told, the watch and the log gone.
     void stop(Doc& doc);
-    // The copy's path: as the old editor named it, so that the bridge's
-    // script.list and whoever reads the temp folder find the same file --
-    // the tab's name without what a file system refuses, the bridge's id,
-    // and the language's extension.
+    // The copy's path, as the old editor names it (ALScriptTempFiles::
+    // nameFor), so that the bridge's script.list and whoever reads the
+    // temp folder find the same file.
     std::string fileName(const Doc& doc) const;
 
 private:

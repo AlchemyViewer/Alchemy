@@ -34,9 +34,6 @@
 #include "lllogchat.h"
 #include "lltrans.h"
 
-#include <algorithm>
-#include <set>
-
 using ALScriptFileIO::readWholeFile;
 using ALScriptFileIO::StudioLiveFile;
 
@@ -56,16 +53,7 @@ ALScriptExternalEditor::ALScriptExternalEditor(ALScriptStudioServices& services,
 
 std::string ALScriptExternalEditor::fileName(const Doc& doc) const
 {
-    // As the old editor named it, so that the bridge's script.list and
-    // whoever reads the temp folder find the same file: the name
-    // without what a file system refuses, the subscription id, and the
-    // language's extension.
-    static const std::set<char> forbidden{ '<', '>', ':', '"', '\\', '/', '|', '?', '*' };
-    std::string                 name = doc.name;
-    name.erase(std::remove_if(name.begin(), name.end(), [](char c) { return forbidden.count(c) > 0; }), name.end());
-    const std::string hash      = mWindow.bridgeId(doc);
-    const std::string extension = doc.language.lua ? ".luau" : ".lsl";
-    return std::string(LLFile::tmpdir()) + "sl_script_" + (name.empty() ? std::string() : name + "_") + hash + extension;
+    return ALScriptTempFiles::nameFor(LLFile::tmpdir(), doc.name, mWindow.bridgeId(doc), doc.language.lua);
 }
 
 void ALScriptExternalEditor::edit(Doc& doc)
@@ -111,13 +99,20 @@ void ALScriptExternalEditor::edit(Doc& doc)
                     changed(id, file);
                 }
             },
-            true);
+            mWindow.holdCopy(filename));
     }
     else
     {
         external.watch->seen();
     }
-    external.log = on_disk ? std::string() : filename + ".log";
+    if (on_disk)
+    {
+        external.log.reset();
+    }
+    else if (!external.log || external.log->path() != filename + ".log")
+    {
+        external.log = mWindow.holdCopy(filename + ".log");
+    }
 
     // The bridge, so that VS Code can subscribe to the script and hear
     // what the compiler says of it; a file on disk is nothing to it.
@@ -237,7 +232,7 @@ void ALScriptExternalEditor::sync(Doc& doc)
 
 void ALScriptExternalEditor::log(Doc& doc, const ALScriptWorkspace::CompileResult& result)
 {
-    if (doc.external.log.empty())
+    if (!doc.external.log)
     {
         return;
     }
@@ -254,7 +249,7 @@ void ALScriptExternalEditor::log(Doc& doc, const ALScriptWorkspace::CompileResul
         LLStringUtil::stripNonprintable(line);
         text += line + "\n";
     }
-    ALFileWrite::temp(doc.external.log, text);
+    ALFileWrite::temp(doc.external.log->path(), text);
 }
 
 void ALScriptExternalEditor::stop(Doc& doc)
@@ -265,10 +260,6 @@ void ALScriptExternalEditor::stop(Doc& doc)
         doc.external.subscribed = false;
     }
     doc.external.watch.reset();
-    if (!doc.external.log.empty())
-    {
-        LLFile::remove(doc.external.log);
-        doc.external.log.clear();
-    }
+    doc.external.log.reset();
     doc.save.endExternal();
 }

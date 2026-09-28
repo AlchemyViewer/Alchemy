@@ -24,9 +24,11 @@
 
 #pragma once
 
+#include "alscripttempfiles.h"
 #include "alwatchedfile.h"
 #include "llfile.h"
 
+#include <memory>
 #include <string>
 #include <string_view>
 
@@ -39,31 +41,25 @@ namespace ALScriptFileIO
     bool fileTooLarge(const std::string& path);
     bool readWholeFile(const std::string& path, std::string& text);
 
-    // The temp file an external editor is given, watched for its saves;
-    // gone from disk with it. What is written here is marked seen as it
-    // is written (ALWatchedFile::seen), and so is no save of the editor's.
+    // The temp file an external editor is given, watched for its saves,
+    // and held while it is watched: gone from disk once nobody holds it
+    // (ALScriptTempFiles). What is written here is marked seen as it is
+    // written (ALWatchedFile::seen), and so is no save of the editor's.
     class StudioLiveFile final : public ALWatchedFile
     {
     public:
-        // A temp file of the studio's own goes with the watch; a file
-        // the author keeps on disk stays.
-        StudioLiveFile(const std::string& path, changed_t changed, bool ours)
+        // A copy in the temp folder is held with the watch; a file the
+        // author keeps on disk, held by nobody, stays.
+        StudioLiveFile(const std::string& path, changed_t changed, std::shared_ptr<ALScriptTempFiles::Claim> held)
         :   ALWatchedFile(path, std::move(changed)),
-            mOurs(ours)
+            mHeld(std::move(held))
         {
             // Twice a second: a save is heard within a second of it, once
             // it has held still from one look to the next.
             poll(0.5f);
         }
-        ~StudioLiveFile() override
-        {
-            if (mOurs)
-            {
-                LLFile::remove(path());
-            }
-        }
 
     private:
-        bool mOurs;
+        std::shared_ptr<ALScriptTempFiles::Claim> mHeld;
     };
 }

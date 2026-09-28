@@ -46,6 +46,7 @@
 #include <vector>
 
 class ALScriptContentsIndex;
+class ALScriptTempFiles;
 class LLChat;
 class LLEventTimer;
 class LLInventoryItem;
@@ -431,6 +432,11 @@ public:
     // whether its scripts run: the one index the studio's windows, lookups
     // and searches read (alscriptcontentsindex.h).
     ALScriptContentsIndex& contentsIndex() { return *mContentsIndex; }
+    // The copies of scripts written to the temp folder for an editor
+    // outside, whichever window writes one (alscripttempfiles.h): named
+    // alike, held rather than owned, and what a session that crashed left
+    // swept at login.
+    ALScriptTempFiles& tempFiles();
 
     // --- changing what an object holds ---------------------------------------------
 
@@ -539,6 +545,7 @@ private:
     // The saves on their way, by request, until each is answered.
     boost::unordered_flat_map<U64, ALScriptRef> mUnderway;
     std::unique_ptr<ALScriptContentsIndex> mContentsIndex;
+    std::unique_ptr<ALScriptTempFiles>     mTempFiles;
     // What leaves the object list let go of by the index.
     boost::signals2::scoped_connection     mPresenceConnection;
     // Shared, so that the timer answering one the object never did can

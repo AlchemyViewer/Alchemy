@@ -26,6 +26,7 @@
 
 #pragma once
 
+#include "alscripttempfiles.h"
 #include "alscriptworkspace.h"
 #include "llpreview.h"
 #include "lltabcontainer.h"
@@ -73,6 +74,9 @@ protected:
 
     change_callback_t   mOnChangeCallback;
     bool                mIgnoreNextUpdate;
+    // The copy held while it is watched: Script Studio may hold the same
+    // one, and it goes with whichever lets go last.
+    std::shared_ptr<ALScriptTempFiles::Claim> mHeld;
 };
 
 // Inner, implementation class.  LLPreviewScript and LLLiveLSLEditor each own one of these.

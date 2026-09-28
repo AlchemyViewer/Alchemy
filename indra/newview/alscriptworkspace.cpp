@@ -31,6 +31,7 @@
 #include "alscriptcontentsindex.h"
 #include "alscriptenvelope.h"
 #include "alscriptpreprocessor.h"
+#include "alscripttempfiles.h"
 #include "llagent.h"
 #include "llappviewer.h"
 #include "llassetstorage.h"
@@ -1293,6 +1294,19 @@ void ALScriptWorkspace::transferEnd(const std::shared_ptr<Transfer>& one)
     {
         startTransfer(mTransfers.front());
     }
+}
+
+ALScriptTempFiles& ALScriptWorkspace::tempFiles()
+{
+    if (!mTempFiles)
+    {
+        // The lists in the settings folder, which is this computer
+        // account's: every session of the viewer on it sweeps what another
+        // left.
+        mTempFiles = std::make_unique<ALScriptTempFiles>(gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, "script_temp_files"),
+                                                         LLUUID::generateNewID().asString());
+    }
+    return *mTempFiles;
 }
 
 ALScriptWorkspace::~ALScriptWorkspace()

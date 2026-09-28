@@ -554,6 +554,7 @@ private:
     void        logExternal(Doc& doc, const ALScriptWorkspace::CompileResult& result) override { mExternal.log(doc, result); }
     void        save(Doc& doc) override;
     std::string bridgeId(const Doc& doc) const override;
+    std::shared_ptr<ALScriptTempFiles::Claim> holdCopy(const std::string& path) override;
     bool        subscribe(Doc& doc) override;
     void        unsubscribe(const Doc& doc) override;
     void        startEditor(Doc& doc, const std::string& file, bool on_disk) override;

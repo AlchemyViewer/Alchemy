@@ -3695,6 +3695,11 @@ std::string ALFloaterScriptStudio::bridgeId(const Doc& doc) const
     return LLScriptEditorWSServer::buildScriptSubscriptionId(doc.ref.object, doc.ref.item);
 }
 
+std::shared_ptr<ALScriptTempFiles::Claim> ALFloaterScriptStudio::holdCopy(const std::string& path)
+{
+    return ALScriptWorkspace::instance().tempFiles().claim(path);
+}
+
 bool ALFloaterScriptStudio::subscribe(Doc& doc)
 {
     LLScriptEditorWSServer::ptr_t server = LLScriptEditorWSServer::isEnabled() ? LLScriptEditorWSServer::ensureServerRunning() : nullptr;

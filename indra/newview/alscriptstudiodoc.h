@@ -34,6 +34,7 @@
 #include "alscriptrecovery.h"
 #include "alscriptsaveflow.h"
 #include "alscriptsymbol.h"
+#include "alscripttempfiles.h"
 #include "alscriptweight.h"
 #include "alscriptworkspace.h"
 #include "alsourcemap.h"
@@ -649,9 +650,9 @@ struct ALScriptStudioDoc
         // The file under the temp folder the editor was given, watched
         // for the editor's saves -- or the tab's file on disk, watched
         // for changes made to it outside; and the log beside the copy the
-        // compiler's words go to.
-        std::unique_ptr<ALWatchedFile> watch;
-        std::string                    log;
+        // compiler's words go to, held while the tab has it.
+        std::unique_ptr<ALWatchedFile>            watch;
+        std::shared_ptr<ALScriptTempFiles::Claim> log;
         // Whether the bridge was told, so that VS Code can subscribe.
         bool                           subscribed = false;
         // What the copy held when the studio last wrote it or read it: a
