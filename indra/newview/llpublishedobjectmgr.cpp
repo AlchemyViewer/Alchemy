@@ -31,6 +31,7 @@
 
 #include "llchat.h"
 #include "llinventorydefines.h"
+#include "llsdutil.h"
 #include "llselectmgr.h"
 #include "llviewerinventory.h"
 #include "llviewerobject.h"
@@ -685,9 +686,25 @@ LLPublishedObjectMgr::reconcileInventoryChanged(
         return result;
     }
 
+    LLSD inv = buildPrimInventoryLLSD(prim);
+    // What was sent already is not sent again: the prim answers whoever
+    // asks it, and every answer comes here.
+    for (auto& p : pub_info->mPrims)
+    {
+        if (p.mPrimID != prim_id)
+        {
+            continue;
+        }
+        if (p.mSentInventory.isDefined() && llsd_equals(p.mSentInventory, inv))
+        {
+            result.mKind = InventoryChangeKind::UNCHANGED;
+            return result;
+        }
+        p.mSentInventory = inv;
+        break;
+    }
     result.mUpdate = LLSD();
     result.mUpdate["object_id"] = object_id;
-    LLSD inv = buildPrimInventoryLLSD(prim);
     if (prim_id == object_id)
     {
         result.mUpdate["inventory"] = inv;
@@ -1051,6 +1068,17 @@ void LLPublishedObjectMgr::buildAndSendPublish(const LLUUID& object_id)
         info.mSourceTaskID.setNull();
     }
 
+    // Each prim's inventory as the publish sends it, for what changes later
+    // to be told from what does not.
+    std::map<LLUUID, LLSD> sent_inventories;
+    sent_inventories[root->getID()] = pub.get("inventory");
+    if (pub.has("linked_objects"))
+    {
+        for (const LLSD& link : llsd::inArray(pub.get("linked_objects")))
+        {
+            sent_inventories[link.get("link_id").asUUID()] = link.get("inventory");
+        }
+    }
     S32 link_num = 1;
     std::vector<LLViewerObject*> prims = linksetOf(root);
     for (LLViewerObject* prim : prims)
@@ -1060,6 +1088,10 @@ void LLPublishedObjectMgr::buildAndSendPublish(const LLUUID& object_id)
         prim_info.mPrimName        = LLScriptEditorWSServer::getPrimName(prim);  // Use helper with selection fallback
         prim_info.mLinkNumber      = link_num++;
         prim_info.mInventorySerial = static_cast<S16>(prim->getInventorySerial());
+        if (const auto sent = sent_inventories.find(prim_info.mPrimID); sent != sent_inventories.end())
+        {
+            prim_info.mSentInventory = sent->second;
+        }
         info.mPrims.push_back(prim_info);
     }
 

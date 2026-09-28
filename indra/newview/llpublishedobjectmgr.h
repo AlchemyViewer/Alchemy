@@ -54,6 +54,10 @@ public:
         S32         mLinkNumber;
         std::string mPrimDescription;
         S16         mInventorySerial;
+        // Its inventory as last sent, undefined until it was: an answer
+        // that says the same -- anyone asking the prim gets one -- is not
+        // sent again.
+        LLSD        mSentInventory;
     };
 
     struct PublishedObjectInfo
@@ -98,6 +102,7 @@ public:
     enum class InventoryChangeKind
     {
         NOT_PUBLISHED,
+        UNCHANGED,
         CHILD_READY_WAIT,
         CHILD_READY_FLUSH_NOW,
         ROOT_INVENTORY_UPDATE,
