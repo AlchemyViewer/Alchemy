@@ -187,13 +187,15 @@ public:
     void                    share(std::shared_ptr<Shared> shared);
 
     // A vimrc read into the shared state, a line at a time, what it made
-    // before taken away first: the :map family and :let mapleader and
-    // maplocalleader; :set of the options the mode keeps, and of each
-    // editor's own, into viewOptions; the rest of :set's options offered
-    // to `host`, true where it took one; comments, blank lines, lines that
-    // go on with a backslash, and silent! before a line to say nothing of
-    // it. Nothing else runs: a vimrc sets things up and does not edit.
-    // What was not understood, a line each with its number, in `errors`.
+    // before taken away first -- the mode's options vim's own again, but
+    // clipboard, which is the host's; the lines typed kept: the :map
+    // family and :let mapleader and maplocalleader; :set of the options
+    // the mode keeps, and of each editor's own, into viewOptions; the
+    // rest of :set's options offered to `host`, true where it took one;
+    // comments, blank lines, lines that go on with a backslash, and
+    // silent! before a line to say nothing of it. Nothing else runs: a
+    // vimrc sets things up and does not edit. What was not understood, a
+    // line each with its number, in `errors`.
     static void source(Shared& shared, std::string_view text, const std::function<bool(const std::string& option)>& host,
                        std::vector<std::string>& errors);
     // One of :set's options that are each view's own set on a view --

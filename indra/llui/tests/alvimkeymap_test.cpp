@@ -2129,6 +2129,7 @@ namespace tut
         std::string listing;
         std::string error;
         shared.mappings.command("nnoremap", "Q gq", false, listing, error);
+        shared.command.push_back("s/a/b/");
         errors.clear();
         ALVimKeymap::source(shared, "nnoremap Z zz\n", host, errors);
         ensure("read again, what it made before is gone", maps.match(ALVimMappings::INSERT, maps.keysOf("jk"), true).full == nullptr &&
@@ -2136,6 +2137,10 @@ namespace tut
         ensure("and the leader vim's", maps.leader() == "\\");
         ensure("one typed kept", maps.match(ALVimMappings::NORMAL, maps.keysOf("Q"), true).full != nullptr);
         ensure("and the view's options it no longer sets", shared.viewOptions.empty());
+        const ALVimKeymap::Shared vims;
+        ensure("nor the mode's: those are vim's own again", shared.ignoreCase == vims.ignoreCase && shared.smartCase == vims.smartCase &&
+                                                              shared.timeout == vims.timeout && shared.timeoutLength == vims.timeoutLength);
+        ensure("the lines typed kept", shared.command == std::vector<std::string>{ "s/a/b/" });
     }
 
     template<> template<>

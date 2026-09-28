@@ -5631,6 +5631,16 @@ void ALVimKeymap::source(Shared& shared, std::string_view text, const std::funct
 {
     shared.mappings.forgetVimrc();
     shared.viewOptions.clear();
+    // The options as vim has them before any vimrc: one a line took out
+    // of it no longer sets does not stay set. The lines typed are kept,
+    // and so is clipboard, which the host has from a setting of its own.
+    const Shared vims;
+    shared.ignoreCase        = vims.ignoreCase;
+    shared.smartCase         = vims.smartCase;
+    shared.highlightSearch   = vims.highlightSearch;
+    shared.incrementalSearch = vims.incrementalSearch;
+    shared.timeout           = vims.timeout;
+    shared.timeoutLength     = vims.timeoutLength;
     // Its lines, with their numbers; one that starts with a backslash
     // goes on the end of the one before it.
     std::vector<std::pair<S32, std::string>> lines;

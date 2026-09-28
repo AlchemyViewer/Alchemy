@@ -821,6 +821,8 @@ bool ALFloaterScriptStudio::postBuild()
     mVimrcConnection = ALScriptStudioVimrc::instance().onChanged([this]() {
         if (mVim.sourced())
         {
+            // A clipboard line taken out of it leaves the setting's.
+            mVim.shared().unnamedClipboard = gSavedSettings.getBOOL("ALScriptStudioVimClipboard");
             mVim.source();
         }
     });
