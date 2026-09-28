@@ -38,6 +38,8 @@
 #include "llpanel.h"
 #include "lluicolortable.h"
 
+#include <boost/unordered/unordered_flat_set.hpp>
+
 #include <algorithm>
 #include <ctime>
 
@@ -255,8 +257,9 @@ ALScriptOutputPane::Place ALScriptOutputPane::heard(const ALScriptWorkspace::Run
     }
     mView->append(std::move(entry));
 
-    // An error the Output tab is not showing, said on its title.
-    if (event.isError)
+    // An error the Output tab is not showing, said on its title -- where
+    // the filters let it through: a stranger's, filtered out, is not news.
+    if (event.isError && mView->shows(mView->entries().back()))
     {
         markUnread();
     }
@@ -275,8 +278,6 @@ void ALScriptOutputPane::said(const std::string& text, bool failure, const ALScr
     if (failure)
     {
         entry.color = alarm.get();
-        // Said while the Output tab is not in sight: its title says so.
-        markUnread();
     }
     // The script's name where the words say it, a link to its tab.
     const size_t at = doc && !doc->name.empty() ? text.find(doc->name) : std::string::npos;
@@ -326,6 +327,12 @@ void ALScriptOutputPane::said(const std::string& text, bool failure, const ALScr
         entry.links.push_back(std::move(link));
     }
     mView->append(std::move(entry));
+    // A failure said while the Output tab is not in sight, and the filters
+    // let it through: its title says so.
+    if (failure && mView->shows(mView->entries().back()))
+    {
+        markUnread();
+    }
 }
 
 void ALScriptOutputPane::markUnread()
@@ -441,7 +448,21 @@ void ALScriptOutputPane::filter()
         mView->setFilter(nullptr);
         return;
     }
-    mView->setFilter([this, whose, kind, words](const ALOutputView::Entry& entry) {
+    // The prims the scripts open here are in: what a script says with no
+    // header naming it -- llOwnerSay, the debug channel, chat -- is known
+    // only by the prim that said it.
+    boost::unordered_flat_set<LLUUID> open_prims;
+    if (whose == "open")
+    {
+        for (const ALScriptStudioDoc* doc : mServices->openDocs())
+        {
+            if (!doc->ref.inInventory() && doc->file.empty())
+            {
+                open_prims.insert(doc->ref.object);
+            }
+        }
+    }
+    mView->setFilter([this, whose, kind, words, open_prims = std::move(open_prims)](const ALOutputView::Entry& entry) {
         const std::string said = entry.key["kind"].asString();
         if (!kind.empty() && said != kind)
         {
@@ -451,7 +472,9 @@ void ALScriptOutputPane::filter()
         // are, but for one object's alone.
         if (whose == "open")
         {
-            if (said != "studio" && !mServices->findDoc(ALScriptRef(entry.key["prim"].asUUID(), entry.key["item"].asUUID())))
+            const LLUUID item = entry.key["item"].asUUID();
+            const LLUUID prim = entry.key["prim"].asUUID();
+            if (said != "studio" && (item.notNull() ? !mServices->findDoc(ALScriptRef(prim, item)) : !open_prims.contains(prim)))
             {
                 return false;
             }

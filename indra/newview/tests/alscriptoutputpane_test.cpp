@@ -212,7 +212,8 @@ namespace tut
         const LLUUID        script = fresh();
         studio.owned.insert(lamp);
         services.addDoc("door-script", ALScriptRef(door, script), "door.lsl");
-        out.heard(said(door, "Door", "door speaks", Event::Channel::Debug, script, "door.lsl"));
+        // As the region says it: the debug channel names no script.
+        out.heard(said(door, "Door", "door speaks", Event::Channel::Debug));
         out.heard(said(lamp, "Lamp", "lamp speaks"));
         out.heard(said(crate, "Crate", "crate tells its owner", Event::Channel::OwnerSay));
         out.said("Saved door.lsl.", false, nullptr, {});
@@ -428,5 +429,22 @@ namespace tut
         ensure("the envelope has lines of its own", under > 3);
         ensure_equals("its code's third line, where the region names it", out.heard(failed(object, item, "Counter", "attempt to index nil", under + 2)).line, 102);
         ensure_equals("a line in the envelope is none of the code's: as said", out.heard(failed(object, item, "Counter", "boom", 1)).line, 1);
+    }
+
+    template <>
+    template <>
+    void alscriptoutputpane_object::test<8>()
+    {
+        set_test_name("an error the filters hide is not unread: a stranger's, with one object's chosen; the chosen one's is");
+        ALScriptOutputPane& out   = make();
+        const LLUUID        lamp  = fresh();
+        const LLUUID        crate = fresh();
+        out.heard(said(lamp, "Lamp", "lamp speaks"));
+        out.heard(said(crate, "Crate", "crate speaks"));
+        whose(lamp.asString());
+        out.heard(failed(crate, fresh(), "crate.lsl", "Math Error", -1));
+        ensure("a stranger's, hidden: not unread", !out.unread() && studio.unreadChanges == 0);
+        out.heard(failed(lamp, fresh(), "lamp.lsl", "Math Error", -1));
+        ensure("the chosen one's is", out.unread());
     }
 }
