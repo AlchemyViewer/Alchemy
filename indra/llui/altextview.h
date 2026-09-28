@@ -799,8 +799,21 @@ protected:
     // it is: all that a long line draws of itself.
     ALTextLayout::Row rowInSight(const ALTextLayout::Line& laid, const ALTextLayout::Row& row, const LLRect& text) const;
     // A wavy line from x0 to x1 with its middle at y, as much of it as is
-    // within `clip`'s sides.
+    // within `clip`'s sides; and many at once, one texture bound for all.
+    struct Squiggle
+    {
+        F32      x0 = 0.f;
+        F32      x1 = 0.f;
+        S32      y  = 0;
+        LLColor4 color;
+        S32      clipLeft  = 0;
+        S32      clipRight = 0;
+    };
     static void drawSquiggle(F32 x0, F32 x1, S32 y, const LLColor4& color, const LLRect& clip);
+    static void drawSquiggles(const Squiggle* squiggles, size_t count);
+    // A squiggle as a row draws one: drawn with the rest of the frame's
+    // squiggles, once the rows are drawn, where the rows are being drawn.
+    void squiggle(F32 x0, F32 x1, S32 y, const LLColor4& color, const LLRect& clip);
     // Something was asked about the name at the caret: its definition,
     // its references, a new name; whether it could be.
     virtual bool performSymbol(ALEditorCommand command) { return false; }
@@ -1134,6 +1147,22 @@ private:
     U32              mRulerMarksRevision = 0;
 
     std::vector<LLColor4U> mColorScratch;
+    // A frame's rows in sight, and their glyphs as one call's runs with the
+    // colours they are drawn in: kept from frame to frame rather than made
+    // for each.
+    struct RowSeen
+    {
+        S32 line         = 0;
+        S32 row          = 0;
+        S32 rowScreenTop = 0;
+        S32 screenTop    = 0;
+    };
+    std::vector<RowSeen>            mRowsSeen;
+    std::vector<LLFontGL::GlyphRun> mGlyphRuns;
+    std::vector<LLColor4U>          mRunColours;
+    std::vector<size_t>             mRunColourAt;
+    std::vector<Squiggle>           mSquiggles;
+    bool                            mQueueSquiggles = false;
     changed_signal_t       mChanged;
     changed_signal_t       mCaretMoved;
 

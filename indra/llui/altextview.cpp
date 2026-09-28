@@ -3887,36 +3887,62 @@ ALTextLayout::Row ALTextView::rowInSight(const ALTextLayout::Line& laid, const A
 
 void ALTextView::drawSquiggle(F32 x0, F32 x1, S32 y, const LLColor4& color, const LLRect& clip)
 {
-    // As much of it as is in sight, the wave kept where it began.
-    const F32 from = llmax(x0, static_cast<F32>(clip.mLeft));
-    const F32 to   = llmin(x1, static_cast<F32>(clip.mRight));
+    const Squiggle one{ x0, x1, y, color, clip.mLeft, clip.mRight };
+    drawSquiggles(&one, 1);
+}
+
+void ALTextView::drawSquiggles(const Squiggle* squiggles, size_t count)
+{
     LLImageGL* wave = squiggleTexture();
-    if (from >= to || !wave || !wave->getHasGLTexture())
+    if (count == 0 || !wave || !wave->getHasGLTexture())
     {
         return;
     }
-    const F32 u0     = (from - x0) / static_cast<F32>(SQUIGGLE_WAVE);
-    const F32 u1     = (to - x0) / static_cast<F32>(SQUIGGLE_WAVE);
-    const F32 bottom = static_cast<F32>(y - SQUIGGLE_HEIGHT / 2);
-    const F32 top    = static_cast<F32>(y + SQUIGGLE_HEIGHT / 2);
     gGL.getTextureSlot(0)->bindSampled(wave, ALSamplers::BilinearWrap);
-    gGL.color4fv(color.mV);
     gGL.begin(LLRender::TRIANGLES);
-    gGL.texCoord2f(u0, 1.f);
-    gGL.vertex2f(from, top);
-    gGL.texCoord2f(u0, 0.f);
-    gGL.vertex2f(from, bottom);
-    gGL.texCoord2f(u1, 0.f);
-    gGL.vertex2f(to, bottom);
-    gGL.texCoord2f(u0, 1.f);
-    gGL.vertex2f(from, top);
-    gGL.texCoord2f(u1, 0.f);
-    gGL.vertex2f(to, bottom);
-    gGL.texCoord2f(u1, 1.f);
-    gGL.vertex2f(to, top);
+    for (size_t i = 0; i < count; ++i)
+    {
+        // As much of it as is in sight, the wave kept where it began.
+        const Squiggle& squiggle = squiggles[i];
+        const F32       from     = llmax(squiggle.x0, static_cast<F32>(squiggle.clipLeft));
+        const F32       to       = llmin(squiggle.x1, static_cast<F32>(squiggle.clipRight));
+        if (from >= to)
+        {
+            continue;
+        }
+        const F32 u0     = (from - squiggle.x0) / static_cast<F32>(SQUIGGLE_WAVE);
+        const F32 u1     = (to - squiggle.x0) / static_cast<F32>(SQUIGGLE_WAVE);
+        const F32 bottom = static_cast<F32>(squiggle.y - SQUIGGLE_HEIGHT / 2);
+        const F32 top    = static_cast<F32>(squiggle.y + SQUIGGLE_HEIGHT / 2);
+        gGL.color4fv(squiggle.color.mV);
+        gGL.texCoord2f(u0, 1.f);
+        gGL.vertex2f(from, top);
+        gGL.texCoord2f(u0, 0.f);
+        gGL.vertex2f(from, bottom);
+        gGL.texCoord2f(u1, 0.f);
+        gGL.vertex2f(to, bottom);
+        gGL.texCoord2f(u0, 1.f);
+        gGL.vertex2f(from, top);
+        gGL.texCoord2f(u1, 0.f);
+        gGL.vertex2f(to, bottom);
+        gGL.texCoord2f(u1, 1.f);
+        gGL.vertex2f(to, top);
+    }
     gGL.end();
     // What is drawn next without a texture of its own gets the white one.
     gGL.getTextureSlot(0)->unbind();
+}
+
+void ALTextView::squiggle(F32 x0, F32 x1, S32 y, const LLColor4& color, const LLRect& clip)
+{
+    if (mQueueSquiggles)
+    {
+        mSquiggles.push_back(Squiggle{ x0, x1, y, color, clip.mLeft, clip.mRight });
+    }
+    else
+    {
+        drawSquiggle(x0, x1, y, color, clip);
+    }
 }
 
 void ALTextView::drawLayers(S32 line, const ALTextLayout::Line& laid, S32 r, const LLRect& text, S32 row_top, F32 left, F32 alpha)
@@ -4007,7 +4033,7 @@ void ALTextView::drawLayers(S32 line, const ALTextLayout::Line& laid, S32 r, con
             F32 x0, x1;
             if (spanOnRow(line, r, ALTextRange(ALTextPos(line, begin), ALTextPos(line, end)), x0, x1))
             {
-                drawSquiggle(left + x0, left + x1, screen_top - row_h + 2, mSpellErrorColor.get() % alpha, text);
+                squiggle(left + x0, left + x1, screen_top - row_h + 2, mSpellErrorColor.get() % alpha, text);
             }
         }
     }
@@ -4058,6 +4084,14 @@ void ALTextView::drawRows(const LLRect& text)
     const F32  caret_x     = mLayout.xOf(mCaret.line, mCaret.column, &caret_row);
     const F32  space       = mLayout.xOf(0, 0) + 6.f;  // what a selected line end is drawn as
 
+    const F32  left        = static_cast<F32>(text.mLeft) - mScrollX;
+
+    // The rows in sight, walked in three passes -- what is behind the
+    // text, the text, and what is over it -- so that each pass goes to GL
+    // as a batch, rather than every row making draws of its own. A row's
+    // things over the text lie over the next row's text, where they reach
+    // it, rather than under.
+    mRowsSeen.clear();
     for (S32 line = mLayout.lineAtY(mScrollY); line < count; ++line)
     {
         if (mLayout.hidden(line))
@@ -4070,7 +4104,6 @@ void ALTextView::drawRows(const LLRect& text)
         {
             break;
         }
-        const S32 length = mDocument.lineLength(line);
         for (size_t r = 0; r < laid.rows.size(); ++r)
         {
             const ALTextLayout::Row& row     = laid.rows[r];
@@ -4086,93 +4119,133 @@ void ALTextView::drawRows(const LLRect& text)
             // The row's top on the screen, and the top of its text's band,
             // which is the row's bottom part where a box made it taller.
             const S32 row_screen_top = text.mTop - (row_top - mScrollY);
-            const S32 screen_top     = row_screen_top - row.textTop();
-            const F32 left           = static_cast<F32>(text.mLeft) - mScrollX;
+            mRowsSeen.push_back(RowSeen{ line, static_cast<S32>(r), row_screen_top, row_screen_top - row.textTop() });
+        }
+    }
 
-            // The selection behind the row.
-            if (has_sel && sel.begin.line <= line && line <= sel.end.line)
+    // Behind the text: the selection and what the find bar found.
+    const std::vector<ALTextRange>& matches = mFind.matches();
+    gGL.getTextureSlot(0)->unbind();
+    gGL.begin(LLRender::TRIANGLES);
+    for (const RowSeen& seen : mRowsSeen)
+    {
+        const S32                 line   = seen.line;
+        const ALTextLayout::Line& laid   = mLayout.line(line);
+        const ALTextLayout::Row&  row    = laid.rows[static_cast<size_t>(seen.row)];
+        const S32                 length = mDocument.lineLength(line);
+        if (has_sel && sel.begin.line <= line && line <= sel.end.line)
+        {
+            const S32  sel_begin = sel.begin.line < line ? 0 : sel.begin.column;
+            const S32  sel_end   = sel.end.line > line ? length + 1 : sel.end.column;
+            const S32  lo        = llmax(sel_begin, row.begin);
+            const bool last_row  = (static_cast<size_t>(seen.row) + 1 == laid.rows.size());
+            const S32  hi        = llmin(sel_end, last_row ? length + 1 : row.end);
+            if (lo < hi)
             {
-                const S32 sel_begin = sel.begin.line < line ? 0 : sel.begin.column;
-                const S32 sel_end   = sel.end.line > line ? length + 1 : sel.end.column;
-                const S32 lo        = llmax(sel_begin, row.begin);
-                const bool last_row = (r + 1 == laid.rows.size());
-                const S32 hi        = llmin(sel_end, last_row ? length + 1 : row.end);
-                if (lo < hi)
-                {
-                    const F32 x0 = mLayout.xOf(line, lo) ;
-                    const F32 x1 = hi > length ? row.width + space : (hi >= row.end && !last_row ? row.width : mLayout.xOf(line, hi));
-                    gl_rect_2d(static_cast<S32>(left + x0), row_screen_top, static_cast<S32>(left + x1), row_screen_top - row.height, selectionDrawColor() % alpha);
-                }
+                const F32 x0 = mLayout.xOf(line, lo);
+                const F32 x1 = hi > length ? row.width + space : (hi >= row.end && !last_row ? row.width : mLayout.xOf(line, hi));
+                gl_rect_2d_in_batch(static_cast<S32>(left + x0), seen.rowScreenTop, static_cast<S32>(left + x1), seen.rowScreenTop - row.height,
+                                    selectionDrawColor() % alpha);
             }
-
-            // What the find bar found, behind the row.
-            const std::vector<ALTextRange>& matches = mFind.matches();
-            if (!matches.empty())
+        }
+        if (!matches.empty())
+        {
+            auto first = std::lower_bound(matches.begin(), matches.end(), line, [](const ALTextRange& m, S32 l) { return m.end.line < l; });
+            for (auto it = first; it != matches.end() && it->begin.line <= line; ++it)
             {
-                auto first = std::lower_bound(matches.begin(), matches.end(), line, [](const ALTextRange& m, S32 l) { return m.end.line < l; });
-                for (auto it = first; it != matches.end() && it->begin.line <= line; ++it)
+                F32 x0, x1;
+                if (spanOnRow(line, seen.row, *it, x0, x1))
                 {
-                    F32 x0, x1;
-                    if (spanOnRow(line, static_cast<S32>(r), *it, x0, x1))
-                    {
-                        gl_rect_2d(static_cast<S32>(left + x0), row_screen_top, static_cast<S32>(left + x1), row_screen_top - row.height, mFindMatchColor.get() % alpha);
-                    }
-                }
-            }
-
-            // The glyphs, as many as are in sight.
-            const ALTextLayout::Row seen        = rowInSight(laid, row, text);
-            const size_t            glyph_count = seen.glyphEnd - seen.glyphBegin;
-            if (glyph_count)
-            {
-                colorRow(line, laid, seen, alpha);
-                tintRow(line, laid, seen, alpha, mColorScratch);
-                mFont->renderGlyphs(&laid.placed[seen.glyphBegin], mColorScratch.data(), glyph_count,
-                                    left - row.xStart, static_cast<F32>(screen_top - row.ascent));
-            }
-
-            if (hasPreedit() && line == mPreeditBegin.line)
-            {
-                drawPreedit(line, row, screen_top, left, alpha);
-            }
-
-            drawLayers(line, laid, static_cast<S32>(r), text, row_screen_top, left, alpha);
-            drawRowExtras(line, static_cast<S32>(r), text, screen_top, left, alpha);
-
-            // The caret.
-            if (caret_on && line == mCaret.line && static_cast<S32>(r) == caret_row)
-            {
-                const S32  x     = static_cast<S32>(left + caret_x);
-                const bool modal = mModal && !mModal->inserting();
-                if (modal || mCaretStyle != CaretStyle::Line)
-                {
-                    // A block over the cluster the caret is on, as a modal
-                    // editor's is; a space's width past the line's end.
-                    const ALTextPos next  = mDocument.nextCluster(mCaret);
-                    const F32       cell  = llmax(4.f, mLayout.columnWidth());
-                    F32             right = next.line == mCaret.line && next != mCaret ? mLayout.xOf(mCaret.line, next.column) : caret_x + cell;
-                    if (right <= caret_x)
-                    {
-                        right = caret_x + cell;
-                    }
-                    if (!modal && mCaretStyle == CaretStyle::Underline)
-                    {
-                        // A bar under the cluster, as thick as the line caret is wide.
-                        gl_rect_2d(x, row_screen_top - row.height + CARET_WIDTH, static_cast<S32>(left + right), row_screen_top - row.height,
-                                   mCursorColor.get() % alpha);
-                    }
-                    else
-                    {
-                        gl_rect_2d(x, row_screen_top, static_cast<S32>(left + right), row_screen_top - row.height, mCursorColor.get() % (0.55f * alpha));
-                    }
-                }
-                else
-                {
-                    gl_rect_2d(x, row_screen_top, x + CARET_WIDTH, row_screen_top - row.height, mCursorColor.get() % alpha);
+                    gl_rect_2d_in_batch(static_cast<S32>(left + x0), seen.rowScreenTop, static_cast<S32>(left + x1), seen.rowScreenTop - row.height,
+                                        mFindMatchColor.get() % alpha);
                 }
             }
         }
     }
+    gGL.end();
+
+    // The text: every row's glyphs, as many as are in sight, in one call.
+    mGlyphRuns.clear();
+    mRunColours.clear();
+    mRunColourAt.clear();
+    for (const RowSeen& seen : mRowsSeen)
+    {
+        const ALTextLayout::Line& laid        = mLayout.line(seen.line);
+        const ALTextLayout::Row&  row         = laid.rows[static_cast<size_t>(seen.row)];
+        const ALTextLayout::Row   in_sight    = rowInSight(laid, row, text);
+        const size_t              glyph_count = in_sight.glyphEnd - in_sight.glyphBegin;
+        if (!glyph_count)
+        {
+            continue;
+        }
+        colorRow(seen.line, laid, in_sight, alpha);
+        tintRow(seen.line, laid, in_sight, alpha, mColorScratch);
+        mRunColourAt.push_back(mRunColours.size());
+        mRunColours.insert(mRunColours.end(), mColorScratch.begin(), mColorScratch.begin() + static_cast<std::ptrdiff_t>(glyph_count));
+        mGlyphRuns.push_back(LLFontGL::GlyphRun{ &laid.placed[in_sight.glyphBegin], nullptr, glyph_count, left - row.xStart,
+                                                 static_cast<F32>(seen.screenTop - row.ascent) });
+    }
+    for (size_t i = 0; i < mGlyphRuns.size(); ++i)
+    {
+        mGlyphRuns[i].colors = mRunColours.data() + mRunColourAt[i];
+    }
+    mFont->renderGlyphRuns(mGlyphRuns.data(), mGlyphRuns.size());
+
+    // Over the text; the squiggles, which share a texture, after the rest
+    // of it and together.
+    mQueueSquiggles = true;
+    for (const RowSeen& seen : mRowsSeen)
+    {
+        const S32                 line           = seen.line;
+        const size_t              r              = static_cast<size_t>(seen.row);
+        const ALTextLayout::Line& laid           = mLayout.line(line);
+        const ALTextLayout::Row&  row            = laid.rows[r];
+        const S32                 row_screen_top = seen.rowScreenTop;
+        const S32                 screen_top     = seen.screenTop;
+        if (hasPreedit() && line == mPreeditBegin.line)
+        {
+            drawPreedit(line, row, screen_top, left, alpha);
+        }
+
+        drawLayers(line, laid, static_cast<S32>(r), text, row_screen_top, left, alpha);
+        drawRowExtras(line, static_cast<S32>(r), text, screen_top, left, alpha);
+
+        // The caret.
+        if (caret_on && line == mCaret.line && static_cast<S32>(r) == caret_row)
+        {
+            const S32  x     = static_cast<S32>(left + caret_x);
+            const bool modal = mModal && !mModal->inserting();
+            if (modal || mCaretStyle != CaretStyle::Line)
+            {
+                // A block over the cluster the caret is on, as a modal
+                // editor's is; a space's width past the line's end.
+                const ALTextPos next  = mDocument.nextCluster(mCaret);
+                const F32       cell  = llmax(4.f, mLayout.columnWidth());
+                F32             right = next.line == mCaret.line && next != mCaret ? mLayout.xOf(mCaret.line, next.column) : caret_x + cell;
+                if (right <= caret_x)
+                {
+                    right = caret_x + cell;
+                }
+                if (!modal && mCaretStyle == CaretStyle::Underline)
+                {
+                    // A bar under the cluster, as thick as the line caret is wide.
+                    gl_rect_2d(x, row_screen_top - row.height + CARET_WIDTH, static_cast<S32>(left + right), row_screen_top - row.height,
+                               mCursorColor.get() % alpha);
+                }
+                else
+                {
+                    gl_rect_2d(x, row_screen_top, static_cast<S32>(left + right), row_screen_top - row.height, mCursorColor.get() % (0.55f * alpha));
+                }
+            }
+            else
+            {
+                gl_rect_2d(x, row_screen_top, x + CARET_WIDTH, row_screen_top - row.height, mCursorColor.get() % alpha);
+            }
+        }
+    }
+    mQueueSquiggles = false;
+    drawSquiggles(mSquiggles.data(), mSquiggles.size());
+    mSquiggles.clear();
 }
 
 void ALTextView::dragSelectTo(S32 x, S32 y)
