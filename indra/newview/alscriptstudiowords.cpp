@@ -222,7 +222,8 @@ void ALScriptStudioWords::teach(ALCodeEditor& editor, bool lua)
     {
         // The preprocessor's words, which the grid's keywords do not list,
         // while their transforms are on: Firestorm's switch and case, the
-        // extensions' break, continue and inline.
+        // extensions' break and continue, and inline and const, which it
+        // takes off whenever it runs.
         const std::vector<std::string> extra = sources().preprocessorWords ? sources().preprocessorWords() : std::vector<std::string>();
         for (const std::string& word : extra)
         {

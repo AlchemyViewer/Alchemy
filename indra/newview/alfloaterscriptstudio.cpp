@@ -142,9 +142,14 @@ namespace
             {
                 words.insert(words.end(), { "switch", "case" });
             }
+            if (ALScriptPreprocessor::enabled())
+            {
+                // Taken off whenever the preprocessor runs, extensions or not.
+                words.insert(words.end(), { "inline", "const" });
+            }
             if (gSavedSettings.getBOOL("ALScriptPreprocExtensions"))
             {
-                words.insert(words.end(), { "break", "continue", "inline" });
+                words.insert(words.end(), { "break", "continue" });
             }
             return words;
         };

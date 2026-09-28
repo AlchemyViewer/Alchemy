@@ -3444,7 +3444,7 @@ namespace
 
     const char* const KEYWORDS[] = { "default", "state",  "event",   "jump",     "return", "if",    "else",       "for",  "do",
                                      "while",   "print",  "integer", "float",    "string", "key",   "vector",     "rotation",
-                                     "quaternion", "list", "TRUE",   "FALSE",    "inline", "break", "continue",   "switch", "case", nullptr };
+                                     "quaternion", "list", "TRUE",   "FALSE",    "inline", "const", "break", "continue",   "switch", "case", nullptr };
 
     // Every name the script owns, shortest first for the most used.
     void shrink(LSLScript* script, ScriptContext& context, ScriptAllocator& allocator, Report& report, ALLSLOptimizer::Result& result)

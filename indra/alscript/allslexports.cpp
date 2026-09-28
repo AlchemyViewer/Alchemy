@@ -43,7 +43,7 @@ namespace
 
     bool isWord(const std::string& word)
     {
-        static const char* const WORDS[] = { "default", "state", "if", "else", "for", "while", "do", "jump", "return", "inline", "print" };
+        static const char* const WORDS[] = { "default", "state", "if", "else", "for", "while", "do", "jump", "return", "inline", "const", "print" };
         return isType(word) || std::any_of(std::begin(WORDS), std::end(WORDS), [&word](const char* one) { return word == one; });
     }
 
