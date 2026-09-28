@@ -3100,8 +3100,52 @@ void ALFloaterScriptStudio::cycleTab(S32 direction)
     activate((mActive + count + static_cast<size_t>(direction > 0 ? 1 : count - 1)) % count);
 }
 
+ALFloaterScriptStudio::ToolbarFacts ALFloaterScriptStudio::toolbarFactsOf() const
+{
+    ToolbarFacts facts;
+    const Doc*   doc = mActive < mDocs.size() ? mDocs[mActive].get() : nullptr;
+    for (const std::unique_ptr<Doc>& each : mDocs)
+    {
+        facts.anyDirty = facts.anyDirty || (each->unsaved() && each->modifiable);
+    }
+    facts.ownExperiences = ALScriptWorkspace::instance().ownExperiences();
+    facts.room           = mCrumbsBar ? mCrumbsBar->getParent()->getRect().getWidth() : 0;
+    if (!doc)
+    {
+        return facts;
+    }
+    facts.id               = doc->id;
+    facts.loaded           = doc->loaded;
+    facts.modifiable       = doc->modifiable;
+    facts.notecard         = doc->notecard;
+    facts.file             = !doc->file.empty();
+    facts.inventory        = doc->ref.inInventory();
+    facts.sending          = doc->save.sending();
+    facts.canUndo          = doc->shownText()->canUndo();
+    facts.canRedo          = doc->shownText()->canRedo();
+    facts.expandable       = doc->expandedEditor != nullptr;
+    facts.view             = static_cast<U8>(doc->shownView());
+    facts.running          = doc->running;
+    const LLViewerObject* object = facts.inventory ? nullptr : gObjectList.findObject(doc->ref.object);
+    facts.publicObject     = object && !object->permAnyOwner();
+    facts.regionLua        = ALScriptWorkspace::luaEnabled(doc->ref);
+    facts.lua              = doc->language.lua;
+    facts.target           = doc->language.compileTarget;
+    facts.experienceKnown  = doc->experienceKnown;
+    facts.experienceChosen = doc->experienceChosen;
+    facts.experienceAsking = doc->experienceAsking;
+    facts.experience       = doc->experience;
+    return facts;
+}
+
 void ALFloaterScriptStudio::refreshToolbar()
 {
+    ToolbarFacts facts = toolbarFactsOf();
+    if (mToolbarFacts && *mToolbarFacts == facts)
+    {
+        return;
+    }
+    mToolbarFacts = std::move(facts);
     Doc*       doc     = active();
     const bool have    = doc && doc->loaded;
     const bool task    = doc && !doc->ref.inInventory() && !doc->notecard;
@@ -3110,15 +3154,8 @@ void ALFloaterScriptStudio::refreshToolbar()
     const bool script  = doc && !doc->notecard && doc->file.empty();
     mCompileTarget->setVisible(script);
     mCompileTarget->setEnabled(have && script && doc->modifiable);
-    // Whether anything is unsaved: the one fact here that every
-    // keystroke can move, and the only one that costs a walk.
     mSaveButton->setEnabled(have && doc->modifiable && !doc->save.sending());
-    bool anyDirty = false;
-    for (const std::unique_ptr<Doc>& each : mDocs)
-    {
-        anyDirty = anyDirty || (each->unsaved() && each->modifiable);
-    }
-    mSaveAllButton->setEnabled(anyDirty);
+    mSaveAllButton->setEnabled(mToolbarFacts->anyDirty);
     mUndoButton->setEnabled(doc && doc->shownText()->canUndo());
     mRedoButton->setEnabled(doc && doc->shownText()->canRedo());
     mFindButton->setEnabled(doc != nullptr);
@@ -3133,8 +3170,7 @@ void ALFloaterScriptStudio::refreshToolbar()
         // Greyed until the region says whether it runs -- a save asks it
         // first meanwhile -- and for an object nobody owns, released to the
         // public, which runs no script.
-        const LLViewerObject* object        = gObjectList.findObject(doc->ref.object);
-        const bool            public_object = object && !object->permAnyOwner();
+        const bool public_object = mToolbarFacts->publicObject;
         mRunning->set(!public_object && doc->running == 1);
         mRunning->setEnabled(!public_object && doc->running >= 0);
         mRunning->setToolTip(getString(public_object ? "RunningPublic" : doc->running < 0 ? "RunningAsking" : "RunningTip"));
@@ -3145,7 +3181,7 @@ void ALFloaterScriptStudio::refreshToolbar()
         // in: one of the other language reads it as that language, as a
         // script converted by hand needs. The Luau machine where the
         // region runs Luau, or the script is SLua already.
-        const bool region_lua = ALScriptWorkspace::luaEnabled(doc->ref);
+        const bool region_lua = mToolbarFacts->regionLua;
         const bool lua        = doc->language.lua;
         for (const std::string target : { "mono", "lsl2", "lsl-luau", "luau" })
         {

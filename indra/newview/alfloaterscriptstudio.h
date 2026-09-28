@@ -285,9 +285,9 @@ private:
     void   activate(size_t index, bool focus = true);
     // The strip filled from the docs, and the toolbar put right. Each does
     // its work only when what it shows has actually changed since the
-    // last. One tab's facts moved -- a keystroke's unsaved dot, a check's
-    // count -- that tab alone is made again, where the strip is otherwise
-    // as it was.
+    // last (TabFacts, ToolbarFacts). One tab's facts moved -- a
+    // keystroke's unsaved dot, a check's count -- that tab alone is made
+    // again, where the strip is otherwise as it was.
     void   fillTabs() override;
     void   fillTabs(const Doc& doc);
     void   refreshToolbar() override;
@@ -916,6 +916,38 @@ private:
     TabFacts tabFactsOf(const Doc& doc) const;
     // The tab a doc is drawn as, from its facts.
     ALTabStrip::Tab tabOf(const Doc& doc, const TabFacts& facts) const;
+    // What the toolbar is made from, as it was when last put right: it is
+    // put right again only where one of these has moved. Whatever
+    // refreshToolbar reads is here.
+    struct ToolbarFacts
+    {
+        std::string         id;
+        bool                loaded     = false;
+        bool                modifiable = false;
+        bool                notecard   = false;
+        bool                file       = false;
+        bool                inventory  = false;
+        bool                sending    = false;
+        bool                anyDirty   = false;
+        bool                canUndo    = false;
+        bool                canRedo    = false;
+        bool                expandable = false;
+        U8                  view       = 0;
+        S32                 running    = -1;
+        bool                publicObject = false;
+        bool                regionLua    = false;
+        bool                lua          = false;
+        std::string         target;
+        bool                experienceKnown  = false;
+        bool                experienceChosen = false;
+        bool                experienceAsking = false;
+        LLUUID              experience;
+        std::vector<LLUUID> ownExperiences;
+        S32                 room = 0;
+        bool                operator==(const ToolbarFacts&) const = default;
+    };
+    ToolbarFacts                toolbarFactsOf() const;
+    std::optional<ToolbarFacts> mToolbarFacts;
     std::vector<TabFacts>              mTabFacts;
     size_t                             mTabFactsActive = NONE;
     // What changed of a tab that the window shows of it, made good once
