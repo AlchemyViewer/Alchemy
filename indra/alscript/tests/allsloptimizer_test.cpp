@@ -267,19 +267,28 @@ namespace tut
     template<> template<>
     void allsloptimizer_object::test<7>()
     {
-        set_test_name("llGetListLength becomes a comparison, and a list literal a sum, with parentheses where they matter");
+        set_test_name("llGetListLength becomes a comparison, and a list literal a sum, with parentheses where they matter, each where smaller");
         const std::string source = wrap("list l;\n", "        integer n = llGetListLength(l) + 1;\n        if (llGetListLength(l)) l = [1, \"a\"];\n        l = [];\n        n = 0;\n");
-        ALLSLOptimizer::Result r = ALLSLOptimizer::run(source, options());
+        // On LSO both are smaller.
+        ALLSLOptimizer::Options lso = options();
+        lso.target                  = ALLSLOptimizer::Target::LSO;
+        ALLSLOptimizer::Result r    = ALLSLOptimizer::run(source, lso);
         ensure("optimized: " + notes(r), r.optimized);
         ensure("in a sum: " + r.text, r.text.find("integer n = (l != []) + 1;") != std::string::npos);
         ensure("as a condition", r.text.find("if (l != [])") != std::string::npos);
         ensure("list add: " + r.text, r.text.find("l = (list)1 + \"a\";") != std::string::npos);
         ensure("an empty list stays", r.text.find("l = [];") != std::string::npos);
 
-        ALLSLOptimizer::Options lso = options();
-        lso.target                  = ALLSLOptimizer::Target::LSO;
-        r                           = ALLSLOptimizer::run(source, lso);
-        ensure("no list add on LSO", r.text.find("l = [1, \"a\"];") != std::string::npos);
+        // On Mono the sum is, and the comparison is not.
+        r = ALLSLOptimizer::run(source, options());
+        ensure("no comparison on Mono: " + r.text, r.text.find("llGetListLength(l) + 1") != std::string::npos && r.text.find("l != []") == std::string::npos);
+        ensure("list add on Mono: " + r.text, r.text.find("l = (list)1 + \"a\";") != std::string::npos);
+
+        // On Luau neither.
+        ALLSLOptimizer::Options luau = options();
+        luau.target                  = ALLSLOptimizer::Target::Luau;
+        r                            = ALLSLOptimizer::run(source, luau);
+        ensure("neither on Luau: " + r.text, r.text.find("l = [1, \"a\"];") != std::string::npos && r.text.find("l != []") == std::string::npos);
     }
 
     template<> template<>

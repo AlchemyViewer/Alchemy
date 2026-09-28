@@ -29,6 +29,7 @@
 
 #include "alscriptengine.h"
 
+#include "allslcosts.h"
 #include "allsleffects.h"
 #include "allslinliner.h"
 #include "allslservice.h"
@@ -1559,6 +1560,11 @@ namespace
                   }
                   return c.string(out);
               } },
+            { "llGetListLength",
+              [](Ctx& c, const Args& a) -> LSLConstant* {
+                  LSLListConstant* l;
+                  return argList(a, 0, l) ? c.integer(static_cast<int>(l->getLength())) : nullptr;
+              } },
             { "llList2List",
               [](Ctx& c, const Args& a) -> LSLConstant* {
                   LSLListConstant* l;
@@ -2365,7 +2371,8 @@ namespace
         {
             visitChildren(expr);
             LSLSymbol* sym = expr->getSymbol();
-            if (options.listlength && sym && sym->getSubType() == SYM_BUILTIN && !strcmp(sym->getName(), "llGetListLength") &&
+            if (options.listlength && ALLSLCosts::of(options.target).lengthAsNotEqual && sym && sym->getSubType() == SYM_BUILTIN &&
+                !strcmp(sym->getName(), "llGetListLength") &&
                 expr->getArguments()->getNumChildren() == 1)
             {
                 // llGetListLength(x) is x != [], which is the length.
@@ -2377,71 +2384,6 @@ namespace
                 putInPlace(expr, test, ctx.allocator);
                 ++changes;
             }
-            return false;
-        }
-
-        bool visit(LSLListExpression* expr) override
-        {
-            visitChildren(expr);
-            if (!options.listadd || options.target != ALLSLOptimizer::Target::Mono || expr->getNumChildren() == 0)
-            {
-                return false;
-            }
-            // Not in a global's initializer, which must stay simple.
-            for (LSLASTNode* up = expr->getParent(); up; up = up->getParent())
-            {
-                if (up->getNodeType() == NODE_GLOBAL_VARIABLE)
-                {
-                    return false;
-                }
-            }
-            // A sum takes its right side first, so its elements are taken
-            // last to first, where a literal's are taken first to last:
-            // where one of them changes something, and another is anything
-            // but a constant, that one could see the change the other way
-            // round.
-            size_t changing = 0;
-            size_t varying  = 0;
-            for (LSLASTNode* child : *expr)
-            {
-                if (child->getIType() == LST_LIST || child->getIType() == LST_ERROR)
-                {
-                    return false;
-                }
-                // Read at another time than it was: a read of the clock
-                // counts as a change here.
-                changing += sideEffectFree(child) ? 0 : 1;
-                varying += child->getConstantValue() ? 0 : 1;
-            }
-            if (changing > 0 && varying > 1)
-            {
-                return false;
-            }
-            // [a, b, c] as (list)a + b + c.
-            const std::string           was = render(expr);
-            std::vector<LSLExpression*> terms;
-            terms.reserve(expr->getNumChildren());
-            while (expr->hasChildren())
-            {
-                // takeChild leaves a null in the slot, dropped each time.
-                terms.push_back(static_cast<LSLExpression*>(expr->takeChild(0)));
-                expr->removeChild(expr->getChild(0));
-            }
-            LSLExpression* sum = nullptr;
-            {
-                const Uncounted uncounted(*ctx.context);
-                sum = uncounted.made(ctx.allocator->newTracked<LSLTypecastExpression>(TYPE(LST_LIST), terms.front()));
-                sum->setLoc(terms.front()->getLoc());
-                for (size_t i = 1; i < terms.size(); ++i)
-                {
-                    sum = uncounted.made(ctx.allocator->newTracked<LSLBinaryExpression>(sum, OP_PLUS, uncounted.made(bracketed(terms[i]))));
-                    sum->setType(TYPE(LST_LIST));
-                    sum->setLoc(terms[i]->getLoc());
-                }
-            }
-            report.note(expr->getLoc(), "OptimizerWroteAs", "wrote [1] as [2]", { was, render(sum) });
-            putInPlace(expr, sum, ctx.allocator);
-            ++changes;
             return false;
         }
 
@@ -2510,46 +2452,6 @@ namespace
         }
 
     private:
-        // An element of a list as a sum has it, after the first: on the
-        // right of a +, which binds tighter than every operator but a
-        // product and what is unary, and so bracketed where it is any
-        // other. (The first goes under the cast, which the printer
-        // brackets for itself.)
-        LSLExpression* bracketed(LSLExpression* element)
-        {
-            bool bare = false;
-            switch (element->getNodeSubType())
-            {
-                case NODE_CONSTANT_EXPRESSION:
-                case NODE_LVALUE_EXPRESSION:
-                case NODE_PARENTHESIS_EXPRESSION:
-                case NODE_FUNCTION_EXPRESSION:
-                case NODE_PRINT_EXPRESSION:
-                case NODE_VECTOR_EXPRESSION:
-                case NODE_QUATERNION_EXPRESSION:
-                case NODE_LIST_EXPRESSION:
-                    bare = true;
-                    break;
-                case NODE_UNARY_EXPRESSION:
-                case NODE_TYPECAST_EXPRESSION:
-                    bare = true;
-                    break;
-                case NODE_BINARY_EXPRESSION:
-                    bare = element->getOperation() == OP_MUL || element->getOperation() == OP_DIV || element->getOperation() == OP_MOD;
-                    break;
-                default:
-                    break;
-            }
-            if (bare)
-            {
-                return element;
-            }
-            auto* parens = ctx.allocator->newTracked<LSLParenthesisExpression>(element);
-            parens->setType(element->getType());
-            parens->setLoc(element->getLoc());
-            return parens;
-        }
-
         static bool empty(LSLStatement* s)
         {
             if (!s)
@@ -2687,6 +2589,121 @@ namespace
                     }
                 }
             }
+        }
+    };
+
+    // Rewrites made for size alone, once the rounds are done: each hides a
+    // value the folder could have used -- a list's literal made a sum is
+    // no longer a constant -- so they wait until nothing more will fold.
+    class Shapes : public ASTVisitor, public Pass
+    {
+    public:
+        using Pass::Pass;
+
+        bool visit(LSLListExpression* expr) override
+        {
+            visitChildren(expr);
+            if (!options.listadd || !ALLSLCosts::of(options.target).listAsSum || expr->getNumChildren() == 0)
+            {
+                return false;
+            }
+            // Not in a global's initializer, which must stay simple.
+            for (LSLASTNode* up = expr->getParent(); up; up = up->getParent())
+            {
+                if (up->getNodeType() == NODE_GLOBAL_VARIABLE)
+                {
+                    return false;
+                }
+            }
+            // A sum takes its right side first, so its elements are taken
+            // last to first, where a literal's are taken first to last:
+            // where one of them changes something, and another is anything
+            // but a constant, that one could see the change the other way
+            // round.
+            size_t changing = 0;
+            size_t varying  = 0;
+            for (LSLASTNode* child : *expr)
+            {
+                if (child->getIType() == LST_LIST || child->getIType() == LST_ERROR)
+                {
+                    return false;
+                }
+                // Read at another time than it was: a read of the clock
+                // counts as a change here.
+                changing += sideEffectFree(child) ? 0 : 1;
+                varying += child->getConstantValue() ? 0 : 1;
+            }
+            if (changing > 0 && varying > 1)
+            {
+                return false;
+            }
+            // [a, b, c] as (list)a + b + c.
+            const std::string           was = render(expr);
+            std::vector<LSLExpression*> terms;
+            terms.reserve(expr->getNumChildren());
+            while (expr->hasChildren())
+            {
+                // takeChild leaves a null in the slot, dropped each time.
+                terms.push_back(static_cast<LSLExpression*>(expr->takeChild(0)));
+                expr->removeChild(expr->getChild(0));
+            }
+            LSLExpression* sum = nullptr;
+            {
+                const Uncounted uncounted(*ctx.context);
+                sum = uncounted.made(ctx.allocator->newTracked<LSLTypecastExpression>(TYPE(LST_LIST), terms.front()));
+                sum->setLoc(terms.front()->getLoc());
+                for (size_t i = 1; i < terms.size(); ++i)
+                {
+                    sum = uncounted.made(ctx.allocator->newTracked<LSLBinaryExpression>(sum, OP_PLUS, uncounted.made(bracketed(terms[i]))));
+                    sum->setType(TYPE(LST_LIST));
+                    sum->setLoc(terms[i]->getLoc());
+                }
+            }
+            report.note(expr->getLoc(), "OptimizerWroteAs", "wrote [1] as [2]", { was, render(sum) });
+            putInPlace(expr, sum, ctx.allocator);
+            ++changes;
+            return false;
+        }
+
+    private:
+        // An element of a list as a sum has it, after the first: on the
+        // right of a +, which binds tighter than every operator but a
+        // product and what is unary, and so bracketed where it is any
+        // other. (The first goes under the cast, which the printer
+        // brackets for itself.)
+        LSLExpression* bracketed(LSLExpression* element)
+        {
+            bool bare = false;
+            switch (element->getNodeSubType())
+            {
+                case NODE_CONSTANT_EXPRESSION:
+                case NODE_LVALUE_EXPRESSION:
+                case NODE_PARENTHESIS_EXPRESSION:
+                case NODE_FUNCTION_EXPRESSION:
+                case NODE_PRINT_EXPRESSION:
+                case NODE_VECTOR_EXPRESSION:
+                case NODE_QUATERNION_EXPRESSION:
+                case NODE_LIST_EXPRESSION:
+                    bare = true;
+                    break;
+                case NODE_UNARY_EXPRESSION:
+                case NODE_TYPECAST_EXPRESSION:
+                    bare = true;
+                    break;
+                case NODE_BINARY_EXPRESSION:
+                    bare = element->getOperation() == OP_MUL || element->getOperation() == OP_DIV || element->getOperation() == OP_MOD;
+                    break;
+                default:
+                    break;
+            }
+            if (bare)
+            {
+                return element;
+            }
+            auto* parens = ctx.allocator->newTracked<LSLParenthesisExpression>(element);
+            parens->setType(element->getType());
+            parens->setLoc(element->getLoc());
+            return parens;
         }
     };
 
@@ -3808,7 +3825,7 @@ namespace
 
         std::string number(double v, bool asInteger)
         {
-            if (mOptions.optfloats && asInteger && integral(v))
+            if (mOptions.optfloats && asInteger && integral(v) && ALLSLCosts::of(mOptions.target).integerForFloat)
             {
                 return std::to_string(static_cast<long long>(v));
             }
@@ -4169,6 +4186,13 @@ ALLSLOptimizer::Result ALLSLOptimizer::run(std::string_view source, const Option
         {
             break;
         }
+    }
+    // What is made for size alone, once nothing more will fold.
+    if (options.constfold)
+    {
+        Shapes shapes(ctx, report, options);
+        script->visit(&shapes);
+        walks(1);
     }
     if (options.shrinknames)
     {

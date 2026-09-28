@@ -184,6 +184,7 @@ namespace tut
             // listlength
             { "llGetListLength(l) as l != []", { "", "i = llGetListLength(l);" }, { "", "i = l != [];" }, "<>>", &ALLSLCosts::lengthAsNotEqual },
             // listadd
+            { "[a] as (list)a", { "", "l = [i];" }, { "", "l = (list)i;" }, "<<>", &ALLSLCosts::listAsSum },
             { "[a, b] as (list)a + b", { "", "l = [i, j];" }, { "", "l = (list)i + j;" }, "<<>", &ALLSLCosts::listAsSum },
             { "[a, b, c] as (list)a + b + c", { "", "l = [i, j, f];" }, { "", "l = (list)i + j + f;" }, "<<>", &ALLSLCosts::listAsSum },
             // To come.

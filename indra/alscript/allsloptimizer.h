@@ -59,7 +59,10 @@ public:
     struct Options
     {
         Target target = Target::Mono;
-        // Folding and simplification, on by default.
+        // Folding and simplification, on by default. A rewrite that is
+        // smaller on one target and not on another is made only where it
+        // is smaller (ALLSLCosts): optfloats' integers for Mono, listlength
+        // for LSO, listadd for LSO and Mono.
         bool constfold  = true;
         bool optsigns   = true;
         bool optfloats  = true;
