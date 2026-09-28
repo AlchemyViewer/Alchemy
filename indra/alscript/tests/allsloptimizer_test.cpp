@@ -39,6 +39,7 @@
 #include <filesystem>
 #include <fstream>
 #include <initializer_list>
+#include <set>
 #include <sstream>
 #include <thread>
 #include <vector>
@@ -1844,5 +1845,40 @@ namespace tut
         ensure("held already on Mono", folded(Target::Mono, held));
         ensure("held already on Luau", folded(Target::Luau, held));
         ensure("LSO writes it again", !folded(Target::LSO, held));
+    }
+    template<> template<>
+    void allsloptimizer_object::test<49>()
+    {
+        set_test_name("labels of one name in one handler keep one name when names are shortened, as a jump finds its label by name");
+        const std::string source = "default\n{\n    state_entry()\n    {\n"
+                                   "        if (1)\n        {\n            jump there;\n            @there;\n        }\n"
+                                   "        if (0)\n        {\n            jump there;\n            @there;\n            llOwnerSay(\"reached\");\n        }\n"
+                                   "    }\n"
+                                   "    touch_start(integer n)\n    {\n        jump there;\n        llOwnerSay(\"skipped\");\n        @there;\n    }\n}\n";
+        for (const ALLSLOptimizer::Target target : { ALLSLOptimizer::Target::LSO, ALLSLOptimizer::Target::Mono, ALLSLOptimizer::Target::Luau })
+        {
+            ALLSLOptimizer::Options o = options();
+            o.target                  = target;
+            o.shrinknames             = true;
+            const ALLSLOptimizer::Result r = ALLSLOptimizer::run(source, o);
+            ensure("optimized, not refused: " + notes(r), r.optimized);
+            ensure("the label jumped to from the first block is still there: " + r.text, r.text.find("reached") != std::string::npos);
+            ensure("renamed: " + r.text, r.text.find("there") == std::string::npos);
+            // In state_entry, every jump and every label one name.
+            const size_t      entry = r.text.find("state_entry");
+            const size_t      touch = r.text.find("touch_start");
+            const std::string body  = r.text.substr(entry, touch - entry);
+            std::set<std::string> names;
+            for (size_t at = body.find_first_of("@j"); at != std::string::npos; at = body.find_first_of("@j", at + 1))
+            {
+                const bool   label = body[at] == '@';
+                const size_t from  = label ? at + 1 : body.compare(at, 5, "jump ") == 0 ? at + 5 : std::string::npos;
+                if (from != std::string::npos)
+                {
+                    names.insert(body.substr(from, body.find(';', from) - from));
+                }
+            }
+            ensure_equals("one name in state_entry: " + r.text, names.size(), size_t(1));
+        }
     }
 } // namespace tut

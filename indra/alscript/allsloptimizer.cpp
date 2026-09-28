@@ -4893,6 +4893,28 @@ namespace
         std::set<LSLSymbolTable*> mSeen;
     };
 
+    // Each label's function or handler. LSL takes a jump to whichever
+    // label of its name the function declares last, seen from the jump or
+    // not, so labels of one name in one function are one name still.
+    class LabelScopes : public ASTVisitor
+    {
+    public:
+        bool visit(LSLLabel* label) override
+        {
+            LSLASTNode* scope = label;
+            while (scope && scope->getNodeType() != NODE_GLOBAL_FUNCTION && scope->getNodeType() != NODE_EVENT_HANDLER)
+            {
+                scope = scope->getParent();
+            }
+            if (LSLSymbol* sym = label->getSymbol())
+            {
+                of[sym] = scope;
+            }
+            return false;
+        }
+        std::map<LSLSymbol*, LSLASTNode*> of;
+    };
+
     const char* const KEYWORDS[] = { "default", "state",  "event",   "jump",     "return", "if",    "else",       "for",  "do",
                                      "while",   "print",  "integer", "float",    "string", "key",   "vector",     "rotation",
                                      "quaternion", "list", "TRUE",   "FALSE",    "inline", "const", "break", "continue",   "switch", "case", nullptr };
@@ -4987,9 +5009,26 @@ namespace
                 return name;
             }
         };
+        LabelScopes labels;
+        script->visit(&labels);
+        std::map<std::pair<LSLASTNode*, std::string>, std::string> labelNames;
         for (LSLSymbol* sym : symbols)
         {
-            const std::string name = next();
+            std::string name;
+            const auto  scope = labels.of.find(sym);
+            if (scope != labels.of.end())
+            {
+                auto [named, fresh] = labelNames.try_emplace({ scope->second, sym->getName() });
+                if (fresh)
+                {
+                    named->second = next();
+                }
+                name = named->second;
+            }
+            else
+            {
+                name = next();
+            }
             sym->setMangledName(allocator.copyStr(name.c_str()));
             result.renamed.emplace(sym->getName(), name);
             report.note(sym->getLoc(), "OptimizerRenamed", "renamed the [1] [2] to [3]", { LSLSymbol::getTypeName(sym->getSymbolType()), sym->getName(), name });
