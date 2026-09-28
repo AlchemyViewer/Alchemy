@@ -301,12 +301,7 @@ void ALTabStrip::chooseKeyed(size_t index)
 
 S32 ALTabStrip::contentWidth() const
 {
-    S32 width = 0;
-    for (const S32 w : mWidths)
-    {
-        width += w;
-    }
-    return width + mGap * llmax(0, static_cast<S32>(mWidths.size()) - 1);
+    return mContentWidth;
 }
 
 bool ALTabStrip::overflowing() const
@@ -440,6 +435,19 @@ std::string ALTabStrip::shortened(const LLFontGL* font, const std::string& label
 // past that the tabs run off the right edge rather than vanish.
 void ALTabStrip::layout()
 {
+    layoutWidths();
+    mLefts.resize(mWidths.size());
+    S32 left = 0;
+    for (size_t i = 0; i < mWidths.size(); ++i)
+    {
+        mLefts[i] = left;
+        left += mWidths[i] + mGap;
+    }
+    mContentWidth = mWidths.empty() ? 0 : left - mGap;
+}
+
+void ALTabStrip::layoutWidths()
+{
     mWidths.assign(mTabs.size(), 0);
     if (mTabs.empty())
     {
@@ -518,11 +526,7 @@ void ALTabStrip::layout()
 
 LLRect ALTabStrip::rectOf(size_t index) const
 {
-    S32 left = -mScroll;
-    for (size_t i = 0; i < index && i < mWidths.size(); ++i)
-    {
-        left += mWidths[i] + mGap;
-    }
+    const S32 left  = (index < mLefts.size() ? mLefts[index] : mWidths.empty() ? 0 : mContentWidth + mGap) - mScroll;
     const S32 width = index < mWidths.size() ? mWidths[index] : 0;
     return LLRect(left, getRect().getHeight(), left + width, 0);
 }

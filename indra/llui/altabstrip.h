@@ -205,6 +205,7 @@ public:
 private:
     // Every tab's width, decided together.
     void layout();
+    void layoutWidths();
     // The tabs' whole width, and the room they are shown in.
     S32  contentWidth() const;
     S32  shownWidth() const;
@@ -228,6 +229,11 @@ private:
 
     std::vector<Tab>    mTabs;
     std::vector<S32>    mWidths;
+    // Where each tab starts, from the first's left, and how wide they are
+    // all told: summed once as they are laid out, rather than from the
+    // left for each tab as it is drawn.
+    std::vector<S32>    mLefts;
+    S32                 mContentWidth = 0;
     // Each tab's name as last drawn: cut for a room, kept while the room,
     // the face -- italic for a preview, regular once held -- and the
     // name are the same, since the cutting measures the words.

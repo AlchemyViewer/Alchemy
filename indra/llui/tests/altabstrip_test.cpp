@@ -689,4 +689,47 @@ namespace tut
         ensure("no such tab", !strip->setTab(tab("gone.xml", "z")) && strip->tabs().size() == 3);
         strip->die();
     }
+    // Where each tab starts is summed once as they are laid out: forty tabs
+    // of every width run edge to edge a gap apart, each found under its own
+    // middle, scrolled or not, and again once their names change.
+    template<> template<>
+    void altabstrip_object::test<15>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        ALTabStrip* strip = make();
+        const auto  many  = [](const char* stem) {
+            std::vector<ALTabStrip::Tab> tabs;
+            for (S32 i = 0; i < 40; ++i)
+            {
+                tabs.push_back(tab(std::string(stem) + std::string(static_cast<size_t>(1 + (i * 7) % 23), 'x') + ".xml", std::to_string(i)));
+            }
+            return tabs;
+        };
+        const auto check = [&](const std::string& what) {
+            const S32 gap = strip->rectOf(1).mLeft - strip->rectOf(0).mRight;
+            for (size_t i = 0; i + 1 < 40; ++i)
+            {
+                ensure_equals(what + ": tab " + std::to_string(i + 1) + " a gap after the one before", strip->rectOf(i + 1).mLeft - strip->rectOf(i).mRight, gap);
+            }
+            for (size_t i = 0; i < 40; ++i)
+            {
+                const LLRect r = strip->rectOf(i);
+                if (r.getCenterX() >= 0 && r.getCenterX() < strip->getRect().getWidth() - 40)
+                {
+                    ensure_equals(what + ": the tab under its own middle", strip->at(r.getCenterX(), r.getCenterY()), (S32)i);
+                }
+            }
+        };
+        strip->setTabs(many("panel_"), "0");
+        check("from the start");
+        strip->choose("39");
+        ensure("scrolled to the last", strip->rectOf(0).mLeft < 0);
+        check("scrolled");
+        strip->setTabs(many("a_much_longer_name_"), "39");
+        check("renamed");
+        strip->die();
+    }
 }
