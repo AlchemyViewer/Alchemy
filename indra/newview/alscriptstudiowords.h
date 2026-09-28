@@ -105,6 +105,10 @@ public:
     // Whether a position of an LSL script is straight inside a state,
     // where an event's handler goes.
     static bool inStateBody(ALCodeEditor& editor, const ALTextPos& at);
+    // Whether a function's argument, from 0, is a link number, as the
+    // definitions name its parameter -- Link, LinkNumber -- where they
+    // know the function.
+    static bool linkArgument(bool lua, std::string_view function, S32 argument);
     // A word as a completion: a function with its call, an event as a
     // handler to fill in -- LSL's as the detail reads, SLua's set on
     // LLEvents -- a constant as itself.

@@ -485,6 +485,9 @@ private:
     void recompile(const ALScriptRef& ref, const std::string& target, std::optional<bool> running, ALScriptWorkspace::compile_callback_t told) override;
     void scriptRecompiled(const ALScriptRecompile::Script& script) override;
     void recompiled(const ALScriptRecompile::Done& done) override;
+    // Completion's link numbers: where the call being typed wants one, the
+    // prims of the script's object by name, each putting in its number.
+    void completeLinks(const Doc& doc, const ALTextPos& at, std::string_view prefix, std::vector<ALCodeEditor::Completion>& out);
     // Navigation (ALScriptNavigation): the services' and saving's calls to
     // it, and what it asks of the window.
     void revealed(LLUICtrl* list, bool to_editor) override { mNavigation.revealed(list, to_editor); }

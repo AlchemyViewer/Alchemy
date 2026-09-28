@@ -2651,7 +2651,83 @@ void ALFloaterScriptStudio::teachEditor(Doc& doc)
     });
     editor.setCompletionProvider([this, lua, raw](const ALTextPos& at, std::string_view prefix, std::vector<ALCodeEditor::Completion>& out) {
         ALScriptStudioWords::complete(lua, *raw->editor, at, prefix, snippets(lua), getString("SnippetDetail"), out);
+        completeLinks(*raw, at, prefix, out);
     });
+}
+
+void ALFloaterScriptStudio::completeLinks(const Doc& doc, const ALTextPos& at, std::string_view prefix, std::vector<ALCodeEditor::Completion>& out)
+{
+    // Where the call being typed wants a link number -- llSetLinkAlpha's
+    // first, ll.MessageLinked's -- the prims of the script's own object by
+    // name, each putting in its number, as a script numbers them.
+    if (doc.ref.inInventory() || doc.notecard || !doc.editor)
+    {
+        return;
+    }
+    ALCodeEditor& editor = *doc.editor;
+    ALTextPos     open;
+    if (!editor.bracketIndex().enclosing(at, '(', 1, open))
+    {
+        return;
+    }
+    // The function the bracket is the call of: its name before it, with
+    // the library it is in -- `ll.MessageLinked`.
+    const std::string& line = editor.document().line(open.line);
+    S32                end  = std::min<S32>(open.column, static_cast<S32>(line.size()));
+    while (end > 0 && (line[end - 1] == ' ' || line[end - 1] == '\t'))
+    {
+        --end;
+    }
+    S32 start = end;
+    while (start > 0 && (std::isalnum(static_cast<unsigned char>(line[start - 1])) || line[start - 1] == '_' || line[start - 1] == '.'))
+    {
+        --start;
+    }
+    if (start == end || !ALScriptStudioWords::linkArgument(doc.language.lua, line.substr(start, end - start), editor.argumentAt(open, at)))
+    {
+        return;
+    }
+    LLViewerObject* object = gObjectList.findObject(doc.ref.object);
+    LLViewerObject* root   = object && object->getRootEdit() ? object->getRootEdit() : object;
+    if (!root)
+    {
+        return;
+    }
+    std::vector<LLViewerObject*> prims{ root };
+    for (const LLPointer<LLViewerObject>& child : root->getChildren())
+    {
+        if (child && !child->isAvatar())
+        {
+            prims.push_back(child.get());
+        }
+    }
+    std::map<std::string, S32> seen;
+    for (size_t index = 0; index < prims.size(); ++index)
+    {
+        const S32   link = prims.size() > 1 ? static_cast<S32>(index) + 1 : 0;
+        std::string name = ALScriptWorkspace::objectName(prims[index], LLStringUtil::null);
+        if (name.empty())
+        {
+            continue;
+        }
+        // Two of one name each by its number.
+        if (seen[name]++ > 0)
+        {
+            name += " #" + std::to_string(link);
+        }
+        if (!prefix.empty() && ALCodeEditor::matchTier(name, prefix) < 0)
+        {
+            continue;
+        }
+        LLStringUtil::format_map_t args;
+        args["[LINK]"] = std::to_string(link);
+        ALCodeEditor::Completion one;
+        one.text    = name;
+        one.snippet = std::to_string(link);
+        one.detail  = getString("LinkCompletion", args);
+        one.kind    = ALSyntaxKind::Constant;
+        out.push_back(std::move(one));
+    }
 }
 
 

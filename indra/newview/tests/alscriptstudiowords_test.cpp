@@ -312,4 +312,22 @@ namespace tut
         ensure("a member: not the global", !Words::hoverText(true, s.document(), ALTextPos(0, 15), "type", text));
         ensure("the global itself", Words::hoverText(true, s.document(), ALTextPos(1, 11), "type", text) && text.find("What a value is.") != std::string::npos);
     }
+
+    template<> template<>
+    void alscriptstudiowords_object::test<11>()
+    {
+        set_test_name("a function's link-number argument, as the definitions name it, in LSL and in SLua");
+        lsl["functions"]["llSetLinkAlpha"] = LLSD().with("return", "").with(
+            "arguments",
+            LLSD().with(0, argument("LinkNumber", "integer")).with(1, argument("Opacity", "float")).with(2, argument("Face", "integer")));
+        slua["functions"]["ll.MessageLinked"] =
+            LLSD().with("return", "()").with("arguments", LLSD().with(0, argument("link", "number")).with(1, argument("num", "number")));
+        Words::forget();
+        ensure("llSetLinkAlpha's first", Words::linkArgument(false, "llSetLinkAlpha", 0));
+        ensure("not its second", !Words::linkArgument(false, "llSetLinkAlpha", 1));
+        ensure("nor past its last", !Words::linkArgument(false, "llSetLinkAlpha", 3));
+        ensure("llSay has none", !Words::linkArgument(false, "llSay", 0));
+        ensure("a word not known, none", !Words::linkArgument(false, "llNothing", 0));
+        ensure("SLua's by its name with its library", Words::linkArgument(true, "ll.MessageLinked", 0) && !Words::linkArgument(true, "ll.MessageLinked", 1));
+    }
 }

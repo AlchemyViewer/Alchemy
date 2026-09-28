@@ -244,6 +244,39 @@ void ALScriptStudioWords::teach(ALCodeEditor& editor, bool lua)
 }
 
 // static
+bool ALScriptStudioWords::linkArgument(bool lua, std::string_view function, S32 argument)
+{
+    const Vocab* found = word(lua, function);
+    if (!found || found->kind != ALSyntaxKind::Function || argument < 0)
+    {
+        return false;
+    }
+    // The detail is the call as the definitions give it: `name(type Name,
+    // type Name)`; the parameter asked about is the last word of its part.
+    const std::string& detail = found->detail;
+    const size_t       open   = detail.find('(');
+    const size_t       close  = detail.rfind(')');
+    if (open == std::string::npos || close == std::string::npos || close <= open)
+    {
+        return false;
+    }
+    std::vector<std::string> parts;
+    LLStringUtil::getTokens(detail.substr(open + 1, close - open - 1), parts, ",");
+    if (argument >= static_cast<S32>(parts.size()))
+    {
+        return false;
+    }
+    std::string name = parts[argument];
+    LLStringUtil::trim(name);
+    if (const size_t space = name.find_last_of(" \t"); space != std::string::npos)
+    {
+        name = name.substr(space + 1);
+    }
+    LLStringUtil::toLower(name);
+    return name == "link" || name == "linknumber";
+}
+
+// static
 bool ALScriptStudioWords::inStateBody(ALCodeEditor& editor, const ALTextPos& at)
 {
     // Straight inside a state is one bracket deep, in a block opened after

@@ -466,6 +466,7 @@
     <floater.string name="SavedElsewhereKept">Kept what is here in [NAME]; saving it replaces what was saved elsewhere.</floater.string>
     <floater.string name="SavedByBridge">VS Code</floater.string>
     <floater.string name="PrimLinked">[LINK]. [NAME]</floater.string>
+    <floater.string name="LinkCompletion">link [LINK]</floater.string>
     <floater.string name="KindAwayIn">away, in [REGION]</floater.string>
     <floater.string name="KeysCopiedA">Copied [KEYS]</floater.string>
     <floater.string name="KeysCopiedB">Copied [COUNT] keys, one a line</floater.string>
