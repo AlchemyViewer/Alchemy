@@ -4049,246 +4049,253 @@ namespace
         block->pushChild(yes);
         node->setChild(1, block);
     }
+    // One run over a script: put in place what is to be, then the rounds,
+    // then the printing, and what was printed checked.
+    ALLSLOptimizer::Result once(std::string_view source, const ALLSLOptimizer::Options& options)
+    {
+        using Result = ALLSLOptimizer::Result;
+        Result result;
+        result.text       = std::string(source);
+        result.sizeBefore = source.size();
+        result.sizeAfter  = source.size();
+        result.map = ALSourceMap::identity(result.text);
+        if (!ALLSLService::builtinsLoaded())
+        {
+            ALScriptProblem p;
+            p.severity = ALScriptProblem::Severity::Error;
+            p.source   = ALScriptProblem::Source::Optimizer;
+            p.message  = "the LSL definitions are not loaded, so nothing was optimized";
+            p.key      = "OptimizerNoDefinitions";
+            result.problems.push_back(std::move(p));
+            return result;
+        }
+
+        // The functions called once put in place first, in the text, so that
+        // what is parsed below is an ordinary script; its map is under the
+        // printer's. Before the engine is taken for the rest, so that the
+        // inliner's hold is its only one and it can let go between rounds.
+        std::string inlined;
+        ALSourceMap inlinedMap;
+        size_t      spent = 0;
+        if (options.inlining)
+        {
+            ALLSLInliner::Result put = ALLSLInliner::run(source, options.inlineNames, options.visitBudget);
+            // One budget for the two: what the inliner visited is spent.
+            spent = put.visited;
+            if (put.stoppedEarly)
+            {
+                ALScriptProblem p;
+                p.severity = ALScriptProblem::Severity::Note;
+                p.source   = ALScriptProblem::Source::Optimizer;
+                p.key      = "InlinerStoppedEarly";
+                p.message  = "stopped putting functions in place part way: there may be more to put in place";
+                result.problems.push_back(std::move(p));
+            }
+            if (put.inlined > 0)
+            {
+                inlined    = std::move(put.text);
+                inlinedMap = std::move(put.map);
+                source     = inlined;
+                for (ALScriptProblem& note : put.notes)
+                {
+                    result.problems.push_back(std::move(note));
+                }
+            }
+        }
+        AL_SCRIPT_ENGINE_HELD;
+        // What is said from here on is said of the inlined text, and brought
+        // back to the source on the way out.
+        const size_t saidOfInlined = result.problems.size();
+        const auto   bringBack     = [&]() {
+            if (inlinedMap.empty())
+            {
+                return;
+            }
+            for (size_t i = saidOfInlined; i < result.problems.size(); ++i)
+            {
+                ALScriptProblem&       p    = result.problems[i];
+                const ALSourceMap::Loc from = inlinedMap.toSource(p.line, p.column);
+                const ALSourceMap::Loc to   = inlinedMap.toSource(p.endLine, p.endColumn);
+                if (from.found())
+                {
+                    p.line   = from.line;
+                    p.column = from.column;
+                }
+                if (to.found())
+                {
+                    p.endLine   = to.line;
+                    p.endColumn = to.column;
+                }
+            }
+        };
+
+        ScopedScriptParser parser(nullptr);
+        LSLScript*         script = parser.parseLSLBytes(source.data(), static_cast<int>(source.size()));
+        if (!script || parser.logger.getErrors())
+        {
+            collectMessages(parser.logger, result.problems);
+            bringBack();
+            result.uncompiled = inlinedMap.empty();
+            return result;
+        }
+        script->collectSymbols();
+        script->determineTypes();
+        script->recalculateReferenceData();
+        Behavior   behavior(&parser.allocator, options.addstrings, options.target);
+        const auto propagate = [&]() {
+            ConstantDeterminingVisitor values(&behavior, &parser.allocator);
+            script->visit(&values);
+        };
+        propagate();
+        script->finalPass();
+        if (parser.logger.getErrors())
+        {
+            collectMessages(parser.logger, result.problems);
+            bringBack();
+            result.uncompiled = inlinedMap.empty();
+            return result;
+        }
+
+        const ALLSLEffects effects(script);
+        Ctx                ctx;
+        ctx.allocator = &parser.allocator;
+        ctx.context   = &parser.context;
+        ctx.target    = options.target;
+        ctx.foldtabs  = options.foldtabs;
+        ctx.effects   = &effects;
+        Report report(result.problems, options.notes);
+        // Each pass opens the way for the others; round and round until a
+        // round changes nothing -- or until the run has visited as much as
+        // its budget allows, since a large script whose passes keep finding
+        // work would otherwise hold whoever asked for as long as it liked.
+        // Every walk of the script counted as it is made -- a pass, and the
+        // references and values found again after a pass that changed
+        // something -- from what the inliner left of the budget.
+        size_t     visited = spent;
+        const auto nodes   = [&]() {
+            size_t count = 0;
+            Gather gather(count);
+            script->visit(&gather);
+            return count;
+        };
+        const size_t perWalk = std::max<size_t>(1, nodes());
+        const auto   walks   = [&](size_t count) { visited += perWalk * count; };
+        const auto   refresh = [&]() {
+            script->recalculateReferenceData();
+            propagate();
+            walks(2);
+        };
+        for (int round = 0; round < 64; ++round)
+        {
+            // No round begun that the budget cannot see through its passes.
+            if (visited + perWalk * 3 > options.visitBudget)
+            {
+                result.stoppedEarly = true;
+                report.note(nullptr, "OptimizerStoppedEarly", "stopped after [1] rounds: there may be more to do", { std::to_string(round) });
+                break;
+            }
+            // The references and values found again after the folder and the
+            // simplifier together, not after each: what the folder makes are
+            // constants, whose values the simplifier reads off them, and what
+            // counts it leaves behind can only be too high -- which a pass
+            // takes as a reason to do less, never as leave to do wrong. Dead
+            // code is looked for with everything found again, since what
+            // runs is told from the values.
+            int changes = 0;
+            if (options.constfold)
+            {
+                Folder folder(ctx, report, options);
+                script->visit(&folder);
+                walks(1);
+                Simplifier simplifier(ctx, report, options);
+                script->visit(&simplifier);
+                walks(1);
+                if (folder.changes + simplifier.changes)
+                {
+                    changes += folder.changes + simplifier.changes;
+                    refresh();
+                }
+            }
+            if (options.dcr)
+            {
+                DeadCode dead(ctx, report, options);
+                const int removed = dead.run(script);
+                walks(1);
+                if (removed)
+                {
+                    changes += removed;
+                    refresh();
+                }
+            }
+            if (!changes)
+            {
+                break;
+            }
+        }
+        // What is made for size alone, once nothing more will fold.
+        if (options.constfold)
+        {
+            Shapes shapes(ctx, report, options);
+            script->visit(&shapes);
+            walks(1);
+        }
+        if (options.shrinknames)
+        {
+            shrink(script, parser.context, parser.allocator, report, result);
+        }
+        braceDanglingElses(script, &parser.allocator);
+
+        PrettyPrintOpts opts{};
+        opts.mangle_local_names  = options.shrinknames;
+        opts.mangle_func_names   = options.shrinknames;
+        opts.mangle_global_names = options.shrinknames;
+        opts.show_unmangled      = false;
+        Printer printer(opts, options);
+        script->visit(&printer);
+        std::string written = printer.mStream.str();
+        // What was written must check as what it was made from did: a script
+        // the optimizer made unable to compile is the optimizer's fault, and
+        // the source goes as it was, said so, rather than that.
+        {
+            ScopedScriptParser check(nullptr);
+            LSLScript*         again = check.parseLSLBytes(written.data(), static_cast<int>(written.size()));
+            if (again && !check.logger.getErrors())
+            {
+                again->collectSymbols();
+                again->determineTypes();
+            }
+            if (!again || check.logger.getErrors())
+            {
+                ALScriptProblems said;
+                collectMessages(check.logger, said);
+                ALScriptProblem p;
+                p.severity = ALScriptProblem::Severity::Warning;
+                p.source   = ALScriptProblem::Source::Optimizer;
+                p.key      = "OptimizerWroteUncompilable";
+                p.args     = { said.empty() ? std::string() : said.front().message };
+                p.message  = ALScriptProblem::fill("not optimized: what the optimizer made of this script did not compile ([1]), so it goes as it was; "
+                                                   "please report it",
+                                                   p.args);
+                result.problems.clear();
+                result.problems.push_back(std::move(p));
+                return result;
+            }
+        }
+        result.text = std::move(written);
+        result.map  = printer.map(std::string());
+        if (!inlinedMap.empty())
+        {
+            result.map = result.map.composed(inlinedMap);
+        }
+        bringBack();
+        result.sizeAfter = result.text.size();
+        result.optimized = true;
+        return result;
+    }
 } // namespace
 
 ALLSLOptimizer::Result ALLSLOptimizer::run(std::string_view source, const Options& options)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
-    Result result;
-    result.text       = std::string(source);
-    result.sizeBefore = source.size();
-    result.sizeAfter  = source.size();
-    result.map = ALSourceMap::identity(result.text);
-    if (!ALLSLService::builtinsLoaded())
-    {
-        ALScriptProblem p;
-        p.severity = ALScriptProblem::Severity::Error;
-        p.source   = ALScriptProblem::Source::Optimizer;
-        p.message  = "the LSL definitions are not loaded, so nothing was optimized";
-        p.key      = "OptimizerNoDefinitions";
-        result.problems.push_back(std::move(p));
-        return result;
-    }
-
-    // The functions called once put in place first, in the text, so that
-    // what is parsed below is an ordinary script; its map is under the
-    // printer's. Before the engine is taken for the rest, so that the
-    // inliner's hold is its only one and it can let go between rounds.
-    std::string inlined;
-    ALSourceMap inlinedMap;
-    size_t      spent = 0;
-    if (options.inlining)
-    {
-        ALLSLInliner::Result put = ALLSLInliner::run(source, options.inlineNames, options.visitBudget);
-        // One budget for the two: what the inliner visited is spent.
-        spent = put.visited;
-        if (put.stoppedEarly)
-        {
-            ALScriptProblem p;
-            p.severity = ALScriptProblem::Severity::Note;
-            p.source   = ALScriptProblem::Source::Optimizer;
-            p.key      = "InlinerStoppedEarly";
-            p.message  = "stopped putting functions in place part way: there may be more to put in place";
-            result.problems.push_back(std::move(p));
-        }
-        if (put.inlined > 0)
-        {
-            inlined    = std::move(put.text);
-            inlinedMap = std::move(put.map);
-            source     = inlined;
-            for (ALScriptProblem& note : put.notes)
-            {
-                result.problems.push_back(std::move(note));
-            }
-        }
-    }
-    AL_SCRIPT_ENGINE_HELD;
-    // What is said from here on is said of the inlined text, and brought
-    // back to the source on the way out.
-    const size_t saidOfInlined = result.problems.size();
-    const auto   bringBack     = [&]() {
-        if (inlinedMap.empty())
-        {
-            return;
-        }
-        for (size_t i = saidOfInlined; i < result.problems.size(); ++i)
-        {
-            ALScriptProblem&       p    = result.problems[i];
-            const ALSourceMap::Loc from = inlinedMap.toSource(p.line, p.column);
-            const ALSourceMap::Loc to   = inlinedMap.toSource(p.endLine, p.endColumn);
-            if (from.found())
-            {
-                p.line   = from.line;
-                p.column = from.column;
-            }
-            if (to.found())
-            {
-                p.endLine   = to.line;
-                p.endColumn = to.column;
-            }
-        }
-    };
-
-    ScopedScriptParser parser(nullptr);
-    LSLScript*         script = parser.parseLSLBytes(source.data(), static_cast<int>(source.size()));
-    if (!script || parser.logger.getErrors())
-    {
-        collectMessages(parser.logger, result.problems);
-        bringBack();
-        result.uncompiled = inlinedMap.empty();
-        return result;
-    }
-    script->collectSymbols();
-    script->determineTypes();
-    script->recalculateReferenceData();
-    Behavior   behavior(&parser.allocator, options.addstrings, options.target);
-    const auto propagate = [&]() {
-        ConstantDeterminingVisitor values(&behavior, &parser.allocator);
-        script->visit(&values);
-    };
-    propagate();
-    script->finalPass();
-    if (parser.logger.getErrors())
-    {
-        collectMessages(parser.logger, result.problems);
-        bringBack();
-        result.uncompiled = inlinedMap.empty();
-        return result;
-    }
-
-    const ALLSLEffects effects(script);
-    Ctx                ctx;
-    ctx.allocator = &parser.allocator;
-    ctx.context   = &parser.context;
-    ctx.target    = options.target;
-    ctx.foldtabs  = options.foldtabs;
-    ctx.effects   = &effects;
-    Report report(result.problems, options.notes);
-    // Each pass opens the way for the others; round and round until a
-    // round changes nothing -- or until the run has visited as much as
-    // its budget allows, since a large script whose passes keep finding
-    // work would otherwise hold whoever asked for as long as it liked.
-    // Every walk of the script counted as it is made -- a pass, and the
-    // references and values found again after a pass that changed
-    // something -- from what the inliner left of the budget.
-    size_t     visited = spent;
-    const auto nodes   = [&]() {
-        size_t count = 0;
-        Gather gather(count);
-        script->visit(&gather);
-        return count;
-    };
-    const size_t perWalk = std::max<size_t>(1, nodes());
-    const auto   walks   = [&](size_t count) { visited += perWalk * count; };
-    const auto   refresh = [&]() {
-        script->recalculateReferenceData();
-        propagate();
-        walks(2);
-    };
-    for (int round = 0; round < 64; ++round)
-    {
-        // No round begun that the budget cannot see through its passes.
-        if (visited + perWalk * 3 > options.visitBudget)
-        {
-            result.stoppedEarly = true;
-            report.note(nullptr, "OptimizerStoppedEarly", "stopped after [1] rounds: there may be more to do", { std::to_string(round) });
-            break;
-        }
-        // The references and values found again after the folder and the
-        // simplifier together, not after each: what the folder makes are
-        // constants, whose values the simplifier reads off them, and what
-        // counts it leaves behind can only be too high -- which a pass
-        // takes as a reason to do less, never as leave to do wrong. Dead
-        // code is looked for with everything found again, since what
-        // runs is told from the values.
-        int changes = 0;
-        if (options.constfold)
-        {
-            Folder folder(ctx, report, options);
-            script->visit(&folder);
-            walks(1);
-            Simplifier simplifier(ctx, report, options);
-            script->visit(&simplifier);
-            walks(1);
-            if (folder.changes + simplifier.changes)
-            {
-                changes += folder.changes + simplifier.changes;
-                refresh();
-            }
-        }
-        if (options.dcr)
-        {
-            DeadCode dead(ctx, report, options);
-            const int removed = dead.run(script);
-            walks(1);
-            if (removed)
-            {
-                changes += removed;
-                refresh();
-            }
-        }
-        if (!changes)
-        {
-            break;
-        }
-    }
-    // What is made for size alone, once nothing more will fold.
-    if (options.constfold)
-    {
-        Shapes shapes(ctx, report, options);
-        script->visit(&shapes);
-        walks(1);
-    }
-    if (options.shrinknames)
-    {
-        shrink(script, parser.context, parser.allocator, report, result);
-    }
-    braceDanglingElses(script, &parser.allocator);
-
-    PrettyPrintOpts opts{};
-    opts.mangle_local_names  = options.shrinknames;
-    opts.mangle_func_names   = options.shrinknames;
-    opts.mangle_global_names = options.shrinknames;
-    opts.show_unmangled      = false;
-    Printer printer(opts, options);
-    script->visit(&printer);
-    std::string written = printer.mStream.str();
-    // What was written must check as what it was made from did: a script
-    // the optimizer made unable to compile is the optimizer's fault, and
-    // the source goes as it was, said so, rather than that.
-    {
-        ScopedScriptParser check(nullptr);
-        LSLScript*         again = check.parseLSLBytes(written.data(), static_cast<int>(written.size()));
-        if (again && !check.logger.getErrors())
-        {
-            again->collectSymbols();
-            again->determineTypes();
-        }
-        if (!again || check.logger.getErrors())
-        {
-            ALScriptProblems said;
-            collectMessages(check.logger, said);
-            ALScriptProblem p;
-            p.severity = ALScriptProblem::Severity::Warning;
-            p.source   = ALScriptProblem::Source::Optimizer;
-            p.key      = "OptimizerWroteUncompilable";
-            p.args     = { said.empty() ? std::string() : said.front().message };
-            p.message  = ALScriptProblem::fill("not optimized: what the optimizer made of this script did not compile ([1]), so it goes as it was; "
-                                               "please report it",
-                                               p.args);
-            result.problems.clear();
-            result.problems.push_back(std::move(p));
-            return result;
-        }
-    }
-    result.text = std::move(written);
-    result.map  = printer.map(std::string());
-    if (!inlinedMap.empty())
-    {
-        result.map = result.map.composed(inlinedMap);
-    }
-    bringBack();
-    result.sizeAfter = result.text.size();
-    result.optimized = true;
-    return result;
+    return once(source, options);
 }
