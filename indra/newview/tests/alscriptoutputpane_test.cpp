@@ -447,4 +447,31 @@ namespace tut
         out.heard(failed(lamp, fresh(), "lamp.lsl", "Math Error", -1));
         ensure("the chosen one's is", out.unread());
     }
+
+    template <>
+    template <>
+    void alscriptoutputpane_object::test<9>()
+    {
+        set_test_name("what the agent's objects say aloud, to the agent, and in IMs: each its kind, the agent's own; the prim that spoke named");
+        ALScriptOutputPane& out  = make();
+        const LLUUID        lamp = fresh();
+        Event               aloud = said(lamp, "Lamp", "hello", Event::Channel::Said);
+        aloud.primName            = "Bulb";
+        out.heard(aloud);
+        out.heard(said(lamp, "Lamp", "just you", Event::Channel::SaidTo));
+        out.heard(said(lamp, "Lamp", "an IM", Event::Channel::Instant));
+        const auto& entries = out.view()->entries();
+        ensure_equals("three", entries.size(), size_t(3));
+        ensure_equals("the prim that spoke, after its object", entries[0].source, std::string("Lamp \xE2\x96\xB8 Bulb"));
+        ensure_equals("said", entries[0].kind, window.services().words("KindSaid"));
+        ensure_equals("said to the agent", entries[1].kind, window.services().words("KindSaidTo"));
+        ensure_equals("an IM", entries[2].kind, window.services().words("KindInstant"));
+        whose("mine");
+        ensure_equals("the agent's own, all of them", shownTexts().size(), size_t(3));
+        whose("");
+        out.showKind("said");
+        ensure_equals("aloud and to the agent", shown(), std::string("|hello|just you"));
+        out.showKind("im");
+        ensure_equals("IMs", shown(), std::string("|an IM"));
+    }
 }

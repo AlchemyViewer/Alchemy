@@ -2595,6 +2595,13 @@ void LLScriptEditorWSServer::sendRuntimeEvent(const ALScriptWorkspace::RuntimeEv
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
 
+    // The protocol's channels: what an object says aloud or in an IM is
+    // the studio's to show, not the bridge's to send.
+    if (event.channel != ALScriptWorkspace::RuntimeEvent::Channel::Debug && event.channel != ALScriptWorkspace::RuntimeEvent::Channel::OwnerSay)
+    {
+        return;
+    }
+
     std::string script_id;
     if (event.item.notNull())
     {
@@ -2633,6 +2640,8 @@ void LLScriptEditorWSServer::sendRuntimeEvent(const ALScriptWorkspace::RuntimeEv
         break;
     case ALScriptWorkspace::RuntimeEvent::Channel::OwnerSay:
         message["channel"] = "owner_say";
+        break;
+    default:
         break;
     }
 

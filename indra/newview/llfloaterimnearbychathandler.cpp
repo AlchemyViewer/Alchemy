@@ -762,6 +762,14 @@ void LLFloaterIMNearbyChatHandler::processChat(const LLChat& chat_msg,
     {
         ALScriptWorkspace::instance().ingestChat(chat_msg);
     }
+    // And what the agent's own objects say aloud, to the agent alone, or
+    // in an IM -- which comes here as chat, with the object's place.
+    else if (chat_msg.mSourceType == CHAT_SOURCE_OBJECT && chat_msg.mOwnerID == gAgentID &&
+             (chat_msg.mChatType == CHAT_TYPE_WHISPER || chat_msg.mChatType == CHAT_TYPE_NORMAL || chat_msg.mChatType == CHAT_TYPE_SHOUT ||
+              chat_msg.mChatType == CHAT_TYPE_DIRECT))
+    {
+        ALScriptWorkspace::instance().ingestChat(chat_msg, args.has("slurl"));
+    }
 
     // don't show toast and add message to chat history on receive debug message
     // with disabled setting showing script errors or enabled setting to show script

@@ -2064,9 +2064,13 @@ bool ALScriptWorkspace::remove(const ALScriptRef& ref, std::string& error)
 
 // --- what scripts say ------------------------------------------------------------
 
-void ALScriptWorkspace::ingestChat(const LLChat& chat)
+void ALScriptWorkspace::ingestChat(const LLChat& chat, bool instant)
 {
-    const RuntimeEvent::Channel channel = chat.mChatType == CHAT_TYPE_OWNER ? RuntimeEvent::Channel::OwnerSay : RuntimeEvent::Channel::Debug;
+    const RuntimeEvent::Channel channel = instant                             ? RuntimeEvent::Channel::Instant
+                                          : chat.mChatType == CHAT_TYPE_OWNER  ? RuntimeEvent::Channel::OwnerSay
+                                          : chat.mChatType == CHAT_TYPE_DEBUG_MSG ? RuntimeEvent::Channel::Debug
+                                          : chat.mChatType == CHAT_TYPE_DIRECT ? RuntimeEvent::Channel::SaidTo
+                                                                               : RuntimeEvent::Channel::Said;
     const std::vector<std::string>  lines = LLStringUtil::getTokens(chat.mText, "\n");
     ALScriptMessages::Header        named;
     const bool                      header = !lines.empty() && ALScriptMessages::readRuntimeHeader(lines.front(), named);
@@ -2172,6 +2176,17 @@ void ALScriptWorkspace::deliverRuntime(const Burst& burst)
         else
         {
             lines.clear();
+        }
+    }
+    // A child prim speaks under its own name: the object's said too,
+    // where it is known.
+    if (prim && root && root != prim)
+    {
+        const std::string object = objectName(root, LLStringUtil::null);
+        if (!object.empty() && object != event.objectName)
+        {
+            event.primName   = event.objectName;
+            event.objectName = object;
         }
     }
     if (prim && !event.scriptName.empty())

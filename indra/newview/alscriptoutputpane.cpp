@@ -179,10 +179,26 @@ ALScriptOutputPane::Place ALScriptOutputPane::heard(const ALScriptWorkspace::Run
 
     // One line of the log, or more where the script said more; the
     // script's name a link to it, at the line of a run-time error.
+    using Channel = ALScriptWorkspace::RuntimeEvent::Channel;
     ALOutputView::Entry entry;
-    entry.time   = clockOf(event.time);
-    entry.source = event.scriptName.empty() ? event.objectName : event.objectName + " / " + event.scriptName;
-    entry.kind   = event.isError ? mServices->words("KindError") : event.channel == ALScriptWorkspace::RuntimeEvent::Channel::OwnerSay ? mServices->words("KindOwnerSay") : std::string();
+    entry.time = clockOf(event.time);
+    // Whose: the object, the prim of it that spoke where that is not its
+    // root, and the script.
+    entry.source = event.objectName;
+    if (!event.primName.empty())
+    {
+        entry.source += " \xE2\x96\xB8 " + event.primName;
+    }
+    if (!event.scriptName.empty())
+    {
+        entry.source += " / " + event.scriptName;
+    }
+    entry.kind = event.isError                        ? mServices->words("KindError")
+                 : event.channel == Channel::OwnerSay ? mServices->words("KindOwnerSay")
+                 : event.channel == Channel::Said     ? mServices->words("KindSaid")
+                 : event.channel == Channel::SaidTo   ? mServices->words("KindSaidTo")
+                 : event.channel == Channel::Instant  ? mServices->words("KindInstant")
+                                                      : std::string();
     entry.text   = event.isError && !event.error.empty() ? event.error : event.message;
     while (!entry.text.empty() && (entry.text.back() == '\n' || entry.text.back() == '\r'))
     {
@@ -192,8 +208,15 @@ ALScriptOutputPane::Place ALScriptOutputPane::heard(const ALScriptWorkspace::Run
     entry.key["root"] = event.root;
     entry.key["prim"] = event.prim;
     entry.key["item"] = event.item;
-    entry.key["kind"] = event.isError ? "error" : event.channel == ALScriptWorkspace::RuntimeEvent::Channel::OwnerSay ? "owner" : "debug";
-    entry.key["mine"] = event.channel == ALScriptWorkspace::RuntimeEvent::Channel::OwnerSay || (event.root.notNull() && mWindow->ownsObject(event.root));
+    // What an object says aloud or in an IM is heard only from the agent's
+    // own objects.
+    const bool aloud  = event.channel == Channel::Said || event.channel == Channel::SaidTo || event.channel == Channel::Instant;
+    entry.key["kind"] = event.isError                         ? "error"
+                        : event.channel == Channel::OwnerSay  ? "owner"
+                        : event.channel == Channel::Instant   ? "im"
+                        : aloud                               ? "said"
+                                                              : "debug";
+    entry.key["mine"] = event.channel == Channel::OwnerSay || aloud || (event.root.notNull() && mWindow->ownsObject(event.root));
     if (event.isError)
     {
         entry.color = runtime_color.get();
@@ -240,7 +263,7 @@ ALScriptOutputPane::Place ALScriptOutputPane::heard(const ALScriptWorkspace::Run
             }
         }
     }
-    else if (event.channel == ALScriptWorkspace::RuntimeEvent::Channel::OwnerSay)
+    else if (event.channel == Channel::OwnerSay || aloud)
     {
         // What the owner was told, in the colour chat shows an object's
         // words in; the debug channel's in the plain ink.

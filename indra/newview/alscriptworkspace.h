@@ -503,16 +503,22 @@ public:
     // --- what scripts say ------------------------------------------------------
 
     // What an object's scripts say on the debug channel and to their
-    // owner, as the viewer hears it: the lines that arrive together from
-    // one script are one event, and a run-time error is parsed to its
-    // place and its stack for both VMs. The line and the column are
-    // zero-based, or -1 where the message named none.
+    // owner, as the viewer hears it -- and what the agent's own objects
+    // say aloud, to the agent alone, or in an IM: the lines that arrive
+    // together from one script are one event, and a run-time error is
+    // parsed to its place and its stack for both VMs. The line and the
+    // column are zero-based, or -1 where the message named none.
     struct RuntimeEvent
     {
         enum class Channel : U8
         {
             Debug,
-            OwnerSay
+            OwnerSay,
+            // Channel 0, heard by everyone near; llRegionSayTo to the
+            // agent; llInstantMessage.
+            Said,
+            SaidTo,
+            Instant
         };
         // Seconds since the epoch, as LLDate counts them.
         F64         time = 0.0;
@@ -521,6 +527,9 @@ public:
         // The script, where the message named one the prim holds.
         LLUUID      item;
         std::string objectName;
+        // The prim that spoke, where it is not the object's root and the
+        // object's own name is known: the object is then `objectName`.
+        std::string primName;
         std::string scriptName;
         bool        lua     = false;
         Channel     channel = Channel::Debug;
@@ -533,10 +542,11 @@ public:
         std::vector<std::string> stack;
     };
     // Every debug-channel and owner-say line the viewer hears from an
-    // object goes through here. A run-time error's lines arrive one
-    // message at a time; they are joined for a moment before they are
-    // delivered.
-    void ingestChat(const LLChat& chat);
+    // object goes through here, and every line the agent's own objects say
+    // aloud, to the agent alone, or -- `instant` -- in an IM. A run-time
+    // error's lines arrive one message at a time; they are joined for a
+    // moment before they are delivered.
+    void ingestChat(const LLChat& chat, bool instant = false);
     // Whatever is still being joined, delivered as it is.
     void flushRuntime();
     // The last few hundred events, oldest first, for a pane opened late.

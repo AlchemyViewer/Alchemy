@@ -291,6 +291,9 @@
     <floater.string name="KindModule">module</floater.string>
     <floater.string name="KindOwnerSay">owner</floater.string>
     <floater.string name="KindError">error</floater.string>
+    <floater.string name="KindSaid">said</floater.string>
+    <floater.string name="KindSaidTo">said to you</floater.string>
+    <floater.string name="KindInstant">IM</floater.string>
     <floater.string name="OriginRuntime">Runtime</floater.string>
     <floater.string name="OriginAny">Every source</floater.string>
     <floater.string name="ProblemsAllHiddenA">The filters hide the 1 problem there is.</floater.string>
@@ -2052,6 +2055,8 @@
                                 <combo_box.item label="Errors" name="output_kind_error" value="error" />
                                 <combo_box.item label="Owner says" name="output_kind_owner" value="owner" />
                                 <combo_box.item label="Debug channel" name="output_kind_debug" value="debug" />
+                                <combo_box.item label="Said aloud" name="output_kind_said" value="said" />
+                                <combo_box.item label="IMs" name="output_kind_im" value="im" />
                                 <combo_box.item label="Studio" name="output_kind_studio" value="studio" />
                             </combo_box>
                             <filter_editor
