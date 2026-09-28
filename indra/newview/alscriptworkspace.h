@@ -200,6 +200,8 @@ public:
         Kind                    kind = Kind::Script;
         Sender                  sender;
         LLUUID                  newAssetId;
+        // An inventory item the save made anew, where it made one.
+        LLUUID                  newItemId;
         std::vector<Diagnostic> diagnostics;
         // The server's lines as they came.
         std::vector<std::string> messages;
@@ -235,6 +237,11 @@ public:
     // the result says it was saved, or why not, the same way.
     bool saveNotecard(const ALScriptRef& ref, const std::string& text, const std::vector<LLPointer<LLInventoryItem>>& embedded,
                       compile_callback_t callback, std::string& error, Sender sender = Sender());
+    // One written out already, in its format with its items, as a text
+    // editor that keeps its own items exports one: the same, its text read
+    // back out of it for those who hear it was saved.
+    bool saveNotecardAsset(const ALScriptRef& ref, const std::string& asset, compile_callback_t callback, std::string& error,
+                           Sender sender = Sender());
 
     // Something's text saved, whoever sent it: the text as it went up, its
     // new asset, and who sent it -- a script's whether it compiled or not,
@@ -531,6 +538,9 @@ private:
     // An answer handed to its caller and every listener, on the main
     // coroutine; and, where the text went up, said as saved with it.
     void        deliver(const CompileResult& result, const compile_callback_t& callback, const std::string* text = nullptr);
+    // A notecard's asset sent, and `text`, its text, said as saved.
+    bool        uploadNotecard(const ALScriptRef& ref, const std::string& buffer, const std::string& text, bool carries,
+                               compile_callback_t callback, std::string& error, Sender sender);
     bool        scriptMessage(const ALScriptRef& ref, const char* message, bool running, bool with_running);
 
     compiled_signal_t             mCompiled;

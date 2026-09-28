@@ -371,6 +371,8 @@ private:
     void onCompileTargetChanged();
 
     static void finishLSLUpload(LLUUID itemId, LLUUID taskId, LLUUID newAssetId, LLSD response, bool isRunning);
+    // A save that did not go up: said in the error list, as a failed compile.
+    static void failedLSLUpload(const LLUUID& itemId, const LLUUID& taskId, const std::string& reason);
     static void receiveExperienceIds(LLSD result, LLHandle<LLLiveLSLEditor> parent);
 
 private:

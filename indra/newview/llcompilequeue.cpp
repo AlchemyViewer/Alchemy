@@ -119,50 +119,6 @@ namespace
 
 }
 
-// *NOTE$: A minor specialization of LLScriptAssetUpload, it does not require a buffer
-// (and does not save a buffer to the cache) and it finds the compile queue window and
-// displays a compiling message.
-class LLQueuedScriptAssetUpload : public LLScriptAssetUpload
-{
-public:
-    LLQueuedScriptAssetUpload(LLUUID taskId, LLUUID itemId, LLUUID assetId, std::string compileTarget,
-            bool isRunning, std::string scriptName, LLUUID queueId, LLUUID exerienceId, taskUploadFinish_f finish) :
-        LLScriptAssetUpload(taskId, itemId, compileTarget, isRunning,
-            exerienceId, std::string(), finish, nullptr),
-        mScriptName(scriptName),
-        mQueueId(queueId)
-    {
-        setAssetId(assetId);
-    }
-
-    virtual LLSD prepareUpload()
-    {
-        /* *NOTE$: The parent class (LLScriptAssetUpload will attempt to save
-         * the script buffer into to the cache.  Since the resource is already in
-         * the cache we don't want to do that.  Just put a compiling message in
-         * the window and move on
-         */
-        LLFloaterCompileQueue* queue = LLFloaterReg::findTypedInstance<LLFloaterCompileQueue>("compile_queue", LLSD(mQueueId));
-        if (queue)
-        {
-            std::string message = std::string("Compiling \"") + getScriptName() + std::string("\"...");
-
-            queue->getChild<LLScrollListCtrl>("queue output")->addSimpleElement(message, ADD_BOTTOM);
-        }
-
-        return LLSDMap("success", LLSD::Boolean(true));
-    }
-
-
-    std::string getScriptName() const { return mScriptName; }
-
-private:
-    void setScriptName(const std::string &scriptName) { mScriptName = scriptName; }
-
-    LLUUID mQueueId;
-    std::string mScriptName;
-};
-
 ///----------------------------------------------------------------------------
 /// Local function declarations, constants, enums, and typedefs
 ///----------------------------------------------------------------------------
@@ -507,86 +463,78 @@ bool LLFloaterCompileQueue::processScript(LLHandle<LLFloaterCompileQueue> hfloat
         return true;
     }
 
-    // A script the preprocessor wrapped, or any script while the
-    // preprocessor is on, is expanded again from its source, so that its
-    // includes are fresh, and goes up as text through the workspace.
-    bool preprocessed = false;
+    // Every recompile goes through the workspace, which every save goes
+    // through, so that every editor hears what the compiler said. A script
+    // the preprocessor wrapped, or any script while the preprocessor is on,
+    // is expanded again from its source, so that its includes are fresh;
+    // one whose text is not at hand is fetched by the workspace itself.
     {
-        std::string text;
-        if (ALScriptWorkspace::readAsset(assetId, item->getType(), text) &&
-            (ALScriptEnvelope::looksWrapped(text) || ALScriptPreprocessor::enabled()))
-        {
-            preprocessed = true;
-            const ALScriptRef ref(object->getID(), inventory->getUUID());
-            const std::string pumpName = pump.getName();
-            auto              prepared = std::make_shared<ALScriptWorkspace::Prepared>();
-            ALScriptWorkspace::instance().prepare(ref, inventory->getName(), assetId, text, script_is_lua, compile_target,
-                                                  [pumpName, prepared](const ALScriptWorkspace::Prepared& p) {
-                                                      *prepared = p;
-                                                      LLEventPumps::instance().post(pumpName, LLSDMap("prepared", LLSD::Boolean(true)));
-                                                  });
-            result = llcoro::suspendUntilEventOnWithTimeout(pump, QUEUE_INVENTORY_FETCH_TIMEOUT, LLSDMap("timeout", LLSD::Boolean(true)));
-            floater.check();
-            if (result.has("timeout"))
+        const ALScriptRef ref(object->getID(), inventory->getUUID());
+        const std::string pumpName = pump.getName();
+        const bool        running  = floater->runsAfterCompile(object->getID(), inventory->getUUID());
+        const auto        heard    = [pumpName](const ALScriptWorkspace::CompileResult& compiled) {
+            LLSD out;
+            out["compiled"] = compiled.success;
+            LLSD errors     = LLSD::emptyArray();
+            if (!compiled.error.empty())
             {
-                LLStringUtil::format_map_t args;
-                args["[OBJECT_NAME]"] = inventory->getName();
-                floater->addStringMessage(floater->getString("Timeout", args));
-                return true;
+                errors.append(compiled.error);
             }
-            if (!prepared->errors.empty())
+            for (const std::string& message : compiled.messages)
             {
-                floater->addStringMessage(std::string("Preprocessing of \"") + inventory->getName() + std::string("\" failed:"));
-                for (const ALScriptWorkspace::Diagnostic& problem : prepared->errors)
+                errors.append(message);
+            }
+            out["errors"] = errors;
+            LLEventPumps::instance().post(pumpName, out);
+        };
+        std::string text;
+        if (!ALScriptWorkspace::readAsset(assetId, item->getType(), text))
+        {
+            ALScriptWorkspace::instance().recompile(ref, compile_target, heard, running,
+                                                    ALScriptWorkspace::Sender(ALScriptWorkspace::Origin::Queue));
+        }
+        else
+        {
+            if (ALScriptEnvelope::looksWrapped(text) || ALScriptPreprocessor::enabled())
+            {
+                auto prepared = std::make_shared<ALScriptWorkspace::Prepared>();
+                ALScriptWorkspace::instance().prepare(ref, inventory->getName(), assetId, text, script_is_lua, compile_target,
+                                                      [pumpName, prepared](const ALScriptWorkspace::Prepared& p) {
+                                                          *prepared = p;
+                                                          LLEventPumps::instance().post(pumpName, LLSDMap("prepared", LLSD::Boolean(true)));
+                                                      });
+                result = llcoro::suspendUntilEventOnWithTimeout(pump, QUEUE_INVENTORY_FETCH_TIMEOUT, LLSDMap("timeout", LLSD::Boolean(true)));
+                floater.check();
+                if (result.has("timeout"))
                 {
-                    floater->addStringMessage(std::to_string(problem.line + 1) + ": " + problem.message);
+                    LLStringUtil::format_map_t args;
+                    args["[OBJECT_NAME]"] = inventory->getName();
+                    floater->addStringMessage(floater->getString("Timeout", args));
+                    return true;
                 }
-                return true;
+                if (!prepared->errors.empty())
+                {
+                    floater->addStringMessage(std::string("Preprocessing of \"") + inventory->getName() + std::string("\" failed:"));
+                    for (const ALScriptWorkspace::Diagnostic& problem : prepared->errors)
+                    {
+                        floater->addStringMessage(std::to_string(problem.line + 1) + ": " + problem.message);
+                    }
+                    return true;
+                }
+                text = prepared->text;
             }
             ALScriptWorkspace::SaveOptions options;
             options.compileTarget = compile_target;
-            options.running       = floater->runsAfterCompile(object->getID(), inventory->getUUID());
+            options.running       = running;
             options.experience    = experienceId;
+            options.sender        = ALScriptWorkspace::Sender(ALScriptWorkspace::Origin::Queue);
             std::string error;
-            const bool  sent = ALScriptWorkspace::instance().save(
-                ref, prepared->text, options,
-                [pumpName](const ALScriptWorkspace::CompileResult& compiled) {
-                    LLSD out;
-                    out["compiled"] = compiled.success;
-                    LLSD errors     = LLSD::emptyArray();
-                    for (const std::string& message : compiled.messages)
-                    {
-                        errors.append(message);
-                    }
-                    out["errors"] = errors;
-                    LLEventPumps::instance().post(pumpName, out);
-                },
-                error);
-            if (!sent)
+            if (!ALScriptWorkspace::instance().save(ref, text, options, heard, error))
             {
                 floater->addStringMessage(std::string("Upload of \"") + inventory->getName() + std::string("\" failed: ") + error);
                 return true;
             }
-            result = llcoro::suspendUntilEventOnWithTimeout(pump, QUEUE_INVENTORY_FETCH_TIMEOUT, LLSDMap("timeout", LLSD::Boolean(true)));
         }
-    }
-
-    if (!preprocessed)
-    {
-        std::string url = object->getRegion()->getCapability("UpdateScriptTask");
-
-        LLResourceUploadInfo::ptr_t uploadInfo = std::make_shared<LLQueuedScriptAssetUpload>(object->getID(),
-            inventory->getUUID(),
-            assetId,
-            compile_target,
-            floater->runsAfterCompile(object->getID(), inventory->getUUID()),
-            inventory->getName(),
-            LLUUID(),
-            experienceId,
-            boost::bind(&LLFloaterCompileQueue::handleHTTPResponse, pump.getName(), _4));
-
-        LLViewerAssetUpload::EnqueueInventoryUpload(url, uploadInfo);
-
         result = llcoro::suspendUntilEventOnWithTimeout(pump, QUEUE_INVENTORY_FETCH_TIMEOUT, LLSDMap("timeout", LLSD::Boolean(true)));
     }
 

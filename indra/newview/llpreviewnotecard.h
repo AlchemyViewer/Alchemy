@@ -121,6 +121,8 @@ protected:
 
     static void finishInventoryUpload(LLUUID itemId, LLUUID newAssetId, LLUUID newItemId);
     static void finishTaskUpload(LLUUID itemId, LLUUID newAssetId, LLUUID taskId);
+    // A save that did not go up: the editor given back, and why said.
+    static void failedUpload(const LLUUID& taskId, const LLUUID& itemId, const std::string& reason);
 
     void openInExternalEditor();
     bool onExternalChange(const std::string& filename);

@@ -28,6 +28,8 @@
 
 #include "llpreviewnotecard.h"
 
+#include "alscriptworkspace.h"
+
 #include "llinventory.h"
 
 #include "llagent.h"
@@ -513,6 +515,29 @@ void LLPreviewNotecard::finishInventoryUpload(LLUUID itemId, LLUUID newAssetId, 
     }
 }
 
+// static
+void LLPreviewNotecard::failedUpload(const LLUUID& taskId, const LLUUID& itemId, const std::string& reason)
+{
+    LLSD floater_key;
+    if (taskId.notNull())
+    {
+        floater_key["taskid"] = taskId;
+        floater_key["itemid"] = itemId;
+    }
+    else
+    {
+        floater_key = LLSD(itemId);
+    }
+    if (LLPreviewNotecard* nc = LLFloaterReg::findTypedInstance<LLPreviewNotecard>("preview_notecard", floater_key))
+    {
+        nc->mAssetStatus = PREVIEW_ASSET_LOADED;
+        nc->setEnabled(true);
+    }
+    LLSD args;
+    args["REASON"] = reason;
+    LLNotificationsUtil::add("SaveNotecardFailReason", args);
+}
+
 void LLPreviewNotecard::finishTaskUpload(LLUUID itemId, LLUUID newAssetId, LLUUID taskId)
 {
 
@@ -557,37 +582,38 @@ bool LLPreviewNotecard::saveIfNeeded(LLInventoryItem* copyitem, bool sync)
 
             if (!agent_url.empty() && !task_url.empty())
             {
-                std::string url;
-                LLResourceUploadInfo::ptr_t uploadInfo;
-
-                if (mObjectUUID.isNull() && !agent_url.empty())
+                // Through the workspace, which every save goes through, so
+                // that every editor hears it -- the Script Studio's tabs
+                // among them.
+                const LLUUID object_uuid(mObjectUUID);
+                const LLUUID item_uuid(mItemUUID);
+                std::string  error;
+                const bool   sent = ALScriptWorkspace::instance().saveNotecardAsset(
+                    ALScriptRef(object_uuid, item_uuid), buffer,
+                    [object_uuid, item_uuid](const ALScriptWorkspace::CompileResult& result) {
+                        if (!result.error.empty())
+                        {
+                            LLPreviewNotecard::failedUpload(object_uuid, item_uuid, result.error);
+                        }
+                        else if (object_uuid.isNull())
+                        {
+                            LLPreviewNotecard::finishInventoryUpload(item_uuid, result.newAssetId, result.newItemId);
+                        }
+                        else
+                        {
+                            LLPreviewNotecard::finishTaskUpload(item_uuid, result.newAssetId, object_uuid);
+                        }
+                    },
+                    error, ALScriptWorkspace::Sender(ALScriptWorkspace::Origin::Editor));
+                if (!sent)
                 {
-                    uploadInfo = std::make_shared<LLBufferedAssetUploadInfo>(mItemUUID, LLAssetType::AT_NOTECARD, buffer,
-                        [](LLUUID itemId, LLUUID newAssetId, LLUUID newItemId, LLSD) {
-                            LLPreviewNotecard::finishInventoryUpload(itemId, newAssetId, newItemId);
-                        },
-                        nullptr);
-                    url = agent_url;
+                    LLSD args;
+                    args["REASON"] = error;
+                    LLNotificationsUtil::add("SaveNotecardFailReason", args);
+                    return false;
                 }
-                else if (!mObjectUUID.isNull() && !task_url.empty())
-                {
-                    LLUUID object_uuid(mObjectUUID);
-                    uploadInfo = std::make_shared<LLBufferedAssetUploadInfo>(mObjectUUID, mItemUUID, LLAssetType::AT_NOTECARD, buffer,
-                        [object_uuid](LLUUID itemId, LLUUID, LLUUID newAssetId, LLSD) {
-                            LLPreviewNotecard::finishTaskUpload(itemId, newAssetId, object_uuid);
-                        },
-                        nullptr);
-                    url = task_url;
-                }
-
-                if (!url.empty() && uploadInfo)
-                {
-                    mAssetStatus = PREVIEW_ASSET_LOADING;
-                    setEnabled(false);
-
-                    LLViewerAssetUpload::EnqueueInventoryUpload(url, uploadInfo);
-                }
-
+                mAssetStatus = PREVIEW_ASSET_LOADING;
+                setEnabled(false);
             }
             else if (gAssetStorage)
             {

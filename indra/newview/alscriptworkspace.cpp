@@ -727,15 +727,37 @@ bool ALScriptWorkspace::saveNotecard(const ALScriptRef& ref, const std::string& 
         error = LLTrans::getString("WorkspaceNotecardUnwritable");
         return false;
     }
-    const std::string buffer   = out.str();
-    const bool        carries  = !embedded.empty();
-    auto              answered = [this, ref, callback, carries, sender, text](const LLUUID& new_asset_id) {
+    return uploadNotecard(ref, out.str(), text, !embedded.empty(), std::move(callback), error, sender);
+}
+
+bool ALScriptWorkspace::saveNotecardAsset(const ALScriptRef& ref, const std::string& asset, compile_callback_t callback, std::string& error,
+                                          Sender sender)
+{
+    LLNotecard         notecard(LLNotecard::MAX_SIZE);
+    std::istringstream in(asset);
+    if (!notecard.importStream(in))
+    {
+        error = LLTrans::getString("WorkspaceNotecardUnwritable");
+        return false;
+    }
+    return uploadNotecard(ref, asset, notecard.getText(), !notecard.getItems().empty(), std::move(callback), error, sender);
+}
+
+bool ALScriptWorkspace::uploadNotecard(const ALScriptRef& ref, const std::string& buffer, const std::string& text, bool carries,
+                                       compile_callback_t callback, std::string& error, Sender sender)
+{
+    if (sender.request == 0)
+    {
+        sender.request = newRequest();
+    }
+    auto answered = [this, ref, callback, carries, sender, text](const LLUUID& new_asset_id, const LLUUID& new_item_id) {
         CompileResult result;
         result.ref        = ref;
         result.kind       = Kind::Notecard;
         result.sender     = sender;
         result.success    = true;
         result.newAssetId = new_asset_id;
+        result.newItemId  = new_item_id;
         if (carries)
         {
             // The uploader may have rewritten what it was given; the copy
@@ -770,7 +792,7 @@ bool ALScriptWorkspace::saveNotecard(const ALScriptRef& ref, const std::string& 
         }
         LLResourceUploadInfo::ptr_t info(std::make_shared<LLBufferedAssetUploadInfo>(
             ref.item, LLAssetType::AT_NOTECARD, buffer,
-            [answered](LLUUID, LLUUID new_asset_id, LLUUID, LLSD) { answered(new_asset_id); }, failed));
+            [answered](LLUUID, LLUUID new_asset_id, LLUUID new_item_id, LLSD) { answered(new_asset_id, new_item_id); }, failed));
         LLViewerAssetUpload::EnqueueInventoryUpload(url, info);
         return true;
     }
@@ -794,7 +816,7 @@ bool ALScriptWorkspace::saveNotecard(const ALScriptRef& ref, const std::string& 
     }
     LLResourceUploadInfo::ptr_t info(std::make_shared<LLBufferedAssetUploadInfo>(
         ref.object, ref.item, LLAssetType::AT_NOTECARD, buffer,
-        [answered](LLUUID, LLUUID, LLUUID new_asset_id, LLSD) { answered(new_asset_id); }, failed));
+        [answered](LLUUID, LLUUID, LLUUID new_asset_id, LLSD) { answered(new_asset_id, LLUUID::null); }, failed));
     LLViewerAssetUpload::EnqueueInventoryUpload(url, info);
     return true;
 }

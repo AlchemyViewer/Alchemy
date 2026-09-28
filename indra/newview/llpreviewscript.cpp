@@ -29,6 +29,7 @@
 #include "llpreviewscript.h"
 
 #include "alscriptmessages.h"
+#include "alscriptworkspace.h"
 #include "llassetstorage.h"
 #include "llbutton.h"
 #include "llcheckboxctrl.h"
@@ -129,6 +130,20 @@ static std::string build_script_help_url(bool luau_language, const std::string& 
     }
 
     return is_luau_library_symbol(help_string) ? HELP_LUA_LIBRARY_URL : HELP_LUA_PORTAL_URL;
+}
+
+// An upload's answer as the legacy editors read it: whether it compiled, and
+// the compiler's lines.
+static LLSD compileResponseOf(const ALScriptWorkspace::CompileResult& result)
+{
+    LLSD response;
+    response["compiled"] = result.success;
+    response["errors"]   = LLSD::emptyArray();
+    for (const std::string& line : result.messages)
+    {
+        response["errors"].append(line);
+    }
+    return response;
 }
 
 static bool have_script_upload_cap(LLUUID& object_id)
@@ -2151,19 +2166,28 @@ void LLPreviewLSL::saveIfNeeded(bool sync /*= true*/)
         mPendingUploads++;
         if (!url.empty())
         {
-            std::string compile_target(mScriptEd->mCompileTarget->getValue());
-            std::string buffer(mScriptEd->mEditor->getText());
-
-            LLUUID old_asset_id = inv_item->getAssetUUID().isNull() ? mScriptEd->getAssetID() : inv_item->getAssetUUID();
-
-            LLResourceUploadInfo::ptr_t uploadInfo(std::make_shared<LLScriptAssetUpload>(mItemUUID, compile_target, buffer,
-                [old_asset_id](LLUUID itemId, LLUUID, LLUUID, LLSD response) {
-                    LLFileSystem::removeFile(old_asset_id, LLAssetType::AT_LSL_TEXT);
-                    LLPreviewLSL::finishedLSLUpload(itemId, response);
+            // Through the workspace, which every save goes through, so that
+            // every editor hears it -- the Script Studio's tabs among them.
+            ALScriptWorkspace::SaveOptions options;
+            options.compileTarget = mScriptEd->mCompileTarget->getValue().asString();
+            options.sender        = ALScriptWorkspace::Sender(ALScriptWorkspace::Origin::Editor);
+            const LLUUID item_id  = mItemUUID;
+            std::string  error;
+            const bool   sent = ALScriptWorkspace::instance().save(
+                ALScriptRef(LLUUID::null, item_id), mScriptEd->mEditor->getText(), options,
+                [item_id](const ALScriptWorkspace::CompileResult& result) {
+                    if (!result.error.empty())
+                    {
+                        LLPreviewLSL::failedLSLUpload(item_id, LLUUID::null, LLSD(), result.error);
+                        return;
+                    }
+                    LLPreviewLSL::finishedLSLUpload(item_id, compileResponseOf(result));
                 },
-                LLPreviewLSL::failedLSLUpload));
-
-            LLViewerAssetUpload::EnqueueInventoryUpload(url, uploadInfo);
+                error);
+            if (!sent)
+            {
+                LLPreviewLSL::failedLSLUpload(item_id, LLUUID::null, LLSD(), error);
+            }
         }
     }
 }
@@ -2769,6 +2793,24 @@ void LLLiveLSLEditor::finishLSLUpload(LLUUID itemId, LLUUID taskId, LLUUID newAs
         });
 }
 
+/*static*/
+void LLLiveLSLEditor::failedLSLUpload(const LLUUID& itemId, const LLUUID& taskId, const std::string& reason)
+{
+    LLSD floater_key;
+    floater_key["taskid"] = taskId;
+    floater_key["itemid"] = itemId;
+    if (LLLiveLSLEditor* preview = LLFloaterReg::findTypedInstance<LLLiveLSLEditor>("preview_scriptedit", floater_key))
+    {
+        LLSD errors;
+        errors.append(LLTrans::getString("UploadFailed") + reason);
+        preview->callbackLSLCompileFailed(errors);
+        LLSD message;
+        message["compiled"] = false;
+        message["errors"]   = errors;
+        preview->sendCompileResults(message);
+    }
+}
+
 // virtual
 void LLLiveLSLEditor::saveIfNeeded(bool sync /*= true*/)
 {
@@ -2832,20 +2874,31 @@ void LLLiveLSLEditor::saveIfNeeded(bool sync /*= true*/)
 
     if (!url.empty())
     {
-        std::string compile_target(mScriptEd->mCompileTarget->getValue());
-        std::string buffer(mScriptEd->mEditor->getText());
-        LLUUID old_asset_id = mScriptEd->getAssetID();
-
-        LLResourceUploadInfo::ptr_t uploadInfo(std::make_shared<LLScriptAssetUpload>(mObjectUUID, mItemUUID,
-            compile_target, is_running, mScriptEd->getAssociatedExperience(), buffer,
-            [is_running, old_asset_id](LLUUID item_id, LLUUID task_id, LLUUID new_asset_id, LLSD response)
-            {
-                LLFileSystem::removeFile(old_asset_id, LLAssetType::AT_LSL_TEXT);
-                LLLiveLSLEditor::finishLSLUpload(item_id, task_id, new_asset_id, response, is_running);
+        // Through the workspace, which every save goes through, so that
+        // every editor hears it -- the Script Studio's tabs among them.
+        ALScriptWorkspace::SaveOptions options;
+        options.compileTarget = mScriptEd->mCompileTarget->getValue().asString();
+        options.running       = is_running;
+        options.experience    = mScriptEd->getAssociatedExperience();
+        options.sender        = ALScriptWorkspace::Sender(ALScriptWorkspace::Origin::Editor);
+        const LLUUID object_id = mObjectUUID;
+        const LLUUID item_id   = mItemUUID;
+        std::string  error;
+        const bool   sent = ALScriptWorkspace::instance().save(
+            ALScriptRef(object_id, item_id), mScriptEd->mEditor->getText(), options,
+            [object_id, item_id, is_running](const ALScriptWorkspace::CompileResult& result) {
+                if (!result.error.empty())
+                {
+                    LLLiveLSLEditor::failedLSLUpload(item_id, object_id, result.error);
+                    return;
+                }
+                LLLiveLSLEditor::finishLSLUpload(item_id, object_id, result.newAssetId, compileResponseOf(result), is_running);
             },
-            nullptr)); // needs failure handling?
-
-        LLViewerAssetUpload::EnqueueInventoryUpload(url, uploadInfo);
+            error);
+        if (!sent)
+        {
+            LLLiveLSLEditor::failedLSLUpload(item_id, object_id, error);
+        }
     }
 }
 
