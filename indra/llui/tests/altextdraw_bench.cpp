@@ -25,10 +25,12 @@
 // What the script studio's editor costs to draw, a frame at a time, over a
 // script of 50,000 lines, LSL and SLua side by side: the code editor as the
 // studio makes it, drawn into llrender's hidden window with the viewer's GL.
-// A number is milliseconds per frame: the median of five samples, each as
-// many frames as fit in fifty milliseconds. A frame is the editor's draw,
-// the batch flushed, and a glFinish, so what the driver was handed is
-// counted and nothing queues up across frames.
+// A number is the CPU's milliseconds per frame: the median of five samples,
+// each as many frames as fit in fifty milliseconds. What is counted of a
+// frame is the editor's draw and the batch flushed, which is everything
+// the viewer's thread does for it, the driver's work on each draw call
+// included; the GPU is waited for between frames, off the clock, so that
+// nothing queues up across them and what it takes to draw is not counted.
 //
 // Nothing here changes between frames, so every row is an idle frame: what
 // the editor spends redrawing what it drew the frame before. The output is a
@@ -70,23 +72,23 @@ namespace
 
     constexpr int LINES = 50000;
 
-    // Milliseconds per call of `frame`.
-    double ms_per_frame(const std::function<void()>& frame)
+    // Milliseconds per call of `frame`, which says how long its own part
+    // took.
+    double ms_per_frame(const std::function<double()>& frame)
     {
         frame();
         double samples[5];
         for (double& sample : samples)
         {
-            size_t          frames = 0;
-            const auto      start  = clock::now();
-            clock::duration elapsed{};
+            size_t     frames  = 0;
+            double     counted = 0.0;
+            const auto start   = clock::now();
             do
             {
-                frame();
+                counted += frame();
                 ++frames;
-                elapsed = clock::now() - start;
-            } while (elapsed < std::chrono::milliseconds(50));
-            sample = std::chrono::duration<double, std::milli>(elapsed).count() / double(frames);
+            } while (clock::now() - start < std::chrono::milliseconds(50));
+            sample = counted / double(frames);
         }
         std::sort(samples, samples + 5);
         return samples[2];
@@ -113,11 +115,16 @@ namespace
         return editor;
     }
 
-    void drawFrame(ALCodeEditor& e)
+    // The draw and the batch handed over, on the clock; then the GPU
+    // waited for.
+    double drawFrame(ALCodeEditor& e)
     {
+        const auto start = clock::now();
         e.draw();
         gGL.flush();
+        const double ms = std::chrono::duration<double, std::milli>(clock::now() - start).count();
         glFinish();
+        return ms;
     }
 
     void row(const char* name, double lsl, double slua)
@@ -133,7 +140,7 @@ namespace
         {
             ALCodeEditor& e = *subjects[i].editor;
             setup(e);
-            ms[i] = ms_per_frame([&] { drawFrame(e); });
+            ms[i] = ms_per_frame([&] { return drawFrame(e); });
         }
         row(name, ms[0], ms[1]);
     }
@@ -223,6 +230,11 @@ int main(int, char**)
     {
         s.editor->setDecorations({});
         s.editor->clearHighlights();
+    }
+    both("with the map beside the text", subjects, [](ALCodeEditor& e) { e.setScrollMap(true); });
+    for (Subject& s : subjects)
+    {
+        s.editor->setScrollMap(false);
     }
 
     // A line of 20,000 characters near the top, as generated code or a list
