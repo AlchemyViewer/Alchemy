@@ -174,21 +174,9 @@ ALScriptProblemsPane::Made ALScriptProblemsPane::make(const Doc& doc, const ALSc
     }
     for (const ALScriptProblem& problem : doc.check.analysis)
     {
-        const Doc::Level  level  = Doc::levelOf(problem.severity);
-        const std::string origin = problem.source == ALScriptProblem::Source::Parser  ? services.words("OriginParser")
-                                   : problem.source == ALScriptProblem::Source::Types ? services.words("OriginTypes")
-                                                                                      : services.words("OriginLint");
-        // A lint's name says what to look up, or what a NOLINT comment
-        // turns off: Luau's own, LSL's as its key has it. An error's number
-        // says nothing to whoever reads it.
-        std::string name = ALScriptFixes::lintName(problem, doc.language.lua);
-        if (name.empty() && !problem.code.empty() && problem.code.find_first_not_of("0123456789") != std::string::npos)
-        {
-            name = problem.code;
-        }
-        const std::string message = name.empty() ? problem.message : problem.message + " [" + name + "]";
-        add(problem.line, problem.column, true, problem.endLine, problem.endColumn, Doc::markOf(level), level, origin, message, problem.file,
-            problem.source == ALScriptProblem::Source::Lint ? problem.code : std::string());
+        const Doc::Shown said = analysisRow(problem, doc.language.lua, services);
+        add(problem.line, problem.column, true, problem.endLine, problem.endColumn, Doc::markOf(said.level), said.level, said.origin, said.message,
+            problem.file, said.lint);
         made.rows.back().key      = problem.key;
         made.rows.back().fixes    = problem.fixes;
         made.rows.back().fixesFor = doc.check.analysisVersion;
@@ -265,6 +253,34 @@ ALScriptProblemsPane::Made ALScriptProblemsPane::make(const Doc& doc, const ALSc
 }
 
 static LLPanelInjector<ALScriptProblemsPane> t_script_studio_problems("script_studio_problems");
+
+// static
+ALScriptProblemsPane::Doc::Shown ALScriptProblemsPane::analysisRow(const ALScriptProblem& problem, bool lua, const ALScriptStudioServices& services)
+{
+    Doc::Shown row;
+    row.level  = Doc::levelOf(problem.severity);
+    row.origin = problem.source == ALScriptProblem::Source::Parser  ? services.words("OriginParser")
+                 : problem.source == ALScriptProblem::Source::Types ? services.words("OriginTypes")
+                                                                    : services.words("OriginLint");
+    // A lint's name says what to look up, or what a NOLINT comment turns
+    // off: Luau's own, LSL's as its key has it. An error's number says
+    // nothing to whoever reads it.
+    std::string name = ALScriptFixes::lintName(problem, lua);
+    if (name.empty() && !problem.code.empty() && problem.code.find_first_not_of("0123456789") != std::string::npos)
+    {
+        name = problem.code;
+    }
+    row.message   = name.empty() ? problem.message : problem.message + " [" + name + "]";
+    row.lint      = problem.source == ALScriptProblem::Source::Lint ? problem.code : std::string();
+    row.line      = problem.line;
+    row.column    = problem.column;
+    row.hasColumn = true;
+    row.endLine   = problem.endLine;
+    row.endColumn = problem.endColumn;
+    row.file      = problem.file;
+    row.key       = problem.key;
+    return row;
+}
 
 ALScriptProblemsPane::ALScriptProblemsPane(const LLPanel::Params& params) : LLPanel(params) {}
 

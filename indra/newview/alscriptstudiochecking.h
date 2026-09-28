@@ -164,6 +164,14 @@ public:
     void              fixesOn(const Doc& doc, S32 line, std::vector<ALCodeEditor::Fix>& out) const;
     const Doc::Shown* shownOf(const LLSD& value) const;
 
+    // A check's problems read back through the expansion it was made of to
+    // the source: each in the script, in an include by its path, in a
+    // module the script requires by that module's own map, or in code the
+    // preprocessor made; and what an include declares and the script does
+    // not use dropped. Fixes are kept only for the script's own.
+    static void mapBack(std::vector<ALScriptProblem>& problems, const ALSourceMap& map,
+                        const std::vector<std::pair<std::string, ALSourceMap>>& module_maps);
+
 private:
     // The expansion asked for, a question waiting on it; and taken.
     void expandFor(Doc& doc, ALScriptAnalysis::Kind kind, const ALTextPos& at, const ALTextPos& to);

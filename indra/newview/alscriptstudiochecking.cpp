@@ -859,32 +859,38 @@ void ALScriptStudioChecking::takeColours(Doc& doc, const ALScriptAnalysis::Resul
 
 void ALScriptStudioChecking::mapProblems(Doc& doc)
 {
+    mapBack(doc.check.analysis, doc.expanded.map, doc.expanded.moduleMaps);
+}
+
+// static
+void ALScriptStudioChecking::mapBack(std::vector<ALScriptProblem>& problems, const ALSourceMap& map,
+                                     const std::vector<std::pair<std::string, ALSourceMap>>& module_maps)
+{
     // Back to the source: a problem in an include keeps its file, and
     // what an include declares is the include's to outline. What an
     // include declares and this script does not use is no problem of
     // this script's: a library is meant to hold more than any one
     // script calls, and every script including it would be told so.
-    const ALSourceMap& map = doc.expanded.map;
-    doc.check.analysis.erase(std::remove_if(doc.check.analysis.begin(), doc.check.analysis.end(),
-                                            [&map](const ALScriptProblem& problem) {
-                                                if (!problem.file.empty() || !unusedWarning(problem))
-                                                {
-                                                    return false;
-                                                }
-                                                const ALSourceMap::Loc loc = map.toSource(problem.line, problem.column);
-                                                return loc.found() && loc.file > 0;
-                                            }),
-                             doc.check.analysis.end());
-    for (ALScriptProblem& problem : doc.check.analysis)
+    problems.erase(std::remove_if(problems.begin(), problems.end(),
+                                  [&map](const ALScriptProblem& problem) {
+                                      if (!problem.file.empty() || !unusedWarning(problem))
+                                      {
+                                          return false;
+                                      }
+                                      const ALSourceMap::Loc loc = map.toSource(problem.line, problem.column);
+                                      return loc.found() && loc.file > 0;
+                                  }),
+                   problems.end());
+    for (ALScriptProblem& problem : problems)
     {
         // One the checker found in a module the script requires, in the
         // module's lines: back to the file it came of, through its own map.
         if (!problem.file.empty())
         {
             problem.fixes.clear();
-            const auto own = std::find_if(doc.expanded.moduleMaps.begin(), doc.expanded.moduleMaps.end(),
+            const auto own = std::find_if(module_maps.begin(), module_maps.end(),
                                           [&problem](const auto& module) { return module.first == problem.file; });
-            if (own == doc.expanded.moduleMaps.end())
+            if (own == module_maps.end())
             {
                 continue;
             }
