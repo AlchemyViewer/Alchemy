@@ -360,7 +360,8 @@ void ALScriptOutputPane::said(const std::string& text, bool failure, const ALScr
 
 void ALScriptOutputPane::markUnread()
 {
-    if (!mWindow->outputInSight())
+    // Said on the title once, not once more for every line after.
+    if (!mUnread && !mWindow->outputInSight())
     {
         mUnread = true;
         mWindow->outputUnreadChanged();

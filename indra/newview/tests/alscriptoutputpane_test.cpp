@@ -446,6 +446,9 @@ namespace tut
         ensure("a stranger's, hidden: not unread", !out.unread() && studio.unreadChanges == 0);
         out.heard(failed(lamp, fresh(), "lamp.lsl", "Math Error", -1));
         ensure("the chosen one's is", out.unread());
+        const S32 said = studio.unreadChanges;
+        out.heard(failed(lamp, fresh(), "lamp.lsl", "Another Error", -1));
+        ensure_equals("unread already: not said again", studio.unreadChanges, said);
     }
 
     template <>
