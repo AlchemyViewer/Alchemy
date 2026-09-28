@@ -257,12 +257,18 @@ namespace
 
     // ---- the library, evaluated -----------------------------------------------------------------
 
+    ALScriptWeight weigh(ALLSLOptimizer::Target target, std::string_view text);
+
     struct Ctx
     {
         ScriptAllocator*       allocator = nullptr;
         ScriptContext*         context   = nullptr;
         ALLSLOptimizer::Target target    = ALLSLOptimizer::Target::Mono;
         bool                   foldtabs  = false;
+        // Whether a call is larger than the string that answers it, by the
+        // call as written and whether the code holds the answer already:
+        // weighed once for the run (Folder::smallerAnswered).
+        boost::unordered_flat_map<std::string, bool, ll::string_hash, std::equal_to<>> answers;
         // What each function may write, found once for the run: the passes
         // only take code away, so what it says stays true, if more than
         // is left.
@@ -2154,8 +2160,189 @@ namespace
             {
                 return false;
             }
+            // An answer no longer than the strings the call was given takes
+            // no more room than they did; a longer one can be larger than
+            // the call, on a target that writes a string at every place it
+            // is used, and on one that holds each string once where the
+            // answer is new to it.
+            if (value->getIType() == LST_STRING && strlen(static_cast<LSLStringConstant*>(value)->getValue()) > givenChars(expr) &&
+                !smallerAnswered(expr, args, static_cast<LSLStringConstant*>(value)))
+            {
+                return false;
+            }
             fold(expr, value, "OptimizerEvaluated", "evaluated");
             return true;
+        }
+
+        // Whether a string is smaller than the call it answers, as the
+        // target's compiler counts: each compiled in a script of its own,
+        // beside what stays either way -- the function called with its
+        // strings emptied, for the reference to it a script may keep, and
+        // each string of the call's and the answer that the code holds
+        // elsewhere.
+        bool smallerAnswered(LSLFunctionExpression* expr, const Args& args, LSLStringConstant* value)
+        {
+            const bool                       wide   = ctx.target == ALLSLOptimizer::Target::Luau;
+            const std::optional<std::string> answer = ALLSLValues::literal(value, wide);
+            if (!answer)
+            {
+                return false;
+            }
+            const std::string name = expr->getSymbol()->getName();
+            std::string       call = name + "(";
+            std::string       again = call;
+            Counted           own;
+            for (size_t i = 0; i < args.size(); ++i)
+            {
+                const std::optional<std::string> arg   = ALLSLValues::literal(args[i], wide);
+                const std::optional<std::string> empty = emptied(args[i], wide);
+                if (!arg || !empty)
+                {
+                    return false;
+                }
+                call += (i ? ", " : "") + *arg;
+                again += (i ? ", " : "") + *empty;
+                count(args[i], own);
+            }
+            call += ")";
+            again += ")";
+            std::string   before    = "default { state_entry() { llOwnerSay(" + again + ");";
+            const Counted held      = holds(expr);
+            const auto    elsewhere = [&](const std::string& text) {
+                const auto in   = held.find(text);
+                const auto mine = own.find(text);
+                return in != held.end() && in->second > (mine == own.end() ? 0 : mine->second);
+            };
+            for (const auto& [text, times] : own)
+            {
+                if (elsewhere(text))
+                {
+                    const std::optional<std::string> written = ALLSLValues::literal(ctx.allocator->newTracked<LSLStringConstant>(ctx.allocator->copyStr(text.c_str())), wide);
+                    if (!written)
+                    {
+                        return false;
+                    }
+                    before += " llOwnerSay(" + *written + ");";
+                }
+            }
+            if (elsewhere(value->getValue()))
+            {
+                before += " llOwnerSay(" + *answer + ");";
+            }
+            const std::string key = before + call;
+            if (const auto found = ctx.answers.find(key); found != ctx.answers.end())
+            {
+                return found->second;
+            }
+            const ALScriptWeight asCall   = weigh(ctx.target, before + " llOwnerSay(" + call + "); } }");
+            const ALScriptWeight asAnswer = weigh(ctx.target, before + " llOwnerSay(" + *answer + "); } }");
+            const bool           smaller  = asCall.compiled && asAnswer.compiled && asAnswer.total <= asCall.total;
+            ctx.answers.emplace(key, smaller);
+            return smaller;
+        }
+
+        using Counted = boost::unordered_flat_map<std::string, int, ll::string_hash, std::equal_to<>>;
+
+        // The strings in a value, each as many times as it is there.
+        static void count(LSLConstant* cv, Counted& out)
+        {
+            switch (cv->getIType())
+            {
+                case LST_STRING:
+                    ++out[static_cast<LSLStringConstant*>(cv)->getValue()];
+                    break;
+                case LST_KEY:
+                    ++out[static_cast<LSLKeyConstant*>(cv)->getValue()];
+                    break;
+                case LST_LIST:
+                    for (LSLASTNode* item : *cv)
+                    {
+                        count(static_cast<LSLConstant*>(item), out);
+                    }
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        // A value as a literal of its shape, its strings empty.
+        static std::optional<std::string> emptied(LSLConstant* cv, bool wide)
+        {
+            switch (cv->getIType())
+            {
+                case LST_STRING:
+                case LST_KEY:
+                    return "\"\"";
+                case LST_LIST:
+                {
+                    std::string out = "[";
+                    for (LSLASTNode* item : *cv)
+                    {
+                        const std::optional<std::string> element = emptied(static_cast<LSLConstant*>(item), wide);
+                        if (!element)
+                        {
+                            return std::nullopt;
+                        }
+                        out += (out.size() > 1 ? ", " : "") + *element;
+                    }
+                    return out + "]";
+                }
+                default:
+                    return ALLSLValues::literal(cv, wide);
+            }
+        }
+
+        // The strings the code holds where a place would share them, each
+        // as many times as it is written, as the code is now: Mono's are
+        // the whole script's, Luau's each function's; LSO writes one
+        // wherever it is used.
+        Counted holds(LSLASTNode* at) const
+        {
+            if (ctx.target == ALLSLOptimizer::Target::LSO)
+            {
+                return {};
+            }
+            LSLASTNode* scope = at;
+            while (scope->getParent() && (ctx.target == ALLSLOptimizer::Target::Mono || (scope->getNodeType() != NODE_GLOBAL_FUNCTION &&
+                                                                                        scope->getNodeType() != NODE_EVENT_HANDLER)))
+            {
+                scope = scope->getParent();
+            }
+            Strings strings;
+            scope->visit(&strings);
+            return std::move(strings.found);
+        }
+
+        // The string literals in what it visits.
+        struct Strings : public ASTVisitor
+        {
+            Counted found;
+
+            bool visit(LSLStringConstant* c) override
+            {
+                ++found[c->getValue()];
+                return false;
+            }
+        };
+
+        // The characters of the strings written in a call's arguments,
+        // which go with it: a variable's value stays where it is.
+        static size_t givenChars(LSLFunctionExpression* expr)
+        {
+            Counted given;
+            for (LSLASTNode* arg : *expr->getArguments())
+            {
+                if (arg->getNodeSubType() != NODE_LVALUE_EXPRESSION && arg->getConstantValue())
+                {
+                    count(arg->getConstantValue(), given);
+                }
+            }
+            size_t chars = 0;
+            for (const auto& [text, times] : given)
+            {
+                chars += text.size() * times;
+            }
+            return chars;
         }
     };
 

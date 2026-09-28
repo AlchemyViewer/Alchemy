@@ -146,7 +146,8 @@ namespace tut
         }
     };
 
-    typedef test_group<allsloptimizer_data> allsloptimizer_group;
+    // Past TUT's fifty tests a group runs only what it is told it has.
+    typedef test_group<allsloptimizer_data, 100> allsloptimizer_group;
     typedef allsloptimizer_group::object    allsloptimizer_object;
     allsloptimizer_group                    allsloptimizer_instance("allsloptimizer");
 
@@ -1790,8 +1791,7 @@ namespace tut
                                         "        llOwnerSay((string)[llRound(2.5), llRound(-2.5), llRound(0.49999997), llAcos(1.0), llAsin(2.0)]);\n"
                                         "        llOwnerSay(llDumpList2String([1, 2.5, \"a\"], \"-\"));\n"
                                         "        llOwnerSay((string)[llListFindList([1, \"a\", 2], [\"a\", 2]), llListFindList([1, 2], [3]),\n"
-                                        "                            llListFindList([1, 2], []), llListFindList([\"1\"], [1])]);\n"
-                                        "        llOwnerSay(llMD5String(\"Hello, Avatar!\", 0));\n");
+                                        "                            llListFindList([1, 2], []), llListFindList([\"1\"], [1])]);\n");
         ALLSLOptimizer::Options o = options();
         o.target                  = ALLSLOptimizer::Target::LSO;
         const ALLSLOptimizer::Result r = ALLSLOptimizer::run(source, o);
@@ -1803,11 +1803,46 @@ namespace tut
         ensure("a dump folded", has("\"1-2.500000-a\""));
         ensure("a find folded, and one not found", !has("llListFindList([1, \"a\", 2]") && !has("[3])"));
         ensure("an empty list to find left, and a string no integer", has("llListFindList((list)1 + 2, [])") || has("llListFindList([1, 2], [])"));
-        ensure("the hash", has("\"112abd47ceaae1c05a826828650434a6\""));
         ALLSLService service;
         for (const ALScriptProblem& p : service.check(r.text, false))
         {
             ensure("what was written compiles: " + p.message + "\n" + r.text, p.severity != ALScriptProblem::Severity::Error);
         }
+    }
+
+    template<> template<>
+    void allsloptimizer_object::test<48>()
+    {
+        set_test_name("a call answered with a string longer than it was given is folded where the answer is the smaller");
+        using Target      = ALLSLOptimizer::Target;
+        const auto weigh  = [](Target target, const std::string& text) {
+            return target == Target::LSO ? ALScriptWeigh::lso(text) : target == Target::Mono ? ALScriptWeigh::mono(text) : ALScriptWeigh::lslLuau(text);
+        };
+        // Folded or not, never larger than the source.
+        const auto folded = [&weigh](Target target, const std::string& body) {
+            ALLSLOptimizer::Options o = options();
+            o.target                  = target;
+            const std::string            source = wrap("", body);
+            const ALLSLOptimizer::Result r      = ALLSLOptimizer::run(source, o);
+            ensure("optimized: " + notes(r), r.optimized);
+            const ALScriptWeight before = weigh(target, source);
+            const ALScriptWeight after  = weigh(target, r.text);
+            ensure("no larger: " + r.text, before.compiled && after.compiled && after.total <= before.total);
+            return r.text.find("llMD5String") == std::string::npos;
+        };
+        const std::string hashOfX = "\"70c6ab518c36e18d9925c3c27c048b26\"";
+        for (const Target target : { Target::LSO, Target::Mono, Target::Luau })
+        {
+            ensure("a hash of one character is smaller as the call", !folded(target, "        llOwnerSay(llMD5String(\"x\", 0));\n"));
+        }
+        // LSO writes the argument where it is used, as it would the answer.
+        ensure("a hash of a longer string is smaller as its answer on LSO",
+               folded(Target::LSO, "        llOwnerSay(llMD5String(\"Hello, Avatar!\", 0));\n"));
+        // Mono and Luau hold a string once: where a function holds the
+        // answer already, it costs a load.
+        const std::string held = "        llOwnerSay(llMD5String(\"x\", 0));\n        llOwnerSay(" + hashOfX + ");\n";
+        ensure("held already on Mono", folded(Target::Mono, held));
+        ensure("held already on Luau", folded(Target::Luau, held));
+        ensure("LSO writes it again", !folded(Target::LSO, held));
     }
 } // namespace tut
