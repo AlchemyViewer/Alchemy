@@ -3754,8 +3754,16 @@ void ALFloaterScriptStudio::refreshUndoLabels()
     Doc*                     doc   = active();
     const LLEditMenuHandler* field = focusedEditHandler();
     const bool               ours  = !field || (doc && (field == doc->editor || field == doc->expandedEditor));
-    const std::string        undo  = doc && (ours || !field->canUndo()) ? doc->shownText()->undoJournal().undoLabel() : std::string();
-    const std::string        redo  = doc && (ours || !field->canRedo()) ? doc->shownText()->undoJournal().redoLabel() : std::string();
+    ALCodeEditor*            text  = doc ? doc->shownText() : nullptr;
+    // Nothing the names come from has moved: nothing to say again.
+    const UndoSaidOf of{ doc, field, text, text ? text->undoJournal().revision() : 0, !ours && field->canUndo(), !ours && field->canRedo() };
+    if (of == mUndoSaidOf)
+    {
+        return;
+    }
+    mUndoSaidOf            = of;
+    const std::string undo = text && (ours || !field->canUndo()) ? text->undoJournal().undoLabel() : std::string();
+    const std::string redo = text && (ours || !field->canRedo()) ? text->undoJournal().redoLabel() : std::string();
     if (undo == mUndoSaid && redo == mRedoSaid)
     {
         return;

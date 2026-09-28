@@ -294,9 +294,16 @@ void ALScriptStudioVim::pump()
     // all in the band the editor draws under its text, where vim has
     // them; the bottom strip says only that vim is on, so that a reader
     // of the strip knows why the keys do what they do.
-    ALCodeEditor* shown  = doc->shownText();
-    ALVimKeymap*  vim    = shown ? dynamic_cast<ALVimKeymap*>(shown->modalKeymap()) : nullptr;
-    std::string   banner = vim ? mServices.words("VimNormal") : std::string();
+    ALCodeEditor*        shown  = doc->shownText();
+    const ALModalKeymap* keymap = shown ? shown->modalKeymap() : nullptr;
+    if (shown == mBannerEditor && keymap == mBannerKeymap)
+    {
+        return;
+    }
+    mBannerEditor      = shown;
+    mBannerKeymap      = keymap;
+    ALVimKeymap* vim    = shown ? dynamic_cast<ALVimKeymap*>(shown->modalKeymap()) : nullptr;
+    std::string  banner = vim ? mServices.words("VimNormal") : std::string();
     if (banner != mBanner)
     {
         mBanner = banner;

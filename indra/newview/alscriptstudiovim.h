@@ -214,6 +214,9 @@ private:
     // The tab in front as pump last saw it, and the one before it, by id.
     std::string                          mCurrent;
     std::string                          mAlternate;
+    // The editor and keymap the banner was last worked out for.
+    const ALCodeEditor*                  mBannerEditor = nullptr;
+    const ALModalKeymap*                 mBannerKeymap = nullptr;
     // Held while this is, for a keymap's hooks to know it still is.
     std::shared_ptr<bool>                mAlive = std::make_shared<bool>(true);
 };

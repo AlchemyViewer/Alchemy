@@ -1073,9 +1073,22 @@ private:
     LLMenuItemGL*                                                                           menuItem(std::string_view id) const;
     std::vector<std::pair<std::string, std::vector<std::string>>> mKeyTips;
     std::map<std::string, std::string> mKeyTipTexts;
-    // What Edit > Undo and Redo were last named for.
+    // What Edit > Undo and Redo were last named for, and what that was
+    // worked out from: the tab, the field with the keyboard, the text
+    // shown, its history's revision, and what another field could undo.
     std::string                        mUndoSaid;
     std::string                        mRedoSaid;
+    struct UndoSaidOf
+    {
+        const void* doc      = nullptr;
+        const void* field    = nullptr;
+        const void* text     = nullptr;
+        U32         revision = 0;
+        bool        canUndo  = false;
+        bool        canRedo  = false;
+        bool operator==(const UndoSaidOf&) const = default;
+    };
+    UndoSaidOf                         mUndoSaidOf;
     // The notice over the editor.
     ALScriptNoticeBar*                 mNoticeBar = nullptr;
     // Whether the connection was seen lost; and when what holds each tab
