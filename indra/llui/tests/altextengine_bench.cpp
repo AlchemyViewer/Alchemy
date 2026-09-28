@@ -216,6 +216,24 @@ int main(int, char**)
         e.highlighter().wordsChanged();
         g_sink = g_sink + e.highlighter().tokens(lastLine(e)).size();
     });
+    // The whole script inside one comment -- LSL's /* */, SLua's long
+    // bracket --[==[ ]==] -- lexed: every byte of it inside a span.
+    {
+        const char* openers[2] = { "/*\n", "--[==[\n" };
+        const char* closers[2] = { "\n*/", "\n]==]" };
+        for (int i = 0; i < 2; ++i)
+        {
+            subjects[i].editor->setText(openers[i] + subjects[i].text + closers[i]);
+        }
+        both("full highlight: all of it in one comment", subjects, 1, [](Subject&, ALCodeEditor& e) {
+            e.highlighter().wordsChanged();
+            g_sink = g_sink + e.highlighter().tokens(lastLine(e)).size();
+        });
+        for (Subject& s : subjects)
+        {
+            s.editor->setText(s.text);
+        }
+    }
 
     std::printf("\nAn edit at the top (typed and taken away, through the journal)\n");
     for (Subject& s : subjects)
