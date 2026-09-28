@@ -574,6 +574,7 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="OptimizerRenamed">renamed the [1] [2] to [3]</string>
 	<string name="OptimizerSimplified">simplified [1] to [2]</string>
 	<string name="OptimizerSwappedBranches">swapped the branches of if ([1]) and dropped the !</string>
+	<string name="OptimizerSwappedOnXor">wrote if ([1]) as if ([2]), its branches swapped</string>
 	<string name="OptimizerTurnedEmptyBranch">turned an empty if branch around</string>
 	<string name="OptimizerWroteAs">wrote [1] as [2]</string>
 

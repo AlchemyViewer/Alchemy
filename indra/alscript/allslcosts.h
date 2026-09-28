@@ -79,6 +79,17 @@ struct ALLSLCosts
     // A key a library function is given that is NULL_KEY, or no key at
     // all, as "": the function takes either as it takes the other.
     bool emptyForNullKey = false;
+    // `!(a < b)` as `a >= b`, and each comparison's so: never larger, and
+    // smaller for most on each target.
+    bool comparisonForNot = false;
+    // `a != b` as `a ^ b` where only truth counts, and `if (a == b) A else
+    // B` as `if (a ^ b) B else A`.
+    bool xorForNotEqual = false;
+    // `a >= 5` as `a > 4`, `a <= 5` as `a < 6`.
+    bool strictForInclusive = false;
+    // `a || b` as `a | b` where only truth counts: LSL runs both sides of
+    // either.
+    bool bitOrForOr = false;
 
     // ---- functions, for whether putting one in place saves
 

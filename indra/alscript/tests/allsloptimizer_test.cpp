@@ -246,7 +246,8 @@ namespace tut
         ensure("equals zero", r.text.find("integer i = (!g);") != std::string::npos);
         ensure("not equal zero as condition", r.text.find("if (g)\n            h = 1;") != std::string::npos);
         ensure("double not", r.text.find("if (g)\n            h = 2;") != std::string::npos);
-        ensure("not equals", r.text.find("if (g != h)\n            h = 3;") != std::string::npos);
+        // As a ^ on Mono, where only truth counts (ALLSLCosts::xorForNotEqual).
+        ensure("not equals: " + r.text, r.text.find("if (g ^ h)\n            h = 3;") != std::string::npos);
         ensure("swapped", r.text.find("if (g)\n            h = 5;\n        else\n            h = 4;") != std::string::npos);
     }
 
@@ -1626,6 +1627,7 @@ namespace tut
                                    "        integer i;\n        for (i = 0; llGetListLength(l) > 5; i++)\n            l = llDeleteSubList(l, 0, 0);\n"
                                    "        shown = llGetUnixTime();\n        show();\n"
                                    "        if (llGetObjectName() == \"on\")\n            count = 1;\n        else\n            llOwnerSay(\"off\");\n"
+                                   "        if (llGetUnixTime() & 1)\n            count = 2;\n        else\n            llOwnerSay(\"even\");\n"
                                    "        state on;\n    }\n}\n"
                                    "state on\n{\n    touch_start(integer n)\n    {\n        llOwnerSay(\"on\");\n    }\n}\n"
                                    "state away\n{\n    state_entry()\n    {\n        state back;\n    }\n}\n"
@@ -1644,12 +1646,59 @@ namespace tut
             ensure("a global only set, and a read of the clock that set it", !has("count") && !has("llGetUnixTime();\n        integer"));
             ensure("a loop's counter never read: " + r.text, !has("i = 0") && !has("i++") && !has("integer i") && has("for (; ") && has(" > 5; )"));
             ensure("a global read stays", has("shown = llGetUnixTime();"));
-            ensure("a branch left empty turned around, what it negates bracketed", has("if (!(llGetObjectName() == \"on\"))"));
+            ensure("a comparison left empty turned around the other way: " + r.text, has("if (llGetObjectName() != \"on\")"));
+            ensure("anything else, what it negates bracketed", has("if (!(llGetUnixTime() & 1))"));
             ensure("said, as set and never read", std::any_of(r.problems.begin(), r.problems.end(), [](const ALScriptProblem& p) {
                        return p.key == "OptimizerRemovedWriteOnly" && p.args.size() == 1 && p.args[0] == "count";
                    }));
             ALLSLService service;
             for (const ALScriptProblem& p : service.check(r.text, target != ALLSLOptimizer::Target::LSO))
+            {
+                ensure("what was written compiles: " + p.message + "\n" + r.text, p.severity != ALScriptProblem::Severity::Error);
+            }
+        }
+    }
+
+    template<> template<>
+    void allsloptimizer_object::test<44>()
+    {
+        set_test_name("comparisons as each target has them smaller: the ! of one, != and || where only truth counts, an if on ==, and inclusive against a constant");
+        const std::string source = wrap("",
+                                        "        list l = llParseString2List(llGetObjectName(), [\" \"], []);\n        list m = llParseString2List(llGetObjectDesc(), [\" \"], []);\n"
+                                        "        integer a = (integer)llFrand(9);\n        integer b = (integer)llFrand(9);\n"
+                                        "        float f = llFrand(1.0);\n        float g = llFrand(1.0);\n        string s = llGetObjectName();\n"
+                                        "        integer r = !(a < b);\n"
+                                        "        integer t = !(s == \"x\");\n"
+                                        "        integer u = !(l == m);\n"
+                                        "        integer v = !(f < g);\n"
+                                        "        if (a != b)\n            llOwnerSay(\"ne\");\n"
+                                        "        if (a == b)\n            llOwnerSay(\"eq\");\n        else\n            llOwnerSay(\"ne\");\n"
+                                        "        if (a >= 5)\n            llOwnerSay(\"ge\");\n"
+                                        "        if (b <= 5)\n            llOwnerSay(\"le\");\n"
+                                        "        if (b <= 2147483647)\n            llOwnerSay(\"max\");\n"
+                                        "        while (a || b)\n            a = b = 0;\n"
+                                        "        llOwnerSay((string)[r, t, u, v]);\n");
+        for (const ALLSLOptimizer::Target target : { ALLSLOptimizer::Target::LSO, ALLSLOptimizer::Target::Mono, ALLSLOptimizer::Target::Luau })
+        {
+            ALLSLOptimizer::Options o = options();
+            o.target                  = target;
+            const ALLSLOptimizer::Result r = ALLSLOptimizer::run(source, o);
+            ensure("optimized: " + notes(r), r.optimized);
+            const auto has  = [&r](const std::string& what) { return r.text.find(what) != std::string::npos; };
+            const bool lso  = target == ALLSLOptimizer::Target::LSO;
+            const bool mono = target == ALLSLOptimizer::Target::Mono;
+            ensure("the ! of a comparison of integers: " + r.text, has("a >= b") && !has("!(a < b)"));
+            ensure("of strings, ==: " + r.text, has("s != \"x\"") && !has("!(s == \"x\")"));
+            ensure("not of lists, whose != is a length", has("!(l == m)"));
+            ensure("not of floats, which may be no number", has("!(f < g)"));
+            ensure("!= where only truth counts", has(lso || mono ? "if (a ^ b)" : "if (a != b)"));
+            ensure("an if on ==, its branches swapped",
+                   lso || mono ? has("if (a ^ b)\n            llOwnerSay(\"ne\");\n        else\n            llOwnerSay(\"eq\");") : has("if (a == b)"));
+            ensure("inclusive against a constant", has(mono ? "if (a > 4)" : "if (a >= 5)") && has(mono ? "if (b < 6)" : "if (b <= 5)"));
+            ensure("not past the largest integer", has("if (b <= 2147483647)"));
+            ensure("|| where only truth counts", has(mono ? "while (a | b)" : "while (a || b)"));
+            ALLSLService service;
+            for (const ALScriptProblem& p : service.check(r.text, !lso))
             {
                 ensure("what was written compiles: " + p.message + "\n" + r.text, p.severity != ALScriptProblem::Severity::Error);
             }

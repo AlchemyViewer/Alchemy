@@ -45,6 +45,10 @@ namespace
         c.complementNegateForDecrement = true;
         c.preForPost                   = true;
         c.emptyForNullKey              = true;
+        c.comparisonForNot             = true;
+        c.xorForNotEqual               = true;
+        c.strictForInclusive           = false;
+        c.bitOrForOr                   = false;
 
         c.local         = 11;
         c.jump          = 5;
@@ -88,6 +92,10 @@ namespace
         c.complementNegateForDecrement = true;
         c.preForPost                   = true;
         c.emptyForNullKey              = true;
+        c.comparisonForNot             = true;
+        c.xorForNotEqual               = true;
+        c.strictForInclusive           = true;
+        c.bitOrForOr                   = true;
 
         c.local         = 6;
         c.jump          = 5;
@@ -132,6 +140,10 @@ namespace
         c.complementNegateForDecrement = false;
         c.preForPost                   = false;
         c.emptyForNullKey              = true;
+        c.comparisonForNot             = true;
+        c.xorForNotEqual               = false;
+        c.strictForInclusive           = false;
+        c.bitOrForOr                   = false;
 
         c.local         = 4;
         c.jump          = 93;

@@ -2485,13 +2485,44 @@ namespace
             return false;
         }
 
-        // Where only whether it is true counts.
+        // Where only whether it is true counts; and an if whose condition
+        // is a == with an else, turned around over a ^.
         bool visit(LSLIfStatement* stmt) override
         {
             visitChildren(stmt);
-            if (mStage == Stage::Values)
+            if (mStage != Stage::Values)
             {
-                truth(stmt, 0);
+                return false;
+            }
+            truth(stmt, 0);
+            LSLExpression* cond = bare(stmt->getCheckExpr());
+            LSLStatement*  yes  = stmt->getTrueBranch();
+            LSLStatement*  no   = stmt->getFalseBranch();
+            if (mCosts.xorForNotEqual && no && yes && cond && cond->getNodeSubType() == NODE_BINARY_EXPRESSION && cond->getOperation() == OP_EQ &&
+                integerOperands(static_cast<LSLBinaryExpression*>(cond)))
+            {
+                const std::string before = report.wanted() ? render(cond) : std::string();
+                cond->setOperation(OP_BIT_XOR);
+                stmt->setTrueBranch(nullptr);
+                stmt->setFalseBranch(nullptr);
+                stmt->setTrueBranch(no);
+                stmt->setFalseBranch(yes);
+                if (report.wanted())
+                {
+                    report.note(stmt->getLoc(), "OptimizerSwappedOnXor", "wrote if ([1]) as if ([2]), its branches swapped", { before, render(cond) });
+                }
+                ++changes;
+            }
+            return false;
+        }
+
+        // The ! of a comparison as the comparison the other way.
+        bool visit(LSLUnaryExpression* expr) override
+        {
+            visitChildren(expr);
+            if (mStage == Stage::Values && !inGlobal(expr))
+            {
+                notComparison(expr);
             }
             return false;
         }
@@ -2725,11 +2756,93 @@ namespace
             return sym && sym->getSubType() == SYM_BUILTIN && ALLSLTraits::atLeastMinusOne(sym->getName());
         }
 
+        static bool integerOperands(LSLBinaryExpression* expr)
+        {
+            return expr->getLHS() && expr->getRHS() && expr->getLHS()->getIType() == LST_INTEGER && expr->getRHS()->getIType() == LST_INTEGER;
+        }
+
+        // !(a < b) as a >= b, and each comparison's so: of integers, where
+        // the order of any two is known; and of anything but lists for ==
+        // and !=, which are each other's opposite whatever the values --
+        // a list's != is how much longer one is.
+        void notComparison(LSLUnaryExpression* expr)
+        {
+            LSLExpression* inner = bare(expr->getChildExpr());
+            if (!mCosts.comparisonForNot || expr->getOperation() != OP_BOOLEAN_NOT || !inner || inner->getNodeSubType() != NODE_BINARY_EXPRESSION)
+            {
+                return;
+            }
+            auto*             cmp = static_cast<LSLBinaryExpression*>(inner);
+            LSLOperator       to  = OP_NONE;
+            const LSLOperator op  = cmp->getOperation();
+            switch (op)
+            {
+                case OP_LESS: to = OP_GEQ; break;
+                case OP_GEQ: to = OP_LESS; break;
+                case OP_GREATER: to = OP_LEQ; break;
+                case OP_LEQ: to = OP_GREATER; break;
+                case OP_EQ: to = OP_NEQ; break;
+                case OP_NEQ: to = OP_EQ; break;
+                default: return;
+            }
+            LSLExpression* left  = cmp->getLHS();
+            LSLExpression* right = cmp->getRHS();
+            if (!left || !right)
+            {
+                return;
+            }
+            const bool equality = op == OP_EQ || op == OP_NEQ;
+            const bool fits     = integerOperands(cmp) || (equality && left->getIType() != LST_LIST && right->getIType() != LST_LIST &&
+                                                       left->getIType() != LST_ERROR && right->getIType() != LST_ERROR);
+            if (!fits)
+            {
+                return;
+            }
+            const std::string before = report.wanted() ? render(expr) : std::string();
+            cmp->getParent()->takeChild(cmp->getParentSlot());
+            cmp->setOperation(to);
+            putInPlace(expr, cmp, ctx.allocator);
+            wrote(expr, cmp, before);
+        }
+
+        // a >= 5 as a > 4, and a <= 5 as a < 6, either way round, where the
+        // constant one either side of it is an integer too.
+        void strict(LSLBinaryExpression* expr)
+        {
+            const LSLOperator op = expr->getOperation();
+            if (!mCosts.strictForInclusive || (op != OP_GEQ && op != OP_LEQ) || !integerOperands(expr))
+            {
+                return;
+            }
+            for (int slot = 0; slot < 2; ++slot)
+            {
+                LSLASTNode*  side = expr->getChild(slot);
+                LSLConstant* cv   = side->getConstantValue();
+                if (!cv || cv->getNodeSubType() != NODE_INTEGER_CONSTANT || expr->getChild(1 - slot)->getConstantValue())
+                {
+                    continue;
+                }
+                // Whether the constant is on the greater side: a >= C, C <= a.
+                const bool    below = (op == OP_GEQ) == (slot == 1);
+                const int32_t c     = static_cast<LSLIntegerConstant*>(cv)->getValue();
+                if ((below && c == INT32_MIN) || (!below && c == INT32_MAX))
+                {
+                    return;
+                }
+                const std::string before = report.wanted() ? render(expr) : std::string();
+                LSLASTNode::replaceNode(side, constant(ctx.integer(below ? c - 1 : c + 1), side));
+                expr->setOperation(op == OP_GEQ ? OP_GREATER : OP_LESS);
+                wrote(expr, expr, before);
+                return;
+            }
+        }
+
         // What an integer comparison or sum comes to in fewer bytes, as a
         // value: x == -1 as !~x, x < 0 as !~x of a find, x + 1 as -~x,
         // x - 1 as ~-x, and two either way.
         void integers(LSLBinaryExpression* expr)
         {
+            strict(expr);
             LSLExpression* left  = expr->getLHS();
             LSLExpression* right = expr->getRHS();
             if (!left || !right || expr->getIType() != LST_INTEGER || left->getIType() != LST_INTEGER || right->getIType() != LST_INTEGER)
@@ -2818,9 +2931,32 @@ namespace
             {
                 truth(expr, 0);
                 truth(expr, 1);
+                // Either true is the two bits or'd true; LSL runs both
+                // sides of || either way.
+                if (expr->getOperation() == OP_BOOLEAN_OR && mCosts.bitOrForOr && integerOperands(expr))
+                {
+                    const std::string before = report.wanted() ? render(expr) : std::string();
+                    expr->setOperation(OP_BIT_OR);
+                    wrote(expr, expr, before);
+                }
                 return;
             }
-            if (!mCosts.complementForNotMinusOne || !left || !right || left->getIType() != LST_INTEGER || right->getIType() != LST_INTEGER)
+            if (!left || !right || left->getIType() != LST_INTEGER || right->getIType() != LST_INTEGER)
+            {
+                return;
+            }
+            if (expr->getOperation() == OP_NEQ && !isInteger(right, -1) && !isInteger(left, -1))
+            {
+                // Different is the bits differing.
+                if (mCosts.xorForNotEqual)
+                {
+                    const std::string before = report.wanted() ? render(expr) : std::string();
+                    expr->setOperation(OP_BIT_XOR);
+                    wrote(expr, expr, before);
+                }
+                return;
+            }
+            if (!mCosts.complementForNotMinusOne)
             {
                 return;
             }
