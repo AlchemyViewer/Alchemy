@@ -26,6 +26,8 @@
 
 #include "alscriptstudiodoc.h"
 
+#include "alscriptfixes.h"
+#include "alscriptstudioservices.h"
 #include "lldate.h"
 #include "llfocusmgr.h"
 
@@ -55,6 +57,34 @@ ALScriptStudioDoc::Level ALScriptStudioDoc::levelOf(ALScriptProblem::Severity se
     return severity == ALScriptProblem::Severity::Error     ? Level::Error
            : severity == ALScriptProblem::Severity::Warning ? Level::Warning
                                                             : Level::Note;
+}
+
+// static
+ALScriptStudioDoc::Shown ALScriptStudioDoc::analysisRow(const ALScriptProblem& problem, bool lua, const ALScriptStudioServices& services)
+{
+    Shown row;
+    row.level  = levelOf(problem.severity);
+    row.origin = problem.source == ALScriptProblem::Source::Parser  ? services.words("OriginParser")
+                 : problem.source == ALScriptProblem::Source::Types ? services.words("OriginTypes")
+                                                                    : services.words("OriginLint");
+    // A lint's name says what to look up, or what a NOLINT comment turns
+    // off: Luau's own, LSL's as its key has it. An error's number says
+    // nothing to whoever reads it.
+    std::string name = ALScriptFixes::lintName(problem, lua);
+    if (name.empty() && !problem.code.empty() && problem.code.find_first_not_of("0123456789") != std::string::npos)
+    {
+        name = problem.code;
+    }
+    row.message   = name.empty() ? problem.message : problem.message + " [" + name + "]";
+    row.lint      = problem.source == ALScriptProblem::Source::Lint ? problem.code : std::string();
+    row.line      = problem.line;
+    row.column    = problem.column;
+    row.hasColumn = true;
+    row.endLine   = problem.endLine;
+    row.endColumn = problem.endColumn;
+    row.file      = problem.file;
+    row.key       = problem.key;
+    return row;
 }
 
 bool ALScriptStudioDoc::hasKeyboard() const

@@ -184,6 +184,7 @@ if(AL_BUILD_VIEWER)
     alscriptkeymap.cpp
     alpanelscriptkeymap.cpp
     alscriptlookup.cpp
+    alscriptobjectcheck.cpp
     alscriptnavigation.cpp
     alscriptmodules.cpp
     alscriptnoticebar.cpp
@@ -1018,6 +1019,7 @@ if(AL_BUILD_VIEWER)
     alscriptkeymap.h
     alpanelscriptkeymap.h
     alscriptlookup.h
+    alscriptobjectcheck.h
     alscriptnavigation.h
     alscriptmodules.h
     alscriptnoticebar.h
@@ -2729,6 +2731,23 @@ if(AL_BUILD_TESTS)
     SOURCES
       alscriptnotecardtab.cpp
       alscriptsaveflow.cpp
+      alscriptstudiodoc.cpp
+      alscriptstudioplaces.cpp
+      alscriptstudiowords.cpp
+    DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
+  )
+
+  # A check of every script of an object, the window and the world faked:
+  # the open ones left to their tabs, the rest read, expanded and asked.
+  al_add_test(
+    alscriptobjectcheck
+    UNIT
+    PROJECT ${test_project}
+    LIBRARIES llui alscript ${test_libs}
+    SOURCES
+      alscriptnotecardtab.cpp
+      alscriptsaveflow.cpp
+      alscriptstudiochecking.cpp
       alscriptstudiodoc.cpp
       alscriptstudioplaces.cpp
       alscriptstudiowords.cpp

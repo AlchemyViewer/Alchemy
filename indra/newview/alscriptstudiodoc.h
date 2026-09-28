@@ -53,6 +53,7 @@
 #include <vector>
 
 class ALScriptNotecardTab;
+class ALScriptStudioServices;
 
 // One tab of the studio: a script, a notecard or a file, and the views
 // of it the pane can show -- its source, and what the preprocessor made
@@ -692,6 +693,11 @@ struct ALScriptStudioDoc
     static Level              levelOf(const std::string& said);
     static Level              levelOf(ALScriptProblem::Severity severity);
     static ALCodeEditor::Mark markOf(Level level);
+    // A problem the analyzers found as its row says it: its level, whose
+    // word it is, the message with the lint's name after it, and the lint
+    // where a scripter may turn it off. Its place and file are the
+    // problem's own, which the caller reads it back to.
+    static Shown analysisRow(const ALScriptProblem& problem, bool lua, const ALScriptStudioServices& services);
     // How the store every studio's findings live in reads a problem.
     struct ProblemTraits
     {

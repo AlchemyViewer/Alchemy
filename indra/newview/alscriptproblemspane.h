@@ -79,11 +79,6 @@ public:
         std::function<std::string(const std::string& path)> includeName;
     };
     static Made make(const Doc& doc, const ALScriptStudioServices& services, const Making& making);
-    // A problem the analyzers found as its row says it: its level, whose
-    // word it is, the message with the lint's name after it, and the lint
-    // where a scripter may turn it off. Its place and file are the
-    // problem's own, which the caller reads it back to.
-    static Doc::Shown analysisRow(const ALScriptProblem& problem, bool lua, const ALScriptStudioServices& services);
 
     // --- the pane ------------------------------------------------------------------
 
