@@ -87,6 +87,9 @@ namespace
     // How long a prim's contents are waited for before they are answered
     // as not fetched.
     const F32    CONTENTS_TIMEOUT   = 20.f;
+    // The coprocedure pool script and notecard saves go up through, apart
+    // from the shared "Upload" one (llcoproceduremanager.cpp).
+    const char* const SCRIPT_UPLOAD_POOL = "ScriptUpload";
 
     // The script a message names, in a prim's contents.
     LLInventoryItem* scriptNamed(LLViewerObject* prim, const std::string& name)
@@ -659,7 +662,15 @@ bool ALScriptWorkspace::save(const ALScriptRef& ref, const std::string& text, co
             result.messages.push_back(it->asString());
         }
         result.diagnostics = parseDiagnostics(response["errors"], lua);
-        LLAppViewer::instance()->postToMainCoro([this, result, callback, text]() { deliver(result, callback, &text); });
+        LLAppViewer::instance()->postToMainCoro([this, result, callback, text]() {
+            // What it runs under now, for the asset it holds now: its next
+            // save asks nothing.
+            if (result.success && result.experience)
+            {
+                knownExperience(result.ref, result.newAssetId, *result.experience);
+            }
+            deliver(result, callback, &text);
+        });
     };
     auto failed = [this, ref, callback, sender = options.sender](LLUUID, LLUUID, LLSD, std::string reason) -> bool {
         CompileResult result;
@@ -694,7 +705,7 @@ bool ALScriptWorkspace::save(const ALScriptRef& ref, const std::string& text, co
             },
             failed));
         mUnderway[options.sender.request] = ref;
-        LLViewerAssetUpload::EnqueueInventoryUpload(url, info);
+        LLViewerAssetUpload::EnqueueInventoryUpload(url, info, SCRIPT_UPLOAD_POOL);
         return true;
     }
 
@@ -720,7 +731,7 @@ bool ALScriptWorkspace::save(const ALScriptRef& ref, const std::string& text, co
         },
         failed));
     mUnderway[options.sender.request] = ref;
-    LLViewerAssetUpload::EnqueueInventoryUpload(url, info);
+    LLViewerAssetUpload::EnqueueInventoryUpload(url, info, SCRIPT_UPLOAD_POOL);
     return true;
 }
 
@@ -817,7 +828,7 @@ bool ALScriptWorkspace::uploadNotecard(const ALScriptRef& ref, const std::string
             ref.item, LLAssetType::AT_NOTECARD, buffer,
             [answered](LLUUID, LLUUID new_asset_id, LLUUID new_item_id, LLSD) { answered(new_asset_id, new_item_id); }, failed));
         mUnderway[sender.request] = ref;
-        LLViewerAssetUpload::EnqueueInventoryUpload(url, info);
+        LLViewerAssetUpload::EnqueueInventoryUpload(url, info, SCRIPT_UPLOAD_POOL);
         return true;
     }
 
@@ -842,7 +853,7 @@ bool ALScriptWorkspace::uploadNotecard(const ALScriptRef& ref, const std::string
         ref.object, ref.item, LLAssetType::AT_NOTECARD, buffer,
         [answered](LLUUID, LLUUID, LLUUID new_asset_id, LLSD) { answered(new_asset_id, LLUUID::null); }, failed));
     mUnderway[sender.request] = ref;
-    LLViewerAssetUpload::EnqueueInventoryUpload(url, info);
+    LLViewerAssetUpload::EnqueueInventoryUpload(url, info, SCRIPT_UPLOAD_POOL);
     return true;
 }
 
@@ -1368,6 +1379,14 @@ void ALScriptWorkspace::askExperience(const ALScriptRef& ref, experience_callbac
         told(std::nullopt);
         return;
     }
+    // Known already for the asset the item holds: nothing to ask.
+    const LLInventoryItem* item  = object->getInventoryItem(ref.item);
+    const LLUUID           asset = item ? item->getAssetUUID() : LLUUID::null;
+    if (const auto known = mExperiences.find({ ref.object, ref.item }); asset.notNull() && known != mExperiences.end() && known->second.first == asset)
+    {
+        told(known->second.second);
+        return;
+    }
     // A region with no way to say keeps none: a grid without experiences.
     if (!region->isCapabilityAvailable("GetMetadata"))
     {
@@ -1382,14 +1401,25 @@ void ALScriptWorkspace::askExperience(const ALScriptRef& ref, experience_callbac
     body["fields"].append("experience");
     const bool asked = region->requestPostCapability(
         "GetMetadata", body,
-        [told](const LLSD& result) {
+        [this, told, ref, asset](const LLSD& result) {
             const LLUUID experience = result.has("experience") ? result["experience"].asUUID() : LLUUID::null;
-            onMain([told, experience]() { told(experience); });
+            onMain([this, told, ref, asset, experience]() {
+                knownExperience(ref, asset, experience);
+                told(experience);
+            });
         },
         [told](const LLSD&) { onMain([told]() { told(std::nullopt); }); });
     if (!asked)
     {
         told(std::nullopt);
+    }
+}
+
+void ALScriptWorkspace::knownExperience(const ALScriptRef& ref, const LLUUID& asset, const LLUUID& experience)
+{
+    if (asset.notNull() && !ref.inInventory())
+    {
+        mExperiences[{ ref.object, ref.item }] = { asset, experience };
     }
 }
 

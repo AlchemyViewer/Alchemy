@@ -596,6 +596,17 @@
             <key>Value</key>
             <integer>1</integer>
         </map>
+        <key>PoolSizeScriptUpload</key>
+        <map>
+            <key>Comment</key>
+            <string>How many script and notecard saves go up at once -- Save All, a recompile of an object, the compile queue -- apart from the shared upload queue of textures and meshes. Read at startup.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>U32</string>
+            <key>Value</key>
+            <integer>4</integer>
+        </map>
         <key>ALScriptStudioVimClipboard</key>
         <map>
             <key>Comment</key>

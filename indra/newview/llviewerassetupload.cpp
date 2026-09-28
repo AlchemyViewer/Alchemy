@@ -905,11 +905,11 @@ LLSD LLScriptAssetUpload::generatePostBody()
 
 //=========================================================================
 /*static*/
-LLUUID LLViewerAssetUpload::EnqueueInventoryUpload(const std::string &url, const LLResourceUploadInfo::ptr_t &uploadInfo)
+LLUUID LLViewerAssetUpload::EnqueueInventoryUpload(const std::string &url, const LLResourceUploadInfo::ptr_t &uploadInfo, const std::string& pool)
 {
     std::string procName("LLViewerAssetUpload::AssetInventoryUploadCoproc(");
 
-    LLUUID queueId = LLCoprocedureManager::instance().enqueueCoprocedure("Upload",
+    LLUUID queueId = LLCoprocedureManager::instance().enqueueCoprocedure(pool,
         procName + LLAssetType::lookup(uploadInfo->getAssetType()) + ")",
         boost::bind(&LLViewerAssetUpload::AssetInventoryUploadCoproc, _1, _2, url, uploadInfo));
 

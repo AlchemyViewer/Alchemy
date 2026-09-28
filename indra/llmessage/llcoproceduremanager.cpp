@@ -42,6 +42,10 @@
 // Map of pool sizes for known pools
 static const std::map<std::string, U32> DefaultPoolSizes{
     {std::string("Upload"),  1},
+    // Script Studio's saves of scripts and notecards, several at once: Save
+    // All and a recompile of an object go up side by side rather than one
+    // after another behind every texture and mesh upload.
+    {std::string("ScriptUpload"), 4},
     {std::string("AIS"),     1},
     // *TODO: Rider for the moment keep AIS calls serialized otherwise the COF will tend to get out of sync.
 };
@@ -233,6 +237,7 @@ void LLCoprocedureManager::setPropertyMethods(SettingQuery_t queryfn, SettingUpd
 
     constexpr size_t UPLOAD_QUEUE_SIZE = 2048;
     initializePool("Upload", UPLOAD_QUEUE_SIZE);
+    initializePool("ScriptUpload", UPLOAD_QUEUE_SIZE);
     initializePool("AIS"); // it might be better to have some kind of on-demand initialization for AIS
     // "ExpCache" pool gets initialized in LLExperienceCache
     // asset storage pool gets initialized in LLViewerAssetStorage

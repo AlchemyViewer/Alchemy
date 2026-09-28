@@ -346,7 +346,10 @@ public:
     // The experience a script in an object runs under, asked of its
     // region: the null one for none -- and for a script in the inventory,
     // or a region that keeps no experiences -- and nothing where the
-    // region could not be asked, or did not answer.
+    // region could not be asked, or did not answer. Known for the asset
+    // the item holds -- asked before, or saved from here -- it is answered
+    // at once: a script is put under another experience only by a save,
+    // which gives it another asset.
     typedef std::function<void(const std::optional<LLUUID>&)> experience_callback_t;
     void askExperience(const ALScriptRef& ref, experience_callback_t told);
 
@@ -562,6 +565,10 @@ private:
     boost::unordered_flat_map<LLUUID, F64> mRuntimeSince;
     // The one in front is under way; the rest wait for it to end.
     std::vector<std::shared_ptr<Transfer>> mTransfers;
+    // Each task script's experience as last known, with the asset it was
+    // known for: (object, item) to (asset, experience).
+    boost::unordered_flat_map<std::pair<LLUUID, LLUUID>, std::pair<LLUUID, LLUUID>> mExperiences;
+    void                                knownExperience(const ALScriptRef& ref, const LLUUID& asset, const LLUUID& experience);
     std::vector<LLUUID>                 mOwnExperiences;
     std::vector<experiences_callback_t> mOwnExperiencesWaiting;
     bool                                mOwnExperiencesAsked = false;

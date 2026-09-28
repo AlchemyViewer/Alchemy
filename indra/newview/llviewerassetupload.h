@@ -286,7 +286,9 @@ private:
 class LLViewerAssetUpload
 {
 public:
-    static LLUUID EnqueueInventoryUpload(const std::string &url, const LLResourceUploadInfo::ptr_t &uploadInfo);
+    // Into the coprocedure pool named: the shared "Upload" one, or one of
+    // its own for uploads that should not wait behind it.
+    static LLUUID EnqueueInventoryUpload(const std::string &url, const LLResourceUploadInfo::ptr_t &uploadInfo, const std::string& pool = "Upload");
 
     static void AssetInventoryUploadCoproc(LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t &httpAdapter, const LLUUID &id, std::string url, LLResourceUploadInfo::ptr_t uploadInfo);
 
