@@ -43,6 +43,7 @@
 #include "../alfoldmodel.h"
 #include "../aloutputview.h"
 #include "../alquickopen.h"
+#include "../llspellcheckengine.h"
 #include "../altextsearch.h"
 #include "../alvimkeymap.h"
 
@@ -395,6 +396,48 @@ int main(int, char**)
     for (Subject& s : subjects)
     {
         s.editor->setDecorations({});
+    }
+
+    // The spell check over comments and strings, as the platform's own
+    // checker answers it: every line checked afresh, and Next Misspelling
+    // round a script with none, the most it ever looks at.
+    {
+        std::unique_ptr<LLSpellCheckEngine> engine = LLSpellCheckEngine::create();
+        const bool                          real   = engine && engine->setLanguage("en_US");
+        std::printf("\nSpelling (%s)\n", real ? "the platform's checker, en_US" : "no checker to be had: every word right");
+        size_t asked = 0;
+        auto   check = [&](const std::string& word) {
+            ++asked;
+            return !real || engine->checkWord(word);
+        };
+        for (Subject& s : subjects)
+        {
+            s.editor->setSpellChecker(check);
+            s.editor->setSpellCheck(true);
+        }
+        size_t words[2] = {};
+        both("every line checked afresh", subjects, 1, [&](Subject& s, ALCodeEditor& e) {
+            e.recheckSpelling();
+            asked = 0;
+            for (S32 line = 0; line < e.document().lineCount(); ++line)
+            {
+                g_sink = g_sink + e.misspellings(line).size();
+            }
+            words[&s - subjects] = asked;
+        });
+        countRow("  words asked of the checker", words[0], words[1]);
+        both("Next Misspelling round a script with none, afresh", subjects, 1, [](Subject&, ALCodeEditor& e) {
+            e.recheckSpelling();
+            g_sink = g_sink + e.misspellingFrom(ALTextPos(0, 0), true).has_value();
+        });
+        both("Next Misspelling round it again, checked already", subjects, 1, [](Subject&, ALCodeEditor& e) {
+            g_sink = g_sink + e.misspellingFrom(ALTextPos(0, 0), true).has_value();
+        });
+        for (Subject& s : subjects)
+        {
+            s.editor->setSpellCheck(false);
+            s.editor->setSpellChecker(nullptr);
+        }
     }
 
     std::printf("\nEvery line at once\n");
