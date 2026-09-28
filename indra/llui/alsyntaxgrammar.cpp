@@ -33,7 +33,9 @@
 #include "llsdserialize.h"
 #include "llstring.h"
 
+#include <array>
 #include <bitset>
+#include <mutex>
 
 // --- kinds -------------------------------------------------------------------
 
@@ -138,10 +140,21 @@ std::optional<ALSyntaxKind> alSyntaxKindFromName(std::string_view name)
 
 void ALSyntaxWords::set(std::string_view table, std::vector<std::string> words)
 {
-    set_t& set = mTables[std::string(table)];
+    const U64 bit = U64(1) << tableBit(table);
+    set_t&    set = mTables[std::string(table)];
+    // The table's bit off every word it held, and on every word it holds.
+    for (const std::string& word : set)
+    {
+        const auto it = mIndex.find(word);
+        if (it != mIndex.end() && (it->second &= ~bit) == 0)
+        {
+            mIndex.erase(it);
+        }
+    }
     set.clear();
     for (std::string& word : words)
     {
+        mIndex[word] |= bit;
         set.insert(std::move(word));
     }
 }
@@ -149,6 +162,36 @@ void ALSyntaxWords::set(std::string_view table, std::vector<std::string> words)
 void ALSyntaxWords::clear()
 {
     mTables.clear();
+    mIndex.clear();
+}
+
+U64 ALSyntaxWords::tablesOf(std::string_view word) const
+{
+    const auto it = mIndex.find(word);
+    return it != mIndex.end() ? it->second : 0;
+}
+
+// static
+U32 ALSyntaxWords::tableBit(std::string_view table)
+{
+    // Tables by name across every grammar and every set of words: a handful
+    // (functions, constants, keywords and the like). Named as grammars load
+    // and words are taught, which is rare, so a lock costs nothing.
+    static std::mutex               lock;
+    static std::vector<std::string> names;
+    const std::lock_guard<std::mutex> held(lock);
+    const auto                        it = std::find(names.begin(), names.end(), table);
+    if (it != names.end())
+    {
+        return static_cast<U32>(it - names.begin());
+    }
+    if (names.size() >= 64)
+    {
+        LL_WARNS_ONCE("Syntax") << "more than 64 word tables; '" << table << "' shares the last one's bit" << LL_ENDL;
+        return 63;
+    }
+    names.emplace_back(table);
+    return static_cast<U32>(names.size() - 1);
 }
 
 bool ALSyntaxWords::has(std::string_view table, std::string_view word) const
@@ -217,8 +260,10 @@ struct ALSyntaxGrammar::Impl
         S32          minCount = 1;
         S32          maxCount = 0;
         // Word: the tables in the order they are asked, each with the kind
-        // a word found there is.
+        // a word found there is; and each table as its bit, for asking all
+        // of them in one look.
         std::vector<std::pair<std::string, ALSyntaxKind>> tables;
+        std::vector<std::pair<U64, ALSyntaxKind>>         tableBits;
         // Regex, and a span opened by one.
         ALRegex      regex;
         // The bytes a match of the regex can begin with, from firstLo to
@@ -232,6 +277,12 @@ struct ALSyntaxGrammar::Impl
         CharClass    notAfter;
         bool         hasNotAfter = false;
         S32          consume     = 0;
+        // SpanEnd written as a regex that is only text around the opening's
+        // capture -- SLua's \]\1\] -- is that text, the capture in the
+        // middle, once the span is open: looked for as text, not compiled.
+        bool         endTemplate = false;
+        std::string  endPrefix;
+        std::string  endSuffix;
 
         bool mayStartWith(unsigned char c) const { return !firstKnown || (c >= firstLo && c <= firstHi); }
     };
@@ -249,6 +300,15 @@ struct ALSyntaxGrammar::Impl
         std::string       name;
         std::vector<Rule> rules;
         ALSyntaxKind      defaultKind = ALSyntaxKind::Text;
+        // The rules that may match where a byte is, in order: at a place
+        // the rest are not tried. And all of them, for plain lexing.
+        std::array<std::vector<U16>, 256> byByte;
+        std::vector<U16>                  all;
+        // A span's own state whose end is text: its escape and its end, by
+        // rule, so that the lexer looks for the nearer of the two rather
+        // than trying them at every byte between.
+        S32               spanEscape = -1;
+        S32               spanEnd    = -1;
     };
 
     std::string              name;
@@ -286,10 +346,6 @@ struct ALSyntaxGrammar::Impl
     U16                      initial = 0;
     CharClass                wordStart;
     CharClass                wordContinue;
-    // The end regexes of spans, one per capture they were written with,
-    // up to a number, then made afresh: a grammar is every view's, for
-    // the whole session, and a capture may be any text at all.
-    mutable std::map<std::string, ALRegex> endRegexes;
 
     S32 stateIndex(std::string_view name) const
     {
@@ -317,9 +373,69 @@ struct ALSyntaxGrammar::Impl
     bool compileOpeners(const LLSD& opens, std::vector<Opener>& out, std::string& error);
     static bool anyOpens(const std::vector<Opener>& openers, std::string_view before);
     size_t tryRule(const Rule& rule, std::string_view line, size_t pos, const std::string& payload, const ALSyntaxWords& words,
-                   ALSyntaxKind& kind, std::string& capture) const;
-    const ALRegex* endRegexFor(const Rule& rule, const std::string& payload) const;
+                   const ALRegex* end_regex, ALSyntaxKind& kind, std::string& capture) const;
+    // What rules may begin where a byte is, and which spans' ends are
+    // text: worked out once every rule is read.
+    void prepare();
 };
+
+namespace
+{
+    // An end written as literal text around the opening's capture, which
+    // is text once the capture is known. False for an end with more to it
+    // than that: a class, a repeat, a second capture.
+    bool endTemplate(const std::string& pattern, std::string& prefix, std::string& suffix)
+    {
+        static constexpr std::string_view META = ".^$|?*+()[]{}";
+        prefix.clear();
+        suffix.clear();
+        bool         captured = false;
+        std::string* out      = &prefix;
+        for (size_t i = 0; i < pattern.size(); ++i)
+        {
+            const char c = pattern[i];
+            if (c == '\\')
+            {
+                if (i + 1 >= pattern.size())
+                {
+                    return false;
+                }
+                const char next = pattern[++i];
+                if (next == '1' && !captured)
+                {
+                    captured = true;
+                    out      = &suffix;
+                    continue;
+                }
+                if (std::isalnum(static_cast<unsigned char>(next)))
+                {
+                    return false;
+                }
+                out->push_back(next);
+                continue;
+            }
+            if (META.find(c) != std::string_view::npos)
+            {
+                return false;
+            }
+            out->push_back(c);
+        }
+        return true;
+    }
+
+    // The end regex a span's capture makes of its pattern.
+    std::string endPattern(const std::string& text, const std::string& payload)
+    {
+        std::string pattern = text;
+        for (size_t at = pattern.find("\\1"); at != std::string::npos; at = pattern.find("\\1", at))
+        {
+            const std::string escaped = ALRegex::escape(payload);
+            pattern.replace(at, 2, escaped);
+            at += escaped.size();
+        }
+        return pattern;
+    }
+}
 
 bool ALSyntaxGrammar::Impl::compileRegex(const std::string& pattern, ALRegex& out, std::string& error) const
 {
@@ -464,6 +580,7 @@ bool ALSyntaxGrammar::Impl::loadRule(const LLSD& in, const std::string& state_na
                 return false;
             }
             rule.tables.emplace_back(table, *kind);
+            rule.tableBits.emplace_back(U64(1) << ALSyntaxWords::tableBit(table), *kind);
             if (std::find(wordTables.begin(), wordTables.end(), table) == wordTables.end())
             {
                 wordTables.push_back(table);
@@ -562,6 +679,7 @@ bool ALSyntaxGrammar::Impl::loadRule(const LLSD& in, const std::string& state_na
             error = where + "the end of a span is empty";
             return false;
         }
+        end.endTemplate = end.endRegex && endTemplate(end.text, end.endPrefix, end.endSuffix);
         inside.rules.push_back(std::move(end));
         if (in.has("multiline") && !in["multiline"].asBoolean())
         {
@@ -606,35 +724,8 @@ bool ALSyntaxGrammar::Impl::loadRule(const LLSD& in, const std::string& state_na
     return true;
 }
 
-const ALRegex* ALSyntaxGrammar::Impl::endRegexFor(const Rule& rule, const std::string& payload) const
-{
-    std::string pattern = rule.text;
-    for (size_t at = pattern.find("\\1"); at != std::string::npos; at = pattern.find("\\1", at))
-    {
-        const std::string escaped = ALRegex::escape(payload);
-        pattern.replace(at, 2, escaped);
-        at += escaped.size();
-    }
-    auto it = endRegexes.find(pattern);
-    if (it == endRegexes.end())
-    {
-        if (endRegexes.size() >= 256)
-        {
-            endRegexes.clear();
-        }
-        ALRegex     compiled;
-        std::string error;
-        if (!compileRegex(pattern, compiled, error))
-        {
-            LL_WARNS("Syntax") << name << ": " << error << LL_ENDL;
-        }
-        it = endRegexes.emplace(pattern, std::move(compiled)).first;
-    }
-    return it->second.ok() ? &it->second : nullptr;
-}
-
 size_t ALSyntaxGrammar::Impl::tryRule(const Rule& rule, std::string_view line, size_t pos, const std::string& payload,
-                                      const ALSyntaxWords& words, ALSyntaxKind& kind, std::string& capture) const
+                                      const ALSyntaxWords& words, const ALRegex* end_regex, ALSyntaxKind& kind, std::string& capture) const
 {
     const size_t npos = std::string_view::npos;
     const size_t len  = line.size();
@@ -693,15 +784,46 @@ size_t ALSyntaxGrammar::Impl::tryRule(const Rule& rule, std::string_view line, s
                 if (head < pos - 1 && wordStart.matches(static_cast<unsigned char>(line[head])))
                 {
                     const std::string_view dotted = line.substr(head, end - head);
-                    for (const auto& [table, table_kind] : rule.tables)
+                    if (!sPlainLexing)
                     {
-                        if (this->words.has(table, dotted) || words.has(table, dotted))
+                        const U64 found = this->words.tablesOf(dotted) | words.tablesOf(dotted);
+                        for (const auto& [bit, table_kind] : rule.tableBits)
                         {
-                            kind = table_kind;
-                            return end;
+                            if (found & bit)
+                            {
+                                kind = table_kind;
+                                return end;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        for (const auto& [table, table_kind] : rule.tables)
+                        {
+                            if (this->words.has(table, dotted) || words.has(table, dotted))
+                            {
+                                kind = table_kind;
+                                return end;
+                            }
                         }
                     }
                 }
+            }
+            // Every table the word is in, in one look at the grammar's words
+            // and one at the runtime's; the first of the rule's tables it is
+            // in says its kind.
+            if (!sPlainLexing)
+            {
+                const U64 found = this->words.tablesOf(word) | words.tablesOf(word);
+                for (const auto& [bit, table_kind] : rule.tableBits)
+                {
+                    if (found & bit)
+                    {
+                        kind = table_kind;
+                        break;
+                    }
+                }
+                return end;
             }
             for (const auto& [table, table_kind] : rule.tables)
             {
@@ -759,9 +881,20 @@ size_t ALSyntaxGrammar::Impl::tryRule(const Rule& rule, std::string_view line, s
             {
                 return line.compare(pos, rule.text.size(), rule.text) == 0 ? pos + rule.text.size() : npos;
             }
-            const ALRegex* regex = endRegexFor(rule, payload);
-            ALRegexMatch   found;
-            if (!regex || !regex->search(line, &found, pos, true, 0) || found.length() == 0)
+            if (rule.endTemplate)
+            {
+                // The text around the capture, and the capture.
+                const size_t length = rule.endPrefix.size() + payload.size() + rule.endSuffix.size();
+                if (length == 0 || pos + length > len || line.compare(pos, rule.endPrefix.size(), rule.endPrefix) != 0 ||
+                    line.compare(pos + rule.endPrefix.size(), payload.size(), payload) != 0 ||
+                    line.compare(pos + rule.endPrefix.size() + payload.size(), rule.endSuffix.size(), rule.endSuffix) != 0)
+                {
+                    return npos;
+                }
+                return pos + length;
+            }
+            ALRegexMatch found;
+            if (!end_regex || !end_regex->search(line, &found, pos, true, 0) || found.length() == 0)
             {
                 return npos;
             }
@@ -771,6 +904,84 @@ size_t ALSyntaxGrammar::Impl::tryRule(const Rule& rule, std::string_view line, s
             return npos;
     }
     return npos;
+}
+
+// static
+bool ALSyntaxGrammar::sPlainLexing = false;
+
+void ALSyntaxGrammar::Impl::prepare()
+{
+    // Whether a rule could match at a place where this byte is: what each
+    // kind of rule looks at first, before anything else.
+    const auto may_begin = [this](const Rule& rule, unsigned char c) {
+        switch (rule.match)
+        {
+            case Rule::Match::Literal:
+            case Rule::Match::SpanEscape:
+                return !rule.text.empty() && static_cast<unsigned char>(rule.text[0]) == c;
+            case Rule::Match::Chars:
+                return rule.chars.matches(c);
+            case Rule::Match::Word:
+                return wordStart.matches(c);
+            case Rule::Match::Span:
+                return rule.regex.ok() ? rule.mayStartWith(c) : !rule.text.empty() && static_cast<unsigned char>(rule.text[0]) == c;
+            case Rule::Match::Regex:
+                return rule.mayStartWith(c);
+            case Rule::Match::SpanEnd:
+                if (!rule.endRegex)
+                {
+                    return static_cast<unsigned char>(rule.text[0]) == c;
+                }
+                return !rule.endTemplate || rule.endPrefix.empty() || static_cast<unsigned char>(rule.endPrefix[0]) == c;
+            case Rule::Match::Eol:
+                return false;
+        }
+        return true;
+    };
+    for (State& state : states)
+    {
+        state.all.clear();
+        for (std::vector<U16>& list : state.byByte)
+        {
+            list.clear();
+        }
+        // A span's own state: its escape, then its end, and a line end
+        // perhaps, and nothing else.
+        S32  escape = -1;
+        S32  end    = -1;
+        bool span   = true;
+        for (size_t r = 0; r < state.rules.size(); ++r)
+        {
+            const Rule& rule = state.rules[r];
+            if (rule.match == Rule::Match::Eol)
+            {
+                continue;
+            }
+            if (rule.match == Rule::Match::SpanEscape && escape < 0 && end < 0)
+            {
+                escape = static_cast<S32>(r);
+            }
+            else if (rule.match == Rule::Match::SpanEnd && end < 0)
+            {
+                end = static_cast<S32>(r);
+            }
+            else
+            {
+                span = false;
+            }
+            state.all.push_back(static_cast<U16>(r));
+            for (U32 b = 0; b < 256; ++b)
+            {
+                if (may_begin(rule, static_cast<unsigned char>(b)))
+                {
+                    state.byByte[b].push_back(static_cast<U16>(r));
+                }
+            }
+        }
+        const bool text_end = end >= 0 && (!state.rules[end].endRegex || state.rules[end].endTemplate);
+        state.spanEscape    = span && text_end ? escape : -1;
+        state.spanEnd       = span && text_end ? end : -1;
+    }
 }
 
 ALSyntaxGrammar::ALSyntaxGrammar()
@@ -958,6 +1169,7 @@ bool ALSyntaxGrammar::load(const LLSD& description, std::string& error)
         }
         impl->states[target.state].rules[target.rule].target = static_cast<U16>(index);
     }
+    impl->prepare();
     mImpl = std::move(impl);
     error.clear();
     return true;
@@ -1092,10 +1304,6 @@ size_t ALSyntaxGrammar::closesBlock(std::string_view text) const
     return found.length();
 }
 
-size_t ALSyntaxGrammar::cachedEndPatterns() const
-{
-    return mImpl->endRegexes.size();
-}
 
 ALSyntaxState ALSyntaxGrammar::initialState() const
 {
@@ -1153,22 +1361,90 @@ void ALSyntaxGrammar::lexLine(std::string_view line, ALSyntaxState& state, std::
         }
     };
 
+    // The ends of spans with more to them than text, made from the
+    // capture they opened with as this line meets them.
+    std::vector<std::pair<std::string, ALRegex>> end_regexes;
+    const auto end_regex_for = [&](const Rule& rule, const std::string& payload) -> const ALRegex* {
+        const std::string pattern = endPattern(rule.text, payload);
+        for (const auto& [written, regex] : end_regexes)
+        {
+            if (written == pattern)
+            {
+                return regex.ok() ? &regex : nullptr;
+            }
+        }
+        ALRegex     compiled;
+        std::string error;
+        if (!mImpl->compileRegex(pattern, compiled, error))
+        {
+            LL_WARNS("Syntax") << mImpl->name << ": " << error << LL_ENDL;
+        }
+        end_regexes.emplace_back(pattern, std::move(compiled));
+        return end_regexes.back().second.ok() ? &end_regexes.back().second : nullptr;
+    };
+    std::string span_end;
+
     size_t pos = 0;
     while (pos < len)
     {
-        const ALSyntaxState::Frame& frame = state.frames.back();
+        const ALSyntaxState::Frame& frame   = state.frames.back();
         const Impl::State&          current = mImpl->states[frame.state];
-        const Rule*                 hit     = nullptr;
-        size_t                      end     = std::string_view::npos;
-        ALSyntaxKind                kind    = current.defaultKind;
-        std::string                 capture;
-        for (const Rule& rule : current.rules)
+        if (!sPlainLexing && current.spanEnd >= 0)
         {
-            if (rule.match == Rule::Match::Eol)
+            // Inside a span whose end is text: the nearer of its escape and
+            // its end looked for, and what lies before it the span's own.
+            // The escape wins a tie, as it is tried first.
+            const Rule& end_rule = current.rules[current.spanEnd];
+            span_end.assign(end_rule.endRegex ? end_rule.endPrefix : end_rule.text);
+            if (end_rule.endRegex)
             {
+                span_end += frame.payload;
+                span_end += end_rule.endSuffix;
+            }
+            const size_t end_at = span_end.empty() ? std::string_view::npos : line.find(span_end, pos);
+            size_t       esc_at = std::string_view::npos;
+            if (current.spanEscape >= 0)
+            {
+                esc_at = line.find(current.rules[current.spanEscape].text, pos);
+            }
+            if (esc_at != std::string_view::npos && esc_at <= end_at)
+            {
+                const Rule& escape = current.rules[current.spanEscape];
+                size_t      after  = esc_at + escape.text.size();
+                if (after < len)
+                {
+                    // The escape and the character it keeps.
+                    after = utf8str_decode_at(line, after).next;
+                }
+                emit(pos, esc_at, current.defaultKind);
+                emit(esc_at, after, escape.kind);
+                pos = after;
                 continue;
             }
-            end = mImpl->tryRule(rule, line, pos, frame.payload, words, kind, capture);
+            if (end_at != std::string_view::npos)
+            {
+                const size_t after = end_at + span_end.size();
+                emit(pos, end_at, current.defaultKind);
+                emit(end_at, after, end_rule.kind);
+                go(end_rule, std::string());
+                pos = after;
+                continue;
+            }
+            emit(pos, len, current.defaultKind);
+            pos = len;
+            continue;
+        }
+        const Rule*             hit        = nullptr;
+        size_t                  end        = std::string_view::npos;
+        ALSyntaxKind            kind       = current.defaultKind;
+        std::string             capture;
+        // Only the rules that can begin with the byte here.
+        const std::vector<U16>& candidates = sPlainLexing ? current.all : current.byByte[static_cast<unsigned char>(line[pos])];
+        for (const U16 index : candidates)
+        {
+            const Rule&    rule      = current.rules[index];
+            const ALRegex* end_regex = rule.match == Rule::Match::SpanEnd && rule.endRegex && !rule.endTemplate ? end_regex_for(rule, frame.payload) : nullptr;
+            end = mImpl->tryRule(rule, line, pos, frame.payload, words, end_regex, kind, capture);
             if (end != std::string_view::npos)
             {
                 hit = &rule;

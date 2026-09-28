@@ -28,6 +28,7 @@
 #include "llsd.h"
 #include "llstl.h"
 
+#include <boost/unordered/unordered_flat_map.hpp>
 #include <boost/unordered/unordered_flat_set.hpp>
 
 #include <map>
@@ -134,9 +135,17 @@ public:
     // its table: what completion offers.
     void collect(std::string_view prefix, std::vector<std::pair<std::string, std::string>>& out) const;
 
+    // Every table a word is in, as a bit each, in one look: what a word
+    // rule asks, instead of asking each of its tables in turn. A table's
+    // bit is the same in every set of words, the grammar's and the
+    // runtime's alike; there are at most 64 tables across all grammars.
+    U64        tablesOf(std::string_view word) const;
+    static U32 tableBit(std::string_view table);
+
 private:
     typedef boost::unordered_flat_set<std::string, ll::string_hash, std::equal_to<>> set_t;
     std::map<std::string, set_t, std::less<>> mTables;
+    boost::unordered_flat_map<std::string, U64, ll::string_hash, std::equal_to<>> mIndex;
 };
 
 // A grammar: named states, each a list of rules tried in order at every
@@ -236,9 +245,10 @@ public:
     // push stays where it is, so that text nested past reason costs no
     // more than this at every line after it.
     static constexpr size_t MAX_DEPTH = 64;
-    // How many span ends written with a capture are kept compiled, for a
-    // test that says they do not pile up.
-    size_t cachedEndPatterns() const;
+    // For a test: lexed without the ways round -- every rule tried at every
+    // place, every span walked a byte at a time, every table asked in turn
+    // -- which must come to the same tokens and the same states.
+    static bool sPlainLexing;
 
 private:
     struct Impl;

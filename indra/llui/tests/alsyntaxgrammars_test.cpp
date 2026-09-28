@@ -26,6 +26,8 @@
 
 #include "../alsyntaxgrammar.h"
 
+#include "albigscript.h"
+
 #include "../test/lltut.h"
 
 #include <string>
@@ -260,14 +262,30 @@ namespace tut
         grammar.lexLine(std::string(10, ')'), state, tokens, words);
         ensure("and out again", state.frames.size() < ALSyntaxGrammar::MAX_DEPTH);
 
-        // A span whose end is its opening's capture, over many captures.
+        // A span whose end is its opening's capture, over many captures:
+        // the end is text once the capture is known, and nothing is kept.
         for (S32 i = 0; i < 400; ++i)
         {
             state = grammar.initialState();
             grammar.lexLine("<<w" + std::to_string(i) + " x w" + std::to_string(i), state, tokens, words);
+            ensure("each closes", state.frames.size() == 1);
         }
-        ensure("the ends kept are held to a number", grammar.cachedEndPatterns() <= 256);
-        ensure("and they still close", state.frames.size() == 1);
+
+        // An end with more to it than text around the capture is a regex,
+        // made from the capture as the line meets it.
+        LLSD regex_states;
+        regex_states["main"] = LLSD::emptyArray().with(0, LLSD().with("span_regex", "<<(\\w+)").with("end_regex", "\\1\\d+").with("kind", "string"));
+        LLSD regex_description;
+        regex_description["name"]   = "tested";
+        regex_description["states"] = regex_states;
+        ALSyntaxGrammar regex_grammar;
+        ensure("loads: " + error, regex_grammar.load(regex_description, error));
+        state = regex_grammar.initialState();
+        regex_grammar.lexLine("<<ab x ab y", state, tokens, words);
+        ensure("not closed by the capture alone", state.frames.size() == 2);
+        regex_grammar.lexLine("still ab42 out", state, tokens, words);
+        ensure("closed by the capture and digits", state.frames.size() == 1);
+        ensure_equals("the span to there, and text after", said("still ab42 out", tokens), std::string("string:still ab42|text: out"));
     }
 
     template<> template<>
@@ -339,5 +357,56 @@ namespace tut
         ALSyntaxState slua;
         ensure_equals("SLua, either quote", lexed("slua", "print('lib.lua', \"a/b\")", slua, words),
                       std::string("function:print|punctuation:(|path:'lib.lua'|punctuation:,|text: |path:\"a/b\"|punctuation:)"));
+    }
+    template<> template<>
+    void alsyntaxgrammars_object::test<12>()
+    {
+        set_test_name("lexed the quick way -- rules by first byte, spans' ends looked for, a word's tables in one look -- is lexed as the plain way does it, token for token and state for state");
+        ALSyntaxWords words;
+        words.set("function", { "llSay", "llOwnerSay", "print", "ll.Say", "tostring" });
+        words.set("constant", { "TRUE", "FALSE", "PI", "ZERO_VECTOR" });
+        words.set("event", { "state_entry", "touch_start" });
+        words.set("type", { "number", "string" });
+        words.set("deprecated", { "llSound" });
+        const std::string mixed = "x = \"a\\\"b\\n\" -- c\n[[long\nstring]] --[=[ lvl\n ]] ]=] y\n"
+                                  "/* block\n * more */ z = \"open\n`s {n} \\{ t` q\n<a href=\"x\">&amp;</a> {\"k\": [1, 2]}\n";
+        const auto compare = [&](const char* grammar_name, const std::string& text) {
+            std::shared_ptr<const ALSyntaxGrammar> grammar = library.find(grammar_name);
+            ensure(std::string("grammar ") + grammar_name, grammar != nullptr);
+            ALSyntaxState              quick = grammar->initialState();
+            ALSyntaxState              plain = grammar->initialState();
+            std::vector<ALSyntaxToken> quick_tokens, plain_tokens;
+            size_t                     at   = 0;
+            S32                        line = 0;
+            while (at <= text.size())
+            {
+                const size_t           next = text.find('\n', at);
+                const std::string_view one  = std::string_view(text).substr(at, next == std::string::npos ? std::string::npos : next - at);
+                ALSyntaxGrammar::sPlainLexing = true;
+                grammar->lexLine(one, plain, plain_tokens, words);
+                ALSyntaxGrammar::sPlainLexing = false;
+                grammar->lexLine(one, quick, quick_tokens, words);
+                const std::string where = std::string(grammar_name) + " line " + std::to_string(line);
+                ensure(where + ": the same tokens: " + said(one, plain_tokens) + " against " + said(one, quick_tokens), quick_tokens == plain_tokens);
+                ensure(where + ": the same state after", quick == plain);
+                if (next == std::string::npos)
+                {
+                    break;
+                }
+                at = next + 1;
+                ++line;
+            }
+        };
+        for (const char* grammar_name : { "lsl", "slua", "xml", "json", "text" })
+        {
+            compare(grammar_name, mixed);
+        }
+        const std::string lsl  = ll_test::bigLSL(3000);
+        const std::string slua = ll_test::bigSLua(3000);
+        compare("lsl", lsl);
+        compare("lsl", "/*\n" + lsl + "\n*/");
+        compare("slua", slua);
+        compare("slua", "--[==[\n" + slua + "\n]==]");
+        compare("slua", "x = [[\n" + slua + "\n]]");
     }
 }
