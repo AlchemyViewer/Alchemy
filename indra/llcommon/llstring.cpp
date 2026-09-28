@@ -1754,6 +1754,36 @@ std::pair<size_t, size_t> utf8str_next_word_range(std::string_view utf8str, size
     return { n, n };
 }
 
+void utf8str_word_ranges(std::string_view utf8str, std::vector<std::pair<size_t, size_t>>& out)
+{
+    out.clear();
+    const size_t n  = utf8str.size();
+    size_t       at = 0;
+    while (at < n)
+    {
+        const auto bounds = utf8str_line_bounds(utf8str, at);
+        if (at < bounds.second)
+        {
+            const std::string_view line = utf8str.substr(bounds.first, bounds.second - bounds.first);
+            const Utf8Breaks breaks(line, UBRK_WORD);
+            if (breaks)
+            {
+                UBreakIterator* iter = breaks.get();
+                int32_t begin = ubrk_first(iter);
+                for (int32_t end = ubrk_next(iter); end != UBRK_DONE;
+                     begin = end, end = ubrk_next(iter))
+                {
+                    if (utf8str_status_is_word(ubrk_getRuleStatus(iter)))
+                    {
+                        out.emplace_back(bounds.first + (size_t)begin, bounds.first + (size_t)end);
+                    }
+                }
+            }
+        }
+        at = bounds.second + 1;
+    }
+}
+
 size_t utf8str_step_word_backward(std::string_view utf8str, size_t byte_pos)
 {
     if (byte_pos == 0)

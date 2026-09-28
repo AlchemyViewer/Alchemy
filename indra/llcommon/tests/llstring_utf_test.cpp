@@ -220,9 +220,9 @@ namespace tut
     //   12x utf8 walkers     (byte-offset segmentation against its wide twin)
     //   14x trim             (Unicode whitespace, and what is not whitespace)
     // The TUT default registers only test<1>..test<50>, but the explicit
-    // test_group<..., 146> below raises that ceiling. Keep this index in
+    // test_group<..., 150> below raises that ceiling. Keep this index in
     // sync with categories used below.
-    typedef test_group<llstring_utf_data, 146> llstring_utf_t;
+    typedef test_group<llstring_utf_data, 150> llstring_utf_t;
     typedef llstring_utf_t::object llstring_utf_object_t;
     tut::llstring_utf_t tut_llstring_utf("LLStringUTF");
 
@@ -2935,5 +2935,47 @@ namespace tut
         ensure("the same stops", utf8str_grapheme_starts(utf8, utf8.size()) == stepped);
         ensure("those before the end asked for", utf8str_grapheme_starts(utf8, 11) == std::vector<size_t>({ 0, 1, 2, 3, 6, 9, 10 }));
         ensure("nothing of nothing", utf8str_grapheme_starts(std::string(), 5).empty() && utf8str_grapheme_starts(utf8, 0).empty());
+    }
+
+    // Every word at once is every word utf8str_next_word_range finds one at
+    // a time from the start: over lines, contractions, numbers, scripts
+    // that do not space their words, combining marks, emoji, blank lines
+    // and nothing at all.
+    template<> template<>
+    void llstring_utf_object_t::test<146>()
+    {
+        const std::string texts[] = {
+            "",
+            "   ",
+            "one",
+            "don't stop, it's 3.14 and a_b or e.g. x:y",
+            "first line\nsecond  line\r\n\nfourth\n",
+            "\n\nafter blanks",
+            "\xE6\x97\xA5\xE6\x9C\xAC\xE8\xAA\x9E\xE3\x81\xA7\xE3\x81\x99 mixed",
+            "caf\xC3\xA9 e\xCC\x81t\xC3\xA9 na\xC3\xAFve",
+            "flag \xF0\x9F\x87\xBA\xF0\x9F\x87\xB8 then words",
+            "    // Counts the parts of b, and more for a long one.",
+            "trailing words   ",
+        };
+        for (const std::string& text : texts)
+        {
+            std::vector<std::pair<size_t, size_t>> stepped;
+            for (size_t at = 0;;)
+            {
+                const auto word = utf8str_next_word_range(text, at);
+                if (word.first >= word.second)
+                {
+                    break;
+                }
+                stepped.push_back(word);
+                at = word.second;
+            }
+            std::vector<std::pair<size_t, size_t>> all = { { 9, 9 } };
+            utf8str_word_ranges(text, all);
+            ensure("the same words in \"" + text + "\"", all == stepped);
+        }
+        std::vector<std::pair<size_t, size_t>> words;
+        utf8str_word_ranges("don't stop", words);
+        ensure("a contraction is one word", words == std::vector<std::pair<size_t, size_t>>({ { 0, 5 }, { 6, 10 } }));
     }
 }

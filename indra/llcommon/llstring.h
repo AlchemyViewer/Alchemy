@@ -902,6 +902,10 @@ LL_COMMON_API size_t utf8str_caret_word_backward(std::string_view utf8str, size_
 // crosses lines and returns an empty range at the end of the text.
 LL_COMMON_API std::pair<size_t, size_t> utf8str_word_range_at(std::string_view utf8str, size_t byte_pos);
 LL_COMMON_API std::pair<size_t, size_t> utf8str_next_word_range(std::string_view utf8str, size_t byte_pos);
+// Every word of the text, in order: the ranges utf8str_next_word_range finds
+// one at a time, walked with one break iterator a line rather than from the
+// line's start for each. Written to `out`, which is emptied first.
+LL_COMMON_API void utf8str_word_ranges(std::string_view utf8str, std::vector<std::pair<size_t, size_t>>& out);
 
 // Positions in `utf8str` where UAX #14 permits a line to end, written to `out`
 // in ascending order and expressed as where the next line would begin. The
