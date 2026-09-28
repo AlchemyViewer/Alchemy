@@ -191,8 +191,11 @@ private:
                     continue;
                 }
                 Item one;
-                one.id   = item->getUUID();
-                one.name = item->getName();
+                one.id          = item->getUUID();
+                one.name        = item->getName();
+                one.copy        = gAgent.allowOperation(PERM_COPY, item->getPermissions(), GP_OBJECT_MANIPULATE);
+                one.modify      = gAgent.allowOperation(PERM_MODIFY, item->getPermissions(), GP_OBJECT_MANIPULATE);
+                one.description = item->getDescription();
                 if (item->getType() == LLAssetType::AT_LSL_TEXT)
                 {
                     one.script = true;
@@ -412,11 +415,14 @@ void ALScriptWorkspace::load(const ALScriptRef& ref, load_callback_t callback)
             return;
         }
         // A library script may be read without being modifiable; anyone
-        // else's needs both copy and modify, unless the agent is a god.
+        // else's needs both copy and modify, unless the agent is a god. A
+        // notecard needs copy alone, as the notecard window has it, and
+        // opens only to be read without modify.
         const bool library   = !gInventory.isObjectDescendentOf(ref.item, gInventory.getRootFolderID());
+        const bool notecard  = item->getType() == LLAssetType::AT_NOTECARD;
         const bool copyable  = gAgent.allowOperation(PERM_COPY, item->getPermissions(), GP_OBJECT_MANIPULATE);
         answer.modifiable    = gAgent.allowOperation(PERM_MODIFY, item->getPermissions(), GP_OBJECT_MANIPULATE);
-        answer.viewable      = gAgent.isGodlike() || (copyable && (answer.modifiable || library));
+        answer.viewable      = gAgent.isGodlike() || (copyable && (answer.modifiable || library || notecard));
         answer.name          = item->getName();
         answer.assetId       = item->getAssetUUID();
         const std::string refused = rlvRefusal(nullptr, item->getType(), RlvUse::See);
@@ -443,9 +449,11 @@ void ALScriptWorkspace::load(const ALScriptRef& ref, load_callback_t callback)
         callback(answer);
         return;
     }
+    // A notecard with copy alone, read-only without modify, as above.
+    const bool notecard = item->getType() == LLAssetType::AT_NOTECARD;
     const bool copyable = gAgent.allowOperation(PERM_COPY, item->getPermissions(), GP_OBJECT_MANIPULATE);
     answer.modifiable   = gAgent.allowOperation(PERM_MODIFY, item->getPermissions(), GP_OBJECT_MANIPULATE);
-    answer.viewable     = gAgent.isGodlike() || (copyable && answer.modifiable);
+    answer.viewable     = gAgent.isGodlike() || (copyable && (answer.modifiable || notecard));
     answer.name         = item->getName();
     answer.assetId      = item->getAssetUUID();
     const std::string refused = rlvRefusal(object, item->getType(), RlvUse::See);

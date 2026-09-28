@@ -426,6 +426,12 @@ public:
         std::string name;
         bool        script = true;
         bool        lua    = false;
+        // What the agent may do with it: copy, and change. A script is read
+        // only with both; a notecard with copy alone, and only read without
+        // modify.
+        bool        copy   = true;
+        bool        modify = true;
+        std::string description;
     };
     struct Contents
     {

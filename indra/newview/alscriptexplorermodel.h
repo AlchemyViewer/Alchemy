@@ -65,6 +65,8 @@ public:
         std::string name;
         // The name is the prim's own, not a stand-in until it is heard.
         bool        named = false;
+        // Whether the agent may change it: put in it, take out, run.
+        bool        modify = true;
     };
     // A pinned object stays listed when it is neither selected nor holding
     // a script open, and across sessions; one that is not around is listed
@@ -113,6 +115,7 @@ public:
         {
             LLUUID      id;
             std::string name;
+            bool        modify = true;
         };
         std::vector<Part> prims;
     };
@@ -201,6 +204,14 @@ public:
     // --- whether scripts run -------------------------------------------------------
 
     std::optional<bool> knownRunning(const ALScriptRef& ref) const { return mIndex.running(ref); }
+    // An item as its prim last said it; none where it has not.
+    std::optional<ALScriptWorkspace::Item> itemAt(const ALScriptRef& ref) const;
+    // Whether the agent may change a prim, as far as it was seen; one not
+    // seen, yes.
+    bool                primModifiable(const LLUUID& prim) const;
+    // A prim's link number, as a script gives it; 0 for one alone or not
+    // seen.
+    S32                 linkNumber(const LLUUID& prim) const;
     // What is known of the listed prims' scripts let go of, for them to be
     // asked again.
     void                forgetRunning();
@@ -239,6 +250,12 @@ public:
         bool        script  = false;
         bool        lua     = false;
         ALScriptRef ref;
+        // A prim's link number, as a script gives it: 1 for the root of a
+        // linkset, 2 and on for the rest in link order, 0 for a prim alone.
+        S32         link = 0;
+        // An item the agent may not copy, or not change.
+        bool        noCopy   = false;
+        bool        noModify = false;
     };
     // The rows through a filter: an item whose name has its letters, and
     // what holds it; an object or a prim whose name has them, with all it

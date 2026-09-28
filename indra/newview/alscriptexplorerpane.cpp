@@ -370,12 +370,12 @@ void ALScriptExplorerPane::relist(bool refetch, bool from_region)
         }
         LLViewerObject* root = rootOf(object);
         Model::Seen     seen;
-        seen.prims.push_back({ root->getID(), ALScriptWorkspace::objectName(root, LLStringUtil::null) });
+        seen.prims.push_back({ root->getID(), ALScriptWorkspace::objectName(root, LLStringUtil::null), root->permModify() });
         for (const LLPointer<LLViewerObject>& child : root->getChildren())
         {
             if (child && !child->isAvatar())
             {
-                seen.prims.push_back({ child->getID(), ALScriptWorkspace::objectName(child, LLStringUtil::null) });
+                seen.prims.push_back({ child->getID(), ALScriptWorkspace::objectName(child, LLStringUtil::null), child->permModify() });
             }
         }
         return seen;
@@ -512,15 +512,30 @@ void ALScriptExplorerPane::fill()
                 break;
             }
             case Model::Row::Kind::Prim:
-                out.label = row.name.empty() ? mServices->words("ObjectNameComing") : row.name;
-                out.icon  = "Studio_Prim";
+            {
+                // By its link number, as llGetLinkName and the rest take it.
+                LLStringUtil::format_map_t args;
+                args["[LINK]"] = std::to_string(row.link);
+                args["[NAME]"] = row.name.empty() ? mServices->words("ObjectNameComing") : row.name;
+                out.label      = mServices->words("PrimLinked", args);
+                out.icon       = "Studio_Prim";
                 break;
+            }
             case Model::Row::Kind::Item:
                 out.label = row.name;
                 if (row.script)
                 {
                     const std::optional<bool> running = knownRunning(row.ref);
                     out.suffix = said(!running ? "StateUnknown" : *running ? "RunningYes" : "RunningNo");
+                }
+                // What the agent may not do with it, as the inventory says.
+                if (row.noModify)
+                {
+                    out.suffix += said("NoModifyMark");
+                }
+                if (row.noCopy)
+                {
+                    out.suffix += said("NoCopyMark");
                 }
                 out.icon = row.script ? (row.lua ? "Inv_Script_Luau" : "Inv_Script")
                            : row.name == ".luaurc" || row.name == ".lslrc" ? "Studio_Config"
@@ -685,24 +700,38 @@ bool ALScriptExplorerPane::enabled(const std::string& action) const
     {
         return !rows.empty();
     }
+    // What the agent may do: a prim changed -- put in, taken out, run --
+    // only where it may modify it; an item read only where it may copy it,
+    // and a script where it may modify it too.
+    auto changeable = [this](const Choice& row) { return mModel.primModifiable(row.prim); };
+    auto readable   = [this](const Choice& row) {
+        const std::optional<ALScriptWorkspace::Item> item = mModel.itemAt(row.ref());
+        return !item || gAgent.isGodlike() || (item->copy && (item->modify || !item->script));
+    };
+    auto itemChangeable = [this](const Choice& row) {
+        const std::optional<ALScriptWorkspace::Item> item = mModel.itemAt(row.ref());
+        return !item || item->modify;
+    };
     if (action == "open")
     {
-        return any([](const Choice& row) { return row.isItem(); });
+        return any([&](const Choice& row) { return row.isItem() && readable(row); });
     }
     if (action == "new_lsl" || action == "new_lua" || action == "new_notecard")
     {
-        // One prim to put it in.
-        return rows.size() == 1 && present(rows.front()) &&
+        // One prim to put it in, which may be changed.
+        return rows.size() == 1 && present(rows.front()) && changeable(rows.front()) &&
                (action != "new_lua" || ALScriptWorkspace::luaEnabled(ALScriptRef(rows.front().prim, LLUUID::null)));
     }
     if (action == "rename")
     {
-        // A script or notecard; or a prim or an object, which is in sight.
-        return rows.size() == 1 && (rows.front().isItem() || present(rows.front()));
+        // A script or notecard; or a prim or an object, which is in sight:
+        // each one the agent may change.
+        const Choice& row = rows.size() == 1 ? rows.front() : Choice();
+        return rows.size() == 1 && (row.isItem() || present(row)) && changeable(row) && (!row.isItem() || itemChangeable(row));
     }
     if (action == "delete")
     {
-        return !rows.empty() && !any([](const Choice& row) { return !row.isItem(); });
+        return !rows.empty() && !any([&](const Choice& row) { return !row.isItem() || !changeable(row); });
     }
     if (action == "recompile_lsl_luau" && !any([](const Choice& row) { return ALScriptWorkspace::luaEnabled(ALScriptRef(row.prim, LLUUID::null)); }))
     {
@@ -713,8 +742,13 @@ bool ALScriptExplorerPane::enabled(const std::string& action) const
         action == "recompile_lsl2" || action == "recompile_lsl_luau")
     {
         // Scripts, or whole prims and objects, whose scripts are walked;
-        // restart is one script at a time.
-        return any([&](const Choice& row) { return present(row) && (row.script || (action != "restart" && !row.isItem())); });
+        // restart is one script at a time. Each in a prim the agent may
+        // change, and a script recompiled one it may read.
+        const bool recompiling = action.rfind("recompile", 0) == 0;
+        return any([&](const Choice& row) {
+            return present(row) && changeable(row) && (row.script || (action != "restart" && !row.isItem())) &&
+                   (!recompiling || !row.isItem() || readable(row));
+        });
     }
     if (action == "teleport" || action == "zoom")
     {

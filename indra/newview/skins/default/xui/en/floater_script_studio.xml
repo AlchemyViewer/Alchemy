@@ -465,6 +465,9 @@
     <floater.string name="SavedElsewhereConflict">[NAME] was saved by [WHO] while it had changes here.</floater.string>
     <floater.string name="SavedElsewhereKept">Kept what is here in [NAME]; saving it replaces what was saved elsewhere.</floater.string>
     <floater.string name="SavedByBridge">VS Code</floater.string>
+    <floater.string name="PrimLinked">[LINK]. [NAME]</floater.string>
+    <floater.string name="NoModifyMark">no modify</floater.string>
+    <floater.string name="NoCopyMark">no copy</floater.string>
     <floater.string name="ScriptInObject">[NAME] in [OBJECT]</floater.string>
     <floater.string name="RecompilingMany">Recompiling...</floater.string>
     <floater.string name="RecompileNothing">There is no script there to recompile.</floater.string>

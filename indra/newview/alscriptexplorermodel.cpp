@@ -88,9 +88,10 @@ void ALScriptExplorerModel::list(const Listing& listing)
         for (const Seen::Part& part : seen->prims)
         {
             Prim prim;
-            prim.id    = part.id;
-            prim.name  = part.id == root ? one.name : part.name;
-            prim.named = part.id == root ? one.named : !part.name.empty();
+            prim.id     = part.id;
+            prim.name   = part.id == root ? one.name : part.name;
+            prim.named  = part.id == root ? one.named : !part.name.empty();
+            prim.modify = part.modify;
             one.prims.push_back(std::move(prim));
         }
         if (one.prims.size() > LARGE_LINKSET)
@@ -368,8 +369,9 @@ std::vector<ALScriptExplorerModel::Row> ALScriptExplorerModel::rows(const std::s
                 group.empties          = empties;
                 out.push_back(group);
             }
-            for (const Prim& prim : object.prims)
+            for (size_t index = 0; index < object.prims.size(); ++index)
             {
+                const Prim& prim = object.prims[index];
                 if (grouped && holds_nothing(prim) != (pass == 1))
                 {
                     continue;
@@ -395,6 +397,7 @@ std::vector<ALScriptExplorerModel::Row> ALScriptExplorerModel::rows(const std::s
                     line.folded  = filter.empty() && mFoldedPrims.contains(prim.id);
                     line.unnamed = object.present && !prim.named;
                     line.known   = mIndex.fetched(prim.id);
+                    line.link    = static_cast<S32>(index) + 1;
                     out.push_back(line);
                 }
                 for (const Item& item : items)
@@ -416,12 +419,56 @@ std::vector<ALScriptExplorerModel::Row> ALScriptExplorerModel::rows(const std::s
                     line.script          = item.script;
                     line.lua             = item.lua;
                     line.ref             = ALScriptRef(prim.id, item.id);
+                    line.noCopy          = !item.copy;
+                    line.noModify        = !item.modify;
                     out.push_back(line);
                 }
             }
         }
     }
     return out;
+}
+
+std::optional<ALScriptWorkspace::Item> ALScriptExplorerModel::itemAt(const ALScriptRef& ref) const
+{
+    for (const Item& item : mIndex.items(ref.object))
+    {
+        if (item.id == ref.item)
+        {
+            return item;
+        }
+    }
+    return std::nullopt;
+}
+
+bool ALScriptExplorerModel::primModifiable(const LLUUID& prim) const
+{
+    for (const Object& object : mObjects)
+    {
+        for (const Prim& one : object.prims)
+        {
+            if (one.id == prim)
+            {
+                return one.modify;
+            }
+        }
+    }
+    return true;
+}
+
+S32 ALScriptExplorerModel::linkNumber(const LLUUID& prim) const
+{
+    for (const Object& object : mObjects)
+    {
+        for (size_t index = 0; index < object.prims.size(); ++index)
+        {
+            if (object.prims[index].id == prim)
+            {
+                return object.prims.size() > 1 ? static_cast<S32>(index) + 1 : 0;
+            }
+        }
+    }
+    return 0;
 }
 
 // --- folding -----------------------------------------------------------------------
