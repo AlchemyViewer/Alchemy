@@ -291,6 +291,8 @@
     <floater.string name="OriginAny">Every source</floater.string>
     <floater.string name="ProblemsAllHiddenA">The filters hide the 1 problem there is.</floater.string>
     <floater.string name="ProblemsAllHiddenB">The filters hide all [COUNT] problems.</floater.string>
+    <floater.string name="ProblemsUnlistedA">1 more not listed</floater.string>
+    <floater.string name="ProblemsUnlistedB">[COUNT] more not listed</floater.string>
     <floater.string name="ProblemsHiddenA">1 more hidden by the filters</floater.string>
     <floater.string name="ProblemsHiddenB">[COUNT] more hidden by the filters</floater.string>
     <floater.string name="ProblemsCopiedA">1 problem copied.</floater.string>

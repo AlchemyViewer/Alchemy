@@ -207,8 +207,16 @@ public:
 private:
     typedef ALFindings<Doc::Shown, Doc::ProblemTraits> store_t;
 
-    // The rows listed, of what fill counted.
-    void listRows(const Doc* doc);
+    // The rows listed, of what fill counted: no more than ROWS_MOST, the
+    // rest counted in a row of their own. A row holds whose it is and
+    // where the store has it; what it says is the store's.
+    static constexpr S32 ROWS_MOST = 1000;
+    void                 listRows(const Doc* doc);
+    // Where a problem is, as the list says it: its line, and its column as
+    // the status line counts it where the script is open here.
+    std::string whereOf(const Doc* doc, const Doc::Shown& problem) const;
+    // A row's tip, made as the pointer rests on it.
+    std::string tipOf(const LLScrollListItem* item) const;
     // The filters' question of one script's problems, by its id.
     store_t::Query          query(const std::string& id) const;
     std::vector<const Doc*> docsFor(const Doc* doc);
@@ -241,6 +249,10 @@ private:
     void     relist(Checked& one);
     // Those listed with the open scripts': not while a tab holds one.
     std::vector<const Checked*> checkedFor();
+    // A row's problem, from the store; null for a heading or one gone.
+    const Doc::Shown* shownOf(const LLSD& value) const;
+    // A script no tab holds, by the store's name for it.
+    const Checked* checkedOf(const std::string& owner) const;
 
     ALScriptStudioServices* mServices = nullptr;
     Window*                 mWindow   = nullptr;

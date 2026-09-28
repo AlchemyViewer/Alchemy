@@ -198,7 +198,7 @@ namespace tut
             for (const LLScrollListItem* item : list()->getAllData())
             {
                 const LLSD& value = item->getValue();
-                out += "|" + (value.has("heading") ? "#" + item->getColumn(1)->getValue().asString() : value["message"].asString());
+                out += std::string(value.has("heading") ? "|#" : "|") + item->getColumn(1)->getValue().asString();
             }
             return out;
         }
@@ -209,7 +209,7 @@ namespace tut
             const std::vector<LLScrollListItem*> rows = list()->getAllData();
             for (size_t i = 0; i < rows.size(); ++i)
             {
-                if (rows[i]->getValue()["message"].asString() == message)
+                if (!rows[i]->getValue().has("heading") && rows[i]->getColumn(1)->getValue().asString() == message)
                 {
                     list()->selectNthItem(static_cast<S32>(i));
                     return;
@@ -606,7 +606,7 @@ namespace tut
         S32 at = -1;
         for (size_t i = 0; i < rows.size(); ++i)
         {
-            at = rows[i]->getValue().has("checked") ? static_cast<S32>(i) : at;
+            at = rows[i]->getValue()["owner"].asString().rfind("checked:", 0) == 0 ? static_cast<S32>(i) : at;
         }
         ensure("a row of it", at >= 0);
         list()->selectNthItem(at);
@@ -697,5 +697,52 @@ namespace tut
         ensure("a row to choose: listed first", shown().find("a second error") != std::string::npos);
         ensure("and chosen", studio.chosen.size() == chosen + 1 && studio.chosen.back().line == 1);
         tabs->selectTabByName("problems_tab");
+    }
+
+    template <>
+    template <>
+    void alscriptproblemspane_object::test<12>()
+    {
+        set_test_name("a refill keeps the rows that say the same, moved or not, and the row chosen; no more than a thousand listed, the rest counted");
+        ALScriptProblemsPane& out = make();
+        using S                   = ALScriptProblem::Source;
+        using V                   = ALScriptProblem::Severity;
+        Doc& door                 = doc("door");
+        const auto row_saying     = [this](const std::string& message) -> LLScrollListItem* {
+            for (LLScrollListItem* item : list()->getAllData())
+            {
+                if (!item->getValue().has("heading") && item->getColumn(1)->getValue().asString() == message)
+                {
+                    return item;
+                }
+            }
+            return nullptr;
+        };
+        door.check.analysis = { problem(S::Parser, V::Error, 1, "first"), problem(S::Lint, V::Warning, 3, "second") };
+        gather(door);
+        LLScrollListItem* second = row_saying("second");
+        ensure("listed", second != nullptr && second->getColumn(3)->getValue().asString().rfind("4:", 0) == 0);
+        choose("second");
+        door.check.analysis = { problem(S::Parser, V::Error, 2, "first"), problem(S::Lint, V::Warning, 4, "second") };
+        gather(door);
+        ensure("moved a line: the same row", row_saying("second") == second);
+        ensure("where it is now", second->getColumn(3)->getValue().asString().rfind("5:", 0) == 0);
+        ensure("still chosen", list()->getFirstSelected() == second);
+
+        std::vector<ALScriptProblem> many;
+        for (S32 i = 0; i < 1005; ++i)
+        {
+            many.push_back(problem(S::Lint, V::Warning, i % 10, "many " + std::to_string(i)));
+        }
+        door.check.analysis = many;
+        gather(door);
+        ensure_equals("all counted", out.held(), 1005);
+        S32 rows = 0;
+        for (LLScrollListItem* item : list()->getAllData())
+        {
+            rows += item->getValue().has("heading") ? 0 : 1;
+        }
+        ensure_equals("a thousand listed", rows, 1000);
+        ensure("the rest said", shown().find(services.counted("ProblemsUnlisted", 5)) != std::string::npos);
     }
 }

@@ -311,27 +311,29 @@ bool ALScriptProblemsPane::postBuild()
         group   = item->getValue()["group"].asInteger();
         heading = item->getValue().has("heading");
     });
-    mList->setComparison([](S32 column, const LLScrollListItem* a, const LLScrollListItem* b) {
-        const LLSD& x = a->getValue();
-        const LLSD& y = b->getValue();
-        const auto  place = [&]() {
-            const S32 lx = x["line"].asInteger(), ly = y["line"].asInteger();
-            return lx != ly ? (lx < ly ? -1 : 1) : x["column"].asInteger() < y["column"].asInteger() ? -1 : x["column"].asInteger() > y["column"].asInteger() ? 1 : 0;
+    mList->setComparison([this](S32 column, const LLScrollListItem* a, const LLScrollListItem* b) {
+        const Doc::Shown* x = shownOf(a->getValue());
+        const Doc::Shown* y = shownOf(b->getValue());
+        if (!x || !y)
+        {
+            return x ? -1 : y ? 1 : 0;
+        }
+        const auto place = [&]() {
+            return x->line != y->line ? (x->line < y->line ? -1 : 1) : x->column < y->column ? -1 : x->column > y->column ? 1 : 0;
         };
-        const auto rank = [](const LLSD& one) {
-            const std::string level = one["level"].asString();
-            return level == "ERROR" ? 0 : level == "WARNING" ? 1 : 2;
-        };
+        const auto rank = [](const Doc::Shown& one) { return one.level == Doc::Level::Error ? 0 : one.level == Doc::Level::Warning ? 1 : 2; };
         S32 said = 0;
         switch (column)
         {
-            case 0: said = rank(x) - rank(y); break;
-            case 1: said = LLStringUtil::compareDict(x["message"].asString(), y["message"].asString()); break;
-            case 2: said = LLStringUtil::compareDict(x["origin"].asString(), y["origin"].asString()); break;
+            case 0: said = rank(*x) - rank(*y); break;
+            case 1: said = LLStringUtil::compareDict(x->message, y->message); break;
+            case 2: said = LLStringUtil::compareDict(x->origin, y->origin); break;
             default: break;
         }
         return said != 0 ? said : place();
     });
+    // A row's whole story, as the pointer rests on it.
+    mList->setRowTip([this](const LLScrollListItem* item) { return tipOf(item); });
     return true;
 }
 
@@ -547,26 +549,31 @@ void ALScriptProblemsPane::choose(bool to_editor)
     {
         return;
     }
-    const LLSD& problem = item->getValue();
-    const bool  checked = problem.isMap() && problem.has("checked");
-    if (!problem.isMap() || problem.has("heading") || (!checked && !mServices->findDoc(problem["doc"].asString())))
+    const LLSD&       value   = item->getValue();
+    const Doc::Shown* problem = shownOf(value);
+    const std::string owner   = value["owner"].asString();
+    const Checked*    checked = problem ? checkedOf(owner) : nullptr;
+    if (!problem || (!checked && !mServices->findDoc(owner)))
     {
         return;
     }
     Place place;
     if (checked)
     {
-        place.ref  = ALScriptRef(problem["object"].asUUID(), problem["item"].asUUID());
-        place.name = problem["name"].asString();
+        place.ref  = checked->ref;
+        place.name = checked->name;
     }
-    place.doc       = problem["doc"].asString();
-    place.file      = problem["file"].asString();
-    place.fileName  = problem["fileName"].asString();
-    place.line      = problem["line"].asInteger();
-    place.column    = problem["column"].asInteger();
-    place.hasColumn = problem["hasColumn"].asBoolean();
-    place.endLine   = problem["endLine"].asInteger();
-    place.endColumn = problem["endColumn"].asInteger();
+    else
+    {
+        place.doc = owner;
+    }
+    place.file      = problem->file;
+    place.fileName  = problem->fileName;
+    place.line      = problem->line;
+    place.column    = problem->column;
+    place.hasColumn = problem->hasColumn;
+    place.endLine   = problem->endLine;
+    place.endColumn = problem->endColumn;
     mWindow->problemChosen(place, to_editor);
 }
 
@@ -661,59 +668,63 @@ void ALScriptProblemsPane::listRows(const Doc* doc)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
     mRowsWanted = false;
-    // The row chosen and how far the list was scrolled are kept through a
-    // refill of the same script's: a check comes at every pause in
-    // typing, and whoever is working down the list keeps their place.
-    LLSD      chosen;
-    const S32 scrolled = mList->getScrollPos();
-    if (LLScrollListItem* item = mList->getFirstSelected())
-    {
-        chosen = item->getValue();
-    }
-    const bool same = doc && doc->id == mRowsFor;
-    mRowsFor        = doc ? doc->id : std::string();
-    mList->deleteAllItems();
+    mRowsFor    = doc ? doc->id : std::string();
     mList->setEmpty(LLStringUtil::null, LLStringUtil::null);
     const std::vector<const Doc*>     docs    = docsFor(doc);
     const std::vector<const Checked*> checked = checkedFor();
     const S32                         held    = mHeld;
+    std::vector<ALPaneList::Row>      rows;
     if (!doc && checked.empty())
     {
+        mList->setRows(std::move(rows));
         return;
     }
 
     // What the filters take, by script and, within one, by the file it is
-    // in: the script's own, then each include's.
-    // A script no tab holds, an object's check reached, after the open ones.
+    // in: the script's own, then each include's; a script no tab holds, an
+    // object's check reached, after the open ones. No more than ROWS_MOST
+    // of them, the rest counted.
     struct Group
     {
-        const Doc*                       doc     = nullptr;
-        const Checked*                   checked = nullptr;
-        std::string                      file;
-        std::string                      fileName;
-        std::vector<const Doc::Shown*>   rows;
+        const Doc*                     doc     = nullptr;
+        const Checked*                 checked = nullptr;
+        // Whose they are, as the store knows them.
+        std::string                    owner;
+        std::string                    file;
+        std::string                    fileName;
+        std::vector<const Doc::Shown*> rows;
+        // Where each is among its owner's, as the store has them.
+        std::vector<size_t>            index;
     };
     std::vector<Group> groups;
-    S32                listed = 0;
-    const auto         take   = [&](const Doc* each, const Checked* one, const store_t::Query& asked) {
-        const auto selected = mStore.select(asked);
-        for (const Doc::Shown* problem : selected.found)
+    S32                listed   = 0;
+    S32                unlisted = 0;
+    const auto         take     = [&](const Doc* each, const Checked* one, const std::string& owner) {
+        const auto selected = mStore.select(query(owner));
+        for (size_t i = 0; i < selected.found.size(); ++i)
         {
+            const Doc::Shown* problem = selected.found[i];
+            if (listed >= ROWS_MOST)
+            {
+                ++unlisted;
+                continue;
+            }
             if (groups.empty() || groups.back().doc != each || groups.back().checked != one || groups.back().file != problem->file)
             {
-                groups.push_back({ each, one, problem->file, problem->fileName, {} });
+                groups.push_back({ each, one, owner, problem->file, problem->fileName, {}, {} });
             }
             groups.back().rows.push_back(problem);
+            groups.back().index.push_back(selected.index[i]);
             ++listed;
         }
     };
     for (const Doc* each : docs)
     {
-        take(each, nullptr, query(each->id));
+        take(each, nullptr, each->id);
     }
     for (const Checked* one : checked)
     {
-        take(nullptr, one, query(one->id));
+        take(nullptr, one, one->id);
     }
     // Where a tab is open, its editor paints a row's mark in the theme's
     // colour; a script no tab holds takes the same.
@@ -730,6 +741,19 @@ void ALScriptProblemsPane::listRows(const Doc* doc)
     // a row followed into an include leaves the list on.
     const bool elsewhere = doc != mServices->frontDoc();
     const bool headings  = all || groups.size() > 1 || elsewhere;
+    const std::string runtime = mServices->words("OriginRuntime");
+    const auto cell = [](const char* column, const std::string& value, const char* type = "text") {
+        LLScrollListCell::Params one;
+        one.column = column;
+        one.type   = type;
+        one.value  = value;
+        return one;
+    };
+    // A row goes on being the same row while it says the same of the same
+    // file -- not where, which an edit above it moves -- and one said twice
+    // is told apart by which time it is.
+    boost::unordered_flat_map<std::string, S32, ll::string_hash, std::equal_to<>> said;
+    rows.reserve(static_cast<size_t>(listed) + groups.size() + 2);
     for (size_t group_index = 0; group_index < groups.size(); ++group_index)
     {
         const Group& group = groups[group_index];
@@ -768,146 +792,67 @@ void ALScriptProblemsPane::listRows(const Doc* doc)
             {
                 name += (i == 0 ? "   \xC2\xB7   " : ", ") + counts[i];
             }
-            LLSD heading;
-            heading["value"]["heading"]      = true;
-            heading["value"]["group"]        = static_cast<S32>(group_index);
-            heading["columns"][0]["column"]  = "icon";
-            heading["columns"][0]["type"]    = "icon";
-            heading["columns"][0]["value"]   = group.doc ? mWindow->problemIcon(*group.doc, group.file) : mWindow->scriptIcon(group.checked->lua, group.file);
-            heading["columns"][1]["column"]  = "message";
-            heading["columns"][1]["value"]   = name;
-            heading["columns"][1]["color"]   = ink.get().getValue();
-            heading["columns"][1]["font"]["style"] = "BOLD";
-            if (LLScrollListItem* item = mList->addElement(heading))
-            {
-                item->setEnabled(false);
-            }
+            ALPaneList::Row heading;
+            heading.key                = "#" + group.owner + "\x1f" + group.file;
+            heading.value["heading"]   = true;
+            heading.value["group"]     = static_cast<S32>(group_index);
+            heading.enabled            = false;
+            LLScrollListCell::Params title = cell("message", name);
+            title.color                = ink.get();
+            title.font                 = LLFontGL::getFontSansSerifSmallBold();
+            heading.cells              = { cell("icon", group.doc ? mWindow->problemIcon(*group.doc, group.file) : mWindow->scriptIcon(group.checked->lua, group.file), "icon"),
+                                           title };
+            rows.push_back(std::move(heading));
         }
-        for (const Doc::Shown* problem : group.rows)
+        for (size_t k = 0; k < group.rows.size(); ++k)
         {
-            // The row carries the place and whose it is, so that choosing
-            // it needs no index into anything that a filter reorders.
-            LLSD value;
-            value["group"]     = static_cast<S32>(group_index);
-            value["doc"]       = group.doc ? group.doc->id : std::string();
-            if (group.checked)
+            const Doc::Shown* problem = group.rows[k];
+            // The row carries whose it is and where the store has it: what
+            // it says is the store's, looked up as it is asked for.
+            ALPaneList::Row row;
+            row.key = group.owner + "\x1f" + Doc::levelName(problem->level) + "\x1f" + problem->origin + "\x1f" + problem->file + "\x1f" +
+                      problem->message;
+            if (const S32 times = said[row.key]++; times > 0)
             {
-                value["checked"] = group.checked->id;
-                value["object"]  = group.checked->ref.object;
-                value["item"]    = group.checked->ref.item;
-                value["name"]    = group.checked->name;
+                row.key += "\x1f" + std::to_string(times);
             }
-            value["line"]      = problem->line;
-            value["column"]    = problem->column;
-            value["hasColumn"] = problem->hasColumn;
-            value["endLine"]   = problem->endLine;
-            value["endColumn"] = problem->endColumn;
-            value["file"]      = problem->file;
-            value["fileName"]  = problem->fileName;
-            value["level"]     = Doc::levelName(problem->level);
-            value["origin"]    = problem->origin;
-            value["message"]   = problem->message;
-            value["lint"]      = problem->lint;
-            // The column as the status line counts it, where the problem is
-            // in the text open here; an include's, or a script's no tab
-            // holds, is its byte, for want of its text.
-            const ALCodeEditor* editor = group.doc ? group.doc->editor : nullptr;
-            const S32           column = editor && problem->file.empty() && problem->line < editor->document().lineCount()
-                                             ? editor->document().displayColumn(ALTextPos(problem->line, problem->column), editor->getTabWidth())
-                                             : problem->column;
-            const std::string where = problem->hasColumn ? llformat("%d:%d", problem->line + 1, column + 1) : llformat("%d", problem->line + 1);
-            const std::string level = mServices->words(problem->level == Doc::Level::Error     ? "LevelError"
-                                                 : problem->level == Doc::Level::Warning ? "LevelWarning"
-                                                                                         : "LevelNote");
-            // Every column carries the whole of it: a diagnostic longer
-            // than the column is cut at the column's edge.
-            std::string tip = level + "   \xC2\xB7   " + (!problem->file.empty() ? problem->fileName : group.doc ? group.doc->name : group.checked->name) +
-                              ":" + where + "\n" + problem->message;
-            // What would put it right, which its right-click menu offers.
-            for (const ALScriptFix& fix : problem->fixes)
-            {
-                if (fix.kind == ALScriptFix::Kind::Fix)
-                {
-                    LLStringUtil::format_map_t fix_args;
-                    fix_args["[TITLE]"] = fix.title;
-                    tip += "\n" + mServices->words("ProblemFixTip", fix_args);
-                }
-            }
-            const ALCodeEditor::Mark mark = problem->origin == mServices->words("OriginRuntime") ? ALCodeEditor::Mark::Runtime : Doc::markOf(problem->level);
-            LLSD row;
-            row["value"]                = value;
-            row["columns"][0]["column"] = "icon";
-            row["columns"][0]["type"]   = "icon";
-            row["columns"][0]["value"]  = problem->level == Doc::Level::Error     ? "Problem_Error"
-                                          : problem->level == Doc::Level::Warning ? "Problem_Warning"
-                                                                                  : "Problem_Note";
+            row.value["group"] = static_cast<S32>(group_index);
+            row.value["owner"] = group.owner;
+            row.value["index"] = static_cast<S32>(group.index[k]);
+            const ALCodeEditor::Mark mark = problem->origin == runtime ? ALCodeEditor::Mark::Runtime : Doc::markOf(problem->level);
+            LLScrollListCell::Params icon = cell("icon",
+                                                 problem->level == Doc::Level::Error     ? "Problem_Error"
+                                                 : problem->level == Doc::Level::Warning ? "Problem_Warning"
+                                                                                         : "Problem_Note",
+                                                 "icon");
             if (const ALCodeEditor* paints = group.doc ? group.doc->editor : painter)
             {
-                row["columns"][0]["color"] = paints->markColor(mark).getValue();
+                icon.color = paints->markColor(mark);
             }
-            row["columns"][1]["column"] = "message";
-            row["columns"][1]["value"]  = problem->message;
-            row["columns"][2]["column"] = "source";
-            row["columns"][2]["value"]  = problem->origin;
-            row["columns"][3]["column"] = "line";
-            row["columns"][3]["value"]  = where;
-            for (S32 i = 0; i < 4; ++i)
-            {
-                row["columns"][i]["tool_tip"] = tip;
-            }
-            mList->addElement(row);
+            row.cells = { icon, cell("message", problem->message), cell("source", problem->origin), cell("line", whereOf(group.doc, *problem)) };
+            rows.push_back(std::move(row));
         }
     }
-    // What the filters hide, said under what they let through.
-    if (listed > 0 && held > listed)
+    // What the list leaves out, said under what it lists: past what it
+    // lists at most, and what the filters hide.
+    const auto more = [&](const char* key, const std::string& words) {
+        ALPaneList::Row row;
+        row.key              = key;
+        row.value["heading"] = true;
+        row.value["group"]   = static_cast<S32>(groups.size());
+        row.enabled          = false;
+        row.cells            = { cell("icon", std::string(), "icon"), cell("message", words) };
+        rows.push_back(std::move(row));
+    };
+    if (unlisted > 0)
     {
-        LLSD more;
-        more["value"]["heading"]     = true;
-        more["value"]["group"]       = static_cast<S32>(groups.size());
-        more["columns"][0]["column"] = "icon";
-        more["columns"][0]["value"]  = std::string();
-        more["columns"][1]["column"] = "message";
-        more["columns"][1]["value"]  = mServices->counted("ProblemsHidden", held - listed);
-        if (LLScrollListItem* item = mList->addElement(more))
-        {
-            item->setEnabled(false);
-        }
+        more("#unlisted", mServices->counted("ProblemsUnlisted", unlisted));
     }
-    if (same)
+    if (listed > 0 && held > listed + unlisted)
     {
-        // The same problem, found by what it says, where it is from and
-        // whose it is; nearest the line it was on, since an edit above
-        // moves it.
-        S32 best          = -1;
-        S32 best_distance = S32_MAX;
-        if (chosen.isMap() && !chosen.has("heading"))
-        {
-            // In the order shown, which a sort by a column has changed.
-            mList->updateSort();
-            const std::vector<LLScrollListItem*> rows = mList->getAllData();
-            for (size_t i = 0; i < rows.size(); ++i)
-            {
-                const LLSD& value = rows[i]->getValue();
-                if (value.has("heading") || value["message"].asString() != chosen["message"].asString() ||
-                    value["origin"].asString() != chosen["origin"].asString() || value["file"].asString() != chosen["file"].asString() ||
-                    value["doc"].asString() != chosen["doc"].asString() || value["checked"].asString() != chosen["checked"].asString())
-                {
-                    continue;
-                }
-                const S32 distance = std::abs(value["line"].asInteger() - chosen["line"].asInteger());
-                if (distance < best_distance)
-                {
-                    best          = static_cast<S32>(i);
-                    best_distance = distance;
-                }
-            }
-        }
-        if (best >= 0)
-        {
-            mList->selectNthItem(best);
-        }
-        mList->setScrollPos(scrolled);
+        more("#hidden", mServices->counted("ProblemsHidden", held - listed - unlisted));
     }
+    mList->setRows(std::move(rows));
     if (held == 0)
     {
         bool current = true;
@@ -927,6 +872,63 @@ void ALScriptProblemsPane::listRows(const Doc* doc)
     {
         mList->setEmpty(mServices->counted("ProblemsAllHidden", held), LLStringUtil::null);
     }
+}
+
+std::string ALScriptProblemsPane::whereOf(const Doc* doc, const Doc::Shown& problem) const
+{
+    // The column as the status line counts it, where the problem is in the
+    // text open here; an include's, or a script's no tab holds, is its
+    // byte, for want of its text.
+    const ALCodeEditor* editor = doc ? doc->editor : nullptr;
+    const S32           column = editor && problem.file.empty() && problem.line < editor->document().lineCount()
+                                     ? editor->document().displayColumn(ALTextPos(problem.line, problem.column), editor->getTabWidth())
+                                     : problem.column;
+    return problem.hasColumn ? llformat("%d:%d", problem.line + 1, column + 1) : llformat("%d", problem.line + 1);
+}
+
+const ALScriptProblemsPane::Doc::Shown* ALScriptProblemsPane::shownOf(const LLSD& value) const
+{
+    if (!value.isMap() || value.has("heading") || !value.has("owner"))
+    {
+        return nullptr;
+    }
+    return mStore.at(value["owner"].asString(), static_cast<size_t>(value["index"].asInteger()));
+}
+
+const ALScriptProblemsPane::Checked* ALScriptProblemsPane::checkedOf(const std::string& owner) const
+{
+    const auto found = std::find_if(mChecked.begin(), mChecked.end(), [&owner](const Checked& one) { return one.id == owner; });
+    return found != mChecked.end() ? &*found : nullptr;
+}
+
+std::string ALScriptProblemsPane::tipOf(const LLScrollListItem* item) const
+{
+    const LLSD&       value   = item->getValue();
+    const Doc::Shown* problem = shownOf(value);
+    if (!problem)
+    {
+        return std::string();
+    }
+    // The whole of it, which a column cuts at its edge: its level, where,
+    // what it says, and what would put it right, which its menu offers.
+    const std::string owner = value["owner"].asString();
+    const Doc*        doc   = mServices->findDoc(owner);
+    const Checked*    one   = doc ? nullptr : checkedOf(owner);
+    const std::string level = mServices->words(problem->level == Doc::Level::Error     ? "LevelError"
+                                               : problem->level == Doc::Level::Warning ? "LevelWarning"
+                                                                                       : "LevelNote");
+    std::string tip = level + "   \xC2\xB7   " + (!problem->file.empty() ? problem->fileName : doc ? doc->name : one ? one->name : std::string()) + ":" +
+                      whereOf(doc, *problem) + "\n" + problem->message;
+    for (const ALScriptFix& fix : problem->fixes)
+    {
+        if (fix.kind == ALScriptFix::Kind::Fix)
+        {
+            LLStringUtil::format_map_t fix_args;
+            fix_args["[TITLE]"] = fix.title;
+            tip += "\n" + mServices->words("ProblemFixTip", fix_args);
+        }
+    }
+    return tip;
 }
 
 void ALScriptProblemsPane::layoutFilters()
@@ -971,8 +973,8 @@ void ALScriptProblemsPane::selectFirstError(bool checkers_only)
     const std::string                    compiler = mServices->words("OriginCompiler");
     for (size_t i = 0; i < rows.size(); ++i)
     {
-        const LLSD& value = rows[i]->getValue();
-        if (value.isMap() && !value.has("heading") && value["level"].asString() == "ERROR" && (!checkers_only || value["origin"].asString() != compiler))
+        const Doc::Shown* problem = shownOf(rows[i]->getValue());
+        if (problem && problem->level == Doc::Level::Error && (!checkers_only || problem->origin != compiler))
         {
             mList->selectNthItem(static_cast<S32>(i));
             mList->scrollToShowSelected();
@@ -985,7 +987,7 @@ void ALScriptProblemsPane::selectFirstError(bool checkers_only)
 ALScriptProblemsPane::Doc* ALScriptProblemsPane::chosenDoc() const
 {
     LLScrollListItem* item = mList->getFirstSelected();
-    return item && item->getValue().isMap() ? mServices->findDoc(item->getValue()["doc"].asString()) : nullptr;
+    return item && item->getValue().isMap() ? mServices->findDoc(item->getValue()["owner"].asString()) : nullptr;
 }
 
 const ALScriptProblemsPane::Doc::Shown* ALScriptProblemsPane::chosenShown() const
@@ -996,8 +998,7 @@ const ALScriptProblemsPane::Doc::Shown* ALScriptProblemsPane::chosenShown() cons
     {
         return nullptr;
     }
-    const LLSD& value = item->getValue();
-    return doc->findShown(value["line"].asInteger(), value["column"].asInteger(), value["file"].asString(), value["message"].asString());
+    return shownOf(item->getValue());
 }
 
 std::string ALScriptProblemsPane::chosenLint(bool& lua) const
@@ -1010,8 +1011,9 @@ std::string ALScriptProblemsPane::chosenLint(bool& lua) const
     {
         return std::string();
     }
-    lua                    = doc->language.lua;
-    const std::string lint = item->getValue()["lint"].asString();
+    lua                       = doc->language.lua;
+    const Doc::Shown* problem = shownOf(item->getValue());
+    const std::string lint    = problem ? problem->lint : std::string();
     return !lint.empty() && mWindow->isLint(lua, lint) ? lint : std::string();
 }
 
@@ -1121,28 +1123,26 @@ void ALScriptProblemsPane::act(const std::string& action)
     {
         return;
     }
-    Doc&              doc   = *of;
-    const LLSD&       value = item->getValue();
-    const std::string lint  = value["lint"].asString();
-    const bool        lua   = doc.language.lua;
+    Doc&              doc     = *of;
+    const LLSD&       value   = item->getValue();
+    const Doc::Shown* chosen  = shownOf(value);
+    const std::string lint    = chosen ? chosen->lint : std::string();
+    const bool        lua     = doc.language.lua;
     // A problem as a line of text: where, what level, from whom, what.
-    const auto as_text = [this](const LLSD& one) {
-        const Doc*        whose = mServices->findDoc(one["doc"].asString());
-        const std::string name  = !one["fileName"].asString().empty() ? one["fileName"].asString() : whose ? whose->name : std::string();
-        const S32         line  = one["line"].asInteger() + 1;
-        const std::string where = one["hasColumn"].asBoolean() ? llformat("%s:%d:%d", name.c_str(), line, one["column"].asInteger() + 1)
-                                                               : llformat("%s:%d", name.c_str(), line);
-        const std::string level = one["level"].asString() == "ERROR" ? "error" : one["level"].asString() == "WARNING" ? "warning" : "note";
-        return where + ": " + level + ": " + one["message"].asString() + " [" + one["origin"].asString() + "]";
+    const auto as_text = [](const Doc& whose, const Doc::Shown& one) {
+        const std::string name  = !one.fileName.empty() ? one.fileName : whose.name;
+        const std::string where = one.hasColumn ? llformat("%s:%d:%d", name.c_str(), one.line + 1, one.column + 1) : llformat("%s:%d", name.c_str(), one.line + 1);
+        const std::string level = one.level == Doc::Level::Error ? "error" : one.level == Doc::Level::Warning ? "warning" : "note";
+        return where + ": " + level + ": " + one.message + " [" + one.origin + "]";
     };
     const auto copy = [](const std::string& text) { LLClipboard::instance().copyToClipboard(text, 0, static_cast<S32>(text.size())); };
     if (action == "copy")
     {
-        copy(value["message"].asString());
+        copy(chosen ? chosen->message : std::string());
     }
     else if (action == "copy_where")
     {
-        copy(as_text(value));
+        copy(chosen ? as_text(doc, *chosen) : std::string());
     }
     else if (action == "copy_all")
     {
@@ -1151,10 +1151,11 @@ void ALScriptProblemsPane::act(const std::string& action)
         S32         count = 0;
         for (LLScrollListItem* row : mList->getAllData())
         {
-            const LLSD& one = row->getValue();
-            if (one.isMap() && !one.has("heading") && mServices->findDoc(one["doc"].asString()))
+            const Doc::Shown* one   = shownOf(row->getValue());
+            const Doc*        whose = one ? mServices->findDoc(row->getValue()["owner"].asString()) : nullptr;
+            if (whose)
             {
-                all += as_text(one) + "\n";
+                all += as_text(*whose, *one) + "\n";
                 ++count;
             }
         }

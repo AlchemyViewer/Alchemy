@@ -144,6 +144,8 @@ public:
     struct Selected
     {
         std::vector<const Finding*> found;
+        // Where each is among its file's, for at().
+        std::vector<size_t>         index;
         size_t                      total = 0;  // before the limit
     };
 
@@ -161,8 +163,9 @@ public:
             {
                 continue;
             }
-            for (const Finding& finding : held->second)
+            for (size_t at = 0; at < held->second.size(); ++at)
             {
+                const Finding& finding = held->second[at];
                 switch (Traits::level(finding))
                 {
                     case Level::Error:   if (!query.errors)   { continue; } break;
@@ -187,10 +190,19 @@ public:
                 if (!query.limit || selected.found.size() < query.limit)
                 {
                     selected.found.push_back(&finding);
+                    selected.index.push_back(at);
                 }
             }
         }
         return selected;
+    }
+
+    // One finding by its file and where it is among the file's, as select
+    // said; null where there is none there now. Good until the next replace.
+    const Finding* at(std::string_view file, size_t index) const
+    {
+        const auto held = mByFile.find(file);
+        return held != mByFile.end() && index < held->second.size() ? &held->second[index] : nullptr;
     }
 
     // The files that have been checked, in the order they first were.
