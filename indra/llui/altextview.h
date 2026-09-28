@@ -1013,6 +1013,15 @@ private:
     F32          mDesiredX = -1.f;
     S32          mScrollY  = 0;
     F32          mScrollX  = 0.f;
+    // The line the top of the view is on and how far into it, and the
+    // layout's heights they were taken under: where heights above the view
+    // change -- a line wrapped, shown or laid out for the first time --
+    // the view keeps to its line rather than to its pixel, so the text
+    // does not move under the reader. A scroll asked for since stands.
+    S32          mAnchorLine    = 0;
+    S32          mAnchorOffset  = 0;
+    U32          mAnchorHeights = 0;
+    bool         mScrollAsked   = true;
     // What a wheel moved that did not make a whole pixel yet.
     F32          mWheelRemainder = 0.f;
     std::function<void(S32)> mZoomWheel;

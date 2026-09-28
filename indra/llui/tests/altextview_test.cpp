@@ -1530,4 +1530,42 @@ namespace tut
         ensure_equals("not looked through at the key", v.findBar()->countSaid(), before);
         ensure("looked through once asked for, as a moment later", !v.findMatches().empty() && v.findBar()->countSaid() != before);
     }
+    template<> template<>
+    void altextview_object::test<51>()
+    {
+        set_test_name("lines above the view laid out to other heights leave it on the line it was on; an edit above it too; a scroll asked for stands");
+        std::string text;
+        for (S32 i = 0; i < 200; ++i)
+        {
+            text += "line " + std::to_string(i) + " with enough words in it to wrap onto a second row and a third\n";
+        }
+        ALTextView& v = make(text.c_str());
+        v.setWordWrap(true);
+        v.scrollToLine(150);
+        ensure_equals("at the line", v.firstVisibleLine(), 150);
+        // The lines above it laid out for the first time: taller than the
+        // row each counted for.
+        const S32 was = v.layout().lineTop(150);
+        for (S32 line = 0; line < 150; ++line)
+        {
+            v.layout().line(line);
+        }
+        ensure("the line moved down", v.layout().lineTop(150) > was);
+        v.setScrollX(0.f);
+        ensure_equals("still on it", v.firstVisibleLine(), 150);
+        ensure_equals("at its top", v.scrollY(), v.layout().lineTop(150));
+
+        // Ten lines put in above: on the same text, ten lines further on.
+        v.document().insert(ALTextPos(10, 0), "a\nb\nc\nd\ne\nf\ng\nh\ni\nj\n");
+        v.setScrollX(0.f);
+        ensure_equals("on the same text", v.firstVisibleLine(), 160);
+        ensure_equals("at its top again", v.scrollY(), v.layout().lineTop(160));
+
+        // A scroll asked for is where the view goes, whatever moved.
+        const S32 asked = v.layout().lineTop(40) + 3;
+        v.setScrollY(asked);
+        ensure_equals("where it was asked to be", v.scrollY(), asked);
+        v.setScrollX(0.f);
+        ensure_equals("and stays", v.scrollY(), asked);
+    }
 }

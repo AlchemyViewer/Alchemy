@@ -426,6 +426,7 @@ void ALTextView::setText(std::string_view text)
     mDesiredX         = -1.f;
     mScrollY          = 0;
     mScrollX          = 0.f;
+    mScrollAsked      = true;
     mChangedSinceFocus = false;
     if (mIndentFrom != IndentFrom::Chosen)
     {
@@ -634,6 +635,13 @@ bool ALTextView::hasHorizontalScrollbar() const
 
 void ALTextView::syncScrollbar()
 {
+    // Heights above the view moved since it was last scrolled: back to the
+    // line it was on, as far into it as it was.
+    if (!mScrollAsked && mLayout.heightsRevision() != mAnchorHeights && mDocument.lineCount() > 0)
+    {
+        const S32 line = llclamp(mAnchorLine, 0, mDocument.lineCount() - 1);
+        mScrollY       = mLayout.lineTop(line) + llmin(mAnchorOffset, llmax(0, mLayout.lineHeight(line) - 1));
+    }
     // The ruler takes room the wrap width depends on, so the need for it
     // is decided again once the first decision has been applied.
     for (S32 pass = 0; pass < 2; ++pass)
@@ -659,6 +667,11 @@ void ALTextView::syncScrollbar()
     const S32 width   = llmax(1, text.getWidth());
     const S32 content = mWordWrap ? 0 : static_cast<S32>(ceilf(mLayout.contentWidth())) + H_MARGIN;
     mScrollX          = llclamp(mScrollX, 0.f, static_cast<F32>(llmax(0, content - width)));
+    // Where the top of the view is now, in the text.
+    mAnchorLine    = mLayout.lineAtY(mScrollY);
+    mAnchorOffset  = mScrollY - mLayout.lineTop(mAnchorLine);
+    mAnchorHeights = mLayout.heightsRevision();
+    mScrollAsked   = false;
 }
 
 void ALTextView::setScrollY(S32 y)
@@ -667,7 +680,8 @@ void ALTextView::setScrollY(S32 y)
     {
         mBarShown.reset();
     }
-    mScrollY = llmax(0, y);
+    mScrollY     = llmax(0, y);
+    mScrollAsked = true;
     syncScrollbar();
 }
 
@@ -738,7 +752,8 @@ void ALTextView::scrollToCaret()
     {
         mScrollY = top;
     }
-    mScrollY = llmax(0, mScrollY);
+    mScrollY     = llmax(0, mScrollY);
+    mScrollAsked = true;
     syncScrollbar();
 }
 
@@ -755,7 +770,8 @@ S32 ALTextView::coveredAbove(S32 local_x)
 
 void ALTextView::scrollToLine(S32 line)
 {
-    mScrollY = mLayout.lineTop(line);
+    mScrollY     = mLayout.lineTop(line);
+    mScrollAsked = true;
     syncScrollbar();
 }
 
@@ -1628,6 +1644,9 @@ void ALTextView::onDocumentEdit(const ALTextDocument::Edit& edit)
         }
     }
     mChangeAt = static_cast<S32>(mChanges.size());
+    // The line the top of the view is on slides with the text, so that an
+    // edit above it leaves the view on what it showed.
+    mAnchorLine = edit.placed(ALTextPos(mAnchorLine, 0)).line;
     // The lines the edit touched are checked again when they are next
     // drawn; the ones below slide.
     mSpelling.edited(edit, mDocument.lineCount());
