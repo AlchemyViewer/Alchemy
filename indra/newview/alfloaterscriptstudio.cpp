@@ -920,6 +920,7 @@ void ALFloaterScriptStudio::restoreTabs(const LLSD& open)
     {
         return;
     }
+    TabsHeld    held(*this);
     const LLSD  tabs   = open["tabs"];
     const S32   chosen = open["active"].asInteger();
     std::string chosen_id;
@@ -1064,9 +1065,12 @@ void ALFloaterScriptStudio::closeFloater(bool app_quitting)
         if (mRecovery.keepAll(docs))
         {
             mTabsAtQuit = openTabs();
-            while (!mDocs.empty())
             {
-                letGoOf(mDocs.size() - 1, true);
+                TabsHeld held(*this);
+                while (!mDocs.empty())
+                {
+                    letGoOf(mDocs.size() - 1, true);
+                }
             }
             ALStudioFloater::closeFloater(app_quitting);
             return;
@@ -1131,6 +1135,7 @@ void ALFloaterScriptStudio::closeFloater(bool app_quitting)
         {
             mTabsAtQuit = openTabs();
         }
+        TabsHeld held(*this);
         while (!mDocs.empty())
         {
             letGoOf(mDocs.size() - 1);
@@ -1508,10 +1513,52 @@ void ALFloaterScriptStudio::reindexDocs()
     {
         changed = !mByRef.contains(it->first);
     }
-    if (changed && mOutputPane)
+    if (changed && mTabsHeld > 0)
+    {
+        mHeld.output = true;
+    }
+    else if (changed && mOutputPane)
     {
         mOutputPane->openChanged();
     }
+}
+
+void ALFloaterScriptStudio::releaseTabs()
+{
+    const HeldTabs held = std::exchange(mHeld, HeldTabs());
+    if (held.output && mOutputPane)
+    {
+        mOutputPane->openChanged();
+    }
+    if (held.activate && mActive < mDocs.size())
+    {
+        activate(mActive, held.focus);
+    }
+    else
+    {
+        if (held.tabs)
+        {
+            fillTabs();
+        }
+        if (held.toolbar)
+        {
+            refreshToolbar();
+        }
+    }
+    if (held.relist)
+    {
+        mExplorerPane->relist();
+    }
+}
+
+void ALFloaterScriptStudio::relistExplorer()
+{
+    if (mTabsHeld > 0)
+    {
+        mHeld.relist = true;
+        return;
+    }
+    mExplorerPane->relist();
 }
 
 void ALFloaterScriptStudio::rekeyDoc(Doc& doc, const std::string& id)
@@ -1831,7 +1878,14 @@ void ALFloaterScriptStudio::openScript(const ALScriptRef& ref, const std::string
     mDocs.push_back(std::move(doc));
     mOrphansDirty = true;
     reindexDocs();
-    activate(mDocs.size() - 1, focus);
+    if (mOpeningBehind && mActive < mDocs.size())
+    {
+        fillTabs();
+    }
+    else
+    {
+        activate(mDocs.size() - 1, focus && !mOpeningBehind);
+    }
 
     const LLHandle<LLFloater> handle = getHandle();
     ALScriptWorkspace::instance().load(ref, [handle](const ALScriptWorkspace::Loaded& answer) {
@@ -2190,7 +2244,7 @@ void ALFloaterScriptStudio::loaded(const ALScriptWorkspace::Loaded& answer)
             {
                 askExperienceOf(doc);
             }
-            mExplorerPane->relist();
+            relistExplorer();
         }
         if (!doc.runtimeRecalled)
         {
@@ -2806,6 +2860,12 @@ void ALFloaterScriptStudio::activate(size_t index, bool focus)
         return;
     }
     mActive = index;
+    if (mTabsHeld > 0)
+    {
+        mHeld.activate = true;
+        mHeld.focus    = mHeld.focus || focus;
+        return;
+    }
     showEditors();
     // Asked for, or the keyboard is in this window already -- in the
     // editor just hidden, where it would type into a tab out of sight.
@@ -2837,6 +2897,11 @@ void ALFloaterScriptStudio::activate(size_t index, bool focus)
 void ALFloaterScriptStudio::fillTabs()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
+    if (mTabsHeld > 0)
+    {
+        mHeld.tabs = true;
+        return;
+    }
     // What the strip would say now: the facts a tab is drawn from. The
     // strip is filled only where one of them moved.
     std::vector<TabFacts> facts;
@@ -2869,6 +2934,11 @@ void ALFloaterScriptStudio::fillTabs(const Doc& doc)
     // The one tab, where the strip is the docs' still -- the same tabs in
     // the same order, the same one in front -- and only its facts moved: a
     // keystroke's unsaved dot, a check's count.
+    if (mTabsHeld > 0)
+    {
+        mHeld.tabs = true;
+        return;
+    }
     const size_t index = indexOf(doc.id);
     if (index == NONE || mTabFacts.size() != mDocs.size() || mTabFactsActive != mActive || mTabFacts[index].id != doc.id)
     {
@@ -3149,6 +3219,11 @@ ALFloaterScriptStudio::ToolbarFacts ALFloaterScriptStudio::toolbarFactsOf() cons
 
 void ALFloaterScriptStudio::refreshToolbar()
 {
+    if (mTabsHeld > 0)
+    {
+        mHeld.toolbar = true;
+        return;
+    }
     ToolbarFacts facts = toolbarFactsOf();
     if (mToolbarFacts && *mToolbarFacts == facts)
     {
@@ -5704,16 +5779,19 @@ void ALFloaterScriptStudio::closeWindowAnswered(S32 option)
     // The clean ones go now; the unsaved are saved, each closing as its
     // save comes back, or let go of.
     std::vector<std::string> saving;
-    for (size_t i = mDocs.size(); i-- > 0;)
     {
-        Doc& doc = *mDocs[i];
-        if (option == 0 && doc.unsaved() && doc.modifiable)
+        TabsHeld held(*this);
+        for (size_t i = mDocs.size(); i-- > 0;)
         {
-            saving.push_back(doc.id);
-        }
-        else
-        {
-            letGoOf(i);
+            Doc& doc = *mDocs[i];
+            if (option == 0 && doc.unsaved() && doc.modifiable)
+            {
+                saving.push_back(doc.id);
+            }
+            else
+            {
+                letGoOf(i);
+            }
         }
     }
     // Every one set to close once saved before any is saved: a file's save
@@ -5748,23 +5826,32 @@ void ALFloaterScriptStudio::closeWindowAnswered(S32 option)
 
 void ALFloaterScriptStudio::continueClosing()
 {
-    size_t i = 0;
-    while (mClosingWindow && i < mDocs.size())
+    std::string asking;
     {
-        Doc& doc = *mDocs[i];
-        if (doc.save.closeAfter())
+        TabsHeld held(*this);
+        size_t   i = 0;
+        while (mClosingWindow && i < mDocs.size())
         {
-            // On its way: it goes when its save comes back.
-            ++i;
-            continue;
+            Doc& doc = *mDocs[i];
+            if (doc.save.closeAfter())
+            {
+                // On its way: it goes when its save comes back.
+                ++i;
+                continue;
+            }
+            if (doc.unsaved() && doc.modifiable)
+            {
+                asking = doc.id;
+                break;
+            }
+            letGoOf(i);
         }
-        if (doc.unsaved() && doc.modifiable)
-        {
-            // Asked; the answer carries on from here, or stops.
-            closeDocument(doc.id);
-            return;
-        }
-        letGoOf(i);
+    }
+    if (!asking.empty())
+    {
+        // Asked; the answer carries on from here, or stops.
+        closeDocument(asking);
+        return;
     }
     if (mClosingWindow && mDocs.empty())
     {
@@ -6038,15 +6125,21 @@ void ALFloaterScriptStudio::pumpRestores()
         }
         ++it;
     }
-    for (const Opening& one : opening)
+    if (!opening.empty())
     {
-        // Beside what is open, without the keyboard: the author may be
-        // typing somewhere by now.
-        openScript(one.ref, one.name, std::nullopt, -1, false);
-        if (const size_t at = indexOf(one.ref); at != NONE)
+        // Beside what is open, not in front of it, and without the
+        // keyboard: the author may be typing somewhere by now.
+        TabsHeld   held(*this);
+        const bool was = std::exchange(mOpeningBehind, true);
+        for (const Opening& one : opening)
         {
-            showView(*mDocs[at], one.view);
+            openScript(one.ref, one.name, std::nullopt, -1, false);
+            if (const size_t at = indexOf(one.ref); at != NONE)
+            {
+                showView(*mDocs[at], one.view);
+            }
         }
+        mOpeningBehind = was;
     }
     // A window made to restore what it had, with nothing of it to be had
     // now nor coming: no window.
@@ -6084,7 +6177,9 @@ void ALFloaterScriptStudio::restoreListed(const ALScriptRef& ref, const ALScript
         const std::string name = item->name;
         const Doc::View   view = waiting->view;
         mPendingRestores.erase(waiting);
+        const bool was = std::exchange(mOpeningBehind, true);
         openScript(ref, name, std::nullopt, -1, false);
+        mOpeningBehind = was;
         if (const size_t at = indexOf(ref); at != NONE)
         {
             showView(*mDocs[at], view);
@@ -6959,20 +7054,23 @@ void ALFloaterScriptStudio::closeMany(const std::vector<std::string>& ids)
     // The saved ones go now; the unsaved are one question between them,
     // or the one question the one of them asks.
     std::vector<std::string> unsaved;
-    for (const std::string& id : ids)
     {
-        const size_t index = indexOf(id);
-        if (index == NONE)
+        TabsHeld held(*this);
+        for (const std::string& id : ids)
         {
-            continue;
-        }
-        if (mDocs[index]->unsaved() && mDocs[index]->modifiable)
-        {
-            unsaved.push_back(id);
-        }
-        else
-        {
-            letGoOf(index);
+            const size_t index = indexOf(id);
+            if (index == NONE)
+            {
+                continue;
+            }
+            if (mDocs[index]->unsaved() && mDocs[index]->modifiable)
+            {
+                unsaved.push_back(id);
+            }
+            else
+            {
+                letGoOf(index);
+            }
         }
     }
     if (unsaved.size() == 1)
@@ -6994,19 +7092,21 @@ void ALFloaterScriptStudio::closeMany(const std::vector<std::string>& ids)
         {
             return;
         }
+        if (option == 1)
+        {
+            TabsHeld held(*studio);
+            for (const std::string& id : unsaved)
+            {
+                studio->letGoOf(studio->indexOf(id));
+            }
+            return;
+        }
         for (const std::string& id : unsaved)
         {
-            const size_t index = studio->indexOf(id);
-            if (index == NONE)
+            if (studio->indexOf(id) != NONE)
             {
-                continue;
+                studio->mSaving.saveToClose(id);
             }
-            if (option == 1)
-            {
-                studio->letGoOf(index);
-                continue;
-            }
-            studio->mSaving.saveToClose(id);
         }
     });
 }
@@ -7101,7 +7201,7 @@ void ALFloaterScriptStudio::letGoOf(size_t index, bool keep)
     {
         activate(llmin(index, mDocs.size() - 1), had_keys);
     }
-    mExplorerPane->relist();
+    relistExplorer();
 }
 
 // --- the menu and the toolbar ---------------------------------------------------

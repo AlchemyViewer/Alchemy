@@ -975,6 +975,46 @@ private:
     };
     boost::unordered_flat_map<std::string, DocChanges, ll::string_hash, std::equal_to<>> mDocChanges;
     bool                                                                                 mDocsChanged = false;
+    // Tabs opened, restored or closed many at once: while one of these is
+    // held, what each tab would make again -- the strip, the toolbar, the
+    // tab in front shown, the explorer's list, Output's filter -- waits,
+    // and is made once as the last lets go. Which tab is in front is
+    // decided as it goes; showing it waits.
+    class TabsHeld
+    {
+    public:
+        explicit TabsHeld(ALFloaterScriptStudio& window) : mWindow(window) { ++mWindow.mTabsHeld; }
+        ~TabsHeld()
+        {
+            if (--mWindow.mTabsHeld == 0)
+            {
+                mWindow.releaseTabs();
+            }
+        }
+        TabsHeld(const TabsHeld&)            = delete;
+        TabsHeld& operator=(const TabsHeld&) = delete;
+
+    private:
+        ALFloaterScriptStudio& mWindow;
+    };
+    struct HeldTabs
+    {
+        bool tabs     = false;
+        bool toolbar  = false;
+        bool output   = false;
+        bool relist   = false;
+        bool activate = false;
+        bool focus    = false;
+    };
+    void     releaseTabs();
+    S32      mTabsHeld = 0;
+    HeldTabs mHeld;
+    // Tabs coming back from the last session open beside what is open: not
+    // brought in front of what is being worked on, and never given the
+    // keyboard (F19).
+    bool     mOpeningBehind = false;
+    // The explorer listed again, now or as the hold lets go.
+    void     relistExplorer();
     // The docs by id, and the scripts' by what they are, for the lookups
     // every answer makes; kept as tabs come and go, and Output's list of
     // what the open scripts said filtered again only where which scripts
