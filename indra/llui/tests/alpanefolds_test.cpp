@@ -343,4 +343,24 @@ namespace tut
         gFloaterView->removeChild(w.floater);
         w.floater->die();
     }
+    // Whether the regions are the sizes given is said with nothing made to
+    // say it, and says what comparing dims() would.
+    template<> template<>
+    void alpanefolds_object::test<7>()
+    {
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        Window w = build();
+        ALPaneFolds folds;
+        folds.bind(w.floater, panes());
+        const std::vector<S32> was = folds.dims();
+        ensure("the sizes they are", folds.dimsAre(was));
+        folds.setDim("side", 240);
+        ensure("not after one changes", !folds.dimsAre(was));
+        ensure("the sizes they are now", folds.dimsAre(folds.dims()));
+        ensure("nor fewer sizes than regions", !folds.dimsAre({}));
+        w.floater->die();
+    }
 }

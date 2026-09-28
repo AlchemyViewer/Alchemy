@@ -87,6 +87,8 @@ public:
     // Every region's size, in the order given, for a window that watches
     // for a drag ending.
     std::vector<S32> dims() const;
+    // Whether every region's size is as given, with nothing made to say so.
+    bool             dimsAre(const std::vector<S32>& dims) const;
 
     // A region out in a window of its own, and back; and every one back,
     // which a window does before it closes, since a pane left in a window

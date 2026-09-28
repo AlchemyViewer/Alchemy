@@ -197,6 +197,22 @@ std::vector<S32> ALPaneFolds::dims() const
     return result;
 }
 
+bool ALPaneFolds::dimsAre(const std::vector<S32>& dims) const
+{
+    if (dims.size() != mPanes.size())
+    {
+        return false;
+    }
+    for (size_t i = 0; i < mPanes.size(); ++i)
+    {
+        if (dims[i] != (mPanes[i].mPanel ? mPanes[i].mPanel->getTargetDim() : 0))
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
 bool ALPaneFolds::out(std::string_view pane) const
 {
     const Bound* bound = find(pane);

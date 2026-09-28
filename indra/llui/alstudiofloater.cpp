@@ -474,7 +474,7 @@ void ALStudioFloater::rememberShape()
     {
         return;
     }
-    if (getRect() != mShapeRect || mFolds.dims() != mShapeDims)
+    if (getRect() != mShapeRect || !mFolds.dimsAre(mShapeDims))
     {
         saveState();
     }
