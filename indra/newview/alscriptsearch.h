@@ -25,9 +25,13 @@
 #pragma once
 
 #include "alscriptstudiodoc.h"
+#include "alscriptworkspace.h"
 #include "altextsearch.h"
 #include "lluuid.h"
 
+#include <boost/unordered/unordered_flat_map.hpp>
+
+#include <memory>
 #include <string>
 #include <utility>
 #include <vector>
@@ -101,6 +105,55 @@ public:
     };
     Kept search(const ALScriptRef& ref, const std::string& name, const std::string& where, const ALTextDocument& text, U32 version,
                 const std::string& doc_id, bool keep_text = false, bool notecard = false, const std::string& file = std::string());
+    // The same in two halves, for a text searched off the main thread:
+    // where the words are in it, and each place's line, which asks
+    // nothing of the search but its words; and what was found kept, as
+    // search keeps it -- with the text it was found in, where given.
+    struct Matched
+    {
+        std::vector<ALTextRange> places;
+        std::vector<std::string> lines;
+        std::vector<S32>         at;
+        // Why the pattern did not read, where it did not.
+        std::string              error;
+    };
+    static Matched match(const ALTextDocument& text, const std::string& query, const ALTextSearchOptions& options);
+    Kept           keep(const ALScriptRef& ref, const std::string& name, const std::string& where, Matched matched, U32 version,
+                        const std::string& doc_id, const std::string* text = nullptr, bool notecard = false, const std::string& file = std::string());
+
+    // The texts of scripts not open read for a search, kept for the
+    // session by what each is and which text it is: searched again -- for
+    // other words, the case turned -- nothing saved since is fetched
+    // again. No more than MOST bytes of them; past that, those used
+    // longest ago go.
+    class Sources
+    {
+    public:
+        struct Source
+        {
+            std::shared_ptr<const std::string> text;
+            std::string                        name;
+            bool                               notecard = false;
+        };
+        static constexpr size_t MOST = 32 * 1024 * 1024;
+        static Sources&         instance();
+        // A script's text, where the one kept is of the asset it has now.
+        const Source* find(const ALScriptRef& ref, const LLUUID& asset);
+        void          keep(const ALScriptRef& ref, const LLUUID& asset, Source source);
+        size_t        bytes() const { return mBytes; }
+        void          clear();
+
+    private:
+        struct Kept
+        {
+            LLUUID asset;
+            Source source;
+            U64    used = 0;
+        };
+        boost::unordered_flat_map<ALScriptRef, Kept> mKept;
+        size_t                                       mBytes = 0;
+        U64                                          mClock = 0;
+    };
     // The pattern did not read, and why: said until the next search.
     bool               badPattern() const { return mBadPattern; }
     const std::string& patternError() const { return mPatternError; }

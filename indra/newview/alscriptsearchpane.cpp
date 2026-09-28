@@ -347,27 +347,54 @@ void ALScriptSearchPane::searchObjects(U32 generation, const std::vector<Window:
 }
 
 void ALScriptSearchPane::fetched(U32 generation, const std::string& where, const ALScriptRef& ref, const std::string& name,
-                                 const std::optional<std::string>& text, bool notecard)
+                                 std::shared_ptr<const std::string> text, bool notecard)
+{
+    if (generation != mSearch.generation())
+    {
+        return;
+    }
+    if (!text)
+    {
+        // Not searched, and counted so: a count that read as complete over
+        // a script not read would pass for having found nothing in it.
+        mSearch.answered(generation);
+        mSearch.notRead();
+        settled();
+        return;
+    }
+    // Sought away from the main thread, still counted as to come until
+    // the answer is back.
+    const LLHandle<LLPanel> handle = getHandle();
+    mWindow->matchApart(text, mSearch.query(), mSearch.options(),
+                        [handle, generation, where, ref, name, text, notecard](ALScriptSearch::Matched found) {
+                            if (ALScriptSearchPane* pane = ALViewType::as<ALScriptSearchPane>(handle.get()))
+                            {
+                                pane->matched(generation, where, ref, name, *text, notecard, std::move(found));
+                            }
+                        });
+}
+
+void ALScriptSearchPane::matched(U32 generation, const std::string& where, const ALScriptRef& ref, const std::string& name, const std::string& text,
+                                 bool notecard, ALScriptSearch::Matched found)
 {
     if (!mSearch.answered(generation))
     {
         return;
     }
-    if (text)
+    // A wrapped script is searched as its author wrote it, and that text
+    // kept for a replace to work over.
+    const ALScriptSearch::Kept kept = mSearch.keep(ref, name, where, std::move(found), 0, std::string(), &text, notecard);
+    if (mSearch.badPattern())
     {
-        // A wrapped script is searched as its author wrote it, and that
-        // text kept for a replace to work over.
-        searched(ref, name, where, ALTextDocument(*text), 0, std::string(), true, notecard);
-        if (!notecard)
-        {
-            searchIncludes(ref, std::string(), name, *text, ALScriptMessages::looksLikeLua(*text));
-        }
+        mCount->setToolTip(mSearch.patternError());
     }
-    else
+    else if (kept == ALScriptSearch::Kept::Added)
     {
-        // Not searched, and counted so: a count that read as complete over
-        // a script not read would pass for having found nothing in it.
-        mSearch.notRead();
+        addRows(mSearch.found().size() - 1);
+    }
+    if (!notecard)
+    {
+        searchIncludes(ref, std::string(), name, text, ALScriptMessages::looksLikeLua(text));
     }
     settled();
 }

@@ -730,6 +730,8 @@ private:
     LLUUID                                          rootOf(const ALScriptRef& ref) const override;
     Doc*                                            openElsewhere(const ALScriptRef& ref) override;
     void fetchForSearch(const ALScriptRef& ref, U32 generation, const std::string& where) override;
+    void matchApart(std::shared_ptr<const std::string> text, const std::string& query, const ALTextSearchOptions& options,
+                    std::function<void(ALScriptSearch::Matched)> matched) override;
     void confirmReplaceAll(const LLSD& args, std::function<void()> yes) override;
     void searchResultChosen(const ALScriptSearch::Found& one, const ALTextRange& place, bool to_editor) override;
     std::vector<ALScriptSearchPane::Window::Included> includesOf(const ALScriptRef& ref, const std::string& file, const std::string& name,

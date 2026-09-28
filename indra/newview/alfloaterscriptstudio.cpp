@@ -28,6 +28,7 @@
 
 #include "alcodeeditor.h"
 #include "aldiskincludes.h"
+#include "alserialworker.h"
 #include "alfilewrite.h"
 #include "fsyspath.h"
 #include "alnotecarditems.h"
@@ -211,6 +212,49 @@ using ALScriptPlaces::sourceOf;
 
 namespace
 {
+    // The thread every window's searches look through scripts not open on:
+    // made with the first such search, closed as the viewer goes.
+    class ALScriptSearchThread final : public LLSingleton<ALScriptSearchThread>
+    {
+        LLSINGLETON_EMPTY_CTOR(ALScriptSearchThread);
+        void cleanupSingleton() override
+        {
+            if (mThread)
+            {
+                mThread->close();
+            }
+        }
+
+    public:
+        bool post(std::function<void()> job)
+        {
+            if (!mThread)
+            {
+                mThread = std::make_unique<ALSerialWorker>("ScriptSearch");
+            }
+            return mThread->post(std::move(job));
+        }
+
+    private:
+        std::unique_ptr<ALSerialWorker> mThread;
+    };
+
+    // Which text a script has now, as its item says; null where the item
+    // is not in hand, or keeps it from the agent.
+    LLUUID assetNow(const ALScriptRef& ref)
+    {
+        const LLInventoryItem* item = nullptr;
+        if (ref.inInventory())
+        {
+            item = gInventory.getItem(ref.item);
+        }
+        else if (LLViewerObject* object = gObjectList.findObject(ref.object))
+        {
+            item = object->getInventoryItem(ref.item);
+        }
+        return item ? item->getAssetUUID() : LLUUID::null;
+    }
+
     // A message as one row reads it.
     std::string oneLine(std::string text)
     {
@@ -5567,19 +5611,38 @@ ALFloaterScriptStudio::Doc* ALFloaterScriptStudio::openElsewhere(const ALScriptR
 
 void ALFloaterScriptStudio::fetchForSearch(const ALScriptRef& ref, U32 generation, const std::string& where)
 {
+    // As read for an earlier search, where it is still the text the item
+    // has: another word sought, or the case turned, fetches nothing.
+    ALScriptSearch::Sources& sources = ALScriptSearch::Sources::instance();
+    if (const ALScriptSearch::Sources::Source* kept = sources.find(ref, assetNow(ref)))
+    {
+        mSearchPane->fetched(generation, where, ref, kept->name, kept->text, kept->notecard);
+        return;
+    }
     const LLHandle<LLFloater> handle = getHandle();
     ALScriptWorkspace::instance().load(ref, [handle, generation, where](const ALScriptWorkspace::Loaded& loaded) {
+        // A wrapped script is searched as its author wrote it, and that
+        // text kept for a replace to work over, and for the next search.
+        std::shared_ptr<const std::string> text;
+        if (loaded.error.empty())
+        {
+            text = std::make_shared<const std::string>(loaded.notecard ? loaded.text : sourceOf(loaded));
+            ALScriptSearch::Sources::instance().keep(loaded.ref, loaded.assetId, { text, loaded.name, loaded.notecard });
+        }
         if (ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get()))
         {
-            // A wrapped script is searched as its author wrote it, and that
-            // text kept for a replace to work over.
-            std::optional<std::string> text;
-            if (loaded.error.empty())
-            {
-                text = loaded.notecard ? loaded.text : sourceOf(loaded);
-            }
             studio->mSearchPane->fetched(generation, where, loaded.ref, loaded.name, text, loaded.notecard);
         }
+    });
+}
+
+void ALFloaterScriptStudio::matchApart(std::shared_ptr<const std::string> text, const std::string& query, const ALTextSearchOptions& options,
+                                       std::function<void(ALScriptSearch::Matched)> matched)
+{
+    ALScriptSearchThread::instance().post([text, query, options, matched]() {
+        LL_PROFILE_ZONE_NAMED_CATEGORY_SCRIPTDEV("search match job");
+        ALScriptSearch::Matched found = ALScriptSearch::match(ALTextDocument(*text), query, options);
+        LLAppViewer::instance()->postToMainCoro([matched, found = std::move(found)]() mutable { matched(std::move(found)); });
     });
 }
 

@@ -86,8 +86,14 @@ public:
         // A script open in another of the studio's windows: its tab there.
         virtual Doc* openElsewhere(const ALScriptRef& ref) = 0;
         // A script's text fetched for the search at `generation`, which
-        // answers through fetched().
+        // answers through fetched(): as read for an earlier search, where
+        // it has not been saved since.
         virtual void fetchForSearch(const ALScriptRef& ref, U32 generation, const std::string& where) = 0;
+        // Words sought in a text away from the main thread, the answer
+        // handed back on it: what a script not open is searched by, which
+        // for an object of many scripts would hold up the frame.
+        virtual void matchApart(std::shared_ptr<const std::string> text, const std::string& query, const ALTextSearchOptions& options,
+                                std::function<void(ALScriptSearch::Matched)> matched) = 0;
         // The edits a tab was opened with (Doc::pendingEdits), made once
         // its text is in, or now.
         virtual void applyPendingEdits(Doc& doc) = 0;
@@ -125,9 +131,10 @@ public:
     void run();
     void focusQuery(const Doc* front);
     // A script's text fetched for a search: searched where it is this
-    // search's; `text` none where it could not be had.
-    void fetched(U32 generation, const std::string& where, const ALScriptRef& ref, const std::string& name, const std::optional<std::string>& text,
-                 bool notecard);
+    // search's, away from the main thread; `text` none where it could not
+    // be had.
+    void fetched(U32 generation, const std::string& where, const ALScriptRef& ref, const std::string& name,
+                 std::shared_ptr<const std::string> text, bool notecard);
     // A tab typed in: searched again a moment later, where the search is
     // over it. Each frame, the moment come.
     void typedIn(const Doc& doc);
@@ -154,6 +161,10 @@ public:
     void readState(const LLSD& state);
 
 private:
+    // A fetched script's places, found apart, kept where they are still
+    // this search's.
+    void matched(U32 generation, const std::string& where, const ALScriptRef& ref, const std::string& name, const std::string& text, bool notecard,
+                 ALScriptSearch::Matched found);
     void buildSentence();
     void onChanged();
     void searchOpen(const Doc& doc);

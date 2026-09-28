@@ -60,36 +60,60 @@ bool ALScriptSearch::answered(U32 generation)
 ALScriptSearch::Kept ALScriptSearch::search(const ALScriptRef& ref, const std::string& name, const std::string& where, const ALTextDocument& text,
                                             U32 version, const std::string& doc_id, bool keep_text, bool notecard, const std::string& file)
 {
-    std::string                    error;
-    const std::vector<ALTextRange> matches = ALTextSearch::matches(text, mQuery, mOptions, nullptr, &error);
-    if (!error.empty())
+    Matched           matched = match(text, mQuery, mOptions);
+    const std::string kept    = keep_text && !matched.places.empty() ? text.text() : std::string();
+    return keep(ref, name, where, std::move(matched), version, doc_id, keep_text ? &kept : nullptr, notecard, file);
+}
+
+// static
+ALScriptSearch::Matched ALScriptSearch::match(const ALTextDocument& text, const std::string& query, const ALTextSearchOptions& options)
+{
+    Matched matched;
+    matched.places = ALTextSearch::matches(text, query, options, nullptr, &matched.error);
+    if (!matched.error.empty())
+    {
+        matched.places.clear();
+        return matched;
+    }
+    // Each place's line as the row lists it, trimmed, and where the words
+    // start in it.
+    for (const ALTextRange& place : matched.places)
+    {
+        const std::string& line  = text.line(place.begin.line);
+        const size_t       first = line.find_first_not_of(" \t");
+        const size_t       last  = line.find_last_not_of(" \t\r");
+        matched.lines.push_back(first == std::string::npos ? std::string() : line.substr(first, last - first + 1));
+        matched.at.push_back(first == std::string::npos ? -1 : place.begin.column - static_cast<S32>(first));
+    }
+    return matched;
+}
+
+ALScriptSearch::Kept ALScriptSearch::keep(const ALScriptRef& ref, const std::string& name, const std::string& where, Matched matched, U32 version,
+                                          const std::string& doc_id, const std::string* text, bool notecard, const std::string& file)
+{
+    if (!matched.error.empty())
     {
         mBadPattern   = true;
-        mPatternError = error;
+        mPatternError = matched.error;
         return Kept::Nothing;
     }
     // The places kept, with the text they were found in, for a replace,
     // and each one's line as the row lists it.
-    Found found;
+    const bool any = !matched.places.empty();
+    Found      found;
     found.ref      = ref;
     found.doc      = doc_id;
     found.name     = name;
     found.where    = where.empty() ? name : where + ": " + name;
     found.version  = version;
-    found.places   = matches;
+    found.places   = std::move(matched.places);
+    found.lines    = std::move(matched.lines);
+    found.at       = std::move(matched.at);
     found.notecard = notecard;
     found.file     = file;
-    if (keep_text && !matches.empty())
+    if (text && any)
     {
-        found.text = text.text();
-    }
-    for (const ALTextRange& match : matches)
-    {
-        const std::string& line  = text.line(match.begin.line);
-        const size_t       first = line.find_first_not_of(" \t");
-        const size_t       last  = line.find_last_not_of(" \t\r");
-        found.lines.push_back(first == std::string::npos ? std::string() : line.substr(first, last - first + 1));
-        found.at.push_back(first == std::string::npos ? -1 : match.begin.column - static_cast<S32>(first));
+        found.text = *text;
     }
     // A script searched again as it stands: in its place among the rest.
     for (Found& one : mFound)
@@ -100,14 +124,69 @@ ALScriptSearch::Kept ALScriptSearch::search(const ALScriptRef& ref, const std::s
             return Kept::Again;
         }
     }
-    if (matches.empty())
+    if (!any)
     {
         return Kept::Nothing;
     }
     ++mFiles;
-    mHits += static_cast<S32>(matches.size());
+    mHits += static_cast<S32>(found.places.size());
     mFound.push_back(std::move(found));
     return Kept::Added;
+}
+
+// --- the texts read for a search ---------------------------------------------------
+
+// static
+ALScriptSearch::Sources& ALScriptSearch::Sources::instance()
+{
+    static Sources sources;
+    return sources;
+}
+
+const ALScriptSearch::Sources::Source* ALScriptSearch::Sources::find(const ALScriptRef& ref, const LLUUID& asset)
+{
+    const auto found = mKept.find(ref);
+    if (found == mKept.end() || asset.isNull() || found->second.asset != asset)
+    {
+        return nullptr;
+    }
+    found->second.used = ++mClock;
+    return &found->second.source;
+}
+
+void ALScriptSearch::Sources::keep(const ALScriptRef& ref, const LLUUID& asset, Source source)
+{
+    // A text whose asset is not known cannot be told from the next one.
+    if (asset.isNull() || !source.text)
+    {
+        return;
+    }
+    Kept& kept = mKept[ref];
+    mBytes -= kept.source.text ? kept.source.text->size() : 0;
+    mBytes += source.text->size();
+    kept.asset  = asset;
+    kept.source = std::move(source);
+    kept.used   = ++mClock;
+    // Past the most, those used longest ago go, this one last.
+    while (mBytes > MOST && mKept.size() > 1)
+    {
+        auto oldest = mKept.end();
+        for (auto it = mKept.begin(); it != mKept.end(); ++it)
+        {
+            if (!(it->first == ref) && (oldest == mKept.end() || it->second.used < oldest->second.used))
+            {
+                oldest = it;
+            }
+        }
+        mBytes -= oldest->second.source.text->size();
+        mKept.erase(oldest);
+    }
+}
+
+void ALScriptSearch::Sources::clear()
+{
+    mKept.clear();
+    mBytes = 0;
 }
 
 void ALScriptSearch::dropEmpty()
