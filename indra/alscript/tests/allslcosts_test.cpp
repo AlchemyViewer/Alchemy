@@ -173,6 +173,10 @@ namespace tut
             Snippet     b;
             const char* verdicts;
             Flag        flag;
+            // Told by one use alone: where the first carries what a script
+            // pays once -- Luau's import of its bit library for ~ -- more
+            // than a few uses after it save.
+            bool        once = false;
         };
         const Fact facts[] = {
             // optfloats
@@ -187,17 +191,40 @@ namespace tut
             { "[a] as (list)a", { "", "l = [i];" }, { "", "l = (list)i;" }, "<<>", &ALLSLCosts::listAsSum },
             { "[a, b] as (list)a + b", { "", "l = [i, j];" }, { "", "l = (list)i + j;" }, "<<>", &ALLSLCosts::listAsSum },
             { "[a, b, c] as (list)a + b + c", { "", "l = [i, j, f];" }, { "", "l = (list)i + j + f;" }, "<<>", &ALLSLCosts::listAsSum },
+            // The -1 idioms, where only truth counts, and of what is never below -1.
+            { "x != -1 as ~x", { "", "if (j != -1) i = 2;" }, { "", "if (~j) i = 2;" }, "<<>", &ALLSLCosts::complementForNotMinusOne, true },
+            { "a find != -1 as ~find", { "", "if (llListFindList(l, [i]) != -1) i = 2;" }, { "", "if (~llListFindList(l, [i])) i = 2;" }, "<<>",
+              &ALLSLCosts::complementForNotMinusOne, true },
+            { "a find >= 0 as ~find", { "", "if (llSubStringIndex(s, \"a\") >= 0) i = 2;" }, { "", "if (~llSubStringIndex(s, \"a\")) i = 2;" }, "<<>",
+              &ALLSLCosts::complementForNotMinusOne, true },
+            { "a find > -1 as ~find", { "", "if (llSubStringIndex(s, \"a\") > -1) i = 2;" }, { "", "if (~llSubStringIndex(s, \"a\")) i = 2;" }, "<<>",
+              &ALLSLCosts::complementForNotMinusOne, true },
+            { "x == -1 as !~x", { "", "i = j == -1;" }, { "", "i = !~j;" }, "<=>", &ALLSLCosts::notComplementForMinusOne },
+            { "x == -1 as !~x, as a condition", { "", "if (j == -1) i = 2;" }, { "", "if (!~j) i = 2;" }, "<=>", &ALLSLCosts::notComplementForMinusOne },
+            // Luau's answer turns on the operand -- a call here, a local above
+            // -- and the flag keeps to the local's.
+            { "a find < 0 as !~find", { "", "if (llSubStringIndex(s, \"a\") < 0) i = 2;" }, { "", "if (!~llSubStringIndex(s, \"a\")) i = 2;" }, "<><",
+              nullptr },
+            // One and two either way.
+            { "x + 1 as -~x", { "", "i = j + 1;" }, { "", "i = -~j;" }, "<=>", &ALLSLCosts::negateComplementForIncrement },
+            { "x + 2 as -~-~x", { "", "i = j + 2;" }, { "", "i = -~-~j;" }, "<>>", &ALLSLCosts::negateComplementForIncrement },
+            { "x - 1 as ~-x", { "", "i = j - 1;" }, { "", "i = ~-j;" }, "<<>", &ALLSLCosts::complementNegateForDecrement },
+            { "x - 2 as ~-~-x", { "", "i = j - 2;" }, { "", "i = ~-~-j;" }, "<<>", &ALLSLCosts::complementNegateForDecrement },
+            // An increment whose value goes unused.
+            { "x++ as ++x", { "", "i++;" }, { "", "++i;" }, "<<=", &ALLSLCosts::preForPost },
+            { "x-- as --x", { "", "i--;" }, { "", "--i;" }, "<<=", &ALLSLCosts::preForPost },
+            { "a for's x++ as ++x", { "", "for (i = 0; i < 3; i++) j = i;" }, { "", "for (i = 0; i < 3; ++i) j = i;" }, "<<=", &ALLSLCosts::preForPost },
+            // A list's element bare.
+            { "l + [a] as l + a", { "", "l = l + [i];" }, { "", "l = l + i;" }, "<<<", &ALLSLCosts::elementForList },
+            { "l + [a, b] as l + a + b", { "", "l = l + [i, j];" }, { "", "l = l + i + j;" }, "<<<", &ALLSLCosts::elementForList },
+            { "[a] + l as a + l", { "", "l = [s] + l;" }, { "", "l = s + l;" }, "<<<", &ALLSLCosts::elementForList },
+            { "l + (list)x as l + x", { "", "l = l + (list)s;" }, { "", "l = l + s;" }, "<<<", &ALLSLCosts::elementForList },
+            { "l += [a] as l += a", { "", "l += [i];" }, { "", "l += i;" }, "<<<", &ALLSLCosts::elementForList },
             // To come.
-            { "x + 1 as -~x", { "", "i = j + 1;" }, { "", "i = -~j;" }, "<=>", nullptr },
-            { "x - 1 as ~-x", { "", "i = j - 1;" }, { "", "i = ~-j;" }, "<<>", nullptr },
-            { "x == -1 as !~x", { "", "if (j == -1) i = 2;" }, { "", "if (!~j) i = 2;" }, "<=>", nullptr },
-            { "x != -1 as ~x", { "", "if (j != -1) i = 2;" }, { "", "if (~j) i = 2;" }, "<<<", nullptr },
+            { "i = i + 1 as ++i", { "", "i = i + 1;" }, { "", "++i;" }, "===", nullptr },
             { "-5 as ((integer)-5)", { "", "i = -5;" }, { "", "i = ((integer)-5);" }, "===", nullptr },
             { "-5.5 as ((float)-5.5)", { "", "f = -5.5;" }, { "", "f = ((float)-5.5);" }, "=<>", nullptr },
-            { "l + [a] as l + a", { "", "l = l + [i];" }, { "", "l = l + i;" }, "<<<", nullptr },
-            { "l + [a, b] as l + a + b", { "", "l = l + [i, j];" }, { "", "l = l + i + j;" }, "<<<", nullptr },
             { "integer x = 0 as integer x", { "", "integer z = 0; i = z;" }, { "", "integer z; i = z;" }, "===", nullptr },
-            { "x++ as ++x", { "", "i++;" }, { "", "++i;" }, "<<=", nullptr },
             { "a <= 5 as a < 6", { "", "if (j <= 5) i = 2;" }, { "", "if (j < 6) i = 2;" }, "=<=", nullptr },
             { "a != b as a ^ b", { "", "if (j != i) i = 2;" }, { "", "if (j ^ i) i = 2;" }, "<<>", nullptr },
             { "!(a < b) as a >= b", { "", "if (!(j < i)) i = 2;" }, { "", "if (j >= i) i = 2;" }, "<=<", nullptr },
@@ -216,7 +243,7 @@ namespace tut
                 const Target t = TARGETS[n];
                 const Delta  d = delta(t, fact.a, fact.b);
                 said(fact.what, t, d, 0);
-                const char v = verdict(d);
+                const char v = fact.once ? verdict({ d.first, d.first }) : verdict(d);
                 ensure_equals(std::string(fact.what) + " on " + nameOf(t), v, fact.verdicts[n]);
                 if (fact.flag)
                 {
@@ -282,6 +309,28 @@ namespace tut
             said("a first call", t, first2, c.call + c.reference + 2 * c.referenceChar);
             ensure_equals("a first call's reference, by the character" + where, (first18.first - first2.first) / 16, c.referenceChar);
             ensure_equals("a first call's reference" + where, first2.first - c.call - 2 * c.referenceChar, c.reference);
+
+            // The most elements of a literal added to a list bare: at it
+            // smaller, one past it larger; with none, eight smaller.
+            const auto bare = [&](S32 n) {
+                std::string literal, sum;
+                for (S32 k = 0; k < n; ++k)
+                {
+                    const char* one = k % 2 ? "j" : "s";
+                    literal += (k ? ", " : "") + std::string(one);
+                    sum += std::string(" + ") + one;
+                }
+                return delta(t, { "", "l = l + [" + literal + "];" }, { "", "l = l" + sum + ";" });
+            };
+            if (c.elementsForListMost > 0)
+            {
+                ensure("the most added bare, smaller" + where, verdict(bare(c.elementsForListMost)) == '<');
+                ensure("one more, larger" + where, verdict(bare(c.elementsForListMost + 1)) == '>');
+            }
+            else
+            {
+                ensure("eight added bare, smaller" + where, verdict(bare(8)) == '<');
+            }
         }
     }
 

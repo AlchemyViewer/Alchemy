@@ -37,6 +37,13 @@ namespace
         c.integerForFloat  = false;
         c.lengthAsNotEqual = true;
         c.listAsSum        = true;
+        c.elementForList   = true;
+
+        c.complementForNotMinusOne     = true;
+        c.notComplementForMinusOne     = true;
+        c.negateComplementForIncrement = true;
+        c.complementNegateForDecrement = true;
+        c.preForPost                   = true;
 
         c.local         = 11;
         c.jump          = 5;
@@ -70,6 +77,13 @@ namespace
         c.integerForFloat  = true;
         c.lengthAsNotEqual = false;
         c.listAsSum        = true;
+        c.elementForList   = true;
+
+        c.complementForNotMinusOne     = true;
+        c.notComplementForMinusOne     = false;
+        c.negateComplementForIncrement = false;
+        c.complementNegateForDecrement = true;
+        c.preForPost                   = true;
 
         c.local         = 6;
         c.jump          = 5;
@@ -102,7 +116,17 @@ namespace
         ALLSLCosts c;
         c.integerForFloat  = false;
         c.lengthAsNotEqual = false;
-        c.listAsSum        = false;
+        c.listAsSum           = false;
+        c.elementForList      = true;
+        c.elementsForListMost = 2;
+
+        // Luau's bitwise operators are calls into its bit32 library, which
+        // a script pays for once, more than a few uses of ~ save.
+        c.complementForNotMinusOne     = false;
+        c.notComplementForMinusOne     = false;
+        c.negateComplementForIncrement = false;
+        c.complementNegateForDecrement = false;
+        c.preForPost                   = false;
 
         c.local         = 4;
         c.jump          = 93;

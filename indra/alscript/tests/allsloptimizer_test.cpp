@@ -239,7 +239,8 @@ namespace tut
         ensure("plus zero: " + r.text, r.text.find("integer a = g;") != std::string::npos);
         ensure("times one", r.text.find("integer b = g;") != std::string::npos);
         ensure("minus minus", r.text.find("integer c = g + 1;") != std::string::npos);
-        ensure("plus minus", r.text.find("integer d = g - 2;") != std::string::npos);
+        // And on Mono, two less as ~-~-g (ALLSLCosts::complementNegateForDecrement).
+        ensure("plus minus: " + r.text, r.text.find("integer d = ~-~-g;") != std::string::npos);
         ensure("cast", r.text.find("integer e = g;") != std::string::npos);
         ensure("times zero", r.text.find("integer f = 0;") != std::string::npos);
         ensure("equals zero", r.text.find("integer i = (!g);") != std::string::npos);
@@ -274,7 +275,8 @@ namespace tut
         lso.target                  = ALLSLOptimizer::Target::LSO;
         ALLSLOptimizer::Result r    = ALLSLOptimizer::run(source, lso);
         ensure("optimized: " + notes(r), r.optimized);
-        ensure("in a sum: " + r.text, r.text.find("integer n = (l != []) + 1;") != std::string::npos);
+        // One more as -~x on LSO (ALLSLCosts::negateComplementForIncrement).
+        ensure("in a sum: " + r.text, r.text.find("integer n = -~(l != []);") != std::string::npos);
         ensure("as a condition", r.text.find("if (l != [])") != std::string::npos);
         ensure("list add: " + r.text, r.text.find("l = (list)1 + \"a\";") != std::string::npos);
         ensure("an empty list stays", r.text.find("l = [];") != std::string::npos);
@@ -1035,8 +1037,9 @@ namespace tut
                                                                 "            ];\n"),
                                                        options());
         ensure("optimized: " + notes(r), r.optimized);
+        // Each element added to the list bare (ALLSLCosts::elementForList).
         ensure("the comparison bracketed: " + r.text,
-               r.text.find("(list)41 + (-1 < --loc_sitTargetsRemaining) + <0, 0, 0> + <0, 0, 0, 1>") != std::string::npos);
+               r.text.find("loc_params + 41 + (-1 < --loc_sitTargetsRemaining) + <0, 0, 0> + <0, 0, 0, 1>") != std::string::npos);
         compiles(r);
 
         // The first element under the cast, bracketed where the cast would
@@ -1455,5 +1458,81 @@ namespace tut
         o.inlineByCost                        = false;
         const ALLSLOptimizer::Result unweighed = ALLSLOptimizer::run(source, o);
         ensure("never larger for trying", weighed.weight.compiled && weighed.weight.total <= ALScriptWeigh::lslLuau(unweighed.text).total);
+    }
+
+    template<> template<>
+    void allsloptimizer_object::test<40>()
+    {
+        set_test_name("-1 tests, one and two either way, increments and list elements are written as each target has them smaller, and compile");
+        const std::string source = wrap("list l;\ninteger g;\n",
+                                        "        integer a = (integer)llFrand(9);\n        integer b = (integer)llFrand(9);\n        string s = llGetObjectName();\n"
+                                        "        integer found = llListFindList(l, [a]);\n"
+                                        "        if (a != -1) g = 1;\n"
+                                        "        if (found >= 0 && llSubStringIndex(s, \"x\") > -1) g = 2;\n"
+                                        "        if (!(found < 0)) g = 3;\n"
+                                        "        g = a == -1;\n"
+                                        "        g = found < 0;\n"
+                                        "        g = a + 1;\n"
+                                        "        g = 2 + a * b;\n"
+                                        "        g = b - 1;\n"
+                                        "        g = -a - 2;\n"
+                                        "        g = a != -1;\n"
+                                        "        a++;\n"
+                                        "        for (b = 0; b < 3; b--) g += b;\n"
+                                        "        l = l + [a];\n"
+                                        "        l = l + [a, s];\n"
+                                        "        l = [s] + l;\n"
+                                        "        l = l + (list)s;\n"
+                                        "        l += [b];\n"
+                                        "        l = l + [llFrand(1), llFrand(2)];\n"
+                                        "        llOwnerSay((string)g + (string)l + (string)a + (string)b);\n");
+        const auto run = [&](ALLSLOptimizer::Target target) {
+            ALLSLOptimizer::Options o = options();
+            o.target                  = target;
+            const ALLSLOptimizer::Result r = ALLSLOptimizer::run(source, o);
+            ensure("optimized: " + notes(r), r.optimized);
+            ALLSLService           service;
+            const ALScriptProblems said = service.check(r.text, target != ALLSLOptimizer::Target::LSO);
+            for (const ALScriptProblem& p : said)
+            {
+                ensure("no error in what was written: " + p.message + "\n" + r.text, p.severity != ALScriptProblem::Severity::Error);
+            }
+            return r.text;
+        };
+        const auto has = [](const std::string& text, const std::string& what) { return text.find(what) != std::string::npos; };
+
+        const std::string lso = run(ALLSLOptimizer::Target::LSO);
+        ensure("x != -1 as ~x, in a condition: " + lso, has(lso, "if (~a)"));
+        ensure("finds, both ways round, inside &&: " + lso, has(lso, "if (~found && ~llSubStringIndex(s, \"x\"))"));
+        ensure("a find < 0 as !~find, under a !", has(lso, "if (!!~found)") || has(lso, "if (~found)"));
+        ensure("x == -1 as !~x, as a value", has(lso, "g = !~a;"));
+        ensure("a find < 0 as !~find, as a value, a local set to a find", has(lso, "g = !~found;"));
+        ensure("x + 1 as -~x", has(lso, "g = -~a;"));
+        ensure("2 + x as -~-~x, the product bracketed", has(lso, "g = -~-~(a * b);"));
+        ensure("x - 1 as ~-x", has(lso, "g = ~-b;"));
+        ensure("x - 2 as ~-~-x, a minus bracketed after a minus", has(lso, "g = ~-~-(-a);"));
+        ensure("x != -1 as a value stays", has(lso, "g = a != -1;"));
+        ensure("an increment before", has(lso, "++a;"));
+        ensure("and a for's step", has(lso, "--b)"));
+        ensure("l + [a] as l + a", has(lso, "l = l + a;"));
+        ensure("l + [a, s] as l + a + s", has(lso, "l = l + a + s;"));
+        ensure("[s] + l as s + l", has(lso, "l = s + l;"));
+        ensure("l + (list)s as l + s", has(lso, "l = l + s;"));
+        ensure("l += [b] as l += b", has(lso, "l += b;"));
+        ensure("elements whose order would show stay together", !has(lso, "l + llFrand(1) + llFrand(2)"));
+
+        const std::string mono = run(ALLSLOptimizer::Target::Mono);
+        ensure("Mono: x != -1 as ~x: " + mono, has(mono, "if (~a)"));
+        ensure("Mono: x == -1 stays", has(mono, "g = a == -1;"));
+        ensure("Mono: x + 1 stays", has(mono, "g = a + 1;"));
+        ensure("Mono: x - 1 as ~-x", has(mono, "g = ~-b;"));
+        ensure("Mono: ++a", has(mono, "++a;"));
+        ensure("Mono: l + a", has(mono, "l = l + a;"));
+
+        const std::string luau = run(ALLSLOptimizer::Target::Luau);
+        ensure("Luau: x != -1 stays, ~ a library call there: " + luau, has(luau, "if (a != -1)"));
+        ensure("Luau: x - 1 stays", has(luau, "g = b - 1;"));
+        ensure("Luau: a++ stays", has(luau, "a++;"));
+        ensure("Luau: l + a", has(luau, "l = l + a;"));
     }
 } // namespace tut

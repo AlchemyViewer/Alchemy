@@ -57,4 +57,9 @@ public:
     // to one whose result is the only point of calling it -- llGetPos,
     // llGetTime -- which reads what changes and changes nothing.
     static bool changesNothing(Tailslide::LSLASTNode* node);
+
+    // A function whose answer is an index or -1, never below: what finds
+    // something, and INVENTORY_NONE. What the definitions do not say, so
+    // kept by hand.
+    static bool atLeastMinusOne(const char* name);
 };

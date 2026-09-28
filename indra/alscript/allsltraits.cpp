@@ -31,6 +31,8 @@
 
 #include <boost/unordered/unordered_flat_map.hpp>
 
+#include <algorithm>
+#include <iterator>
 #include <string_view>
 
 namespace
@@ -151,4 +153,12 @@ bool ALLSLTraits::sideEffectFree(Tailslide::LSLASTNode* node)
 bool ALLSLTraits::changesNothing(Tailslide::LSLASTNode* node)
 {
     return quiet(node, true);
+}
+
+// static
+bool ALLSLTraits::atLeastMinusOne(const char* name)
+{
+    static constexpr std::string_view NAMES[] = { "llGetInventoryType", "llListFindList", "llListFindListNext", "llListFindStrided",
+                                                  "llSubStringIndex" };
+    return name && std::find(std::begin(NAMES), std::end(NAMES), std::string_view(name)) != std::end(NAMES);
 }

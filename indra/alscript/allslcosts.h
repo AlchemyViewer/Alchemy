@@ -51,6 +51,24 @@ struct ALLSLCosts
     bool lengthAsNotEqual = false;
     // A list `[a, b]` as `(list)a + b`.
     bool listAsSum        = false;
+    // A list's element added bare: `l + [a]` as `l + a`, `[a] + l` as
+    // `a + l`, `l + [a, b]` as `l + a + b`, `l + (list)x` as `l + x`; and
+    // the most elements of a literal that are, where there is a most --
+    // Luau's sum of many holds a register for each, where its literal is
+    // one table.
+    bool elementForList      = false;
+    S32  elementsForListMost = 0;
+    // `x != -1` as `~x` where only whether it is true counts -- and, of a
+    // value never below -1, `x > -1` and `x >= 0` too.
+    bool complementForNotMinusOne = false;
+    // `x == -1` as `!~x` -- and, of a value never below -1, `x < 0`.
+    bool notComplementForMinusOne = false;
+    // `x + 1` as `-~x`, `x + 2` as `-~-~x`.
+    bool negateComplementForIncrement = false;
+    // `x - 1` as `~-x`, `x - 2` as `~-~-x`.
+    bool complementNegateForDecrement = false;
+    // `x++` as `++x`, and `x--` as `--x`, where the value goes unused.
+    bool preForPost = false;
 
     // ---- functions, for whether putting one in place saves
 

@@ -2452,22 +2452,78 @@ namespace
     class Shapes : public ASTVisitor, public Pass
     {
     public:
-        using Pass::Pass;
+        Shapes(Ctx& c, Report& r, const ALLSLOptimizer::Options& o) : Pass(c, r, o), mCosts(ALLSLCosts::of(o.target)) {}
+
+        // An increment whose value nothing reads, before rather than after.
+        bool visit(LSLExpressionStatement* stmt) override
+        {
+            visitChildren(stmt);
+            pre(stmt->getExpr());
+            return false;
+        }
+
+        // Where only whether it is true counts.
+        bool visit(LSLIfStatement* stmt) override
+        {
+            visitChildren(stmt);
+            truth(stmt, 0);
+            return false;
+        }
+        bool visit(LSLWhileStatement* stmt) override
+        {
+            visitChildren(stmt);
+            truth(stmt, 0);
+            return false;
+        }
+        bool visit(LSLDoStatement* stmt) override
+        {
+            visitChildren(stmt);
+            truth(stmt, 1);
+            return false;
+        }
+        bool visit(LSLForStatement* stmt) override
+        {
+            visitChildren(stmt);
+            truth(stmt, 1);
+            if (LSLASTNode* steps = stmt->getIncrExprs())
+            {
+                for (LSLASTNode* step = steps->getChild(0); step; step = step->getNext())
+                {
+                    pre(step);
+                }
+            }
+            return false;
+        }
+
+        bool visit(LSLBinaryExpression* expr) override
+        {
+            if (inGlobal(expr))
+            {
+                return false;
+            }
+            // A list's elements bare, seen as the author wrote them, before
+            // what is left of a literal is made a sum below.
+            if (LSLExpression* made = elements(expr))
+            {
+                made->visit(this);
+                return false;
+            }
+            visitChildren(expr);
+            integers(expr);
+            return false;
+        }
 
         bool visit(LSLListExpression* expr) override
         {
             visitChildren(expr);
-            if (!options.listadd || !ALLSLCosts::of(options.target).listAsSum || expr->getNumChildren() == 0)
+            if (!options.listadd || !mCosts.listAsSum || expr->getNumChildren() == 0)
             {
                 return false;
             }
             // Not in a global's initializer, which must stay simple.
-            for (LSLASTNode* up = expr->getParent(); up; up = up->getParent())
+            if (inGlobal(expr))
             {
-                if (up->getNodeType() == NODE_GLOBAL_VARIABLE)
-                {
-                    return false;
-                }
+                return false;
             }
             // A sum takes its right side first, so its elements are taken
             // last to first, where a literal's are taken first to last:
@@ -2520,6 +2576,367 @@ namespace
         }
 
     private:
+        const ALLSLCosts& mCosts;
+
+        static bool inGlobal(LSLASTNode* node)
+        {
+            for (LSLASTNode* up = node->getParent(); up; up = up->getParent())
+            {
+                if (up->getNodeType() == NODE_GLOBAL_VARIABLE)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        void wrote(LSLASTNode* was, LSLExpression* now, const std::string& before)
+        {
+            if (report.wanted())
+            {
+                report.note(was->getLoc(), "OptimizerWroteAs", "wrote [1] as [2]", { before, render(now) });
+            }
+            ++changes;
+        }
+
+        // `op` over `x`, which is bracketed where what it is could read
+        // otherwise after the operator: a sum, or -- after a minus -- a
+        // minus of its own, which would read as a decrement.
+        LSLExpression* unary(const Uncounted& uncounted, LSLOperator op, LSLExpression* x)
+        {
+            bool tight = false;
+            switch (x->getNodeSubType())
+            {
+                case NODE_LVALUE_EXPRESSION:
+                case NODE_FUNCTION_EXPRESSION:
+                case NODE_PARENTHESIS_EXPRESSION:
+                case NODE_TYPECAST_EXPRESSION:
+                    tight = true;
+                    break;
+                case NODE_UNARY_EXPRESSION:
+                    tight = op != OP_MINUS || (x->getOperation() != OP_MINUS && x->getOperation() != OP_PRE_DECR);
+                    break;
+                default:
+                    break;
+            }
+            if (!tight)
+            {
+                auto* parens = uncounted.made(ctx.allocator->newTracked<LSLParenthesisExpression>(x));
+                parens->setType(x->getType());
+                parens->setLoc(x->getLoc());
+                x = parens;
+            }
+            auto* made = uncounted.made(ctx.allocator->newTracked<LSLUnaryExpression>(x, op));
+            made->setType(TYPE(LST_INTEGER));
+            made->setLoc(x->getLoc());
+            return made;
+        }
+
+        // `expr`, a binary expression, made `ops` over its operand in
+        // `slot`, the last of them outermost: `-~x` is { OP_BIT_NOT,
+        // OP_MINUS }.
+        void over(LSLBinaryExpression* expr, int slot, std::initializer_list<LSLOperator> ops)
+        {
+            const std::string before = report.wanted() ? render(expr) : std::string();
+            auto*             x      = static_cast<LSLExpression*>(expr->takeChild(slot));
+            LSLExpression*    made   = x;
+            {
+                const Uncounted uncounted(*ctx.context);
+                for (LSLOperator op : ops)
+                {
+                    made = unary(uncounted, op, made);
+                }
+            }
+            made->setLoc(expr->getLoc());
+            // Unary binds tighter than anything around it.
+            LSLASTNode::replaceNode(expr, made);
+            wrote(expr, made, before);
+        }
+
+        // Whether a value is never below -1: a find's, or a local's that
+        // is set to one where it is declared and never after.
+        static bool atLeastMinusOne(LSLExpression* x)
+        {
+            x = bare(x);
+            if (x && x->getNodeSubType() == NODE_LVALUE_EXPRESSION && !static_cast<LSLLValueExpression*>(x)->getMember())
+            {
+                LSLSymbol*  sym  = x->getSymbol();
+                LSLASTNode* decl = sym && sym->getSubType() == SYM_LOCAL && sym->getAssignments() == 0 ? sym->getVarDecl() : nullptr;
+                LSLASTNode* init = decl ? decl->getChild(1) : nullptr;
+                return init && init->getNodeType() == NODE_EXPRESSION && atLeastMinusOne(static_cast<LSLExpression*>(init));
+            }
+            if (!x || x->getNodeSubType() != NODE_FUNCTION_EXPRESSION)
+            {
+                return false;
+            }
+            LSLSymbol* sym = static_cast<LSLFunctionExpression*>(x)->getSymbol();
+            return sym && sym->getSubType() == SYM_BUILTIN && ALLSLTraits::atLeastMinusOne(sym->getName());
+        }
+
+        // What an integer comparison or sum comes to in fewer bytes, as a
+        // value: x == -1 as !~x, x < 0 as !~x of a find, x + 1 as -~x,
+        // x - 1 as ~-x, and two either way.
+        void integers(LSLBinaryExpression* expr)
+        {
+            LSLExpression* left  = expr->getLHS();
+            LSLExpression* right = expr->getRHS();
+            if (!left || !right || expr->getIType() != LST_INTEGER || left->getIType() != LST_INTEGER || right->getIType() != LST_INTEGER)
+            {
+                return;
+            }
+            switch (expr->getOperation())
+            {
+                case OP_EQ:
+                    if (mCosts.notComplementForMinusOne && (isInteger(right, -1) || isInteger(left, -1)))
+                    {
+                        over(expr, isInteger(right, -1) ? 0 : 1, { OP_BIT_NOT, OP_BOOLEAN_NOT });
+                    }
+                    return;
+                case OP_LESS:
+                    if (mCosts.notComplementForMinusOne && isInteger(right, 0) && atLeastMinusOne(left))
+                    {
+                        over(expr, 0, { OP_BIT_NOT, OP_BOOLEAN_NOT });
+                    }
+                    return;
+                case OP_GREATER:
+                    if (mCosts.notComplementForMinusOne && isInteger(left, 0) && atLeastMinusOne(right))
+                    {
+                        over(expr, 1, { OP_BIT_NOT, OP_BOOLEAN_NOT });
+                    }
+                    return;
+                case OP_PLUS:
+                    for (int slot = 0; slot < 2 && mCosts.negateComplementForIncrement; ++slot)
+                    {
+                        LSLExpression* other = slot == 0 ? right : left;
+                        if (isInteger(other, 1))
+                        {
+                            over(expr, slot, { OP_BIT_NOT, OP_MINUS });
+                            return;
+                        }
+                        if (isInteger(other, 2))
+                        {
+                            over(expr, slot, { OP_BIT_NOT, OP_MINUS, OP_BIT_NOT, OP_MINUS });
+                            return;
+                        }
+                    }
+                    return;
+                case OP_MINUS:
+                    if (mCosts.complementNegateForDecrement && isInteger(right, 1))
+                    {
+                        over(expr, 0, { OP_MINUS, OP_BIT_NOT });
+                    }
+                    else if (mCosts.complementNegateForDecrement && isInteger(right, 2))
+                    {
+                        over(expr, 0, { OP_MINUS, OP_BIT_NOT, OP_MINUS, OP_BIT_NOT });
+                    }
+                    return;
+                default:
+                    return;
+            }
+        }
+
+        // What only counts as true or false -- a condition, an operand of
+        // !, && or || in one -- in fewer bytes: x != -1 as ~x, and x > -1
+        // and x >= 0 as ~x of a find.
+        void truth(LSLASTNode* parent, int slot)
+        {
+            LSLASTNode* child = parent->getChild(slot);
+            if (!child || child->getNodeType() != NODE_EXPRESSION)
+            {
+                return;
+            }
+            LSLExpression* inner = bare(static_cast<LSLExpression*>(child));
+            if (!inner || inGlobal(inner))
+            {
+                return;
+            }
+            if (inner->getNodeSubType() == NODE_UNARY_EXPRESSION && inner->getOperation() == OP_BOOLEAN_NOT)
+            {
+                truth(inner, 0);
+                return;
+            }
+            if (inner->getNodeSubType() != NODE_BINARY_EXPRESSION)
+            {
+                return;
+            }
+            auto*          expr  = static_cast<LSLBinaryExpression*>(inner);
+            LSLExpression* left  = expr->getLHS();
+            LSLExpression* right = expr->getRHS();
+            if (expr->getOperation() == OP_BOOLEAN_AND || expr->getOperation() == OP_BOOLEAN_OR)
+            {
+                truth(expr, 0);
+                truth(expr, 1);
+                return;
+            }
+            if (!mCosts.complementForNotMinusOne || !left || !right || left->getIType() != LST_INTEGER || right->getIType() != LST_INTEGER)
+            {
+                return;
+            }
+            switch (expr->getOperation())
+            {
+                case OP_NEQ:
+                    if (isInteger(right, -1) || isInteger(left, -1))
+                    {
+                        over(expr, isInteger(right, -1) ? 0 : 1, { OP_BIT_NOT });
+                    }
+                    return;
+                case OP_GREATER:
+                    if (isInteger(right, -1) && atLeastMinusOne(left))
+                    {
+                        over(expr, 0, { OP_BIT_NOT });
+                    }
+                    return;
+                case OP_GEQ:
+                    if (isInteger(right, 0) && atLeastMinusOne(left))
+                    {
+                        over(expr, 0, { OP_BIT_NOT });
+                    }
+                    return;
+                case OP_LESS:
+                    if (isInteger(left, -1) && atLeastMinusOne(right))
+                    {
+                        over(expr, 1, { OP_BIT_NOT });
+                    }
+                    return;
+                case OP_LEQ:
+                    if (isInteger(left, 0) && atLeastMinusOne(right))
+                    {
+                        over(expr, 1, { OP_BIT_NOT });
+                    }
+                    return;
+                default:
+                    return;
+            }
+        }
+
+        // x++ and x-- whose value nothing reads, as ++x and --x.
+        void pre(LSLASTNode* node)
+        {
+            if (!mCosts.preForPost || !node || node->getNodeType() != NODE_EXPRESSION || node->getNodeSubType() != NODE_UNARY_EXPRESSION)
+            {
+                return;
+            }
+            auto*             expr = static_cast<LSLExpression*>(node);
+            const LSLOperator op   = expr->getOperation();
+            if (op != OP_POST_INCR && op != OP_POST_DECR)
+            {
+                return;
+            }
+            const std::string before = report.wanted() ? render(expr) : std::string();
+            expr->setOperation(op == OP_POST_INCR ? OP_PRE_INCR : OP_PRE_DECR);
+            wrote(expr, expr, before);
+        }
+
+        // A list's element added bare: l + [a, b] as l + a + b, [a] + l as
+        // a + l, l + (list)x as l + x, and l += [a] as l += a. What was
+        // made, where anything was.
+        LSLExpression* elements(LSLBinaryExpression* expr)
+        {
+            if (!mCosts.elementForList || expr->getIType() != LST_LIST)
+            {
+                return nullptr;
+            }
+            LSLExpression*    left  = expr->getLHS();
+            LSLExpression*    right = expr->getRHS();
+            const LSLOperator op    = expr->getOperation();
+            if (!left || !right || (op != OP_PLUS && op != OP_ADD_ASSIGN) || left->getIType() != LST_LIST)
+            {
+                return nullptr;
+            }
+            if (LSLExpression* made = appended(expr, left, right, op))
+            {
+                return made;
+            }
+            // [a] + l as a + l.
+            LSLExpression* literal = bare(left);
+            if (op == OP_PLUS && right->getIType() == LST_LIST && literal->getNodeSubType() == NODE_LIST_EXPRESSION &&
+                literal->getNumChildren() == 1 && literal->getChild(0)->getIType() != LST_LIST)
+            {
+                const std::string before = report.wanted() ? render(expr) : std::string();
+                LSLASTNode*       a      = literal->takeChild(0);
+                literal->removeChild(literal->getChild(0));
+                LSLASTNode::replaceNode(left, a);
+                wrote(expr, expr, before);
+                return expr;
+            }
+            return nullptr;
+        }
+
+        // A list with elements added to it: those elements bare.
+        LSLExpression* appended(LSLBinaryExpression* expr, LSLExpression* left, LSLExpression* right, LSLOperator op)
+        {
+            LSLExpression* added = bare(right);
+            // l + (list)x as l + x.
+            if (op == OP_PLUS && added->getNodeSubType() == NODE_TYPECAST_EXPRESSION && added->getIType() == LST_LIST)
+            {
+                LSLExpression* x = static_cast<LSLTypecastExpression*>(added)->getChildExpr();
+                if (!x || x->getIType() == LST_LIST)
+                {
+                    return nullptr;
+                }
+                const std::string before = report.wanted() ? render(expr) : std::string();
+                added->takeChild(0);
+                LSLASTNode::replaceNode(right, x);
+                wrote(expr, expr, before);
+                return expr;
+            }
+            if (added->getNodeSubType() != NODE_LIST_EXPRESSION || added->getNumChildren() == 0)
+            {
+                return nullptr;
+            }
+            const size_t count = added->getNumChildren();
+            if ((op == OP_ADD_ASSIGN && count != 1) || (mCosts.elementsForListMost > 0 && count > size_t(mCosts.elementsForListMost)))
+            {
+                return nullptr;
+            }
+            // Each element's order as a sum's -- last first -- against a
+            // literal's, which is known to nobody: as for listadd.
+            size_t changing = 0;
+            size_t varying  = 0;
+            for (LSLASTNode* child : *added)
+            {
+                if (child->getIType() == LST_LIST || child->getIType() == LST_ERROR)
+                {
+                    return nullptr;
+                }
+                changing += sideEffectFree(child) ? 0 : 1;
+                varying += child->getConstantValue() ? 0 : 1;
+            }
+            if (changing > 0 && varying > 1)
+            {
+                return nullptr;
+            }
+            const std::string           before = report.wanted() ? render(expr) : std::string();
+            std::vector<LSLExpression*> terms;
+            while (added->hasChildren())
+            {
+                terms.push_back(static_cast<LSLExpression*>(added->takeChild(0)));
+                added->removeChild(added->getChild(0));
+            }
+            if (op == OP_ADD_ASSIGN)
+            {
+                LSLASTNode::replaceNode(right, terms.front());
+                wrote(expr, expr, before);
+                return expr;
+            }
+            // l + a + b, each on the right of its own +.
+            auto*          l   = static_cast<LSLExpression*>(expr->takeChild(0));
+            LSLExpression* sum = l;
+            {
+                const Uncounted uncounted(*ctx.context);
+                for (LSLExpression* term : terms)
+                {
+                    sum = uncounted.made(ctx.allocator->newTracked<LSLBinaryExpression>(sum, OP_PLUS, uncounted.made(bracketed(term))));
+                    sum->setType(TYPE(LST_LIST));
+                    sum->setLoc(term->getLoc());
+                }
+            }
+            sum->setLoc(expr->getLoc());
+            putInPlace(expr, sum, ctx.allocator);
+            wrote(expr, sum, before);
+            return sum;
+        }
+
         // An element of a list as a sum has it, after the first: on the
         // right of a +, which binds tighter than every operator but a
         // product and what is unary, and so bracketed where it is any
