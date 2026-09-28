@@ -470,4 +470,27 @@ namespace tut
         ensure_equals("without a place", named(lost, "twice")->line, -1);
         ensure_equals("the handler still placed", named(lost, "state_entry")->line, 3);
     }
+
+    // Mono's user string heap holds a string once, however many loads of
+    // it there are: a second load costs the instruction alone, on its line.
+    template<> template<>
+    void alscriptweight_object::test<11>()
+    {
+        ensure("builtins: " + error, lslLoaded);
+        const auto script = [](int says) {
+            std::string text = "default\n{\n    state_entry()\n    {\n";
+            for (int i = 0; i < says; ++i)
+            {
+                text += "        llOwnerSay(\"a sentence of some length, said more than once\");\n";
+            }
+            return text + "    }\n}\n";
+        };
+        const ALScriptWeight one   = ALScriptWeigh::mono(script(1));
+        const ALScriptWeight two   = ALScriptWeigh::mono(script(2));
+        const ALScriptWeight three = ALScriptWeigh::mono(script(3));
+        ensure("compiled: " + one.error + two.error + three.error, one.compiled && two.compiled && three.compiled);
+        ensure_equals("the third load as the second", three.total - two.total, two.total - one.total);
+        ensure("the second less than the string" + lined(two), two.total - one.total < 20);
+        ensure("the string is the first line's" + lined(two), at(two, 4) > at(two, 5) + 80);
+    }
 }
