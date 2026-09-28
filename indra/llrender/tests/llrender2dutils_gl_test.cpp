@@ -36,6 +36,7 @@
 #include "../test/lltut.h"
 
 #include <cstring>
+#include <functional>
 #include <list>
 #include <vector>
 
@@ -176,5 +177,54 @@ namespace tut
         ensureNear("right", turned.max_x, 15.f);
         ensureNear("bottom", turned.min_y, 17.f);
         ensureNear("top", turned.max_y, 25.f);
+    }
+    // Rectangles added to one batch are one draw, where gl_rect_2d makes
+    // a draw of each; and they are the same rectangles.
+    template<> template<>
+    void llrender2dutils_object::test<3>()
+    {
+        const auto count_draws = [](const std::function<void()>& draw) {
+            std::list<LLVertexBufferData> capture;
+            gGL.beginList(&capture);
+            draw();
+            gGL.flush();
+            gGL.endList();
+            size_t vertices = 0;
+            for (const LLVertexBufferData& data : capture)
+            {
+                vertices += data.mCount;
+            }
+            return std::make_pair(capture.size(), vertices);
+        };
+        const auto apiece = count_draws([] {
+            for (S32 i = 0; i < 40; ++i)
+            {
+                gl_rect_2d(i * 5, 30, i * 5 + 4, 20, LLColor4::white);
+            }
+        });
+        const auto batched = count_draws([] {
+            gGL.getTextureSlot(0)->unbind();
+            gGL.begin(LLRender::TRIANGLES);
+            for (S32 i = 0; i < 40; ++i)
+            {
+                gl_rect_2d_in_batch(i * 5, 30, i * 5 + 4, 20, LLColor4::white);
+            }
+            gGL.end();
+        });
+        ensure_equals("a draw apiece", apiece.first, (size_t)40);
+        ensure_equals("one draw in a batch", batched.first, (size_t)1);
+        ensure_equals("the same vertices", batched.second, apiece.second);
+
+        const Bounds b = boundsOf([] {
+            gGL.getTextureSlot(0)->unbind();
+            gGL.begin(LLRender::TRIANGLES);
+            gl_rect_2d_in_batch(10, 30, 20, 25, LLColor4::white);
+            gl_rect_2d_in_batch(40, 60, 50, 55, LLColor4::white);
+            gGL.end();
+        });
+        ensureNear("left", b.min_x, 10.f);
+        ensureNear("right", b.max_x, 50.f);
+        ensureNear("bottom", b.min_y, 25.f);
+        ensureNear("top", b.max_y, 60.f);
     }
 }

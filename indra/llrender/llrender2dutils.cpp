@@ -144,6 +144,18 @@ void gl_rect_2d(S32 left, S32 top, S32 right, S32 bottom, const LLColor4 &color,
 }
 
 
+void gl_rect_2d_in_batch(S32 left, S32 top, S32 right, S32 bottom, const LLColor4& color)
+{
+    gGL.color4fv(color.mV);
+    gGL.vertex2i(left, top);
+    gGL.vertex2i(left, bottom);
+    gGL.vertex2i(right, bottom);
+
+    gGL.vertex2i(left, top);
+    gGL.vertex2i(right, bottom);
+    gGL.vertex2i(right, top);
+}
+
 void gl_rect_2d( const LLRect& rect, const LLColor4& color, bool filled )
 {
     gGL.color4fv( color.mV );

@@ -88,6 +88,12 @@ void gl_rect_2d_offset_local( S32 left, S32 top, S32 right, S32 bottom, const LL
 void gl_rect_2d_offset_local( S32 left, S32 top, S32 right, S32 bottom, S32 pixel_offset = 0, bool filled = true );
 void gl_rect_2d(const LLRect& rect, bool filled = true );
 void gl_rect_2d(const LLRect& rect, const LLColor4& color, bool filled = true );
+// A filled rectangle in its own colour, added to the triangles being drawn:
+// it unbinds no texture and begins and ends no batch, so that many drawn
+// between one gGL.getTextureSlot(0)->unbind() and gGL.begin(LLRender::TRIANGLES)
+// and one gGL.end() go to GL as one draw, where gl_rect_2d makes each one
+// its own.
+void gl_rect_2d_in_batch(S32 left, S32 top, S32 right, S32 bottom, const LLColor4& color);
 void gl_rect_2d_checkerboard(const LLRect& rect, GLfloat alpha = 1.0f);
 
 void gl_drop_shadow(S32 left, S32 top, S32 right, S32 bottom, const LLColor4 &start_color, S32 lines);
