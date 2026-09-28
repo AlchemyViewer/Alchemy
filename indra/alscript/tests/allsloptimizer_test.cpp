@@ -1331,4 +1331,28 @@ namespace tut
             ensure("what was written compiles: " + p.message + "\n" + r.text, p.severity != ALScriptProblem::Severity::Error);
         }
     }
+    template<> template<>
+    void allsloptimizer_object::test<37>()
+    {
+        set_test_name("what the optimizer wrote is checked: where it does not compile, the script goes as it was, and that is said");
+        // A literal past a float's range: what it folds to cannot be
+        // written back (O0g), which is how this test finds a failure.
+        const std::string source = "default\n{\n    state_entry()\n    {\n        llSetPos(<-2.0e+9999, 2.0e+9999, 0>);\n    }\n}\n";
+        const ALLSLOptimizer::Result r = ALLSLOptimizer::run(source, options());
+        if (r.optimized)
+        {
+            // Should the optimizer learn to write it, the check has nothing
+            // to refuse; what it wrote must then compile.
+            ALLSLService service;
+            for (const ALScriptProblem& p : service.check(r.text))
+            {
+                ensure("what was written compiles: " + p.message + "\n" + r.text, p.severity != ALScriptProblem::Severity::Error);
+            }
+            return;
+        }
+        ensure_equals("the source as it was", r.text, source);
+        ensure("said, once, as a warning", r.problems.size() == 1 && r.problems[0].key == "OptimizerWroteUncompilable" &&
+                                                r.problems[0].severity == ALScriptProblem::Severity::Warning);
+        ensure_equals("its map the source's own", r.map.toSource(4, 8).line, 4);
+    }
 } // namespace tut

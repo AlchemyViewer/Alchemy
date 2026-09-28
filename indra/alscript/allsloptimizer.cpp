@@ -4183,8 +4183,37 @@ ALLSLOptimizer::Result ALLSLOptimizer::run(std::string_view source, const Option
     opts.show_unmangled      = false;
     Printer printer(opts, options);
     script->visit(&printer);
-    result.text      = printer.mStream.str();
-    result.map       = printer.map(std::string());
+    std::string written = printer.mStream.str();
+    // What was written must check as what it was made from did: a script
+    // the optimizer made unable to compile is the optimizer's fault, and
+    // the source goes as it was, said so, rather than that.
+    {
+        ScopedScriptParser check(nullptr);
+        LSLScript*         again = check.parseLSLBytes(written.data(), static_cast<int>(written.size()));
+        if (again && !check.logger.getErrors())
+        {
+            again->collectSymbols();
+            again->determineTypes();
+        }
+        if (!again || check.logger.getErrors())
+        {
+            ALScriptProblems said;
+            collectMessages(check.logger, said);
+            ALScriptProblem p;
+            p.severity = ALScriptProblem::Severity::Warning;
+            p.source   = ALScriptProblem::Source::Optimizer;
+            p.key      = "OptimizerWroteUncompilable";
+            p.args     = { said.empty() ? std::string() : said.front().message };
+            p.message  = ALScriptProblem::fill("not optimized: what the optimizer made of this script did not compile ([1]), so it goes as it was; "
+                                               "please report it",
+                                               p.args);
+            result.problems.clear();
+            result.problems.push_back(std::move(p));
+            return result;
+        }
+    }
+    result.text = std::move(written);
+    result.map  = printer.map(std::string());
     if (!inlinedMap.empty())
     {
         result.map = result.map.composed(inlinedMap);

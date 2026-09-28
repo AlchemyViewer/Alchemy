@@ -549,6 +549,7 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="OptimizerInlinedConstant">inlined [1] to [2]</string>
 	<string name="OptimizerNoDefinitions">the LSL definitions are not loaded, so nothing was optimized</string>
 	<string name="OptimizerUncompiled">not optimized: the script does not compile as it stands, and compiling it says why</string>
+	<string name="OptimizerWroteUncompilable">not optimized: what the optimizer made of this script did not compile ([1]), so it goes as it was; please report it</string>
 	<string name="OptimizerRemovedFor">removed a for loop whose condition is always false; its initialisers stay</string>
 	<string name="OptimizerRemovedFunction">removed the unused function [1]</string>
 	<string name="OptimizerRemovedGlobal">removed the unused global [1]</string>
