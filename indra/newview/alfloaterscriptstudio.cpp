@@ -3633,12 +3633,14 @@ void ALFloaterScriptStudio::goToProblem(Doc& doc, S32 direction)
 
 void ALFloaterScriptStudio::showProblemCard(Doc& doc, const ALTextPos& at)
 {
-    // What is wrong there, in the card the mouse would bring up.
+    // What is wrong there, in the card the mouse would bring up, and in
+    // the same order: those on its line, as the checkers gave them.
     std::vector<ALCodeEditor::CardProblem> problems;
     ALTextRange                            about;
-    for (const ALCodeEditor::Decoration& decoration : doc.editor->decorations())
+    for (const ALCodeEditor::Decoration* each : doc.editor->decorationsOn(at.line))
     {
-        const ALTextRange range = decoration.range.normalised();
+        const ALCodeEditor::Decoration& decoration = *each;
+        const ALTextRange               range      = decoration.range.normalised();
         if (!decoration.message.empty() && range.begin <= at && (at < range.end || range.begin == at))
         {
             problems.push_back({ decoration.message, decoration.color });
