@@ -235,8 +235,11 @@ namespace
                     return false;
                 }
                 return true;
-            case NODE_UNARY_EXPRESSION:
+            // A cast's own printing puts its operand in parentheses where
+            // it needs them, and around parentheses too.
             case NODE_TYPECAST_EXPRESSION:
+                return false;
+            case NODE_UNARY_EXPRESSION:
             case NODE_PRINT_EXPRESSION:
             case NODE_BOOL_CONVERSION_EXPRESSION:
                 return true;
