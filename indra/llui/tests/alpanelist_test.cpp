@@ -491,7 +491,7 @@ namespace tut
     template<> template<>
     void alpanelist_object::test<13>()
     {
-        set_test_name("rows by key: the same rows made again only where a cell changed, what is chosen kept; some gone taken out, new ones after; else made again");
+        set_test_name("rows by key: the same rows made again only where a cell changed, what is chosen kept; gone ones taken out, new ones made, all in the order given");
         ALPaneList& l   = make();
         const auto  row = [](const std::string& key, const std::string& text) {
             ALPaneList::Row one;
@@ -518,9 +518,9 @@ namespace tut
         ensure_equals("one gone, one after", order(), std::string("beta gamma 2 delta"));
         ensure("the same row, chosen", l.rowWithKey("b") == b && l.getFirstSelected() == b && l.keyOf(b) == "b");
 
-        l.setRows({ row("d", "delta"), row("b", "beta") });
-        ensure_equals("moved: made again", order(), std::string("delta beta"));
-        ensure("chosen again by its key", l.getFirstSelected() && l.keyOf(l.getFirstSelected()) == "b");
+        l.setRows({ row("d", "delta"), row("x", "chi"), row("b", "beta") });
+        ensure_equals("moved, and one between", order(), std::string("delta chi beta"));
+        ensure("the same row, still chosen", l.rowWithKey("b") == b && l.getFirstSelected() == b);
         ensure("gone: nothing by it", !l.rowWithKey("c") && l.keyOf(nullptr).empty());
         l.setRows({});
         ensure("none", l.getItemCount() == 0 && !l.rowWithKey("d"));
@@ -529,6 +529,8 @@ namespace tut
         ensure_equals("a row not its own: made again", order(), std::string("epsilon"));
         l.setRows({ row("e", "epsilon"), row("e", "twice") });
         ensure_equals("a key twice: made again, both listed", order(), std::string("epsilon twice"));
+        l.setRows({ row("e", "epsilon") });
+        ensure_equals("and then again", order(), std::string("epsilon"));
 
         // Its tip made as the pointer rests on it.
         std::vector<std::string> asked;

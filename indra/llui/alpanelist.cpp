@@ -225,33 +225,9 @@ void ALPaneList::setRows(std::vector<Row> rows)
     {
         in_place = in_place && !rows[i].key.empty() && given.emplace(rows[i].key, i).second;
     }
-    // The rows there, some gone, in their order; then only new ones.
-    size_t kept = 0;
-    if (in_place)
-    {
-        size_t at = 0;
-        for (; kept < rows.size() && mKeyed.contains(rows[kept].key); ++kept)
-        {
-            while (at < mOrder.size() && mOrder[at] != rows[kept].key)
-            {
-                ++at;
-            }
-            if (at == mOrder.size())
-            {
-                in_place = false;
-                break;
-            }
-            ++at;
-        }
-        for (size_t i = kept; in_place && i < rows.size(); ++i)
-        {
-            in_place = !mKeyed.contains(rows[i].key);
-        }
-    }
     if (!in_place)
     {
         deleteAllItems();
-        kept = 0;
     }
     else
     {
@@ -260,31 +236,43 @@ void ALPaneList::setRows(std::vector<Row> rows)
         {
             if (!given.contains(key))
             {
-                const auto gone = mKeyed.find(key);
+                const auto        gone = mKeyed.find(key);
                 LLScrollListItem* item = gone->second.item;
                 mKeyOf.erase(item);
                 mKeyed.erase(gone);
                 deleteSingleItem(item);
             }
         }
-        for (size_t i = 0; i < kept; ++i)
-        {
-            Keyed& keyed = mKeyed[rows[i].key];
-            rewrite(keyed.item, rows[i], keyed.said);
-        }
-        // A cell's words changed may sort it elsewhere.
-        setNeedsSort();
-        dirtyColumns();
     }
+    // The rest made again where a cell says something else, the new ones
+    // made, and all of them put in the order given -- which a sort by a
+    // column then sorts, as it would have.
+    item_list order;
     mOrder.clear();
     mOrder.reserve(rows.size());
-    for (size_t i = 0; i < rows.size(); ++i)
+    for (Row& row : rows)
     {
-        mOrder.push_back(rows[i].key);
-        if (i >= kept)
+        mOrder.push_back(row.key);
+        LLScrollListItem* item = nullptr;
+        if (const auto kept = mKeyed.find(row.key); in_place && kept != mKeyed.end())
         {
-            addKeyed(rows[i]);
+            item = kept->second.item;
+            rewrite(item, row, kept->second.said);
         }
+        else
+        {
+            item = addKeyed(row);
+        }
+        if (item)
+        {
+            order.push_back(item);
+        }
+    }
+    if (in_place)
+    {
+        getItemList() = std::move(order);
+        setNeedsSort();
+        dirtyColumns();
     }
 
     // What was chosen chosen again, and the row at the top back there.

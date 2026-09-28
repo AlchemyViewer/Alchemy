@@ -155,12 +155,12 @@ public:
     };
     // The rows afresh, in order, each key once. A row whose key was there
     // is the same row, its cells made again only where they say something
-    // else. Where the rows are those there were -- some gone, the rest in
-    // the same order -- with any new ones after them, nothing else is
-    // added or taken away: a check that moved some lines, a filter
-    // narrowed, more places found. Otherwise the list is made again.
-    // Either way the rows chosen, and the row at the top of the view, are
-    // kept by their keys.
+    // else and put where the order puts it; a key not there before is a
+    // row made, and one not given any more a row taken out. So a check
+    // that moved some lines, a filter narrowed or widened, a symbol added,
+    // makes only what changed. Only a list holding rows setRows did not
+    // put in, or given a key twice, is made again whole. Either way the
+    // rows chosen, and the row at the top of the view, are kept by key.
     void setRows(std::vector<Row> rows);
     // A row's key, empty for one setRows did not put in; and the row with
     // a key, or null.
