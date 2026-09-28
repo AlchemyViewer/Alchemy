@@ -490,6 +490,53 @@ int main(int, char**)
         }
     }
 
+    // Word wrap on: a character typed at the top and taken away, and the
+    // last line's top found after each, which every line's height above it
+    // goes into; the width moved by a pixel and back, and the lines in
+    // view laid out again after each, as a window dragged wider does; and
+    // a line's top asked at random, as drawing and the mouse ask.
+    std::printf("\nWord wrap\n");
+    for (Subject& s : subjects)
+    {
+        s.editor->setWordWrap(true);
+        for (S32 line = 0; line < 60; ++line)
+        {
+            g_sink = g_sink + s.editor->layout().line(line).rows.size();
+        }
+    }
+    both("a keystroke at the top, the last line's top found", subjects, 2, [](Subject&, ALCodeEditor& e) {
+        e.setCaret(ALTextPos(0, 0));
+        e.insertText("x");
+        g_sink = g_sink + static_cast<size_t>(e.layout().lineTop(lastLine(e)));
+        e.deleteRange(ALTextRange(ALTextPos(0, 0), ALTextPos(0, 1)));
+        g_sink = g_sink + static_cast<size_t>(e.layout().lineTop(lastLine(e)));
+    });
+    both("the width moved by a pixel, 60 lines laid out again", subjects, 2, [](Subject&, ALCodeEditor& e) {
+        ALTextLayout& laid  = e.layout();
+        const S32     width = laid.wrapWidth();
+        for (const S32 to : { width + 1, width })
+        {
+            laid.setWrapWidth(to);
+            for (S32 line = 0; line < 60; ++line)
+            {
+                g_sink = g_sink + laid.line(line).rows.size();
+            }
+            g_sink = g_sink + static_cast<size_t>(laid.lineTop(60));
+        }
+    });
+    both("a line's top and the line at a y, per thousand", subjects, 1, [](Subject&, ALCodeEditor& e) {
+        ALTextLayout& laid = e.layout();
+        for (S32 i = 0; i < 1000; ++i)
+        {
+            const S32 line = (i * 7919) % LINES;
+            g_sink         = g_sink + static_cast<size_t>(laid.lineAtY(laid.lineTop(line) + 1));
+        }
+    });
+    for (Subject& s : subjects)
+    {
+        s.editor->setWordWrap(false);
+    }
+
     std::printf("\nBrackets (an opener at the top, unmatched)\n");
     for (Subject& s : subjects)
     {
