@@ -257,7 +257,9 @@ public:
     // source where the preprocessor wrapped it or is on, so that its
     // includes are current, and wrapped again; or as it is. The
     // preprocessor's errors, where it found any, are the diagnostics and
-    // nothing goes up.
+    // nothing goes up -- or, `anyway`, it goes up wrapped as the
+    // preprocessor made it, the source safe in the envelope, with its
+    // errors said: a save of someone's work, which always goes up.
     struct Prepared
     {
         std::string             text;
@@ -265,7 +267,7 @@ public:
     };
     typedef std::function<void(const Prepared&)> prepared_callback_t;
     void prepare(const ALScriptRef& ref, const std::string& name, const LLUUID& asset_id, const std::string& text, bool lua,
-                 const std::string& target, prepared_callback_t callback);
+                 const std::string& target, prepared_callback_t callback, bool anyway = false);
 
     // A script fetched, prepared, and uploaded to compile for a target:
     // what was asked, or "auto" for what it compiles for now. What the

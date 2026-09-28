@@ -800,7 +800,7 @@ bool ALScriptWorkspace::saveNotecard(const ALScriptRef& ref, const std::string& 
 }
 
 void ALScriptWorkspace::prepare(const ALScriptRef& ref, const std::string& name, const LLUUID& asset_id, const std::string& text, bool lua,
-                                const std::string& target, prepared_callback_t callback)
+                                const std::string& target, prepared_callback_t callback, bool anyway)
 {
     if (!ALScriptEnvelope::looksWrapped(text) && !ALScriptPreprocessor::enabled())
     {
@@ -817,7 +817,7 @@ void ALScriptWorkspace::prepare(const ALScriptRef& ref, const std::string& name,
     request.source        = std::make_shared<const std::string>(envelope ? envelope->source : text);
     request.lua           = lua;
     request.compileTarget = target;
-    ALScriptPreprocessor::instance().run(request, [request, envelope, lua, target, callback](const ALPreprocessor::Result& expanded) {
+    ALScriptPreprocessor::instance().run(request, [request, envelope, lua, target, callback, anyway](const ALPreprocessor::Result& expanded) {
         Prepared prepared;
         if (expanded.hasErrors() || !expanded.pending.empty())
         {
@@ -836,17 +836,23 @@ void ALScriptWorkspace::prepare(const ALScriptRef& ref, const std::string& name,
                 prepared.errors.push_back(std::move(diagnostic));
             }
             // An include that never came would go up left out, with nobody
-            // at a save to be told: not sent, and said why.
+            // at a save to be told: not sent, and said why -- or, where it
+            // goes anyway, said that it went without.
             for (const std::string& name : expanded.pending)
             {
                 Diagnostic diagnostic;
                 diagnostic.level   = "ERROR";
-                diagnostic.message = alScriptKeyedWords("PreprocIncludeNotFetched", { name },
-                                                        ALScriptProblem::fill("include file '[1]' could not be fetched, and the script is not sent without it", { name }));
+                diagnostic.message = anyway ? alScriptKeyedWords("PreprocIncludeSentWithout", { name },
+                                                                 ALScriptProblem::fill("include file '[1]' could not be fetched, and the script went up without it", { name }))
+                                            : alScriptKeyedWords("PreprocIncludeNotFetched", { name },
+                                                                 ALScriptProblem::fill("include file '[1]' could not be fetched, and the script is not sent without it", { name }));
                 prepared.errors.push_back(std::move(diagnostic));
             }
-            callback(prepared);
-            return;
+            if (!anyway)
+            {
+                callback(prepared);
+                return;
+            }
         }
         prepared.text = request.sourceText();
         if (!expanded.disabled)

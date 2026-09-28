@@ -31,6 +31,8 @@
 #include "llscripteditorws.h"
 
 #include "alfloaterscriptstudio.h"
+#include "alscriptenvelope.h"
+#include "alscriptpreprocessor.h"
 #include "alscriptworkspace.h"
 
 #include "llagent.h"
@@ -124,30 +126,6 @@ namespace
             throw LLJSONRPCConnection::RequestTimeoutError(timeout_msg);
         }
         return result;
-    }
-
-    // Builds the (success, failure) callback pair used by LLResourceUploadInfo-
-    // derived uploads. Both outcomes post a single LLSD to pump_name:
-    //   - success: the server's response LLSD with item_id/task_id added.
-    //   - failure: { "failed": true, "reason": <reason> }.
-    auto make_asset_upload_callbacks(const std::string& pump_name)
-    {
-        auto on_success = [pump_name](LLUUID item_id, LLUUID task_id, LLUUID new_asset_id, LLSD response)
-        {
-            response["item_id"]      = item_id;
-            response["task_id"]      = task_id;
-            response["new_asset_id"] = new_asset_id;
-            LLEventPumps::instance().post(pump_name, response);
-        };
-        auto on_failure = [pump_name](LLUUID /*item_id*/, LLUUID /*task_id*/, LLSD /*response*/, std::string reason)
-        {
-            LLSD failure;
-            failure["failed"] = true;
-            failure["reason"] = reason;
-            LLEventPumps::instance().post(pump_name, failure);
-            return false;
-        };
-        return std::make_pair(std::move(on_success), std::move(on_failure));
     }
 
     // Returns the value of NV pair key on obj as a string, or empty if
@@ -1906,6 +1884,9 @@ LLSD LLScriptEditorWSServer::saveScript(LLViewerObject* prim, LLInventoryItem* i
     // Keep stable identifiers for use after await_async_result().
     const LLUUID prim_id = prim->getID();
     const LLUUID item_id = item->getUUID();
+    const std::string item_name = item->getName();
+    const LLUUID item_asset = item->getAssetUUID();
+    const ALScriptRef ref(prim_id, item_id);
     const LLViewerInventoryItem* viewer_item = dynamic_cast<const LLViewerInventoryItem*>(item);
     bool is_running = viewer_item ? viewer_item->getIsRunning() : false;
     if (params.has("running"))
@@ -1915,53 +1896,82 @@ LLSD LLScriptEditorWSServer::saveScript(LLViewerObject* prim, LLInventoryItem* i
     if (region_of(prim)->getCapability("UpdateScriptTask").empty())
         throw LLJSONRPCConnection::InternalError("UpdateScriptTask capability not available");
 
-    // The experience it runs under: the upload sets whatever it is sent, and
-    // none takes it away, so it is asked of the region first, as the
-    // studio's own save asks. A save that cannot learn it is refused rather
-    // than strip it.
-    const LLSD asked = await_async_result(
-        "objectContentSaveExperience", ASSET_FETCH_TIMEOUT, "The script's experience was not answered",
-        [prim_id, item_id](const std::string& pump_name)
-        {
-            ALScriptWorkspace::instance().askExperience(ALScriptRef(prim_id, item_id), [pump_name](const std::optional<LLUUID>& experience) {
-                LLSD said;
-                if (experience)
-                {
-                    said["experience"] = *experience;
-                }
-                else
-                {
-                    said["unknown"] = true;
-                }
-                LLEventPumps::instance().post(pump_name, said);
+    // Sent as the studio sends it: expanded afresh where the preprocessor
+    // is on, or where the script is in its envelope, so that its includes
+    // are current -- sent whatever the preprocessor found, since a save is
+    // someone's work, with what it found said. But an envelope whose
+    // compiled half was edited here, its source as it was, goes up as it
+    // is: what the source makes would take the edit away.
+    const bool  lua = compile_target == "luau";
+    std::string text = content;
+    std::vector<ALScriptWorkspace::Diagnostic> preprocessed;
+    bool        as_is = false;
+    const std::optional<ALScriptEnvelope> was = ALScriptEnvelope::parse(content);
+    if (was && item_asset.notNull())
+    {
+        const std::optional<ALScriptEnvelope> held = ALScriptEnvelope::parse(fetch_item_asset(prim, item, LLAssetType::AT_LSL_TEXT));
+        as_is = held && held->source == was->source && held->expanded != was->expanded;
+    }
+    if (!as_is && (was || ALScriptPreprocessor::enabled()))
+    {
+        auto prepared = std::make_shared<ALScriptWorkspace::Prepared>();
+        await_async_result(
+            "objectContentSavePrepare", ASSET_FETCH_TIMEOUT, "The script's includes did not come in time",
+            [&](const std::string& pump_name)
+            {
+                ALScriptWorkspace::instance().prepare(
+                    ref, item_name, item_asset, content, lua, compile_target,
+                    [prepared, pump_name](const ALScriptWorkspace::Prepared& made)
+                    {
+                        *prepared = made;
+                        LLEventPumps::instance().post(pump_name, LLSD().with("done", true));
+                    },
+                    true);
             });
-        });
-    if (asked.has("unknown"))
-        throw LLJSONRPCConnection::InternalError(LLTrans::getString("WorkspaceExperienceUnknown"));
-    const LLUUID experience = asked["experience"].asUUID();
+        text         = prepared->text;
+        preprocessed = prepared->errors;
+    }
 
-    // The object again, after the wait: it may have gone out of view.
-    LLViewerObject* holder = gObjectList.findObject(prim_id);
-    if (!holder)
-        throw LLJSONRPCConnection::InvalidParams("Prim not found");
-    std::string url = region_of(holder)->getCapability("UpdateScriptTask");
-    if (url.empty())
-        throw LLJSONRPCConnection::InternalError("UpdateScriptTask capability not available");
-
-    LLSD cb_result = await_async_result(
+    // Through the workspace, which every save goes through: it refuses what
+    // the simulator would, asks the region the experience the script runs
+    // under -- the upload sets whatever it is sent, and none takes it away
+    // -- and every editor hears it was saved.
+    ALScriptWorkspace::SaveOptions options;
+    options.compileTarget = compile_target;
+    options.running       = is_running;
+    options.sender        = ALScriptWorkspace::Sender(ALScriptWorkspace::Origin::Bridge);
+    auto        answer    = std::make_shared<ALScriptWorkspace::CompileResult>();
+    std::string refused;
+    const LLSD  landed = await_async_result(
         "objectContentSave", SCRIPT_UPLOAD_TIMEOUT, "Script upload/compile timed out",
-        [&, prim_id, item_id](const std::string& pump_name)
+        [&](const std::string& pump_name)
         {
-            auto [on_success, on_failure] = make_asset_upload_callbacks(pump_name);
-            LLResourceUploadInfo::ptr_t uploadInfo(std::make_shared<LLScriptAssetUpload>(
-                prim_id, item_id,
-                compile_target, is_running, experience, content,
-                std::move(on_success), std::move(on_failure)));
-            LLViewerAssetUpload::EnqueueInventoryUpload(url, uploadInfo);
+            const bool sent = ALScriptWorkspace::instance().save(ref, text, options,
+                [answer, pump_name](const ALScriptWorkspace::CompileResult& result)
+                {
+                    *answer = result;
+                    LLEventPumps::instance().post(pump_name, LLSD().with("done", true));
+                },
+                refused);
+            if (!sent)
+            {
+                LLEventPumps::instance().post(pump_name, LLSD().with("refused", true));
+            }
         });
+    if (landed.has("refused"))
+        throw LLJSONRPCConnection::InvalidParams(refused);
+    if (answer->experienceUnknown)
+        throw LLJSONRPCConnection::InternalError(LLTrans::getString("WorkspaceExperienceUnknown"));
+    if (!answer->error.empty())
+        throw LLJSONRPCConnection::InternalError("Upload failed: " + answer->error);
 
-    if (cb_result.has("failed"))
-        throw LLJSONRPCConnection::InternalError("Upload failed: " + cb_result["reason"].asString());
+    LLSD cb_result;
+    cb_result["compiled"]     = answer->success;
+    cb_result["new_asset_id"] = answer->newAssetId;
+    for (const std::string& message : answer->messages)
+    {
+        cb_result["errors"].append(message);
+    }
 
     LLSD response;
     response["success"]  = true;
@@ -2018,6 +2028,27 @@ LLSD LLScriptEditorWSServer::saveScript(LLViewerObject* prim, LLInventoryItem* i
         }
     }
 
+    // What the preprocessor found, which the script went up with; and a
+    // compiled half that went up as it was edited.
+    for (const ALScriptWorkspace::Diagnostic& found : preprocessed)
+    {
+        LLSD diagnostic;
+        diagnostic["level"]   = found.level;
+        diagnostic["row"]     = found.line + 1;
+        diagnostic["column"]  = found.hasColumn ? found.column + 1 : 0;
+        diagnostic["message"] = found.message;
+        response["diagnostics"].append(diagnostic);
+    }
+    if (as_is)
+    {
+        LLSD note;
+        note["level"]   = "WARNING";
+        note["row"]     = 0;
+        note["column"]  = 0;
+        note["message"] = LLTrans::getString("BridgeSentCompiledAsIs");
+        response["diagnostics"].append(note);
+    }
+
     // If the script is open in the viewer's editor, update it
     LLSD floater_key;
     floater_key["taskid"] = prim_id;
@@ -2028,11 +2059,11 @@ LLSD LLScriptEditorWSServer::saveScript(LLViewerObject* prim, LLInventoryItem* i
         LLScriptEdCore* sed = editor->getScriptEdCore();
         if (sed)
         {
-            sed->setScriptText(LLStringExplicit(content), true);
+            sed->setScriptText(LLStringExplicit(text), true);
             sed->makeEditorPristine();
         }
     }
-    ALFloaterScriptStudio::savedElsewhere(ALScriptRef(prim_id, item_id), content, cb_result["new_asset_id"].asUUID());
+    ALFloaterScriptStudio::savedElsewhere(ALScriptRef(prim_id, item_id), text, answer->newAssetId);
 
     return response;
 }
@@ -2073,31 +2104,32 @@ LLSD LLScriptEditorWSServer::saveNotecard(LLViewerObject* prim, LLInventoryItem*
         }
     }
 
-    std::string url = region_of(prim)->getCapability("UpdateNotecardTaskInventory");
-    if (url.empty())
-        throw LLJSONRPCConnection::InternalError("UpdateNotecardTaskInventory capability not available");
-
-    // Use LLNotecard to produce the proper notecard format
-    LLNotecard notecard;
-    notecard.setText(content);
-
-    std::ostringstream ostr;
-    notecard.exportStream(ostr);
-
-    LLSD cb_result = await_async_result(
+    // Through the workspace, which every save goes through, and every
+    // editor hears of it -- the studio's notecard tabs among them.
+    auto        answer  = std::make_shared<ALScriptWorkspace::CompileResult>();
+    std::string refused;
+    const LLSD  landed = await_async_result(
         "objectContentSaveNotecard", NOTECARD_UPLOAD_TIMEOUT, "Notecard upload timed out",
         [&, prim_id, item_id](const std::string& pump_name)
         {
-            auto [on_success, on_failure] = make_asset_upload_callbacks(pump_name);
-            LLResourceUploadInfo::ptr_t uploadInfo(std::make_shared<LLBufferedAssetUploadInfo>(
-                prim_id, item_id,
-                LLAssetType::AT_NOTECARD, ostr.str(),
-                std::move(on_success), std::move(on_failure)));
-            LLViewerAssetUpload::EnqueueInventoryUpload(url, uploadInfo);
+            const bool sent = ALScriptWorkspace::instance().saveNotecard(
+                ALScriptRef(prim_id, item_id), content, {},
+                [answer, pump_name](const ALScriptWorkspace::CompileResult& result)
+                {
+                    *answer = result;
+                    LLEventPumps::instance().post(pump_name, LLSD().with("done", true));
+                },
+                refused, ALScriptWorkspace::Sender(ALScriptWorkspace::Origin::Bridge));
+            if (!sent)
+            {
+                LLEventPumps::instance().post(pump_name, LLSD().with("refused", true));
+            }
         });
 
-    if (cb_result.has("failed"))
-        throw LLJSONRPCConnection::InternalError("Upload failed: " + cb_result["reason"].asString());
+    if (landed.has("refused"))
+        throw LLJSONRPCConnection::InvalidParams(refused);
+    if (!answer->error.empty())
+        throw LLJSONRPCConnection::InternalError("Upload failed: " + answer->error);
 
     LLSD response;
     response["success"] = true;
@@ -2508,8 +2540,10 @@ namespace
 void LLScriptEditorWSServer::sendCompiled(const ALScriptWorkspace::CompileResult& result)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
-    // Nothing compiled: a notecard, or an upload that failed.
-    if (result.kind == ALScriptWorkspace::Kind::Notecard || !result.error.empty() || result.ref.item.isNull())
+    // Nothing compiled: a notecard, or an upload that failed. Nor one this
+    // bridge sent, which its client is answered about as the save's reply.
+    if (result.kind == ALScriptWorkspace::Kind::Notecard || !result.error.empty() || result.ref.item.isNull() ||
+        result.sender.origin == ALScriptWorkspace::Origin::Bridge)
     {
         return;
     }
