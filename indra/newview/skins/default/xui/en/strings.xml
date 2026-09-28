@@ -579,7 +579,7 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="InlinerPutExpressionOnce">put what the function [1] returns in place of its one call</string>
 	<string name="InlinerPutFunction">put the function [1] in place of a call</string>
 	<string name="InlinerPutFunctionOnce">put the function [1] in place of its one call</string>
-	<string name="InlinerChoseFunction">put the function [1] in place at its [2] calls: about [3] bytes less code on [4]</string>
+	<string name="InlinerChoseFunction">put the function [1] in place at its [2] calls, of what put in place so made the code [3] bytes smaller on [4]</string>
 	<string name="InlinerLoopAsJumps">wrote the loop as a label, an if and a jump back, for a call in its condition to go in place</string>
 
 	<!-- What the studio says in place of Luau's own words (alluauservice.cpp) -->

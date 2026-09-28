@@ -208,8 +208,9 @@ namespace tut
         const ALPreprocessor::Result r = ALPreprocessor::run(source, o);
         ensure("optimized: " + r.text, r.optimized);
         ensure_equals("nothing wrong", said(source), std::string());
-        // The list a sum, as Mono has it smaller.
-        ensure("each worked out: " + r.text, r.text.find("(list)9 + 1.5707964 + 10 + sq(n)") != std::string::npos);
+        // The list stays a literal: as a sum it would need a helper the
+        // script has no other use for, which costs Mono more than it saves.
+        ensure("each worked out: " + r.text, r.text.find("[9, 1.5707964, 10, sq(n)]") != std::string::npos);
         ensure("the functions no call is left to go: " + r.text, r.text.find("deg(") == std::string::npos && r.text.find("clampi(") == std::string::npos);
         ensure("and the one a call is left to stays: " + r.text, r.text.find("integer sq(integer x)") != std::string::npos);
 

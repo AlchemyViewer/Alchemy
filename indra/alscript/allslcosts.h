@@ -58,6 +58,13 @@ struct ALLSLCosts
     // one table.
     bool elementForList      = false;
     S32  elementsForListMost = 0;
+    // Where a list's operations are calls to helpers the assembly
+    // references once for the whole script (Mono): the least any of a
+    // list's shapes saves at a place, and the most a helper new to the
+    // script costs. Where the places come to more than the helpers, the
+    // shapes are smaller without a weighing to say so.
+    S32  listShapeLeast = 0;
+    S32  listHelperMost = 0;
     // `x != -1` as `~x` where only whether it is true counts -- and, of a
     // value never below -1, `x > -1` and `x >= 0` too.
     bool complementForNotMinusOne = false;

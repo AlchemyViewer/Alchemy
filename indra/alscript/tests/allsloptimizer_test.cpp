@@ -281,10 +281,11 @@ namespace tut
         ensure("list add: " + r.text, r.text.find("l = (list)1 + \"a\";") != std::string::npos);
         ensure("an empty list stays", r.text.find("l = [];") != std::string::npos);
 
-        // On Mono the sum is, and the comparison is not.
+        // On Mono the comparison is not; nor is the sum here, one sum not
+        // paying for the helper it would be the script's only use of.
         r = ALLSLOptimizer::run(source, options());
         ensure("no comparison on Mono: " + r.text, r.text.find("llGetListLength(l) + 1") != std::string::npos && r.text.find("l != []") == std::string::npos);
-        ensure("list add on Mono: " + r.text, r.text.find("l = (list)1 + \"a\";") != std::string::npos);
+        ensure("one sum not worth its helper on Mono: " + r.text, r.text.find("l = [1, \"a\"];") != std::string::npos);
 
         // On Luau neither.
         ALLSLOptimizer::Options luau = options();
@@ -1018,6 +1019,10 @@ namespace tut
     void allsloptimizer_object::test<27>()
     {
         set_test_name("a list literal as a sum brackets an element where the sum would bind it otherwise, and stays a literal where the order would show");
+        // On LSO, where a list's shapes are made wherever they are smaller:
+        // Mono weighs them against the helpers they need (test 41).
+        ALLSLOptimizer::Options lso = options();
+        lso.target                  = ALLSLOptimizer::Target::LSO;
         const auto compiles = [](const ALLSLOptimizer::Result& r) {
             ALLSLService           service;
             const ALScriptProblems said = service.check(r.text);
@@ -1035,18 +1040,18 @@ namespace tut
                                                                 "            , <((float)0), ((float)0), ((float)0)>\n"
                                                                 "            , <((float)0), ((float)0), ((float)0), ((float)1)>\n"
                                                                 "            ];\n"),
-                                                       options());
+                                                       lso);
         ensure("optimized: " + notes(r), r.optimized);
         // Each element added to the list bare (ALLSLCosts::elementForList).
         ensure("the comparison bracketed: " + r.text,
-               r.text.find("loc_params + 41 + (-1 < --loc_sitTargetsRemaining) + <0, 0, 0> + <0, 0, 0, 1>") != std::string::npos);
+               r.text.find("loc_params + 41 + (-1 < --loc_sitTargetsRemaining) + <0.0, 0.0, 0.0> + <0.0, 0.0, 0.0, 1.0>") != std::string::npos);
         compiles(r);
 
         // The first element under the cast, bracketed where the cast would
         // take less of it; the rest where the sum would.
         r = ALLSLOptimizer::run(wrap("", "        integer a = (integer)llFrand(9);\n        integer b = (integer)llFrand(9);\n        list l;\n"
                                          "        l = [a - b, 1];\n        l = [--a, 2];\n        l = [-1, 3];\n        l = [a * b, a - b];\n        llSay(0, llList2CSV(l));\n"),
-                                options());
+                                lso);
         ensure("a difference: " + r.text, r.text.find("l = (list)(a - b) + 1;") != std::string::npos);
         ensure("a step down: " + r.text, r.text.find("l = (list)(--a) + 2;") != std::string::npos);
         ensure("a negative constant bare: " + r.text, r.text.find("l = (list)-1 + 3;") != std::string::npos);
@@ -1060,7 +1065,7 @@ namespace tut
                                      "        integer i = (integer)llFrand(9);\n        list l;\n"
                                      "        l = [i, --i];\n        l = [bump(), bump()];\n        l = [llGetUnixTime(), bump()];\n        l = [i, g];\n"
                                      "        llSay(0, llList2CSV(l));\n"),
-                                options());
+                                lso);
         ensure("a name and its change: " + r.text, r.text.find("l = [i, --i];") != std::string::npos);
         ensure("two calls that change: " + r.text, r.text.find("l = [bump(), bump()];") != std::string::npos);
         ensure("a read and a call that changes: " + r.text, r.text.find("l = [llGetUnixTime(), bump()];") != std::string::npos);
@@ -1532,12 +1537,43 @@ namespace tut
         ensure("Mono: x + 1 stays", has(mono, "g = a + 1;"));
         ensure("Mono: x - 1 as ~-x", has(mono, "g = ~-b;"));
         ensure("Mono: ++a", has(mono, "++a;"));
-        ensure("Mono: l + a", has(mono, "l = l + a;"));
+        ensure("Mono: what it wrote weighs what it says", mono.find("l = l") != std::string::npos);
 
         const std::string luau = run(ALLSLOptimizer::Target::Luau);
         ensure("Luau: x != -1 stays, ~ a library call there: " + luau, has(luau, "if (a != -1)"));
         ensure("Luau: x - 1 stays", has(luau, "g = b - 1;"));
         ensure("Luau: a++ stays", has(luau, "a++;"));
         ensure("Luau: l + a", has(luau, "l = l + a;"));
+    }
+
+    template<> template<>
+    void allsloptimizer_object::test<41>()
+    {
+        set_test_name("on Mono a list's shapes are weighed against the helpers they need, and kept only where they pay for them");
+        // A literal whose order would show, which stays, and a list added
+        // to a list: the helpers a literal and a list's sum need are the
+        // script's whatever happens to the rest.
+        const auto adding = [](int times) {
+            std::string body = "        integer i = (integer)llFrand(9);\n        list m = [i, --i];\n        list l = m + m;\n";
+            for (int k = 0; k < times; ++k)
+            {
+                body += "        l += [llGetSubString(llGetObjectName(), " + std::to_string(k) + ", -1)];\n";
+            }
+            return wrap("", body + "        llOwnerSay((string)l);\n");
+        };
+        // Once: adding a string bare needs a helper nothing else in the
+        // script uses, which costs more than the one place saves.
+        const ALLSLOptimizer::Result once = ALLSLOptimizer::run(adding(1), options());
+        ensure("optimized: " + notes(once), once.optimized);
+        ensure("once, the literal stays: " + once.text, once.text.find("l += [llGetSubString") != std::string::npos);
+        ensure("weighed, as written", once.weight.compiled && once.weight.total == ALScriptWeigh::mono(once.text).total);
+        // Often: the places pay for it.
+        const ALLSLOptimizer::Result often = ALLSLOptimizer::run(adding(4), options());
+        ensure("often, bare: " + often.text, often.text.find("l += llGetSubString") != std::string::npos && often.text.find("l += [") == std::string::npos);
+        ensure("weighed, as written", often.weight.compiled && often.weight.total == ALScriptWeigh::mono(often.text).total);
+        // LSO holds no helpers for a list: bare, once or often.
+        ALLSLOptimizer::Options lso = options();
+        lso.target                  = ALLSLOptimizer::Target::LSO;
+        ensure("LSO, bare once", ALLSLOptimizer::run(adding(1), lso).text.find("l += llGetSubString") != std::string::npos);
     }
 } // namespace tut

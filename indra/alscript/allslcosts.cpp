@@ -78,6 +78,8 @@ namespace
         c.lengthAsNotEqual = false;
         c.listAsSum        = true;
         c.elementForList   = true;
+        c.listShapeLeast   = 5;
+        c.listHelperMost   = 26;
 
         c.complementForNotMinusOne     = true;
         c.notComplementForMinusOne     = false;

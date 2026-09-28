@@ -43,6 +43,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <limits>
 
 namespace tut
 {
@@ -448,6 +449,51 @@ namespace tut
                 ensure(std::string(one.what) + " on " + nameOf(t) + ": estimated " + std::to_string(estimate) + ", measured " + std::to_string(measured),
                        (estimate < 0) == (measured < 0) && std::abs(estimate - measured) <= std::max(12, std::abs(measured) / 4));
             }
+        }
+    }
+
+    // Where a list's helpers are held once for the script: the least a
+    // list's shape saves at a place, and the most a helper new to the
+    // script costs.
+    template<> template<>
+    void allslcosts_object::test<5>()
+    {
+        ensure("builtins: " + error, lslLoaded);
+        for (const Target t : TARGETS)
+        {
+            const ALLSLCosts& c     = ALLSLCosts::of(t);
+            const std::string where = std::string(" on ") + nameOf(t);
+            if (c.listShapeLeast == 0)
+            {
+                continue;
+            }
+            const std::pair<Snippet, Snippet> shapes[] = {
+                { { "", "l = [i];" }, { "", "l = (list)i;" } },
+                { { "", "l = [i, j];" }, { "", "l = (list)i + j;" } },
+                { { "", "l = l + [i];" }, { "", "l = l + i;" } },
+                { { "", "l = l + [i, j];" }, { "", "l = l + i + j;" } },
+                { { "", "l = [s] + l;" }, { "", "l = s + l;" } },
+                { { "", "l = l + (list)s;" }, { "", "l = l + s;" } },
+                { { "", "l += [i];" }, { "", "l += i;" } },
+            };
+            S32 least = std::numeric_limits<S32>::max();
+            for (const auto& [a, b] : shapes)
+            {
+                least = std::min(least, -delta(t, a, b).each);
+            }
+            said("the least a list's shape saves", t, { least, least }, c.listShapeLeast);
+            ensure_equals("the least a list's shape saves at a place" + where, least, c.listShapeLeast);
+            // A helper each: a cast to a list, something added after one,
+            // something added before one.
+            const Snippet had{ "", "l = l + [i];" };
+            S32           most = 0;
+            for (const char* more : { "l = (list)s;", "l = l + v;", "l = v + l;" })
+            {
+                const Delta d = delta(t, had, { "", std::string("l = l + [i]; ") + more });
+                most          = std::max(most, d.first - d.each);
+            }
+            said("the most a helper costs", t, { most, most }, c.listHelperMost);
+            ensure_equals("the most a list's helper new to the script costs" + where, most, c.listHelperMost);
         }
     }
 }

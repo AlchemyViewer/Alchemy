@@ -2452,13 +2452,26 @@ namespace
     class Shapes : public ASTVisitor, public Pass
     {
     public:
-        Shapes(Ctx& c, Report& r, const ALLSLOptimizer::Options& o) : Pass(c, r, o), mCosts(ALLSLCosts::of(o.target)) {}
+        // Integers' and conditions' shapes, and increments', which the
+        // code makes of plain instructions; and lists', which Mono makes
+        // of helpers its assembly references once each, so that what they
+        // save at each place a helper new to the script can cost more than
+        // -- weighed, where it can (once()).
+        enum class Stage : U8
+        {
+            Values,
+            Lists
+        };
+        Shapes(Ctx& c, Report& r, const ALLSLOptimizer::Options& o, Stage stage) : Pass(c, r, o), mCosts(ALLSLCosts::of(o.target)), mStage(stage) {}
 
         // An increment whose value nothing reads, before rather than after.
         bool visit(LSLExpressionStatement* stmt) override
         {
             visitChildren(stmt);
-            pre(stmt->getExpr());
+            if (mStage == Stage::Values)
+            {
+                pre(stmt->getExpr());
+            }
             return false;
         }
 
@@ -2466,24 +2479,37 @@ namespace
         bool visit(LSLIfStatement* stmt) override
         {
             visitChildren(stmt);
-            truth(stmt, 0);
+            if (mStage == Stage::Values)
+            {
+                truth(stmt, 0);
+            }
             return false;
         }
         bool visit(LSLWhileStatement* stmt) override
         {
             visitChildren(stmt);
-            truth(stmt, 0);
+            if (mStage == Stage::Values)
+            {
+                truth(stmt, 0);
+            }
             return false;
         }
         bool visit(LSLDoStatement* stmt) override
         {
             visitChildren(stmt);
-            truth(stmt, 1);
+            if (mStage == Stage::Values)
+            {
+                truth(stmt, 1);
+            }
             return false;
         }
         bool visit(LSLForStatement* stmt) override
         {
             visitChildren(stmt);
+            if (mStage != Stage::Values)
+            {
+                return false;
+            }
             truth(stmt, 1);
             if (LSLASTNode* steps = stmt->getIncrExprs())
             {
@@ -2503,9 +2529,14 @@ namespace
             }
             // A list's elements bare, seen as the author wrote them, before
             // what is left of a literal is made a sum below.
-            if (LSLExpression* made = elements(expr))
+            if (mStage == Stage::Lists)
             {
-                made->visit(this);
+                if (LSLExpression* made = elements(expr))
+                {
+                    made->visit(this);
+                    return false;
+                }
+                visitChildren(expr);
                 return false;
             }
             visitChildren(expr);
@@ -2516,7 +2547,7 @@ namespace
         bool visit(LSLListExpression* expr) override
         {
             visitChildren(expr);
-            if (!options.listadd || !mCosts.listAsSum || expr->getNumChildren() == 0)
+            if (mStage != Stage::Lists || !options.listadd || !mCosts.listAsSum || expr->getNumChildren() == 0)
             {
                 return false;
             }
@@ -2577,6 +2608,7 @@ namespace
 
     private:
         const ALLSLCosts& mCosts;
+        const Stage       mStage;
 
         static bool inGlobal(LSLASTNode* node)
         {
@@ -4396,10 +4428,74 @@ namespace
         }
     }
 
+    // Which of Mono's list helpers a script calls, each by what Tailslide's
+    // Mono compiler calls one for: a literal, an empty list, a cast to a
+    // list, a list's literal among the globals, something added to a list
+    // -- a helper for each type added -- and something added before one.
+    // The assembly references each once, which is what a list's shapes can
+    // cost that they do not save at each place: a helper nothing in the
+    // script called before.
+    class ListHelpers : public ASTVisitor
+    {
+    public:
+        boost::unordered_flat_set<U32> used;
+
+        // How many of `after`'s helpers are not among these.
+        S32 freshIn(const ListHelpers& after) const
+        {
+            return static_cast<S32>(std::count_if(after.used.begin(), after.used.end(), [this](U32 helper) { return !used.contains(helper); }));
+        }
+
+        bool visit(LSLGlobalVariable* global) override
+        {
+            mGlobal = true;
+            visitChildren(global);
+            mGlobal = false;
+            return false;
+        }
+        bool visit(LSLListExpression* expr) override
+        {
+            used.insert(mGlobal ? GLOBAL_LITERAL : expr->hasChildren() ? LITERAL : EMPTY);
+            return true;
+        }
+        bool visit(LSLTypecastExpression* expr) override
+        {
+            if (expr->getIType() == LST_LIST)
+            {
+                used.insert(CAST);
+            }
+            return true;
+        }
+        bool visit(LSLBinaryExpression* expr) override
+        {
+            const LSLOperator op    = expr->getOperation();
+            LSLExpression*    left  = expr->getLHS();
+            LSLExpression*    right = expr->getRHS();
+            if ((op == OP_PLUS || op == OP_ADD_ASSIGN) && expr->getIType() == LST_LIST && left && right)
+            {
+                used.insert(left->getIType() == LST_LIST ? APPEND | static_cast<U32>(right->getIType()) : PREPEND);
+            }
+            return true;
+        }
+
+    private:
+        enum : U32
+        {
+            LITERAL        = 1u << 8,
+            EMPTY          = 2u << 8,
+            GLOBAL_LITERAL = 3u << 8,
+            CAST           = 4u << 8,
+            PREPEND        = 5u << 8,
+            APPEND         = 6u << 8
+        };
+        bool mGlobal = false;
+    };
+
     // One run over a script: put in place what is to be, then the rounds,
     // then the printing, and what was printed checked. The functions it
-    // leaves standing into `standing`, where that is asked for.
-    ALLSLOptimizer::Result once(std::string_view source, const ALLSLOptimizer::Options& options, std::vector<Standing>* standing)
+    // leaves standing into `standing`, where that is asked for; a list's
+    // shapes made where `lists` says so.
+    ALLSLOptimizer::Result once(std::string_view source, const ALLSLOptimizer::Options& options, std::vector<Standing>* standing, bool lists = true)
     {
         using Result = ALLSLOptimizer::Result;
         Result result;
@@ -4585,11 +4681,39 @@ namespace
             }
         }
         // What is made for size alone, once nothing more will fold.
+        bool weighLists = false;
         if (options.constfold)
         {
-            Shapes shapes(ctx, report, options);
-            script->visit(&shapes);
+            Shapes values(ctx, report, options, Shapes::Stage::Values);
+            script->visit(&values);
             walks(1);
+            // A list's shapes on Mono, which references a list's helpers
+            // once for the whole script -- one to add a string, another to
+            // add an integer, one for a literal. At each place they are
+            // smaller (ALLSLCosts), which is all they could cost but for a
+            // helper nothing in the script called before: where they bring
+            // one in, and the places they save at are too few to pay for it
+            // at the most a helper costs, the script is weighed with them
+            // and without (below), and the smaller kept.
+            const bool  mono = lists && options.target == ALLSLOptimizer::Target::Mono;
+            ListHelpers had;
+            if (mono)
+            {
+                script->visit(&had);
+            }
+            if (lists)
+            {
+                Shapes shaped(ctx, report, options, Shapes::Stage::Lists);
+                script->visit(&shaped);
+                walks(1);
+                if (mono && shaped.changes)
+                {
+                    ListHelpers has;
+                    script->visit(&has);
+                    const ALLSLCosts& costs = ALLSLCosts::of(options.target);
+                    weighLists              = shaped.changes * costs.listShapeLeast <= had.freshIn(has) * costs.listHelperMost;
+                }
+            }
         }
         if (standing)
         {
@@ -4627,6 +4751,23 @@ namespace
         bringBack();
         result.sizeAfter = result.text.size();
         result.optimized = true;
+        if (weighLists)
+        {
+            // Made again without a list's shapes, both weighed, the smaller
+            // kept with its weight.
+            std::vector<Standing>  alone;
+            ALLSLOptimizer::Result plain = once(source, options, standing ? &alone : nullptr, false);
+            result.weight                = weigh(options.target, result.text);
+            plain.weight                 = weigh(options.target, plain.text);
+            if (plain.optimized && plain.weight.compiled && result.weight.compiled && plain.weight.total <= result.weight.total)
+            {
+                if (standing)
+                {
+                    *standing = std::move(alone);
+                }
+                return plain;
+            }
+        }
         return result;
     }
 } // namespace
@@ -4647,15 +4788,17 @@ ALLSLOptimizer::Result ALLSLOptimizer::run(std::string_view source, const Option
     {
         return kept;
     }
-    kept.weight = weigh(options.target, kept.text);
+    if (!kept.weight.compiled)
+    {
+        kept.weight = weigh(options.target, kept.text);
+    }
     if (!kept.weight.compiled)
     {
         return kept;
     }
     // Each estimated from what it weighs as the run left it.
-    const ALLSLCosts&                               costs = ALLSLCosts::of(options.target);
-    Options                                         more  = options;
-    std::vector<std::pair<const Standing*, S32>>    chosen;
+    const ALLSLCosts&                            costs = ALLSLCosts::of(options.target);
+    std::vector<std::pair<const Standing*, S32>> estimated;
     for (const Standing& f : standing)
     {
         const auto        renamed = kept.renamed.find(f.name);
@@ -4669,50 +4812,73 @@ ALLSLOptimizer::Result ALLSLOptimizer::run(std::string_view source, const Option
             ALLSLCosts::Inlining shape = f.shape;
             shape.bytes                = static_cast<S32>(part.bytes);
             shape.name                 = shown.size();
-            if (const S32 estimate = costs.inlined(shape); estimate < 0)
-            {
-                more.inlineNames.push_back(f.name);
-                chosen.emplace_back(&f, estimate);
-            }
+            estimated.emplace_back(&f, costs.inlined(shape));
             break;
         }
     }
-    if (chosen.empty())
+    // Tried, and kept only where it is smaller as the compiler counts it:
+    // those estimated within what an estimate is good to -- a function near
+    // nothing either way is often worth it beside the others -- and those
+    // estimated to save alone, where they are fewer; the smallest kept.
+    constexpr S32         MARGIN = 16;
+    size_t                last   = 0;
+    std::optional<Result> best;
+    for (const S32 under : { MARGIN, 0 })
     {
-        return kept;
-    }
-    // Tried, and kept only where it is smaller as the compiler counts it.
-    std::vector<Standing> left;
-    Result                tried = once(source, more, &left);
-    // What the inliner could not take is the same text.
-    if (!tried.optimized || tried.text == kept.text)
-    {
-        return kept;
-    }
-    tried.weight = weigh(options.target, tried.text);
-    if (!tried.weight.compiled || tried.weight.total >= kept.weight.total)
-    {
-        return kept;
-    }
-    for (const auto& [f, estimate] : chosen)
-    {
-        if (std::any_of(left.begin(), left.end(), [f](const Standing& l) { return l.name == f->name; }) || !options.notes)
+        Options                  more = options;
+        std::vector<std::string> chosen;
+        for (const auto& [f, estimate] : estimated)
+        {
+            if (estimate < under)
+            {
+                more.inlineNames.push_back(f->name);
+                chosen.push_back(f->name);
+            }
+        }
+        if (chosen.empty() || chosen.size() == last)
         {
             continue;
         }
-        ALScriptProblem p;
-        p.severity  = ALScriptProblem::Severity::Note;
-        p.source    = ALScriptProblem::Source::Optimizer;
-        p.key       = "InlinerChoseFunction";
-        p.line      = f->line;
-        p.column    = f->column;
-        p.endLine   = f->endLine;
-        p.endColumn = f->endColumn;
-        p.args      = { f->name, std::to_string(f->shape.calls), std::to_string(-estimate), ALScriptWeight::nameOf(weightTarget(options.target)) };
-        p.message   = ALScriptProblem::fill("put the function [1] in place at its [2] calls: about [3] bytes less code on [4]", p.args);
-        tried.problems.push_back(std::move(p));
+        last = chosen.size();
+        std::vector<Standing> left;
+        Result                tried = once(source, more, &left);
+        // What the inliner could not take is the same text.
+        if (!tried.optimized || tried.text == kept.text)
+        {
+            continue;
+        }
+        if (!tried.weight.compiled)
+        {
+            tried.weight = weigh(options.target, tried.text);
+        }
+        if (!tried.weight.compiled || tried.weight.total >= (best ? best->weight.total : kept.weight.total))
+        {
+            continue;
+        }
+        const size_t saved = kept.weight.total - tried.weight.total;
+        for (const auto& [f, estimate] : estimated)
+        {
+            if (std::find(chosen.begin(), chosen.end(), f->name) == chosen.end() || !options.notes ||
+                std::any_of(left.begin(), left.end(), [f](const Standing& l) { return l.name == f->name; }))
+            {
+                continue;
+            }
+            ALScriptProblem p;
+            p.severity  = ALScriptProblem::Severity::Note;
+            p.source    = ALScriptProblem::Source::Optimizer;
+            p.key       = "InlinerChoseFunction";
+            p.line      = f->line;
+            p.column    = f->column;
+            p.endLine   = f->endLine;
+            p.endColumn = f->endColumn;
+            p.args      = { f->name, std::to_string(f->shape.calls), std::to_string(saved), ALScriptWeight::nameOf(weightTarget(options.target)) };
+            p.message   = ALScriptProblem::fill("put the function [1] in place at its [2] calls, of what put in place so made the code [3] bytes smaller on [4]",
+                                                p.args);
+            tried.problems.push_back(std::move(p));
+        }
+        best = std::move(tried);
     }
-    return tried;
+    return best ? std::move(*best) : std::move(kept);
 }
 
 // static
