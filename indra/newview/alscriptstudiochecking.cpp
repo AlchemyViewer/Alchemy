@@ -1330,6 +1330,7 @@ void ALScriptStudioChecking::askFixAll(Doc& doc, const FixPick& pick)
         mServices.setStatus(mServices.words("FixChecking", args));
         return;
     }
+    mWindow.settleProblems(doc);
     size_t                                left  = 0;
     const std::vector<const ALScriptFix*> fixes = doc.pickFixes(pick, &left);
     // What is not safe to make without a look, said to be left for one.
@@ -1375,6 +1376,7 @@ bool ALScriptStudioChecking::fixAll(Doc& doc, const FixPick& pick)
     // a save, into the source where it stands, whichever view is in front,
     // as the formatting and the trimming a save makes are; asked for,
     // with the source brought forward, to be seen.
+    mWindow.settleProblems(doc);
     ALCodeEditor&                                    source = pick.forSave ? *doc.editor : mWindow.editorInFront(doc);
     const std::vector<const ALScriptFix*>            fixes  = doc.pickFixes(pick);
     std::vector<std::pair<ALTextRange, std::string>> edits;
@@ -1397,8 +1399,9 @@ bool ALScriptStudioChecking::fixAll(Doc& doc, const FixPick& pick)
     return true;
 }
 
-void ALScriptStudioChecking::fixesOn(const Doc& doc, S32 line, std::vector<ALCodeEditor::Fix>& out) const
+void ALScriptStudioChecking::fixesOn(Doc& doc, S32 line, std::vector<ALCodeEditor::Fix>& out)
 {
+    mWindow.settleProblems(doc);
     // Only over the text they were made in: a text typed in since has other
     // places, and is checked again a moment later.
     const U32 now = doc.editor->document().version();

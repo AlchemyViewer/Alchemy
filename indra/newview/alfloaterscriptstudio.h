@@ -525,8 +525,13 @@ private:
     void scheduleAnalysis(Doc& doc, bool now = false) override { mChecking.schedule(doc, now); }
     bool lslFragment(const Doc& doc) const override { return mChecking.lslFragment(doc); }
     // The marks, the squiggles and the pane, from the compiler's problems
-    // and the analyzer's together.
-    void refreshProblems(Doc& doc) override;
+    // and the analyzer's together: asked for, and made once before the
+    // next frame is drawn however often they were asked for meanwhile --
+    // a check, its preprocessor run and its weighing each ask, one after
+    // another (docChanged). Made now, where they are waiting to be, for
+    // what is about to read them: a fix, the first error, the next problem.
+    void refreshProblems(Doc& doc) override { docChanged(doc, CHANGED_PROBLEMS); }
+    void settleProblems(Doc& doc) override;
     void runtimeCleared(Doc& doc) override;
     // The rest of what the Problems tab asks of the window
     // (ALScriptProblemsPane::Window).
@@ -913,6 +918,31 @@ private:
     ALTabStrip::Tab tabOf(const Doc& doc, const TabFacts& facts) const;
     std::vector<TabFacts>              mTabFacts;
     size_t                             mTabFactsActive = NONE;
+    // What changed of a tab that the window shows of it, made good once
+    // before the next frame is drawn, however often it was asked for in
+    // between (docChanged); and made good now, all of it or one tab's.
+    enum DocChange : U8
+    {
+        CHANGED_PROBLEMS = 1 << 0,
+        // A run-time error heard: its problems, made no more often than
+        // RUNTIME_EVERY while a looping script says one after another --
+        // the first at once, the rest together at the end of the turn.
+        CHANGED_RUNTIME = 1 << 1,
+    };
+    static constexpr F64 RUNTIME_EVERY = 0.25;
+    void                 docChanged(Doc& doc, U8 what);
+    void                 settleChanges(bool all_now = false);
+    void                 makeProblems(Doc& doc);
+    struct DocChanges
+    {
+        U8  what = 0;
+        // Not to be made before then.
+        F64 due  = 0.0;
+        // When its problems were last made, for a run-time error's turn.
+        F64 made = -RUNTIME_EVERY;
+    };
+    boost::unordered_flat_map<std::string, DocChanges, ll::string_hash, std::equal_to<>> mDocChanges;
+    bool                                                                                 mDocsChanged = false;
     // The docs by id, for the lookups every answer makes.
     boost::unordered_flat_map<std::string, size_t, ll::string_hash, std::equal_to<>> mByDocId;
     void                               reindexDocs();

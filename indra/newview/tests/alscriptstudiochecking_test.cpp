@@ -38,6 +38,7 @@
 #include "../test/lltut.h"
 
 #include <algorithm>
+#include <set>
 
 // The lints as a scripter chose them, and the skin's words for a key, are
 // the viewer's settings.
@@ -131,9 +132,19 @@ namespace
             told.push_back(kindOf(result.kind) + " " + doc.id + " " + at(pos));
             labels.push_back(result.hover.label);
         }
+        // Asked for, and made as the window makes them: with the next frame,
+        // or now for what is about to read them.
         void refreshProblems(Doc& doc) override
         {
             told.push_back("problems " + doc.id);
+            waiting.insert(doc.id);
+        }
+        void settleProblems(Doc& doc) override
+        {
+            if (!waiting.erase(doc.id))
+            {
+                return;
+            }
             doc.shown.clear();
             for (const ALScriptProblem& problem : doc.check.analysis)
             {
@@ -172,6 +183,8 @@ namespace
         std::string                         front;
         LLSD                                confirmed;
         std::function<void()>               confirm;
+        // The tabs whose problems are asked for and not made yet.
+        std::set<std::string>               waiting;
     };
 
     ALScriptProblem problem(S32 line, const std::string& message, ALScriptProblem::Severity severity = ALScriptProblem::Severity::Error)
@@ -798,9 +811,11 @@ namespace tut
         one.fixes                        = { fix("First", 0, 0, 7, "float") };
         checking.ask(doc, Kind::Check, ALTextPos(), ALTextPos());
         studio.asks[0].answered(answer(doc, { one, problem(2, "two") }));
+        ensure("asked for, made with the next frame", studio.waiting.count("a") == 1 && doc.shown.empty());
         std::vector<ALCodeEditor::Fix> fixes;
         checking.fixesOn(doc, 0, fixes);
-        ensure("one", fixes.size() == 1 && fixes[0].title == "First" && fixes[0].edits[0].second == "float");
+        ensure("made first: one", studio.waiting.empty() && fixes.size() == 1 && fixes[0].title == "First" &&
+               fixes[0].edits[0].second == "float");
         const Doc::Shown* shown = checking.shownOf(fixes[0].value);
         ensure("its problem", shown && shown->message == "one");
         fixes.clear();

@@ -80,8 +80,9 @@ public:
         virtual void holdPreview(Doc& doc) = 0;
         // The analyzers asked about the text, now or after a pause.
         virtual void scheduleAnalysis(Doc& doc, bool now) = 0;
-        // The Problems tab said again for a tab; brought into sight; and
-        // its first error chosen, of the checkers' alone or of all.
+        // The Problems tab said again for a tab, with the next frame;
+        // brought into sight; and its first error chosen, of the checkers'
+        // alone or of all, over what the tab says by then.
         virtual void refreshProblems(Doc& doc)            = 0;
         virtual void showProblems()                       = 0;
         virtual void selectFirstError(bool checkers_only) = 0;

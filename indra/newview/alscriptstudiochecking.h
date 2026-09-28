@@ -95,6 +95,10 @@ public:
         // and the weights the front tab's check weighed along with it; and
         // the targets a weighing is asked for.
         virtual void                                refreshProblems(Doc& doc)                                     = 0;
+        // Those asked for made now, where they wait to be made with the
+        // next frame: what is about to read them -- the fixes -- reads
+        // what the last answer said.
+        virtual void                                settleProblems(Doc& doc)                                      = 0;
         virtual void                                showOutline(Doc& doc)                                         = 0;
         virtual void                                weighed(Doc& doc, const ALScriptAnalysis::Result& result)     = 0;
         virtual std::vector<ALScriptWeight::Target> weightTargets(const Doc& doc)                                 = 0;
@@ -161,7 +165,7 @@ public:
     // The fixes of the problems on a line, as the editor lists them, each
     // with the value that finds it again; none where the text has moved on
     // since the check they were made in. And the problem a value is.
-    void              fixesOn(const Doc& doc, S32 line, std::vector<ALCodeEditor::Fix>& out) const;
+    void              fixesOn(Doc& doc, S32 line, std::vector<ALCodeEditor::Fix>& out);
     const Doc::Shown* shownOf(const LLSD& value) const;
 
     // A check's problems read back through the expansion it was made of to

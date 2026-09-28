@@ -120,7 +120,7 @@ public:
         // The preferred fix of every problem of a kind made -- of every
         // kind, for none -- once asked.
         virtual void fixAllOfKind(Doc& doc, const std::string& key) = 0;
-        // The tab's problems gathered again.
+        // The tab's problems gathered again, with the next frame.
         virtual void refreshProblems(Doc& doc) = 0;
         // What the script said as it ran let go of, and not listed again
         // when it is next opened.

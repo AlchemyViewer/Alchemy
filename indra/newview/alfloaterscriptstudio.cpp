@@ -1308,6 +1308,7 @@ void ALFloaterScriptStudio::showProblems()
 
 void ALFloaterScriptStudio::selectFirstError(bool checkers_only)
 {
+    settleChanges(true);
     mProblemsPane->selectFirstError(checkers_only);
 }
 
@@ -1363,6 +1364,8 @@ void ALFloaterScriptStudio::draw()
     mOutputPane->pump();
     // The fixes shown weighed, and the Weights tab kept filled.
     mWeighing.pump();
+    // What changed of the tabs this frame, shown once.
+    settleChanges();
     ALStudioFloater::draw();
 }
 
@@ -1520,6 +1523,12 @@ void ALFloaterScriptStudio::rekeyDoc(Doc& doc, const std::string& id)
             held = id;
         }
     };
+    if (const auto changes = mDocChanges.find(was); changes != mDocChanges.end())
+    {
+        const DocChanges moved = changes->second;
+        mDocChanges.erase(changes);
+        mDocChanges[id] = moved;
+    }
     mProblemsPane->rekey(was, id);
     mReferencesPane->rekey(was, id);
     mNavigation.rekey(was, id);
@@ -3212,7 +3221,69 @@ void ALFloaterScriptStudio::confirmFixAll(const LLSD& args, std::function<void()
     });
 }
 
-void ALFloaterScriptStudio::refreshProblems(Doc& doc)
+void ALFloaterScriptStudio::docChanged(Doc& doc, U8 what)
+{
+    DocChanges& changes = mDocChanges[doc.id];
+    const F64   now     = LLTimer::getTotalSeconds();
+    // Due with the next frame; a run-time error alone, once the last one
+    // shown has had its turn.
+    const F64   due     = (what & ~CHANGED_RUNTIME) ? now : llmax(now, changes.made + RUNTIME_EVERY);
+    changes.due         = changes.what ? llmin(changes.due, due) : due;
+    changes.what |= what;
+    mDocsChanged = true;
+}
+
+void ALFloaterScriptStudio::settleChanges(bool all_now)
+{
+    if (!mDocsChanged)
+    {
+        return;
+    }
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
+    // Those due taken first, and made after: making them may ask for more,
+    // which waits for the next frame.
+    const F64                now = LLTimer::getTotalSeconds();
+    std::vector<std::string> due;
+    mDocsChanged = false;
+    for (auto it = mDocChanges.begin(); it != mDocChanges.end();)
+    {
+        if (indexOf(it->first) == NONE)
+        {
+            it = mDocChanges.erase(it);
+            continue;
+        }
+        DocChanges& changes = it->second;
+        if (changes.what && (all_now || changes.due <= now))
+        {
+            changes.what = 0;
+            changes.made = now;
+            due.push_back(it->first);
+        }
+        mDocsChanged = mDocsChanged || changes.what != 0;
+        ++it;
+    }
+    for (const std::string& id : due)
+    {
+        if (Doc* doc = findDoc(id))
+        {
+            makeProblems(*doc);
+        }
+    }
+}
+
+void ALFloaterScriptStudio::settleProblems(Doc& doc)
+{
+    const auto found = mDocChanges.find(doc.id);
+    if (found == mDocChanges.end() || !found->second.what)
+    {
+        return;
+    }
+    found->second.what = 0;
+    found->second.made = LLTimer::getTotalSeconds();
+    makeProblems(doc);
+}
+
+void ALFloaterScriptStudio::makeProblems(Doc& doc)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
     ALScriptProblemsPane::Making making;
@@ -3342,6 +3413,7 @@ void ALFloaterScriptStudio::goToProblemAt(Doc& doc, const ALTextPos& to)
 
 bool ALFloaterScriptStudio::goToProblemNumber(Doc& doc, S32 number)
 {
+    settleProblems(doc);
     const std::vector<ALTextPos> places = problemPlaces(doc);
     if (places.empty())
     {
@@ -3362,6 +3434,7 @@ bool ALFloaterScriptStudio::goToProblemNumber(Doc& doc, S32 number)
 
 void ALFloaterScriptStudio::goToProblem(Doc& doc, S32 direction)
 {
+    settleProblems(doc);
     const std::vector<ALTextPos> places = problemPlaces(doc);
     if (places.empty())
     {
@@ -6455,7 +6528,7 @@ void ALFloaterScriptStudio::runtimeEvent(const ALScriptWorkspace::RuntimeEvent& 
     {
         Doc& doc = *mDocs[open];
         doc.heardRuntime(runtimeProblemOf(event), holdsRuntime(doc));
-        refreshProblems(doc);
+        docChanged(doc, CHANGED_RUNTIME);
     }
 }
 
@@ -6935,6 +7008,7 @@ void ALFloaterScriptStudio::letGoOf(size_t index, bool keep)
             ALScriptAnalysis::instance().forget(doc.id);
         }
         mProblemsPane->closed(doc.id);
+        mDocChanges.erase(doc.id);
         if (doc.id == mReferencesPane->found().from)
         {
             // Its own places cannot be gone to with it closed.
