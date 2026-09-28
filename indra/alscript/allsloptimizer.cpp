@@ -36,6 +36,7 @@
 #include "allsltraits.h"
 #include "allslvalues.h"
 #include "llmath.h"
+#include "llmd5.h"
 #include "llstl.h"
 #include "llquaternion.h"
 #include "v3math.h"
@@ -1674,6 +1675,108 @@ namespace
                       return nullptr;
                   }
                   return listOf(c, out);
+              } },
+            { "llAcos",
+              [](Ctx& c, const Args& a) -> LSLConstant* {
+                  double v;
+                  return argFloat(a, 0, v) && std::fabs(v) <= 1.0 ? c.number(std::acos(v)) : nullptr;
+              } },
+            { "llAsin",
+              [](Ctx& c, const Args& a) -> LSLConstant* {
+                  double v;
+                  return argFloat(a, 0, v) && std::fabs(v) <= 1.0 ? c.number(std::asin(v)) : nullptr;
+              } },
+            { "llRound",
+              [](Ctx& c, const Args& a) -> LSLConstant* {
+                  double v;
+                  if (!argFloat(a, 0, v)) return nullptr;
+                  // LSO adds the half in single precision, Mono in double:
+                  // folded only where the two come to the same.
+                  double rounded = std::floor(v + 0.5);
+                  if (c.target != ALLSLOptimizer::Target::Luau)
+                  {
+                      const float f = static_cast<float>(v);
+                      rounded       = std::floor(static_cast<double>(f) + 0.5);
+                      if (static_cast<double>(std::floor(f + 0.5f)) != rounded) return nullptr;
+                  }
+                  return std::fabs(rounded) < 2147483647.0 ? c.integer(static_cast<int>(rounded)) : nullptr;
+              } },
+            { "llDumpList2String",
+              [](Ctx& c, const Args& a) -> LSLConstant* {
+                  LSLListConstant* l;
+                  std::string      between;
+                  if (!argList(a, 0, l) || !argString(a, 1, between) || !ascii(between.c_str())) return nullptr;
+                  std::string out;
+                  bool        first = true;
+                  for (LSLConstant* item : elements(l))
+                  {
+                      std::string text;
+                      if (!elementText(item, text)) return nullptr;
+                      out += (first ? "" : between) + text;
+                      first = false;
+                  }
+                  return c.string(out);
+              } },
+            { "llListFindList",
+              [](Ctx& c, const Args& a) -> LSLConstant* {
+                  LSLListConstant* in;
+                  LSLListConstant* sought;
+                  // An empty list to find is found where LSO and Mono
+                  // disagree: not folded.
+                  if (!argList(a, 0, in) || !argList(a, 1, sought)) return nullptr;
+                  const std::vector<LSLConstant*> hay  = elements(in);
+                  const std::vector<LSLConstant*> find = elements(sought);
+                  if (find.empty()) return nullptr;
+                  // The same type and the same value.
+                  const auto same = [](LSLConstant* x, LSLConstant* y) {
+                      if (x->getNodeSubType() != y->getNodeSubType()) return false;
+                      switch (x->getNodeSubType())
+                      {
+                          case NODE_INTEGER_CONSTANT:
+                              return static_cast<LSLIntegerConstant*>(x)->getValue() == static_cast<LSLIntegerConstant*>(y)->getValue();
+                          case NODE_FLOAT_CONSTANT:
+                              return static_cast<LSLFloatConstant*>(x)->getValue() == static_cast<LSLFloatConstant*>(y)->getValue();
+                          case NODE_STRING_CONSTANT:
+                          case NODE_KEY_CONSTANT:
+                              return !strcmp(static_cast<LSLStringConstant*>(x)->getValue(), static_cast<LSLStringConstant*>(y)->getValue());
+                          case NODE_VECTOR_CONSTANT:
+                          {
+                              const Vector3* p = static_cast<LSLVectorConstant*>(x)->getValue();
+                              const Vector3* q = static_cast<LSLVectorConstant*>(y)->getValue();
+                              return p->x == q->x && p->y == q->y && p->z == q->z;
+                          }
+                          case NODE_QUATERNION_CONSTANT:
+                          {
+                              const Quaternion* p = static_cast<LSLQuaternionConstant*>(x)->getValue();
+                              const Quaternion* q = static_cast<LSLQuaternionConstant*>(y)->getValue();
+                              return p->x == q->x && p->y == q->y && p->z == q->z && p->s == q->s;
+                          }
+                          default:
+                              return false;
+                      }
+                  };
+                  for (size_t i = 0; i + find.size() <= hay.size(); ++i)
+                  {
+                      bool all = true;
+                      for (size_t j = 0; j < find.size() && all; ++j)
+                      {
+                          all = same(hay[i + j], find[j]);
+                      }
+                      if (all) return c.integer(static_cast<int>(i));
+                  }
+                  return c.integer(-1);
+              } },
+            { "llMD5String",
+              [](Ctx& c, const Args& a) -> LSLConstant* {
+                  std::string text;
+                  int         nonce;
+                  if (!argString(a, 0, text) || !argInt(a, 1, nonce)) return nullptr;
+                  LLMD5 md5;
+                  md5.update(text + ":" + std::to_string(nonce));
+                  md5.finalize();
+                  char hex[33];
+                  md5.hex_digest(hex);
+                  return c.string(hex);
               } },
             { "llList2CSV",
               [](Ctx& c, const Args& a) -> LSLConstant* {

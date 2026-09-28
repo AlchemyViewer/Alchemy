@@ -1781,4 +1781,33 @@ namespace tut
             ensure("what was written compiles: " + p.message + "\n" + r.text, p.severity != ALScriptProblem::Severity::Error);
         }
     }
+
+    template<> template<>
+    void allsloptimizer_object::test<47>()
+    {
+        set_test_name("more of the library folded where its answer is known: llRound, llAcos, llAsin, llDumpList2String, llListFindList, llMD5String");
+        const std::string source = wrap("",
+                                        "        llOwnerSay((string)[llRound(2.5), llRound(-2.5), llRound(0.49999997), llAcos(1.0), llAsin(2.0)]);\n"
+                                        "        llOwnerSay(llDumpList2String([1, 2.5, \"a\"], \"-\"));\n"
+                                        "        llOwnerSay((string)[llListFindList([1, \"a\", 2], [\"a\", 2]), llListFindList([1, 2], [3]),\n"
+                                        "                            llListFindList([1, 2], []), llListFindList([\"1\"], [1])]);\n"
+                                        "        llOwnerSay(llMD5String(\"Hello, Avatar!\", 0));\n");
+        ALLSLOptimizer::Options o = options();
+        o.target                  = ALLSLOptimizer::Target::LSO;
+        const ALLSLOptimizer::Result r = ALLSLOptimizer::run(source, o);
+        ensure("optimized: " + notes(r), r.optimized);
+        const auto has = [&r](const std::string& what) { return r.text.find(what) != std::string::npos; };
+        ensure("llRound half up: " + r.text, !has("llRound(2.5)") && !has("llRound(-2.5)"));
+        ensure("llRound where single and double would differ, left", has("llRound("));
+        ensure("llAcos folded, llAsin out of its range left", !has("llAcos") && has("llAsin(2.0)"));
+        ensure("a dump folded", has("\"1-2.500000-a\""));
+        ensure("a find folded, and one not found", !has("llListFindList([1, \"a\", 2]") && !has("[3])"));
+        ensure("an empty list to find left, and a string no integer", has("llListFindList((list)1 + 2, [])") || has("llListFindList([1, 2], [])"));
+        ensure("the hash", has("\"112abd47ceaae1c05a826828650434a6\""));
+        ALLSLService service;
+        for (const ALScriptProblem& p : service.check(r.text, false))
+        {
+            ensure("what was written compiles: " + p.message + "\n" + r.text, p.severity != ALScriptProblem::Severity::Error);
+        }
+    }
 } // namespace tut
