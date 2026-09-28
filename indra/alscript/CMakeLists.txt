@@ -14,6 +14,7 @@ target_sources(
     alincludeidentity.cpp
     alincludesearch.cpp
     almodulelook.cpp
+    allslcosts.cpp
     allsleffects.cpp
     allslinliner.cpp
     almessagemap.cpp
@@ -49,6 +50,7 @@ target_sources(
         alincludeidentity.h
         alincludesearch.h
         almodulelook.h
+        allslcosts.h
         allsleffects.h
         allslinliner.h
         almessagemap.h
@@ -154,6 +156,14 @@ if(AL_BUILD_TESTS)
     allsleffects
     PROJECT alscript
     LIBRARIES alscript llcommon ll::tailslide
+    DEFINES ${definitions_defines}
+  )
+  # What LSL forms cost on each target: snippet pairs compiled by
+  # Tailslide, against what the optimizer takes them to cost.
+  al_add_test(
+    allslcosts
+    PROJECT alscript
+    LIBRARIES alscript llcommon
     DEFINES ${definitions_defines}
   )
   # The optimizer's golden files under tests/optimizer/, checked with the
