@@ -48,6 +48,21 @@ const std::string& rlvGetAnonym(const LLAvatarName& av_name)
     return gCodeTestAnonName;
 }
 
+namespace ll_test
+{
+    // The colours the view works out for a row's glyphs, as it draws them.
+    struct TextViewProbe
+    {
+        static std::vector<LLColor4U> colours(ALTextView& view, S32 line, const ALTextLayout::Row& row)
+        {
+            const ALTextLayout::Line& laid = view.layout().line(line);
+            view.colorRow(line, laid, row, 1.f);
+            view.tintRow(line, laid, row, 1.f, view.mColorScratch);
+            return view.mColorScratch;
+        }
+    };
+}
+
 namespace tut
 {
     struct alcodeeditor_data
@@ -2404,4 +2419,100 @@ namespace tut
         e.supplyHover(asked[1], std::string());
         ensure("the analyzer saying nothing: the definitions'", e.cardShown() && e.card()->text() == "the definitions on value");
     }
+    template<> template<>
+    void alcodeeditor_object::test<69>()
+    {
+        set_test_name("a row's colours are the whole line's, however much of it is drawn: wrapped, or cut down to what is in sight");
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        // A long line with brackets nested in code, in a string and in a
+        // comment, and a name lit by the analyzer wherever it is written:
+        // in code it takes the analyzer's colour, in the string and the
+        // comment it keeps its own.
+        std::string text;
+        while (text.size() < 3000)
+        {
+            text += "x = f(g(x, [x]), \"(x)\") + ";
+        }
+        text += "/* (x) */";
+        ALCodeEditor::Params p(LLUICtrlFactory::getDefaultParams<ALCodeEditor>());
+        p.name            = "editor";
+        p.rect            = LLRect(0, 200, 400, 0);
+        p.default_text    = text;
+        p.syntax          = "lsl";
+        p.bracket_color_1 = LLUIColor(LLColor4::red);
+        p.bracket_color_2 = LLUIColor(LLColor4::green);
+        p.bracket_color_3 = LLUIColor(LLColor4::blue);
+        editor            = LLUICtrlFactory::create<ALCodeEditor>(p);
+        editor->setFont(LLFontGL::getFontMonospace());
+        std::vector<ALCodeEditor::SemanticToken> lit;
+        for (size_t at = text.find('x'); at != std::string::npos; at = text.find('x', at + 1))
+        {
+            ALCodeEditor::SemanticToken token;
+            token.range = ALTextRange(ALTextPos(0, static_cast<S32>(at)), ALTextPos(0, static_cast<S32>(at) + 1));
+            token.kind  = ALSyntaxKind::Constant;
+            lit.push_back(token);
+        }
+        editor->setSemanticTokens(std::move(lit));
+
+        const auto whole_of = [&]() {
+            const ALTextLayout::Line& laid = editor->layout().line(0);
+            ALTextLayout::Row         whole;
+            whole.glyphBegin = 0;
+            whole.glyphEnd   = laid.glyphs.size();
+            whole.begin      = 0;
+            whole.end        = editor->document().lineLength(0);
+            return ll_test::TextViewProbe::colours(*editor, 0, whole);
+        };
+        const auto same = [&](const std::string& what, const std::vector<LLColor4U>& all, const ALTextLayout::Row& row) {
+            const std::vector<LLColor4U> colours = ll_test::TextViewProbe::colours(*editor, 0, row);
+            ensure_equals(what + ": as many", colours.size(), row.glyphEnd - row.glyphBegin);
+            for (size_t k = 0; k < colours.size(); ++k)
+            {
+                ensure(what + ": glyph " + std::to_string(row.glyphBegin + k), colours[k] == all[row.glyphBegin + k]);
+            }
+        };
+
+        const std::vector<LLColor4U> all = whole_of();
+        // What the line is coloured with: a bracket at each depth, the
+        // analyzer's colour in code, and the grammar's in the string.
+        const S32 first_open = static_cast<S32>(text.find('('));
+        const S32 in_string  = static_cast<S32>(text.find("(x)") + 1);
+        ensure("the outer bracket in the first colour", all[static_cast<size_t>(first_open)] == LLColor4U(LLColor4::red));
+        ensure("the inner one in the second", all[static_cast<size_t>(first_open) + 2] == LLColor4U(LLColor4::green));
+        ensure("a name in code in the analyzer's colour", all[0] == LLColor4U(editor->colorForKind(ALSyntaxKind::Constant)));
+        ensure("the name in the string in the string's", all[static_cast<size_t>(in_string)] == all[static_cast<size_t>(in_string) - 1]);
+
+        editor->setWordWrap(true);
+        const ALTextLayout::Line& wrapped = editor->layout().line(0);
+        ensure("wrapped into rows", wrapped.rows.size() > 10);
+        for (size_t r = 0; r < wrapped.rows.size(); ++r)
+        {
+            same("wrapped row " + std::to_string(r), all, wrapped.rows[r]);
+        }
+
+        editor->setWordWrap(false);
+        const ALTextLayout::Line& one = editor->layout().line(0);
+        for (F32 from = 0.f; from < one.width; from += 1500.f)
+        {
+            const ALTextLayout::Row seen = ALTextLayout::rowWithin(one, one.rows[0], from, from + 400.f);
+            same("in sight from " + std::to_string(from), all, seen);
+        }
+
+        // An opener typed at the start: every bracket after it one deeper,
+        // in the rows drawn as in the whole line.
+        editor->setCaret(ALTextPos(0, 0));
+        editor->insertText("(");
+        const std::vector<LLColor4U> deeper = whole_of();
+        ensure("the outer bracket one deeper", deeper[static_cast<size_t>(first_open) + 1] == LLColor4U(LLColor4::green));
+        editor->setWordWrap(true);
+        const ALTextLayout::Line& again = editor->layout().line(0);
+        for (size_t r = 0; r < again.rows.size(); ++r)
+        {
+            same("wrapped row " + std::to_string(r) + " after the opener", deeper, again.rows[r]);
+        }
+    }
 }
+

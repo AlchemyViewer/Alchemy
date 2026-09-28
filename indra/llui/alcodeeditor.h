@@ -856,6 +856,16 @@ private:
     bool      mBracketColorsSet    = false;
     // Where the brackets pair up, and how deep each line starts.
     ALBracketIndex   mBracketIndex;
+    // The depth at each bracket of the last line drawn, by column, for the
+    // rest of its rows: under the text and the grammar they were found in.
+    struct BracketDepths
+    {
+        S32                              line    = -1;
+        U32                              version = 0;
+        const void*                      grammar = nullptr;
+        std::vector<std::pair<S32, S32>> at;
+    };
+    BracketDepths    mBracketDepths;
     // Whether the name under the caret is to be lit, since when it is due,
     // and the lines it was lit over.
     bool         mLightsOccurrences = true;

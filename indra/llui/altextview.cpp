@@ -3745,7 +3745,10 @@ void ALTextView::colorRow(S32 line, const ALTextLayout::Line& laid, const ALText
     mColorScratch.resize(count);
     const LLColor4                    base   = textColor() % alpha;
     const std::vector<ALSyntaxToken>& tokens = mHighlighter.tokens(line);
-    size_t                            t      = 0;
+    // From the first token that reaches the row, where the glyphs go
+    // forward through the line: a long line wraps into many rows.
+    const auto ends_before = [&](const ALSyntaxToken& token) { return token.end <= row.begin; };
+    size_t     t = laid.ordered ? static_cast<size_t>(std::partition_point(tokens.begin(), tokens.end(), ends_before) - tokens.begin()) : 0;
     for (size_t k = 0; k < count; ++k)
     {
         const S32 cluster = laid.glyphs[row.glyphBegin + k].cluster;
@@ -3804,6 +3807,14 @@ void ALTextView::colorRow(S32 line, const ALTextLayout::Line& laid, const ALText
             }
         }
     }
+}
+
+ALTextLayout::Row ALTextView::rowInSight(const ALTextLayout::Line& laid, const ALTextLayout::Row& row, const LLRect& text) const
+{
+    // A glyph may reach past its advance -- an italic's overhang, a wide
+    // mark -- so those just past the text's edges are drawn as well.
+    constexpr F32 OVERHANG = 16.f;
+    return ALTextLayout::rowWithin(laid, row, mScrollX - OVERHANG, mScrollX + static_cast<F32>(text.getWidth()) + OVERHANG);
 }
 
 void ALTextView::drawSquiggle(F32 x0, F32 x1, S32 y, const LLColor4& color, const LLRect& clip)
@@ -3886,7 +3897,8 @@ void ALTextView::drawLayers(S32 line, const ALTextLayout::Line& laid, S32 r, con
     // view put there.
     if (!mAtoms.empty())
     {
-        for (size_t k = row.glyphBegin; k < row.glyphEnd; ++k)
+        const ALTextLayout::Row seen = rowInSight(laid, row, text);
+        for (size_t k = seen.glyphBegin; k < seen.glyphEnd; ++k)
         {
             const ALTextLayout::Glyph& glyph = laid.glyphs[k];
             if (!isAtomId(glyph.substitution))
@@ -4040,13 +4052,14 @@ void ALTextView::drawRows(const LLRect& text)
                 }
             }
 
-            // The glyphs.
-            const size_t glyph_count = row.glyphEnd - row.glyphBegin;
+            // The glyphs, as many as are in sight.
+            const ALTextLayout::Row seen        = rowInSight(laid, row, text);
+            const size_t            glyph_count = seen.glyphEnd - seen.glyphBegin;
             if (glyph_count)
             {
-                colorRow(line, laid, row, alpha);
-                tintRow(line, laid, row, alpha, mColorScratch);
-                mFont->renderGlyphs(&laid.placed[row.glyphBegin], mColorScratch.data(), glyph_count,
+                colorRow(line, laid, seen, alpha);
+                tintRow(line, laid, seen, alpha, mColorScratch);
+                mFont->renderGlyphs(&laid.placed[seen.glyphBegin], mColorScratch.data(), glyph_count,
                                     left - row.xStart, static_cast<F32>(screen_top - row.ascent));
             }
 

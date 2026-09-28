@@ -960,18 +960,37 @@ void ALCodeEditor::tintRow(S32 line, const ALTextLayout::Line& laid, const ALTex
     // one is not that name.
     if (!mSemantics.empty())
     {
-        auto first = mSemantics.onLine(line).first;
+        const auto on    = mSemantics.onLine(line);
+        auto       first = on.first;
         if (first != mSemantics.end() && first->range.begin.line <= line)
         {
+            // Where the glyphs go forward through the line, from the first
+            // token that reaches the row, and the grammar's tokens walked
+            // alongside; else from the line's first, and the grammar asked
+            // afresh for each glyph.
             const std::vector<ALSyntaxToken>& grammar = highlighter().tokens(line);
-            auto                              literal = [&](S32 cluster) {
-                for (const ALSyntaxToken& g : grammar)
+            size_t                            g_at    = 0;
+            if (laid.ordered)
+            {
+                const ALTextPos row_start(line, row.begin);
+                first = std::partition_point(first, on.second, [&](const SemanticToken& t) { return t.range.end <= row_start; });
+                g_at  = static_cast<size_t>(std::partition_point(grammar.begin(), grammar.end(), [&](const ALSyntaxToken& g) { return g.end <= row.begin; }) -
+                                           grammar.begin());
+            }
+            auto literal = [&](S32 cluster) {
+                if (!laid.ordered)
                 {
-                    if (g.begin <= cluster && cluster < g.end)
-                    {
-                        return g.kind == ALSyntaxKind::Comment || g.kind == ALSyntaxKind::DocComment || g.kind == ALSyntaxKind::String
-                               || g.kind == ALSyntaxKind::Escape || g.kind == ALSyntaxKind::Preprocessor;
-                    }
+                    g_at = 0;
+                }
+                while (g_at < grammar.size() && grammar[g_at].end <= cluster)
+                {
+                    ++g_at;
+                }
+                if (g_at < grammar.size() && grammar[g_at].begin <= cluster)
+                {
+                    const ALSyntaxKind kind = grammar[g_at].kind;
+                    return kind == ALSyntaxKind::Comment || kind == ALSyntaxKind::DocComment || kind == ALSyntaxKind::String || kind == ALSyntaxKind::Escape ||
+                           kind == ALSyntaxKind::Preprocessor;
                 }
                 return false;
             };
@@ -1004,28 +1023,38 @@ void ALCodeEditor::tintRow(S32 line, const ALTextLayout::Line& laid, const ALTex
     {
         return;
     }
-    // The depth at each bracket of the line that is code, then the row's
-    // glyphs that are brackets in their depth's colour.
-    S32                              depth = mBracketIndex.depthBefore(line);
-    std::vector<std::pair<S32, S32>> at;
-    for (const auto& [column, c] : mBracketIndex.bracketsOn(line))
+    // The depth at each bracket of the line that is code, worked out once
+    // for the line's rows; then the row's glyphs that are brackets in their
+    // depth's colour.
+    BracketDepths&    depths  = mBracketDepths;
+    const void* const grammar = highlighter().grammar().get();
+    if (depths.line != line || depths.version != document().version() || depths.grammar != grammar)
     {
-        if (c == '(' || c == '[' || c == '{')
+        depths.line    = line;
+        depths.version = document().version();
+        depths.grammar = grammar;
+        depths.at.clear();
+        S32 depth = mBracketIndex.depthBefore(line);
+        for (const auto& [column, c] : mBracketIndex.bracketsOn(line))
         {
-            at.emplace_back(column, depth);
-            ++depth;
-        }
-        else
-        {
-            depth = llmax(0, depth - 1);
-            at.emplace_back(column, depth);
+            if (c == '(' || c == '[' || c == '{')
+            {
+                depths.at.emplace_back(column, depth);
+                ++depth;
+            }
+            else
+            {
+                depth = llmax(0, depth - 1);
+                depths.at.emplace_back(column, depth);
+            }
         }
     }
+    const std::vector<std::pair<S32, S32>>& at = depths.at;
     if (at.empty())
     {
         return;
     }
-    size_t next = 0;
+    size_t next = laid.ordered ? static_cast<size_t>(std::lower_bound(at.begin(), at.end(), std::make_pair(row.begin, S32_MIN)) - at.begin()) : 0;
     for (size_t k = 0; k < colors.size(); ++k)
     {
         const S32 cluster = laid.glyphs[row.glyphBegin + k].cluster;
@@ -1564,10 +1593,11 @@ void ALCodeEditor::drawWhitespace(S32 line, S32 r, const LLRect& text, S32 scree
     {
         return;
     }
-    const ALTextLayout::Row& row = laid.rows[static_cast<size_t>(r)];
-    // Only what this row covers: a line wrapped into many rows would
-    // otherwise be walked once for each of them.
-    std::vector<Blank> blanks = blanksOn(line, row.begin, row.end);
+    // Only what this row covers, and of that what is in sight: a line
+    // wrapped into many rows, or scrolled across, would otherwise be
+    // walked whole for each.
+    const ALTextLayout::Row row    = rowInSight(laid, laid.rows[static_cast<size_t>(r)], text);
+    std::vector<Blank>      blanks = blanksOn(line, row.begin, row.end);
     if (blanks.empty())
     {
         return;
@@ -1705,8 +1735,8 @@ void ALCodeEditor::drawRowExtras(S32 line, S32 row, const LLRect& text, S32 scre
         const ALTextLayout::Line& laid = layout().line(line);
         if (row >= 0 && row < static_cast<S32>(laid.rows.size()))
         {
-            const ALTextLayout::Row& r    = laid.rows[static_cast<size_t>(row)];
-            const LLFontGL*          font = getFont();
+            const ALTextLayout::Row r    = rowInSight(laid, laid.rows[static_cast<size_t>(row)], text);
+            const LLFontGL*         font = getFont();
             for (size_t k = r.glyphBegin; k < r.glyphEnd && font; ++k)
             {
                 const ALTextLayout::Glyph& glyph = laid.glyphs[k];

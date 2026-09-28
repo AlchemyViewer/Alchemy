@@ -82,6 +82,11 @@ class LLContextMenu;
 // and offers the dictionary's suggestions on the right-click menu.
 class ALTextView;
 
+namespace ll_test
+{
+    struct TextViewProbe;
+}
+
 // A keymap with a mind of its own -- a vim mode -- told each key and each
 // character typed before the plain keymap and the text see them, keeping
 // whatever state it needs and working the view through what it exposes.
@@ -123,6 +128,10 @@ public:
 
 class ALTextView : public LLUICtrl, public LLEditMenuHandler, public LLSpellCheckMenuHandler, protected LLPreeditor
 {
+    // What a test asks of how a row is coloured, without that being any
+    // more of what the view offers.
+    friend struct ll_test::TextViewProbe;
+
 public:
     AL_VIEW_TYPE(ALTextView, LLUICtrl);
 
@@ -786,6 +795,9 @@ protected:
     // The x span of a range on a row, if it touches the row; a range past
     // the line's end reaches a little past the last glyph.
     bool spanOnRow(S32 line, S32 row, const ALTextRange& range, F32& x0, F32& x1);
+    // A row cut down to what of it is in sight across the text, scrolled as
+    // it is: all that a long line draws of itself.
+    ALTextLayout::Row rowInSight(const ALTextLayout::Line& laid, const ALTextLayout::Row& row, const LLRect& text) const;
     // A wavy line from x0 to x1 with its middle at y, as much of it as is
     // within `clip`'s sides.
     static void drawSquiggle(F32 x0, F32 x1, S32 y, const LLColor4& color, const LLRect& clip);
