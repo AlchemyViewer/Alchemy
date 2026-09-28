@@ -124,6 +124,8 @@ public:
     // As the region last said; nothing where it has not.
     std::optional<bool> running(const ALScriptRef& ref) const;
     void                running(const ALScriptRef& ref, bool running) { mRunning[{ ref.object, ref.item }] = running; }
+    // Every script's that is known, by prim and item.
+    const std::map<std::pair<LLUUID, LLUUID>, bool>& runningKnown() const { return mRunning; }
     // What was known of these prims' scripts let go of, for them to be asked
     // again.
     void forgetRunning(const std::vector<LLUUID>& prims);

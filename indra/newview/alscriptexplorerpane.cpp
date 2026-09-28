@@ -191,10 +191,11 @@ bool ALScriptExplorerPane::postBuild()
     // Put in the list with the frame, once for all that answered in it: a
     // refresh asks every script whether it runs, and a linkset's hundred
     // answers were a hundred lists.
-    mRunningConnection = ALScriptWorkspace::instance().onRunningState([this](const ALScriptWorkspace::RunningState& state) {
-        mModel.running(state.ref, state.running);
-        mStale = true;
-    });
+    mRunningConnection = ALScriptWorkspace::instance().onRunningState([this](const ALScriptWorkspace::RunningState&) { mStale = true; });
+    // What a prim holds, answered to whoever asked: the index is every
+    // window's.
+    mHeardConnection = ALScriptWorkspace::instance().contentsIndex().onHeard(
+        [this](const ALScriptWorkspace::Contents& contents) { contentsHeard(contents); });
     return true;
 }
 
@@ -317,26 +318,14 @@ void ALScriptExplorerPane::relist(bool refetch, bool from_region)
     fill();
     std::string filter = mFilter->getText();
     LLStringUtil::trim(filter);
-    // What each prim holds, asked where it is not known, where the object
-    // says it has changed since, or where a person asked -- not again for
-    // every prim at every tab opened or closed, nor for one already asked
-    // and not answered yet.
-    const std::vector<LLUUID> asking = mModel.toAsk(refetch, !filter.empty(), [](const LLUUID& prim) {
-        LLViewerObject* in_world = gObjectList.findObject(prim);
-        return in_world && !in_world->isInventoryDirty();
-    });
-    const LLHandle<LLPanel> handle = getHandle();
-    for (const LLUUID& prim : asking)
+    // What each prim listed holds, asked of the index, which asks where it
+    // does not know, where the object says it has changed since, or where
+    // a person asked -- not again for every prim at every tab opened or
+    // closed, nor for one already asked and not answered yet.
+    ALScriptContentsIndex& index = ALScriptWorkspace::instance().contentsIndex();
+    for (const LLUUID& prim : mModel.wanted(!filter.empty()))
     {
-        ALScriptWorkspace::instance().listContents(
-            prim,
-            [handle](const ALScriptWorkspace::Contents& contents) {
-                if (ALScriptExplorerPane* pane = ALViewType::as<ALScriptExplorerPane>(handle.get()))
-                {
-                    pane->contentsHeard(contents);
-                }
-            },
-            from_region || mModel.asksRegion(prim));
+        index.ask(prim, refetch, from_region || mModel.asksRegion(prim));
     }
     // Asked of the region until the second ask after a drop has gone.
     if (mRefetchAt == 0.0)
@@ -355,10 +344,6 @@ void ALScriptExplorerPane::contentsHeard(const ALScriptWorkspace::Contents& cont
     if (mModel.takePinsChanged())
     {
         mWindow->explorerPinsChanged();
-    }
-    for (const ALScriptRef& ref : heard.askRunning)
-    {
-        ALScriptWorkspace::instance().askRunning(ref);
     }
     mStale = true;
     for (Model::Opening& one : heard.opening)
@@ -1027,7 +1012,7 @@ void ALScriptExplorerPane::recompile(const std::vector<Choice>& rows)
     if (!prims.empty())
     {
         std::string                               error;
-        std::map<std::pair<LLUUID, LLUUID>, bool> running = mModel.runningKnown();
+        std::map<std::pair<LLUUID, LLUUID>, bool> running = ALScriptWorkspace::instance().contentsIndex().runningKnown();
         for (const ALScriptStudioDoc* doc : mServices->openDocs())
         {
             if (!doc->ref.inInventory() && doc->running >= 0)

@@ -63,7 +63,10 @@ namespace tut
 
         ll_test::HeadlessUI&          ui   = ll_test::HeadlessUI::get();
         ALScriptExplorerTree*         tree = nullptr;
-        Model                         model;
+        // What each prim holds, which the index is answered with on the spot.
+        std::map<LLUUID, ALScriptWorkspace::Contents> held;
+        ALScriptContentsIndex                         index{ fake() };
+        Model                                         model{ index };
         std::map<LLUUID, Model::Seen> world;
         std::vector<LLUUID>           selected;
         // What the tree told its owner of folders opened and folded.
@@ -72,6 +75,13 @@ namespace tut
         std::string state = "running";
 
         ~alscriptexplorertree_data() { delete tree; }
+
+        ALScriptContentsIndex::World fake()
+        {
+            ALScriptContentsIndex::World out;
+            out.ask = [this](const LLUUID& prim, bool, std::function<void(const ALScriptWorkspace::Contents&)> told) { told(held[prim]); };
+            return out;
+        }
 
         ALScriptExplorerTree& make()
         {
@@ -119,6 +129,8 @@ namespace tut
             {
                 contents.items.push_back({ id(n++), name, name.ends_with(".lsl"), false });
             }
+            held[prim] = contents;
+            index.ask(prim, true);
             model.contents(contents);
         }
 

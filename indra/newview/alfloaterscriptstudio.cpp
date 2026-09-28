@@ -3531,7 +3531,7 @@ std::vector<ALScriptLookup::Candidate> ALFloaterScriptStudio::candidates(const D
         }
         for (const ALScriptExplorerModel::Prim& prim : object.prims)
         {
-            for (const ALScriptWorkspace::Item& item : prim.items)
+            for (const ALScriptWorkspace::Item& item : mExplorerPane->model().items(prim.id))
             {
                 const ALScriptRef ref(prim.id, item.id);
                 if (item.script && item.lua == doc.language.lua && ref != doc.ref)
@@ -4206,7 +4206,7 @@ std::vector<ALQuickOpen::Candidate> ALFloaterScriptStudio::paletteScripts(std::v
     {
         for (const ALScriptExplorerModel::Prim& prim : object.prims)
         {
-            for (const ALScriptWorkspace::Item& item : prim.items)
+            for (const ALScriptWorkspace::Item& item : mExplorerPane->model().items(prim.id))
             {
                 const ALScriptRef ref(prim.id, item.id);
                 if (!listed.insert(ref.id()).second)
@@ -4794,7 +4794,7 @@ std::vector<ALScriptSearchPane::Window::Object> ALFloaterScriptStudio::objectsLi
         one.name = object.name;
         for (const ALScriptExplorerModel::Prim& prim : object.prims)
         {
-            for (const ALScriptWorkspace::Item& item : prim.items)
+            for (const ALScriptWorkspace::Item& item : mExplorerPane->model().items(prim.id))
             {
                 one.items.emplace_back(prim.id, item.id);
             }
@@ -5625,17 +5625,11 @@ ALScriptStudioOrphans::Reach ALFloaterScriptStudio::reach(const Doc& doc)
     reach.objectThere      = object && !object->isDead();
     // Whether its prim holds the item, where the region has said what the
     // prim holds.
-    for (const ALScriptExplorerModel::Object& one : mExplorerPane->model().objects())
+    const ALScriptContentsIndex& index = ALScriptWorkspace::instance().contentsIndex();
+    if (index.fetched(doc.ref.object))
     {
-        for (const ALScriptExplorerModel::Prim& prim : one.prims)
-        {
-            if (prim.id == doc.ref.object && prim.fetched)
-            {
-                const auto held = [&doc](const ALScriptWorkspace::Item& item) { return item.id == doc.ref.item; };
-                reach.heldByPrim = std::any_of(prim.items.begin(), prim.items.end(), held);
-                return reach;
-            }
-        }
+        const std::vector<ALScriptWorkspace::Item>& items = index.items(doc.ref.object);
+        reach.heldByPrim = std::any_of(items.begin(), items.end(), [&doc](const ALScriptWorkspace::Item& item) { return item.id == doc.ref.item; });
     }
     return reach;
 }

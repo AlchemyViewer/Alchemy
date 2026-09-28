@@ -2508,6 +2508,7 @@ if(AL_BUILD_TESTS)
     UNIT
     PROJECT ${test_project}
     LIBRARIES llui alscript ${test_libs}
+    SOURCES alscriptcontentsindex.cpp
   )
 
   # The explorer's rows shown as the inventory's folder view, from the source
@@ -2517,7 +2518,7 @@ if(AL_BUILD_TESTS)
     UNIT
     PROJECT ${test_project}
     LIBRARIES llui alscript ${test_libs}
-    SOURCES alscriptexplorermodel.cpp
+    SOURCES alscriptexplorermodel.cpp alscriptcontentsindex.cpp
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
 
