@@ -1483,26 +1483,32 @@ ALFloaterScriptStudio::Doc* ALFloaterScriptStudio::active()
 
 size_t ALFloaterScriptStudio::indexOf(const ALScriptRef& ref) const
 {
-    for (size_t i = 0; i < mDocs.size(); ++i)
-    {
-        if (mDocs[i]->ref == ref && mDocs[i]->file.empty())
-        {
-            return i;
-        }
-    }
-    return NONE;
+    const auto found = mByRef.find(ref);
+    return found == mByRef.end() ? NONE : found->second;
 }
 
 void ALFloaterScriptStudio::reindexDocs()
 {
+    const boost::unordered_flat_map<ALScriptRef, size_t> was = std::move(mByRef);
     mByDocId.clear();
+    mByRef.clear();
     for (size_t i = 0; i < mDocs.size(); ++i)
     {
         mByDocId.emplace(mDocs[i]->id, i);
+        // A file on disk is no script in the world, whatever it holds.
+        if (mDocs[i]->file.empty())
+        {
+            mByRef.emplace(mDocs[i]->ref, i);
+        }
     }
-    // Output listening to the scripts open here: which those are has
-    // changed.
-    if (mOutputPane)
+    // Output listening to the scripts open here: where which those are has
+    // changed -- a tab opened or closed, not the strip reordered.
+    bool changed = was.size() != mByRef.size();
+    for (auto it = was.begin(); !changed && it != was.end(); ++it)
+    {
+        changed = !mByRef.contains(it->first);
+    }
+    if (changed && mOutputPane)
     {
         mOutputPane->openChanged();
     }

@@ -32,6 +32,7 @@
 #include "llsingleton.h"
 #include "lluuid.h"
 
+#include <boost/container_hash/hash.hpp>
 #include <boost/signals2.hpp>
 #include <boost/unordered/unordered_flat_map.hpp>
 
@@ -80,6 +81,13 @@ struct ALScriptRef
 
     friend bool operator==(const ALScriptRef& a, const ALScriptRef& b) { return a.object == b.object && a.item == b.item; }
     friend bool operator!=(const ALScriptRef& a, const ALScriptRef& b) { return !(a == b); }
+    // For a map by it.
+    friend size_t hash_value(const ALScriptRef& ref) noexcept
+    {
+        size_t seed = hash_value(ref.object);
+        boost::hash_combine(seed, hash_value(ref.item));
+        return seed;
+    }
 };
 
 // What a script is and what happens to it: its language and compile target

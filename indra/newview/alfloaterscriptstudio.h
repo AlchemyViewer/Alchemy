@@ -975,8 +975,12 @@ private:
     };
     boost::unordered_flat_map<std::string, DocChanges, ll::string_hash, std::equal_to<>> mDocChanges;
     bool                                                                                 mDocsChanged = false;
-    // The docs by id, for the lookups every answer makes.
+    // The docs by id, and the scripts' by what they are, for the lookups
+    // every answer makes; kept as tabs come and go, and Output's list of
+    // what the open scripts said filtered again only where which scripts
+    // are open changed.
     boost::unordered_flat_map<std::string, size_t, ll::string_hash, std::equal_to<>> mByDocId;
+    boost::unordered_flat_map<ALScriptRef, size_t>                                   mByRef;
     void                               reindexDocs();
     // A tab known by another id from here on -- a file saved under
     // another name: the index, its editors' names, and whatever holds it
