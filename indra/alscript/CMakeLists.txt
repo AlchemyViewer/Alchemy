@@ -26,6 +26,7 @@ target_sources(
     allslexports.cpp
     allslservice.cpp
     allsltraits.cpp
+    allslvalues.cpp
     alpreprocessor.cpp
     alscriptenvelope.cpp
     alscriptfixes.cpp
@@ -64,6 +65,7 @@ target_sources(
         allslexports.h
         allslservice.h
         allsltraits.h
+        allslvalues.h
         alpreprocessor.h
         alscriptengine.h
         alscriptenvelope.h
