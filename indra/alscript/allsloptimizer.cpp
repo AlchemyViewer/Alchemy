@@ -4008,9 +4008,13 @@ namespace
         std::string inlined;
         ALSourceMap inlinedMap;
         size_t      spent = 0;
-        if (options.inlining)
+        if (options.inlining || !options.constFunctions.empty())
         {
-            ALLSLInliner::Result put = ALLSLInliner::run(source, options.inlineNames, options.visitBudget);
+            ALLSLInliner::Asked asked;
+            asked.marked             = options.inlineNames;
+            asked.constant           = options.constFunctions;
+            asked.others             = options.inlining;
+            ALLSLInliner::Result put = ALLSLInliner::run(source, asked, options.visitBudget);
             // One budget for the two: what the inliner visited is spent.
             spent = put.visited;
             if (put.stoppedEarly)

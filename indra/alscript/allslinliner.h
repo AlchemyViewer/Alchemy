@@ -71,10 +71,26 @@ public:
         bool             stoppedEarly = false;
     };
 
+    // What a run is to put in place.
+    struct Asked
+    {
+        // Functions put in place wherever they are called: what the script
+        // marked `inline`.
+        std::vector<std::string> marked;
+        // Functions put in place where every argument a call passes is a
+        // constant, for the optimizer to fold the call to its answer: what
+        // the script declared `const`.
+        std::vector<std::string> constant;
+        // A function called from one place, and a small one returning an
+        // expression, put in place as well.
+        bool others = true;
+    };
+
     // Needs the builtins loaded through ALLSLService, as the optimizer
     // does; the source must parse, or it is returned as it is. The
     // functions named are put in place wherever they are called.
     // No more is visited than `budget`, which the optimizer's run after it
     // shares (ALLSLOptimizer::Options::visitBudget).
     static Result run(std::string_view source, const std::vector<std::string>& marked = {}, size_t budget = size_t(-1));
+    static Result run(std::string_view source, const Asked& asked, size_t budget = size_t(-1));
 };

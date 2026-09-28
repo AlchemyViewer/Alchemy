@@ -191,4 +191,30 @@ namespace tut
         ensure("the value in place: " + r.text, r.text.find("llRequestPermissions(llGetOwner(), 20);") != std::string::npos);
         ensure("and no global: " + r.text, r.text.find("FLAGS") == std::string::npos);
     }
+
+    template<> template<>
+    void allslconsts_object::test<6>()
+    {
+        set_test_name("with the optimizer on, a const function called with constants folds to its answer, and a call with anything else stays");
+        ensure("builtins: " + error, lslLoaded);
+        const std::string source = "const integer sq(integer x) { return x * x; }\n"
+                                   "const float deg(float d) { return d * DEG_TO_RAD; }\n"
+                                   "const integer clampi(integer v, integer lo, integer hi)\n{\n    if (v < lo)\n        return lo;\n"
+                                   "    if (v > hi)\n        return hi;\n    return v;\n}\n"
+                                   "default\n{\n    touch_start(integer n)\n    {\n"
+                                   "        llOwnerSay((string)[sq(3), deg(90), clampi(12, 0, 10), sq(n)]);\n    }\n}\n";
+        ALPreprocessor::Options o = ALPreprocessor::Options();
+        o.optimize                = true;
+        const ALPreprocessor::Result r = ALPreprocessor::run(source, o);
+        ensure("optimized: " + r.text, r.optimized);
+        ensure_equals("nothing wrong", said(source), std::string());
+        // The list a sum, as Mono has it smaller.
+        ensure("each worked out: " + r.text, r.text.find("(list)9 + 1.5707964 + 10 + sq(n)") != std::string::npos);
+        ensure("the functions no call is left to go: " + r.text, r.text.find("deg(") == std::string::npos && r.text.find("clampi(") == std::string::npos);
+        ensure("and the one a call is left to stays: " + r.text, r.text.find("integer sq(integer x)") != std::string::npos);
+
+        // With the optimizer off, a call is a call.
+        const ALPreprocessor::Result off = ALPreprocessor::run(source, ALPreprocessor::Options());
+        ensure("calls stay: " + off.text, off.text.find("sq(3), deg(90), clampi(12, 0, 10), sq(n)") != std::string::npos);
+    }
 }

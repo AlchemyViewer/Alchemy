@@ -1091,13 +1091,13 @@ namespace tut
         ensure("with room: not stopped", !whole.stoppedEarly);
         // Room for the inliner's first round and not much more: it stops,
         // and leaves the optimizer nothing.
-        const ALLSLInliner::Result once = ALLSLInliner::run(source, {}, size_t(-1));
+        const ALLSLInliner::Result once = ALLSLInliner::run(source, ALLSLInliner::Asked(), size_t(-1));
         ensure("the inliner visits", once.visited > 0);
         o.visitBudget = once.visited / 4;
         const ALLSLOptimizer::Result short_of = ALLSLOptimizer::run(source, o);
         ensure("the optimizer stopped for what the inliner spent", short_of.stoppedEarly);
         ensure("said", std::any_of(short_of.problems.begin(), short_of.problems.end(), [](const ALScriptProblem& p) { return p.key == "OptimizerStoppedEarly"; }));
-        const ALLSLInliner::Result cut = ALLSLInliner::run(source, {}, 1);
+        const ALLSLInliner::Result cut = ALLSLInliner::run(source, ALLSLInliner::Asked(), 1);
         ensure("the inliner's one round done, the next not begun", cut.inlined > 0 && (cut.stoppedEarly || cut.inlined == once.inlined));
     }
     template<> template<>

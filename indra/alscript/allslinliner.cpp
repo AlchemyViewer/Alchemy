@@ -1264,7 +1264,7 @@ namespace
     // references, and the inliner's own look through it.
     constexpr size_t WALKS_A_ROUND = 5;
 
-    S32 inlineRound(std::string& text, ALSourceMap& map, ALScriptProblems& notes, const std::vector<std::string>& marked, size_t& walked)
+    S32 inlineRound(std::string& text, ALSourceMap& map, ALScriptProblems& notes, const ALLSLInliner::Asked& asked, size_t& walked)
     {
         ScopedScriptParser parser(nullptr);
         LSLScript*         script = parser.parseLSLBytes(text.data(), static_cast<int>(text.size()));
@@ -1281,6 +1281,11 @@ namespace
         if (parser.logger.getErrors())
         {
             return 0;
+        }
+        // What is constant, for which calls of a const function go.
+        if (!asked.constant.empty())
+        {
+            script->propagateValues();
         }
         const Lines        lines = splitLines(text);
         const ALLSLEffects effects(script);
@@ -1432,8 +1437,8 @@ namespace
                     {
                         continue;
                     }
-                    const bool is_marked = std::find(marked.begin(), marked.end(), sym->getName()) != marked.end();
-                    const bool once      = calls[sym].size() == 1;
+                    const bool is_marked = std::find(asked.marked.begin(), asked.marked.end(), sym->getName()) != asked.marked.end();
+                    const bool once      = calls[sym].size() == 1 && asked.others;
                     if (!is_marked && !once)
                     {
                         continue;
@@ -1546,7 +1551,12 @@ namespace
                     continue;
                 }
             }
-            const bool   is_marked = std::find(marked.begin(), marked.end(), sym->getName()) != marked.end();
+            const bool is_marked = std::find(asked.marked.begin(), asked.marked.end(), sym->getName()) != asked.marked.end();
+            const bool is_const  = std::find(asked.constant.begin(), asked.constant.end(), sym->getName()) != asked.constant.end();
+            if (!asked.others && !is_marked && !is_const)
+            {
+                continue;
+            }
             const size_t count     = found->second.size();
             // Every call of it planned; the function goes when all of them
             // do. A plan that crosses another's edit waits for the next
@@ -1559,7 +1569,19 @@ namespace
                 const auto moreClash = [&](const Plan& p) {
                     return std::any_of(p.more.begin(), p.more.end(), [&](const Edit& e) { return clashes(e.begin, e.end); });
                 };
-                if (plan(lines, parser.context, effects, function, call, count == 1, is_marked, used, one) && !clashes(one.edit.begin, one.edit.end) &&
+                // A const function's call goes where it can be worked out:
+                // every argument a constant.
+                const bool worked = !is_marked && is_const && [call] {
+                    LSLASTNodeList<LSLExpression>* list = call->getArguments();
+                    return !list || std::all_of(list->begin(), list->end(), [](LSLExpression* a) { return a->getConstantValue() != nullptr; });
+                }();
+                if (!is_marked && !worked && !asked.others)
+                {
+                    all = false;
+                    continue;
+                }
+                if (plan(lines, parser.context, effects, function, call, count == 1 && asked.others, is_marked || worked, used, one) &&
+                    !clashes(one.edit.begin, one.edit.end) &&
                     !(one.edit.begin.line >= fbegin.line && one.edit.end.line <= fend.line) &&
                     !(one.before && clashes(one.before->begin, one.before->end)) && !(one.after && clashes(one.after->begin, one.after->end)) &&
                     !moreClash(one))
@@ -1652,6 +1674,14 @@ namespace
 // static
 ALLSLInliner::Result ALLSLInliner::run(std::string_view source, const std::vector<std::string>& marked, size_t budget)
 {
+    Asked asked;
+    asked.marked = marked;
+    return run(source, asked, budget);
+}
+
+// static
+ALLSLInliner::Result ALLSLInliner::run(std::string_view source, const Asked& asked, size_t budget)
+{
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
     AL_SCRIPT_ENGINE_HELD;
     Result result;
@@ -1677,7 +1707,7 @@ ALLSLInliner::Result ALLSLInliner::run(std::string_view source, const std::vecto
         ALSourceMap      step;
         ALScriptProblems said;
         size_t           walked = 0;
-        const S32        went   = inlineRound(result.text, step, said, marked, walked);
+        const S32        went   = inlineRound(result.text, step, said, asked, walked);
         result.visited += walked;
         last = walked;
         if (went == 0)

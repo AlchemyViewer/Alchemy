@@ -4465,6 +4465,13 @@ void ALPreprocessor::optimize(Result& result, const Options& options)
     ALLSLOptimizer::Options optimizing = options.optimizer;
     optimizing.inlineNames             = result.inlined;
     optimizing.inlining                = optimizing.inlining || !result.inlined.empty();
+    for (const ALPreprocessor::Result::Const& c : result.consts)
+    {
+        if (c.function)
+        {
+            optimizing.constFunctions.push_back(c.name);
+        }
+    }
     ALLSLOptimizer::Result optimized   = ALLSLOptimizer::run(result.text, optimizing);
     const size_t           first_note  = result.problems.size();
     if (optimized.uncompiled)

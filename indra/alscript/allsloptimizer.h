@@ -112,6 +112,10 @@ public:
         // weighing where there is a function to try, and a second run and
         // weighing where one is estimated to be worth it.
         bool                     inlineByCost = true;
+        // Functions put in place where every argument of a call is a
+        // constant, whether inlining is on or not, so that the call folds
+        // to its answer: what the script declared `const`.
+        std::vector<std::string> constFunctions;
     };
 
     struct Result
