@@ -60,16 +60,17 @@ public:
     bool  underway() const { return mStage != Stage::Idle; }
     bool  sending() const { return mStage == Stage::Sending; }
 
-    // The checks that may stop a save. One that stopped a save is let past
+    // The checks that may stop a save: the analyzers' errors, where the
+    // author asked to be held on them. One that stopped a save is let past
     // -- it alone, for that text alone -- where the author asks again over
     // the same text: Save Anyway, or Save a second time. A later check
-    // still stops it, and says why.
+    // still stops it, and says why. Nothing the preprocessor finds stops
+    // one: a save is what keeps the author's work, the source going up in
+    // the envelope whatever the expansion came to.
     enum Check : U8
     {
-        CheckAnalyzers    = 1,
-        CheckPreprocessor = 2,
-        CheckPending      = 4,
-        CheckAll          = 0xFF
+        CheckAnalyzers = 1,
+        CheckAll       = 0xFF
     };
 
     // --- asking --------------------------------------------------------------------
@@ -133,20 +134,15 @@ public:
     // now at `now`.
     struct Run
     {
-        S64  asked   = 0;
-        S64  now     = 0;
-        bool errors  = false;
-        bool pending = false;
+        S64 asked = 0;
+        S64 now   = 0;
     };
     // No save waited on it; the text moved on while it ran, and the save is
-    // asked for again; its errors, or an include still to come, stopped the
-    // save; or what it made is to be sent.
+    // asked for again; or what it made is to be sent, whatever it found.
     enum class Landed : U8
     {
         NotForSave,
         MovedOn,
-        StoppedByErrors,
-        StoppedByPending,
         Send
     };
     Landed preprocessed(const Run& run);

@@ -138,8 +138,6 @@ void ALScriptStudioSaving::preprocessedAnswer(const std::string& id, U32 version
     ALScriptSaveFlow::Run run;
     run.asked                             = version;
     run.now                               = doc.editor->document().version();
-    run.errors                            = result.hasErrors();
-    run.pending                           = !result.pending.empty();
     const ALScriptSaveFlow::Landed landed = doc.save.preprocessed(run);
     LLStringUtil::format_map_t args;
     args["[NAME]"] = doc.name;
@@ -172,55 +170,20 @@ void ALScriptStudioSaving::preprocessedAnswer(const std::string& id, U32 version
                 // script is when a file one of them may include is saved.
                 mServices.setStatus(mServices.words("Preprocessed", args));
                 // Weighed as a save would send it; not with an include still
-                // to come, which a save would wait for.
+                // to come, which may yet.
                 mWindow.weighSent(doc);
             }
-            return;
-        case ALScriptSaveFlow::Landed::StoppedByErrors:
-        {
-            S32 errors = 0;
-            for (const ALScriptProblem& problem : result.problems)
-            {
-                errors += problem.severity == ALScriptProblem::Severity::Error ? 1 : 0;
-            }
-            // An include not found is said by name, as one that would go
-            // up without it: a second save sends the rest, and a script
-            // missing what it calls stops in the object.
-            const ALIncludeSearch::LeftOut left_out = ALIncludeSearch::leftOut(result.problems);
-            if (left_out.names.empty())
-            {
-                mServices.report(mServices.counted("PreprocessErrors", errors, args), true, &doc, { "save_anyway" });
-            }
-            else
-            {
-                args["[FILES]"]  = joined(left_out.names);
-                std::string said = mServices.counted("PreprocessMissingSave", static_cast<S32>(left_out.names.size()), args);
-                if (errors > left_out.problems)
-                {
-                    said += " " + mServices.counted("PreprocessOtherErrors", errors - left_out.problems, args);
-                }
-                if (left_out.diskRoute)
-                {
-                    said += " " + mServices.words("PreprocessMissingDiskRoute", args);
-                }
-                mServices.report(said, true, &doc, { "save_anyway" });
-            }
-            stopped(doc);
-            mWindow.showProblems();
-            return;
-        }
-        case ALScriptSaveFlow::Landed::StoppedByPending:
-            mServices.report(mServices.counted("PreprocessPendingSave", static_cast<S32>(result.pending.size()), args), true, &doc,
-                             { "save_anyway" });
-            stopped(doc);
             return;
         case ALScriptSaveFlow::Landed::MovedOn:
         case ALScriptSaveFlow::Landed::Send:
             break;
     }
-    // Going up without what was not found or never came, as the save
-    // before this one said it would: said again as it goes.
-    std::vector<std::string> without = ALIncludeSearch::leftOut(result.problems).names;
+    // Going up whatever the run found: a save is what keeps the author's
+    // work, the source going up in the envelope with what it expanded to.
+    // What it goes without -- an include not found, or one that never came
+    // -- said by name as it goes, and the errors besides, in sight.
+    const ALIncludeSearch::LeftOut left_out = ALIncludeSearch::leftOut(result.problems);
+    std::vector<std::string>       without  = left_out.names;
     for (const std::string& name : result.pending)
     {
         if (std::find(without.begin(), without.end(), name) == without.end())
@@ -230,8 +193,20 @@ void ALScriptStudioSaving::preprocessedAnswer(const std::string& id, U32 version
     }
     if (!without.empty())
     {
-        args["[FILES]"] = joined(without);
-        mServices.report(mServices.counted("SavingWithout", static_cast<S32>(without.size()), args), true, &doc);
+        args["[FILES]"]  = joined(without);
+        std::string said = mServices.counted("SavingWithout", static_cast<S32>(without.size()), args);
+        if (left_out.diskRoute)
+        {
+            said += " " + mServices.words("PreprocessMissingDiskRoute", args);
+        }
+        mServices.report(said, true, &doc);
+    }
+    const S32 errors = static_cast<S32>(std::count_if(result.problems.begin(), result.problems.end(),
+                                                      [](const ALScriptProblem& p) { return p.severity == ALScriptProblem::Severity::Error; }));
+    if (errors > left_out.problems)
+    {
+        mServices.report(mServices.counted("SavingWithErrors", errors - left_out.problems, args), true, &doc);
+        mWindow.showProblems();
     }
     // Weighed as it goes.
     weighForSave(doc);

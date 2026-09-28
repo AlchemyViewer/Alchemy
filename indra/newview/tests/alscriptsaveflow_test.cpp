@@ -54,13 +54,11 @@ namespace tut
             tab.preprocessorBusy = busy;
             return tab;
         }
-        static Flow::Run run(S64 asked, S64 now, bool errors = false, bool pending = false)
+        static Flow::Run run(S64 asked, S64 now)
         {
             Flow::Run one;
-            one.asked   = asked;
-            one.now     = now;
-            one.errors  = errors;
-            one.pending = pending;
+            one.asked = asked;
+            one.now   = now;
             return one;
         }
         void send() { flow.sent(ALTextUndo::SavePoint(), std::nullopt, {}); }
@@ -99,18 +97,17 @@ namespace tut
     template<> template<>
     void alscriptsaveflow_object::test<2>()
     {
-        set_test_name("Save Anyway lets past the check that stopped the save, for that text: not an include still to come (S3-D1)");
+        set_test_name("Save Anyway lets past the check that stopped the save, for that text (S3-D1); nothing the preprocessor finds stops one");
         ensure("the analyzers' errors stop it", flow.route(expanded(1, true, true, 2)) == Route::StoppedByAnalyzers);
         ensure("and nothing waits", !flow.underway());
         flow.letPast(1);
         ensure("asked again: past the errors, on to the preprocessor", flow.route(expanded(1, true, true, 2)) == Route::Preprocess);
-        ensure("an include still to come stops it all the same", flow.preprocessed(run(1, 1, false, true)) == Flow::Landed::StoppedByPending);
-        flow.letPast(1);
-        ensure("asked again: both let past", flow.route(expanded(1, true, true, 2)) == Route::Preprocess);
-        ensure("and sent", flow.preprocessed(run(1, 1, false, true)) == Flow::Landed::Send);
-        ensure("the preprocessor's own errors were never let past", flow.route(expanded(1, true, true, 2)) == Route::Preprocess &&
-                                                                        flow.preprocessed(run(1, 1, true, true)) == Flow::Landed::StoppedByErrors);
+        ensure("whatever it found, sent: the save keeps the work", flow.preprocessed(run(1, 1)) == Flow::Landed::Send);
+        ensure("the same text asked again: still past", flow.route(expanded(1, true, true, 2)) == Route::Preprocess);
         ensure("a changed text asks afresh", flow.route(expanded(2, true, true, 2)) == Route::StoppedByAnalyzers);
+        flow.letPast(2);
+        ensure("let past", flow.route(expanded(2, true, true, 2)) == Route::Preprocess);
+        flow.preprocessed(run(2, 2));
         send();
         compile(true, true);
         ensure("and a save that went up leaves nothing let past", flow.route(expanded(2, true, true, 2)) == Route::StoppedByAnalyzers);
@@ -178,7 +175,7 @@ namespace tut
         flow.fromExternal(3);
         ensure("the editor's", flow.external());
         ensure("past the errors", flow.route(expanded(3, true, true, 5)) == Route::Preprocess);
-        ensure("and the preprocessor's", flow.preprocessed(run(3, 3, true, true)) == Flow::Landed::Send);
+        ensure("and sent", flow.preprocessed(run(3, 3)) == Flow::Landed::Send);
         flow.endExternal();
         ensure("ended", !flow.external());
 

@@ -124,21 +124,8 @@ ALScriptSaveFlow::Landed ALScriptSaveFlow::preprocessed(const Run& run)
         // start.
         return Landed::MovedOn;
     }
-    if (run.errors && !letsPast(run.asked, CheckPreprocessor))
-    {
-        stoppedBy(run.asked, CheckPreprocessor);
-        stopped();
-        return Landed::StoppedByErrors;
-    }
-    // An include still on its way is one the upload would go without, its
-    // line dropped from the text: the script as written is not what would
-    // compile.
-    if (run.pending && !letsPast(run.asked, CheckPending))
-    {
-        stoppedBy(run.asked, CheckPending);
-        stopped();
-        return Landed::StoppedByPending;
-    }
+    // Sent whatever it found -- errors, an include that never came: what
+    // it goes up with, or without, is the window's to say as it goes.
     return Landed::Send;
 }
 
