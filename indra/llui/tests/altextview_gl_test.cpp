@@ -30,11 +30,15 @@
 
 #include "../altextview.h"
 #include "../llui.h"
+#include "../lluictrlfactory.h"
+
+#include "alheadlessui_fixture.h"
 
 #include "llrender2dutils.h"
 
 #include "../test/lltut.h"
 
+#include <algorithm>
 #include <cmath>
 #include <functional>
 #include <string>
@@ -219,5 +223,56 @@ namespace tut
         ensure("the ribbon drew something" + said(d), d.covered > 0);
         ensure("no pixel far from the ribbon's" + said(d), d.most <= 64);
         ensure("as much covered as the ribbon" + said(d), std::abs(d.covered - d.compared) * 16 <= d.covered);
+    }
+    // The map draws each line's runs from what it read last, and reads a
+    // line again when it changes -- a space made a tab moves the runs after
+    // it, though no token does -- and not otherwise.
+    template<> template<>
+    void altextview_gl_object::test<4>()
+    {
+        ll_test::HeadlessUI& ui = ll_test::HeadlessUI::get(/*gl_textures=*/true);
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        std::string text;
+        for (S32 i = 0; i < 40; ++i)
+        {
+            text += "word word word word\n";
+        }
+        ALTextView::Params p(LLUICtrlFactory::getDefaultParams<ALTextView>());
+        p.name         = "view";
+        p.rect         = LLRect(0, H, W, 0);
+        p.default_text = text;
+        ALTextView* view = LLUICtrlFactory::create<ALTextView>(p);
+        view->setFont(LLFontGL::getFontMonospace());
+        view->setScrollMap(true);
+        // The map's columns, at the right of the view.
+        const S32  map_left = W - view->scrollMapWidth();
+        // Every channel of the map's pixels, as the view draws them.
+        const auto map_of = [&]() {
+            gl().clearFramebuffer();
+            glEnable(GL_BLEND);
+            gGL.setSceneBlendType(LLRender::BT_ALPHA);
+            view->draw();
+            gGL.flush();
+            glDisable(GL_BLEND);
+            glFinish();
+            const std::vector<U8> rgba = ll_test::readFramebufferRGBA(W, H);
+            std::vector<U8>       map;
+            for (S32 y = 0; y < H; ++y)
+            {
+                map.insert(map.end(), rgba.begin() + (static_cast<size_t>(y) * W + map_left) * 4, rgba.begin() + (static_cast<size_t>(y) * W + W) * 4);
+            }
+            return map;
+        };
+        const std::vector<U8> first = map_of();
+        ensure("the map draws its lines", std::adjacent_find(first.begin(), first.end(), std::not_equal_to<U8>()) != first.end());
+        ensure("the same map when nothing changed", map_of() == first);
+        view->document().replace(ALTextRange(ALTextPos(3, 4), ALTextPos(3, 5)), "\t");
+        const std::vector<U8> tabbed = map_of();
+        ensure("a space made a tab changes the map", tabbed != first);
+        ensure("and it stays as it now is", map_of() == tabbed);
+        view->die();
     }
 }

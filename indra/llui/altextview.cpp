@@ -3550,6 +3550,71 @@ void ALTextView::scrollToMapY(S32 y)
     setScrollY(mLayout.lineTop(line) - page / 2);
 }
 
+void ALTextView::readMapRuns(S32 line, S32 columns, std::vector<MapRun>& out)
+{
+    // Each run of glyphs of one kind, by column, as far as the map is
+    // wide; spaces and tabs part runs.
+    const std::string&                text   = mDocument.line(line);
+    const std::vector<ALSyntaxToken>& tokens = mHighlighter.tokens(line);
+    size_t                            t      = 0;
+    S32                               col    = 0;
+    S32                               from   = -1;
+    ALSyntaxKind                      kind   = ALSyntaxKind::Text;
+    const auto                        end    = [&](S32 to) {
+        if (from >= 0)
+        {
+            const S32 x0 = llmin(columns, from);
+            const S32 x1 = llmin(columns, to);
+            if (x1 > x0)
+            {
+                out.push_back(MapRun{ x0, x1, kind });
+            }
+            from = -1;
+        }
+    };
+    for (size_t i = 0; i < text.size(); ++i)
+    {
+        const unsigned char c = static_cast<unsigned char>(text[i]);
+        if ((c & 0xC0) == 0x80)
+        {
+            continue;  // the rest of a character
+        }
+        while (t < tokens.size() && tokens[t].end <= static_cast<S32>(i))
+        {
+            ++t;
+        }
+        const ALSyntaxKind here = t < tokens.size() && tokens[t].begin <= static_cast<S32>(i) ? tokens[t].kind : ALSyntaxKind::Text;
+        if (c == '\t')
+        {
+            end(col);
+            col = alNextTabStop(col, mTabWidth);
+        }
+        else if (c == ' ')
+        {
+            end(col);
+            ++col;
+        }
+        else
+        {
+            if (from >= 0 && here != kind)
+            {
+                end(col);
+            }
+            if (from < 0)
+            {
+                from = col;
+                kind = here;
+            }
+            ++col;
+        }
+        if (col > columns)
+        {
+            break;
+        }
+    }
+    end(col);
+}
+
 void ALTextView::drawMap(F32 alpha)
 {
     const LLRect map = mapRect();
@@ -3579,78 +3644,61 @@ void ALTextView::drawMap(F32 alpha)
     const S32 inner_right = map.mRight - MAP_PAD - (mScrollMapLeft ? 0 : MAP_MARK_W);
     const S32 mark_left   = mScrollMapLeft ? map.mLeft + 1 : map.mRight - MAP_MARK_W;
     LLLocalClipRect clip(map);
+    // Each line's runs of text, read again only where something they are
+    // read from has moved.
+    const S32 columns = llmax(0, (inner_right - inner_left) / MAP_CHAR_W);
+    MapRuns&  runs    = mMapRuns;
+    bool      fresh   = runs.version == mDocument.version() && runs.grammar == mHighlighter.grammar().get() && runs.tabWidth == mTabWidth &&
+                 runs.columns == columns && runs.first == first && runs.last == last && runs.hidden == mLayout.hiddenRevision();
+    for (S32 o = first; fresh && o <= last; ++o)
+    {
+        fresh = runs.revisions[static_cast<size_t>(o - first)] == mHighlighter.revision(mMapLines[o]);
+    }
+    if (!fresh)
+    {
+        runs.version  = mDocument.version();
+        runs.grammar  = mHighlighter.grammar().get();
+        runs.tabWidth = mTabWidth;
+        runs.columns  = columns;
+        runs.first    = first;
+        runs.last     = last;
+        runs.hidden   = mLayout.hiddenRevision();
+        runs.starts.clear();
+        runs.revisions.clear();
+        runs.runs.clear();
+        for (S32 o = first; o <= last; ++o)
+        {
+            const S32 line = mMapLines[o];
+            runs.starts.push_back(runs.runs.size());
+            runs.revisions.push_back(mHighlighter.revision(line));
+            readMapRuns(line, columns, runs.runs);
+        }
+        runs.starts.push_back(runs.runs.size());
+    }
+    // Every run, mark and tick in one batch, which is one draw: a rectangle
+    // drawn apiece is a draw apiece, and the map has thousands.
+    gGL.getTextureSlot(0)->unbind();
+    gGL.begin(LLRender::TRIANGLES);
     for (S32 o = first; o <= last; ++o)
     {
-        const S32 line  = mMapLines[o];
-        const S32 top   = map.mTop - MAP_PAD - (o * MAP_LINE_H - scroll);
+        const S32 line   = mMapLines[o];
+        const S32 top    = map.mTop - MAP_PAD - (o * MAP_LINE_H - scroll);
         const S32 bottom = top - MAP_LINE_H;
-        const std::string&                text   = mDocument.line(line);
-        const std::vector<ALSyntaxToken>& tokens = mHighlighter.tokens(line);
         // Each run of glyphs, a rectangle in its kind's ink.
-        size_t t   = 0;
-        S32    col = 0;
-        S32    run_from = -1;
-        ALSyntaxKind run_kind = ALSyntaxKind::Text;
-        auto flush = [&](S32 to) {
-            if (run_from < 0)
-            {
-                return;
-            }
-            const S32 x0 = llmin(inner_right, inner_left + run_from * MAP_CHAR_W);
-            const S32 x1 = llmin(inner_right, inner_left + to * MAP_CHAR_W);
-            if (x1 > x0)
-            {
-                const LLColor4& kind_ink = run_kind == ALSyntaxKind::Text ? ink : colorForKind(run_kind);
-                gl_rect_2d(x0, top, x1, bottom, kind_ink % (alpha * (run_kind == ALSyntaxKind::Text ? 0.45f : 0.7f)));
-            }
-            run_from = -1;
-        };
-        for (size_t i = 0; i < text.size(); ++i)
+        const size_t from = runs.starts[static_cast<size_t>(o - first)];
+        const size_t to   = runs.starts[static_cast<size_t>(o - first) + 1];
+        for (size_t r = from; r < to; ++r)
         {
-            const unsigned char c = static_cast<unsigned char>(text[i]);
-            if ((c & 0xC0) == 0x80)
-            {
-                continue;  // the rest of a character
-            }
-            while (t < tokens.size() && tokens[t].end <= static_cast<S32>(i))
-            {
-                ++t;
-            }
-            const ALSyntaxKind kind = t < tokens.size() && tokens[t].begin <= static_cast<S32>(i) ? tokens[t].kind : ALSyntaxKind::Text;
-            if (c == '\t')
-            {
-                flush(col);
-                col = alNextTabStop(col, mTabWidth);
-            }
-            else if (c == ' ')
-            {
-                flush(col);
-                ++col;
-            }
-            else
-            {
-                if (run_from >= 0 && kind != run_kind)
-                {
-                    flush(col);
-                }
-                if (run_from < 0)
-                {
-                    run_from = col;
-                    run_kind = kind;
-                }
-                ++col;
-            }
-            if (inner_left + col * MAP_CHAR_W > inner_right)
-            {
-                break;
-            }
+            const MapRun&   run      = runs.runs[r];
+            const bool      plain    = run.kind == ALSyntaxKind::Text;
+            const LLColor4& kind_ink = plain ? ink : colorForKind(run.kind);
+            gl_rect_2d_in_batch(inner_left + run.from * MAP_CHAR_W, top, inner_left + run.to * MAP_CHAR_W, bottom, kind_ink % (alpha * (plain ? 0.45f : 0.7f)));
         }
-        flush(col);
         // A mark beside the line, and a match in it.
         LLColor4 mark;
         if (mapMark(line, mark))
         {
-            gl_rect_2d(mark_left, top, mark_left + MAP_MARK_W, bottom - 1, mark % alpha);
+            gl_rect_2d_in_batch(mark_left, top, mark_left + MAP_MARK_W, bottom - 1, mark % alpha);
         }
         const std::vector<ALTextRange>& matches = mFind.matches();
         if (!matches.empty())
@@ -3659,14 +3707,15 @@ void ALTextView::drawMap(F32 alpha)
             if (found != matches.end() && found->begin.line <= line)
             {
                 const S32 tick_left = mScrollMapLeft ? map.mRight - MAP_MARK_W : map.mLeft + 1;
-                gl_rect_2d(tick_left, top, tick_left + MAP_MARK_W, bottom - 1, mFindMatchColor.get() % alpha);
+                gl_rect_2d_in_batch(tick_left, top, tick_left + MAP_MARK_W, bottom - 1, mFindMatchColor.get() % alpha);
             }
         }
         if (line == mCaret.line)
         {
-            gl_rect_2d(inner_left, top, inner_right, top - 1, mCursorColor.get() % (alpha * 0.6f));
+            gl_rect_2d_in_batch(inner_left, top, inner_right, top - 1, mCursorColor.get() % (alpha * 0.6f));
         }
     }
+    gGL.end();
     // The rows on screen, as a window over the map.
     const S32 page        = llmax(1, textRect().getHeight());
     const S32 top_line    = mLayout.lineAtY(mScrollY);

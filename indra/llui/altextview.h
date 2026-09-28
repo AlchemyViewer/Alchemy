@@ -1087,10 +1087,39 @@ private:
     // The lines the map shows, as of the layout's hidden revision and the
     // line count; and the ruler's lines with a mark, as of the text's
     // version and the marks' revision.
+    // The runs of one line for the map, by column, as far as `columns`.
+    struct MapRun;
+    void             readMapRuns(S32 line, S32 columns, std::vector<MapRun>& out);
     std::vector<S32> mMapLines;
     bool             mMapLinesValid    = false;
     U32              mMapLinesRevision = 0;
     S32              mMapLinesCount    = 0;
+    // The map's runs of text for the lines in sight, by column, as last
+    // read: kept while the text, its grammar and each line's tokens, the
+    // tab width, the map's width and the lines in sight hold, so that an
+    // idle frame does not read every line again.
+    struct MapRun
+    {
+        S32          from = 0;
+        S32          to   = 0;
+        ALSyntaxKind kind = ALSyntaxKind::Text;
+    };
+    struct MapRuns
+    {
+        U32                 version  = 0;
+        const void*         grammar  = nullptr;
+        S32                 tabWidth = -1;
+        S32                 columns  = -1;
+        S32                 first    = -1;
+        S32                 last     = -1;
+        U32                 hidden   = 0;
+        // For each line in sight, where its runs start, and its tokens'
+        // revision; the runs of the last end where the list does.
+        std::vector<size_t> starts;
+        std::vector<U32>    revisions;
+        std::vector<MapRun> runs;
+    };
+    MapRuns          mMapRuns;
     std::vector<S32> mRulerMarkLines;
     bool             mRulerMarksValid    = false;
     // Each pixel row of the ruler's track with a match on it, as last found:
