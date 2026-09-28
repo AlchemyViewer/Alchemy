@@ -90,6 +90,8 @@ namespace
     // The coprocedure pool script and notecard saves go up through, apart
     // from the shared "Upload" one (llcoproceduremanager.cpp).
     const char* const SCRIPT_UPLOAD_POOL = "ScriptUpload";
+    // How long a save waits to hear whether its script runs.
+    const F32    RUNNING_TIMEOUT    = 5.f;
 
     // The script a message names, in a prim's contents.
     LLInventoryItem* scriptNamed(LLViewerObject* prim, const std::string& name)
@@ -591,6 +593,32 @@ bool ALScriptWorkspace::save(const ALScriptRef& ref, const std::string& text, co
             return false;
         }
     }
+    if (!ref.inInventory() && !options.running)
+    {
+        // Whether it runs, before it goes: the index's word, or the
+        // region's, waited for; one that does not answer leaves it
+        // running, as a script newly saved is.
+        LLViewerObject* object = gObjectList.findObject(ref.object);
+        if (!object || !object->getRegion())
+        {
+            error = LLTrans::getString("WorkspaceNoSuchObject");
+            return false;
+        }
+        awaitRunning(ref, [this, ref, text, options, callback](std::optional<bool> running) {
+            SaveOptions known = options;
+            known.running     = running.value_or(true);
+            std::string why;
+            if (!save(ref, text, known, callback, why))
+            {
+                CompileResult result;
+                result.ref    = ref;
+                result.sender = options.sender;
+                result.error  = why;
+                deliver(result, callback);
+            }
+        });
+        return true;
+    }
     if (!ref.inInventory() && !options.experience)
     {
         // What stops it here stops it before the region is asked, as it
@@ -645,7 +673,7 @@ bool ALScriptWorkspace::save(const ALScriptRef& ref, const std::string& text, co
         return false;
     }
     const bool lua = options.compileTarget == "luau";
-    auto answered  = [this, ref, lua, callback, text, sender = options.sender, running = options.running,
+    auto answered  = [this, ref, lua, callback, text, sender = options.sender, running = options.running.value_or(true),
                      experience = options.experience](const LLSD& response, const LLUUID& new_asset_id) {
         CompileResult result;
         result.ref        = ref;
@@ -724,7 +752,7 @@ bool ALScriptWorkspace::save(const ALScriptRef& ref, const std::string& text, co
     LLInventoryItem* item      = object->getInventoryItem(ref.item);
     const LLUUID     old_asset = item ? item->getAssetUUID() : LLUUID::null;
     LLResourceUploadInfo::ptr_t info(std::make_shared<LLScriptAssetUpload>(
-        ref.object, ref.item, options.compileTarget, options.running, options.experience.value_or(LLUUID::null), text,
+        ref.object, ref.item, options.compileTarget, options.running.value_or(true), options.experience.value_or(LLUUID::null), text,
         [answered, old_asset](LLUUID, LLUUID, LLUUID new_asset_id, LLSD response) {
             LLFileSystem::removeFile(old_asset, LLAssetType::AT_LSL_TEXT);
             answered(response, new_asset_id);
@@ -999,7 +1027,7 @@ void ALScriptWorkspace::recompile(const ALScriptRef& ref, const std::string& req
             }
             SaveOptions options;
             options.compileTarget = target;
-            options.running       = running.value_or(true);
+            options.running       = running;
             options.sender        = sender;
             std::string error;
             if (!save(ref, prepared.text, options, callback, error))
@@ -1628,7 +1656,52 @@ void ALScriptWorkspace::processScriptRunningReply(LLMessageSystem* msg, void** d
     if (instanceExists())
     {
         instance().mContentsIndex->running(state.ref, state.running);
+        instance().answerRunning(state.ref, state.running);
         instance().mRunningState(state);
+    }
+}
+
+void ALScriptWorkspace::awaitRunning(const ALScriptRef& ref, std::function<void(std::optional<bool>)> told)
+{
+    if (const std::optional<bool> known = mContentsIndex->running(ref))
+    {
+        told(known);
+        return;
+    }
+    RunningWait& wait = mRunningWaits[{ ref.object, ref.item }];
+    wait.told.push_back(std::move(told));
+    if (wait.told.size() > 1)
+    {
+        // Asked already: this one hears the same answer.
+        return;
+    }
+    wait.generation      = ++mRunningGeneration;
+    const U32 generation = wait.generation;
+    if (!askRunning(ref))
+    {
+        answerRunning(ref, std::nullopt);
+        return;
+    }
+    LLEventTimer::run_after(RUNNING_TIMEOUT, [ref, generation]() {
+        if (instanceExists())
+        {
+            instance().answerRunning(ref, std::nullopt, generation);
+        }
+    });
+}
+
+void ALScriptWorkspace::answerRunning(const ALScriptRef& ref, std::optional<bool> running, U32 generation)
+{
+    const auto found = mRunningWaits.find({ ref.object, ref.item });
+    if (found == mRunningWaits.end() || (generation != 0 && found->second.generation != generation))
+    {
+        return;
+    }
+    const std::vector<std::function<void(std::optional<bool>)>> told = std::move(found->second.told);
+    mRunningWaits.erase(found);
+    for (const auto& one : told)
+    {
+        one(running);
     }
 }
 

@@ -36,6 +36,7 @@
 #include "llevents.h"
 
 #include <map>
+#include <optional>
 
 class LLScrollListCtrl;
 
@@ -107,10 +108,11 @@ protected:
     std::string mStartString;
     std::string mCompileTarget { "lsl2" };
     std::map<std::pair<LLUUID, LLUUID>, bool> mKnownRunning;
-    bool runsAfterCompile(const LLUUID& object, const LLUUID& item) const
+    // As the explorer knew it; not known, the save asks the region.
+    std::optional<bool> runsAfterCompile(const LLUUID& object, const LLUUID& item) const
     {
         const auto known = mKnownRunning.find({ object, item });
-        return known == mKnownRunning.end() || known->second;
+        return known == mKnownRunning.end() ? std::nullopt : std::optional<bool>(known->second);
     }
 
     typedef std::function<bool(const LLPointer<LLViewerObject> &, LLInventoryObject*, LLEventPump &)>   fnQueueAction_t;

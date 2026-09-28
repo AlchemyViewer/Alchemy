@@ -77,6 +77,9 @@
     <floater.string name="SearchListed">every object listed</floater.string>
     <floater.string name="SearchAlone">alone</floater.string>
     <floater.string name="SearchWithIncludes">and what they include</floater.string>
+    <floater.string name="RunningTip">Whether the script runs in its object; a save keeps whatever this says</floater.string>
+    <floater.string name="RunningAsking">Asking the region whether the script runs. A save meanwhile asks first, and keeps whatever it says</floater.string>
+    <floater.string name="RunningPublic">Public objects cannot run scripts: this one is released to the public, with no owner</floater.string>
     <floater.string name="SearchIncludesTip">What an #include or a require brings in, searched too: each file once, as its own, as it is on disk or was last fetched. Replace All leaves those alone, since they are every script's that includes them.</floater.string>
     <floater.string name="SearchIncluded">Included</floater.string>
     <floater.string name="SearchCountTip">How many places were found, in how many scripts</floater.string>

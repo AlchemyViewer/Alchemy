@@ -2988,7 +2988,14 @@ void ALFloaterScriptStudio::refreshToolbar()
     refreshExperience();
     if (task)
     {
-        mRunning->set(doc->running == 1);
+        // Greyed until the region says whether it runs -- a save asks it
+        // first meanwhile -- and for an object nobody owns, released to the
+        // public, which runs no script.
+        const LLViewerObject* object        = gObjectList.findObject(doc->ref.object);
+        const bool            public_object = object && !object->permAnyOwner();
+        mRunning->set(!public_object && doc->running == 1);
+        mRunning->setEnabled(!public_object && doc->running >= 0);
+        mRunning->setToolTip(getString(public_object ? "RunningPublic" : doc->running < 0 ? "RunningAsking" : "RunningTip"));
     }
     if (have && script)
     {

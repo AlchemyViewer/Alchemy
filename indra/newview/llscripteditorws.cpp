@@ -1887,8 +1887,10 @@ LLSD LLScriptEditorWSServer::saveScript(LLViewerObject* prim, LLInventoryItem* i
     const std::string item_name = item->getName();
     const LLUUID item_asset = item->getAssetUUID();
     const ALScriptRef ref(prim_id, item_id);
-    const LLViewerInventoryItem* viewer_item = dynamic_cast<const LLViewerInventoryItem*>(item);
-    bool is_running = viewer_item ? viewer_item->getIsRunning() : false;
+    // Whether it runs after: as asked, or as it runs now, which the save
+    // asks the region where it is not known -- not the item's own word,
+    // which only the newer inventory fetch fills in.
+    std::optional<bool> is_running;
     if (params.has("running"))
     {
         is_running = params["running"].asBoolean();

@@ -2859,7 +2859,12 @@ void LLLiveLSLEditor::saveIfNeeded(bool sync /*= true*/)
         mScriptEd->sync();
     }
 
-    bool is_running = mRunningCheckbox->get();
+    // What the box says once the region has said; before, the save asks.
+    std::optional<bool> is_running;
+    if (mHaveRunningInfo)
+    {
+        is_running = mRunningCheckbox->get();
+    }
     getWindow()->incBusyCount();
     mPendingUploads++;
 
@@ -2879,13 +2884,13 @@ void LLLiveLSLEditor::saveIfNeeded(bool sync /*= true*/)
         std::string  error;
         const bool   sent = ALScriptWorkspace::instance().save(
             ALScriptRef(object_id, item_id), mScriptEd->mEditor->getText(), options,
-            [object_id, item_id, is_running](const ALScriptWorkspace::CompileResult& result) {
+            [object_id, item_id](const ALScriptWorkspace::CompileResult& result) {
                 if (!result.error.empty())
                 {
                     LLLiveLSLEditor::failedLSLUpload(item_id, object_id, result.error);
                     return;
                 }
-                LLLiveLSLEditor::finishLSLUpload(item_id, object_id, result.newAssetId, compileResponseOf(result), is_running);
+                LLLiveLSLEditor::finishLSLUpload(item_id, object_id, result.newAssetId, compileResponseOf(result), result.running);
             },
             error);
         if (!sent)

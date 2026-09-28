@@ -502,7 +502,12 @@ void ALScriptStudioSaving::upload(Doc& doc, const std::string& text, const ALSou
     // theirs, not by the front one's.
     ALScriptWorkspace::SaveOptions options;
     options.compileTarget = doc.language.compileTarget;
-    options.running       = doc.ref.inInventory() || doc.running != 0;
+    // Whether it runs as the region last said; not said yet, the save asks
+    // first rather than start a stopped script or stop a running one.
+    if (doc.running >= 0)
+    {
+        options.running = doc.running != 0;
+    }
     // The experience picked here, or the one it runs under; not known yet,
     // the save asks the region first rather than send none.
     if (doc.experienceChosen || doc.experienceKnown)

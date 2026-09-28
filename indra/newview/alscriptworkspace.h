@@ -224,10 +224,12 @@ public:
         std::string compileTarget;
         // Task scripts only: whether it runs after the compile, and the
         // experience it runs under -- the null one for none. Not given,
-        // the one it runs under now, asked of the region first: an
-        // upload says an experience whatever, and one that said none
-        // would take it away.
-        bool                  running = true;
+        // each as it is now, asked of the region first: an upload says
+        // both whatever, and one that guessed would start a stopped script
+        // or take an experience away. Whether it runs is the index's word
+        // where it has one; a region that does not answer in a few
+        // seconds leaves it running, as a script newly saved is.
+        std::optional<bool>   running;
         std::optional<LLUUID> experience;
         Sender                sender;
     };
@@ -565,6 +567,20 @@ private:
     boost::unordered_flat_map<LLUUID, F64> mRuntimeSince;
     // The one in front is under way; the rest wait for it to end.
     std::vector<std::shared_ptr<Transfer>> mTransfers;
+    // Saves waiting to hear whether a script runs, by (object, item), each
+    // wait numbered so that the timer of an earlier one answers none.
+    struct RunningWait
+    {
+        U32                                              generation = 0;
+        std::vector<std::function<void(std::optional<bool>)>> told;
+    };
+    boost::unordered_flat_map<std::pair<LLUUID, LLUUID>, RunningWait> mRunningWaits;
+    U32                                                              mRunningGeneration = 0;
+    // Whether a script runs: the index's word, or the region asked and
+    // waited for a while; nothing where it could not be asked or did not
+    // answer.
+    void awaitRunning(const ALScriptRef& ref, std::function<void(std::optional<bool>)> told);
+    void answerRunning(const ALScriptRef& ref, std::optional<bool> running, U32 generation = 0);
     // Each task script's experience as last known, with the asset it was
     // known for: (object, item) to (asset, experience).
     boost::unordered_flat_map<std::pair<LLUUID, LLUUID>, std::pair<LLUUID, LLUUID>> mExperiences;

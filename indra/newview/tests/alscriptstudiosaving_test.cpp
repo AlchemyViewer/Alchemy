@@ -369,7 +369,7 @@ namespace tut
         const FakeSavingWindow::Sent& sent = studio.sent.back();
         ensure_equals("the text as it stands", sent.text, std::string("default {}\n// more"));
         ensure("its target, not running, its experience",
-               sent.options.compileTarget == "mono" && !sent.options.running && sent.options.experience == experience);
+               sent.options.compileTarget == "mono" && sent.options.running == false && sent.options.experience == experience);
         ensure("on its way", doc.save.sending());
         ensure_equals("said", lastStatus(), std::string("Saving"));
 
@@ -384,6 +384,7 @@ namespace tut
         Doc& clean = tab("clean", "default {}");
         type(clean, " ");
         saving.save(clean);
+        ensure("whether it runs not heard yet: not said, for the save to ask", !studio.sent.back().options.running.has_value());
         saving.compiled(answer(clean));
         ensure("nothing typed since: saved", !clean.unsaved());
 
