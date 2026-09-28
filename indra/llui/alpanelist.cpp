@@ -35,10 +35,13 @@
 #include "llscrolllistcolumn.h"
 #include "llscrolllistitem.h"
 #include "llsdutil.h"
+#include "lltooltip.h"
 #include "llui.h"
 #include "lluictrlfactory.h"
 
 #include <utility>
+
+#include <boost/container_hash/hash.hpp>
 
 static LLDefaultChildRegistry::Register<ALPaneList> r("pane_list");
 
@@ -110,6 +113,222 @@ ALPaneList::~ALPaneList()
     {
         menu->die();
     }
+}
+
+void ALPaneList::clearRows()
+{
+    mKeyed.clear();
+    mKeyOf.clear();
+    mOrder.clear();
+    LLScrollListCtrl::clearRows();
+}
+
+// static
+size_t ALPaneList::saidBy(const LLScrollListCell::Params& cell)
+{
+    size_t said = 0;
+    boost::hash_combine(said, cell.type());
+    boost::hash_combine(said, cell.column());
+    boost::hash_combine(said, cell.value().asString());
+    boost::hash_combine(said, cell.label.isProvided() ? cell.label() : std::string());
+    boost::hash_combine(said, cell.tool_tip());
+    boost::hash_combine(said, reinterpret_cast<uintptr_t>(cell.font()));
+    boost::hash_combine(said, static_cast<S32>(cell.font_halign()));
+    boost::hash_combine(said, cell.enabled());
+    boost::hash_combine(said, cell.visible());
+    for (const auto* color : { &cell.color, &cell.font_color })
+    {
+        boost::hash_combine(said, color->isProvided());
+        for (F32 channel : (*color)().mV)
+        {
+            boost::hash_combine(said, channel);
+        }
+    }
+    return said;
+}
+
+LLScrollListItem* ALPaneList::addKeyed(Row& row)
+{
+    LLScrollListItem::Params item;
+    item.value   = row.value;
+    item.enabled = row.enabled;
+    Keyed keyed;
+    keyed.said.reserve(row.cells.size());
+    for (LLScrollListCell::Params& cell : row.cells)
+    {
+        keyed.said.push_back(saidBy(cell));
+        item.columns.add(std::move(cell));
+    }
+    LLScrollListItem* made = addRow(item, ADD_BOTTOM);
+    if (made)
+    {
+        keyed.item      = made;
+        mKeyOf[made]    = row.key;
+        mKeyed[row.key] = std::move(keyed);
+    }
+    return made;
+}
+
+void ALPaneList::rewrite(LLScrollListItem* item, Row& row, std::vector<size_t>& said)
+{
+    item->setValue(row.value);
+    item->setEnabled(row.enabled);
+    said.resize(row.cells.size(), 0);
+    for (size_t i = 0; i < row.cells.size(); ++i)
+    {
+        LLScrollListCell::Params& cell = row.cells[i];
+        const size_t              now  = saidBy(cell);
+        const LLScrollListColumn* column = getColumn(cell.column());
+        if (now == said[i] || !column)
+        {
+            continue;
+        }
+        // Made again, only this cell, as wide as its column.
+        said[i] = now;
+        if (!cell.width.isProvided())
+        {
+            cell.width = column->getWidth();
+        }
+        if (LLScrollListCell* made = LLScrollListCell::create(cell))
+        {
+            item->setColumn(column->mIndex, made);
+        }
+    }
+}
+
+void ALPaneList::setRows(std::vector<Row> rows)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
+    // Kept by key through it: the rows chosen, and the row at the top.
+    updateSort();
+    const item_list&         items = getItemList();
+    std::vector<std::string> chosen;
+    for (const LLScrollListItem* item : items)
+    {
+        if (item->getSelected())
+        {
+            chosen.push_back(keyOf(item));
+        }
+    }
+    const S32         scrolled = getScrollPos();
+    const std::string top      = scrolled >= 0 && scrolled < static_cast<S32>(items.size()) ? keyOf(items[scrolled]) : std::string();
+
+    // The rows there now all this list's own, and each key given once:
+    // else the list is made again.
+    boost::unordered_flat_map<std::string_view, size_t> given;
+    bool                                                in_place = mKeyed.size() == items.size();
+    for (const LLScrollListItem* item : items)
+    {
+        in_place = in_place && mKeyOf.contains(item);
+    }
+    for (size_t i = 0; i < rows.size(); ++i)
+    {
+        in_place = in_place && !rows[i].key.empty() && given.emplace(rows[i].key, i).second;
+    }
+    // The rows there, some gone, in their order; then only new ones.
+    size_t kept = 0;
+    if (in_place)
+    {
+        size_t at = 0;
+        for (; kept < rows.size() && mKeyed.contains(rows[kept].key); ++kept)
+        {
+            while (at < mOrder.size() && mOrder[at] != rows[kept].key)
+            {
+                ++at;
+            }
+            if (at == mOrder.size())
+            {
+                in_place = false;
+                break;
+            }
+            ++at;
+        }
+        for (size_t i = kept; in_place && i < rows.size(); ++i)
+        {
+            in_place = !mKeyed.contains(rows[i].key);
+        }
+    }
+    if (!in_place)
+    {
+        deleteAllItems();
+        kept = 0;
+    }
+    else
+    {
+        // Those gone, taken out where they stand.
+        for (const std::string& key : mOrder)
+        {
+            if (!given.contains(key))
+            {
+                const auto gone = mKeyed.find(key);
+                LLScrollListItem* item = gone->second.item;
+                mKeyOf.erase(item);
+                mKeyed.erase(gone);
+                deleteSingleItem(item);
+            }
+        }
+        for (size_t i = 0; i < kept; ++i)
+        {
+            Keyed& keyed = mKeyed[rows[i].key];
+            rewrite(keyed.item, rows[i], keyed.said);
+        }
+        // A cell's words changed may sort it elsewhere.
+        setNeedsSort();
+        dirtyColumns();
+    }
+    mOrder.clear();
+    mOrder.reserve(rows.size());
+    for (size_t i = 0; i < rows.size(); ++i)
+    {
+        mOrder.push_back(rows[i].key);
+        if (i >= kept)
+        {
+            addKeyed(rows[i]);
+        }
+    }
+
+    // What was chosen chosen again, and the row at the top back there.
+    updateSort();
+    if (!in_place && !chosen.empty())
+    {
+        bool first = true;
+        for (const std::string& key : chosen)
+        {
+            LLScrollListItem* item = rowWithKey(key);
+            if (!item)
+            {
+                continue;
+            }
+            if (first)
+            {
+                selectNthItem(getItemIndex(item));
+                first = false;
+            }
+            else
+            {
+                item->setSelected(true);
+            }
+        }
+    }
+    if (!top.empty())
+    {
+        if (LLScrollListItem* item = rowWithKey(top))
+        {
+            setScrollPos(getItemIndex(item));
+        }
+    }
+}
+
+const std::string& ALPaneList::keyOf(const LLScrollListItem* item) const
+{
+    const auto found = mKeyOf.find(item);
+    return found != mKeyOf.end() ? found->second : LLStringUtil::null;
+}
+
+LLScrollListItem* ALPaneList::rowWithKey(std::string_view key) const
+{
+    const auto found = mKeyed.find(key);
+    return found != mKeyed.end() ? found->second.item : nullptr;
 }
 
 void ALPaneList::setEmpty(const std::string& headline, const std::string& sentence)
@@ -552,9 +771,25 @@ bool ALPaneList::handleDragAndDrop(S32 x, S32 y, MASK mask, bool drop, EDragAndD
 
 bool ALPaneList::handleToolTip(S32 x, S32 y, MASK mask)
 {
-    if (!hitItem(x, y) && getItemListRect().pointInRect(x, y))
+    LLScrollListItem* item = hitItem(x, y);
+    if (!item && getItemListRect().pointInRect(x, y))
     {
         return LLUICtrl::handleToolTip(x, y, mask);
+    }
+    // The row's own, made now.
+    const std::string tip = item && mRowTip ? mRowTip(item) : std::string();
+    if (!tip.empty())
+    {
+        const S32 index = getItemIndex(item);
+        LLRect    sticky;
+        localRectToScreen(getCellRect(index, getColumnIndexFromOffset(x)), &sticky);
+        LLToolTipMgr::instance().show(LLToolTip::Params()
+                                          .message(tip)
+                                          .font(LLFontGL::getFontSansSerifSmall())
+                                          .pos(LLCoordGL(sticky.mLeft - 5, sticky.mTop + 6))
+                                          .delay_time(0.2f)
+                                          .sticky_rect(sticky));
+        return true;
     }
     return LLScrollListCtrl::handleToolTip(x, y, mask);
 }

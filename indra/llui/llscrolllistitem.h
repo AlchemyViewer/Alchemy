@@ -107,6 +107,8 @@ public:
 
     virtual LLUUID  getUUID() const         { return mItemValue.asUUID(); }
     LLSD    getValue() const                { return mItemValue; }
+    // Made again where it stands, the same row (ALPaneList::setRows).
+    void    setValue(const LLSD& value)     { mItemValue = value; }
     LLSD    getAltValue() const             { return mItemAltValue; }
 
     void    setRect(LLRect rect)            { mRectangle = rect; }

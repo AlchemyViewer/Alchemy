@@ -28,6 +28,7 @@
 #include "../alemptystate.h"
 
 #include "../llclipboard.h"
+#include "../llscrolllistcell.h"
 #include "../llscrolllistitem.h"
 #include "../lluictrlfactory.h"
 
@@ -485,5 +486,58 @@ namespace tut
         l.handleMouseDown(row.getCenterX(), row.getCenterY(), MASK_NONE);
         l.handleMouseUp(row.getCenterX(), row.getCenterY(), MASK_NONE);
         ensure_equals("a click after chooses again", chosen, 2);
+    }
+
+    template<> template<>
+    void alpanelist_object::test<13>()
+    {
+        set_test_name("rows by key: the same rows made again only where a cell changed, what is chosen kept; some gone taken out, new ones after; else made again");
+        ALPaneList& l   = make();
+        const auto  row = [](const std::string& key, const std::string& text) {
+            ALPaneList::Row one;
+            one.key   = key;
+            one.value = LLSD(key);
+            LLScrollListCell::Params cell;
+            cell.column = "text";
+            cell.value  = text;
+            one.cells.push_back(cell);
+            return one;
+        };
+        l.setRows({ row("a", "alpha"), row("b", "beta"), row("c", "gamma") });
+        ensure_equals("listed", order(), std::string("alpha beta gamma"));
+        LLScrollListItem* b      = l.rowWithKey("b");
+        LLScrollListCell* b_cell = b->getColumn(0);
+        LLScrollListCell* c_cell = l.rowWithKey("c")->getColumn(0);
+        l.selectNthItem(1);
+        l.setRows({ row("a", "alpha"), row("b", "beta"), row("c", "gamma 2") });
+        ensure("the same rows", l.rowWithKey("b") == b && b->getColumn(0) == b_cell);
+        ensure("the changed cell made again", l.rowWithKey("c")->getColumn(0) != c_cell && order() == "alpha beta gamma 2");
+        ensure("still chosen", l.getFirstSelected() == b);
+
+        l.setRows({ row("b", "beta"), row("c", "gamma 2"), row("d", "delta") });
+        ensure_equals("one gone, one after", order(), std::string("beta gamma 2 delta"));
+        ensure("the same row, chosen", l.rowWithKey("b") == b && l.getFirstSelected() == b && l.keyOf(b) == "b");
+
+        l.setRows({ row("d", "delta"), row("b", "beta") });
+        ensure_equals("moved: made again", order(), std::string("delta beta"));
+        ensure("chosen again by its key", l.getFirstSelected() && l.keyOf(l.getFirstSelected()) == "b");
+        ensure("gone: nothing by it", !l.rowWithKey("c") && l.keyOf(nullptr).empty());
+        l.setRows({});
+        ensure("none", l.getItemCount() == 0 && !l.rowWithKey("d"));
+        add("loose", 0);
+        l.setRows({ row("e", "epsilon") });
+        ensure_equals("a row not its own: made again", order(), std::string("epsilon"));
+        l.setRows({ row("e", "epsilon"), row("e", "twice") });
+        ensure_equals("a key twice: made again, both listed", order(), std::string("epsilon twice"));
+
+        // Its tip made as the pointer rests on it.
+        std::vector<std::string> asked;
+        l.setRowTip([&asked, &l](const LLScrollListItem* item) {
+            asked.push_back(l.keyOf(item));
+            return std::string("the tip");
+        });
+        l.setRows({ row("f", "phi") });
+        const LLRect rows = l.getItemListRect();
+        ensure("over the row: its tip", l.handleToolTip(rows.mLeft + 4, rows.mTop - 4, MASK_NONE) && asked == std::vector<std::string>{ "f" });
     }
 }

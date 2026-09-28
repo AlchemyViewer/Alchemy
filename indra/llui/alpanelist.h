@@ -25,10 +25,17 @@
 
 #include "aldraggesture.h"
 #include "llframetimer.h"
+#include "llscrolllistcell.h"
 #include "llscrolllistctrl.h"
+#include "llstl.h"
+
+#include <boost/unordered/unordered_flat_map.hpp>
 
 #include <functional>
 #include <optional>
+#include <string>
+#include <string_view>
+#include <vector>
 
 // A studio pane's list -- problems, references, places found, an outline --
 // whose rows are places to go. Choosing a row shows its place and the arrow
@@ -135,8 +142,37 @@ public:
         drop_t;
     void setDropHandler(drop_t handler) { mDropHandler = std::move(handler); }
 
+    // A row its owner knows by a key: what stays the same row while its
+    // words change -- a problem whose line moved, a place whose line was
+    // edited. Its value, which choosing it reads; whether it can be
+    // chosen; and its cells, by column.
+    struct Row
+    {
+        std::string                           key;
+        LLSD                                  value;
+        bool                                  enabled = true;
+        std::vector<LLScrollListCell::Params> cells;
+    };
+    // The rows afresh, in order, each key once. A row whose key was there
+    // is the same row, its cells made again only where they say something
+    // else. Where the rows are those there were -- some gone, the rest in
+    // the same order -- with any new ones after them, nothing else is
+    // added or taken away: a check that moved some lines, a filter
+    // narrowed, more places found. Otherwise the list is made again.
+    // Either way the rows chosen, and the row at the top of the view, are
+    // kept by their keys.
+    void setRows(std::vector<Row> rows);
+    // A row's key, empty for one setRows did not put in; and the row with
+    // a key, or null.
+    const std::string& keyOf(const LLScrollListItem* item) const;
+    LLScrollListItem*  rowWithKey(std::string_view key) const;
+    // A row's tip, made as the pointer rests on it rather than carried by
+    // every cell of every row. Where it says nothing, a cell's own tip.
+    void setRowTip(std::function<std::string(const LLScrollListItem*)> tip) { mRowTip = std::move(tip); }
+
     ~ALPaneList() override;
 
+    void clearRows() override;
     bool handleKeyHere(KEY key, MASK mask) override;
     bool handleUnicodeCharHere(llwchar uni_char) override;
     // Copyable, the row under the pointer is chosen, unless the click is in
@@ -169,6 +205,25 @@ private:
     void connectSort();
 
     void copyRows(const std::vector<LLScrollListItem*>& rows);
+
+    // What a cell says, as one number to compare: its kind, its words, its
+    // tip, its face and colours.
+    static size_t saidBy(const LLScrollListCell::Params& cell);
+    // A row put in, and one made again where it stands.
+    LLScrollListItem* addKeyed(Row& row);
+    void              rewrite(LLScrollListItem* item, Row& row, std::vector<size_t>& said);
+
+    struct Keyed
+    {
+        LLScrollListItem*   item = nullptr;
+        // What each cell said when last made.
+        std::vector<size_t> said;
+    };
+    boost::unordered_flat_map<std::string, Keyed, ll::string_hash, std::equal_to<>> mKeyed;
+    boost::unordered_flat_map<const LLScrollListItem*, std::string>                    mKeyOf;
+    // The keys in the order they were given.
+    std::vector<std::string>                                                           mOrder;
+    std::function<std::string(const LLScrollListItem*)>                                mRowTip;
 
     ALEmptyState*               mEmpty = nullptr;
     std::string                 mEmptyHeadline;
