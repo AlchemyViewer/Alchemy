@@ -414,53 +414,34 @@ ALFloaterScriptStudio* ALFloaterScriptStudio::explore(const LLUUID& root)
     return studio;
 }
 
-// static
-void ALFloaterScriptStudio::savedElsewhere(const ALScriptRef& ref, const std::string& text, const LLUUID& asset_id)
+void ALFloaterScriptStudio::takeLoaded(Doc& doc, const std::string& text)
 {
-    for (LLFloater* floater : LLFloaterReg::getFloaterList("script_studio"))
+    // As if loaded afresh -- the envelope read, the expanded code shown, the
+    // analyzers asked, and nothing to save -- the caret and the view where
+    // the author left them. A notecard's text does not carry the items it
+    // holds: loaded afresh, items and all.
+    doc.keepCaret  = doc.editor->caret();
+    doc.keepScroll = doc.editor->scrollY();
+    if (doc.notecard)
     {
-        ALFloaterScriptStudio* window = ALViewType::as<ALFloaterScriptStudio>(floater);
-        const size_t           index  = window ? window->indexOf(ref) : NONE;
-        if (index == NONE)
-        {
-            continue;
-        }
-        Doc& doc = *window->mDocs[index];
-        if (doc.notecard || !doc.loaded || doc.save.sending())
-        {
-            continue;
-        }
-        if (doc.editor->isDirty() && doc.modifiable)
-        {
-            // What was typed here stays a step behind what was saved
-            // there, and the tab stays unsaved -- over the asset that save
-            // made, which a kept text is now measured against.
-            if (asset_id.notNull())
+        const LLHandle<LLFloater> handle = getHandle();
+        ALScriptWorkspace::instance().load(doc.ref, [handle](const ALScriptWorkspace::Loaded& answer) {
+            if (ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get()); studio && answer.error.empty())
             {
-                doc.assetId = asset_id;
+                studio->loaded(answer);
             }
-            doc.carriedText = text;
-            window->takeCarriedText(doc);
-        }
-        else
-        {
-            // As if loaded afresh: the envelope read, the expanded code
-            // shown, the analyzers asked, and nothing to save -- the caret
-            // and the view where the author left them.
-            doc.keepCaret  = doc.editor->caret();
-            doc.keepScroll = doc.editor->scrollY();
-            ALScriptWorkspace::Loaded answer;
-            answer.ref        = ref;
-            answer.assetId    = asset_id.notNull() ? asset_id : doc.assetId;
-            answer.name       = doc.name;
-            answer.text       = text;
-            answer.language   = doc.language;
-            answer.viewable   = true;
-            answer.modifiable = doc.modifiable;
-            window->loaded(answer);
-        }
+        });
         return;
     }
+    ALScriptWorkspace::Loaded answer;
+    answer.ref        = doc.ref;
+    answer.assetId    = doc.assetId;
+    answer.name       = doc.name;
+    answer.text       = text;
+    answer.language   = doc.language;
+    answer.viewable   = true;
+    answer.modifiable = doc.modifiable;
+    loaded(answer);
 }
 
 // static
@@ -736,6 +717,7 @@ bool ALFloaterScriptStudio::postBuild()
     mExpandedButton->setCommitCallback([this](LLUICtrl*, const LLSD&) { toggleExpanded(); });
     mCompiledConnection =
         ALScriptWorkspace::instance().onCompiled([this](const ALScriptWorkspace::CompileResult& result) { mSaving.compiled(result); });
+    mSavedConnection = ALScriptWorkspace::instance().onSaved([this](const ALScriptWorkspace::Saved& saved) { mSaving.savedElsewhere(saved); });
     // New definitions from the region: the analyzers reload, the words
     // are rebuilt, and every script is checked again.
     mDefinitionsConnection = LLSyntaxDefCache::instance().addSyntaxIDCallback([this]() {
@@ -6284,6 +6266,18 @@ void ALFloaterScriptStudio::outputAction(Doc& doc, const std::string& action)
         LLStringUtil::format_map_t args;
         args["[NAME]"] = doc.name;
         setStatus(getString("ExternalKept", args));
+    }
+    else if (action == "take_saved")
+    {
+        mSaving.takeSaved(doc);
+    }
+    else if (action == "keep_saved")
+    {
+        mSaving.keepSaved(doc);
+    }
+    else if (action == "compare_saved" && doc.savedThere)
+    {
+        compare(doc, *doc.savedThere, doc.editor->wholeText(), getString("CompareSavedThere"), getString("CompareNow"));
     }
 }
 

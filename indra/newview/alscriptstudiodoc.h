@@ -415,6 +415,10 @@ struct ALScriptStudioDoc
     // once that has loaded; and a compile target and an experience
     // picked there for the next save, picked again here once it has.
     std::optional<std::string>                 carriedText;
+    // A save of this item from elsewhere -- VS Code, another editor, a
+    // queue -- that landed over changes made here: its text, until the
+    // author says whose to keep.
+    std::optional<std::string>                 savedThere;
     std::optional<std::string>                 carriedTarget;
     std::optional<LLUUID>                      carriedExperience;
     // A line to go to once the script has loaded, or -1; and a

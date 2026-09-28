@@ -123,6 +123,15 @@ public:
         // A file's text written back where it came from.
         virtual void saveFile(Doc& doc) = 0;
 
+        // --- saves from elsewhere ------------------------------------------------------
+
+        // What another save put up, taken in as if the tab had loaded so: a
+        // script's text as it went up; a notecard fetched afresh, since its
+        // text does not carry the items it holds. And the text carried in
+        // (Doc::carriedText) put in as one step to undo.
+        virtual void takeLoaded(Doc& doc, const std::string& text) = 0;
+        virtual void takeCarried(Doc& doc)                        = 0;
+
         // --- the tab and the window ----------------------------------------------------
 
         // A kept text loaded under its item, what it holds carried over.
@@ -170,6 +179,16 @@ public:
     void saveAsked(Doc& doc);
     // Every tab with anything unsaved.
     void saveAll();
+
+    // A script or notecard saved elsewhere -- VS Code, another editor, a
+    // queue -- which a tab holds: taken in where nothing was typed there;
+    // where something was, the author asked whose to keep, Take Theirs,
+    // Keep Mine or Compare -- but for a save of the text the tab last had,
+    // which changes nothing it holds (ALScriptWorkspace::onSaved). And the
+    // author's answer.
+    void savedElsewhere(const ALScriptWorkspace::Saved& saved);
+    void takeSaved(Doc& doc);
+    void keepSaved(Doc& doc);
     // A tab saved to be closed once its save comes back: where the save
     // cannot begin, the tab is left as it was, and a close waiting on it
     // stops -- rather than closing at whatever save comes next.

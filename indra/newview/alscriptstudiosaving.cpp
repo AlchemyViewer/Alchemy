@@ -518,6 +518,95 @@ void ALScriptStudioSaving::saveAll()
     }
 }
 
+void ALScriptStudioSaving::savedElsewhere(const ALScriptWorkspace::Saved& saved)
+{
+    Doc* found = mServices.findDoc(saved.ref);
+    if (!found)
+    {
+        return;
+    }
+    Doc& doc = *found;
+    // This tab's own save lands as its answer; one of its own on its way
+    // lands after this, and is what the server keeps.
+    const bool notecard = saved.kind == ALScriptWorkspace::Kind::Notecard;
+    if ((saved.sender.origin == ALScriptWorkspace::Origin::Studio && saved.sender.request == doc.save.request()) || !doc.loaded ||
+        notecard != doc.notecard || doc.save.sending())
+    {
+        return;
+    }
+    // The author's text as it went up: a script's out of its envelope.
+    std::string theirs = saved.text;
+    if (!notecard)
+    {
+        if (std::optional<ALScriptEnvelope> envelope = ALScriptEnvelope::parse(saved.text))
+        {
+            theirs = envelope->source;
+        }
+    }
+    if (saved.asset.notNull())
+    {
+        doc.assetId = saved.asset;
+    }
+    const std::string& here = doc.editor->wholeText();
+    if (theirs == here)
+    {
+        // What is here is what went up.
+        doc.editor->resetDirty();
+        mWindow.refreshToolbar();
+        return;
+    }
+    if (doc.editor->isDirty() && doc.modifiable)
+    {
+        // A save of the text this tab last had -- a recompile, a queue --
+        // changes nothing it holds: what was typed stays, to be saved.
+        const std::optional<std::string> before = doc.editor->undoJournal().savedText();
+        if (before && theirs == *before)
+        {
+            return;
+        }
+        // Changed here and there: one would be lost, so the author says
+        // which, with the two to compare.
+        doc.savedThere = theirs;
+        LLStringUtil::format_map_t args;
+        args["[NAME]"] = doc.name;
+        args["[WHO]"]  = mServices.words(saved.sender.origin == ALScriptWorkspace::Origin::Bridge   ? "SavedByBridge"
+                                         : saved.sender.origin == ALScriptWorkspace::Origin::Editor ? "SavedByEditor"
+                                                                                                    : "SavedByQueue");
+        mServices.report(mServices.words("SavedElsewhereConflict", args), true, &doc, { "take_saved", "keep_saved", "compare_saved" });
+        return;
+    }
+    // Nothing typed here: taken as if loaded afresh.
+    mWindow.takeLoaded(doc, saved.text);
+}
+
+void ALScriptStudioSaving::takeSaved(Doc& doc)
+{
+    if (!doc.savedThere)
+    {
+        return;
+    }
+    // What was saved elsewhere put in as one step, what was typed here a
+    // step back in the undo; the server holds it, so nothing to save.
+    doc.carriedText = std::move(*doc.savedThere);
+    doc.savedThere.reset();
+    mWindow.takeCarried(doc);
+    doc.editor->resetDirty();
+    mWindow.refreshToolbar();
+}
+
+void ALScriptStudioSaving::keepSaved(Doc& doc)
+{
+    if (!doc.savedThere)
+    {
+        return;
+    }
+    // What was typed here kept; saving it replaces what was saved there.
+    doc.savedThere.reset();
+    LLStringUtil::format_map_t args;
+    args["[NAME]"] = doc.name;
+    mServices.setStatus(mServices.words("SavedElsewhereKept", args));
+}
+
 void ALScriptStudioSaving::compiled(const ALScriptWorkspace::CompileResult& result)
 {
     // A copy of another tab, saved -- compiled or not, the text is up: the

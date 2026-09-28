@@ -157,7 +157,6 @@ public:
     // does, shows the text as saved. A tab with unsaved changes takes
     // the text as one more step to undo, so that nothing typed is lost.
     // The asset the save made, where the saver knows it.
-    static void savedElsewhere(const ALScriptRef& ref, const std::string& text, const LLUUID& asset_id = LLUUID::null);
     // A script or notecard gone from its object, so that a tab holding
     // it goes too.
     static void itemRemoved(const ALScriptRef& ref);
@@ -445,6 +444,8 @@ private:
                       U64 request) override;
     U64  newRequest() override;
     void keepForRecovery(Doc& doc) override;
+    void takeLoaded(Doc& doc, const std::string& text) override;
+    void takeCarried(Doc& doc) override { takeCarriedText(doc); }
     void showProblems() override;
     void selectFirstError(bool checkers_only) override;
     // A row, a reference, a place found, an outline entry chosen: the
@@ -1046,6 +1047,7 @@ private:
     LLButton*                          mFormatButton  = nullptr;
     LLButton*                          mExpandedButton = nullptr;
     boost::signals2::scoped_connection mCompiledConnection;
+    boost::signals2::scoped_connection mSavedConnection;
     boost::signals2::scoped_connection mDefinitionsConnection;
     // The vimrc changed: read again into this window's vim.
     boost::signals2::scoped_connection mVimrcConnection;

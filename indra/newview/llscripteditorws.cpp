@@ -2063,7 +2063,6 @@ LLSD LLScriptEditorWSServer::saveScript(LLViewerObject* prim, LLInventoryItem* i
             sed->makeEditorPristine();
         }
     }
-    ALFloaterScriptStudio::savedElsewhere(ALScriptRef(prim_id, item_id), text, answer->newAssetId);
 
     return response;
 }

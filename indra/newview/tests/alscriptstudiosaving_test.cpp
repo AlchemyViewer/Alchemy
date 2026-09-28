@@ -106,6 +106,16 @@ namespace
             return true;
         }
         U64 newRequest() override { return ++requests; }
+        void takeLoaded(Doc& doc, const std::string& text) override { loadedAgain.push_back(doc.id + ":" + text); }
+        void takeCarried(Doc& doc) override
+        {
+            if (doc.carriedText)
+            {
+                doc.editor->setSelection(ALTextRange(doc.editor->document().start(), doc.editor->document().end()));
+                doc.editor->insertText(*doc.carriedText);
+                doc.carriedText.reset();
+            }
+        }
         void saveFile(Doc& doc) override { files.push_back(doc.id); }
         void reattach(Doc& doc) override { reattached.push_back(doc.id); }
         void refreshNotice() override { ++notices; }
@@ -145,6 +155,7 @@ namespace
         std::vector<Sent>                                   sent;
         Names                                               notecards;
         U64                                                 requests = 0;
+        Names                                               loadedAgain;
         std::vector<bool>                                   firstErrors;
         S32                                                 problemsShown = 0, notices = 0, stops = 0, continues = 0;
     };
@@ -711,5 +722,65 @@ namespace tut
 
         saving.compiled(answer(doc));
         ensure("its own lands", !doc.save.sending() && !doc.editor->isDirty());
+    }
+
+    template<> template<>
+    void alscriptstudiosaving_object::test<14>()
+    {
+        set_test_name("a save from elsewhere: taken in by a tab with nothing typed, asked about by one with changes, let be where it saved what the tab last had");
+        ALScriptStudioSaving& saving = make();
+        const auto            saved  = [](const Doc& doc, const std::string& text, ALScriptWorkspace::Origin origin, U64 request = 0) {
+            ALScriptWorkspace::Saved one;
+            one.ref    = doc.ref;
+            one.text   = text;
+            one.sender = ALScriptWorkspace::Sender(origin, request);
+            one.asset.generate();
+            return one;
+        };
+
+        // Nothing typed here: taken in as loaded.
+        Doc& clean = tab("clean", "default {}");
+        saving.savedElsewhere(saved(clean, "default { touch_start(integer n) {} }", ALScriptWorkspace::Origin::Bridge));
+        ensure("taken in", studio.loadedAgain == Names{ "clean:default { touch_start(integer n) {} }" });
+
+        // Changed here and there: asked, and nothing taken yet.
+        Doc& dirty = tab("dirty", "default {}");
+        type(dirty, "\n// mine");
+        saving.savedElsewhere(saved(dirty, "default {}\n// theirs", ALScriptWorkspace::Origin::Bridge));
+        ensure_equals("asked whose to keep", lastSaid(), std::string("SavedElsewhereConflict"));
+        ensure("with the three answers", services.reports.back().actions == Names{ "take_saved", "keep_saved", "compare_saved" });
+        ensure("nothing taken yet", dirty.editor->wholeText() == "default {}\n// mine" && dirty.savedThere);
+        saving.takeSaved(dirty);
+        ensure("theirs taken, and nothing to save", dirty.editor->wholeText() == "default {}\n// theirs" && !dirty.editor->isDirty());
+        ensure("asked no more", !dirty.savedThere);
+
+        // A recompile of what the tab last had: nothing changes, nothing asked.
+        Doc& kept = tab("kept", "default {}");
+        type(kept, "\n// typing");
+        const size_t said = services.reports.size();
+        saving.savedElsewhere(saved(kept, "default {}", ALScriptWorkspace::Origin::Recompile));
+        ensure("not asked", services.reports.size() == said && !kept.savedThere && kept.editor->isDirty());
+
+        // In its envelope: read by its source; what went up is what is here.
+        ALScriptEnvelope envelope;
+        envelope.source        = "default {}\n// typing";
+        envelope.expanded      = "default {}";
+        envelope.compileTarget = "mono";
+        saving.savedElsewhere(saved(kept, envelope.wrap(), ALScriptWorkspace::Origin::Bridge));
+        ensure("the same as here: saved", !kept.editor->isDirty() && services.reports.size() == said);
+
+        // Its own save lands as its answer, not as a save from elsewhere.
+        Doc& own = tab("own", "default {}");
+        type(own, " ");
+        saving.save(own);
+        ALScriptWorkspace::Saved mine = saved(own, "something else", ALScriptWorkspace::Origin::Studio, own.save.request());
+        saving.savedElsewhere(mine);
+        ensure("its own let be", !own.savedThere && own.editor->wholeText() == "default {} ");
+
+        // Kept: what is here stays, to be saved.
+        type(dirty, "\n// again");
+        saving.savedElsewhere(saved(dirty, "default {}\n// third", ALScriptWorkspace::Origin::Editor));
+        saving.keepSaved(dirty);
+        ensure("kept", !dirty.savedThere && dirty.editor->isDirty() && lastStatus() == "SavedElsewhereKept");
     }
 }
