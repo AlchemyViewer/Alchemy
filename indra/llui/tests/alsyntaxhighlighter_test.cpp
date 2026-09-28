@@ -313,4 +313,44 @@ namespace tut
         ensure_equals("the first's edit reached nothing", highlighter.lastLexed(), 0);
         ensure_equals("and the second reads as it did", said(second.line(1), highlighter.tokens(1)), std::string("text:y"));
     }
+    template<> template<>
+    void alsyntaxhighlighter_object::test<9>()
+    {
+        set_test_name("the states lines are in are kept once, and those no line is in any longer let go of; the tokens are what lexing afresh gives");
+        ALTextDocument doc;
+        std::string    text;
+        for (S32 i = 0; i < 100; ++i)
+        {
+            text += "a\n";
+        }
+        doc.setText(text);
+        ALSyntaxHighlighter highlighter;
+        highlighter.setGrammar(loaded(brackets()));
+        highlighter.attach(&doc);
+        highlighter.tokens(99);
+        ensure("one state for every line in the same state", highlighter.statesKept() <= 2);
+
+        // Each time, the first line opens a bracket of another level, which
+        // every line after it is inside: a hundred new states each time,
+        // and the last time's no longer anyone's.
+        for (S32 level = 1; level <= 60; ++level)
+        {
+            const S32 first_length = doc.lineLength(0);
+            doc.replace(ALTextRange(ALTextPos(0, 0), ALTextPos(0, first_length)), "[" + std::string(static_cast<size_t>(level), '=') + "[");
+            highlighter.tokens(99);
+        }
+        highlighter.tokens(99);
+        ensure("let go of past a number: " + std::to_string(highlighter.statesKept()), highlighter.statesKept() <= 4096 + 100);
+
+        // One more edit, and every line's tokens as a highlighter made
+        // afresh has them.
+        doc.replace(ALTextRange(ALTextPos(50, 0), ALTextPos(50, 1)), "]" + std::string(60, '=') + "] b");
+        ALSyntaxHighlighter fresh;
+        fresh.setGrammar(loaded(brackets()));
+        fresh.attach(&doc);
+        for (S32 line = 0; line < doc.lineCount(); ++line)
+        {
+            ensure("line " + std::to_string(line) + " as lexed afresh", highlighter.tokens(line) == fresh.tokens(line));
+        }
+    }
 }
