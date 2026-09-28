@@ -24,6 +24,7 @@
 
 #pragma once
 
+#include "alfenwicktree.h"
 #include "alfontshaping.h"
 #include "allinetable.h"
 #include "altextdocument.h"
@@ -38,8 +39,11 @@
 // their pen positions, and cut into rows where it wraps; each row a height;
 // every line a top, so a view can find the line under a pixel and the pixel
 // under a caret. Laid out lazily, line by line, as a view asks; an edit
-// throws away the lines it touched and nothing else; a change of font, tab
-// width or wrap width throws away everything.
+// throws away the lines it touched and nothing else; a change of font or
+// tab width throws away everything; a change of wrap width cuts each line
+// into rows again as it is next asked for, and it is not shaped again.
+// Until a line is laid out again it keeps the height it had, and the lines
+// below it their tops.
 //
 // Fonts: one for the document, and any other over a stretch of a line
 // where a provider says so -- a heading in a heavier face, a note in the
@@ -175,6 +179,14 @@ public:
         // column with a search needs. A line with text written right to
         // left in it is walked instead.
         bool                          ordered = true;
+        // The wrap width its rows were cut at; and, to cut them again at
+        // another without shaping it again, the fonts over stretches of it
+        // where not the document's -- each starting at a glyph, or ending
+        // with none -- and the boxes on it by glyph, with their heights,
+        // which is what a row is as tall as.
+        S32                                             wrappedAt = -1;
+        std::vector<std::pair<size_t, const LLFontGL*>> fonts;
+        std::vector<std::pair<size_t, S32>>             boxes;
     };
 
     ALTextLayout();
@@ -249,9 +261,15 @@ public:
     // --- the column ----------------------------------------------------------
 
     // The top of a line from the top of the document, and the whole. Lines
-    // not yet laid out count as one row.
+    // not yet laid out count as one row, and one laid out once as the
+    // height it was until it is laid out again.
     S32 lineTop(S32 index);
     S32 totalHeight();
+    // Moves on whenever a line's top may have moved: a line laid out to
+    // another height, lines made or taken away, hidden or shown, or
+    // everything laid out again -- for a view that keeps to its place in
+    // the text as heights above it change.
+    U32 heightsRevision() const { return mHeightsRevision; }
     // The line whose rows cover a y, clamped to the first and the last;
     // never a hidden one where any line is not.
     S32 lineAtY(S32 y);
@@ -279,8 +297,17 @@ public:
 private:
     void onEdit(const ALTextDocument::Edit& edit);
     void invalidateAll();
+    // Shaped and cut into rows; and cut into rows alone, for a line whose
+    // glyphs are current at another wrap width.
     void layoutLine(S32 index, Line& out);
-    void ensureTops();
+    void wrapLine(S32 index, Line& out);
+    // What a line counts for in the column: nothing hidden; its height
+    // once laid out, even since thrown away; a row before.
+    S32  countedHeight(S32 index) const;
+    // Every line's height summed afresh, where lines were made or taken
+    // away, hidden or everything thrown away since.
+    void ensureHeights();
+    void heightsMoved();
     // A space's advance, in the screen's pixels.
     F32  spaceAdvance();
     // Throws everything away when the fonts were reloaded or the UI
@@ -295,9 +322,12 @@ private:
     ALLineTable<Line>                  mLines;
     ALLineTable<U8>                    mHidden;
     S32                                mHiddenCount = 0;
-    // mTops[i] is the top of line i; mTops[count] the whole height.
-    std::vector<S32>                   mTops;
-    bool                               mTopsDirty    = true;
+    // Each line's height as it counts, summed so that one changing moves
+    // the tops after it without adding them all up again.
+    ALFenwickTree<S32>                 mHeights;
+    std::vector<S32>                   mHeightScratch;
+    bool                               mHeightsStale    = true;
+    U32                                mHeightsRevision = 0;
     F32                                mSpaceAdvance = -1.f;
     // Negative until asked for.
     F32                                mContentWidth = -1.f;

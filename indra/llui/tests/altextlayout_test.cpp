@@ -629,4 +629,85 @@ namespace tut
         ensure("one more before, no more", line.glyphs[seen.glyphBegin + 1].pen + line.glyphs[seen.glyphBegin + 1].advance - row.xStart >= from);
         ensure("one more after, no more", line.glyphs[seen.glyphEnd - 2].pen - row.xStart <= to);
     }
+    template<> template<>
+    void altextlayout_object::test<15>()
+    {
+        set_test_name("the wrap width moved: a line is cut into rows again from its glyphs, not shaped again, and keeps its height until it is");
+        ready("aaaa bbbb cccc dddd eeee ffff\nzz");
+        const F32 fifteen = layout.xOf(0, 15);
+        const F32 whole   = layout.line(0).width;
+        layout.setWrapWidth(static_cast<S32>(fifteen));
+        const U32 shaped = layout.linesLaidOut();
+        ensure("wrapped", layout.line(0).rows.size() >= 2);
+        ensure_equals("cut into rows, not shaped", layout.linesLaidOut(), shaped);
+        const S32 tall = layout.lineTop(1);
+        ensure("taller than a row", tall > layout.rowHeight());
+        layout.setWrapWidth(static_cast<S32>(whole) + 50);
+        ensure_equals("its height kept until it is laid out again", layout.lineTop(1), tall);
+        ensure_equals("one row now", layout.line(0).rows.size(), size_t(1));
+        ensure_equals("and the next line's top follows", layout.lineTop(1), layout.rowHeight());
+        ensure_equals("still not shaped again", layout.linesLaidOut(), shaped);
+    }
+
+    template<> template<>
+    void altextlayout_object::test<16>()
+    {
+        set_test_name("the tops and the line at a y are the heights added up, through wrapping, typing, lines made and taken away, and hidden lines");
+        std::string text;
+        for (S32 i = 0; i < 40; ++i)
+        {
+            text += std::string(static_cast<size_t>(1 + (i * 37) % 90), static_cast<char>('a' + i % 26)) + " word word\n";
+        }
+        ready(text.c_str());
+        layout.setWrapWidth(200);
+        const auto check = [&](const std::string& what) {
+            for (S32 i = 0; i < layout.lineCount(); ++i)
+            {
+                layout.line(i);
+            }
+            S32 top = 0;
+            for (S32 i = 0; i < layout.lineCount(); ++i)
+            {
+                ensure_equals(what + ": the top of line " + std::to_string(i), layout.lineTop(i), top);
+                const S32 height = layout.lineHeight(i);
+                if (height > 0)
+                {
+                    ensure_equals(what + ": the line at its top", layout.lineAtY(top), i);
+                    ensure_equals(what + ": the line at its bottom", layout.lineAtY(top + height - 1), i);
+                }
+                top += height;
+            }
+            ensure_equals(what + ": the whole", layout.totalHeight(), top);
+        };
+        check("laid out");
+        doc.insert(ALTextPos(3, 2), std::string(300, 'x'));
+        check("typed in");
+        doc.insert(ALTextPos(5, 0), "new\nlines\n");
+        check("lines made");
+        doc.remove(ALTextRange(ALTextPos(1, 0), ALTextPos(4, 0)));
+        check("lines taken away");
+        layout.setHidden(6, 9, true);
+        check("hidden");
+        layout.setHidden(7, 7, false);
+        check("one shown");
+        layout.setWrapWidth(120);
+        check("narrower");
+    }
+
+    template<> template<>
+    void altextlayout_object::test<17>()
+    {
+        set_test_name("a line typed in keeps its height until it is laid out again, and the lines after it their tops");
+        ready("short\nnext\n");
+        layout.setWrapWidth(static_cast<S32>(layout.columnWidth() * 10.f));
+        layout.line(0);
+        const S32 before   = layout.lineTop(1);
+        const U32 revision = layout.heightsRevision();
+        doc.insert(ALTextPos(0, 5), " and a great deal more that wraps onto rows");
+        ensure_equals("its height kept", layout.lineTop(1), before);
+        ensure_equals("nothing moved yet", layout.heightsRevision(), revision);
+        layout.line(0);
+        ensure("taller once laid out", layout.lineTop(1) > before);
+        ensure("and the heights moved", layout.heightsRevision() != revision);
+    }
 }
