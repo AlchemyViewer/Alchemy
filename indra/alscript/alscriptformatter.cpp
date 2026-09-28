@@ -483,7 +483,7 @@ namespace
                     last  = &t;
                 }
             }
-            if (!lua && (continued || (first && first->kind == Kind::Punct && first->text == "#")))
+            if (continued || (first && first->kind == Kind::Punct && first->text == (lua ? "--#" : "#")))
             {
                 // A preprocessor line: as written, and no part of the
                 // structure.

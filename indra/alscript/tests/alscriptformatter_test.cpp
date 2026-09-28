@@ -230,6 +230,11 @@ namespace tut
                                   "        BLOCK(\"hi\")\n"
                                   "    }\n"
                                   "}\n"));
+        // SLua's are written --#, and are as written too: a function-like
+        // macro's ( stays against its name, and a # is no operator's.
+        ensure_equals("SLua's directives as written, the script as it should be",
+                      lua("--#define SQUARE(x) ((x)*(x))\n--#define LEN(t) #t\nlocal function f(a)\nreturn SQUARE(a)+LEN(a)\nend\n"),
+                      std::string("--#define SQUARE(x) ((x)*(x))\n--#define LEN(t) #t\nlocal function f(a)\n    return SQUARE(a) + LEN(a)\nend\n"));
     }
     template<> template<>
     void alscriptformatter_object::test<8>()

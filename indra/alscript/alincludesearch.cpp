@@ -424,8 +424,8 @@ ALPreprocessor::Found ALIncludeSearch::lookUp(const ALPreprocessor::Ask& ask, AL
 
 std::vector<ALPreprocessor::Include> ALIncludeSearch::includedBy(const std::string& text, const Asking& asking, const Where& where)
 {
-    // What a file asks for: its `#include` lines, and a SLua script's
-    // require calls.
+    // What a file asks for: its include lines -- `#include`, `--#include`
+    // in SLua -- and a SLua script's require calls.
     const auto asks_in = [&asking](const std::string& text, const std::string& from) {
         std::vector<ALPreprocessor::Ask> asks;
         for (size_t at = 0; at < text.size();)
@@ -433,13 +433,12 @@ std::vector<ALPreprocessor::Include> ALIncludeSearch::includedBy(const std::stri
             const size_t     nl   = text.find('\n', at);
             std::string_view line = std::string_view(text).substr(at, nl == std::string::npos ? std::string::npos : nl - at);
             at                    = nl == std::string::npos ? text.size() : nl + 1;
-            const size_t hash     = line.find_first_not_of(" \t");
-            if (hash == std::string_view::npos || line[hash] != '#')
+            const size_t name     = ALPreprocessor::directiveName(line, asking.lua);
+            if (name == std::string_view::npos)
             {
                 continue;
             }
-            line.remove_prefix(hash + 1);
-            line.remove_prefix(std::min(line.size(), line.find_first_not_of(" \t")));
+            line.remove_prefix(name);
             if (line.substr(0, 7) != "include")
             {
                 continue;

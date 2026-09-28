@@ -214,8 +214,23 @@ namespace
     // and plain LSL has no use for an & before an =.
     constexpr std::string_view LSL_PUNCT[] = { "<<=", ">>=", "...", "##", "++", "--", "+=", "-=", "*=", "/=", "%=", "&=", "|=", "^=",
                                                "==",  "!=",  "<=",  ">=", "&&", "||", "<<", ">>" };
-    constexpr std::string_view LUA_PUNCT[] = { "...", "//=", "..=", "##", "..", "//", "::", "->", "+=", "-=", "*=", "/=", "%=", "^=",
+    // No `##` in SLua: `#` is Luau's length, and `##t` its length twice.
+    constexpr std::string_view LUA_PUNCT[] = { "...", "//=", "..=", "..", "//", "::", "->", "+=", "-=", "*=", "/=", "%=", "^=",
                                                "==",  "~=",  "<=",  ">=" };
+
+    // The directives the engine reads, by name.
+    bool isDirectiveName(std::string_view word)
+    {
+        static constexpr std::string_view NAMES[] = { "if",    "ifdef", "ifndef",  "elif",   "else", "endif", "define",
+                                                      "undef", "include", "error", "warning", "pragma", "line" };
+        return std::find(std::begin(NAMES), std::end(NAMES), word) != std::end(NAMES);
+    }
+
+    // What starts a directive in each language: LSL's `#`, which SLua
+    // cannot have, since `#` is its length operator and may start a line
+    // that goes on an expression; SLua's `--#`, which is a comment to
+    // Luau, so that a script written with directives is Luau still.
+    std::string_view hashOf(bool lua) { return lua ? "--#" : "#"; }
 
     // A language's punctuators by their first byte, in the order the list
     // has them, longest first: a mark is tried against the few that start
@@ -597,6 +612,34 @@ namespace
             }
         }
 
+        // Nothing but blanks and comments since the last newline.
+        bool lineStart() const
+        {
+            for (auto it = mOut.rbegin(); it != mOut.rend(); ++it)
+            {
+                if (it->kind == Kind::Newline)
+                {
+                    return true;
+                }
+                if (it->kind != Kind::Space && it->kind != Kind::Comment)
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        // The name that starts at `from`, as far as a name goes.
+        std::string_view wordAt(size_t from) const
+        {
+            size_t end = from;
+            while (end < mText.size() && isIdentChar(mText[end]))
+            {
+                ++end;
+            }
+            return end > from ? mText.substr(from, end - from) : std::string_view();
+        }
+
         void luaToken()
         {
             if (continuation())
@@ -604,6 +647,19 @@ namespace
                 return;
             }
             const char c = at(mPos);
+            // A directive as SLua writes one: `--#` and a directive's name
+            // at once, first on its line. Anything else after `--#` -- a
+            // rule of #s, `--# selene: allow(...)`, `--# note` -- is the
+            // comment it looks like.
+            if (c == '-' && at(mPos + 1) == '-' && at(mPos + 2) == '#' && isDirectiveName(wordAt(mPos + 3)) && lineStart())
+            {
+                start(Kind::Punct);
+                take();
+                take();
+                take();
+                finish();
+                return;
+            }
             if (c == '-' && at(mPos + 1) == '-')
             {
                 start(Kind::Comment);
@@ -836,7 +892,7 @@ namespace
     // first the last of everything but blanks, with no `#else` or `#elif`
     // of it between -- or nothing. Such a file is wanted once: included
     // again while X is defined, it makes nothing.
-    std::string guardOf(const Tokens& tokens)
+    std::string guardOf(const Tokens& tokens, std::string_view hash)
     {
         // Each directive's word, where it stands at the start of a line.
         struct Directive
@@ -858,7 +914,7 @@ namespace
             {
                 continue;
             }
-            if (line_start && t.is(Kind::Punct, "#"))
+            if (line_start && t.kind == Kind::Punct && t.text == hash)
             {
                 const size_t word = skipSpace(tokens, i + 1);
                 directives.push_back({ i, word < tokens.size() && tokens[word].kind == Kind::Ident ? tokens[word].text : std::string() });
@@ -1188,7 +1244,7 @@ namespace
             if (!path.empty())
             {
                 mLexed[path] = Lexed{ f->index, f->lexed };
-                if (std::string guard = guardOf(f->tokens()); !guard.empty())
+                if (std::string guard = guardOf(f->tokens(), hashOf(mOptions.lua)); !guard.empty())
                 {
                     mGuards[path] = std::move(guard);
                 }
@@ -1228,7 +1284,7 @@ namespace
     {
         const Tokens& tokens = f.tokens();
         const size_t  i      = skipSpace(tokens, f.pos);
-        return i < tokens.size() && tokens[i].is(Kind::Punct, "#");
+        return i < tokens.size() && tokens[i].kind == Kind::Punct && tokens[i].text == hashOf(mOptions.lua);
     }
 
     void Engine::loop(size_t depth)
@@ -1683,7 +1739,7 @@ namespace
         for (size_t i = 0; i < body.size(); ++i)
         {
             const Token& b = body[i];
-            if (m.functionLike && b.is(Kind::Punct, "#"))
+            if (m.functionLike && !mOptions.lua && b.is(Kind::Punct, "#"))
             {
                 const size_t j   = skipBlank(body, i + 1);
                 const S32    idx = j < body.size() ? paramIndex(m, body[j]) : -1;
@@ -2318,7 +2374,9 @@ namespace
             problem(ALScriptProblem::Severity::Error, "PreprocPasteAtEnd", "'##' cannot be at either end of a macro body", {}, line[at]);
             return;
         }
-        if (m.functionLike)
+        // In SLua a `#` is the length of what follows it, a parameter or
+        // not: there is no stringizing to check.
+        if (m.functionLike && !mOptions.lua)
         {
             for (size_t k = 0; k < m.body.size(); ++k)
             {
@@ -4585,6 +4643,28 @@ void ALPreprocessor::optimize(Result& result, const Options& options)
     result.map       = after_map;
     result.text      = std::move(optimized.text);
     result.optimized = true;
+}
+
+// static
+size_t ALPreprocessor::directiveName(std::string_view line, bool lua)
+{
+    size_t at = line.find_first_not_of(" \t");
+    if (at == std::string_view::npos || line.compare(at, hashOf(lua).size(), hashOf(lua)) != 0)
+    {
+        return std::string_view::npos;
+    }
+    at += hashOf(lua).size();
+    if (!lua)
+    {
+        at = line.find_first_not_of(" \t", at);
+        return at != std::string_view::npos && isIdentStart(line[at]) ? at : std::string_view::npos;
+    }
+    size_t end = at;
+    while (end < line.size() && isIdentChar(line[end]))
+    {
+        ++end;
+    }
+    return isDirectiveName(line.substr(at, end - at)) ? at : std::string_view::npos;
 }
 
 std::vector<ALPreprocessor::Token> ALPreprocessor::tokenize(std::string_view text, bool lua)

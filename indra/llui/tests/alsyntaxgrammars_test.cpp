@@ -141,6 +141,13 @@ namespace tut
                       std::string("text:s |operator:=|text: |string:[==[ a ]] b ]==]|text: |punctuation:..|text: |string:'c'"));
         ensure_equals("an attribute and constants", lexed("slua", "@native true nil", state, words),
                       std::string("attribute:@native|text: |constant:true|text: |constant:nil"));
+        ensure_equals("a directive, written as a comment to Luau", lexed("slua", "--#define X 1.5 -- the x", state, words),
+                      std::string("preprocessor:--#define X 1.5 |comment:-- the x"));
+        ensure_equals("an include's name is a path", lexed("slua", "--#include \"lib.luau\"", state, words),
+                      std::string("preprocessor:--#include |path:\"lib.luau\""));
+        ensure_equals("selene's file-wide word is a comment", lexed("slua", "--# selene: allow(unused_variable)", state, words),
+                      std::string("comment:--# selene: allow(unused_variable)"));
+        ensure_equals("and so is a rule of #s", lexed("slua", "--##########", state, words), std::string("comment:--##########"));
     }
 
     template<> template<>

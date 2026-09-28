@@ -439,12 +439,12 @@ namespace tut
     void alpreprocessor_object::test<10>()
     {
         set_test_name("SLua: its own strings and comments, # in a line, and require gathered into modules");
-        const std::string source = "#define N 3\n"
+        const std::string source = "--#define N 3\n"
                                    "local s = [[N]] -- N\n"
                                    "local t = \"N\" .. #N_list .. 'N' .. `N{N}`\n"
                                    "--[==[ N\nN ]==]\n"
                                    "print(N)\n"
-                                   "#line 3\n";
+                                   "--#line 3\n";
         ALPreprocessor::Result r = ALPreprocessor::run(source, options(true));
         ensure_equals("problems", messages(r), std::string());
         ensure_equals("text", r.text,
@@ -495,7 +495,7 @@ namespace tut
         ensure_equals("missing", messages(r), std::string("E 0: could not find module 'd'\n"));
         ensure_equals("left alone", r.text, std::string("local d = require(\"d\")\n"));
 
-        r = ALPreprocessor::run("--fspreprocessor off\n#define X\n", options(true));
+        r = ALPreprocessor::run("--fspreprocessor off\n--#define X\n", options(true));
         ensure("off in Lua", r.disabled);
     }
 
@@ -916,7 +916,7 @@ namespace tut
                kinds.size() >= 6 && kinds[3] == "`a{ \"{\" .. `{'}'}` }b`" && kinds[4] == ".." && kinds[5] == "X");
 
         // And the macro after it is expanded.
-        ALPreprocessor::Result r = ALPreprocessor::run("#define X 42\nlocal s = `{\"{\"}` .. X\n", options(true));
+        ALPreprocessor::Result r = ALPreprocessor::run("--#define X 42\nlocal s = `{\"{\"}` .. X\n", options(true));
         ensure("the macro after the string expanded: " + r.text, r.text.find(".. 42") != std::string::npos);
     }
 
@@ -1011,7 +1011,7 @@ namespace tut
         loc = r.map.toExpanded(0, 2, 4);
         ensure("and back", loc.found() && loc.line == 2 && loc.column == 4);
 
-        const std::string lua = "#define X 2\nlocal s = [[one\ntwo\nthree]] .. X\n";
+        const std::string lua = "--#define X 2\nlocal s = [[one\ntwo\nthree]] .. X\n";
         r = ALPreprocessor::run(lua, options(true));
         ensure_equals("nothing wrong in SLua", messages(r), std::string());
         loc = r.map.toSource(2, 1);
@@ -1518,5 +1518,73 @@ namespace tut
         const S32    line    = static_cast<S32>(std::count(r.text.begin(), r.text.begin() + z, '\n'));
         const S32    column  = static_cast<S32>(newline == std::string::npos ? z : z - newline - 1);
         ensure("where the name is in the text", at(r, 0, "Z", line, column, false) && r.consts.size() == 1);
+    }
+
+    template<> template<>
+    void alpreprocessor_object::test<41>()
+    {
+        set_test_name("SLua: a directive is --# and its name first on a line, # is Luau's length wherever it stands, and a macro's # is length too");
+        // A line that starts with # goes on an expression: never a
+        // directive, and nothing said of it.
+        ALPreprocessor::Result r = ALPreprocessor::run("local n =\n    #items\n#define N 3\nprint(N)\n", options(true));
+        ensure_equals("nothing wrong", messages(r), std::string());
+        ensure_equals("# lines are Luau's", r.text, std::string("local n =\n    #items\n#define N 3\nprint(N)\n"));
+
+        // --# with a directive's name at once, indented or not; the
+        // conditionals, the macros, #line.
+        r = ALPreprocessor::run("--#define DEBUG\n"
+                                "--#define LEN(t) #t\n"
+                                "--#define LAST(t) t[#t]\n"
+                                "--#define TWICE(t) ##t\n"
+                                "--#ifdef DEBUG\n"
+                                "    --#define LEVEL 2\n"
+                                "--#else\n"
+                                "    --#define LEVEL 0\n"
+                                "--#endif\n"
+                                "--#if LEVEL > 1\n"
+                                "print(LEN(xs), LAST(xs), TWICE(xs), LEVEL)\n"
+                                "--#endif\n"
+                                "--#line 40\n",
+                                options(true));
+        ensure_equals("nothing wrong", messages(r), std::string());
+        ensure_equals("directives read, # as length", r.text,
+                      std::string("\n\n\n\n\n\n\n\n\n\nprint(#xs, xs[#xs], ##xs, 2)\n\n--#line 40\n"));
+
+        // Comments that only look like directives stay comments: selene's
+        // file-wide word, a rule of #s, a note, a word that is no
+        // directive's, a blank after the --, and one after code.
+        const std::string comments = "--# selene: allow(unused_variable)\n"
+                                     "--##########\n"
+                                     "--# define X 1\n"
+                                     "--#definitely not\n"
+                                     "-- #define Y 2\n"
+                                     "local z = 1 --#define Z 3\n"
+                                     "print(X, Y, Z)\n";
+        r = ALPreprocessor::run(comments, options(true));
+        ensure_equals("nothing wrong", messages(r), std::string());
+        ensure_equals("all as written", r.text, comments);
+
+        // An include, as LSL has one.
+        add("lib.luau", "--#define GREETING \"hi\"\nlocal lib = {}\n");
+        r = ALPreprocessor::run("--#include \"lib.luau\"\nprint(GREETING)\n", options(true));
+        ensure_equals("nothing wrong", messages(r), std::string());
+        ensure("the include's text in, and its macro", r.text.find("local lib = {}") != std::string::npos &&
+                                                       r.text.find("print(\"hi\")") != std::string::npos);
+
+        // Its errors are the directive's.
+        r = ALPreprocessor::run("--#endif\n--#if\n--#endif\n", options(true));
+        ensure("an #endif without #if, and an #if without an expression: " + messages(r),
+               messages(r).find("E 0:") != std::string::npos && messages(r).find("E 1:") != std::string::npos);
+
+        // Read as a script's lines are, by what finds includes and names.
+        ensure_equals("--#include's name", ALPreprocessor::directiveName("  --#include \"x\"", true), size_t(5));
+        ensure("not with a blank", ALPreprocessor::directiveName("--# include \"x\"", true) == std::string_view::npos);
+        ensure("not # in SLua", ALPreprocessor::directiveName("#include \"x\"", true) == std::string_view::npos);
+        ensure_equals("# in LSL, blanks about it", ALPreprocessor::directiveName(" # include \"x\"", false), size_t(3));
+        ensure("not --# in LSL", ALPreprocessor::directiveName("--#include \"x\"", false) == std::string_view::npos);
+
+        // And by the lines a verbatim reader sees: --# is a mark of its own.
+        const std::vector<ALPreprocessor::Token> tokens = ALPreprocessor::tokenize("--#define A 1\n#a\n", true);
+        ensure("the mark, then the directive's words", tokens.size() > 2 && tokens[0].text == "--#" && tokens[1].text == "define");
     }
 }

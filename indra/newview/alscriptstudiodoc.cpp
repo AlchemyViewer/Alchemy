@@ -233,25 +233,22 @@ std::optional<ALScriptStudioDoc::Named> ALScriptStudioDoc::namedIn(const ALTextD
     {
         return std::nullopt;
     }
-    // #include "name" or #include <name>, blanks allowed about the #.
+    // #include "name" or #include <name>, blanks allowed about the #;
+    // --#include in SLua.
     const std::string& line = text.line(at.line);
-    size_t             i    = line.find_first_not_of(" \t");
-    if (i != std::string::npos && line[i] == '#')
+    size_t             i    = ALPreprocessor::directiveName(line, lua);
+    if (i != std::string::npos && line.compare(i, 7, "include") == 0)
     {
-        i = line.find_first_not_of(" \t", i + 1);
-        if (i != std::string::npos && line.compare(i, 7, "include") == 0)
+        i = line.find_first_not_of(" \t", i + 7);
+        if (i != std::string::npos && (line[i] == '"' || line[i] == '<'))
         {
-            i = line.find_first_not_of(" \t", i + 7);
-            if (i != std::string::npos && (line[i] == '"' || line[i] == '<'))
+            const size_t close = line.find(line[i] == '"' ? '"' : '>', i + 1);
+            if (close != std::string::npos && close > i + 1)
             {
-                const size_t close = line.find(line[i] == '"' ? '"' : '>', i + 1);
-                if (close != std::string::npos && close > i + 1)
-                {
-                    Named named;
-                    named.name  = line.substr(i + 1, close - i - 1);
-                    named.range = ALTextRange(ALTextPos(at.line, 0), ALTextPos(at.line, static_cast<S32>(line.size())));
-                    return named;
-                }
+                Named named;
+                named.name  = line.substr(i + 1, close - i - 1);
+                named.range = ALTextRange(ALTextPos(at.line, 0), ALTextPos(at.line, static_cast<S32>(line.size())));
+                return named;
             }
         }
     }

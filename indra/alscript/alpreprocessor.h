@@ -290,6 +290,12 @@ public:
         S32         column = 0;
     };
     static std::vector<Token> tokenize(std::string_view text, bool lua);
+    // Where the name of the directive a line holds starts, as the run
+    // reads one: after `#` and any blanks in LSL; straight after `--#` in
+    // SLua, where `#` is Luau's length operator and only a directive's
+    // own name makes `--#` more than a comment. npos where the line holds
+    // no directive.
+    static size_t             directiveName(std::string_view line, bool lua);
 
     // The transform a line of LSL is written for, by the shape of its
     // first statement: `switch (` and `case ...:` the switch's; `break;`,

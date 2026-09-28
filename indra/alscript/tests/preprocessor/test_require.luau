@@ -1,6 +1,6 @@
 --!strict
 -- Modules gathered at the top, each once, dependencies first.
-#define CHANNEL 0
+--#define CHANNEL 0
 local util = require("util")
 local deep = require("deep")
 local s = [[require("util") CHANNEL]]
