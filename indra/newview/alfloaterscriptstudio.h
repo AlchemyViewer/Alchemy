@@ -425,10 +425,10 @@ private:
     // Where the analyzer says a name is declared (ALScriptPlaces), as the
     // hover card and the inspector say it.
     typedef ALScriptPlaces::Declared Declared;
-    // A line of an include as it reads -- in its tab where it is open,
-    // else as the preprocessor last read it -- untrimmed; false where
-    // neither has it.
-    bool                          sourceLine(const std::string& path, S32 line, std::string& out) const override;
+    // An include's lines as it reads -- in its tab where it is open, else
+    // as the preprocessor last read it -- found once for all its places;
+    // none where neither has it.
+    ALScriptPlaces::Lines         sourceLines(const std::string& path) const override;
 
     void loaded(const ALScriptWorkspace::Loaded& answer);
     // The caret to the line, or the stretch, asked for before the text had

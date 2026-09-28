@@ -48,14 +48,14 @@ namespace
             asked.push_back(std::string(kind == ALScriptAnalysis::Kind::References ? "references " : "inspect ") + at(pos));
         }
         bool preprocessed(const Doc&) const override { return expanded; }
-        bool sourceLine(const std::string& path, S32 line, std::string& out) const override
+        ALScriptPlaces::Lines sourceLines(const std::string& path) const override
         {
-            if (path != held || line != 4)
+            // The include held, whose fifth line has the name.
+            if (path != held)
             {
-                return false;
+                return ALScriptPlaces::Lines();
             }
-            out = "  integer count; // held";
-            return true;
+            return ALScriptPlaces::Lines(std::make_shared<const std::string>("\n\n\n\n  integer count; // held"));
         }
         void noteJump() override { said.push_back("jump"); }
         void keyboardInText() override { ++typing; }

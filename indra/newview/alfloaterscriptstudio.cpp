@@ -3839,28 +3839,22 @@ void ALFloaterScriptStudio::goToDeclared(const LLSD& value)
     source.setFocus(true);
 }
 
-bool ALFloaterScriptStudio::sourceLine(const std::string& path, S32 line, std::string& out) const
+ALScriptPlaces::Lines ALFloaterScriptStudio::sourceLines(const std::string& path) const
 {
     // In its tab, as it stands there, where it is open.
     for (const std::unique_ptr<Doc>& doc : mDocs)
     {
         if (doc->loaded && (doc->file.empty() ? ALScriptPreprocessor::pathOf(doc->ref) : doc->id) == path)
         {
-            if (line < 0 || line >= doc->editor->document().lineCount())
-            {
-                return false;
-            }
-            out = doc->editor->document().line(line);
-            return true;
+            return ALScriptPlaces::Lines(&doc->editor->document());
         }
     }
     std::string text;
     if (!ALScriptPreprocessor::instance().heldText(path, text))
     {
-        return false;
+        return ALScriptPlaces::Lines();
     }
-    out = lineOf(text, line);
-    return true;
+    return ALScriptPlaces::Lines(std::make_shared<const std::string>(std::move(text)));
 }
 
 // --- across the object's scripts ------------------------------------------------------

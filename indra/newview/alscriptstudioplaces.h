@@ -28,7 +28,9 @@
 #include "alscriptstudiodoc.h"
 #include "alscriptworkspace.h"
 
+#include <memory>
 #include <string>
+#include <vector>
 
 // What the studio's window and its units share of places in scripts: a
 // span as a range of a text, a line of a text, whether a word is a name,
@@ -40,6 +42,31 @@ namespace ALScriptPlaces
     ALTextRange rangeOf(const ALScriptSpan& span);
     std::string lineOf(const std::string& text, S32 line);
     std::string lineOf(const ALTextDocument& text, S32 line);
+    // A text's lines, found once, for the many places a name has in one
+    // text -- an include, an expansion -- rather than each read by walking
+    // the text from its top: a text open in a tab, read where it stands for
+    // as long as the lines are asked, or a copy held apart.
+    class Lines
+    {
+    public:
+        Lines() = default;
+        explicit Lines(const ALTextDocument* open) : mOpen(open) {}
+        explicit Lines(std::shared_ptr<const std::string> held);
+        // A text read where it is, for as long as the lines are asked.
+        explicit Lines(const std::string& text);
+        // Whether it has a line: none past the end, or with no text.
+        bool        has(S32 line) const;
+        std::string line(S32 line) const;
+
+    private:
+        void index();
+
+        const ALTextDocument*              mOpen = nullptr;
+        std::shared_ptr<const std::string> mHeld;
+        const std::string*                 mText = nullptr;
+        // Where each of the text's lines starts.
+        std::vector<size_t>                mStarts;
+    };
     bool        isIdentifier(const std::string& text);
     // A span of an expansion as the source's, in place; the file of the
     // expansion's map it is in, or -1 where it is in none.

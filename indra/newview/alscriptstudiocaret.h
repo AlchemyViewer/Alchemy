@@ -26,6 +26,7 @@
 
 #include "alscriptanalysis.h"
 #include "alscriptstudiodoc.h"
+#include "alscriptstudioplaces.h"
 #include "alscriptstudiowords.h"
 
 #include <string>
@@ -57,11 +58,11 @@ public:
     {
     public:
         // The analyzers asked about a place of a tab's source; whether
-        // the preprocessor makes what they read; and a line of an include
-        // as it reads, false where it is not had.
-        virtual void askAnalyzer(Doc& doc, ALScriptAnalysis::Kind kind, const ALTextPos& at)  = 0;
-        virtual bool preprocessed(const Doc& doc) const                                      = 0;
-        virtual bool sourceLine(const std::string& path, S32 line, std::string& out) const = 0;
+        // the preprocessor makes what they read; and an include's lines as
+        // it reads, none where it is not had.
+        virtual void                 askAnalyzer(Doc& doc, ALScriptAnalysis::Kind kind, const ALTextPos& at) = 0;
+        virtual bool                 preprocessed(const Doc& doc) const                                     = 0;
+        virtual ALScriptPlaces::Lines sourceLines(const std::string& path) const                            = 0;
         // A jump about to be made, for Back to come back from; and the
         // keyboard in the text in front, which ends a walk down a list.
         virtual void noteJump()       = 0;

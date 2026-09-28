@@ -134,15 +134,31 @@ namespace
         {
             asks.push_back({ std::move(request), std::move(answered) });
         }
-        bool sourceLine(const std::string& path, S32 line, std::string& out) const override
+        ALScriptPlaces::Lines sourceLines(const std::string& path) const override
         {
-            const auto held = lines.find(path + "#" + std::to_string(line));
-            if (held == lines.end())
+            // The file as its lines were given, each at its number; asked
+            // once however many places are in it.
+            ++linesAsked[path];
+            std::string text;
+            S32         last = -1;
+            for (const auto& [key, line] : lines)
             {
-                return false;
+                const size_t hash = key.rfind('#');
+                if (key.substr(0, hash) == path)
+                {
+                    last = llmax(last, std::stoi(key.substr(hash + 1)));
+                }
             }
-            out = held->second;
-            return true;
+            if (last < 0)
+            {
+                return ALScriptPlaces::Lines();
+            }
+            for (S32 i = 0; i <= last; ++i)
+            {
+                const auto held = lines.find(path + "#" + std::to_string(i));
+                text += (held == lines.end() ? std::string() : held->second) + (i < last ? "\n" : "");
+            }
+            return ALScriptPlaces::Lines(std::make_shared<const std::string>(text));
         }
         void holdPreview(Doc& doc) override { held.push_back(doc.id); }
         void showFound(Doc& doc, const Found& found) override
@@ -182,6 +198,7 @@ namespace
         bool                                               holdCandidates = false;
         std::function<void()>                              heldCandidates;
         std::map<std::string, std::string>                 lines;
+        mutable std::map<std::string, S32>                 linesAsked;
         std::vector<Load>                                  loads;
         std::vector<Expand>                                expands;
         std::vector<Ask>                                   asks;
@@ -474,6 +491,7 @@ namespace tut
         const Doc::Place& found = studio.shown.places[0];
         ensure("in the include", found.file == inc && found.fileName == "inc.lsl");
         ensure("as the include reads", found.text == "integer count; // kept" && found.at == 5);
+        ensure_equals("its lines asked for once", studio.linesAsked[inc], 1);
 
         studio.lines.clear();
         unit->start(doc, ALEditorCommand::FindReferences, refsOf("count"), true, inc, span(0, 8, 5), {}, doc.editor->document().version());
@@ -787,5 +805,22 @@ namespace tut
         ensure("a new name asked", static_cast<bool>(studio.hint));
         const std::string hint = studio.hint("total");
         ensure("the hint says it: " + hint, has(hint, "LookupUnread [COUNT]=1 [NAMES]=B") && !has(hint, "LookupUnlisted"));
+    }
+
+    template<> template<>
+    void alscriptlookup_object::test<14>()
+    {
+        set_test_name("a text's lines found once: held, read where it is, or open in a tab; none past the end; a line's return left off");
+        const ALScriptPlaces::Lines held(std::make_shared<const std::string>("one\r\ntwo\n\nfour"));
+        ensure("four lines", held.has(0) && held.has(3) && !held.has(4) && !held.has(-1));
+        ensure("each as it is", held.line(0) == "one" && held.line(1) == "two" && held.line(2).empty() && held.line(3) == "four");
+        ensure("none past the end", held.line(9).empty());
+        const std::string           text = "a\nb\n";
+        const ALScriptPlaces::Lines here(text);
+        ensure("read where it is, the last line empty", here.line(1) == "b" && here.has(2) && here.line(2).empty() && !here.has(3));
+        const ALTextDocument        open("x\ny");
+        const ALScriptPlaces::Lines tab(&open);
+        ensure("a tab's", tab.line(1) == "y" && !tab.has(2));
+        ensure("nothing: no lines", !ALScriptPlaces::Lines().has(0));
     }
 }

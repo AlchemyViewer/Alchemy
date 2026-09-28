@@ -402,6 +402,10 @@ void ALScriptLookup::answered(const std::string& id, U32 generation, const ALScr
     --doc.lookup.pending;
     if (result.references.found)
     {
+        // Each file's lines found once, however many places are in it.
+        boost::unordered_flat_map<std::string, ALScriptPlaces::Lines, ll::string_hash, std::equal_to<>> files;
+        const ALScriptPlaces::Lines                                                     own_lines(source);
+        const ALScriptPlaces::Lines                                                     expansion(expanded);
         for (ALScriptSpan span : result.references.references)
         {
             const ALScriptSpan raw  = span;
@@ -422,18 +426,22 @@ void ALScriptLookup::answered(const std::string& id, U32 generation, const ALScr
             place.file     = file == 0 ? self : map.files()[file].path;
             place.fileName = file == 0 ? name : map.files()[file].name;
             // As the other script, or its include, was written.
-            std::string line;
+            auto lines = file == 0 ? files.end() : files.find(place.file);
+            if (file != 0 && lines == files.end())
+            {
+                lines = files.emplace(place.file, mWindow.sourceLines(place.file)).first;
+            }
             if (file == 0)
             {
-                placeText(place, lineOf(source, span.line));
+                placeText(place, own_lines.line(span.line));
             }
-            else if (mWindow.sourceLine(place.file, span.line, line))
+            else if (lines->second.has(span.line))
             {
-                placeText(place, line);
+                placeText(place, lines->second.line(span.line));
             }
             else
             {
-                placeText(place, lineOf(*expanded, raw.line));
+                placeText(place, expansion.line(raw.line));
                 place.at = -1;
             }
             addPlace(doc.lookup, std::move(place));

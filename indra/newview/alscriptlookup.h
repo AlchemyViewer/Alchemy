@@ -28,6 +28,7 @@
 #include "alscriptpreprocessor.h"
 #include "alscriptreferencespane.h"
 #include "alscriptstudiodoc.h"
+#include "alscriptstudioplaces.h"
 #include "llstl.h"
 
 #include <boost/unordered/unordered_flat_map.hpp>
@@ -90,8 +91,8 @@ public:
         // A script expanded as the compiler sees it; and the analyzers asked.
         virtual void expand(ALScriptPreprocessor::Request request, std::function<void(const ALPreprocessor::Result&)> expanded) = 0;
         virtual void askAnalysis(ALScriptAnalysis::Request request, std::function<void(const ALScriptAnalysis::Result&)> answered) = 0;
-        // A line of an include as it reads; false where it is not had.
-        virtual bool sourceLine(const std::string& path, S32 line, std::string& out) const = 0;
+        // An include's lines as it reads; none where it is not had.
+        virtual ALScriptPlaces::Lines sourceLines(const std::string& path) const = 0;
         // A preview held, so that following what is found does not close it.
         virtual void holdPreview(Doc& doc) = 0;
         // What Find References found: listed, lit in the script, the tab

@@ -29,6 +29,11 @@
 #include "alcodeeditor.h"
 #include "alscriptstudioplaces.h"
 #include "alscriptstudioservices.h"
+#include "llstl.h"
+
+#include <boost/unordered/unordered_flat_map.hpp>
+
+#include <optional>
 
 using ALScriptPlaces::lineOf;
 using ALScriptPlaces::mapSpan;
@@ -100,6 +105,10 @@ void ALScriptStudioCaret::answered(Doc& doc, const ALScriptAnalysis::Result& res
     }
     std::vector<Doc::Place> places;
     places.reserve(refs.references.size());
+    // Each file's lines found once, however many places are in it; the
+    // expansion's too, for a place in an include not had.
+    boost::unordered_flat_map<std::string, ALScriptPlaces::Lines, ll::string_hash, std::equal_to<>> files;
+    std::optional<ALScriptPlaces::Lines>                                                            expansion;
     for (ALScriptSpan span : refs.references)
     {
         const ALScriptSpan raw = span;
@@ -121,18 +130,26 @@ void ALScriptStudioCaret::answered(Doc& doc, const ALScriptAnalysis::Result& res
         // The line as it was written: this script's, or the include's
         // where it is in hand; the expansion's, with its macros put in
         // place, only where it is not.
-        std::string line;
+        auto lines = place.file.empty() ? files.end() : files.find(place.file);
+        if (!place.file.empty() && lines == files.end())
+        {
+            lines = files.emplace(place.file, mWindow.sourceLines(place.file)).first;
+        }
         if (place.file.empty())
         {
             placeText(place, lineOf(doc.editor->document(), span.line));
         }
-        else if (mWindow.sourceLine(place.file, span.line, line))
+        else if (lines->second.has(span.line))
         {
-            placeText(place, line);
+            placeText(place, lines->second.line(span.line));
         }
         else
         {
-            placeText(place, lineOf(*doc.expanded.text, raw.line));
+            if (!expansion)
+            {
+                expansion.emplace(doc.expanded.text);
+            }
+            placeText(place, expansion->line(raw.line));
             place.at = -1;
         }
         places.push_back(std::move(place));
