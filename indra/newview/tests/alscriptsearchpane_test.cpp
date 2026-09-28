@@ -33,6 +33,7 @@
 #include "lltextbox.h"
 
 #include "alscriptstudio_fixture.h"
+#include "lltabcontainer.h"
 
 #include "../test/lltut.h"
 
@@ -159,6 +160,8 @@ namespace tut
             // The tab as the skin built it.
             pane = window.find<ALScriptSearchPane>("search_tab");
             ensure("the skin builds the tab as the pane", pane != nullptr);
+            // In sight, its tab the one chosen, as when it is worked in.
+            window.find<LLTabContainer>("bottom_tabs")->selectTabByName("search_tab");
             return *pane;
         }
 
@@ -299,8 +302,13 @@ namespace tut
         out.pump();
         ensure_equals("not at once", out.search().found()[0].places[0].begin.column, 1);
         std::this_thread::sleep_for(std::chrono::milliseconds(700));
+        LLTabContainer* tabs = window.find<LLTabContainer>("bottom_tabs");
+        tabs->selectTabByName("problems_tab");
         out.pump();
-        ensure_equals("then, where it is now", out.search().found()[0].places[0].begin.column, 3);
+        ensure_equals("due, but out of sight: waiting", out.search().found()[0].places[0].begin.column, 1);
+        tabs->selectTabByName("search_tab");
+        out.pump();
+        ensure_equals("then, seen, where it is now", out.search().found()[0].places[0].begin.column, 3);
         out.replaceAll();
         ensure_equals("and replaced", door.editor->text(), std::string("yyx one\n two\n"));
         door.editor->undo();

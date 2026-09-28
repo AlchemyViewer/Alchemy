@@ -170,8 +170,11 @@ public:
 
     // The list filled with a tab's problems, and every open script's
     // where the scope says, the row chosen and the scroll kept through a
-    // refill of the same; with none, only the counts.
+    // refill of the same; with none, only the counts. The counts at once,
+    // the rows only while the list can be seen: out of sight, they are
+    // listed once it comes into sight (pump) or a row is to be chosen.
     void               fill(const Doc* doc);
+    void               pump();
     // Whose problems the list holds; the tab in front where it holds none
     // that is open.
     Doc*               listed();
@@ -204,6 +207,8 @@ public:
 private:
     typedef ALFindings<Doc::Shown, Doc::ProblemTraits> store_t;
 
+    // The rows listed, of what fill counted.
+    void listRows(const Doc* doc);
     // The filters' question of one script's problems, by its id.
     store_t::Query          query(const std::string& id) const;
     std::vector<const Doc*> docsFor(const Doc* doc);
@@ -253,5 +258,8 @@ private:
     // script's keeps the row chosen and the scroll.
     std::string             mShownFor;
     S32                     mHeld = 0;
+    // Whose rows the list holds, and whether they wait for it to be seen.
+    std::string             mRowsFor;
+    bool                    mRowsWanted = false;
     LLHandle<LLContextMenu> mMenu;
 };

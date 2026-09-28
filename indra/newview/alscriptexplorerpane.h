@@ -125,7 +125,10 @@ public:
     void readState(const LLSD& state) { mModel.readState(state); }
 
 private:
+    // The tree made from the model: now, or -- out of sight -- once it is
+    // seen (pump).
     void fill();
+    void fillWhenSeen();
     void contentsHeard(const ALScriptWorkspace::Contents& contents);
     void rereadNames();
     void askName(const LLUUID& id);

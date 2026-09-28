@@ -1364,8 +1364,11 @@ void ALFloaterScriptStudio::draw()
     mOutputPane->pump();
     // The fixes shown weighed, and the Weights tab kept filled.
     mWeighing.pump();
-    // What changed of the tabs this frame, shown once.
+    // What changed of the tabs this frame, shown once; and the panes that
+    // fill only while they are seen, filled where they are now.
     settleChanges();
+    mProblemsPane->pump();
+    mOutlinePane->pump();
     ALStudioFloater::draw();
 }
 
@@ -4147,8 +4150,7 @@ std::string ALFloaterScriptStudio::programVersion() const
 
 bool ALFloaterScriptStudio::weightsShown() const
 {
-    const LLPanel* current = mBottomTabs ? mBottomTabs->getCurrentPanel() : nullptr;
-    return mWeightsPane && !mFolds.collapsed("bottom") && current && current->getName() == "weights_tab" && getVisible() && !isMinimized();
+    return ALPaneFolds::inSight(mWeightsPane);
 }
 
 void ALFloaterScriptStudio::onWeightChosen(bool to_editor)
@@ -6623,12 +6625,12 @@ void ALFloaterScriptStudio::runtimeCleared(Doc& doc)
 
 bool ALFloaterScriptStudio::inspectorShown() const
 {
-    return mInspectorPane && !mFolds.collapsed("inspector") && mInspectorPane->isInVisibleChain() && getVisible() && !isMinimized();
+    return ALPaneFolds::inSight(mInspectorPane);
 }
 
 bool ALFloaterScriptStudio::outputInSight() const
 {
-    return !mFolds.collapsed("bottom") && mBottomTabs->getCurrentPanel() && mBottomTabs->getCurrentPanel()->getName() == "output_tab";
+    return ALPaneFolds::inSight(mOutputPane);
 }
 
 bool ALFloaterScriptStudio::ownsObject(const LLUUID& root) const

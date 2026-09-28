@@ -27,6 +27,7 @@
 #include "alscriptsearchpane.h"
 
 #include "alcodeeditor.h"
+#include "alpanefolds.h"
 #include "alpanelist.h"
 #include "alscopebar.h"
 #include "alscriptmessages.h"
@@ -507,7 +508,9 @@ void ALScriptSearchPane::typedIn(const Doc& doc)
 
 void ALScriptSearchPane::pump()
 {
-    if (!mSearch.due(LLTimer::getTotalSeconds()))
+    // Searched again only while the results can be seen, and once they
+    // are: what was typed in meanwhile waits.
+    if (!ALPaneFolds::inSight(this) || !mSearch.due(LLTimer::getTotalSeconds()))
     {
         return;
     }

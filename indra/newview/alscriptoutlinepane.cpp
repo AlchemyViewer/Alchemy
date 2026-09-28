@@ -26,6 +26,7 @@
 
 #include "alscriptoutlinepane.h"
 
+#include "alpanefolds.h"
 #include "alpanelist.h"
 #include "alscriptstudioservices.h"
 #include "alscriptstudiowords.h"
@@ -97,6 +98,15 @@ void ALScriptOutlinePane::show(Doc& doc)
     {
         return;
     }
+    // Listed only while it can be seen, and once it is (pump); the window
+    // told all the same, whose bar at the bottom walks the same outline.
+    if (!ALPaneFolds::inSight(this))
+    {
+        mUnseen = true;
+        mWindow->outlineShown(doc);
+        return;
+    }
+    mUnseen = false;
     // The symbols as a tree, each under what holds it -- the outline is
     // flat, each entry after its holder one deeper -- keyed by the names
     // down to it, so that a fold outlives a check that numbers them anew.
@@ -307,6 +317,11 @@ void ALScriptOutlinePane::followCaret(Doc& doc)
     {
         return;
     }
+    if (mUnseen || !ALPaneFolds::inSight(this))
+    {
+        mUnseen = true;
+        return;
+    }
     // The innermost symbol the caret is in, as the breadcrumb found it.
     if (doc.caret.crumbPath.empty())
     {
@@ -346,8 +361,18 @@ void ALScriptOutlinePane::choose(bool to_editor)
     }
 }
 
+void ALScriptOutlinePane::pump()
+{
+    Doc* front = mServices ? mServices->frontDoc() : nullptr;
+    if (mUnseen && front && ALPaneFolds::inSight(this))
+    {
+        show(*front);
+    }
+}
+
 void ALScriptOutlinePane::forget()
 {
+    mUnseen = false;
     mList->deleteAllItems();
     // What the list says is nothing now: the next tab's is put in
     // whatever it says, the same rows as the last one's or not.

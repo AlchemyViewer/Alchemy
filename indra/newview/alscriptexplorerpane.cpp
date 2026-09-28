@@ -29,6 +29,7 @@
 #include "alkeychord.h"
 
 #include "alobjectproperties.h"
+#include "alpanefolds.h"
 #include "alscriptexplorertree.h"
 #include "alscriptstudiodoc.h"
 #include "alscriptstudioservices.h"
@@ -230,7 +231,7 @@ bool ALScriptExplorerPane::postBuild()
     mFilter->setCommitCallback([this](LLUICtrl*, const LLSD&) {
         if (mFilter->getText().empty())
         {
-            fill();
+            fillWhenSeen();
         }
         else
         {
@@ -328,7 +329,7 @@ void ALScriptExplorerPane::pump()
     // run, names -- put in the list once, however many answers there were,
     // and not at every frame while a linkset's answers stream in.
     const F64 now = LLTimer::getTotalSeconds();
-    if (mStale && now >= mFilled + EXPLORER_FILL)
+    if (mStale && now >= mFilled + EXPLORER_FILL && ALPaneFolds::inSight(this))
     {
         fill();
     }
@@ -395,7 +396,7 @@ void ALScriptExplorerPane::relist(bool refetch, bool from_region)
     }
     listing.unnamed = mServices->words("ObjectUnnamed");
     mModel.list(listing);
-    fill();
+    fillWhenSeen();
     std::string filter = mFilter->getText();
     LLStringUtil::trim(filter);
     // What each prim listed holds, asked of the index, which asks where it
@@ -570,6 +571,18 @@ void ALScriptExplorerPane::fill()
     refreshButtons();
 }
 
+void ALScriptExplorerPane::fillWhenSeen()
+{
+    if (ALPaneFolds::inSight(this))
+    {
+        fill();
+    }
+    else
+    {
+        mStale = true;
+    }
+}
+
 void ALScriptExplorerPane::refreshButtons()
 {
     for (const char* action : { "open", "start", "stop", "reset" })
@@ -688,8 +701,13 @@ void ALScriptExplorerPane::explore(const LLUUID& root)
     }
     mWindow->showExplorer();
     // Open, whatever it was: what it holds is what it was asked to show.
+    // Filled now, seen or not, for its row to be chosen.
     mModel.fold(root, false, false);
     relist();
+    if (mStale)
+    {
+        fill();
+    }
     LLSD row;
     row["root"] = root;
     mTree->choose(row, false);

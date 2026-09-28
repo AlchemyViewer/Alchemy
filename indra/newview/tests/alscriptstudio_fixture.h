@@ -270,6 +270,12 @@ namespace al_studio_test
             {
                 floater = nullptr;
             }
+            else
+            {
+                // Open, as the studio is while it is worked in: a pane that
+                // fills only while it is seen fills here.
+                floater->setVisible(true);
+            }
         }
         ~StudioWindowOf() { delete mStage; }
         StudioWindowOf(const StudioWindowOf&)            = delete;

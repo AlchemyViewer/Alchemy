@@ -26,6 +26,7 @@
 
 #include "alscriptreferencespane.h"
 
+#include "alpanefolds.h"
 #include "alpanelist.h"
 #include "alscriptstudioplaces.h"
 #include "alscriptstudioservices.h"
@@ -399,7 +400,8 @@ size_t ALScriptReferencesPane::placeWith(U32 id, bool or_after) const
 
 void ALScriptReferencesPane::pump()
 {
-    if (mStale)
+    // Refilled only while it can be seen, and once it is.
+    if (mStale && ALPaneFolds::inSight(this))
     {
         fill();
     }

@@ -28,6 +28,7 @@
 
 #include "alpanelist.h"
 #include "alscriptstudio_fixture.h"
+#include "lltabcontainer.h"
 #include "llbutton.h"
 #include "llfocusmgr.h"
 #include "llscrolllistcell.h"
@@ -104,6 +105,8 @@ namespace tut
             {
                 skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
             }
+            // In sight, its tab the one chosen, as when it is worked in.
+            window.find<LLTabContainer>("bottom_tabs")->selectTabByName("references_tab");
             return found;
         }
         std::string head() { return window.find<LLTextBox>("references_head")->getText(); }
@@ -342,5 +345,26 @@ namespace tut
         window.find<LLButton>("references_cancel")->onCommit();
         ensure("Cancel makes nothing", !applied && !refs->previewing());
         ensure("each row as found", cell(refs->list()->getAllData()[0], 3) == "integer count;" && refs->list()->getAllData()[0]->getColumn(2)->getValue().asString() != "1");
+    }
+
+    template<> template<>
+    void alscriptreferencespane_object::test<7>()
+    {
+        set_test_name("places slid out of sight are listed again once the list is seen, not before");
+        ALScriptReferencesPane* refs = pane();
+        Doc&                    a    = tab("a", "integer count;\nx = count;\n");
+        tab("b", "foo() { count; }\n");
+        refs->show(found());
+        boost::signals2::scoped_connection in_a(
+            a.editor->document().onChanged([refs, &a](const ALTextDocument::Edit& edit) { refs->slide(a, "object:1:a", edit); }));
+        LLTabContainer* tabs = window.find<LLTabContainer>("bottom_tabs");
+        tabs->selectTabByName("problems_tab");
+        a.editor->replaceAll({ { ALTextRange(ALTextPos(0, 0), ALTextPos(0, 0)), "// one\n" } });
+        refs->pump();
+        ensure_equals("slid, not listed again unseen", lines(), joined(Names{ "A 1:9", "A 2:5", "B 1:9" }));
+        ensure_equals("the places themselves slid", refs->found().places[0].span.line, 1);
+        tabs->selectTabByName("references_tab");
+        refs->pump();
+        ensure_equals("seen: listed again", lines(), joined(Names{ "A 2:9", "A 3:5", "B 1:9" }));
     }
 }

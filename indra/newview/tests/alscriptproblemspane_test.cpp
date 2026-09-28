@@ -26,12 +26,14 @@
 
 #include "../alscriptproblemspane.h"
 
+#include "alpanefolds.h"
 #include "alpanelist.h"
 #include "llcheckboxctrl.h"
 #include "llcombobox.h"
 #include "llfiltereditor.h"
 #include "llfontgl.h"
 #include "llscrolllistitem.h"
+#include "lltabcontainer.h"
 
 #include "alscriptstudio_fixture.h"
 
@@ -661,5 +663,39 @@ namespace tut
         ensure_equals("listed", pane->checkedCount(), size_t(2));
         pane->compiledScript(lone, "latch.lsl", false, {}, "House");
         ensure_equals("gone", pane->checkedCount(), size_t(1));
+    }
+
+    template <>
+    template <>
+    void alscriptproblemspane_object::test<11>()
+    {
+        set_test_name("out of sight, the counts said at once and the rows listed once the list is seen, or once a row is to be chosen");
+        ALScriptProblemsPane& out  = make();
+        using S                    = ALScriptProblem::Source;
+        using V                    = ALScriptProblem::Severity;
+        LLTabContainer* tabs       = window.find<LLTabContainer>("bottom_tabs");
+        Doc&            door       = doc("door");
+        door.check.analysis        = { problem(S::Parser, V::Error, 1, "door error"), problem(S::Lint, V::Warning, 3, "door warning") };
+        tabs->selectTabByName("references_tab");
+        ensure("out of sight", !ALPaneFolds::inSight(&out));
+        const S32 said = studio.counts;
+        gather(door);
+        ensure("counted, and said on the tab", out.held() == 2 && studio.counts > said);
+        ensure_equals("not listed", shown(), std::string());
+        out.pump();
+        ensure_equals("nor while unseen", shown(), std::string());
+        tabs->selectTabByName("problems_tab");
+        out.pump();
+        ensure_equals("seen: listed", shown(), std::string("|door error|door warning"));
+
+        tabs->selectTabByName("references_tab");
+        door.check.analysis.push_back(problem(S::Parser, V::Error, 5, "a second error"));
+        gather(door);
+        ensure("counted again, the rows as they were", out.held() == 3 && shown() == "|door error|door warning");
+        const size_t chosen = studio.chosen.size();
+        out.selectFirstError(false);
+        ensure("a row to choose: listed first", shown().find("a second error") != std::string::npos);
+        ensure("and chosen", studio.chosen.size() == chosen + 1 && studio.chosen.back().line == 1);
+        tabs->selectTabByName("problems_tab");
     }
 }

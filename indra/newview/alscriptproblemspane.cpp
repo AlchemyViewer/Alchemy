@@ -29,6 +29,7 @@
 #include "alscriptfixes.h"
 
 #include "alcodeeditor.h"
+#include "alpanefolds.h"
 #include "alpanelist.h"
 #include "alscriptstudioservices.h"
 #include "llcheckboxctrl.h"
@@ -370,6 +371,10 @@ void ALScriptProblemsPane::closed(const std::string& id)
     {
         mShownFor.clear();
     }
+    if (id == mRowsFor)
+    {
+        mRowsFor.clear();
+    }
 }
 
 void ALScriptProblemsPane::rekey(const std::string& from, const std::string& to)
@@ -377,6 +382,10 @@ void ALScriptProblemsPane::rekey(const std::string& from, const std::string& to)
     if (mShownFor == from)
     {
         mShownFor = to;
+    }
+    if (mRowsFor == from)
+    {
+        mRowsFor = to;
     }
 }
 
@@ -591,22 +600,9 @@ void ALScriptProblemsPane::readState(const LLSD& state)
 void ALScriptProblemsPane::fill(const Doc* doc)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
-    // The row chosen and how far the list was scrolled are kept through a
-    // refill of the same script's: a check comes at every pause in
-    // typing, and whoever is working down the list keeps their place.
-    LLSD      chosen;
-    const S32 scrolled = mList->getScrollPos();
-    if (LLScrollListItem* item = mList->getFirstSelected())
-    {
-        chosen = item->getValue();
-    }
-    const bool same = doc && doc->id == mShownFor;
     mShownFor = doc ? doc->id : std::string();
-    mList->deleteAllItems();
-    mList->setEmpty(LLStringUtil::null, LLStringUtil::null);
-
     // How many of each there are before the filters: what the level
-    // boxes and the tab say.
+    // boxes and the tab say, which are seen with the list out of sight.
     const std::vector<const Doc*>     docs    = docsFor(doc);
     const std::vector<const Checked*> checked = checkedFor();
     S32                               errors = 0, warnings = 0, notes = 0, fixable = 0;
@@ -644,6 +640,43 @@ void ALScriptProblemsPane::fill(const Doc* doc)
     layoutFilters();
     mHeld = held;
     mWindow->problemCountsChanged();
+    // The rows only while the list can be seen; else once it is (pump).
+    if (!ALPaneFolds::inSight(this))
+    {
+        mRowsWanted = true;
+        return;
+    }
+    listRows(doc);
+}
+
+void ALScriptProblemsPane::pump()
+{
+    if (mRowsWanted && ALPaneFolds::inSight(this))
+    {
+        listRows(listed());
+    }
+}
+
+void ALScriptProblemsPane::listRows(const Doc* doc)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
+    mRowsWanted = false;
+    // The row chosen and how far the list was scrolled are kept through a
+    // refill of the same script's: a check comes at every pause in
+    // typing, and whoever is working down the list keeps their place.
+    LLSD      chosen;
+    const S32 scrolled = mList->getScrollPos();
+    if (LLScrollListItem* item = mList->getFirstSelected())
+    {
+        chosen = item->getValue();
+    }
+    const bool same = doc && doc->id == mRowsFor;
+    mRowsFor        = doc ? doc->id : std::string();
+    mList->deleteAllItems();
+    mList->setEmpty(LLStringUtil::null, LLStringUtil::null);
+    const std::vector<const Doc*>     docs    = docsFor(doc);
+    const std::vector<const Checked*> checked = checkedFor();
+    const S32                         held    = mHeld;
     if (!doc && checked.empty())
     {
         return;
@@ -928,6 +961,11 @@ void ALScriptProblemsPane::layoutFilters()
 
 void ALScriptProblemsPane::selectFirstError(bool checkers_only)
 {
+    // Listed now, seen or not: the row is chosen in the list.
+    if (mRowsWanted)
+    {
+        listRows(listed());
+    }
     mList->updateSort();
     const std::vector<LLScrollListItem*> rows     = mList->getAllData();
     const std::string                    compiler = mServices->words("OriginCompiler");

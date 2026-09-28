@@ -354,4 +354,31 @@ namespace tut
         outline->handleMouseDown(x, y, MASK_NONE);
         ensure_equals("chosen by the list", chosen(), 0);
     }
+
+    template<> template<>
+    void alscriptoutlinepane_object::test<7>()
+    {
+        set_test_name("out of sight, only the window told; listed, and the caret followed, once it is seen");
+        ALScriptOutlinePane* outline = pane();
+        Doc&                 doc     = tab("a");
+        window.floater->setVisible(false);
+        outline->show(doc);
+        ensure("told", joined(told().shown) == "a");
+        ensure("not listed", outline->list()->getItemCount() == 0);
+        outline->pump();
+        ensure("nor while unseen", outline->list()->getItemCount() == 0);
+        window.floater->setVisible(true);
+        outline->pump();
+        ensure_equals("seen: listed", rows(), std::string("count, ^default, .touch_start, .state_entry, alpha"));
+
+        window.floater->setVisible(false);
+        doc.caret.crumbPath = { 1, 3 };
+        outline->followCaret(doc);
+        ensure_equals("not followed unseen", chosen(), -1);
+        window.floater->setVisible(true);
+        outline->pump();
+        ensure_equals("followed once seen", chosen(), 3);
+        outline->pump();
+        ensure_equals("and then left be", joined(told().shown), std::string("a, a, a"));
+    }
 }
