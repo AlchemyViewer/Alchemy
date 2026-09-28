@@ -45,11 +45,11 @@
 #include "llinventory.h"
 #include "llinventorydefines.h"
 #include "llinventorymodel.h"
+#include "llmd5.h"
 #include "llinventoryobserver.h"
 #include "llnotecard.h"
 #include "llnotificationsutil.h"
 #include "llpreviewscript.h"
-#include "llscripteditorws.h"
 #include "llselectmgr.h"
 #include "lltooldraganddrop.h"
 #include "llsdutil.h"
@@ -240,7 +240,11 @@ struct ALScriptWorkspace::Burst
 
 std::string ALScriptRef::id() const
 {
-    return LLScriptEditorWSServer::buildScriptSubscriptionId(object, item);
+    const std::string                 joined = object.asString() + "_" + item.asString();
+    std::array<char, MD5HEX_STR_SIZE> hex    = {};
+    LLMD5                             hash(reinterpret_cast<const U8*>(joined.c_str()));
+    hash.hex_digest(hex.data());
+    return std::string(hex.data());
 }
 
 LLSD ALScriptRef::key() const

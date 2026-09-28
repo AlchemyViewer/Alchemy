@@ -451,13 +451,8 @@ LLScriptEditorWSServer::ptr_t LLScriptEditorWSServer::ensureServerRunning()
 std::string LLScriptEditorWSServer::buildScriptSubscriptionId(const LLUUID& object_id,
                                                               const LLUUID& item_id)
 {
-    std::string script_id = object_id.asString() + "_" + item_id.asString();
-
-    std::array<char, MD5HEX_STR_SIZE> script_id_hash_str = {};
-    LLMD5 script_id_hash((const U8*)script_id.c_str());
-    script_id_hash.hex_digest(script_id_hash_str.data());
-
-    return std::string(script_id_hash_str.data());
+    // The one identity every part of the viewer calls a script by.
+    return ALScriptRef(object_id, item_id).id();
 }
 
 std::string LLScriptEditorWSServer::buildVSCodeURI(const LLUUID& object_id,
