@@ -446,6 +446,50 @@ int main(int, char**)
         }));
     }
 
+    // A line of 20,000 characters, as generated code or a list written out
+    // at length has, put in near the top: a character typed in its middle
+    // and taken away, the line laid out again after each; and the x of a
+    // column along it with the column back from that x, as the caret and
+    // the mouse ask.
+    std::printf("\nA line of 20,000 characters\n");
+    {
+        std::string long_line;
+        while (long_line.size() < 20000)
+        {
+            long_line += "value = f(x, [y, z]) + ";
+        }
+        for (Subject& s : subjects)
+        {
+            s.editor->setCaret(ALTextPos(5, 0));
+            s.editor->insertText(long_line + "\n");
+        }
+        // Each pass another letter somewhere else in the middle, so that the
+        // line is one the shaper has not seen, as it is after a keystroke.
+        both("a keystroke in its middle, laid out again", subjects, 2, [](Subject&, ALCodeEditor& e) {
+            static S32 pass = 0;
+            ++pass;
+            const S32  at     = 5000 + (pass * 7) % 10000;
+            const char typed[2] = { static_cast<char>('a' + pass % 26), 0 };
+            e.setCaret(ALTextPos(5, at));
+            e.insertText(typed);
+            g_sink = g_sink + e.layout().line(5).glyphs.size();
+            e.deleteRange(ALTextRange(ALTextPos(5, at), ALTextPos(5, at + 1)));
+            g_sink = g_sink + e.layout().line(5).glyphs.size();
+        });
+        both("a column's x and the column at an x, per thousand", subjects, 1, [](Subject&, ALCodeEditor& e) {
+            ALTextLayout& laid = e.layout();
+            for (S32 i = 0; i < 1000; ++i)
+            {
+                const S32 column = (i * 7919) % 20000;
+                g_sink           = g_sink + static_cast<size_t>(laid.columnAt(5, 0, laid.xOf(5, column) + 1.f, true));
+            }
+        });
+        for (Subject& s : subjects)
+        {
+            s.editor->deleteRange(ALTextRange(ALTextPos(5, 0), ALTextPos(6, 0)));
+        }
+    }
+
     std::printf("\nBrackets (an opener at the top, unmatched)\n");
     for (Subject& s : subjects)
     {

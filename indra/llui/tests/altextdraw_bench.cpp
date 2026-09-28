@@ -225,6 +225,33 @@ int main(int, char**)
         s.editor->clearHighlights();
     }
 
+    // A line of 20,000 characters near the top, as generated code or a list
+    // written out at length has: scrolled across to its middle, then
+    // wrapped, which makes it every row in sight.
+    std::printf("\nA line of 20,000 characters near the top\n");
+    {
+        std::string long_line;
+        while (long_line.size() < 20000)
+        {
+            long_line += "value = f(x, [y, z]) + ";
+        }
+        for (Subject& s : subjects)
+        {
+            s.editor->setCaret(ALTextPos(2, 0));
+            s.editor->insertText(long_line + "\n");
+        }
+        both("scrolled across to its middle", subjects, [](ALCodeEditor& e) { e.setScrollX(e.layout().line(2).width * 0.5f); });
+        both("wrapped", subjects, [](ALCodeEditor& e) {
+            e.setScrollX(0.f);
+            e.setWordWrap(true);
+        });
+        for (Subject& s : subjects)
+        {
+            s.editor->setWordWrap(false);
+            s.editor->deleteRange(ALTextRange(ALTextPos(2, 0), ALTextPos(3, 0)));
+        }
+    }
+
     for (Subject& s : subjects)
     {
         delete s.editor;
