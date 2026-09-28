@@ -27,6 +27,7 @@
 #include "alscriptexplorermodel.h"
 
 #include "alstringmatch.h"
+#include "llsdutil_math.h"
 
 #include <algorithm>
 #include <set>
@@ -51,6 +52,12 @@ std::optional<ALScriptExplorerModel::Choice> ALScriptExplorerModel::Choice::of(c
         row.prim = row.root;
     }
     return row;
+}
+
+namespace
+{
+    // How far a pinned object goes before its pin keeps the new place.
+    constexpr F64 PIN_MOVED_METERS = 16.0;
 }
 
 // --- what is listed ----------------------------------------------------------------
@@ -78,9 +85,11 @@ void ALScriptExplorerModel::list(const Listing& listing)
             return already;
         }
         Object one;
-        one.root  = root;
-        one.name  = seen->prims.front().name;
-        one.named = !one.name.empty();
+        one.root     = root;
+        one.name     = seen->prims.front().name;
+        one.named    = !one.name.empty();
+        one.position = seen->position;
+        one.region   = seen->region;
         if (!one.named && listing.nameless)
         {
             one.name = listing.nameless(one.root);
@@ -110,19 +119,30 @@ void ALScriptExplorerModel::list(const Listing& listing)
         mObjects.push_back(std::move(one));
         return &mObjects.back();
     };
-    for (const Pin& pin : mPins)
+    for (Pin& pin : mPins)
     {
         if (Object* object = add(pin.root))
         {
             object->pinned = true;
+            // Its place kept for when it is away: said to be kept where it
+            // is another region's, or has gone far, not at every step.
+            if (object->position &&
+                (!pin.position || pin.region != object->region || (*pin.position - *object->position).magVec() > PIN_MOVED_METERS))
+            {
+                pin.position = object->position;
+                pin.region   = object->region;
+                mPinsChanged = true;
+            }
         }
         else if (!known(pin.root))
         {
             Object away;
-            away.root    = pin.root;
-            away.name    = pin.name.empty() ? listing.unnamed : pin.name;
-            away.pinned  = true;
-            away.present = false;
+            away.root     = pin.root;
+            away.name     = pin.name.empty() ? listing.unnamed : pin.name;
+            away.pinned   = true;
+            away.present  = false;
+            away.position = pin.position;
+            away.region   = pin.region;
             mObjectAt.emplace(away.root, mObjects.size());
             mObjects.push_back(std::move(away));
         }
@@ -348,6 +368,7 @@ std::vector<ALScriptExplorerModel::Row> ALScriptExplorerModel::rows(const std::s
         row.many    = many;
         row.unnamed = object.present && !object.named;
         row.known   = many || object.prims.empty() || mIndex.fetched(object.prims.front().id);
+        row.region  = object.region;
         out.push_back(row);
         // A linkset's prims known to hold nothing, but its root, under one
         // row after the rest, folded until opened: there to drop into, and
@@ -626,8 +647,21 @@ void ALScriptExplorerModel::togglePinned(const LLUUID& root, const std::string& 
     }
     else
     {
-        mPins.push_back(Pin{ root, name });
+        // With the place it is at, where it is seen.
+        Pin pin{ root, name };
+        if (const Object* object = objectAt(root))
+        {
+            pin.position = object->position;
+            pin.region   = object->region;
+        }
+        mPins.push_back(std::move(pin));
     }
+}
+
+const ALScriptExplorerModel::Pin* ALScriptExplorerModel::pinOf(const LLUUID& root) const
+{
+    const auto found = std::find_if(mPins.begin(), mPins.end(), [&root](const Pin& pin) { return pin.root == root; });
+    return found != mPins.end() ? &*found : nullptr;
 }
 
 void ALScriptExplorerModel::pin(const std::vector<Choice>& rows)
@@ -657,6 +691,11 @@ void ALScriptExplorerModel::saveState(LLSD& state) const
         LLSD one;
         one["id"]   = pin.root;
         one["name"] = pin.name;
+        if (pin.position)
+        {
+            one["position"] = ll_sd_from_vector3d(*pin.position);
+            one["region"]   = pin.region;
+        }
         pinned.append(one);
     }
     state["pinned"] = pinned;
@@ -674,7 +713,13 @@ void ALScriptExplorerModel::readState(const LLSD& state)
         const LLUUID id = (*it)["id"].asUUID();
         if (id.notNull() && !isPinned(id))
         {
-            mPins.push_back(Pin{ id, (*it)["name"].asString() });
+            Pin pin{ id, (*it)["name"].asString() };
+            if ((*it).has("position"))
+            {
+                pin.position = ll_vector3d_from_sd((*it)["position"]);
+                pin.region   = (*it)["region"].asString();
+            }
+            mPins.push_back(std::move(pin));
         }
     }
 }

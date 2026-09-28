@@ -34,6 +34,7 @@
 #include "alscriptstudioservices.h"
 #include "llagent.h"
 #include "llbutton.h"
+#include "llclipboard.h"
 #include "llfiltereditor.h"
 #include "llfloaterreg.h"
 #include "llcompilequeue.h"
@@ -51,6 +52,7 @@
 #include "llviewermenu.h"
 #include "llviewerobject.h"
 #include "llviewerobjectlist.h"
+#include "llviewerregion.h"
 #include "roles_constants.h"
 
 #include <algorithm>
@@ -370,6 +372,8 @@ void ALScriptExplorerPane::relist(bool refetch, bool from_region)
         }
         LLViewerObject* root = rootOf(object);
         Model::Seen     seen;
+        seen.position        = root->getPositionGlobal();
+        seen.region          = root->getRegion() ? root->getRegion()->getName() : std::string();
         seen.prims.push_back({ root->getID(), ALScriptWorkspace::objectName(root, LLStringUtil::null), root->permModify() });
         for (const LLPointer<LLViewerObject>& child : root->getChildren())
         {
@@ -499,10 +503,17 @@ void ALScriptExplorerPane::fill()
         switch (row.kind)
         {
             case Model::Row::Kind::Object:
+            {
+                // Away, where it was last: its pin keeps the place.
+                LLStringUtil::format_map_t where;
+                where["[REGION]"] = row.region;
                 out.label  = (row.pinned ? mServices->words("PinnedMark") : LLStringUtil::null) + row.name;
-                out.suffix = row.present ? LLStringUtil::null : said("KindAway");
+                out.suffix = row.present         ? LLStringUtil::null
+                             : row.region.empty() ? said("KindAway")
+                                                  : " (" + mServices->words("KindAwayIn", where) + ")";
                 out.icon   = row.many ? "Inv_Object_Multi" : "Inv_Object";
                 break;
+            }
             case Model::Row::Kind::Empties:
             {
                 LLStringUtil::format_map_t args;
@@ -750,9 +761,24 @@ bool ALScriptExplorerPane::enabled(const std::string& action) const
                    (!recompiling || !row.isItem() || readable(row));
         });
     }
-    if (action == "teleport" || action == "zoom")
+    if (action == "teleport")
+    {
+        // In sight, or away with the place its pin kept.
+        const Model::Pin* pin = rows.size() == 1 ? mModel.pinOf(rows.front().root) : nullptr;
+        return rows.size() == 1 && (present(rows.front()) || (pin && pin->position));
+    }
+    if (action == "zoom" || action == "edit_in_world")
     {
         return rows.size() == 1 && present(rows.front());
+    }
+    if (action == "copy_key")
+    {
+        return !rows.empty();
+    }
+    if (action == "describe")
+    {
+        // A script or notecard the agent may change, in a prim it may.
+        return rows.size() == 1 && rows.front().isItem() && changeable(rows.front()) && itemChangeable(rows.front());
     }
     if (action == "check")
     {
@@ -847,6 +873,23 @@ void ALScriptExplorerPane::act(const std::string& action)
                 handle_zoom_to_object(object->getID());
             }
         }
+        else if (const Model::Pin* pin = mModel.pinOf(rows.front().root); action == "teleport" && pin && pin->position)
+        {
+            // Away: where its pin last saw it.
+            gAgent.teleportViaLocation(*pin->position);
+        }
+    }
+    else if (action == "copy_key")
+    {
+        copyKeys(rows);
+    }
+    else if (action == "edit_in_world")
+    {
+        editInWorld(rows.front());
+    }
+    else if (action == "describe")
+    {
+        describe(rows.front());
     }
     else if (action == "pin")
     {
@@ -937,6 +980,76 @@ void ALScriptExplorerPane::showMenu(S32 x, S32 y)
     mMenu = menu->getHandle();
     menu->show(x, y);
     LLMenuGL::showPopup(mTree, menu, x, y);
+}
+
+// --- keys, the build tools, descriptions ----------------------------------------------
+
+void ALScriptExplorerPane::copyKeys(const std::vector<Choice>& rows)
+{
+    // The key a script names each by: an object's is its root prim's, a
+    // prim's its own, an item's its own; one a line.
+    std::string keys;
+    for (const Choice& row : rows)
+    {
+        const LLUUID key = row.isItem() ? row.item : row.primRow ? row.prim : row.root;
+        keys += (keys.empty() ? "" : "\n") + key.asString();
+    }
+    LLClipboard::instance().copyToClipboard(keys, 0, static_cast<S32>(keys.size()));
+    LLStringUtil::format_map_t args;
+    args["[KEYS]"] = keys;
+    mServices->setStatus(mServices->counted("KeysCopied", static_cast<S32>(rows.size()), args));
+}
+
+void ALScriptExplorerPane::editInWorld(const Choice& row)
+{
+    // The object, or the prim alone -- a prim's row, or an item's in a prim
+    // not the root -- chosen in world and the build tools opened on it, as
+    // the pie menu's Edit does.
+    const bool      prim_only = row.primRow || (row.isItem() && row.prim != row.root);
+    LLViewerObject* object    = gObjectList.findObject(prim_only ? row.prim : row.root);
+    if (!object)
+    {
+        return;
+    }
+    if (std::string refused = ALScriptWorkspace::rlvRefusal(object, LLAssetType::AT_NONE, ALScriptWorkspace::RlvUse::Change); !refused.empty())
+    {
+        mServices->report(refused, true);
+        return;
+    }
+    LLSelectMgr::getInstance()->deselectAll();
+    if (prim_only)
+    {
+        gSavedSettings.setBOOL("EditLinkedParts", true);
+        LLSelectMgr::getInstance()->selectObjectOnly(object);
+    }
+    else
+    {
+        LLSelectMgr::getInstance()->selectObjectAndFamily(object);
+    }
+    handle_object_edit();
+}
+
+void ALScriptExplorerPane::describe(const Choice& row)
+{
+    const std::optional<ALScriptWorkspace::Item> item = mModel.itemAt(row.ref());
+    LLSD args;
+    args["NAME"]                   = row.name;
+    args["DESCRIPTION"]            = item ? item->description : std::string();
+    const LLHandle<LLPanel> handle = getHandle();
+    const ALScriptRef       ref    = row.ref();
+    LLNotificationsUtil::add("ScriptStudioDescribe", args, LLSD(), [handle, ref](const LLSD& notification, const LLSD& response) {
+        ALScriptExplorerPane* pane = ALViewType::as<ALScriptExplorerPane>(handle.get());
+        if (!pane || LLNotificationsUtil::getSelectedOption(notification, response) != 0)
+        {
+            return;
+        }
+        std::string description = response["description"].asString();
+        LLStringUtil::trim(description);
+        if (std::string error; !ALScriptWorkspace::instance().describe(ref, description, error))
+        {
+            pane->mServices->report(error, true);
+        }
+    });
 }
 
 // --- making, renaming, deleting and recompiling ----------------------------------------

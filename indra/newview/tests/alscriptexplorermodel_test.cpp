@@ -547,4 +547,45 @@ namespace tut
         ensure("a prim the agent may not change", !model.primModifiable(id(12)) && model.primModifiable(id(11)));
         ensure("one not seen, yes", model.primModifiable(id(99)));
     }
+
+    template<> template<>
+    void alscriptexplorermodel_object::test<13>()
+    {
+        set_test_name("a pin keeps the place its object was last seen at, and the region's name, across sessions, for one away");
+        const LLUUID house = object(10, "House");
+        world[house].position = LLVector3d(256000.0 + 10.0, 256000.0 + 20.0, 30.0);
+        world[house].region   = "Ahern";
+        selected              = { house };
+        list();
+        std::vector<Model::Choice> rows(1);
+        rows[0].root = house;
+        rows[0].prim = house;
+        model.pin(rows);
+        const Model::Pin* pin = model.pinOf(house);
+        ensure("pinned with its place", pin && pin->position && pin->position->mdV[VZ] == 30.0 && pin->region == "Ahern");
+
+        // Moved a little: kept as it was; far, or to another region: kept anew.
+        world[house].position = LLVector3d(256000.0 + 12.0, 256000.0 + 20.0, 30.0);
+        list();
+        ensure("a step is no new place", !model.takePinsChanged() && model.pinOf(house)->position->mdV[VX] == 256010.0);
+        world[house].position = LLVector3d(256000.0 + 100.0, 256000.0 + 20.0, 30.0);
+        world[house].region   = "Morris";
+        list();
+        ensure("far, and elsewhere: kept, and said", model.takePinsChanged() && model.pinOf(house)->region == "Morris");
+
+        // Across sessions, and away.
+        LLSD state;
+        model.saveState(state);
+        Model again(index);
+        again.readState(state);
+        ensure("read back", again.pinOf(house) && again.pinOf(house)->position && again.pinOf(house)->region == "Morris");
+        world.clear();
+        selected.clear();
+        Model::Listing listing;
+        listing.seen    = [](const LLUUID&) -> std::optional<Model::Seen> { return std::nullopt; };
+        listing.unnamed = "(unnamed)";
+        again.list(listing);
+        const std::vector<Model::Row> all = again.rows(std::string());
+        ensure("listed away, with its region", !all.empty() && !all[0].present && all[0].region == "Morris");
+    }
 }

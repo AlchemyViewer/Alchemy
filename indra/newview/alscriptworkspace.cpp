@@ -32,6 +32,7 @@
 #include "alscriptenvelope.h"
 #include "alscriptpreprocessor.h"
 #include "alscripttempfiles.h"
+#include "lldbstrings.h"
 #include "llagent.h"
 #include "llappviewer.h"
 #include "llassetstorage.h"
@@ -1929,6 +1930,57 @@ bool ALScriptWorkspace::rename(const ALScriptRef& ref, const std::string& name, 
     LLPointer<LLViewerInventoryItem> renamed = new LLViewerInventoryItem(item);
     renamed->rename(name);
     object->updateInventory(renamed, TASK_INVENTORY_ITEM_KEY, false);
+    return true;
+}
+
+bool ALScriptWorkspace::describe(const ALScriptRef& ref, const std::string& description, std::string& error)
+{
+    const std::string kept = utf8str_truncate(description, DB_INV_ITEM_DESC_STR_LEN);
+    if (ref.inInventory())
+    {
+        LLViewerInventoryItem* item = gInventory.getItem(ref.item);
+        if (!item)
+        {
+            error = LLTrans::getString("WorkspaceNoSuchItem");
+            return false;
+        }
+        if (!gAgent.allowOperation(PERM_MODIFY, item->getPermissions(), GP_OBJECT_MANIPULATE))
+        {
+            error = LLTrans::getString("WorkspaceNotPermitted");
+            return false;
+        }
+        if (item->getDescription() != kept)
+        {
+            LLSD updates;
+            updates["desc"] = kept;
+            update_inventory_item(ref.item, updates, nullptr);
+        }
+        return true;
+    }
+    LLViewerObject*  object = gObjectList.findObject(ref.object);
+    LLInventoryItem* item   = object ? object->getInventoryItem(ref.item) : nullptr;
+    if (!item)
+    {
+        error = LLTrans::getString(object ? "WorkspaceNoSuchItemInObject" : "WorkspaceNoSuchObject");
+        return false;
+    }
+    if (std::string refused = rlvRefusal(object, item->getType(), RlvUse::Change); !refused.empty())
+    {
+        error = std::move(refused);
+        return false;
+    }
+    if (!object->permModify())
+    {
+        error = LLTrans::getString("WorkspaceObjectNotModifiable");
+        return false;
+    }
+    if (item->getDescription() == kept)
+    {
+        return true;
+    }
+    LLPointer<LLViewerInventoryItem> changed = new LLViewerInventoryItem(item);
+    changed->setDescription(kept);
+    object->updateInventory(changed, TASK_INVENTORY_ITEM_KEY, false);
     return true;
 }
 

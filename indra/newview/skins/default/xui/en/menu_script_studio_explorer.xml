@@ -26,6 +26,10 @@
     <menu_item_call.on_click function="Explorer.Action" parameter="rename" />
     <menu_item_call.on_enable function="Explorer.Enable" parameter="rename" />
   </menu_item_call>
+  <menu_item_call label="Description..." layout="topleft" name="describe">
+    <menu_item_call.on_click function="Explorer.Action" parameter="describe" />
+    <menu_item_call.on_enable function="Explorer.Enable" parameter="describe" />
+  </menu_item_call>
   <menu_item_call label="Delete..." layout="topleft" name="delete">
     <menu_item_call.on_click function="Explorer.Action" parameter="delete" />
     <menu_item_call.on_enable function="Explorer.Enable" parameter="delete" />
@@ -77,6 +81,14 @@
   <menu_item_call label="Zoom To" layout="topleft" name="zoom">
     <menu_item_call.on_click function="Explorer.Action" parameter="zoom" />
     <menu_item_call.on_enable function="Explorer.Enable" parameter="zoom" />
+  </menu_item_call>
+  <menu_item_call label="Edit in World" layout="topleft" name="edit_in_world">
+    <menu_item_call.on_click function="Explorer.Action" parameter="edit_in_world" />
+    <menu_item_call.on_enable function="Explorer.Enable" parameter="edit_in_world" />
+  </menu_item_call>
+  <menu_item_call label="Copy Key" layout="topleft" name="copy_key">
+    <menu_item_call.on_click function="Explorer.Action" parameter="copy_key" />
+    <menu_item_call.on_enable function="Explorer.Enable" parameter="copy_key" />
   </menu_item_call>
   <menu_item_separator layout="topleft" />
   <menu_item_check label="Pinned" layout="topleft" name="pin">

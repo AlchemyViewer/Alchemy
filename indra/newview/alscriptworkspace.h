@@ -480,6 +480,10 @@ public:
     bool create(const LLUUID& prim, bool notecard, bool lua, const std::string& name, created_callback_t callback, std::string& error);
     // A new name for a script or notecard, in an object or in inventory.
     bool rename(const ALScriptRef& ref, const std::string& name, std::string& error);
+    // A new description for one, as the legacy editor's field gives it: at
+    // most what an item's description holds, and refused where the item
+    // or its object may not be changed.
+    bool describe(const ALScriptRef& ref, const std::string& description, std::string& error);
     // A new name for a prim -- an object's is its root prim's -- as the
     // build floater's gives one, whether or not it is selected: refused
     // where it may not be changed, or RLVa keeps it from being edited.

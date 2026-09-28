@@ -155,6 +155,12 @@ private:
     // The name a row was given where it stands, taken.
     void renamed(const Choice& row, const std::string& was, std::string name);
     void remove(const std::vector<Choice>& rows);
+    // The rows' keys to the clipboard, one a line; the row's object or prim
+    // chosen in world with the build tools on it; the row's item described,
+    // through a dialog.
+    void copyKeys(const std::vector<Choice>& rows);
+    void editInWorld(const Choice& row);
+    void describe(const Choice& row);
     // The rows' scripts, and their prims', up again for a target: "auto"
     // for each as it compiles now.
     void recompile(const std::vector<Choice>& rows, const std::string& target);

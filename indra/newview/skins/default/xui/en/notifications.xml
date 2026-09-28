@@ -1778,6 +1778,27 @@ A name for the new [KIND]:
 
   <notification
    icon="alertmodal.tga"
+   label="Description"
+   name="ScriptStudioDescribe"
+   type="alertmodal">
+A description for [NAME]:
+    <tag>confirm</tag>
+    <form name="form">
+      <input name="description" type="text" value="[DESCRIPTION]" max_length_chars="127" />
+      <button
+       default="true"
+       index="0"
+       name="OK"
+       text="Save"/>
+      <button
+       index="1"
+       name="Cancel"
+       text="Cancel"/>
+    </form>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
    label="Save Theme"
    name="ScriptStudioSaveTheme"
    type="alertmodal">
