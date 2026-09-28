@@ -4372,16 +4372,46 @@ void ALTextView::drawBand(F32 alpha)
     {
         return;
     }
-    std::string line;
-    S32         caret    = 0;
-    const bool  typing   = mModal->typingLine(line, caret);
-    std::string shown    = typing ? line : mModal->message();
-    LLColor4    colour   = typing || !mModal->messageIsError() ? ink : mSpellErrorColor.get();
-    if (!typing && shown.empty())
+    // What to show, read from the keymap and measured only when it has
+    // moved on since.
+    BandShown& band_shown = mBandShown;
+    if (band_shown.keymap != mModal.get() || band_shown.generation != mModal->generation() || band_shown.font != font)
     {
-        shown  = mModal->status();
-        colour = lerp(paper, ink, 0.8f);
+        band_shown.keymap     = mModal.get();
+        band_shown.generation = mModal->generation();
+        band_shown.font       = font;
+        std::string line;
+        S32         caret     = 0;
+        band_shown.typing     = mModal->typingLine(line, caret);
+        band_shown.shown      = band_shown.typing ? line : mModal->message();
+        band_shown.error      = !band_shown.typing && mModal->messageIsError();
+        band_shown.status     = !band_shown.typing && band_shown.shown.empty();
+        if (band_shown.status)
+        {
+            band_shown.shown = mModal->status();
+        }
+        band_shown.caretX = band_shown.typing ? font->getWidth(band_shown.shown.substr(0, static_cast<size_t>(llclamp(caret, 0, static_cast<S32>(band_shown.shown.size())))))
+                                              : 0;
+        band_shown.items.clear();
+        band_shown.lefts.clear();
+        band_shown.widths.clear();
+        band_shown.chosen = -1;
+        band_shown.gap    = font->getWidth("  ");
+        if (band_shown.typing && mModal->menu(band_shown.items, band_shown.chosen))
+        {
+            S32 at = 0;
+            for (const std::string& item : band_shown.items)
+            {
+                const S32 width = font->getWidth(item);
+                band_shown.lefts.push_back(at);
+                band_shown.widths.push_back(width);
+                at += width + band_shown.gap;
+            }
+        }
     }
+    const bool         typing = band_shown.typing;
+    const std::string& shown  = band_shown.shown;
+    const LLColor4     colour = band_shown.status ? lerp(paper, ink, 0.8f) : band_shown.error ? mSpellErrorColor.get() : ink;
     const S32 x = local.mLeft + mHPad + 2;
     const S32 y = band.mBottom + 2 + static_cast<S32>(font->getDescenderHeight());
     font->renderUTF8(shown, 0, static_cast<F32>(x), static_cast<F32>(y), colour % alpha, LLFontGL::LEFT, LLFontGL::BASELINE, LLFontGL::NORMAL, LLFontGL::NO_SHADOW,
@@ -4390,31 +4420,25 @@ void ALTextView::drawBand(F32 alpha)
     const F32 blink = mBlink.getElapsedTimeF32();
     if (typing && keyboardOnText() && gFocusMgr.getAppHasFocus() && (blink < BLINK_DELAY || (static_cast<S32>(blink * 2.f) & 1)))
     {
-        const S32 at    = font->getWidth(shown.substr(0, static_cast<size_t>(llclamp(caret, 0, static_cast<S32>(shown.size())))));
-        const S32 width = llmax(2, static_cast<S32>(font->getWidth(" ")));
+        const S32 at    = band_shown.caretX;
+        const S32 width = llmax(2, band_shown.gap / 2);
         gl_rect_2d(x + at, band.mTop - 2, x + at + width, band.mBottom + 2, ink % (0.6f * alpha));
     }
     // The keymap's row of choices, over the band on the text's last row
     // -- vim's wildmenu -- the one on the line set in the ink with the
     // ink for its ground, and the row slid left so that it shows.
-    std::vector<std::string> items;
-    S32                      chosen = -1;
-    if (typing && mModal->menu(items, chosen) && !items.empty())
+    const std::vector<std::string>& items  = band_shown.items;
+    const std::vector<S32>&         lefts  = band_shown.lefts;
+    const S32                       chosen = band_shown.chosen;
+    if (typing && !items.empty())
     {
-        const S32    gap = font->getWidth("  ");
+        const S32    gap = band_shown.gap;
         const LLRect row(local.mLeft, band.mTop + mLayout.rowHeight() + 2, local.mRight, band.mTop);
         gl_rect_2d(row, lerp(paper, ink, 0.12f) % alpha);
-        std::vector<S32> lefts;
-        S32              at = 0;
-        for (const std::string& item : items)
-        {
-            lefts.push_back(at);
-            at += font->getWidth(item) + gap;
-        }
         S32 slide = 0;
         if (chosen >= 0 && chosen < static_cast<S32>(items.size()))
         {
-            const S32 right = x + lefts[chosen] + font->getWidth(items[chosen]) + gap / 2;
+            const S32 right = x + lefts[chosen] + band_shown.widths[chosen] + gap / 2;
             slide           = llmax(0, right - row.mRight);
         }
         const S32 baseline = row.mBottom + 1 + static_cast<S32>(font->getDescenderHeight());
@@ -4428,7 +4452,7 @@ void ALTextView::drawBand(F32 alpha)
             const bool on = static_cast<S32>(i) == chosen;
             if (on)
             {
-                gl_rect_2d(left - gap / 4, row.mTop - 1, left + font->getWidth(items[i]) + gap / 4, row.mBottom + 1, ink % (0.85f * alpha));
+                gl_rect_2d(left - gap / 4, row.mTop - 1, left + band_shown.widths[i] + gap / 4, row.mBottom + 1, ink % (0.85f * alpha));
             }
             font->renderUTF8(items[i], 0, static_cast<F32>(left), static_cast<F32>(baseline), (on ? paper : ink) % alpha, LLFontGL::LEFT, LLFontGL::BASELINE,
                              LLFontGL::NORMAL, LLFontGL::NO_SHADOW, S32_MAX, row.mRight - left, nullptr, false);

@@ -2522,4 +2522,30 @@ namespace tut
         keys("0wgI");
         ensure("in insert mode", vim->inserting());
     }
+    template<> template<>
+    void alvimkeymap_object::test<82>()
+    {
+        set_test_name("every change of what the band shows moves the generation: each key of a : line, a message, Escape");
+        make("one\ntwo\n");
+        U32 was = vim->generation();
+        const auto moved = [&](const std::string& what) {
+            ensure(what, vim->generation() != was);
+            was = vim->generation();
+        };
+        keys(":");
+        moved("the line opened");
+        for (const char* key : { "s", "/", "o", "/", "x" })
+        {
+            keys(key);
+            moved(std::string("typed ") + key);
+        }
+        keys("<BS>");
+        moved("a character taken back");
+        keys("<Esc>");
+        moved("the line closed");
+        keys("/nothing-here<CR>");
+        moved("a pattern not found said");
+        keys("j");
+        moved("the message cleared by a key");
+    }
 }

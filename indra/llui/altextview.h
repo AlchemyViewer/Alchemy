@@ -1162,6 +1162,26 @@ private:
     std::vector<LLColor4U>          mRunColours;
     std::vector<size_t>             mRunColourAt;
     std::vector<Squiggle>           mSquiggles;
+    // What the band under the text shows and where its pieces go, as the
+    // keymap had it at its generation in this font: read and measured
+    // again only when the keymap has moved on.
+    struct BandShown
+    {
+        const ALModalKeymap*     keymap     = nullptr;
+        U32                      generation = 0;
+        const LLFontGL*          font       = nullptr;
+        bool                     typing     = false;
+        bool                     error      = false;
+        bool                     status     = false;
+        std::string              shown;
+        S32                      caretX     = 0;
+        std::vector<std::string> items;
+        std::vector<S32>         lefts;
+        std::vector<S32>         widths;
+        S32                      chosen     = -1;
+        S32                      gap        = 0;
+    };
+    BandShown                       mBandShown;
     bool                            mQueueSquiggles = false;
     changed_signal_t       mChanged;
     changed_signal_t       mCaretMoved;
