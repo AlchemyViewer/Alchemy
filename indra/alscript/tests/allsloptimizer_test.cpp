@@ -1212,4 +1212,46 @@ namespace tut
             ensure("and what it wrote compiles: " + p.message + "\n" + r.text, p.severity != ALScriptProblem::Severity::Error);
         }
     }
+    template<> template<>
+    void allsloptimizer_object::test<34>()
+    {
+        set_test_name("a call in a loop's condition or a for's step goes too: a while or a for written as its label, if and jump back, a do's value set at the end of its body");
+        const std::string source =
+            "integer g;\n"
+            "integer next()\n{\n    g = g + 1;\n    return g;\n}\n"
+            "tick(integer i)\n{\n    llOwnerSay((string)i);\n}\n"
+            "default\n{\n    state_entry()\n    {\n"
+            "        while (next() < 10) { if (g == 3) jump c1; llOwnerSay(\"w\"); @c1; }\n"
+            "        integer i;\n"
+            "        for (i = 0; next() < 20; tick(i++)) { if (i == 5) jump b2; }\n"
+            "        @b2;\n"
+            "        if (g) do llOwnerSay(\"d\"); while (next() < 30);\n"
+            "    }\n}\n";
+        const ALLSLInliner::Result put = ALLSLInliner::run(source, { "next", "tick" });
+        auto has = [&put](const std::string& text) { return put.text.find(text) != std::string::npos; };
+        ensure("every call went, and both functions: " + put.text, !has("next()") && !has("tick(") && !has("integer next()"));
+        ensure("the while and the for are labels and ifs: " + put.text, !has("while (next") && !has("for (") && has("@_loop_1;") && has("jump _loop_1;") &&
+                                                                              has("@_loop_2;") && has("jump _loop_2;"));
+        ensure("the for's first part runs once, before its label: " + put.text, put.text.find("i = 0;") < put.text.find("@_loop_2;"));
+        ensure("its step's call goes as a statement's, the argument set in the call's order: " + put.text, has("integer i_1 = i++;"));
+        ensure("the do stays a do, braces round the if's branch for its value's local: " + put.text, has("if (g) {") && has("do {") && has("} while (_r_"));
+        ALLSLService service;
+        for (const ALScriptProblem& p : service.check(put.text))
+        {
+            ensure("what was written compiles: " + p.message + "\n" + put.text, p.severity != ALScriptProblem::Severity::Error);
+        }
+        ALLSLOptimizer::Options o = options();
+        o.inlining                = true;
+        o.inlineNames             = { "next", "tick" };
+        for (ALLSLOptimizer::Target target : { ALLSLOptimizer::Target::Mono, ALLSLOptimizer::Target::LSO })
+        {
+            o.target                       = target;
+            const ALLSLOptimizer::Result r = ALLSLOptimizer::run(source, o);
+            ensure("optimized: " + notes(r), r.optimized);
+            for (const ALScriptProblem& p : service.check(r.text))
+            {
+                ensure("and what the optimizer wrote compiles: " + p.message + "\n" + r.text, p.severity != ALScriptProblem::Severity::Error);
+            }
+        }
+    }
 } // namespace tut

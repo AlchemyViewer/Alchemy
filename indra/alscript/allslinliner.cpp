@@ -414,6 +414,9 @@ namespace
         // The brace that closes those put around a statement that stood
         // alone as a branch or a loop's body.
         std::optional<Edit> after;
+        // Anything else the plan changes: a do loop's body, opened and
+        // closed round the block that ends it.
+        std::vector<Edit>   more;
         ALScriptProblem     note;
         S32                 callLine = 0;
     };
@@ -432,6 +435,33 @@ namespace
                 return name;
             }
         }
+    }
+
+    // Text added to the end of a block's last line, a new line started, a
+    // block's lines joined on: what a block is built of.
+    void addText(Block& block, const std::string& text, Pos at)
+    {
+        if (block.empty())
+        {
+            block.emplace_back();
+        }
+        block.back().push_back(Piece{ text, at, false });
+    }
+    void addLine(Block& block) { block.emplace_back(); }
+    void addBlock(Block& block, Block more)
+    {
+        if (more.empty())
+        {
+            return;
+        }
+        if (block.empty())
+        {
+            block = std::move(more);
+            return;
+        }
+        PieceLine& last = block.back();
+        last.insert(last.end(), more.front().begin(), more.front().end());
+        block.insert(block.end(), std::make_move_iterator(more.begin() + 1), std::make_move_iterator(more.end()));
     }
 
     // What becomes of a body's returns where it is put in place.
@@ -987,8 +1017,17 @@ namespace
                     return false;
                 }
                 break;
+            case NODE_DO_STATEMENT:
+                // Read every time round, after the body: the block goes at
+                // the body's end.
+                if (!isInside(call, static_cast<LSLDoStatement*>(holder)->getCheckExpr()))
+                {
+                    return false;
+                }
+                break;
             default:
-                // A loop's condition is read every time round.
+                // A while's or a for's condition is read every time round
+                // before the body: the loop is written as an if first.
                 return false;
         }
         LSLASTNode* parent  = holder->getParent();
@@ -1078,17 +1117,46 @@ namespace
             out.edit = Edit{ beginOf(holder), endWithSemicolon(lines, holder), std::move(block) };
             return true;
         }
-        block.insert(block.begin(), PieceLine{ Piece{ std::string(typeName) + " " + target + ";", beginOf(call), false } });
+        // The statement's own indentation before it, on the line what goes
+        // before it leaves it on.
+        const Pos          at     = beginOf(holder);
+        const std::string& line   = lines[static_cast<size_t>(at.line)];
+        const size_t       indent = line.find_first_not_of(" \t");
+        const PieceLine    indented{ Piece{ line.substr(0, indent == std::string::npos ? 0 : std::min(indent, static_cast<size_t>(at.column))), at, false } };
+        const std::string  local    = std::string(typeName) + " " + target + ";";
+        if (shape == NODE_DO_STATEMENT)
+        {
+            // The value's local before the loop; the block at the end of
+            // each time round, after the loop's own body -- in braces with
+            // it, so that the body's names are not the block's -- and
+            // before the condition is read.
+            LSLStatement* loopBody = static_cast<LSLDoStatement*>(holder)->getBody();
+            Block         opening;
+            if (!inBlock)
+            {
+                opening.push_back(PieceLine{ Piece{ "{", at, false } });
+            }
+            opening.push_back(PieceLine{ Piece{ local, beginOf(call), false } });
+            opening.push_back(indented);
+            out.before = Edit{ at, at, std::move(opening) };
+            out.more.push_back(Edit{ beginOf(loopBody), beginOf(loopBody), Block{ PieceLine{ Piece{ "{ ", beginOf(loopBody), false } } } });
+            block.insert(block.begin(), PieceLine());
+            block.push_back(PieceLine{ Piece{ "}", endOf(loopBody), false } });
+            out.more.push_back(Edit{ endOf(loopBody), endOf(loopBody), std::move(block) });
+            out.edit = Edit{ beginOf(call), endOf(call), Block{ PieceLine{ Piece{ target, beginOf(call), false } } } };
+            if (!inBlock)
+            {
+                const Pos end = endWithSemicolon(lines, holder);
+                out.after     = Edit{ end, end, Block{ PieceLine{ Piece{ " }", end, false } } } };
+            }
+            return true;
+        }
+        block.insert(block.begin(), PieceLine{ Piece{ local, beginOf(call), false } });
         if (!inBlock)
         {
             block.insert(block.begin(), PieceLine{ Piece{ "{", beginOf(holder), false } });
         }
-        // The statement's own indentation before it, on the line the block
-        // leaves it on.
-        const Pos          at     = beginOf(holder);
-        const std::string& line   = lines[static_cast<size_t>(at.line)];
-        const size_t       indent = line.find_first_not_of(" \t");
-        block.push_back(PieceLine{ Piece{ line.substr(0, indent == std::string::npos ? 0 : std::min(indent, static_cast<size_t>(at.column))), at, false } });
+        block.push_back(indented);
         out.before = Edit{ at, at, std::move(block) };
         out.edit   = Edit{ beginOf(call), endOf(call), Block{ PieceLine{ Piece{ target, beginOf(call), false } } } };
         if (!inBlock)
@@ -1315,6 +1383,144 @@ namespace
             }
             return false;
         };
+        // A while or a for whose condition, or whose step, calls a function
+        // that goes as a block is written first as the label, the if and
+        // the jump back it compiles to -- `@top; if (c) { body jump top; }`
+        // -- so that the call stands in an if's condition, or as a
+        // statement, and goes in place from there in the rounds after. A
+        // call its function's expression can take goes as it stands, and
+        // its loop is left alone.
+        boost::unordered_flat_map<LSLSymbol*, LSLGlobalFunction*> definitions;
+        for (LSLGlobalFunction* function : functions)
+        {
+            if (function->getSymbol())
+            {
+                definitions[function->getSymbol()] = function;
+            }
+        }
+        for (LSLASTNode* node : nodesOf(script))
+        {
+            const bool isWhile = node->getNodeType() == NODE_STATEMENT && node->getNodeSubType() == NODE_WHILE_STATEMENT;
+            const bool isFor   = node->getNodeType() == NODE_STATEMENT && node->getNodeSubType() == NODE_FOR_STATEMENT;
+            if (!isWhile && !isFor)
+            {
+                continue;
+            }
+            auto*         loop  = static_cast<LSLStatement*>(node);
+            LSLASTNode*   check = isFor ? static_cast<LSLASTNode*>(static_cast<LSLForStatement*>(loop)->getCheckExpr())
+                                        : static_cast<LSLASTNode*>(static_cast<LSLWhileStatement*>(loop)->getCheckExpr());
+            LSLASTNode*   steps = isFor ? static_cast<LSLForStatement*>(loop)->getIncrExprs() : nullptr;
+            LSLStatement* body  = isFor ? static_cast<LSLForStatement*>(loop)->getBody() : static_cast<LSLWhileStatement*>(loop)->getBody();
+            LSLASTNode*   parent = loop->getParent();
+            if (!check || !body || !parent || parent->getNodeType() != NODE_STATEMENT)
+            {
+                continue;
+            }
+            bool wanted = false;
+            for (LSLASTNode* part : { check, steps })
+            {
+                for (LSLASTNode* n : part ? nodesOf(part) : std::vector<LSLASTNode*>())
+                {
+                    if (wanted || n->getNodeType() != NODE_EXPRESSION || n->getNodeSubType() != NODE_FUNCTION_EXPRESSION)
+                    {
+                        continue;
+                    }
+                    auto*      call = static_cast<LSLFunctionExpression*>(n);
+                    LSLSymbol* sym  = call->getIdentifier()->getSymbol();
+                    const auto def  = sym ? definitions.find(sym) : definitions.end();
+                    if (def == definitions.end() || recursive(sym))
+                    {
+                        continue;
+                    }
+                    const bool is_marked = std::find(marked.begin(), marked.end(), sym->getName()) != marked.end();
+                    const bool once      = calls[sym].size() == 1;
+                    if (!is_marked && !once)
+                    {
+                        continue;
+                    }
+                    // Whether it goes as it stands: planned on a copy of the
+                    // names given out, and not kept.
+                    Names scratch = used;
+                    Plan  dry;
+                    wanted        = !plan(lines, parser.context, effects, def->second, call, once, is_marked, scratch, dry);
+                }
+            }
+            if (!wanted)
+            {
+                continue;
+            }
+            const bool  inBlock = parent->getNodeSubType() == NODE_COMPOUND_STATEMENT;
+            const Pos   lb      = beginOf(loop);
+            const Pos   le      = endOf(loop);
+            const Pos   bb      = beginOf(body);
+            Names       taken   = visibleFrom(loop);
+            for (const std::string& name : namesAround(loop))
+            {
+                taken.insert(name);
+            }
+            const std::string  label  = freshName("_loop", taken, used, parser.context);
+            const std::string& first  = lines[static_cast<size_t>(lb.line)];
+            const size_t       indent = first.find_first_not_of(" \t");
+            const std::string  pad    = first.substr(0, indent == std::string::npos ? 0 : std::min(indent, static_cast<size_t>(lb.column)));
+            // In front of the body: the for's first parts as statements, the
+            // label, and the if over the condition as written.
+            Block head;
+            if (!inBlock)
+            {
+                addText(head, "{ ", lb);
+            }
+            if (isFor)
+            {
+                if (LSLASTNode* inits = static_cast<LSLForStatement*>(loop)->getInitExprs())
+                {
+                    for (LSLASTNode* init = inits->getChild(0); init; init = init->getNext())
+                    {
+                        addBlock(head, renamedText(lines, beginOf(init), endOf(init), {}));
+                        addText(head, ";", endOf(init));
+                        addLine(head);
+                        addText(head, pad, lb);
+                    }
+                }
+            }
+            addText(head, "@" + label + ";", lb);
+            addLine(head);
+            addText(head, pad + "if (", lb);
+            addBlock(head, renamedText(lines, beginOf(check), endOf(check), {}));
+            addText(head, ") ", endOf(check));
+            // After it: the for's steps as statements, and the jump back.
+            Block tail;
+            addText(tail, "", le);
+            if (steps)
+            {
+                for (LSLASTNode* step = steps->getChild(0); step; step = step->getNext())
+                {
+                    addLine(tail);
+                    addBlock(tail, renamedText(lines, beginOf(step), endOf(step), {}));
+                    addText(tail, ";", endOf(step));
+                }
+            }
+            addLine(tail);
+            addText(tail, "jump " + label + "; }", le);
+            if (!inBlock)
+            {
+                addText(tail, " }", le);
+            }
+            Edit header{ lb, bb, std::move(head) };
+            Edit opening{ bb, bb, Block{ PieceLine{ Piece{ "{ ", bb, false } } } };
+            Edit closing{ le, le, std::move(tail) };
+            if (clashes(header.begin, header.end) || clashes(opening.begin, opening.end) || clashes(closing.begin, closing.end))
+            {
+                continue;
+            }
+            edited.emplace_back(header.begin, header.end);
+            edited.emplace_back(opening.begin, opening.end);
+            edited.emplace_back(closing.begin, closing.end);
+            weave.edits.push_back(std::move(header));
+            weave.edits.push_back(std::move(opening));
+            weave.edits.push_back(std::move(closing));
+            said.push_back(noteAt(loop, "InlinerLoopAsJumps", "wrote the loop as a label, an if and a jump back, for a call in its condition to go in place", {}));
+            ++went;
+        }
         for (LSLGlobalFunction* function : functions)
         {
             LSLSymbol* sym = function->getSymbol();
@@ -1350,10 +1556,18 @@ namespace
             for (LSLFunctionExpression* call : found->second)
             {
                 Plan one;
+                const auto moreClash = [&](const Plan& p) {
+                    return std::any_of(p.more.begin(), p.more.end(), [&](const Edit& e) { return clashes(e.begin, e.end); });
+                };
                 if (plan(lines, parser.context, effects, function, call, count == 1, is_marked, used, one) && !clashes(one.edit.begin, one.edit.end) &&
                     !(one.edit.begin.line >= fbegin.line && one.edit.end.line <= fend.line) &&
-                    !(one.before && clashes(one.before->begin, one.before->end)) && !(one.after && clashes(one.after->begin, one.after->end)))
+                    !(one.before && clashes(one.before->begin, one.before->end)) && !(one.after && clashes(one.after->begin, one.after->end)) &&
+                    !moreClash(one))
                 {
+                    for (const Edit& e : one.more)
+                    {
+                        edited.emplace_back(e.begin, e.end);
+                    }
                     if (one.before)
                     {
                         edited.emplace_back(one.before->begin, one.before->end);
@@ -1384,6 +1598,10 @@ namespace
                 if (one.after)
                 {
                     weave.edits.push_back(std::move(*one.after));
+                }
+                for (Edit& e : one.more)
+                {
+                    weave.edits.push_back(std::move(e));
                 }
                 weave.edits.push_back(std::move(one.edit));
                 ++went;
