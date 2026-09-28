@@ -340,6 +340,9 @@ struct ALScriptStudioDoc
         size_t           codeAfter  = 0;
         // What each include and module was found as (ALPreprocessor).
         std::vector<ALPreprocessor::Result::Resolved> resolved;
+        // What the script declared const, where each name is in the text,
+        // which the analyzers read with the word taken off.
+        std::vector<ALPreprocessor::Result::Const> consts;
     };
     Expanded                                   expanded;
     Expanded                                   uploaded;

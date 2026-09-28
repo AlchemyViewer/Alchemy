@@ -246,6 +246,7 @@ void ALScriptStudioChecking::expandedAnswer(const std::string& id, U32 version, 
     doc.expanded.elsewhere = doc.expanded.map.othersLines();
     doc.expanded.problems = result.problems;
     doc.expanded.resolved = result.resolved;
+    doc.expanded.consts   = result.consts;
     // What the preprocessor found is shown with what the analyzers found.
     mWindow.refreshProblems(doc);
     std::vector<Doc::Waiting> waiting;
@@ -418,6 +419,23 @@ void ALScriptStudioChecking::answered(const ALScriptAnalysis::Result& result, U3
         }
         at = ALTextPos(loc.line, loc.column);
     }
+    // A name declared const, which the analyzers read with the word taken
+    // off, said as the author declared it.
+    std::optional<ALScriptAnalysis::Result> marked;
+    if (expansion != 0 && (result.kind == ALScriptAnalysis::Kind::Hover || result.kind == ALScriptAnalysis::Kind::Inspect) && result.hover.found &&
+        result.hover.hasDefinition)
+    {
+        for (const ALPreprocessor::Result::Const& declared : doc.expanded.consts)
+        {
+            if (declared.line == result.hover.definitionLine && declared.column == result.hover.definitionColumn)
+            {
+                marked.emplace(result);
+                marked->hover.label = "const " + marked->hover.label;
+                break;
+            }
+        }
+    }
+    const ALScriptAnalysis::Result& shown = marked ? *marked : result;
     switch (result.kind)
     {
         case ALScriptAnalysis::Kind::Check:
@@ -449,7 +467,7 @@ void ALScriptStudioChecking::answered(const ALScriptAnalysis::Result& result, U3
                 doc.editor->supplyHover(at, std::string());
                 break;
             }
-            std::string text = result.hover.label;
+            std::string text = shown.hover.label;
             // Where it was declared, as the inspector says it: a link there.
             std::vector<ALCodeEditor::CardLink> links;
             const Declared                      declared = declaredOf(doc, result, preprocessed(doc));
@@ -520,7 +538,7 @@ void ALScriptStudioChecking::answered(const ALScriptAnalysis::Result& result, U3
         case ALScriptAnalysis::Kind::References:
         case ALScriptAnalysis::Kind::Inspect:
         case ALScriptAnalysis::Kind::Weigh:
-            mWindow.answeredElsewhere(doc, result, at);
+            mWindow.answeredElsewhere(doc, shown, at);
             break;
     }
 }

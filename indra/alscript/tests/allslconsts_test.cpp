@@ -217,4 +217,33 @@ namespace tut
         const ALPreprocessor::Result off = ALPreprocessor::run(source, ALPreprocessor::Options());
         ensure("calls stay: " + off.text, off.text.find("sq(3), deg(90), clampi(12, 0, 10), sq(n)") != std::string::npos);
     }
+
+    template<> template<>
+    void allslconsts_object::test<7>()
+    {
+        set_test_name("where the analyzer says a name was declared is where the preprocessor says a const is: a global, a parameter, a function");
+        ensure("builtins: " + error, lslLoaded);
+        const ALPreprocessor::Result r = ALPreprocessor::run("const integer LIMIT = 3 * 4;\n"
+                                                             "const integer twice(const integer n) { return n * 2; }\n"
+                                                             "default { state_entry() { llOwnerSay((string)twice(LIMIT)); } }\n",
+                                                             ALPreprocessor::Options());
+        ensure_equals("three", r.consts.size(), size_t(3));
+        const auto declaredAt = [&](const std::string& word, size_t from) {
+            const size_t at     = r.text.find(word, from);
+            const S32    line   = static_cast<S32>(std::count(r.text.begin(), r.text.begin() + at, '\n'));
+            const size_t start  = r.text.rfind('\n', at);
+            const S32    column = static_cast<S32>(start == std::string::npos ? at : at - start - 1);
+            return lsl.hover(r.text, line, column);
+        };
+        const size_t handler = r.text.find("default");
+        for (const auto& [word, from] : std::vector<std::pair<std::string, size_t>>{ { "LIMIT", handler }, { "twice", handler }, { "n * 2", 0 } })
+        {
+            const ALScriptHover hover = declaredAt(word, from);
+            ensure(word + ": found", hover.found && hover.hasDefinition);
+            const bool matches = std::any_of(r.consts.begin(), r.consts.end(), [&](const ALPreprocessor::Result::Const& c) {
+                return c.line == hover.definitionLine && c.column == hover.definitionColumn;
+            });
+            ensure(word + ": at a const's place, " + std::to_string(hover.definitionLine) + ":" + std::to_string(hover.definitionColumn), matches);
+        }
+    }
 }

@@ -129,6 +129,7 @@ namespace
         void answeredElsewhere(Doc& doc, const ALScriptAnalysis::Result& result, const ALTextPos& pos) override
         {
             told.push_back(kindOf(result.kind) + " " + doc.id + " " + at(pos));
+            labels.push_back(result.hover.label);
         }
         void refreshProblems(Doc& doc) override
         {
@@ -164,6 +165,8 @@ namespace
 
         std::vector<Ask>                    asks;
         Names                               told;
+        // What each answer it was handed elsewhere said of the word.
+        Names                               labels;
         std::vector<ALScriptWeight::Target> targets;
         // The tab in front, by id.
         std::string                         front;
@@ -1025,5 +1028,35 @@ namespace tut
         }
         ensure("the module's, in its file's lines", mapped);
         ensure("the script's own, in its", own);
+    }
+
+    template<> template<>
+    void alscriptstudiochecking_object::test<17>()
+    {
+        set_test_name("a name declared const, which the analyzers read with the word taken off, is said to be const where it is inspected");
+        ALScriptStudioChecking& checking = make();
+        Doc&                    doc      = tab("a");
+        preprocessing                    = true;
+        checking.ask(doc, Kind::Check, ALTextPos(), ALTextPos());
+        // `count` declared const: in the expansion, a line down.
+        ALPreprocessor::Result expanded = expansion(SCRIPT);
+        expanded.consts                 = { { "count", 1, 8, false } };
+        expansions[0].second(expanded);
+        const auto inspect = [&](S32 line, S32 column, const std::string& label) {
+            checking.ask(doc, Kind::Inspect, ALTextPos(0, 8), ALTextPos(0, 8));
+            ALScriptAnalysis::Result result = answer(doc);
+            result.kind                     = Kind::Inspect;
+            result.line                     = studio.asks.back().request.line;
+            result.column                   = studio.asks.back().request.column;
+            result.hover.found              = true;
+            result.hover.label              = label;
+            result.hover.hasDefinition      = true;
+            result.hover.definitionLine     = line;
+            result.hover.definitionColumn   = column;
+            studio.asks.back().answered(result);
+            return studio.labels.empty() ? std::string() : studio.labels.back();
+        };
+        ensure_equals("said const", inspect(1, 8, "integer count"), std::string("const integer count"));
+        ensure_equals("another name is not", inspect(0, 8, "integer helper"), std::string("integer helper"));
     }
 }
