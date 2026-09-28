@@ -26,6 +26,7 @@
 
 #pragma once
 
+#include "alscriptworkspace.h"
 #include "llpreview.h"
 #include "lltabcontainer.h"
 #include "llinventory.h"
@@ -317,7 +318,9 @@ public:
 
     LLLiveLSLEditor(const LLSD& key);
 
-    static void processScriptRunningReply(LLMessageSystem* msg, void**);
+    // The region's word on whether a script runs, and what it compiles for,
+    // which the workspace says to everyone (ALScriptWorkspace::onRunningState).
+    static void runningHeard(const ALScriptWorkspace::RunningState& state);
 
     virtual void callbackLSLCompileSucceeded(const LLUUID& task_id,
                                             const LLUUID& item_id,

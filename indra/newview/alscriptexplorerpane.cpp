@@ -35,12 +35,15 @@
 #include "llagent.h"
 #include "llbutton.h"
 #include "llfiltereditor.h"
+#include "llfloaterreg.h"
+#include "llcompilequeue.h"
 #include "llfloater.h"
 #include "llmenugl.h"
 #include "llnotificationsutil.h"
 #include "llselectmgr.h"
 #include "lltimer.h"
 #include "lltooldraganddrop.h"
+#include "lltrans.h"
 #include "lluictrlfactory.h"
 #include "llviewerassettype.h"
 #include "llviewercontrol.h"
@@ -81,6 +84,68 @@ namespace
     LLViewerObject* rootOf(LLViewerObject* object)
     {
         return object && object->getRootEdit() ? object->getRootEdit() : object;
+    }
+
+    // The legacy queues over whole prims, which walk their contents and
+    // report in a window of their own: every script recompiled for a
+    // target ("auto" for what each compiles for now), reset, started or
+    // stopped. Each prim comes with a name for the report. A recompile
+    // leaves a script `running` knows to be stopped stopped, by prim and
+    // item; the rest run after it, as the queue always had it.
+    enum class Queue : U8
+    {
+            Recompile,
+            Reset,
+            Start,
+            Stop
+        };
+        bool startQueue(Queue kind, const std::vector<std::pair<LLUUID, std::string>>& prims, const std::string& target, std::string& error,
+                        std::map<std::pair<LLUUID, LLUUID>, bool> running = {})
+        {
+        // Only the objects RLVa lets be changed; none, and why.
+        std::vector<std::pair<LLUUID, std::string>> allowed;
+        std::string                                  refused;
+        for (const auto& prim : prims)
+        {
+            const std::string why = ALScriptWorkspace::rlvRefusal(gObjectList.findObject(prim.first), LLAssetType::AT_NONE, ALScriptWorkspace::RlvUse::Change);
+            if (why.empty())
+            {
+                allowed.push_back(prim);
+            }
+            else
+            {
+                refused = why;
+            }
+        }
+        if (allowed.empty())
+        {
+            error = refused.empty() ? LLTrans::getString("WorkspaceNothingToDo") : refused;
+            return false;
+        }
+        const char* name  = kind == Queue::Recompile ? "compile_queue" : kind == Queue::Reset ? "reset_queue" : kind == Queue::Start ? "start_queue" : "stop_queue";
+        const char* title = kind == Queue::Recompile ? "CompileQueueTitle" : kind == Queue::Reset ? "ResetQueueTitle" : kind == Queue::Start ? "RunQueueTitle" : "NotRunQueueTitle";
+        LLUUID      id;
+        id.generate();
+        LLFloaterScriptQueue* queue = LLFloaterReg::getTypedInstance<LLFloaterScriptQueue>(name, LLSD(id));
+        if (!queue)
+        {
+            error = LLTrans::getString("WorkspaceQueueCannotOpen");
+            return false;
+        }
+        queue->setCompileTarget(target.empty() ? std::string("auto") : target);
+        queue->setKnownRunning(std::move(running));
+        for (const auto& [prim, prim_name] : allowed)
+        {
+            queue->addObject(prim, prim_name);
+        }
+        if (!queue->start())
+        {
+            queue->closeFloater();
+            error = LLTrans::getString("WorkspaceQueueWouldNotStart");
+            return false;
+        }
+        queue->setTitle(LLTrans::getString(title));
+        return true;
     }
 }
 
@@ -772,27 +837,33 @@ void ALScriptExplorerPane::run(const std::string& action, const std::vector<Choi
             continue;
         }
         const ALScriptRef ref = row.ref();
+        std::string       error;
+        bool              sent = false;
         if (action == "reset")
         {
-            workspace.reset(ref);
+            sent = workspace.reset(ref, error);
         }
         else if (action == "restart")
         {
             // Stopped and set running again, keeping its state.
-            workspace.restart(ref);
+            sent = workspace.restart(ref, error);
         }
-        else if (workspace.setRunning(ref, action == "start"))
+        else if ((sent = workspace.setRunning(ref, action == "start", error)))
         {
             workspace.askRunning(ref);
+        }
+        if (!sent)
+        {
+            mServices->report(error, true);
         }
     }
     if (!prims.empty())
     {
-        const auto kind = action == "start"  ? ALScriptWorkspace::Queue::Start
-                          : action == "stop" ? ALScriptWorkspace::Queue::Stop
-                                             : ALScriptWorkspace::Queue::Reset;
+        const auto kind = action == "start"  ? Queue::Start
+                          : action == "stop" ? Queue::Stop
+                                             : Queue::Reset;
         std::string error;
-        if (!workspace.queue(kind, prims, LLStringUtil::null, error))
+        if (!startQueue(kind, prims, LLStringUtil::null, error))
         {
             mServices->report(error, true);
         }
@@ -1059,7 +1130,7 @@ void ALScriptExplorerPane::recompile(const std::vector<Choice>& rows)
                 running[{ doc->ref.object, doc->ref.item }] = doc->running != 0;
             }
         }
-        if (!ALScriptWorkspace::instance().queue(ALScriptWorkspace::Queue::Recompile, prims, "auto", error, std::move(running)))
+        if (!startQueue(Queue::Recompile, prims, "auto", error, std::move(running)))
         {
             mServices->report(error, true);
         }

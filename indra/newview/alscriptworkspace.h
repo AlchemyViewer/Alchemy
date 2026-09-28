@@ -315,14 +315,16 @@ public:
 
     // --- a script in an object -----------------------------------------------
 
-    bool setRunning(const ALScriptRef& ref, bool running);
-    bool reset(const ALScriptRef& ref);
+    // Each false with why where nothing could be sent, which the caller
+    // says: the workspace presents nothing of its own.
+    bool setRunning(const ALScriptRef& ref, bool running, std::string& error);
+    bool reset(const ALScriptRef& ref, std::string& error);
     // Stopped, then set running again once its region says it has stopped:
     // sent back to back, a stop sent again after it went astray could reach
     // the region after the start and leave the script stopped. Asked again
     // while the region says it still runs, and started after a while all
     // the same. False where the stop could not be sent.
-    bool restart(const ALScriptRef& ref);
+    bool restart(const ALScriptRef& ref, std::string& error);
 
     // Whether a script in an object runs and what it compiles for, asked
     // of the region; every listener hears the answer. False where there
@@ -458,22 +460,6 @@ public:
     // item put in the trash.
     bool remove(const ALScriptRef& ref, std::string& error);
 
-    // The legacy queues over whole prims, which walk their contents and
-    // report in a window of their own: every script recompiled for a
-    // target ("auto" for what each compiles for now), reset, started or
-    // stopped. Each prim comes with a name for the report.
-    enum class Queue : U8
-    {
-        Recompile,
-        Reset,
-        Start,
-        Stop
-    };
-    // A recompile leaves a script `running` knows to be stopped stopped,
-    // by prim and item; the rest run after it, as the queue always had it.
-    bool queue(Queue kind, const std::vector<std::pair<LLUUID, std::string>>& prims, const std::string& target, std::string& error,
-               std::map<std::pair<LLUUID, LLUUID>, bool> running = {});
-
     // --- what scripts say ------------------------------------------------------
 
     // What an object's scripts say on the debug channel and to their
@@ -544,7 +530,7 @@ private:
     // A notecard's asset sent, and `text`, its text, said as saved.
     bool        uploadNotecard(const ALScriptRef& ref, const std::string& buffer, const std::string& text, bool carries,
                                compile_callback_t callback, std::string& error, Sender sender);
-    bool        scriptMessage(const ALScriptRef& ref, const char* message, bool running, bool with_running);
+    bool        scriptMessage(const ALScriptRef& ref, const char* message, bool running, bool with_running, std::string& error);
 
     compiled_signal_t             mCompiled;
     saved_signal_t                mSaved;

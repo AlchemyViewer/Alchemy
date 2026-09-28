@@ -36,20 +36,16 @@
 #include "llassetstorage.h"
 #include "llcallbacklist.h"
 #include "llchat.h"
-#include "llcompilequeue.h"
 #include "lldate.h"
 #include "lleventtimer.h"
 #include "llfilesystem.h"
 #include "llfloaterperms.h"
-#include "llfloaterreg.h"
 #include "llinventory.h"
 #include "llinventorydefines.h"
 #include "llinventorymodel.h"
 #include "llmd5.h"
 #include "llinventoryobserver.h"
 #include "llnotecard.h"
-#include "llnotificationsutil.h"
-#include "llpreviewscript.h"
 #include "llselectmgr.h"
 #include "lltooldraganddrop.h"
 #include "llsdutil.h"
@@ -235,6 +231,24 @@ struct ALScriptWorkspace::Burst
     std::vector<std::string> texts;
     size_t                   lines = 0;
 };
+
+namespace
+{
+    // An answer that may come on a fiber -- an HTTP reply, an asset fetch --
+    // handed to the main coroutine first: what hears it draws, and a text
+    // editor's reflow takes a mutex a fiber may not. Called at once where
+    // it is on the main coroutine already.
+    template<typename Call>
+    void onMain(Call&& call)
+    {
+        if (LLCoros::on_main_coro())
+        {
+            call();
+            return;
+        }
+        LLAppViewer::instance()->postToMainCoro(std::forward<Call>(call));
+    }
+}
 
 // --- ALScriptRef -------------------------------------------------------------
 
@@ -500,7 +514,7 @@ void ALScriptWorkspace::onAssetLoaded(const LLUUID& asset_id, LLAssetType::EType
         }
         answer.language = resolve(item, answer.text);
     }
-    request->callback(answer);
+    onMain([callback = std::move(request->callback), answer]() { callback(answer); });
 }
 
 // --- saving and compiling ------------------------------------------------------
@@ -1353,8 +1367,12 @@ void ALScriptWorkspace::askExperience(const ALScriptRef& ref, experience_callbac
     body["item-id"]   = ref.item;
     body["fields"].append("experience");
     const bool asked = region->requestPostCapability(
-        "GetMetadata", body, [told](const LLSD& result) { told(result.has("experience") ? result["experience"].asUUID() : LLUUID::null); },
-        [told](const LLSD&) { told(std::nullopt); });
+        "GetMetadata", body,
+        [told](const LLSD& result) {
+            const LLUUID experience = result.has("experience") ? result["experience"].asUUID() : LLUUID::null;
+            onMain([told, experience]() { told(experience); });
+        },
+        [told](const LLSD&) { onMain([told]() { told(std::nullopt); }); });
     if (!asked)
     {
         told(std::nullopt);
@@ -1401,38 +1419,39 @@ void ALScriptWorkspace::askOwnExperiences(experiences_callback_t told)
     const bool asked     = region->requestGetCapability(
         "GetCreatorExperiences",
         [this, tell](const LLSD& result) {
-            mOwnExperiences.clear();
+            std::vector<LLUUID> own;
             for (const LLSD& id : llsd::inArray(result["experience_ids"]))
             {
                 if (id.asUUID().notNull())
                 {
-                    mOwnExperiences.push_back(id.asUUID());
+                    own.push_back(id.asUUID());
                 }
             }
-            tell(true);
+            onMain([this, tell, own = std::move(own)]() {
+                mOwnExperiences = own;
+                tell(true);
+            });
         },
-        [tell](const LLSD&) { tell(false); });
+        [tell](const LLSD&) { onMain([tell]() { tell(false); }); });
     if (!asked)
     {
         tell(false);
     }
 }
 
-bool ALScriptWorkspace::scriptMessage(const ALScriptRef& ref, const char* message, bool running, bool with_running)
+bool ALScriptWorkspace::scriptMessage(const ALScriptRef& ref, const char* message, bool running, bool with_running, std::string& error)
 {
     LLViewerObject* object = gObjectList.findObject(ref.object);
     if (!object || !object->getRegion())
     {
-        LLNotificationsUtil::add("CouldNotStartStopScript");
+        error = LLTrans::getString("WorkspaceNoSuchObject");
         return false;
     }
-// [RLVa:KB] - Checked: 2010-09-28 (RLVa-1.2.1f) | Modified: RLVa-1.0.5a
-    if (!rlvRefusal(object, LLAssetType::AT_LSL_TEXT, RlvUse::Change).empty())
+    if (std::string refused = rlvRefusal(object, LLAssetType::AT_LSL_TEXT, RlvUse::Change); !refused.empty())
     {
-        RlvUtil::notifyBlockedGeneric();
+        error = std::move(refused);
         return false;
     }
-// [/RLVa:KB]
     LLMessageSystem* msg = gMessageSystem;
     msg->newMessageFast(message);
     msg->nextBlockFast(_PREHASH_AgentData);
@@ -1449,14 +1468,14 @@ bool ALScriptWorkspace::scriptMessage(const ALScriptRef& ref, const char* messag
     return true;
 }
 
-bool ALScriptWorkspace::setRunning(const ALScriptRef& ref, bool running)
+bool ALScriptWorkspace::setRunning(const ALScriptRef& ref, bool running, std::string& error)
 {
-    return scriptMessage(ref, _PREHASH_SetScriptRunning, running, true);
+    return scriptMessage(ref, _PREHASH_SetScriptRunning, running, true, error);
 }
 
-bool ALScriptWorkspace::reset(const ALScriptRef& ref)
+bool ALScriptWorkspace::reset(const ALScriptRef& ref, std::string& error)
 {
-    return scriptMessage(ref, _PREHASH_ScriptReset, false, false);
+    return scriptMessage(ref, _PREHASH_ScriptReset, false, false, error);
 }
 
 namespace
@@ -1467,9 +1486,9 @@ namespace
     constexpr S32 RESTART_ASKS      = 20;
 }
 
-bool ALScriptWorkspace::restart(const ALScriptRef& ref)
+bool ALScriptWorkspace::restart(const ALScriptRef& ref, std::string& error)
 {
-    if (!setRunning(ref, false))
+    if (!setRunning(ref, false, error))
     {
         return false;
     }
@@ -1490,7 +1509,10 @@ bool ALScriptWorkspace::restart(const ALScriptRef& ref)
         }
         one->done = true;
         one->heard.disconnect();
-        if (setRunning(one->ref, true))
+        // The stop went; a start that cannot follow has nobody waiting to
+        // be told, and the region's answer says it stays stopped.
+        std::string unsent;
+        if (setRunning(one->ref, true, unsent))
         {
             askRunning(one->ref);
         }
@@ -1564,7 +1586,6 @@ void ALScriptWorkspace::processScriptRunningReply(LLMessageSystem* msg, void** d
         instance().mContentsIndex->running(state.ref, state.running);
         instance().mRunningState(state);
     }
-    LLLiveLSLEditor::processScriptRunningReply(msg, data);
 }
 
 // --- what an object holds ----------------------------------------------------------
@@ -1844,55 +1865,6 @@ bool ALScriptWorkspace::remove(const ALScriptRef& ref, std::string& error)
         return false;
     }
     object->removeInventory(ref.item);
-    return true;
-}
-
-bool ALScriptWorkspace::queue(Queue kind, const std::vector<std::pair<LLUUID, std::string>>& prims, const std::string& target, std::string& error,
-                              std::map<std::pair<LLUUID, LLUUID>, bool> running)
-{
-    // Only the objects RLVa lets be changed; none, and why.
-    std::vector<std::pair<LLUUID, std::string>> allowed;
-    std::string                                  refused;
-    for (const auto& prim : prims)
-    {
-        const std::string why = rlvRefusal(gObjectList.findObject(prim.first), LLAssetType::AT_NONE, RlvUse::Change);
-        if (why.empty())
-        {
-            allowed.push_back(prim);
-        }
-        else
-        {
-            refused = why;
-        }
-    }
-    if (allowed.empty())
-    {
-        error = refused.empty() ? LLTrans::getString("WorkspaceNothingToDo") : refused;
-        return false;
-    }
-    const char* name  = kind == Queue::Recompile ? "compile_queue" : kind == Queue::Reset ? "reset_queue" : kind == Queue::Start ? "start_queue" : "stop_queue";
-    const char* title = kind == Queue::Recompile ? "CompileQueueTitle" : kind == Queue::Reset ? "ResetQueueTitle" : kind == Queue::Start ? "RunQueueTitle" : "NotRunQueueTitle";
-    LLUUID      id;
-    id.generate();
-    LLFloaterScriptQueue* queue = LLFloaterReg::getTypedInstance<LLFloaterScriptQueue>(name, LLSD(id));
-    if (!queue)
-    {
-        error = LLTrans::getString("WorkspaceQueueCannotOpen");
-        return false;
-    }
-    queue->setCompileTarget(target.empty() ? std::string("auto") : target);
-    queue->setKnownRunning(std::move(running));
-    for (const auto& [prim, prim_name] : allowed)
-    {
-        queue->addObject(prim, prim_name);
-    }
-    if (!queue->start())
-    {
-        queue->closeFloater();
-        error = LLTrans::getString("WorkspaceQueueWouldNotStart");
-        return false;
-    }
-    queue->setTitle(LLTrans::getString(title));
     return true;
 }
 

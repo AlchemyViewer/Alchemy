@@ -2344,6 +2344,9 @@ LLLiveLSLEditor::LLLiveLSLEditor(const LLSD& key) :
     mObjectName("")
 {
     mFactoryMap["script ed panel"] = LLCallbackMap(LLLiveLSLEditor::createScriptEdPanel, this);
+    // Whether a script runs, as the workspace hears it: listened to once,
+    // for every editor.
+    static boost::signals2::scoped_connection running_heard = ALScriptWorkspace::instance().onRunningState(&LLLiveLSLEditor::runningHeard);
 }
 
 bool LLLiveLSLEditor::postBuild()
@@ -2936,52 +2939,20 @@ void LLLiveLSLEditor::onSave(void* userdata, bool close_after_save)
 }
 
 // static
-void LLLiveLSLEditor::processScriptRunningReply(LLMessageSystem* msg, void**)
+void LLLiveLSLEditor::runningHeard(const ALScriptWorkspace::RunningState& state)
 {
-    LLUUID item_id;
-    LLUUID object_id;
-    msg->getUUIDFast(_PREHASH_Script, _PREHASH_ObjectID, object_id);
-    msg->getUUIDFast(_PREHASH_Script, _PREHASH_ItemID, item_id);
-
-    LLSD floater_key;
+    LLUUID object_id = state.ref.object;
+    LLSD          floater_key;
     floater_key["taskid"] = object_id;
-    floater_key["itemid"] = item_id;
+    floater_key["itemid"] = state.ref.item;
     if (LLLiveLSLEditor* instance = LLFloaterReg::findTypedInstance<LLLiveLSLEditor>("preview_scriptedit", floater_key))
     {
         instance->mHaveRunningInfo = true;
+        instance->mRunningCheckbox->set(state.running);
 
-        bool running;
-        msg->getBOOLFast(_PREHASH_Script, _PREHASH_Running, running);
-        instance->mRunningCheckbox->set(running);
-
-        bool mono = false, luau = false, luau_language = false;
-        msg->getBOOLFast(_PREHASH_Script, _PREHASH_Mono, mono);
-        msg->getBOOLFast(_PREHASH_Script, _PREHASH_Luau, luau); // Luau compiler is enabled
-        msg->getBOOLFast(_PREHASH_Script, _PREHASH_LuauLanguage, luau_language);
-
-        std::string compile_target;
-        if (luau)
-        {
-            if (luau_language)
-            {
-                compile_target = "luau";
-            }
-            else
-            {
-                compile_target = "lsl-luau"; // Luau compiler running in LSL compatibility mode
-            }
-        }
-        else if (mono)
-        {
-            compile_target = "mono";
-        }
-        else
-        {
-            compile_target = "lsl2";
-        }
-
+        const std::string& compile_target = state.compileTarget;
         instance->mScriptEd->mCompileTarget->setValue(compile_target);
-        instance->mScriptEd->processKeywords(luau && luau_language); // Use Luau syntax highlighting for Luau scripts
+        instance->mScriptEd->processKeywords(compile_target == "luau"); // Use Luau syntax highlighting for Luau scripts
 
         bool lua_scripts_enabled = have_lua_enabled(object_id);
         if (LLScrollListItem* luau_item = instance->mScriptEd->mCompileTarget->findItemByValue("luau"))

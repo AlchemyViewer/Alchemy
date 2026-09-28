@@ -7552,9 +7552,10 @@ void ALFloaterScriptStudio::onRunning()
 {
     if (Doc* doc = active(); doc && !doc->ref.inInventory())
     {
-        if (!ALScriptWorkspace::instance().setRunning(doc->ref, mRunning->get()))
+        if (std::string error; !ALScriptWorkspace::instance().setRunning(doc->ref, mRunning->get(), error))
         {
             mRunning->set(!mRunning->get());
+            report(error, true, doc);
         }
         // The script's own, which its next save keeps.
         doc->running = mRunning->get() ? 1 : 0;
@@ -7565,7 +7566,10 @@ void ALFloaterScriptStudio::onReset()
 {
     if (Doc* doc = active(); doc && !doc->ref.inInventory())
     {
-        ALScriptWorkspace::instance().reset(doc->ref);
+        if (std::string error; !ALScriptWorkspace::instance().reset(doc->ref, error))
+        {
+            report(error, true, doc);
+        }
     }
 }
 
