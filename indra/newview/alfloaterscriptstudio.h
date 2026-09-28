@@ -448,6 +448,7 @@ private:
     U64  newRequest() override;
     void keepForRecovery(Doc& doc) override;
     void takeLoaded(Doc& doc, const std::string& text) override;
+    void worldAsset(const Doc& doc, std::function<void(std::optional<LLUUID>)> told) override;
     void takeCarried(Doc& doc) override { takeCarriedText(doc); }
     void showProblems() override;
     void selectFirstError(bool checkers_only) override;

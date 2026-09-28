@@ -234,4 +234,32 @@ namespace tut
         flow.setWarnWeightFor(9);
         ensure("the weight to warn of", flow.warnWeightFor() == 9);
     }
+
+    template<> template<>
+    void alscriptsaveflow_object::test<10>()
+    {
+        set_test_name("the world asked once a text what the item holds; moved, the save stops until asked again; a save asked meanwhile waits on the answer");
+        Flow::Tab tab = script(1);
+        tab.askWorld  = true;
+        ensure("asked first", flow.route(tab) == Route::AskWorld && flow.stage() == Flow::Stage::Asking);
+        ensure("a save asked meanwhile waits on the answer", flow.ask(false, false) == Flow::Start::Queued);
+        flow.worldAnswered(1, false);
+        ensure("answered, nothing moved: sent", flow.route(tab) == Route::Send);
+
+        tab.version = 2;
+        ensure("a new text asks again", flow.route(tab) == Route::AskWorld);
+        flow.worldAnswered(2, true);
+        ensure("moved: stopped", flow.route(tab) == Route::StoppedByWorld && !flow.underway());
+        ensure("and again", flow.route(tab) == Route::StoppedByWorld);
+        flow.letPast(2);
+        ensure("asked again: saved over it", flow.route(tab) == Route::Send);
+
+        Flow::Tab file = tab;
+        file.file      = true;
+        ensure("a file asks nothing of the world", flow.route(file) == Route::File);
+        Flow::Tab card = script(3);
+        card.notecard  = true;
+        card.askWorld  = true;
+        ensure("a notecard is asked about too", flow.route(card) == Route::AskWorld);
+    }
 }

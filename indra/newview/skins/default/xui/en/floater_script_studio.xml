@@ -467,6 +467,13 @@
     <floater.string name="SavedByEditor">another editor</floater.string>
     <floater.string name="SavedByQueue">a recompile</floater.string>
     <floater.string name="CompareSavedThere">Saved elsewhere</floater.string>
+    <floater.string name="SaveAskingWorld">Checking whether [NAME] was saved elsewhere...</floater.string>
+    <floater.string name="SaveWorldMoved">[NAME] was saved elsewhere since it was opened here -- by a co-owner, or in another viewer -- and saving would replace that.</floater.string>
+    <floater.string name="ActionReloadWorld">Reload</floater.string>
+    <floater.string name="ActionReloadWorldTip">[NAME] loaded again as it is saved now; what was typed here is kept in File > Recover Unsaved Changes</floater.string>
+    <floater.string name="ActionCompareWorld">Compare</floater.string>
+    <floater.string name="ActionCompareWorldTip">[NAME] as it is saved now beside what is here</floater.string>
+    <floater.string name="CompareWorld">Saved now</floater.string>
     <floater.string name="ActionExport">Export to a file</floater.string>
     <floater.string name="ActionExportTip">What [NAME] holds, written to a file on this computer</floater.string>
     <floater.string name="SaveAnywayTip">Save [NAME] as it stands, over what was found</floater.string>

@@ -414,6 +414,29 @@ ALFloaterScriptStudio* ALFloaterScriptStudio::explore(const LLUUID& root)
     return studio;
 }
 
+void ALFloaterScriptStudio::worldAsset(const Doc& doc, std::function<void(std::optional<LLUUID>)> told)
+{
+    const ALScriptRef ref = doc.ref;
+    if (ref.inInventory())
+    {
+        // The inventory is told of every change to its items, this agent's
+        // own uploads among them before they answer.
+        const LLViewerInventoryItem* item = gInventory.getItem(ref.item);
+        told(item ? std::optional<LLUUID>(item->getAssetUUID()) : std::nullopt);
+        return;
+    }
+    // An object keeps its copy of what it holds until it is selected or
+    // asked, and hears nothing of a co-owner's save: the region asked.
+    ALScriptWorkspace::instance().listContents(
+        ref.object,
+        [ref, told = std::move(told)](const ALScriptWorkspace::Contents& contents) {
+            LLViewerObject*  object = contents.fetched ? gObjectList.findObject(ref.object) : nullptr;
+            LLInventoryItem* item   = object ? object->getInventoryItem(ref.item) : nullptr;
+            told(item ? std::optional<LLUUID>(item->getAssetUUID()) : std::nullopt);
+        },
+        true);
+}
+
 void ALFloaterScriptStudio::takeLoaded(Doc& doc, const std::string& text)
 {
     // As if loaded afresh -- the envelope read, the expanded code shown, the
@@ -6274,6 +6297,32 @@ void ALFloaterScriptStudio::outputAction(Doc& doc, const std::string& action)
     else if (action == "keep_saved")
     {
         mSaving.keepSaved(doc);
+    }
+    else if (action == "reload_world")
+    {
+        // What was typed here set aside for File > Recover, and the tab
+        // loaded again as the world has it.
+        revert(doc);
+    }
+    else if (action == "compare_world")
+    {
+        const LLHandle<LLFloater> handle = getHandle();
+        const std::string         id     = doc.id;
+        ALScriptWorkspace::instance().load(doc.ref, [handle, id](const ALScriptWorkspace::Loaded& answer) {
+            ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get());
+            Doc*                   found  = studio ? studio->findDoc(id) : nullptr;
+            if (!found || !found->loaded)
+            {
+                return;
+            }
+            if (!answer.error.empty())
+            {
+                studio->setStatus(answer.error, true);
+                return;
+            }
+            const std::string theirs = answer.notecard ? answer.text : sourceOf(answer);
+            studio->compare(*found, theirs, found->editor->wholeText(), studio->getString("CompareWorld"), studio->getString("CompareNow"));
+        });
     }
     else if (action == "compare_saved" && doc.savedThere)
     {

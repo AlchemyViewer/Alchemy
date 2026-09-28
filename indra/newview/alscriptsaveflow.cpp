@@ -39,6 +39,12 @@ ALScriptSaveFlow::Start ALScriptSaveFlow::ask(bool out_of_reach, bool detached)
         mAgain = true;
         return Start::Queued;
     }
+    // The world's word on its way: the save goes on once it answers, with
+    // whatever the text is by then.
+    if (mStage == Stage::Asking)
+    {
+        return Start::Queued;
+    }
     // Nothing is tried that would only fail.
     if (out_of_reach)
     {
@@ -66,6 +72,23 @@ ALScriptSaveFlow::Route ALScriptSaveFlow::route(const Tab& tab)
     if (tab.file)
     {
         return Route::File;
+    }
+    // The world asked first what the item holds, once for a text: a save
+    // made elsewhere since would be replaced without a word. Let past by
+    // asking again, as the analyzers' errors are.
+    if (tab.askWorld && !letsPast(tab.version, CheckWorld))
+    {
+        if (mWorldVersion != tab.version)
+        {
+            mStage = Stage::Asking;
+            return Route::AskWorld;
+        }
+        if (mWorldMoved)
+        {
+            stoppedBy(tab.version, CheckWorld);
+            stopped();
+            return Route::StoppedByWorld;
+        }
     }
     if (tab.notecard)
     {
@@ -143,6 +166,16 @@ void ALScriptSaveFlow::sent(const ALTextUndo::SavePoint& at, std::optional<ALSou
     // text.
     mSentMap   = std::move(map);
     mSentItems = std::move(items);
+}
+
+void ALScriptSaveFlow::worldAnswered(S64 version, bool moved)
+{
+    mWorldVersion = version;
+    mWorldMoved   = moved;
+    if (mStage == Stage::Asking)
+    {
+        mStage = Stage::Idle;
+    }
 }
 
 void ALScriptSaveFlow::stopped()

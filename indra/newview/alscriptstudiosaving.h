@@ -122,6 +122,10 @@ public:
         virtual U64  newRequest()                                                                                                 = 0;
         // A file's text written back where it came from.
         virtual void saveFile(Doc& doc) = 0;
+        // The asset the world holds now for the tab's item: the region asked
+        // for an object's, which keeps no word of a co-owner's save; the
+        // inventory's as it stands. Nothing where it cannot be told.
+        virtual void worldAsset(const Doc& doc, std::function<void(std::optional<LLUUID>)> told) = 0;
 
         // --- saves from elsewhere ------------------------------------------------------
 

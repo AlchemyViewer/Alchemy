@@ -306,6 +306,8 @@ void ALScriptOutputPane::said(const std::string& text, bool failure, const ALScr
                                   : action == "take_saved"    ? "ActionTakeSaved"
                                   : action == "keep_saved"    ? "ActionKeepSaved"
                                   : action == "compare_saved" ? "ActionCompareSaved"
+                                  : action == "reload_world"  ? "ActionReloadWorld"
+                                  : action == "compare_world" ? "ActionCompareWorld"
                                                               : "ActionExport";
         const std::string label = mServices->words(key);
         const size_t      last  = entry.text.rfind('\n');

@@ -340,11 +340,37 @@ void ALScriptStudioSaving::save(Doc& doc)
     tab.holdOnErrors     = options.holdOnErrors;
     tab.checked          = doc.check.analysisVersion == tab.version;
     tab.checkerErrors    = checkerErrors(doc);
+    tab.askWorld         = !tab.file && !doc.ref.isNull() && doc.assetId.notNull();
     const ALScriptSaveFlow::Route route = doc.save.route(tab);
     switch (route)
     {
         case ALScriptSaveFlow::Route::File:
             mWindow.saveFile(doc);
+            return;
+        case ALScriptSaveFlow::Route::AskWorld:
+        {
+            // What the item holds now asked first; the save goes on once
+            // the world answers, with whatever the text is by then.
+            const std::weak_ptr<bool> alive   = mAlive;
+            const std::string         id      = doc.id;
+            const S64                 version = tab.version;
+            mServices.setStatus(mServices.words("SaveAskingWorld", args));
+            mWindow.worldAsset(doc, [this, alive, id, version](std::optional<LLUUID> asset) {
+                Doc* asked = alive.lock() ? mServices.findDoc(id) : nullptr;
+                if (!asked || asked->save.stage() != ALScriptSaveFlow::Stage::Asking)
+                {
+                    return;
+                }
+                asked->save.worldAnswered(version, asset && asset->notNull() && *asset != asked->assetId);
+                save(*asked);
+            });
+            return;
+        }
+        case ALScriptSaveFlow::Route::StoppedByWorld:
+            // Saved elsewhere since this tab had it: saving would replace
+            // that. The author says whether to, to reload, or to compare.
+            mServices.report(mServices.words("SaveWorldMoved", args), true, &doc, { "save_anyway", "reload_world", "compare_world" });
+            stopped(doc);
             return;
         case ALScriptSaveFlow::Route::Notecard:
         {

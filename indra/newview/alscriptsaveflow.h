@@ -40,6 +40,8 @@
 //
 // A save is one of:
 //   Idle           nothing on its way
+//   Asking         waiting on the world's word on the item: the asset it
+//                  holds now, which another save may have moved
 //   Checking       waiting on the analyzers' check of the text as it stands
 //   Preprocessing  waiting on a run of the preprocessor: its own, or one
 //                  that was on its way already, which it joins
@@ -52,6 +54,7 @@ public:
     enum class Stage : U8
     {
         Idle,
+        Asking,
         Checking,
         Preprocessing,
         Sending
@@ -67,9 +70,13 @@ public:
     // still stops it, and says why. Nothing the preprocessor finds stops
     // one: a save is what keeps the author's work, the source going up in
     // the envelope whatever the expansion came to.
+    // The world's copy stops one too: an item saved elsewhere since the tab
+    // had it -- by a co-owner, in another viewer -- which this save would
+    // replace without a word.
     enum Check : U8
     {
         CheckAnalyzers = 1,
+        CheckWorld     = 2,
         CheckAll       = 0xFF
     };
 
@@ -109,6 +116,9 @@ public:
         bool holdOnErrors  = false;
         bool checked       = false;
         S32  checkerErrors = 0;
+        // Whether the world can be asked what the item holds: an item, in
+        // an object or the inventory, whose asset the tab knows.
+        bool askWorld      = false;
     };
     // Where the save goes from here: a file written on the spot, a notecard
     // sent as it stands; the analyzers asked first, or their errors
@@ -116,6 +126,8 @@ public:
     enum class Route : U8
     {
         File,
+        AskWorld,
+        StoppedByWorld,
         Notecard,
         Check,
         StoppedByAnalyzers,
@@ -124,6 +136,10 @@ public:
         Send
     };
     Route route(const Tab& tab);
+
+    // The world's word on the item, of the text at `version`: whether the
+    // asset it holds now is another than the tab's. Asked once for a text.
+    void worldAnswered(S64 version, bool moved);
 
     // --- what it waits on answering ---------------------------------------------
 
@@ -230,5 +246,8 @@ private:
     std::optional<ALSourceMap> mSentMap;
     std::vector<LLUUID>        mSentItems;
     U64                        mRequest = 0;
+    // The text the world was last asked about, and whether it had moved.
+    S64                        mWorldVersion = -1;
+    bool                       mWorldMoved   = false;
     S64                        mWarnWeightFor = -1;
 };

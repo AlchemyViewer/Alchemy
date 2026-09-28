@@ -106,6 +106,13 @@ namespace
             return true;
         }
         U64 newRequest() override { return ++requests; }
+        // The world holds the tab's own asset, but where a test moves it;
+        // asked of it counted.
+        void worldAsset(const Doc& doc, std::function<void(std::optional<LLUUID>)> told) override
+        {
+            ++worldAsks;
+            told(worldHolds ? *worldHolds : doc.assetId);
+        }
         void takeLoaded(Doc& doc, const std::string& text) override { loadedAgain.push_back(doc.id + ":" + text); }
         void takeCarried(Doc& doc) override
         {
@@ -155,6 +162,8 @@ namespace
         std::vector<Sent>                                   sent;
         Names                                               notecards;
         U64                                                 requests = 0;
+        std::optional<LLUUID>                               worldHolds;
+        S32                                                 worldAsks = 0;
         Names                                               loadedAgain;
         std::vector<bool>                                   firstErrors;
         S32                                                 problemsShown = 0, notices = 0, stops = 0, continues = 0;
@@ -782,5 +791,30 @@ namespace tut
         saving.savedElsewhere(saved(dirty, "default {}\n// third", ALScriptWorkspace::Origin::Editor));
         saving.keepSaved(dirty);
         ensure("kept", !dirty.savedThere && dirty.editor->isDirty() && lastStatus() == "SavedElsewhereKept");
+    }
+
+    template<> template<>
+    void alscriptstudiosaving_object::test<15>()
+    {
+        set_test_name("a save asks what the item holds now; saved elsewhere since, it stops with Save Anyway, Reload and Compare, and goes when asked again");
+        ALScriptStudioSaving& saving = make();
+        Doc&                  doc    = tab("a", "default {}");
+        doc.assetId.generate();
+        type(doc, " ");
+        saving.save(doc);
+        ensure_equals("asked once", studio.worldAsks, 1);
+        ensure_equals("nothing moved: sent", studio.sent.size(), size_t(1));
+        saving.compiled(answer(doc));
+
+        LLUUID elsewhere;
+        elsewhere.generate();
+        studio.worldHolds = elsewhere;
+        type(doc, "x");
+        saving.save(doc);
+        ensure_equals("moved: said", lastSaid(), std::string("SaveWorldMoved"));
+        ensure("with what can be done", services.reports.back().actions == Names{ "save_anyway", "reload_world", "compare_world" });
+        ensure("and not sent", studio.sent.size() == 1 && !doc.save.underway());
+        saving.saveAsked(doc);
+        ensure_equals("asked again: sent over it", studio.sent.size(), size_t(2));
     }
 }
