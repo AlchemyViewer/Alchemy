@@ -503,6 +503,14 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="PreprocExpectedValue">expected a value in preprocessor expression</string>
 	<string name="PreprocIfNeedsExpression">#if with no expression</string>
 	<string name="PreprocIfWithoutEndif">#if without #endif at the end of the file</string>
+	<string name="PreprocIntegerTooLarge">integer constant '[1]' is too large for its type</string>
+	<string name="PreprocBadCharacter">'[1]' is not a character constant</string>
+	<string name="PreprocVaArgsNotAName">'__VA_ARGS__' cannot be used as a macro name</string>
+	<string name="PreprocVaArgsNotAParameter">'__VA_ARGS__' cannot be a macro parameter</string>
+	<string name="PreprocVaArgsOutside">__VA_ARGS__ can only appear in the expansion of a variadic macro</string>
+	<string name="PreprocExtraTokens">extra tokens at end of #[1] directive</string>
+	<string name="PreprocPragmaNeedsString">_Pragma takes a string literal in parentheses</string>
+	<string name="PreprocBadLine">#line takes a line number from 1 to 2147483647, and may take a file name in quotes after it</string>
 	<string name="PreprocTooMuch">the macros expand to more than this preprocessor will make; nothing was preprocessed</string>
 	<string name="PreprocExpressionTooDeep">the expression nests too deeply for this preprocessor</string>
 	<string name="PreprocMacrosTooDeep">macros are invoked inside each other's arguments more deeply than this preprocessor follows; nothing was preprocessed</string>

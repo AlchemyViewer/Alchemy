@@ -157,6 +157,8 @@ if(AL_BUILD_TESTS)
   al_add_test(alscriptmessages PROJECT alscript LIBRARIES alscript llcommon)
   al_add_test(alscriptrecovery PROJECT alscript LIBRARIES alscript llcommon)
   al_add_test(alscripttempfiles PROJECT alscript LIBRARIES alscript llcommon)
+  # The preprocessor against C11's 6.10, clause by clause.
+  al_add_test(alpreprocessorc11 PROJECT alscript LIBRARIES alscript llcommon)
   # What LSL may change and the order it runs in, over scripts parsed with
   # the grid's builtins loaded.
   al_add_test(

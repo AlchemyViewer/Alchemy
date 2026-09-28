@@ -354,6 +354,17 @@ namespace
             return false;
         }
 
+        // Every join where a token goes on: C joins the lines before it
+        // reads a token (5.1.1.2 phase 2), so one runs on over a join --
+        // a name, a number, a directive's name, a // comment. LSL's alone:
+        // Luau joins nothing.
+        void splices()
+        {
+            while (!mLua && continuation())
+            {
+            }
+        }
+
         void common()
         {
             const char c = at(mPos);
@@ -384,6 +395,7 @@ namespace
                 while (isIdentChar(at(mPos)))
                 {
                     take();
+                    splices();
                 }
                 finish();
             }
@@ -399,6 +411,7 @@ namespace
             // than either language's and holds every literal of both.
             start(Kind::Number);
             take();
+            splices();
             while (mPos < mText.size())
             {
                 const char c = at(mPos);
@@ -415,6 +428,7 @@ namespace
                 {
                     break;
                 }
+                splices();
             }
             finish();
         }
@@ -459,9 +473,16 @@ namespace
             const char c = at(mPos);
             if (c == '/' && at(mPos + 1) == '/')
             {
+                // Over a join: a note that ends in a backslash takes the
+                // next line with it, as C and Firestorm's Wave have it.
                 start(Kind::Comment);
-                while (mPos < mText.size() && at(mPos) != '\n')
+                while (mPos < mText.size())
                 {
+                    splices();
+                    if (mPos >= mText.size() || at(mPos) == '\n')
+                    {
+                        break;
+                    }
                     take();
                 }
                 finish();
@@ -485,6 +506,15 @@ namespace
             else if (c == '"')
             {
                 lslString();
+            }
+            else if (c == '\'')
+            {
+                // A character constant, which LSL has none of but C's
+                // preprocessor reads -- in an #if, and to stringize: to
+                // its closing quote or its line's end, and taken whole.
+                start(Kind::String);
+                takeQuoted('\'');
+                finish();
             }
             else
             {
@@ -994,7 +1024,10 @@ namespace
             Line,
             File,
             AssetId,
-            ShortFile
+            ShortFile,
+            // C11 6.10.9's _Pragma operator: function-like, its one
+            // argument a string that is read as a #pragma.
+            Pragma
         };
         std::string              name;
         bool                     functionLike = false;
@@ -1028,6 +1061,9 @@ namespace
         bool active   = false;
         bool taken    = false;
         bool seenElse = false;
+        // Where its #if is, for one left open at the end of its file.
+        S32  line   = 0;
+        S32  column = 0;
     };
 
     struct FileState
@@ -1043,6 +1079,10 @@ namespace
         // Nothing but blanks since the last newline: where a directive
         // may stand.
         bool                          lineStart = true;
+        // What #line says: added to a line's number for __LINE__, and the
+        // name for __FILE__ in place of the file's own.
+        S64                           lineOffset = 0;
+        std::string                   presumed;
         std::vector<Cond>             conds;
 
         bool          active() const { return conds.empty() || conds.back().active; }
@@ -1137,6 +1177,17 @@ namespace
         // -- directives --
         Tokens readLine(FileState& f, Token& newline);
         void   directive(FileState& f);
+        // A warning where a directive C gives nothing more to has
+        // something more from `from` on, as GCC gives one.
+        void   extraTokens(const Tokens& line, size_t from, const std::string& name, const Token& hash);
+        // A #pragma's words, from the directive or from _Pragma.
+        void   pragma(const Tokens& words, size_t at);
+        // _Pragma("..."): the string unquoted and read as a #pragma's
+        // words, and nothing left in the text.
+        void   pragmaOperator(const Tokens& arg, const Token& at);
+        // #line: the line after it numbered as it says, and named where it
+        // names one, for __LINE__ and __FILE__ (C11 6.10.4).
+        void   lineDirective(FileState& f, const Tokens& line, size_t at, const Token& hash);
         void   define(const Tokens& line, size_t at, const Token& hash);
         void   include(const Tokens& line, size_t at, const Token& hash);
         bool   evalCondition(const Tokens& line, size_t at, const Token& hash);
@@ -1219,7 +1270,12 @@ namespace
         Macro m;
         m.name         = name;
         m.dynamic      = dynamic;
-        mMacros[name]  = m;
+        if (dynamic == Macro::Dynamic::Pragma)
+        {
+            m.functionLike = true;
+            m.params       = { "string" };
+        }
+        mMacros[name] = m;
     }
 
     // -- files --
@@ -1270,11 +1326,13 @@ namespace
     void Engine::popFile()
     {
         FileState& f = *mFiles.back();
-        if (!f.conds.empty())
+        // Each conditional left open, said where its #if is.
+        for (const Cond& c : f.conds)
         {
             Token at;
-            at.file = f.index;
-            at.line = f.tokens().empty() ? 0 : f.tokens().back().line;
+            at.file   = f.index;
+            at.line   = c.line;
+            at.column = c.column;
             problem(ALScriptProblem::Severity::Error, "PreprocIfWithoutEndif", "#if without #endif at the end of the file", {}, at);
         }
         mFiles.pop_back();
@@ -1441,7 +1499,7 @@ namespace
             if (it != mMacros.end())
             {
                 const Macro& m = it->second;
-                if (m.dynamic != Macro::Dynamic::None ? expandDynamic(t, m) : m.functionLike ? expandFunction(t, m) : expandObject(t, m))
+                if (m.dynamic != Macro::Dynamic::None && !m.functionLike ? expandDynamic(t, m) : m.functionLike ? expandFunction(t, m) : expandObject(t, m))
                 {
                     return;
                 }
@@ -1476,9 +1534,12 @@ namespace
         {
             case Macro::Dynamic::Line:
                 out.kind = Kind::Number;
-                out.text = std::to_string(t.line + 1);
+                out.text = std::to_string(S64(t.line) + 1 + f.lineOffset);
                 break;
             case Macro::Dynamic::File:
+                out.kind = Kind::String;
+                out.text = literalOf(f.presumed.empty() ? f.name : f.presumed);
+                break;
             case Macro::Dynamic::ShortFile:
                 out.kind = Kind::String;
                 out.text = literalOf(f.name);
@@ -1488,6 +1549,7 @@ namespace
                 out.text = literalOf(f.assetId.empty() ? std::string("NOT_IN_WORLD") : f.assetId);
                 break;
             case Macro::Dynamic::None:
+            case Macro::Dynamic::Pragma:
                 return false;
         }
         mPending.push_front(std::move(out));
@@ -1626,6 +1688,11 @@ namespace
                     moved.text = " ";
                 }
             }
+        }
+        if (m.dynamic == Macro::Dynamic::Pragma)
+        {
+            pragmaOperator(args.front(), t);
+            return true;
         }
         const hide_set_ptr hs  = mHides.with(mHides.meet(t.hide, read.back().hide), m.name);
         Tokens             out = substitute(m, args, t, hs);
@@ -1926,15 +1993,57 @@ namespace
         return line;
     }
 
-    S64 parseInteger(const std::string& in, bool& ok)
+    // A value of an #if: every integer type there is intmax_t or
+    // uintmax_t (C11 6.10.1p4), and which it is decides how it compares,
+    // divides and shifts.
+    struct Value
     {
+        U64  bits     = 0;
+        bool unsigned_ = false;
+
+        S64  s() const { return S64(bits); }
+        bool truth() const { return bits != 0; }
+    };
+
+    Value signedValue(S64 v) { return { U64(v), false }; }
+
+    // An integer constant: its digits in its base, and its suffix -- u, l,
+    // ll, each case, in either order. Unsigned where it says so, or where
+    // it is too big for intmax_t (hex and octal are unsigned then by C's
+    // list; a decimal one is too, as GCC and Wave have it). `fits` is false
+    // where it is too big for uintmax_t.
+    struct Integer
+    {
+        Value value;
+        bool  ok   = false;
+        bool  fits = true;
+    };
+
+    Integer parseInteger(const std::string& in)
+    {
+        Integer     out;
         std::string text = in;
+        std::string suffix;
         while (!text.empty() && (text.back() == 'u' || text.back() == 'U' || text.back() == 'l' || text.back() == 'L'))
         {
+            suffix.insert(suffix.begin(), text.back());
             text.pop_back();
         }
-        S32    base = 10;
-        size_t i    = 0;
+        std::string lower = suffix;
+        for (char& c : lower)
+        {
+            c = static_cast<char>(tolower(static_cast<unsigned char>(c)));
+        }
+        static const char* const SUFFIXES[] = { "", "u", "l", "ul", "lu", "ll", "ull", "llu" };
+        if (std::find_if(std::begin(SUFFIXES), std::end(SUFFIXES), [&lower](const char* one) { return lower == one; }) == std::end(SUFFIXES) ||
+            (lower.find("ll") != std::string::npos && suffix.find("lL") != std::string::npos) ||
+            (lower.find("ll") != std::string::npos && suffix.find("Ll") != std::string::npos))
+        {
+            return out;
+        }
+        const bool said_unsigned = lower.find('u') != std::string::npos;
+        S32        base          = 10;
+        size_t     i             = 0;
         if (text.size() > 1 && text[0] == '0' && (text[1] == 'x' || text[1] == 'X'))
         {
             base = 16;
@@ -1952,8 +2061,8 @@ namespace
         }
         if (i >= text.size())
         {
-            ok = text == "0";
-            return 0;
+            out.ok = text == "0";
+            return out;
         }
         U64 value = 0;
         for (; i < text.size(); ++i)
@@ -1974,27 +2083,109 @@ namespace
             }
             else
             {
-                ok = false;
-                return 0;
+                return out;
             }
             if (digit >= base)
             {
-                ok = false;
-                return 0;
+                return out;
+            }
+            if (value > (std::numeric_limits<U64>::max() - U64(digit)) / U64(base))
+            {
+                out.fits = false;
             }
             value = value * U64(base) + U64(digit);
         }
-        ok = true;
-        return S64(value);
+        out.ok              = true;
+        out.value.bits      = value;
+        out.value.unsigned_ = said_unsigned || value > U64(std::numeric_limits<S64>::max());
+        return out;
+    }
+
+    // A character constant's value, as C gives an int one: each character
+    // a byte, an escape its byte, and more than one character each shifted
+    // in on the right, as GCC does. False where it is none: empty, not
+    // closed, or an escape C has not got.
+    bool characterValue(const std::string& text, S64& out)
+    {
+        if (text.size() < 3 || text.front() != '\'' || text.back() != '\'')
+        {
+            return false;
+        }
+        U64    value = 0;
+        size_t count = 0;
+        for (size_t i = 1; i + 1 < text.size(); ++count)
+        {
+            U32 byte = static_cast<unsigned char>(text[i++]);
+            if (byte == '\\')
+            {
+                if (i + 1 >= text.size())
+                {
+                    return false;
+                }
+                const char e = text[i++];
+                switch (e)
+                {
+                    case 'n': byte = '\n'; break;
+                    case 't': byte = '\t'; break;
+                    case 'r': byte = '\r'; break;
+                    case 'a': byte = '\a'; break;
+                    case 'b': byte = '\b'; break;
+                    case 'f': byte = '\f'; break;
+                    case 'v': byte = '\v'; break;
+                    case '\\': case '\'': case '"': case '?': byte = static_cast<unsigned char>(e); break;
+                    case 'x':
+                    {
+                        byte         = 0;
+                        size_t digits = 0;
+                        for (; i + 1 < text.size() && isxdigit(static_cast<unsigned char>(text[i])); ++i, ++digits)
+                        {
+                            const char h = text[i];
+                            byte         = (byte << 4) | U32(isdigit(static_cast<unsigned char>(h)) ? h - '0' : (tolower(h) - 'a' + 10));
+                        }
+                        if (digits == 0)
+                        {
+                            return false;
+                        }
+                        byte &= 0xFF;
+                        break;
+                    }
+                    default:
+                        if (e >= '0' && e <= '7')
+                        {
+                            byte = U32(e - '0');
+                            for (size_t d = 1; d < 3 && i + 1 < text.size() && text[i] >= '0' && text[i] <= '7'; ++d, ++i)
+                            {
+                                byte = (byte << 3) | U32(text[i] - '0');
+                            }
+                            byte &= 0xFF;
+                            break;
+                        }
+                        return false;
+                }
+            }
+            value = (value << 8) | byte;
+        }
+        if (count == 0)
+        {
+            return false;
+        }
+        out = S64(count == 1 ? value : U64(S32(U32(value))));
+        return true;
     }
 
     // A C integer expression over what `#if` was given, once `defined`
-    // and the macros are gone: 64-bit, with any name left standing as 0.
+    // and the macros are gone (C11 6.10.1), in intmax_t and uintmax_t,
+    // with any name left standing as 0 -- but for true and false, which
+    // are 1 and 0 as C++ and Firestorm's Wave have them. What an operand
+    // C does not work out -- the right of a decided && or ||, the arm of
+    // ?: not taken -- is read, and not worked out: it divides by zero
+    // without a word.
     class Expr
     {
     public:
         Expr(const Tokens& tokens, bool lua, Engine& engine, const Token& at, S32 depth)
-            : mTokens(tokens), mLua(lua), mEngine(engine), mAt(at), mDepth(std::max(1, depth))
+            : mJoined(lua ? cOperators(tokens) : Tokens()), mTokens(lua ? mJoined : tokens), mLua(lua), mEngine(engine), mAt(at),
+              mDepth(std::max(1, depth))
         {
         }
 
@@ -2005,13 +2196,13 @@ namespace
             {
                 fail("PreprocIfNeedsExpression", "#if with no expression");
             }
-            S64 v = ternary();
+            const Value v = ternary();
             if (mOk && peek())
             {
                 fail("PreprocUnexpectedInExpression", "unexpected '[1]' in preprocessor expression", { peek()->text });
             }
             ok = mOk;
-            return mOk ? v : 0;
+            return mOk ? (v.truth() ? 1 : 0) : 0;
         }
 
     private:
@@ -2041,25 +2232,81 @@ namespace
             return false;
         }
 
-        S64 ternary()
+        // SLua's #if in C's operators too, as Linden Lab's preprocessor
+        // reads it: && || << >> != are two marks each to the Luau lexer,
+        // and are joined back where nothing stands between the two.
+        static Tokens cOperators(const Tokens& in)
+        {
+            static constexpr std::string_view PAIRS[] = { "&&", "||", "<<", ">>", "!=" };
+            Tokens                            out;
+            out.reserve(in.size());
+            for (const Token& t : in)
+            {
+                if (!out.empty() && t.kind == Kind::Punct && out.back().kind == Kind::Punct && out.back().text.size() == 1 && t.text.size() == 1)
+                {
+                    const std::string pair = out.back().text + t.text;
+                    if (std::find(std::begin(PAIRS), std::end(PAIRS), pair) != std::end(PAIRS))
+                    {
+                        out.back().text = pair;
+                        continue;
+                    }
+                }
+                out.push_back(t);
+            }
+            return out;
+        }
+
+        // A word SLua writes an operator as.
+        bool acceptWord(std::string_view word)
+        {
+            const Token* t = peek();
+            if (mLua && t && t->is(Kind::Ident, word))
+            {
+                ++mI;
+                return true;
+            }
+            return false;
+        }
+
+        // Read, and not worked out, while it stands.
+        struct Unworked
+        {
+            Expr& e;
+            bool  on;
+            Unworked(Expr& expr, bool unworked) : e(expr), on(unworked) { e.mUnworked += on ? 1 : 0; }
+            ~Unworked() { e.mUnworked -= on ? 1 : 0; }
+        };
+
+        Value ternary()
         {
             // A chain of them -- `a ? b ? c ? ...` -- is a level each, as
             // a bracket is.
             Deeper deeper(*this);
             if (!deeper.ok)
             {
-                return 0;
+                return {};
             }
-            S64 c = binary(1);
+            const Value c = binary(1);
             if (accept("?"))
             {
-                S64 a = ternary();
+                Value a;
+                {
+                    Unworked unworked(*this, !c.truth());
+                    a = ternary();
+                }
                 if (!accept(":"))
                 {
                     fail("PreprocExpectedColon", "expected ':' in preprocessor expression");
                 }
-                S64 b = ternary();
-                return c ? a : b;
+                Value b;
+                {
+                    Unworked unworked(*this, c.truth());
+                    b = ternary();
+                }
+                // Both arms converted as C converts them.
+                Value out     = c.truth() ? a : b;
+                out.unsigned_ = a.unsigned_ || b.unsigned_;
+                return out;
             }
             return c;
         }
@@ -2079,114 +2326,193 @@ namespace
             return 0;
         }
 
-        S64 binary(S32 minPrec)
+        // SLua writes && || ! as Luau does, and, or and not, as Linden
+        // Lab's preprocessor reads them: the same operators.
+        std::string operatorOf(const Token& t) const
         {
-            S64 left = unary();
+            if (t.kind == Kind::Punct)
+            {
+                return t.text;
+            }
+            if (mLua && t.kind == Kind::Ident && (t.text == "and" || t.text == "or"))
+            {
+                return t.text == "and" ? "&&" : "||";
+            }
+            return std::string();
+        }
+
+        Value binary(S32 minPrec)
+        {
+            Value left = unary();
             while (true)
             {
                 const Token* t = peek();
-                if (!t || t->kind != Kind::Punct)
+                if (!t)
                 {
                     return left;
                 }
-                const S32 prec = precedence(t->text);
+                const std::string op   = operatorOf(*t);
+                const S32         prec = op.empty() ? 0 : precedence(op);
                 if (prec == 0 || prec < minPrec)
                 {
                     return left;
                 }
-                const std::string op = t->text;
                 ++mI;
-                const S64 right = binary(prec + 1);
-                left            = apply(op, left, right);
+                // The right of an && or || that the left decides is not
+                // worked out.
+                const bool decided = (op == "&&" && !left.truth()) || (op == "||" && left.truth());
+                Value      right;
+                {
+                    Unworked unworked(*this, decided);
+                    right = binary(prec + 1);
+                }
+                left = apply(op, left, right);
             }
         }
 
-        S64 apply(const std::string& op, S64 a, S64 b)
+        Value apply(const std::string& op, Value a, Value b)
         {
-            const U64 ua = U64(a);
-            const U64 ub = U64(b);
-            if (op == "||") return (a != 0 || b != 0) ? 1 : 0;
-            if (op == "&&") return (a != 0 && b != 0) ? 1 : 0;
-            if (op == "|") return S64(ua | ub);
-            if (op == "^") return S64(ua ^ ub);
-            if (op == "&") return S64(ua & ub);
-            if (op == "==") return a == b ? 1 : 0;
-            if (op == "!=" || op == "~=") return a != b ? 1 : 0;
-            if (op == "<") return a < b ? 1 : 0;
-            if (op == ">") return a > b ? 1 : 0;
-            if (op == "<=") return a <= b ? 1 : 0;
-            if (op == ">=") return a >= b ? 1 : 0;
-            if (op == "<<") return (b < 0 || b >= 64) ? 0 : S64(ua << ub);
-            if (op == ">>")
+            const auto truth = [](bool v) { return signedValue(v ? 1 : 0); };
+            if (op == "||") return truth(a.truth() || b.truth());
+            if (op == "&&") return truth(a.truth() && b.truth());
+            // A shift is its left operand's type; everything else is both
+            // operands' together, unsigned where either is.
+            if (op == "<<" || op == ">>")
             {
-                if (b < 0 || b >= 64) return a < 0 ? -1 : 0;
-                return a >> b;
+                const bool neg_count = !b.unsigned_ && b.s() < 0;
+                const U64  count     = b.bits;
+                Value      out       = a;
+                if (neg_count || count >= 64)
+                {
+                    out.bits = (op == ">>" && !a.unsigned_ && a.s() < 0) ? ~U64(0) : 0;
+                    return out;
+                }
+                if (op == "<<")
+                {
+                    out.bits = a.bits << count;
+                }
+                else
+                {
+                    out.bits = a.unsigned_ ? a.bits >> count : U64(a.s() >> count);
+                }
+                return out;
             }
-            if (op == "+") return S64(ua + ub);
-            if (op == "-") return S64(ua - ub);
-            if (op == "*") return S64(ua * ub);
-            if (op == "/" || op == "%")
+            const bool uns = a.unsigned_ || b.unsigned_;
+            if (op == "==") return truth(a.bits == b.bits);
+            if (op == "!=" || op == "~=") return truth(a.bits != b.bits);
+            if (op == "<") return truth(uns ? a.bits < b.bits : a.s() < b.s());
+            if (op == ">") return truth(uns ? a.bits > b.bits : a.s() > b.s());
+            if (op == "<=") return truth(uns ? a.bits <= b.bits : a.s() <= b.s());
+            if (op == ">=") return truth(uns ? a.bits >= b.bits : a.s() >= b.s());
+            Value out;
+            out.unsigned_ = uns;
+            if (op == "|") out.bits = a.bits | b.bits;
+            else if (op == "^") out.bits = a.bits ^ b.bits;
+            else if (op == "&") out.bits = a.bits & b.bits;
+            else if (op == "+") out.bits = a.bits + b.bits;
+            else if (op == "-") out.bits = a.bits - b.bits;
+            else if (op == "*") out.bits = a.bits * b.bits;
+            else if (op == "/" || op == "%")
             {
-                if (b == 0)
+                if (b.bits == 0)
                 {
-                    fail("PreprocDivisionByZero", "division by zero in preprocessor expression");
-                    return 0;
+                    if (mUnworked == 0)
+                    {
+                        fail("PreprocDivisionByZero", "division by zero in preprocessor expression");
+                    }
+                    return out;
                 }
-                if (a == std::numeric_limits<S64>::min() && b == -1)
+                if (uns)
                 {
-                    return op == "/" ? a : 0;
+                    out.bits = op == "/" ? a.bits / b.bits : a.bits % b.bits;
                 }
-                return op == "/" ? a / b : a % b;
+                else if (a.s() == std::numeric_limits<S64>::min() && b.s() == -1)
+                {
+                    out.bits = op == "/" ? a.bits : 0;
+                }
+                else
+                {
+                    out.bits = U64(op == "/" ? a.s() / b.s() : a.s() % b.s());
+                }
             }
-            return 0;
+            return out;
         }
 
-        S64 unary()
+        Value unary()
         {
             Deeper deeper(*this);
             if (!deeper.ok)
             {
-                return 0;
+                return {};
             }
-            if (accept("+")) return unary();
-            if (accept("-")) return S64(0 - U64(unary()));
-            if (accept("!")) return unary() == 0 ? 1 : 0;
-            if (accept("~")) return S64(~U64(unary()));
+            if (accept("+"))
+            {
+                return unary();
+            }
+            if (accept("-"))
+            {
+                Value v = unary();
+                v.bits  = U64(0) - v.bits;
+                return v;
+            }
+            if (accept("!") || acceptWord("not"))
+            {
+                return signedValue(unary().truth() ? 0 : 1);
+            }
+            if (accept("~"))
+            {
+                Value v = unary();
+                v.bits  = ~v.bits;
+                return v;
+            }
             return primary();
         }
 
-        S64 primary()
+        Value primary()
         {
             const Token* t = peek();
             if (!t)
             {
                 fail("PreprocExpectedValue", "expected a value in preprocessor expression");
-                return 0;
+                return {};
             }
             if (t->kind == Kind::Number)
             {
                 ++mI;
-                bool ok = false;
-                S64  v  = parseInteger(t->text, ok);
-                if (!ok)
+                const Integer n = parseInteger(t->text);
+                if (!n.ok)
                 {
                     fail("PreprocNotAnInteger", "'[1]' is not an integer constant", { t->text });
                 }
-                return v;
+                else if (!n.fits)
+                {
+                    fail("PreprocIntegerTooLarge", "integer constant '[1]' is too large for its type", { t->text });
+                }
+                return n.value;
+            }
+            if (!mLua && t->kind == Kind::String && !t->text.empty() && t->text.front() == '\'')
+            {
+                ++mI;
+                S64 v = 0;
+                if (!characterValue(t->text, v))
+                {
+                    fail("PreprocBadCharacter", "'[1]' is not a character constant", { t->text });
+                }
+                return signedValue(v);
             }
             if (t->kind == Kind::Ident)
             {
                 ++mI;
-                return t->text == "true" ? 1 : 0;
+                return signedValue(t->text == "true" ? 1 : 0);
             }
             if (accept("("))
             {
                 Deeper deeper(*this);
                 if (!deeper.ok)
                 {
-                    return 0;
+                    return {};
                 }
-                S64 v = ternary();
+                const Value v = ternary();
                 if (!accept(")"))
                 {
                     fail("PreprocExpectedClose", "expected ')' in preprocessor expression");
@@ -2194,9 +2520,11 @@ namespace
                 return v;
             }
             fail("PreprocUnexpectedInExpression", "unexpected '[1]' in preprocessor expression", { t->text });
-            return 0;
+            return {};
         }
 
+        // SLua's tokens with C's operators joined; what is read.
+        Tokens        mJoined;
         const Tokens& mTokens;
         bool          mLua;
         Engine&       mEngine;
@@ -2208,6 +2536,8 @@ namespace
         // stack's to answer for.
         S32           mDepth = 64;
         S32           mIn    = 0;
+        // Above 0 while an operand C does not work out is read.
+        S32           mUnworked = 0;
         // One level deeper while it stands; false where that is too deep.
         struct Deeper
         {
@@ -2288,6 +2618,11 @@ namespace
             problem(ALScriptProblem::Severity::Error, "PreprocDefinedNotAName", "'defined' cannot be used as a macro name", {}, line[at]);
             return;
         }
+        if (m.name == "__VA_ARGS__")
+        {
+            problem(ALScriptProblem::Severity::Error, "PreprocVaArgsNotAName", "'__VA_ARGS__' cannot be used as a macro name", {}, line[at]);
+            return;
+        }
         size_t i = at + 1;
         if (i < line.size() && line[i].is(Kind::Punct, "("))
         {
@@ -2320,6 +2655,11 @@ namespace
                     {
                         ok = false;
                         break;
+                    }
+                    if (line[i].text == "__VA_ARGS__")
+                    {
+                        problem(ALScriptProblem::Severity::Error, "PreprocVaArgsNotAParameter", "'__VA_ARGS__' cannot be a macro parameter", {}, line[i]);
+                        return;
                     }
                     if (std::find(m.params.begin(), m.params.end(), line[i].text) != m.params.end())
                     {
@@ -2368,6 +2708,14 @@ namespace
         while (!m.body.empty() && m.body.back().kind == Kind::Space)
         {
             m.body.pop_back();
+        }
+        // C11 6.10.3p5: only a variadic macro's body may name __VA_ARGS__.
+        if (!m.variadic &&
+            std::any_of(m.body.begin(), m.body.end(), [](const Token& t) { return t.kind == Kind::Ident && t.text == "__VA_ARGS__"; }))
+        {
+            problem(ALScriptProblem::Severity::Error, "PreprocVaArgsOutside", "__VA_ARGS__ can only appear in the expansion of a variadic macro", {},
+                    line[at]);
+            return;
         }
         if (!m.body.empty() && (m.body.front().is(Kind::Punct, "##") || m.body.back().is(Kind::Punct, "##")))
         {
@@ -2424,6 +2772,7 @@ namespace
         if (i < rest.size() && rest[i].kind == Kind::String && rest[i].text.size() >= 2 && rest[i].text.front() == '"' && rest[i].text.back() == '"')
         {
             ask.name = rest[i].text.substr(1, rest[i].text.size() - 2);
+            extraTokens(rest, i + 1, "include", hash);
         }
         else if (i < rest.size() && rest[i].is(Kind::Punct, "<"))
         {
@@ -2440,6 +2789,7 @@ namespace
                 return;
             }
             ask.name = trim(ask.name);
+            extraTokens(rest, j + 1, "include", hash);
         }
         else
         {
@@ -2487,6 +2837,90 @@ namespace
         pushFile(found.text, identity, found.name.empty() ? ask.name : found.name, found.assetId);
     }
 
+    void Engine::pragma(const Tokens& words, size_t at)
+    {
+        // `once`; any other is the implementation's, and none else is this
+        // one's: passed over, as C lets a pragma not known be.
+        const size_t i = skipBlank(words, at);
+        if (i < words.size() && words[i].is(Kind::Ident, "once"))
+        {
+            mOnce.insert(mFiles.back()->path);
+        }
+    }
+
+    void Engine::pragmaOperator(const Tokens& arg, const Token& at)
+    {
+        const size_t i = skipBlank(arg, 0);
+        if (i >= arg.size() || arg[i].kind != Kind::String || arg[i].text.size() < 2 || arg[i].text.front() != '"' ||
+            skipBlank(arg, i + 1) < arg.size())
+        {
+            problem(ALScriptProblem::Severity::Error, "PreprocPragmaNeedsString", "_Pragma takes a string literal in parentheses", {}, at);
+            return;
+        }
+        // Unquoted, and \" and \\ made " and \ again (6.10.9).
+        const std::string& quoted = arg[i].text;
+        std::string        words;
+        for (size_t k = 1; k + 1 < quoted.size(); ++k)
+        {
+            if (quoted[k] == '\\' && k + 2 < quoted.size() && (quoted[k + 1] == '"' || quoted[k + 1] == '\\'))
+            {
+                ++k;
+            }
+            words += quoted[k];
+        }
+        pragma(Lexer(mOptions.lua, at.file).run(words), 0);
+    }
+
+    void Engine::lineDirective(FileState& f, const Tokens& line, size_t at, const Token& hash)
+    {
+        // Its words as macros make them: a line number from 1 to
+        // 2147483647 in decimal digits, then perhaps a name in quotes.
+        const Tokens rest = expandAll(Tokens(line.begin() + std::min(at, line.size()), line.end()));
+        const auto   bad  = [&]() {
+            problem(ALScriptProblem::Severity::Error, "PreprocBadLine", "#line takes a line number from 1 to 2147483647, and may take a file name in quotes after it",
+                    {}, hash);
+        };
+        const size_t i = skipBlank(rest, 0);
+        if (i >= rest.size() || rest[i].kind != Kind::Number ||
+            !std::all_of(rest[i].text.begin(), rest[i].text.end(), [](char c) { return c >= '0' && c <= '9'; }) || rest[i].text.size() > 10)
+        {
+            bad();
+            return;
+        }
+        const S64 number = std::stoll(rest[i].text);
+        if (number < 1 || number > 2147483647)
+        {
+            bad();
+            return;
+        }
+        std::string  presumed;
+        const size_t j = skipBlank(rest, i + 1);
+        if (j < rest.size())
+        {
+            if (rest[j].kind != Kind::String || rest[j].text.size() < 2 || rest[j].text.front() != '"' || skipBlank(rest, j + 1) < rest.size())
+            {
+                bad();
+                return;
+            }
+            presumed = rest[j].text.substr(1, rest[j].text.size() - 2);
+        }
+        // The line after the directive, however many it was joined from.
+        const S32 next = f.pos < f.tokens().size() ? f.tokens()[f.pos].line : hash.line + 1;
+        f.lineOffset   = number - S64(next) - 1;
+        if (!presumed.empty())
+        {
+            f.presumed = presumed;
+        }
+    }
+
+    void Engine::extraTokens(const Tokens& line, size_t from, const std::string& name, const Token& hash)
+    {
+        if (skipBlank(line, from) < line.size())
+        {
+            problem(ALScriptProblem::Severity::Warning, "PreprocExtraTokens", "extra tokens at end of #[1] directive", { name }, hash);
+        }
+    }
+
     void Engine::directive(FileState& f)
     {
         // The line itself stays a line (or the lines it was joined from),
@@ -2514,6 +2948,8 @@ namespace
         if (name == "if" || name == "ifdef" || name == "ifndef")
         {
             Cond c;
+            c.line   = hash.line;
+            c.column = hash.column;
             if (!active)
             {
                 c.taken = true;
@@ -2532,6 +2968,7 @@ namespace
                 else
                 {
                     c.active = (mMacros.count(line[after].text) > 0) == (name == "ifdef");
+                    extraTokens(line, after + 1, name, hash);
                 }
                 c.taken = c.active;
             }
@@ -2573,6 +3010,10 @@ namespace
             {
                 problem(ALScriptProblem::Severity::Error, "PreprocElseAfterElse", "#else after #else", {}, hash);
             }
+            if (parentActive())
+            {
+                extraTokens(line, after, name, hash);
+            }
             c.active   = !c.taken && parentActive();
             c.taken    = true;
             c.seenElse = true;
@@ -2584,6 +3025,10 @@ namespace
             {
                 problem(ALScriptProblem::Severity::Error, "PreprocEndifWithoutIf", "#endif without #if", {}, hash);
                 return;
+            }
+            if (parentActive())
+            {
+                extraTokens(line, after, name, hash);
             }
             f.conds.pop_back();
             return;
@@ -2603,6 +3048,12 @@ namespace
                 problem(ALScriptProblem::Severity::Error, "PreprocUndefNeedsName", "macro name missing in #undef", {}, hash);
                 return;
             }
+            if (line[after].text == "defined")
+            {
+                problem(ALScriptProblem::Severity::Error, "PreprocDefinedNotAName", "'defined' cannot be used as a macro name", {}, line[after]);
+                return;
+            }
+            extraTokens(line, after + 1, name, hash);
             mMacros.erase(line[after].text);
         }
         else if (name == "include")
@@ -2617,13 +3068,11 @@ namespace
         }
         else if (name == "pragma")
         {
-            if (after < line.size() && line[after].is(Kind::Ident, "once"))
-            {
-                mOnce.insert(f.path);
-            }
+            pragma(line, after);
         }
         else if (name == "line")
         {
+            lineDirective(f, line, after, hash);
             // Passed through as a comment, as Firestorm does with Wave's.
             Token comment    = hash;
             comment.kind     = Kind::Comment;
@@ -4149,12 +4598,61 @@ namespace
         }
     }
 
-    void assemble(const Tokens& tokens, ALPreprocessor::Result& result)
+    // Whether two tokens written together would be read as something other
+    // than the two: a name or a number running into the next, a number
+    // taking a . or an exponent's sign, two marks one longer mark, and
+    // what would start a comment or a long string. Two that stood together
+    // in the source never are, since they were read apart; two that a
+    // macro set beside each other may be: `-f(1)`, f's body `-x`.
+    bool wouldJoin(const Token& a, const Token& b, bool lua)
     {
-        S32 line   = 0;
-        S32 column = 0;
+        if (a.blank() || b.blank() || a.text.empty() || b.text.empty())
+        {
+            return false;
+        }
+        const char last  = a.text.back();
+        const char first = b.text.front();
+        // A name takes on letters and digits; a number letters, digits and
+        // dots, and the sign after an exponent.
+        if (a.kind == Kind::Ident)
+        {
+            return (b.kind == Kind::Ident || b.kind == Kind::Number) && isIdentChar(first);
+        }
+        if (a.kind == Kind::Number)
+        {
+            return b.kind == Kind::Ident || b.kind == Kind::Number || first == '.' ||
+                   ((first == '+' || first == '-') && (last == 'e' || last == 'E' || (lua && (last == 'p' || last == 'P'))));
+        }
+        if (a.is(Kind::Punct, ".") && b.kind == Kind::Number && isDigit(first))
+        {
+            return true;
+        }
+        if (a.kind != Kind::Punct || b.kind != Kind::Punct)
+        {
+            return false;
+        }
+        // A comment's start, or a long string's.
+        if (lua ? ((last == '-' && first == '-') || (last == '[' && (first == '[' || first == '='))) : (last == '/' && (first == '/' || first == '*')))
+        {
+            return true;
+        }
+        return punctJoins(lua, a.text, b.text);
+    }
+
+    void assemble(const Tokens& tokens, ALPreprocessor::Result& result, bool lua)
+    {
+        S32          line   = 0;
+        S32          column = 0;
+        const Token* before = nullptr;
         for (const Token& t : tokens)
         {
+            // Two that would run together kept apart by a space.
+            if (before && wouldJoin(*before, t, lua))
+            {
+                result.text += ' ';
+                ++column;
+            }
+            before = &t;
             if (t.declared != Token::Const::None)
             {
                 result.consts.push_back({ t.text, line, column, t.declared == Token::Const::Function });
@@ -4249,7 +4747,7 @@ namespace
             out.push_back(std::move(t));
         }
         ALPreprocessor::Result written;
-        assemble(out, written);
+        assemble(out, written, false);
         result.map    = written.map.composed(result.map);
         result.text   = std::move(written.text);
         result.consts = std::move(written.consts);
@@ -4326,6 +4824,7 @@ ALPreprocessor::Result ALPreprocessor::run(std::string_view source, const Option
     engine.predefine("__FILE__", Macro::Dynamic::File);
     engine.predefine("__SHORTFILE__", Macro::Dynamic::ShortFile);
     engine.predefine("__ASSETID__", Macro::Dynamic::AssetId);
+    engine.predefine("_Pragma", Macro::Dynamic::Pragma);
     engine.predefine("__DATE__ \"" + stamp(now, "%b %e %Y") + "\"");
     engine.predefine("__TIME__ \"" + stamp(now, "%H:%M:%S") + "\"");
     engine.predefine("__UNIXTIME__ " + std::to_string(now));
@@ -4393,7 +4892,7 @@ ALPreprocessor::Result ALPreprocessor::run(std::string_view source, const Option
                 {
                     part.map.addFile(file.name, file.path);
                 }
-                assemble(made, part);
+                assemble(made, part, true);
                 return Result::Piece{ std::move(key), std::move(part.text), std::move(part.map) };
             };
             result.apart.valid  = true;
@@ -4462,7 +4961,7 @@ ALPreprocessor::Result ALPreprocessor::run(std::string_view source, const Option
             tokens              = Switches(engine).run(tokens);
         }
     }
-    assemble(tokens, result);
+    assemble(tokens, result, options.lua);
     if (result.overran)
     {
         // Nothing that came of a run that ran away is to be compiled or
@@ -4506,7 +5005,7 @@ void ALPreprocessor::finish(Result& result, const Options& options)
         // Over whatever the text is by now, mapped back through it.
         Tokens                 again = compress(Lexer(false, 0).run(result.text), false);
         ALPreprocessor::Result squeezed;
-        assemble(again, squeezed);
+        assemble(again, squeezed, false);
         result.map  = squeezed.map.composed(result.map);
         result.text = std::move(squeezed.text);
     }
