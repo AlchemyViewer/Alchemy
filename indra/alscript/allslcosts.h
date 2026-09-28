@@ -90,6 +90,8 @@ struct ALLSLCosts
     // `a || b` as `a | b` where only truth counts: LSL runs both sides of
     // either.
     bool bitOrForOr = false;
+    // llStringLength(s) as `s != ""` where only truth counts.
+    bool emptyForLength = false;
     // llDumpList2String(l, "") as (string)l.
     bool castForDump = false;
     // llList2String(llGetObjectDetails(k, [X]), 0) as a cast of the

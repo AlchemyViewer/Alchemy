@@ -3022,6 +3022,24 @@ namespace
                 truth(inner, 0);
                 return;
             }
+            // A string's length is nothing where the string is.
+            if (inner->getNodeSubType() == NODE_FUNCTION_EXPRESSION && mCosts.emptyForLength)
+            {
+                auto*                          call = static_cast<LSLFunctionExpression*>(inner);
+                LSLSymbol*                     sym  = call->getSymbol();
+                LSLASTNodeList<LSLExpression>* args = call->getArguments();
+                if (sym && sym->getSubType() == SYM_BUILTIN && !strcmp(sym->getName(), "llStringLength") && args && args->getNumChildren() == 1)
+                {
+                    const std::string before = report.wanted() ? render(call) : std::string();
+                    auto*             text   = static_cast<LSLExpression*>(args->takeChild(0));
+                    auto*             made   = ctx.allocator->newTracked<LSLBinaryExpression>(text, OP_NEQ, constant(ctx.string(std::string()), call));
+                    made->setType(TYPE(LST_INTEGER));
+                    made->setLoc(call->getLoc());
+                    putInPlace(call, made, ctx.allocator);
+                    wrote(call, made, before);
+                }
+                return;
+            }
             if (inner->getNodeSubType() != NODE_BINARY_EXPRESSION)
             {
                 return;

@@ -1679,6 +1679,7 @@ namespace tut
                                         "        if (b <= 5)\n            llOwnerSay(\"le\");\n"
                                         "        if (b <= 2147483647)\n            llOwnerSay(\"max\");\n"
                                         "        while (a || b)\n            a = b = 0;\n"
+                                        "        if (llStringLength(s))\n            llOwnerSay(s);\n"
                                         "        llOwnerSay((string)[r, t, u, v]);\n");
         for (const ALLSLOptimizer::Target target : { ALLSLOptimizer::Target::LSO, ALLSLOptimizer::Target::Mono, ALLSLOptimizer::Target::Luau })
         {
@@ -1699,6 +1700,7 @@ namespace tut
             ensure("inclusive against a constant", has(mono ? "if (a > 4)" : "if (a >= 5)") && has(mono ? "if (b < 6)" : "if (b <= 5)"));
             ensure("not past the largest integer", has("if (b <= 2147483647)"));
             ensure("|| where only truth counts", has(mono ? "while (a | b)" : "while (a || b)"));
+            ensure("a string's length where only truth counts: " + r.text, has(lso ? "if (s != \"\")" : "if (llStringLength(s))"));
             ALLSLService service;
             for (const ALScriptProblem& p : service.check(r.text, !lso))
             {

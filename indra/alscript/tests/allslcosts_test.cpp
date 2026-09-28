@@ -254,7 +254,7 @@ namespace tut
             { "integer x = 0 as integer x", { "", "integer z = 0; i = z;" }, { "", "integer z; i = z;" }, "===", nullptr },
             { "a && b as !(!a | !b)", { "", "if (i && j) i = 2;" }, { "", "if (!(!i | !j)) i = 2;" }, ">=>", nullptr },
             { "NULL_KEY as \"\"", { "", "k = llGetOwnerKey(NULL_KEY);" }, { "", "k = llGetOwnerKey(\"\");" }, "<<<", &ALLSLCosts::emptyForNullKey },
-            { "llStringLength(s) as s != \"\"", { "", "if (llStringLength(s)) i = 2;" }, { "", "if (s != \"\") i = 2;" }, "<>>", nullptr },
+            { "llStringLength(s) as s != \"\"", { "", "if (llStringLength(s)) i = 2;" }, { "", "if (s != \"\") i = 2;" }, "<>>", &ALLSLCosts::emptyForLength },
             { "llDumpList2String(l, \"\") as (string)l", { "", "s = llDumpList2String(l, \"\");" }, { "", "s = (string)l;" }, "<<<", nullptr },
             { "if (!a) A else B as if (a) B else A", { "", "if (!j) i = 2; else i = 3;" }, { "", "if (j) i = 3; else i = 2;" }, "<<<", nullptr },
             { "a trailing return;", { "integer i0; f1() { i0 = 1; return; }", "f1();" }, { "integer i0; f1() { i0 = 1; }", "f1();" }, "===", nullptr },
