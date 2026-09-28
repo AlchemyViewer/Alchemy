@@ -474,4 +474,41 @@ namespace tut
         crumbs->showTrailer(doc);
         ensure("answered: gone", part("Checking") == nullptr);
     }
+
+    template<> template<>
+    void alscriptcrumbsbar_object::test<8>()
+    {
+        set_test_name("a caret moving says its place and the selection again, and nothing else; the rest said again where what it says changed");
+        ALScriptCrumbsBar* crumbs = bar();
+        Doc&               doc    = tab("a");
+        told().errors             = 2;
+        crumbs->showTrailer(doc);
+        S32& said = window.services().wordsSaid;
+        said      = 0;
+        doc.editor->setCaret(ALTextPos(4, 0));
+        crumbs->showTrailer(doc);
+        ensure_equals("the place alone said", said, 1);
+        ensure_equals("and the rest kept", trailer(), std::string("Ln 5, Col 1, Tab Size: 4, 2 errors"));
+        doc.editor->setSelection(ALTextRange(ALTextPos(2, 0), ALTextPos(4, 0)));
+        said = 0;
+        crumbs->showTrailer(doc);
+        ensure_equals("and the selection", said, 2);
+
+        said          = 0;
+        told().errors = 3;
+        crumbs->showTrailer(doc);
+        ensure("counted again: said again", said > 2 && part("3 errors") != nullptr);
+        said = 0;
+        doc.editor->setTabWidth(2);
+        crumbs->showTrailer(doc);
+        ensure("indented otherwise", said > 2 && part("Tab Size: 2") != nullptr);
+        said = 0;
+        crumbs->setTips({ "line", "problems", "source", "expanded" });
+        crumbs->showTrailer(doc);
+        ensure("other tips: said again", said > 2 && part("3 errors")->toolTip == "problems");
+        said = 0;
+        Doc& other = tab("b");
+        crumbs->showTrailer(other);
+        ensure("another tab: its own", said > 2 && part("3 errors") != nullptr && part("Tab Size: 4") != nullptr);
+    }
 }

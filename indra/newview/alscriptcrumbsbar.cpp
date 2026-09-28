@@ -104,17 +104,29 @@ void ALScriptCrumbsBar::showTrailer(Doc& doc)
     {
         return;
     }
-    std::vector<Part> parts;
+    // What does not move with the caret made again only where what it is
+    // made of has; a caret moving makes its place and the selection.
+    Steady steady = steadyOf(doc);
+    if (!mSteady || !(*mSteady == steady))
+    {
+        mSteadyLead.clear();
+        mSteadyRest.clear();
+        lead(doc, mSteadyLead);
+        indentation(doc, mSteadyRest);
+        problems(doc, mSteadyRest);
+        weight(doc, mSteadyRest);
+        sending(doc, mSteadyRest);
+        views(doc, mSteadyRest);
+        mSteady = std::move(steady);
+    }
+    std::vector<Part> parts = mSteadyLead;
     place(doc, parts);
     selection(doc, parts);
-    indentation(doc, parts);
-    problems(doc, parts);
-    weight(doc, parts);
-    sending(doc, parts);
-    views(doc, parts);
+    parts.insert(parts.end(), mSteadyRest.begin(), mSteadyRest.end());
     // Joined by a middle dot with air around it; in code, since a
     // string of the skin's is trimmed of its spaces.
     std::vector<Part> said;
+    said.reserve(parts.size() * 2);
     for (Part& part : parts)
     {
         if (!said.empty())
@@ -126,7 +138,42 @@ void ALScriptCrumbsBar::showTrailer(Doc& doc)
     mBar->setTrailer(std::move(said));
 }
 
-void ALScriptCrumbsBar::place(Doc& doc, std::vector<Part>& parts) const
+ALScriptCrumbsBar::Steady ALScriptCrumbsBar::steadyOf(Doc& doc) const
+{
+    Steady steady;
+    steady.id         = doc.id;
+    steady.readOnly   = doc.loaded && !doc.modifiable;
+    steady.banner     = mWindow->vimBanner();
+    steady.loaded     = doc.loaded;
+    steady.tabWidth   = doc.editor->getTabWidth();
+    steady.softTabs   = doc.editor->getSoftTabs();
+    steady.indentFrom = static_cast<U8>(doc.editor->indentFrom());
+    steady.checking   = doc.checkRunning(LLTimer::getTotalSeconds());
+    mWindow->problemCounts(doc, steady.errors, steady.warnings);
+    steady.target     = mWindow->weightTarget(doc);
+    steady.expandable = doc.expandedEditor != nullptr;
+    steady.expanded   = doc.shownView() == Doc::View::Expanded;
+    steady.optimized  = steady.expanded && doc.uploaded.valid && doc.uploaded.version == doc.editor->document().version();
+    steady.codeBefore = doc.uploaded.codeBefore;
+    steady.codeAfter  = doc.uploaded.codeAfter;
+    if (doc.weighing.weight)
+    {
+        steady.weighed    = true;
+        steady.weighedFor = doc.weighing.weight->target;
+        steady.total      = doc.weighing.weight->total;
+        steady.limit      = doc.weighing.weight->limit;
+        steady.estimate   = doc.weighing.weight->estimate;
+    }
+    steady.exact        = doc.weighing.exact;
+    steady.sent         = doc.weighing.sent;
+    steady.notecard     = doc.notecard;
+    steady.assetBytes   = doc.weighing.assetBytes;
+    steady.errorColor   = doc.editor->markColor(ALCodeEditor::Mark::Error);
+    steady.warningColor = doc.editor->markColor(ALCodeEditor::Mark::Warning);
+    return steady;
+}
+
+void ALScriptCrumbsBar::lead(Doc& doc, std::vector<Part>& parts) const
 {
     // A script that may be read and not changed says so for as long as it
     // is in front, not only in the status line as it arrives.
@@ -139,6 +186,10 @@ void ALScriptCrumbsBar::place(Doc& doc, std::vector<Part>& parts) const
     {
         parts.push_back({ banner, std::string(), std::string() });
     }
+}
+
+void ALScriptCrumbsBar::place(Doc& doc, std::vector<Part>& parts) const
+{
     // The view in front's caret: the expansion's own line, while it is
     // the one being read.
     const ALCodeEditor&        shown = *doc.shownText();

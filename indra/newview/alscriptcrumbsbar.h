@@ -104,13 +104,18 @@ public:
     void indentAct(const std::string& action);
     bool indentEnabled(const std::string& action) const;
     bool indentChecked(const std::string& action) const;
-    void setTips(Tips tips) { mTips = std::move(tips); }
+    void setTips(Tips tips)
+    {
+        mTips = std::move(tips);
+        mSteady.reset();
+    }
 
 private:
     // The trailer's parts, each added to `parts` where it has anything to
-    // say: the place -- read only, vim's word, the caret; the selection;
-    // the problems; what it weighs, or what the optimizer made it; what a
-    // save would send; and the view.
+    // say: the lead -- read only, vim's word; the caret's place; the
+    // selection; the indentation; the problems; what it weighs, or what
+    // the optimizer made it; what a save would send; and the view.
+    void lead(Doc& doc, std::vector<Part>& parts) const;
     void place(Doc& doc, std::vector<Part>& parts) const;
     void selection(Doc& doc, std::vector<Part>& parts) const;
     void indentation(Doc& doc, std::vector<Part>& parts) const;
@@ -130,4 +135,51 @@ private:
     // Whose path the bar shows, so that a tab come to the front is shown
     // there whatever its own path was when last shown.
     std::string             mShownFor;
+
+    // What the trailer's words that do not move with the caret are made
+    // of -- all but the caret's place and the selection -- and those
+    // words as last made: a caret moving says the same of them, and they
+    // are made again only where something here has changed. Whatever a
+    // part of them reads is here.
+    struct Steady
+    {
+        std::string id;
+        bool        readOnly = false;
+        std::string banner;
+        // The indentation's.
+        bool        loaded     = false;
+        S32         tabWidth   = 0;
+        bool        softTabs   = false;
+        U8          indentFrom = 0;
+        // The problems'.
+        bool        checking = false;
+        S32         errors   = 0;
+        S32         warnings = 0;
+        // The weight's, or the optimizer's.
+        std::optional<ALScriptWeight::Target> target;
+        bool                                  optimized  = false;
+        size_t                                codeBefore = 0;
+        size_t                                codeAfter  = 0;
+        bool                                  weighed    = false;
+        ALScriptWeight::Target                weighedFor = ALScriptWeight::Target::Mono;
+        size_t                                total      = 0;
+        size_t                                limit      = 0;
+        bool                                  estimate   = false;
+        bool                                  exact      = false;
+        bool                                  sent       = false;
+        // What a save sends.
+        bool                                  notecard   = false;
+        size_t                                assetBytes = 0;
+        // The views'.
+        bool                                  expandable = false;
+        bool                                  expanded   = false;
+        // The colours the weight and the size are said in past a limit.
+        LLColor4                              errorColor;
+        LLColor4                              warningColor;
+        bool operator==(const Steady&) const = default;
+    };
+    Steady steadyOf(Doc& doc) const;
+    std::optional<Steady> mSteady;
+    std::vector<Part>     mSteadyLead;
+    std::vector<Part>     mSteadyRest;
 };

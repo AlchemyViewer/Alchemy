@@ -124,6 +124,7 @@ namespace al_studio_test
         }
         std::string words(const std::string& name, const LLStringUtil::format_map_t& args = LLStringUtil::format_map_t()) const override
         {
+            ++wordsSaid;
             if (mStrings && mStrings->hasString(name))
             {
                 return mStrings->getString(name, args);
@@ -195,6 +196,9 @@ namespace al_studio_test
         std::vector<std::string>                        statuses;
         // Whether each status said was a failure, in step with them.
         std::vector<bool>                               statusFailures;
+        // How many words were asked for, counted and all: what a unit
+        // that keeps its words says again.
+        mutable S32                                     wordsSaid = 0;
         std::vector<Opened>                             opened;
         std::vector<Went>                               went;
         std::vector<bool>                               reveals;
