@@ -592,30 +592,40 @@ bool ALScriptStudioChecking::lslFragment(const Doc& doc) const
     {
         return false;
     }
+    // Walked once for each text it is asked of.
+    ALCodeEditor& editor  = *doc.editor;
+    const U32     version = editor.document().version();
+    if (doc.check.fragment && doc.check.fragment->first == version)
+    {
+        return doc.check.fragment->second;
+    }
     // A default state, by the grammar's tokens: `default` then `{`, past
     // blanks and comments, the brace on the same line or a later one.
-    ALCodeEditor&   editor  = *doc.editor;
-    bool            waiting = false;
-    const S32       lines   = editor.document().lineCount();
-    for (S32 line = 0; line < lines; ++line)
-    {
-        const std::string& text = editor.document().line(line);
-        for (const ALSyntaxToken& token : editor.highlighter().tokens(line))
+    const auto has_default = [&editor]() {
+        bool      waiting = false;
+        const S32 lines   = editor.document().lineCount();
+        for (S32 line = 0; line < lines; ++line)
         {
-            const std::string_view word = std::string_view(text).substr(token.begin, token.end - token.begin);
-            if (token.kind == ALSyntaxKind::Comment || token.kind == ALSyntaxKind::DocComment ||
-                word.find_first_not_of(" \t") == std::string_view::npos)
+            const std::string& text = editor.document().line(line);
+            for (const ALSyntaxToken& token : editor.highlighter().tokens(line))
             {
-                continue;
+                const std::string_view word = std::string_view(text).substr(token.begin, token.end - token.begin);
+                if (token.kind == ALSyntaxKind::Comment || token.kind == ALSyntaxKind::DocComment ||
+                    word.find_first_not_of(" \t") == std::string_view::npos)
+                {
+                    continue;
+                }
+                if (waiting && word.front() == '{')
+                {
+                    return true;
+                }
+                waiting = token.kind == ALSyntaxKind::Control && word == "default";
             }
-            if (waiting && word.front() == '{')
-            {
-                return false;
-            }
-            waiting = token.kind == ALSyntaxKind::Control && word == "default";
         }
-    }
-    return true;
+        return false;
+    };
+    doc.check.fragment = std::make_pair(version, !has_default());
+    return doc.check.fragment->second;
 }
 
 void ALScriptStudioChecking::schedule(Doc& doc, bool now)

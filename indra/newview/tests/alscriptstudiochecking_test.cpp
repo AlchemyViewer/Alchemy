@@ -586,6 +586,8 @@ namespace tut
         doc.file                         = "/lib.lsl";
         doc.editor->setSyntax("lsl");
         ensure("a fragment", checking.lslFragment(doc));
+        ensure("kept for the text it was asked of", doc.check.fragment && doc.check.fragment->first == doc.editor->document().version() &&
+                                                        doc.check.fragment->second);
         checking.ask(doc, Kind::Check, ALTextPos(), ALTextPos());
         ensure("a state put after it", *studio.asks[0].request.text == doc.editor->text() + "\ndefault{state_entry(){}}\n");
         ALScriptProblem unused = problem(0, "helper unused", ALScriptProblem::Severity::Warning);

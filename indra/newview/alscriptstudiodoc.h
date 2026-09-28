@@ -504,6 +504,11 @@ struct ALScriptStudioDoc
         // an expansion of an older one was on its way: one expansion at a
         // time, and the next for the latest text, not one a key.
         std::optional<U32> wanted;
+        // Whether the text, at the version kept with it, has no default
+        // state (ALScriptStudioChecking::lslFragment): asked on every
+        // caret move and every frame Weights is shown, and a walk of the
+        // whole text to answer.
+        mutable std::optional<std::pair<U32, bool>> fragment;
         // The questions held until it comes.
         std::vector<Waiting> waiting;
         // Whether the script's `.luaurc` was asked for once, so that a
