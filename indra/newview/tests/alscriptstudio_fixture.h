@@ -28,6 +28,7 @@
 #include "linden_common.h"
 
 #include "../alscriptstudiodoc.h"
+#include "../alscriptexternaleditor.h"
 #include "../alscriptnavigation.h"
 #include "../alscriptstudioanalysis.h"
 #include "../alscriptstudiosaves.h"
@@ -276,6 +277,26 @@ namespace al_studio_test
         QuietTabs                tabs;
         ALScriptNavigation       unit;
         std::vector<std::string> shown;
+    };
+
+    // The external editor, for a unit given it (ALScriptExternalEditor):
+    // over tabs and saving that do nothing, and a window with no bridge, no
+    // copy held and no editor started, which records the tabs whose files
+    // it was asked to watch.
+    struct StudioExternal final : public ALScriptExternalEditor::Window
+    {
+        explicit StudioExternal(ALScriptStudioServices& services) : unit(services, tabs, saves, *this) {}
+        void        watchFile(ALScriptStudioDoc& doc) override { watched.push_back(doc.id); }
+        std::string bridgeId(const ALScriptStudioDoc&) const override { return std::string(); }
+        bool        subscribe(ALScriptStudioDoc&) override { return false; }
+        void        unsubscribe(const ALScriptStudioDoc&) override {}
+        std::shared_ptr<ALScriptTempFiles::Claim> holdCopy(const std::string&) override { return nullptr; }
+        void startEditor(ALScriptStudioDoc&, const std::string&, bool) override {}
+
+        QuietTabs                tabs;
+        QuietSaves               saves;
+        ALScriptExternalEditor   unit;
+        std::vector<std::string> watched;
     };
 
     // A pane's window with nothing to fake: the services alone.

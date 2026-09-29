@@ -133,8 +133,6 @@ namespace
         void refreshTrailer(Doc&) override {}
         void fillTabs() override {}
         void keepForRecovery(Doc& doc) override { recovered.push_back(doc.id); }
-        void syncExternal(Doc&) override {}
-        void logExternal(Doc&, const CompileResult&) override {}
         bool quittingOnUs() const override { return false; }
         void stopClosing() override { ++stops; }
         // Let go of, as the window does: the tab is gone.
@@ -192,6 +190,7 @@ namespace tut
         al_studio_test::FakeServices                      services;
         FakeSavingWindow                                  studio;
         std::unique_ptr<al_studio_test::StudioNavigation> navigation;
+        std::unique_ptr<al_studio_test::StudioExternal>   external;
         std::unique_ptr<ALScriptStudioSaving>             saving;
 
         ALScriptStudioSaving& make()
@@ -203,7 +202,8 @@ namespace tut
             studio.services        = &services;
             studio.options.program = "Alchemy Test 1.2.3";
             navigation             = std::make_unique<al_studio_test::StudioNavigation>(services);
-            saving                 = std::make_unique<ALScriptStudioSaving>(services, studio, studio, navigation->unit, studio);
+            external               = std::make_unique<al_studio_test::StudioExternal>(services);
+            saving = std::make_unique<ALScriptStudioSaving>(services, studio, studio, navigation->unit, external->unit, studio);
             return *saving;
         }
 

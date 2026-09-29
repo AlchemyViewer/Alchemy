@@ -2439,11 +2439,14 @@ if(AL_BUILD_TESTS)
     STATIC
     alnotecardembedded.cpp
     alrecovery.cpp
+    alscriptexternaleditor.cpp
     alscriptnavigation.cpp
     alscriptsaveflow.cpp
     alscriptstudiodoc.cpp
+    alscriptstudiofileio.cpp
     alscriptstudioplaces.cpp
     alscriptstudiowords.cpp
+    tests/alscriptstudio_stubs.cpp
   )
   get_property(studio_test_includes TARGET ${test_project} PROPERTY INTERFACE_INCLUDE_DIRECTORIES)
   target_include_directories(
@@ -2656,7 +2659,6 @@ if(AL_BUILD_TESTS)
     PROJECT ${test_project}
     LIBRARIES al_studio_test_common llui alscript ${test_libs}
     PCH al_studio_test_common
-    SOURCES alscriptstudiofileio.cpp
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
 
@@ -2833,7 +2835,6 @@ if(AL_BUILD_TESTS)
     PROJECT ${test_project}
     LIBRARIES al_studio_test_common llui alscript ${test_libs}
     PCH al_studio_test_common
-    SOURCES alscriptstudiofileio.cpp
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
 

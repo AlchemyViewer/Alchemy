@@ -560,8 +560,6 @@ private:
     // and the editor's launch, which are the window's -- VS Code itself
     // under tight integration, else the command the ExternalEditor setting
     // gives.
-    void        syncExternal(Doc& doc) override { mExternal.sync(doc); }
-    void        logExternal(Doc& doc, const ALScriptCompileResult& result) override { mExternal.log(doc, result); }
     std::string bridgeId(const Doc& doc) const override;
     std::shared_ptr<ALScriptTempFiles::Claim> holdCopy(const std::string& path) override;
     bool        subscribe(Doc& doc) override;
@@ -1183,7 +1181,7 @@ private:
     // What is unsaved in the tabs, kept against the viewer going.
     ALScriptStudioRecovery             mRecovery{ *this, *this, *this };
     // Saving and compiling the tabs.
-    ALScriptStudioSaving               mSaving{ *this, *this, *this, mNavigation, *this };
+    ALScriptStudioSaving               mSaving{ *this, *this, *this, mNavigation, mExternal, *this };
     // The window's side of vim, over its editors.
     ALScriptStudioVim                  mVim{ *this, *this, mSaving, mNavigation, mCommands, *this };
     // Its tabs held open in an editor outside.

@@ -26,7 +26,6 @@
 
 #include "../alscriptexternaleditor.h"
 
-#include "../lllogchat.h"
 #include "alscriptstudio_fixture.h"
 #include "alscripttempfiles.h"
 #include "alwatchedfile.h"
@@ -39,11 +38,8 @@
 #include <fstream>
 #include <optional>
 
-// The log's first line says when; the chat log's clock is the viewer's.
-std::string LLLogChat::timestamp2LogString(U32, bool)
-{
-    return "[when]";
-}
+// The log's first line says when: "[when]", by the studio's tests' stub of
+// the chat log's clock (alscriptstudio_stubs.cpp).
 
 namespace
 {

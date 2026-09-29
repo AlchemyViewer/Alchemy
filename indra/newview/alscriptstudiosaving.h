@@ -38,6 +38,7 @@
 
 class ALScriptStudioAnalysis;
 class ALScriptNavigation;
+class ALScriptExternalEditor;
 class ALScriptStudioServices;
 class ALScriptStudioTabs;
 
@@ -141,10 +142,6 @@ public:
         // Written to the recovery store as it stands: saved, what is kept
         // of it against a crash forgotten.
         virtual void keepForRecovery(Doc& doc) = 0;
-        // The editor outside told of what was saved here, and of what the
-        // compiler made of it.
-        virtual void syncExternal(Doc& doc)                                                  = 0;
-        virtual void logExternal(Doc& doc, const ALScriptCompileResult& result) = 0;
 
         // --- closing -------------------------------------------------------------------
 
@@ -160,7 +157,7 @@ public:
         ~Window() = default;
     };
 
-    ALScriptStudioSaving(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, ALScriptStudioAnalysis& analysis, ALScriptNavigation& navigation, Window& window);
+    ALScriptStudioSaving(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, ALScriptStudioAnalysis& analysis, ALScriptNavigation& navigation, ALScriptExternalEditor& external, Window& window);
 
     // --- saving ------------------------------------------------------------------------
 
@@ -238,6 +235,7 @@ private:
     ALScriptStudioTabs&     mTabs;
     ALScriptStudioAnalysis& mAnalysis;
     ALScriptNavigation&     mNavigation;
+    ALScriptExternalEditor& mExternal;
     Window&                 mWindow;
     // Held while this is, for what answers later to know it still is.
     std::shared_ptr<bool>   mAlive = std::make_shared<bool>(true);

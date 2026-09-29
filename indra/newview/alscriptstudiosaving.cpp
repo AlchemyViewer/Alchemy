@@ -28,6 +28,7 @@
 
 #include "alincludesearch.h"
 #include "alnotecardembedded.h"
+#include "alscriptexternaleditor.h"
 #include "alscriptnavigation.h"
 #include "alscriptstudioanalysis.h"
 #include "alscriptstudiochecking.h"
@@ -39,7 +40,7 @@
 
 #include <algorithm>
 
-ALScriptStudioSaving::ALScriptStudioSaving(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, ALScriptStudioAnalysis& analysis, ALScriptNavigation& navigation, Window& window) : mServices(services), mTabs(tabs), mAnalysis(analysis), mNavigation(navigation), mWindow(window)
+ALScriptStudioSaving::ALScriptStudioSaving(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, ALScriptStudioAnalysis& analysis, ALScriptNavigation& navigation, ALScriptExternalEditor& external, Window& window) : mServices(services), mTabs(tabs), mAnalysis(analysis), mNavigation(navigation), mExternal(external), mWindow(window)
 {
 }
 
@@ -822,10 +823,10 @@ void ALScriptStudioSaving::compiledHere(const ALScriptCompileResult& result)
         // compiler made of it; its own save is not written back to it.
         if (!doc.save.external())
         {
-            mWindow.syncExternal(doc);
+            mExternal.sync(doc);
         }
         doc.save.endExternal();
-        mWindow.logExternal(doc, result);
+        mExternal.log(doc, result);
     }
 
     if (result.success)
