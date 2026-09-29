@@ -81,7 +81,7 @@ namespace ALScriptPlaces
     // What a loaded script's author wrote: the source out of the envelope
     // where one wrapped it, the text as it came otherwise, and nothing
     // where it could not be read.
-    std::string sourceOf(const ALScriptWorkspace::Loaded& loaded);
+    std::string sourceOf(const ALScriptLoaded& loaded);
     // An outline entry as a picker's value, and back: by where it was and
     // what it is called, so that an outline made again while a list is up
     // -- a check answering -- still finds it, or nothing.

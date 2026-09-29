@@ -357,7 +357,7 @@ void ALScriptStudioRecovery::takeUp(Doc& doc, const Entry& listed)
     {
         doc.recoverable.reset();
     }
-    using Failure = ALScriptWorkspace::Loaded::Failure;
+    using Failure = ALScriptLoaded::Failure;
     if (doc.loadFailure != Failure::None || (doc.loaded && !doc.modifiable))
     {
         // Nothing it could be saved over: the script could not be loaded,

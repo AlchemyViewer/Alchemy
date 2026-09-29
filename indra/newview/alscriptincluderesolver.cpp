@@ -218,7 +218,7 @@ std::vector<std::string> ALScriptIncludeResolver::nearby(const Request& request,
     {
         if (const auto listed = mContents.find(request.ref.object); listed != mContents.end())
         {
-            for (const ALScriptWorkspace::Item& item : listed->second)
+            for (const ALScriptContents::Item& item : listed->second)
             {
                 if (item.id != request.ref.item && (!item.script || item.lua == request.lua))
                 {
@@ -304,7 +304,7 @@ std::vector<ALIncludeWorld::Item> ALScriptIncludeResolver::inObject(const std::s
         return out;
     }
     LLViewerObject* in_world = gObjectList.findObject(object);
-    for (const ALScriptWorkspace::Item& held : listed->second)
+    for (const ALScriptContents::Item& held : listed->second)
     {
         if (held.name != item_name)
         {
@@ -406,7 +406,7 @@ ALPreprocessor::Found ALScriptIncludeResolver::configsOver(const std::string& fr
         return mUnanswered.contains(object) ? ALPreprocessor::Found::No : ALPreprocessor::Found::Pending;
     }
     LLViewerObject* in_world = gObjectList.findObject(object);
-    for (const ALScriptWorkspace::Item& held : listed->second)
+    for (const ALScriptContents::Item& held : listed->second)
     {
         if (held.name == name)
         {
@@ -433,5 +433,6 @@ bool ALScriptIncludeResolver::inWorld(const Request& request, const std::string&
     }
     const auto listed = request.ref.inInventory() ? mContents.end() : mContents.find(request.ref.object);
     return listed != mContents.end() &&
-           std::any_of(listed->second.begin(), listed->second.end(), [&item_name](const ALScriptWorkspace::Item& item) { return item.name == item_name; });
+           std::any_of(listed->second.begin(), listed->second.end(),
+                       [&item_name](const ALScriptContents::Item& item) { return item.name == item_name; });
 }

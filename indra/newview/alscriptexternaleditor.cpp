@@ -230,7 +230,7 @@ void ALScriptExternalEditor::sync(Doc& doc)
     doc.external.watch->seen();
 }
 
-void ALScriptExternalEditor::log(Doc& doc, const ALScriptWorkspace::CompileResult& result)
+void ALScriptExternalEditor::log(Doc& doc, const ALScriptCompileResult& result)
 {
     if (!doc.external.log)
     {

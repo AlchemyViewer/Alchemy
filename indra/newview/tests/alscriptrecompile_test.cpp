@@ -42,7 +42,7 @@ namespace
 {
     typedef ALScriptRecompile        Recompile;
     typedef Recompile::Window        Window;
-    typedef ALScriptWorkspace::CompileResult Result;
+    typedef ALScriptCompileResult Result;
 
     // The window and the world, answered as a test says: the prims'
     // scripts; which are open, saving or unsaved; what is known of whether
@@ -63,7 +63,7 @@ namespace
             return found == runs.end() ? std::nullopt : std::optional<bool>(found->second);
         }
         void recompile(const ALScriptRef& ref, const std::string& target, std::optional<bool> running,
-                       ALScriptWorkspace::compile_callback_t told) override
+                       ALScriptCompileCallback told) override
         {
             asked.push_back({ ref, target, running, std::move(told) });
         }
@@ -79,7 +79,7 @@ namespace
             ALScriptRef                         ref;
             std::string                         target;
             std::optional<bool>                 running;
-            ALScriptWorkspace::compile_callback_t told;
+            ALScriptCompileCallback told;
         };
         std::vector<Asked>            asked;
         std::vector<Recompile::Script> scripts;
@@ -104,7 +104,7 @@ namespace
     Result failed(S32 line, const std::string& message)
     {
         Result result;
-        ALScriptWorkspace::Diagnostic said;
+        ALScriptDiagnostic said;
         said.line      = line;
         said.column    = 3;
         said.hasColumn = true;

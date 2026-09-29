@@ -52,8 +52,8 @@
 class ALScriptContentsIndex
 {
 public:
-    typedef ALScriptWorkspace::Item     Item;
-    typedef ALScriptWorkspace::Contents Contents;
+    typedef ALScriptContents::Item Item;
+    typedef ALScriptContents       Contents;
 
     struct World
     {

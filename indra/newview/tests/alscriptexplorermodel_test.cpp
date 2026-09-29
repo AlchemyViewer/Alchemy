@@ -48,7 +48,7 @@ namespace tut
     struct alscriptexplorermodel_data
     {
         typedef ALScriptExplorerModel Model;
-        typedef std::function<void(const ALScriptWorkspace::Contents&)> Told;
+        typedef std::function<void(const ALScriptContents&)> Told;
 
         // The world: each object in sight by its root, its prims the root
         // first; what is selected; the prims of the scripts open; the prims
@@ -70,7 +70,7 @@ namespace tut
 
         alscriptexplorermodel_data() : index(fake()), model(index)
         {
-            heardConnection = index.onHeard([this](const ALScriptWorkspace::Contents& contents) { lastHeard = model.contents(contents); });
+            heardConnection = index.onHeard([this](const ALScriptContents& contents) { lastHeard = model.contents(contents); });
         }
 
         ALScriptContentsIndex::World fake()
@@ -104,7 +104,7 @@ namespace tut
 
         // An answer, through the index: to every ask of its prim not
         // answered yet, or to one made for it.
-        Model::Heard feed(const ALScriptWorkspace::Contents& contents)
+        Model::Heard feed(const ALScriptContents& contents)
         {
             if (pending[contents.prim].empty())
             {
@@ -167,13 +167,13 @@ namespace tut
         // What a prim says it holds.
         void holds(const LLUUID& prim, std::vector<std::string> names, bool fetched = true)
         {
-            ALScriptWorkspace::Contents contents;
+            ALScriptContents contents;
             contents.prim    = prim;
             contents.fetched = fetched;
             U32 n            = 1000;
             for (const std::string& name : names)
             {
-                ALScriptWorkspace::Item item;
+                ALScriptContents::Item item;
                 item.id     = id(n++ + static_cast<U32>(prim.mData[0]) * 50);
                 item.name   = name;
                 item.script = name.ends_with(".lsl") || name.ends_with(".luau");
@@ -363,7 +363,7 @@ namespace tut
         selected           = { chair };
         list();
         model.openWhenListed(chair, LLUUID::null, "new.lsl", std::string("default {}"));
-        ALScriptWorkspace::Contents contents;
+        ALScriptContents contents;
         contents.prim    = chair;
         contents.fetched = true;
         contents.items.push_back({ id(500), "old.lsl", true, false });
@@ -378,7 +378,7 @@ namespace tut
         ensure("the one known to run not asked again", askedRunning.size() == 2 && askedRunning[1].item == id(501));
         heard = feed(contents);
         ensure("once", heard.opening.empty());
-        ensure("a prim not listed is no answer", !model.contents(ALScriptWorkspace::Contents{ id(77) }).listed);
+        ensure("a prim not listed is no answer", !model.contents(ALScriptContents{ id(77) }).listed);
         ensure("what runs, known", model.knownRunning(ALScriptRef(chair, id(500))) == std::optional<bool>(true) &&
                                        !model.knownRunning(ALScriptRef(chair, id(501))));
         model.forgetRunning();
@@ -523,10 +523,10 @@ namespace tut
         selected = { house, lone };
         list();
         ask(false, false);
-        ALScriptWorkspace::Contents contents;
+        ALScriptContents contents;
         contents.prim    = id(11);
         contents.fetched = true;
-        ALScriptWorkspace::Item locked;
+        ALScriptContents::Item locked;
         locked.id     = id(2000);
         locked.name   = "locked.lsl";
         locked.modify = false;

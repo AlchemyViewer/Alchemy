@@ -171,7 +171,7 @@ private:
     void answer(LLViewerObject* from, LLInventoryObject::object_list_t* inventory)
     {
         done = true;
-        Contents contents;
+        ALScriptContents contents;
         contents.prim    = prim;
         contents.fetched = inventory != nullptr;
         if (from)
@@ -190,7 +190,7 @@ private:
                 {
                     continue;
                 }
-                Item one;
+                ALScriptContents::Item one;
                 one.id          = item->getUUID();
                 one.name        = item->getName();
                 one.copy        = gAgent.allowOperation(PERM_COPY, item->getPermissions(), GP_OBJECT_MANIPULATE);
@@ -214,7 +214,9 @@ private:
             // By name, as the build floater's Contents lists them, not in
             // the order the simulator sends them in.
             std::stable_sort(contents.items.begin(), contents.items.end(),
-                             [](const Item& a, const Item& b) { return LLStringUtil::compareDict(a.name, b.name) < 0; });
+                             [](const ALScriptContents::Item& a, const ALScriptContents::Item& b) {
+                                 return LLStringUtil::compareDict(a.name, b.name) < 0;
+                             });
         }
         // The object may be walking its listeners: this one leaves the
         // walk now, and answers once it is over.
@@ -235,10 +237,10 @@ struct ALScriptWorkspace::Burst
 {
     LLUUID                   fromId;
     std::string              fromName;
-    bool                     lua = false;
-    RuntimeEvent::Channel    channel = RuntimeEvent::Channel::Debug;
-    std::vector<std::string> texts;
-    size_t                   lines = 0;
+    bool                          lua     = false;
+    ALScriptRuntimeEvent::Channel channel = ALScriptRuntimeEvent::Channel::Debug;
+    std::vector<std::string>      texts;
+    size_t                        lines = 0;
 };
 
 namespace
@@ -286,7 +288,7 @@ ALScriptWorkspace::ALScriptWorkspace()
         LLViewerObject* in_world = gObjectList.findObject(prim);
         return in_world && !in_world->isInventoryDirty();
     };
-    world.ask = [this](const LLUUID& prim, bool from_region, std::function<void(const Contents&)> told) {
+    world.ask = [this](const LLUUID& prim, bool from_region, std::function<void(const ALScriptContents&)> told) {
         listContents(prim, std::move(told), from_region);
     };
     world.askRunning = [this](const ALScriptRef& ref) { askRunning(ref); };
@@ -307,9 +309,9 @@ bool ALScriptWorkspace::looksLikeLua(std::string_view content)
     return ALScriptMessages::looksLikeLua(content);
 }
 
-ALScriptWorkspace::Language ALScriptWorkspace::resolve(const LLInventoryItem* item, std::string_view content, const std::string& requested)
+ALScriptLanguage ALScriptWorkspace::resolve(const LLInventoryItem* item, std::string_view content, const std::string& requested)
 {
-    Language language;
+    ALScriptLanguage language;
     language.lua       = item && item->getInventorySubType() == SST_LUA;
     std::string target = requested;
     if (target.empty() && item)
@@ -369,12 +371,12 @@ bool ALScriptWorkspace::readAsset(const LLUUID& asset_id, LLAssetType::EType typ
 struct ALScriptWorkspace::LoadRequest
 {
     load_callback_t callback;
-    Loaded          answer;
+    ALScriptLoaded  answer;
 };
 
 void ALScriptWorkspace::load(const ALScriptRef& ref, load_callback_t callback)
 {
-    Loaded answer;
+    ALScriptLoaded answer;
     answer.ref = ref;
     if (ref.inInventory())
     {
@@ -382,7 +384,7 @@ void ALScriptWorkspace::load(const ALScriptRef& ref, load_callback_t callback)
         if (!item)
         {
             answer.error   = LLTrans::getString("WorkspaceNoSuchItem");
-            answer.failure = Loaded::Failure::Missing;
+            answer.failure = ALScriptLoaded::Failure::Missing;
             callback(answer);
             return;
         }
@@ -397,11 +399,11 @@ void ALScriptWorkspace::load(const ALScriptRef& ref, load_callback_t callback)
         answer.viewable      = gAgent.isGodlike() || (copyable && (answer.modifiable || library || notecard));
         answer.name          = item->getName();
         answer.assetId       = item->getAssetUUID();
-        const std::string refused = rlvRefusal(nullptr, item->getType(), RlvUse::See);
+        const std::string refused = rlvRefusal(nullptr, item->getType(), ALScriptRlvUse::See);
         if (!answer.viewable || !refused.empty())
         {
             answer.error   = refused.empty() ? LLTrans::getString("WorkspaceNotPermitted") : refused;
-            answer.failure = Loaded::Failure::NotPermitted;
+            answer.failure = ALScriptLoaded::Failure::NotPermitted;
             callback(answer);
             return;
         }
@@ -417,7 +419,7 @@ void ALScriptWorkspace::load(const ALScriptRef& ref, load_callback_t callback)
     if (!object || !item || !object->getRegion())
     {
         answer.error   = LLTrans::getString(object ? "WorkspaceNoSuchItemInObject" : "WorkspaceNoSuchObject");
-        answer.failure = Loaded::Failure::Missing;
+        answer.failure = ALScriptLoaded::Failure::Missing;
         callback(answer);
         return;
     }
@@ -428,11 +430,11 @@ void ALScriptWorkspace::load(const ALScriptRef& ref, load_callback_t callback)
     answer.viewable     = gAgent.isGodlike() || (copyable && (answer.modifiable || notecard));
     answer.name         = item->getName();
     answer.assetId      = item->getAssetUUID();
-    const std::string refused = rlvRefusal(object, item->getType(), RlvUse::See);
+    const std::string refused = rlvRefusal(object, item->getType(), ALScriptRlvUse::See);
     if (!answer.viewable || !refused.empty())
     {
         answer.error   = refused.empty() ? LLTrans::getString("WorkspaceNotPermitted") : refused;
-        answer.failure = Loaded::Failure::NotPermitted;
+        answer.failure = ALScriptLoaded::Failure::NotPermitted;
         callback(answer);
         return;
     }
@@ -446,21 +448,21 @@ void ALScriptWorkspace::load(const ALScriptRef& ref, load_callback_t callback)
 void ALScriptWorkspace::onAssetLoaded(const LLUUID& asset_id, LLAssetType::EType type, void* user_data, S32 status, LLExtStat ext_status)
 {
     std::unique_ptr<LoadRequest> request(static_cast<LoadRequest*>(user_data));
-    Loaded&                      answer = request->answer;
+    ALScriptLoaded&              answer = request->answer;
     if (status != 0)
     {
         // Refused, or not there to be had, the same next time; anything
         // else -- a timeout, a lost capability -- may go through again.
         answer.error   = LLAssetStorage::getErrorString(status);
-        answer.failure = status == LL_ERR_INSUFFICIENT_PERMISSIONS ? Loaded::Failure::NotPermitted
+        answer.failure = status == LL_ERR_INSUFFICIENT_PERMISSIONS ? ALScriptLoaded::Failure::NotPermitted
                          : status == LL_ERR_ASSET_REQUEST_NOT_IN_DATABASE || status == LL_ERR_ASSET_REQUEST_NONEXISTENT_FILE
-                             ? Loaded::Failure::Unreadable
-                             : Loaded::Failure::Fetch;
+                             ? ALScriptLoaded::Failure::Unreadable
+                             : ALScriptLoaded::Failure::Fetch;
     }
     else if (!readAsset(asset_id, type, answer.text))
     {
         answer.error   = LLTrans::getString("WorkspaceAssetUnreadable");
-        answer.failure = Loaded::Failure::Unreadable;
+        answer.failure = ALScriptLoaded::Failure::Unreadable;
     }
     else if (type == LLAssetType::AT_NOTECARD)
     {
@@ -480,7 +482,7 @@ void ALScriptWorkspace::onAssetLoaded(const LLUUID& asset_id, LLAssetType::EType
             else
             {
                 answer.error   = LLTrans::getString("WorkspaceNotecardUnreadable");
-                answer.failure = Loaded::Failure::Unreadable;
+                answer.failure = ALScriptLoaded::Failure::Unreadable;
             }
         }
     }
@@ -505,12 +507,12 @@ void ALScriptWorkspace::onAssetLoaded(const LLUUID& asset_id, LLAssetType::EType
 
 // --- saving and compiling ------------------------------------------------------
 
-std::vector<ALScriptWorkspace::Diagnostic> ALScriptWorkspace::parseDiagnostics(const LLSD& errors, bool lua)
+std::vector<ALScriptDiagnostic> ALScriptWorkspace::parseDiagnostics(const LLSD& errors, bool lua)
 {
-    std::vector<Diagnostic> out;
+    std::vector<ALScriptDiagnostic> out;
     for (const ALScriptMessages::Place& place : ALScriptMessages::readDiagnostics(errors, lua))
     {
-        Diagnostic diagnostic;
+        ALScriptDiagnostic diagnostic;
         diagnostic.line      = place.line;
         diagnostic.column    = place.column;
         diagnostic.hasColumn = place.hasColumn;
@@ -521,13 +523,13 @@ std::vector<ALScriptWorkspace::Diagnostic> ALScriptWorkspace::parseDiagnostics(c
     return out;
 }
 
-void ALScriptWorkspace::deliver(const CompileResult& result, const compile_callback_t& callback, const std::string* text)
+void ALScriptWorkspace::deliver(const ALScriptCompileResult& result, const ALScriptCompileCallback& callback, const std::string* text)
 {
     // Everything that draws hears it, and a text editor's reflow takes a
     // mutex a fiber may not.
     llassert(LLCoros::on_main_coro());
     mUnderway.erase(result.sender.request);
-    if (result.success && result.kind == Kind::Script)
+    if (result.success && result.kind == ALScriptKind::Script)
     {
         // A new script runs from here; what the old one said is past.
         forgetRuntime(result.ref.item);
@@ -539,7 +541,7 @@ void ALScriptWorkspace::deliver(const CompileResult& result, const compile_callb
     mCompiled(result);
     if (text && result.error.empty() && result.newAssetId.notNull())
     {
-        Saved saved;
+        ALScriptSaved saved;
         saved.ref      = result.ref;
         saved.kind     = result.kind;
         saved.text     = *text;
@@ -555,19 +557,21 @@ bool ALScriptWorkspace::saving(const ALScriptRef& ref) const
     return std::any_of(mUnderway.begin(), mUnderway.end(), [&ref](const auto& one) { return one.second == ref; });
 }
 
-bool ALScriptWorkspace::save(const ALScriptRef& ref, const std::string& text, const SaveOptions& options, compile_callback_t callback, std::string& error)
+bool ALScriptWorkspace::save(const ALScriptRef& ref, const std::string& text, const ALScriptSaveOptions& options,
+                             ALScriptCompileCallback callback, std::string& error)
 {
     // Which save it is, from here to its answer, the region asked first or
     // not.
     if (options.sender.request == 0)
     {
-        SaveOptions numbered    = options;
-        numbered.sender.request = newRequest();
+        ALScriptSaveOptions numbered = options;
+        numbered.sender.request      = newRequest();
         return save(ref, text, numbered, callback, error);
     }
     if (!ref.inInventory())
     {
-        if (std::string refused = rlvRefusal(gObjectList.findObject(ref.object), LLAssetType::AT_LSL_TEXT, RlvUse::Change); !refused.empty())
+        if (std::string refused = rlvRefusal(gObjectList.findObject(ref.object), LLAssetType::AT_LSL_TEXT, ALScriptRlvUse::Change);
+            !refused.empty())
         {
             error = std::move(refused);
             return false;
@@ -585,12 +589,12 @@ bool ALScriptWorkspace::save(const ALScriptRef& ref, const std::string& text, co
             return false;
         }
         awaitRunning(ref, [this, ref, text, options, callback](std::optional<bool> running) {
-            SaveOptions known = options;
+            ALScriptSaveOptions known = options;
             known.running     = running.value_or(true);
             std::string why;
             if (!save(ref, text, known, callback, why))
             {
-                CompileResult result;
+                ALScriptCompileResult result;
                 result.ref    = ref;
                 result.sender = options.sender;
                 result.error  = why;
@@ -618,14 +622,14 @@ bool ALScriptWorkspace::save(const ALScriptRef& ref, const std::string& text, co
             std::string why;
             if (experience)
             {
-                SaveOptions known = options;
+                ALScriptSaveOptions known = options;
                 known.experience  = *experience;
                 if (save(ref, text, known, callback, why))
                 {
                     return;
                 }
             }
-            CompileResult result;
+            ALScriptCompileResult result;
             if (!experience)
             {
                 why                      = LLTrans::getString("WorkspaceExperienceUnknown");
@@ -655,7 +659,7 @@ bool ALScriptWorkspace::save(const ALScriptRef& ref, const std::string& text, co
     const bool lua = options.compileTarget == "luau";
     auto answered  = [this, ref, lua, callback, text, sender = options.sender, running = options.running.value_or(true),
                      experience = options.experience](const LLSD& response, const LLUUID& new_asset_id) {
-        CompileResult result;
+        ALScriptCompileResult result;
         result.ref        = ref;
         result.sender     = sender;
         result.success    = response["compiled"].asBoolean();
@@ -681,7 +685,7 @@ bool ALScriptWorkspace::save(const ALScriptRef& ref, const std::string& text, co
         });
     };
     auto failed = [this, ref, callback, sender = options.sender](LLUUID, LLUUID, LLSD, std::string reason) -> bool {
-        CompileResult result;
+        ALScriptCompileResult result;
         result.ref    = ref;
         result.sender = sender;
         result.error  = reason.empty() ? LLTrans::getString("WorkspaceUploadFailed") : reason;
@@ -744,7 +748,7 @@ bool ALScriptWorkspace::save(const ALScriptRef& ref, const std::string& text, co
 }
 
 bool ALScriptWorkspace::saveNotecard(const ALScriptRef& ref, const std::string& text, const std::vector<LLPointer<LLInventoryItem>>& embedded,
-                                     compile_callback_t callback, std::string& error, Sender sender)
+                                     ALScriptCompileCallback callback, std::string& error, ALScriptSender sender)
 {
     if (sender.request == 0)
     {
@@ -773,16 +777,16 @@ bool ALScriptWorkspace::saveNotecard(const ALScriptRef& ref, const std::string& 
 }
 
 bool ALScriptWorkspace::uploadNotecard(const ALScriptRef& ref, const std::string& buffer, const std::string& text, bool carries,
-                                       compile_callback_t callback, std::string& error, Sender sender)
+                                       ALScriptCompileCallback callback, std::string& error, ALScriptSender sender)
 {
     if (sender.request == 0)
     {
         sender.request = newRequest();
     }
     auto answered = [this, ref, callback, carries, sender, text](const LLUUID& new_asset_id, const LLUUID& new_item_id) {
-        CompileResult result;
+        ALScriptCompileResult result;
         result.ref        = ref;
-        result.kind       = Kind::Notecard;
+        result.kind       = ALScriptKind::Notecard;
         result.sender     = sender;
         result.success    = true;
         result.newAssetId = new_asset_id;
@@ -796,9 +800,9 @@ bool ALScriptWorkspace::uploadNotecard(const ALScriptRef& ref, const std::string
         LLAppViewer::instance()->postToMainCoro([this, result, callback, text]() { deliver(result, callback, &text); });
     };
     auto failed = [this, ref, callback, sender](LLUUID, LLUUID, LLSD, std::string reason) -> bool {
-        CompileResult result;
+        ALScriptCompileResult result;
         result.ref    = ref;
-        result.kind   = Kind::Notecard;
+        result.kind   = ALScriptKind::Notecard;
         result.sender = sender;
         result.error  = reason.empty() ? LLTrans::getString("WorkspaceUploadFailed") : reason;
         LLAppViewer::instance()->postToMainCoro([this, result, callback]() { deliver(result, callback); });
@@ -833,7 +837,7 @@ bool ALScriptWorkspace::uploadNotecard(const ALScriptRef& ref, const std::string
         error = LLTrans::getString("WorkspaceNoSuchObject");
         return false;
     }
-    if (std::string refused = rlvRefusal(object, LLAssetType::AT_NOTECARD, RlvUse::Change); !refused.empty())
+    if (std::string refused = rlvRefusal(object, LLAssetType::AT_NOTECARD, ALScriptRlvUse::Change); !refused.empty())
     {
         error = std::move(refused);
         return false;
@@ -857,7 +861,7 @@ void ALScriptWorkspace::prepare(const ALScriptRef& ref, const std::string& name,
 {
     if (!ALScriptEnvelope::looksWrapped(text) && !ALScriptPreprocessor::enabled())
     {
-        Prepared as_is;
+        ALScriptPrepared as_is;
         as_is.text = text;
         callback(as_is);
         return;
@@ -871,7 +875,7 @@ void ALScriptWorkspace::prepare(const ALScriptRef& ref, const std::string& name,
     request.lua           = lua;
     request.compileTarget = target;
     ALScriptPreprocessor::instance().run(request, [request, envelope, lua, target, callback, anyway](const ALPreprocessor::Result& expanded) {
-        Prepared prepared;
+        ALScriptPrepared prepared;
         if (expanded.hasErrors() || !expanded.pending.empty())
         {
             for (const ALScriptProblem& problem : expanded.problems)
@@ -880,7 +884,7 @@ void ALScriptWorkspace::prepare(const ALScriptRef& ref, const std::string& name,
                 {
                     continue;
                 }
-                Diagnostic diagnostic;
+                ALScriptDiagnostic diagnostic;
                 diagnostic.line      = problem.line;
                 diagnostic.column    = problem.column;
                 diagnostic.hasColumn = true;
@@ -893,7 +897,7 @@ void ALScriptWorkspace::prepare(const ALScriptRef& ref, const std::string& name,
             // goes anyway, said that it went without.
             for (const std::string& name : expanded.pending)
             {
-                Diagnostic diagnostic;
+                ALScriptDiagnostic diagnostic;
                 diagnostic.level   = "ERROR";
                 diagnostic.message = anyway ? alScriptKeyedWords("PreprocIncludeSentWithout", { name },
                                                                  ALScriptProblem::fill("include file '[1]' could not be fetched, and the script went up without it", { name }))
@@ -928,15 +932,15 @@ void ALScriptWorkspace::prepare(const ALScriptRef& ref, const std::string& name,
     });
 }
 
-void ALScriptWorkspace::recompile(const ALScriptRef& ref, const std::string& requested, compile_callback_t callback, std::optional<bool> running,
-                                  Sender sender)
+void ALScriptWorkspace::recompile(const ALScriptRef& ref, const std::string& requested, ALScriptCompileCallback callback,
+                                  std::optional<bool> running, ALScriptSender sender)
 {
     if (sender.request == 0)
     {
         sender.request = newRequest();
     }
     auto fail = [this, ref, callback, sender](const std::string& why) {
-        CompileResult result;
+        ALScriptCompileResult result;
         result.ref    = ref;
         result.sender = sender;
         result.error  = why;
@@ -949,7 +953,8 @@ void ALScriptWorkspace::recompile(const ALScriptRef& ref, const std::string& req
         fail(LLTrans::getString(ref.inInventory() ? "WorkspaceNoSuchItem" : object ? "WorkspaceNoSuchItemInObject" : "WorkspaceNoSuchObject"));
         return;
     }
-    if (std::string refused = object ? rlvRefusal(object, LLAssetType::AT_LSL_TEXT, RlvUse::Change) : std::string(); !refused.empty())
+    if (std::string refused = object ? rlvRefusal(object, LLAssetType::AT_LSL_TEXT, ALScriptRlvUse::Change) : std::string();
+        !refused.empty())
     {
         fail(refused);
         return;
@@ -976,39 +981,39 @@ void ALScriptWorkspace::recompile(const ALScriptRef& ref, const std::string& req
     }
     const std::string name = item->getName();
     // Its text, then the upload, which keeps the experience it runs under.
-    load(ref, [this, target, lua, name, callback, fail, running, sender](const Loaded& loaded) {
+    load(ref, [this, target, lua, name, callback, fail, running, sender](const ALScriptLoaded& loaded) {
         if (!loaded.error.empty())
         {
             fail(loaded.error);
             return;
         }
         const ALScriptRef ref = loaded.ref;
-        prepare(ref, name, loaded.assetId, loaded.text, lua, target, [this, ref, target, callback, fail, running, sender](const Prepared& prepared) {
+        prepare(ref, name, loaded.assetId, loaded.text, lua, target, [this, ref, target, callback, fail, running, sender](const ALScriptPrepared& prepared) {
             if (!prepared.errors.empty())
             {
-                CompileResult result;
+                ALScriptCompileResult result;
                 result.ref         = ref;
                 result.sender      = sender;
                 result.diagnostics = prepared.errors;
-                for (const Diagnostic& diagnostic : prepared.errors)
+                for (const ALScriptDiagnostic& diagnostic : prepared.errors)
                 {
                     result.messages.push_back(diagnostic.message);
                 }
                 deliver(result, callback);
                 return;
             }
-            SaveOptions options;
+            ALScriptSaveOptions options;
             options.compileTarget = target;
             options.running       = running;
             options.sender        = sender;
             // What the compiler says is of the expansion: the caller told
             // how to read it back.
-            const auto told = [callback, map = prepared.map, line = prepared.codeLine](const CompileResult& result) {
+            const auto told = [callback, map = prepared.map, line = prepared.codeLine](const ALScriptCompileResult& result) {
                 if (!callback)
                 {
                     return;
                 }
-                CompileResult read = result;
+                ALScriptCompileResult read = result;
                 read.sourceMap     = map;
                 read.codeLine      = line;
                 callback(read);
@@ -1101,7 +1106,7 @@ struct ALScriptWorkspace::Transfer final : public LLInventoryObserver
     // The names of what was taken, until each has come.
     std::vector<std::string>          awaited;
     boost::unordered_flat_set<LLUUID> arrived;
-    TransferResult                    result;
+    ALScriptTransferResult            result;
     transfer_callback_t               done;
     bool                              finished = false;
     std::weak_ptr<Transfer>           self;
@@ -1134,10 +1139,10 @@ void ALScriptWorkspace::transfer(const LLUUID& from_id, const std::vector<LLUUID
         return;
     }
     // Taken out of the one and put in the other: both changed.
-    std::string refused = rlvRefusal(from, LLAssetType::AT_NONE, RlvUse::Change);
+    std::string refused = rlvRefusal(from, LLAssetType::AT_NONE, ALScriptRlvUse::Change);
     if (refused.empty())
     {
-        refused = rlvRefusal(to, LLAssetType::AT_NONE, RlvUse::Change);
+        refused = rlvRefusal(to, LLAssetType::AT_NONE, ALScriptRlvUse::Change);
     }
     if (!refused.empty())
     {
@@ -1352,13 +1357,13 @@ ALScriptWorkspace::~ALScriptWorkspace()
 // --- what RLVa allows ------------------------------------------------------------
 
 // static
-std::string ALScriptWorkspace::rlvRefusal(LLViewerObject* object, LLAssetType::EType type, RlvUse use)
+std::string ALScriptWorkspace::rlvRefusal(LLViewerObject* object, LLAssetType::EType type, ALScriptRlvUse use)
 {
     if (!RlvActions::isRlvEnabled())
     {
         return std::string();
     }
-    if (use == RlvUse::See)
+    if (use == ALScriptRlvUse::See)
     {
         const bool script = type == LLAssetType::AT_LSL_TEXT;
         if ((script && gRlvHandler.hasBehaviour(RLV_BHVR_VIEWSCRIPT)) || (type == LLAssetType::AT_NOTECARD && gRlvHandler.hasBehaviour(RLV_BHVR_VIEWNOTE)))
@@ -1503,7 +1508,7 @@ bool ALScriptWorkspace::scriptMessage(const ALScriptRef& ref, const char* messag
         error = LLTrans::getString("WorkspaceNoSuchObject");
         return false;
     }
-    if (std::string refused = rlvRefusal(object, LLAssetType::AT_LSL_TEXT, RlvUse::Change); !refused.empty())
+    if (std::string refused = rlvRefusal(object, LLAssetType::AT_LSL_TEXT, ALScriptRlvUse::Change); !refused.empty())
     {
         error = std::move(refused);
         return false;
@@ -1573,7 +1578,7 @@ bool ALScriptWorkspace::restart(const ALScriptRef& ref, std::string& error)
             askRunning(one->ref);
         }
     };
-    pending->heard = mRunningState.connect([pending = std::weak_ptr<Pending>(pending), start](const RunningState& state) {
+    pending->heard = mRunningState.connect([pending = std::weak_ptr<Pending>(pending), start](const ALScriptRunningState& state) {
         const std::shared_ptr<Pending> one = pending.lock();
         if (one && state.ref == one->ref && !state.running)
         {
@@ -1628,7 +1633,7 @@ bool ALScriptWorkspace::askRunning(const ALScriptRef& ref)
 // static
 void ALScriptWorkspace::processScriptRunningReply(LLMessageSystem* msg, void** data)
 {
-    RunningState state;
+    ALScriptRunningState state;
     msg->getUUIDFast(_PREHASH_Script, _PREHASH_ObjectID, state.ref.object);
     msg->getUUIDFast(_PREHASH_Script, _PREHASH_ItemID, state.ref.item);
     msg->getBOOLFast(_PREHASH_Script, _PREHASH_Running, state.running);
@@ -1697,16 +1702,16 @@ void ALScriptWorkspace::listContents(const LLUUID& prim, contents_callback_t cal
     LLViewerObject* object = gObjectList.findObject(prim);
     if (!object)
     {
-        Contents none;
+        ALScriptContents none;
         none.prim = prim;
         callback(none);
         return;
     }
-    if (!rlvRefusal(object, LLAssetType::AT_NONE, RlvUse::See).empty())
+    if (!rlvRefusal(object, LLAssetType::AT_NONE, ALScriptRlvUse::See).empty())
     {
         // Not to be seen: listed as holding nothing, so that what was
         // listed before goes as well.
-        Contents hidden;
+        ALScriptContents hidden;
         hidden.prim    = prim;
         hidden.fetched = true;
         callback(hidden);
@@ -1727,11 +1732,11 @@ void ALScriptWorkspace::listContents(const LLUUID& prim, contents_callback_t cal
     }, CONTENTS_TIMEOUT);
 }
 
-std::vector<ALScriptWorkspace::RuntimeEvent> ALScriptWorkspace::runtimeErrorsOf(const LLUUID& prim, const LLUUID& item) const
+std::vector<ALScriptRuntimeEvent> ALScriptWorkspace::runtimeErrorsOf(const LLUUID& prim, const LLUUID& item) const
 {
-    std::vector<RuntimeEvent> errors;
+    std::vector<ALScriptRuntimeEvent> errors;
     const auto                since = mRuntimeSince.find(item);
-    for (const RuntimeEvent& event : mRecent)
+    for (const ALScriptRuntimeEvent& event : mRecent)
     {
         if (event.isError && event.prim == prim && event.item == item && (since == mRuntimeSince.end() || event.time > since->second))
         {
@@ -1770,7 +1775,7 @@ bool ALScriptWorkspace::create(const LLUUID& prim_id, bool notecard, bool lua, c
         error = LLTrans::getString("WorkspaceNoSuchObject");
         return false;
     }
-    if (std::string refused = rlvRefusal(prim, LLAssetType::AT_NONE, RlvUse::Change); !refused.empty())
+    if (std::string refused = rlvRefusal(prim, LLAssetType::AT_NONE, ALScriptRlvUse::Change); !refused.empty())
     {
         error = std::move(refused);
         return false;
@@ -1809,7 +1814,7 @@ bool ALScriptWorkspace::create(const LLUUID& prim_id, bool notecard, bool lua, c
         }
         prim->createInventoryItem(asset_type, inv_type, sub_type, name, description, perms, params,
                                   [prim_id, name, callback](bool success, const LLSD& response) {
-                                      Created made;
+                                      ALScriptCreated made;
                                       made.prim = prim_id;
                                       made.name = name;
                                       if (success)
@@ -1834,7 +1839,7 @@ bool ALScriptWorkspace::create(const LLUUID& prim_id, bool notecard, bool lua, c
     prim->saveScript(item, true, true, LLUUID::null);
     // The object's contents will show it, under whatever id the region
     // gives it.
-    Created made;
+    ALScriptCreated made;
     made.prim = prim_id;
     made.name = name;
     callback(made);
@@ -1871,7 +1876,7 @@ bool ALScriptWorkspace::rename(const ALScriptRef& ref, const std::string& name, 
         error = LLTrans::getString(object ? "WorkspaceNoSuchItemInObject" : "WorkspaceNoSuchObject");
         return false;
     }
-    if (std::string refused = rlvRefusal(object, item->getType(), RlvUse::Change); !refused.empty())
+    if (std::string refused = rlvRefusal(object, item->getType(), ALScriptRlvUse::Change); !refused.empty())
     {
         error = std::move(refused);
         return false;
@@ -1922,7 +1927,7 @@ bool ALScriptWorkspace::describe(const ALScriptRef& ref, const std::string& desc
         error = LLTrans::getString(object ? "WorkspaceNoSuchItemInObject" : "WorkspaceNoSuchObject");
         return false;
     }
-    if (std::string refused = rlvRefusal(object, item->getType(), RlvUse::Change); !refused.empty())
+    if (std::string refused = rlvRefusal(object, item->getType(), ALScriptRlvUse::Change); !refused.empty())
     {
         error = std::move(refused);
         return false;
@@ -1956,7 +1961,7 @@ bool ALScriptWorkspace::renameObject(const LLUUID& prim_id, const std::string& n
         error = LLTrans::getString("WorkspaceNoSuchObject");
         return false;
     }
-    if (std::string refused = rlvRefusal(prim, LLAssetType::AT_NONE, RlvUse::Change); !refused.empty())
+    if (std::string refused = rlvRefusal(prim, LLAssetType::AT_NONE, ALScriptRlvUse::Change); !refused.empty())
     {
         error = std::move(refused);
         return false;
@@ -2006,7 +2011,7 @@ bool ALScriptWorkspace::remove(const ALScriptRef& ref, std::string& error)
         error = LLTrans::getString(object ? "WorkspaceNoSuchItemInObject" : "WorkspaceNoSuchObject");
         return false;
     }
-    if (std::string refused = rlvRefusal(object, item->getType(), RlvUse::Change); !refused.empty())
+    if (std::string refused = rlvRefusal(object, item->getType(), ALScriptRlvUse::Change); !refused.empty())
     {
         error = std::move(refused);
         return false;
@@ -2024,11 +2029,11 @@ bool ALScriptWorkspace::remove(const ALScriptRef& ref, std::string& error)
 
 void ALScriptWorkspace::ingestChat(const LLChat& chat, bool instant)
 {
-    const RuntimeEvent::Channel channel = instant                             ? RuntimeEvent::Channel::Instant
-                                          : chat.mChatType == CHAT_TYPE_OWNER  ? RuntimeEvent::Channel::OwnerSay
-                                          : chat.mChatType == CHAT_TYPE_DEBUG_MSG ? RuntimeEvent::Channel::Debug
-                                          : chat.mChatType == CHAT_TYPE_DIRECT ? RuntimeEvent::Channel::SaidTo
-                                                                               : RuntimeEvent::Channel::Said;
+    const ALScriptRuntimeEvent::Channel channel = instant                             ? ALScriptRuntimeEvent::Channel::Instant
+                                          : chat.mChatType == CHAT_TYPE_OWNER  ? ALScriptRuntimeEvent::Channel::OwnerSay
+                                          : chat.mChatType == CHAT_TYPE_DEBUG_MSG ? ALScriptRuntimeEvent::Channel::Debug
+                                          : chat.mChatType == CHAT_TYPE_DIRECT ? ALScriptRuntimeEvent::Channel::SaidTo
+                                                                               : ALScriptRuntimeEvent::Channel::Said;
     const std::vector<std::string>  lines = LLStringUtil::getTokens(chat.mText, "\n");
     ALScriptMessages::Header        named;
     const bool                      header = !lines.empty() && ALScriptMessages::readRuntimeHeader(lines.front(), named);
@@ -2102,7 +2107,7 @@ void ALScriptWorkspace::deliverRuntime(const Burst& burst)
     LLViewerObject* prim = gObjectList.findObject(burst.fromId);
     LLViewerObject* root = prim ? prim->getRootEdit() : nullptr;
 
-    RuntimeEvent event;
+    ALScriptRuntimeEvent event;
     event.time       = LLDate::now().secondsSinceEpoch();
     event.prim       = burst.fromId;
     event.root       = root ? root->getID() : burst.fromId;

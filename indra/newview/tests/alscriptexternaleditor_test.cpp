@@ -286,7 +286,7 @@ namespace tut
         unit.sync(a);
         ensure_equals("written again", contents(unit.fileName(a)), std::string("one two"));
         ensure_equals("and known", a.external.written, std::string("one two"));
-        ALScriptWorkspace::CompileResult result;
+        ALScriptCompileResult result;
         result.messages = { "(1, 2) : ERROR : Syntax error\x07" };
         unit.log(a, result);
         const std::string log = contents(a.external.log->path());
@@ -307,7 +307,7 @@ namespace tut
         studio.bridgeThere           = true;
         Doc& a                       = tab("a", "one");
         unit.edit(a);
-        ALScriptWorkspace::CompileResult result;
+        ALScriptCompileResult result;
         unit.log(a, result);
         const std::string file = unit.fileName(a);
         const std::string log  = a.external.log->path();

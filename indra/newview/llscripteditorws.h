@@ -316,7 +316,7 @@ protected:
     };
     // And what RLVa allows of it: seeing it, or changing it
     // (ALScriptWorkspace::rlvRefusal), refused in RLVa's words.
-    ValidatedItem validatePublishedItem(const LLSD& params, U32 permMask, ALScriptWorkspace::RlvUse use) const;
+    ValidatedItem validatePublishedItem(const LLSD& params, U32 permMask, ALScriptRlvUse use) const;
 
     // --- Object Content Publishing (helpers) ---
     static std::string getPrimName(LLViewerObject* obj);
@@ -346,17 +346,17 @@ protected:
 private:
     // What a script said, from the workspace, to whoever published its
     // object or subscribed to it.
-    void sendRuntimeEvent(const ALScriptWorkspace::RuntimeEvent& event) const;
+    void sendRuntimeEvent(const ALScriptRuntimeEvent& event) const;
     // What the compiler said of a script saved through the workspace --
     // by Script Studio, the compile queue, anything but a client's own
     // object.content.save, which is answered inline -- to the connection
     // subscribed to it, else to everyone with its object published; and
     // the prim's inventory fetched again, so that the object.update
     // that follows carries the item's new revision.
-    void sendCompiled(const ALScriptWorkspace::CompileResult& result);
+    void sendCompiled(const ALScriptCompileResult& result);
     // The script.compiled message for a result, in the protocol's terms.
     static LLSD compiledMessage(const std::string& script_id, bool success, bool running,
-                                const std::vector<ALScriptWorkspace::Diagnostic>& diagnostics, bool lua);
+                                const std::vector<ALScriptDiagnostic>& diagnostics, bool lua);
 
     struct EditorSubscription
     {

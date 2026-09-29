@@ -60,9 +60,9 @@ namespace
         void activate(Doc& doc) override { activated.push_back(doc.id); }
         void openOrphan(const Entry& entry, Doc::Orphan orphan) override { orphans.emplace_back(entry.name, orphan); }
         void becomeOrphan(Doc& doc, const Entry& entry, Doc::Orphan orphan) override { became.emplace_back(doc.id, orphan); }
-        Doc::Orphan failedAs(const Doc& doc, ALScriptWorkspace::Loaded::Failure failure) const override
+        Doc::Orphan failedAs(const Doc& doc, ALScriptLoaded::Failure failure) const override
         {
-            return failure == ALScriptWorkspace::Loaded::Failure::NotPermitted ? Doc::Orphan::Locked : Doc::Orphan::Unloaded;
+            return failure == ALScriptLoaded::Failure::NotPermitted ? Doc::Orphan::Locked : Doc::Orphan::Unloaded;
         }
         // As the window does: the kept history where it fits, else the text
         // as one step to undo.

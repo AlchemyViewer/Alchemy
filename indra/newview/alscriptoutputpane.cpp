@@ -144,7 +144,7 @@ bool ALScriptOutputPane::postBuild()
 
 
 
-ALScriptOutputPane::Place ALScriptOutputPane::heard(const ALScriptWorkspace::RuntimeEvent& event)
+ALScriptOutputPane::Place ALScriptOutputPane::heard(const ALScriptRuntimeEvent& event)
 {
     static const LLUIColor runtime_color = LLUIColorTable::instance().getColor("CodeMarkRuntime", LLColor4::magenta);
     static const LLUIColor owner_color   = LLUIColorTable::instance().getColor("ObjectChatColor", LLColor4::white);
@@ -197,7 +197,7 @@ ALScriptOutputPane::Place ALScriptOutputPane::heard(const ALScriptWorkspace::Run
 
     // One line of the log, or more where the script said more; the
     // script's name a link to it, at the line of a run-time error.
-    using Channel = ALScriptWorkspace::RuntimeEvent::Channel;
+    using Channel = ALScriptRuntimeEvent::Channel;
     ALOutputView::Entry entry;
     entry.time = clockOf(event.time);
     // Whose: the object, the prim of it that spoke where that is not its

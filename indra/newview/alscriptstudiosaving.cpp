@@ -510,7 +510,7 @@ void ALScriptStudioSaving::upload(Doc& doc, const std::string& text, const ALSou
     // The script's own target and whether it runs, which the strip under
     // the editor says for the one in front: Save All saves the others by
     // theirs, not by the front one's.
-    ALScriptWorkspace::SaveOptions options;
+    ALScriptSaveOptions options;
     options.compileTarget = doc.language.compileTarget;
     // Whether it runs as the region last said; not said yet, the save asks
     // first rather than start a stopped script or stop a running one.
@@ -524,7 +524,7 @@ void ALScriptStudioSaving::upload(Doc& doc, const std::string& text, const ALSou
     {
         options.experience = doc.experience;
     }
-    options.sender = ALScriptWorkspace::Sender(ALScriptWorkspace::Origin::Studio, mWindow.newRequest());
+    options.sender = ALScriptSender(ALScriptOrigin::Studio, mWindow.newRequest());
     std::string error;
     // Where the journal stands as the text goes, taken before anything
     // can be typed after it.
@@ -559,7 +559,7 @@ void ALScriptStudioSaving::saveAll()
     }
 }
 
-void ALScriptStudioSaving::savedElsewhere(const ALScriptWorkspace::Saved& saved)
+void ALScriptStudioSaving::savedElsewhere(const ALScriptSaved& saved)
 {
     Doc* found = mServices.findDoc(saved.ref);
     if (!found)
@@ -569,8 +569,8 @@ void ALScriptStudioSaving::savedElsewhere(const ALScriptWorkspace::Saved& saved)
     Doc& doc = *found;
     // This tab's own save lands as its answer; one of its own on its way
     // lands after this, and is what the server keeps.
-    const bool notecard = saved.kind == ALScriptWorkspace::Kind::Notecard;
-    if ((saved.sender.origin == ALScriptWorkspace::Origin::Studio && saved.sender.request == doc.save.request()) || !doc.loaded ||
+    const bool notecard = saved.kind == ALScriptKind::Notecard;
+    if ((saved.sender.origin == ALScriptOrigin::Studio && saved.sender.request == doc.save.request()) || !doc.loaded ||
         notecard != doc.notecard || doc.save.sending())
     {
         return;
@@ -588,33 +588,33 @@ void ALScriptStudioSaving::savedElsewhere(const ALScriptWorkspace::Saved& saved)
     {
         doc.assetId = saved.asset;
     }
-    switch (ALScriptWorkspace::heard(theirs, doc.editor->wholeText(), doc.editor->isDirty() && doc.modifiable,
-                                     [&doc]() { return doc.editor->undoJournal().savedText(); }))
+    switch (ALScriptSaved::heard(theirs, doc.editor->wholeText(), doc.editor->isDirty() && doc.modifiable,
+                                 [&doc]() { return doc.editor->undoJournal().savedText(); }))
     {
-        case ALScriptWorkspace::Heard::Same:
+        case ALScriptSaved::Heard::Same:
             // What is here is what went up.
             doc.editor->resetDirty();
             mWindow.refreshToolbar();
             return;
-        case ALScriptWorkspace::Heard::Keep:
+        case ALScriptSaved::Heard::Keep:
             // A save of the text this tab last had -- a recompile, a queue
             // -- changes nothing it holds: what was typed stays, to be
             // saved.
             return;
-        case ALScriptWorkspace::Heard::Ask:
+        case ALScriptSaved::Heard::Ask:
         {
             // Changed here and there: one would be lost, so the author says
             // which, with the two to compare.
             doc.savedThere = theirs;
             LLStringUtil::format_map_t args;
             args["[NAME]"] = doc.name;
-            args["[WHO]"]  = mServices.words(saved.sender.origin == ALScriptWorkspace::Origin::Bridge   ? "SavedByBridge"
-                                             : saved.sender.origin == ALScriptWorkspace::Origin::Editor ? "SavedByEditor"
-                                                                                                        : "SavedByQueue");
+            args["[WHO]"]  = mServices.words(saved.sender.origin == ALScriptOrigin::Bridge   ? "SavedByBridge"
+                                             : saved.sender.origin == ALScriptOrigin::Editor ? "SavedByEditor"
+                                                                                                    : "SavedByQueue");
             mServices.report(mServices.words("SavedElsewhereConflict", args), true, &doc, { "take_saved", "keep_saved", "compare_saved" });
             return;
         }
-        case ALScriptWorkspace::Heard::Take:
+        case ALScriptSaved::Heard::Take:
             // Nothing typed here: taken as if loaded afresh.
             mWindow.takeLoaded(doc, saved.text);
             return;
@@ -649,7 +649,7 @@ void ALScriptStudioSaving::keepSaved(Doc& doc)
     mServices.setStatus(mServices.words("SavedElsewhereKept", args));
 }
 
-void ALScriptStudioSaving::compiled(const ALScriptWorkspace::CompileResult& result)
+void ALScriptStudioSaving::compiled(const ALScriptCompileResult& result)
 {
     // A copy of another tab, saved -- compiled or not, the text is up: the
     // tab it copied is safe in the inventory, and closes, once everything
@@ -680,7 +680,7 @@ void ALScriptStudioSaving::compiled(const ALScriptWorkspace::CompileResult& resu
     }
 }
 
-void ALScriptStudioSaving::compiledHere(const ALScriptWorkspace::CompileResult& result)
+void ALScriptStudioSaving::compiledHere(const ALScriptCompileResult& result)
 {
     Doc* found = mServices.findDoc(result.ref);
     if (!found)
@@ -747,7 +747,7 @@ void ALScriptStudioSaving::compiledHere(const ALScriptWorkspace::CompileResult& 
     // Saved: nothing of it to keep against a crash any more, or only what
     // was typed while the save was on its way.
     mWindow.keepForRecovery(doc);
-    if (result.kind == ALScriptWorkspace::Kind::Notecard)
+    if (result.kind == ALScriptKind::Notecard)
     {
         // The asset carries what was sent, and the server can copy it out.
         if (ours)
@@ -776,7 +776,7 @@ void ALScriptStudioSaving::compiledHere(const ALScriptWorkspace::CompileResult& 
     // The region's lines count the envelope's; the map is of the code under it.
     const ALSourceMap* read  = doc.runningMap();
     const S32          under = doc.runningCodeLine();
-    for (const ALScriptWorkspace::Diagnostic& said : result.diagnostics)
+    for (const ALScriptDiagnostic& said : result.diagnostics)
     {
         Doc::Compiled one;
         one.line      = said.line;

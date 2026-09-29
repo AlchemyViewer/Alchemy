@@ -436,7 +436,7 @@ private:
     // none where neither has it.
     ALScriptPlaces::Lines         sourceLines(const std::string& path) const override;
 
-    void loaded(const ALScriptWorkspace::Loaded& answer);
+    void loaded(const ALScriptLoaded& answer);
     // The caret to the line, or the stretch, asked for before the text had
     // loaded, once it has.
     void goToPending(Doc& doc);
@@ -455,7 +455,7 @@ private:
     // against a crash written again, and the Problems tab shown.
     ALScriptStudioSaving::Options saveOptions() const override;
     void tidy(Doc& doc, bool fix, bool format, bool trim) override;
-    bool send(const Doc& doc, const std::string& text, const ALScriptWorkspace::SaveOptions& options, std::string& error) override;
+    bool send(const Doc& doc, const std::string& text, const ALScriptSaveOptions& options, std::string& error) override;
     bool sendNotecard(const Doc& doc, const std::string& text, const std::vector<LLPointer<LLInventoryItem>>& items, std::string& error,
                       U64 request) override;
     U64  newRequest() override;
@@ -491,7 +491,7 @@ private:
     bool saving(const ALScriptRef& ref) override;
     bool unsaved(const ALScriptRef& ref) override { return unsavedAnywhere(ref); }
     std::optional<bool> knownRunning(const ALScriptRef& ref) override;
-    void recompile(const ALScriptRef& ref, const std::string& target, std::optional<bool> running, ALScriptWorkspace::compile_callback_t told) override;
+    void recompile(const ALScriptRef& ref, const std::string& target, std::optional<bool> running, ALScriptCompileCallback told) override;
     void scriptRecompiled(const ALScriptRecompile::Script& script) override;
     void recompiled(const ALScriptRecompile::Done& done) override;
     // Completion's link numbers: where the call being typed wants one, the
@@ -591,7 +591,7 @@ private:
     // under tight integration, else the command the ExternalEditor setting
     // gives.
     void        syncExternal(Doc& doc) override { mExternal.sync(doc); }
-    void        logExternal(Doc& doc, const ALScriptWorkspace::CompileResult& result) override { mExternal.log(doc, result); }
+    void        logExternal(Doc& doc, const ALScriptCompileResult& result) override { mExternal.log(doc, result); }
     void        save(Doc& doc) override;
     std::string bridgeId(const Doc& doc) const override;
     std::shared_ptr<ALScriptTempFiles::Claim> holdCopy(const std::string& path) override;
@@ -709,10 +709,10 @@ private:
 
     // What scripts say, from the workspace: listed in the Output tab, and
     // a run-time error in a script that is open marked on its line.
-    void runtimeEvent(const ALScriptWorkspace::RuntimeEvent& event);
+    void runtimeEvent(const ALScriptRuntimeEvent& event);
     // A line of code the preprocessor made, shown in the Preprocessed view.
     void showGenerated(Doc& doc, S32 line, S32 column);
-    static ALScriptStudioDoc::RuntimeProblem runtimeProblemOf(const ALScriptWorkspace::RuntimeEvent& event);
+    static ALScriptStudioDoc::RuntimeProblem runtimeProblemOf(const ALScriptRuntimeEvent& event);
     // Whether a run-time error's line waits for the map what runs is read
     // back by; and a tab's own, said while it was closed, taken as it loads.
     bool holdsRuntime(const Doc& doc) const;
@@ -735,7 +735,7 @@ private:
     bool unsavedAnywhere(const ALScriptRef& ref) const override;
     // Whether a script runs, what it compiles for: the region's word, on a
     // tab that has it open.
-    void runningState(const ALScriptWorkspace::RunningState& state);
+    void runningState(const ALScriptRunningState& state);
 
     // Find in files: words looked for across the scripts open, one
     // object's contents or every object the explorer lists, said as a
@@ -826,7 +826,7 @@ private:
     // them, and what they ask of the window -- what is in reach of a tab,
     // which is the world's; its place; its script loaded; the notice; and
     // the notice's actions.
-    Doc::Orphan failedAs(const Doc& doc, ALScriptWorkspace::Loaded::Failure failure) const override;
+    Doc::Orphan failedAs(const Doc& doc, ALScriptLoaded::Failure failure) const override;
     void        reattach(Doc& doc) override { mOrphans.reattach(doc); }
     ALScriptStudioOrphans::Reach reach(const Doc& doc) override;
     void                         refreshPlace(Doc& doc) override;
@@ -1088,7 +1088,7 @@ private:
     };
     std::vector<PendingRestore>        mPendingRestores;
     void                               pumpRestores();
-    void                               restoreListed(const ALScriptRef& ref, const ALScriptWorkspace::Contents& contents);
+    void                               restoreListed(const ALScriptRef& ref, const ALScriptContents& contents);
     // The viewer is quitting and this window was asked to close; and the
     // tabs as they were when it was, which the state keeps for next time.
     bool                               mAppQuitting = false;

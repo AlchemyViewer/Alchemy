@@ -212,7 +212,7 @@ void ALScriptExplorerModel::openWhenListed(const LLUUID& prim, const LLUUID& ite
     mOpenWhenListed.push_back(OpenWhenListed{ prim, item, name, std::move(text) });
 }
 
-ALScriptExplorerModel::Heard ALScriptExplorerModel::contents(const ALScriptWorkspace::Contents& contents)
+ALScriptExplorerModel::Heard ALScriptExplorerModel::contents(const ALScriptContents& contents)
 {
     Heard      heard;
     const auto at = mPrimAt.find(contents.prim);
@@ -450,7 +450,7 @@ std::vector<ALScriptExplorerModel::Row> ALScriptExplorerModel::rows(const std::s
     return out;
 }
 
-std::optional<ALScriptWorkspace::Item> ALScriptExplorerModel::itemAt(const ALScriptRef& ref) const
+std::optional<ALScriptContents::Item> ALScriptExplorerModel::itemAt(const ALScriptRef& ref) const
 {
     for (const Item& item : mIndex.items(ref.object))
     {

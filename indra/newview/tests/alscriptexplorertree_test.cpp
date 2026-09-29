@@ -64,7 +64,7 @@ namespace tut
         ll_test::HeadlessUI&          ui   = ll_test::HeadlessUI::get();
         ALScriptExplorerTree*         tree = nullptr;
         // What each prim holds, which the index is answered with on the spot.
-        std::map<LLUUID, ALScriptWorkspace::Contents> held;
+        std::map<LLUUID, ALScriptContents> held;
         ALScriptContentsIndex                         index{ fake() };
         Model                                         model{ index };
         std::map<LLUUID, Model::Seen> world;
@@ -79,7 +79,7 @@ namespace tut
         ALScriptContentsIndex::World fake()
         {
             ALScriptContentsIndex::World out;
-            out.ask = [this](const LLUUID& prim, bool, std::function<void(const ALScriptWorkspace::Contents&)> told) { told(held[prim]); };
+            out.ask = [this](const LLUUID& prim, bool, std::function<void(const ALScriptContents&)> told) { told(held[prim]); };
             return out;
         }
 
@@ -121,7 +121,7 @@ namespace tut
 
         void holds(const LLUUID& prim, const std::vector<std::string>& names)
         {
-            ALScriptWorkspace::Contents contents;
+            ALScriptContents contents;
             contents.prim    = prim;
             contents.fetched = true;
             U32 n            = 100 + static_cast<U32>(prim.mData[0]) * 10;

@@ -179,7 +179,7 @@ void ALScriptStudioVimrc::fetch(const LLUUID& item)
         return;
     }
     mFetching = held->getAssetUUID();
-    ALScriptWorkspace::getInstance()->load(ALScriptRef(LLUUID::null, item), [item](const ALScriptWorkspace::Loaded& loaded) {
+    ALScriptWorkspace::getInstance()->load(ALScriptRef(LLUUID::null, item), [item](const ALScriptLoaded& loaded) {
         if (!ALScriptStudioVimrc::instanceExists())
         {
             return;

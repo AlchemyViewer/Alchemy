@@ -490,7 +490,7 @@ bool LLFloaterCompileQueue::processScript(LLHandle<LLFloaterCompileQueue> hfloat
         // Whether it runs after as it runs now, which the save asks the
         // region.
         const std::optional<bool> running;
-        const auto        heard    = [pumpName](const ALScriptWorkspace::CompileResult& compiled) {
+        const auto        heard    = [pumpName](const ALScriptCompileResult& compiled) {
             LLSD out;
             out["compiled"] = compiled.success;
             LLSD errors     = LLSD::emptyArray();
@@ -509,15 +509,15 @@ bool LLFloaterCompileQueue::processScript(LLHandle<LLFloaterCompileQueue> hfloat
         if (!ALScriptWorkspace::readAsset(assetId, item->getType(), text))
         {
             ALScriptWorkspace::instance().recompile(ref, compile_target, heard, running,
-                                                    ALScriptWorkspace::Sender(ALScriptWorkspace::Origin::Queue));
+                                                    ALScriptSender(ALScriptOrigin::Queue));
         }
         else
         {
             if (ALScriptEnvelope::looksWrapped(text) || ALScriptPreprocessor::enabled())
             {
-                auto prepared = std::make_shared<ALScriptWorkspace::Prepared>();
+                auto prepared = std::make_shared<ALScriptPrepared>();
                 ALScriptWorkspace::instance().prepare(ref, inventory->getName(), assetId, text, script_is_lua, compile_target,
-                                                      [pumpName, prepared](const ALScriptWorkspace::Prepared& p) {
+                                                      [pumpName, prepared](const ALScriptPrepared& p) {
                                                           *prepared = p;
                                                           LLEventPumps::instance().post(pumpName, LLSDMap("prepared", LLSD::Boolean(true)));
                                                       });
@@ -533,7 +533,7 @@ bool LLFloaterCompileQueue::processScript(LLHandle<LLFloaterCompileQueue> hfloat
                 if (!prepared->errors.empty())
                 {
                     floater->addStringMessage(std::string("Preprocessing of \"") + inventory->getName() + std::string("\" failed:"));
-                    for (const ALScriptWorkspace::Diagnostic& problem : prepared->errors)
+                    for (const ALScriptDiagnostic& problem : prepared->errors)
                     {
                         floater->addStringMessage(std::to_string(problem.line + 1) + ": " + problem.message);
                     }
@@ -541,11 +541,11 @@ bool LLFloaterCompileQueue::processScript(LLHandle<LLFloaterCompileQueue> hfloat
                 }
                 text = prepared->text;
             }
-            ALScriptWorkspace::SaveOptions options;
+            ALScriptSaveOptions options;
             options.compileTarget = compile_target;
             options.running       = running;
             options.experience    = experienceId;
-            options.sender        = ALScriptWorkspace::Sender(ALScriptWorkspace::Origin::Queue);
+            options.sender        = ALScriptSender(ALScriptOrigin::Queue);
             std::string error;
             if (!ALScriptWorkspace::instance().save(ref, text, options, heard, error))
             {

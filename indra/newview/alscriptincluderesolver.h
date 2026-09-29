@@ -73,7 +73,7 @@ public:
     // Past a few hundred prims, what all of them said let go of, and each
     // asked again as a script in it is run.
     static constexpr size_t PRIMS_KEPT = 256;
-    void heard(const LLUUID& prim, std::vector<ALScriptWorkspace::Item> items)
+    void heard(const LLUUID& prim, std::vector<ALScriptContents::Item> items)
     {
         if (mContents.size() >= PRIMS_KEPT && !mContents.contains(prim))
         {
@@ -116,7 +116,7 @@ private:
     std::optional<std::vector<std::string>>         mOwnFolders;
     std::vector<boost::signals2::scoped_connection> mDiskSettings;
     // What each prim was last said to hold.
-    boost::unordered_flat_map<LLUUID, std::vector<ALScriptWorkspace::Item>> mContents;
+    boost::unordered_flat_map<LLUUID, std::vector<ALScriptContents::Item>> mContents;
     // The prims asked what they hold that did not answer -- not in time,
     // or not in view -- and never had: nothing is looked for in one, and
     // a run over a script in one says why, until a save asks again and it

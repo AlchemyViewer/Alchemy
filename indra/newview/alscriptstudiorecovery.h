@@ -74,7 +74,7 @@ public:
         // and what a load failing makes one.
         virtual void        openOrphan(const Entry& entry, Doc::Orphan orphan)                  = 0;
         virtual void        becomeOrphan(Doc& doc, const Entry& entry, Doc::Orphan orphan)      = 0;
-        virtual Doc::Orphan failedAs(const Doc& doc, ALScriptWorkspace::Loaded::Failure failure) const = 0;
+        virtual Doc::Orphan failedAs(const Doc& doc, ALScriptLoaded::Failure failure) const = 0;
         // Text carried in put in place of the server's, as one step to undo.
         virtual void takeCarriedText(Doc& doc) = 0;
         // The notice over the editor said again; and the tabs and the

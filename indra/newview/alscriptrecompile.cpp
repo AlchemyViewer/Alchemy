@@ -148,7 +148,7 @@ void ALScriptRecompile::begin(const One& one)
     // An SLua script compiles as SLua: an LSL target asked is the LSL
     // scripts'.
     mWindow.recompile(one.ref, one.lua ? std::string("auto") : mTarget, mWindow.knownRunning(one.ref),
-                      [this, alive, generation, one](const ALScriptWorkspace::CompileResult& result) {
+                      [this, alive, generation, one](const ALScriptCompileResult& result) {
                           if (alive.lock() && generation == mGeneration)
                           {
                               answered(one, result);
@@ -156,7 +156,7 @@ void ALScriptRecompile::begin(const One& one)
                       });
 }
 
-void ALScriptRecompile::answered(const One& one, const ALScriptWorkspace::CompileResult& result)
+void ALScriptRecompile::answered(const One& one, const ALScriptCompileResult& result)
 {
     Script script;
     script.one  = one;
@@ -191,12 +191,12 @@ void ALScriptRecompile::answered(const One& one, const ALScriptWorkspace::Compil
 }
 
 // static
-std::vector<ALScriptRecompile::Doc::Shown> ALScriptRecompile::rowsOf(const ALScriptWorkspace::CompileResult& result, const std::string& origin,
+std::vector<ALScriptRecompile::Doc::Shown> ALScriptRecompile::rowsOf(const ALScriptCompileResult& result, const std::string& origin,
                                                                      const std::string& generated)
 {
     std::vector<Doc::Shown> rows;
     const ALSourceMap*      map = result.sourceMap.get();
-    for (const ALScriptWorkspace::Diagnostic& said : result.diagnostics)
+    for (const ALScriptDiagnostic& said : result.diagnostics)
     {
         Doc::Shown row;
         row.level     = Doc::levelOf(said.level);

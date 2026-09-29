@@ -180,7 +180,7 @@ namespace
     // What RLVa refuses of an object or an item in it, refused in its
     // words, by the rules the studio keeps (ALScriptWorkspace::rlvRefusal):
     // a client acts as the user, and is held to what the user is.
-    void refuse_under_rlv(LLViewerObject* object, LLAssetType::EType type, ALScriptWorkspace::RlvUse use)
+    void refuse_under_rlv(LLViewerObject* object, LLAssetType::EType type, ALScriptRlvUse use)
     {
         const std::string refused = ALScriptWorkspace::rlvRefusal(object, type, use);
         if (!refused.empty())
@@ -279,7 +279,7 @@ LLScriptEditorWSServer::LLScriptEditorWSServer(const std::string& name, U16 port
 
     // What scripts say reaches the IDE through the workspace, which hears
     // every object's debug and owner-say chat, when forwarding is on.
-    mRuntimeConnection = ALScriptWorkspace::instance().onRuntime([this](const ALScriptWorkspace::RuntimeEvent& event) {
+    mRuntimeConnection = ALScriptWorkspace::instance().onRuntime([this](const ALScriptRuntimeEvent& event) {
         static LLCachedControl<bool> forward(gSavedSettings, "ExternalWebsocketForwardDebug", false);
         if (forward)
         {
@@ -289,7 +289,7 @@ LLScriptEditorWSServer::LLScriptEditorWSServer(const std::string& name, U16 port
     // And what the compiler said of a script saved through it, whichever
     // editor saved it: the workspace owns the compile, so a result is not
     // lost with a closed floater.
-    mCompiledConnection = ALScriptWorkspace::instance().onCompiled([this](const ALScriptWorkspace::CompileResult& result) { sendCompiled(result); });
+    mCompiledConnection = ALScriptWorkspace::instance().onCompiled([this](const ALScriptCompileResult& result) { sendCompiled(result); });
 
     registerCommand({ "viewer.teleport", "Teleport agent to an in-world object",
                       object_id_command_params() },
@@ -950,7 +950,7 @@ LLSD LLScriptEditorWSServer::handleObjectScriptSetRunning(U32 connection_id, con
     if (!gAgent.allowOperation(PERM_MODIFY, item->getPermissions(), GP_OBJECT_MANIPULATE))
         throw LLJSONRPCConnection::ForbiddenError("No modify permission on script");
 
-    refuse_under_rlv(prim, LLAssetType::AT_LSL_TEXT, ALScriptWorkspace::RlvUse::Change);
+    refuse_under_rlv(prim, LLAssetType::AT_LSL_TEXT, ALScriptRlvUse::Change);
 
     LLViewerRegion* region = region_of(prim);
 
@@ -997,7 +997,7 @@ LLSD LLScriptEditorWSServer::handleObjectScriptReset(U32 connection_id, const LL
     if (!gAgent.allowOperation(PERM_MODIFY, item->getPermissions(), GP_OBJECT_MANIPULATE))
         throw LLJSONRPCConnection::ForbiddenError("No modify permission on script");
 
-    refuse_under_rlv(prim, LLAssetType::AT_LSL_TEXT, ALScriptWorkspace::RlvUse::Change);
+    refuse_under_rlv(prim, LLAssetType::AT_LSL_TEXT, ALScriptRlvUse::Change);
 
     LLViewerRegion* region = region_of(prim);
 
@@ -1036,7 +1036,7 @@ LLSD LLScriptEditorWSServer::handleObjectScriptResetAll(U32 connection_id, const
     {
         throw LLJSONRPCConnection::ForbiddenError("Object is not published");
     }
-    refuse_under_rlv(prim, LLAssetType::AT_NONE, ALScriptWorkspace::RlvUse::Change);
+    refuse_under_rlv(prim, LLAssetType::AT_NONE, ALScriptRlvUse::Change);
 
     if (!prim->flagScripted())
     {
@@ -1109,7 +1109,7 @@ LLSD LLScriptEditorWSServer::handleObjectScriptRecompileAll(
     {
         throw LLJSONRPCConnection::ForbiddenError("Object is not published");
     }
-    refuse_under_rlv(root, LLAssetType::AT_NONE, ALScriptWorkspace::RlvUse::Change);
+    refuse_under_rlv(root, LLAssetType::AT_NONE, ALScriptRlvUse::Change);
 
     if (!root->flagScripted())
     {
@@ -1185,7 +1185,7 @@ LLSD LLScriptEditorWSServer::handleObjectModify(U32 connection_id, const LLSD& p
 
     if (!prim->permModify())
         throw LLJSONRPCConnection::ForbiddenError("No modify permission on object");
-    refuse_under_rlv(prim, LLAssetType::AT_NONE, ALScriptWorkspace::RlvUse::Change);
+    refuse_under_rlv(prim, LLAssetType::AT_NONE, ALScriptRlvUse::Change);
 
     // Step 3: Send Property Update Messages
     LLMessageSystem* msg = gMessageSystem;
@@ -1260,7 +1260,7 @@ LLSD LLScriptEditorWSServer::handleObjectItemModify(U32 connection_id, const LLS
             "At least one property (name, description, or permissions) must be specified");
 
     // Step 2: Validate Published Item (reuse existing helper)
-    ValidatedItem v = validatePublishedItem(params, PERM_MODIFY, ALScriptWorkspace::RlvUse::Change);
+    ValidatedItem v = validatePublishedItem(params, PERM_MODIFY, ALScriptRlvUse::Change);
 
     LLUUID prim_id = params["prim_id"].asUUID();
     LLUUID item_id = params["item_id"].asUUID();
@@ -1339,8 +1339,8 @@ LLSD LLScriptEditorWSServer::handleSaveBackToObjectContents(U32 connection_id, c
     }
 
     // A copy of it put into the object it came from: that one changed.
-    refuse_under_rlv(root, LLAssetType::AT_NONE, ALScriptWorkspace::RlvUse::See);
-    refuse_under_rlv(gObjectList.findObject(published_info->mSourceTaskID), LLAssetType::AT_NONE, ALScriptWorkspace::RlvUse::Change);
+    refuse_under_rlv(root, LLAssetType::AT_NONE, ALScriptRlvUse::See);
+    refuse_under_rlv(gObjectList.findObject(published_info->mSourceTaskID), LLAssetType::AT_NONE, ALScriptRlvUse::Change);
 
     if (!save_object_back_to_contents(root, published_info->mSourceTaskID))
     {
@@ -1695,7 +1695,7 @@ LLSD LLScriptEditorWSServer::handleObjectRequest(U32 connection_id, const LLSD& 
     }
 
     // Published, its contents are listed to the client.
-    refuse_under_rlv(object, LLAssetType::AT_NONE, ALScriptWorkspace::RlvUse::See);
+    refuse_under_rlv(object, LLAssetType::AT_NONE, ALScriptRlvUse::See);
 
     bool accepted = publishObject(object_id);
     if (!accepted)
@@ -1712,7 +1712,7 @@ LLSD LLScriptEditorWSServer::handleObjectRequest(U32 connection_id, const LLSD& 
 // item are valid, published, and have the required permissions.
 // Throws JSON-RPC exceptions if validation fails.
 LLScriptEditorWSServer::ValidatedItem LLScriptEditorWSServer::validatePublishedItem(
-    const LLSD& params, U32 permMask, ALScriptWorkspace::RlvUse use) const
+    const LLSD& params, U32 permMask, ALScriptRlvUse use) const
 {
     LLUUID prim_id = params["prim_id"].asUUID();
     LLUUID item_id = params["item_id"].asUUID();
@@ -1782,7 +1782,7 @@ LLSD LLScriptEditorWSServer::handleObjectContentGet(const std::string& method, c
         }
     }
 
-    auto v = validatePublishedItem(params, required_perms, ALScriptWorkspace::RlvUse::See);
+    auto v = validatePublishedItem(params, required_perms, ALScriptRlvUse::See);
 
     LLUUID prim_id = params["prim_id"].asUUID();
     LLUUID item_id = params["item_id"].asUUID();
@@ -1830,7 +1830,7 @@ LLSD LLScriptEditorWSServer::handleObjectContentSave(const std::string& method, 
         throw LLJSONRPCConnection::InvalidParams("content is required");
     const std::string content = params["content"].asString();
 
-    auto v = validatePublishedItem(params, PERM_MODIFY, ALScriptWorkspace::RlvUse::Change);
+    auto v = validatePublishedItem(params, PERM_MODIFY, ALScriptRlvUse::Change);
 
     if (v.type == LLAssetType::AT_LSL_TEXT)
     {
@@ -1905,7 +1905,7 @@ LLSD LLScriptEditorWSServer::saveScript(LLViewerObject* prim, LLInventoryItem* i
     // is: what the source makes would take the edit away.
     const bool  lua = compile_target == "luau";
     std::string text = content;
-    std::vector<ALScriptWorkspace::Diagnostic> preprocessed;
+    std::vector<ALScriptDiagnostic> preprocessed;
     bool        as_is = false;
     const std::optional<ALScriptEnvelope> was = ALScriptEnvelope::parse(content);
     if (was && item_asset.notNull())
@@ -1915,14 +1915,14 @@ LLSD LLScriptEditorWSServer::saveScript(LLViewerObject* prim, LLInventoryItem* i
     }
     if (!as_is && (was || ALScriptPreprocessor::enabled()))
     {
-        auto prepared = std::make_shared<ALScriptWorkspace::Prepared>();
+        auto prepared = std::make_shared<ALScriptPrepared>();
         await_async_result(
             "objectContentSavePrepare", ASSET_FETCH_TIMEOUT, "The script's includes did not come in time",
             [&](const std::string& pump_name)
             {
                 ALScriptWorkspace::instance().prepare(
                     ref, item_name, item_asset, content, lua, compile_target,
-                    [prepared, pump_name](const ALScriptWorkspace::Prepared& made)
+                    [prepared, pump_name](const ALScriptPrepared& made)
                     {
                         *prepared = made;
                         LLEventPumps::instance().post(pump_name, LLSD().with("done", true));
@@ -1937,18 +1937,18 @@ LLSD LLScriptEditorWSServer::saveScript(LLViewerObject* prim, LLInventoryItem* i
     // the simulator would, asks the region the experience the script runs
     // under -- the upload sets whatever it is sent, and none takes it away
     // -- and every editor hears it was saved.
-    ALScriptWorkspace::SaveOptions options;
+    ALScriptSaveOptions options;
     options.compileTarget = compile_target;
     options.running       = is_running;
-    options.sender        = ALScriptWorkspace::Sender(ALScriptWorkspace::Origin::Bridge);
-    auto        answer    = std::make_shared<ALScriptWorkspace::CompileResult>();
+    options.sender        = ALScriptSender(ALScriptOrigin::Bridge);
+    auto        answer    = std::make_shared<ALScriptCompileResult>();
     std::string refused;
     const LLSD  landed = await_async_result(
         "objectContentSave", SCRIPT_UPLOAD_TIMEOUT, "Script upload/compile timed out",
         [&](const std::string& pump_name)
         {
             const bool sent = ALScriptWorkspace::instance().save(ref, text, options,
-                [answer, pump_name](const ALScriptWorkspace::CompileResult& result)
+                [answer, pump_name](const ALScriptCompileResult& result)
                 {
                     *answer = result;
                     LLEventPumps::instance().post(pump_name, LLSD().with("done", true));
@@ -2031,7 +2031,7 @@ LLSD LLScriptEditorWSServer::saveScript(LLViewerObject* prim, LLInventoryItem* i
 
     // What the preprocessor found, which the script went up with; and a
     // compiled half that went up as it was edited.
-    for (const ALScriptWorkspace::Diagnostic& found : preprocessed)
+    for (const ALScriptDiagnostic& found : preprocessed)
     {
         LLSD diagnostic;
         diagnostic["level"]   = found.level;
@@ -2091,7 +2091,7 @@ LLSD LLScriptEditorWSServer::saveNotecard(LLViewerObject* prim, LLInventoryItem*
 
     // Through the workspace, which every save goes through, and every
     // editor hears of it -- the studio's notecard tabs among them.
-    auto        answer  = std::make_shared<ALScriptWorkspace::CompileResult>();
+    auto        answer  = std::make_shared<ALScriptCompileResult>();
     std::string refused;
     const LLSD  landed = await_async_result(
         "objectContentSaveNotecard", NOTECARD_UPLOAD_TIMEOUT, "Notecard upload timed out",
@@ -2099,12 +2099,12 @@ LLSD LLScriptEditorWSServer::saveNotecard(LLViewerObject* prim, LLInventoryItem*
         {
             const bool sent = ALScriptWorkspace::instance().saveNotecard(
                 ALScriptRef(prim_id, item_id), content, {},
-                [answer, pump_name](const ALScriptWorkspace::CompileResult& result)
+                [answer, pump_name](const ALScriptCompileResult& result)
                 {
                     *answer = result;
                     LLEventPumps::instance().post(pump_name, LLSD().with("done", true));
                 },
-                refused, ALScriptWorkspace::Sender(ALScriptWorkspace::Origin::Bridge));
+                refused, ALScriptSender(ALScriptOrigin::Bridge));
             if (!sent)
             {
                 LLEventPumps::instance().post(pump_name, LLSD().with("refused", true));
@@ -2127,7 +2127,7 @@ LLSD LLScriptEditorWSServer::saveNotecard(LLViewerObject* prim, LLInventoryItem*
 
 LLSD LLScriptEditorWSServer::handleObjectItemDelete(U32 connection_id, const LLSD& params)
 {
-    auto v = validatePublishedItem(params, PERM_MODIFY, ALScriptWorkspace::RlvUse::Change);
+    auto v = validatePublishedItem(params, PERM_MODIFY, ALScriptRlvUse::Change);
 
     const LLUUID prim_id = v.prim->getID();
     const LLUUID root_id = v.root->getID();
@@ -2200,7 +2200,7 @@ LLSD LLScriptEditorWSServer::handleObjectItemCreate(const std::string& method, c
     {
         throw LLJSONRPCConnection::ForbiddenError("Object is not published");
     }
-    refuse_under_rlv(prim, LLAssetType::AT_NONE, ALScriptWorkspace::RlvUse::Change);
+    refuse_under_rlv(prim, LLAssetType::AT_NONE, ALScriptRlvUse::Change);
 
     // Nothing goes into a prim the agent may not change: the simulator
     // would drop the request without a word, and the wait for the item
@@ -2460,14 +2460,14 @@ void LLScriptEditorWSServer::sendUnsubscribeScriptEditor(const std::string& scri
 
 // static
 LLSD LLScriptEditorWSServer::compiledMessage(const std::string& script_id, bool success, bool running,
-                                             const std::vector<ALScriptWorkspace::Diagnostic>& diagnostics, bool lua)
+                                             const std::vector<ALScriptDiagnostic>& diagnostics, bool lua)
 {
     LLSD params;
     params["script_id"]   = script_id;
     params["success"]     = success;
     params["running"]     = running;
     params["diagnostics"] = LLSD::emptyArray();
-    for (const ALScriptWorkspace::Diagnostic& diagnostic : diagnostics)
+    for (const ALScriptDiagnostic& diagnostic : diagnostics)
     {
         // The protocol counts from one, and says zero for a place the
         // compiler did not name.
@@ -2494,13 +2494,13 @@ namespace
     }
 }
 
-void LLScriptEditorWSServer::sendCompiled(const ALScriptWorkspace::CompileResult& result)
+void LLScriptEditorWSServer::sendCompiled(const ALScriptCompileResult& result)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
     // Nothing compiled: a notecard, or an upload that failed. Nor one this
     // bridge sent, which its client is answered about as the save's reply.
-    if (result.kind == ALScriptWorkspace::Kind::Notecard || !result.error.empty() || result.ref.item.isNull() ||
-        result.sender.origin == ALScriptWorkspace::Origin::Bridge)
+    if (result.kind == ALScriptKind::Notecard || !result.error.empty() || result.ref.item.isNull() ||
+        result.sender.origin == ALScriptOrigin::Bridge)
     {
         return;
     }
@@ -2547,13 +2547,13 @@ void LLScriptEditorWSServer::sendCompiled(const ALScriptWorkspace::CompileResult
     }
 }
 
-void LLScriptEditorWSServer::sendRuntimeEvent(const ALScriptWorkspace::RuntimeEvent& event) const
+void LLScriptEditorWSServer::sendRuntimeEvent(const ALScriptRuntimeEvent& event) const
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
 
     // The protocol's channels: what an object says aloud or in an IM is
     // the studio's to show, not the bridge's to send.
-    if (event.channel != ALScriptWorkspace::RuntimeEvent::Channel::Debug && event.channel != ALScriptWorkspace::RuntimeEvent::Channel::OwnerSay)
+    if (event.channel != ALScriptRuntimeEvent::Channel::Debug && event.channel != ALScriptRuntimeEvent::Channel::OwnerSay)
     {
         return;
     }
@@ -2591,10 +2591,10 @@ void LLScriptEditorWSServer::sendRuntimeEvent(const ALScriptWorkspace::RuntimeEv
 
     switch (event.channel)
     {
-    case ALScriptWorkspace::RuntimeEvent::Channel::Debug:
+    case ALScriptRuntimeEvent::Channel::Debug:
         message["channel"] = "debug";
         break;
-    case ALScriptWorkspace::RuntimeEvent::Channel::OwnerSay:
+    case ALScriptRuntimeEvent::Channel::OwnerSay:
         message["channel"] = "owner_say";
         break;
     default:
@@ -2706,7 +2706,7 @@ bool LLScriptEditorWSServer::publishObject(const LLUUID& object_id)
         return false;
     }
 
-    if (!ALScriptWorkspace::rlvRefusal(root, LLAssetType::AT_NONE, ALScriptWorkspace::RlvUse::See).empty())
+    if (!ALScriptWorkspace::rlvRefusal(root, LLAssetType::AT_NONE, ALScriptRlvUse::See).empty())
     {
         RlvUtil::notifyBlockedGeneric();
         return false;

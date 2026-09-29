@@ -111,7 +111,7 @@ public:
         virtual std::optional<bool> knownRunning(const ALScriptRef& ref) = 0;
         // The workspace's recompile.
         virtual void recompile(const ALScriptRef& ref, const std::string& target, std::optional<bool> running,
-                               ALScriptWorkspace::compile_callback_t told) = 0;
+                               ALScriptCompileCallback told) = 0;
         // A script recompiled, and the recompile done.
         virtual void scriptRecompiled(const Script& script) = 0;
         virtual void recompiled(const Done& done)           = 0;
@@ -134,13 +134,13 @@ public:
     // What the compiler said, read back through the expansion that went up
     // to the source and its includes, as the Problems tab lists it.
     // `origin` names the compiler, `generated` code the preprocessor made.
-    static std::vector<Doc::Shown> rowsOf(const ALScriptWorkspace::CompileResult& result, const std::string& origin, const std::string& generated);
+    static std::vector<Doc::Shown> rowsOf(const ALScriptCompileResult& result, const std::string& origin, const std::string& generated);
 
 private:
     void listed(U32 generation, std::vector<One> chosen, Window::Listed listed);
     void feed();
     void begin(const One& one);
-    void answered(const One& one, const ALScriptWorkspace::CompileResult& result);
+    void answered(const One& one, const ALScriptCompileResult& result);
     void passed();
 
     ALScriptStudioServices& mServices;

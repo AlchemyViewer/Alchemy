@@ -76,12 +76,12 @@ struct ALScriptStudioDoc
     // checked, kept against a crash and gone to by every place a list,
     // a card or a jump names, whichever view is in front.
     ALCodeEditor*                              editor = nullptr;
-    ALScriptWorkspace::Language                language;
+    ALScriptLanguage                           language;
     LLUUID                                     assetId;
     bool                                       loaded     = false;
     // Why the last load came back with no text, and what it said: nothing
     // is coming to put a kept text over until it is loaded again.
-    ALScriptWorkspace::Loaded::Failure         loadFailure = ALScriptWorkspace::Loaded::Failure::None;
+    ALScriptLoaded::Failure                    loadFailure = ALScriptLoaded::Failure::None;
     std::string                                loadError;
     bool                                       modifiable = false;
     // A save of it: where it stands, what it waits on, what the checks let

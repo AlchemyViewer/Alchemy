@@ -109,7 +109,8 @@ namespace
         std::string                                  refused;
         for (const auto& prim : prims)
         {
-            const std::string why = ALScriptWorkspace::rlvRefusal(gObjectList.findObject(prim.first), LLAssetType::AT_NONE, ALScriptWorkspace::RlvUse::Change);
+            const std::string why =
+                ALScriptWorkspace::rlvRefusal(gObjectList.findObject(prim.first), LLAssetType::AT_NONE, ALScriptRlvUse::Change);
             if (why.empty())
             {
                 allowed.push_back(prim);
@@ -279,11 +280,11 @@ bool ALScriptExplorerPane::postBuild()
     // Put in the list with the frame, once for all that answered in it: a
     // refresh asks every script whether it runs, and a linkset's hundred
     // answers were a hundred lists.
-    mRunningConnection = ALScriptWorkspace::instance().onRunningState([this](const ALScriptWorkspace::RunningState&) { mStale = true; });
+    mRunningConnection = ALScriptWorkspace::instance().onRunningState([this](const ALScriptRunningState&) { mStale = true; });
     // What a prim holds, answered to whoever asked: the index is every
     // window's.
     mHeardConnection = ALScriptWorkspace::instance().contentsIndex().onHeard(
-        [this](const ALScriptWorkspace::Contents& contents) { contentsHeard(contents); });
+        [this](const ALScriptContents& contents) { contentsHeard(contents); });
     // An object it lists, or would list in sight, coming or going: a pin in
     // sight again after a teleport, one taken back into the inventory.
     mPresenceConnection = gObjectList.onPresence([this](const LLUUID& id, bool) {
@@ -437,7 +438,7 @@ void ALScriptExplorerPane::relist(bool refetch, bool from_region)
     }
 }
 
-void ALScriptExplorerPane::contentsHeard(const ALScriptWorkspace::Contents& contents)
+void ALScriptExplorerPane::contentsHeard(const ALScriptContents& contents)
 {
     Model::Heard heard = mModel.contents(contents);
     if (!heard.listed)
@@ -768,11 +769,11 @@ bool ALScriptExplorerPane::enabled(const std::string& action) const
     // and a script where it may modify it too.
     auto changeable = [this](const Choice& row) { return mModel.primModifiable(row.prim); };
     auto readable   = [this](const Choice& row) {
-        const std::optional<ALScriptWorkspace::Item> item = mModel.itemAt(row.ref());
+        const std::optional<ALScriptContents::Item> item = mModel.itemAt(row.ref());
         return !item || gAgent.isGodlike() || (item->copy && (item->modify || !item->script));
     };
     auto itemChangeable = [this](const Choice& row) {
-        const std::optional<ALScriptWorkspace::Item> item = mModel.itemAt(row.ref());
+        const std::optional<ALScriptContents::Item> item = mModel.itemAt(row.ref());
         return !item || item->modify;
     };
     if (action == "open")
@@ -1063,7 +1064,7 @@ void ALScriptExplorerPane::editInWorld(const Choice& row)
     {
         return;
     }
-    if (std::string refused = ALScriptWorkspace::rlvRefusal(object, LLAssetType::AT_NONE, ALScriptWorkspace::RlvUse::Change); !refused.empty())
+    if (std::string refused = ALScriptWorkspace::rlvRefusal(object, LLAssetType::AT_NONE, ALScriptRlvUse::Change); !refused.empty())
     {
         mServices->report(refused, true);
         return;
@@ -1083,7 +1084,7 @@ void ALScriptExplorerPane::editInWorld(const Choice& row)
 
 void ALScriptExplorerPane::describe(const Choice& row)
 {
-    const std::optional<ALScriptWorkspace::Item> item = mModel.itemAt(row.ref());
+    const std::optional<ALScriptContents::Item> item = mModel.itemAt(row.ref());
     LLSD args;
     args["NAME"]                   = row.name;
     args["DESCRIPTION"]            = item ? item->description : std::string();
@@ -1133,7 +1134,7 @@ void ALScriptExplorerPane::create(const LLUUID& prim, bool notecard, bool lua)
         std::string                error;
         const bool                 asked = ALScriptWorkspace::instance().create(
             prim, notecard, lua, name,
-            [handle, opening](const ALScriptWorkspace::Created& made) {
+            [handle, opening](const ALScriptCreated& made) {
                 if (ALScriptExplorerPane* again = ALViewType::as<ALScriptExplorerPane>(handle.get()))
                 {
                     again->created(made, opening);
@@ -1147,7 +1148,7 @@ void ALScriptExplorerPane::create(const LLUUID& prim, bool notecard, bool lua)
     });
 }
 
-void ALScriptExplorerPane::created(const ALScriptWorkspace::Created& made, const std::optional<std::string>& opening)
+void ALScriptExplorerPane::created(const ALScriptCreated& made, const std::optional<std::string>& opening)
 {
     if (!made.error.empty())
     {
@@ -1324,7 +1325,7 @@ void ALScriptExplorerPane::transfer(const LLUUID& from, const std::vector<LLUUID
     args["[NAME]"] = ALScriptWorkspace::objectName(rootOf(gObjectList.findObject(to)), mServices->words("ObjectUnnamed"));
     mServices->setStatus(mServices->words("TransferGoing", args));
     const LLHandle<LLPanel> handle = getHandle();
-    ALScriptWorkspace::instance().transfer(from, items, to, running, [handle, args, to](const ALScriptWorkspace::TransferResult& result) {
+    ALScriptWorkspace::instance().transfer(from, items, to, running, [handle, args, to](const ALScriptTransferResult& result) {
         ALScriptExplorerPane* pane = ALViewType::as<ALScriptExplorerPane>(handle.get());
         if (!pane)
         {
@@ -1418,7 +1419,7 @@ std::string ALScriptExplorerPane::dropRefusal(LLViewerObject* prim, EDragAndDrop
 {
     LLStringUtil::format_map_t args;
     args["[NAME]"] = ALScriptWorkspace::objectName(rootOf(prim), mServices->words("ObjectUnnamed"));
-    if (std::string refused = ALScriptWorkspace::rlvRefusal(prim, LLAssetType::AT_NONE, ALScriptWorkspace::RlvUse::Change); !refused.empty())
+    if (std::string refused = ALScriptWorkspace::rlvRefusal(prim, LLAssetType::AT_NONE, ALScriptRlvUse::Change); !refused.empty())
     {
         return refused;
     }

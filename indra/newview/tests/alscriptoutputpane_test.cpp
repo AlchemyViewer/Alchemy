@@ -41,7 +41,7 @@
 
 namespace
 {
-    typedef ALScriptWorkspace::RuntimeEvent Event;
+    typedef ALScriptRuntimeEvent Event;
 
     // The window's side, answered as a test says, and what was asked of it
     // kept.

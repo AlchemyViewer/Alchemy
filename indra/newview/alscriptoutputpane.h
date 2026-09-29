@@ -107,7 +107,7 @@ public:
     // names is the expansion's: said as the source's, or an include's,
     // where the script is open here. The place its error names, which the
     // window marks on the script's line.
-    Place heard(const ALScriptWorkspace::RuntimeEvent& event);
+    Place heard(const ALScriptRuntimeEvent& event);
     // What the studio did, kept where it can be read again. The tab's name
     // where the words say it is a link to it; after them, a link for each
     // thing to be done about it (Window::outputAction).

@@ -132,7 +132,7 @@ private:
     // seen (pump).
     void fill();
     void fillWhenSeen();
-    void contentsHeard(const ALScriptWorkspace::Contents& contents);
+    void contentsHeard(const ALScriptContents& contents);
     void rereadNames();
     void askName(const LLUUID& id);
     // What to call an object that has never said its name here: what a pin
@@ -156,7 +156,7 @@ private:
     // A script or notecard made in a prim, named through a dialog and
     // opened once the region lists it.
     void create(const LLUUID& prim, bool notecard, bool lua);
-    void created(const ALScriptWorkspace::Created& made, const std::optional<std::string>& opening);
+    void created(const ALScriptCreated& made, const std::optional<std::string>& opening);
     // The name a row was given where it stands, taken.
     void renamed(const Choice& row, const std::string& was, std::string name);
     void remove(const std::vector<Choice>& rows);

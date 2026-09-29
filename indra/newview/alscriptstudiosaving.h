@@ -117,7 +117,7 @@ public:
         // its items. False, with why, where nothing was sent.
         // Each as the request `options.sender` or `request` names, which its
         // answer carries; a new one from newRequest().
-        virtual bool send(const Doc& doc, const std::string& text, const ALScriptWorkspace::SaveOptions& options, std::string& error) = 0;
+        virtual bool send(const Doc& doc, const std::string& text, const ALScriptSaveOptions& options, std::string& error) = 0;
         virtual bool sendNotecard(const Doc& doc, const std::string& text, const std::vector<LLPointer<LLInventoryItem>>& items,
                                   std::string& error, U64 request)                                                                = 0;
         virtual U64  newRequest()                                                                                                 = 0;
@@ -153,7 +153,7 @@ public:
         // The editor outside told of what was saved here, and of what the
         // compiler made of it.
         virtual void syncExternal(Doc& doc)                                                  = 0;
-        virtual void logExternal(Doc& doc, const ALScriptWorkspace::CompileResult& result) = 0;
+        virtual void logExternal(Doc& doc, const ALScriptCompileResult& result) = 0;
 
         // --- closing -------------------------------------------------------------------
 
@@ -191,7 +191,7 @@ public:
     // Keep Mine or Compare -- but for a save of the text the tab last had,
     // which changes nothing it holds (ALScriptWorkspace::onSaved). And the
     // author's answer.
-    void savedElsewhere(const ALScriptWorkspace::Saved& saved);
+    void savedElsewhere(const ALScriptSaved& saved);
     void takeSaved(Doc& doc);
     void keepSaved(Doc& doc);
     // A tab saved to be closed once its save comes back: where the save
@@ -214,7 +214,7 @@ public:
 
     // The compiler's answer, to a save of a tab's or a recompile from the
     // explorer; a copy saved closes the tab it was made of.
-    void compiled(const ALScriptWorkspace::CompileResult& result);
+    void compiled(const ALScriptCompileResult& result);
     // A tab's weight known: over its target's limit, as a save sent it,
     // said once.
     void warnOverWeight(Doc& doc);
@@ -237,7 +237,7 @@ private:
     // its word.
     void weighForSave(Doc& doc);
     void reportOverWeight(const Doc& doc, const ALScriptWeight& weight);
-    void compiledHere(const ALScriptWorkspace::CompileResult& result);
+    void compiledHere(const ALScriptCompileResult& result);
     // The save asked for while the last was on its way, made now where
     // anything is still unsaved; true where one is under way again.
     bool sendQueuedSave(Doc& doc);

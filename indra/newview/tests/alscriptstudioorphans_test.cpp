@@ -39,7 +39,7 @@ namespace
     typedef Doc::Orphan                       Orphan;
     typedef ALScriptStudioOrphans             Orphans;
     typedef Orphans::Reach                    Reach;
-    typedef ALScriptWorkspace::Loaded::Failure Failure;
+    typedef ALScriptLoaded::Failure Failure;
     typedef std::vector<std::string>          Names;
 
     // The notice bar's window, faked: its buttons pressed, by action.

@@ -50,7 +50,7 @@
 class ALScriptExplorerModel
 {
 public:
-    typedef ALScriptWorkspace::Item Item;
+    typedef ALScriptContents::Item Item;
 
     explicit ALScriptExplorerModel(ALScriptContentsIndex& index) : mIndex(index) {}
 
@@ -184,7 +184,7 @@ public:
         bool                 listed = false;
         std::vector<Opening> opening;
     };
-    Heard contents(const ALScriptWorkspace::Contents& contents);
+    Heard contents(const ALScriptContents& contents);
 
     // What a prim holds as far as the index knows: nothing where it does
     // not; and whether it knows.
@@ -217,7 +217,7 @@ public:
 
     std::optional<bool> knownRunning(const ALScriptRef& ref) const { return mIndex.running(ref); }
     // An item as its prim last said it; none where it has not.
-    std::optional<ALScriptWorkspace::Item> itemAt(const ALScriptRef& ref) const;
+    std::optional<ALScriptContents::Item> itemAt(const ALScriptRef& ref) const;
     // Whether the agent may change a prim, as far as it was seen; one not
     // seen, yes.
     bool                primModifiable(const LLUUID& prim) const;

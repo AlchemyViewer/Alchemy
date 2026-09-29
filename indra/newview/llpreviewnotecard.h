@@ -93,7 +93,7 @@ private:
 
     // The workspace's answer: the text and its items put in, or why there
     // are none said where the text would be.
-    void loaded(const ALScriptWorkspace::Loaded& answer);
+    void loaded(const ALScriptLoaded& answer);
     // Nothing to show, and why: in place of the text, read-only.
     void showUnloaded(const std::string& why);
     // Whether the text may be changed, and the rest of the window with it:
@@ -104,10 +104,10 @@ private:
 
     bool saveIfNeeded();
     // A save of ours answered.
-    void savedHere(const ALScriptWorkspace::CompileResult& result);
+    void savedHere(const ALScriptCompileResult& result);
     // A save of this notecard heard from anywhere else: taken, marked
-    // saved, or asked about (ALScriptWorkspace::heard).
-    void heard(const ALScriptWorkspace::Saved& saved);
+    // saved, or asked about (ALScriptSaved::heard).
+    void heard(const ALScriptSaved& saved);
     void takeTheirs();
     void keepMine();
     void toggleCompare();

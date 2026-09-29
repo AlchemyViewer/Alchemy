@@ -99,7 +99,7 @@ bool LLPreviewNotecard::postBuild()
     });
     // A save of this notecard made anywhere: in Script Studio, from VS
     // Code, by a copy of the viewer's own editors.
-    mSavedConnection = ALScriptWorkspace::instance().onSaved([this](const ALScriptWorkspace::Saved& saved) { heard(saved); });
+    mSavedConnection = ALScriptWorkspace::instance().onSaved([this](const ALScriptSaved& saved) { heard(saved); });
 
     mSaveBtn = getChild<LLButton>("Save");
     mSaveBtn->setCommitCallback([this](LLUICtrl*, const LLSD&) { saveIfNeeded(); });
@@ -262,7 +262,7 @@ void LLPreviewNotecard::loadAsset()
     if (item->getAssetUUID().isNull())
     {
         // Made and never saved: nothing to fetch.
-        ALScriptWorkspace::Loaded answer;
+        ALScriptLoaded answer;
         answer.ref        = ref();
         answer.name       = mNoteName;
         answer.viewable   = true;
@@ -274,7 +274,7 @@ void LLPreviewNotecard::loadAsset()
     // Through the workspace, as every editor loads: copy is enough to
     // read, modify decides whether it can be changed.
     LLHandle<LLFloater> handle = getHandle();
-    ALScriptWorkspace::instance().load(ref(), [handle](const ALScriptWorkspace::Loaded& answer) {
+    ALScriptWorkspace::instance().load(ref(), [handle](const ALScriptLoaded& answer) {
         if (LLPreviewNotecard* self = ALViewType::as<LLPreviewNotecard>(handle.get()))
         {
             self->loaded(answer);
@@ -282,7 +282,7 @@ void LLPreviewNotecard::loadAsset()
     });
 }
 
-void LLPreviewNotecard::loaded(const ALScriptWorkspace::Loaded& answer)
+void LLPreviewNotecard::loaded(const ALScriptLoaded& answer)
 {
     if (answer.ref.item != mItemUUID || answer.ref.object != mObjectUUID)
     {
@@ -303,7 +303,7 @@ void LLPreviewNotecard::loaded(const ALScriptWorkspace::Loaded& answer)
             setStatus(getString("ReadOnlyFailed", args), true);
             return;
         }
-        showUnloaded(getString(answer.failure == ALScriptWorkspace::Loaded::Failure::NotPermitted ? "not_allowed" : "ReadOnlyFailed", args));
+        showUnloaded(getString(answer.failure == ALScriptLoaded::Failure::NotPermitted ? "not_allowed" : "ReadOnlyFailed", args));
         mAssetStatus = PREVIEW_ASSET_ERROR;
         return;
     }
@@ -430,13 +430,13 @@ bool LLPreviewNotecard::saveIfNeeded()
     std::string         error;
     const bool          sent = workspace.saveNotecard(
         ref(), text, items,
-        [handle](const ALScriptWorkspace::CompileResult& result) {
+        [handle](const ALScriptCompileResult& result) {
             if (LLPreviewNotecard* self = ALViewType::as<LLPreviewNotecard>(handle.get()))
             {
                 self->savedHere(result);
             }
         },
-        error, ALScriptWorkspace::Sender(ALScriptWorkspace::Origin::Editor, mSaveRequest));
+        error, ALScriptSender(ALScriptOrigin::Editor, mSaveRequest));
     if (!sent)
     {
         LLStringUtil::format_map_t args;
@@ -450,7 +450,7 @@ bool LLPreviewNotecard::saveIfNeeded()
     return true;
 }
 
-void LLPreviewNotecard::savedHere(const ALScriptWorkspace::CompileResult& result)
+void LLPreviewNotecard::savedHere(const ALScriptCompileResult& result)
 {
     if (result.sender.request != mSaveRequest)
     {
@@ -495,15 +495,15 @@ void LLPreviewNotecard::savedHere(const ALScriptWorkspace::CompileResult& result
     }
 }
 
-void LLPreviewNotecard::heard(const ALScriptWorkspace::Saved& saved)
+void LLPreviewNotecard::heard(const ALScriptSaved& saved)
 {
-    if (!mLoaded || saved.kind != ALScriptWorkspace::Kind::Notecard || saved.ref.item != mItemUUID || saved.ref.object != mObjectUUID)
+    if (!mLoaded || saved.kind != ALScriptKind::Notecard || saved.ref.item != mItemUUID || saved.ref.object != mObjectUUID)
     {
         return;
     }
     // Our own save lands as its answer; one of ours on its way lands after
     // this, and is what the server keeps.
-    if ((saved.sender.origin == ALScriptWorkspace::Origin::Editor && saved.sender.request == mSaveRequest) || mSaving)
+    if ((saved.sender.origin == ALScriptOrigin::Editor && saved.sender.request == mSaveRequest) || mSaving)
     {
         return;
     }
@@ -511,29 +511,29 @@ void LLPreviewNotecard::heard(const ALScriptWorkspace::Saved& saved)
     {
         mAssetID = saved.asset;
     }
-    switch (ALScriptWorkspace::heard(saved.text, mText->wholeText(), mText->isDirty() && mModifiable,
-                                     [this]() { return mText->undoJournal().savedText(); }))
+    switch (ALScriptSaved::heard(saved.text, mText->wholeText(), mText->isDirty() && mModifiable,
+                                 [this]() { return mText->undoJournal().savedText(); }))
     {
-        case ALScriptWorkspace::Heard::Same:
+        case ALScriptSaved::Heard::Same:
             mText->resetDirty();
             mKeeper.forget();
             return;
-        case ALScriptWorkspace::Heard::Keep:
+        case ALScriptSaved::Heard::Keep:
             return;
-        case ALScriptWorkspace::Heard::Ask:
+        case ALScriptSaved::Heard::Ask:
         {
             mSavedThere = saved.text;
             LLStringUtil::format_map_t args;
             args["[NAME]"] = mNoteName;
-            args["[WHO]"]  = getString(saved.sender.origin == ALScriptWorkspace::Origin::Bridge   ? "SavedByBridge"
-                                       : saved.sender.origin == ALScriptWorkspace::Origin::Studio ? "SavedByStudio"
+            args["[WHO]"]  = getString(saved.sender.origin == ALScriptOrigin::Bridge   ? "SavedByBridge"
+                                       : saved.sender.origin == ALScriptOrigin::Studio ? "SavedByStudio"
                                                                                                   : "SavedByOther");
             showNotice(getString("SavedElsewhere", args), { { getString("TakeTheirs"), [this]() { takeTheirs(); } },
                                                             { getString("KeepMine"), [this]() { keepMine(); } },
                                                             { getString("Compare"), [this]() { toggleCompare(); } } });
             return;
         }
-        case ALScriptWorkspace::Heard::Take:
+        case ALScriptSaved::Heard::Take:
             // Nothing typed here: loaded again, for its items as well as
             // its text, the caret and the view kept where they were.
             mKeepPlace = std::make_pair(mText->caret(), mText->scrollY());

@@ -94,7 +94,7 @@ public:
     // After a save from here: the copy written again where it holds
     // something else; and the compiler's words put in the log beside it.
     void sync(Doc& doc);
-    void log(Doc& doc, const ALScriptWorkspace::CompileResult& result);
+    void log(Doc& doc, const ALScriptCompileResult& result);
     // The tab let go of: the bridge told, the watch and the log gone.
     void stop(Doc& doc);
     // The copy's path, as the old editor names it (ALScriptTempFiles::

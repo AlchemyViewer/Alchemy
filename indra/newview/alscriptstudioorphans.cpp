@@ -141,9 +141,9 @@ ALScriptStudioOrphans::Orphan ALScriptStudioOrphans::seen(const Doc& doc, const 
 }
 
 // static
-ALScriptStudioOrphans::Orphan ALScriptStudioOrphans::failedAs(const Doc& doc, ALScriptWorkspace::Loaded::Failure failure, bool object_there)
+ALScriptStudioOrphans::Orphan ALScriptStudioOrphans::failedAs(const Doc& doc, ALScriptLoaded::Failure failure, bool object_there)
 {
-    using Failure = ALScriptWorkspace::Loaded::Failure;
+    using Failure = ALScriptLoaded::Failure;
     switch (failure)
     {
         case Failure::NotPermitted:
@@ -253,7 +253,7 @@ F64 ALScriptStudioOrphans::check()
     {
         const Doc& doc   = *each;
         const bool ready = doc.orphan.kind == Orphan::None ||
-                           (doc.orphan.kind == Orphan::Unloaded && doc.loadFailure == ALScriptWorkspace::Loaded::Failure::Fetch);
+                           (doc.orphan.kind == Orphan::Unloaded && doc.loadFailure == ALScriptLoaded::Failure::Fetch);
         const bool may = ALRecoveryRetry::mayTry(doc.orphan.reattachTries);
         if (doc.orphan.detached && doc.loaded && ready && may)
         {

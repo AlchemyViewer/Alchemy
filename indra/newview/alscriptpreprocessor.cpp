@@ -373,7 +373,7 @@ void ALScriptPreprocessor::start(const Request& request, callback_t callback, bo
         attemptJob(job);
         return;
     }
-    ALScriptWorkspace::instance().listContents(prim, [this, job, prim](const ALScriptWorkspace::Contents& contents) {
+    ALScriptWorkspace::instance().listContents(prim, [this, job, prim](const ALScriptContents& contents) {
         if (contents.fetched)
         {
             mResolver->heard(prim, contents.items);
@@ -621,7 +621,7 @@ void ALScriptPreprocessor::fetch(const std::string& path, std::function<void()> 
         done();
         return;
     }
-    ALScriptWorkspace::instance().load(ref, [this, path, done](const ALScriptWorkspace::Loaded& loaded) {
+    ALScriptWorkspace::instance().load(ref, [this, path, done](const ALScriptLoaded& loaded) {
         if (!loaded.error.empty())
         {
             mTexts.failed(path);

@@ -74,7 +74,7 @@ public:
     // What a load that failed makes a tab: not permitted, locked; not to
     // be read or fetched, unloaded; else gone, from the inventory or its
     // object, or its object out of sight.
-    static Orphan failedAs(const Doc& doc, ALScriptWorkspace::Loaded::Failure failure, bool object_there);
+    static Orphan failedAs(const Doc& doc, ALScriptLoaded::Failure failure, bool object_there);
     // What the notice says for a tab: a text kept from an earlier session
     // first, then what it is, unless it was hidden since that changed,
     // then what the last word about it offered to do; nothing for none.
