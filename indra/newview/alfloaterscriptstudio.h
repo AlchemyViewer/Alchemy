@@ -791,9 +791,16 @@ private:
     void closeWindowAnswered(S32 option);
 
     void onTabChosen(const std::string& value);
-    // A script made in the inventory, named first and opened here once the
-    // inventory has it, with the scripter's template in it.
+    // A script made in the inventory: what it starts from chosen first --
+    // the scripter's own template, the grid's own, or one of the templates
+    // shipped and kept (templatesOf) -- then named, and opened here once
+    // the inventory has it, with that in it.
     void newInventoryScript(bool lua);
+    void nameNewInventoryScript(bool lua, const std::string& opening);
+    // The templates of a language, as New Script offers them: the viewer's
+    // from app_settings/script_templates, then the scripter's own from the
+    // settings folder's, each a name, a line about it and the script.
+    static std::vector<ALScriptSnippets::Snippet> templatesOf(bool lua);
 
     // Due writings of what is unsaved, a lost connection, and what holds
     // each tab, looked at a few times a second, whether the window is shown

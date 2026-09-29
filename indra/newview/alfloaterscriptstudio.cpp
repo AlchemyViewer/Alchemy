@@ -7093,17 +7093,64 @@ void ALFloaterScriptStudio::runningState(const ALScriptWorkspace::RunningState& 
 
 // --- a new script in the inventory ----------------------------------------------------
 
+// static
+std::vector<ALScriptSnippets::Snippet> ALFloaterScriptStudio::templatesOf(bool lua)
+{
+    const std::string                      file = lua ? "slua.xml" : "lsl.xml";
+    std::vector<ALScriptSnippets::Snippet> out;
+    ALScriptSnippets::readFrom(gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS, "script_templates", file), true, out);
+    ALScriptSnippets::readFrom(gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, "script_templates", file), false, out);
+    return out;
+}
+
 void ALFloaterScriptStudio::newInventoryScript(bool lua)
+{
+    // What it starts from, as Go to Script asks where to go: the
+    // scripter's own template first where there is one, the grid's own,
+    // then the templates, each told by its value's place in the list.
+    std::vector<ALQuickOpen::Candidate> candidates;
+    auto                                openings = std::make_shared<std::vector<std::string>>();
+    const auto add = [&](const std::string& label, const std::string& detail, const std::string& opening) {
+        ALQuickOpen::Candidate one;
+        one.label  = label;
+        one.detail = detail;
+        one.value  = std::to_string(openings->size());
+        candidates.push_back(std::move(one));
+        openings->push_back(opening);
+    };
+    const std::string own = gSavedSettings.getString(lua ? "ALScriptTemplateSLua" : "ALScriptTemplateLSL");
+    if (!own.empty())
+    {
+        add(getString("TemplateOwn"), getString("TemplateOwnDetail"), own);
+    }
+    add(getString("TemplateGrid"), getString("TemplateGridDetail"), std::string());
+    for (const ALScriptSnippets::Snippet& one : templatesOf(lua))
+    {
+        add(one.name, one.detail, one.body);
+    }
+    const LLHandle<LLFloater> handle = getHandle();
+    quickOpen(std::move(candidates), getString("TemplatesPlaceholder"), getString("TemplatesTitle"),
+              [handle, lua, openings](const std::string& value) {
+                  ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get());
+                  const size_t           index  = static_cast<size_t>(std::atoi(value.c_str()));
+                  if (studio && index < openings->size())
+                  {
+                      studio->nameNewInventoryScript(lua, (*openings)[index]);
+                  }
+              });
+}
+
+void ALFloaterScriptStudio::nameNewInventoryScript(bool lua, const std::string& opening_in)
 {
     // Named first, as one made in a prim is; then made in the inventory's
     // scripts folder, in the language asked for rather than whichever the
-    // region would pick, and opened here with the scripter's template in
-    // it once the inventory has it.
+    // region would pick, and opened here with what was chosen in it once
+    // the inventory has it -- the grid's own where that was nothing.
     LLSD args;
     args["KIND"]                     = getString(lua ? "NewScriptLua" : "NewScriptLSL");
     args["NAME"]                     = getString("NewScriptName");
     const LLHandle<LLFloater> handle = getHandle();
-    LLNotificationsUtil::add("ScriptStudioNewItem", args, LLSD(), [handle, lua](const LLSD& notification, const LLSD& response) {
+    LLNotificationsUtil::add("ScriptStudioNewItem", args, LLSD(), [handle, lua, opening = opening_in](const LLSD& notification, const LLSD& response) {
         if (!ALViewType::as<ALFloaterScriptStudio>(handle.get()) || LLNotificationsUtil::getSelectedOption(notification, response) != 0)
         {
             return;
@@ -7114,7 +7161,6 @@ void ALFloaterScriptStudio::newInventoryScript(bool lua)
         {
             return;
         }
-        const std::string opening = gSavedSettings.getString(lua ? "ALScriptTemplateSLua" : "ALScriptTemplateLSL");
         LLPointer<LLBoostFuncInventoryCallback> made = new LLBoostFuncInventoryCallback(create_script_cb);
         made->addOnFireFunc([handle, opening](const LLUUID& item_id) {
             ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get());

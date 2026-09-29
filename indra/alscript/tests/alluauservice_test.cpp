@@ -29,6 +29,7 @@
 #include "../alselenefilters.h"
 
 #include "../test/lltut.h"
+#include "llsdserialize.h"
 
 #include <cstring>
 #include <fstream>
@@ -996,5 +997,30 @@ namespace tut
         ensure("once, too", outline[2].name == "listen" && outline[2].kind == ALScriptSymbolKind::Event);
         ensure_equals("a timer, how often", outline[3].name, std::string("timer every 2.5"));
         ensure_equals("a timer whose delay the script works out", outline[4].name, std::string("timer once"));
+    }
+
+    template<> template<>
+    void alluauservice_object::test<33>()
+    {
+        set_test_name("every template Script Studio offers for a new SLua script checks without an error");
+        ensure("definitions loaded: " + error, loaded);
+        llifstream in(std::string(AL_SCRIPT_TEMPLATES_DIR) + "/slua.xml", std::ios::in | std::ios::binary);
+        LLSD       templates;
+        ensure("read", in.is_open() && LLSDSerialize::fromXML(templates, in) != LLSDParser::PARSE_FAILURE && templates.isArray());
+        ensure("some", templates.size() > 0);
+        for (LLSD::array_const_iterator it = templates.beginArray(); it != templates.endArray(); ++it)
+        {
+            const std::string      name     = (*it)["name"].asString();
+            const ALScriptProblems problems = service.check((*it)["body"].asString());
+            std::string            wrong;
+            for (const ALScriptProblem& problem : problems)
+            {
+                if (problem.severity == ALScriptProblem::Severity::Error)
+                {
+                    wrong += llformat(" [%d:%d] %s", problem.line, problem.column, problem.message.c_str());
+                }
+            }
+            ensure(name + ":" + wrong, wrong.empty());
+        }
     }
 }

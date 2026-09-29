@@ -165,6 +165,12 @@
     <floater.string name="NewKindLua">SLua script</floater.string>
     <floater.string name="NewKindNotecard">notecard</floater.string>
     <floater.string name="NewScriptName">New Script</floater.string>
+    <floater.string name="TemplatesTitle">New Script</floater.string>
+    <floater.string name="TemplatesPlaceholder">Start from...</floater.string>
+    <floater.string name="TemplateOwn">Your template</floater.string>
+    <floater.string name="TemplateOwnDetail">As the preferences' Templates tab has it</floater.string>
+    <floater.string name="TemplateGrid">The grid's own</floater.string>
+    <floater.string name="TemplateGridDetail">What a new script holds when made anywhere else</floater.string>
     <floater.string name="NewNotecardName">New Note</floater.string>
     <floater.string name="CreateFailed">[NAME] was not made: [ERROR]</floater.string>
     <floater.string name="Recompiling">Recompiling [NAME]...</floater.string>

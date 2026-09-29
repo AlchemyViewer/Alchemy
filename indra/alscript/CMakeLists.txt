@@ -96,17 +96,22 @@ if(AL_BUILD_TESTS)
   # the lsl-definitions port ships.
   find_package(unofficial-lsl-definitions CONFIG REQUIRED)
   set(definitions_defines "AL_LSL_DEFINITIONS_DIR=\"${LSL_DEFINITIONS_DIR}\"")
+  # The templates Script Studio offers for a new script, which must check.
+  set(
+    templates_define
+    "AL_SCRIPT_TEMPLATES_DIR=\"${INDRA_SOURCE_DIR}/newview/app_settings/script_templates\""
+  )
   al_add_test(
     alluauservice
     PROJECT alscript
     LIBRARIES alscript llcommon
-    DEFINES ${definitions_defines}
+    DEFINES ${definitions_defines} ${templates_define}
   )
   al_add_test(
     allslservice
     PROJECT alscript
     LIBRARIES alscript llcommon
-    DEFINES ${definitions_defines}
+    DEFINES ${definitions_defines} ${templates_define}
   )
   # Each fix made over a real check, applied, and the text checked again.
   al_add_test(

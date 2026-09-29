@@ -28,6 +28,7 @@
 
 #include "../test/lltut.h"
 
+#include "llsdserialize.h"
 #include "lluuid.h"
 
 #include <filesystem>
@@ -757,5 +758,23 @@ namespace tut
         // Nothing twice: an old one still one declaration.
         const ALScriptSignature said = service.signature("default { state_entry() { llAbs( } }\n", 0, 32);
         ensure("an old function as it was", said.found && said.label.find("llAbs") != std::string::npos);
+    }
+
+    template<> template<>
+    void allslservice_object::test<22>()
+    {
+        set_test_name("every template Script Studio offers for a new LSL script checks without an error");
+        ensure("builtins loaded: " + error, loaded);
+        llifstream in(std::string(AL_SCRIPT_TEMPLATES_DIR) + "/lsl.xml", std::ios::in | std::ios::binary);
+        LLSD       templates;
+        ensure("read", in.is_open() && LLSDSerialize::fromXML(templates, in) != LLSDParser::PARSE_FAILURE && templates.isArray());
+        ensure("some", templates.size() > 0);
+        for (LLSD::array_const_iterator it = templates.beginArray(); it != templates.endArray(); ++it)
+        {
+            const std::string      name     = (*it)["name"].asString();
+            const ALScriptProblems problems = service.check((*it)["body"].asString());
+            ensure(name + " parses", service.parsed());
+            ensure_equals(name + ": " + said(problems), errors(problems), size_t(0));
+        }
     }
 }
