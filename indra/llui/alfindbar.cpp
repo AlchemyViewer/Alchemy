@@ -132,7 +132,7 @@ public:
         if (hasFocus())
         {
             // Where the keyboard is, once Tab has brought it here.
-            gl_rect_2d(local, gFocusMgr.getFocusColor() % alpha, false);
+            ALSurface::outline(local, gFocusMgr.getFocusColor() % alpha);
         }
         mHover = false;
     }
@@ -469,7 +469,7 @@ void ALFindBar::draw()
     const F32    alpha = getDrawContext().mAlpha;
     const LLRect local = getLocalRect();
     gl_rect_2d(local, mBgColor.get() % alpha);
-    gl_rect_2d(local, ALSurface::frame(mInkColor.get(), alpha), false);
+    ALSurface::outline(local, ALSurface::frame(mInkColor.get(), alpha));
     LLPanel::draw();
 }
 

@@ -120,7 +120,7 @@ namespace ALSurface
     void draw(const LLRect& rect, const LLColor4& paper, const LLColor4& ink, F32 alpha)
     {
         gl_rect_2d(rect, ground(paper, ink) % alpha, true);
-        gl_rect_2d(rect, frame(ink, alpha), false);
+        ALSurface::outline(rect, frame(ink, alpha));
     }
 
     const LLUIColor& well()

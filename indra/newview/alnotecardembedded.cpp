@@ -125,7 +125,7 @@ namespace
             }
             const F32 amount = pressed ? ALSurface::CHOSEN * 1.5f : mNeedsHighlight ? ALSurface::CHOSEN : ALSurface::GROUND;
             gl_rect_2d(box, ALSurface::shade(paper, ink, amount) % alpha, true);
-            gl_rect_2d(box, hasFocus() ? gFocusMgr.getFocusColor() % alpha : ALSurface::frame(ink, alpha), false);
+            ALSurface::outline(box, hasFocus() ? gFocusMgr.getFocusColor() % alpha : ALSurface::frame(ink, alpha));
 
             S32 x = box.mLeft + CHIP_PAD_LEFT;
             if (LLPointer<LLUIImage> icon = getImageOverlay(); icon.notNull() && icon->getWidth() > 1)

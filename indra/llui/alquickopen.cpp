@@ -441,7 +441,7 @@ void ALQuickOpen::draw()
         // The card: its ground, and a frame in a quarter of the ink as
         // the find bar's.
         gl_rect_2d(local, mGround % alpha, true);
-        gl_rect_2d(local, ALSurface::frame(mInk, alpha), false);
+        ALSurface::outline(local, ALSurface::frame(mInk, alpha));
     }
     LLPanel::draw();
     if (mThemed)
@@ -455,11 +455,11 @@ void ALQuickOpen::draw()
         // one frame weight so that it cannot drift away from it.
         if (mField)
         {
-            gl_rect_2d(mField->getRect(), mInk % (1.4f * ALSurface::FRAME * alpha), false);
+            ALSurface::outline(mField->getRect(), mInk % (1.4f * ALSurface::FRAME * alpha));
         }
         if (mList)
         {
-            gl_rect_2d(mList->getRect(), ALSurface::frame(mInk, alpha), false);
+            ALSurface::outline(mList->getRect(), ALSurface::frame(mInk, alpha));
         }
     }
 }

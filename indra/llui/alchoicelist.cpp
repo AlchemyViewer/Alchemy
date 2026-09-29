@@ -26,6 +26,8 @@
 
 #include "alchoicelist.h"
 
+#include "alsurface.h"
+
 #include "llrender.h"
 #include "lluicolortable.h"
 #include "lluictrlfactory.h"
@@ -259,7 +261,7 @@ S32 ALChoiceList::markSide() const
 void ALChoiceList::draw()
 {
     ALTextView::draw();
-    gl_rect_2d(getLocalRect(), mBorderColor.get() % getDrawContext().mAlpha, false);
+    ALSurface::outline(getLocalRect(), mBorderColor.get() % getDrawContext().mAlpha);
 }
 
 // --- the mouse ------------------------------------------------------------------
