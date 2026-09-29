@@ -45,6 +45,12 @@
     <floater.string name="Discard">Discard</floater.string>
     <floater.string name="Restored">The kept changes are back. Undo takes them out.</floater.string>
     <floater.string name="RecoveryWriteFailed">Your unsaved changes could not be kept in case the viewer closes.</floater.string>
+    <floater.string name="GoToLineTitle">Go to Line</floater.string>
+    <floater.string name="GoToLinePlaceholder">Line, or line:column</floater.string>
+    <floater.string name="GoToLineHint">Type a line number to go to (from [FIRST] to [COUNT]).</floater.string>
+    <floater.string name="GoToLineGo">Go to line [LINE].</floater.string>
+    <floater.string name="GoToLineGoColumn">Go to line [LINE], column [COL].</floater.string>
+    <floater.string name="GoToLineNone">There is no line [LINE]. The last line is [COUNT].</floater.string>
     <icon
      follows="top|right"
      height="18"

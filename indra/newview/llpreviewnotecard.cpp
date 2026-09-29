@@ -33,6 +33,7 @@
 #include "alrecovery.h"
 #include "alsaid.h"
 #include "alsurface.h"
+#include "altextgotoline.h"
 #include "altextview.h"
 
 #include "llagent.h"
@@ -171,7 +172,45 @@ bool LLPreviewNotecard::handleKeyHere(KEY key, MASK mask)
         mText->perform(ALEditorCommand::Find);
         return true;
     }
+    // Go to Line on Script Studio's key: Control-G, and on a Mac the
+    // Control key itself, Command-G being the next match there.
+#if LL_DARWIN
+    constexpr MASK GO_TO_LINE = MASK_MAC_CONTROL;
+#else
+    constexpr MASK GO_TO_LINE = MASK_CONTROL;
+#endif
+    if ('G' == key && GO_TO_LINE == mask)
+    {
+        goToLine();
+        return true;
+    }
     return LLPreview::handleKeyHere(key, mask);
+}
+
+void LLPreviewNotecard::goToLine()
+{
+    if (!mText || !mLoaded)
+    {
+        return;
+    }
+    const LLHandle<LLFloater> handle = getHandle();
+    ALTextGoToLine::ask(
+        [this](std::function<void(const std::string&)> chose, std::function<void()> escaped, std::function<void()> left) {
+            // As wide as the studio's where the window is, and within it
+            // where it is narrower.
+            const S32 width = llmin(420, mText->getRect().getWidth() - 16);
+            return mQuickAsk.ask({}, getString("GoToLinePlaceholder"), getString("GoToLineTitle"), std::move(chose), mText, width,
+                                 ALQuickOpen::heightForRows(1), std::move(escaped), {}, std::move(left));
+        },
+        [handle]() -> ALTextView* {
+            LLPreviewNotecard* window = ALViewType::as<LLPreviewNotecard>(handle.get());
+            return window ? window->mText : nullptr;
+        },
+        -1,
+        [handle](const std::string& name, const LLStringUtil::format_map_t& args) {
+            LLFloater* window = handle.get();
+            return window ? window->getString(name, args) : std::string();
+        });
 }
 
 // virtual

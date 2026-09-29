@@ -27,6 +27,7 @@
 #ifndef LL_LLPREVIEWNOTECARD_H
 #define LL_LLPREVIEWNOTECARD_H
 
+#include "alquickask.h"
 #include "alrecoverykeeper.h"
 #include "alscriptworkspace.h"
 #include "altextundo.h"
@@ -118,6 +119,10 @@ private:
     void deleteNotecard();
     bool handleConfirmDeleteDialog(const LLSD& notification, const LLSD& response);
 
+    // Go to Line, as Script Studio's is, by the numbers a script reads a
+    // notecard's lines by: from 0.
+    void goToLine();
+
     // --- what the window says ---------------------------------------------------------
 
     void setStatus(const std::string& text, bool failure = false);
@@ -163,6 +168,7 @@ private:
     std::array<std::function<void()>, 3> mNoticeActions;
     ALDiffView*                          mCompare     = nullptr;
     std::shared_ptr<ALNotecardEmbedded>  mItems;
+    ALQuickAsk                           mQuickAsk;
 
     std::string mNoteName;
     LLUUID      mAssetID;
