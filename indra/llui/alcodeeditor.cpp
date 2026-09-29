@@ -74,7 +74,12 @@ namespace
 namespace
 {
     const S32 GUTTER_PAD  = 6;
-    const S32 MARK_SIZE   = 6;
+    const S32 MARK_SIZE   = 10;
+    // A warning's underline: dashes; a note's: dots.
+    const S32 UNDERLINE_DASH     = 4;
+    const S32 UNDERLINE_DASH_GAP = 2;
+    const S32 UNDERLINE_DOT      = 2;
+    const S32 UNDERLINE_DOT_GAP  = 2;
     const S32 MARK_INSET  = 3;
     const S32 FOLD_COLUMN = 12;
     const S32 FOLD_MARKER = 7;
@@ -896,17 +901,26 @@ void ALCodeEditor::drawGutter(const LLRect& text, F32 alpha)
             }
             else if (mark != Mark::None)
             {
-                const S32 y = screen_top - (row_h - MARK_SIZE) / 2;
-                if (changesAt(line) && !isReadOnly())
+                // Its severity's own shape, as the Problems list has it --
+                // a cross in a ring for an error, run-time or found, a
+                // triangle for a warning, a ring with a stroke for a note
+                // -- so that the marks tell apart without their colours;
+                // and a dot at its corner where a fix would put it right,
+                // the lightbulb's promise away from the caret.
+                const S32    y = screen_top - (row_h - MARK_SIZE) / 2;
+                const LLRect box(gutter.mLeft + MARK_INSET, y, gutter.mLeft + MARK_INSET + MARK_SIZE, y - MARK_SIZE);
+                if (const LLUIImagePtr icon = markIcon(mark); icon.notNull())
                 {
-                    // Round where a fix would put it right.
-                    gGL.color4fv((markColor(mark) % alpha).mV);
-                    gl_circle_2d(static_cast<F32>(gutter.mLeft + MARK_INSET) + MARK_SIZE / 2.f, static_cast<F32>(y) - MARK_SIZE / 2.f,
-                                 MARK_SIZE / 2.f + 0.5f, 12, true);
+                    icon->draw(box, markColor(mark) % alpha);
                 }
                 else
                 {
-                    gl_rect_2d(gutter.mLeft + MARK_INSET, y, gutter.mLeft + MARK_INSET + MARK_SIZE, y - MARK_SIZE, markColor(mark) % alpha);
+                    gl_rect_2d(box, markColor(mark) % alpha);
+                }
+                if (changesAt(line) && !isReadOnly())
+                {
+                    gGL.color4fv(lit.mV);
+                    gl_circle_2d(static_cast<F32>(box.mRight), static_cast<F32>(box.mBottom) + 1.f, 2.f, 8, true);
                 }
             }
         }
@@ -1794,9 +1808,34 @@ void ALCodeEditor::drawRowExtras(S32 line, S32 row, const LLRect& text, S32 scre
         {
             gl_rect_2d(static_cast<S32>(left + x0), screen_top, static_cast<S32>(left + x1), screen_top - row_h, d.color % alpha);
         }
-        else
+        else if (d.style == Decoration::Style::Squiggle)
         {
             squiggle(left + x0, left + x1, screen_top - row_h + 2, d.color % alpha, text);
+        }
+        else
+        {
+            // Dashes or dots two pixels high, counted from where the range
+            // begins so that they do not crawl as it scrolls sideways;
+            // as much of them as is in sight.
+            const bool dashed = d.style == Decoration::Style::Dashed;
+            const S32  on     = dashed ? UNDERLINE_DASH : UNDERLINE_DOT;
+            const S32  period = on + (dashed ? UNDERLINE_DASH_GAP : UNDERLINE_DOT_GAP);
+            const S32  from   = static_cast<S32>(left + x0);
+            const S32  to     = static_cast<S32>(left + x1);
+            const S32  y      = screen_top - row_h + 2;
+            const LLColor4 ink = d.color % alpha;
+            gGL.getTextureSlot(0)->unbind();
+            gGL.begin(LLRender::TRIANGLES);
+            for (S32 x = from; x < to; x += period)
+            {
+                const S32 a = llmax(x, text.mLeft);
+                const S32 b = llmin(llmin(x + on, to), text.mRight);
+                if (a < b)
+                {
+                    gl_rect_2d_in_batch(a, y + 1, b, y - 1, ink);
+                }
+            }
+            gGL.end();
         }
     }
     if (mBrackets.matched && (line == mBrackets.open.line || line == mBrackets.close.line))
@@ -2405,6 +2444,17 @@ void ALCodeEditor::refreshCompletion()
         mCompletionMoved = false;
     }
     listCompletions(again);
+}
+
+LLUIImagePtr ALCodeEditor::markIcon(Mark mark)
+{
+    const char* name = mark == Mark::Error || mark == Mark::Runtime ? "Problem_Error" : mark == Mark::Warning ? "Problem_Warning" : "Problem_Note";
+    auto        found = mIcons.find(std::string_view(name));
+    if (found == mIcons.end())
+    {
+        found = mIcons.emplace(std::string(name), LLUI::getUIImage(name)).first;
+    }
+    return found->second;
 }
 
 LLUIImagePtr ALCodeEditor::iconOf(const Completion& completion)

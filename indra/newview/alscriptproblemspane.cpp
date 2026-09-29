@@ -92,6 +92,9 @@ ALScriptProblemsPane::Made ALScriptProblemsPane::make(const Doc& doc, const ALSc
                              : level == Doc::Level::Error   ? error_color
                              : level == Doc::Level::Warning ? warning_color
                                                             : note_color;
+        decoration.style   = mark == ALCodeEditor::Mark::Runtime || level == Doc::Level::Error ? ALCodeEditor::Decoration::Style::Squiggle
+                             : level == Doc::Level::Warning                                     ? ALCodeEditor::Decoration::Style::Dashed
+                                                                                                : ALCodeEditor::Decoration::Style::Dotted;
         decoration.message = origin + ": " + message;
         made.decorations.push_back(std::move(decoration));
     };

@@ -282,6 +282,19 @@ namespace tut
         ensure("a run-time error is an error", made.rows[4].level == Doc::Level::Error);
         ensure_equals("the include's last", made.rows[5].fileName, std::string("lib.lsl"));
         ensure_equals("the squiggles: the script's own", made.decorations.size(), size_t(4));
+        const auto underline = [&](S32 line) {
+            for (const ALCodeEditor::Decoration& each : made.decorations)
+            {
+                if (each.range.begin.line == line)
+                {
+                    return each.style;
+                }
+            }
+            return ALCodeEditor::Decoration::Style::Background;
+        };
+        using Style = ALCodeEditor::Decoration::Style;
+        ensure("an error waved, a warning dashed, a run-time error waved",
+               underline(2) == Style::Squiggle && underline(4) == Style::Dashed && underline(8) == Style::Squiggle);
         ensure("the run-time mark on its line",
                std::find(made.marks.begin(), made.marks.end(), std::make_pair(S32(8), ALCodeEditor::Mark::Runtime)) != made.marks.end());
         ensure_equals("the lint's line offers its fix", made.fixable.size(), size_t(1));

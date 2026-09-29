@@ -181,7 +181,7 @@ std::string ALScriptInspectorPane::problemsAt(const Doc& doc, const ALTextPos& a
     for (const ALCodeEditor::Decoration* each : doc.editor->decorationsOn(at.line))
     {
         const ALCodeEditor::Decoration& decoration = *each;
-        if (decoration.style == ALCodeEditor::Decoration::Style::Squiggle && !decoration.message.empty() && decoration.range.contains(at))
+        if (decoration.underlined() && !decoration.message.empty() && decoration.range.contains(at))
         {
             LLStringUtil::format_map_t args;
             args["[MESSAGE]"] = decoration.message;

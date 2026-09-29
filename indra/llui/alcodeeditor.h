@@ -140,16 +140,22 @@ public:
     LLColor4           paint(Paint which) const;
     LLColor4           selectionDrawColor() const override;
 
-    // Something drawn over a range: a squiggle under it, or a wash behind
-    // it. Replaced whole by whoever computes them; an edit slides the ones
+    // Something drawn over a range: a line under it, or a wash behind it.
+    // Replaced whole by whoever computes them; an edit slides the ones
     // below it and drops the ones it cuts through.
     struct Decoration
     {
+        // The line is told apart by its shape as well as its colour, so
+        // that a reader who cannot tell the colours apart still can: a
+        // wave for an error, dashes for a warning, dots for a note.
         enum class Style : U8
         {
             Squiggle,
+            Dashed,
+            Dotted,
             Background
         };
+        bool        underlined() const { return style != Style::Background; }
         ALTextRange range;
         Style       style = Style::Squiggle;
         LLColor4    color;
@@ -421,6 +427,9 @@ public:
     typedef ALCompletion Completion;
     static S32   matchTier(std::string_view word, std::string_view typed) { return ALCompletionModel::matchTier(word, typed); }
     LLUIImagePtr iconOf(const Completion& completion);
+    // A mark's glyph in the gutter: the Problems list's icon for its
+    // severity, drawn in the mark's colour.
+    LLUIImagePtr markIcon(Mark mark);
     // Asked for what could go at a position, given the identifier typed
     // so far; answers into `out`, already narrowed to the prefix. The
     // words of the document itself are added after whatever it answers,
