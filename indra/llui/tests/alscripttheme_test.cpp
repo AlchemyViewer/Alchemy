@@ -122,4 +122,41 @@ namespace tut
         ALScriptTheme::setChosen(std::string());
         ensure("none", ALScriptTheme::chosen().empty());
     }
+
+    template<> template<>
+    void alscripttheme_object::test<4>()
+    {
+        set_test_name("what reads less than it should: code against both grounds, the text against its bands, the line numbers against the gutter");
+        ALScriptTheme theme;
+        theme.colors["ScriptBackground"] = LLColor4(1.f, 1.f, 1.f, 1.f);
+        theme.colors["ScriptText"]       = LLColor4(0.f, 0.f, 0.f, 1.f);
+        theme.colors["ScriptComment"]    = LLColor4(0.2f, 0.4f, 0.2f, 1.f);
+        ensure("black and a dark green on white read", theme.illegible().empty());
+
+        theme.colors["ScriptString"] = LLColor4(0.9f, 0.6f, 0.6f, 1.f);
+        std::vector<ALScriptTheme::Illegible> said = theme.illegible();
+        ensure("a pale pink does not", said.size() == 1 && said[0].name == "ScriptString" && said[0].against == "ScriptBackground" &&
+                                           said[0].contrast < ALSurface::LEGIBLE);
+        theme.colors.erase("ScriptString");
+
+        theme.colors["ScriptBgReadOnlyColor"] = LLColor4(0.3f, 0.3f, 0.3f, 1.f);
+        said                                  = theme.illegible();
+        ensure("a dark read-only ground takes both from the text", said.size() == 2 && said[0].against == "ScriptBgReadOnlyColor");
+        theme.colors.erase("ScriptBgReadOnlyColor");
+
+        theme.colors["ScriptSelectionColor"] = LLColor4(0.f, 0.f, 0.3f, 0.9f);
+        said                                 = theme.illegible();
+        ensure("a selection the text is lost in, as laid over the ground",
+               said.size() == 1 && said[0].name == "ScriptText" && said[0].against == "ScriptSelectionColor");
+        theme.colors["ScriptSelectionColor"] = LLColor4(0.f, 0.f, 0.3f, 0.2f);
+        ensure("thin enough, it reads", theme.illegible().empty());
+
+        theme.colors["ScriptGutterColor"]     = LLColor4(0.95f, 0.95f, 0.95f, 1.f);
+        theme.colors["ScriptLineNumberColor"] = LLColor4(0.75f, 0.75f, 0.75f, 1.f);
+        said                                  = theme.illegible();
+        ensure("faint numbers on the gutter", said.size() == 1 && said[0].against == "ScriptGutterColor");
+        theme.colors["ScriptLineNumberColor"] = LLColor4(0.5f, 0.5f, 0.5f, 1.f);
+        ensure("numbers are held to less than the code", theme.illegible().empty() && !theme.illegible(7.f, 4.5f).empty());
+    }
+
 }

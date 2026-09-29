@@ -24,9 +24,12 @@
 
 #pragma once
 
+#include "alsurface.h"
 #include "v4color.h"
 
+#include <functional>
 #include <map>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -55,6 +58,24 @@ public:
     static std::string labelOf(const std::string& name);
     // Whether the name is one of the editor's own rather than a kind's.
     static bool isEditorColor(const std::string& name);
+
+    // A colour that reads less than it should against what it is drawn
+    // on: its name, the name of that, and how far apart the two read.
+    struct Illegible
+    {
+        std::string name;
+        std::string against;
+        F32         contrast = 0.f;
+    };
+    // Every such colour among those `colour` gives by name -- nothing for
+    // one it does not have: the text and each kind of code against the
+    // ground and the read-only ground; the text against the caret's line
+    // and the selection, each drawn over the ground; the line numbers
+    // against the gutter. Text and code are held to `least`, the line
+    // numbers, which are not read as the code is, to `numbers`.
+    typedef std::function<std::optional<LLColor4>(const std::string&)> lookup_t;
+    static std::vector<Illegible> illegible(const lookup_t& colour, F32 least = ALSurface::LEGIBLE, F32 numbers = 3.f);
+    std::vector<Illegible>        illegible(F32 least = ALSurface::LEGIBLE, F32 numbers = 3.f) const;
 
     // The themes on disk, shipped then own, each by name.
     static std::vector<ALScriptTheme> available();
