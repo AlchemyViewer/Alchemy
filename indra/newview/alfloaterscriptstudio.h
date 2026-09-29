@@ -909,6 +909,8 @@ private:
     // id, a file by its path, and which is in front.
     LLSD openTabs() const;
     void writeState(LLSD& state) const override;
+    // What writeState writes before the account's own is taken out of it.
+    void writeSharedState(LLSD& state) const;
     void readState(const LLSD& state) override;
     // The View menu's options, vim's among them: kept in the state, and
     // taken by a window popped out of another -- which keeps no state of

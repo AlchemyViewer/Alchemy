@@ -26,6 +26,8 @@
 
 #include "alfloaterscriptstudio.h"
 
+#include "alscriptstudioaccount.h"
+
 #include "alcodeeditor.h"
 #include "aldiskincludes.h"
 #include "alserialworker.h"
@@ -95,6 +97,7 @@
 #include "lluictrlfactory.h"
 #include "llviewerassettype.h"
 #include "llviewercontrol.h"
+#include "llviewernetwork.h"
 #include "llviewerinventory.h"
 #include "llweb.h"
 #include "llviewermenufile.h"
@@ -8537,7 +8540,35 @@ void ALFloaterScriptStudio::takeViewOptions(const ALFloaterScriptStudio& from)
     applyEditorOptions();
 }
 
+namespace
+{
+    // The account's own state is kept with its settings, by grid
+    // (ALScriptStudioAccount), where there is an account: logged in, its
+    // settings read.
+    constexpr char ACCOUNT_SETTING[] = "ALScriptStudioAccountState";
+    bool           accountReady()
+    {
+        return gAgent.getID().notNull() && gSavedPerAccountSettings.controlExists(ACCOUNT_SETTING);
+    }
+}
+
 void ALFloaterScriptStudio::writeState(LLSD& state) const
+{
+    writeSharedState(state);
+    // The account's own, out of what every account shares and into the
+    // account's settings, under its grid.
+    if (accountReady())
+    {
+        LLSD              all  = gSavedPerAccountSettings.getLLSD(ACCOUNT_SETTING);
+        const std::string grid = LLGridManager::getInstance()->getGrid();
+        LLSD              mine = all[grid];
+        ALScriptStudioAccount::split(state, mine);
+        all[grid] = mine;
+        gSavedPerAccountSettings.setLLSD(ACCOUNT_SETTING, all);
+    }
+}
+
+void ALFloaterScriptStudio::writeSharedState(LLSD& state) const
 {
     writeViewOptions(state);
     state["bottom_waiting"] = mBottomWaiting;
@@ -8632,8 +8663,14 @@ LLSD ALFloaterScriptStudio::openTabs() const
     return open;
 }
 
-void ALFloaterScriptStudio::readState(const LLSD& state)
+void ALFloaterScriptStudio::readState(const LLSD& shared)
 {
+    // The account's own from its settings, where it has kept any; before
+    // it has -- the first login since these were shared -- what the shared
+    // state held, taken over as it was.
+    const LLSD state = accountReady()
+                           ? ALScriptStudioAccount::merged(shared, gSavedPerAccountSettings.getLLSD(ACCOUNT_SETTING)[LLGridManager::getInstance()->getGrid()])
+                           : shared;
     readViewOptions(state);
     mBottomWaiting = state["bottom_waiting"].asBoolean();
     if (mExplorerPane)

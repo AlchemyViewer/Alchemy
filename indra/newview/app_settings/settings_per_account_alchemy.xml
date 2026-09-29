@@ -330,5 +330,16 @@
             <key>Value</key>
             <string>00000000-0000-0000-0000-000000000000</string>
         </map>
+        <key>ALScriptStudioAccountState</key>
+        <map>
+            <key>Comment</key>
+            <string>Script Studio's state that is this account's own, by grid: the tabs open, the windows popped out, the pinned objects and the scripts opened lately. The window's shape and switches are ALScriptStudioState, shared.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>LLSD</string>
+            <key>Value</key>
+            <map />
+        </map>
     </map>
 </llsd>

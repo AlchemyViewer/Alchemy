@@ -200,6 +200,7 @@ if(AL_BUILD_VIEWER)
     alscriptsaveflow.cpp
     alscriptsearch.cpp
     alscriptsearchpane.cpp
+    alscriptstudioaccount.cpp
     alscriptstudiocaret.cpp
     alscriptstudiochecking.cpp
     alscriptstudiocommands.cpp
@@ -1035,6 +1036,7 @@ if(AL_BUILD_VIEWER)
     alscriptsaveflow.h
     alscriptsearch.h
     alscriptsearchpane.h
+    alscriptstudioaccount.h
     alscriptstudiocaret.h
     alscriptstudiochecking.h
     alscriptstudiocommands.h
@@ -2612,6 +2614,10 @@ if(AL_BUILD_TESTS)
       alscriptstudiofileio.cpp
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
+
+  # What of Script Studio's state is an account's own, kept apart from the
+  # shared and put back over it.
+  al_add_test(alscriptstudioaccount UNIT PROJECT ${test_project} LIBRARIES ${test_libs})
 
   # Script Studio's navigation: the history of places, back and forward,
   # and previews opened as a list is walked.
