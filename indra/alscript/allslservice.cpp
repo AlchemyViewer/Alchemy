@@ -496,66 +496,24 @@ namespace
     {
         Lexed out;
         out.code.assign(text.size(), 0);
-        enum class In { Code, String, LineComment, BlockComment } in = In::Code;
-        for (size_t i = 0; i < text.size(); ++i)
+        for (size_t i = 0; i < text.size();)
         {
-            const char c    = text[i];
-            const char next = i + 1 < text.size() ? text[i + 1] : '\0';
-            switch (in)
+            const ALScriptLexicon::Stretch run = ALScriptLexicon::stretchAt(text, i, false);
+            switch (run.kind)
             {
-                case In::Code:
-                    if (c == '"')
-                    {
-                        in          = In::String;
-                        out.code[i] = STRING_BYTE;
-                    }
-                    else if (c == '/' && next == '/')
-                    {
-                        in = In::LineComment;
-                        ++i;
-                    }
-                    else if (c == '/' && next == '*')
-                    {
-                        in = In::BlockComment;
-                        ++i;
-                    }
-                    else
-                    {
-                        out.code[i] = CODE_BYTE;
-                    }
+                case ALScriptLexicon::Kind::Code:
+                    out.code[i] = CODE_BYTE;
                     break;
-                case In::String:
-                    out.code[i] = STRING_BYTE;
-                    if (c == '\\')
-                    {
-                        if (i + 1 < text.size())
-                        {
-                            out.code[++i] = STRING_BYTE;
-                        }
-                    }
-                    else if (c == '"')
-                    {
-                        in = In::Code;
-                    }
+                case ALScriptLexicon::Kind::String:
+                    std::fill(out.code.begin() + i, out.code.begin() + run.end, STRING_BYTE);
+                    out.inString = !run.closed;
                     break;
-                case In::LineComment:
-                    if (c == '\n')
-                    {
-                        in          = In::Code;
-                        out.code[i] = CODE_BYTE;
-                    }
-                    break;
-                case In::BlockComment:
-                    if (c == '*' && next == '/')
-                    {
-                        in = In::Code;
-                        ++i;
-                    }
+                case ALScriptLexicon::Kind::Comment:
+                    out.inComment = !run.closed;
                     break;
             }
+            i = run.end;
         }
-        out.inString  = in == In::String;
-        out.inComment = in == In::BlockComment;
         return out;
     }
 

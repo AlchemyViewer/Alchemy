@@ -1,6 +1,6 @@
 /**
  * @file alscriptlexicon.h
- * @brief The words and name characters of LSL and SLua, written once.
+ * @brief The words, name characters, strings and comments of LSL and SLua, written once.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -31,8 +31,8 @@
 
 // The lexical rules of the two languages the studio edits, written once
 // for everything that reads a script by hand rather than through its
-// parser: which words are the language's own, and which characters make a
-// name.
+// parser: which words are the language's own, which characters make a
+// name, and where a string or a comment ends.
 namespace ALScriptLexicon
 {
     // What a word is in LSL: one of these, or none -- a name a script may
@@ -76,4 +76,50 @@ namespace ALScriptLexicon
     constexpr bool isNameStart(char c) { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_'; }
     constexpr bool isNameByte(char c) { return isNameStart(c) || (c >= '0' && c <= '9'); }
     bool           isName(std::string_view word);
+
+    // -- strings and comments ---------------------------------------------
+
+    // A long bracket opening at a place -- `[[`, `[==[` -- as Luau opens a
+    // long string with one, and after `--` a long comment: its level, the
+    // count of its equals signs; or -1, where none opens there.
+    S32    longBracketLevel(std::string_view text, size_t at);
+    // Past the long bracket of a level that closes at or after `from` --
+    // its `]]`, its `]==]` -- or npos, where the text runs out first.
+    size_t longBracketClose(std::string_view text, size_t from, S32 level);
+
+    // What a stretch of a script's text is, read as its language's lexer
+    // reads it.
+    enum class Kind : U8
+    {
+        Code,
+        String,
+        Comment,
+    };
+    struct Stretch
+    {
+        Kind   kind   = Kind::Code;
+        // Past its end: past a string's closing quote or bracket, past a
+        // block comment's closer; at the break that ends a line comment,
+        // or a Luau quoted string not closed on its line; at the text's
+        // end, where it ran out first.
+        size_t end    = 0;
+        // Its delimiters' lengths, what it holds being between them: the
+        // opener's; and the closer's, none for a line comment or one the
+        // text ran out in.
+        size_t open   = 0;
+        size_t close  = 0;
+        // Whether it was closed: false for a string or a block comment the
+        // text ran out in, or a Luau quoted string its line did.
+        bool   closed = true;
+    };
+    // The string or the comment that opens at a place, and where it ends;
+    // or one byte of code, where neither does.
+    // - LSL: "" strings, a backslash escaping the next byte and a break
+    //   held as written; // to the line's end; /* */.
+    // - SLua: "", '' and `` strings, a backslash escaping the next byte,
+    //   ending at a break not escaped; [[ ]] long strings; -- to the
+    //   line's end, --[[ ]] long comments. An interpolated string's
+    //   expressions are string here: only the preprocessor's tokenizer
+    //   reads into them.
+    Stretch stretchAt(std::string_view text, size_t at, bool lua);
 }

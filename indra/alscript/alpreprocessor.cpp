@@ -598,47 +598,16 @@ namespace
         // -- Luau --
 
         // The level of a long bracket opening at `pos`, or -1.
-        S32 longBracket(size_t pos) const
-        {
-            if (at(pos) != '[')
-            {
-                return -1;
-            }
-            size_t i = pos + 1;
-            while (at(i) == '=')
-            {
-                ++i;
-            }
-            return at(i) == '[' ? S32(i - pos - 1) : -1;
-        }
+        S32 longBracket(size_t pos) const { return ALScriptLexicon::longBracketLevel(mText, pos); }
 
         void takeLong(S32 level)
         {
-            // Past the opening bracket, to the closing one of the same level.
-            for (S32 i = 0; i < level + 2; ++i)
+            // Past the opening bracket, to the closing one of the same
+            // level, or the text's end.
+            const size_t past = ALScriptLexicon::longBracketClose(mText, mPos + static_cast<size_t>(level) + 2, level);
+            const size_t end  = past == std::string_view::npos ? mText.size() : past;
+            while (mPos < end)
             {
-                take();
-            }
-            while (mPos < mText.size())
-            {
-                if (at(mPos) == ']')
-                {
-                    size_t i = mPos + 1;
-                    S32    n = 0;
-                    while (at(i) == '=')
-                    {
-                        ++i;
-                        ++n;
-                    }
-                    if (n == level && at(i) == ']')
-                    {
-                        for (S32 k = 0; k < level + 2; ++k)
-                        {
-                            take();
-                        }
-                        return;
-                    }
-                }
                 take();
             }
         }

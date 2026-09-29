@@ -680,100 +680,22 @@ namespace
         bool   toLineEnd = false;
     };
 
-    // Lua's long bracket at `at`, `[[` or `[==[`: its level, or -1.
-    int longBracket(std::string_view line, size_t at)
-    {
-        if (at >= line.size() || line[at] != '[')
-        {
-            return -1;
-        }
-        size_t level = 0;
-        while (at + 1 + level < line.size() && line[at + 1 + level] == '=')
-        {
-            ++level;
-        }
-        return at + 1 + level < line.size() && line[at + 1 + level] == '[' ? static_cast<int>(level) : -1;
-    }
-
     // The comments of one line, past its strings. A comment or a string
     // begun on a line before is not seen, which is no loss: a NOLINT is
     // said at the end of the line it is about.
     std::vector<Comment> commentsOf(std::string_view line, bool lua)
     {
         std::vector<Comment> out;
-        char                 quote = 0;
-        for (size_t i = 0; i < line.size(); ++i)
+        for (size_t i = 0; i < line.size();)
         {
-            const char c = line[i];
-            if (quote)
+            const ALScriptLexicon::Stretch run = ALScriptLexicon::stretchAt(line, i, lua);
+            if (run.kind == ALScriptLexicon::Kind::Comment)
             {
-                if (c == '\\')
-                {
-                    ++i;
-                }
-                else if (c == quote)
-                {
-                    quote = 0;
-                }
-                continue;
+                // To the line's end where it is a line comment: closed,
+                // by the line, with no closer of its own.
+                out.push_back({ i + run.open, run.end - run.close, run.closed && run.close == 0 });
             }
-            if (c == '"' || (lua && (c == '\'' || c == '`')))
-            {
-                quote = c;
-                continue;
-            }
-            if (lua)
-            {
-                // A long string is passed over whole: a `--` in one is
-                // no comment.
-                if (const int level = longBracket(line, i); level >= 0)
-                {
-                    const std::string closer = "]" + std::string(static_cast<size_t>(level), '=') + "]";
-                    const size_t      end    = line.find(closer, i + static_cast<size_t>(level) + 2);
-                    if (end == std::string_view::npos)
-                    {
-                        break;
-                    }
-                    i = end + closer.size() - 1;
-                    continue;
-                }
-                if (c == '-' && i + 1 < line.size() && line[i + 1] == '-')
-                {
-                    if (const int level = longBracket(line, i + 2); level >= 0)
-                    {
-                        const std::string closer = "]" + std::string(static_cast<size_t>(level), '=') + "]";
-                        const size_t      begin  = i + 4 + static_cast<size_t>(level);
-                        const size_t      end    = line.find(closer, begin);
-                        out.push_back({ begin, end == std::string_view::npos ? line.size() : end, false });
-                        if (end == std::string_view::npos)
-                        {
-                            break;
-                        }
-                        i = end + closer.size() - 1;
-                        continue;
-                    }
-                    out.push_back({ i + 2, line.size(), true });
-                    break;
-                }
-            }
-            else if (c == '/' && i + 1 < line.size())
-            {
-                if (line[i + 1] == '/')
-                {
-                    out.push_back({ i + 2, line.size(), true });
-                    break;
-                }
-                if (line[i + 1] == '*')
-                {
-                    const size_t end = line.find("*/", i + 2);
-                    out.push_back({ i + 2, end == std::string_view::npos ? line.size() : end, false });
-                    if (end == std::string_view::npos)
-                    {
-                        break;
-                    }
-                    i = end + 1;
-                }
-            }
+            i = run.end;
         }
         return out;
     }
@@ -896,18 +818,10 @@ namespace
                 // A block comment runs to its closing brackets, with as
                 // many equals signs between them as it opened with.
                 comment = true;
-                if (line.size() > 2 && line[2] == '[')
+                if (const S32 level = ALScriptLexicon::longBracketLevel(line, 2); level >= 0)
                 {
-                    size_t equals = 3;
-                    while (equals < line.size() && line[equals] == '=')
-                    {
-                        ++equals;
-                    }
-                    if (equals < line.size() && line[equals] == '[')
-                    {
-                        closing  = "]" + std::string(equals - 3, '=') + "]";
-                        in_block = line.find(closing, equals + 1) == std::string_view::npos;
-                    }
+                    closing  = "]" + std::string(static_cast<size_t>(level), '=') + "]";
+                    in_block = ALScriptLexicon::longBracketClose(line, 4 + static_cast<size_t>(level), level) == std::string_view::npos;
                 }
             }
             else if (!lua && (line.compare(0, 2, "//") == 0 || line.compare(0, 2, "/*") == 0))

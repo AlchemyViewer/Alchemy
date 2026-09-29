@@ -589,58 +589,14 @@ std::string ALScriptLookup::refused(const Doc& doc, const std::string& name) con
 // static
 bool ALScriptLookup::mentions(std::string_view text, std::string_view name, bool lua)
 {
-    // Passed over as the lexers pass over them: `//` and `/* */` comments
-    // and "" strings in LSL; `--` and `--[[ ]]` comments, '' "" `` strings
-    // and [[ ]] long ones in SLua.
-    const auto long_close = [&text](size_t at, size_t& level) {
-        // A long bracket opening at `at`, `[[` or `[==[`: its closer.
-        if (at >= text.size() || text[at] != '[')
-        {
-            return std::string();
-        }
-        level = 0;
-        while (at + 1 + level < text.size() && text[at + 1 + level] == '=')
-        {
-            ++level;
-        }
-        return at + 1 + level < text.size() && text[at + 1 + level] == '[' ? "]" + std::string(level, '=') + "]" : std::string();
-    };
+    // Past the strings and the comments, as the lexers pass over them.
     const auto name_byte = ALScriptLexicon::isNameByte;
     for (size_t i = 0; i < text.size();)
     {
         const char c = text[i];
-        if (c == '"' || (lua && (c == '\'' || c == '`')))
+        if (const ALScriptLexicon::Stretch run = ALScriptLexicon::stretchAt(text, i, lua); run.kind != ALScriptLexicon::Kind::Code)
         {
-            for (++i; i < text.size() && text[i] != c && text[i] != '\n'; ++i)
-            {
-                i += text[i] == '\\' ? 1 : 0;
-            }
-            ++i;
-            continue;
-        }
-        if (lua && c == '-' && i + 1 < text.size() && text[i + 1] == '-')
-        {
-            size_t            level  = 0;
-            const std::string closer = long_close(i + 2, level);
-            const size_t      end    = closer.empty() ? text.find('\n', i) : text.find(closer, i + 4 + level);
-            i                        = end == std::string_view::npos ? text.size() : end + (closer.empty() ? 0 : closer.size());
-            continue;
-        }
-        if (lua && c == '[')
-        {
-            size_t            level  = 0;
-            const std::string closer = long_close(i, level);
-            if (!closer.empty())
-            {
-                const size_t end = text.find(closer, i + 2 + level);
-                i                = end == std::string_view::npos ? text.size() : end + closer.size();
-                continue;
-            }
-        }
-        if (!lua && c == '/' && i + 1 < text.size() && (text[i + 1] == '/' || text[i + 1] == '*'))
-        {
-            const size_t end = text[i + 1] == '/' ? text.find('\n', i) : text.find("*/", i + 2);
-            i                = end == std::string_view::npos ? text.size() : end + (text[i + 1] == '/' ? 0 : 2);
+            i = run.end;
             continue;
         }
         if (name_byte(c))
