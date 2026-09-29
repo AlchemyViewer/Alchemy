@@ -26,6 +26,7 @@
 
 #include "alscriptweight.h"
 #include "llpanel.h"
+#include "llstl.h"
 
 #include <boost/unordered/unordered_flat_map.hpp>
 
@@ -66,7 +67,7 @@ public:
         bool                        beforeOptimizer = false;
         std::optional<size_t>       sent;
         // An include's name, by the identity its parts carry.
-        boost::unordered_flat_map<std::string, std::string> fileNames;
+        boost::unordered_flat_map<std::string, std::string, ll::string_hash, std::equal_to<>> fileNames;
         // What a function with no name of its own is called by where it
         // stands: the event a handler is put on, as the outline lists it,
         // by the line the function starts on.

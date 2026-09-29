@@ -33,6 +33,7 @@
 #include "lltrans.h"
 #include "lluicolortable.h"
 #include "lluictrlfactory.h"
+#include "llstl.h"
 
 #include <fmt/format.h>
 
@@ -213,7 +214,7 @@ void ALColorTablePanel::fill()
     const S32 added_group = S32(mFiles.size()) + 1;
 
     // What the sheet had to say about a name, for the row's sentence.
-    boost::unordered_flat_map<std::string, std::string> complaints;
+    boost::unordered_flat_map<std::string, std::string, ll::string_hash, std::equal_to<>> complaints;
     for (const ALColorSheet::Diagnostic& diagnostic : sheet.diagnostics())
     {
         if (diagnostic.declaration >= 0)

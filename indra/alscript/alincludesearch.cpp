@@ -26,6 +26,9 @@
 #include "alincludesearch.h"
 
 #include "alincludeidentity.h"
+#include "llstl.h"
+
+#include <boost/unordered/unordered_flat_set.hpp>
 
 #include <algorithm>
 
@@ -471,7 +474,7 @@ std::vector<ALPreprocessor::Include> ALIncludeSearch::includedBy(const std::stri
         return asks;
     };
     std::vector<ALPreprocessor::Include>             out;
-    boost::unordered_flat_set<std::string>           seen;
+    boost::unordered_flat_set<std::string, ll::string_hash, std::equal_to<>> seen;
     std::vector<std::pair<std::string, std::string>> todo{ { text, asking.self } };
     for (size_t next = 0; next < todo.size() && out.size() < 256; ++next)
     {
