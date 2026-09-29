@@ -621,7 +621,7 @@ namespace tut
 
         std::vector<std::string> taken;
         bool                     has = true;
-        ALScriptStudioRecovery::takeNotecardsTo([&taken, &has](const Entry& entry) {
+        ALScriptStudioRecovery::takeWindowsTo([&taken, &has](const Entry& entry) {
             taken.push_back(entry.name);
             return has;
         });
@@ -638,6 +638,6 @@ namespace tut
         has = false;
         r.recover(card);
         ensure("the window cannot have it: the studio keeps it", taken.size() == 2 && studio().orphans.size() == 2);
-        ALScriptStudioRecovery::takeNotecardsTo(nullptr);
+        ALScriptStudioRecovery::takeWindowsTo(nullptr);
     }
 }

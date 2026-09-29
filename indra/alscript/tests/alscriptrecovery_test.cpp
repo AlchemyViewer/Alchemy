@@ -602,6 +602,12 @@ namespace tut
         const std::vector<std::string> failed = nowhere.takeFailures();
         ensure("failed, by key", failed.size() == 1 && failed.front() == "item:w");
         ensure("and said once", nowhere.takeFailures().empty());
+        // Each asking of its own key leaves another's.
+        nowhere.writeSoon(entry("item:u", "lost"));
+        nowhere.writeSoon(entry("item:v", "lost"));
+        nowhere.flush();
+        ensure("one key's own", nowhere.takeFailure("item:u") && !nowhere.takeFailure("item:u"));
+        ensure("the other's left for it", nowhere.takeFailures() == std::vector<std::string>({ "item:v" }));
     }
 
     template<> template<>

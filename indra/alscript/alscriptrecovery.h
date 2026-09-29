@@ -171,9 +171,10 @@ public:
     // Whose text: an item in an object, an item in the inventory, or a
     // file on disk.
     static std::string keyOf(const LLUUID& object, const LLUUID& item, const std::string& file);
-    // Whose text, where the notecard window keeps it rather than a Script
+    // Whose text, where a window of the viewer's own keeps it -- the
+    // notecard window, the legacy script editors -- rather than a Script
     // Studio tab: a key of its own, so that the two never write over each
-    // other's entry for one notecard, and whoever takes an entry up knows
+    // other's entry for one item, and whoever takes an entry up knows
     // which of them it goes back to.
     static std::string windowKeyOf(const LLUUID& object, const LLUUID& item);
     static bool        isWindowKey(const std::string& key);
@@ -199,8 +200,11 @@ public:
     // The text and what goes with it read in, for an entry a listing read
     // only the start of; false where its file is gone or cannot be read.
     bool load(ALScriptRecoveryEntry& entry) const;
-    // The keys whose entries writeSoon could not write, since last asked.
+    // The keys whose entries writeSoon could not write, since last asked;
+    // and whether one key's could not, since last asked of it. Each asks
+    // of its own, so that one window taking failures leaves another's.
     std::vector<std::string> takeFailures();
+    bool                     takeFailure(const std::string& key);
     // This session's entry for the key gone: the text was saved, or is not
     // this session's to keep any more.
     void forget(const std::string& key);

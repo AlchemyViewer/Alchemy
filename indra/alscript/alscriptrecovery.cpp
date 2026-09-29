@@ -439,6 +439,20 @@ std::vector<std::string> ALScriptRecoveryStore::takeFailures()
     return out;
 }
 
+bool ALScriptRecoveryStore::takeFailure(const std::string& key)
+{
+    if (!mWriter)
+    {
+        return false;
+    }
+    const std::lock_guard<std::mutex> lock(mWriter->mutex);
+    std::vector<std::string>&         failed = mWriter->failed;
+    const auto                        gone   = std::remove(failed.begin(), failed.end(), key);
+    const bool                        any    = gone != failed.end();
+    failed.erase(gone, failed.end());
+    return any;
+}
+
 // static
 std::string ALScriptRecoveryStore::keyOf(const LLUUID& object, const LLUUID& item, const std::string& file)
 {
@@ -451,12 +465,12 @@ std::string ALScriptRecoveryStore::keyOf(const LLUUID& object, const LLUUID& ite
 
 std::string ALScriptRecoveryStore::windowKeyOf(const LLUUID& object, const LLUUID& item)
 {
-    return "card:" + keyOf(object, item, std::string());
+    return "window:" + keyOf(object, item, std::string());
 }
 
 bool ALScriptRecoveryStore::isWindowKey(const std::string& key)
 {
-    return key.starts_with("card:");
+    return key.starts_with("window:");
 }
 
 std::string ALScriptRecoveryStore::fileOf(const std::string& key) const

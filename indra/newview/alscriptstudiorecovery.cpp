@@ -48,18 +48,18 @@ namespace
     // A test's store, in place of the account's.
     ALScriptRecoveryStore* sGivenStore = nullptr;
 
-    // The notecard window's way of taking up what it kept.
-    ALScriptStudioRecovery::notecard_window_t& notecardWindow()
+    // The viewer's own windows' way of taking up what they kept.
+    ALScriptStudioRecovery::window_t& ownWindows()
     {
-        static ALScriptStudioRecovery::notecard_window_t window;
+        static ALScriptStudioRecovery::window_t window;
         return window;
     }
 
-    // An entry the notecard window kept, taken up there: false where it is
-    // not the window's, or the window cannot have its notecard.
-    bool toNotecardWindow(const ALScriptRecoveryEntry& entry)
+    // An entry one of the viewer's own windows kept, taken up there: false
+    // where it is not such a window's, or the window cannot have its item.
+    bool toOwnWindow(const ALScriptRecoveryEntry& entry)
     {
-        const ALScriptStudioRecovery::notecard_window_t& window = notecardWindow();
+        const ALScriptStudioRecovery::window_t& window = ownWindows();
         return ALScriptRecoveryStore::isWindowKey(entry.key) && window && window(entry);
     }
 
@@ -162,9 +162,9 @@ void ALScriptStudioRecovery::useStore(ALScriptRecoveryStore* store)
 }
 
 // static
-void ALScriptStudioRecovery::takeNotecardsTo(notecard_window_t window)
+void ALScriptStudioRecovery::takeWindowsTo(window_t window)
 {
-    notecardWindow() = std::move(window);
+    ownWindows() = std::move(window);
 }
 
 // static
@@ -279,11 +279,10 @@ bool ALScriptStudioRecovery::keepAll(const std::vector<Doc*>& docs, Entry::State
         return all;
     }
     kept->flush();
-    const std::vector<std::string> failed = kept->takeFailures();
     for (Doc* doc : written)
     {
         doc->recoveryDue = 0.0;
-        if (std::find(failed.begin(), failed.end(), doc->recoveryKey) != failed.end())
+        if (kept->takeFailure(doc->recoveryKey))
         {
             all                        = false;
             doc->recoveryWritten.valid = false;
@@ -313,25 +312,23 @@ void ALScriptStudioRecovery::keepSoon(Doc& doc)
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
     ALScriptRecoveryStore* kept = store();
     // What the last of these could not write, said once, as a write here
-    // says it.
+    // says it: each tab's own, leaving another window's to it.
     if (kept)
     {
-        for (const std::string& key : kept->takeFailures())
+        for (Doc* each : mServices.openDocs())
         {
-            for (Doc* each : mServices.openDocs())
+            if (each->recoveryKey.empty() || !kept->takeFailure(each->recoveryKey))
             {
-                if (each->recoveryKey == key)
-                {
-                    // Not written after all: written again next time.
-                    each->recoveryWritten.valid = false;
-                }
-                if (each->recoveryKey == key && !each->recoveryFailed)
-                {
-                    each->recoveryFailed = true;
-                    LLStringUtil::format_map_t args;
-                    args["[NAME]"] = each->name;
-                    mServices.report(mServices.words("RecoveryWriteFailed", args), true, each);
-                }
+                continue;
+            }
+            // Not written after all: written again next time.
+            each->recoveryWritten.valid = false;
+            if (!each->recoveryFailed)
+            {
+                each->recoveryFailed = true;
+                LLStringUtil::format_map_t args;
+                args["[NAME]"] = each->name;
+                mServices.report(mServices.words("RecoveryWriteFailed", args), true, each);
             }
         }
     }
@@ -569,9 +566,10 @@ void ALScriptStudioRecovery::recover(const Entry& listed)
     {
         return;
     }
-    // What the notecard window kept goes back to it, where it can have the
-    // notecard: reading and writing a notecard needs no studio.
-    if (toNotecardWindow(entry))
+    // What one of the viewer's own windows kept goes back to it, where it
+    // can have the item: the notecard window, a legacy script editor.
+    // Reading and writing a notecard needs no studio.
+    if (toOwnWindow(entry))
     {
         return;
     }
@@ -801,13 +799,13 @@ void ALScriptStudioRecovery::offer(std::function<ALScriptStudioRecovery*()> stud
                                      }
                                      return;
                                  }
-                                 // What the notecard window kept goes back to
-                                 // it; the studio opens only for the rest.
+                                 // What the viewer's own windows kept goes back
+                                 // to them; the studio opens only for the rest.
                                  std::vector<Entry> rest;
                                  for (const Entry& entry : now)
                                  {
                                      Entry whole = entry;
-                                     if (!(ALScriptRecoveryStore::isWindowKey(entry.key) && kept->load(whole) && toNotecardWindow(whole)))
+                                     if (!(ALScriptRecoveryStore::isWindowKey(entry.key) && kept->load(whole) && toOwnWindow(whole)))
                                      {
                                          rest.push_back(entry);
                                      }
