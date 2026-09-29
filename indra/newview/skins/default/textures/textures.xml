@@ -1062,6 +1062,13 @@ with the same filename but different name
   <texture name="Studio_File" file_name="studio/Studio_File.png" preload="false" />
   <texture name="Studio_Prim" file_name="studio/Studio_Prim.png" preload="false" />
   <texture name="Studio_Config" file_name="studio/Studio_Config.png" preload="false" />
+  <texture name="Studio_Save" file_name="studio/Studio_Save.png" preload="false" />
+  <texture name="Studio_Undo" file_name="studio/Studio_Undo.png" preload="false" />
+  <texture name="Studio_Redo" file_name="studio/Studio_Redo.png" preload="false" />
+  <texture name="Studio_PaneLeft" file_name="studio/Studio_PaneLeft.png" preload="false" />
+  <texture name="Studio_PaneBottom" file_name="studio/Studio_PaneBottom.png" preload="false" />
+  <texture name="Studio_PaneRight" file_name="studio/Studio_PaneRight.png" preload="false" />
+  <texture name="Studio_Pinned" file_name="studio/Studio_Pinned.png" preload="false" />
   <texture name="Problem_Error" file_name="studio/Problem_Error.png" preload="false" />
   <texture name="Problem_Warning" file_name="studio/Problem_Warning.png" preload="false" />
   <texture name="Problem_Note" file_name="studio/Problem_Note.png" preload="false" />

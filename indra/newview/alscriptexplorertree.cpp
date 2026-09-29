@@ -59,7 +59,7 @@ public:
     // What it stands for and how it is shown; true where that changed.
     bool set(const Row& row, const Look& look)
     {
-        const bool changed = look.label != mLabel || look.suffix != mSuffix || look.icon != mIconName || row.name != mName;
+        const bool changed = look.label != mLabel || look.suffix != mSuffix || look.icon != mIconName || look.overlay != mOverlayName || row.name != mName;
         mValue  = row.value;
         mName   = row.name;
         mLabel  = look.label;
@@ -69,6 +69,11 @@ public:
         {
             mIconName = look.icon;
             mIcon     = look.icon.empty() ? LLPointer<LLUIImage>() : LLUI::getUIImage(look.icon);
+        }
+        if (look.overlay != mOverlayName)
+        {
+            mOverlayName = look.overlay;
+            mOverlay     = look.overlay.empty() ? LLPointer<LLUIImage>() : LLUI::getUIImage(look.overlay);
         }
         return changed;
     }
@@ -93,6 +98,7 @@ public:
     std::string        getSearchableUUIDString() const override { return std::string(); }
 
     LLPointer<LLUIImage> getIcon() const override { return mIcon; }
+    LLPointer<LLUIImage> getIconOverlay() const override { return mOverlay; }
     LLFontGL::StyleFlags getLabelStyle() const override { return LLFontGL::NORMAL; }
     std::string          getLabelSuffix() const override { return mSuffix; }
 
@@ -157,6 +163,8 @@ private:
     std::string           mSuffix;
     std::string           mIconName;
     LLPointer<LLUIImage>  mIcon;
+    std::string           mOverlayName;
+    LLPointer<LLUIImage>  mOverlay;
     bool                  mKnown = true;
 };
 
@@ -232,6 +240,9 @@ bool ALScriptExplorerTree::postBuild()
     p.root              = nullptr;
     p.use_ellipses      = true;
     p.use_label_suffix  = true;
+    // What marks a row beside its kind -- a pin -- is drawn over its icon,
+    // as the inventory marks a link.
+    p.show_item_link_overlays = true;
     p.allow_multiselect = true;
     p.allow_drag        = true;
     // Never shown: the explorer's own menu is, from a right-click here.

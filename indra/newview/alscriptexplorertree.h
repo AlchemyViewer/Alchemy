@@ -85,6 +85,8 @@ public:
         std::string label;
         std::string suffix;
         std::string icon;
+        // Drawn over the icon: a mark beside what the row is, such as a pin.
+        std::string overlay;
     };
 
     // Built by the skin (class="script_studio_explorer_tree").

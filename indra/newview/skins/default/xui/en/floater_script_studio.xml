@@ -165,7 +165,6 @@
     <floater.string name="ExperienceUnknown">Experience: not known</floater.string>
     <floater.string name="ExperienceSetOnSave">[NAME] runs under [EXPERIENCE] once it is saved.</floater.string>
     <floater.string name="ExperienceClearedOnSave">[NAME] runs under no experience once it is saved.</floater.string>
-    <floater.string name="PinnedMark">* </floater.string>
     <floater.string name="ArrowOpen">&#9662; </floater.string>
     <floater.string name="ArrowFolded">&#9656; </floater.string>
     <floater.string name="NewKindScript">script</floater.string>
@@ -1386,7 +1385,7 @@
     <button
      follows="left|top"
      height="22"
-     image_overlay="Script_Save"
+     image_overlay="Studio_Save"
      layout="topleft"
      left="8"
      name="save_btn"
@@ -1406,7 +1405,7 @@
     <button
      follows="left|top"
      height="22"
-     image_overlay="Script_Undo"
+     image_overlay="Studio_Undo"
      layout="topleft"
      left_pad="8"
      name="undo_btn"
@@ -1416,7 +1415,7 @@
     <button
      follows="left|top"
      height="22"
-     image_overlay="Script_Redo"
+     image_overlay="Studio_Redo"
      layout="topleft"
      left_pad="2"
      name="redo_btn"
@@ -1457,7 +1456,7 @@
     <button
      follows="right|top"
      height="22"
-     image_overlay="SidebarLeft_Off"
+     image_overlay="Studio_PaneLeft"
      image_overlay_alignment="left"
      is_toggle="true"
      label="Explorer"
@@ -1470,7 +1469,7 @@
     <button
      follows="right|top"
      height="22"
-     image_overlay="SidebarBottom_Off"
+     image_overlay="Studio_PaneBottom"
      image_overlay_alignment="left"
      is_toggle="true"
      label="Panel"
@@ -1483,7 +1482,7 @@
     <button
      follows="right|top"
      height="22"
-     image_overlay="SidebarRight_Off"
+     image_overlay="Studio_PaneRight"
      image_overlay_alignment="left"
      is_toggle="true"
      label="Inspector"

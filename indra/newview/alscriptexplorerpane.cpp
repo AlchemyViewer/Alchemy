@@ -503,7 +503,6 @@ void ALScriptExplorerPane::fill()
     // inventory's worn items say so.
     // The words every row of a kind says, looked up once for all of them.
     const auto        said        = [this](const std::string& word) { return " (" + mServices->words(word) + ")"; };
-    const std::string pinned_mark = mServices->words("PinnedMark");
     const std::string away        = said("KindAway");
     const std::string coming      = mServices->words("ObjectNameComing");
     const std::string unknown     = said("StateUnknown");
@@ -520,7 +519,10 @@ void ALScriptExplorerPane::fill()
                 // Away, where it was last: its pin keeps the place.
                 LLStringUtil::format_map_t where;
                 where["[REGION]"] = row.region;
-                out.label  = (row.pinned ? pinned_mark : LLStringUtil::null) + row.name;
+                // A pin over its icon where it is pinned, rather than a
+                // mark before its name, which read as unsaved.
+                out.label   = row.name;
+                out.overlay = row.pinned ? "Studio_Pinned" : LLStringUtil::null;
                 out.suffix = row.present         ? LLStringUtil::null
                              : row.region.empty() ? away
                                                   : " (" + mServices->words("KindAwayIn", where) + ")";
