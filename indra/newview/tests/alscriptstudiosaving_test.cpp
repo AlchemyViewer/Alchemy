@@ -823,4 +823,25 @@ namespace tut
         saving.saveAsked(doc);
         ensure_equals("asked again: sent over it", studio.sent.size(), size_t(2));
     }
+
+    template<> template<>
+    void alscriptstudiosaving_object::test<16>()
+    {
+        set_test_name("a save heard from elsewhere, as every editor of the item decides it: the same text, taken, kept or asked about; what was last saved asked only where it is needed");
+        using Heard = ALScriptWorkspace::Heard;
+        S32  asked     = 0;
+        auto last_was  = [&asked](std::optional<std::string> text) {
+            return [&asked, text]() {
+                ++asked;
+                return text;
+            };
+        };
+        ensure("the same text", ALScriptWorkspace::heard("a", "a", true, last_was("b")) == Heard::Same);
+        ensure("nothing typed: taken", ALScriptWorkspace::heard("a", "b", false, last_was("b")) == Heard::Take);
+        ensure_equals("without asking what was last saved", asked, 0);
+        ensure("typed, and theirs is what was last saved: kept", ALScriptWorkspace::heard("a", "b", true, last_was("a")) == Heard::Keep);
+        ensure("typed, and theirs is new: asked", ALScriptWorkspace::heard("a", "b", true, last_was("c")) == Heard::Ask);
+        ensure("typed, nothing known of the last save: asked", ALScriptWorkspace::heard("a", "b", true, last_was(std::nullopt)) == Heard::Ask);
+        ensure_equals("asked where it was needed", asked, 3);
+    }
 }

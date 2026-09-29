@@ -588,36 +588,37 @@ void ALScriptStudioSaving::savedElsewhere(const ALScriptWorkspace::Saved& saved)
     {
         doc.assetId = saved.asset;
     }
-    const std::string& here = doc.editor->wholeText();
-    if (theirs == here)
+    switch (ALScriptWorkspace::heard(theirs, doc.editor->wholeText(), doc.editor->isDirty() && doc.modifiable,
+                                     [&doc]() { return doc.editor->undoJournal().savedText(); }))
     {
-        // What is here is what went up.
-        doc.editor->resetDirty();
-        mWindow.refreshToolbar();
-        return;
-    }
-    if (doc.editor->isDirty() && doc.modifiable)
-    {
-        // A save of the text this tab last had -- a recompile, a queue --
-        // changes nothing it holds: what was typed stays, to be saved.
-        const std::optional<std::string> before = doc.editor->undoJournal().savedText();
-        if (before && theirs == *before)
+        case ALScriptWorkspace::Heard::Same:
+            // What is here is what went up.
+            doc.editor->resetDirty();
+            mWindow.refreshToolbar();
+            return;
+        case ALScriptWorkspace::Heard::Keep:
+            // A save of the text this tab last had -- a recompile, a queue
+            // -- changes nothing it holds: what was typed stays, to be
+            // saved.
+            return;
+        case ALScriptWorkspace::Heard::Ask:
         {
+            // Changed here and there: one would be lost, so the author says
+            // which, with the two to compare.
+            doc.savedThere = theirs;
+            LLStringUtil::format_map_t args;
+            args["[NAME]"] = doc.name;
+            args["[WHO]"]  = mServices.words(saved.sender.origin == ALScriptWorkspace::Origin::Bridge   ? "SavedByBridge"
+                                             : saved.sender.origin == ALScriptWorkspace::Origin::Editor ? "SavedByEditor"
+                                                                                                        : "SavedByQueue");
+            mServices.report(mServices.words("SavedElsewhereConflict", args), true, &doc, { "take_saved", "keep_saved", "compare_saved" });
             return;
         }
-        // Changed here and there: one would be lost, so the author says
-        // which, with the two to compare.
-        doc.savedThere = theirs;
-        LLStringUtil::format_map_t args;
-        args["[NAME]"] = doc.name;
-        args["[WHO]"]  = mServices.words(saved.sender.origin == ALScriptWorkspace::Origin::Bridge   ? "SavedByBridge"
-                                         : saved.sender.origin == ALScriptWorkspace::Origin::Editor ? "SavedByEditor"
-                                                                                                    : "SavedByQueue");
-        mServices.report(mServices.words("SavedElsewhereConflict", args), true, &doc, { "take_saved", "keep_saved", "compare_saved" });
-        return;
+        case ALScriptWorkspace::Heard::Take:
+            // Nothing typed here: taken as if loaded afresh.
+            mWindow.takeLoaded(doc, saved.text);
+            return;
     }
-    // Nothing typed here: taken as if loaded afresh.
-    mWindow.takeLoaded(doc, saved.text);
 }
 
 void ALScriptStudioSaving::takeSaved(Doc& doc)

@@ -280,6 +280,40 @@ public:
     };
     typedef boost::signals2::signal<void(const Saved&)> saved_signal_t;
     boost::signals2::connection onSaved(const saved_signal_t::slot_type& slot) { return mSaved.connect(slot); }
+    // What an editor holding the item does about a save of it heard from
+    // elsewhere -- the author's text as it went up, a script's out of its
+    // envelope, against what the editor holds: the same text, marked
+    // saved; nothing typed there, or nothing that may be changed, taken as
+    // if loaded afresh; typed there, and what went up is what the editor
+    // last had -- a recompile, a queue -- kept, to be saved; typed there
+    // otherwise, asked which to keep, since one would be lost. Every
+    // editor of an item decides by this, so that a studio tab and the
+    // notecard window decide alike.
+    enum class Heard : U8
+    {
+        Same,
+        Take,
+        Keep,
+        Ask
+    };
+    // `changed`: typed in, where it may be changed at all; `last_saved`:
+    // the text as the editor last had it saved or loaded, where it knows,
+    // asked only where it is needed.
+    // Here, so that whatever decides by it need not link the workspace.
+    static Heard heard(std::string_view theirs, std::string_view here, bool changed,
+                       const std::function<std::optional<std::string>()>& last_saved)
+    {
+        if (theirs == here)
+        {
+            return Heard::Same;
+        }
+        if (!changed)
+        {
+            return Heard::Take;
+        }
+        const std::optional<std::string> before = last_saved ? last_saved() : std::nullopt;
+        return before && theirs == *before ? Heard::Keep : Heard::Ask;
+    }
 
     // A script's text as it goes up again: expanded afresh from its
     // source where the preprocessor wrapped it or is on, so that its
