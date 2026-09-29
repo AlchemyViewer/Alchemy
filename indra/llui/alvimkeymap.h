@@ -306,8 +306,44 @@ private:
     void typeIn(ALTextView& view, const std::string& text);
 
     // Normal mode's command, once the count, the register and any
-    // operator have been read; false where the character is not one.
-    bool command(ALTextView& view, llwchar ch);
+    // operator have been read; false where the character is not one. In
+    // turn: the key a waiting one wants (afterPending), a count or a
+    // register, an operator's motion (operatorKey), visual mode's own
+    // (visualKey), everyone's (normalKey), and else a motion (motionKey).
+    // visualKey and normalKey say nothing of a key that is none of theirs.
+    bool                command(ALTextView& view, llwchar ch);
+    bool                operatorKey(ALTextView& view, llwchar ch);
+    std::optional<bool> visualKey(ALTextView& view, llwchar ch);
+    std::optional<bool> normalKey(ALTextView& view, llwchar ch);
+    bool                motionKey(ALTextView& view, llwchar ch);
+    // A key that waits for the one after it -- a register's name, g's and
+    // z's commands, r's character, a text object's kind -- and that one:
+    // what the waiting key is picks a function from PENDING_KEYS, each
+    // told the waiting key and the one after it. f, F, t, T, ` and ' are
+    // none of the table's, and take a motion's argument (afterMotionKey).
+    struct PendingKey
+    {
+        llwchar key;
+        bool (ALVimKeymap::*take)(ALTextView& view, llwchar pending, llwchar ch);
+    };
+    static const PendingKey PENDING_KEYS[];
+    bool afterPending(ALTextView& view, llwchar pending, llwchar ch);
+    bool afterSurroundWith(ALTextView& view, llwchar pending, llwchar ch);
+    bool afterChangeSurround(ALTextView& view, llwchar pending, llwchar ch);
+    bool afterSurroundPair(ALTextView& view, llwchar pending, llwchar ch);
+    bool afterRegisterName(ALTextView& view, llwchar pending, llwchar ch);
+    bool afterMark(ALTextView& view, llwchar pending, llwchar ch);
+    bool afterRecord(ALTextView& view, llwchar pending, llwchar ch);
+    bool afterPlay(ALTextView& view, llwchar pending, llwchar ch);
+    bool afterReplace(ALTextView& view, llwchar pending, llwchar ch);
+    bool afterG(ALTextView& view, llwchar pending, llwchar ch);
+    bool afterZ(ALTextView& view, llwchar pending, llwchar ch);
+    bool afterGr(ALTextView& view, llwchar pending, llwchar ch);
+    bool afterBracket(ALTextView& view, llwchar pending, llwchar ch);
+    bool afterBigZ(ALTextView& view, llwchar pending, llwchar ch);
+    bool afterWindow(ALTextView& view, llwchar pending, llwchar ch);
+    bool afterObject(ALTextView& view, llwchar pending, llwchar ch);
+    bool afterMotionKey(ALTextView& view, llwchar pending, llwchar ch);
     // A motion by its character, with the count; not ok where the
     // character is no motion.
     Motion motion(ALTextView& view, llwchar ch, S32 count, llwchar arg);

@@ -1061,720 +1061,13 @@ bool ALVimKeymap::normal(ALTextView& view, const Input& input)
 
 bool ALVimKeymap::command(ALTextView& view, llwchar ch)
 {
-    const ALTextDocument& d       = view.document();
-    const bool            visual  = mMode != Mode::Normal;
-    const bool            editing = !view.isReadOnly();
-
-    // Something waiting for this character.
+    // Something waiting for this character: what that is says what this
+    // one does (afterPending).
     if (mPending)
     {
         const llwchar pending = mPending;
         mPending              = 0;
-        const S32 count       = countOr(mCount);
-        switch (pending)
-        {
-            case SURROUND_WITH:
-            {
-                // ys's stretch, or visual S's, with the pair round it.
-                std::string open;
-                std::string close;
-                mSurroundWaiting = false;
-                if (!editing || !surroundPair(ch, open, close))
-                {
-                    clearPending();
-                    return true;
-                }
-                surround(view, mSurroundSpan, open, close);
-                finishCommand(true);
-                return true;
-            }
-            case CHANGE_SURROUND:
-                mSurroundOld = ch;
-                mPending     = CHANGE_SURROUND_TO;
-                return true;
-            case DELETE_SURROUND:
-            case CHANGE_SURROUND_TO:
-            {
-                // ds's pair taken away, or cs's changed; the count before
-                // the d or the c the pair that many out.
-                const bool changed = editing && changeSurround(view, pending == DELETE_SURROUND ? ch : mSurroundOld,
-                                                               pending == DELETE_SURROUND ? 0 : ch, countOr(mOperatorCount));
-                if (!changed)
-                {
-                    clearPending();
-                    return true;
-                }
-                finishCommand(true);
-                return true;
-            }
-            case '"':
-                if ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || ch == '"' || (ch >= '0' && ch <= '9') || ch == '-' || ch == '_' || ch == '+' ||
-                    ch == '*')
-                {
-                    mRegister = static_cast<char>(ch);
-                    mCount    = 0;
-                    return true;
-                }
-                clearPending();
-                return true;
-            case 'm':
-                if (ch >= 'a' && ch <= 'z')
-                {
-                    mMarks[static_cast<char>(ch)] = cursor(view);
-                }
-                clearPending();
-                return true;
-            case 'q':
-                // Recording into a register: a-z afresh, A-Z onto what
-                // is there. q: q/ and q? are the line with its history
-                // in it, the last line entered up, rather than vim's
-                // window of them.
-                if ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z'))
-                {
-                    mRecording = static_cast<char>(ch);
-                    mRecorded.clear();
-                }
-                else if (ch == ':' || ch == '/' || ch == '?')
-                {
-                    clearPending();
-                    const std::vector<std::string>& history = mCommandLine.historyOf(ch);
-                    if (mHooks.historyWindow && !history.empty())
-                    {
-                        // The host's window of them; what is picked comes
-                        // back onto the line.
-                        const llwchar kind = ch;
-                        // Picked later: the tab, or vim in it, may have gone
-                        // meanwhile, and both are looked for again.
-                        const LLHandle<LLUICtrl> handle = view.getHandle();
-                        mHooks.historyWindow(view, kind, history, [handle, kind](const std::string& line, bool run) {
-                            ALTextView*  again = dynamic_cast<ALTextView*>(handle.get());
-                            ALVimKeymap* vim   = again ? dynamic_cast<ALVimKeymap*>(again->modalKeymap()) : nullptr;
-                            if (vim)
-                            {
-                                vim->takeLine(*again, kind, line, run);
-                            }
-                        });
-                        return true;
-                    }
-                    mMode     = ch == ':' ? Mode::Command : Mode::Search;
-                    mCommandLine.kind = ch;
-                    mCommandLine.historyPrefix.clear();
-                    mCommandLine.historyAt  = history.empty() ? -1 : static_cast<S32>(history.size()) - 1;
-                    mCommandLine.line       = history.empty() ? std::string() : history.back();
-                    mCommandLine.cursor = mCommandLine.line.size();
-                    return true;
-                }
-                clearPending();
-                return true;
-            case '@':
-            {
-                // A register's keys played, the count times over; @@ the
-                // last one again.
-                char name = static_cast<char>(ch);
-                if (name == '@')
-                {
-                    name = mLastPlayed;
-                }
-                if (name == ':')
-                {
-                    // The last : line again.
-                    clearPending();
-                    mLastPlayed = ':';
-                    const std::vector<std::string>& history = mCommandLine.historyOf(':');
-                    if (history.empty())
-                    {
-                        say(said("VimNoPreviousCommand", "E30: No previous command line"), true);
-                        return true;
-                    }
-                    view.undoJournal().beginGroup();
-                    for (S32 n = 0; n < count; ++n)
-                    {
-                        mEx->runCommand(view, history.back());
-                        if (mMessageError)
-                        {
-                            break;
-                        }
-                    }
-                    view.undoJournal().endGroup();
-                    return true;
-                }
-                if (!((name >= 'a' && name <= 'z') || (name >= 'A' && name <= 'Z') || name == '"' || name == '0'))
-                {
-                    clearPending();
-                    return true;
-                }
-                const std::vector<Input> inputs = decodeInputs(fetch(static_cast<char>(std::tolower(name))).text);
-                mLastPlayed                     = static_cast<char>(std::tolower(name));
-                clearPending();
-                // The count's plays one step to undo, and the first to fail
-                // the last, as in vim.
-                view.undoJournal().beginGroup();
-                for (S32 n = 0; n < count; ++n)
-                {
-                    if (!play(view, inputs, true))
-                    {
-                        break;
-                    }
-                }
-                view.undoJournal().endGroup();
-                return true;
-            }
-            case 'r':
-            {
-                if (!editing)
-                {
-                    clearPending();
-                    return true;
-                }
-                if (visual)
-                {
-                    // Every character of the selection becomes this one.
-                    const Span                                        span = visualSpan(view);
-                    std::vector<std::pair<ALTextRange, std::string>> edits;
-                    for (S32 line = span.range.begin.line; line <= span.range.end.line; ++line)
-                    {
-                        const S32 c0 = span.linewise ? 0 : (span.block || line == span.range.begin.line) ? span.range.begin.column : 0;
-                        const S32 c1 = span.linewise ? d.lineLength(line)
-                                       : span.block ? llmin(d.lineLength(line), span.range.end.column + 1)
-                                       : line == span.range.end.line ? span.range.end.column : d.lineLength(line);
-                        const S32 lo = llmin(c0, d.lineLength(line));
-                        const S32 hi = llmin(llmax(lo, c1), d.lineLength(line));
-                        if (hi > lo)
-                        {
-                            std::string with;
-                            for (S32 c = lo; c < hi; ++c)
-                            {
-                                with += utf8Of(ch);
-                            }
-                            edits.emplace_back(ALTextRange(ALTextPos(line, lo), ALTextPos(line, hi)), with);
-                        }
-                    }
-                    const ALTextPos start = span.range.begin;
-                    leaveVisual(view);
-                    view.replaceAll(std::move(edits));
-                    moveTo(view, start);
-                    finishCommand(true);
-                    return true;
-                }
-                // The character under the caret, and the count after it,
-                // replaced; a return breaks the line -- once, whatever the
-                // count, as vim's does -- the new line indented as a
-                // Return would indent it, the caret at its start.
-                ALTextPos from = view.caret();
-                ALTextPos to   = from;
-                for (S32 n = 0; n < count; ++n)
-                {
-                    if (atLineEnd(d, to))
-                    {
-                        clearPending();
-                        return true;
-                    }
-                    to = d.nextCluster(to);
-                }
-                view.setSelection(ALTextRange(from, to));
-                if (ch == '\r' || ch == '\n')
-                {
-                    view.perform(ALEditorCommand::NewLine);
-                    moveTo(view, view.caret());
-                    finishCommand(true);
-                    return true;
-                }
-                std::string with;
-                for (S32 n = 0; n < count; ++n)
-                {
-                    with += utf8Of(ch);
-                }
-                view.insertText(with);
-                moveTo(view, d.prevCluster(view.caret()));
-                finishCommand(true);
-                return true;
-            }
-            case 'g':
-                switch (ch)
-                {
-                    case 'g':
-                        return command(view, GO_TOP);
-                    case 'c':
-                        // Comments: an operator over lines, gcc a line, gc
-                        // a visual selection's lines.
-                        if (visual)
-                        {
-                            const Span span = visualSpan(view);
-                            noteVisualOperation(span);
-                            applyOperator(view, COMMENT_OPERATOR, span, 1);
-                            leaveVisual(view);
-                            finishCommand(true);
-                            return true;
-                        }
-                        if (!editing)
-                        {
-                            clearPending();
-                            return true;
-                        }
-                        mOperator      = COMMENT_OPERATOR;
-                        mOperatorCount = mCount;
-                        mCount         = 0;
-                        return true;
-                    case 'r':
-                        mPending = PENDING_GR;
-                        return true;
-                    case '_':
-                        return command(view, LAST_NON_BLANK);
-                    case ';':
-                    case ',':
-                    {
-                        // The change list: older, or newer again.
-                        clearPending();
-                        if (view.changes().empty())
-                        {
-                            say(said("VimNoChanges", "E664: Changelist is empty"), true);
-                        }
-                        else if (!view.goToChange(ch == ';' ? -count : count))
-                        {
-                            say(ch == ';' ? said("VimChangesStart", "E662: At start of changelist")
-                                          : said("VimChangesEnd", "E663: At end of changelist"),
-                                true);
-                        }
-                        else
-                        {
-                            moveTo(view, view.caret());
-                        }
-                        return true;
-                    }
-                    case 'i':
-                    {
-                        // Inserting again where it last stopped.
-                        clearPending();
-                        if (!editing)
-                        {
-                            return true;
-                        }
-                        const auto mark = mMarks.find('^');
-                        if (mark != mMarks.end())
-                        {
-                            view.setCaret(d.clamp(mark->second));
-                        }
-                        enterInsert(view, count);
-                        return true;
-                    }
-                    case 'I':
-                        // Inserting in the line's first column, before its
-                        // indent, where I goes after it.
-                        clearPending();
-                        if (editing && !visual)
-                        {
-                            view.setCaret(ALTextPos(view.caret().line, 0));
-                            enterInsert(view, count);
-                        }
-                        return true;
-                    case '*':
-                    case '#':
-                    {
-                        // As * and #, the word anywhere, not only whole.
-                        const ALTextRange word = d.wordAt(view.caret());
-                        clearPending();
-                        if (!word.empty())
-                        {
-                            mSearch.pattern   = d.text(word);
-                            mSearch.forward   = ch == '*';
-                            mSearch.wholeWord = false;
-                            mSearch.offset    = ALVimSearch::Offset();
-                            mSearch.search(view, mSearch.pattern, mSearch.forward, count, false);
-                        }
-                        return true;
-                    }
-                    case 'p':
-                    case 'P':
-                        if (editing && !visual)
-                        {
-                            put(view, mRegister, ch == 'p', count, true);
-                            finishCommand(true);
-                        }
-                        else
-                        {
-                            clearPending();
-                        }
-                        return true;
-                    case 'n':
-                    case 'N':
-                    {
-                        // The last search's match here or next: selected, or
-                        // what an operator works on -- cgn, and . for the
-                        // next.
-                        const std::optional<ALTextRange> match = mSearch.matchNear(view, ch == 'n');
-                        if (!match)
-                        {
-                            clearPending();
-                            return true;
-                        }
-                        if (mOperator)
-                        {
-                            Span span;
-                            span.range       = *match;
-                            const llwchar op = mOperator;
-                            applyOperator(view, op, span, 1);
-                            finishCommand(op != 'y');
-                            return true;
-                        }
-                        clearPending();
-                        if (!visual)
-                        {
-                            mVisualAnchor = match->begin;
-                            enterVisual(view, Mode::Visual);
-                        }
-                        mVisualAnchor = match->begin;
-                        mVisualCaret  = d.prevCluster(match->end);
-                        showVisual(view);
-                        return true;
-                    }
-                    case 'O':
-                        // The script's symbols, to go to one: the host's.
-                        clearPending();
-                        if (mHooks.command)
-                        {
-                            mHooks.command(view, "go_to_symbol", std::string());
-                        }
-                        return true;
-                    case 'f':
-                    {
-                        // The file named under the caret, as :find finds
-                        // one: an include's or a module's where the host has
-                        // one.
-                        clearPending();
-                        const std::string name = fileUnderCursor(view);
-                        if (name.empty())
-                        {
-                            say(said("VimNoFileUnderCursor", "E446: No file name under cursor"), true);
-                        }
-                        else
-                        {
-                            mEx->runCommand(view, "find " + name);
-                        }
-                        return true;
-                    }
-                    case 'd':
-                    case 'D':
-                        // The declaration: the host's definition, as :tag
-                        // goes to it.
-                        clearPending();
-                        mEx->runCommand(view, "tag");
-                        return true;
-                    case 't':
-                    case 'T':
-                    {
-                        // The host's tabs: gt the next, {N}gt the Nth; gT
-                        // back one, or N.
-                        const S32  given    = mCount;
-                        const bool operated = mOperator != 0;
-                        clearPending();
-                        if (!operated)
-                        {
-                            const std::string tabs = ch == 't' ? "tabnext" : "tabprevious";
-                            mEx->runCommand(view, given > 0 ? tabs + " " + std::to_string(given) : tabs);
-                        }
-                        return true;
-                    }
-                    case '&':
-                        // The last :s again on every line, with its flags.
-                        clearPending();
-                        if (editing)
-                        {
-                            mEx->runCommand(view, "%s//~/&");
-                        }
-                        return true;
-                    case 'v':
-                        if (mVisualLast != Mode::Normal)
-                        {
-                            mVisualAnchor = mVisualLastAnchor;
-                            mVisualCaret  = mVisualLastCaret;
-                            mMode         = mVisualLast;
-                            showVisual(view);
-                        }
-                        clearPending();
-                        return true;
-                    case 'J':
-                    {
-                        // Lines joined as they are.
-                        if (!editing)
-                        {
-                            clearPending();
-                            return true;
-                        }
-                        const S32 first = visual ? llmin(mVisualAnchor.line, cursor(view).line) : view.caret().line;
-                        const S32 last  = visual ? llmax(mVisualAnchor.line, cursor(view).line) : first;
-                        const S32 until = visual ? llmax(last, first + 1) : first + llmax(1, count - 1);
-                        if (visual)
-                        {
-                            leaveVisual(view);
-                        }
-                        if (const std::optional<ALTextEditing::Change> join = ALTextEditing::joinLines(d, first, until, true))
-                        {
-                            view.apply(*join);
-                            moveTo(view, join->caret);
-                        }
-                        finishCommand(true);
-                        return true;
-                    }
-                    case '~':
-                    case 'u':
-                    case 'U':
-                        if (visual)
-                        {
-                            const Span span = visualSpan(view);
-                            noteVisualOperation(span);
-                            applyOperator(view, ch, span, 1);
-                            leaveVisual(view);
-                            finishCommand(true);
-                            return true;
-                        }
-                        mOperator      = ch;
-                        mOperatorCount = mCount;
-                        mCount         = 0;
-                        return true;
-                    case 'e':
-                    case 'E':
-                        // The end of the previous word: a motion the
-                        // table knows, so an operator takes it too.
-                        return command(view, ch == 'e' ? WORD_END_BACK : BIG_WORD_END_BACK);
-                    case 'j':
-                    case 'k':
-                        // A row of the display down or up, through a
-                        // wrapped line.
-                        return command(view, ch == 'j' ? DISPLAY_DOWN : DISPLAY_UP);
-                    default:
-                        clearPending();
-                        return true;
-                }
-            case 'z':
-            {
-                const S32 line = cursor(view).line;
-                const S32 row  = view.layout().rowHeight();
-                const S32 top  = view.layout().lineTop(line);
-                const S32 given = mCount;
-                clearPending();
-                if (ch == 't')
-                {
-                    view.setScrollY(top);
-                }
-                else if (ch == 'z')
-                {
-                    view.setScrollY(top - (view.rowsPerPage() / 2) * row);
-                }
-                else if (ch == 'b')
-                {
-                    view.setScrollY(top - (view.rowsPerPage() - 1) * row);
-                }
-                else if (ch == '=' || ch == 'g')
-                {
-                    // The misspelled word at the caret: put right, or taken
-                    // into the dictionary.
-                    if (ch == 'g')
-                    {
-                        view.refreshSuggestions();
-                        if (view.canAddToDictionary())
-                        {
-                            view.addToDictionary();
-                        }
-                        else
-                        {
-                            say(said("VimNotAddable", "E764: Cannot add this word"), true);
-                        }
-                    }
-                    else if (editing)
-                    {
-                        suggest(view, given);
-                    }
-                }
-                else
-                {
-                    foldCommand(view, ch, 'z');
-                }
-                return true;
-            }
-            case PENDING_GR:
-            {
-                // grn rename, grr the references, gra the fixes and actions
-                // at the caret: the editor's own.
-                const ALEditorCommand command = ch == 'n' ? ALEditorCommand::Rename
-                                                : ch == 'r' ? ALEditorCommand::FindReferences
-                                                : ch == 'a' ? ALEditorCommand::QuickFix
-                                                            : ALEditorCommand::None;
-                clearPending();
-                if (command != ALEditorCommand::None)
-                {
-                    view.perform(command);
-                }
-                return true;
-            }
-            case '[':
-            case ']':
-            {
-                // ]d [d the problems, ]s [s the misspellings, [z ]z the fold
-                // the caret is in.
-                const bool    forward  = pending == ']';
-                const S32     given    = mCount;
-                const llwchar operated = mOperator;
-                clearPending();
-                if (ch == 'd')
-                {
-                    mEx->runCommand(view, std::string(forward ? "cnext" : "cprevious") + (given > 0 ? " " + std::to_string(given) : ""));
-                }
-                else if (ch == 's')
-                {
-                    misspelling(view, forward, countOr(given));
-                }
-                else if (ch == 'z')
-                {
-                    foldCommand(view, ch, pending);
-                }
-                else if (ch == '[' || ch == ']' || ch == 'm' || ch == 'M')
-                {
-                    // [[ ]] [m ]m the start of the function before or after
-                    // the caret; [] ][ [M ]M its end. The count on.
-                    const bool          ends   = ch == 'M' || (ch == '[' && forward) || (ch == ']' && !forward);
-                    ALVimHost* host = view.vimHost();
-                    // From past the character the caret is on, going on:
-                    // at a function's end already is not before it.
-                    ALTextPos                  at = forward && ends ? d.nextCluster(cursor(view)) : cursor(view);
-                    std::optional<ALTextRange> fn;
-                    for (S32 n = 0; n < countOr(given) && host; ++n)
-                    {
-                        const std::optional<ALTextRange> next = host->functionFrom(at, forward, ends);
-                        if (!next)
-                        {
-                            break;
-                        }
-                        fn = next;
-                        at = ends ? next->end : next->begin;
-                    }
-                    if (fn)
-                    {
-                        const ALTextPos to = ends ? d.prevCluster(fn->end) : fn->begin;
-                        if (operated)
-                        {
-                            Span span;
-                            span.range = ALTextRange(cursor(view), to).normalised();
-                            applyOperator(view, operated, span, 1);
-                            finishCommand(operated != 'y');
-                            return true;
-                        }
-                        noteJump(view, cursor(view));
-                        moveTo(view, to);
-                    }
-                }
-                else if ((forward && (ch == ')' || ch == '}')) || (!forward && (ch == '(' || ch == '{')))
-                {
-                    ALTextPos to;
-                    if (unmatchedBracket(view, ch, countOr(given), to))
-                    {
-                        if (operated)
-                        {
-                            // Exclusive, as vim's are: the bracket itself is
-                            // left.
-                            Span span;
-                            span.range = ALTextRange(cursor(view), to).normalised();
-                            applyOperator(view, operated, span, 1);
-                            finishCommand(operated != 'y');
-                            return true;
-                        }
-                        moveTo(view, to);
-                    }
-                }
-                return true;
-            }
-            case 'Z':
-                if (ch == 'Z')
-                {
-                    mEx->runCommand(view, "x");
-                }
-                else if (ch == 'Q')
-                {
-                    mEx->runCommand(view, "q!");
-                }
-                clearPending();
-                return true;
-            case WINDOW_PREFIX:
-            {
-                // A tab for each of vim's windows: closed, the others
-                // closed, a new one, the next, the one before, the one
-                // last in front. There are no splits to go between.
-                const char* const line = ch == 'q' ? "quit"
-                                         : ch == 'c' ? "close"
-                                         : ch == 'o' ? "tabonly"
-                                         : ch == 'n' ? "tabnew"
-                                         : ch == 'w' ? "tabnext"
-                                         : ch == 'W' ? "tabprevious"
-                                         : ch == 'p' ? "buffer #"
-                                                     : nullptr;
-                clearPending();
-                if (line)
-                {
-                    mEx->runCommand(view, line);
-                }
-                else
-                {
-                    mFailed = true;
-                }
-                return true;
-            }
-            case 'i':
-            case 'a':
-            {
-                // A text object, for the operator or the visual selection.
-                Span span;
-                if (textObject(view, pending, ch, count, span))
-                {
-                    if (visual)
-                    {
-                        mVisualAnchor = span.range.begin;
-                        mVisualCaret  = span.linewise ? span.range.end : d.prevCluster(span.range.end);
-                        mMode         = span.linewise ? Mode::VisualLine : Mode::Visual;
-                        showVisual(view);
-                        clearPending();
-                        return true;
-                    }
-                    const llwchar op = mOperator;
-                    applyOperator(view, op, span, 1);
-                    finishCommand(op != 'y');
-                    return true;
-                }
-                clearPending();
-                return true;
-            }
-            default:
-            {
-                // f, F, t, T, ` and ': motions with an argument.
-                Motion m = motion(view, pending, count, ch);
-                mFailed  = mFailed || (m.ok && !m.moved);
-                if (!m.ok)
-                {
-                    clearPending();
-                    return true;
-                }
-                if (mOperator)
-                {
-                    Span span;
-                    const ALTextPos from = cursor(view);
-                    span.range           = ALTextRange(from, m.to).normalised();
-                    if (m.inclusive)
-                    {
-                        span.range.end = d.nextCluster(span.range.end);
-                    }
-                    span.linewise = m.linewise;
-                    const llwchar op = mOperator;
-                    applyOperator(view, op, span, 1);
-                    finishCommand(op != 'y');
-                    return true;
-                }
-                if ((pending == '`' || pending == '\'') && m.to != cursor(view))
-                {
-                    noteJump(view, cursor(view));
-                }
-                moveTo(view, m.to);
-                clearPending();
-                return true;
-            }
-        }
+        return afterPending(view, pending, ch);
     }
 
     // A count.
@@ -1790,258 +1083,1069 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
     }
 
     // An operator, or its motion.
-    const S32 count = countOr(mCount);
     if (mOperator)
     {
-        const llwchar op = mOperator;
-        // Surround's: ys an operator of its own, ds and cs the pair to
-        // take away or change, as surround.vim has them.
-        if (op == 'y' && ch == 's')
+        return operatorKey(view, ch);
+    }
+    // Visual mode's own commands, then everyone's; else a motion.
+    if (mMode != Mode::Normal)
+    {
+        if (const std::optional<bool> taken = visualKey(view, ch))
         {
-            mOperator = SURROUND_OPERATOR;
+            return *taken;
+        }
+    }
+    if (const std::optional<bool> taken = normalKey(view, ch))
+    {
+        return *taken;
+    }
+    return motionKey(view, ch);
+}
+
+// The keys that wait for the one after them, and what each does with it;
+// any other -- f, F, t, T, ` and ' -- a motion with its argument.
+const ALVimKeymap::PendingKey ALVimKeymap::PENDING_KEYS[] = {
+    { SURROUND_WITH, &ALVimKeymap::afterSurroundWith },
+    { CHANGE_SURROUND, &ALVimKeymap::afterChangeSurround },
+    { DELETE_SURROUND, &ALVimKeymap::afterSurroundPair },
+    { CHANGE_SURROUND_TO, &ALVimKeymap::afterSurroundPair },
+    { '"', &ALVimKeymap::afterRegisterName },
+    { 'm', &ALVimKeymap::afterMark },
+    { 'q', &ALVimKeymap::afterRecord },
+    { '@', &ALVimKeymap::afterPlay },
+    { 'r', &ALVimKeymap::afterReplace },
+    { 'g', &ALVimKeymap::afterG },
+    { 'z', &ALVimKeymap::afterZ },
+    { PENDING_GR, &ALVimKeymap::afterGr },
+    { '[', &ALVimKeymap::afterBracket },
+    { ']', &ALVimKeymap::afterBracket },
+    { 'Z', &ALVimKeymap::afterBigZ },
+    { WINDOW_PREFIX, &ALVimKeymap::afterWindow },
+    { 'i', &ALVimKeymap::afterObject },
+    { 'a', &ALVimKeymap::afterObject },
+};
+
+bool ALVimKeymap::afterPending(ALTextView& view, llwchar pending, llwchar ch)
+{
+    for (const PendingKey& waiting : PENDING_KEYS)
+    {
+        if (waiting.key == pending)
+        {
+            return (this->*waiting.take)(view, pending, ch);
+        }
+    }
+    return afterMotionKey(view, pending, ch);
+}
+
+bool ALVimKeymap::afterSurroundWith(ALTextView& view, llwchar pending, llwchar ch)
+{
+    const bool            visual  = mMode != Mode::Normal;
+    const bool            editing = !view.isReadOnly();
+    // ys's stretch, or visual S's, with the pair round it.
+    std::string open;
+    std::string close;
+    mSurroundWaiting = false;
+    if (!editing || !surroundPair(ch, open, close))
+    {
+        clearPending();
+        return true;
+    }
+    surround(view, mSurroundSpan, open, close);
+    finishCommand(true);
+    return true;
+}
+
+bool ALVimKeymap::afterChangeSurround(ALTextView& view, llwchar pending, llwchar ch)
+{
+    mSurroundOld = ch;
+    mPending     = CHANGE_SURROUND_TO;
+    return true;
+}
+
+bool ALVimKeymap::afterSurroundPair(ALTextView& view, llwchar pending, llwchar ch)
+{
+    const ALTextDocument& d       = view.document();
+    const bool            editing = !view.isReadOnly();
+    const S32             count   = countOr(mCount);
+    // ds's pair taken away, or cs's changed; the count before
+    // the d or the c the pair that many out.
+    const bool changed = editing && changeSurround(view, pending == DELETE_SURROUND ? ch : mSurroundOld,
+                                                   pending == DELETE_SURROUND ? 0 : ch, countOr(mOperatorCount));
+    if (!changed)
+    {
+        clearPending();
+        return true;
+    }
+    finishCommand(true);
+    return true;
+}
+
+bool ALVimKeymap::afterRegisterName(ALTextView& view, llwchar pending, llwchar ch)
+{
+    if ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || ch == '"' || (ch >= '0' && ch <= '9') || ch == '-' || ch == '_' || ch == '+' ||
+        ch == '*')
+    {
+        mRegister = static_cast<char>(ch);
+        mCount    = 0;
+        return true;
+    }
+    clearPending();
+    return true;
+}
+
+bool ALVimKeymap::afterMark(ALTextView& view, llwchar pending, llwchar ch)
+{
+    if (ch >= 'a' && ch <= 'z')
+    {
+        mMarks[static_cast<char>(ch)] = cursor(view);
+    }
+    clearPending();
+    return true;
+}
+
+bool ALVimKeymap::afterRecord(ALTextView& view, llwchar pending, llwchar ch)
+{
+    // Recording into a register: a-z afresh, A-Z onto what
+    // is there. q: q/ and q? are the line with its history
+    // in it, the last line entered up, rather than vim's
+    // window of them.
+    if ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z'))
+    {
+        mRecording = static_cast<char>(ch);
+        mRecorded.clear();
+    }
+    else if (ch == ':' || ch == '/' || ch == '?')
+    {
+        clearPending();
+        const std::vector<std::string>& history = mCommandLine.historyOf(ch);
+        if (mHooks.historyWindow && !history.empty())
+        {
+            // The host's window of them; what is picked comes
+            // back onto the line.
+            const llwchar kind = ch;
+            // Picked later: the tab, or vim in it, may have gone
+            // meanwhile, and both are looked for again.
+            const LLHandle<LLUICtrl> handle = view.getHandle();
+            mHooks.historyWindow(view, kind, history, [handle, kind](const std::string& line, bool run) {
+                ALTextView*  again = dynamic_cast<ALTextView*>(handle.get());
+                ALVimKeymap* vim   = again ? dynamic_cast<ALVimKeymap*>(again->modalKeymap()) : nullptr;
+                if (vim)
+                {
+                    vim->takeLine(*again, kind, line, run);
+                }
+            });
             return true;
         }
-        if ((op == 'd' || op == 'c') && ch == 's')
+        mMode     = ch == ':' ? Mode::Command : Mode::Search;
+        mCommandLine.kind = ch;
+        mCommandLine.historyPrefix.clear();
+        mCommandLine.historyAt  = history.empty() ? -1 : static_cast<S32>(history.size()) - 1;
+        mCommandLine.line       = history.empty() ? std::string() : history.back();
+        mCommandLine.cursor = mCommandLine.line.size();
+        return true;
+    }
+    clearPending();
+    return true;
+}
+
+bool ALVimKeymap::afterPlay(ALTextView& view, llwchar pending, llwchar ch)
+{
+    const S32             count   = countOr(mCount);
+    // A register's keys played, the count times over; @@ the
+    // last one again.
+    char name = static_cast<char>(ch);
+    if (name == '@')
+    {
+        name = mLastPlayed;
+    }
+    if (name == ':')
+    {
+        // The last : line again.
+        clearPending();
+        mLastPlayed = ':';
+        const std::vector<std::string>& history = mCommandLine.historyOf(':');
+        if (history.empty())
         {
-            mOperator = 0;
-            mPending  = op == 'd' ? DELETE_SURROUND : CHANGE_SURROUND;
+            say(said("VimNoPreviousCommand", "E30: No previous command line"), true);
             return true;
         }
-        if (op == SURROUND_OPERATOR && ch == 's')
+        view.undoJournal().beginGroup();
+        for (S32 n = 0; n < count; ++n)
         {
-            // yss: the line's text, from the first of it that is not blank
-            // to the last.
-            const S32          line = cursor(view).line;
-            const std::string& text = d.line(line);
-            S32                end  = static_cast<S32>(text.size());
-            while (end > 0 && isSpace(text[end - 1]))
+            mEx->runCommand(view, history.back());
+            if (mMessageError)
             {
-                --end;
+                break;
             }
-            Span span;
-            const S32 first = firstNonBlankColumn(d, line);
-            span.range      = ALTextRange(ALTextPos(line, first), ALTextPos(line, llmax(end, first)));
-            applyOperator(view, op, span, 1);
+        }
+        view.undoJournal().endGroup();
+        return true;
+    }
+    if (!((name >= 'a' && name <= 'z') || (name >= 'A' && name <= 'Z') || name == '"' || name == '0'))
+    {
+        clearPending();
+        return true;
+    }
+    const std::vector<Input> inputs = decodeInputs(fetch(static_cast<char>(std::tolower(name))).text);
+    mLastPlayed                     = static_cast<char>(std::tolower(name));
+    clearPending();
+    // The count's plays one step to undo, and the first to fail
+    // the last, as in vim.
+    view.undoJournal().beginGroup();
+    for (S32 n = 0; n < count; ++n)
+    {
+        if (!play(view, inputs, true))
+        {
+            break;
+        }
+    }
+    view.undoJournal().endGroup();
+    return true;
+}
+
+bool ALVimKeymap::afterReplace(ALTextView& view, llwchar pending, llwchar ch)
+{
+    const ALTextDocument& d       = view.document();
+    const bool            visual  = mMode != Mode::Normal;
+    const bool            editing = !view.isReadOnly();
+    const S32             count   = countOr(mCount);
+    if (!editing)
+    {
+        clearPending();
+        return true;
+    }
+    if (visual)
+    {
+        // Every character of the selection becomes this one.
+        const Span                                        span = visualSpan(view);
+        std::vector<std::pair<ALTextRange, std::string>> edits;
+        for (S32 line = span.range.begin.line; line <= span.range.end.line; ++line)
+        {
+            const S32 c0 = span.linewise ? 0 : (span.block || line == span.range.begin.line) ? span.range.begin.column : 0;
+            const S32 c1 = span.linewise ? d.lineLength(line)
+                           : span.block ? llmin(d.lineLength(line), span.range.end.column + 1)
+                           : line == span.range.end.line ? span.range.end.column : d.lineLength(line);
+            const S32 lo = llmin(c0, d.lineLength(line));
+            const S32 hi = llmin(llmax(lo, c1), d.lineLength(line));
+            if (hi > lo)
+            {
+                std::string with;
+                for (S32 c = lo; c < hi; ++c)
+                {
+                    with += utf8Of(ch);
+                }
+                edits.emplace_back(ALTextRange(ALTextPos(line, lo), ALTextPos(line, hi)), with);
+            }
+        }
+        const ALTextPos start = span.range.begin;
+        leaveVisual(view);
+        view.replaceAll(std::move(edits));
+        moveTo(view, start);
+        finishCommand(true);
+        return true;
+    }
+    // The character under the caret, and the count after it,
+    // replaced; a return breaks the line -- once, whatever the
+    // count, as vim's does -- the new line indented as a
+    // Return would indent it, the caret at its start.
+    ALTextPos from = view.caret();
+    ALTextPos to   = from;
+    for (S32 n = 0; n < count; ++n)
+    {
+        if (atLineEnd(d, to))
+        {
+            clearPending();
+            return true;
+        }
+        to = d.nextCluster(to);
+    }
+    view.setSelection(ALTextRange(from, to));
+    if (ch == '\r' || ch == '\n')
+    {
+        view.perform(ALEditorCommand::NewLine);
+        moveTo(view, view.caret());
+        finishCommand(true);
+        return true;
+    }
+    std::string with;
+    for (S32 n = 0; n < count; ++n)
+    {
+        with += utf8Of(ch);
+    }
+    view.insertText(with);
+    moveTo(view, d.prevCluster(view.caret()));
+    finishCommand(true);
+    return true;
+}
+
+bool ALVimKeymap::afterG(ALTextView& view, llwchar pending, llwchar ch)
+{
+    const ALTextDocument& d       = view.document();
+    const bool            visual  = mMode != Mode::Normal;
+    const bool            editing = !view.isReadOnly();
+    const S32             count   = countOr(mCount);
+    switch (ch)
+    {
+        case 'g':
+            return command(view, GO_TOP);
+        case 'c':
+            // Comments: an operator over lines, gcc a line, gc
+            // a visual selection's lines.
+            if (visual)
+            {
+                const Span span = visualSpan(view);
+                noteVisualOperation(span);
+                applyOperator(view, COMMENT_OPERATOR, span, 1);
+                leaveVisual(view);
+                finishCommand(true);
+                return true;
+            }
+            if (!editing)
+            {
+                clearPending();
+                return true;
+            }
+            mOperator      = COMMENT_OPERATOR;
+            mOperatorCount = mCount;
+            mCount         = 0;
+            return true;
+        case 'r':
+            mPending = PENDING_GR;
+            return true;
+        case '_':
+            return command(view, LAST_NON_BLANK);
+        case ';':
+        case ',':
+        {
+            // The change list: older, or newer again.
+            clearPending();
+            if (view.changes().empty())
+            {
+                say(said("VimNoChanges", "E664: Changelist is empty"), true);
+            }
+            else if (!view.goToChange(ch == ';' ? -count : count))
+            {
+                say(ch == ';' ? said("VimChangesStart", "E662: At start of changelist")
+                              : said("VimChangesEnd", "E663: At end of changelist"),
+                    true);
+            }
+            else
+            {
+                moveTo(view, view.caret());
+            }
+            return true;
+        }
+        case 'i':
+        {
+            // Inserting again where it last stopped.
+            clearPending();
+            if (!editing)
+            {
+                return true;
+            }
+            const auto mark = mMarks.find('^');
+            if (mark != mMarks.end())
+            {
+                view.setCaret(d.clamp(mark->second));
+            }
+            enterInsert(view, count);
+            return true;
+        }
+        case 'I':
+            // Inserting in the line's first column, before its
+            // indent, where I goes after it.
+            clearPending();
+            if (editing && !visual)
+            {
+                view.setCaret(ALTextPos(view.caret().line, 0));
+                enterInsert(view, count);
+            }
+            return true;
+        case '*':
+        case '#':
+        {
+            // As * and #, the word anywhere, not only whole.
+            const ALTextRange word = d.wordAt(view.caret());
+            clearPending();
+            if (!word.empty())
+            {
+                mSearch.pattern   = d.text(word);
+                mSearch.forward   = ch == '*';
+                mSearch.wholeWord = false;
+                mSearch.offset    = ALVimSearch::Offset();
+                mSearch.search(view, mSearch.pattern, mSearch.forward, count, false);
+            }
+            return true;
+        }
+        case 'p':
+        case 'P':
+            if (editing && !visual)
+            {
+                put(view, mRegister, ch == 'p', count, true);
+                finishCommand(true);
+            }
+            else
+            {
+                clearPending();
+            }
+            return true;
+        case 'n':
+        case 'N':
+        {
+            // The last search's match here or next: selected, or
+            // what an operator works on -- cgn, and . for the
+            // next.
+            const std::optional<ALTextRange> match = mSearch.matchNear(view, ch == 'n');
+            if (!match)
+            {
+                clearPending();
+                return true;
+            }
+            if (mOperator)
+            {
+                Span span;
+                span.range       = *match;
+                const llwchar op = mOperator;
+                applyOperator(view, op, span, 1);
+                finishCommand(op != 'y');
+                return true;
+            }
+            clearPending();
+            if (!visual)
+            {
+                mVisualAnchor = match->begin;
+                enterVisual(view, Mode::Visual);
+            }
+            mVisualAnchor = match->begin;
+            mVisualCaret  = d.prevCluster(match->end);
+            showVisual(view);
+            return true;
+        }
+        case 'O':
+            // The script's symbols, to go to one: the host's.
+            clearPending();
+            if (mHooks.command)
+            {
+                mHooks.command(view, "go_to_symbol", std::string());
+            }
+            return true;
+        case 'f':
+        {
+            // The file named under the caret, as :find finds
+            // one: an include's or a module's where the host has
+            // one.
+            clearPending();
+            const std::string name = fileUnderCursor(view);
+            if (name.empty())
+            {
+                say(said("VimNoFileUnderCursor", "E446: No file name under cursor"), true);
+            }
+            else
+            {
+                mEx->runCommand(view, "find " + name);
+            }
+            return true;
+        }
+        case 'd':
+        case 'D':
+            // The declaration: the host's definition, as :tag
+            // goes to it.
+            clearPending();
+            mEx->runCommand(view, "tag");
+            return true;
+        case 't':
+        case 'T':
+        {
+            // The host's tabs: gt the next, {N}gt the Nth; gT
+            // back one, or N.
+            const S32  given    = mCount;
+            const bool operated = mOperator != 0;
+            clearPending();
+            if (!operated)
+            {
+                const std::string tabs = ch == 't' ? "tabnext" : "tabprevious";
+                mEx->runCommand(view, given > 0 ? tabs + " " + std::to_string(given) : tabs);
+            }
+            return true;
+        }
+        case '&':
+            // The last :s again on every line, with its flags.
+            clearPending();
+            if (editing)
+            {
+                mEx->runCommand(view, "%s//~/&");
+            }
+            return true;
+        case 'v':
+            if (mVisualLast != Mode::Normal)
+            {
+                mVisualAnchor = mVisualLastAnchor;
+                mVisualCaret  = mVisualLastCaret;
+                mMode         = mVisualLast;
+                showVisual(view);
+            }
+            clearPending();
+            return true;
+        case 'J':
+        {
+            // Lines joined as they are.
+            if (!editing)
+            {
+                clearPending();
+                return true;
+            }
+            const S32 first = visual ? llmin(mVisualAnchor.line, cursor(view).line) : view.caret().line;
+            const S32 last  = visual ? llmax(mVisualAnchor.line, cursor(view).line) : first;
+            const S32 until = visual ? llmax(last, first + 1) : first + llmax(1, count - 1);
+            if (visual)
+            {
+                leaveVisual(view);
+            }
+            if (const std::optional<ALTextEditing::Change> join = ALTextEditing::joinLines(d, first, until, true))
+            {
+                view.apply(*join);
+                moveTo(view, join->caret);
+            }
             finishCommand(true);
             return true;
         }
-        // The operator doubled -- dd, yy, cc, >>, <<, == -- is the line, and
-        // the count more.
-        if (ch == op || (op == '~' && ch == '~') || (op == 'u' && ch == 'u') || (op == 'U' && ch == 'U') ||
-            (op == COMMENT_OPERATOR && ch == 'c'))
-        {
-            const S32 lines = countTimes(countOr(mOperatorCount), count);
-            Span      span;
-            span.linewise    = true;
-            const S32 first  = cursor(view).line;
-            const S32 last   = llmin(d.lineCount() - 1, first + lines - 1);
-            span.range       = ALTextRange(d.lineStart(first), d.lineEnd(last));
-            applyOperator(view, op, span, 1);
-            finishCommand(op != 'y');
+        case '~':
+        case 'u':
+        case 'U':
+            if (visual)
+            {
+                const Span span = visualSpan(view);
+                noteVisualOperation(span);
+                applyOperator(view, ch, span, 1);
+                leaveVisual(view);
+                finishCommand(true);
+                return true;
+            }
+            mOperator      = ch;
+            mOperatorCount = mCount;
+            mCount         = 0;
             return true;
-        }
-        if (ch == 'i' || ch == 'a')
-        {
-            mPending = ch;
-            return true;
-        }
-        if (ch == 'f' || ch == 'F' || ch == 't' || ch == 'T' || ch == '`' || ch == '\'' || ch == 'g' || ch == '[' || ch == ']')
-        {
-            mPending = ch;
-            return true;
-        }
-        // cw on a word is ce: the space after it is not eaten.
-        llwchar m_ch = ch;
-        if (op == 'c' && (ch == 'w' || ch == 'W') && classOf(at(d, cursor(view)), ch == 'W') != 0)
-        {
-            m_ch = ch == 'w' ? 'e' : 'E';
-        }
-        Motion m = motion(view, m_ch, countTimes(countOr(mOperatorCount), count), 0);
-        if (!m.ok || !m.moved)
-        {
-            mFailed = mFailed || m.ok;
+        case 'e':
+        case 'E':
+            // The end of the previous word: a motion the
+            // table knows, so an operator takes it too.
+            return command(view, ch == 'e' ? WORD_END_BACK : BIG_WORD_END_BACK);
+        case 'j':
+        case 'k':
+            // A row of the display down or up, through a
+            // wrapped line.
+            return command(view, ch == 'j' ? DISPLAY_DOWN : DISPLAY_UP);
+        default:
             clearPending();
-            return m.ok;
+            return true;
+    }
+}
+
+bool ALVimKeymap::afterZ(ALTextView& view, llwchar pending, llwchar ch)
+{
+    const bool            editing = !view.isReadOnly();
+    const S32 line = cursor(view).line;
+    const S32 row  = view.layout().rowHeight();
+    const S32 top  = view.layout().lineTop(line);
+    const S32 given = mCount;
+    clearPending();
+    if (ch == 't')
+    {
+        view.setScrollY(top);
+    }
+    else if (ch == 'z')
+    {
+        view.setScrollY(top - (view.rowsPerPage() / 2) * row);
+    }
+    else if (ch == 'b')
+    {
+        view.setScrollY(top - (view.rowsPerPage() - 1) * row);
+    }
+    else if (ch == '=' || ch == 'g')
+    {
+        // The misspelled word at the caret: put right, or taken
+        // into the dictionary.
+        if (ch == 'g')
+        {
+            view.refreshSuggestions();
+            if (view.canAddToDictionary())
+            {
+                view.addToDictionary();
+            }
+            else
+            {
+                say(said("VimNotAddable", "E764: Cannot add this word"), true);
+            }
         }
-        Span            span;
+        else if (editing)
+        {
+            suggest(view, given);
+        }
+    }
+    else
+    {
+        foldCommand(view, ch, 'z');
+    }
+    return true;
+}
+
+bool ALVimKeymap::afterGr(ALTextView& view, llwchar pending, llwchar ch)
+{
+    // grn rename, grr the references, gra the fixes and actions
+    // at the caret: the editor's own.
+    const ALEditorCommand command = ch == 'n' ? ALEditorCommand::Rename
+                                    : ch == 'r' ? ALEditorCommand::FindReferences
+                                    : ch == 'a' ? ALEditorCommand::QuickFix
+                                                : ALEditorCommand::None;
+    clearPending();
+    if (command != ALEditorCommand::None)
+    {
+        view.perform(command);
+    }
+    return true;
+}
+
+bool ALVimKeymap::afterBracket(ALTextView& view, llwchar pending, llwchar ch)
+{
+    const ALTextDocument& d       = view.document();
+    const S32             count   = countOr(mCount);
+    // ]d [d the problems, ]s [s the misspellings, [z ]z the fold
+    // the caret is in.
+    const bool    forward  = pending == ']';
+    const S32     given    = mCount;
+    const llwchar operated = mOperator;
+    clearPending();
+    if (ch == 'd')
+    {
+        mEx->runCommand(view, std::string(forward ? "cnext" : "cprevious") + (given > 0 ? " " + std::to_string(given) : ""));
+    }
+    else if (ch == 's')
+    {
+        misspelling(view, forward, countOr(given));
+    }
+    else if (ch == 'z')
+    {
+        foldCommand(view, ch, pending);
+    }
+    else if (ch == '[' || ch == ']' || ch == 'm' || ch == 'M')
+    {
+        // [[ ]] [m ]m the start of the function before or after
+        // the caret; [] ][ [M ]M its end. The count on.
+        const bool          ends   = ch == 'M' || (ch == '[' && forward) || (ch == ']' && !forward);
+        ALVimHost* host = view.vimHost();
+        // From past the character the caret is on, going on:
+        // at a function's end already is not before it.
+        ALTextPos                  at = forward && ends ? d.nextCluster(cursor(view)) : cursor(view);
+        std::optional<ALTextRange> fn;
+        for (S32 n = 0; n < countOr(given) && host; ++n)
+        {
+            const std::optional<ALTextRange> next = host->functionFrom(at, forward, ends);
+            if (!next)
+            {
+                break;
+            }
+            fn = next;
+            at = ends ? next->end : next->begin;
+        }
+        if (fn)
+        {
+            const ALTextPos to = ends ? d.prevCluster(fn->end) : fn->begin;
+            if (operated)
+            {
+                Span span;
+                span.range = ALTextRange(cursor(view), to).normalised();
+                applyOperator(view, operated, span, 1);
+                finishCommand(operated != 'y');
+                return true;
+            }
+            noteJump(view, cursor(view));
+            moveTo(view, to);
+        }
+    }
+    else if ((forward && (ch == ')' || ch == '}')) || (!forward && (ch == '(' || ch == '{')))
+    {
+        ALTextPos to;
+        if (unmatchedBracket(view, ch, countOr(given), to))
+        {
+            if (operated)
+            {
+                // Exclusive, as vim's are: the bracket itself is
+                // left.
+                Span span;
+                span.range = ALTextRange(cursor(view), to).normalised();
+                applyOperator(view, operated, span, 1);
+                finishCommand(operated != 'y');
+                return true;
+            }
+            moveTo(view, to);
+        }
+    }
+    return true;
+}
+
+bool ALVimKeymap::afterBigZ(ALTextView& view, llwchar pending, llwchar ch)
+{
+    if (ch == 'Z')
+    {
+        mEx->runCommand(view, "x");
+    }
+    else if (ch == 'Q')
+    {
+        mEx->runCommand(view, "q!");
+    }
+    clearPending();
+    return true;
+}
+
+bool ALVimKeymap::afterWindow(ALTextView& view, llwchar pending, llwchar ch)
+{
+    // A tab for each of vim's windows: closed, the others
+    // closed, a new one, the next, the one before, the one
+    // last in front. There are no splits to go between.
+    const char* const line = ch == 'q' ? "quit"
+                             : ch == 'c' ? "close"
+                             : ch == 'o' ? "tabonly"
+                             : ch == 'n' ? "tabnew"
+                             : ch == 'w' ? "tabnext"
+                             : ch == 'W' ? "tabprevious"
+                             : ch == 'p' ? "buffer #"
+                                         : nullptr;
+    clearPending();
+    if (line)
+    {
+        mEx->runCommand(view, line);
+    }
+    else
+    {
+        mFailed = true;
+    }
+    return true;
+}
+
+bool ALVimKeymap::afterObject(ALTextView& view, llwchar pending, llwchar ch)
+{
+    const ALTextDocument& d       = view.document();
+    const bool            visual  = mMode != Mode::Normal;
+    const S32             count   = countOr(mCount);
+    // A text object, for the operator or the visual selection.
+    Span span;
+    if (textObject(view, pending, ch, count, span))
+    {
+        if (visual)
+        {
+            mVisualAnchor = span.range.begin;
+            mVisualCaret  = span.linewise ? span.range.end : d.prevCluster(span.range.end);
+            mMode         = span.linewise ? Mode::VisualLine : Mode::Visual;
+            showVisual(view);
+            clearPending();
+            return true;
+        }
+        const llwchar op = mOperator;
+        applyOperator(view, op, span, 1);
+        finishCommand(op != 'y');
+        return true;
+    }
+    clearPending();
+    return true;
+}
+
+bool ALVimKeymap::afterMotionKey(ALTextView& view, llwchar pending, llwchar ch)
+{
+    const ALTextDocument& d       = view.document();
+    const S32             count   = countOr(mCount);
+    // f, F, t, T, ` and ': motions with an argument.
+    Motion m = motion(view, pending, count, ch);
+    mFailed  = mFailed || (m.ok && !m.moved);
+    if (!m.ok)
+    {
+        clearPending();
+        return true;
+    }
+    if (mOperator)
+    {
+        Span span;
         const ALTextPos from = cursor(view);
         span.range           = ALTextRange(from, m.to).normalised();
-        // A word motion under an operator stops at the line's end rather
-        // than reaching the next line's first word.
-        if ((ch == 'w' || ch == 'W') && span.range.end.line > from.line && !m.linewise)
-        {
-            span.range.end = d.lineEnd(from.line);
-        }
         if (m.inclusive)
         {
             span.range.end = d.nextCluster(span.range.end);
         }
         span.linewise = m.linewise;
+        const llwchar op = mOperator;
         applyOperator(view, op, span, 1);
         finishCommand(op != 'y');
         return true;
     }
-
-    // Visual mode's own commands.
-    if (visual)
+    if ((pending == '`' || pending == '\'') && m.to != cursor(view))
     {
-        switch (ch)
+        noteJump(view, cursor(view));
+    }
+    moveTo(view, m.to);
+    clearPending();
+    return true;
+}
+
+bool ALVimKeymap::operatorKey(ALTextView& view, llwchar ch)
+{
+    const ALTextDocument& d       = view.document();
+    const S32             count   = countOr(mCount);
+    const llwchar op = mOperator;
+    // Surround's: ys an operator of its own, ds and cs the pair to
+    // take away or change, as surround.vim has them.
+    if (op == 'y' && ch == 's')
+    {
+        mOperator = SURROUND_OPERATOR;
+        return true;
+    }
+    if ((op == 'd' || op == 'c') && ch == 's')
+    {
+        mOperator = 0;
+        mPending  = op == 'd' ? DELETE_SURROUND : CHANGE_SURROUND;
+        return true;
+    }
+    if (op == SURROUND_OPERATOR && ch == 's')
+    {
+        // yss: the line's text, from the first of it that is not blank
+        // to the last.
+        const S32          line = cursor(view).line;
+        const std::string& text = d.line(line);
+        S32                end  = static_cast<S32>(text.size());
+        while (end > 0 && isSpace(text[end - 1]))
         {
-            case 'd':
-            case 'x':
-            case 'y':
-            case 'c':
-            case 's':
-            case '>':
-            case '<':
-            case '=':
-            case '~':
-            case 'u':
-            case 'U':
-            case 'J':
-            case 'r':
-            case 'p':
-            case 'P':
-            case 'I':
-            case 'A':
-            case 'D':
-            case 'X':
-            case 'Y':
-            case 'C':
-            case 'S':
-            case 'R':
+            --end;
+        }
+        Span span;
+        const S32 first = firstNonBlankColumn(d, line);
+        span.range      = ALTextRange(ALTextPos(line, first), ALTextPos(line, llmax(end, first)));
+        applyOperator(view, op, span, 1);
+        finishCommand(true);
+        return true;
+    }
+    // The operator doubled -- dd, yy, cc, >>, <<, == -- is the line, and
+    // the count more.
+    if (ch == op || (op == '~' && ch == '~') || (op == 'u' && ch == 'u') || (op == 'U' && ch == 'U') ||
+        (op == COMMENT_OPERATOR && ch == 'c'))
+    {
+        const S32 lines = countTimes(countOr(mOperatorCount), count);
+        Span      span;
+        span.linewise    = true;
+        const S32 first  = cursor(view).line;
+        const S32 last   = llmin(d.lineCount() - 1, first + lines - 1);
+        span.range       = ALTextRange(d.lineStart(first), d.lineEnd(last));
+        applyOperator(view, op, span, 1);
+        finishCommand(op != 'y');
+        return true;
+    }
+    if (ch == 'i' || ch == 'a')
+    {
+        mPending = ch;
+        return true;
+    }
+    if (ch == 'f' || ch == 'F' || ch == 't' || ch == 'T' || ch == '`' || ch == '\'' || ch == 'g' || ch == '[' || ch == ']')
+    {
+        mPending = ch;
+        return true;
+    }
+    // cw on a word is ce: the space after it is not eaten.
+    llwchar m_ch = ch;
+    if (op == 'c' && (ch == 'w' || ch == 'W') && classOf(at(d, cursor(view)), ch == 'W') != 0)
+    {
+        m_ch = ch == 'w' ? 'e' : 'E';
+    }
+    Motion m = motion(view, m_ch, countTimes(countOr(mOperatorCount), count), 0);
+    if (!m.ok || !m.moved)
+    {
+        mFailed = mFailed || m.ok;
+        clearPending();
+        return m.ok;
+    }
+    Span            span;
+    const ALTextPos from = cursor(view);
+    span.range           = ALTextRange(from, m.to).normalised();
+    // A word motion under an operator stops at the line's end rather
+    // than reaching the next line's first word.
+    if ((ch == 'w' || ch == 'W') && span.range.end.line > from.line && !m.linewise)
+    {
+        span.range.end = d.lineEnd(from.line);
+    }
+    if (m.inclusive)
+    {
+        span.range.end = d.nextCluster(span.range.end);
+    }
+    span.linewise = m.linewise;
+    applyOperator(view, op, span, 1);
+    finishCommand(op != 'y');
+    return true;
+}
+
+std::optional<bool> ALVimKeymap::visualKey(ALTextView& view, llwchar ch)
+{
+    const ALTextDocument& d       = view.document();
+    const bool            visual  = mMode != Mode::Normal;
+    const bool            editing = !view.isReadOnly();
+    const S32             count   = countOr(mCount);
+    switch (ch)
+    {
+        case 'd':
+        case 'x':
+        case 'y':
+        case 'c':
+        case 's':
+        case '>':
+        case '<':
+        case '=':
+        case '~':
+        case 'u':
+        case 'U':
+        case 'J':
+        case 'r':
+        case 'p':
+        case 'P':
+        case 'I':
+        case 'A':
+        case 'D':
+        case 'X':
+        case 'Y':
+        case 'C':
+        case 'S':
+        case 'R':
+        {
+            if (ch == 'r')
             {
-                if (ch == 'r')
-                {
-                    mPending = 'r';
-                    return true;
-                }
-                if (ch == 'S')
-                {
-                    // The selection surrounded, as surround.vim's visual S:
-                    // kept for the character that says with what.
-                    const Span span = visualSpan(view);
-                    noteVisualOperation(span);
-                    leaveVisual(view);
-                    clearPending();
-                    mSurroundSpan    = span;
-                    mPending         = SURROUND_WITH;
-                    mSurroundWaiting = true;
-                    return true;
-                }
-                Span span = visualSpan(view);
-                if (ch == 'D' || ch == 'X' || ch == 'Y' || ch == 'C' || ch == 'S' || ch == 'R')
-                {
-                    // The lines whole, whatever was selected.
-                    span.linewise = true;
-                    span.block    = false;
-                    span.range    = ALTextRange(d.lineStart(span.range.begin.line), d.lineEnd(span.range.end.line));
-                }
-                if (ch == 'J')
-                {
-                    const S32 first = span.range.begin.line;
-                    const S32 last  = llmax(span.range.end.line, first + 1);
-                    leaveVisual(view);
-                    mCount = last - first + 1;
-                    view.setCaret(d.lineStart(first));
-                    return command(view, 'J');
-                }
-                if (ch == 'p' || ch == 'P')
-                {
-                    // The selection replaced by the register, which keeps
-                    // what was there for a further put.
-                    const Register put_this = fetch(mRegister);
-                    leaveVisual(view);
-                    if (!editing)
-                    {
-                        clearPending();
-                        return true;
-                    }
-                    view.undoJournal().beginGroup();
-                    view.deleteRange(span.range);
-                    view.setCaret(span.range.begin);
-                    if (put_this.linewise)
-                    {
-                        view.insertText(put_this.text + "\n");
-                    }
-                    else
-                    {
-                        view.insertText(put_this.text);
-                    }
-                    view.undoJournal().endGroup();
-                    moveTo(view, put_this.text.empty() ? view.caret() : d.prevCluster(view.caret()));
-                    finishCommand(true);
-                    return true;
-                }
-                if (ch == 'I' || ch == 'A')
-                {
-                    // Typed onto every line of the block, once insert mode
-                    // is left.
-                    const bool block = span.block;
-                    const S32  first = span.range.begin.line;
-                    const S32  last  = span.range.end.line;
-                    S32        column = ch == 'A' ? span.range.end.column : span.range.begin.column;
-                    if (!block)
-                    {
-                        column = ch == 'A' ? d.lineLength(first) : firstNonBlankColumn(d, first);
-                    }
-                    leaveVisual(view);
-                    if (!editing)
-                    {
-                        clearPending();
-                        return true;
-                    }
-                    mBlockInsert = block && last > first;
-                    mBlockFirst  = first;
-                    mBlockLast   = last;
-                    mBlockColumn = column;
-                    mBlockAppend = ch == 'A';
-                    view.setCaret(d.clamp(ALTextPos(first, column)));
-                    enterInsert(view, 1);
-                    return true;
-                }
-                const llwchar op = ch == 'x' ? 'd' : ch == 's' || ch == 'C' || ch == 'S' || ch == 'R' ? 'c' : ch == 'D' || ch == 'X' ? 'd' : ch == 'Y' ? 'y' : ch;
-                const S32     n  = count;
+                mPending = 'r';
+                return true;
+            }
+            if (ch == 'S')
+            {
+                // The selection surrounded, as surround.vim's visual S:
+                // kept for the character that says with what.
+                const Span span = visualSpan(view);
                 noteVisualOperation(span);
                 leaveVisual(view);
-                applyOperator(view, op, span, n);
-                finishCommand(op != 'y');
-                return true;
-            }
-            case 'o':
-            {
-                std::swap(mVisualAnchor, mVisualCaret);
-                showVisual(view);
                 clearPending();
+                mSurroundSpan    = span;
+                mPending         = SURROUND_WITH;
+                mSurroundWaiting = true;
                 return true;
             }
-            case 'v':
-            case 'V':
-            case 0x16:
+            Span span = visualSpan(view);
+            if (ch == 'D' || ch == 'X' || ch == 'Y' || ch == 'C' || ch == 'S' || ch == 'R')
             {
-                const Mode which = ch == 'v' ? Mode::Visual : ch == 'V' ? Mode::VisualLine : Mode::VisualBlock;
-                if (mMode == which)
+                // The lines whole, whatever was selected.
+                span.linewise = true;
+                span.block    = false;
+                span.range    = ALTextRange(d.lineStart(span.range.begin.line), d.lineEnd(span.range.end.line));
+            }
+            if (ch == 'J')
+            {
+                const S32 first = span.range.begin.line;
+                const S32 last  = llmax(span.range.end.line, first + 1);
+                leaveVisual(view);
+                mCount = last - first + 1;
+                view.setCaret(d.lineStart(first));
+                return command(view, 'J');
+            }
+            if (ch == 'p' || ch == 'P')
+            {
+                // The selection replaced by the register, which keeps
+                // what was there for a further put.
+                const Register put_this = fetch(mRegister);
+                leaveVisual(view);
+                if (!editing)
                 {
-                    leaveVisual(view);
+                    clearPending();
+                    return true;
+                }
+                view.undoJournal().beginGroup();
+                view.deleteRange(span.range);
+                view.setCaret(span.range.begin);
+                if (put_this.linewise)
+                {
+                    view.insertText(put_this.text + "\n");
                 }
                 else
                 {
-                    mMode = which;
-                    showVisual(view);
+                    view.insertText(put_this.text);
                 }
-                clearPending();
+                view.undoJournal().endGroup();
+                moveTo(view, put_this.text.empty() ? view.caret() : d.prevCluster(view.caret()));
+                finishCommand(true);
                 return true;
             }
-            case 'i':
-            case 'a':
-                mPending = ch;
+            if (ch == 'I' || ch == 'A')
+            {
+                // Typed onto every line of the block, once insert mode
+                // is left.
+                const bool block = span.block;
+                const S32  first = span.range.begin.line;
+                const S32  last  = span.range.end.line;
+                S32        column = ch == 'A' ? span.range.end.column : span.range.begin.column;
+                if (!block)
+                {
+                    column = ch == 'A' ? d.lineLength(first) : firstNonBlankColumn(d, first);
+                }
+                leaveVisual(view);
+                if (!editing)
+                {
+                    clearPending();
+                    return true;
+                }
+                mBlockInsert = block && last > first;
+                mBlockFirst  = first;
+                mBlockLast   = last;
+                mBlockColumn = column;
+                mBlockAppend = ch == 'A';
+                view.setCaret(d.clamp(ALTextPos(first, column)));
+                enterInsert(view, 1);
                 return true;
-            default:
-                break;
+            }
+            const llwchar op = ch == 'x' ? 'd' : ch == 's' || ch == 'C' || ch == 'S' || ch == 'R' ? 'c' : ch == 'D' || ch == 'X' ? 'd' : ch == 'Y' ? 'y' : ch;
+            const S32     n  = count;
+            noteVisualOperation(span);
+            leaveVisual(view);
+            applyOperator(view, op, span, n);
+            finishCommand(op != 'y');
+            return true;
         }
+        case 'o':
+        {
+            std::swap(mVisualAnchor, mVisualCaret);
+            showVisual(view);
+            clearPending();
+            return true;
+        }
+        case 'v':
+        case 'V':
+        case 0x16:
+        {
+            const Mode which = ch == 'v' ? Mode::Visual : ch == 'V' ? Mode::VisualLine : Mode::VisualBlock;
+            if (mMode == which)
+            {
+                leaveVisual(view);
+            }
+            else
+            {
+                mMode = which;
+                showVisual(view);
+            }
+            clearPending();
+            return true;
+        }
+        case 'i':
+        case 'a':
+            mPending = ch;
+            return true;
+        default:
+            return std::nullopt;
     }
+}
 
-    // Commands.
+std::optional<bool> ALVimKeymap::normalKey(ALTextView& view, llwchar ch)
+{
+    const ALTextDocument& d       = view.document();
+    const bool            visual  = mMode != Mode::Normal;
+    const bool            editing = !view.isReadOnly();
+    const S32             count   = countOr(mCount);
     switch (ch)
     {
         case 'K':
@@ -2466,9 +2570,13 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
             clearPending();
             return true;
         default:
-            break;
+            return std::nullopt;
     }
+}
 
+bool ALVimKeymap::motionKey(ALTextView& view, llwchar ch)
+{
+    const S32             count   = countOr(mCount);
     // A motion on its own; one of vim's jumps notes where it began. One
     // that could not move failed, as vim has it.
     Motion m = motion(view, ch, count, 0);
