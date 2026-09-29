@@ -252,7 +252,9 @@ void ALScriptOutlinePane::show(Doc& doc)
         list.push_back(std::move(one));
     }
     mList->setRows(std::move(list));
-    mList->setEmpty(doc.outline.empty() ? mServices->words(doc.loaded ? "NoOutline" : "NoOutlineYet")
+    // A notecard has one only as JSON.
+    const char* none = !doc.loaded ? "NoOutlineYet" : !doc.notecard ? "NoOutline" : doc.grammar == "json" ? "NoOutlineJson" : "NoOutlineNotecard";
+    mList->setEmpty(doc.outline.empty() ? mServices->words(none)
                     : rows.empty()      ? mServices->words("OutlineNoMatch")
                                         : LLStringUtil::null,
                     LLStringUtil::null);

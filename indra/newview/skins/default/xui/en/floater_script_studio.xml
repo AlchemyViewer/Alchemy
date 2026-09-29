@@ -52,6 +52,10 @@
     <floater.string name="NoReferences">Nothing to show yet. Put the caret on a name and choose Find References.</floater.string>
     <floater.string name="NoOutline">Nothing in this script to outline yet.</floater.string>
     <floater.string name="NoOutlineYet">Still loading.</floater.string>
+    <floater.string name="NoOutlineNotecard">A notecard has an outline when it is read as JSON.</floater.string>
+    <floater.string name="NoOutlineJson">Nothing in this notecard to outline yet.</floater.string>
+    <floater.string name="NotecardItemsUnread">Scripts cannot read this notecard: it holds embedded items, so llGetNotecardLine returns EOF for every line.</floater.string>
+    <floater.string name="NotecardLineCut">Scripts read only the first [BYTES] bytes of this line, which is [SIZE] bytes.</floater.string>
     <floater.string name="NoExplorerSelection">Nothing selected. Select an object in the world to see its contents.</floater.string>
     <floater.string name="ExplorerNoMatch">No listed item has that text in its name.</floater.string>
     <floater.string name="NoOutput">No output yet. Messages from compiling, running and the preprocessor appear here.</floater.string>
@@ -1852,6 +1856,22 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
                         <combo_box.item label="LSL (LSO)" name="compile_target_lsl2" value="lsl2" />
                         <combo_box.item label="LSL (Luau)" name="compile_target_lsl_luau" value="lsl-luau" />
                         <combo_box.item label="SLua" name="compile_target_luau" value="luau" />
+                    </combo_box>
+                    <!-- A notecard's, in the same place: what its text is
+                         coloured, checked and outlined as. -->
+                    <combo_box
+                     follows="right|top"
+                     height="20"
+                     layout="topleft"
+                     name="notecard_grammar"
+                     right="-4"
+                     tool_tip="What the notecard is read as, for its colours and outline. Guessed from its text as it opens."
+                     top="2"
+                     visible="false"
+                     width="100">
+                        <combo_box.item label="Plain Text" name="notecard_grammar_text" value="text" />
+                        <combo_box.item label="JSON" name="notecard_grammar_json" value="json" />
+                        <combo_box.item label="Settings" name="notecard_grammar_config" value="config" />
                     </combo_box>
                 </layout_panel>
                 </layout_stack>

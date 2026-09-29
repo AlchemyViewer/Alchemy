@@ -30,6 +30,9 @@
 
 #include "../alscriptstudiochecking.h"
 
+#include "../alnotecardembedded.h"
+#include "alnotecarditems.h"
+
 #include "../alscriptstudiowords.h"
 #include "alcodeeditor.h"
 #include "alscriptstudio_fixture.h"
@@ -227,6 +230,24 @@ namespace
 
 namespace tut
 {
+    // A notecard's items need a world to be made with; this one answers
+    // nothing.
+    class NoWorld final : public ALNotecardEmbedded::World
+    {
+    public:
+        std::string iconOf(const LLInventoryItem&) const override { return std::string(); }
+        bool        draggedFromNotecard() const override { return false; }
+        bool        carriesSettings() const override { return false; }
+        bool        mayCopy(const LLInventoryItem&) const override { return false; }
+        U32         frame() const override { return 0; }
+        bool        open(const LLPointer<LLInventoryItem>&, const ALScriptRef&, std::function<void(const LLUUID&, U32)>) override { return true; }
+        void        confirmCopy(std::function<void()>) override {}
+        bool        askCopy(const ALScriptRef&, const LLUUID&, const LLUUID&, U32, std::function<void(const std::string&)>) override { return false; }
+        void        pressedAt(S32, S32) override {}
+        bool        pastDragStart(S32, S32) override { return false; }
+        void        dragOut(const LLInventoryItem&, const ALScriptRef&) override {}
+    };
+
     struct alscriptstudiochecking_data
     {
         al_studio_test::StudioWindow            window;
@@ -377,14 +398,16 @@ namespace tut
         checking.schedule(doc, true);
         checking.pump(1.0);
         ensure_equals("at once", studio.asks.size(), size_t(2));
+        // A notecard is checked here, as scripts read it (test 20).
         doc.notecard = true;
         checking.schedule(doc, true);
+        checking.pump(1e9);
         doc.notecard = false;
         doc.loaded   = false;
         checking.schedule(doc, true);
         doc.loaded = true;
         checking.pump(1e9);
-        ensure_equals("a notecard, or a tab not loaded: never", studio.asks.size(), size_t(2));
+        ensure_equals("a notecard, or a tab not loaded: never asked of the analyzers", studio.asks.size(), size_t(2));
         doc.notecard = true;
         checking.ask(doc, Kind::Hover, ALTextPos(0, 8), ALTextPos(0, 8));
         ensure_equals("a notecard not asked about", studio.asks.size(), size_t(2));
@@ -1130,5 +1153,43 @@ namespace tut
         doc.editor->insertText(" ");
         checking.ask(doc, Kind::Inspect, ALTextPos(0, 10), ALTextPos(0, 10));
         ensure_equals("typed in since: asked", studio.asks.size(), size_t(3));
+    }
+
+    template<> template<>
+    void alscriptstudiochecking_object::test<20>()
+    {
+        set_test_name("a notecard checked as scripts read it, with no analyzer asked: its items making every line EOF, a line past 1024 bytes; outlined as JSON only");
+        ALScriptStudioChecking& checking = make();
+        const std::string long_line(1030, 'x');
+        Doc& card    = tab("card", "one " + ALNotecardItems::charOf(0) + "\n" + long_line + "\n");
+        card.ref     = ALScriptRef(LLUUID::generateNewID(), LLUUID::generateNewID());
+        card.notecard = true;
+        card.grammar  = "text";
+        NoWorld world;
+        card.items = std::make_shared<ALNotecardEmbedded>(*card.editor, ALNotecardEmbedded::Holder(), world);
+        card.items->loaded({ LLPointer<LLInventoryItem>(new LLInventoryItem()) });
+        checking.schedule(card, true);
+        checking.pump(2.0);
+        ensure("no analyzer asked", studio.asks.empty());
+        ensure_equals("two", card.check.analysis.size(), size_t(2));
+        ensure("the items, at the first", card.check.analysis[0].line == 0 && card.check.analysis[0].column == 4 &&
+                                              card.check.analysis[0].severity == ALScriptProblem::Severity::Warning);
+        ensure("the long line, from where it is cut", card.check.analysis[1].line == 1 && card.check.analysis[1].column == 1024 &&
+                                                          card.check.analysis[1].endColumn == 1030);
+        ensure("no outline as plain text", card.outline.empty());
+
+        card.items.reset();
+        card.grammar = "json";
+        card.editor->setText("{ \"door\": { \"speed\": 2 } }\n");
+        checking.schedule(card, true);
+        checking.pump(3.0);
+        ensure("nothing to say", card.check.analysis.empty());
+        ensure("its keys outlined", card.outline.size() == 2 && card.outline[0].name == "door" && card.outline[1].name == "speed");
+
+        Doc& file     = tab("disk", "{ \"a\": 1 }\n");
+        file.file     = "/tmp/a.json";
+        file.notecard = true;
+        checking.schedule(file, true);
+        ensure("a text file on disk is not checked", file.check.analysisDue <= 0.0);
     }
 }

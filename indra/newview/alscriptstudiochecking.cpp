@@ -26,6 +26,9 @@
 
 #include "alscriptstudiochecking.h"
 
+#include "alnotecardembedded.h"
+#include "alnotecardformat.h"
+#include "alnotecarditems.h"
 #include "alscriptfixes.h"
 #include "alscriptstudioplaces.h"
 #include "alscriptstudioservices.h"
@@ -662,8 +665,9 @@ void ALScriptStudioChecking::schedule(Doc& doc, bool now)
 {
     // A file on disk is checked as what it is: a Lua module, or an LSL
     // script, or an LSL include, which is checked with a state put after
-    // it (lslFragment).
-    if (!doc.loaded || doc.notecard)
+    // it (lslFragment); a notecard in the world as scripts read it; any
+    // other text not at all.
+    if (!doc.loaded || (doc.notecard && !doc.itemNotecard()))
     {
         return;
     }
@@ -714,6 +718,12 @@ void ALScriptStudioChecking::pump(F64 now)
         {
             continue;
         }
+        // Quick, and nothing to wait on.
+        if (doc->itemNotecard())
+        {
+            checkNotecard(*doc);
+            continue;
+        }
         if (doc == front)
         {
             askCheck(*doc, now);
@@ -735,6 +745,57 @@ void ALScriptStudioChecking::askCheck(Doc& doc, F64 now)
     doc.check.requestedVersion = doc.editor->document().version();
     doc.check.askedAt          = now;
     ask(doc, ALScriptAnalysis::Kind::Check, ALTextPos(), ALTextPos());
+}
+
+void ALScriptStudioChecking::checkNotecard(Doc& doc)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
+    doc.check.analysisDue           = 0.0;
+    const ALTextDocument& text      = doc.editor->document();
+    ALScriptProblems      problems;
+    // Every line is EOF to a script where the notecard carries anything:
+    // said once, at the first item.
+    if (doc.items && !doc.items->items().empty())
+    {
+        for (S32 line = 0; line < text.lineCount() && problems.empty(); ++line)
+        {
+            ALNotecardItems::forEach(text.line(line), [&](size_t column, size_t) {
+                if (!problems.empty())
+                {
+                    return;
+                }
+                ALScriptProblem problem;
+                problem.severity  = ALScriptProblem::Severity::Warning;
+                problem.source    = ALScriptProblem::Source::Lint;
+                problem.line      = problem.endLine = line;
+                problem.column    = static_cast<S32>(column);
+                problem.endColumn = static_cast<S32>(column + ALNotecardItems::CHAR_BYTES);
+                problem.message   = mServices.words("NotecardItemsUnread");
+                problems.push_back(std::move(problem));
+            });
+        }
+    }
+    // What a script is given of a long line: its first so many bytes.
+    for (const S32 line : ALNotecardFormat::linesPast(doc.editor->wholeText()))
+    {
+        const S32                  length = static_cast<S32>(text.line(line).size());
+        LLStringUtil::format_map_t args;
+        args["[BYTES]"] = std::to_string(ALNotecardFormat::READ_LINE_BYTES);
+        args["[SIZE]"]  = std::to_string(length);
+        ALScriptProblem problem;
+        problem.severity  = ALScriptProblem::Severity::Warning;
+        problem.source    = ALScriptProblem::Source::Lint;
+        problem.line      = problem.endLine = line;
+        problem.column    = static_cast<S32>(ALNotecardFormat::READ_LINE_BYTES);
+        problem.endColumn = length;
+        problem.message   = mServices.words("NotecardLineCut", args);
+        problems.push_back(std::move(problem));
+    }
+    doc.check.analysis        = std::move(problems);
+    doc.check.analysisVersion = text.version();
+    doc.outline               = doc.grammar == "json" ? ALNotecardFormat::outline(doc.editor->wholeText()) : std::vector<ALScriptOutlineEntry>();
+    mWindow.refreshProblems(doc);
+    mWindow.showOutline(doc);
 }
 
 void ALScriptStudioChecking::analysed(const ALScriptAnalysis::Result& result)

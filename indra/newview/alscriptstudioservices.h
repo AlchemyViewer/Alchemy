@@ -83,6 +83,10 @@ public:
         return label.empty() ? text : words("Labelled", { { "[LABEL]", label }, { "[TEXT]", text } });
     }
     std::string sentence(const std::string& text) const { return text.empty() ? text : words("Sentence", { { "[TEXT]", text } }); }
+    // A line, counted from 0 as the text holds it, as a list shows it:
+    // from 1, or from 0 for a notecard where the window counts a
+    // notecard's lines as scripts read them.
+    virtual S32 shownLine(S32 line, bool notecard) const { return line + 1; }
 
     // --- the tabs ----------------------------------------------------------------
 

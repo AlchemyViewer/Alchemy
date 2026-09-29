@@ -886,7 +886,9 @@ std::string ALScriptProblemsPane::whereOf(const Doc* doc, const Doc::Shown& prob
     const S32           column = editor && problem.file.empty() && problem.line < editor->document().lineCount()
                                      ? editor->document().displayColumn(ALTextPos(problem.line, problem.column), editor->getTabWidth())
                                      : problem.column;
-    return problem.hasColumn ? llformat("%d:%d", problem.line + 1, column + 1) : llformat("%d", problem.line + 1);
+    // The line as the tab's gutter counts it: a notecard's may be from 0.
+    const S32 line = mServices->shownLine(problem.line, doc && doc->itemNotecard() && problem.file.empty());
+    return problem.hasColumn ? llformat("%d:%d", line, column + 1) : llformat("%d", line);
 }
 
 const ALScriptProblemsPane::Doc::Shown* ALScriptProblemsPane::shownOf(const LLSD& value) const
@@ -1132,9 +1134,10 @@ void ALScriptProblemsPane::act(const std::string& action)
     const std::string lint    = chosen ? chosen->lint : std::string();
     const bool        lua     = doc.language.lua;
     // A problem as a line of text: where, what level, from whom, what.
-    const auto as_text = [](const Doc& whose, const Doc::Shown& one) {
+    const auto as_text = [this](const Doc& whose, const Doc::Shown& one) {
         const std::string name  = !one.fileName.empty() ? one.fileName : whose.name;
-        const std::string where = one.hasColumn ? llformat("%s:%d:%d", name.c_str(), one.line + 1, one.column + 1) : llformat("%s:%d", name.c_str(), one.line + 1);
+        const S32         line  = mServices->shownLine(one.line, whose.itemNotecard() && one.file.empty());
+        const std::string where = one.hasColumn ? llformat("%s:%d:%d", name.c_str(), line, one.column + 1) : llformat("%s:%d", name.c_str(), line);
         const std::string level = one.level == Doc::Level::Error ? "error" : one.level == Doc::Level::Warning ? "warning" : "note";
         return where + ": " + level + ": " + one.message + " [" + one.origin + "]";
     };

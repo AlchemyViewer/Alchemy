@@ -131,7 +131,9 @@ public:
     // and globals, which the parser takes for no script at all until a
     // state is put after them, and whose declarations are for others.
     bool lslFragment(const Doc& doc) const;
-    // A check due a moment after the last keystroke, or at once.
+    // A check due a moment after the last keystroke, or at once. A
+    // notecard's is its own (checkNotecard), which the analyzers have no
+    // part in.
     void schedule(Doc& doc, bool now = false);
     // The analyzers asked about a place of a tab, or a stretch from `at`
     // to `to`: of what the compiler would see, the expansion asked for
@@ -182,6 +184,10 @@ private:
     void showHover(Doc& doc, const ALScriptAnalysis::Result& said, const ALTextPos& at);
     // A check asked of a tab now.
     void askCheck(Doc& doc, F64 now);
+    // A notecard's, made here and now: what scripts will not read of it --
+    // none of it where it carries items, and past so many bytes of a line
+    // -- and, read as JSON, its keys as its outline.
+    void checkNotecard(Doc& doc);
     // The expansion asked for, a question waiting on it; and taken.
     void expandFor(Doc& doc, ALScriptAnalysis::Kind kind, const ALTextPos& at, const ALTextPos& to);
     void expandedAnswer(const std::string& id, U32 version, const ALPreprocessor::Result& result);

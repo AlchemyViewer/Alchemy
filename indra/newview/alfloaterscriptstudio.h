@@ -274,6 +274,7 @@ private:
     void               setStatus(const std::string& text, bool failure = false) override { ALStudioFloater::setStatus(text, failure); }
     std::string        words(const std::string& name, const LLStringUtil::format_map_t& args = LLStringUtil::format_map_t()) const override;
     ALScriptStudioDoc* frontDoc() override { return active(); }
+    S32                shownLine(S32 line, bool notecard) const override { return line + (notecard && mNotecardFromZero ? 0 : 1); }
     ALScriptStudioDoc* findDoc(std::string_view id) override;
     ALScriptStudioDoc* findDoc(const ALScriptRef& ref) override;
     std::vector<ALScriptStudioDoc*> openDocs() override;
@@ -901,6 +902,8 @@ private:
     void addHelpCommands();
     void addEditorCommand(const std::string& name, ALEditorCommand command, bool changes);
     void onCompileTarget();
+    // A notecard's grammar picked from the strip.
+    void onNotecardGrammar();
     // The tab's script read as the other language from here: its grammar,
     // its words, its checks; what was made of it as the one it was, gone.
     void readAs(Doc& doc, bool lua);
@@ -980,6 +983,7 @@ private:
         bool                regionLua    = false;
         bool                lua          = false;
         std::string         target;
+        std::string         grammar;
         bool                experienceKnown  = false;
         bool                experienceChosen = false;
         bool                experienceAsking = false;
@@ -1240,6 +1244,7 @@ private:
     bool                               mMain = true;
     bool                               mClosingWindow = false;
     LLComboBox*                        mCompileTarget = nullptr;
+    LLComboBox*                        mNotecardGrammar = nullptr;
     LLCheckBoxCtrl*                    mRunning       = nullptr;
     LLComboBox*                        mExperience    = nullptr;
     LLButton*                          mExperienceProfile = nullptr;

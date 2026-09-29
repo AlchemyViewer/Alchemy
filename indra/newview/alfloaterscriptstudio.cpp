@@ -33,6 +33,7 @@
 #include "alserialworker.h"
 #include "alfilewrite.h"
 #include "fsyspath.h"
+#include "alnotecardformat.h"
 #include "alnotecarditems.h"
 #include "alscriptinventoryindex.h"
 #include "alscriptmodules.h"
@@ -798,6 +799,8 @@ bool ALFloaterScriptStudio::postBuild()
     mSearchPane = getChild<ALScriptSearchPane>("search_tab");
     mRunningConnection = ALScriptWorkspace::instance().onRunningState([this](const ALScriptWorkspace::RunningState& state) { runningState(state); });
     mCompileTarget->setCommitCallback(boost::bind(&ALFloaterScriptStudio::onCompileTarget, this));
+    mNotecardGrammar = getChild<LLComboBox>("notecard_grammar");
+    mNotecardGrammar->setCommitCallback(boost::bind(&ALFloaterScriptStudio::onNotecardGrammar, this));
     mRunning->setCommitCallback(boost::bind(&ALFloaterScriptStudio::onRunning, this));
     mExperience->setCommitCallback(boost::bind(&ALFloaterScriptStudio::onExperience, this));
     mExperienceProfile->setCommitCallback([this](LLUICtrl*, const LLSD&) {
@@ -2274,7 +2277,13 @@ void ALFloaterScriptStudio::loaded(const ALScriptWorkspace::Loaded& answer)
         doc.loaded                 = true;
         ALNotecardEmbedded& items = notecardItems(doc);
         items.loaded(answer.embedded);
-        doc.editor->setSyntax("text");
+        // Coloured and outlined as what its text looks written in, unless
+        // picked otherwise.
+        if (!doc.grammarPicked)
+        {
+            doc.grammar = doc.itemNotecard() ? ALNotecardFormat::guess(answer.text) : "text";
+        }
+        doc.editor->setSyntax(doc.grammar);
         applyEditorOptions(*doc.editor, doc.itemNotecard());
         doc.editor->setText(answer.text);
         // A kept or copied text says its items by their places in the list
@@ -3345,6 +3354,7 @@ ALFloaterScriptStudio::ToolbarFacts ALFloaterScriptStudio::toolbarFactsOf() cons
     facts.regionLua        = ALScriptWorkspace::luaEnabled(doc->ref);
     facts.lua              = doc->language.lua;
     facts.target           = doc->language.compileTarget;
+    facts.grammar          = doc->grammar;
     facts.experienceKnown  = doc->experienceKnown;
     facts.experienceChosen = doc->experienceChosen;
     facts.experienceAsking = doc->experienceAsking;
@@ -3373,6 +3383,14 @@ void ALFloaterScriptStudio::refreshToolbar()
     const bool script  = doc && !doc->notecard && doc->file.empty();
     mCompileTarget->setVisible(script);
     mCompileTarget->setEnabled(have && script && doc->modifiable);
+    // In its place for a notecard: what its text is read as.
+    const bool notecard = doc && doc->itemNotecard();
+    mNotecardGrammar->setVisible(notecard);
+    mNotecardGrammar->setEnabled(have && notecard);
+    if (notecard)
+    {
+        mNotecardGrammar->setValue(doc->grammar);
+    }
     mSaveButton->setEnabled(have && doc->modifiable && !doc->save.sending());
     mSaveAllButton->setEnabled(mToolbarFacts->anyDirty);
     mUndoButton->setEnabled(doc && doc->shownText()->canUndo());
@@ -3420,7 +3438,7 @@ namespace
     // of the script's controls from the right, and what the breadcrumb
     // keeps before the experience's box narrows, down to its least.
     constexpr S32 STRIP_EDGE       = 4;
-    constexpr S32 STRIP_GAPS[]     = { 4, 6, 8, 4, 6 };
+    constexpr S32 STRIP_GAPS[]     = { 4, 4, 6, 8, 4, 6 };
     constexpr S32 CRUMBS_LEAST     = 200;
     constexpr S32 EXPERIENCE_LEAST = 90;
 }
@@ -3442,7 +3460,7 @@ void ALFloaterScriptStudio::layStrip()
     mStripLaid      = width;
     S32       right = width - STRIP_EDGE;
     const S32 left  = mCrumbsBar->getRect().mLeft;
-    LLView* const order[] = { mCompileTarget, mRunning, mResetButton, mExperienceProfile, mExperience };
+    LLView* const order[] = { mCompileTarget, mNotecardGrammar, mRunning, mResetButton, mExperienceProfile, mExperience };
     for (size_t i = 0; i < std::size(order); ++i)
     {
         LLView* control = order[i];
@@ -3466,6 +3484,21 @@ void ALFloaterScriptStudio::layStrip()
         mCrumbsBar->reshape(end - crumbs.mLeft, crumbs.getHeight());
         mCrumbsBar->setOrigin(crumbs.mLeft, crumbs.mBottom);
     }
+}
+
+void ALFloaterScriptStudio::onNotecardGrammar()
+{
+    Doc* doc = active();
+    if (!doc || !doc->itemNotecard())
+    {
+        return;
+    }
+    doc->grammar       = mNotecardGrammar->getValue().asString();
+    doc->grammarPicked = true;
+    doc->editor->setSyntax(doc->grammar);
+    // Checked and outlined again as what it is read as now.
+    mChecking.schedule(*doc, true);
+    refreshToolbar();
 }
 
 void ALFloaterScriptStudio::onTabChosen(const std::string& value)

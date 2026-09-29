@@ -200,6 +200,11 @@ struct ALScriptStudioDoc
     // A notecard in the world, rather than a text file on disk: what a
     // script reads by line, which is shown the way a notecard is.
     bool itemNotecard() const { return notecard && file.empty(); }
+    // A notecard's grammar -- "text", "json" or "config" -- guessed from
+    // its text as it loads (ALNotecardFormat::guess), or picked from the
+    // strip, which a load keeps.
+    std::string                                grammar;
+    bool                                       grammarPicked = false;
     // Opened by walking a pane's list past a place in it: looked at
     // without being held, and replaced by the next one looked at, until
     // it is typed in, saved, gone to or double-clicked.
