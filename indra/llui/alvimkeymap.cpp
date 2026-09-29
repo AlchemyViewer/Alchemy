@@ -5554,7 +5554,7 @@ namespace
                     shown = std::string("  clipboard=") + (shared.unnamedClipboard ? "unnamed" : "");
                     break;
                 case Op::Default:
-                    shared.unnamedClipboard = true;
+                    shared.unnamedClipboard = false;
                     break;
                 case Op::Assign:
                     if (named || setting.value.empty())

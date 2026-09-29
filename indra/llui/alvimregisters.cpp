@@ -89,13 +89,14 @@ void ALVimRegisters::store(char name, std::string text, bool linewise, bool bloc
     }
     else if (linewise || reg.text.find('\n') != std::string::npos)
     {
-        // A delete of a line or more: the last nine kept, newest first.
+        // A delete of a line or more: the last nine kept, newest first,
+        // each moved down one rather than copied.
         for (char n = '9'; n > '1'; --n)
         {
             const auto older = mRegisters.find(static_cast<char>(n - 1));
             if (older != mRegisters.end())
             {
-                mRegisters[n] = older->second;
+                mRegisters[n] = std::move(older->second);
             }
         }
         mRegisters['1'] = reg;
@@ -107,11 +108,11 @@ void ALVimRegisters::store(char name, std::string text, bool linewise, bool bloc
     }
     // The unnamed register: the clipboard, which the world shares, where
     // the setting says so; the editor's own otherwise.
-    mUnnamed = reg;
     if (unnamed_clipboard)
     {
         mCopy(reg.text);
     }
+    mUnnamed = std::move(reg);
 }
 
 ALVimRegisters::Register ALVimRegisters::fetch(char name, bool unnamed_clipboard) const

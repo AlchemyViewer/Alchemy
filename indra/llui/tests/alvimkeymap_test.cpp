@@ -1204,7 +1204,7 @@ namespace tut
         ensure_equals("a named register leaves the clipboard alone", clipboard(), outside);
         ensure_equals("and \"\" names it", vim->registerText('"'), std::string("one"));
 
-        vim->sharedState()->unnamedClipboard = false;
+        ensure("off, as vim has it", !vim->shared().unnamedClipboard);
         keys("x");
         ensure_equals("off: a delete leaves the clipboard alone", clipboard(), outside);
         ensure_equals("and keeps what it took", vim->registerText('"'), std::string("o"));
@@ -1219,6 +1219,9 @@ namespace tut
         ensure_equals("a yank goes by the clipboard", clipboard(), std::string("two"));
         keys(":set clipboard=<CR>");
         ensure("and off", !vim->shared().unnamedClipboard);
+        keys(":set clipboard=unnamed<CR>");
+        keys(":set clipboard&<CR>");
+        ensure("off again by default", !vim->shared().unnamedClipboard);
         keys(":set clipboard=bogus<CR>");
         ensure("a value vim has not is said", vim->messageIsError() && vim->message().find("E474") != std::string::npos);
     }

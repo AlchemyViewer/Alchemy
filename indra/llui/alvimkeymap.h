@@ -48,8 +48,9 @@
 // C D Y p P J gJ r ~ o O i a I A u Ctrl-R and . to do the last change
 // again; in insert mode Ctrl-W Ctrl-U Ctrl-H Ctrl-T Ctrl-D Ctrl-N Ctrl-P
 // Ctrl-A Ctrl-R Ctrl-E Ctrl-Y, and Ctrl-J Ctrl-M Ctrl-I for Return and
-// Tab; registers, the unnamed one being the system clipboard, with 0
-// for the last yank and a-z by name (A-Z to add); marks a-z, ` and '; a
+// Tab; registers, the unnamed one the editor's own unless clipboard is
+// unnamed, with 0 for the last yank and a-z by name (A-Z to add), and "+
+// and "* the system clipboard; marks a-z, ` and '; a
 // search line for / and ?; and a : line for a line number, s/// with
 // vim's flags and & g& :& :&& to do the last one again, set, g and v
 // over the lines a pattern picks out, normal, and whatever the hooks
@@ -155,7 +156,8 @@ public:
     // @: and :history; and the settings a :set changes, ignorecase and
     // smartcase, and clipboard: whether what is yanked, deleted and put
     // with no register named goes by the system clipboard, as vim's
-    // clipboard=unnamed has it, or stays the editor's own. A register
+    // clipboard=unnamed has it, or stays the editor's own -- vim's own
+    // default, so that :g/x/d is not a clipboard write a line. A register
     // named -- "a -- never touches the clipboard, and "+ and "* are it
     // whatever this says. The keymap's own unless told to share another's.
     struct Shared
@@ -164,7 +166,7 @@ public:
         std::vector<std::string> search;
         bool                     ignoreCase       = false;
         bool                     smartCase        = false;
-        bool                     unnamedClipboard = true;
+        bool                     unnamedClipboard = false;
         // Every match of the last search lit, as hlsearch has it; and the
         // matches of what is typed on the search line lit, and the next
         // brought into sight, as incsearch has it.
