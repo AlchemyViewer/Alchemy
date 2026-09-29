@@ -704,19 +704,6 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="new_lua_script" />
             </menu_item_call>
             <menu_item_separator layout="topleft" />
-            <menu_item_call label="Save" layout="topleft" name="save">
-                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="save" />
-                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="save" />
-            </menu_item_call>
-            <menu_item_call label="Save All" layout="topleft" name="save_all">
-                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="save_all" />
-                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="save_all" />
-            </menu_item_call>
-            <menu_item_call label="Revert to Saved" layout="topleft" name="revert">
-                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="revert" />
-                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="revert" />
-            </menu_item_call>
-            <menu_item_separator layout="topleft" />
             <menu_item_call label="Open File..." layout="topleft" name="open_file">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="open_file" />
             </menu_item_call>
@@ -731,32 +718,48 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="recover" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="recover" />
             </menu_item_call>
-            <menu_item_call label="Insert File..." layout="topleft" name="insert_file">
-                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="insert_file" />
-                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="insert_file" />
+            <menu_item_separator layout="topleft" />
+            <menu_item_call label="Save" layout="topleft" name="save">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="save" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="save" />
             </menu_item_call>
-            <menu_item_call label="Replace Text from File..." layout="topleft" name="load_file">
-                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="load_file" />
-                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="load_file" />
-            </menu_item_call>
-            <menu_item_call label="Export to File..." layout="topleft" name="save_file">
-                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="save_file" />
-                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="save_file" />
+            <menu_item_call label="Save All" layout="topleft" name="save_all">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="save_all" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="save_all" />
             </menu_item_call>
             <menu_item_call label="Save File As..." layout="topleft" name="save_as">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="save_as" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="save_as" />
             </menu_item_call>
+            <menu_item_call label="Revert to Saved" layout="topleft" name="revert">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="revert" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="revert" />
+            </menu_item_call>
+            <menu_item_separator layout="topleft" />
+            <menu
+             label="Import and Export"
+             layout="topleft"
+             mouse_opaque="false"
+             name="file_transfer_menu"
+             tear_off="false"
+             width="200">
+                <menu_item_call label="Insert File..." layout="topleft" name="insert_file">
+                    <menu_item_call.on_click function="ScriptStudio.Menu" parameter="insert_file" />
+                    <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="insert_file" />
+                </menu_item_call>
+                <menu_item_call label="Replace Text from File..." layout="topleft" name="load_file">
+                    <menu_item_call.on_click function="ScriptStudio.Menu" parameter="load_file" />
+                    <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="load_file" />
+                </menu_item_call>
+                <menu_item_separator layout="topleft" />
+                <menu_item_call label="Export to File..." layout="topleft" name="save_file">
+                    <menu_item_call.on_click function="ScriptStudio.Menu" parameter="save_file" />
+                    <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="save_file" />
+                </menu_item_call>
+            </menu>
             <menu_item_call label="Edit in External Editor" layout="topleft" name="external_editor">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="external_editor" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="external_editor" />
-            </menu_item_call>
-            <menu_item_separator layout="topleft" />
-            <menu_item_call label="Preferences..." layout="topleft" name="preferences">
-                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="preferences" />
-            </menu_item_call>
-            <menu_item_call label="Update Language Definitions" layout="topleft" name="update_definitions">
-                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="update_definitions" />
             </menu_item_call>
             <menu_item_separator layout="topleft" />
             <menu_item_call label="Move to New Window" layout="topleft" name="pop_out">
@@ -778,6 +781,10 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
             <menu_item_call label="Close All" layout="topleft" name="close_all">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="close_all" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="close_all" />
+            </menu_item_call>
+            <menu_item_separator layout="topleft" />
+            <menu_item_call label="Preferences..." layout="topleft" name="preferences">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="preferences" />
             </menu_item_call>
         </menu>
         <menu
@@ -808,116 +815,6 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="paste" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="paste" />
             </menu_item_call>
-            <menu_item_call label="Select All" layout="topleft" name="select_all">
-                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="select_all" />
-                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="select_all" />
-            </menu_item_call>
-            <menu_item_call label="Select Line" layout="topleft" name="select_line">
-                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="select_line" />
-                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="select_line" />
-            </menu_item_call>
-            <menu_item_call label="Expand Selection" layout="topleft" name="expand_selection">
-                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="expand_selection" />
-                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="expand_selection" />
-            </menu_item_call>
-            <menu_item_call label="Shrink Selection" layout="topleft" name="shrink_selection">
-                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="shrink_selection" />
-                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="shrink_selection" />
-            </menu_item_call>
-            <menu_item_call label="Select Next Occurrence" layout="topleft" name="select_next_occurrence">
-                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="select_next_occurrence" />
-                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="select_next_occurrence" />
-            </menu_item_call>
-            <menu_item_call label="Change All Occurrences" layout="topleft" name="change_all_occurrences">
-                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="change_all_occurrences" />
-                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="change_all_occurrences" />
-            </menu_item_call>
-            <menu_item_call label="Select Function" layout="topleft" name="select_function">
-                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="select_function" />
-                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="select_function" />
-            </menu_item_call>
-            <menu_item_separator layout="topleft" />
-            <menu_item_call label="Toggle Comment" layout="topleft" name="toggle_comment">
-                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="toggle_comment" />
-                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="toggle_comment" />
-            </menu_item_call>
-            <menu_item_call label="Insert Line Below" layout="topleft" name="insert_line_below">
-                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="insert_line_below" />
-                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="insert_line_below" />
-            </menu_item_call>
-            <menu_item_call label="Insert Line Above" layout="topleft" name="insert_line_above">
-                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="insert_line_above" />
-                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="insert_line_above" />
-            </menu_item_call>
-            <menu_item_call label="Duplicate Line" layout="topleft" name="duplicate_line">
-                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="duplicate_line" />
-                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="duplicate_line" />
-            </menu_item_call>
-            <menu_item_call label="Delete Line" layout="topleft" name="delete_line">
-                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="delete_line" />
-                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="delete_line" />
-            </menu_item_call>
-            <menu_item_call label="Move Line Up" layout="topleft" name="move_line_up">
-                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="move_line_up" />
-                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="move_line_up" />
-            </menu_item_call>
-            <menu_item_call label="Move Line Down" layout="topleft" name="move_line_down">
-                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="move_line_down" />
-                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="move_line_down" />
-            </menu_item_call>
-            <menu_item_call label="Join Lines" layout="topleft" name="join_lines">
-                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="join_lines" />
-                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="join_lines" />
-            </menu_item_call>
-            <menu_item_call label="Complete" layout="topleft" name="complete">
-                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="complete" />
-                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="complete" />
-            </menu_item_call>
-            <menu_item_call label="Parameter Info" layout="topleft" name="signature_help">
-                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="signature_help" />
-                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="signature_help" />
-            </menu_item_call>
-            <menu_item_call label="Rename Symbol..." layout="topleft" name="rename">
-                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="rename" />
-                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="rename" />
-            </menu_item_call>
-            <menu_item_call label="Quick Fix..." layout="topleft" name="quick_fix">
-                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="quick_fix" />
-                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="quick_fix" />
-            </menu_item_call>
-            <menu_item_call label="Fix All Problems" layout="topleft" name="fix_all">
-                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="fix_all" />
-                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="fix_all" />
-            </menu_item_call>
-            <menu_item_call label="Check Every Script in This Object" layout="topleft" name="check_object">
-                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="check_object" />
-                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="check_object" />
-            </menu_item_call>
-            <menu_item_call label="Next Misspelling" layout="topleft" name="next_misspelling">
-                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="next_misspelling" />
-                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="next_misspelling" />
-            </menu_item_call>
-            <menu_item_call label="Previous Misspelling" layout="topleft" name="previous_misspelling">
-                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="previous_misspelling" />
-                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="previous_misspelling" />
-            </menu_item_call>
-            <menu_item_separator layout="topleft" />
-            <menu_item_call label="Format Document" layout="topleft" name="format">
-                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="format" />
-                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="format" />
-            </menu_item_call>
-            <menu_item_call label="Format Selection" layout="topleft" name="format_selection">
-                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="format_selection" />
-                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="format_selection" />
-            </menu_item_call>
-            <menu_item_call label="Convert Indentation to Spaces" layout="topleft" name="indent_spaces">
-                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="indent_spaces" />
-                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="indent_spaces" />
-            </menu_item_call>
-            <menu_item_call label="Convert Indentation to Tabs" layout="topleft" name="indent_tabs">
-                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="indent_tabs" />
-                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="indent_tabs" />
-            </menu_item_call>
             <menu_item_separator layout="topleft" />
             <menu_item_call label="Find..." layout="topleft" name="find">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="find" />
@@ -938,30 +835,166 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
             <menu_item_call label="Find in Files..." layout="topleft" name="find_in_files">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="find_in_files" />
             </menu_item_call>
+            <menu_item_separator layout="topleft" />
+            <menu_item_call label="Toggle Comment" layout="topleft" name="toggle_comment">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="toggle_comment" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="toggle_comment" />
+            </menu_item_call>
+            <menu
+             label="Lines"
+             layout="topleft"
+             mouse_opaque="false"
+             name="lines_menu"
+             tear_off="false"
+             width="200">
+                <menu_item_call label="Insert Line Below" layout="topleft" name="insert_line_below">
+                    <menu_item_call.on_click function="ScriptStudio.Menu" parameter="insert_line_below" />
+                    <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="insert_line_below" />
+                </menu_item_call>
+                <menu_item_call label="Insert Line Above" layout="topleft" name="insert_line_above">
+                    <menu_item_call.on_click function="ScriptStudio.Menu" parameter="insert_line_above" />
+                    <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="insert_line_above" />
+                </menu_item_call>
+                <menu_item_separator layout="topleft" />
+                <menu_item_call label="Duplicate Line" layout="topleft" name="duplicate_line">
+                    <menu_item_call.on_click function="ScriptStudio.Menu" parameter="duplicate_line" />
+                    <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="duplicate_line" />
+                </menu_item_call>
+                <menu_item_call label="Delete Line" layout="topleft" name="delete_line">
+                    <menu_item_call.on_click function="ScriptStudio.Menu" parameter="delete_line" />
+                    <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="delete_line" />
+                </menu_item_call>
+                <menu_item_call label="Join Lines" layout="topleft" name="join_lines">
+                    <menu_item_call.on_click function="ScriptStudio.Menu" parameter="join_lines" />
+                    <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="join_lines" />
+                </menu_item_call>
+                <menu_item_separator layout="topleft" />
+                <menu_item_call label="Move Line Up" layout="topleft" name="move_line_up">
+                    <menu_item_call.on_click function="ScriptStudio.Menu" parameter="move_line_up" />
+                    <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="move_line_up" />
+                </menu_item_call>
+                <menu_item_call label="Move Line Down" layout="topleft" name="move_line_down">
+                    <menu_item_call.on_click function="ScriptStudio.Menu" parameter="move_line_down" />
+                    <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="move_line_down" />
+                </menu_item_call>
+            </menu>
         </menu>
         <menu
-         label="Insert"
+         label="Selection"
          layout="topleft"
          mouse_opaque="false"
-         name="insert"
+         name="selection"
          tear_off="false"
-         width="200">
-            <menu_item_call label="Snippet..." layout="topleft" name="insert_snippet">
-                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="insert_snippet" />
-                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="insert_snippet" />
+         width="220">
+            <menu_item_call label="Select All" layout="topleft" name="select_all">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="select_all" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="select_all" />
             </menu_item_call>
-            <menu_item_call label="Function..." layout="topleft" name="insert_function">
-                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="insert_function" />
-                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="insert_function" />
+            <menu_item_call label="Select Line" layout="topleft" name="select_line">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="select_line" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="select_line" />
             </menu_item_call>
-            <menu_item_call label="Event Handler..." layout="topleft" name="insert_event">
-                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="insert_event" />
-                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="insert_event" />
+            <menu_item_call label="Select Function" layout="topleft" name="select_function">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="select_function" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="select_function" />
             </menu_item_call>
-            <menu_item_call label="Constant..." layout="topleft" name="insert_constant">
-                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="insert_constant" />
-                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="insert_constant" />
+            <menu_item_separator layout="topleft" />
+            <menu_item_call label="Expand Selection" layout="topleft" name="expand_selection">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="expand_selection" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="expand_selection" />
             </menu_item_call>
+            <menu_item_call label="Shrink Selection" layout="topleft" name="shrink_selection">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="shrink_selection" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="shrink_selection" />
+            </menu_item_call>
+            <menu_item_separator layout="topleft" />
+            <menu_item_call label="Select Next Occurrence" layout="topleft" name="select_next_occurrence">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="select_next_occurrence" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="select_next_occurrence" />
+            </menu_item_call>
+            <menu_item_call label="Change All Occurrences" layout="topleft" name="change_all_occurrences">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="change_all_occurrences" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="change_all_occurrences" />
+            </menu_item_call>
+        </menu>
+        <menu
+         label="Code"
+         layout="topleft"
+         mouse_opaque="false"
+         name="code"
+         tear_off="false"
+         width="220">
+            <menu_item_call label="Complete" layout="topleft" name="complete">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="complete" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="complete" />
+            </menu_item_call>
+            <menu_item_call label="Parameter Info" layout="topleft" name="signature_help">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="signature_help" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="signature_help" />
+            </menu_item_call>
+            <menu_item_separator layout="topleft" />
+            <menu
+             label="Insert"
+             layout="topleft"
+             mouse_opaque="false"
+             name="insert"
+             tear_off="false"
+             width="200">
+                <menu_item_call label="Snippet..." layout="topleft" name="insert_snippet">
+                    <menu_item_call.on_click function="ScriptStudio.Menu" parameter="insert_snippet" />
+                    <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="insert_snippet" />
+                </menu_item_call>
+                <menu_item_call label="Function..." layout="topleft" name="insert_function">
+                    <menu_item_call.on_click function="ScriptStudio.Menu" parameter="insert_function" />
+                    <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="insert_function" />
+                </menu_item_call>
+                <menu_item_call label="Event Handler..." layout="topleft" name="insert_event">
+                    <menu_item_call.on_click function="ScriptStudio.Menu" parameter="insert_event" />
+                    <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="insert_event" />
+                </menu_item_call>
+                <menu_item_call label="Constant..." layout="topleft" name="insert_constant">
+                    <menu_item_call.on_click function="ScriptStudio.Menu" parameter="insert_constant" />
+                    <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="insert_constant" />
+                </menu_item_call>
+            </menu>
+            <menu_item_separator layout="topleft" />
+            <menu_item_call label="Rename Symbol..." layout="topleft" name="rename">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="rename" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="rename" />
+            </menu_item_call>
+            <menu_item_call label="Quick Fix..." layout="topleft" name="quick_fix">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="quick_fix" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="quick_fix" />
+            </menu_item_call>
+            <menu_item_call label="Fix All Problems" layout="topleft" name="fix_all">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="fix_all" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="fix_all" />
+            </menu_item_call>
+            <menu_item_separator layout="topleft" />
+            <menu_item_call label="Format Document" layout="topleft" name="format">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="format" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="format" />
+            </menu_item_call>
+            <menu_item_call label="Format Selection" layout="topleft" name="format_selection">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="format_selection" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="format_selection" />
+            </menu_item_call>
+            <menu
+             label="Indentation"
+             layout="topleft"
+             mouse_opaque="false"
+             name="indentation_menu"
+             tear_off="false"
+             width="200">
+                <menu_item_call label="Convert to Spaces" layout="topleft" name="indent_spaces">
+                    <menu_item_call.on_click function="ScriptStudio.Menu" parameter="indent_spaces" />
+                    <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="indent_spaces" />
+                </menu_item_call>
+                <menu_item_call label="Convert to Tabs" layout="topleft" name="indent_tabs">
+                    <menu_item_call.on_click function="ScriptStudio.Menu" parameter="indent_tabs" />
+                    <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="indent_tabs" />
+                </menu_item_call>
+            </menu>
         </menu>
         <menu
          label="Go"
@@ -990,25 +1023,13 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
             <menu_item_call label="Go to Script..." layout="topleft" name="quick_open">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="quick_open" />
             </menu_item_call>
-            <menu_item_call label="Go to Line..." layout="topleft" name="go_to_line">
-                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="go_to_line" />
-                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="go_to_line" />
-            </menu_item_call>
             <menu_item_call label="Go to Symbol..." layout="topleft" name="go_to_symbol">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="go_to_symbol" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="go_to_symbol" />
             </menu_item_call>
-            <menu_item_call label="Next Function" layout="topleft" name="next_function">
-                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="next_function" />
-                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="next_function" />
-            </menu_item_call>
-            <menu_item_call label="Previous Function" layout="topleft" name="previous_function">
-                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="previous_function" />
-                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="previous_function" />
-            </menu_item_call>
-            <menu_item_call label="Matching Bracket" layout="topleft" name="go_to_bracket">
-                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="go_to_bracket" />
-                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="go_to_bracket" />
+            <menu_item_call label="Go to Line..." layout="topleft" name="go_to_line">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="go_to_line" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="go_to_line" />
             </menu_item_call>
             <menu_item_separator layout="topleft" />
             <menu_item_call label="Go to Definition" layout="topleft" name="go_to_definition">
@@ -1019,6 +1040,18 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="find_references" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="find_references" />
             </menu_item_call>
+            <menu_item_call label="Matching Bracket" layout="topleft" name="go_to_bracket">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="go_to_bracket" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="go_to_bracket" />
+            </menu_item_call>
+            <menu_item_call label="Next Function" layout="topleft" name="next_function">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="next_function" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="next_function" />
+            </menu_item_call>
+            <menu_item_call label="Previous Function" layout="topleft" name="previous_function">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="previous_function" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="previous_function" />
+            </menu_item_call>
             <menu_item_separator layout="topleft" />
             <menu_item_call label="Next Problem" layout="topleft" name="next_problem">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="next_problem" />
@@ -1028,33 +1061,50 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="previous_problem" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="previous_problem" />
             </menu_item_call>
-            <menu_item_separator layout="topleft" />
-            <menu_item_call label="Next Tab" layout="topleft" name="next_tab">
-                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="next_tab" />
+            <menu_item_call label="Next Misspelling" layout="topleft" name="next_misspelling">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="next_misspelling" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="next_misspelling" />
             </menu_item_call>
-            <menu_item_call label="Previous Tab" layout="topleft" name="previous_tab">
-                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="previous_tab" />
-            </menu_item_call>
-            <menu_item_call label="Last Used Tab" layout="topleft" name="last_tab" use_mac_ctrl="true">
-                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="last_tab" />
-                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="last_tab" />
-            </menu_item_call>
-            <menu_item_call label="All Tabs..." layout="topleft" name="all_tabs">
-                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="all_tabs" />
-            </menu_item_call>
-            <menu_item_call label="Move Tab Left" layout="topleft" name="move_tab_left">
-                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="move_tab_left" />
-            </menu_item_call>
-            <menu_item_call label="Move Tab Right" layout="topleft" name="move_tab_right">
-                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="move_tab_right" />
-            </menu_item_call>
-            <!-- The code editor takes Tab for itself, so the strip is
-                 reached from here: then the arrows walk it, as its own
-                 tooltip says. -->
-            <menu_item_call label="Go to Tabs" layout="topleft" name="focus_tabs">
-                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="focus_tabs" />
+            <menu_item_call label="Previous Misspelling" layout="topleft" name="previous_misspelling">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="previous_misspelling" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="previous_misspelling" />
             </menu_item_call>
             <menu_item_separator layout="topleft" />
+            <menu
+             label="Tabs"
+             layout="topleft"
+             mouse_opaque="false"
+             name="tabs_menu"
+             tear_off="false"
+             width="200">
+                <menu_item_call label="Next Tab" layout="topleft" name="next_tab">
+                    <menu_item_call.on_click function="ScriptStudio.Menu" parameter="next_tab" />
+                </menu_item_call>
+                <menu_item_call label="Previous Tab" layout="topleft" name="previous_tab">
+                    <menu_item_call.on_click function="ScriptStudio.Menu" parameter="previous_tab" />
+                </menu_item_call>
+                <menu_item_call label="Last Used Tab" layout="topleft" name="last_tab" use_mac_ctrl="true">
+                    <menu_item_call.on_click function="ScriptStudio.Menu" parameter="last_tab" />
+                    <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="last_tab" />
+                </menu_item_call>
+                <menu_item_call label="All Tabs..." layout="topleft" name="all_tabs">
+                    <menu_item_call.on_click function="ScriptStudio.Menu" parameter="all_tabs" />
+                </menu_item_call>
+                <menu_item_separator layout="topleft" />
+                <menu_item_call label="Move Tab Left" layout="topleft" name="move_tab_left">
+                    <menu_item_call.on_click function="ScriptStudio.Menu" parameter="move_tab_left" />
+                </menu_item_call>
+                <menu_item_call label="Move Tab Right" layout="topleft" name="move_tab_right">
+                    <menu_item_call.on_click function="ScriptStudio.Menu" parameter="move_tab_right" />
+                </menu_item_call>
+                <menu_item_separator layout="topleft" />
+                <!-- The code editor takes Tab for itself, so the strip is
+                     reached from here: then the arrows walk it, as its own
+                     tooltip says. -->
+                <menu_item_call label="Go to Tabs" layout="topleft" name="focus_tabs">
+                    <menu_item_call.on_click function="ScriptStudio.Menu" parameter="focus_tabs" />
+                </menu_item_call>
+            </menu>
             <menu_item_call label="Next Pane" layout="topleft" name="next_pane">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="next_pane" />
             </menu_item_call>
@@ -1073,174 +1123,42 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="command_palette" />
             </menu_item_call>
             <menu_item_separator layout="topleft" />
-            <menu_item_check label="Word Wrap" layout="topleft" name="word_wrap">
-                <menu_item_check.on_check function="ScriptStudio.Check" parameter="word_wrap" />
-                <menu_item_check.on_click function="ScriptStudio.Menu" parameter="word_wrap" />
-            </menu_item_check>
-            <menu_item_check label="Line Numbers" layout="topleft" name="line_numbers">
-                <menu_item_check.on_check function="ScriptStudio.Check" parameter="line_numbers" />
-                <menu_item_check.on_click function="ScriptStudio.Menu" parameter="line_numbers" />
-            </menu_item_check>
-            <menu_item_check label="Relative Line Numbers" layout="topleft" name="relative_numbers">
-                <menu_item_check.on_check function="ScriptStudio.Check" parameter="relative_numbers" />
-                <menu_item_check.on_click function="ScriptStudio.Menu" parameter="relative_numbers" />
-            </menu_item_check>
-            <menu_item_check label="Notecard Lines From 0" layout="topleft" name="notecard_from_zero">
-                <menu_item_check.on_check function="ScriptStudio.Check" parameter="notecard_from_zero" />
-                <menu_item_check.on_click function="ScriptStudio.Menu" parameter="notecard_from_zero" />
-                <menu_item_check.on_enable function="ScriptStudio.Enable" parameter="notecard_from_zero" />
-            </menu_item_check>
-            <menu_item_check label="Indent Guides" layout="topleft" name="indent_guides">
-                <menu_item_check.on_check function="ScriptStudio.Check" parameter="indent_guides" />
-                <menu_item_check.on_click function="ScriptStudio.Menu" parameter="indent_guides" />
-            </menu_item_check>
             <menu
-             label="Whitespace"
+             label="Panes"
              layout="topleft"
              mouse_opaque="false"
-             name="whitespace_menu"
+             name="panes_menu"
              tear_off="false"
              width="200">
-                <menu_item_check label="None" layout="topleft" name="blanks_none">
-                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="blanks_none" />
-                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="blanks_none" />
+                <menu_item_check label="Explorer" layout="topleft" name="explorer">
+                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="explorer" />
+                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="explorer" />
                 </menu_item_check>
-                <menu_item_check label="Under the Selection" layout="topleft" name="blanks_selection">
-                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="blanks_selection" />
-                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="blanks_selection" />
+                <menu_item_check label="Problems" layout="topleft" name="problems">
+                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="problems" />
+                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="problems" />
                 </menu_item_check>
-                <menu_item_check label="Trailing Only" layout="topleft" name="blanks_trailing">
-                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="blanks_trailing" />
-                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="blanks_trailing" />
+                <menu_item_check label="References" layout="topleft" name="references">
+                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="references" />
+                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="references" />
                 </menu_item_check>
-                <menu_item_check label="All" layout="topleft" name="blanks_all">
-                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="blanks_all" />
-                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="blanks_all" />
+                <menu_item_check label="Output" layout="topleft" name="output">
+                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="output" />
+                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="output" />
                 </menu_item_check>
-            </menu>
-            <menu_item_check label="Rainbow Brackets" layout="topleft" name="rainbow_brackets">
-                <menu_item_check.on_check function="ScriptStudio.Check" parameter="rainbow_brackets" />
-                <menu_item_check.on_click function="ScriptStudio.Menu" parameter="rainbow_brackets" />
-            </menu_item_check>
-            <menu_item_check label="Sticky Headers" layout="topleft" name="sticky_headers">
-                <menu_item_check.on_check function="ScriptStudio.Check" parameter="sticky_headers" />
-                <menu_item_check.on_click function="ScriptStudio.Menu" parameter="sticky_headers" />
-            </menu_item_check>
-            <menu_item_separator layout="topleft" />
-            <menu_item_check label="Vim Mode" layout="topleft" name="vim_mode">
-                <menu_item_check.on_check function="ScriptStudio.Check" parameter="vim_mode" />
-                <menu_item_check.on_click function="ScriptStudio.Menu" parameter="vim_mode" />
-            </menu_item_check>
-            <menu_item_separator layout="topleft" />
-            <menu_item_check label="Semantic Coloring" layout="topleft" name="semantic_colors">
-                <menu_item_check.on_check function="ScriptStudio.Check" parameter="semantic_colors" />
-                <menu_item_check.on_click function="ScriptStudio.Menu" parameter="semantic_colors" />
-            </menu_item_check>
-            <menu_item_check label="Parameter Name Hints" layout="topleft" name="inlay_parameters">
-                <menu_item_check.on_check function="ScriptStudio.Check" parameter="inlay_parameters" />
-                <menu_item_check.on_click function="ScriptStudio.Menu" parameter="inlay_parameters" />
-            </menu_item_check>
-            <menu_item_check label="Type Hints" layout="topleft" name="inlay_types">
-                <menu_item_check.on_check function="ScriptStudio.Check" parameter="inlay_types" />
-                <menu_item_check.on_click function="ScriptStudio.Menu" parameter="inlay_types" />
-            </menu_item_check>
-            <menu_item_check label="Bytes After Declarations" layout="topleft" name="weight_notes">
-                <menu_item_check.on_check function="ScriptStudio.Check" parameter="weight_notes" />
-                <menu_item_check.on_click function="ScriptStudio.Menu" parameter="weight_notes" />
-            </menu_item_check>
-            <menu_item_check label="Memory Heat in Gutter" layout="topleft" name="weight_heat">
-                <menu_item_check.on_check function="ScriptStudio.Check" parameter="weight_heat" />
-                <menu_item_check.on_click function="ScriptStudio.Menu" parameter="weight_heat" />
-            </menu_item_check>
-            <menu_item_check label="Spell Check" layout="topleft" name="spell_check">
-                <menu_item_check.on_check function="ScriptStudio.Check" parameter="spell_check" />
-                <menu_item_check.on_click function="ScriptStudio.Menu" parameter="spell_check" />
-            </menu_item_check>
-            <menu_item_separator layout="topleft" />
-            <menu
-             label="Scrollbar"
-             layout="topleft"
-             mouse_opaque="false"
-             name="scrollbar_menu"
-             tear_off="false"
-             width="200">
-                <menu_item_check label="Bar" layout="topleft" name="scroll_bar">
-                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="scroll_bar" />
-                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="scroll_bar" />
+                <menu_item_check label="Search" layout="topleft" name="search">
+                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="search" />
+                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="search" />
                 </menu_item_check>
-                <menu_item_check label="Map" layout="topleft" name="scroll_map">
-                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="scroll_map" />
-                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="scroll_map" />
+                <menu_item_check label="Memory" layout="topleft" name="weights">
+                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="weights" />
+                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="weights" />
                 </menu_item_check>
-                <menu_item_separator layout="topleft" />
-                <menu_item_check label="Narrow Map" layout="topleft" name="map_narrow">
-                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="map_narrow" />
-                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="map_narrow" />
-                </menu_item_check>
-                <menu_item_check label="Medium Map" layout="topleft" name="map_medium">
-                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="map_medium" />
-                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="map_medium" />
-                </menu_item_check>
-                <menu_item_check label="Wide Map" layout="topleft" name="map_wide">
-                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="map_wide" />
-                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="map_wide" />
-                </menu_item_check>
-                <menu_item_separator layout="topleft" />
-                <menu_item_check label="Preview Under the Mouse" layout="topleft" name="map_preview">
-                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="map_preview" />
-                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="map_preview" />
-                </menu_item_check>
-                <menu_item_check label="Map on the Left" layout="topleft" name="map_left">
-                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="map_left" />
-                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="map_left" />
+                <menu_item_check label="Inspector" layout="topleft" name="inspector">
+                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="inspector" />
+                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="inspector" />
                 </menu_item_check>
             </menu>
-            <menu_item_separator layout="topleft" />
-            <menu_item_call label="Fold" layout="topleft" name="fold">
-                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="fold" />
-                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="fold" />
-            </menu_item_call>
-            <menu_item_call label="Unfold" layout="topleft" name="unfold">
-                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="unfold" />
-                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="unfold" />
-            </menu_item_call>
-            <menu_item_call label="Fold All" layout="topleft" name="fold_all">
-                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="fold_all" />
-                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="fold_all" />
-            </menu_item_call>
-            <menu_item_call label="Unfold All" layout="topleft" name="unfold_all">
-                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="unfold_all" />
-                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="unfold_all" />
-            </menu_item_call>
-            <menu_item_separator layout="topleft" />
-            <menu_item_check label="Explorer" layout="topleft" name="explorer">
-                <menu_item_check.on_check function="ScriptStudio.Check" parameter="explorer" />
-                <menu_item_check.on_click function="ScriptStudio.Menu" parameter="explorer" />
-            </menu_item_check>
-            <menu_item_check label="Problems" layout="topleft" name="problems">
-                <menu_item_check.on_check function="ScriptStudio.Check" parameter="problems" />
-                <menu_item_check.on_click function="ScriptStudio.Menu" parameter="problems" />
-            </menu_item_check>
-            <menu_item_check label="References" layout="topleft" name="references">
-                <menu_item_check.on_check function="ScriptStudio.Check" parameter="references" />
-                <menu_item_check.on_click function="ScriptStudio.Menu" parameter="references" />
-            </menu_item_check>
-            <menu_item_check label="Output" layout="topleft" name="output">
-                <menu_item_check.on_check function="ScriptStudio.Check" parameter="output" />
-                <menu_item_check.on_click function="ScriptStudio.Menu" parameter="output" />
-            </menu_item_check>
-            <menu_item_check label="Search" layout="topleft" name="search">
-                <menu_item_check.on_check function="ScriptStudio.Check" parameter="search" />
-                <menu_item_check.on_click function="ScriptStudio.Menu" parameter="search" />
-            </menu_item_check>
-            <menu_item_check label="Memory" layout="topleft" name="weights">
-                <menu_item_check.on_check function="ScriptStudio.Check" parameter="weights" />
-                <menu_item_check.on_click function="ScriptStudio.Menu" parameter="weights" />
-            </menu_item_check>
-            <menu_item_check label="Inspector" layout="topleft" name="inspector">
-                <menu_item_check.on_check function="ScriptStudio.Check" parameter="inspector" />
-                <menu_item_check.on_click function="ScriptStudio.Menu" parameter="inspector" />
-            </menu_item_check>
             <menu_item_separator layout="topleft" />
             <menu_item_check label="Preprocessed View" layout="topleft" name="expanded">
                 <menu_item_check.on_check function="ScriptStudio.Check" parameter="expanded" />
@@ -1256,6 +1174,171 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
                 <menu_item_check.on_check function="ScriptStudio.Check" parameter="compare_inline" />
                 <menu_item_check.on_click function="ScriptStudio.Menu" parameter="compare_inline" />
                 <menu_item_check.on_enable function="ScriptStudio.Enable" parameter="compare_inline" />
+            </menu_item_check>
+            <menu_item_separator layout="topleft" />
+            <menu_item_check label="Word Wrap" layout="topleft" name="word_wrap">
+                <menu_item_check.on_check function="ScriptStudio.Check" parameter="word_wrap" />
+                <menu_item_check.on_click function="ScriptStudio.Menu" parameter="word_wrap" />
+            </menu_item_check>
+            <menu
+             label="Editor"
+             layout="topleft"
+             mouse_opaque="false"
+             name="editor_view_menu"
+             tear_off="false"
+             width="220">
+                <menu_item_check label="Line Numbers" layout="topleft" name="line_numbers">
+                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="line_numbers" />
+                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="line_numbers" />
+                </menu_item_check>
+                <menu_item_check label="Relative Line Numbers" layout="topleft" name="relative_numbers">
+                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="relative_numbers" />
+                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="relative_numbers" />
+                </menu_item_check>
+                <menu_item_check label="Notecard Lines From 0" layout="topleft" name="notecard_from_zero">
+                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="notecard_from_zero" />
+                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="notecard_from_zero" />
+                    <menu_item_check.on_enable function="ScriptStudio.Enable" parameter="notecard_from_zero" />
+                </menu_item_check>
+                <menu_item_separator layout="topleft" />
+                <menu_item_check label="Indent Guides" layout="topleft" name="indent_guides">
+                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="indent_guides" />
+                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="indent_guides" />
+                </menu_item_check>
+                <menu
+                 label="Whitespace"
+                 layout="topleft"
+                 mouse_opaque="false"
+                 name="whitespace_menu"
+                 tear_off="false"
+                 width="200">
+                    <menu_item_check label="None" layout="topleft" name="blanks_none">
+                        <menu_item_check.on_check function="ScriptStudio.Check" parameter="blanks_none" />
+                        <menu_item_check.on_click function="ScriptStudio.Menu" parameter="blanks_none" />
+                    </menu_item_check>
+                    <menu_item_check label="Under the Selection" layout="topleft" name="blanks_selection">
+                        <menu_item_check.on_check function="ScriptStudio.Check" parameter="blanks_selection" />
+                        <menu_item_check.on_click function="ScriptStudio.Menu" parameter="blanks_selection" />
+                    </menu_item_check>
+                    <menu_item_check label="Trailing Only" layout="topleft" name="blanks_trailing">
+                        <menu_item_check.on_check function="ScriptStudio.Check" parameter="blanks_trailing" />
+                        <menu_item_check.on_click function="ScriptStudio.Menu" parameter="blanks_trailing" />
+                    </menu_item_check>
+                    <menu_item_check label="All" layout="topleft" name="blanks_all">
+                        <menu_item_check.on_check function="ScriptStudio.Check" parameter="blanks_all" />
+                        <menu_item_check.on_click function="ScriptStudio.Menu" parameter="blanks_all" />
+                    </menu_item_check>
+                </menu>
+                <menu_item_check label="Rainbow Brackets" layout="topleft" name="rainbow_brackets">
+                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="rainbow_brackets" />
+                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="rainbow_brackets" />
+                </menu_item_check>
+                <menu_item_check label="Sticky Headers" layout="topleft" name="sticky_headers">
+                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="sticky_headers" />
+                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="sticky_headers" />
+                </menu_item_check>
+                <menu_item_separator layout="topleft" />
+                <menu_item_check label="Semantic Coloring" layout="topleft" name="semantic_colors">
+                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="semantic_colors" />
+                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="semantic_colors" />
+                </menu_item_check>
+                <menu_item_check label="Spell Check" layout="topleft" name="spell_check">
+                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="spell_check" />
+                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="spell_check" />
+                </menu_item_check>
+                <menu_item_separator layout="topleft" />
+                <menu
+                 label="Scrollbar"
+                 layout="topleft"
+                 mouse_opaque="false"
+                 name="scrollbar_menu"
+                 tear_off="false"
+                 width="200">
+                    <menu_item_check label="Bar" layout="topleft" name="scroll_bar">
+                        <menu_item_check.on_check function="ScriptStudio.Check" parameter="scroll_bar" />
+                        <menu_item_check.on_click function="ScriptStudio.Menu" parameter="scroll_bar" />
+                    </menu_item_check>
+                    <menu_item_check label="Map" layout="topleft" name="scroll_map">
+                        <menu_item_check.on_check function="ScriptStudio.Check" parameter="scroll_map" />
+                        <menu_item_check.on_click function="ScriptStudio.Menu" parameter="scroll_map" />
+                    </menu_item_check>
+                    <menu_item_separator layout="topleft" />
+                    <menu_item_check label="Narrow Map" layout="topleft" name="map_narrow">
+                        <menu_item_check.on_check function="ScriptStudio.Check" parameter="map_narrow" />
+                        <menu_item_check.on_click function="ScriptStudio.Menu" parameter="map_narrow" />
+                    </menu_item_check>
+                    <menu_item_check label="Medium Map" layout="topleft" name="map_medium">
+                        <menu_item_check.on_check function="ScriptStudio.Check" parameter="map_medium" />
+                        <menu_item_check.on_click function="ScriptStudio.Menu" parameter="map_medium" />
+                    </menu_item_check>
+                    <menu_item_check label="Wide Map" layout="topleft" name="map_wide">
+                        <menu_item_check.on_check function="ScriptStudio.Check" parameter="map_wide" />
+                        <menu_item_check.on_click function="ScriptStudio.Menu" parameter="map_wide" />
+                    </menu_item_check>
+                    <menu_item_separator layout="topleft" />
+                    <menu_item_check label="Preview Under the Mouse" layout="topleft" name="map_preview">
+                        <menu_item_check.on_check function="ScriptStudio.Check" parameter="map_preview" />
+                        <menu_item_check.on_click function="ScriptStudio.Menu" parameter="map_preview" />
+                    </menu_item_check>
+                    <menu_item_check label="Map on the Left" layout="topleft" name="map_left">
+                        <menu_item_check.on_check function="ScriptStudio.Check" parameter="map_left" />
+                        <menu_item_check.on_click function="ScriptStudio.Menu" parameter="map_left" />
+                    </menu_item_check>
+                </menu>
+            </menu>
+            <menu
+             label="Hints"
+             layout="topleft"
+             mouse_opaque="false"
+             name="hints_menu"
+             tear_off="false"
+             width="220">
+                <menu_item_check label="Parameter Name Hints" layout="topleft" name="inlay_parameters">
+                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="inlay_parameters" />
+                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="inlay_parameters" />
+                </menu_item_check>
+                <menu_item_check label="Type Hints" layout="topleft" name="inlay_types">
+                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="inlay_types" />
+                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="inlay_types" />
+                </menu_item_check>
+                <menu_item_separator layout="topleft" />
+                <menu_item_check label="Bytes After Declarations" layout="topleft" name="weight_notes">
+                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="weight_notes" />
+                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="weight_notes" />
+                </menu_item_check>
+                <menu_item_check label="Memory Heat in Gutter" layout="topleft" name="weight_heat">
+                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="weight_heat" />
+                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="weight_heat" />
+                </menu_item_check>
+            </menu>
+            <menu
+             label="Folding"
+             layout="topleft"
+             mouse_opaque="false"
+             name="folding_menu"
+             tear_off="false"
+             width="200">
+                <menu_item_call label="Fold" layout="topleft" name="fold">
+                    <menu_item_call.on_click function="ScriptStudio.Menu" parameter="fold" />
+                    <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="fold" />
+                </menu_item_call>
+                <menu_item_call label="Unfold" layout="topleft" name="unfold">
+                    <menu_item_call.on_click function="ScriptStudio.Menu" parameter="unfold" />
+                    <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="unfold" />
+                </menu_item_call>
+                <menu_item_call label="Fold All" layout="topleft" name="fold_all">
+                    <menu_item_call.on_click function="ScriptStudio.Menu" parameter="fold_all" />
+                    <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="fold_all" />
+                </menu_item_call>
+                <menu_item_call label="Unfold All" layout="topleft" name="unfold_all">
+                    <menu_item_call.on_click function="ScriptStudio.Menu" parameter="unfold_all" />
+                    <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="unfold_all" />
+                </menu_item_call>
+            </menu>
+            <menu_item_separator layout="topleft" />
+            <menu_item_check label="Vim Mode" layout="topleft" name="vim_mode">
+                <menu_item_check.on_check function="ScriptStudio.Check" parameter="vim_mode" />
+                <menu_item_check.on_click function="ScriptStudio.Menu" parameter="vim_mode" />
             </menu_item_check>
             <menu_item_separator layout="topleft" />
             <menu_item_call label="Zoom In" layout="topleft" name="zoom_in">
@@ -1278,6 +1361,10 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
             <menu_item_call label="Preprocess Now" layout="topleft" name="preprocess">
                 <menu_item_call.on_click function="ScriptStudio.Menu" parameter="preprocess" />
                 <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="preprocess" />
+            </menu_item_call>
+            <menu_item_call label="Check Every Script in This Object" layout="topleft" name="check_object">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="check_object" />
+                <menu_item_call.on_enable function="ScriptStudio.Enable" parameter="check_object" />
             </menu_item_call>
             <menu_item_separator layout="topleft" />
             <menu_item_check label="Running" layout="topleft" name="running">
@@ -1302,49 +1389,58 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
                 <menu_item_check.on_check function="ScriptStudio.Check" parameter="preflight" />
                 <menu_item_check.on_click function="ScriptStudio.Menu" parameter="preflight" />
             </menu_item_check>
-            <menu_item_check label="Preprocess on Save" layout="topleft" name="preproc_enabled">
-                <menu_item_check.on_check function="ScriptStudio.Check" parameter="preproc_enabled" />
-                <menu_item_check.on_click function="ScriptStudio.Menu" parameter="preproc_enabled" />
-            </menu_item_check>
-            <menu_item_check label="Include from Disk" layout="topleft" name="preproc_disk">
-                <menu_item_check.on_check function="ScriptStudio.Check" parameter="preproc_disk" />
-                <menu_item_check.on_click function="ScriptStudio.Menu" parameter="preproc_disk" />
-            </menu_item_check>
-            <menu_item_call label="Add Include Folder..." layout="topleft" name="preproc_folder">
-                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="preproc_folder" />
-            </menu_item_call>
             <menu_item_separator layout="topleft" />
             <menu
-             label="Firestorm"
+             label="Preprocessor"
              layout="topleft"
              mouse_opaque="false"
-             name="preproc_firestorm_menu"
+             name="preprocessor_menu"
              tear_off="false"
-             width="200">
-                <menu_item_check label="Switch Statements" layout="topleft" name="preproc_switch">
-                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="preproc_switch" />
-                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="preproc_switch" />
+             width="220">
+                <menu_item_check label="Preprocess on Save" layout="topleft" name="preproc_enabled">
+                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="preproc_enabled" />
+                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="preproc_enabled" />
                 </menu_item_check>
-                <menu_item_check label="Lazy Lists" layout="topleft" name="preproc_lazy">
-                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="preproc_lazy" />
-                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="preproc_lazy" />
+                <menu_item_check label="Include from Disk" layout="topleft" name="preproc_disk">
+                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="preproc_disk" />
+                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="preproc_disk" />
                 </menu_item_check>
-                <menu_item_check label="Compress Preprocessed Code" layout="topleft" name="preproc_compress">
-                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="preproc_compress" />
-                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="preproc_compress" />
-                </menu_item_check>
-            </menu>
-            <menu
-             label="Extensions"
-             layout="topleft"
-             mouse_opaque="false"
-             name="preproc_extensions_menu"
-             tear_off="false"
-             width="200">
-                <menu_item_check label="Break, Continue, &amp;= |= ^= and inline" layout="topleft" name="preproc_extensions">
-                    <menu_item_check.on_check function="ScriptStudio.Check" parameter="preproc_extensions" />
-                    <menu_item_check.on_click function="ScriptStudio.Menu" parameter="preproc_extensions" />
-                </menu_item_check>
+                <menu_item_call label="Add Include Folder..." layout="topleft" name="preproc_folder">
+                    <menu_item_call.on_click function="ScriptStudio.Menu" parameter="preproc_folder" />
+                </menu_item_call>
+                <menu_item_separator layout="topleft" />
+                <menu
+                 label="Firestorm"
+                 layout="topleft"
+                 mouse_opaque="false"
+                 name="preproc_firestorm_menu"
+                 tear_off="false"
+                 width="200">
+                    <menu_item_check label="Switch Statements" layout="topleft" name="preproc_switch">
+                        <menu_item_check.on_check function="ScriptStudio.Check" parameter="preproc_switch" />
+                        <menu_item_check.on_click function="ScriptStudio.Menu" parameter="preproc_switch" />
+                    </menu_item_check>
+                    <menu_item_check label="Lazy Lists" layout="topleft" name="preproc_lazy">
+                        <menu_item_check.on_check function="ScriptStudio.Check" parameter="preproc_lazy" />
+                        <menu_item_check.on_click function="ScriptStudio.Menu" parameter="preproc_lazy" />
+                    </menu_item_check>
+                    <menu_item_check label="Compress Preprocessed Code" layout="topleft" name="preproc_compress">
+                        <menu_item_check.on_check function="ScriptStudio.Check" parameter="preproc_compress" />
+                        <menu_item_check.on_click function="ScriptStudio.Menu" parameter="preproc_compress" />
+                    </menu_item_check>
+                </menu>
+                <menu
+                 label="Extensions"
+                 layout="topleft"
+                 mouse_opaque="false"
+                 name="preproc_extensions_menu"
+                 tear_off="false"
+                 width="200">
+                    <menu_item_check label="Break, Continue, &amp;= |= ^= and inline" layout="topleft" name="preproc_extensions">
+                        <menu_item_check.on_check function="ScriptStudio.Check" parameter="preproc_extensions" />
+                        <menu_item_check.on_click function="ScriptStudio.Menu" parameter="preproc_extensions" />
+                    </menu_item_check>
+                </menu>
             </menu>
             <menu
              label="Optimizer"
@@ -1371,6 +1467,10 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
                     <menu_item_check.on_click function="ScriptStudio.Menu" parameter="preproc_inline" />
                 </menu_item_check>
             </menu>
+            <menu_item_separator layout="topleft" />
+            <menu_item_call label="Update Language Definitions" layout="topleft" name="update_definitions">
+                <menu_item_call.on_click function="ScriptStudio.Menu" parameter="update_definitions" />
+            </menu_item_call>
         </menu>
         <menu
          label="Help"

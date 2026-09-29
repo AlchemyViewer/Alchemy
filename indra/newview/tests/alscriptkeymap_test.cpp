@@ -163,7 +163,7 @@ namespace tut
             ensure("the table's commands are the menus': " + id, ids.count(id) == 1);
         }
         const auto map = std::find_if(items.begin(), items.end(), [](const ALScriptKeymap::MenuItem& item) { return item.id == "map_left"; });
-        ensure("as deep as it goes", map != items.end() && map->path == "View > Scrollbar > Map on the Left");
+        ensure("as deep as it goes", map != items.end() && map->path == "View > Editor > Scrollbar > Map on the Left");
     }
 
     template<> template<>
