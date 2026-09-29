@@ -33,7 +33,7 @@
 #include <string>
 
 // One window's unsaved text kept against the viewer going before it was
-// saved -- the notecard window's, a legacy script editor's -- in the
+// saved -- the notecard window's -- in the
 // account's store (ALRecovery::store), as Script Studio keeps its tabs'
 // (ALScriptStudioRecovery): written a moment after it changes, whatever is
 // typed meanwhile; forgotten once it is saved or changed back; set aside a

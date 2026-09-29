@@ -482,8 +482,9 @@ void ALScriptStudioRecovery::recover(const Entry& listed)
         return;
     }
     // What one of the viewer's own windows kept goes back to it, where it
-    // can have the item: the notecard window, a legacy script editor.
-    // Reading and writing a notecard needs no studio.
+    // can have the item: the notecard window, since reading and writing a
+    // notecard needs no studio. A script the legacy editors kept, in an
+    // earlier session, is the studio's.
     if (ALRecovery::toOwnWindow(entry))
     {
         return;

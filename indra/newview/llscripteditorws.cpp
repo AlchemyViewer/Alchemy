@@ -2458,20 +2458,6 @@ void LLScriptEditorWSServer::sendUnsubscribeScriptEditor(const std::string& scri
     notifyScript(script_id, "script.unsubscribe", params);
 }
 
-void LLScriptEditorWSServer::sendCompileResults(const std::string &script_id, const LLSD &results) const
-{
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
-    auto it = mSubscriptions.find(script_id);
-    if (it == mSubscriptions.end())
-    {
-        return;
-    }
-    const bool lua = it->second.mLua;
-    notifyScript(script_id, "script.compiled",
-                 compiledMessage(script_id, results["compiled"].asBoolean(), results["is_running"].asBoolean(),
-                                 ALScriptWorkspace::parseDiagnostics(results["errors"], lua), lua));
-}
-
 // static
 LLSD LLScriptEditorWSServer::compiledMessage(const std::string& script_id, bool success, bool running,
                                              const std::vector<ALScriptWorkspace::Diagnostic>& diagnostics, bool lua)

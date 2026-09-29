@@ -48,8 +48,8 @@ public:
     static ALRecoveryStore* store();
     static void             useStore(ALRecoveryStore* store);
     // Where a text one of the viewer's own windows kept
-    // (ALRecoveryStore::isWindowKey) goes back to: the notecard
-    // window, a legacy script editor, as the viewer has them -- false where
+    // (ALRecoveryStore::isWindowKey) goes back to: the notecard window, as
+    // the viewer has it -- false where
     // it cannot have the item, and the text is taken up in the studio as
     // any other is. None where none is given, as in a test.
     typedef std::function<bool(const Entry& entry)> window_t;

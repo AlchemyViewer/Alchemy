@@ -46,7 +46,6 @@
 #include <functional>
 
 // Forward declarations
-class LLLiveLSLEditor;
 class LLScriptEditorWSServer;
 class LLPanel;
 class LLViewerObject;
@@ -155,7 +154,7 @@ private:
  * ## Architecture
  *
  * The server acts as a JSON-RPC communication hub between:
- * - LLLiveLSLEditor instances (in-world script editing)
+ * - Script Studio's tabs (in-world script editing)
  * - External script editors (VS Code, Atom, Sublime Text, etc.)
  * - Script compilation and save services
  *
@@ -246,9 +245,6 @@ public:
 
     void notifyScript(const std::string& script_id, const std::string& method, const LLSD& message) const;
     void sendUnsubscribeScriptEditor(const std::string& script_id);
-    // What the compiler said of a script, as the legacy editors report
-    // it: the raw response with `compiled`, `is_running` and `errors`.
-    void sendCompileResults(const std::string& script_id, const LLSD& results) const;
 
     LLHandle<LLPanel> findEditorForScript(const std::string& script_id) const;
 
