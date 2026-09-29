@@ -182,10 +182,10 @@ void ALScriptExternalEditor::changed(const std::string& id, const std::string& f
         mServices.report(mServices.words("ExternalConflict", args), true, &doc, { "take_external", "keep_here" });
         return;
     }
-    take(doc, text);
+    take(doc, std::move(text));
 }
 
-void ALScriptExternalEditor::take(Doc& doc, const std::string& text)
+void ALScriptExternalEditor::take(Doc& doc, std::string text)
 {
     doc.external.waiting.reset();
     doc.external.written = text;

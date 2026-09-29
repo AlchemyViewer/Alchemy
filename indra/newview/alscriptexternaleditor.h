@@ -88,8 +88,9 @@ public:
     // save in two steps empties it for a moment -- `settled` is that look.
     void changed(const std::string& id, const std::string& file, bool settled = false);
     // A save from outside taken into the tab, as one step to undo, and
-    // saved from here.
-    void take(Doc& doc, const std::string& text);
+    // saved from here. By value: the text is often the one held, which
+    // taking it lets go of.
+    void take(Doc& doc, std::string text);
     // After a save from here: the copy written again where it holds
     // something else; and the compiler's words put in the log beside it.
     void sync(Doc& doc);
