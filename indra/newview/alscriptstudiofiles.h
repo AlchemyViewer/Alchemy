@@ -32,6 +32,7 @@
 #include <vector>
 
 class ALScriptStudioAnalysis;
+class ALScriptStudioSaves;
 class ALScriptStudioServices;
 class ALScriptStudioTabs;
 class LLMenuGL;
@@ -70,7 +71,7 @@ public:
         std::string name;
     };
 
-    // What the files ask of the window beyond its services, its tabs and its analysis.
+    // What the files ask of the window itself, beyond what they are given.
     class Window
     {
     public:
@@ -85,8 +86,6 @@ public:
         // weights and recovery told, the scripts that include it expanded
         // again, a close that waited on it done.
         virtual void fileSettled(Doc& doc) = 0;
-        // A save of a tab's file that did not go.
-        virtual void saveStopped(Doc& doc) = 0;
         // A file written that the studio reads something from: the
         // snippets, the vimrc.
         virtual void fileWritten(const std::string& path) = 0;
@@ -106,7 +105,7 @@ public:
         ~Window() = default;
     };
 
-    ALScriptStudioFiles(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, ALScriptStudioAnalysis& analysis, Window& window);
+    ALScriptStudioFiles(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, ALScriptStudioAnalysis& analysis, ALScriptStudioSaves& saves, Window& window);
 
     // A tab's file watched for changes made to it outside, whoever makes
     // them: an editor the studio started, or anything else. Taken where
@@ -153,6 +152,7 @@ private:
     ALScriptStudioServices&  mServices;
     ALScriptStudioTabs&      mTabs;
     ALScriptStudioAnalysis&  mAnalysis;
+    ALScriptStudioSaves&     mSaves;
     Window&                  mWindow;
     std::vector<std::string> mRecentFiles;
     std::vector<Recent>      mRecentScripts;

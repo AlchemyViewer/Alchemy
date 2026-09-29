@@ -81,7 +81,7 @@ public:
     typedef ALScriptStudioDoc     Doc;
     typedef ALRecoveryEntry Entry;
 
-    // What recovery asks of the window beyond its services and its tabs.
+    // What recovery asks of the window itself, beyond what it is given.
     class Window
     {
     public:

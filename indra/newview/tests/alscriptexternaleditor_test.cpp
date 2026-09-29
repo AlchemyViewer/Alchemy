@@ -51,7 +51,7 @@ namespace
     typedef std::vector<std::string> Names;
 
     // The window, faked: a record of what the external editor asked of it.
-    struct FakeExternalWindow : public ALScriptExternalEditor::Window, public al_studio_test::QuietTabs
+    struct FakeExternalWindow : public ALScriptExternalEditor::Window, public al_studio_test::QuietTabs, public al_studio_test::QuietSaves
     {
         void watchFile(Doc& doc) override { watched.push_back(doc.id); }
         // As the window takes it: the tab's text replaced, one step to undo.
@@ -120,7 +120,7 @@ namespace tut
             {
                 skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
             }
-            unit = std::make_unique<ALScriptExternalEditor>(services, studio, studio);
+            unit = std::make_unique<ALScriptExternalEditor>(services, studio, studio, studio);
             return *unit;
         }
         // A script's tab, loaded, changeable and saved.

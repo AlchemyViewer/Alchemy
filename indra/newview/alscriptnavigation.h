@@ -78,7 +78,7 @@ public:
     typedef ALScriptStudioDoc Doc;
     typedef ALNavHistory::Place Place;
 
-    // What navigation asks of the window beyond its services and its tabs.
+    // What navigation asks of the window itself, beyond what it is given.
     class Window
     {
     public:

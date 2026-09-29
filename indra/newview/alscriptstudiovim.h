@@ -36,6 +36,7 @@
 #include <vector>
 
 class ALScriptStudioCommands;
+class ALScriptStudioSaves;
 class ALScriptStudioServices;
 class ALScriptStudioTabs;
 class ALTextView;
@@ -51,15 +52,13 @@ class ALScriptStudioVim
 public:
     typedef ALScriptStudioDoc Doc;
 
-    // What vim asks of the window beyond its services, its tabs and its commands.
+    // What vim asks of the window itself, beyond what it is given.
     class Window
     {
     public:
-        // A tab closed: asked about first where it is unsaved; or saved,
-        // and closed once the save comes back. Several at once, the unsaved
-        // asked about in one question.
+        // A tab closed, asked about first where it is unsaved; several at
+        // once, the unsaved asked about in one question.
         virtual void closeDocument(std::string_view id)             = 0;
-        virtual void saveToClose(const std::string& id)             = 0;
         virtual void closeMany(const std::vector<std::string>& ids) = 0;
         // The selection formatted, or the whole text.
         virtual void format(Doc& doc, bool selection_only) = 0;
@@ -108,7 +107,7 @@ public:
         ~Window() = default;
     };
 
-    ALScriptStudioVim(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, ALScriptStudioCommands& commands, Window& window);
+    ALScriptStudioVim(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, ALScriptStudioSaves& saves, ALScriptStudioCommands& commands, Window& window);
 
     // A keymap put over one of the window's editors: sharing its history
     // and options with the rest, and asking this what it leaves.
@@ -198,6 +197,7 @@ private:
 
     ALScriptStudioServices&              mServices;
     ALScriptStudioTabs&                  mTabs;
+    ALScriptStudioSaves&                 mSaves;
     ALScriptStudioCommands&              mCommands;
     Window&                              mWindow;
     std::shared_ptr<ALVimKeymap::Shared> mShared = std::make_shared<ALVimKeymap::Shared>();

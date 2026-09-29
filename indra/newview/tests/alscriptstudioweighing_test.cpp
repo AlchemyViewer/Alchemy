@@ -40,7 +40,7 @@ namespace
 
     // The window, faked: a record of what weighing asked of it, and the
     // analyzers' questions held for a test to answer.
-    struct FakeWeighingWindow : public ALScriptStudioWeighing::Window, public al_studio_test::QuietAnalysis
+    struct FakeWeighingWindow : public ALScriptStudioWeighing::Window, public al_studio_test::QuietAnalysis, public al_studio_test::QuietSaves
     {
         void askWeights(Doc& doc) override { asked.push_back(doc.id); }
         void askAnalysis(ALScriptAnalysis::Request request, std::function<void(const ALScriptAnalysis::Result&)> answered) override
@@ -92,7 +92,7 @@ namespace tut
             {
                 skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
             }
-            unit = std::make_unique<ALScriptStudioWeighing>(services, studio, studio);
+            unit = std::make_unique<ALScriptStudioWeighing>(services, studio, studio, studio);
             return *unit;
         }
         // A script's tab, loaded, compiled for `target` -- "luau" for SLua.

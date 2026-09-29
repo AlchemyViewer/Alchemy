@@ -350,7 +350,6 @@ private:
     std::vector<ALScriptWeight::Target> weightTargets(const Doc& doc) override { return mWeighing.targets(doc); }
     void weighed(Doc& doc, const ALScriptAnalysis::Result& result) override { mWeighing.weighed(doc, result); }
     bool inspectorShown() const override;
-    void                                preprocessForSave(Doc& doc) override { mSaving.preprocess(doc); }
     ALCodeEditor&                       editorInFront(Doc& doc) override { return sourceInFront(doc); }
     void                                confirmFixAll(const LLSD& args, std::function<void()> yes) override;
     // Weighing (ALScriptStudioWeighing): saving's calls to it, and what
@@ -365,7 +364,6 @@ private:
     std::string programVersion() const override;
     bool        weightNotes() const override { return mWeightNotes; }
     bool        weightHeat() const override { return mWeightHeat; }
-    void        warnOverWeight(Doc& doc) override { mSaving.warnOverWeight(doc); }
     ALScriptWeightsPane* weightsPane() override { return mWeightsPane; }
 
     // The preprocessor: whether it applies to a script; its run over the
@@ -399,7 +397,6 @@ private:
     void                          pickFilesToOpen(bool several, std::function<void(const std::vector<std::string>& files)> chosen) override;
     void pickFileToSave(const std::string& name, std::function<void(const std::vector<std::string>& files)> chosen) override;
     void askReload(const Doc& doc, std::function<void(bool reload)> answered) override;
-    void saveStopped(Doc& doc) override;
     void fileWritten(const std::string& path) override;
     // A file of a tab changed on disk, or went: what is in reach looked at.
     void reachChanged() override { mOrphansDirty = true; }
@@ -570,7 +567,6 @@ private:
     // gives.
     void        syncExternal(Doc& doc) override { mExternal.sync(doc); }
     void        logExternal(Doc& doc, const ALScriptCompileResult& result) override { mExternal.log(doc, result); }
-    void        save(Doc& doc) override;
     std::string bridgeId(const Doc& doc) const override;
     std::shared_ptr<ALScriptTempFiles::Claim> holdCopy(const std::string& path) override;
     bool        subscribe(Doc& doc) override;
@@ -778,8 +774,6 @@ private:
     // another window, kept for next time, or kept as the viewer goes.
     void letGoOf(size_t index, bool keep = false);
     void letGoOf(Doc& doc) override;
-    // A tab saved, and closed once its save comes back.
-    void saveToClose(const std::string& id) override;
     // The window's close, with several scripts unsaved, asked about all of
     // them at once: saved, let go of, or the window kept.
     void closeWindowAnswered(S32 option);
@@ -811,7 +805,6 @@ private:
     void                         loadScript(const ALScriptRef& ref) override;
     ALScriptNoticeBar*           noticeBar() override { return mNoticeBar; }
     void                         saveCopyToFile() override { mFiles.saveCopy(); }
-    void                         saveAgain(Doc& doc) override { mSaving.saveAsked(doc); }
     void                         takeUpRecovery(Doc& doc, const ALRecoveryEntry& entry) override { mRecovery.takeUp(doc, entry); }
     void                         discardRecovery(const ALRecoveryEntry& entry) override;
     void                         noticeAction(const std::string& action) override { mOrphans.noticeAction(action); }
@@ -1197,15 +1190,15 @@ private:
     // Saving and compiling the tabs.
     ALScriptStudioSaving               mSaving{ *this, *this, *this, *this };
     // The window's side of vim, over its editors.
-    ALScriptStudioVim                  mVim{ *this, *this, mCommands, *this };
+    ALScriptStudioVim                  mVim{ *this, *this, mSaving, mCommands, *this };
     // Its tabs held open in an editor outside.
-    ALScriptExternalEditor             mExternal{ *this, *this, *this };
+    ALScriptExternalEditor             mExternal{ *this, *this, mSaving, *this };
     // Its files on disk, and the recent lists.
-    ALScriptStudioFiles                mFiles{ *this, *this, *this, *this };
+    ALScriptStudioFiles                mFiles{ *this, *this, *this, mSaving, *this };
     // What its scripts weigh.
-    ALScriptStudioWeighing             mWeighing{ *this, *this, *this };
+    ALScriptStudioWeighing             mWeighing{ *this, *this, mSaving, *this };
     // Its tabs whose script is gone or out of reach, and the notice.
-    ALScriptStudioOrphans              mOrphans{ *this, *this, *this };
+    ALScriptStudioOrphans              mOrphans{ *this, *this, mSaving, *this };
     // The places gone from, and the previews a list opens as it is walked.
     ALScriptNavigation                 mNavigation{ *this, *this, *this };
     // Its names looked up across the object's scripts, and renamed.
@@ -1220,7 +1213,7 @@ private:
     // The name at its caret, and the caret watched.
     ALScriptStudioCaret                mCaret{ *this, *this, *this };
     // Its checking: the analyzers asked and answered, and fixes.
-    ALScriptStudioChecking             mChecking{ *this, *this, *this };
+    ALScriptStudioChecking             mChecking{ *this, *this, mSaving, *this };
     LLHandle<LLContextMenu>            mTabMenuHandle;
     bool                               mMain = true;
     bool                               mClosingWindow = false;

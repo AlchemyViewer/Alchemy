@@ -29,6 +29,7 @@
 #include "alcodeeditor.h"
 #include "alfilewrite.h"
 #include "alscriptstudiofileio.h"
+#include "alscriptstudiosaves.h"
 #include "alscriptstudioservices.h"
 #include "alscriptstudiotabs.h"
 #include "llcallbacklist.h"
@@ -48,8 +49,8 @@ namespace
     }
 }
 
-ALScriptExternalEditor::ALScriptExternalEditor(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, Window& window)
-    : mServices(services), mTabs(tabs), mWindow(window)
+ALScriptExternalEditor::ALScriptExternalEditor(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, ALScriptStudioSaves& saves, Window& window)
+    : mServices(services), mTabs(tabs), mSaves(saves), mWindow(window)
 {
 }
 
@@ -204,7 +205,7 @@ void ALScriptExternalEditor::take(Doc& doc, std::string text)
         return;
     }
     doc.save.fromExternal(doc.editor->document().version());
-    mWindow.save(doc);
+    mSaves.save(doc);
 }
 
 void ALScriptExternalEditor::keep(Doc& doc)

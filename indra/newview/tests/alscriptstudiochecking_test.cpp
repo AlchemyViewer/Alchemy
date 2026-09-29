@@ -115,7 +115,7 @@ namespace
 
     // The window, faked: its answers held for the test to give, and what it
     // was told. Its problems made as the Problems pane makes them.
-    struct FakeCheckingWindow : public ALScriptStudioChecking::Window, public al_studio_test::QuietAnalysis
+    struct FakeCheckingWindow : public ALScriptStudioChecking::Window, public al_studio_test::QuietAnalysis, public al_studio_test::QuietSaves
     {
         struct Ask
         {
@@ -170,7 +170,7 @@ namespace
         }
         std::vector<ALScriptWeight::Target> weightTargets(const Doc&) override { return targets; }
         void                                save(Doc& doc) override { told.push_back("save " + doc.id); }
-        void                                preprocessForSave(Doc& doc) override { told.push_back("run " + doc.id); }
+        void                                preprocess(Doc& doc) override { told.push_back("run " + doc.id); }
         ALCodeEditor&                       editorInFront(Doc& doc) override { return *doc.editor; }
         void                                confirmFixAll(const LLSD& args, std::function<void()> yes) override
         {
@@ -301,7 +301,7 @@ namespace tut
             {
                 skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
             }
-            unit = std::make_unique<ALScriptStudioChecking>(services, studio, studio);
+            unit = std::make_unique<ALScriptStudioChecking>(services, studio, studio, studio);
             return *unit;
         }
         ALCodeEditor* editor(const std::string& name, const std::string& text)

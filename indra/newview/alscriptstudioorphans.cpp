@@ -30,6 +30,7 @@
 #include "alrecoverystore.h"
 #include "alscriptexternaleditor.h"
 #include "alscriptstudiorecovery.h"
+#include "alscriptstudiosaves.h"
 #include "alscriptstudioservices.h"
 #include "alscriptstudiotabs.h"
 #include "lltimer.h"
@@ -92,7 +93,7 @@ namespace
     }
 }
 
-ALScriptStudioOrphans::ALScriptStudioOrphans(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, Window& window) : mServices(services), mTabs(tabs), mWindow(window)
+ALScriptStudioOrphans::ALScriptStudioOrphans(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, ALScriptStudioSaves& saves, Window& window) : mServices(services), mTabs(tabs), mSaves(saves), mWindow(window)
 {
 }
 
@@ -485,7 +486,7 @@ void ALScriptStudioOrphans::noticeAction(const std::string& action)
     }
     else if (action == "save")
     {
-        mWindow.saveAgain(*doc);
+        mSaves.saveAsked(*doc);
     }
     refreshNotice();
 }

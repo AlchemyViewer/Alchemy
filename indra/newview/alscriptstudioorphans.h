@@ -31,6 +31,7 @@
 #include <optional>
 #include <string>
 
+class ALScriptStudioSaves;
 class ALScriptStudioServices;
 class ALScriptStudioTabs;
 struct ALRecoveryEntry;
@@ -124,7 +125,7 @@ public:
     static void loadFailed(Doc& doc);
     static void loadWentThrough(Doc& doc) { doc.orphan->reattachTries = 0; }
 
-    // What the orphans ask of the window beyond its services and its tabs.
+    // What the orphans ask of the window itself, beyond what they are given.
     class Window
     {
     public:
@@ -146,7 +147,6 @@ public:
         // Output does it (Doc::offer).
         virtual void takeOffer(Doc& doc, const std::string& action)                          = 0;
         virtual void saveCopyToFile()                                                        = 0;
-        virtual void saveAgain(Doc& doc)                                                     = 0;
         virtual void takeUpRecovery(Doc& doc, const ALRecoveryEntry& entry)            = 0;
         virtual void discardRecovery(const ALRecoveryEntry& entry)                     = 0;
         // Two texts compared in the tab's place, each with what it is; and
@@ -159,7 +159,7 @@ public:
         ~Window() = default;
     };
 
-    ALScriptStudioOrphans(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, Window& window);
+    ALScriptStudioOrphans(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, ALScriptStudioSaves& saves, Window& window);
 
     // Every tab looked at again: what it is called and where, what it is
     // now -- an object out of sight a moment not yet gone -- said where it
@@ -182,5 +182,6 @@ public:
 private:
     ALScriptStudioServices& mServices;
     ALScriptStudioTabs&     mTabs;
+    ALScriptStudioSaves&    mSaves;
     Window&                 mWindow;
 };

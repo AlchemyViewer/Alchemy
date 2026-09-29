@@ -40,6 +40,7 @@
 #include <vector>
 
 class ALScriptStudioAnalysis;
+class ALScriptStudioSaves;
 class ALScriptStudioServices;
 
 // The tab's part of checking (ALScriptStudioChecking): what the
@@ -154,7 +155,7 @@ public:
     };
     static Sources& sources();
 
-    // What checking asks of the window beyond its services and its analysis.
+    // What checking asks of the window itself, beyond what it is given.
     class Window
     {
     public:
@@ -172,10 +173,6 @@ public:
         virtual void                                showOutline(Doc& doc)                                         = 0;
         virtual void                                weighed(Doc& doc, const ALScriptAnalysis::Result& result)     = 0;
         virtual std::vector<ALScriptWeight::Target> weightTargets(const Doc& doc)                                 = 0;
-        // A save that waited on the check, done; a run of the preprocessor
-        // for a save, where the settings changed.
-        virtual void save(Doc& doc)             = 0;
-        virtual void preprocessForSave(Doc& doc) = 0;
         // The editor of the view in front, which a fix is made in; and the
         // question of whether to make many fixes at once, `yes` where they
         // are to be.
@@ -186,7 +183,7 @@ public:
         ~Window() = default;
     };
 
-    ALScriptStudioChecking(ALScriptStudioServices& services, ALScriptStudioAnalysis& analysis, Window& window);
+    ALScriptStudioChecking(ALScriptStudioServices& services, ALScriptStudioAnalysis& analysis, ALScriptStudioSaves& saves, Window& window);
 
     // --- the analyzers ------------------------------------------------------------
 
@@ -293,6 +290,7 @@ private:
 
     ALScriptStudioServices& mServices;
     ALScriptStudioAnalysis& mAnalysis;
+    ALScriptStudioSaves&    mSaves;
     Window&                 mWindow;
     // When the preprocessor's settings are next taken, or zero; and
     // whether its words changed with them.

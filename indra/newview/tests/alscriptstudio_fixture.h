@@ -29,6 +29,7 @@
 
 #include "../alscriptstudiodoc.h"
 #include "../alscriptstudioanalysis.h"
+#include "../alscriptstudiosaves.h"
 #include "../alscriptstudioservices.h"
 #include "../alscriptstudiotabs.h"
 
@@ -240,6 +241,19 @@ namespace al_studio_test
         std::string includeName(const ALScriptStudioDoc&, const std::string& path) const override { return path; }
         ALScriptPlaces::Lines sourceLines(const std::string&) const override { return ALScriptPlaces::Lines(); }
         void refreshProblems(ALScriptStudioDoc&) override {}
+    };
+
+    // The window's saving with nothing saved, stopped or warned of: what a
+    // unit's test's fake of its window starts from, overriding what the
+    // test watches.
+    struct QuietSaves : public ALScriptStudioSaves
+    {
+        void save(ALScriptStudioDoc&) override {}
+        void saveAsked(ALScriptStudioDoc&) override {}
+        void saveToClose(const std::string&) override {}
+        void stopped(ALScriptStudioDoc&) override {}
+        void preprocess(ALScriptStudioDoc&) override {}
+        void warnOverWeight(ALScriptStudioDoc&) override {}
     };
 
     // A pane's window with nothing to fake: the services alone.

@@ -1255,11 +1255,6 @@ void ALFloaterScriptStudio::letGoOf(Doc& doc)
     }
 }
 
-void ALFloaterScriptStudio::saveToClose(const std::string& id)
-{
-    mSaving.saveToClose(id);
-}
-
 void ALFloaterScriptStudio::output(const ALOutputView::Entry& entry)
 {
     mOutputPane->view()->append(entry);
@@ -4349,11 +4344,6 @@ void ALFloaterScriptStudio::referenceChosen(const ALScriptReferencesPane::Found&
     revealed(list, to_editor);
 }
 
-void ALFloaterScriptStudio::save(Doc& doc)
-{
-    mSaving.save(doc);
-}
-
 std::string ALFloaterScriptStudio::bridgeId(const Doc& doc) const
 {
     return LLScriptEditorWSServer::buildScriptSubscriptionId(doc.ref.object, doc.ref.item);
@@ -4443,11 +4433,6 @@ void ALFloaterScriptStudio::askReload(const Doc& doc, std::function<void(bool re
     LLNotificationsUtil::add("ScriptStudioFileChanged", question, LLSD(), [answered](const LLSD& notification, const LLSD& response) {
         answered(LLNotificationsUtil::getSelectedOption(notification, response) == 0);
     });
-}
-
-void ALFloaterScriptStudio::saveStopped(Doc& doc)
-{
-    mSaving.stopped(doc);
 }
 
 void ALFloaterScriptStudio::fileWritten(const std::string& path)

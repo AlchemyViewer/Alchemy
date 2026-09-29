@@ -30,6 +30,7 @@
 #include "alfilewrite.h"
 #include "alscriptstudioanalysis.h"
 #include "alscriptstudiofileio.h"
+#include "alscriptstudiosaves.h"
 #include "alscriptstudioservices.h"
 #include "alscriptstudiotabs.h"
 #include "lldir.h"
@@ -50,7 +51,7 @@ namespace
     constexpr size_t MOST_RECENT = 10;
 }
 
-ALScriptStudioFiles::ALScriptStudioFiles(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, ALScriptStudioAnalysis& analysis, Window& window) : mServices(services), mTabs(tabs), mAnalysis(analysis), mWindow(window)
+ALScriptStudioFiles::ALScriptStudioFiles(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, ALScriptStudioAnalysis& analysis, ALScriptStudioSaves& saves, Window& window) : mServices(services), mTabs(tabs), mAnalysis(analysis), mSaves(saves), mWindow(window)
 {
 }
 
@@ -165,7 +166,7 @@ void ALScriptStudioFiles::write(Doc& doc)
     if (!ALFileWrite::whole(doc.file, doc.editor->wholeText()))
     {
         mServices.report(mServices.words("SaveToFileFailed", args), true, &doc);
-        mWindow.saveStopped(doc);
+        mSaves.stopped(doc);
         return;
     }
     if (doc.watch)

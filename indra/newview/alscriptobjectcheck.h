@@ -75,7 +75,7 @@ public:
         std::vector<std::string> unread;
     };
 
-    // What the check asks of the window beyond its services and its analysis.
+    // What the check asks of the window itself, beyond what it is given.
     class Window
     {
     public:

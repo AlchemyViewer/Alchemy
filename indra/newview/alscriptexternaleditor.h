@@ -31,6 +31,7 @@
 #include <memory>
 #include <string>
 
+class ALScriptStudioSaves;
 class ALScriptStudioServices;
 class ALScriptStudioTabs;
 
@@ -66,14 +67,12 @@ class ALScriptExternalEditor
 public:
     typedef ALScriptStudioDoc Doc;
 
-    // What the external editor asks of the window beyond its services and its tabs.
+    // What the external editor asks of the window itself, beyond what it is given.
     class Window
     {
     public:
         // A tab's file on disk watched for changes made to it outside.
         virtual void watchFile(Doc& doc) = 0;
-        // A save of the tab from here.
-        virtual void save(Doc& doc) = 0;
         // The bridge: the id it knows a script by, which the copy's name
         // carries so that whoever reads the temp folder finds the same
         // file; the tab told of, so that VS Code can subscribe to it, false
@@ -94,7 +93,7 @@ public:
         ~Window() = default;
     };
 
-    ALScriptExternalEditor(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, Window& window);
+    ALScriptExternalEditor(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, ALScriptStudioSaves& saves, Window& window);
 
     // Edit Externally: the copy written afresh -- the editor may have been
     // closed on an old one -- and watched, the bridge told, and the editor
@@ -126,6 +125,7 @@ public:
 private:
     ALScriptStudioServices& mServices;
     ALScriptStudioTabs&     mTabs;
+    ALScriptStudioSaves&    mSaves;
     Window&                 mWindow;
     // Held while this is, for a watch or a timer to know it still is.
     std::shared_ptr<bool>   mAlive = std::make_shared<bool>(true);

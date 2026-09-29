@@ -36,6 +36,7 @@
 #include <vector>
 
 class ALScriptStudioAnalysis;
+class ALScriptStudioSaves;
 class ALScriptStudioServices;
 class ALScriptWeightsPane;
 
@@ -83,7 +84,7 @@ class ALScriptStudioWeighing
 public:
     typedef ALScriptStudioDoc Doc;
 
-    // What weighing asks of the window beyond its services and its analysis.
+    // What weighing asks of the window itself, beyond what it is given.
     class Window
     {
     public:
@@ -96,9 +97,6 @@ public:
         virtual std::string programVersion() const = 0;
         virtual bool        weightNotes() const    = 0;
         virtual bool        weightHeat() const     = 0;
-        // A save told of a tab's weight, which warns where it is over its
-        // limit.
-        virtual void warnOverWeight(Doc& doc) = 0;
         // The Weights tab: whether it is looked at, and the pane.
         virtual bool                 weightsShown() const = 0;
         virtual ALScriptWeightsPane* weightsPane()        = 0;
@@ -107,7 +105,7 @@ public:
         ~Window() = default;
     };
 
-    ALScriptStudioWeighing(ALScriptStudioServices& services, ALScriptStudioAnalysis& analysis, Window& window);
+    ALScriptStudioWeighing(ALScriptStudioServices& services, ALScriptStudioAnalysis& analysis, ALScriptStudioSaves& saves, Window& window);
 
     // The target a tab is weighed for; none for one that is not weighed --
     // not loaded, a notecard, a fragment, a target there is no weigher for.
@@ -162,6 +160,7 @@ private:
 
     ALScriptStudioServices& mServices;
     ALScriptStudioAnalysis& mAnalysis;
+    ALScriptStudioSaves&    mSaves;
     Window&                 mWindow;
     // The fix list last shown, to be weighed once nothing more is coming
     // to it.

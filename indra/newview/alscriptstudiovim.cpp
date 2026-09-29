@@ -28,6 +28,7 @@
 
 #include "alcodeeditor.h"
 #include "alscriptstudiocommands.h"
+#include "alscriptstudiosaves.h"
 #include "alscriptstudioservices.h"
 #include "alscriptstudiotabs.h"
 #include "fsyspath.h"
@@ -65,8 +66,8 @@ namespace
     }
 }
 
-ALScriptStudioVim::ALScriptStudioVim(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, ALScriptStudioCommands& commands, Window& window)
-    : mServices(services), mTabs(tabs), mCommands(commands), mWindow(window)
+ALScriptStudioVim::ALScriptStudioVim(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, ALScriptStudioSaves& saves, ALScriptStudioCommands& commands, Window& window)
+    : mServices(services), mTabs(tabs), mSaves(saves), mCommands(commands), mWindow(window)
 {
 }
 
@@ -383,7 +384,7 @@ bool ALScriptStudioVim::command(ALTextView& view, const std::string& name, const
     {
         if (doc->unsaved() && doc->modifiable)
         {
-            mWindow.saveToClose(doc->id);
+            mSaves.saveToClose(doc->id);
         }
         else
         {
@@ -1160,7 +1161,7 @@ bool ALScriptStudioVim::fileCommand(ALTextView& view, Doc& doc, const std::strin
             {
                 if (each->unsaved() && each->modifiable)
                 {
-                    mWindow.saveToClose(id);
+                    mSaves.saveToClose(id);
                 }
                 else
                 {

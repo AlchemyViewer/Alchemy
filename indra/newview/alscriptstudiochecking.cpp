@@ -32,6 +32,7 @@
 #include "alscriptfixes.h"
 #include "alscriptstudioanalysis.h"
 #include "alscriptstudioplaces.h"
+#include "alscriptstudiosaves.h"
 #include "alscriptstudioservices.h"
 #include "alscriptstudioweighing.h"
 #include "alscriptstudiowords.h"
@@ -112,7 +113,7 @@ ALScriptStudioChecking::Sources& ALScriptStudioChecking::sources()
     return sources;
 }
 
-ALScriptStudioChecking::ALScriptStudioChecking(ALScriptStudioServices& services, ALScriptStudioAnalysis& analysis, Window& window) : mServices(services), mAnalysis(analysis), mWindow(window) {}
+ALScriptStudioChecking::ALScriptStudioChecking(ALScriptStudioServices& services, ALScriptStudioAnalysis& analysis, ALScriptStudioSaves& saves, Window& window) : mServices(services), mAnalysis(analysis), mSaves(saves), mWindow(window) {}
 
 bool ALScriptStudioChecking::preprocessed(const Doc& doc) const
 {
@@ -709,7 +710,7 @@ void ALScriptStudioChecking::pump(F64 now)
             }
             if (preprocessed(*doc))
             {
-                mWindow.preprocessForSave(*doc);
+                mSaves.preprocess(*doc);
             }
             schedule(*doc, true);
         }
@@ -1099,7 +1100,7 @@ void ALScriptStudioChecking::checked(Doc& doc)
     }
     if (doc.save.checked())
     {
-        mWindow.save(doc);
+        mSaves.save(doc);
     }
 }
 

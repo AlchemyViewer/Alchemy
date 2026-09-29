@@ -112,7 +112,7 @@ public:
     // language, SLua's by the item's subtype or its runtime.
     static std::vector<Candidate> folderCandidates(const std::vector<const LLInventoryItem*>& items, const LLUUID& own, bool lua);
 
-    // What the lookups ask of the window beyond its services, its tabs and its analysis.
+    // What the lookups ask of the window itself, beyond what they are given.
     class Window
     {
     public:

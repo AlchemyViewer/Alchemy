@@ -26,6 +26,7 @@
 
 #include "alpreprocessor.h"
 #include "alscriptstudiodoc.h"
+#include "alscriptstudiosaves.h"
 #include "alscripttypes.h"
 #include "alscriptweight.h"
 
@@ -45,7 +46,7 @@ class ALScriptStudioTabs;
 // tidies, checks, preprocesses, sends, reports, closes -- and tells it what
 // came of each. What it asks of the viewer, the preprocessor and the upload
 // among it, goes through the window, so that whole saves run in a test.
-class ALScriptStudioSaving
+class ALScriptStudioSaving final : public ALScriptStudioSaves
 {
 public:
     typedef ALScriptStudioDoc Doc;
@@ -67,7 +68,7 @@ public:
         std::string program;
     };
 
-    // What saving asks of the window beyond its services, its tabs and its analysis.
+    // What saving asks of the window itself, beyond what it is given.
     class Window
     {
     public:
@@ -166,10 +167,10 @@ public:
 
     // A tab saved: out of reach said, queued behind one on its way, or
     // tidied, checked, preprocessed and sent as its flow says.
-    void save(Doc& doc);
+    void save(Doc& doc) override;
     // A save the author asked for: past the one check that stopped the last
     // save of the same text, and then a save.
-    void saveAsked(Doc& doc);
+    void saveAsked(Doc& doc) override;
     // Every tab with anything unsaved.
     void saveAll();
 
@@ -185,18 +186,18 @@ public:
     // A tab saved to be closed once its save comes back: where the save
     // cannot begin, the tab is left as it was, and a close waiting on it
     // stops -- rather than closing at whatever save comes next.
-    void saveToClose(const std::string& id);
+    void saveToClose(const std::string& id) override;
     // A save that did not go through -- refused over errors, failed, or
     // compiled with errors: a close waiting on it waits no longer, and a
     // window closing stops, the tab left for the author to look at.
-    void stopped(Doc& doc);
+    void stopped(Doc& doc) override;
 
     // --- the preprocessor --------------------------------------------------------------
 
     // A run of the preprocessor over the text as it stands, fetching its
     // includes; none where one is on its way already. A save waiting on it
     // goes on when it answers (ALScriptSaveFlow::preprocessed).
-    void preprocess(Doc& doc);
+    void preprocess(Doc& doc) override;
 
     // --- answers -----------------------------------------------------------------------
 
@@ -205,7 +206,7 @@ public:
     void compiled(const ALScriptCompileResult& result);
     // A tab's weight known: over its target's limit, as a save sent it,
     // said once.
-    void warnOverWeight(Doc& doc);
+    void warnOverWeight(Doc& doc) override;
 
 private:
     void preprocessedAnswer(const std::string& id, U32 version, const ALPreprocessor::Result& result);

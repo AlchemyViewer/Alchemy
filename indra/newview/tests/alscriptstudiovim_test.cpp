@@ -43,7 +43,7 @@ namespace
     typedef std::vector<std::string> Names;
 
     // The window, faked: a record of what vim asked of it.
-    struct FakeVimWindow : public ALScriptStudioVim::Window, public al_studio_test::QuietTabs
+    struct FakeVimWindow : public ALScriptStudioVim::Window, public al_studio_test::QuietTabs, public al_studio_test::QuietSaves
     {
         void closeDocument(std::string_view id) override { asked.push_back(std::string(id)); }
         void letGoOf(Doc& doc) override { letGo.push_back(doc.id); }
@@ -263,7 +263,7 @@ namespace tut
                 },
                 nullptr, [this]() { return relativeNumbers; });
             studio.services = &services;
-            vim             = std::make_unique<ALScriptStudioVim>(services, studio, commands, studio);
+            vim             = std::make_unique<ALScriptStudioVim>(services, studio, studio, commands, studio);
             return *vim;
         }
 

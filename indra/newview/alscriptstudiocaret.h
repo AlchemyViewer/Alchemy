@@ -78,7 +78,7 @@ public:
     // long as the analyzers wait after the last keystroke.
     static constexpr F64 SETTLE = 0.35;
 
-    // What the name at the caret asks of the window beyond its services and its analysis.
+    // What the name at the caret asks of the window itself, beyond what it is given.
     class Window
     {
     public:

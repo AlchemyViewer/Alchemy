@@ -51,7 +51,7 @@ namespace
 
     // The orphans' window, faked: what is in reach as a test says, and a
     // record of what was asked.
-    struct FakeOrphansWindow : public Orphans::Window, public al_studio_test::QuietTabs
+    struct FakeOrphansWindow : public Orphans::Window, public al_studio_test::QuietTabs, public al_studio_test::QuietSaves
     {
         Reach reach(const Doc& doc) override { return reaches.count(doc.id) ? reaches[doc.id] : Reach(); }
         void  refreshPlace(Doc& doc) override { placed.push_back(doc.id); }
@@ -61,7 +61,7 @@ namespace
         void               refreshToolbar() override { ++toolbars; }
         void               saveCopyToInventory(Doc& doc) override { did.push_back("copy " + doc.id); }
         void               saveCopyToFile() override { did.push_back("export"); }
-        void               saveAgain(Doc& doc) override { did.push_back("save " + doc.id); }
+        void               saveAsked(Doc& doc) override { did.push_back("save " + doc.id); }
         void               takeOffer(Doc& doc, const std::string& action) override { did.push_back("offer " + doc.id + ": " + action); }
         void               takeUpRecovery(Doc& doc, const ALRecoveryEntry& entry) override { did.push_back("restore " + doc.id); }
         void               discardRecovery(const ALRecoveryEntry&) override { did.push_back("discard"); }
@@ -119,7 +119,7 @@ namespace tut
             {
                 skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
             }
-            unit = std::make_unique<Orphans>(services(), studio, studio);
+            unit = std::make_unique<Orphans>(services(), studio, studio, studio);
             return *unit;
         }
         // A tab of a script in an object, or in the inventory, loaded and

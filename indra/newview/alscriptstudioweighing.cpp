@@ -30,6 +30,7 @@
 #include "alscriptfixes.h"
 #include "alscriptstudioanalysis.h"
 #include "alscriptstudiochecking.h"
+#include "alscriptstudiosaves.h"
 #include "alscriptstudioservices.h"
 #include "alscriptweightspane.h"
 #include "lldate.h"
@@ -38,7 +39,7 @@
 #include <cmath>
 #include <map>
 
-ALScriptStudioWeighing::ALScriptStudioWeighing(ALScriptStudioServices& services, ALScriptStudioAnalysis& analysis, Window& window) : mServices(services), mAnalysis(analysis), mWindow(window)
+ALScriptStudioWeighing::ALScriptStudioWeighing(ALScriptStudioServices& services, ALScriptStudioAnalysis& analysis, ALScriptStudioSaves& saves, Window& window) : mServices(services), mAnalysis(analysis), mSaves(saves), mWindow(window)
 {
 }
 
@@ -113,7 +114,7 @@ void ALScriptStudioWeighing::weighed(Doc& doc, const ALScriptAnalysis::Result& r
         mAnalysis.refreshProblems(doc);
         showInEditor(doc);
     }
-    mWindow.warnOverWeight(doc);
+    mSaves.warnOverWeight(doc);
 }
 
 void ALScriptStudioWeighing::weighSent(Doc& doc)
@@ -165,7 +166,7 @@ void ALScriptStudioWeighing::weighedSent(Doc& doc, const ALScriptAnalysis::Resul
             mStale = true;
         }
     }
-    mWindow.warnOverWeight(doc);
+    mSaves.warnOverWeight(doc);
 }
 
 std::vector<ALScriptWeight::Target> ALScriptStudioWeighing::targets(const Doc& doc) const
