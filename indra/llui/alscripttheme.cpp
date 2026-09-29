@@ -26,6 +26,7 @@
 
 #include "alscripttheme.h"
 
+#include "alsaid.h"
 #include "altextview.h"
 #include "llcontrol.h"
 #include "lldir.h"
@@ -193,18 +194,23 @@ const std::vector<std::string>& ALScriptTheme::names()
 // static
 std::string ALScriptTheme::labelOf(const std::string& name)
 {
+    // The English here, and the viewer's language where strings.xml has
+    // the name.
+    std::string english = name;
+    bool        found   = false;
     for (const auto& [own, label] : EDITOR_COLORS)
     {
         if (name == own)
         {
-            return label;
+            english = label;
+            found   = true;
         }
     }
-    if (name.compare(0, 6, "Script") == 0)
+    if (!found && name.compare(0, 6, "Script") == 0)
     {
-        return spaced(name.substr(6));
+        english = spaced(name.substr(6));
     }
-    return name;
+    return alSaidTemplate("ScriptColorLabel_" + name, english);
 }
 
 // static

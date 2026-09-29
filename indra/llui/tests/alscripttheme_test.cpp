@@ -35,6 +35,8 @@
 #include "../test/lltut.h"
 
 #include <algorithm>
+#include <fstream>
+#include <iterator>
 
 class LLAvatarName;
 const std::string gScriptThemeTestAnonName("Anon");
@@ -184,5 +186,25 @@ namespace tut
             ensure(theme.name + " reads:" + said, said.empty());
         }
         ensure_equals("a dark and a light high-contrast theme", high, 2);
+    }
+
+    template<> template<>
+    void alscripttheme_object::test<6>()
+    {
+        set_test_name("every colour a theme speaks for has its label in strings.xml, to be translated");
+#ifdef LLUI_TEST_APP_DIR
+        std::ifstream in(std::string(LLUI_TEST_APP_DIR) + "/skins/default/xui/en/strings.xml");
+        if (!in)
+        {
+            skip("no source tree: LLUI_TEST_APP_DIR does not point at newview");
+        }
+        const std::string strings((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+        for (const std::string& name : ALScriptTheme::names())
+        {
+            ensure("a label for " + name, strings.find("name=\"ScriptColorLabel_" + name + "\"") != std::string::npos);
+        }
+#else
+        skip("no LLUI_TEST_APP_DIR");
+#endif
     }
 }

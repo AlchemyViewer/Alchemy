@@ -401,6 +401,69 @@ If you feel this is an error, please contact support@secondlife.com</string>
 
 	<!-- The row of tabs over an editor (altabstrip.cpp): the button that
 	     lists them all once they run past it. -->
+	<!-- Script Studio's editor colors, as the preferences list them (ALScriptTheme::labelOf). -->
+	<string name="ScriptColorLabel_ScriptText">Text</string>
+	<string name="ScriptColorLabel_ScriptBackground">Background</string>
+	<string name="ScriptColorLabel_ScriptBgReadOnlyColor">Background, read-only</string>
+	<string name="ScriptColorLabel_ScriptCursorColor">Caret</string>
+	<string name="ScriptColorLabel_ScriptSelectionColor">Selection</string>
+	<string name="ScriptColorLabel_ScriptSelectionInactiveColor">Selection, unfocused</string>
+	<string name="ScriptColorLabel_ScriptCurrentLineColor">Current line</string>
+	<string name="ScriptColorLabel_ScriptGutterColor">Gutter</string>
+	<string name="ScriptColorLabel_ScriptLineNumberColor">Line numbers</string>
+	<string name="ScriptColorLabel_ScriptActiveLineNumberColor">Caret's line number</string>
+	<string name="ScriptColorLabel_ScriptBracketMatchColor">Matching bracket</string>
+	<string name="ScriptColorLabel_ScriptFindMatchColor">Find match</string>
+	<string name="ScriptColorLabel_ScriptFoldColor">Fold marks</string>
+	<string name="ScriptColorLabel_ScriptIndentGuideColor">Indent guides</string>
+	<string name="ScriptColorLabel_ScriptWhitespaceColor">Whitespace</string>
+	<string name="ScriptColorLabel_ScriptHighlightColor">Highlighted references</string>
+	<string name="ScriptColorLabel_ScriptChangedColor">Changed lines</string>
+	<string name="ScriptColorLabel_ScriptStickyHeaderColor">Sticky headers</string>
+	<string name="ScriptColorLabel_ScriptInlayHintColor">Parameter name hints</string>
+	<string name="ScriptColorLabel_ScriptInlayHintBgColor">Parameter name hints, background</string>
+	<string name="ScriptColorLabel_ScriptHeatColor">Memory heat</string>
+	<string name="ScriptColorLabel_ScriptErrorColor">Errors</string>
+	<string name="ScriptColorLabel_ScriptWarningColor">Warnings</string>
+	<string name="ScriptColorLabel_ScriptNoteColor">Notes</string>
+	<string name="ScriptColorLabel_ScriptRuntimeErrorColor">Run-time errors</string>
+	<string name="ScriptColorLabel_ScriptWidgetColor">Pop-ups</string>
+	<string name="ScriptColorLabel_ScriptWidgetBorderColor">Pop-ups, border</string>
+	<string name="ScriptColorLabel_ScriptWidgetSelectionColor">Pop-ups, chosen row</string>
+	<string name="ScriptColorLabel_ScriptBracket1Color">Rainbow brackets, level 1</string>
+	<string name="ScriptColorLabel_ScriptBracket2Color">Rainbow brackets, level 2</string>
+	<string name="ScriptColorLabel_ScriptBracket3Color">Rainbow brackets, level 3</string>
+	<string name="ScriptColorLabel_ScriptComment">Comment</string>
+	<string name="ScriptColorLabel_ScriptDocComment">Doc comment</string>
+	<string name="ScriptColorLabel_ScriptString">String</string>
+	<string name="ScriptColorLabel_ScriptEscape">Escape</string>
+	<string name="ScriptColorLabel_ScriptNumber">Number</string>
+	<string name="ScriptColorLabel_ScriptKeyword">Keyword</string>
+	<string name="ScriptColorLabel_ScriptControl">Control</string>
+	<string name="ScriptColorLabel_ScriptType">Type</string>
+	<string name="ScriptColorLabel_ScriptConstant">Constant</string>
+	<string name="ScriptColorLabel_ScriptFunction">Function</string>
+	<string name="ScriptColorLabel_ScriptEvent">Event</string>
+	<string name="ScriptColorLabel_ScriptLabel">Label</string>
+	<string name="ScriptColorLabel_ScriptOperator">Operator</string>
+	<string name="ScriptColorLabel_ScriptPunctuation">Punctuation</string>
+	<string name="ScriptColorLabel_ScriptPreprocessor">Preprocessor</string>
+	<string name="ScriptColorLabel_ScriptTag">Tag</string>
+	<string name="ScriptColorLabel_ScriptAttribute">Attribute</string>
+	<string name="ScriptColorLabel_ScriptAttributeValue">Attribute value</string>
+	<string name="ScriptColorLabel_ScriptEntity">Entity</string>
+	<string name="ScriptColorLabel_ScriptVariable">Variable</string>
+	<string name="ScriptColorLabel_ScriptParameter">Parameter</string>
+	<string name="ScriptColorLabel_ScriptProperty">Property</string>
+	<string name="ScriptColorLabel_ScriptDeprecated">Deprecated</string>
+	<string name="ScriptColorLabel_ScriptInvalid">Invalid</string>
+	<string name="ScriptColorLabel_ScriptNamespace">Namespace</string>
+	<string name="ScriptColorLabel_ScriptState">State</string>
+	<string name="ScriptColorLabel_ScriptGlobalVariable">Global variable</string>
+	<string name="ScriptColorLabel_ScriptPath">Path</string>
+	<!-- A command's keys in a tip, and a tip with them after it. -->
+	<string name="KeysInTip">([KEYS])</string>
+	<string name="TipWithKeys">[TIP] ([KEYS])</string>
 	<string name="TabStripList">All tabs</string>
 	<string name="QuickOpenNone">Nothing matches</string>
 
