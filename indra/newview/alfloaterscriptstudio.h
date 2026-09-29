@@ -779,7 +779,6 @@ private:
     // which is the world's; its place; its script loaded; the notice; and
     // the notice's actions.
     Doc::Orphan failedAs(const Doc& doc, ALScriptLoaded::Failure failure) const override;
-    void        retryLoad(Doc& doc) override { mOrphans.retryLoad(doc); }
     ALScriptStudioOrphans::Reach reach(const Doc& doc) override;
     void                         refreshPlace(Doc& doc) override;
     void                         loadScript(const ALScriptRef& ref) override;
@@ -1166,7 +1165,7 @@ private:
     // What is unsaved in the tabs, kept against the viewer going.
     ALScriptStudioRecovery             mRecovery{ *this, *this, *this };
     // Saving and compiling the tabs.
-    ALScriptStudioSaving               mSaving{ *this, *this, *this, mNavigation, mExternal, mWeighing, mRecovery, mFiles, *this };
+    ALScriptStudioSaving               mSaving{ *this, *this, *this, mNavigation, mExternal, mWeighing, mRecovery, mFiles, mOrphans, *this };
     // The window's side of vim, over its editors.
     ALScriptStudioVim                  mVim{ *this, *this, mSaving, mNavigation, mCommands, *this };
     // Its tabs held open in an editor outside.

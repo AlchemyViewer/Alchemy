@@ -42,6 +42,7 @@ class ALScriptExternalEditor;
 class ALScriptStudioWeighing;
 class ALScriptStudioRecovery;
 class ALScriptStudioFiles;
+class ALScriptStudioOrphans;
 class ALScriptStudioServices;
 class ALScriptStudioTabs;
 
@@ -124,12 +125,6 @@ public:
         virtual void takeLoaded(Doc& doc, const std::string& text) = 0;
         virtual void takeCarried(Doc& doc)                        = 0;
 
-        // --- the tab and the window ----------------------------------------------------
-
-        // A kept text loaded under its item, what it holds carried over:
-        // tried now, and a few more times after if it fails.
-        virtual void retryLoad(Doc& doc) = 0;
-
         // --- closing -------------------------------------------------------------------
 
         // Whether the viewer is quitting on this window's answer.
@@ -144,7 +139,7 @@ public:
         ~Window() = default;
     };
 
-    ALScriptStudioSaving(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, ALScriptStudioAnalysis& analysis, ALScriptNavigation& navigation, ALScriptExternalEditor& external, ALScriptStudioWeighing& weighing, ALScriptStudioRecovery& recovery, ALScriptStudioFiles& files, Window& window);
+    ALScriptStudioSaving(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, ALScriptStudioAnalysis& analysis, ALScriptNavigation& navigation, ALScriptExternalEditor& external, ALScriptStudioWeighing& weighing, ALScriptStudioRecovery& recovery, ALScriptStudioFiles& files, ALScriptStudioOrphans& orphans, Window& window);
 
     // --- saving ------------------------------------------------------------------------
 
@@ -226,6 +221,7 @@ private:
     ALScriptStudioWeighing& mWeighing;
     ALScriptStudioRecovery& mRecovery;
     ALScriptStudioFiles&    mFiles;
+    ALScriptStudioOrphans&  mOrphans;
     Window&                 mWindow;
     // Held while this is, for what answers later to know it still is.
     std::shared_ptr<bool>   mAlive = std::make_shared<bool>(true);

@@ -42,7 +42,7 @@
 
 #include <algorithm>
 
-ALScriptStudioSaving::ALScriptStudioSaving(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, ALScriptStudioAnalysis& analysis, ALScriptNavigation& navigation, ALScriptExternalEditor& external, ALScriptStudioWeighing& weighing, ALScriptStudioRecovery& recovery, ALScriptStudioFiles& files, Window& window) : mServices(services), mTabs(tabs), mAnalysis(analysis), mNavigation(navigation), mExternal(external), mWeighing(weighing), mRecovery(recovery), mFiles(files), mWindow(window)
+ALScriptStudioSaving::ALScriptStudioSaving(ALScriptStudioServices& services, ALScriptStudioTabs& tabs, ALScriptStudioAnalysis& analysis, ALScriptNavigation& navigation, ALScriptExternalEditor& external, ALScriptStudioWeighing& weighing, ALScriptStudioRecovery& recovery, ALScriptStudioFiles& files, ALScriptStudioOrphans& orphans, Window& window) : mServices(services), mTabs(tabs), mAnalysis(analysis), mNavigation(navigation), mExternal(external), mWeighing(weighing), mRecovery(recovery), mFiles(files), mOrphans(orphans), mWindow(window)
 {
 }
 
@@ -325,7 +325,7 @@ void ALScriptStudioSaving::save(Doc& doc)
             // failed waits its turn: loaded now, what it holds carried over,
             // so that it is saved as what the item is once asked again.
             mServices.setStatus(mServices.words("SaveWaitsForLoad", args), true);
-            mWindow.retryLoad(doc);
+            mOrphans.retryLoad(doc);
             stopped(doc);
             return;
         case ALScriptSaveFlow::Start::Go:

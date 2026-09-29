@@ -123,7 +123,6 @@ namespace
                 doc.carriedText.reset();
             }
         }
-        void retryLoad(Doc& doc) override { reattached.push_back(doc.id); }
         void refreshNotice() override { ++notices; }
         void refreshToolbar() override {}
         void refreshTrailer(Doc&) override {}
@@ -153,7 +152,7 @@ namespace
         bool                                                preprocessor = false;
         std::string                                         refuse;
         std::function<void(const ALPreprocessor::Result&)> run;
-        Names                                               tidied, analysed, runs, reattached, closed, known;
+        Names                                               tidied, analysed, runs, closed, known;
         std::vector<Sent>                                   sent;
         Names                                               notecards;
         U64                                                 requests = 0;
@@ -188,6 +187,7 @@ namespace tut
         std::unique_ptr<al_studio_test::StudioWeighing>   weighing;
         std::unique_ptr<al_studio_test::StudioRecovery>   recovery;
         std::unique_ptr<al_studio_test::StudioFiles>      files;
+        std::unique_ptr<al_studio_test::StudioOrphans>    orphans;
         std::unique_ptr<ALScriptStudioSaving>             saving;
 
         ALScriptStudioSaving& make()
@@ -203,8 +203,9 @@ namespace tut
             weighing               = std::make_unique<al_studio_test::StudioWeighing>(services);
             recovery               = std::make_unique<al_studio_test::StudioRecovery>(services);
             files                  = std::make_unique<al_studio_test::StudioFiles>(services);
+            orphans                = std::make_unique<al_studio_test::StudioOrphans>(services, recovery->unit, files->unit);
             saving = std::make_unique<ALScriptStudioSaving>(services, studio, studio, navigation->unit, external->unit, weighing->unit,
-                                                            recovery->unit, files->unit, studio);
+                                                            recovery->unit, files->unit, orphans->unit, studio);
             return *saving;
         }
 
@@ -298,7 +299,7 @@ namespace tut
         Doc& detached    = tab("detached", "default {}");
         detached.orphan->detached = true;
         saving.save(detached);
-        ensure("loaded under its item first", studio.reattached == Names{ "detached" } && studio.sent.empty());
+        ensure("loaded under its item first", orphans->loads.size() == 1 && orphans->loads[0] == detached.ref && studio.sent.empty());
         ensure_equals("and said to wait", lastStatus(), std::string("SaveWaitsForLoad"));
     }
 

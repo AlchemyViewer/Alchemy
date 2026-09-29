@@ -33,6 +33,7 @@
 #include "../alscriptnavigation.h"
 #include "../alscriptstudioanalysis.h"
 #include "../alscriptstudiofiles.h"
+#include "../alscriptstudioorphans.h"
 #include "../alscriptstudiodoc.h"
 #include "../alscriptstudiorecovery.h"
 #include "../alscriptstudiosaves.h"
@@ -432,6 +433,40 @@ namespace al_studio_test
         std::string                      folder;
         std::unique_ptr<ALRecoveryStore> store;
         ALScriptStudioRecovery           unit;
+    };
+
+    // The orphans, for a unit given them (ALScriptStudioOrphans): over the
+    // recovery and the files a test has -- the recovery's store is the
+    // process's, one at a time -- tabs and saving that do nothing, and a
+    // window with every tab in reach and no notice, which records the
+    // scripts it was asked to load again.
+    struct StudioOrphans final : public ALScriptStudioOrphans::Window
+    {
+        StudioOrphans(ALScriptStudioServices& services, ALScriptStudioRecovery& recovery, ALScriptStudioFiles& files)
+        :   unit(services, tabs, saves, recovery, files, *this)
+        {
+        }
+        ALScriptStudioOrphans::Reach reach(const ALScriptStudioDoc&) override
+        {
+            ALScriptStudioOrphans::Reach reach;
+            reach.itemThere   = true;
+            reach.objectThere = true;
+            reach.fileThere   = true;
+            return reach;
+        }
+        void               refreshPlace(ALScriptStudioDoc&) override {}
+        void               loadScript(const ALScriptRef& ref) override { loads.push_back(ref); }
+        ALScriptNoticeBar* noticeBar() override { return nullptr; }
+        void               saveCopyToInventory(ALScriptStudioDoc&) override {}
+        void               discardRecovery(const ALRecoveryEntry&) override {}
+        void               takeOffer(ALScriptStudioDoc&, const std::string&) override {}
+        void compare(ALScriptStudioDoc&, const std::string&, const std::string&, const std::string&, const std::string&) override {}
+        void endCompare(ALScriptStudioDoc&) override {}
+
+        QuietTabs                tabs;
+        QuietSaves               saves;
+        ALScriptStudioOrphans    unit;
+        std::vector<ALScriptRef> loads;
     };
 
     // Weighing, for a unit given it (ALScriptStudioWeighing): over an
