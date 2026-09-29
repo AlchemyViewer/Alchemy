@@ -55,6 +55,7 @@
 #include "alscriptkeymap.h"
 #include "alscriptmessages.h"
 #include "altabstrip.h"
+#include "altextgotoline.h"
 #include "altextsearch.h"
 #include "alvimkeymap.h"
 #include "llagent.h"
@@ -280,51 +281,6 @@ namespace
             }
         }
         return text;
-    }
-
-    // "12" or "12:5", as a person types a place: the line and the column
-    // from one, zero where there is none or it is not a number.
-    void placeTyped(const std::string& text, S32& line, S32& column)
-    {
-        line = column = 0;
-        std::string_view rest(text);
-        while (!rest.empty() && rest.front() == ' ')
-        {
-            rest.remove_prefix(1);
-        }
-        while (!rest.empty() && rest.front() == ':')
-        {
-            rest.remove_prefix(1);
-        }
-        size_t digits = 0;
-        while (digits < rest.size() && isdigit(static_cast<unsigned char>(rest[digits])))
-        {
-            ++digits;
-        }
-        if (digits == 0)
-        {
-            return;
-        }
-        line = static_cast<S32>(std::strtol(std::string(rest.substr(0, digits)).c_str(), nullptr, 10));
-        rest.remove_prefix(digits);
-        if (rest.empty() || (rest.front() != ':' && rest.front() != ','))
-        {
-            return;
-        }
-        rest.remove_prefix(1);
-        while (!rest.empty() && rest.front() == ' ')
-        {
-            rest.remove_prefix(1);
-        }
-        digits = 0;
-        while (digits < rest.size() && isdigit(static_cast<unsigned char>(rest[digits])))
-        {
-            ++digits;
-        }
-        if (digits > 0)
-        {
-            column = static_cast<S32>(std::strtol(std::string(rest.substr(0, digits)).c_str(), nullptr, 10));
-        }
     }
 }
 
@@ -4765,7 +4721,7 @@ void ALFloaterScriptStudio::goToLine()
     // By the numbers the view shows: the expansion's count from past the
     // envelope's lines, as a runtime error's does.
     auto placeOf = [](const Doc& doc, const std::string& typed, S32& line, S32& column) {
-        placeTyped(typed, line, column);
+        ALTextGoToLine::placeTyped(typed, line, column);
         line -= doc.shownText()->lineNumberBase();
         const S32 count = doc.shownText()->document().lineCount();
         return line >= 1 && line <= count;

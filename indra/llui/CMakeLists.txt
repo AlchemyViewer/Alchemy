@@ -166,6 +166,7 @@ target_sources(
     altextdocument.cpp
     altextediting.cpp
     altextfind.cpp
+    altextgotoline.cpp
     altextindent.cpp
     altextlayout.cpp
     altextsearch.cpp
@@ -387,6 +388,7 @@ target_sources(
         altextdocument.h
         altextediting.h
         altextfind.h
+        altextgotoline.h
         altextindent.h
         altextlayout.h
         altextsearch.h
