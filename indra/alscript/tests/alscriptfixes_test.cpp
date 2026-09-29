@@ -1100,4 +1100,16 @@ namespace tut
         const ALScriptProblem* ended   = keyed(missing, "LSLSyntaxMissing");
         ensure("a missing ';' put in safely", ended && !ended->fixes.empty() && ended->fixes.front().safe);
     }
+
+    template<> template<>
+    void object::test<36>()
+    {
+        set_test_name("a handler's missing brace is put on a line of its own, level with the handler after it, and the script checks clean");
+        ensure("builtins: " + error, lslLoaded);
+        const std::string script = "default\n{\n    state_entry()\n    {\n        llSay(0, \"Hello, Avatar!\");\n\n"
+                                   "    touch_start(integer total_number)\n    {\n        llSay(0, \"Touched.\");\n    }\n}\n";
+        const std::string made = fixed(script, false, "LSLSyntaxMissing", "Insert '}'");
+        ensure("closed after the call, its own line: " + made, made.find("\"Hello, Avatar!\");\n    }\n\n    touch_start(") != std::string::npos);
+        ensure("no error left", errors(check(made, false)) == 0);
+    }
 }

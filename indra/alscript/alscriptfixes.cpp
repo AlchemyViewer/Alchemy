@@ -1468,7 +1468,24 @@ namespace ALScriptFixes
                     // A `;` the parser wanted ends the statement where it
                     // already ended: nothing else could have been meant.
                     fix.safe        = token == ";";
-                    fix.edits.push_back({ problem.line, problem.endColumn, problem.line, problem.endColumn, token });
+                    // A block's `}` on a line of its own, as far in as the
+                    // next line of code -- the handler or the state it
+                    // stands before, which its block's head is level with.
+                    std::string put = token;
+                    if (token == "}")
+                    {
+                        for (S32 next = problem.line + 1; next < lines.count(); ++next)
+                        {
+                            const std::string_view line = lines.line(next);
+                            const size_t           code = line.find_first_not_of(" \t");
+                            if (code != std::string_view::npos && line[code] != '\r')
+                            {
+                                put = "\n" + std::string(line.substr(0, code)) + "}";
+                                break;
+                            }
+                        }
+                    }
+                    fix.edits.push_back({ problem.line, problem.endColumn, problem.line, problem.endColumn, put });
                     problem.fixes.push_back(std::move(fix));
                 }
             }

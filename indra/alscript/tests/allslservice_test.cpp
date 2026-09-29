@@ -777,4 +777,39 @@ namespace tut
             ensure_equals(name + ": " + said(problems), errors(problems), size_t(0));
         }
     }
+
+    template<> template<>
+    void allslservice_object::test<23>()
+    {
+        set_test_name("a handler or a state begun inside a block left open is a missing brace, after the last code before it, not what the "
+                      "parser wanted of the head it misread");
+        ensure("builtins loaded: " + error, loaded);
+        auto first_error = [&](const std::string& script) {
+            for (const ALScriptProblem& problem : service.check(script))
+            {
+                if (problem.severity == ALScriptProblem::Severity::Error)
+                {
+                    return problem;
+                }
+            }
+            return ALScriptProblem();
+        };
+        const std::string open = "default\n{\n    state_entry()\n    {\n        llSay(0, \"Hello, Avatar!\");\n\n";
+        // A handler with parameters, read as a call.
+        ALScriptProblem p = first_error(open + "    touch_start(integer total_number)\n    {\n        llSay(0, \"Touched.\");\n    }\n}\n");
+        ensure_equals("the brace: " + p.message, p.message, std::string("Missing '}'."));
+        ensure("keyed", p.key == "LSLSyntaxMissing" && p.args.size() == 1 && p.args[0] == "'}'");
+        ensure("on the semicolon before it", p.line == 4 && p.column == 34 && p.endColumn == 35);
+        // One without, its brace on the next line.
+        p = first_error(open + "    touch_start()\n    {\n    }\n}\n");
+        ensure_equals("the brace, a head without parameters: " + p.message, p.message, std::string("Missing '}'."));
+        ensure("on the same semicolon", p.line == 4 && p.column == 34);
+        // A state after one not closed.
+        p = first_error("default\n{\n    state_entry()\n    {\n    }\n\nstate other\n{\n    state_entry()\n    {\n    }\n}\n");
+        ensure_equals("the state's brace: " + p.message, p.message, std::string("Missing '}'."));
+        ensure("after the handler's", p.line == 4 && p.column == 4);
+        // A handler's own head wrong where handlers go is not one.
+        p = first_error("default\n{\n    touch_start(integer)\n    {\n    }\n}\n");
+        ensure("a head wrong in its state's braces: not a brace", p.severity == ALScriptProblem::Severity::Error && p.message != "Missing '}'.");
+    }
 }
