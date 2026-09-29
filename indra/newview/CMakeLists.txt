@@ -201,6 +201,7 @@ if(AL_BUILD_VIEWER)
     alscriptsaveflow.cpp
     alscriptsearch.cpp
     alscriptsearchpane.cpp
+    alscriptsnippets.cpp
     alscriptstudioaccount.cpp
     alscriptstudiocaret.cpp
     alscriptstudiochecking.cpp
@@ -219,6 +220,7 @@ if(AL_BUILD_VIEWER)
     alscriptstudiovimrc.cpp
     alscriptstudioweighing.cpp
     alscriptstudiowords.cpp
+    alscripttheme.cpp
     alscripttypes.cpp
     alscriptweightspane.cpp
     alscriptworkspace.cpp
@@ -1038,6 +1040,7 @@ if(AL_BUILD_VIEWER)
     alscriptsaveflow.h
     alscriptsearch.h
     alscriptsearchpane.h
+    alscriptsnippets.h
     alscriptstudio.h
     alscriptstudioaccount.h
     alscriptstudiocaret.h
@@ -1062,6 +1065,7 @@ if(AL_BUILD_VIEWER)
     alscriptstudiosaves.h
     alscriptstudioservices.h
     alscriptstudiotabs.h
+    alscripttheme.h
     alscripttypes.h
     alscriptweightspane.h
     alscriptworkspace.h
@@ -2628,6 +2632,20 @@ if(AL_BUILD_TESTS)
     PROJECT ${test_project}
     LIBRARIES al_studio_test_common llui alscript ${test_libs}
     PCH al_studio_test_common
+    DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
+  )
+
+  # The scripter's snippets: the shipped and their own, read, written and
+  # kept whole on disk.
+  al_add_test(alscriptsnippets UNIT PROJECT ${test_project} LIBRARIES llui ${test_libs})
+
+  # Script Studio's themes: their colours, the shipped ones legible, and
+  # every skin's script colours read against what they are drawn on.
+  al_add_test(
+    alscripttheme
+    UNIT
+    PROJECT ${test_project}
+    LIBRARIES llui ${test_libs}
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
 

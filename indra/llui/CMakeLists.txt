@@ -177,8 +177,6 @@ target_sources(
     altextview.cpp
     altextundo.cpp
     alnotecarditems.cpp
-    alscripttheme.cpp
-    alscriptsnippets.cpp
     alfieldeditors.cpp
     alfolderfilter.cpp
     alfollowscontrol.cpp
@@ -403,8 +401,6 @@ target_sources(
         altextview.h
         altextundo.h
         alnotecarditems.h
-        alscripttheme.h
-        alscriptsnippets.h
         alfieldeditors.h
         alfolderfilter.h
         alfollowscontrol.h
@@ -506,7 +502,6 @@ if(AL_BUILD_TESTS)
   al_add_test(altextdocument UNIT PROJECT llui LIBRARIES ${test_libs})
   al_add_test(altextundo UNIT PROJECT llui SOURCES altextdocument.cpp LIBRARIES ${test_libs})
   al_add_test(alnotecarditems UNIT PROJECT llui LIBRARIES ${test_libs})
-  al_add_test(alscriptsnippets UNIT PROJECT llui LIBRARIES ${test_libs})
   al_add_test(
     alsyntaxhighlighter
     UNIT
@@ -613,7 +608,6 @@ if(AL_BUILD_TESTS)
     alfixlistmodel
     alfoldmodel
     alsnippetsession
-    alscripttheme
     alvimkeymap
     alvimmappings
     alvimpattern

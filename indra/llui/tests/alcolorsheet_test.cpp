@@ -25,7 +25,6 @@
 #include "linden_common.h"
 
 #include "../alcolorsheet.h"
-#include "../alscripttheme.h"
 
 #include "../test/lltut.h"
 
@@ -516,61 +515,6 @@ namespace tut
             sheet.resolve();
             ensure(std::string(skin) + " has EmphasisColor", sheet.find("EmphasisColor") != nullptr);
             ensure(std::string(skin) + " has nothing to report:\n" + all(sheet), sheet.diagnostics().empty());
-        }
-#else
-        skip("no LLUI_TEST_APP_DIR");
-#endif
-    }
-
-    // Every shipped skin's script colours read: the text and each kind of
-    // code against the ground and the read-only ground, the text against
-    // the caret's line and the selection, the line numbers against the
-    // gutter -- the dark skins included, whose defaults were once the
-    // white skin's.
-    template<> template<>
-    void alcolorsheet_object::test<18>()
-    {
-#ifdef LLUI_TEST_APP_DIR
-        const std::string skins = std::string(LLUI_TEST_APP_DIR) + "/skins/";
-        LLXMLNodePtr default_root;
-        if (!LLXMLNode::parseFile(skins + "default/colors.xml", default_root, nullptr))
-        {
-            skip("no source tree: LLUI_TEST_APP_DIR does not point at newview");
-        }
-        for (const char* skin : { "default", "alchemy", "gemini", "heretic", "ionic" })
-        {
-            ALColorSheet sheet;
-            sheet.read(default_root, "default/colors.xml");
-            if (std::string(skin) != "default")
-            {
-                LLXMLNodePtr root;
-                ensure(std::string(skin) + " parses", LLXMLNode::parseFile(skins + skin + "/colors.xml", root, nullptr));
-                sheet.read(root, std::string(skin) + "/colors.xml");
-            }
-            sheet.resolve();
-            std::string said;
-            const auto  lookup = [&sheet](const std::string& name) -> std::optional<LLColor4> {
-                const LLColor4* found = sheet.find(name);
-                return found ? std::optional<LLColor4>(*found) : std::nullopt;
-            };
-            for (const ALScriptTheme::Illegible& each : ALScriptTheme::illegible(lookup))
-            {
-                said += "\n  " + each.name + " on " + each.against + ": " + std::to_string(each.contrast);
-            }
-            ensure(std::string(skin) + "'s script colours read:" + said, said.empty());
-            // And the studios' parts told apart by what they are: a divider
-            // from the panes it divides, a tab not chosen from the chosen
-            // one, the notice and the strips from the panes.
-            const auto apart = [&](const char* a, const char* b, F32 least) {
-                const LLColor4* x = sheet.find(a);
-                const LLColor4* y = sheet.find(b);
-                ensure(std::string(skin) + " has " + a + " and " + b, x && y);
-                ensure(std::string(skin) + ": " + a + " apart from " + b, ALSurface::contrast(*x, *y) >= least);
-            };
-            apart("StudioDividerColor", "StudioPaneColor", 1.3f);
-            apart("StudioTabColor", "PanelDefaultBackgroundColor", 1.08f);
-            apart("StudioNoticeColor", "StudioPaneColor", 1.08f);
-            apart("StudioStripColor", "StudioPaneColor", 1.05f);
         }
 #else
         skip("no LLUI_TEST_APP_DIR");
