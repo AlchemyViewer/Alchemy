@@ -1264,11 +1264,6 @@ Second Lifeに入るにはアカウントが必要です。今すぐアカウン
 土地を結合してもよろしいですか？
 		<usetemplate name="okcancelbuttons" notext="キャンセル" yestext="ＯＫ"/>
 	</notification>
-	<notification name="ConfirmNotecardSave">
-		このアイテムをコピー、表示する前に、ノートカードの保存が必要です。
-保存してもよろしいですか？
-		<usetemplate name="okcancelbuttons" notext="キャンセル" yestext="ＯＫ"/>
-	</notification>
 	<notification name="ConfirmItemCopy">
 		このアイテムをあなたのインベントリにコピーしますか？
 		<usetemplate name="okcancelbuttons" notext="キャンセル" yestext="コピー"/>

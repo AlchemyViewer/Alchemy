@@ -32,11 +32,10 @@
 #include <vector>
 
 // The notecard format stands each item a notecard carries in its text as a
-// character past the last the standard assigns, the first item's the first
-// of them -- LLTextEditor::FIRST_EMBEDDED_CHAR, which alnotecarditems.cpp
-// checks this agrees with. Every one of them is four bytes in UTF-8, the
-// first of them F4, so a text is read and renumbered in its bytes, where
-// the editor keeps it.
+// character of the last plane, a private one, the first item's the plane's
+// first character. Every one of them is four bytes in UTF-8, the first of
+// them F4, so a text is read and renumbered in its bytes, where the editor
+// keeps it.
 namespace ALNotecardItems
 {
     constexpr U32    FIRST_CHAR = 0x100000;
@@ -57,4 +56,7 @@ namespace ALNotecardItems
     // stands it, and any other such character left as it is. Answers the
     // number each had before, in their new order: the items to send.
     std::vector<size_t> renumber(std::string& text, const std::function<bool(size_t item)>& carried);
+    // The text with no item's character in it: what is shown where the
+    // items cannot be, as an estate covenant is.
+    std::string withoutItems(std::string_view text);
 }

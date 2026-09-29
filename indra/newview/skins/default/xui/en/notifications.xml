@@ -3524,17 +3524,6 @@ Join land?
      yestext="OK"/>
   </notification>
 
-  <notification
-   icon="alertmodal.tga"
-   name="ConfirmNotecardSave"
-   type="alertmodal">
-This notecard needs to be saved before the item can be copied or viewed. Save notecard?
-    <tag>confirm</tag>
-    <usetemplate
-     name="okcancelbuttons"
-     notext="Cancel"
-     yestext="OK"/>
-  </notification>
 
   <notification
    icon="alertmodal.tga"

@@ -856,10 +856,6 @@ Sie müssen der neuen Parzelle einen Namen geben und ihre Optionen festlegen.
 Land zusammenlegen?
 		<usetemplate name="okcancelbuttons" notext="Abbrechen" yestext="OK"/>
 	</notification>
-	<notification name="ConfirmNotecardSave">
-		Um das Objekt kopieren oder anzeigen zu können, müssen Sie zuerst diese Notizkarte speichern. Notizkarte speichern?
-		<usetemplate name="okcancelbuttons" notext="Abbrechen" yestext="OK"/>
-	</notification>
 	<notification name="ConfirmItemCopy">
 		Dieses Objekt in Ihr Inventar kopieren?
 		<usetemplate name="okcancelbuttons" notext="Abbrechen" yestext="Kopieren"/>

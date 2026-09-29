@@ -88,4 +88,13 @@ namespace tut
         ensure("none", ALNotecardItems::renumber(plain, [](size_t) { return true; }).empty());
         ensure_equals("and the text as it was", plain, std::string("no items here"));
     }
+
+    template<> template<>
+    void alnotecarditems_object::test<4>()
+    {
+        set_test_name("a text without its items: every item's character taken out, and nothing else");
+        const std::string text = "see " + ALNotecardItems::charOf(0) + " and " + ALNotecardItems::charOf(3) + "\xC3\xA9";
+        ensure_equals("taken out", ALNotecardItems::withoutItems(text), std::string("see  and \xC3\xA9"));
+        ensure_equals("nothing to take", ALNotecardItems::withoutItems("plain"), std::string("plain"));
+    }
 }

@@ -28,9 +28,11 @@
 #include "llviewermessage.h"
 
 #include "alfloaterscriptstudio.h"
+#include "alnotecarditems.h"
 
 // Linden libraries
 #include "llanimationstates.h"
+#include "llnotecard.h"
 #include "llaudioengine.h"
 #include "llavataractions.h"
 #include "llavatarnamecache.h"      // IDEVO HACK
@@ -7425,20 +7427,21 @@ void onCovenantLoadComplete(const LLUUID& asset_uuid,
 
         if( (file_length > 19) && !strncmp( &buffer[0], "Linden text version", 19 ) )
         {
-            LLViewerTextEditor::Params params;
-            params.name("temp");
-            params.max_text_length(file_length+1);
-            LLViewerTextEditor * editor = LLUICtrlFactory::create<LLViewerTextEditor> (params);
-            if( !editor->importBuffer( &buffer[0], file_length+1 ) )
+            LLNotecard         notecard(LLNotecard::MAX_SIZE);
+            std::istringstream in(std::string(&buffer[0], file_length));
+            if (!notecard.importStream(in))
             {
                 LL_WARNS("Messaging") << "Problem importing estate covenant." << LL_ENDL;
                 covenant_text = "Problem importing estate covenant.";
-                delete editor;
             }
             else
             {
-                // Version 0 (just text, doesn't include version number)
-                editorp.reset(editor); // Use covenant from editorp;
+                LLViewerTextEditor::Params params;
+                params.name("temp");
+                params.max_text_length(file_length+1);
+                editorp.reset(LLUICtrlFactory::create<LLViewerTextEditor>(params));
+                // The items a covenant carries are not shown here.
+                editorp->setText(ALNotecardItems::withoutItems(notecard.getText()));
             }
         }
         else

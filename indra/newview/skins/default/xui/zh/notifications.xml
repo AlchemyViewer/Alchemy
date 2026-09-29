@@ -1128,10 +1128,6 @@
 進行土地合併？
 		<usetemplate name="okcancelbuttons" notext="取消" yestext="確定"/>
 	</notification>
-	<notification name="ConfirmNotecardSave">
-		覆製或察看前，這記事卡必須先進行儲存。 儲存記事卡？
-		<usetemplate name="okcancelbuttons" notext="取消" yestext="確定"/>
-	</notification>
 	<notification name="ConfirmItemCopy">
 		覆製這個物品到你的收納區？
 		<usetemplate name="okcancelbuttons" notext="取消" yestext="恚庨"/>

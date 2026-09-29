@@ -838,10 +838,6 @@ Você vai ter que redefinir nome e as opções do novo lote.
 Unir os terrenos?
 		<usetemplate name="okcancelbuttons" notext="Cancelar" yestext="Unir"/>
 	</notification>
-	<notification name="ConfirmNotecardSave">
-		Esta anotação precisa ser salva antes de o item ser copiado ou visualizado. Salvar anotação?
-		<usetemplate name="okcancelbuttons" notext="Cancelar" yestext="Salvar"/>
-	</notification>
 	<notification name="ConfirmItemCopy">
 		Copiar este item para o seu inventário?
 		<usetemplate name="okcancelbuttons" notext="Cancelar" yestext="Copiar"/>

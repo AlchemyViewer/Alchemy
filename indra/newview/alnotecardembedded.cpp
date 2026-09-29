@@ -32,7 +32,6 @@
 #include "alscriptworkspace.h"
 #include "llbutton.h"
 #include "llfontgl.h"
-#include "lltexteditor.h"
 #include "lltrans.h"
 #include "lluictrlfactory.h"
 
@@ -261,7 +260,7 @@ bool ALNotecardEmbedded::drop(S32 x, S32 y, bool dropping, EDragAndDropType type
         // where the drop landed, one step to undo; the button follows the
         // edit through the document's change.
         const size_t index = mItems.size();
-        if (index >= static_cast<size_t>(LLTextEditor::MAX_EMBEDDED_ITEMS))
+        if (index >= ALNotecardItems::MOST)
         {
             *accept = ACCEPT_NO;
             return true;

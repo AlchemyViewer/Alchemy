@@ -1135,10 +1135,6 @@ Yeni parselin adını ve seçeneklerini yeniden ayarlamanız gerekecektir.
 Arazi birleştirilsin mi?
 		<usetemplate name="okcancelbuttons" notext="İptal" yestext="Tamam"/>
 	</notification>
-	<notification name="ConfirmNotecardSave">
-		Öğe kopyalanmadan veya görüntülenmeden önce bu not kartının kaydedilmesi gerekiyor. Not kartı kaydedilsin mi?
-		<usetemplate name="okcancelbuttons" notext="İptal" yestext="Tamam"/>
-	</notification>
 	<notification name="ConfirmItemCopy">
 		Bu öğe envanterinize kopyalansın mı?
 		<usetemplate name="okcancelbuttons" notext="İptal Et" yestext="Kopyala"/>

@@ -26,15 +26,7 @@
 
 #include "alnotecarditems.h"
 
-#include "lltexteditor.h"
-
 #include <boost/unordered/unordered_flat_map.hpp>
-
-// The characters are read here and made by the text editor the legacy
-// notecard uses: the two must agree.
-static_assert(ALNotecardItems::FIRST_CHAR == LLTextEditor::FIRST_EMBEDDED_CHAR &&
-                  ALNotecardItems::MOST == static_cast<size_t>(LLTextEditor::MAX_EMBEDDED_ITEMS),
-              "a notecard's item characters are numbered one way");
 
 namespace ALNotecardItems
 {
@@ -82,6 +74,19 @@ void forEach(std::string_view bytes, const std::function<void(size_t at, size_t 
             i += CHAR_BYTES - 1;
         }
     }
+}
+
+std::string withoutItems(std::string_view text)
+{
+    std::string out;
+    out.reserve(text.size());
+    size_t from = 0;
+    forEach(text, [&](size_t at, size_t) {
+        out.append(text.substr(from, at - from));
+        from = at + CHAR_BYTES;
+    });
+    out.append(text.substr(from));
+    return out;
 }
 
 std::vector<size_t> renumber(std::string& text, const std::function<bool(size_t item)>& carried)

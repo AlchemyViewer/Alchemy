@@ -1058,10 +1058,6 @@ Nazwa i opcje działki będą musiały zostać skonfigurowane.
 Połączyć działki?
 		<usetemplate name="okcancelbuttons" notext="Anuluj" />
 	</notification>
-	<notification name="ConfirmNotecardSave">
-		Ta notka musi być zapisana żeby mogła być skopiowana lub zobaczona. Zapisać notkę?
-		<usetemplate name="okcancelbuttons" notext="Anuluj" />
-	</notification>
 	<notification name="ConfirmItemCopy">
 		Skopiować ten obiekt do Twojej szafy?
 		<usetemplate name="okcancelbuttons" notext="Anuluj" yestext="Skopiuj" />

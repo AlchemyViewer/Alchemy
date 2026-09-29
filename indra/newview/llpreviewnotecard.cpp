@@ -148,11 +148,6 @@ bool LLPreviewNotecard::postBuild()
     return LLPreview::postBuild();
 }
 
-bool LLPreviewNotecard::saveItem()
-{
-    return saveIfNeeded();
-}
-
 void LLPreviewNotecard::draw()
 {
     mSaveBtn->setEnabled(mLoaded && mModifiable && !mSaving && mText->isDirty());

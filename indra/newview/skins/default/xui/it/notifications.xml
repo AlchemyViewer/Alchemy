@@ -844,10 +844,6 @@ Dovrai reimpostare il nome e le opzioni del nuovo terreno.
 Unisci il terreno?
 		<usetemplate name="okcancelbuttons" notext="Annulla" yestext="OK"/>
 	</notification>
-	<notification name="ConfirmNotecardSave">
-		Questa notecard deve essere salvata prima che l'elemento possa essere copiato o visualizzato. Salva la notecard?
-		<usetemplate name="okcancelbuttons" notext="Annulla" yestext="OK"/>
-	</notification>
 	<notification name="ConfirmItemCopy">
 		Copia questo elemento nel tuo inventario?
 		<usetemplate name="okcancelbuttons" notext="Annulla" yestext="Copia"/>

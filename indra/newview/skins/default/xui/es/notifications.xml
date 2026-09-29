@@ -848,10 +848,6 @@ Deberás reconfigurar el nombre y las opciones de la nueva parcela.
 ¿Unir el terreno?
 		<usetemplate name="okcancelbuttons" notext="Cancelar" yestext="OK"/>
 	</notification>
-	<notification name="ConfirmNotecardSave">
-		Esta nota debe guardarse antes de que puedas copiarla o verla. ¿Guardar la nota?
-		<usetemplate name="okcancelbuttons" notext="Cancelar" yestext="OK"/>
-	</notification>
 	<notification name="ConfirmItemCopy">
 		¿Copiar este ítem a tu inventario?
 		<usetemplate name="okcancelbuttons" notext="Cancelar" yestext="Copiar"/>

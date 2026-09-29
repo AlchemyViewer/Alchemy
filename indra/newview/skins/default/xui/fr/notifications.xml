@@ -844,10 +844,6 @@ Vous devrez réinitialiser le nom et les options de la nouvelle parcelle.
 Fusionner le terrain ?
 		<usetemplate name="okcancelbuttons" notext="Annuler" yestext="OK"/>
 	</notification>
-	<notification name="ConfirmNotecardSave">
-		Cette note doit être sauvegardée avant que l'objet ne puisse être copié ou visualisé. Enregistrer la note ?
-		<usetemplate name="okcancelbuttons" notext="Annuler" yestext="OK"/>
-	</notification>
 	<notification name="ConfirmItemCopy">
 		Copier cet objet dans votre inventaire ?
 		<usetemplate name="okcancelbuttons" notext="Annuler" yestext="Copier"/>

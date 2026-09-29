@@ -248,7 +248,6 @@ private:
 LLTextEditor::Params::Params()
 :   default_text("default_text"),
     prevalidator("prevalidator"),
-    embedded_items("embedded_items", false),
     ignore_tab("ignore_tab", true),
     auto_indent("auto_indent", true),
     default_color("default_color"),
@@ -271,9 +270,6 @@ LLTextEditor::LLTextEditor(const LLTextEditor::Params& p) :
     mAutoIndent(p.auto_indent),
     mParseOnTheFly(false),
     mCommitOnFocusLost( p.commit_on_focus_lost),
-    mAllowEmbeddedItems( p.embedded_items ),
-    mMouseDownX(0),
-    mMouseDownY(0),
     mTabsToNextField(p.ignore_tab),
     mPrevalidator(p.prevalidator()),
     mShowContextMenu(p.show_context_menu),
@@ -285,8 +281,6 @@ LLTextEditor::LLTextEditor(const LLTextEditor::Params& p) :
     mSelectAllOnFocusReceived(false),
     mSelectedOnFocusReceived(false)
 {
-    mSourceID.generate();
-
     //FIXME: use image?
     LLViewBorder::Params params;
     params.name = "text ed border";
@@ -1833,32 +1827,6 @@ void LLTextEditor::cleanStringForPaste(std::string& clean_string)
 {
     LLStringUtil::replaceChar(clean_string, '\r', '\n');
     LLStringUtil::replaceTabsWithSpaces(clean_string, SPACES_PER_TAB);
-    if( mAllowEmbeddedItems )
-    {
-        // Rebuilt rather than edited in place: a character replaced here need
-        // not occupy as many bytes as the one replacing it, and an embedded
-        // item's character is four bytes whatever it stands in for.
-        const llwchar LF = 10;
-        std::string rebuilt;
-        rebuilt.reserve(clean_string.size());
-        for( size_t i = 0; i < clean_string.size(); )
-        {
-            const LLCodepointAt at = utf8str_decode_at(clean_string, i);
-            i = at.next;
-
-            llwchar wc = at.cp;
-            if( (wc < LLFontFreetype::FIRST_CHAR) && (wc != LF) )
-            {
-                wc = LL_UNKNOWN_CHAR;
-            }
-            else if (wc >= FIRST_EMBEDDED_CHAR && wc <= LAST_EMBEDDED_CHAR)
-            {
-                wc = pasteEmbeddedItem(wc);
-            }
-            utf8str_append_cp(rebuilt, wc);
-        }
-        clean_string.swap(rebuilt);
-    }
 }
 
 
@@ -2938,110 +2906,6 @@ void LLTextEditor::updateLinkSegments()
 void LLTextEditor::onMouseCaptureLost()
 {
     endSelection();
-}
-
-///////////////////////////////////////////////////////////////////
-// Hack for Notecards
-
-bool LLTextEditor::importBuffer(const char* buffer, S32 length )
-{
-    std::istringstream instream(buffer);
-
-    // Version 1 format:
-    //      Linden text version 1\n
-    //      {\n
-    //          <EmbeddedItemList chunk>
-    //          Text length <bytes without \0>\n
-    //          <text without \0> (text may contain ext_char_values)
-    //      }\n
-
-    char tbuf[MAX_STRING];  /* Flawfinder: ignore */
-
-    S32 version = 0;
-    instream.getline(tbuf, MAX_STRING);
-    if( 1 != sscanf(tbuf, "Linden text version %d", &version) )
-    {
-        LL_WARNS() << "Invalid Linden text file header " << LL_ENDL;
-        return false;
-    }
-
-    if( 1 != version )
-    {
-        LL_WARNS() << "Invalid Linden text file version: " << version << LL_ENDL;
-        return false;
-    }
-
-    instream.getline(tbuf, MAX_STRING);
-    if( 0 != sscanf(tbuf, "{") )
-    {
-        LL_WARNS() << "Invalid Linden text file format" << LL_ENDL;
-        return false;
-    }
-
-    S32 text_len = 0;
-    instream.getline(tbuf, MAX_STRING);
-    if( 1 != sscanf(tbuf, "Text length %d", &text_len) )
-    {
-        LL_WARNS() << "Invalid Linden text length field" << LL_ENDL;
-        return false;
-    }
-
-    if( text_len > mMaxTextByteLength )
-    {
-        LL_WARNS() << "Invalid Linden text length: " << text_len << LL_ENDL;
-        return false;
-    }
-
-    bool success = true;
-
-    char* text = new char[ text_len + 1];
-    if (text == NULL)
-    {
-        LLError::LLUserWarningMsg::showOutOfMemory();
-        LL_ERRS() << "Memory allocation failure." << LL_ENDL;
-        return false;
-    }
-    instream.get(text, text_len + 1, '\0');
-    text[text_len] = '\0';
-    if( text_len != (S32)strlen(text) )/* Flawfinder: ignore */
-    {
-        LL_WARNS() << llformat("Invalid text length: %d != %d ",strlen(text),text_len) << LL_ENDL;/* Flawfinder: ignore */
-        success = false;
-    }
-
-    instream.getline(tbuf, MAX_STRING);
-    if( success && (0 != sscanf(tbuf, "}")) )
-    {
-        LL_WARNS() << "Invalid Linden text file format: missing terminal }" << LL_ENDL;
-        success = false;
-    }
-
-    if( success )
-    {
-        // Actually set the text
-        setText( LLStringExplicit(text) );
-    }
-
-    delete[] text;
-
-    startOfDoc();
-    deselect();
-
-    return success;
-}
-
-bool LLTextEditor::exportBuffer(std::string &buffer )
-{
-    std::ostringstream outstream(buffer);
-
-    outstream << "Linden text version 1\n";
-    outstream << "{\n";
-
-    outstream << llformat("Text length %d\n", getLengthBytes() );
-    outstream << getText();
-    outstream << "}\n";
-
-    return true;
 }
 
 void LLTextEditor::updateAllowingLanguageInput()

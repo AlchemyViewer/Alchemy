@@ -74,9 +74,6 @@ public:
     bool handleKeyHere(KEY key, MASK mask) override;
     bool canClose() override;
 
-    // Saved where it has changes: false where it could not be sent.
-    bool saveItem();
-
     void inventoryChanged(LLViewerObject* object, LLInventoryObject::object_list_t* inventory, S32 serial_num, void* user_data) override;
 
     // A text the window kept, taken up where it belongs -- this window

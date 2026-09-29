@@ -801,19 +801,6 @@ bool ALScriptWorkspace::saveNotecard(const ALScriptRef& ref, const std::string& 
     return uploadNotecard(ref, out.str(), text, !embedded.empty(), std::move(callback), error, sender);
 }
 
-bool ALScriptWorkspace::saveNotecardAsset(const ALScriptRef& ref, const std::string& asset, compile_callback_t callback, std::string& error,
-                                          Sender sender)
-{
-    LLNotecard         notecard(LLNotecard::MAX_SIZE);
-    std::istringstream in(asset);
-    if (!notecard.importStream(in))
-    {
-        error = LLTrans::getString("WorkspaceNotecardUnwritable");
-        return false;
-    }
-    return uploadNotecard(ref, asset, notecard.getText(), !notecard.getItems().empty(), std::move(callback), error, sender);
-}
-
 bool ALScriptWorkspace::uploadNotecard(const ALScriptRef& ref, const std::string& buffer, const std::string& text, bool carries,
                                        compile_callback_t callback, std::string& error, Sender sender)
 {

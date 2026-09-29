@@ -58,8 +58,7 @@ public:
         Optional<std::string>   default_text;
         Optional<LLTextValidate::Validator, LLTextValidate::Validators> prevalidator;
 
-        Optional<bool>          embedded_items,
-                                ignore_tab,
+        Optional<bool>          ignore_tab,
                                 commit_on_focus_lost,
                                 show_context_menu,
                                 show_emoji_helper,
@@ -77,13 +76,6 @@ protected:
     LLTextEditor(const Params&);
     friend class LLUICtrlFactory;
 public:
-    //
-    // Constants
-    //
-    static const llwchar FIRST_EMBEDDED_CHAR = 0x100000;
-    static const llwchar LAST_EMBEDDED_CHAR =  0x10ffff;
-    static const S32 MAX_EMBEDDED_ITEMS = LAST_EMBEDDED_CHAR - FIRST_EMBEDDED_CHAR + 1;
-
     virtual ~LLTextEditor();
 
     typedef boost::signals2::signal<void (LLTextEditor* caller)> keystroke_signal_t;
@@ -168,7 +160,6 @@ public:
     // Text editing
     virtual void    makePristine();
     bool            isPristine() const;
-    bool            allowsEmbeddedItems() const { return mAllowEmbeddedItems; }
 
     // Autoreplace (formerly part of LLLineEditor)
     typedef std::function<void(S32&, S32&, std::string&, S32&, const std::string&)> autoreplace_callback_t;
@@ -203,12 +194,6 @@ public:
     // read-only text box.
     void            setCommitOnFocusLost(bool b)            { mCommitOnFocusLost = b; }
 
-    // Hack to handle Notecards
-    virtual bool    importBuffer(const char* buffer, S32 length );
-    virtual bool    exportBuffer(std::string& buffer );
-
-
-    const LLUUID&   getSourceID() const                     { return mSourceID; }
 
     const LLTextSegmentPtr  getPreviousSegment() const;
     void            getSelectedSegments(segment_vec_t& segments) const;
@@ -256,7 +241,6 @@ protected:
 
     void            getSegmentsInRange(segment_vec_t& segments, S32 start, S32 end, bool include_partial) const;
 
-    virtual llwchar pasteEmbeddedItem(llwchar ext_char) { return ext_char; }
 
 
     // Here's the method that takes and applies text commands.
@@ -296,10 +280,6 @@ protected:
     // Probably deserves serious thought to hiding as many of these
     // as possible behind protected accessor methods.
     //
-
-    // Use these to determine if a click on an embedded item is a drag or not.
-    S32             mMouseDownX;
-    S32             mMouseDownY;
 
     std::string         mPreeditString;
     std::string         mPreeditOverwrittenString;
@@ -344,7 +324,6 @@ private:
     bool            mTabsToNextField;       // if true, tab moves focus to next field, else inserts spaces
     bool            mCommitOnFocusLost;
 
-    bool            mAllowEmbeddedItems;
     bool            mShowContextMenu;
     bool            mShowEmojiHelper;
     bool            mEnableTooltipPaste;
@@ -352,8 +331,6 @@ private:
     bool            mKeepSelectionOnReturn; // disabling of removing selected text after pressing of Enter
     bool            mSelectAllOnFocusReceived;
     bool            mSelectedOnFocusReceived;
-
-    LLUUID          mSourceID;
 
     keystroke_signal_t mKeystrokeSignal;
     LLTextValidate::Validator mPrevalidator;

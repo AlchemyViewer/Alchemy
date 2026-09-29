@@ -28,10 +28,13 @@
 #include "llviewerprecompiledheaders.h"
 #include "llfloaterregioninfo.h"
 
+#include "alnotecarditems.h"
+
 #include <algorithm>
 #include <functional>
 
 #include "lldir.h"
+#include "llnotecard.h"
 #include "lldispatcher.h"
 #include "llglheaders.h"
 #include "llregionflags.h"
@@ -2883,13 +2886,17 @@ void LLPanelEstateCovenant::onLoadComplete(const LLUUID& asset_uuid,
 
             if( (file_length > 19) && !strncmp( &buffer[0], "Linden text version", 19 ) )
             {
-                if( !panelp->mEditor->importBuffer( &buffer[0], file_length+1 ) )
+                LLNotecard         notecard(LLNotecard::MAX_SIZE);
+                std::istringstream in(std::string(&buffer[0], file_length));
+                if (!notecard.importStream(in))
                 {
                     LL_WARNS() << "Problem importing estate covenant." << LL_ENDL;
                     LLNotificationsUtil::add("ProblemImportingEstateCovenant");
                 }
                 else
                 {
+                    // The items a covenant carries are not shown here.
+                    panelp->mEditor->setText(ALNotecardItems::withoutItems(notecard.getText()));
                     panelp->sendChangeCovenantID(asset_uuid);
                 }
             }
