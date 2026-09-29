@@ -365,6 +365,7 @@ target_sources(
         alkeychord.h
         alkeymap.h
         allinetable.h
+        alvimhost.h
         alvimkeymap.h
         alvimmappings.h
         alvimpattern.h

@@ -29,7 +29,7 @@
 #include "altextchars.h"
 
 #include "alanchoredranges.h"
-#include "alcodeeditor.h"
+#include "albracketindex.h"
 #include "alsaid.h"
 #include "altextsearch.h"
 #include "llclipboard.h"
@@ -471,9 +471,9 @@ void ALVimKeymap::mouseChanged(ALTextView& view)
         else if (mMode == Mode::VisualBlock)
         {
             mMode = Mode::Visual;
-            if (ALCodeEditor* editor = ALViewType::as<ALCodeEditor>(&view))
+            if (ALVimHost* host = view.vimHost())
             {
-                editor->clearHighlights(ALCodeEditor::Highlight::Block);
+                host->clearLayer(ALVimHost::Layer::Block);
             }
         }
     }
@@ -486,9 +486,9 @@ void ALVimKeymap::mouseChanged(ALTextView& view)
             mVisualLastAnchor = mVisualAnchor;
             mVisualLastCaret  = mVisualCaret;
             mMode             = Mode::Normal;
-            if (ALCodeEditor* editor = ALViewType::as<ALCodeEditor>(&view))
+            if (ALVimHost* host = view.vimHost())
             {
-                editor->clearHighlights(ALCodeEditor::Highlight::Block);
+                host->clearLayer(ALVimHost::Layer::Block);
             }
         }
         // The character pressed, whichever half of it, rather than the
@@ -941,9 +941,9 @@ void ALVimKeymap::slideHeld(const ALTextDocument::Edit& edit)
 
 ALBracketIndex& ALVimKeymap::bracketsOf(ALTextView& view) const
 {
-    if (ALCodeEditor* editor = ALViewType::as<ALCodeEditor>(&view))
+    if (ALVimHost* host = view.vimHost())
     {
-        return editor->bracketIndex();
+        return host->bracketIndex();
     }
     // Summed up afresh for each question: a plain view's text is asked of
     // seldom, and a text kept from before may not be this one.
@@ -1860,14 +1860,14 @@ bool ALVimKeymap::command(ALTextView& view, llwchar ch)
                     // [[ ]] [m ]m the start of the function before or after
                     // the caret; [] ][ [M ]M its end. The count on.
                     const bool          ends   = ch == 'M' || (ch == '[' && forward) || (ch == ']' && !forward);
-                    const ALCodeEditor* editor = ALViewType::as<ALCodeEditor>(&view);
+                    ALVimHost* host = view.vimHost();
                     // From past the character the caret is on, going on:
                     // at a function's end already is not before it.
                     ALTextPos                  at = forward && ends ? d.nextCluster(cursor(view)) : cursor(view);
                     std::optional<ALTextRange> fn;
-                    for (S32 n = 0; n < countOr(given) && editor; ++n)
+                    for (S32 n = 0; n < countOr(given) && host; ++n)
                     {
-                        const std::optional<ALTextRange> next = editor->functionFrom(at, forward, ends);
+                        const std::optional<ALTextRange> next = host->functionFrom(at, forward, ends);
                         if (!next)
                         {
                             break;
@@ -3470,11 +3470,11 @@ bool ALVimKeymap::textObject(ALTextView& view, llwchar kind, llwchar what, S32 c
             // A function, as the host knows them: af its lines whole, if the
             // lines of its body -- not a { alone under its header, nor what
             // closes it. A count, the ones around it.
-            const ALCodeEditor* editor = ALViewType::as<ALCodeEditor>(&view);
-            std::optional<ALTextRange> fn = editor ? editor->functionAround(ALTextRange(from, from)) : std::nullopt;
+            ALVimHost* host = view.vimHost();
+            std::optional<ALTextRange> fn = host ? host->functionAround(ALTextRange(from, from)) : std::nullopt;
             for (S32 n = 1; n < count && fn; ++n)
             {
-                if (const std::optional<ALTextRange> outer = editor->functionAround(*fn))
+                if (const std::optional<ALTextRange> outer = host->functionAround(*fn))
                 {
                     fn = outer;
                 }
@@ -4415,9 +4415,9 @@ void ALVimKeymap::leaveVisual(ALTextView& view)
     }
     const ALTextPos caret = cursor(view);
     mMode                 = Mode::Normal;
-    if (ALCodeEditor* editor = ALViewType::as<ALCodeEditor>(&view))
+    if (ALVimHost* host = view.vimHost())
     {
-        editor->clearHighlights(ALCodeEditor::Highlight::Block);
+        host->clearLayer(ALVimHost::Layer::Block);
     }
     view.setCaret(caret);
     moveTo(view, caret);
@@ -4472,7 +4472,7 @@ void ALVimKeymap::showVisual(ALTextView& view)
         // The rows between, each lit over the block's columns where the
         // view can; the selection itself the corners.
         const Span span = visualSpan(view);
-        if (ALCodeEditor* editor = ALViewType::as<ALCodeEditor>(&view))
+        if (ALVimHost* host = view.vimHost())
         {
             std::vector<ALTextRange> lit;
             const S32                c0 = span.range.begin.column;
@@ -4482,7 +4482,7 @@ void ALVimKeymap::showVisual(ALTextView& view)
                 const S32 length = d.lineLength(line);
                 lit.emplace_back(ALTextPos(line, llmin(c0, length)), ALTextPos(line, llmin(c1, length)));
             }
-            editor->setHighlights(ALCodeEditor::Highlight::Block, std::move(lit));
+            host->setLayer(ALVimHost::Layer::Block, std::move(lit));
         }
         view.setCaret(caret);
     }
@@ -4499,9 +4499,9 @@ void ALVimKeymap::showVisual(ALTextView& view)
     }
     if (mMode != Mode::VisualBlock)
     {
-        if (ALCodeEditor* editor = ALViewType::as<ALCodeEditor>(&view))
+        if (ALVimHost* host = view.vimHost())
         {
-            editor->clearHighlights(ALCodeEditor::Highlight::Block);
+            host->clearLayer(ALVimHost::Layer::Block);
         }
     }
 }
@@ -4552,9 +4552,9 @@ bool ALVimKeymap::search(ALTextView& view, const std::string& pattern, bool forw
     }
     // Every match lit, as hlsearch has it, until :noh or the caret
     // leaves them.
-    if (ALCodeEditor* editor = ALViewType::as<ALCodeEditor>(&view); editor && !isVisual() && mShared->highlightSearch)
+    if (ALVimHost* host = view.vimHost(); host && !isVisual() && mShared->highlightSearch)
     {
-        lightFound(*editor);
+        lightFound(*host);
     }
     if (!mOperator && from != start)
     {
@@ -5002,7 +5002,7 @@ void ALVimKeymap::askNext(ALTextView& view)
     // the lit ones sliding with the text as the edits go in.
     const ALTextRange asked = mConfirming.edits[mConfirming.at].first;
     view.setSelection(asked);
-    if (ALCodeEditor* editor = ALViewType::as<ALCodeEditor>(&view))
+    if (ALVimHost* host = view.vimHost())
     {
         if (!mConfirming.lit)
         {
@@ -5012,12 +5012,12 @@ void ALVimKeymap::askNext(ALTextView& view)
             {
                 left.push_back(mConfirming.edits[k].first);
             }
-            editor->setHighlights(ALCodeEditor::Highlight::Confirm, std::move(left));
+            host->setLayer(ALVimHost::Layer::Confirm, std::move(left));
             mConfirming.lit = true;
         }
         else
         {
-            editor->clearHighlightsBefore(ALCodeEditor::Highlight::Confirm, asked.normalised().begin);
+            host->clearLayerBefore(ALVimHost::Layer::Confirm, asked.normalised().begin);
         }
     }
     bump();
@@ -5153,9 +5153,9 @@ void ALVimKeymap::endConfirming(ALTextView& view)
     }
     const bool changed = mConfirming.made > 0;
     mConfirming        = Confirming();
-    if (ALCodeEditor* editor = ALViewType::as<ALCodeEditor>(&view))
+    if (ALVimHost* host = view.vimHost())
     {
-        editor->clearHighlights(ALCodeEditor::Highlight::Confirm);
+        host->clearLayer(ALVimHost::Layer::Confirm);
     }
     finishCommand(changed);
     bump();
@@ -6110,9 +6110,9 @@ void ALVimKeymap::runCommand(ALTextView& view, const std::string& line_in)
     }
     if (name == "noh" || name == "nohlsearch")
     {
-        if (ALCodeEditor* editor = ALViewType::as<ALCodeEditor>(&view))
+        if (ALVimHost* host = view.vimHost())
         {
-            editor->clearHighlights(ALCodeEditor::Highlight::Search);
+            host->clearLayer(ALVimHost::Layer::Search);
         }
         return;
     }
@@ -6178,9 +6178,9 @@ void ALVimKeymap::runCommand(ALTextView& view, const std::string& line_in)
         }
         if (search_lit && !mShared->highlightSearch)
         {
-            if (ALCodeEditor* editor = ALViewType::as<ALCodeEditor>(&view))
+            if (ALVimHost* host = view.vimHost())
             {
-                editor->clearHighlights(ALCodeEditor::Highlight::Search);
+                host->clearLayer(ALVimHost::Layer::Search);
             }
         }
         if (!shown_all.empty())
@@ -6694,16 +6694,16 @@ const ALVimKeymap::Found& ALVimKeymap::found(ALTextView& view, const Pattern& pa
     return mFound;
 }
 
-void ALVimKeymap::lightFound(ALCodeEditor& editor)
+void ALVimKeymap::lightFound(ALVimHost& host)
 {
-    // Lit already where the editor holds as many as were lit there: what
+    // Lit already where the host holds as many as were lit there: what
     // puts them out -- :noh, the caret leaving them -- leaves none.
-    if (mFound.lit == &editor && editor.highlights(ALCodeEditor::Highlight::Search).size() == mFound.matches.size())
+    if (mFound.lit == &host && host.layer(ALVimHost::Layer::Search).size() == mFound.matches.size())
     {
         return;
     }
-    editor.setHighlights(ALCodeEditor::Highlight::Search, mFound.matches);
-    mFound.lit = &editor;
+    host.setLayer(ALVimHost::Layer::Search, mFound.matches);
+    mFound.lit = &host;
 }
 
 std::string ALVimKeymap::replacementOf(const std::string& with) const
@@ -7138,8 +7138,8 @@ void ALVimKeymap::suggest(ALTextView& view, S32 given)
 
 bool ALVimKeymap::foldCommand(ALTextView& view, llwchar ch, llwchar prefix)
 {
-    ALCodeEditor* editor = ALViewType::as<ALCodeEditor>(&view);
-    if (!editor)
+    ALVimHost* host = view.vimHost();
+    if (!host)
     {
         return false;
     }
@@ -7154,28 +7154,28 @@ bool ALVimKeymap::foldCommand(ALTextView& view, llwchar ch, llwchar prefix)
             case 'v':
                 // Open: the block at the caret, or around it; zv what
                 // hides the caret, which is the same here.
-                editor->unfoldAt(line);
+                host->unfoldAt(line);
                 return true;
             case 'c':
             case 'C':
-                editor->foldAt(line);
+                host->foldAt(line);
                 return true;
             case 'a':
             case 'A':
-                if (editor->isFolded(line))
+                if (host->isFolded(line))
                 {
-                    editor->unfoldAt(line);
+                    host->unfoldAt(line);
                 }
                 else
                 {
-                    editor->foldAt(line);
+                    host->foldAt(line);
                 }
                 return true;
             case 'R':
-                editor->unfoldAll();
+                host->unfoldAll();
                 return true;
             case 'M':
-                editor->foldAll();
+                host->foldAll();
                 return true;
             case 'j':
             case 'k':
@@ -7183,7 +7183,7 @@ bool ALVimKeymap::foldCommand(ALTextView& view, llwchar ch, llwchar prefix)
                 // zj the start of the next block below; zk the end of the
                 // last one above.
                 S32 to = -1;
-                for (const ALCodeEditor::FoldRegion& region : editor->foldRegions())
+                for (const ALFoldModel::Region& region : host->foldRegions())
                 {
                     if (ch == 'j' && region.start > line && (to < 0 || region.start < to))
                     {
@@ -7206,8 +7206,8 @@ bool ALVimKeymap::foldCommand(ALTextView& view, llwchar ch, llwchar prefix)
     }
     // [z and ]z: the start and the end of the innermost block the caret is
     // in.
-    const ALCodeEditor::FoldRegion* around = nullptr;
-    for (const ALCodeEditor::FoldRegion& region : editor->foldRegions())
+    const ALFoldModel::Region* around = nullptr;
+    for (const ALFoldModel::Region& region : host->foldRegions())
     {
         if (region.start <= line && line <= region.end && (!around || region.start >= around->start))
         {
@@ -7350,8 +7350,8 @@ ALTextPos ALVimKeymap::offsetFrom(const ALTextDocument& d, const ALTextRange& ma
 
 void ALVimKeymap::incrementalSearch(ALTextView& view)
 {
-    ALCodeEditor* editor = ALViewType::as<ALCodeEditor>(&view);
-    if (!mShared->incrementalSearch || !editor)
+    ALVimHost* host = view.vimHost();
+    if (!mShared->incrementalSearch || !host)
     {
         return;
     }
@@ -7370,7 +7370,7 @@ void ALVimKeymap::incrementalSearch(ALTextView& view)
     mIncrementalVersion = view.document().version();
     if (pattern.empty())
     {
-        editor->clearHighlights(ALCodeEditor::Highlight::Search);
+        host->clearLayer(ALVimHost::Layer::Search);
         view.scrollToCaret();
         return;
     }
@@ -7383,7 +7383,7 @@ void ALVimKeymap::incrementalSearch(ALTextView& view)
     const std::vector<ALTextRange>& matches   = found_now.matches;
     if (!found_now.error.empty() || matches.empty())
     {
-        editor->clearHighlights(ALCodeEditor::Highlight::Search);
+        host->clearLayer(ALVimHost::Layer::Search);
         view.scrollToCaret();
         return;
     }
@@ -7393,11 +7393,11 @@ void ALVimKeymap::incrementalSearch(ALTextView& view)
     // Every match lit where hlsearch has them, else the next alone.
     if (mShared->highlightSearch)
     {
-        lightFound(*editor);
+        lightFound(*host);
     }
     else
     {
-        editor->setHighlights(ALCodeEditor::Highlight::Search, { next });
+        host->setLayer(ALVimHost::Layer::Search, { next });
         mFound.lit = nullptr;
     }
     view.scrollToLine(next.begin.line);
@@ -7410,9 +7410,9 @@ void ALVimKeymap::endIncremental(ALTextView& view)
         return;
     }
     mIncrementalShown = false;
-    if (ALCodeEditor* editor = ALViewType::as<ALCodeEditor>(&view))
+    if (ALVimHost* host = view.vimHost())
     {
-        editor->clearHighlights(ALCodeEditor::Highlight::Search);
+        host->clearLayer(ALVimHost::Layer::Search);
     }
     view.scrollToCaret();
 }

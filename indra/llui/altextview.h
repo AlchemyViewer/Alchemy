@@ -52,6 +52,7 @@
 #include <vector>
 
 class ALFindBar;
+class ALVimHost;
 class LLContextMenu;
 
 // A view of a document: the lines laid out and drawn, only the ones in
@@ -349,6 +350,9 @@ public:
     // one first again.
     void           setModalKeymap(std::unique_ptr<ALModalKeymap> keymap);
     ALModalKeymap* modalKeymap() const { return mModal.get(); }
+    // What vim asks beyond the view -- lit layers, folds, functions,
+    // brackets kept with the text -- where this view has them (ALVimHost).
+    virtual ALVimHost* vimHost() { return nullptr; }
     // Whether a character typed now goes into the text: always, but for a
     // modal keymap outside its inserting modes, where it is a command.
     bool           typingText() const { return !mModal || mModal->inserting(); }

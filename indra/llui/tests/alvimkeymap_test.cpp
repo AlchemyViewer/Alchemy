@@ -2735,4 +2735,44 @@ namespace tut
         ensure_equals("not gg, nor gc: j alone moved", e.caret().line, 2);
         ensure_equals("nothing commented", flat(e.text()), std::string("\x01\xee\x80\x81j|one|two|"));
     }
+
+    template<> template<>
+    void alvimkeymap_object::test<92>()
+    {
+        set_test_name("vim over a plain text view, which is no host: searches, brackets and motions work; folds and functions are nothing");
+        if (!ui.ok())
+        {
+            skip("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        ALTextView::Params p(LLUICtrlFactory::getDefaultParams<ALTextView>());
+        p.name         = "plain";
+        p.rect         = LLRect(0, 200, 400, 0);
+        p.default_text = "";
+        ALTextView* view = LLUICtrlFactory::create<ALTextView>(p);
+        view->setText("f(a) {\n  x\n}\nx again\n");
+        auto keymap    = std::make_unique<ALVimKeymap>();
+        ALVimKeymap* v = keymap.get();
+        view->setModalKeymap(std::move(keymap));
+        ensure("no host", view->vimHost() == nullptr);
+        // As the viewer types: the key first, then the character.
+        const auto type = [&](const char* text) {
+            for (const char* c = text; *c; ++c)
+            {
+                if (!view->handleKeyHere(static_cast<KEY>(toupper(static_cast<unsigned char>(*c))), MASK_NONE))
+                {
+                    view->handleUnicodeCharHere(static_cast<llwchar>(static_cast<unsigned char>(*c)));
+                }
+            }
+        };
+        v->takeLine(*view, '/', "x", true);
+        ensure("searched", view->caret() == ALTextPos(1, 2));
+        type("n");
+        ensure("n", view->caret() == ALTextPos(3, 0));
+        view->setCaret(ALTextPos(0, 5));
+        type("%");
+        ensure("% by brackets summed afresh", view->caret() == ALTextPos(2, 0));
+        type("zc");
+        ensure("zc folds nothing, and the text is as it was", view->text() == "f(a) {\n  x\n}\nx again\n");
+        view->die();
+    }
 }

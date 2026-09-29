@@ -33,6 +33,7 @@
 #include "allinetable.h"
 #include "alsnippetsession.h"
 #include "altextview.h"
+#include "alvimhost.h"
 #include "llstl.h"
 
 #include <boost/unordered/unordered_flat_map.hpp>
@@ -58,7 +59,7 @@ class ALChoiceList;
 // none of the analyzers hands over regions of its own.
 // Completions come from whoever is set as the provider, and until someone
 // is, from the grammar's vocabulary and the words in the document.
-class ALCodeEditor : public ALTextView
+class ALCodeEditor : public ALTextView, public ALVimHost
 {
 public:
     AL_VIEW_TYPE(ALCodeEditor, ALTextView);
@@ -259,6 +260,23 @@ public:
     // Those of a layer that begin before a place let go, the rest left lit
     // as they are: what an asking :s has been through.
     void                            clearHighlightsBefore(Highlight layer, const ALTextPos& pos);
+    // Vim's layers are three of these (ALVimHost), and it asks for them
+    // through the host alone.
+    ALVimHost*                      vimHost() override { return this; }
+    void                            setLayer(Layer layer, std::vector<ALTextRange> ranges) override { setHighlights(highlightOf(layer), std::move(ranges)); }
+    void                            clearLayer(Layer layer) override { clearHighlights(highlightOf(layer)); }
+    void                            clearLayerBefore(Layer layer, const ALTextPos& pos) override { clearHighlightsBefore(highlightOf(layer), pos); }
+    const std::vector<ALTextRange>& layer(Layer layer) const override { return highlights(highlightOf(layer)); }
+    static Highlight                highlightOf(Layer layer)
+    {
+        switch (layer)
+        {
+            case Layer::Search:  return Highlight::Search;
+            case Layer::Block:   return Highlight::Block;
+            case Layer::Confirm: return Highlight::Confirm;
+        }
+        return Highlight::Search;
+    }
     const std::vector<ALTextRange>& highlights(Highlight layer) const { return mHighlights[static_cast<size_t>(layer)].items(); }
     // Every layer's, in the layers' order.
     std::vector<ALTextRange>        highlights() const;
@@ -282,7 +300,7 @@ public:
     // drawn agree. All of it is the bracket index's (ALBracketIndex),
     // which vim asks of directly for the brackets around a place.
     bool            matchBracketAt(const ALTextPos& at, ALTextPos& match, S32 lines = ALBracketIndex::NEARBY);
-    ALBracketIndex& bracketIndex() { return mBracketIndex; }
+    ALBracketIndex& bracketIndex() override { return mBracketIndex; }
 
     void setShowLineNumbers(bool show);
     bool getShowLineNumbers() const { return mShowLineNumbers; }
@@ -378,15 +396,15 @@ public:
     typedef ALFoldModel::Region FoldRegion;
     // Every block in the text, by start line, found again when the text
     // has changed.
-    const std::vector<FoldRegion>& foldRegions();
+    const std::vector<FoldRegion>& foldRegions() override;
     // The block that starts at the line, else the innermost one around
     // it. False where there is none, or it is already that way.
-    bool foldAt(S32 line);
-    bool unfoldAt(S32 line);
-    void foldAll();
-    void unfoldAll();
+    bool foldAt(S32 line) override;
+    bool unfoldAt(S32 line) override;
+    void foldAll() override;
+    void unfoldAll() override;
     // Whether a folded block starts at the line.
-    bool isFolded(S32 line) const;
+    bool isFolded(S32 line) const override;
 
     // How many brackets are open at a line's start, found from the top
     // once and kept until an edit above it; and at a place of a line. A
@@ -550,9 +568,9 @@ public:
     std::vector<ALTextRange> functions() const;
     // The start of the next function after a place, or of the last one
     // before it; or with `ends`, the end.
-    std::optional<ALTextRange> functionFrom(const ALTextPos& at, bool forward, bool ends) const;
+    std::optional<ALTextRange> functionFrom(const ALTextPos& at, bool forward, bool ends) const override;
     // The innermost function holding a stretch and more besides.
-    std::optional<ALTextRange> functionAround(const ALTextRange& range) const;
+    std::optional<ALTextRange> functionAround(const ALTextRange& range) const override;
     typedef std::function<void(const LLSD& value)> fix_handler_t;
     void setFixHandler(fix_handler_t handler) { mFixHandler = std::move(handler); }
     // What the problems on a line offer: any fix at all -- a suppression

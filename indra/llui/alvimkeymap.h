@@ -26,6 +26,7 @@
 
 #include "albracketindex.h"
 #include "altextview.h"
+#include "alvimhost.h"
 #include "alvimmappings.h"
 #include "alvimpattern.h"
 #include "alvimregisters.h"
@@ -39,8 +40,6 @@
 #include <string>
 #include <string_view>
 #include <vector>
-
-class ALCodeEditor;
 
 // Vim over the text view, as a keymap with state: normal, insert, replace,
 // visual, visual-line and visual-block modes; counts; the operators d c y
@@ -392,7 +391,7 @@ private:
     // pattern or how it is matched changes: n, N, gn and every key on the
     // search line ask it again of the same text. Found afresh each time
     // where the pattern places its matches by the caret or the last visual
-    // area. `lit`: the editor its matches were last lit in, by
+    // area. `lit`: the host its matches were last lit in, by
     // lightFound().
     struct Found
     {
@@ -403,12 +402,12 @@ private:
         std::vector<ALTextRange> matches;
         std::vector<ALTextPos>   wholes;
         std::string              error;
-        const ALCodeEditor*      lit = nullptr;
+        const ALVimHost*         lit = nullptr;
     };
     const Found& found(ALTextView& view, const Pattern& pattern, const ALTextSearchOptions& options);
     // Every match found lit, as hlsearch has it: not again where they are
     // lit already.
-    void lightFound(ALCodeEditor& editor);
+    void lightFound(ALVimHost& host);
     // The :s asking about each match: the edits left to make, in order,
     // and the one being asked about; the text put in, for the question.
     struct Confirming
