@@ -2989,6 +2989,10 @@ even though the user gets a free copy.
          name="Contents"
          top_delta="0"
          width="300">
+            <panel.string name="studio_label">Open in Script Studio</panel.string>
+            <panel.string name="studio_tooltip">Open this object in Script Studio's Explorer</panel.string>
+            <panel.string name="ide_label">Explore in IDE</panel.string>
+            <panel.string name="ide_tooltip">Publish this object to the external editor over WebSocket sync</panel.string>
             <flyout_button
              follows="left|top"
              height="23"
@@ -3029,12 +3033,12 @@ even though the user gets a free copy.
              follows="left|top"
              height="23"
              is_toggle="true"
-             label="Explore in IDE"
+             label="Open in Script Studio"
              label_selected="Stop Exploring"
              layout="topleft"
              left_pad="8"
              name="button publish"
-             tool_tip="Open this object in Script Studio's explorer, or publish it to an external editor when WebSocket sync is on"
+             tool_tip="Open this object in Script Studio's Explorer"
              width="140" />
             <filter_editor
              follows="left|top|right"

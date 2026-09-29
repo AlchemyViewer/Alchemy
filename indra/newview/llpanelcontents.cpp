@@ -227,9 +227,12 @@ void LLPanelContents::getState(LLViewerObject *objectp )
     getChildView("button new notecard")->setEnabled(has_create_cap && new_button_enabled);
 
     // Explore in IDE: to an external editor over the bridge when that is
-    // on, else to Script Studio when it takes scripts; either way a
-    // single editable root object.
-    mPublishButton->setEnabled((LLScriptEditorWSServer::isEnabled() || ALFloaterScriptStudio::wantsScripts()) && new_button_enabled);
+    // on, else to Script Studio when it takes scripts, and named for
+    // which; either way a single editable root object.
+    const bool ide = LLScriptEditorWSServer::isEnabled();
+    mPublishButton->setLabel(getString(ide ? "ide_label" : "studio_label"));
+    mPublishButton->setToolTip(getString(ide ? "ide_tooltip" : "studio_tooltip"));
+    mPublishButton->setEnabled((ide || ALFloaterScriptStudio::wantsScripts()) && new_button_enabled);
 
     // Sync toggle state to reflect whether the object is currently published.
     if (LLScriptEditorWSServer::isEnabled())

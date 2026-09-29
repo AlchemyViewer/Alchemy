@@ -1579,6 +1579,17 @@ function="World.EnvPreset"
            name="Scripts"
            tear_off="true">
           <menu_item_check
+             label="Script Studio..."
+             name="Script Studio Build">
+            <menu_item_check.on_check
+             function="Floater.IsOpen"
+             parameter="script_studio" />
+            <menu_item_check.on_click
+             function="Floater.ToggleOrBringToFront"
+             parameter="script_studio" />
+          </menu_item_check>
+          <menu_item_separator/>
+          <menu_item_check
              label="Script warnings/errors..."
              name="Script debug">
             <menu_item_check.on_check

@@ -194,6 +194,7 @@ with the same filename but different name
   <texture name="Command_RegionTracker_Icon" file_name="toolbar_icons/regiontracker.png"       preload="true" />
   <texture name="Command_Report_Abuse_Icon" file_name="toolbar_icons/report_abuse.png" preload="true" />
   <texture name="Command_Scripts_Icon"      file_name="toolbar_icons/script.png"       preload="true" />
+  <texture name="Command_ScriptStudio_Icon" file_name="toolbar_icons/script_studio.png" preload="true" />
   <texture name="Command_Stats_Icon"        file_name="toolbar_icons/stats.png"        preload="true" />
   <texture name="Command_Search_Icon"       file_name="toolbar_icons/search.png"       preload="true" />
   <texture name="Command_Snapshot_Icon"     file_name="toolbar_icons/snapshot.png"     preload="true" />
