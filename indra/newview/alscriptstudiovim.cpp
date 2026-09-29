@@ -449,6 +449,9 @@ bool ALScriptStudioVim::command(ALTextView& view, const std::string& name, const
         const S32                  lines = text.lineCount();
         LLStringUtil::format_map_t words;
         words["[NAME]"]    = doc->name;
+        // In quotes, as vim says it; put here, since a string of the skin's
+        // that begins with a quotation mark is read as quoted.
+        words["[QUOTED]"]  = "\"" + doc->name + "\"";
         const char* state  = !doc->modifiable ? "VimStateReadOnly" : doc->unsaved() ? "VimStateModified" : nullptr;
         words["[STATE]"]   = state ? mServices.words(state) + " " : std::string();
         words["[LINES]"]   = std::to_string(lines);
@@ -1127,8 +1130,9 @@ bool ALScriptStudioVim::fileCommand(ALTextView& view, Doc& doc, const std::strin
             fail(view, mServices.words("VimCannotWrite", words));
             return true;
         }
-        words["[LINES]"] = std::to_string(view.document().lineCount());
-        words["[BYTES]"] = std::to_string(text.size());
+        words["[LINES]"]  = std::to_string(view.document().lineCount());
+        words["[BYTES]"]  = std::to_string(text.size());
+        words["[QUOTED]"] = "\"" + path + "\"";
         say(view, mServices.words("VimWritten", words));
         return true;
     }

@@ -438,6 +438,20 @@ std::string ALFloaterScriptStudio::vimrc(std::string& whence)
     return vimrc.text();
 }
 
+std::string ALFloaterScriptStudio::vimrcNewFile() const
+{
+    // Vim comments: the skin's words a line each, each begun by vim's mark
+    // for one -- which the words themselves cannot be, since a string of
+    // the skin's that begins with a quotation mark is read as quoted --
+    // and a blank line to start from.
+    std::string made;
+    for (const std::string& line : LLStringUtil::getTokens(getString("VimrcNewFile"), "\n"))
+    {
+        made += "\" " + line + "\n";
+    }
+    return made + "\n";
+}
+
 void ALFloaterScriptStudio::editVimrc()
 {
     ALScriptStudioVimrc& vimrc = ALScriptStudioVimrc::instance();
@@ -447,7 +461,7 @@ void ALFloaterScriptStudio::editVimrc()
         return;
     }
     const std::string path = ALScriptStudioVimrc::filePath();
-    if (!LLFile::isfile(path) && !ALFileWrite::whole(path, getString("VimrcNewFile")))
+    if (!LLFile::isfile(path) && !ALFileWrite::whole(path, vimrcNewFile()))
     {
         LLStringUtil::format_map_t args;
         args["[FILE]"] = path;

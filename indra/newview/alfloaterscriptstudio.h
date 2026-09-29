@@ -613,6 +613,8 @@ private:
     // every editor's options set again once it is read.
     std::string vimrc(std::string& whence) override;
     void        editVimrc() override;
+    // A new vimrc's text: the skin's words as vim comments.
+    std::string vimrcNewFile() const;
     void        refreshEditors() override { applyEditorOptions(); }
     // A line, or line:column, typed into the same popover, the editor
     // showing the line as it is typed and going back on escape.

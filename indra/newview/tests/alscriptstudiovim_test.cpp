@@ -667,7 +667,7 @@ namespace tut
 
         ex(a, "w", "out.lsl");
         ensure_equals("written", contents(in("out.lsl")), a.editor->text());
-        const std::string written = "VimWritten [BYTES]=" + std::to_string(a.editor->text().size()) + " [FILE]=" + in("out.lsl") + " [LINES]=4";
+        const std::string written = "VimWritten [BYTES]=" + std::to_string(a.editor->text().size()) + " [FILE]=" + in("out.lsl") + " [LINES]=4 [QUOTED]=\"" + in("out.lsl") + "\"";
         ensure_equals("and said", said->message(), written);
         ensure("not as an error", !said->messageIsError());
         ensure("the tab left as it was", ran.empty());
@@ -783,11 +783,11 @@ namespace tut
 
         a.editor->setCaret(ALTextPos(1, 0));
         ex(a, "file");
-        ensure_equals(":file", said->message(), std::string("VimFileInfo [LINES]=4 [NAME]=a [PERCENT]=50 [STATE]="));
+        ensure_equals(":file", said->message(), std::string("VimFileInfo [LINES]=4 [NAME]=a [PERCENT]=50 [QUOTED]=\"a\" [STATE]="));
         ensure("not as an error", !said->messageIsError());
         a.editor->insertText("!");
         ex(a, "f");
-        ensure_equals("unsaved", said->message(), std::string("VimFileInfo [LINES]=4 [NAME]=a [PERCENT]=50 [STATE]=VimStateModified "));
+        ensure_equals("unsaved", said->message(), std::string("VimFileInfo [LINES]=4 [NAME]=a [PERCENT]=50 [QUOTED]=\"a\" [STATE]=VimStateModified "));
 
         said->hooks().listing(*a.editor, "mark line  col file/text");
         ensure("a listing to Output",

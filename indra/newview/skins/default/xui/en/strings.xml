@@ -523,7 +523,7 @@ If you feel this is an error, please contact support@secondlife.com</string>
 	<string name="PreprocModuleInWorld">could not find module '[1]': one so named is in the object or the inventory, but modules from there are off. Modules come from folders on disk: turn on Build &gt; Include from Disk, and add the folder with Build &gt; Add Include Folder...</string>
 	<string name="PreprocIncludeNotFetched">include file '[1]' could not be fetched, and the script is not sent without it</string>
 	<string name="CompileQueueSkippedSaving">Skipped "[SCRIPT_NAME]": a save of it is on its way, which a recompile would land over.</string>
-	<string name="CompileQueueUnsavedInStudio">"[SCRIPT_NAME]" has changes not saved in Script Studio; what compiles is the server's text, without them.</string>
+	<string name="CompileQueueUnsavedInStudio">Script Studio has unsaved changes to "[SCRIPT_NAME]"; the recompile uses the version saved on the server, without them.</string>
 	<string name="BridgeSentCompiledAsIs">The compiled half was changed and its source was not, so it went up as it is rather than as its source expands.</string>
 	<string name="PreprocIncludeSentWithout">include file '[1]' could not be fetched, and the script went up without it</string>
 	<string name="PreprocObjectUnanswered">the object this script is in did not say what it holds -- it did not answer in time, or is out of view -- so no include was looked for in it; save again once it answers</string>

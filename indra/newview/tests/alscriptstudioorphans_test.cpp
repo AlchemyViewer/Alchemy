@@ -478,4 +478,19 @@ namespace tut
         unit.noticeAction("close");
         ensure("more than that: said next", a.offer && Orphans::noticeFor(&a, words).text == "Saving a failed.");
     }
+
+    template<> template<>
+    void alscriptstudioorphans_object::test<11>()
+    {
+        set_test_name("no string of the skin's begins with a quotation mark, which the skin reads as quoting it: vim's quotes are put in by the code");
+        make();
+        ensure_equals("a name in quotes", said("RenameBadName", "[NAME]", "9lives"), std::string("Not a valid name: \"9lives\"."));
+        LLStringUtil::format_map_t written;
+        written["[QUOTED]"] = "\"a.lsl\"";
+        written["[LINES]"]  = "4";
+        written["[BYTES]"]  = "20";
+        ensure_equals("vim's written", services().words("VimWritten", written), std::string("\"a.lsl\" 4L, 20B written"));
+        const std::string vimrc = services().words("VimrcNewFile");
+        ensure("the vimrc's words whole", vimrc.rfind("Script Studio's vimrc.", 0) == 0 && std::count(vimrc.begin(), vimrc.end(), '\n') == 3);
+    }
 }
