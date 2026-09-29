@@ -450,6 +450,11 @@ struct ALScriptStudioDoc
     // Whether the script runs in its object, as the region last
     // said: -1 until it has.
     S32                                        running = -1;
+    // What the Running box last asked of the region, until the region
+    // says it is so or has been asked enough times; and how many times
+    // more it is asked.
+    std::optional<bool>                        runningAsked;
+    S32                                        runningAsks = 0;
     // A compile target picked here since the last save, which the
     // region's word on what the script compiles for does not put back.
     bool                                       targetChosen = false;

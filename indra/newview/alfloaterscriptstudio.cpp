@@ -7162,6 +7162,14 @@ bool ALFloaterScriptStudio::unsavedIn(const ALScriptRef& ref)
     return index != NONE && holder->mDocs[index]->editor->isDirty() && holder->mDocs[index]->modifiable;
 }
 
+namespace
+{
+    // How often the Running box asks the region whether what it asked has
+    // taken, and how many times before it says it has not.
+    constexpr F32 RUNNING_ASK_EVERY = 0.5f;
+    constexpr S32 RUNNING_ASKS      = 10;
+}
+
 void ALFloaterScriptStudio::runningState(const ALScriptWorkspace::RunningState& state)
 {
     const size_t index = indexOf(state.ref);
@@ -7169,14 +7177,43 @@ void ALFloaterScriptStudio::runningState(const ALScriptWorkspace::RunningState& 
     {
         return;
     }
-    Doc& doc    = *mDocs[index];
-    doc.running = state.running ? 1 : 0;
+    Doc& doc = *mDocs[index];
     // What it compiles for, as the region knows it, but for one picked
     // here and not saved yet, which is what the next save sends.
     if (!state.compileTarget.empty() && !doc.targetChosen)
     {
         doc.language.compileTarget = state.compileTarget;
     }
+    // The Running box's ask answered: said once the region says it is so,
+    // the box left saying what was asked while the region is not there
+    // yet and asked again in a moment, and said as not so once it has
+    // been asked enough.
+    if (doc.runningAsked)
+    {
+        const bool asked = *doc.runningAsked;
+        if (state.running != asked && --doc.runningAsks > 0)
+        {
+            const LLHandle<LLFloater> handle = getHandle();
+            const std::string         id     = doc.id;
+            doAfterInterval(
+                [handle, id]() {
+                    ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get());
+                    const Doc*             asking = studio ? studio->findDoc(id) : nullptr;
+                    if (asking && asking->runningAsked)
+                    {
+                        ALScriptWorkspace::instance().askRunning(asking->ref);
+                    }
+                },
+                RUNNING_ASK_EVERY);
+            return;
+        }
+        doc.runningAsked.reset();
+        LLStringUtil::format_map_t args;
+        args["[NAME]"] = doc.name;
+        const char* said = state.running == asked ? (asked ? "RunningStarted" : "RunningStopped") : (asked ? "RunningNotStarted" : "RunningNotStopped");
+        report(getString(said, args), state.running != asked, &doc);
+    }
+    doc.running = state.running ? 1 : 0;
     if (&doc == active())
     {
         refreshToolbar();
@@ -8377,13 +8414,22 @@ void ALFloaterScriptStudio::onRunning()
 {
     if (Doc* doc = active(); doc && !doc->ref.inInventory())
     {
-        if (std::string error; !ALScriptWorkspace::instance().setRunning(doc->ref, mRunning->get(), error))
+        const bool wanted = mRunning->get();
+        if (std::string error; !ALScriptWorkspace::instance().setRunning(doc->ref, wanted, error))
         {
-            mRunning->set(!mRunning->get());
+            mRunning->set(!wanted);
             report(error, true, doc);
+            return;
         }
-        // The script's own, which its next save keeps.
-        doc->running = mRunning->get() ? 1 : 0;
+        // The script's own, which its next save keeps; said once the
+        // region says it is so.
+        doc->running      = wanted ? 1 : 0;
+        doc->runningAsked = wanted;
+        doc->runningAsks  = RUNNING_ASKS;
+        ALScriptWorkspace::instance().askRunning(doc->ref);
+        LLStringUtil::format_map_t args;
+        args["[NAME]"] = doc->name;
+        setStatus(getString(wanted ? "RunningStarting" : "RunningStopping", args));
     }
 }
 
@@ -8394,7 +8440,11 @@ void ALFloaterScriptStudio::onReset()
         if (std::string error; !ALScriptWorkspace::instance().reset(doc->ref, error))
         {
             report(error, true, doc);
+            return;
         }
+        LLStringUtil::format_map_t args;
+        args["[NAME]"] = doc->name;
+        report(getString("ResetSent", args), false, doc);
     }
 }
 

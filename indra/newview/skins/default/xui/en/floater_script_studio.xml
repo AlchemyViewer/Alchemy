@@ -84,6 +84,13 @@
     <floater.string name="RunningTip">Whether the script runs in its object; a save keeps whatever this says</floater.string>
     <floater.string name="RunningAsking">Asking the region whether the script runs. A save meanwhile asks first, and keeps whatever it says</floater.string>
     <floater.string name="RunningPublic">Public objects cannot run scripts: this one is released to the public, with no owner</floater.string>
+    <floater.string name="RunningStarting">Starting [NAME]...</floater.string>
+    <floater.string name="RunningStopping">Stopping [NAME]...</floater.string>
+    <floater.string name="RunningStarted">[NAME] is running.</floater.string>
+    <floater.string name="RunningStopped">[NAME] is stopped.</floater.string>
+    <floater.string name="RunningNotStarted">[NAME] did not start: its region still says it is stopped.</floater.string>
+    <floater.string name="RunningNotStopped">[NAME] did not stop: its region still says it runs.</floater.string>
+    <floater.string name="ResetSent">[NAME] reset: its state forgotten, and state_entry run again.</floater.string>
     <floater.string name="SearchIncludesTip">What an #include or a require brings in, searched too: each file once, as its own, as it is on disk or was last fetched. Replace All leaves those alone, since they are every script's that includes them.</floater.string>
     <floater.string name="SearchIncluded">Included</floater.string>
     <floater.string name="SearchCountTip">How many places were found, in how many scripts</floater.string>
