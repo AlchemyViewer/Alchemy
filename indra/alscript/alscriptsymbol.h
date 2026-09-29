@@ -24,6 +24,7 @@
 
 #pragma once
 
+#include "alscriptspan.h"
 #include "stdtypes.h"
 
 #include <string>
@@ -103,24 +104,6 @@ struct ALScriptSignature
     };
     std::vector<Overload> overloads;
     S32                   overload = 0;
-};
-
-// A stretch of the script, the end exclusive.
-struct ALScriptSpan
-{
-    S32 line      = 0;
-    S32 column    = 0;
-    S32 endLine   = 0;
-    S32 endColumn = 0;
-
-    friend bool operator==(const ALScriptSpan& a, const ALScriptSpan& b)
-    {
-        return a.line == b.line && a.column == b.column && a.endLine == b.endLine && a.endColumn == b.endColumn;
-    }
-    friend bool operator<(const ALScriptSpan& a, const ALScriptSpan& b)
-    {
-        return a.line != b.line ? a.line < b.line : a.column < b.column;
-    }
 };
 
 // The name at a position: where the script declares it, if it does, and

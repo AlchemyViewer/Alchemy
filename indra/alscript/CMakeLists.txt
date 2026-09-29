@@ -78,6 +78,7 @@ target_sources(
         alscriptmessages.h
         alscriptnameindex.h
         alscriptsnapshot.h
+        alscriptspan.h
         alnotecardformat.h
         alscriptproblem.h
         alscriptstack.h
