@@ -26,6 +26,10 @@
 
 #include "../alscriptstudiosaving.h"
 
+#include "../alscriptstudiochecking.h"
+#include "../alscriptstudioorphans.h"
+#include "../alscriptstudioweighing.h"
+
 #include "alscriptstudio_fixture.h"
 
 #include "../test/lltut.h"

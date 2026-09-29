@@ -32,6 +32,24 @@
 
 class ALScriptStudioServices;
 
+// The script held open in an external editor (ALScriptExternalEditor).
+// Whether the save under way came from the editor, which does not
+// write the file back, is the save's (ALScriptSaveFlow::external).
+struct ALScriptStudioDoc::External
+{
+    // The log beside the copy the editor was given, which the
+    // compiler's words go to, held while the tab has it.
+    std::shared_ptr<ALScriptTempFiles::Claim> log;
+    // Whether the bridge was told, so that VS Code can subscribe.
+    bool                           subscribed = false;
+    // What the copy held when the studio last wrote it or read it: a
+    // save there over changes made here since is asked about rather
+    // than taken, the text it brought held in `waiting` until the
+    // author says which.
+    std::string                    written;
+    std::optional<std::string>     waiting;
+};
+
 // A Script Studio window's tabs held open in an editor outside the viewer
 // -- Edit Externally -- as the tab's part `doc.external` keeps them: a
 // script's copy written to the temp folder for the editor, watched for its

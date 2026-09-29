@@ -28,8 +28,10 @@
 
 #include "alcodeeditor.h"
 #include "alscriptenvelope.h"
+#include "alscriptstudiocaret.h"
 #include "alscriptstudioplaces.h"
 #include "alscriptstudioservices.h"
+#include "alscriptstudioweighing.h"
 #include "llfloater.h"
 #include "llmenugl.h"
 #include "lluictrlfactory.h"

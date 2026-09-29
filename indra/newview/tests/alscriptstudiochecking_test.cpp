@@ -31,6 +31,7 @@
 #include "../alscriptstudiochecking.h"
 
 #include "../alnotecardembedded.h"
+#include "../alscriptstudioweighing.h"
 #include "alnotecarditems.h"
 
 #include "../alscriptstudiowords.h"

@@ -26,6 +26,8 @@
 
 #include "../alscriptstudiocaret.h"
 
+#include "../alscriptstudiochecking.h"
+
 #include "alcodeeditor.h"
 #include "alscriptstudio_fixture.h"
 #include "llfocusmgr.h"

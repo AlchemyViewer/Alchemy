@@ -28,6 +28,7 @@
 
 #include "alscriptenvelope.h"
 #include "alscriptfixes.h"
+#include "alscriptstudiochecking.h"
 #include "alscriptstudioservices.h"
 #include "alscriptweightspane.h"
 #include "lldate.h"

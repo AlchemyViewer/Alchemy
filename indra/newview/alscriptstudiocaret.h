@@ -34,6 +34,32 @@
 
 class ALScriptStudioServices;
 
+// The tab's part of what is said of its caret: the outline's folds,
+// the name asked about, the path the bar shows, and the inspector's
+// question about where the caret is.
+struct ALScriptStudioDoc::Caret
+{
+    // The outline's symbols folded shut, each by the names from the
+    // outermost down to it.
+    boost::unordered_flat_set<std::string, ll::string_hash, std::equal_to<>> outlineFolded;
+    // The name last asked about -- its definition, its references, a
+    // new name -- where, and of which text.
+    ALEditorCommand symbolCommand = ALEditorCommand::None;
+    U32             symbolVersion = 0;
+    ALTextPos       symbolAt;
+    // The symbols the caret is in, the outermost first, by the outline
+    // it was read from (ALScriptStudioCaret::placePath): what the bar
+    // at the bottom and the outline both show.
+    std::vector<size_t> crumbPath;
+    U32                 crumbsOf = 0;
+    // Where the caret was last seen; when the inspector is due to be
+    // told what it is on, or zero; and what it was last told about.
+    ALTextPos seen{ -1, -1 };
+    F64       inspectDue = 0.0;
+    ALTextPos inspectAt{ -1, -1 };
+    U32       inspectVersion = 0;
+};
+
 // A Script Studio window's name at the caret, as the tab's part
 // `doc.caret` keeps it: Go to Definition, Find References and Rename asked
 // of the analyzers about the name under the caret, and their answer read

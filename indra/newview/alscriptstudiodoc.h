@@ -298,24 +298,7 @@ struct ALScriptStudioDoc
         Unloaded
     };
     // What it is, and the rest of what ALScriptStudioOrphans keeps of it.
-    struct Orphaned
-    {
-        Orphan kind            = Orphan::None;
-        bool   noticeDismissed = false;
-        // A kept text with nothing loaded under it -- its item out of
-        // reach as it was opened -- whose script is known only as the
-        // entry said: loaded under it once the item is in reach, before
-        // it is saved. How many loads have failed on the way since the
-        // last that went through, and when the next may be tried: further
-        // apart each time, and a few times only unless a person asks.
-        bool   detached      = false;
-        S32    reattachTries = 0;
-        F64    nextReattach  = 0.0;
-        // Since when its object has been out of sight, or zero: an object
-        // at the edge of what is in view comes and goes, and is taken for
-        // gone only once it has been gone a moment.
-        F64    awaySince = 0.0;
-    };
+    struct Orphaned;
     Part<Orphaned>                             orphan;
     // What its object and region were called, while they were in sight:
     // what a kept text says it came from once they are not.
@@ -493,109 +476,10 @@ struct ALScriptStudioDoc
     bool                                       experienceChosen = false;
     bool                                       experienceAsking = false;
     // What the script weighs (ALScriptStudioWeighing).
-    struct Weighing
-    {
-        // For its target, as the last weighing said of the text at
-        // `version`; whether what was weighed is what a save compiles --
-        // not where the optimizer changes it after -- and whether it is
-        // what a preprocessor's run made to be sent, which a check's
-        // weighing of the same text, before the optimizer, does not
-        // replace; and a weighing on its way.
-        std::optional<ALScriptWeight> weight;
-        U32                           version = 0;
-        bool                          exact   = false;
-        bool                          sent    = false;
-        bool                          asking  = false;
-        // The version its weights were last asked for, by a weigh or with
-        // a check: a tab come to the front is weighed once for its text.
-        U32                           askedFor = 0;
-        // What the Weights tab lists: each target the last check's text
-        // was weighed for, its own first, in the source's places, of the
-        // text at `allVersion`; and each target's as the text was last
-        // saved, where it was weighed while it was that text -- what
-        // "since the save" counts from.
-        std::vector<ALScriptWeight> all;
-        U32                         allVersion = 0;
-        std::vector<ALScriptWeight> saved;
-        // What a save would send, in bytes, as the last check measured
-        // it, and the text and the expansion it was measured of: what the
-        // trailer says once it is past half of what a script may be.
-        size_t                             assetBytes = 0;
-        std::optional<std::pair<U32, U32>> assetMeasured;
-    };
+    struct Weighing;
     Part<Weighing>                             weighing;
-    // The tab's part of checking (ALScriptStudioChecking): what the
-    // analyzers said and when they are next asked, the expansion asked for
-    // them and the questions waiting on it, the refactors offered at the
-    // caret, and a Fix All waiting on a check.
-    struct Check
-    {
-        // What the analyzer said of the text at analysisVersion; when the
-        // next check is due, or zero; the version last asked about.
-        ALScriptProblems analysis;
-        // LSL's, as the analyzer said them, before the lints as chosen:
-        // what a change of the lints filters again.
-        ALScriptProblems unfiltered;
-        U32              analysisVersion  = 0;
-        U32              requestedVersion = 0;
-        F64              analysisDue      = 0.0;
-        // When the version last asked about was asked.
-        F64              askedAt          = 0.0;
-        std::string      definitionsError;
-        // How many expansions were taken, which is how an answer about one
-        // names it; the version one has been asked for, or none -- not a
-        // zero, which an empty text's version is: the preprocessor answers
-        // on the main thread a moment later, and one text is expanded once
-        // however many questions wait on it.
-        U32                expansions = 0;
-        std::optional<U32> expanding;
-        // The version the questions waiting were last asked about, while
-        // an expansion of an older one was on its way: one expansion at a
-        // time, and the next for the latest text, not one a key.
-        std::optional<U32> wanted;
-        // What the analyzers last said of a word -- for the tip under the
-        // mouse or the inspector at the caret, which ask the same question
-        // -- by the text's version, the expansion it was read through (none
-        // for the text as it stands) and where the word starts: the other
-        // asking of it is answered from here.
-        struct Hovered
-        {
-            U32                      version   = 0;
-            U32                      expansion = 0;
-            ALTextPos                word;
-            ALScriptAnalysis::Result said;
-        };
-        std::optional<Hovered> hovered;
-        // Whether the text, at the version kept with it, has no default
-        // state (ALScriptStudioChecking::lslFragment): asked on every
-        // caret move and every frame Weights is shown, and a walk of the
-        // whole text to answer.
-        mutable std::optional<std::pair<U32, bool>> fragment;
-        // A question held until the expansion it asks about comes. A
-        // question of a kind replaces the one of that kind still waiting:
-        // a second hover is a hover of somewhere else, and only the last is
-        // wanted.
-        struct Waiting
-        {
-            ALScriptAnalysis::Kind kind = ALScriptAnalysis::Kind::Check;
-            ALTextPos              at;
-            // Where a stretch chosen from `at` ends: the refactors'.
-            ALTextPos              to;
-        };
-        // The questions held until it comes.
-        std::vector<Waiting> waiting;
-        // Whether the script's `.luaurc` was asked for once, so that a
-        // script with none is not asked for it at every check.
-        bool configAsked = false;
-        // The refactors last offered at the caret, in the source's places
-        // at actionsVersion, and the stretch they were asked about.
-        std::vector<ALScriptFix> actions;
-        U32                      actionsVersion = 0;
-        ALTextRange              actionsAsked;
-        // A Fix All asked before the text as it stands was checked, made
-        // once it is: of the problems of one kind, or of all where empty.
-        std::optional<std::string> fixAllAfterCheck;
-    };
+    // The tab's part of checking (ALScriptStudioChecking).
+    struct Check;
     Part<Check>                                check;
     // How bad a problem is: what the marks, the counts, the filters
     // and the compiler's own words all go by, rather than a word
@@ -680,38 +564,8 @@ struct ALScriptStudioDoc
         // edits and some go, where a place in the list would not be.
         U32          id = 0;
     };
-    // The name being looked up across the object's scripts: what
-    // was asked, the script that declares it (this one, or the
-    // include, by identity) and where, how many scripts are still
-    // to answer, the places gathered so far, each once, and the
-    // version of each open script's text as it was read, so that a
-    // rename knows it still holds.
-    struct Lookup
-    {
-        U32                            generation = 0;
-        ALEditorCommand                command    = ALEditorCommand::None;
-        std::string                    name;
-        bool                           hasDefinition = false;
-        std::string                    homePath;
-        ALScriptSpan                   definition;
-        bool                           renamable = false;
-        U32                            version   = 0;
-        S32                            pending   = 0;
-        std::vector<Place>             places;
-        boost::unordered_flat_set<std::string, ll::string_hash, std::equal_to<>>      seen;
-        boost::unordered_flat_map<std::string, U32, ll::string_hash, std::equal_to<>> versions;
-        // What a rename would change, for its clash check: each script's
-        // text as the analyzers read it -- this one's expansion, with its
-        // includes, and each other script's reached -- by its name; and
-        // the other scripts reached, by the path the map calls them.
-        std::vector<std::pair<std::string, std::shared_ptr<const std::string>>> texts;
-        boost::unordered_flat_set<std::string, ll::string_hash, std::equal_to<>>  scripts;
-        // What it could not look through: how many of the object's prims
-        // did not say what they hold, and the scripts that could not be
-        // read, by name.
-        S32                                                                       unlisted = 0;
-        std::vector<std::string>                                                  unread;
-    };
+    // The name being looked up across the object's scripts (ALScriptLookup).
+    struct Lookup;
     Part<Lookup>                               lookup;
     // Edits to make once the script has loaded: a rename that reached
     // it from another script, each place with the name that must
@@ -727,48 +581,10 @@ struct ALScriptStudioDoc
     };
     std::vector<PendingEdit>                   pendingEdits;
     // The script held open in an external editor (ALScriptExternalEditor).
-    // Whether the save under way came from the editor, which does not
-    // write the file back, is the save's (ALScriptSaveFlow::external).
-    struct External
-    {
-        // The log beside the copy the editor was given, which the
-        // compiler's words go to, held while the tab has it.
-        std::shared_ptr<ALScriptTempFiles::Claim> log;
-        // Whether the bridge was told, so that VS Code can subscribe.
-        bool                           subscribed = false;
-        // What the copy held when the studio last wrote it or read it: a
-        // save there over changes made here since is asked about rather
-        // than taken, the text it brought held in `waiting` until the
-        // author says which.
-        std::string                    written;
-        std::optional<std::string>     waiting;
-    };
+    struct External;
     Part<External>                             external;
-    // The tab's part of what is said of its caret: the outline's folds,
-    // the name asked about, the path the bar shows, and the inspector's
-    // question about where the caret is.
-    struct Caret
-    {
-        // The outline's symbols folded shut, each by the names from the
-        // outermost down to it.
-        boost::unordered_flat_set<std::string, ll::string_hash, std::equal_to<>> outlineFolded;
-        // The name last asked about -- its definition, its references, a
-        // new name -- where, and of which text.
-        ALEditorCommand symbolCommand = ALEditorCommand::None;
-        U32             symbolVersion = 0;
-        ALTextPos       symbolAt;
-        // The symbols the caret is in, the outermost first, by the outline
-        // it was read from (ALScriptStudioCaret::placePath): what the bar
-        // at the bottom and the outline both show.
-        std::vector<size_t> crumbPath;
-        U32                 crumbsOf = 0;
-        // Where the caret was last seen; when the inspector is due to be
-        // told what it is on, or zero; and what it was last told about.
-        ALTextPos seen{ -1, -1 };
-        F64       inspectDue = 0.0;
-        ALTextPos inspectAt{ -1, -1 };
-        U32       inspectVersion = 0;
-    };
+    // The tab's part of what is said of its caret (ALScriptStudioCaret).
+    struct Caret;
     Part<Caret>                                caret;
     boost::signals2::scoped_connection         changed;
 

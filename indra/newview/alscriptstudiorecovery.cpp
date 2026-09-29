@@ -30,6 +30,7 @@
 
 #include "alcodeeditor.h"
 #include "alnotecardembedded.h"
+#include "alscriptstudioorphans.h"
 #include "alscriptstudioservices.h"
 #include "lldir.h"
 #include "llfile.h"

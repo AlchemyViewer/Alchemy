@@ -32,6 +32,7 @@
 #include "alscriptfixes.h"
 #include "alscriptstudioplaces.h"
 #include "alscriptstudioservices.h"
+#include "alscriptstudioweighing.h"
 #include "alscriptstudiowords.h"
 #include "lldir.h"
 #include "lltimer.h"

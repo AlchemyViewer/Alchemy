@@ -26,6 +26,7 @@
 
 #include "../alscriptinspectorpane.h"
 
+#include "../alscriptstudiocaret.h"
 #include "../alscriptstudiowords.h"
 #include "alcodeeditor.h"
 #include "alscriptstudio_fixture.h"

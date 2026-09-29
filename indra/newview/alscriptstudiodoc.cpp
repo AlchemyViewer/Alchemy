@@ -27,8 +27,14 @@
 #include "alscriptstudiodoc.h"
 
 #include "alnotecardembedded.h"
+#include "alscriptexternaleditor.h"
 #include "alscriptfixes.h"
+#include "alscriptlookup.h"
+#include "alscriptstudiocaret.h"
+#include "alscriptstudiochecking.h"
+#include "alscriptstudioorphans.h"
 #include "alscriptstudioservices.h"
+#include "alscriptstudioweighing.h"
 #include "lldate.h"
 #include "llfocusmgr.h"
 

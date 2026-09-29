@@ -28,6 +28,7 @@
 
 #include "alpanefolds.h"
 #include "alpanelist.h"
+#include "alscriptstudiocaret.h"
 #include "alscriptstudioservices.h"
 #include "alscriptstudiowords.h"
 #include "alstringmatch.h"

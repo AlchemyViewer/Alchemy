@@ -42,6 +42,39 @@
 
 class ALScriptStudioServices;
 
+// The name being looked up across the object's scripts: what
+// was asked, the script that declares it (this one, or the
+// include, by identity) and where, how many scripts are still
+// to answer, the places gathered so far, each once, and the
+// version of each open script's text as it was read, so that a
+// rename knows it still holds.
+struct ALScriptStudioDoc::Lookup
+{
+    U32                            generation = 0;
+    ALEditorCommand                command    = ALEditorCommand::None;
+    std::string                    name;
+    bool                           hasDefinition = false;
+    std::string                    homePath;
+    ALScriptSpan                   definition;
+    bool                           renamable = false;
+    U32                            version   = 0;
+    S32                            pending   = 0;
+    std::vector<Place>             places;
+    boost::unordered_flat_set<std::string, ll::string_hash, std::equal_to<>>      seen;
+    boost::unordered_flat_map<std::string, U32, ll::string_hash, std::equal_to<>> versions;
+    // What a rename would change, for its clash check: each script's
+    // text as the analyzers read it -- this one's expansion, with its
+    // includes, and each other script's reached -- by its name; and
+    // the other scripts reached, by the path the map calls them.
+    std::vector<std::pair<std::string, std::shared_ptr<const std::string>>> texts;
+    boost::unordered_flat_set<std::string, ll::string_hash, std::equal_to<>>  scripts;
+    // What it could not look through: how many of the object's prims
+    // did not say what they hold, and the scripts that could not be
+    // read, by name.
+    S32                                                                       unlisted = 0;
+    std::vector<std::string>                                                  unread;
+};
+
 // A Script Studio window's lookups of a name across scripts, as the tab's
 // part `doc.lookup` keeps one: Find References and Rename, from what the
 // analyzers found in the script, then through every other script of its

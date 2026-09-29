@@ -36,6 +36,38 @@
 class ALScriptStudioServices;
 class ALScriptWeightsPane;
 
+// What the script weighs (ALScriptStudioWeighing).
+struct ALScriptStudioDoc::Weighing
+{
+    // For its target, as the last weighing said of the text at
+    // `version`; whether what was weighed is what a save compiles --
+    // not where the optimizer changes it after -- and whether it is
+    // what a preprocessor's run made to be sent, which a check's
+    // weighing of the same text, before the optimizer, does not
+    // replace; and a weighing on its way.
+    std::optional<ALScriptWeight> weight;
+    U32                           version = 0;
+    bool                          exact   = false;
+    bool                          sent    = false;
+    bool                          asking  = false;
+    // The version its weights were last asked for, by a weigh or with
+    // a check: a tab come to the front is weighed once for its text.
+    U32                           askedFor = 0;
+    // What the Weights tab lists: each target the last check's text
+    // was weighed for, its own first, in the source's places, of the
+    // text at `allVersion`; and each target's as the text was last
+    // saved, where it was weighed while it was that text -- what
+    // "since the save" counts from.
+    std::vector<ALScriptWeight> all;
+    U32                         allVersion = 0;
+    std::vector<ALScriptWeight> saved;
+    // What a save would send, in bytes, as the last check measured
+    // it, and the text and the expansion it was measured of: what the
+    // trailer says once it is past half of what a script may be.
+    size_t                             assetBytes = 0;
+    std::optional<std::pair<U32, U32>> assetMeasured;
+};
+
 // A Script Studio window's weighing, as the tab's part `doc.weighing` keeps
 // it: what a script comes to for the target it is compiled for, weighed with
 // each check and again as a save sends it; each target's, while the Weights

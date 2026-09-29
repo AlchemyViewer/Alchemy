@@ -26,6 +26,8 @@
 
 #include "../alscriptoutlinepane.h"
 
+#include "../alscriptstudiocaret.h"
+
 #include "alpanelist.h"
 #include "alscriptstudio_fixture.h"
 #include "llcombobox.h"

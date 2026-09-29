@@ -26,6 +26,8 @@
 
 #include "../alscriptstudioweighing.h"
 
+#include "../alscriptstudiochecking.h"
+
 #include "alscriptstudio_fixture.h"
 
 #include "../test/lltut.h"

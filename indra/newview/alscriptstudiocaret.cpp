@@ -27,6 +27,7 @@
 #include "alscriptstudiocaret.h"
 
 #include "alcodeeditor.h"
+#include "alscriptstudiochecking.h"
 #include "alscriptstudioplaces.h"
 #include "alscriptstudioservices.h"
 #include "llstl.h"

@@ -26,7 +26,10 @@
 
 #include "../alscriptcrumbsbar.h"
 
+#include "../alscriptstudiocaret.h"
+#include "../alscriptstudiochecking.h"
 #include "../alscriptstudioplaces.h"
+#include "../alscriptstudioweighing.h"
 
 #include "alcodeeditor.h"
 #include "alscriptenvelope.h"

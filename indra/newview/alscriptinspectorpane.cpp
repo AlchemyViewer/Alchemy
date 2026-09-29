@@ -27,6 +27,7 @@
 #include "alscriptinspectorpane.h"
 
 #include "alcodeeditor.h"
+#include "alscriptstudiocaret.h"
 #include "alscriptstudioservices.h"
 #include "alscriptstudiowords.h"
 #include "altextview.h"

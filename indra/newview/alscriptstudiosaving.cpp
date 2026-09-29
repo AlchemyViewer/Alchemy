@@ -28,7 +28,10 @@
 
 #include "alincludesearch.h"
 #include "alnotecardembedded.h"
+#include "alscriptstudiochecking.h"
+#include "alscriptstudioorphans.h"
 #include "alscriptstudioservices.h"
+#include "alscriptstudioweighing.h"
 #include "lldate.h"
 
 #include <algorithm>

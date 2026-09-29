@@ -26,6 +26,9 @@
 
 #include "../alscriptproblemspane.h"
 
+#include "../alscriptstudiochecking.h"
+#include "../alscriptstudioweighing.h"
+
 #include "alpanefolds.h"
 #include "alpanelist.h"
 #include "llcheckboxctrl.h"

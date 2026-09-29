@@ -41,6 +41,79 @@
 
 class ALScriptStudioServices;
 
+// The tab's part of checking (ALScriptStudioChecking): what the
+// analyzers said and when they are next asked, the expansion asked for
+// them and the questions waiting on it, the refactors offered at the
+// caret, and a Fix All waiting on a check.
+struct ALScriptStudioDoc::Check
+{
+    // What the analyzer said of the text at analysisVersion; when the
+    // next check is due, or zero; the version last asked about.
+    ALScriptProblems analysis;
+    // LSL's, as the analyzer said them, before the lints as chosen:
+    // what a change of the lints filters again.
+    ALScriptProblems unfiltered;
+    U32              analysisVersion  = 0;
+    U32              requestedVersion = 0;
+    F64              analysisDue      = 0.0;
+    // When the version last asked about was asked.
+    F64              askedAt          = 0.0;
+    std::string      definitionsError;
+    // How many expansions were taken, which is how an answer about one
+    // names it; the version one has been asked for, or none -- not a
+    // zero, which an empty text's version is: the preprocessor answers
+    // on the main thread a moment later, and one text is expanded once
+    // however many questions wait on it.
+    U32                expansions = 0;
+    std::optional<U32> expanding;
+    // The version the questions waiting were last asked about, while
+    // an expansion of an older one was on its way: one expansion at a
+    // time, and the next for the latest text, not one a key.
+    std::optional<U32> wanted;
+    // What the analyzers last said of a word -- for the tip under the
+    // mouse or the inspector at the caret, which ask the same question
+    // -- by the text's version, the expansion it was read through (none
+    // for the text as it stands) and where the word starts: the other
+    // asking of it is answered from here.
+    struct Hovered
+    {
+        U32                      version   = 0;
+        U32                      expansion = 0;
+        ALTextPos                word;
+        ALScriptAnalysis::Result said;
+    };
+    std::optional<Hovered> hovered;
+    // Whether the text, at the version kept with it, has no default
+    // state (ALScriptStudioChecking::lslFragment): asked on every
+    // caret move and every frame Weights is shown, and a walk of the
+    // whole text to answer.
+    mutable std::optional<std::pair<U32, bool>> fragment;
+    // A question held until the expansion it asks about comes. A
+    // question of a kind replaces the one of that kind still waiting:
+    // a second hover is a hover of somewhere else, and only the last is
+    // wanted.
+    struct Waiting
+    {
+        ALScriptAnalysis::Kind kind = ALScriptAnalysis::Kind::Check;
+        ALTextPos              at;
+        // Where a stretch chosen from `at` ends: the refactors'.
+        ALTextPos              to;
+    };
+    // The questions held until it comes.
+    std::vector<Waiting> waiting;
+    // Whether the script's `.luaurc` was asked for once, so that a
+    // script with none is not asked for it at every check.
+    bool configAsked = false;
+    // The refactors last offered at the caret, in the source's places
+    // at actionsVersion, and the stretch they were asked about.
+    std::vector<ALScriptFix> actions;
+    U32                      actionsVersion = 0;
+    ALTextRange              actionsAsked;
+    // A Fix All asked before the text as it stands was checked, made
+    // once it is: of the problems of one kind, or of all where empty.
+    std::optional<std::string> fixAllAfterCheck;
+};
+
 // A Script Studio window's checking, as the tab's part `doc.check` keeps
 // it: a check due a moment after the last keystroke and sent from the
 // frame; the analyzers asked -- about what the compiler would see, the

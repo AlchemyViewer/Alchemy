@@ -34,6 +34,27 @@
 class ALScriptStudioServices;
 struct ALRecoveryEntry;
 
+// A tab's part of where it stands with what holds it: what it is
+// (Doc::Orphan), and the rest of what ALScriptStudioOrphans keeps of it.
+struct ALScriptStudioDoc::Orphaned
+{
+    Orphan kind            = Orphan::None;
+    bool   noticeDismissed = false;
+    // A kept text with nothing loaded under it -- its item out of
+    // reach as it was opened -- whose script is known only as the
+    // entry said: loaded under it once the item is in reach, before
+    // it is saved. How many loads have failed on the way since the
+    // last that went through, and when the next may be tried: further
+    // apart each time, and a few times only unless a person asks.
+    bool   detached      = false;
+    S32    reattachTries = 0;
+    F64    nextReattach  = 0.0;
+    // Since when its object has been out of sight, or zero: an object
+    // at the edge of what is in view comes and goes, and is taken for
+    // gone only once it has been gone a moment.
+    F64    awaySince = 0.0;
+};
+
 // A Script Studio window's tabs as what holds them has them, the tab's part
 // `doc.orphan` keeping it: its object out of sight, its item gone from the
 // object or the inventory, the connection lost, the item in the Trash, the
