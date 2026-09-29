@@ -210,6 +210,7 @@ if(AL_BUILD_VIEWER)
     alscriptstudioorphans.cpp
     alscriptstudioplaces.cpp
     alscriptstudiorecovery.cpp
+    alrecovery.cpp
     alscriptstudiosaving.cpp
     alscriptstudiovim.cpp
     alscriptstudiovimrc.cpp
@@ -1047,6 +1048,7 @@ if(AL_BUILD_VIEWER)
     alscriptstudioorphans.h
     alscriptstudioplaces.h
     alscriptstudiorecovery.h
+    alrecovery.h
     alscriptstudiosaving.h
     alscriptstudiovim.h
     alscriptstudiovimrc.h
@@ -2568,7 +2570,7 @@ if(AL_BUILD_TESTS)
     UNIT
     PROJECT ${test_project}
     LIBRARIES llui alscript ${test_libs}
-    SOURCES alnotecardembedded.cpp alscriptstudiodoc.cpp
+    SOURCES alnotecardembedded.cpp alrecovery.cpp alscriptstudiodoc.cpp
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
 
@@ -2789,8 +2791,10 @@ if(AL_BUILD_TESTS)
     SOURCES
       alscriptnoticebar.cpp
       alnotecardembedded.cpp
+      alrecovery.cpp
       alscriptstudiodoc.cpp
       alscriptstudiorecovery.cpp
+      alrecovery.cpp
     DEFINES "LLUI_TEST_APP_DIR=\"${INDRA_SOURCE_DIR}/newview\""
   )
 

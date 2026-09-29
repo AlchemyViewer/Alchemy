@@ -92,21 +92,6 @@ public:
 
     ALScriptStudioRecovery(ALScriptStudioServices& services, Window& window);
 
-    // --- the store -------------------------------------------------------------------
-
-    // One for the account logged in, under its own folder, made again where
-    // another has logged in since; null before one has. Every entry this
-    // process writes is under one session, which is how the next session
-    // tells what this one left. A test's in its place, where one is given.
-    static ALRecoveryStore* store();
-    static void                   useStore(ALRecoveryStore* store);
-    // Where a text one of the viewer's own windows kept
-    // (ALRecoveryStore::isWindowKey) goes back to: the notecard
-    // window, a legacy script editor, as the viewer has them -- false where
-    // it cannot have the item, and the text is taken up here as any other
-    // is. None where none is given, as in a test.
-    typedef std::function<bool(const Entry& entry)> window_t;
-    static void takeWindowsTo(window_t window);
     // A tab as an entry, from the tab alone -- nothing of the world's asked
     // -- since it is written as the viewer goes as well, after the world
     // may have.
@@ -157,20 +142,6 @@ public:
     // was thrown away lately, to pick one to take up, or Shift-Return to
     // throw it away -- or, thrown away already, to let it go for good.
     void show();
-    // At login: what a session that ended before saving left, offered, to
-    // take up now, later, or not at all; `studio` opens the studio to take
-    // it up in. What was kept on purpose at a quit opens with the studio,
-    // and where the studio is not open already, is offered to open it now.
-    static void offer(std::function<ALScriptStudioRecovery*()> studio, bool studio_open);
-    // What the login offers: what sessions that ended left unsaved, and
-    // what was kept on purpose, where the studio is not open to have
-    // opened it.
-    struct Offers
-    {
-        std::vector<Entry> unsaved;
-        std::vector<Entry> kept;
-    };
-    static Offers offersAt(const ALRecoveryStore& store, bool studio_open);
 
 private:
     // An entry a listing read only the start of, read whole; false, and

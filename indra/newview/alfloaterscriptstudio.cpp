@@ -35,6 +35,7 @@
 #include "fsyspath.h"
 #include "alnotecardformat.h"
 #include "alnotecarditems.h"
+#include "alrecovery.h"
 #include "alscriptinventoryindex.h"
 #include "alscriptmodules.h"
 #include "alscriptpreprocessor.h"
@@ -632,7 +633,7 @@ ALFloaterScriptStudio::~ALFloaterScriptStudio()
     // Straight to the store: nothing here is to be said any more.
     // Each forced out to the disk on the writer's thread, and waited on
     // once for the lot.
-    ALRecoveryStore* store = ALScriptStudioRecovery::store();
+    ALRecoveryStore* store = ALRecovery::store();
     for (const std::unique_ptr<Doc>& doc : mDocs)
     {
         if (store && doc->editor && !doc->recoveryKey.empty() && doc->loaded && doc->modifiable && !doc->carriedText && doc->unsaved())
@@ -1131,7 +1132,7 @@ void ALFloaterScriptStudio::reopenKept()
 {
     // What was kept on purpose at the last quit opens again, with its
     // unsaved changes, into its restored tab or a tab of its own.
-    ALRecoveryStore* store = ALScriptStudioRecovery::store();
+    ALRecoveryStore* store = ALRecovery::store();
     if (!store)
     {
         return;
@@ -4388,7 +4389,7 @@ void ALFloaterScriptStudio::fileWritten(const std::string& path)
 void ALFloaterScriptStudio::becomeFile(Doc& doc, const std::string& path)
 {
     mProblemsPane->forget(doc.id);
-    if (ALRecoveryStore* store = ALScriptStudioRecovery::store(); store && !doc.recoveryKey.empty())
+    if (ALRecoveryStore* store = ALRecovery::store(); store && !doc.recoveryKey.empty())
     {
         store->forget(doc.recoveryKey);
     }
@@ -6325,7 +6326,7 @@ void ALFloaterScriptStudio::offerRecovery()
     // What was kept on purpose opens with the main window, which may be
     // up already, restored as the viewer started.
     const bool open = LLFloaterReg::findTypedInstance<ALFloaterScriptStudio>("script_studio", LLSD()) != nullptr;
-    ALScriptStudioRecovery::offer(
+    ALRecovery::offer(
         []() -> ALScriptStudioRecovery* {
             ALFloaterScriptStudio* studio = LLFloaterReg::showTypedInstance<ALFloaterScriptStudio>("script_studio", LLSD(), TAKE_FOCUS_YES);
             return studio ? &studio->mRecovery : nullptr;
@@ -6723,7 +6724,7 @@ void ALFloaterScriptStudio::loadScript(const ALScriptRef& ref)
 
 void ALFloaterScriptStudio::discardRecovery(const ALRecoveryEntry& entry)
 {
-    if (ALRecoveryStore* store = ALScriptStudioRecovery::store())
+    if (ALRecoveryStore* store = ALRecovery::store())
     {
         store->discard(entry);
     }
@@ -7518,7 +7519,7 @@ void ALFloaterScriptStudio::letGoOf(size_t index, bool keep)
         // entry the tab took up goes with it only once what the tab holds
         // is safe -- set aside, saved, or the same as saved -- so that a
         // failed write, or a text nobody could save, loses nothing.
-        ALRecoveryStore* store = ALScriptStudioRecovery::store();
+        ALRecoveryStore* store = ALRecovery::store();
         if (!keep && store && !doc.recoveryKey.empty())
         {
             ALRecoveryStore::Parting parting;
@@ -7669,7 +7670,7 @@ void ALFloaterScriptStudio::addFileCommands()
     mCommands.add(
         "recover", [this]() { mRecovery.show(); },
         []() {
-            const ALRecoveryStore* store = ALScriptStudioRecovery::store();
+            const ALRecoveryStore* store = ALRecovery::store();
             return store && store->hasOffers();
         });
     mCommands.add(

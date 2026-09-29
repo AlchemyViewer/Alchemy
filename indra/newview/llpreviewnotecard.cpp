@@ -30,8 +30,8 @@
 
 #include "aldiffview.h"
 #include "alnotecardembedded.h"
+#include "alrecovery.h"
 #include "alsaid.h"
-#include "alscriptstudiorecovery.h"
 #include "alsurface.h"
 #include "altextview.h"
 
@@ -166,7 +166,7 @@ void LLPreviewNotecard::draw()
     if (mRecoveryDue > 0.0 && LLTimer::getTotalSeconds() >= mRecoveryDue)
     {
         mRecoveryDue = 0.0;
-        if (ALRecoveryStore* kept = ALScriptStudioRecovery::store(); kept && mText->isDirty())
+        if (ALRecoveryStore* kept = ALRecovery::store(); kept && mText->isDirty())
         {
             kept->writeSoon(recoveryEntry());
             mRecoveryWritten = true;
@@ -174,7 +174,7 @@ void LLPreviewNotecard::draw()
     }
     if (mRecoveryWritten)
     {
-        if (ALRecoveryStore* kept = ALScriptStudioRecovery::store())
+        if (ALRecoveryStore* kept = ALRecovery::store())
         {
             for (const std::string& key : kept->takeFailures())
             {
@@ -360,7 +360,7 @@ void LLPreviewNotecard::loaded(const ALScriptWorkspace::Loaded& answer)
     {
         // Theirs over what was typed here, as one step: Undo brings back
         // what was typed, which the store keeps too.
-        if (ALRecoveryStore* kept = ALScriptStudioRecovery::store())
+        if (ALRecoveryStore* kept = ALRecovery::store())
         {
             kept->setAside(recoveryEntry());
         }
@@ -648,7 +648,7 @@ bool LLPreviewNotecard::handleSaveChangesDialog(const LLSD& notification, const 
         case 1: // "No"
             // Thrown away, and set aside a while all the same, in case
             // that was a mistake.
-            if (ALRecoveryStore* kept = ALScriptStudioRecovery::store())
+            if (ALRecoveryStore* kept = ALRecovery::store())
             {
                 kept->setAside(recoveryEntry());
             }
@@ -803,7 +803,7 @@ void LLPreviewNotecard::forgetKept()
     {
         return;
     }
-    if (ALRecoveryStore* kept = ALScriptStudioRecovery::store())
+    if (ALRecoveryStore* kept = ALRecovery::store())
     {
         kept->forget(mRecoveryKey);
     }
@@ -813,7 +813,7 @@ void LLPreviewNotecard::forgetKept()
 
 void LLPreviewNotecard::offerKept()
 {
-    ALRecoveryStore* kept = ALScriptStudioRecovery::store();
+    ALRecoveryStore* kept = ALRecovery::store();
     if (!kept || mRecoveryKey.empty() || !mModifiable)
     {
         return;
@@ -828,7 +828,7 @@ void LLPreviewNotecard::offerKept()
     const ALRecoveryEntry entry = *left;
     showNotice(getString("Recovered", args), { { getString("Restore"), [this, entry]() { takeUp(entry); } },
                                                { getString("Discard"), [this, entry]() {
-                                                    if (ALRecoveryStore* store = ALScriptStudioRecovery::store())
+                                                    if (ALRecoveryStore* store = ALRecovery::store())
                                                     {
                                                         store->discard(entry);
                                                     }
@@ -838,7 +838,7 @@ void LLPreviewNotecard::offerKept()
 
 void LLPreviewNotecard::takeUp(ALRecoveryEntry entry)
 {
-    ALRecoveryStore* kept = ALScriptStudioRecovery::store();
+    ALRecoveryStore* kept = ALRecovery::store();
     hideNotice();
     if (!kept || (!entry.whole && !kept->load(entry)) || !mLoaded || !mModifiable)
     {

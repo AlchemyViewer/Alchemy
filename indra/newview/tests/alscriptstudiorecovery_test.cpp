@@ -26,6 +26,8 @@
 
 #include "../alscriptstudiorecovery.h"
 
+#include "../alrecovery.h"
+
 #include "alscriptstudio_fixture.h"
 
 #include "fsyspath.h"
@@ -114,7 +116,7 @@ namespace tut
 
         ~alscriptstudiorecovery_data()
         {
-            ALScriptStudioRecovery::useStore(nullptr);
+            ALRecovery::useStore(nullptr);
             store.reset();
             if (!folder.empty())
             {
@@ -137,7 +139,7 @@ namespace tut
             folder = fsyspath(std::filesystem::temp_directory_path() / fsyspath("alscriptstudiorecovery_" + LLUUID::generateNewID().asString())).string();
             std::filesystem::create_directories(fsyspath(folder));
             store = std::make_unique<ALRecoveryStore>(folder, "this-session");
-            ALScriptStudioRecovery::useStore(store.get());
+            ALRecovery::useStore(store.get());
             return *recovery;
         }
 
@@ -280,17 +282,17 @@ namespace tut
             file << "a file where a folder would be";
         }
         ALRecoveryStore nowhere(blocked, "this-session");
-        ALScriptStudioRecovery::useStore(&nowhere);
+        ALRecovery::useStore(&nowhere);
         type(doc, "y");
         ensure("not kept", !r.keep(doc));
         ensure("said", services().reports.size() == 1 && services().reports[0].failure && services().reports[0].doc == "a" &&
                            services().reports[0].text.find("a") != std::string::npos);
         type(doc, "z");
         ensure("not said again", !r.keep(doc) && services().reports.size() == 1);
-        ALScriptStudioRecovery::useStore(store.get());
+        ALRecovery::useStore(store.get());
         ensure("kept, once it can be", r.keep(doc) && !doc.recoveryFailed);
 
-        ALScriptStudioRecovery::useStore(&nowhere);
+        ALRecovery::useStore(&nowhere);
         type(doc, "w");
         r.keepSoon(doc);
         nowhere.flush();
@@ -301,7 +303,7 @@ namespace tut
         nowhere.flush();
         r.keepSoon(doc);
         ensure("and not again", services().reports.size() == 2);
-        ALScriptStudioRecovery::useStore(store.get());
+        ALRecovery::useStore(store.get());
     }
 
     template<> template<>
@@ -513,12 +515,12 @@ namespace tut
             file << "a file where a folder would be";
         }
         ALRecoveryStore nowhere(blocked, "this-session");
-        ALScriptStudioRecovery::useStore(&nowhere);
+        ALRecovery::useStore(&nowhere);
         type(a, "z");
         type(b, "w");
         ensure("not kept", !r.keepAll({ &a, &b }));
         ensure("each said once", services().reports.size() == 2 && a.recoveryFailed && b.recoveryFailed);
-        ALScriptStudioRecovery::useStore(store.get());
+        ALRecovery::useStore(store.get());
     }
 
     template<> template<>
@@ -565,9 +567,9 @@ namespace tut
         Entry                 kept = entry("item:kept", "kept for next time");
         kept.state                 = Entry::State::Kept;
         ensure("written", earlier.write(lost) && earlier.write(kept));
-        const ALScriptStudioRecovery::Offers closed = ALScriptStudioRecovery::offersAt(*store, false);
+        const ALRecovery::Offers closed = ALRecovery::offersAt(*store, false);
         ensure("both offered", closed.unsaved.size() == 1 && closed.kept.size() == 1 && closed.kept.front().key == "item:kept");
-        const ALScriptStudioRecovery::Offers open = ALScriptStudioRecovery::offersAt(*store, true);
+        const ALRecovery::Offers open = ALRecovery::offersAt(*store, true);
         ensure("the kept not, the studio open having opened it", open.unsaved.size() == 1 && open.kept.empty());
     }
 
@@ -621,7 +623,7 @@ namespace tut
 
         std::vector<std::string> taken;
         bool                     has = true;
-        ALScriptStudioRecovery::takeWindowsTo([&taken, &has](const Entry& entry) {
+        ALRecovery::takeWindowsTo([&taken, &has](const Entry& entry) {
             taken.push_back(entry.name);
             return has;
         });
@@ -638,6 +640,6 @@ namespace tut
         has = false;
         r.recover(card);
         ensure("the window cannot have it: the studio keeps it", taken.size() == 2 && studio().orphans.size() == 2);
-        ALScriptStudioRecovery::takeWindowsTo(nullptr);
+        ALRecovery::takeWindowsTo(nullptr);
     }
 }
