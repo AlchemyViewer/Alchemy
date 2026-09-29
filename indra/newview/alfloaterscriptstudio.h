@@ -619,6 +619,14 @@ private:
     // preprocessor would look. An include's, a module's, or either. False
     // where it is nowhere known.
     bool openIncluded(Doc& doc, const std::string& name, std::optional<bool> require) override;
+    // A notecard a script names where it reads one, opened: the one of that
+    // name in the script's own object, where a script reads it from. False,
+    // and said, where there is none, or the script is in no object.
+    bool openNotecardNamed(const Doc& doc, const std::string& name);
+    // A notecard's References: every place the scripts of its object name
+    // it where they read a notecard, each script read as it stands here or
+    // as the region has it.
+    void findNotecardReaders(const Doc& doc);
     // Vim's vimrc: its text and where it is, opened here to be edited; and
     // every editor's options set again once it is read.
     std::string vimrc(std::string& whence) override;
@@ -1245,6 +1253,9 @@ private:
     bool                               mClosingWindow = false;
     LLComboBox*                        mCompileTarget = nullptr;
     LLComboBox*                        mNotecardGrammar = nullptr;
+    // Which notecard's readers were asked for last: an answer for an
+    // earlier one is let go of.
+    U32                                mReadersAsked = 0;
     LLCheckBoxCtrl*                    mRunning       = nullptr;
     LLComboBox*                        mExperience    = nullptr;
     LLButton*                          mExperienceProfile = nullptr;

@@ -2301,6 +2301,13 @@ void ALFloaterScriptStudio::loaded(const ALScriptWorkspace::Loaded& answer)
         // over or not, is what it is.
         doc.editor->setMaxBytes(LLNotecard::MAX_SIZE);
         items.wire();
+        // Its References: the scripts of its object that read it.
+        doc.editor->setSymbolRequest([this, raw = &doc](ALEditorCommand command, const ALTextRange&) {
+            if (command == ALEditorCommand::FindReferences)
+            {
+                findNotecardReaders(*raw);
+            }
+        });
         LLStringUtil::format_map_t args;
         args["[NAME]"] = doc.name;
         setStatus(getString(answer.modifiable ? "Loaded" : "LoadedReadOnly", args));
@@ -2824,7 +2831,23 @@ void ALFloaterScriptStudio::teachEditor(Doc& doc)
         const std::optional<Doc::Named> named = raw->namedAt(at);
         if (!named)
         {
-            return ALTextRange();
+            // A notecard the script reads, by the name it gives: the one in
+            // its object.
+            const ALTextDocument& text = raw->editor->document();
+            if (at.line < 0 || at.line >= text.lineCount())
+            {
+                return ALTextRange();
+            }
+            const std::optional<ALNotecardFormat::Named> card = ALNotecardFormat::namedAt(text.line(at.line), at.column);
+            if (!card)
+            {
+                return ALTextRange();
+            }
+            if (follow)
+            {
+                openNotecardNamed(*raw, card->name);
+            }
+            return ALTextRange(ALTextPos(at.line, card->begin), ALTextPos(at.line, card->end));
         }
         if (follow && !openIncluded(*raw, named->name, named->require))
         {
@@ -2871,6 +2894,119 @@ void ALFloaterScriptStudio::teachEditor(Doc& doc)
         ALScriptStudioWords::complete(lua, *raw->editor, at, prefix, snippets(lua), getString("SnippetDetail"), out);
         completeLinks(*raw, at, prefix, out);
     });
+}
+
+bool ALFloaterScriptStudio::openNotecardNamed(const Doc& doc, const std::string& name)
+{
+    LLStringUtil::format_map_t args;
+    args["[NAME]"] = name;
+    if (doc.ref.inInventory() || !doc.file.empty())
+    {
+        setStatus(getString("NotecardReadFromObject", args), true);
+        return false;
+    }
+    for (const ALScriptWorkspace::Item& item : ALScriptWorkspace::instance().contentsIndex().items(doc.ref.object))
+    {
+        if (!item.script && item.name == name)
+        {
+            openScript(ALScriptRef(doc.ref.object, item.id), item.name);
+            return true;
+        }
+    }
+    setStatus(getString("NotecardNotFoundHere", args), true);
+    return false;
+}
+
+void ALFloaterScriptStudio::findNotecardReaders(const Doc& doc)
+{
+    LLStringUtil::format_map_t args;
+    args["[NAME]"] = doc.name;
+    if (!doc.itemNotecard() || doc.ref.inInventory())
+    {
+        setStatus(getString("NotecardReadersNeedObject", args), true);
+        return;
+    }
+    // Every script of its object read -- as its tab holds it, or as the
+    // region has it -- and the places it names the notecard listed once the
+    // last has answered.
+    struct Gather
+    {
+        U32                            asked   = 0;
+        S32                            pending = 0;
+        ALScriptReferencesPane::Found found;
+    };
+    auto gather           = std::make_shared<Gather>();
+    gather->asked         = ++mReadersAsked;
+    gather->found.from    = doc.id;
+    gather->found.fromName = doc.name;
+    gather->found.name    = doc.name;
+    const std::string name = doc.name;
+    auto read = [gather, name](const ALScriptRef& ref, const std::string& script, const std::string& text) {
+        const std::vector<ALScriptSpan> spans = ALNotecardFormat::readersOf(text, name);
+        size_t                          from  = 0;
+        S32                             line  = 0;
+        for (const ALScriptSpan& span : spans)
+        {
+            // The line it is on, for the list to show.
+            for (; line < span.line && from != std::string::npos; ++line)
+            {
+                from = text.find('\n', from);
+                from = from == std::string::npos ? from : from + 1;
+            }
+            Doc::Place place;
+            place.span     = span;
+            place.file     = ALScriptPreprocessor::pathOf(ref);
+            place.fileName = script;
+            place.text     = from == std::string::npos ? std::string() : text.substr(from, text.find('\n', from) - from);
+            place.at       = span.column + 1;
+            gather->found.places.push_back(std::move(place));
+        }
+    };
+    const LLHandle<LLFloater> handle = getHandle();
+    auto shown = [handle, gather]() {
+        ALFloaterScriptStudio* studio = ALViewType::as<ALFloaterScriptStudio>(handle.get());
+        if (!studio || gather->asked != studio->mReadersAsked)
+        {
+            return;
+        }
+        studio->mReferencesPane->show(gather->found);
+        studio->showBottom("references_tab");
+        if (gather->found.places.empty())
+        {
+            LLStringUtil::format_map_t said;
+            said["[NAME]"] = gather->found.name;
+            studio->setStatus(studio->getString("NotecardReadByNone", said));
+        }
+    };
+    gather->pending = 1;
+    for (const ALScriptWorkspace::Item& item : ALScriptWorkspace::instance().contentsIndex().items(doc.ref.object))
+    {
+        if (!item.script)
+        {
+            continue;
+        }
+        const ALScriptRef ref(doc.ref.object, item.id);
+        if (const Doc* open = findDoc(ref); open && open->loaded)
+        {
+            read(ref, item.name, open->editor->wholeText());
+            continue;
+        }
+        ++gather->pending;
+        ALScriptWorkspace::instance().load(ref, [gather, read, shown, ref, script = item.name](const ALScriptWorkspace::Loaded& answer) {
+            if (answer.error.empty())
+            {
+                read(ref, script, sourceOf(answer));
+            }
+            if (--gather->pending == 0)
+            {
+                shown();
+            }
+        });
+    }
+    if (--gather->pending == 0)
+    {
+        shown();
+    }
 }
 
 void ALFloaterScriptStudio::completeLinks(const Doc& doc, const ALTextPos& at, std::string_view prefix, std::vector<ALCodeEditor::Completion>& out)
@@ -7962,7 +8098,23 @@ void ALFloaterScriptStudio::addGoCommands()
             return doc && !doc->outline.empty();
         });
     addEditorCommand("go_to_definition", ALEditorCommand::GoToDefinition, false);
-    addEditorCommand("find_references", ALEditorCommand::FindReferences, false);
+    // A notecard's references are the scripts of its object that read it.
+    mCommands.add(
+        "find_references",
+        [this]() {
+            if (Doc* doc = active(); doc && doc->itemNotecard())
+            {
+                findNotecardReaders(*doc);
+            }
+            else if (doc)
+            {
+                doc->shownText()->perform(ALEditorCommand::FindReferences);
+            }
+        },
+        [this]() {
+            Doc* doc = active();
+            return doc && (doc->itemNotecard() ? doc->loaded && !doc->ref.inInventory() : doc->shownText()->canPerform(ALEditorCommand::FindReferences));
+        });
     for (const auto& [name, step] : { std::pair{ "next_problem", 1 }, std::pair{ "previous_problem", -1 } })
     {
         mCommands.add(

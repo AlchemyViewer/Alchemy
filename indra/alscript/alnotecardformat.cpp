@@ -112,6 +112,132 @@ std::vector<S32> linesPast(std::string_view text, size_t bytes)
     return out;
 }
 
+namespace
+{
+    // What a script reads a notecard with, the name given first.
+    constexpr std::string_view READERS[] = { "llGetNotecardLineSync",     "llGetNotecardLine",     "llGetNumberOfNotecardLines",
+                                             "ll.GetNotecardLineSync", "ll.GetNotecardLine", "ll.GetNumberOfNotecardLines" };
+
+    bool nameChar(char c) { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '.'; }
+
+    // A string opening at a quote: its end past the closing quote, and what
+    // it says, its escapes taken out; none where it does not close.
+    std::optional<std::pair<size_t, std::string>> stringAt(std::string_view line, size_t open)
+    {
+        const char  quote = line[open];
+        std::string said;
+        for (size_t i = open + 1; i < line.size(); ++i)
+        {
+            if (line[i] == '\\' && i + 1 < line.size())
+            {
+                said += line[++i];
+                continue;
+            }
+            if (line[i] == quote)
+            {
+                return std::make_pair(i + 1, said);
+            }
+            said += line[i];
+        }
+        return std::nullopt;
+    }
+
+    // Whether what comes before a place is a reader's name and its bracket,
+    // blanks allowed about the bracket.
+    bool readerBefore(std::string_view line, size_t at)
+    {
+        size_t i = at;
+        while (i > 0 && blank(line[i - 1]))
+        {
+            --i;
+        }
+        if (i == 0 || line[i - 1] != '(')
+        {
+            return false;
+        }
+        --i;
+        while (i > 0 && blank(line[i - 1]))
+        {
+            --i;
+        }
+        size_t first = i;
+        while (first > 0 && nameChar(line[first - 1]))
+        {
+            --first;
+        }
+        const std::string_view called = line.substr(first, i - first);
+        return std::find(std::begin(READERS), std::end(READERS), called) != std::end(READERS);
+    }
+}
+
+std::optional<Named> namedAt(std::string_view line, S32 column)
+{
+    // Each string of the line in turn, until the one that holds the column.
+    for (size_t i = 0; i < line.size(); ++i)
+    {
+        if (line[i] != '"' && line[i] != '\'')
+        {
+            continue;
+        }
+        const auto string = stringAt(line, i);
+        if (!string)
+        {
+            return std::nullopt;
+        }
+        const size_t end = string->first;
+        if (static_cast<size_t>(column) >= i && static_cast<size_t>(column) <= end)
+        {
+            if (!readerBefore(line, i))
+            {
+                return std::nullopt;
+            }
+            return Named{ string->second, static_cast<S32>(i), static_cast<S32>(end) };
+        }
+        i = end - 1;
+    }
+    return std::nullopt;
+}
+
+std::vector<ALScriptSpan> readersOf(std::string_view text, std::string_view name)
+{
+    std::vector<ALScriptSpan> out;
+    S32                       line_no = 0;
+    size_t                    from    = 0;
+    while (from <= text.size())
+    {
+        size_t end = text.find('\n', from);
+        if (end == std::string_view::npos)
+        {
+            end = text.size();
+        }
+        const std::string_view line = text.substr(from, end - from);
+        for (size_t i = 0; i < line.size(); ++i)
+        {
+            if (line[i] != '"' && line[i] != '\'')
+            {
+                continue;
+            }
+            const auto string = stringAt(line, i);
+            if (!string)
+            {
+                break;
+            }
+            if (string->second == name && readerBefore(line, i))
+            {
+                ALScriptSpan span;
+                span.line = span.endLine = line_no;
+                span.column              = static_cast<S32>(i);
+                span.endColumn           = static_cast<S32>(string->first);
+                out.push_back(span);
+            }
+            i = string->first - 1;
+        }
+        from = end + 1;
+        ++line_no;
+    }
+    return out;
+}
+
 std::vector<ALScriptOutlineEntry> outline(std::string_view text, size_t most)
 {
     std::vector<ALScriptOutlineEntry> out;

@@ -29,6 +29,7 @@
 
 #include "stdtypes.h"
 
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -60,4 +61,21 @@ namespace ALNotecardFormat
     // outlines as much as it can, and one of more entries than `most` stops
     // there.
     std::vector<ALScriptOutlineEntry> outline(std::string_view text, size_t most = 2000);
+
+    // A notecard a script names where it reads one: the string given first
+    // to llGetNotecardLine, llGetNotecardLineSync or
+    // llGetNumberOfNotecardLines -- or ll.GetNotecardLine and the rest in
+    // SLua -- in either quote. The name, and where the string stands on
+    // its line, quotes and all.
+    struct Named
+    {
+        std::string name;
+        S32         begin = 0;
+        S32         end   = 0;
+    };
+    // The one whose string holds a column of a line, where there is one.
+    std::optional<Named> namedAt(std::string_view line, S32 column);
+    // Every place a script's text names a notecard of this name so, by
+    // line and the string's columns.
+    std::vector<ALScriptSpan> readersOf(std::string_view text, std::string_view name);
 }

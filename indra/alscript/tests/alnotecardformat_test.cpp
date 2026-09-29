@@ -112,4 +112,29 @@ namespace tut
         ensure_equals("not JSON at all: nothing", said(ALNotecardFormat::outline("just words: here")), std::string());
         ensure_equals("no more than asked", ALNotecardFormat::outline("{\"a\":1,\"b\":2,\"c\":3}", 2).size(), size_t(2));
     }
+
+    template<> template<>
+    void alnotecardformat_object::test<5>()
+    {
+        set_test_name("a notecard a script names where it reads one: the string first in llGetNotecardLine and its kin, LSL's or SLua's, in either quote");
+        const std::string lsl = "    key q = llGetNotecardLine(\"config\", line);";
+        std::optional<ALNotecardFormat::Named> named = ALNotecardFormat::namedAt(lsl, 34);
+        ensure("inside the string", named && named->name == "config" && named->begin == 30 && named->end == 38);
+        ensure("on its quote", ALNotecardFormat::namedAt(lsl, 30).has_value());
+        ensure("not on the call's name", !ALNotecardFormat::namedAt(lsl, 16));
+        ensure("SLua's, single quotes, blanks about the bracket", ALNotecardFormat::namedAt("ll.GetNumberOfNotecardLines ( 'dialog' )", 32)->name == "dialog");
+        ensure("an escape taken out", ALNotecardFormat::namedAt("llGetNotecardLineSync(\"say \\\"hi\\\"\", 0)", 25)->name == "say \"hi\"");
+        ensure("a string another call is given, not", !ALNotecardFormat::namedAt("llSay(0, \"config\");", 12));
+        ensure("the second argument, not", !ALNotecardFormat::namedAt("llGetNotecardLine(name, \"x\")", 25));
+
+        const std::string script = "default {\n"
+                                   "  state_entry() { llGetNotecardLine(\"config\", 0); llSay(0, \"config\"); }\n"
+                                   "  touch_start(integer n) { llGetNumberOfNotecardLines(\"config\"); llGetNotecardLine(\"other\", 0); }\n"
+                                   "}\n";
+        const std::vector<ALScriptSpan> read = ALNotecardFormat::readersOf(script, "config");
+        ensure_equals("two readers of it", read.size(), size_t(2));
+        ensure("the first", read[0].line == 1 && read[0].column == 36 && read[0].endColumn == 44);
+        ensure("the second", read[1].line == 2 && read[1].column == 54);
+        ensure("none of another", ALNotecardFormat::readersOf(script, "missing").empty());
+    }
 }

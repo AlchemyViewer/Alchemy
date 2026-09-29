@@ -55,6 +55,10 @@
     <floater.string name="NoOutlineNotecard">A notecard has an outline when it is read as JSON.</floater.string>
     <floater.string name="NoOutlineJson">Nothing in this notecard to outline yet.</floater.string>
     <floater.string name="NotecardItemsUnread">Scripts cannot read this notecard: it holds embedded items, so llGetNotecardLine returns EOF for every line.</floater.string>
+    <floater.string name="NotecardReadFromObject">A script reads a notecard from its own object: open this script from an object to go to [NAME].</floater.string>
+    <floater.string name="NotecardNotFoundHere">No notecard named [NAME] in this script's object.</floater.string>
+    <floater.string name="NotecardReadersNeedObject">Scripts read [NAME] only from an object it is in.</floater.string>
+    <floater.string name="NotecardReadByNone">No script in this object reads [NAME].</floater.string>
     <floater.string name="NotecardLineCut">Scripts read only the first [BYTES] bytes of this line, which is [SIZE] bytes.</floater.string>
     <floater.string name="NoExplorerSelection">Nothing selected. Select an object in the world to see its contents.</floater.string>
     <floater.string name="ExplorerNoMatch">No listed item has that text in its name.</floater.string>
